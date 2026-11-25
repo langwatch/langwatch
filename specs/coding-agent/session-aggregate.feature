@@ -53,6 +53,19 @@ Feature: Coding-agent sessions
     When a coding-agent trace arrives whose telemetry carries no session id
     Then it appears as a single-trace session of its own
 
+  Scenario: a launcher's declared session groups every harness session it runs
+    Given a launcher stamps langwatch.session.id on its agent's spans, logs or resource
+    When the agent runs several Claude Code sessions, each with its own session.id
+    Then their spans, logs and metrics all fold into the one declared session
+    And the declared session wins over the agent's own session key, codex's thread id included
+    And each trace's conversation is the declared session, so the replay walks every run
+    And a thread the launcher declared stays on its spans as langwatch.thread.id to filter by
+
+  Scenario: a session with no declared session is keyed by the agent's own session id
+    When a plain Claude Code session exports telemetry with no LangWatch attributes
+    Then its spans, logs and metrics fold into one session keyed by Claude Code's session.id
+    And each trace's conversation is that session id, even when a launcher declared a thread
+
   Scenario: a Cowork session is an agent session
     When Claude Cowork exports its session telemetry as events only, under one session id
     Then the session appears with its turns, tool activity, costs and token totals
@@ -121,6 +134,14 @@ Feature: Coding-agent sessions
     Given several of a session's contributions written together
     When the session is assembled from them
     Then they apply in the order the agent produced them
+
+  # Claude Code logs both ends of every hook run. Only the completion says what
+  # the hook did, so the start is dropped rather than paid for as a contribution.
+  Scenario: a hook's start is not contributed, its completion is
+    Given a Claude Code session whose hooks log their start and their completion
+    When those log records are lifted into contributions
+    Then no contribution is made for a hook's start, bare or namespaced
+    And the completion is contributed with its outcome
 
   Scenario: an agent that reports only logs keeps its model-call sequence
     Given an agent whose model calls are reported as logs rather than spans

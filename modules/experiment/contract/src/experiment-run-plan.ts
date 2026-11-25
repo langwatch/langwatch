@@ -99,6 +99,8 @@ export const experimentRunPinnedVersionsSchema: ExperimentRunPinnedVersionsSchem
 
 const experimentRunPlanSchemaDefinition = z.object({
   concurrency: z.number().int().positive(),
+  /** How many times every dataset row runs; run row `r * repeat + k` is dataset row `r`. */
+  repeat: z.number().int().min(2).optional(),
   origin: experimentRunOriginSchema,
   persistResults: z.boolean(),
   /** Who the run's board write is credited to: a person, a Langy session or a personless key. */
@@ -119,6 +121,11 @@ const experimentRunPlanSchemaDefinition = z.object({
       entry: z.record(z.string(), z.unknown()),
     }),
   ),
+  /**
+   * The board row each run row is written back to, by row id, when the run read a dataset version
+   * other than the board's rows; null for a row the board no longer has. Absent means the same row.
+   */
+  boardRowIndices: z.array(z.number().int().nonnegative().nullable()).optional(),
   /** Phase 1 in ordinal order, then phase 2. */
   cells: z.array(experimentRunPlanCellSchema),
   pinned: experimentRunPinnedVersionsSchema,

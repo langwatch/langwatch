@@ -16,6 +16,7 @@ const baseConfig: StoresConfig = {
   queueTenantCap: undefined,
   queueGlobalBudget: undefined,
   clickhouseStatementLaneReserveShare: undefined,
+  clickhousePasswordFile: undefined,
   clickhousePool: {
     override: undefined,
     replicas: undefined,
@@ -27,6 +28,7 @@ const baseConfig: StoresConfig = {
   redis: { dbIndex: undefined },
   objectStorage: {
     backend: "azure",
+    uploads: undefined,
     localRoot: undefined,
     s3: { bucket: undefined, endpoint: undefined, region: undefined },
     azure: {

@@ -24,7 +24,7 @@ vi.mock("@langwatch/observability", async (importOriginal) => ({
 // re-evaluate the chain against it, whatever ran earlier.
 vi.resetModules();
 
-const { identityStack, signUp } = await import("./support/storage-adapter-stack.ts");
+const { identityStack, signUp, withIssuer } = await import("./support/storage-adapter-stack.ts");
 
 const EMAIL = "member@acme.com";
 
@@ -74,7 +74,7 @@ describe("given a finalized user on the identity branch", () => {
       await context.internalAdapter.linkAccount({
         userId,
         providerId: "google",
-        issuer: "local:oauth:google",
+        ...withIssuer("local:oauth:google"),
         accountId: "sub-google-1",
       });
       const google = (await context.internalAdapter.findAccounts(userId)).find(

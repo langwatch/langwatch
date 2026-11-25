@@ -40,7 +40,7 @@ from openinference.instrumentation.haystack import HaystackInstrumentor
 langwatch.setup(instrumentors=[HaystackInstrumentor()])
 
 basic_agent = Agent(
-    chat_generator=OpenAIChatGenerator(model="gpt-5-mini"),
+    chat_generator=OpenAIChatGenerator(model="gpt-6-luna"),
     system_prompt="You are a helpful web agent.",
     tools=[],
 )
@@ -51,6 +51,12 @@ print(result["last_message"].text)
 ```
 
 The `HaystackInstrumentor` automatically captures Haystack pipeline operations, component executions, and model interactions. Use `@langwatch.trace()` to create a parent trace under which Haystack operations will be nested.
+
+## Check it worked
+
+Run the example. Then open your project in LangWatch: a new trace appears in the traces list within a few seconds. Open it to see the Haystack pipeline, its components and the model calls as spans.
+
+If no trace appears, check that `LANGWATCH_API_KEY` is set in the environment the script runs in.
 
 ## Related
 

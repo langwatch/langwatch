@@ -17,6 +17,7 @@ export {
   makeUsePreload,
   type DrawerPreloader,
 } from "./behavior/drawer-preloader.ts";
+export { useInPlaceDrawer, useInPlaceDrawerOpen } from "./behavior/in-place-drawer.ts";
 export {
   clearFlowCallbacks,
   getAllFlowCallbacks,

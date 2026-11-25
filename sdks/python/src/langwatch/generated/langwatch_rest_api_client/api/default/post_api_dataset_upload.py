@@ -59,8 +59,8 @@ def sync_detailed(
     client: AuthenticatedClient,
     body: PostApiDatasetUploadBody,
 ) -> Response[PostApiDatasetUploadResponse201]:
-    """Create a new dataset from an uploaded file (CSV, JSON, JSONL) upload the file as a stored object
-    with the purpose dataset_import, then create the dataset from it
+    """Create a new dataset from an uploaded file (CSV, JSON, JSONL). upload the file as a stored object
+    with the purpose dataset_import, then create the dataset from it.
 
     Args:
         body (PostApiDatasetUploadBody):
@@ -89,8 +89,8 @@ def sync(
     client: AuthenticatedClient,
     body: PostApiDatasetUploadBody,
 ) -> PostApiDatasetUploadResponse201 | None:
-    """Create a new dataset from an uploaded file (CSV, JSON, JSONL) upload the file as a stored object
-    with the purpose dataset_import, then create the dataset from it
+    """Create a new dataset from an uploaded file (CSV, JSON, JSONL). upload the file as a stored object
+    with the purpose dataset_import, then create the dataset from it.
 
     Args:
         body (PostApiDatasetUploadBody):
@@ -114,8 +114,8 @@ async def asyncio_detailed(
     client: AuthenticatedClient,
     body: PostApiDatasetUploadBody,
 ) -> Response[PostApiDatasetUploadResponse201]:
-    """Create a new dataset from an uploaded file (CSV, JSON, JSONL) upload the file as a stored object
-    with the purpose dataset_import, then create the dataset from it
+    """Create a new dataset from an uploaded file (CSV, JSON, JSONL). upload the file as a stored object
+    with the purpose dataset_import, then create the dataset from it.
 
     Args:
         body (PostApiDatasetUploadBody):
@@ -142,8 +142,8 @@ async def asyncio(
     client: AuthenticatedClient,
     body: PostApiDatasetUploadBody,
 ) -> PostApiDatasetUploadResponse201 | None:
-    """Create a new dataset from an uploaded file (CSV, JSON, JSONL) upload the file as a stored object
-    with the purpose dataset_import, then create the dataset from it
+    """Create a new dataset from an uploaded file (CSV, JSON, JSONL). upload the file as a stored object
+    with the purpose dataset_import, then create the dataset from it.
 
     Args:
         body (PostApiDatasetUploadBody):

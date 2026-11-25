@@ -37,7 +37,7 @@ def get_user_location() -> str:
     return "London, UK"
 
 
-model_id = "openai/gpt-5-mini"
+model_id = "openai/gpt-6-luna"
 
 
 class KiteAgent:
@@ -47,6 +47,13 @@ class KiteAgent:
                 "api_key": os.getenv("OPENAI_API_KEY"),
             },
             model_id=model_id,
+            # gpt-6-luna takes function tools on Chat Completions only with
+            # reasoning off; litellm forwards reasoning_effort for it only
+            # when allowed explicitly.
+            params={
+                "reasoning_effort": "none",
+                "allowed_openai_params": ["reasoning_effort"],
+            },
         )
         self.agent = Agent(
             # name="kite-agent", // Name parameter is not supported

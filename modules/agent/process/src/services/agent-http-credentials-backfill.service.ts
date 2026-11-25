@@ -1,8 +1,4 @@
-import {
-  httpAgentConfigSchema,
-  httpAgentConfigStoringSecrets,
-  type HttpAgentConfig,
-} from "@langwatch/agent-contract";
+import { httpAgentConfigSchema, type HttpAgentConfig } from "@langwatch/agent-contract";
 import { createLogger } from "@langwatch/observability";
 import { fromDate, type Instant } from "@langwatch/time";
 
@@ -12,6 +8,7 @@ import {
   moveFailureOf,
   type AgentCredentialOutcome,
 } from "../rules/agent-http-credentials-backfill.rules.ts";
+import { holdsLiteralCredential } from "../rules/agent-version-snapshot.rules.ts";
 import type { AgentHttpSecretsService } from "./agent-http-secrets.service.ts";
 
 const logger = createLogger("langwatch:agent:http-credentials-backfill");
@@ -120,7 +117,7 @@ export class AgentHttpCredentialsBackfillService {
           });
         continue;
       }
-      if (!(await holdsLiteral(agent.config))) continue;
+      if (!(await holdsLiteralCredential(agent.config))) continue;
       if (dryRun) {
         report.moved += 1;
         continue;
@@ -150,7 +147,7 @@ export class AgentHttpCredentialsBackfillService {
     const { agent, outcome } = input;
     try {
       const reread = await this.deps.agents.getByIdIncludingArchived(agent);
-      if (reread.type !== "http" || !(await holdsLiteral(reread.config))) {
+      if (reread.type !== "http" || !(await holdsLiteralCredential(reread.config))) {
         return { kind: "written" };
       }
     } catch (error) {
@@ -212,19 +209,4 @@ export class AgentHttpCredentialsBackfillService {
       return moveFailureOf(error);
     }
   }
-}
-
-/** Whether the config holds a credential that is not a `{{ secrets.NAME }}` reference. */
-async function holdsLiteral(config: HttpAgentConfig): Promise<boolean> {
-  let found = false;
-  await httpAgentConfigStoringSecrets({
-    config,
-    owner: "probe",
-    reference: async ({ value }) => {
-      found = true;
-      return value;
-    },
-  });
-
-  return found;
 }

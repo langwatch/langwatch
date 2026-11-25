@@ -7,7 +7,7 @@
 # HEAD_COMMIT was built on. Tags from other lines of history, including commits
 # reached only through a merge's second parent, are skipped, and push order
 # never decides: an older commit rebuilt later is still older code. Used by
-# publish-docker-ecr.yml for service images and by publish-lambda-tag.sh for
+# publish-docker-ecr.yml for service images and by tools/ecrtag (cmd/ecrtag) for
 # Lambda images.
 #
 # Env:

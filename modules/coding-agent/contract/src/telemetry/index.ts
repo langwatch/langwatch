@@ -2,7 +2,9 @@ import { codexAgent } from "./codex.ts";
 import { claudeCodeAgent, claudeCoworkAgent, copilotAgent } from "./coding-agent-definition.ts";
 import type { CodingAgentDefinition } from "./coding-agent-definition.ts";
 import { geminiCliAgent } from "./gemini-cli.ts";
+import { grokAgent } from "./grok.ts";
 import { opencodeAgent } from "./opencode.ts";
+import { piAgent } from "./pi.ts";
 
 export type {
   CodingAgent,
@@ -13,8 +15,17 @@ export type {
   GenAiOperationRole,
   TokenType,
 } from "./coding-agent-definition.ts";
-export { codingAgentSchema } from "./coding-agent-definition.ts";
+export {
+  codingAgentSchema,
+  type CodingTerminal,
+  codingTerminalSchema,
+} from "./coding-agent-definition.ts";
 export { isModelCallSpan, pickString } from "./coding-agent-span.ts";
+export {
+  type ToolDecisionOutcome,
+  toolDecisionByUser,
+  toolDecisionOutcome,
+} from "./tool-decision.ts";
 
 // Agent registry ordered first-match-wins; claude_cowork before claude_code
 // because only service identity distinguishes them.
@@ -25,6 +36,8 @@ export const CODING_AGENT_REGISTRY = [
   codexAgent,
   geminiCliAgent,
   copilotAgent,
+  grokAgent,
+  piAgent,
 ] as const satisfies readonly CodingAgentDefinition[];
 
 // Module-load failure on a duplicate id: `satisfies` checks each entry's
@@ -75,6 +88,22 @@ export const WRAPPER_TOOL_NAMES_BY_AGENT_ID: ReadonlyMap<string, ReadonlySet<str
 export const LOGS_REQUIRE_SESSION_KEY_AGENT_IDS: ReadonlySet<string> = new Set(
   CODING_AGENT_REGISTRY.filter((agent) => agent.logsRequireSessionKey === true).map(
     (agent) => agent.id,
+  ),
+);
+
+/** Agents whose log `input_tokens` include their cache reads (`logInputIncludesCacheRead`). */
+export const LOG_INPUT_INCLUDES_CACHE_READ_AGENT_IDS: ReadonlySet<string> = new Set(
+  CODING_AGENT_REGISTRY.filter((agent) => agent.logInputIncludesCacheRead === true).map(
+    (agent) => agent.id,
+  ),
+);
+
+/** Per agent, the log attribute holding cost in micro-dollars (`logCostUsdMicrosAttribute`). */
+export const LOG_COST_USD_MICROS_ATTRIBUTE_BY_AGENT_ID: ReadonlyMap<string, string> = new Map(
+  CODING_AGENT_REGISTRY.flatMap((agent) =>
+    agent.logCostUsdMicrosAttribute !== undefined
+      ? [[agent.id, agent.logCostUsdMicrosAttribute] as const]
+      : [],
   ),
 );
 

@@ -21,11 +21,20 @@ import (
 // Step is one entry in a job's `steps:` list. Only the fields the guards read
 // are modeled; everything else in a workflow is deliberately ignored.
 type Step struct {
+	ID   string            `yaml:"id"`
 	Name string            `yaml:"name"`
+	Run  string            `yaml:"run"`
 	If   string            `yaml:"if"`
 	Uses string            `yaml:"uses"`
 	With map[string]any    `yaml:"with"`
 	Env  map[string]string `yaml:"env"`
+
+	// ContinueOnError is a bool or an expression string; a guard that needs a
+	// step to fail the job treats anything but a literal false as set.
+	ContinueOnError any `yaml:"continue-on-error"`
+
+	// TimeoutMinutes is a number or an expression string; nil when unset.
+	TimeoutMinutes any `yaml:"timeout-minutes"`
 
 	// UsesComment is the trailing `# <version>` comment on the `uses:` line.
 	// yaml keeps it on the node but drops it from Uses, and the pin guard needs
@@ -121,12 +130,17 @@ func usesLineComment(mapping *yaml.Node) string {
 // literal text rather than evaluated — a guard's job is to notice a gate
 // clause disappearing, not to re-implement GitHub's expression language.
 // Permissions is the job's own `permissions:` block, which GitHub uses to
-// replace (not merge with) the workflow-level block when present.
+// replace (not merge with) the workflow-level block when present. Needs stays
+// a yaml.Node because GitHub accepts a scalar or a list.
 type Job struct {
-	Name        string      `yaml:"name"`
-	If          string      `yaml:"if"`
-	Permissions Permissions `yaml:"permissions"`
-	Steps       []Step      `yaml:"steps"`
+	Name  string    `yaml:"name"`
+	Needs yaml.Node `yaml:"needs"`
+	If    string    `yaml:"if"`
+	// TimeoutMinutes is a number or an expression string; nil when unset.
+	TimeoutMinutes any               `yaml:"timeout-minutes"`
+	Permissions    Permissions       `yaml:"permissions"`
+	Env            map[string]string `yaml:"env"`
+	Steps          []Step            `yaml:"steps"`
 }
 
 // PullRequest is the `on.pull_request` trigger and the event types that fire
@@ -312,9 +326,10 @@ type CheckoutStep struct {
 func (w *Workflow) CheckoutSteps() []CheckoutStep {
 	var found []CheckoutStep
 	for _, job := range w.JobNames() {
-		for _, step := range w.Jobs[job].Steps {
-			if strings.HasPrefix(step.Uses, "actions/checkout@") {
-				found = append(found, CheckoutStep{Workflow: w.Path, Job: job, Step: step})
+		steps := w.Jobs[job].Steps
+		for i := range steps {
+			if strings.HasPrefix(steps[i].Uses, "actions/checkout@") {
+				found = append(found, CheckoutStep{Workflow: w.Path, Job: job, Step: steps[i]})
 			}
 		}
 	}

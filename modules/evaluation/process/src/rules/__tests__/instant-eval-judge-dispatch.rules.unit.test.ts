@@ -1,5 +1,8 @@
 import { AVAILABLE_EVALUATORS } from "@langwatch/evaluator-contract";
-import { INSTANT_EVAL_JUDGE_MODEL_ID } from "@langwatch/instant-eval-judge-contract";
+import {
+  INSTANT_EVAL_JUDGE_EVALUATOR_TYPES,
+  INSTANT_EVAL_JUDGE_MODEL_ID,
+} from "@langwatch/instant-eval-judge-contract";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -7,19 +10,50 @@ import {
   instantEvalJudgeOf,
 } from "../instant-eval-judge-dispatch.rules.ts";
 
+const OWN_DECISION_MODEL = "openai/decisions:gpt-6-luna";
+
 describe("instantEvalJudgeOf", () => {
-  describe("given a boolean judge whose model is Instant Evals", () => {
+  describe("given a boolean judge whose model is LangWatch Instant (preview)", () => {
     it("answers the judge with its prompt", () => {
       expect(
         instantEvalJudgeOf({
           evaluatorType: "langevals/llm_boolean",
-          settings: { model: INSTANT_EVAL_JUDGE_MODEL_ID, prompt: "is it polite?" },
+          settings: { model: "langwatch/instant-preview", prompt: "is it polite?" },
         }),
       ).toEqual({
         kind: "instant_eval",
         judge: { evaluatorType: "langevals/llm_boolean", settings: { prompt: "is it polite?" } },
       });
     });
+  });
+
+  describe("given every evaluator the picker offers LangWatch's model to", () => {
+    /** @scenario "An evaluator Instant Evals does not answer is offered no decision model" */
+    it.each(INSTANT_EVAL_JUDGE_EVALUATOR_TYPES)("answers %s, and nothing else", (evaluatorType) => {
+      expect(
+        instantEvalJudgeOf({ evaluatorType, settings: { model: INSTANT_EVAL_JUDGE_MODEL_ID } }),
+      ).toMatchObject({ kind: "instant_eval" });
+      expect(
+        instantEvalJudgeOf({
+          evaluatorType: "langevals/off_topic",
+          settings: { model: INSTANT_EVAL_JUDGE_MODEL_ID },
+        }),
+      ).toEqual({ kind: "runs_as_today" });
+    });
+  });
+
+  describe("given a boolean judge whose model is LangWatch Evals (preview), or the id the picker writes", () => {
+    it.each(["langwatch/evals-preview", "langwatch/instant-evals"])(
+      "marks %s as one the judge router may answer",
+      (model) => {
+        expect(
+          instantEvalJudgeOf({
+            evaluatorType: "langevals/llm_boolean",
+            settings: { model, prompt: "is it polite?" },
+          }),
+        ).toMatchObject({ kind: "instant_eval", isRoutable: true });
+      },
+    );
   });
 
   describe("given a score judge with a range", () => {
@@ -31,6 +65,7 @@ describe("instantEvalJudgeOf", () => {
         }),
       ).toEqual({
         kind: "instant_eval",
+        isRoutable: true,
         judge: {
           evaluatorType: "langevals/llm_score",
           settings: { prompt: "rate it", min: 1, max: 5 },
@@ -53,6 +88,7 @@ describe("instantEvalJudgeOf", () => {
         }),
       ).toEqual({
         kind: "instant_eval",
+        isRoutable: true,
         judge: {
           evaluatorType: "langevals/llm_category",
           settings: { prompt: defaults.prompt?.default, categories: defaults.categories?.default },
@@ -87,6 +123,56 @@ describe("instantEvalJudgeOf", () => {
     it("answers nothing", () => {
       expect(
         instantEvalJudgeOf({ evaluatorType: "langevals/llm_boolean", settings: undefined }),
+      ).toEqual({ kind: "runs_as_today" });
+    });
+  });
+
+  describe("given a judge whose model is an own decision model", () => {
+    /** @scenario "A judge on an own decision model is answered by Instant Evals" */
+    it("answers the judge and carries the picked model", () => {
+      expect(
+        instantEvalJudgeOf({
+          evaluatorType: "langevals/llm_boolean",
+          settings: { model: OWN_DECISION_MODEL, prompt: "is it polite?" },
+        }),
+      ).toEqual({
+        kind: "instant_eval",
+        decisionModel: OWN_DECISION_MODEL,
+        judge: { evaluatorType: "langevals/llm_boolean", settings: { prompt: "is it polite?" } },
+      });
+    });
+
+    it("keeps a score judge's range, as for Instant Evals", () => {
+      expect(
+        instantEvalJudgeOf({
+          evaluatorType: "langevals/llm_score",
+          settings: { model: OWN_DECISION_MODEL, prompt: "rate it", min: 0, max: 10 },
+        }),
+      ).toEqual({
+        kind: "instant_eval",
+        decisionModel: OWN_DECISION_MODEL,
+        judge: {
+          evaluatorType: "langevals/llm_score",
+          settings: { prompt: "rate it", min: 0, max: 10 },
+        },
+      });
+    });
+  });
+
+  describe("given a judge whose model only looks like a decision model", () => {
+    /** @scenario "A judge on an id the decision model catalogue does not hold runs as it does today" */
+    it("answers nothing for an id the catalogue does not hold", () => {
+      expect(
+        instantEvalJudgeOf({
+          evaluatorType: "langevals/llm_boolean",
+          settings: { model: "openai/decisions:made-up", prompt: "is it polite?" },
+        }),
+      ).toEqual({ kind: "runs_as_today" });
+    });
+
+    it("answers nothing for a model that is not text", () => {
+      expect(
+        instantEvalJudgeOf({ evaluatorType: "langevals/llm_boolean", settings: { model: 7 } }),
       ).toEqual({ kind: "runs_as_today" });
     });
   });

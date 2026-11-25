@@ -7,12 +7,11 @@ import {
   LangWatchQLTableModifierError,
   type LangWatchQLTimeWindow,
 } from "@langwatch/analytics-contract";
-import { DEFAULT_TRACE_ORIGIN } from "@langwatch/trace-contract";
 
 import type { LangWatchQLViewDefinition } from "../services/langwatch-ql-catalog-shapes.service.ts";
 import { clickHouseSqlParser, type SqlAstNode } from "./langwatch-ql-parser.rules.ts";
 import { qualifyTableName } from "./langwatch-ql-policy.rules.ts";
-import { clickHouseLiteral } from "./langwatch-ql-sql-literal.rules.ts";
+import { assertSafeIdentifier, clickHouseLiteral } from "./langwatch-ql-sql-literal.rules.ts";
 import { METADATA_FIELDS } from "./langwatch-ql-validation-shape.rules.ts";
 
 /**
@@ -39,23 +38,13 @@ export function strictestLangWatchQLProtections(
   };
 }
 
-const ORIGIN_COLUMN = "Origin";
 const TRACE_ID_COLUMN = "TraceId";
-
-/**
- * The one-row-per-trace view that knows each trace's origin. A view that only names a trace is
- * scoped through it, because spans, evaluations and the rest carry no origin of their own.
- */
-const TRACE_ORIGIN_VIEW = "trace_metrics";
-
-/** An unstamped origin is the application's, exactly as `deriveTraceOrigin` reads it. */
-const traceOriginOf = (column: string) =>
-  `ifNull(nullIf(${column}, ''), ${clickHouseLiteral(DEFAULT_TRACE_ORIGIN)})`;
+const TENANT_COLUMN = "TenantId";
 
 /**
  * Earliest `OccurredAt` of a trace owning a row in `window`: one window back for a comparison
  * with the period before, plus the day of slack catalogue lookups give a trace observed after its
- * first span started. `OccurredAt` leads the sort key, so it prunes (analytics ADR-003).
+ * first span started. `OccurredAt` leads the sort key, so it prunes.
  */
 function traceLookupStart(window: LangWatchQLTimeWindow): string {
   const at = (instant: string) =>
@@ -153,8 +142,9 @@ function findViewReferences({
 }
 
 /**
- * Refuses `FINAL` or `SAMPLE` on a view about to be read as a subquery, which ClickHouse rejects
- * with a bare error. The parser gives neither a position, so neither can be moved inside.
+ * Refuses `FINAL` or `SAMPLE` on a subquery, on a view about to be read as one, or on the other
+ * given references. On a subquery neither modifier means anything; the parser gives neither a
+ * position, so neither can be moved inside one.
  * @throws {LangWatchQLTableModifierError} naming the modifiers written.
  */
 function assertNoTableModifiers({
@@ -164,14 +154,15 @@ function assertNoTableModifiers({
   statements: readonly SqlAstNode[];
   references: readonly ViewReference[];
 }): void {
-  const rewritten = new Set(references.map((reference) => reference.start));
+  const refused = new Set(references.map((reference) => reference.start));
   const modifiers = new Set<string>();
   for (const expression of collectNodes(statements, "TableExpression", [])) {
     const table = expression.database_and_table_name as
       | { location?: { start?: { offset?: unknown } } }
       | undefined;
     const start = table?.location?.start?.offset;
-    if (typeof start !== "number" || !rewritten.has(start)) continue;
+    const isRefused = typeof start === "number" && refused.has(start);
+    if (expression.subquery === undefined && !isRefused) continue;
     if (expression.final === true) modifiers.add("FINAL");
     if (expression.sample_size !== undefined) modifiers.add("SAMPLE");
   }
@@ -179,45 +170,53 @@ function assertNoTableModifiers({
 }
 
 /**
- * The predicate keeping each view's rows to the origins not left out, keyed like a reference.
- * A view with no `Origin` and no `TraceId`, such as a per-minute rollup, gets none.
+ * The references to a PostgreSQL-resident view. Its PostgreSQL engine table refuses `FINAL` with
+ * ILLEGAL_FINAL, and the view already keeps one row per key, so neither modifier buys anything.
  */
-function buildOriginPredicates({
+function postgresReferences({
+  references,
   views,
   database,
-  excludeOrigins,
-  timeWindow,
 }: {
+  references: readonly ViewReference[];
   views: readonly LangWatchQLViewDefinition[];
   database: string;
-  excludeOrigins: readonly string[];
-  timeWindow?: LangWatchQLTimeWindow;
-}): ReadonlyMap<string, string> {
-  const excluded = excludeOrigins.map(clickHouseLiteral).join(", ");
-  const traceOriginView = qualifyTableName({ table: TRACE_ORIGIN_VIEW, defaultDatabase: database });
-  const canReachTraceOrigin = views.some(
-    (view) => qualifyTableName({ table: view.name, defaultDatabase: database }) === traceOriginView,
+}): ViewReference[] {
+  const postgres = new Set(
+    views
+      .filter((view) => view.postgres !== undefined)
+      .map((view) => qualifyTableName({ table: view.name, defaultDatabase: database })),
   );
-  // `ifNull` because `NULL NOT IN (…)` is NULL, which would drop a row that belongs to no trace.
-  const byTrace =
-    `ifNull(${TRACE_ID_COLUMN}, '') NOT IN (SELECT ${TRACE_ID_COLUMN} ` +
-    `FROM ${database}.${TRACE_ORIGIN_VIEW} ` +
-    `WHERE ${traceOriginOf(ORIGIN_COLUMN)} IN (${excluded})` +
-    (timeWindow ? ` AND OccurredAt >= ${traceLookupStart(timeWindow)}` : "") +
-    ")";
-  const byOrigin = `${traceOriginOf(ORIGIN_COLUMN)} NOT IN (${excluded})`;
-
-  const predicates = new Map<string, string>();
-  for (const view of views) {
-    const columns = new Set(view.columns.map((column) => column.name));
-    const key = qualifyTableName({ table: view.name, defaultDatabase: database });
-    if (columns.has(ORIGIN_COLUMN)) predicates.set(key, byOrigin);
-    else if (columns.has(TRACE_ID_COLUMN) && canReachTraceOrigin) predicates.set(key, byTrace);
-  }
-  return predicates;
+  return references.filter((reference) => postgres.has(reference.qualified));
 }
 
-const TENANT_COLUMN = "TenantId";
+/**
+ * Refuses `FINAL` or `SAMPLE` on a subquery or a PostgreSQL-resident view in a statement read as
+ * written. A statement that does not parse is left for the validator to refuse, as before.
+ * @throws {LangWatchQLTableModifierError} naming the modifiers written.
+ */
+export function assertNoUnsupportedTableModifiers({
+  sql,
+  views,
+  database,
+}: {
+  sql: string;
+  views: readonly LangWatchQLViewDefinition[];
+  database: string;
+}): void {
+  if (!/\b(final|sample)\b/i.test(sql)) return;
+  const parsed = clickHouseSqlParser.parse(sql);
+  if (!parsed.ok) return;
+  const references = findViewReferences({
+    statements: parsed.statements,
+    database,
+    withNames: findWithNames(parsed.statements),
+  });
+  assertNoTableModifiers({
+    statements: parsed.statements,
+    references: postgresReferences({ references, views, database }),
+  });
+}
 
 /** The one-row-per-trace view a dated member's evaluations are timed through. */
 const TRACE_VIEW = "traces";
@@ -231,6 +230,8 @@ const EVALUATION_VIEWS: readonly string[] = [
   "evaluations",
   "evaluation_metrics",
   "evaluation_metrics_by_minute",
+  "trace_evaluation_metrics",
+  "trace_evaluation_checks",
 ];
 
 /** Admits no row: a view the windows cannot be applied to reads nothing on an aggregate. */
@@ -275,9 +276,48 @@ function buildWindowPredicates({
       ...datedPicks({ view, key, reach }),
     ];
     const tenanted = view.columns.some((column) => column.name === TENANT_COLUMN);
-    predicates.set(key, !tenanted || picks.length === 0 ? NO_ROWS : `(${picks.join(" OR ")})`);
+    predicates.set(
+      key,
+      !tenanted || picks.length === 0
+        ? NO_ROWS
+        : windowPredicate({ view, database, picks, memberWindows }),
+    );
   }
   return predicates;
+}
+
+/**
+ * One predicate for the members' picks. A fanned-out view keeps only the lowest project's copy
+ * (tasks#1212), which alone would drop a row a sibling's window admits, so the picks run on the
+ * per-project copies, under the same row policy, and admit the row's keys. Plain `IN` list leads.
+ */
+function windowPredicate({
+  view,
+  database,
+  picks,
+  memberWindows,
+}: {
+  view: LangWatchQLViewDefinition;
+  database: string;
+  picks: readonly string[];
+  memberWindows: readonly LangWatchQLMemberWindow[];
+}): string {
+  const either = `(${picks.join(" OR ")})`;
+  const keys = view.postgres?.entityKeyColumns ?? [];
+  if (keys.length === 0) return either;
+  // Checked as the view DDL checks them: a catalogue name never reaches SQL unchecked.
+  const keyList = keys.map((key) => `\`${identifier(key, "entity key")}\``).join(", ");
+  const table = `${identifier(database, "database")}.${identifier(view.sourceTable, "table")}`;
+  const members = memberWindows.map((window) => clickHouseLiteral(window.projectId)).join(", ");
+  return (
+    `(${keyList}) IN (SELECT ${keyList} FROM ${table} ` +
+    `WHERE ${TENANT_COLUMN} IN (${members}) AND ${either})`
+  );
+}
+
+/** `value` when it is a plain identifier; anything else is a catalogue bug, so it throws. */
+function identifier(value: string, role: string): string {
+  return assertSafeIdentifier({ value, role });
 }
 
 /** What a view's dated-member windows are built from, the same for every view. */
@@ -286,7 +326,7 @@ type WindowReach = {
   dated: readonly LangWatchQLMemberWindow[];
   canReachTraceView: boolean;
   evaluationViews: ReadonlySet<string>;
-  /** The statement's period, bounding the trace lookup as the origin lookup is bounded. */
+  /** The statement's period, bounding the trace lookup. */
   timeWindow: LangWatchQLTimeWindow | undefined;
 };
 
@@ -348,67 +388,74 @@ function datedPicks({
 }
 
 /**
- * `sql` with each catalogued view it reads replaced by that view minus the `excludeOrigins` traces
- * (ADR-061, analytics ADR-003). With `memberWindows`, each view is also kept to the members inside
- * their grants' windows, and a view outside `views` reads nothing (ADR-177 v4.14).
+ * `sql` with each catalogued view it reads kept to the members inside their grants' windows, and
+ * a view outside `views` reading nothing (ADR-177 v4.14). It adds no origin condition: a statement
+ * is kept to its sources only where its SQL reads the sources parameter (analytics ADR-003).
  */
 export function scopeLangWatchQL({
   sql,
-  excludeOrigins,
   database,
   views,
   timeWindow,
-  memberWindows,
+  memberWindows: requestedWindows,
+  projectIds,
 }: {
   sql: string;
-  excludeOrigins: readonly string[];
   /** Where unqualified view names resolve. */
   database: string;
   views: readonly LangWatchQLViewDefinition[];
   /** The period the statement is bound to; absent, the trace lookup reads all history. */
   timeWindow?: LangWatchQLTimeWindow;
-  /** The members an aggregate reads and where each window opens; absent on a plain project. */
+  /**
+   * The members an aggregate reads and where each window opens; absent on a plain project. A
+   * project without a window, so every project when the list is empty, admits no row.
+   */
   memberWindows?: readonly LangWatchQLMemberWindow[];
+  /**
+   * The projects the caller's key set reads; a window naming any other is dropped. Absent, no
+   * window is dropped and the windows are taken not to cover the projects: the read is rewritten.
+   */
+  projectIds?: readonly string[];
 }): string {
-  // Whole-history members need no rewrite: the row policy bounds them exactly.
-  const isWindowed = memberWindows?.some((window) => window.from > 0) === true;
-  if (excludeOrigins.length === 0 && !isWindowed) return sql;
+  // The service drops these too; dropping them here means no caller widens the key set.
+  const memberWindows =
+    requestedWindows && projectIds
+      ? windowsNaming({ memberWindows: requestedWindows, projectIds })
+      : requestedWindows;
+  // Whole-history members need no rewrite when each project has exactly its own window: the row
+  // policy bounds them exactly. A project without a window must read nothing, so it is rewritten.
+  const isWindowed =
+    memberWindows !== undefined &&
+    (memberWindows.some((window) => window.from > 0) ||
+      !windowsCoverProjects({ memberWindows, projectIds }));
+  if (!isWindowed) {
+    assertNoUnsupportedTableModifiers({ sql, views, database });
+    return sql;
+  }
 
   const parsed = clickHouseSqlParser.parse(sql);
   if (!parsed.ok) {
     throw new Error("LangWatchQL scope: an accepted statement no longer parses");
   }
 
-  const origins =
-    excludeOrigins.length === 0
-      ? new Map<string, string>()
-      : buildOriginPredicates({
-          views,
-          database,
-          excludeOrigins,
-          ...(timeWindow ? { timeWindow } : {}),
-        });
   const windows =
     isWindowed && memberWindows
       ? buildWindowPredicates({ views, database, memberWindows, timeWindow })
       : undefined;
   const withNames = findWithNames(parsed.statements);
   assertNoShadowedView({ withNames, views, windows });
-  const rewrites = findViewReferences({
-    statements: parsed.statements,
-    database,
-    withNames,
-  }).flatMap((reference) => {
+  const references = findViewReferences({ statements: parsed.statements, database, withNames });
+  const rewrites = references.flatMap((reference) => {
     const window =
       windows === undefined ? undefined : (windows.get(reference.qualified) ?? NO_ROWS);
-    const predicate = [origins.get(reference.qualified), window]
-      .filter((part) => part !== undefined)
-      .join(" AND ");
-    return predicate === "" ? [] : [{ reference, predicate }];
+    return window === undefined ? [] : [{ reference, predicate: window }];
   });
   assertNoTableModifiers({
     statements: parsed.statements,
-    references: rewrites.map(({ reference }) => reference),
+    references: [
+      ...rewrites.map(({ reference }) => reference),
+      ...postgresReferences({ references, views, database }),
+    ],
   });
   let scoped = sql;
   for (const { reference, predicate } of rewrites) {
@@ -419,6 +466,49 @@ export function scopeLangWatchQL({
       scoped.slice(reference.end);
   }
   return scoped;
+}
+
+/** Whether each project the caller reads has exactly one window, and each window one project. */
+function windowsCoverProjects({
+  memberWindows,
+  projectIds,
+}: {
+  memberWindows: readonly LangWatchQLMemberWindow[];
+  projectIds: readonly string[] | undefined;
+}): boolean {
+  if (projectIds === undefined) return false;
+  const windowed = new Set(memberWindows.map((window) => window.projectId));
+  return (
+    windowed.size === memberWindows.length &&
+    windowed.size === projectIds.length &&
+    projectIds.every((projectId) => windowed.has(projectId))
+  );
+}
+
+/**
+ * The member windows naming a project the caller reads. A window never widens the key set: one
+ * for any other project is dropped before a predicate is built from it (tasks#1212).
+ */
+export function readableMemberWindows({
+  projects,
+  memberWindows,
+}: {
+  projects: readonly LangWatchQLCaller[];
+  memberWindows: readonly LangWatchQLMemberWindow[];
+}): readonly LangWatchQLMemberWindow[] {
+  return windowsNaming({ memberWindows, projectIds: projects.map((project) => project.id) });
+}
+
+/** The windows naming one of `projectIds`. */
+function windowsNaming({
+  memberWindows,
+  projectIds,
+}: {
+  memberWindows: readonly LangWatchQLMemberWindow[];
+  projectIds: readonly string[];
+}): readonly LangWatchQLMemberWindow[] {
+  const readable = new Set(projectIds);
+  return memberWindows.filter((window) => readable.has(window.projectId));
 }
 
 /**

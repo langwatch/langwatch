@@ -1,7 +1,9 @@
 import type { Plan } from "@langwatch/entitlement-contract";
 import { ScenarioEventType } from "@langwatch/scenario-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
+import type { ScenarioRepository } from "../../repositories/scenario.repository.ts";
 import { ScenarioCreationCapService } from "../scenario-creation-cap.service.ts";
 
 /** The cloud Free caps (specs/licensing/cloud-free-creation-caps.feature). */
@@ -15,6 +17,7 @@ function plan(overrides: Partial<Plan> = {}): Plan {
     free: true,
     maxMembers: 2,
     maxMembersLite: 0,
+    maxMembersDeveloper: 0,
     maxMessagesPerMonth: 50_000,
     canPublish: true,
     prices: { USD: 0, EUR: 0 },
@@ -41,7 +44,9 @@ function capsWith({
       getOrganizationId: async () => "organization-1",
       listIdsByOrganization: async () => ["project-1", "project-2"],
     },
-    scenarios: { countActiveByProjects },
+    scenarios: createApiFixture<Pick<ScenarioRepository, "countActiveByProjects">>({
+      countActiveByProjects,
+    }),
     simulations: { getDistinctExternalSetIds },
   });
   return { service, countActiveByProjects, getDistinctExternalSetIds };

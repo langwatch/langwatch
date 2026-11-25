@@ -404,6 +404,7 @@ export const FACET_REGISTRY: readonly FacetDefinition[] = [
     group: "span",
     table: "stored_spans",
     expression: "SpanAttributes['langwatch.span.type']",
+    lightExpression: "SpanType",
   },
   EVENT_FACET,
   EVENT_ATTRIBUTE_KEYS_FACET,
@@ -416,4 +417,6 @@ export const FACET_REGISTRY: readonly FacetDefinition[] = [
 export const CLICKHOUSE_FACET_CATALOG: FacetCatalog = {
   registry: FACET_REGISTRY,
   timeColumns: TABLE_TIME_COLUMNS,
+  // A span facet read from stored_spans decompresses the whole SpanAttributes map for one key.
+  lightTwins: { stored_spans: { table: "span_analytics", timeColumn: "StartTime" } },
 };

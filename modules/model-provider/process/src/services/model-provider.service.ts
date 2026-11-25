@@ -40,6 +40,7 @@ import {
   type TranslateOutput,
   type ModelProviderCustomKeys,
   type ModelProviderUsageCount,
+  type BuiltInModel,
   type DecisionModelResolution,
 } from "@langwatch/model-provider-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
@@ -175,6 +176,7 @@ export class ModelProviderService {
       resolution: this.resolution,
       scopes,
       findProviderForProject: (input) => this.query.findProviderForProject(input),
+      findProviderForScope: (input) => this.query.findProviderForScope(input),
       isOwnModelAllowed: options.isOwnDecisionModelAllowed,
     });
     this.defaultWrites = ModelProviderDefaultsWriteService.create({
@@ -343,8 +345,22 @@ export class ModelProviderService {
     return this.resolution.resolve(input);
   }
 
-  resolveDecisionModel(input: { projectId: string }): Promise<DecisionModelResolution> {
+  resolveDecisionModel(input: {
+    projectId: string;
+    model?: string;
+  }): Promise<DecisionModelResolution> {
     return this.decisionModels.resolve(input);
+  }
+
+  listDecisionModelsForProject(input: { projectId: string }): Promise<readonly BuiltInModel[]> {
+    return this.decisionModels.listPickable(input);
+  }
+
+  listDecisionModelsForScopes(input: {
+    projectId: string;
+    scopes: readonly ModelDefaultScope[];
+  }): Promise<readonly BuiltInModel[]> {
+    return this.decisionModels.listPickableForScopes(input);
   }
 
   findAlternateModel(input: {

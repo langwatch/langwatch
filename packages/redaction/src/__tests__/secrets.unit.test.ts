@@ -457,7 +457,7 @@ describe("redactSecretsInText, given text that only looks like secrets", () => {
     ["a bedrock model id", "us.anthropic.claude-opus-4-20250514-v1:0"],
     [
       "an open-weight model id with size and quantisation tags",
-      "doubleword/nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-NVFP4",
+      "doubleword/nvidia/NVIDIA-Nemotron-3-Ultra-550B-A55B-NVFP4",
     ],
     [
       "an open-weight model id in a JSON payload",

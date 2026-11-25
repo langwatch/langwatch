@@ -115,6 +115,10 @@ export class TestModelProviderService implements ModelProviderApi {
     return this.priced(model);
   }
 
+  listForProjectWithServedModels(): Promise<[]> {
+    return Promise.resolve([]);
+  }
+
   listForProject(): Promise<[]> {
     return Promise.resolve([]);
   }
@@ -215,6 +219,14 @@ export class TestModelProviderService implements ModelProviderApi {
 
   resolveDecisionModel(): Promise<never> {
     throw new Error("Not used by Coding Agent tests.");
+  }
+
+  listDecisionModelsForProject(): Promise<[]> {
+    return Promise.resolve([]);
+  }
+
+  listDecisionModelsForScopes(): Promise<[]> {
+    return Promise.resolve([]);
   }
 
   findAlternateModel(): Promise<never> {

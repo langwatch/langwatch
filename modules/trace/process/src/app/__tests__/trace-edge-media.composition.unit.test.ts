@@ -23,6 +23,7 @@ import { TraceBlobStoreService } from "../../features/media/services/trace-blob-
 import { MemoryTraceSpanDedupRepository } from "../../repositories/memory/memory.trace-span-dedup.repository.ts";
 import { MemoryTraceRepositories } from "../../repositories/memory/memory.trace.repositories.ts";
 import { TraceModule } from "../trace.app.ts";
+import { braidTwins } from "./support/trace-app.harness.ts";
 
 const PNG_DATA_URI =
   "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=";
@@ -45,6 +46,7 @@ function compose({
     legacySpool: S3TraceLegacySpoolChannel.create({ resolveS3Client: refuse }),
   });
   const deps = TraceModule.composeDependencies({
+    ...braidTwins(),
     repositories: MemoryTraceRepositories.create(),
     storedObjects: createApiFixture<StoredObjectApi>({ storeFromBytes } as never),
     canonicalisation: TraceCanonicalisationService.create(),

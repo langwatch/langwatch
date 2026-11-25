@@ -2,6 +2,9 @@ import {
   LOG_FACTS_CONTRIBUTED_EVENT_TYPE,
   LOG_FACTS_CONTRIBUTED_EVENT_VERSION_LATEST,
   logFactsContributedEventSchema,
+  SPAN_FACTS_CONTRIBUTED_EVENT_TYPE,
+  SPAN_FACTS_CONTRIBUTED_EVENT_VERSION_LATEST,
+  spanFactsContributedEventSchema,
 } from "@langwatch/coding-agent-contract";
 import { createRecordingMeterProvider } from "@langwatch/observability/metrics/testing";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -66,5 +69,53 @@ describe("codingAgentCostDrift subscriber redelivery", () => {
         model: "claude",
       }),
     ).toBe(1);
+  });
+
+  describe("when a pi model-call span reports a cost the catalogue disagrees with", () => {
+    /** @scenario "The two figures disagreeing is readable, not reconciled away" */
+    it("records the computed and the reported figure each on its own counter", async () => {
+      const subscriber = createCodingAgentCostDriftSubscriber({
+        metrics: OtelCodingAgentCostMetricsService.create(),
+        modelProviders: new TestModelProviderService(() => 0.002),
+        traceCanonicalisation: ClaudeAnswersTraceCanonicalisation.create(),
+      });
+      const event = spanFactsContributedEventSchema.parse({
+        id: "pi-call-1",
+        aggregateId: "pi-session-1",
+        aggregateType: "coding_agent_session",
+        tenantId: "project-1",
+        createdAt: 1_000,
+        occurredAt: 1_000,
+        type: SPAN_FACTS_CONTRIBUTED_EVENT_TYPE,
+        version: SPAN_FACTS_CONTRIBUTED_EVENT_VERSION_LATEST,
+        data: {
+          tenantId: "project-1",
+          sessionId: "pi-session-1",
+          sessionKeySource: "provider",
+          agent: "pi",
+          occurredAt: 1_000,
+          traceId: "c0ffee00c0ffee00c0ffee00c0ffee00",
+          spanId: "span-1",
+          name: "pi.ai.request",
+          startTimeUnixMs: 1_000,
+          endTimeUnixMs: 2_500,
+          statusCode: 0,
+          scopeName: null,
+          facts: {
+            "pi.session.id": "pi-session-1",
+            "gen_ai.request.model": "claude-opus-4-7",
+            "gen_ai.usage.input_tokens": 120,
+            "gen_ai.usage.output_tokens": 30,
+            "pi.ai.usage.cost": 0.0875,
+          },
+        },
+      });
+
+      await subscriber.handle(event, { tenantId: "project-1", aggregateId: "pi-session-1" });
+
+      const labels = { agent: "pi", model: "claude-opus-4-7" };
+      expect(metricsHarness.valueOf("coding_agent_cost_computed_usd_total", labels)).toBe(0.002);
+      expect(metricsHarness.valueOf("coding_agent_cost_reported_usd_total", labels)).toBe(0.0875);
+    });
   });
 });

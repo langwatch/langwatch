@@ -1,4 +1,7 @@
 /** The credential-free targets the stores hand out, and when they answer "not configured". */
+import { createServer } from "node:http";
+import type { AddressInfo } from "node:net";
+
 import { describe, expect, it } from "vitest";
 
 import { buildClickHouseAdmin, buildDatabaseTarget } from "../store-targets.ts";
@@ -16,6 +19,34 @@ describe("given the stores' ClickHouse admin member", () => {
       });
       expect(JSON.stringify(built.value)).not.toContain("admin-secret");
       await built.close?.();
+    });
+  });
+
+  describe("when a read carries query parameters", () => {
+    /** ClickHouse logs each request's URL at trace level; a parameter there reaches its logs. */
+    it("sends them in the request body, never the URL", async () => {
+      const seen: { url: string; body: string }[] = [];
+      const server = createServer((request, response) => {
+        const chunks: Buffer[] = [];
+        request.on("data", (chunk: Buffer) => chunks.push(chunk));
+        request.on("end", () => {
+          seen.push({ url: request.url ?? "", body: Buffer.concat(chunks).toString() });
+          response.end("");
+        });
+      });
+      await new Promise<void>((listening) => server.listen(0, "127.0.0.1", listening));
+      const { port } = server.address() as AddressInfo;
+      const built = buildClickHouseAdmin({ url: `http://admin:admin@127.0.0.1:${port}/langwatch` });
+      if (!built.value.configured) throw new Error("the admin member was not configured");
+
+      await built.value.statements.rows("SELECT {password:String}", { password: "param-secret" });
+
+      expect(seen).toEqual([
+        { url: expect.not.stringContaining("param-secret"), body: expect.any(String) },
+      ]);
+      expect(seen[0]?.body).toContain("param-secret");
+      await built.close?.();
+      server.close();
     });
   });
 

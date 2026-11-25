@@ -33,6 +33,7 @@ import { TraceBlobStoreService } from "../../../features/media/services/trace-bl
 import { IO_PREVIEW_BYTES } from "../../../features/projection/rules/trace-projection-lean.rules.ts";
 import { EventingTraceEventPayloadRepository } from "../../../repositories/eventing/eventing.trace-event-payload.repository.ts";
 import { TraceEventPayloadFieldNotFoundError } from "../../../repositories/trace-payload-reader.repository.ts";
+import { offloadedFieldKey } from "../../../rules/trace-offload-recall.rules.ts";
 import {
   TraceOffloadResolutionService,
   type WarnLogger,
@@ -78,6 +79,33 @@ function blobStoreOver(
     legacySpool: S3TraceLegacySpoolChannel.create({ resolveS3Client }),
     payloads: EventingTraceEventPayloadRepository.create({ eventReadSeat: seat }),
   });
+}
+
+/**
+ * One offloaded field recalled through the store's real recall path: its value, or the error that
+ * kept its preview, thrown so a test can assert on either.
+ */
+async function recallField(
+  store: TraceBlobStoreService,
+  {
+    eventId,
+    field,
+    tenantId,
+    aggregateId,
+  }: {
+    eventId: string;
+    field: string;
+    tenantId: string;
+    aggregateId: string;
+  },
+): Promise<string> {
+  const reference = { traceId: aggregateId, eventId, field };
+  const outcomes = await store.recallFromEventLog({ tenantId, references: [reference] });
+  const outcome = outcomes.get(offloadedFieldKey(reference));
+  if (!outcome) throw new Error("recall answered no outcome for the reference");
+  if (!outcome.ok) throw outcome.error;
+
+  return outcome.value;
 }
 
 /** The payload exactly as the write path stores it, read back through JSON as the seat answers. */
@@ -134,12 +162,12 @@ describe("given a trace event stored under tenantA carrying an offloaded field",
       data: spanPayload([{ key: FIELD, value: { stringValue: FULL_VALUE } }]),
     });
 
-  describe("when getFromEventLog is called with tenantA's context", () => {
+  describe("when the offloaded field is recalled with tenantA's context", () => {
     /** @scenario Cross-tenant event_log read is structurally denied */
     it("asks the seat for tenantA's trace event and returns the full value", async () => {
       const recording = seat();
 
-      const value = await blobStoreOver(recording).getFromEventLog({
+      const value = await recallField(blobStoreOver(recording), {
         eventId: EVENT_ID,
         field: FIELD,
         tenantId: TENANT_A,
@@ -158,13 +186,40 @@ describe("given a trace event stored under tenantA carrying an offloaded field",
     });
   });
 
+  describe("when two fields of the same event are recalled together", () => {
+    it("asks the seat for the event once and answers both fields", async () => {
+      const recording = new RecordingSeat().store({
+        tenantId: TENANT_A,
+        eventId: EVENT_ID,
+        data: spanPayload([
+          { key: "langwatch.input", value: { stringValue: "full input" } },
+          { key: "langwatch.output", value: { stringValue: "full output" } },
+        ]),
+      });
+      const inputRef = { traceId: AGGREGATE_ID, eventId: EVENT_ID, field: "langwatch.input" };
+      const outputRef = { traceId: AGGREGATE_ID, eventId: EVENT_ID, field: "langwatch.output" };
+
+      const outcomes = await blobStoreOver(recording).recallFromEventLog({
+        tenantId: TENANT_A,
+        references: [inputRef, outputRef],
+      });
+
+      expect(recording.reads).toHaveLength(1);
+      expect(outcomes.get(offloadedFieldKey(inputRef))).toEqual({ ok: true, value: "full input" });
+      expect(outcomes.get(offloadedFieldKey(outputRef))).toEqual({
+        ok: true,
+        value: "full output",
+      });
+    });
+  });
+
   describe("when tenantB attempts to read it with the same EventId", () => {
     /** @scenario Cross-tenant event_log read is structurally denied */
     it("asks the seat under tenantB, which answers not found", async () => {
       const recording = seat();
 
       await expect(
-        blobStoreOver(recording).getFromEventLog({
+        recallField(blobStoreOver(recording), {
           eventId: EVENT_ID,
           field: FIELD,
           tenantId: TENANT_B,
@@ -178,7 +233,7 @@ describe("given a trace event stored under tenantA carrying an offloaded field",
   describe("when the requested field is not in the payload", () => {
     it("raises field-not-found", async () => {
       await expect(
-        blobStoreOver(seat()).getFromEventLog({
+        recallField(blobStoreOver(seat()), {
           eventId: EVENT_ID,
           field: "langwatch.input",
           tenantId: TENANT_A,
@@ -194,7 +249,7 @@ describe("given a trace event stored under tenantA carrying an offloaded field",
         throw new Error("no object storage configured");
       };
 
-      const value = await blobStoreOver(seat(), noStorage).getFromEventLog({
+      const value = await recallField(blobStoreOver(seat(), noStorage), {
         eventId: EVENT_ID,
         field: FIELD,
         tenantId: TENANT_A,
@@ -207,7 +262,7 @@ describe("given a trace event stored under tenantA carrying an offloaded field",
 });
 
 describe("given a blob store composed with no payload reader", () => {
-  it("refuses the read by name", async () => {
+  it("answers the refusal by name for every reference", async () => {
     const store = TraceBlobStoreService.create({
       legacySpool: S3TraceLegacySpoolChannel.create({
         resolveS3Client: makeS3Resolver({ send: vi.fn() }),
@@ -215,7 +270,7 @@ describe("given a blob store composed with no payload reader", () => {
     });
 
     await expect(
-      store.getFromEventLog({
+      recallField(store, {
         eventId: EVENT_ID,
         field: FIELD,
         tenantId: TENANT_A,
@@ -235,7 +290,7 @@ describe("given a log record event whose body was offloaded", () => {
     });
 
     await expect(
-      blobStoreOver(recording).getFromEventLog({
+      recallField(blobStoreOver(recording), {
         eventId: EVENT_ID,
         field: "body",
         tenantId: TENANT_A,
@@ -252,7 +307,7 @@ describe("given a log record event whose body was offloaded", () => {
     });
 
     await expect(
-      blobStoreOver(recording).getFromEventLog({
+      recallField(blobStoreOver(recording), {
         eventId: EVENT_ID,
         field: "body",
         tenantId: TENANT_A,
@@ -300,7 +355,7 @@ describe("given an S3 GetObject that returns a response with no Body", () => {
 
 /** CONTRACT REGRESSION (#4215): the read path finds the field where the write path stores it. */
 describe("given a SpanReceivedEvent written through eventToRecord (real write path)", () => {
-  describe("when getFromEventLog is called with matching ids and the oversize field name", () => {
+  describe("when the offloaded field is recalled with matching ids and the oversize field name", () => {
     it("returns the field value, proving the read path matches the write path", async () => {
       const event = spanReceivedEvent([{ key: FIELD, value: { stringValue: FULL_VALUE } }]);
       const recording = new RecordingSeat().store({
@@ -309,7 +364,7 @@ describe("given a SpanReceivedEvent written through eventToRecord (real write pa
         data: storedPayloadOf(event),
       });
 
-      const value = await blobStoreOver(recording).getFromEventLog({
+      const value = await recallField(blobStoreOver(recording), {
         eventId: event.id,
         field: FIELD,
         tenantId: TENANT_A,
@@ -331,7 +386,7 @@ describe("given a real OTLP payload whose span carries mixed-type siblings besid
     ["langwatch.input", BIG],
     ["langwatch.output", BIG_OUTPUT],
   ] as const) {
-    describe(`when getFromEventLog is called for ${field}`, () => {
+    describe(`when the offloaded field is recalled for ${field}`, () => {
       it("returns the FULL >64KB value despite non-string sibling attributes", async () => {
         const event = spanReceivedEvent([
           { key: "langwatch.input", value: { stringValue: BIG } },
@@ -344,7 +399,7 @@ describe("given a real OTLP payload whose span carries mixed-type siblings besid
           data: storedPayloadOf(event),
         });
 
-        const value = await blobStoreOver(recording).getFromEventLog({
+        const value = await recallField(blobStoreOver(recording), {
           eventId: event.id,
           field,
           tenantId: TENANT_A,

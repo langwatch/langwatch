@@ -19,7 +19,7 @@
     "lint": "node --disable-warning=ExperimentalWarning --experimental-transform-types src/cli.ts --root ../..",
     "review:test-quality": "node --disable-warning=ExperimentalWarning --experimental-transform-types src/cli.ts --root ../.. --review-test-quality",
     "typecheck": "GOMAXPROCS=2 GOMEMLIMIT=2GiB pnpm -w exec tsc -b packages/architecture-enforcer",
-    "test": "vitest run",
+    "test": "vitest run --fsModuleCache",
     "check:feature-parity": "node --experimental-transform-types src/tools/check-feature-parity.ts",
     "print:table-owners": "node --disable-warning=ExperimentalWarning --experimental-transform-types src/tools/print-table-owners.ts",
     "parity:candidates": "node --experimental-transform-types src/tools/parity-candidates.ts",

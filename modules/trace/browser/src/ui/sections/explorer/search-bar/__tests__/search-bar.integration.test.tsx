@@ -95,6 +95,7 @@ vi.mock("../use-instant-eval-route.ts", () => ({
 // Enter on a sentence calls `traces.routeSearch`; the hook's own routing is
 // covered by use-submit-search.integration, so the submit is stubbed here
 // rather than mounting a tRPC provider.
+vi.mock("../use-own-decision-models.ts", () => ({ useOwnDecisionModels: () => undefined }));
 vi.mock("../use-submit-search.ts", () => ({
   useSubmitSearch: () => ({ submitSearch: vi.fn(), isRouting: false }),
 }));
@@ -320,6 +321,29 @@ describe("<SearchBar /> ask affordance", () => {
         fireEvent.keyDown(screen.getByRole("textbox"), { key: "Escape" });
 
         expect(host.asked).toEqual([]);
+      });
+    });
+
+    describe("when Ask Langy is clicked with the panel closed and a trace drawer open", () => {
+      beforeEach(() => {
+        window.history.replaceState(
+          null,
+          "",
+          "/demo/traces?drawer.open=traceV2Details&drawer.traceId=t1",
+        );
+      });
+      afterEach(() => {
+        window.history.replaceState(null, "", "/");
+      });
+
+      /** @scenario "Opening Langy beside a wide trace drawer narrows the drawer" */
+      it("opens the panel, since a floating ask bar would sit under the drawer", () => {
+        renderSearchBar();
+
+        fireEvent.click(screen.getByRole("button", { name: "Ask Langy" }));
+
+        expect(host.asked).toHaveLength(1);
+        expect(document.querySelector("[data-placeholder]")).toBeInTheDocument();
       });
     });
 

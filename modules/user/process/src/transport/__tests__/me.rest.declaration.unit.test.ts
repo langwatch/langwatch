@@ -22,10 +22,16 @@ describe("the me REST family", () => {
       expect(declaration.credential).toBe("project");
     });
 
-    it("keeps every path, operation id and permission", () => {
-      expect(
-        declaration.routes.map((route) => [route.path, route.operation, route.permission]),
-      ).toEqual([["/project", "getApiMeProject", "project:view"]]);
+    it("keeps every path and operation id", () => {
+      expect(declaration.routes.map((route) => [route.path, route.operation])).toEqual([
+        ["/project", "getApiMeProject"],
+      ]);
+    });
+
+    it("asks no permission of /project, so any key bound to the project reads its identity", () => {
+      const [project] = declaration.routes;
+      expect(project?.permission).toBeUndefined();
+      expect(project?.access).toMatchObject({ kind: "authenticated" });
     });
   });
 });

@@ -60,9 +60,11 @@ export {
 
 // Platform experiment types (Experiments Workbench)
 export type {
+  ExperimentConcurrencyOptions,
   ExperimentRunSummary,
   RunExperimentOptions,
   ExperimentRunResult,
+  PrintSummaryOptions,
   RunWithResultsOptions,
   ExperimentRowResult,
   ExperimentRunWithResults,

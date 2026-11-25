@@ -6,6 +6,7 @@ import { memo, type ReactNode, useEffect, useLayoutEffect } from "react";
 
 import { useLangyStore } from "../../../../behavior/langy.store.ts";
 import { useLangyConversationDeepLink } from "../../../../behavior/use-langy-conversation-deep-link.ts";
+import { useLangyPromptLink } from "../../../../behavior/use-langy-prompt-link.ts";
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
 import {
   LANGY_DOCK_GAP,
@@ -33,6 +34,7 @@ export default function ProjectLangyLayout({ children }: { children?: ReactNode 
   });
   useLangyScopeReset();
   useLangyConversationDeepLink();
+  useLangyPromptLink();
   useLangyWebPush();
 
   return (
@@ -80,10 +82,11 @@ function LangyShiftedRoot({ showLangy, children }: { showLangy: boolean; childre
   // While a drawer is open the panel rides beside it as a floating companion
   // (see LangyPanel), so the dock's reservation releases and the page gets
   // its width back underneath the overlay pair.
-  const { currentDrawer } = useDrawer();
+  const { currentDrawer, inPlaceDrawerOpen } = useDrawer();
   // Only Sidebar mode reserves room (pushes content left). Floating mode
   // overlays the page — content stays full width and the card floats over it.
-  const shifted = showLangy && isOpen && panelMode === "sidebar" && !currentDrawer;
+  const shifted =
+    showLangy && isOpen && panelMode === "sidebar" && !currentDrawer && !inPlaceDrawerOpen;
   // Publish the reservation truth for a claiming shell (see the store): this
   // wrapper owns the visibility gate, the shell only consumes the result.
   useEffect(() => {

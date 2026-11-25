@@ -11,10 +11,37 @@ export const codingAgentSchema = z.enum([
   "codex",
   "gemini_cli",
   "copilot",
+  "grok",
+  "pi",
   "unknown",
 ]);
 
 export type CodingAgent = z.infer<typeof codingAgentSchema>;
+
+/**
+ * The terminals a session can name to peers. `terminal.type` is a client string, so a peer only
+ * ever sees one of these; `other` is an honest answer, and the set caps any list built from it.
+ */
+export const codingTerminalSchema = z.enum([
+  "vscode",
+  "cursor",
+  "windsurf",
+  "zed",
+  "jetbrains",
+  "iterm",
+  "apple_terminal",
+  "ghostty",
+  "kitty",
+  "alacritty",
+  "wezterm",
+  "warp",
+  "tmux",
+  "windows_terminal",
+  "xterm",
+  "other",
+]);
+
+export type CodingTerminal = z.infer<typeof codingTerminalSchema>;
 
 /**
  * The canonical event kinds. Every agent's event name maps onto one of these, or
@@ -163,6 +190,15 @@ export interface CodingAgentDefinition {
 
   /** Events-only telemetry: session fold gets model calls and tool runs from LOG events. */
   logsOnly?: boolean;
+
+  /**
+   * The log event's `input_tokens` already includes `cache_read_tokens`. The log-facts rule
+   * restates it as fresh input, since the fold sums the buckets as disjoint (Claude's shape).
+   */
+  logInputIncludesCacheRead?: boolean;
+
+  /** The log attribute carrying cost in micro-dollars; restated as `cost_usd` before the fold. */
+  logCostUsdMicrosAttribute?: string;
 
   /**
    * For agents naming spans `{gen_ai.operation.name} {target}`: the operation behind each session

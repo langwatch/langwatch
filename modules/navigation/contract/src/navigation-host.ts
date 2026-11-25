@@ -33,6 +33,8 @@ export type NavigationOrganization = {
   name: string;
   /** What the organization declared it is for (ADR-038 v6); null or absent when it has not. */
   primaryIntent?: string | null;
+  /** When the organization was made, as the wire carries it; absent until the graph says. */
+  createdAt?: string | null;
   teams: NavigationTeam[];
 };
 
@@ -101,6 +103,8 @@ export type NavigationOpsAccess = {
 /** Scope change through host; written to app shell's localStorage, not package's */
 export type NavigationScopeWrite = {
   organizationId?: string;
+  /** The remembered team, which belongs to one organization and nowhere else. */
+  teamId?: string;
   projectSlug?: string;
 };
 

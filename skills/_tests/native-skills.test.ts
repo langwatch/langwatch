@@ -4,7 +4,12 @@ import { fileURLToPath } from "url";
 
 import { describe, expect, it } from "vitest";
 
-import { listNativeSkills, listPublishedSkills, renderSkill } from "../_compiler/native.ts";
+import {
+  listNativeSkills,
+  listPublishedSkills,
+  renderSkill,
+  targetOutput,
+} from "../_compiler/native.ts";
 import { FEATURE_SKILLS, NATIVE_ONLY_SKILLS } from "../_lib/feature-skills.ts";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -26,6 +31,24 @@ function routingRows(): { skill: string; commands: string }[] {
       const skill = cells[2]?.match(/^`([a-z0-9-]+)`$/)?.[1];
       return skill ? [{ skill, commands: cells[3] ?? "" }] : [];
     });
+}
+
+// Phrases only the excluded login and key-setup partials carry ("log in" alone also
+// matches sample data such as "i cant log in", so it is not one of them).
+const SIGN_IN_COPY = [
+  "langwatch login",
+  "sign in",
+  "signs this machine in",
+  "where you are logging in",
+  "finishes in the browser",
+  "login --api-key",
+  "writes a project's key",
+  "ask for a new key",
+];
+
+function signInCopyIn(body: string): string[] {
+  const lower = body.toLowerCase();
+  return SIGN_IN_COPY.filter((phrase) => lower.includes(phrase));
 }
 
 function expectSameSkillFile({
@@ -166,6 +189,36 @@ describe("native skill generation", () => {
     });
   });
 
+  // skills/_compiled/cli/ is COMMITTED too: the CLI's `langwatch skills` bundle
+  // embeds it, so a stale copy ships stale instructions inside the binary.
+  describe("given the committed _compiled/cli output", () => {
+    const { skills: cliSkills, outDir: cliDir } = targetOutput("cli");
+
+    it("carries exactly the published skill set — no extras, none missing", () => {
+      const committed = fs
+        .readdirSync(cliDir, { withFileTypes: true })
+        .filter((e) => e.isDirectory())
+        .map((e) => e.name)
+        .toSorted();
+      expect(committed).toEqual(publishedSkills.map((s) => s.slug).toSorted());
+    });
+
+    it("matches the sources — regenerate with `bash skills/_compiled/generate.sh`", () => {
+      for (const skill of cliSkills) {
+        const committed = fs.readFileSync(path.join(cliDir, skill.slug, "SKILL.md"), "utf8");
+        expect(committed, `${skill.slug}: committed CLI output is stale`).toBe(
+          renderSkill(skill, "cli"),
+        );
+      }
+    });
+
+    it("keeps the sign-in steps Langy leaves out", () => {
+      const setup = cliSkills.find((skill) => skill.slug === "setup-lw");
+      expect(setup, "setup-lw is not in the CLI set").toBeDefined();
+      expect(renderSkill(setup!, "cli")).toContain("langwatch login");
+    });
+  });
+
   // A skill body reaches the customer as literal tool output, so anything
   // describing the machine WE run on is a leak (e.g. a worker-side host
   // where only the question's answer should appear). Naming a variable the
@@ -222,6 +275,18 @@ describe("native skill generation", () => {
     });
   });
 
+  // The login and key-setup partials are excluded from Langy's render because Langy
+  // already holds a key: their copy would have it tell a signed-in user to log in
+  // or set up a key.
+  describe("given a skill Langy ships", () => {
+    /** @scenario "No skill Langy ships tells the reader to sign in or set up a key" */
+    it("carries no sign-in or key setup copy", () => {
+      for (const skill of skills) {
+        expect(signInCopyIn(renderSkill(skill)), `${skill.slug}: carries sign-in copy`).toEqual([]);
+      }
+    });
+  });
+
   // The rule is prose, and prose gets reworded. This gate is what keeps a
   // rewording from dropping it out of the compiled copies Langy reads.
   // Backs specs/langy/langy-scenario-grounding.feature.
@@ -238,6 +303,53 @@ describe("native skill generation", () => {
           "verbatim into the situation",
         );
       }
+    });
+  });
+
+  // Backs specs/langy/langy-scenario-suite.feature.
+  describe("given the scenarios skill creates a platform scenario", () => {
+    /** @scenario "Creating a scenario with no suite named lists the suites first" */
+    it("lists the test suites and files or asks, and never lets the scenario land in Default", () => {
+      const body = renderSkill(skills.find((s) => s.slug === "scenarios")!);
+      const stepOne = body.slice(
+        body.indexOf("#### 1. Pick the test suite"),
+        body.indexOf("#### 2."),
+      );
+      const listAt = stepOne.indexOf("langwatch test-suite list --format json");
+      const createAt = stepOne.indexOf("langwatch scenario create");
+      expect(listAt, "step 1 lists the suites").toBeGreaterThan(-1);
+      expect(createAt, "step 1 creates after listing").toBeGreaterThan(listAt);
+      expect(stepOne.slice(createAt), "the create example files into a suite").toMatch(
+        /^langwatch scenario create[^`]*--test-suite /,
+      );
+      expect(stepOne, "asks when none fits").toContain("ask the user which test suite");
+      expect(stepOne, "no silent default").toContain(
+        "Never create a scenario with `--test-suite` left out",
+      );
+    });
+
+    /** @scenario "The guided-onboarding first scenario is the one Default exception both skills name" */
+    it("names the onboarding first scenario as the one Default exception in both skills", () => {
+      const scenarios = renderSkill(skills.find((s) => s.slug === "scenarios")!);
+      const onboarding = renderSkill(skills.find((s) => s.slug === "guided-onboarding")!);
+      expect(scenarios).toContain("The one exception is the guided-onboarding script");
+      expect(onboarding).toContain("Item 1 leaves `--test-suite` out on purpose");
+    });
+  });
+
+  // Backs specs/langy/langy-scenario-suite.feature.
+  describe("given the connect-agent skill runs its first test suite", () => {
+    /** @scenario "The connect-agent first run picks a test suite the same way" */
+    it("lists the test suites before the first create, asks when none fits, and invents no suite", () => {
+      const body = renderSkill(skills.find((s) => s.slug === "connect-agent")!);
+      const stepFive = body.slice(body.indexOf("## Step 5"), body.indexOf("## Step 6"));
+      const listAt = stepFive.indexOf("langwatch test-suite list");
+      const createAt = stepFive.indexOf("langwatch scenario create");
+      expect(listAt, "step 5 lists the suites").toBeGreaterThan(-1);
+      expect(createAt, "step 5 creates after listing").toBeGreaterThan(listAt);
+      expect(stepFive, "asks when none fits").toContain("ask the user which test suite");
+      expect(stepFive, "no invented suite name").not.toMatch(/test-suite create '[^<]/);
+      expect(stepFive, "no invented suite name").not.toContain("Smoke");
     });
   });
 

@@ -42,6 +42,7 @@ export function memoryObjectStorage(): ObjectStorage {
         yield* chunks;
       })();
     },
+    exists: (at) => Promise.resolve(held.has(slot(at))),
     digest: (at) => Promise.resolve(find(at).digest),
     remove(at) {
       held.delete(slot(at));
@@ -50,6 +51,10 @@ export function memoryObjectStorage(): ObjectStorage {
     signUpload(at) {
       slot(at);
       return Promise.resolve({ kind: "through-process" });
+    },
+    uploadRoute(projectId) {
+      slot({ projectId, key: "" });
+      return Promise.resolve("through-process");
     },
     signDownload(at, facts) {
       slot(at);

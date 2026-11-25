@@ -8,6 +8,7 @@ import { nowInstant } from "@langwatch/time";
 
 import type { PostHogEventInput } from "../channels/posthog.channel.ts";
 import { unixSecondsOf } from "./nurturing-customer-io-timestamp.rules.ts";
+import { type KnownTraces, knownTraceTraits } from "./nurturing-member-facts.rules.ts";
 
 type SignUpData = NurturingSignalOf<"signed_up">["signUpData"];
 
@@ -41,6 +42,7 @@ export function fireSignup({
   organizationName,
   signUpData,
   primaryIntent,
+  traces,
 }: {
   userId: string;
   email?: string | null;
@@ -50,12 +52,15 @@ export function fireSignup({
   signUpData?: SignUpData;
   /** ADR-038 org intent — explicit trait; deliberately NOT part of signupData. */
   primaryIntent?: string | null;
+  /** A person already in an organization with traces keeps has_traces true. Null: read failed. */
+  traces: KnownTraces | null;
 }): CioBatchCall[] {
   const traits: Partial<CioPersonTraits> = {
     ...pickDefined({
       email,
       name,
       role: signUpData?.yourRole,
+      seat: "admin",
       company_size: signUpData?.companySize,
       signup_usage: signUpData?.usage,
       signup_solution: signUpData?.solution,
@@ -70,7 +75,7 @@ export function fireSignup({
       referrer: signUpData?.referrer,
       primary_intent: primaryIntent?.toLowerCase(),
     }),
-    has_traces: false,
+    ...knownTraceTraits(traces),
     has_evaluations: false,
     has_prompts: false,
     has_simulations: false,
@@ -88,6 +93,7 @@ export function fireSignup({
         name: organizationName,
         ...pickDefined({ company_size: signUpData?.companySize }),
         plan: "free",
+        relationshipAttributes: { seat: "admin" },
       },
     },
     {

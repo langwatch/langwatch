@@ -42,6 +42,7 @@ import type {
 } from "../subscribers/subscriber.types.ts";
 import { toError } from "../utils/errors.ts";
 import { EventUtils } from "../utils/event.utils.ts";
+import { appliedTokenOf } from "./appliedToken.ts";
 import { MAX_APPLIED_EVENT_IDS } from "./foldCache/foldCacheEntry.ts";
 import type { FoldProjectionDefinition, FoldStateRead } from "./foldProjection.types.ts";
 import { FoldProjectionExecutor } from "./foldProjectionExecutor.ts";
@@ -50,6 +51,7 @@ import { MapProjectionExecutor } from "./mapProjectionExecutor.ts";
 import type { ProjectionStoreContext } from "./projectionStoreContext.ts";
 import type { ReplayMarkerChecker } from "./replayMarkerCheck.ts";
 import {
+  type FoldProjectionView,
   type SealedFoldProjection,
   type OpenMapProjection,
   type SealedMapProjection,
@@ -950,6 +952,7 @@ export class ProjectionRouter<
     const entry = this.foldProjections.get(lane);
     if (!entry) throw laneNotRegistered({ kind: "fold", lane });
     if (entry.definition.options?.disabled) return;
+    if (!this.foldEnqueueAccepts({ fold: entry.definition, name: lane, event })) return;
     if (this.queueManager.hasProjectionQueues()) {
       const queue = this.queueManager.getProjectionQueue(lane);
       if (!queue) throw foldQueueNotReady(lane);
@@ -1071,11 +1074,18 @@ export class ProjectionRouter<
       aggregateId: String(missed.aggregateId),
       occurredAtMs: missed.occurredAt,
     });
-    if (!history.some((event) => event.id === missed.id)) {
+    // A history read keeps the first row per idempotency key. A re-send under a held key is in
+    // the log, but the read returns an earlier copy until a merge in the same weekly partition
+    // keeps the newer row, and across partitions it never does. Waiting for the re-send's own id
+    // could then never end, so a held key counts as the log holding it, and the missed event is
+    // folded in at its own position: the rebuild writes what the live lane would have.
+    const held = history.some((event) => event.id === missed.id);
+    const missedToken = appliedTokenOf(missed);
+    if (!held && !history.some((event) => appliedTokenOf(event) === missedToken)) {
       throw new Error(`The log does not yet hold missed event ${missed.id}; retrying the rebuild`);
     }
     let latest: StoredProjection<State> | null = null;
-    for (const event of orderEvents(history)) {
+    for (const event of orderEvents(held ? history : [...history, missed])) {
       latest = applyStateEvent({ projection, latest, event });
     }
     if (!latest) return;
@@ -1137,7 +1147,9 @@ export class ProjectionRouter<
   ): Promise<FailedHandoff<EventType>[]> {
     const failures: FailedHandoff<EventType>[] = [];
     for (const [projectionName, { definition: fold }] of this.foldProjections) {
-      const filtered = foldEventsFor(fold, events);
+      const filtered = foldEventsFor(fold, events).filter((event) =>
+        this.foldEnqueueAccepts({ fold, name: projectionName, event }),
+      );
       if (filtered.length === 0) continue;
 
       const queueProcessor = this.queueManager.getProjectionQueue(projectionName);
@@ -1173,6 +1185,7 @@ export class ProjectionRouter<
     for (const event of events) {
       for (const [projectionName, { definition: fold, open: openFold }] of this.foldProjections) {
         if (fold.eventTypes.length > 0 && !fold.eventTypes.includes(event.type)) continue;
+        if (!this.foldEnqueueAccepts({ fold, name: projectionName, event })) continue;
         try {
           await openFold((definition) =>
             this.processFoldProjectionEvent({ projectionName, fold: definition, event, context }),
@@ -1454,6 +1467,38 @@ export class ProjectionRouter<
         },
       });
       return [{ kind: "map", lane: name, events: [event], error: toError(error) }];
+    }
+  }
+
+  /**
+   * The fold's enqueue-time gate, the map's twin: fail-OPEN on a throw, since
+   * admitting costs one job whose apply() ignores the event, declining could drop a count.
+   */
+  private foldEnqueueAccepts({
+    fold,
+    name,
+    event,
+  }: {
+    fold: FoldProjectionView<EventType>;
+    name: string;
+    event: EventType;
+  }): boolean {
+    const filter = fold.options?.enqueue?.filter;
+    if (!filter) return true;
+    try {
+      return filter(event);
+    } catch (error) {
+      this.logger.warn(
+        {
+          projectionName: name,
+          eventId: event.id,
+          eventType: event.type,
+          tenantId: String(event.tenantId),
+          error: error instanceof Error ? error.message : String(error),
+        },
+        "Fold projection enqueue filter threw; admitting the event so no count is lost",
+      );
+      return true;
     }
   }
 

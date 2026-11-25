@@ -67,3 +67,31 @@ export const Alignments: Story = {
 export const NarrowWidth: Story = {
   args: { width: "36px" },
 };
+
+/** Two parts of one whole, e.g. traces that get every span and those that get some. */
+export const TwoSegments: Story = {
+  render: () => (
+    <MeterBar
+      width="240px"
+      height="8px"
+      segments={[
+        { ratio: 0.45, color: "blue.solid" },
+        { ratio: 0.2, color: "blue.muted" },
+      ]}
+    />
+  ),
+};
+
+/** Parts that add up past the track clamp to a full track. */
+export const TwoSegmentsOverFull: Story = {
+  render: () => (
+    <MeterBar
+      width="240px"
+      height="8px"
+      segments={[
+        { ratio: 0.8, color: "blue.solid" },
+        { ratio: 0.6, color: "blue.muted" },
+      ]}
+    />
+  ),
+};

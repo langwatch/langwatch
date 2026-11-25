@@ -12,14 +12,20 @@ const widget = ({
   id,
   gridRow = 0,
   code = "export default function Widget() { return null; }",
+  sources,
 }: {
   id: string;
   gridRow?: number;
   code?: string;
+  sources?: ("application" | "langy")[];
 }): BoardWidget => ({
   id,
   name: `Widget ${id}`,
-  definition: { version: 1, code, queries: [{ name: "main", sql: "SELECT 1" }] },
+  definition: {
+    version: 1,
+    code,
+    queries: [{ name: "main", sql: "SELECT 1", ...(sources ? { sources } : {}) }],
+  },
   placement: { graphId: id, gridColumn: 0, gridRow, colSpan: 4, rowSpan: 3 },
 });
 
@@ -62,6 +68,21 @@ describe("boardRestorePlan", () => {
       expect(plan.layouts).toEqual([BEFORE[1]!.placement]);
       expect(plan.remove).toEqual([]);
       expect(plan.recreate).toEqual([]);
+    });
+  });
+
+  describe("given only a widget query's sources changed since", () => {
+    /** @scenario "AC200k Sources: Undo puts a query's sources back, including back to none" */
+    it("reverts it, whether it was set, changed or not stored before", () => {
+      const plan = (before: BoardWidget, now: BoardWidget) =>
+        boardRestorePlan({ before: [before], now: [now] }).revert;
+      const none = widget({ id: "a" });
+      const included = widget({ id: "a", sources: ["application", "langy"] });
+
+      expect(plan(none, included)).toEqual([none]);
+      expect(plan(included, none)).toEqual([included]);
+      expect(plan(included, widget({ id: "a", sources: ["langy"] }))).toEqual([included]);
+      expect(plan(included, included)).toEqual([]);
     });
   });
 });

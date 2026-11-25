@@ -27,14 +27,22 @@ function artworkOf(provider: ProviderKey): string {
 describe("provider icons", () => {
   describe("given LangWatch's hosted decision model id", () => {
     it("names LangWatch as the provider", () => {
-      expect(inferProvider("langwatch/instant-evals")).toBe("langwatch");
+      expect(inferProvider("langwatch/instant-preview")).toBe("langwatch");
     });
   });
 
   describe("given the decision model providers", () => {
     /** @scenario Each decision model provider draws its own brand mark */
     it("draws the LangWatch logo and a mark of each one's own rather than the Custom glyph", () => {
-      const providers = ["inception", "perplexity", "cloudflare", "langwatch"] as const;
+      const providers = [
+        "inception",
+        "perplexity",
+        "cloudflare",
+        "typesafe",
+        "openrouter",
+        "fireworks",
+        "langwatch",
+      ] as const;
       const drawings = [...providers, "custom" as const].map(artworkOf);
 
       expect(artworkOf("langwatch")).toBe([LOGO_PLATE_PATH, LOGO_LINES_PATH].join("|"));

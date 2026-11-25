@@ -8,7 +8,7 @@ import {
   LWQL_GRANULARITY_MAX_BUCKETS,
   type LangWatchQLAcceptedGranularityStep,
 } from "@langwatch/analytics-contract";
-import { LANGY_TRACE_ORIGIN } from "@langwatch/trace-contract";
+import { Temporal } from "@langwatch/time";
 
 /** "live" is the last hour, rolling, refreshed every minute (dashboards-v2 AC19c). */
 export const BOARD_PERIOD_RANGES = ["live", "1h", "24h", "7d", "30d", "90d", "1y"] as const;
@@ -22,26 +22,6 @@ export interface BoardPeriod {
   readonly periodStart: number;
   readonly periodEnd: number;
   readonly granularitySeconds: LangWatchQLAcceptedGranularityStep;
-}
-
-/**
- * What every query on a board is run with: its period, and the trace origins it leaves out.
- * A list rather than a switch, so a board parameter can set it later without a new shape.
- */
-export interface BoardQueryContext extends BoardPeriod {
-  readonly excludeOrigins: readonly string[];
-}
-
-/**
- * The origins a board leaves out by default: Langy's turns, since a board shows the member's
- * agent (ADR-061); none in a personal project, where Langy's conversations are the data.
- */
-export function defaultBoardExcludedOrigins({
-  isPersonalProject,
-}: {
-  isPersonalProject: boolean;
-}): readonly string[] {
-  return isPersonalProject ? [] : [LANGY_TRACE_ORIGIN];
 }
 
 export const DEFAULT_BOARD_PERIOD_RANGE: BoardPeriodRange = "30d";
@@ -72,6 +52,27 @@ function autoGrain({ spanMs }: { spanMs: number }): Exclude<BoardPeriodGrain, "a
   if (spanMs <= RANGE_MS["24h"]) return "1h";
   if (spanMs <= RANGE_MS["30d"]) return "1d";
   return "1w";
+}
+
+const MINUTE_MS = 60_000;
+
+/**
+ * Where a board's window ends, on the next whole minute so a render does not refetch: Live
+ * rolls with the clock; a fixed range ends at the last refresh, or when it was picked (AC19d).
+ */
+export function boardWindowEnd({
+  range,
+  now,
+  pickedAt,
+  refreshedAt,
+}: {
+  range: BoardPeriodRange;
+  now: number;
+  pickedAt: number;
+  refreshedAt?: number;
+}): number {
+  const end = range === "live" ? now : Math.max(pickedAt, refreshedAt ?? 0);
+  return Math.ceil(end / MINUTE_MS) * MINUTE_MS;
 }
 
 /** `[periodStart, periodEnd]` in epoch milliseconds for a range ending at `now`. */
@@ -148,4 +149,58 @@ export function parseBoardPeriodGrain(value: string | undefined): BoardPeriodGra
   return (BOARD_PERIOD_GRAINS as readonly string[]).includes(value ?? "")
     ? (value as BoardPeriodGrain)
     : DEFAULT_BOARD_PERIOD_GRAIN;
+}
+
+/** Each range as a person says it; Live is the last hour, as its window is. */
+const RANGE_WORDS: Readonly<Record<Exclude<BoardPeriodRange, "live">, string>> = {
+  "1h": "the last hour",
+  "24h": "the last 24 hours",
+  "7d": "the last 7 days",
+  "30d": "the last 30 days",
+  "90d": "the last 90 days",
+  "1y": "the last year",
+};
+
+const dayInWords = (epochMs: number) =>
+  Temporal.Instant.fromEpochMilliseconds(epochMs)
+    .toZonedDateTimeISO("UTC")
+    .toPlainDate()
+    .toLocaleString("en-GB", { day: "numeric", month: "long", year: "numeric" });
+
+/** The board's period as the header reads it ("the last 30 days"), else its first and last day. */
+export function boardPeriodInWords({ periodStart, periodEnd }: BoardPeriod): string {
+  const span = periodEnd - periodStart;
+  const range = (Object.keys(RANGE_WORDS) as (keyof typeof RANGE_WORDS)[]).find(
+    (each) => RANGE_MS[each] === span,
+  );
+  if (range) return RANGE_WORDS[range];
+  return `${dayInWords(periodStart)} to ${dayInWords(periodEnd)}`;
+}
+
+function instantOf(at: string) {
+  try {
+    return Temporal.Instant.from(at);
+  } catch {
+    return void 0;
+  }
+}
+
+/**
+ * A clicked bucket in words: its day, the hour too on an hourly board, or the week it starts.
+ * Undefined when `at` is no instant.
+ */
+export function bucketInWords({
+  at,
+  granularitySeconds,
+}: {
+  at: string;
+  granularitySeconds: number;
+}): string | undefined {
+  const instant = instantOf(at);
+  if (!instant) return void 0;
+  const day = dayInWords(instant.epochMilliseconds);
+  if (granularitySeconds >= 604_800) return `the week of ${day}`;
+  if (granularitySeconds >= 86_400) return day;
+  const time = instant.toZonedDateTimeISO("UTC").toPlainTime().toString().slice(0, 5);
+  return `${day} at ${time} UTC`;
 }

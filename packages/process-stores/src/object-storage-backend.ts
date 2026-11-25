@@ -3,19 +3,27 @@
  * streaming measure each write and digest runs its bytes through (ADR-158).
  */
 import { createHash } from "node:crypto";
+import { Readable } from "node:stream";
 
-import { HandledError } from "@langwatch/handled-error";
+import { HandledError, remediation } from "@langwatch/handled-error";
 import type { Instant } from "@langwatch/time";
 
+import type { ObjectStorageUploads } from "./config.ts";
 import type {
   DownloadFacts,
   ObjectBodyFacts,
   ObjectDigest,
   ObjectStorageDestination,
+  ObjectUploadRoute,
   SignedObjectUpload,
   StoredObjectAddress,
   UploadFacts,
 } from "./members.ts";
+
+/** An account's upload setting as the route its clients take; absent uploads direct. */
+export function uploadRouteOf(uploads: ObjectStorageUploads | undefined): ObjectUploadRoute {
+  return uploads === "through-langwatch" ? "through-process" : "direct";
+}
 
 /** One backend, already placed: the member routes a project to it, then calls it by key. */
 export interface ObjectBackend {
@@ -26,9 +34,11 @@ export interface ObjectBackend {
     facts: ObjectBodyFacts,
   ): Promise<ObjectDigest>;
   read(at: StoredObjectAddress): Promise<AsyncIterable<Uint8Array>>;
+  exists(at: StoredObjectAddress): Promise<boolean>;
   digest(at: StoredObjectAddress): Promise<ObjectDigest>;
   remove(at: StoredObjectAddress): Promise<void>;
   signUpload(at: StoredObjectAddress, facts: UploadFacts): Promise<SignedObjectUpload>;
+  readonly uploadRoute: ObjectUploadRoute;
   signDownload(at: StoredObjectAddress, facts: DownloadFacts): Promise<string>;
   probe(): Promise<void>;
 }
@@ -43,6 +53,36 @@ export class StorageNotWritableError extends HandledError {
       fault: "platform",
     });
     this.name = "StorageNotWritableError";
+  }
+}
+
+/** Storage turned away the credentials this deployment signs with: a wrong key or identity. */
+export class StorageCredentialsRefusedError extends HandledError {
+  declare readonly code: "storage_credentials_refused";
+
+  constructor({ operation, status }: { operation: string; status: string }) {
+    super(
+      "storage_credentials_refused",
+      `Storage refused this deployment's credentials (${operation}: ${status}); ` +
+        "check the account name and key, or the identity",
+      { httpStatus: 500, fault: "platform", ...remediation("storage_credentials_refused") },
+    );
+    this.name = "StorageCredentialsRefusedError";
+  }
+}
+
+/** Storage accepted the identity but it holds no data access to the account or container. */
+export class StoragePermissionDeniedError extends HandledError {
+  declare readonly code: "storage_permission_denied";
+
+  constructor({ operation, status }: { operation: string; status: string }) {
+    super(
+      "storage_permission_denied",
+      `Storage denied the identity data access (${operation}: ${status}); ` +
+        "grant it a data role on the account or container",
+      { httpStatus: 500, fault: "platform", ...remediation("storage_permission_denied") },
+    );
+    this.name = "StoragePermissionDeniedError";
   }
 }
 
@@ -173,6 +213,30 @@ export function measureBody(options: {
       return { byteLength: received, sha256 };
     },
   };
+}
+
+/**
+ * A body whose iterator frees its socket or file on `return()` even before the first read:
+ * Node's own iterator ignores that call until started, which held S3 sockets (tasks#1173).
+ */
+export function releasingBody(body: AsyncIterable<Uint8Array>): AsyncIterable<Uint8Array> {
+  if (!(body instanceof Readable)) return body;
+  const iterate = body[Symbol.asyncIterator].bind(body);
+  body[Symbol.asyncIterator] = () => {
+    const inner = iterate();
+    const finish = inner.return?.bind(inner);
+    inner.return = async () => {
+      body.destroy();
+      return finish ? finish() : { done: true, value: undefined };
+    };
+    return inner;
+  };
+  return body;
+}
+
+/** A body as a Node stream: the member's own one when it is, so stopping early frees its socket. */
+export function readableBody(body: AsyncIterable<Uint8Array>): Readable {
+  return body instanceof Readable ? body : Readable.from(body, { objectMode: false });
 }
 
 /** Reads a stream to its end through the hash, holding one chunk at a time. */

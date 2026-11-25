@@ -4,6 +4,8 @@ import {
   AI_TOOL_STARTER_TILES,
   aiToolConfigEnvelopeSchema,
   cliBootstrapResultSchema,
+  PLATFORM_TOOL_POLICY_DEFAULTS,
+  PLATFORM_TOOL_SLUG_BY_SOURCE_TYPE,
 } from "../index.ts";
 
 describe("Governance product contracts", () => {
@@ -20,7 +22,29 @@ describe("Governance product contracts", () => {
         config: { setupCommand: "langwatch claude" },
       }),
     ).toBe(false);
-    expect(AI_TOOL_STARTER_TILES).toHaveLength(9);
+    expect(AI_TOOL_STARTER_TILES).toHaveLength(10);
+  });
+
+  /** @scenario "The server's tool policy lets pi send telemetry but never use a gateway key" */
+  it("defaults pi to direct telemetry only and maps its ingest key to that policy", () => {
+    expect(PLATFORM_TOOL_POLICY_DEFAULTS.pi).toEqual({ allowVk: false, allowOtelDirect: true });
+    expect(PLATFORM_TOOL_SLUG_BY_SOURCE_TYPE.pi_cli).toBe("pi");
+  });
+
+  /** @scenario "pi is offered as an AI tool that sets up with `langwatch pi`" */
+  it("lists pi as a coding assistant tile set up with langwatch pi", () => {
+    const pi = AI_TOOL_STARTER_TILES.filter((tile) => tile.slug === "pi");
+
+    expect(pi).toHaveLength(1);
+    expect(pi[0]).toMatchObject({
+      type: "coding_assistant",
+      config: {
+        assistantKind: "pi",
+        setupCommand: "langwatch pi",
+        allowVk: false,
+        bundledPlan: false,
+      },
+    });
   });
 
   it("round-trips CLI bootstrap output through JSON", () => {
@@ -43,6 +67,8 @@ describe("Governance product contracts", () => {
         cursor: { allowVk: true, allowOtelDirect: false },
         copilot: { allowVk: true, allowOtelDirect: true },
         code: { allowVk: false, allowOtelDirect: true },
+        grok: { allowVk: false, allowOtelDirect: true },
+        pi: { allowVk: false, allowOtelDirect: true },
       },
     });
     expect(JSON.parse(JSON.stringify(bootstrap))).toEqual(bootstrap);
@@ -65,6 +91,8 @@ describe("Governance product contracts", () => {
         cursor: { allowVk: true, allowOtelDirect: false },
         copilot: { allowVk: true, allowOtelDirect: true },
         code: { allowVk: false, allowOtelDirect: true },
+        grok: { allowVk: false, allowOtelDirect: true },
+        pi: { allowVk: false, allowOtelDirect: true },
       },
     });
     expect(bootstrap.adminEmail).toBe("not an email");

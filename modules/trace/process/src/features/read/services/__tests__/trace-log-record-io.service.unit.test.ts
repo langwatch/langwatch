@@ -98,6 +98,60 @@ describe("TraceLogRecordIOService", () => {
       });
     });
 
+    describe("when a launcher declares the request inside its wrapper", () => {
+      /** @scenario A user prompt's declared input replaces the wrapped prompt */
+      it("takes the declared input, not the wrapped prompt", () => {
+        const result = service.extractIO(
+          record({
+            scopeName: CLAUDE_SCOPE,
+            attributes: {
+              "event.name": "user_prompt",
+              prompt: "## Context\n[#support] Ada · message msg_1\nCan you check the build?",
+              "langwatch.input": "Can you check the build?",
+            },
+          }),
+        );
+
+        expect(result).toEqual({ input: "Can you check the build?", output: null });
+      });
+    });
+
+    describe("when a launcher declares the reply the agent posted", () => {
+      it("takes it as a declared output", () => {
+        const result = service.extractIO(
+          record({
+            scopeName: CLAUDE_SCOPE,
+            attributes: { "event.name": "tool_result", "langwatch.output": "The build is green." },
+          }),
+        );
+
+        expect(result).toEqual({
+          input: null,
+          output: "The build is green.",
+          outputDeclared: true,
+        });
+      });
+
+      it("keeps the native side it did not declare", () => {
+        const result = service.extractIO(
+          record({
+            scopeName: CLAUDE_SCOPE,
+            attributes: {
+              "event.name": "user_prompt",
+              prompt: "Can you check the build?",
+              "langwatch.output": "The build is green.",
+            },
+          }),
+        );
+
+        expect(result).toEqual({
+          input: "Can you check the build?",
+          output: "The build is green.",
+          outputDeclared: true,
+        });
+      });
+    });
+
     describe("when a subagent emits a prompt on some other event", () => {
       it("ignores it, so a shell command cannot become the trace input", () => {
         const result = service.extractIO(
@@ -165,6 +219,45 @@ describe("TraceLogRecordIOService", () => {
 
         expect(result).toEqual({ input: null, output: null });
       });
+    });
+  });
+
+  describe("given a Grok turn's records", () => {
+    /** @scenario A Grok turn's trace shows the prompt as input and the reply as output */
+    it("reads the unwrapped prompt as input and the reply as output", () => {
+      const scopeName = "ai.xai.grok_code";
+      const prompt = service.extractIO(
+        record({
+          scopeName,
+          attributes: {
+            "event.name": "grok_code.user_prompt",
+            prompt: "<user_query>\nAdd a subtract function.\n</user_query>",
+          },
+        }),
+      );
+      const reply = service.extractIO(
+        record({
+          scopeName,
+          attributes: {
+            "event.name": "grok_code.assistant_response",
+            response: "Added subtract().",
+          },
+        }),
+      );
+
+      expect(prompt).toEqual({ input: "Add a subtract function.", output: null });
+      expect(reply).toEqual({ input: null, output: "Added subtract()." });
+    });
+
+    it("reads nothing from a model call record", () => {
+      const result = service.extractIO(
+        record({
+          scopeName: "ai.xai.grok_code",
+          attributes: { "event.name": "grok_code.api_request", input_tokens: "25279" },
+        }),
+      );
+
+      expect(result).toEqual({ input: null, output: null });
     });
   });
 });

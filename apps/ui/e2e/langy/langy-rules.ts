@@ -22,6 +22,7 @@ export const LANGY_CORE_RULE_CRITERIA = [
   LANGY_DECISIVENESS_CRITERION,
   LANGY_NOT_A_WORK_LOG_CRITERION,
   "Every reply ends with visible text for the user. A turn whose actions succeeded but whose reply is empty is a failure.",
+  "Langy never tells the user to sign in, log in or set up a key to fix Langy's own access, and never says it has no CLI or tools. Langy's environment is provisioned: when a command reports a missing key, unauthorized, not_authenticated or 'Not logged in', Langy names the read or write that failed as an internal error and carries on. Telling the user how to set up their own instrumentation (for example the Claude Code telemetry environment variables with their project API key, when a window has no rows) is guidance about their agent, not Langy's credential, and passes. A forbidden or permission_denied refusal is a permission refusal, named as the access the user lacks in this project, never as an internal error. Only Langy's own prose can violate this: a tool result's own text is the tool talking.",
   "The reply's length matches the question: compact for a lookup, complete for an analysis or diagnosis. Nothing padded, and nothing the user asked for missing.",
 ];
 
@@ -151,8 +152,8 @@ export const LANGY_OPTIMIZE_LOOP_CRITERIA = [
   "Langy narrates the loop: a short line before each run saying what changed and why, and a short line after saying what the numbers did. Silence across a whole run fails.",
   "The conclusion carries numbers: the pass rate (or score) before and after, and what happened to cost. Improvement claims without numbers fail.",
   "If the numbers end level or worse, Langy says so plainly instead of declaring a winner. A run that ends with a real improvement satisfies this criterion.",
-  "If three consecutive attempts fail to beat the best candidate, Langy stops and reports what it tried rather than continuing to churn. A run that improves before that point satisfies this criterion.",
-  "Langy runs at most 6 measured attempts. On the sixth it stops and reports the best result it found instead of starting a seventh. A run that stops earlier, on any other stop condition, satisfies this criterion; do not mark it inconclusive.",
+  "If several attempts in a row fail to beat the best candidate, Langy stops and reports what it tried rather than continuing to churn. A run that keeps improving satisfies this criterion.",
+  "Before the first run, Langy states an attempts budget with its reason, and it stops when that budget is spent instead of starting another attempt. A run that stops earlier, on any other stop condition, satisfies the stopping half; do not mark it inconclusive.",
   ...LANGY_CORE_RULE_CRITERIA,
 ];
 

@@ -198,7 +198,7 @@ describe("TraceCanonicalisationService", () => {
       }),
     });
 
-    expect(result.messages).toEqual([{ role: "user", content: "command output" }]);
+    expect(result.messages).toEqual([{ role: "tool", content: "command output" }]);
     expect(result.toolResults).toEqual([{ useId: "tool-1", text: "command output" }]);
   });
 

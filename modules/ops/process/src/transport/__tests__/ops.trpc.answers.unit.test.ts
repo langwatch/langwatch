@@ -267,16 +267,16 @@ describe("the ops surface's declared answers", () => {
   });
 
   describe("when an answer drifts from what the procedure declared", () => {
-    it("answers a 500 and never sends the raw value the schema refused", async () => {
+    it("answers the value cut to the keys the schema names, never the raw value", async () => {
+      // wrong-typed input: the drift under test is an answer its schema refuses
+      const drifted = { internal: "stored-value" } as unknown as { wasBlocked: boolean };
       const { operator } = mount(opsQueueTrpcTransport, {
-        unblockQueueGroup: async () => ({}) as { wasBlocked: boolean },
+        unblockQueueGroup: async () => drifted,
       });
 
-      const failure = await operator
-        .unblockGroup({ queueName: "traces", groupId: "g-1" })
-        .catch((error: unknown) => error);
+      const answer = await operator.unblockGroup({ queueName: "traces", groupId: "g-1" });
 
-      expect(failure).toMatchObject({ code: "INTERNAL_SERVER_ERROR" });
+      expect(answer).toEqual({});
     });
   });
 });

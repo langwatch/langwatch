@@ -9,6 +9,7 @@ const noVendorBases = {
   microsoftGraphApiBase: undefined,
   databricksWorkspaceBase: undefined,
   dataverseEnvironmentBase: undefined,
+  bedrockAgentEndpoint: undefined,
 };
 
 describe("where an issued personal key tells its holder to send traffic", () => {

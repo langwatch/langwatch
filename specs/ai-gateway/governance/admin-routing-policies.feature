@@ -185,7 +185,7 @@ Feature: AI Gateway Governance — Admin RoutingPolicies (decoupled from VK)
   @bdd @ui @routing-policy @user-visibility
   Scenario: Personal Settings page shows the policy a user's keys reference
     Given jane's personal VK references the "developer-default" policy
-    When she navigates to "/me/settings"
+    When she navigates to "/coding-agents/configure"
     Then a small "Routing policy" line in the Profile section reads "Routing: developer-default (managed by your org)"
     And the line links to a read-only policy preview drawer (no edit affordance)
 

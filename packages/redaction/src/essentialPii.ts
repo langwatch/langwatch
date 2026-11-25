@@ -15,9 +15,19 @@ const CONTEXT_WINDOW = 50;
 
 export { ESSENTIAL_PII_ENTITIES } from "./piiEntities.ts";
 
-interface Recognizer {
+/** One recognizer hit: the matched text and where it starts. */
+interface RecognizerMatch {
+  raw: string;
+  index: number;
+}
+
+/** A recognizer finds its hits either with a global regex or with its own linear scan. */
+type RecognizerFinder =
+  | { regex: RegExp; scan?: never }
+  | { scan: (text: string) => RecognizerMatch[]; regex?: never };
+
+type Recognizer = RecognizerFinder & {
   entity: string;
-  regex: RegExp;
   /**
    * A literal the regex cannot match without, checked via `String.includes` before the regex
    * runs to skip its backtracking cost on non-matching text. Getting it wrong silently stops
@@ -35,7 +45,7 @@ interface Recognizer {
    * proof: bitcoin and card once matched on shape and hit machine identifiers.
    */
   isSelfProving?: boolean;
-}
+};
 
 function luhnValid(raw: string): boolean {
   const digits = raw.replace(/\D/g, "");
@@ -101,6 +111,32 @@ function ibanValid(raw: string): boolean {
   return remainder === 1;
 }
 
+/**
+ * An AWS ARN; its `::` empty fields (region, account) look like IPv6 to the IP recognizer. A `=`
+ * or `,` stays in the ARN unless it starts a `key=` pair, so a value after the ARN is still read.
+ */
+const AWS_ARN =
+  /\b(arn:aws[a-z-]*:[a-z0-9-]+:[a-z0-9-]*:\d{0,12}:)(?:[\w+.@:/-]|[=,](?![\w.-]*=))+/g;
+
+/** Each ARN, with where its structural fields end and its resource (it may hold an IP) starts. */
+type AwsArnRange = ProtectedRange & { headerEnd: number };
+
+function findAwsArnRanges(text: string): AwsArnRange[] {
+  if (!text.includes("arn:aws")) return [];
+  return [...text.matchAll(AWS_ARN)].map((m) => ({
+    start: m.index,
+    headerEnd: m.index + (m[1]?.length ?? 0),
+    end: m.index + m[0].length,
+  }));
+}
+
+/** A false IP match starts in an ARN's empty `::` fields; one in the resource path is real. */
+function isArnFieldMatch(span: Span, arnRanges: readonly AwsArnRange[]): boolean {
+  return arnRanges.some(
+    (arn) => span.start >= arn.start && span.start < arn.headerEnd && span.end <= arn.end,
+  );
+}
+
 function ipv6Plausible(raw: string): boolean {
   if (raw.includes("::")) return true;
   if (/[a-fA-F]/.test(raw)) return true;
@@ -129,10 +165,51 @@ function cpfValid(raw: string): boolean {
   );
 }
 
+/** `[A-Za-z0-9._%+-]`, the characters an address's local part may hold; `@` is not one. */
+function isEmailLocalCode(code: number): boolean {
+  return (
+    (code >= 48 && code <= 57) ||
+    (code >= 65 && code <= 90) ||
+    (code >= 97 && code <= 122) ||
+    code === 46 ||
+    code === 95 ||
+    code === 37 ||
+    code === 43 ||
+    code === 45
+  );
+}
+
+/** The domain half of `[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}`, tried just after an `@`. */
+const EMAIL_DOMAIN = /[A-Za-z0-9.-]+\.[A-Za-z]{2,}/y;
+
+/**
+ * The matches `matchAll` of that pattern finds, in one pass: the regex retried every start of
+ * a long local-part run (quadratic; a 250k value froze a worker). The domain match does not
+ * depend on where the local part starts, so each `@` is tried once. Spec: pii-redaction.feature.
+ */
+function findEmailAddresses(text: string): RecognizerMatch[] {
+  const matches: RecognizerMatch[] = [];
+  let from = 0;
+  let at = text.indexOf("@");
+  while (at !== -1) {
+    let start = at;
+    while (start > from && isEmailLocalCode(text.charCodeAt(start - 1))) start--;
+    EMAIL_DOMAIN.lastIndex = at + 1;
+    if (start < at && EMAIL_DOMAIN.test(text)) {
+      matches.push({ raw: text.slice(start, EMAIL_DOMAIN.lastIndex), index: start });
+      from = EMAIL_DOMAIN.lastIndex;
+      at = text.indexOf("@", from);
+    } else {
+      at = text.indexOf("@", at + 1);
+    }
+  }
+  return matches;
+}
+
 const RECOGNIZERS: Recognizer[] = [
   {
     entity: "EMAIL_ADDRESS",
-    regex: /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g,
+    scan: findEmailAddresses,
     requiresSubstring: "@",
     isSelfProving: true,
   },
@@ -414,12 +491,11 @@ function recognizedSpanFor({
   excepted,
 }: {
   recognizer: Recognizer;
-  match: RegExpMatchArray;
+  match: RecognizerMatch;
   text: string;
   excepted: (span: Span) => boolean;
 }): Span | null {
-  const raw = match[0];
-  const start = match.index ?? 0;
+  const { raw, index: start } = match;
   const span: Span = {
     start,
     end: start + raw.length,
@@ -458,6 +534,20 @@ function recognizerRuns({
   return !isIdentifierShaped || recognizer.isSelfProving === true;
 }
 
+function matchesOf({
+  recognizer,
+  text,
+}: {
+  recognizer: Recognizer;
+  text: string;
+}): RecognizerMatch[] {
+  if (recognizer.scan) return recognizer.scan(text);
+  return Array.from(text.matchAll(recognizer.regex), (match) => ({
+    raw: match[0],
+    index: match.index,
+  }));
+}
+
 /**
  * Regex/checksum recognizer pass: every `RECOGNIZERS` entry `recognizerRuns` keeps, reduced
  * match-by-match via `recognizedSpanFor`. Split out of `collectCandidateSpans` so each pass
@@ -479,7 +569,7 @@ function collectRecognizerSpans({
     if (!recognizerRuns({ recognizer, allowed, isIdentifierShaped, text })) {
       continue;
     }
-    for (const match of text.matchAll(recognizer.regex)) {
+    for (const match of matchesOf({ recognizer, text })) {
       const span = recognizedSpanFor({ recognizer, match, text, excepted });
       if (span) spans.push(span);
     }
@@ -633,13 +723,17 @@ export function redactEssentialPiiInText({
     isIdentifierShaped:
       isAttributeValue && (shouldTreatAsIdentifier || isIdentifierShapedValue(text)),
   });
-  if (spans.length === 0) return { text, redactedCount: 0 };
+  const arnRanges = findAwsArnRanges(text);
+  const scannable = spans.filter(
+    (span) => span.entity !== "IP_ADDRESS" || !isArnFieldMatch(span, arnRanges),
+  );
+  if (scannable.length === 0) return { text, redactedCount: 0 };
 
   // Merge overlaps, preferring earlier-and-longer spans.
-  spans.sort((a, b) => a.start - b.start || b.end - a.end);
+  scannable.sort((a, b) => a.start - b.start || b.end - a.end);
   const kept: Span[] = [];
   let lastEnd = -1;
-  for (const span of spans) {
+  for (const span of scannable) {
     if (span.start >= lastEnd) {
       kept.push(span);
       lastEnd = span.end;

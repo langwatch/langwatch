@@ -68,6 +68,23 @@ cleanup_cluster() {
   kind delete cluster --name "${CLUSTER_NAME}" 2>/dev/null || true
 }
 
+# Side-load one image into the Kind cluster as the docker host's platform.
+# `kind load docker-image` imports with --all-platforms and dies when the
+# docker containerd store holds only the native child of a multi-platform
+# list (e.g. alpine/k8s); saving one platform and loading the archive works.
+# Runs in a subshell so its EXIT trap removes the archive even on failure,
+# without replacing the caller's trap.
+kind_side_load() (
+  set -euo pipefail
+  local ref="$1" platform dir
+  platform="linux/$(docker version --format '{{.Server.Arch}}' 2>/dev/null || echo amd64)"
+  dir="$(mktemp -d)"
+  trap 'rm -rf "$dir"' EXIT
+  docker image inspect "$ref" >/dev/null 2>&1 || docker pull --platform "$platform" "$ref" >/dev/null
+  docker save --platform "$platform" -o "$dir/image.tar" "$ref"
+  kind load image-archive "$dir/image.tar" --name "$CLUSTER_NAME"
+)
+
 # ─── Kubectl / Helm wrappers ────────────────────────────────────────────────
 
 kc() {
@@ -98,14 +115,16 @@ helm_install() {
 helm_uninstall() {
   hc uninstall "${RELEASE}" --wait 2>/dev/null || true
   kubectl --context "$KUBE_CTX" delete namespace "${NAMESPACE}" --wait=false 2>/dev/null || true
-  # Wait for namespace to be fully gone before next suite
-  local attempts=0
+  # Wait for the namespace to be gone before the next suite. The wait must
+  # outlast the longest pod terminationGracePeriodSeconds in values.yaml
+  # (app 65s, piiRedactionModel 80s), or a pod draining on time fails it.
+  local wait_seconds=180 attempts=0
   while kubectl --context "$KUBE_CTX" get namespace "${NAMESPACE}" &>/dev/null \
-        && [[ $attempts -lt 30 ]]; do
+        && [[ $attempts -lt $((wait_seconds / 2)) ]]; do
     sleep 2; attempts=$((attempts + 1))
   done
   if kubectl --context "$KUBE_CTX" get namespace "${NAMESPACE}" &>/dev/null; then
-    fail "namespace ${NAMESPACE} still exists after 60s — aborting to prevent flakes"
+    fail "namespace ${NAMESPACE} still exists after ${wait_seconds}s, aborting to prevent flakes"
   fi
 }
 

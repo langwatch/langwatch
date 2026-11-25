@@ -51,7 +51,7 @@ os.environ["OPENAI_API_KEY"] = "your-openai-api-key"
 # Configure your agents
 config_list = [
     {
-        "model": "gpt-5",
+        "model": "gpt-6-luna",
         "api_key": os.environ["OPENAI_API_KEY"],
     }
 ]
@@ -115,7 +115,7 @@ def run_agent_conversation(user_message: str):
                 "user_id": "user_123",
                 "session_id": "session_abc",
                 "agent_count": 2,
-                "model": "gpt-5"
+                "model": "gpt-6-luna"
             }
         )
 
@@ -173,7 +173,7 @@ def my_custom_autogen_app(input_message: str):
     # Your AutoGen code here
     config_list = [
         {
-            "model": "gpt-5",
+            "model": "gpt-6-luna",
             "api_key": os.environ["OPENAI_API_KEY"],
         }
     ]
@@ -199,7 +199,7 @@ def my_custom_autogen_app(input_message: str):
                 "user_id": "user_123",
                 "session_id": "session_abc",
                 "agent_count": 2,
-                "model": "gpt-5"
+                "model": "gpt-6-luna"
             }
         )
 

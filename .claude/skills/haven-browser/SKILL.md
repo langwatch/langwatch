@@ -28,6 +28,7 @@ prints url and title alone.
 
 ```bash
 haven browser open /settings --lane qa-1 --as admin        # url + title once the app shell mounted
+haven browser open https://docs.<slug>.langwatch.localhost:1355/ --lane docs  # the docs site (+docs or --only docs), signed out
 haven browser goto /traces --lane qa-1 --as admin
 haven browser snapshot --lane qa-1 --as admin              # accessibility tree with refs (e12), as text
 haven browser snapshot --grep Save --lane qa-1 --as admin  # only nodes whose role or name contain "Save", plus ancestors

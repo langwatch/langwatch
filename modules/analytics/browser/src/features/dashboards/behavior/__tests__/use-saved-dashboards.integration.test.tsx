@@ -1,7 +1,7 @@
 /**
  * @vitest-environment jsdom
- * Creating a board sends no scope (the server starts it at Project), and the list carries
- * each board's star, scope and last change, the organization's boards apart from the project's.
+ * The list carries each board's star, scope and last change, the organization's boards apart
+ * from the project's, and deletes go through the Dashboards area's own procedure.
  * @see modules/dashboard/specs/dashboards-v2.feature
  */
 
@@ -34,7 +34,6 @@ const mocks = vi.hoisted(() => ({
     isStarred: false,
     updatedAt: new Date("2026-01-02"),
   },
-  create: { mutate: vi.fn(), mutateAsync: vi.fn(), isPending: false },
   rename: { mutate: vi.fn(), isPending: false },
   remove: { mutate: vi.fn(), isPending: false },
   utils: {
@@ -46,7 +45,6 @@ const mocks = vi.hoisted(() => ({
   },
   host: {
     project: () => ({ id: "project-1", slug: "acme", name: "Acme", hasFirstMessage: true }),
-    navigate: vi.fn(),
     failed: vi.fn(),
   },
 }));
@@ -66,7 +64,6 @@ vi.mock("../../../../behavior/analytics-api.ts", () => ({
           };
         },
       },
-      create: { useMutation: () => mocks.create },
       update: { useMutation: () => mocks.rename },
       delete: { useMutation: () => mocks.remove },
     },
@@ -83,22 +80,8 @@ beforeEach(() => {
   vi.clearAllMocks();
 });
 
-describe("given a member creates a board", () => {
-  /** @scenario "AC10 Blank board matches the reference" */
-  it("sends the project and a numbered name, and no scope", () => {
-    const { result } = renderHook(() => useSavedDashboards());
-
-    act(() => result.current.createBoard());
-
-    expect(mocks.create.mutate).toHaveBeenCalledWith(
-      { projectId: "project-1", name: "Untitled dashboard 2" },
-      expect.anything(),
-    );
-  });
-});
-
 describe("given the project has boards", () => {
-  /** @scenario "AC161b Your dashboards: My dashboard first, then the team's unstarred boards by name" */
+  /** @scenario "AC161b Your dashboards: My dashboard first, then the team's unpinned boards by name" */
   it("lists each with its star, scope and last change", () => {
     const { result } = renderHook(() => useSavedDashboards());
 

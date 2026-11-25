@@ -14,6 +14,7 @@ export type GatewayBudgetSpendRecord = {
   currentPeriodStartedAt: Instant;
   lastResetAt: Instant | null;
   cycleAnchorAt: Instant | null;
+  timezone: string | null;
 };
 
 export type BudgetBucketBoundary = {
@@ -37,6 +38,12 @@ export type ScopeSpend = {
   scopeId: string;
   spentNanoUsd: number;
   spentUsd: string;
+};
+
+/** One model's successful spend in a bucket this period. */
+export type ModelSpend = {
+  model: string;
+  spentNanoUsd: bigint;
 };
 
 export type BucketSpend = {
@@ -124,6 +131,15 @@ export interface GatewayBudgetSpendRepository {
     boundaries: BudgetBucketBoundary[];
     now: Instant;
   }): Promise<BucketSpend[]>;
+
+  /**
+   * What one budget bucket spent on each model since `periodFloorMs`, one request counted once.
+   * `target.periodFloorMs` is required: the caller names the period the crossing stamped.
+   */
+  findModelSpendForTarget(input: {
+    tenantIds: string[];
+    target: BudgetSpendTarget & { periodFloorMs: number };
+  }): Promise<ModelSpend[]>;
 
   recentEventsForBudget(
     tenantIds: string[],

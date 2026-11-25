@@ -234,6 +234,7 @@ export class InsightDailyRunService implements InsightDailyRunExecutor {
         // The run is the key: a repeat with the same brief is answered with the same turn.
         idempotencyKey: `insight-daily-run:${scheduleId}:${runId}`,
         text: buildDailyRunBrief({
+          projectId,
           board: gate.board,
           widgets: gate.widgets,
           windows,
@@ -398,6 +399,7 @@ export class InsightDailyRunService implements InsightDailyRunExecutor {
       board,
       ...supersedes,
       ...failed("timeout", null),
+      idLayout: "v2",
     });
     this.members.metrics.settled({ outcome: "failed", reason: "timeout" });
   }
@@ -425,6 +427,8 @@ export class InsightDailyRunService implements InsightDailyRunExecutor {
       runId,
       slot,
       ...result,
+      // A run's outcome is stored once (its command is keyed by the run), so the first one is new.
+      idLayout: "v2",
     });
     const { outcome, reason } = result;
     this.members.metrics.settled({ outcome, reason, durationMs: settledAt - startedAt });

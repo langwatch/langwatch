@@ -30,6 +30,7 @@ class GetApiExperimentsRunsByRunIdResponse200:
         status (GetApiExperimentsRunsByRunIdResponse200Status):
         progress (float): Cells finished so far
         total (float): Cells in the run
+        concurrency (int | Unset): Cells the run executes at once, as it was fixed when the run started
         started_at (float | Unset): Unix milliseconds
         finished_at (float | Unset): Unix milliseconds; set once the run is no longer running
         summary (GetApiExperimentsRunsByRunIdResponse200Summary | Unset): Present when completed
@@ -44,6 +45,7 @@ class GetApiExperimentsRunsByRunIdResponse200:
     status: GetApiExperimentsRunsByRunIdResponse200Status
     progress: float
     total: float
+    concurrency: int | Unset = UNSET
     started_at: float | Unset = UNSET
     finished_at: float | Unset = UNSET
     summary: GetApiExperimentsRunsByRunIdResponse200Summary | Unset = UNSET
@@ -59,6 +61,8 @@ class GetApiExperimentsRunsByRunIdResponse200:
         progress = self.progress
 
         total = self.total
+
+        concurrency = self.concurrency
 
         started_at = self.started_at
 
@@ -86,6 +90,8 @@ class GetApiExperimentsRunsByRunIdResponse200:
                 "total": total,
             }
         )
+        if concurrency is not UNSET:
+            field_dict["concurrency"] = concurrency
         if started_at is not UNSET:
             field_dict["startedAt"] = started_at
         if finished_at is not UNSET:
@@ -119,6 +125,8 @@ class GetApiExperimentsRunsByRunIdResponse200:
 
         total = d.pop("total")
 
+        concurrency = d.pop("concurrency", UNSET)
+
         started_at = d.pop("startedAt", UNSET)
 
         finished_at = d.pop("finishedAt", UNSET)
@@ -146,6 +154,7 @@ class GetApiExperimentsRunsByRunIdResponse200:
             status=status,
             progress=progress,
             total=total,
+            concurrency=concurrency,
             started_at=started_at,
             finished_at=finished_at,
             summary=summary,

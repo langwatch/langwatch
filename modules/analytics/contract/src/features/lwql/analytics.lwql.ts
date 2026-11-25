@@ -45,6 +45,9 @@ export const LWQL_DIAGNOSTIC_CODES = [
   "APP_FUNCTION_UNRESOLVED_KEYS",
   "APP_FUNCTION_RESULT_TRUNCATED",
   "INSTANT_EVAL_SKIPPED",
+  "SHARE_WINDOW_LIMITED",
+  "SOURCES_IGNORED",
+  "GRANULARITY_COARSENED",
 ] as const;
 export const langWatchQLDiagnosticCodeSchema = z.enum(LWQL_DIAGNOSTIC_CODES);
 export type LangWatchQLDiagnosticCode = z.infer<typeof langWatchQLDiagnosticCodeSchema>;
@@ -89,6 +92,19 @@ export const queryCompletenessSchema: QueryCompletenessSchema = queryCompletenes
 export type QueryCompleteness = z.infer<typeof queryCompletenessSchema>;
 export type QueryCompletenessState = QueryCompleteness["state"];
 
+/**
+ * Every placeholder the statement declares, by its SQL name, with the value the run bound, plus
+ * the `period` it followed. A flat map, so the SQL name is the key an agent already knows. Never
+ * holds a protection or a key (permissions stay server-side).
+ */
+const langWatchQLRunParamsSchemaDefinition = z.record(z.string(), z.unknown());
+export interface LangWatchQLRunParamsSchema extends Named<
+  typeof langWatchQLRunParamsSchemaDefinition
+> {}
+export const langWatchQLRunParamsSchema: LangWatchQLRunParamsSchema =
+  langWatchQLRunParamsSchemaDefinition;
+export type LangWatchQLRunParams = z.infer<typeof langWatchQLRunParamsSchema>;
+
 /** The complete result envelope returned by the query transport. */
 const langWatchQLQueryResultSchemaDefinition = z
   .object({
@@ -102,6 +118,8 @@ const langWatchQLQueryResultSchemaDefinition = z
     coarsenedFromSeconds: z.number().optional(),
     /** Absent when the run had no time window or read no catalogued view, and on a failure. */
     completeness: queryCompletenessSchema.optional(),
+    /** What the run was bound to; absent on a pass and on a failure. */
+    params: langWatchQLRunParamsSchema.optional(),
   })
   .strict();
 export interface LangWatchQLQueryResultSchema extends Named<
@@ -280,10 +298,42 @@ export type LangWatchQLRunContext = Readonly<{
   timeWindow?: LangWatchQLTimeWindow;
   granularitySeconds?: number;
   onBudgetOverflow?: LangWatchQLBudgetOverflowMode;
-  /** Trace origins the surface leaves out of every view the statement reads; none when absent. */
-  excludeOrigins?: readonly string[];
+  /** A widget query's sources (AC200), `null` for its default; the default when absent. */
+  sources?: RunSources;
+  /** The projects a card names (AC207); absent, the board's project. */
+  projects?: readonly string[] | "all";
+  /** The member a card's named projects are checked for; absent, none may be named. */
+  userId?: string;
   /** The caller's request, as main's query took it: a hang-up stops judging (eval-functions). */
   signal?: AbortSignal;
+  /** Who ran it, for its log line and metrics only; it never changes what the query reads. */
+  telemetry?: LangWatchQLRunTelemetry;
+}>;
+
+/**
+ * The door a run came in by, named by the server and never by the browser: the `caller` of its
+ * log line and the one label its metrics split by besides the outcome.
+ * @see modules/dashboard/specs/dashboards-telemetry.feature
+ */
+export const LWQL_TELEMETRY_CALLERS = [
+  "dashboard_widget",
+  "workbench",
+  "rest_api",
+  "cli",
+  "mcp",
+  "langy",
+  "saved_chart",
+  "source_presence",
+] as const;
+/** One door a run can come in by. */
+export type LangWatchQLTelemetryCaller = (typeof LWQL_TELEMETRY_CALLERS)[number];
+
+/** Where a run came from, as its log line records it. The ids never become metric labels. */
+export type LangWatchQLRunTelemetry = Readonly<{
+  caller: LangWatchQLTelemetryCaller;
+  dashboardId?: string;
+  widgetId?: string;
+  templateId?: string;
 }>;
 
 /** Input shared by every restricted LangWatchQL execution surface. */
@@ -369,7 +419,10 @@ export type LangWatchQLPassInput = Pick<
  * secrets become the tenant-capability set, so the query reads the union of their rows; an
  * empty set is a valid scope that reads zero rows.
  */
-export type LangWatchQLProjectSetExecuteInput = Omit<LangWatchQLExecuteInput, "project"> &
+export type LangWatchQLProjectSetExecuteInput = Omit<
+  LangWatchQLExecuteInput,
+  "project" | "projects"
+> &
   Readonly<{ projects: readonly LangWatchQLCaller[] }>;
 
 /**
@@ -474,3 +527,48 @@ export interface LangWatchQLAvailabilitySchema extends Named<
 export const langWatchQLAvailabilitySchema: LangWatchQLAvailabilitySchema =
   langWatchQLAvailabilitySchemaDefinition;
 export type LangWatchQLAvailability = z.infer<typeof langWatchQLAvailabilitySchema>;
+
+/** The origins LangWatch stamps, in the order the editor shows them. */
+export const KNOWN_TRACE_ORIGINS = [
+  "application",
+  "simulation",
+  "evaluation",
+  "sample",
+  "coding_agent",
+  "ai_tool",
+  "gateway",
+  "workflow",
+  "playground",
+  "langy",
+] as const;
+
+/** Every origin not in {@link KNOWN_TRACE_ORIGINS}. An unstamped trace is `application`'s. */
+export const OTHER_TRACE_SOURCE = "other";
+
+/**
+ * A dashboard query's sources, the trace origins it counts (dashboards-v2 AC200). Here, not in
+ * the trace contract, because that contract depends on this package.
+ */
+export const TRACE_SOURCES = [...KNOWN_TRACE_ORIGINS, OTHER_TRACE_SOURCE] as const;
+export type TraceSource = (typeof TRACE_SOURCES)[number];
+
+/** What an unset query counts, and what a new widget's query stores. */
+export const DEFAULT_WIDGET_SOURCES: readonly TraceSource[] = ["application"];
+
+const traceSourceSchema = z.enum(TRACE_SOURCES);
+const traceSourcesSchemaDefinition = z.array(traceSourceSchema).max(TRACE_SOURCES.length);
+export interface TraceSourcesSchema extends Named<typeof traceSourcesSchemaDefinition> {}
+export const traceSourcesSchema: TraceSourcesSchema = traceSourcesSchemaDefinition;
+
+/**
+ * What a run names: a widget query's list (empty counts nothing), `null` for an unset widget
+ * query (the server counts {@link DEFAULT_WIDGET_SOURCES}), or absent for a run no widget owns.
+ */
+export type RunSources = readonly TraceSource[] | null;
+
+/** A query's sources as it runs: its list, or {@link DEFAULT_WIDGET_SOURCES} when unset. */
+export function effectiveSources(
+  stored: readonly TraceSource[] | null | undefined,
+): readonly TraceSource[] {
+  return stored ?? DEFAULT_WIDGET_SOURCES;
+}

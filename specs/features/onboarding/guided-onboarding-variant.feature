@@ -213,6 +213,27 @@ Feature: Guided onboarding variant
     When the user records paths
     Then the guided onboarding event hook receives a "paths_selected" event for that organization and user
 
+  # Langy's governance opener asks how the person wants to start. "call" is the
+  # choice they made: nothing books the call, so nothing records one as booked.
+  @unit
+  Scenario: recording Langy's start stores the choice and announces it
+    Given an organization in the guided variant that picked governance
+    When the start call is recorded
+    Then the guided state carries the start call
+    And a "start_chosen" event is announced with the start call
+    When the start coding is recorded after it
+    Then the guided state carries the start coding
+    And a "start_chosen" event is announced with the start coding
+
+  # A retried CLI call repeats the start it already recorded: announcing it again
+  # would count the choice twice in Customer.io and PostHog.
+  @unit
+  Scenario: recording the same Langy start again changes and announces nothing
+    Given an organization in the guided variant whose recorded start is call
+    When the start call is recorded again
+    Then the guided state is not written
+    And no event is announced
+
   # ============================================================================
   # The CLI reaches the same state through the project's credential
   # ============================================================================
@@ -230,10 +251,24 @@ Feature: Guided onboarding variant
     Then the organization's done paths list llmops
 
   @unit
+  Scenario: the REST route records Langy's start for the project's organization
+    When the start call is recorded with that project's credential
+    Then the start is recorded on the project's organization
+    And a start other than coding or call is refused before the application is called
+
+  @unit
   Scenario: the REST routes are guarded by a permission Langy's own key can hold
     Given Langy reports a path as done from inside its own session, with the conversation's key
     When the guided state route and the completion route declare their guards
     Then each guard is a permission the platform delegates to a Langy session key
+
+  @unit
+  Scenario: completing a path asks a write permission, so a read-only key cannot
+    Given a key that holds only the project's read permissions, such as a read-only docs session key
+    When it reads the guided state
+    Then the state is answered
+    When it completes a path
+    Then it is refused with status 403 and nothing is written
 
   @unit
   Scenario: the CLI prints the guided state as JSON
@@ -251,6 +286,18 @@ Feature: Guided onboarding variant
     Given Langy runs "langwatch onboarding complete-path" inside the panel, where the output is a card
     When the command prints
     Then the card carries that one line and none of the state the platform answered
+
+  @unit
+  Scenario: the CLI records Langy's start by name
+    When "langwatch onboarding start call" runs
+    Then it asks the platform to record the start call
+    And it prints one line saying the person chose a call, never that a call is booked
+
+  @unit
+  Scenario: the CLI refuses a start other than coding or call before any request
+    When "langwatch onboarding start meeting" runs
+    Then it fails naming coding and call
+    And the platform is never asked
 
   @unit
   Scenario: the onboarding card carries what the person reads and nothing else

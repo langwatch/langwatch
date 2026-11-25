@@ -5,6 +5,8 @@ import {
   runNoteSchema,
   runParameterValuesSchema,
   scenarioMappingSchema,
+  traceQuietPeriodMsSchema,
+  traceWaitTimeoutMsSchema,
 } from "@langwatch/scenario-contract";
 import { z } from "zod";
 
@@ -293,6 +295,16 @@ const runSuiteInputSchemaDefinition = z.object({
     .describe(
       "The model that judges every scenario in the run. Used only when the id names a test suite.",
     ),
+  traceQuietPeriodMs: traceQuietPeriodMsSchema
+    .nullish()
+    .describe(
+      "Milliseconds (0 to 60000) the agent's trace must stay unchanged before the judge reads it, for every scenario in the run. Used only when the id names a test suite.",
+    ),
+  traceWaitTimeoutMs: traceWaitTimeoutMsSchema
+    .nullish()
+    .describe(
+      "Milliseconds (1000 to 300000) the judge waits for the agent's trace before a verdict, for every scenario in the run. Used only when the id names a test suite.",
+    ),
   parameters: runParameterValuesSchema
     .optional()
     .describe(
@@ -425,6 +437,22 @@ const runPlanWireSchemaDefinition = z.object({
     .string()
     .nullable()
     .describe("The model that judges the run, or null for the scenario or project default."),
+  traceQuietPeriodMs: z
+    .number()
+    .int()
+    .nullable()
+    .optional()
+    .describe(
+      "Milliseconds the agent's trace must stay unchanged before the judge reads it, or null for the scenario setting or the project's recommendation. Absent on servers that predate judge trace settings.",
+    ),
+  traceWaitTimeoutMs: z
+    .number()
+    .int()
+    .nullable()
+    .optional()
+    .describe(
+      "Milliseconds the judge waits for the agent's trace before a verdict, or null for the scenario setting or the project's recommendation. Absent on servers that predate judge trace settings.",
+    ),
   labels: z.array(z.string()).describe("The labels the plan carries."),
   evaluators: evaluatorAttachmentsWireSchema
     .optional()

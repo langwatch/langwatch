@@ -290,6 +290,7 @@
         "**/scripts/**",
         "**/vite.config.ts",
         "**/vitest.config.ts",
+        "**/vitest.*.config.ts",
         "**/prisma.config.ts",
         "apps/ui/vite/**",
       ],

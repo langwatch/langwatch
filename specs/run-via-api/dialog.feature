@@ -37,3 +37,28 @@ Feature: Run via API dialog for workflows and evaluations-v3
     Given an evaluations-v3 experiment
     When I open its Run via API dialog and choose Shell
     Then the curl posts to the experiment run endpoint for that experiment
+
+  @integration
+  Scenario: The evaluations-v3 dialog offers CLI and GitHub Actions snippets
+    Given an evaluations-v3 experiment
+    When I open its Run via API dialog
+    Then the language options include CLI and GitHub Actions
+    When I choose GitHub Actions
+    Then the snippet is a workflow step that runs the experiment through the CLI
+
+  @integration
+  Scenario: The execution choice sets the concurrency the snippets start the run with
+    Given an evaluations-v3 experiment saved with a concurrency of 6
+    When I open its Run via API dialog and choose CLI
+    Then the snippet runs in parallel with a concurrency of 6
+    When I choose sequential execution
+    Then the snippet runs with a concurrency of 1
+    When I choose parallel execution with a concurrency of 3
+    Then the snippet runs with a concurrency of 3
+
+  @integration
+  Scenario: An experiment with no saved concurrency starts on Auto and its snippets name none
+    Given an evaluations-v3 experiment saved without a concurrency
+    When I open its Run via API dialog and choose CLI
+    Then the execution choice is Auto
+    And the snippet names no concurrency, so the server picks the default

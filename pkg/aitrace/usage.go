@@ -17,11 +17,11 @@ type Usage struct {
 	// CacheCreation1hTokens is the portion of CacheCreationTokens that bought
 	// an hour-long cache entry rather than a five-minute one. Anthropic bills
 	// the hour at twice the input rate against the five minutes' 1.25x, so a
-	// write priced without this comes out about a third under the bill. Only
-	// the Anthropic-native lanes can report it: the provider states the split
-	// in its own response body, and the normalized usage struct every other
-	// lane goes through has one flat cache-write count. Zero means unknown,
-	// and the whole write prices short-lived, exactly as before.
+	// write priced without this comes out about a third under the bill. The
+	// Anthropic-native lanes read it from the provider's response body and the
+	// translated messages lane from Bifrost's write details; other lanes have
+	// one flat cache-write count. Zero means unknown, and the whole write
+	// prices short-lived.
 	CacheCreation1hTokens int
 	CostMicroUSD          int64  // cost in microdollars (1/1_000_000 USD)
 	Model                 string // resolved model name from the request
@@ -62,6 +62,12 @@ type Usage struct {
 	// thinking. The provider already bills those tokens inside the
 	// completion total, so this count is reported and never priced.
 	ReasoningTokens int
+
+	// WebSearchRequests is how many server-side web searches the call ran,
+	// which providers bill per query on top of the tokens: Anthropic's
+	// usage.server_tool_use.web_search_requests, or the web_search_call
+	// items of an OpenAI Responses answer.
+	WebSearchRequests int
 }
 
 // BillableInputTokens is the input to charge at the plain input rate: the

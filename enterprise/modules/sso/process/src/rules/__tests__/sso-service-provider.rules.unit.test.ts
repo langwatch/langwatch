@@ -24,6 +24,7 @@ describe("the addresses this deployment answers on", () => {
       singleLogoutUrl: "https://app.acme.test/api/auth/sso/saml2/sp/slo/connection-1",
       entityId: "https://app.acme.test/api/auth/sso/saml2/sp",
       metadataUrl: "https://app.acme.test/api/auth/sso/saml2/sp/metadata?providerId=connection-1",
+      refusalPageUrl: "https://app.acme.test/api/auth/sso/refused/connection-1",
     });
   });
 

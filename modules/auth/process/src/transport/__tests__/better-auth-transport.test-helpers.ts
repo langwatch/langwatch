@@ -13,6 +13,7 @@ import {
  */
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { nowInstant } from "@langwatch/time";
+import type { UserApi } from "@langwatch/user-contract";
 import { memoryAdapter } from "better-auth/adapters/memory";
 
 import type { LinkProposals } from "../../channels/http/http.better-auth-hooks.channel.ts";
@@ -80,7 +81,7 @@ export function betterAuthTransportFor(
     /** No organization claims any domain, and nobody belongs to one. */
     organizations: {
       findBySsoDomain: async () => null,
-      createSsoDomainMembership: async () => "created",
+      createMembership: async () => ({ outcome: "created", seat: "MEMBER", pending: false }),
       countMembershipsForUser: async () => 0,
     },
     announcements: {
@@ -95,7 +96,6 @@ export function betterAuthTransportFor(
       route: async () => undefined,
       resolveAuthProvider: async () => "credential",
     } as never,
-    authzGrants: {} as never,
     arrivals: createApiFixture<SsoArrivalApi>({ admit: async () => undefined }),
     ssoActivity: createApiFixture<SsoAuthenticationActivityApi>({ record: async () => undefined }),
     linkProposals: createApiFixture<LinkProposals>(),
@@ -137,4 +137,13 @@ export function betterAuthTransportFor(
     mintClaims: { claimsForMint: async () => NO_SESSION_CLAIMS },
     ...ports,
   });
+}
+
+/** user's created-fact door, noting each account it was asked to record. */
+export function recordingUsers() {
+  const recorded: string[] = [];
+  const users = createApiFixture<Pick<UserApi, "recordCreated">>({
+    recordCreated: async ({ id }) => void recorded.push(id),
+  });
+  return { users, recorded };
 }

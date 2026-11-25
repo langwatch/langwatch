@@ -37,15 +37,19 @@ class Payloads extends TracePayloadReaderRepository {
     super();
   }
 
-  async read(input: { tenantId: string; traceId: string }): Promise<string> {
-    this.calls.push(input);
-    return this.value;
+  async readFields(input: {
+    tenantId: string;
+    traceId: string;
+    fields: readonly string[];
+  }): Promise<ReadonlyMap<string, string>> {
+    this.calls.push({ tenantId: input.tenantId, traceId: input.traceId });
+    return new Map(input.fields.map((field) => [field, this.value]));
   }
 }
 
-/** A blob read that fails. `read` throws now rather than answering null. */
+/** A blob read that fails. `readFields` throws; the recall answers each field with the error. */
 class FailingPayloads extends TracePayloadReaderRepository {
-  async read(): Promise<string> {
+  async readFields(): Promise<ReadonlyMap<string, string>> {
     throw new Error("blob unavailable");
   }
 }

@@ -58,23 +58,29 @@ describe("InviteService resilience", () => {
           ? (arg as (tx: unknown) => unknown)(mockPrisma)
           : Promise.all(arg as Promise<unknown>[]),
       organizationInvite: {
-        findFirst: vi.fn(),
+        // An unscripted read finds no row, as Prisma answers; the seat reads (ADR-002) ask too.
+        findFirst: vi.fn().mockResolvedValue(null),
         findUnique: vi.fn(),
         findMany: vi.fn(),
         create: vi.fn(),
         update: vi.fn(),
         updateMany: vi.fn(),
       },
+      // Nobody here holds a seat hold (seat-rotation.feature).
+      seatHold: {
+        findFirst: vi.fn().mockResolvedValue(null),
+        findMany: vi.fn().mockResolvedValue([]),
+      },
       // The acceptance claim and the revoke are SQL; the resend and extend
       // claims still go through `updateMany`.
       $executeRaw: vi.fn(),
       organizationUser: {
         createMany: vi.fn().mockResolvedValue({ count: 1 }),
-        findFirst: vi.fn(),
+        findFirst: vi.fn().mockResolvedValue(null),
         findUnique: vi.fn(),
       },
       organization: { findFirst: vi.fn() },
-      customRole: { findMany: vi.fn() },
+      customRole: { findMany: vi.fn().mockResolvedValue([]) },
     };
 
     service = InviteService.create({
@@ -116,7 +122,8 @@ describe("InviteService resilience", () => {
         expect(ledger.attachBindings).not.toHaveBeenCalled();
       });
 
-      it("repairs instead of refusing when the loser is the winner racing itself", async () => {
+      /** @scenario "A delayed second accept writes no grant" */
+      it("answers the winner racing itself without writing any grant", async () => {
         mockPrisma.$executeRaw.mockResolvedValue(0);
         mockPrisma.organizationInvite.findUnique.mockResolvedValue({
           status: "ACCEPTED",
@@ -125,12 +132,15 @@ describe("InviteService resilience", () => {
           userId: "user-winner",
         });
 
-        await service.applyInvite({
-          userId: "user-winner",
-          invite: makePendingInvite(),
-        });
+        await expect(
+          service.applyInvite({
+            userId: "user-winner",
+            invite: makePendingInvite(),
+          }),
+        ).resolves.toBeUndefined();
 
-        expect(ledger.attachBindings).toHaveBeenCalled();
+        expect(ledger.attachBindings).not.toHaveBeenCalled();
+        expect(mockPrisma.organizationUser.createMany).not.toHaveBeenCalled();
       });
     });
   });

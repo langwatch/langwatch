@@ -46,10 +46,13 @@ async function application() {
     recordPersonalWorkspaceFeaturesChanged: accepts,
     recordPresenceSettingChanged: { ...accepts, sendBatch: async () => undefined },
     recordTraceSharingDisabled: accepts,
+    recordDocsPlaygroundSessionsDisabled: accepts,
     recordMemberDisabled: accepts,
     recordMemberEnabled: accepts,
     recordMemberRemoved: accepts,
     recordMemberDepartmentChanged: accepts,
+    recordMemberRoleChanged: accepts,
+    recordMemberAdmitted: accepts,
   });
 
   return { app, repositories: setup.repositories, permissions };

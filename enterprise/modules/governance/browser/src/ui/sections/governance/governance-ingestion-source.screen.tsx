@@ -18,6 +18,10 @@ import {
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 import { SkeletonRows } from "@langwatch/design-system/skeletons";
 import { StatTile, StatTileFigure } from "@langwatch/design-system/stat-tile";
+import {
+  ingestionSourceIsLive,
+  SECURITY_LAKE_SOURCE_TYPE,
+} from "@langwatch/enterprise-governance-contract";
 import { HandledErrorAlert } from "@langwatch/error-views";
 import { readHandledError } from "@langwatch/handled-error/read-handled-error";
 import { Temporal, toDate, toEpochMs, type TimeInput } from "@langwatch/time";
@@ -33,7 +37,6 @@ import { confirmArchiveSource } from "../../../features/ingestion-sources/model/
 import {
   needsIngestSecret,
   SOURCE_TYPE_OPTIONS,
-  type SourceType,
 } from "../../../features/ingestion-sources/model/ingestion-source-catalog.ts";
 import {
   runCompleteness,
@@ -51,8 +54,8 @@ import { NotFoundScene } from "../../../ui/elements/not-found-scene.tsx";
 import { PermissionRequiredNotice } from "../../../ui/elements/permission-required-notice.tsx";
 import GovernanceLayout from "../../../ui/sections/governance-layout.tsx";
 import { withGovernanceSection } from "../../../ui/sections/governance-section-gate.tsx";
-import { SourceEditDrawer } from "./governance-inventory.screen.tsx";
 import { useDestinationContext } from "./ingestion-source-forms.ts";
+import { SourceEditDrawer } from "./inventory/source-edit-drawer.tsx";
 
 /**
  * Per-source detail page - health metrics + a cursor-walked table of every
@@ -83,6 +86,9 @@ function isNotFoundError(error: unknown): boolean {
   return readHandledError(error)?.httpStatus === 404;
 }
 
+/** Where a Security Lake source is edited: its own section on the Sources tab. */
+const SECURITY_LAKE_SETTINGS_HREF = "/governance/inventory?tab=sources";
+
 const fmtRelative = (iso: string | null): string =>
   iso ? (formatTimeAgo(toEpochMs(iso)) ?? "-") : "-";
 
@@ -90,8 +96,8 @@ function formatMoment(value: TimeInput): string {
   return toDate(Temporal.Instant.fromEpochMilliseconds(toEpochMs(value))).toLocaleString();
 }
 
-/** Back link, name, status, and the two manage-only controls. */
-function SourceDetailHeader({
+/** Back link, name, status, and the manage-only controls. */
+export function SourceDetailHeader({
   source,
   canManage,
   isRotating,
@@ -115,6 +121,7 @@ function SourceDetailHeader({
     // A run stopped by a page limit reports no error, so without this the
     // badge reads Active on a source collecting a fraction of its data.
     completeness: runCompleteness(source.lastRunCompleteness),
+    configComplaints: source.configComplaints,
   });
   const StatusIcon = status.icon;
   return (
@@ -139,12 +146,19 @@ function SourceDetailHeader({
           `ingestionSources:manage`. */}
       {canManage && (
         <>
-          <PageLayout.HeaderButton onClick={onEdit} title="Edit this source's configuration">
-            <Pencil size={14} /> Edit
-          </PageLayout.HeaderButton>
-          {needsIngestSecret({
-            sourceType: source.sourceType as SourceType,
-          }) && (
+          {source.sourceType === SECURITY_LAKE_SOURCE_TYPE ? (
+            <PageLayout.HeaderButton
+              onClick={() => router.push(SECURITY_LAKE_SETTINGS_HREF)}
+              title="Security Lake sources are edited in their own section"
+            >
+              <Pencil size={14} /> Edit in Security Lake settings
+            </PageLayout.HeaderButton>
+          ) : (
+            <PageLayout.HeaderButton onClick={onEdit} title="Edit this source's configuration">
+              <Pencil size={14} /> Edit
+            </PageLayout.HeaderButton>
+          )}
+          {needsIngestSecret({ sourceType: source.sourceType }) && (
             <PageLayout.HeaderButton
               onClick={onRotate}
               loading={isRotating}
@@ -171,12 +185,32 @@ function SourceDetailHeader({
 
 /** Pull completion time and provider record time answer different questions. */
 function SourcePullStatus({ source }: { source: Source }) {
-  if (!source.pullSchedule) return null;
+  const complaints = source.configComplaints ?? [];
+  if (!source.pullSchedule && complaints.length === 0) return null;
   const pull = source.pullStatus;
-  const retrying = source.status !== "disabled" && !source.archivedAt;
+  const isLive = ingestionSourceIsLive(source);
+  // A configuration the adapter refuses fails every retry the same way, so
+  // promising one would leave the admin waiting on a fix only they can make.
+  const retrying = isLive && complaints.length === 0;
   return (
     <Card padding="sm">
       <VStack align="stretch" gap={2}>
+        {complaints.length > 0 && (
+          <VStack align="stretch" gap={1} data-testid="source-config-error">
+            <Text fontSize="sm" fontWeight="medium" color="red.fg">
+              This source's connection needs fixing before it can pull.
+            </Text>
+            {complaints.map((complaint) => (
+              <Text key={complaint} fontSize="sm" color="red.fg">
+                {complaint}
+              </Text>
+            ))}
+            <Text fontSize="sm">
+              Use Edit to fix the connection. Pulls fail until it is saved with values the source
+              can read.
+            </Text>
+          </VStack>
+        )}
         <Text fontSize="sm">
           Last successful pull:{" "}
           {source.lastSuccessAt ? formatMoment(source.lastSuccessAt) : "No successful pull yet"}
@@ -188,9 +222,7 @@ function SourcePullStatus({ source }: { source: Source }) {
         )}
         {pull?.error && (
           <Text fontSize="sm" color="red.fg">
-            {pull.error}{" "}
-            {retrying ? "The next scheduled pull will retry." : "This source is disabled."} Saved
-            records may be incomplete.
+            {pull.error} {pullErrorFollowUp({ retrying, isLive })} Saved records may be incomplete.
           </Text>
         )}
         {pull?.backfillThrough && (
@@ -201,15 +233,26 @@ function SourcePullStatus({ source }: { source: Source }) {
         )}
         {pull?.hasMore && (
           <Text fontSize="sm" color="fg.muted">
-            More history remains.
-            {retrying
-              ? " The next scheduled pull continues from the saved checkpoint."
-              : " Resume the source to continue."}
+            More history remains. {moreHistoryFollowUp({ retrying, isLive })}
           </Text>
         )}
       </VStack>
     </Card>
   );
+}
+
+/** What happens after a failed pull, in the words the status card closes on. */
+function pullErrorFollowUp({ retrying, isLive }: { retrying: boolean; isLive: boolean }): string {
+  if (retrying) return "The next scheduled pull will retry.";
+  if (isLive) return "Pulls keep failing until the connection is fixed.";
+  return "This source is disabled.";
+}
+
+/** How the remaining history gets pulled, in the words the checkpoint line closes on. */
+function moreHistoryFollowUp({ retrying, isLive }: { retrying: boolean; isLive: boolean }): string {
+  if (retrying) return "The next scheduled pull continues from the saved checkpoint.";
+  if (isLive) return "Fix the connection to continue.";
+  return "Resume the source to continue.";
 }
 
 /**
@@ -345,8 +388,8 @@ function SourceDetailShell({ pageTitle, children }: { pageTitle: string; childre
   return (
     <GovernanceLayout pageTitle={pageTitle}>
       <EnterpriseLockedSurface
-        featureName="Ingestion Source detail"
-        description="Source-level health metrics and event drill-downs are part of the Enterprise plan."
+        featureName="Ingestion source detail"
+        description="See health metrics and drill into the events of each ingestion source."
       >
         {children}
       </EnterpriseLockedSurface>

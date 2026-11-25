@@ -115,8 +115,8 @@ A run goes against every target you name, so naming two targets runs each scenar
 
 ```bash
 langwatch test-suite run "Checkout regression" \
-  --target 'http:agent_abc123?model=gpt-5' \
-  --target 'http:agent_abc123?model=gpt-5-mini' \
+  --target 'http:agent_abc123?model=gpt-6-sol' \
+  --target 'http:agent_abc123?model=gpt-6-luna' \
   --wait
 ```
 
@@ -133,15 +133,15 @@ curl -X POST "https://app.langwatch.ai/api/v1/test-suites/suite_abc123/run" \
       {
         "type": "http",
         "referenceId": "agent_abc123",
-        "runParameters": { "model": "gpt-5" }
+        "runParameters": { "model": "gpt-6-sol" }
       },
       {
         "type": "http",
         "referenceId": "agent_abc123",
-        "runParameters": { "model": "gpt-5-mini" }
+        "runParameters": { "model": "gpt-6-luna" }
       }
     ],
-    "note": "gpt-5 against gpt-5-mini"
+    "note": "gpt-6-sol against gpt-6-luna"
   }'
 ```
 

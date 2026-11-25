@@ -6,7 +6,7 @@
 import { createTrpcRuntime } from "@langwatch/api/trpc";
 import { trpcTestMembers } from "@langwatch/test-harness/trpc-members";
 import { initTRPC } from "@trpc/server";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { createTestLicensingApp, EXPIRED_LICENSE_KEY } from "../../__tests__/testing.ts";
 import { licenseTrpcTransport } from "../licensing.trpc.ts";
@@ -21,7 +21,7 @@ async function mount(options: { permits?: (permission: string) => boolean } = {}
     members: trpcTestMembers<LicensingTrpcTestContext>({ permits: options.permits }),
   }).mount(licenseTrpcTransport, () => licensing);
 
-  return { router, caller: router.createCaller({ actor: { id: "user-123" } }) };
+  return { router, licensing, caller: router.createCaller({ actor: { id: "user-123" } }) };
 }
 
 describe("the license tRPC namespace", () => {
@@ -74,6 +74,34 @@ describe("the license tRPC namespace", () => {
           code: "FORBIDDEN",
         });
       });
+    });
+  });
+
+  describe("given a member who may view the organization but not manage it", () => {
+    /** @scenario The server still refuses licence changes from a member */
+    it("refuses upload, activate, remove and refresh before any handler runs", async () => {
+      const { caller, licensing } = await mount({
+        permits: (permission) => permission === "organization:view",
+      });
+      const handlers = [
+        vi.spyOn(licensing, "uploadLicense"),
+        vi.spyOn(licensing, "activateLicenseWithCode"),
+        vi.spyOn(licensing, "removeLicense"),
+        vi.spyOn(licensing, "refreshLicense"),
+      ];
+      const organizationId = "org-456";
+
+      const refusals = await Promise.allSettled([
+        caller.upload({ organizationId, licenseKey: EXPIRED_LICENSE_KEY }),
+        caller.activate({ organizationId, code: "LW-AAAA-BBBB-CCCC-DDDD" }),
+        caller.remove({ organizationId }),
+        caller.refresh({ organizationId }),
+      ]);
+
+      for (const refusal of refusals) {
+        expect(refusal).toMatchObject({ status: "rejected", reason: { code: "FORBIDDEN" } });
+      }
+      for (const handler of handlers) expect(handler).not.toHaveBeenCalled();
     });
   });
 

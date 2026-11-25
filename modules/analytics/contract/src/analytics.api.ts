@@ -26,6 +26,7 @@ import type {
   DashboardWidgetQuery,
   DashboardWidgetSource,
 } from "./features/dashboard-widget/dashboard-widget-definition.ts";
+import type { LangWatchQLKeyReach } from "./features/lwql/analytics-lwql.schemas.ts";
 import type {
   LangWatchQLCaller,
   LangWatchQLExecuteInput,
@@ -183,6 +184,19 @@ export interface AnalyticsApi {
   langWatchQLKeyCapFor(input: { appFunctions: readonly LangWatchQLAppFunctionCall[] }): number;
   executeLangWatchQL(input: LangWatchQLExecuteInput): Promise<LangWatchQLQueryResult>;
   /**
+   * Proves each project exists and holds `analytics:view` for the member, so a widget never
+   * stores a project its writer could not read.
+   * @throws LangWatchQLProjectNotFoundError with no id, for any that does not.
+   */
+  assertProjectsReadable(input: {
+    userId?: string;
+    /** The API key writing, whose reach a run would apply. It decides over `userId`. */
+    reach?: LangWatchQLKeyReach;
+    projectIds: readonly string[];
+    /** The board's or run's project: a member's projects must lie in its organization. */
+    anchorProjectId: string;
+  }): Promise<void>;
+  /**
    * Re-validates the statement with the full policy, eval gate taken from the caller's
    * answer, then runs it inside the fixed wrapper its pass names: an instant-eval read.
    */
@@ -231,6 +245,11 @@ export interface AnalyticsApi {
    * project's own rows runs under, with neither a session nor a credential.
    */
   resolveApiKeyRunCaller(input: Readonly<{ projectId: string }>): Promise<LangWatchQLCaller>;
+  /**
+   * Whether the project's LangWatchQL key-map row is there, written first when missing. False
+   * when it cannot be, so a caller refuses instead of reading zero rows; never throws.
+   */
+  ensureLwqlKeyMapRow(input: Readonly<{ projectId: string }>): Promise<boolean>;
 }
 
 export const AnalyticsApi = moduleApi<AnalyticsApi>()("analytics");

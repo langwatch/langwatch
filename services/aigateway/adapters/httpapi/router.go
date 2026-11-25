@@ -95,6 +95,10 @@ type RouterDeps struct {
 	// VoiceRelay relays vendor voice sockets for clients on the WebSocket
 	// transport. Optional; when nil the socket routes are not mounted.
 	VoiceRelay *voicesession.Manager
+	// A2A proxies agent-to-agent calls under /a2a/{target}
+	// (specs/ai-gateway/a2a-proxy.feature). Optional; when nil the route is
+	// not mounted.
+	A2A http.Handler
 }
 
 // WebhookRelay hands one vendor delivery to the control plane byte for byte.
@@ -151,8 +155,8 @@ func NewRouter(deps RouterDeps) http.Handler {
 	// /metrics is not served here: the scrape has its own listener (ADR-175).
 
 	// Unauthenticated and kept off the public ingress the same way as the
-	// probes above (charts/gateway/templates/ingress.yaml
-	// allowlists only /v1 and the exact /health path). Reveals nothing but
+	// probes above (the gateway Ingress in charts/langwatch/templates/ingress.yaml
+	// allowlists only /v1, /a2a and the exact /health path). Reveals nothing but
 	// a URL: dev tooling polls it to verify an already-running gateway
 	// before trusting it on a reused port.
 	r.Get("/debug/control-plane", debugControlPlaneHandler(deps.ControlPlaneBaseURL))
@@ -188,6 +192,7 @@ func NewRouter(deps RouterDeps) http.Handler {
 			v1.Post("/messages", messagesHandler(deps))
 			v1.Post("/responses", responsesHandler(deps))
 			v1.Post("/embeddings", embeddingsHandler(deps))
+			v1.Post("/decisions", decisionsHandler(deps))
 			v1.Post("/audio/speech", speechHandler(deps))
 			v1.Post("/audio/transcriptions", transcriptionsHandler(deps))
 			v1.Post("/images/generations", imageGenerationsHandler(deps))
@@ -229,6 +234,16 @@ func NewRouter(deps RouterDeps) http.Handler {
 			v1.Put("/budget", hostedServiceHandler(deps, domain.HostedBudget))
 		})
 	})
+
+	if deps.A2A != nil {
+		r.Route("/a2a", func(a2a chi.Router) {
+			a2a.Use(noStoreMiddleware)
+			a2a.Use(AuthMiddleware(deps.App.Auth()))
+			a2a.Use(CustomerTraceMiddleware())
+			a2a.Use(TraceRegistryMiddleware(deps.TraceRegistry, deps.DefaultExportEndpoint))
+			a2a.Handle("/*", deps.A2A)
+		})
+	}
 
 	// Gemini-native surface. gemini-cli (GOOGLE_GEMINI_BASE_URL) and the
 	// @google/genai SDK POST to `/v1beta/models/{model}:generateContent`
@@ -430,6 +445,32 @@ func embeddingsHandler(deps RouterDeps) http.HandlerFunc {
 
 		result, hw, err := withHeartbeat(r.Context(), w, deps.HeartbeatInterval, func() (*app.EmbeddingResult, error) {
 			return deps.App.HandleEmbeddings(r.Context(), bundle, body, app.PeekModel(peek))
+		})
+		if err != nil {
+			writeError(deps.Logger, hw, r.Context(), err)
+			return
+		}
+		setMetaHeaders(hw, result.Meta)
+		writeJSONResponse(hw, result.Response)
+	}
+}
+
+// decisionsHandler terminates POST /v1/decisions (OpenAI Decisions API). The
+// body is small JSON and the answer is the provider's JSON, relayed as it
+// came. Never streams. The full body is read because the model field may sit
+// after a long input.
+func decisionsHandler(deps RouterDeps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		bundle, ok := requireBundle(w, r, deps.Logger)
+		if !ok {
+			return
+		}
+		body, ok := readFullBody(deps.Logger, w, r, deps.MaxRequestBodyBytes)
+		if !ok {
+			return
+		}
+		result, hw, err := withHeartbeat(r.Context(), w, deps.HeartbeatInterval, func() (*app.CompletionResult, error) {
+			return deps.App.HandleDecisions(r.Context(), bundle, body, app.PeekModel(body))
 		})
 		if err != nil {
 			writeError(deps.Logger, hw, r.Context(), err)
@@ -2303,4 +2344,13 @@ func registerErrorStatusesOnce() {
 	herr.RegisterStatus(domain.ErrRealtimeRegistryUnavailable, http.StatusServiceUnavailable)
 	// 503 with Retry-After: this instance is draining or full, another is not.
 	herr.RegisterStatus(domain.ErrVoiceBrokerUnavailable, http.StatusServiceUnavailable)
+}
+
+// noStoreMiddleware marks every /a2a answer uncacheable before any handler
+// runs, so a refusal the auth middleware writes carries it too.
+func noStoreMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Cache-Control", "no-store")
+		next.ServeHTTP(w, r)
+	})
 }

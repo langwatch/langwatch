@@ -2,6 +2,7 @@ import type { PersonalFeatures } from "@langwatch/organization-contract";
 import {
   NEVER_LANDED_ON_PROJECT_KINDS,
   NON_DESTINATION_PROJECT_KINDS,
+  UNMANAGED_PROJECT_KEY_KINDS,
   aggregateRuleSchema,
   type AggregateMemberCandidate,
   type AggregateRule,
@@ -38,9 +39,13 @@ import {
 } from "@langwatch/project-contract";
 import { fromDate, nowInstant, toDate, type Instant } from "@langwatch/time";
 
+import { isLegacyKeyRevoked } from "../../rules/legacy-project-key.rules.ts";
 import type {
+  LiveLegacyKey,
   ProjectBackfillEntry,
   ProjectRepository,
+  ProjectSlugHolder,
+  ProjectSlugMove,
   ProjectWithOrgAdmin,
   TouchCodingAgentActivityInput,
 } from "../project.repository.ts";
@@ -137,6 +142,25 @@ export class MemoryProjectRepository implements ProjectRepository {
       .projects()
       .filter((row) => row.kind === kind && row.archivedAt === null)
       .map((row) => row.id);
+  }
+
+  async findSlugHolders({ slug }: { slug: string }): Promise<ProjectSlugHolder[]> {
+    return this.#database
+      .projects()
+      .filter((row) => row.slug === slug)
+      .map(({ id, name, slug: held }) => ({ id, name, slug: held }));
+  }
+
+  async replaceSlug(input: {
+    projectId: string;
+    from: string;
+    to: string;
+  }): Promise<ProjectSlugMove> {
+    const project = this.#database.findProject(input.projectId);
+    if (!project || project.slug !== input.from) return "gone";
+    if (this.#database.projects().some((row) => row.slug === input.to)) return "taken";
+    this.#database.putProject({ ...project, slug: input.to });
+    return "moved";
   }
 
   async findInternalBySlug(slug: string): Promise<InternalProject | null> {
@@ -265,6 +289,8 @@ export class MemoryProjectRepository implements ProjectRepository {
           presenceEnabled: project.presenceEnabled,
           isArchived: project.archivedAt !== null,
           adminUserId: organization.adminUserIds[0] ?? null,
+          ownerUserId: project.ownerUserId,
+          firstMessage: project.firstMessage,
         },
       };
     });
@@ -653,8 +679,33 @@ export class MemoryProjectRepository implements ProjectRepository {
     return project?.id ?? null;
   }
 
-  /** The memory store keeps no usage stamp: nothing in it reads one back. */
-  async markLegacyApiKeyUsed(_input: { projectId: string; at: Instant }): Promise<void> {}
+  async markLegacyApiKeyUsed(input: { projectId: string; at: Instant }): Promise<void> {
+    this.#database.putLegacyKeyUse(input.projectId, input.at);
+  }
+
+  async findLegacyApiKeyLastUsedAt(input: { projectId: string }): Promise<Instant | null> {
+    return this.#database.findLegacyKeyUse(input.projectId) ?? null;
+  }
+
+  async findLiveLegacyKeys(input: { organizationId: string }): Promise<LiveLegacyKey[]> {
+    return this.#database
+      .projects()
+      .filter(
+        (project) =>
+          project.archivedAt === null &&
+          !UNMANAGED_PROJECT_KEY_KINDS.includes(project.kind) &&
+          this.#database.isInOrganization(project, input.organizationId) &&
+          !isLegacyKeyRevoked(project.apiKey),
+      )
+      .toSorted((left, right) => left.name.localeCompare(right.name))
+      .map((project) => ({
+        projectId: project.id,
+        teamId: project.teamId,
+        projectName: project.name,
+        projectSlug: project.slug,
+        lastUsedAt: this.#database.findLegacyKeyUse(project.id) ?? null,
+      }));
+  }
 
   /** Answers false for a project this memory holds no live row for, as the fenced UPDATE does. */
   async rotateLegacyApiKey(input: { projectId: string; token: string }): Promise<boolean> {

@@ -4,11 +4,16 @@
  * boards other projects own. Failures travel raw to the host (#5984).
  */
 
-import type { DashboardProject, DashboardScope } from "@langwatch/dashboard-contract";
+import { useUiAnalytics } from "@langwatch/browser-host/analytics";
+import type {
+  DashboardHomeProduct,
+  DashboardProject,
+  DashboardScope,
+} from "@langwatch/dashboard-contract";
 
 import { analyticsApi } from "../../../behavior/analytics-api.ts";
 import { useAnalyticsHost } from "../../../model/analytics-host.ts";
-import { dashboardsPath, untitledBoardName } from "../model/boards.ts";
+import { dashboardDeleted, dashboardEdited } from "../model/dashboard-usage-events.ts";
 
 /** One stored board, as the list answers it. */
 export type SavedBoard = {
@@ -20,6 +25,8 @@ export type SavedBoard = {
   /** Null for a board older than creators. */
   createdById: string | null;
   scope: DashboardScope;
+  /** The product whose sidebar lists it, which decides whose data it reads (ADR-002, D2). */
+  homeProduct: DashboardHomeProduct;
   organizationId: string | null;
   /** The owning project, named only where the board is listed in another project. */
   ownerProject: DashboardProject | null;
@@ -37,6 +44,7 @@ function savedBoardOf({
   description,
   createdById,
   scope,
+  homeProduct,
   organizationId,
   ownerProject,
   isStarred,
@@ -49,6 +57,7 @@ function savedBoardOf({
     description,
     createdById,
     scope,
+    homeProduct,
     organizationId,
     ownerProject,
     isStarred,
@@ -58,6 +67,7 @@ function savedBoardOf({
 
 export function useSavedDashboards() {
   const host = useAnalyticsHost();
+  const analytics = useUiAnalytics();
   const project = host.project();
   const projectId = project?.id ?? "";
   const projectSlug = project?.slug ?? "";
@@ -67,7 +77,6 @@ export function useSavedDashboards() {
     { projectId, includeOrganization: true },
     { enabled: !!projectId },
   );
-  const create = analyticsApi.boards.create.useMutation();
   const rename = analyticsApi.boards.update.useMutation();
   const remove = analyticsApi.boards.delete.useMutation();
 
@@ -80,24 +89,14 @@ export function useSavedDashboards() {
       utils.boards.listStarred.invalidate({ projectId }),
     ]);
 
-  const createBoard = () => {
-    create.mutate(
-      { projectId, name: untitledBoardName({ existingCount: boards.length }) },
-      {
-        onSuccess: (created) => {
-          void refresh();
-          host.navigate(dashboardsPath({ projectSlug, dashboardId: created.id }));
-        },
-        onError: (error) => host.failed({ error, fallbackTitle: "Couldn't create the dashboard" }),
-      },
-    );
-  };
-
   const renameBoard = ({ dashboardId, name }: { dashboardId: string; name: string }) => {
     rename.mutate(
       { projectId, dashboardId, name },
       {
-        onSuccess: () => void refresh(),
+        onSuccess: () => {
+          analytics.track(dashboardEdited({ change: "rename" }));
+          void refresh();
+        },
         onError: (error) => host.failed({ error, fallbackTitle: "Couldn't rename the dashboard" }),
       },
     );
@@ -114,6 +113,7 @@ export function useSavedDashboards() {
       { projectId, dashboardId },
       {
         onSuccess: () => {
+          analytics.track(dashboardDeleted());
           void refresh();
           // The plan limit counts dashboards, so a delete frees an allowance.
           void utils.licenseEnforcement.checkLimit.invalidate();
@@ -132,10 +132,10 @@ export function useSavedDashboards() {
     organizationBoards,
     /** True until the first list answer arrives, so a board lookup never reads "missing" early. */
     isLoading: list.data === void 0 && !list.isError,
+    /** A held list being read again: a board just made elsewhere may not be in it yet. */
+    isRefreshing: list.isFetching,
     loadError: list.error,
-    isCreating: create.isPending,
     isDeleting: remove.isPending,
-    createBoard,
     renameBoard,
     deleteBoard,
   };

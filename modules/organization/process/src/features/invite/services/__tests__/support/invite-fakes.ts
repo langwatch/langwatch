@@ -11,6 +11,7 @@ import type {
   AuthzAttachBindingsOutput,
   AuthzRevokeBindingsWhereInput,
   AuthzRevokeBindingsWhereOutput,
+  AuthzSetBillingRoleInput,
   GrantScopeTier,
 } from "@langwatch/authz-contract";
 import type { PlanProvider, Plan } from "@langwatch/entitlement-contract";
@@ -69,6 +70,31 @@ export class FakeAuthzGrantsService implements AuthzGrantsService {
     binding: Pick<FakeBinding, "scopeType" | "scopeId" | "userId" | "role" | "customRoleId">,
   ): string {
     return `${binding.scopeType}:${binding.scopeId}:${binding.userId}:${binding.role}:${binding.customRoleId ?? ""}`;
+  }
+
+  /** Who holds the Billing role, per organization, keyed by the last command that set it. */
+  private readonly billingHolders = new Map<string, AuthzSetBillingRoleInput>();
+
+  /** The Billing role write a user holds in an organization, if any. */
+  billingRoleOf({
+    organizationId,
+    userId,
+  }: {
+    organizationId: string;
+    userId: string;
+  }): AuthzSetBillingRoleInput | undefined {
+    return this.billingHolders.get(`${organizationId}:${userId}`);
+  }
+
+  async setBillingRole(input: AuthzSetBillingRoleInput): Promise<void> {
+    const key = `${input.organizationId}:${input.userId}`;
+    if (input.holds) this.billingHolders.set(key, input);
+    else this.billingHolders.delete(key);
+  }
+
+  /** The Billing grant goes without the Billing switch, the state ADR-205's repair covers. */
+  dropBillingGrant({ organizationId, userId }: { organizationId: string; userId: string }): void {
+    this.billingHolders.delete(`${organizationId}:${userId}`);
   }
 
   /** Every binding currently held for one user, for assertions. */
@@ -178,6 +204,7 @@ function authzApiFromFake(grants: FakeAuthzGrantsService): AuthzApi {
   return createApiFixture<AuthzApi>({
     attachBindings: (input) => grants.attachBindings(input),
     revokeBindingsWhere: (input) => grants.revokeBindingsWhere(input),
+    setBillingRole: (input) => grants.setBillingRole(input),
   });
 }
 
@@ -448,6 +475,40 @@ export class FakeOrganizationInviteRepository implements OrganizationInviteRepos
         (invite.expiration === null || invite.expiration.epochMilliseconds > now),
     );
   }
+  async hasPendingInviteForEmail({
+    email,
+    organizationId,
+  }: {
+    email: string;
+    organizationId: string;
+  }): Promise<boolean> {
+    const now = nowInstant().epochMilliseconds;
+    return Array.from(this.invitesById.values()).some(
+      (invite) =>
+        invite.organizationId === organizationId &&
+        invite.email.toLowerCase() === email.trim().toLowerCase() &&
+        invite.status === "PENDING" &&
+        (invite.expiration === null || invite.expiration.epochMilliseconds > now),
+    );
+  }
+
+  async deletePaymentPendingInvitesForEmail({
+    email,
+    organizationId,
+  }: {
+    email: string;
+    organizationId: string;
+  }): Promise<number> {
+    const held = Array.from(this.invitesById.values()).filter(
+      (invite) =>
+        invite.organizationId === organizationId &&
+        invite.email.toLowerCase() === email.trim().toLowerCase() &&
+        invite.status === "PAYMENT_PENDING",
+    );
+    for (const invite of held) this.invitesById.delete(invite.id);
+    return held.length;
+  }
+
   findMemberEmails =
     unsupported<OrganizationInviteRepository["findMemberEmails"]>("findMemberEmails");
   findTeamIdsInOrganization = unsupported<
@@ -651,6 +712,14 @@ export class FakeSeatCensus implements OrganizationInviteSeatCensus {
   isViewOnlyCustomRole(): boolean {
     return true;
   }
+
+  withSeatLock<T>({
+    work,
+  }: {
+    work: (lease: { assertHeld(): Promise<void> }) => Promise<T>;
+  }): Promise<T> {
+    return work({ assertHeld: async () => {} });
+  }
 }
 
 /** An unlimited plan, unless a test builds its own `Plan`. */
@@ -662,6 +731,7 @@ export function makePlanProvider(plan: Partial<Plan> = {}): PlanProvider {
     free: true,
     maxMembers: 1_000_000,
     maxMembersLite: 1_000_000,
+    maxMembersDeveloper: 0,
     maxMessagesPerMonth: 1_000_000,
     canPublish: true,
     prices: { USD: 0, EUR: 0 },

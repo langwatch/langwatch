@@ -81,6 +81,23 @@ describe("classifyLangyCanaryOutcome", () => {
   });
 
   /** @scenario "The Langy canary classifies a settled turn as main did" */
+  it("names a completed turn that ended on a card with no text empty_reply", () => {
+    expect(
+      classifyLangyCanaryOutcome({
+        kind: "settled",
+        settlement: {
+          succeeded: true,
+          outcome: "completed",
+          text: "",
+          messageId: "message-1",
+          parts: [{ type: "tool-code_access" }],
+          error: null,
+        },
+      }),
+    ).toEqual({ healthy: false, reason: "empty_reply" });
+  });
+
+  /** @scenario "The Langy canary classifies a settled turn as main did" */
   /** @scenario "A completed turn with only whitespace is empty_reply" */
   it("names a completed turn with only whitespace empty_reply", () => {
     expect(

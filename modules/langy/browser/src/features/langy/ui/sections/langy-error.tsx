@@ -1,10 +1,11 @@
 import { Box, Button, chakra, HStack, Text, VStack } from "@langwatch/design-system/primitives";
-import { AlertCircle, ChevronRight, RotateCcw, Settings } from "lucide-react";
+import { AlertCircle, ChevronRight, Gauge, RotateCcw, Settings } from "lucide-react";
 import { useState } from "react";
 
 import { useLangyDevMode } from "../../../../behavior/use-langy-dev-mode.ts";
 import { LangyCard } from "../../../../ui/sections/langy-card.tsx";
 import {
+  GATEWAY_BUDGETS_HREF,
   type LangyErrorPresentation,
   type LangySerializedReason,
   MODEL_PROVIDERS_SETTINGS_HREF,
@@ -201,8 +202,14 @@ function ErrorDetails({
 
 type ErrorAction = NonNullable<LangyErrorPresentation["action"]>;
 
+/** The actions that are links to a settings page, and the icon each one shows. */
+const SETTINGS_LINK_ACTIONS = {
+  "configure-model": { href: MODEL_PROVIDERS_SETTINGS_HREF, Icon: Settings },
+  "open-budgets": { href: GATEWAY_BUDGETS_HREF, Icon: Gauge },
+} as const;
+
 /**
- * The settings action is a real link: it says where it goes, opens in a new tab on request and
+ * A settings action is a real link: it says where it goes, opens in a new tab on request and
  * works on a surface that passes no handler. A caller that handles it takes over the click.
  */
 function ErrorActionButton({
@@ -212,7 +219,9 @@ function ErrorActionButton({
   action: ErrorAction;
   onAction?: (kind: ErrorAction["kind"]) => void;
 }) {
-  if (action.kind === "configure-model") {
+  if (action.kind === "configure-model" || action.kind === "open-budgets") {
+    const { href, Icon } = SETTINGS_LINK_ACTIONS[action.kind];
+    const kind = action.kind;
     return (
       <Button
         size="xs"
@@ -223,14 +232,14 @@ function ErrorActionButton({
         asChild
       >
         <a
-          href={MODEL_PROVIDERS_SETTINGS_HREF}
+          href={href}
           onClick={(event) => {
             if (!onAction || isModifiedClick(event)) return;
             event.preventDefault();
-            onAction("configure-model");
+            onAction(kind);
           }}
         >
-          <Settings size={12} aria-hidden="true" />
+          <Icon size={12} aria-hidden="true" />
           {action.label}
         </a>
       </Button>

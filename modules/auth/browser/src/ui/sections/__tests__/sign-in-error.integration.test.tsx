@@ -8,8 +8,9 @@ import { cleanup, render, screen } from "@testing-library/react";
 import { MemoryRouter, useLocation } from "react-router";
 import { afterEach, describe, expect, it } from "vitest";
 
+import { UI_SIGN_OUT_PATH } from "../../../behavior/ui-session-client.ts";
 import { WithTestAuthHost } from "../../../testing.tsx";
-import ErrorScreen, { FEDERATED_LOGOUT_PATH, SignInError } from "../sign-in-error-screen.tsx";
+import ErrorScreen, { SignInError } from "../sign-in-error-screen.tsx";
 
 function renderError(error: string, extra: Record<string, string> = {}) {
   return render(
@@ -44,7 +45,7 @@ describe("<SignInError/>", () => {
       const recovery = screen.getByRole("link", {
         name: /sign out.*try again/i,
       });
-      expect(recovery.getAttribute("href")).toBe(FEDERATED_LOGOUT_PATH);
+      expect(recovery.getAttribute("href")).toBe(UI_SIGN_OUT_PATH);
       // The old behaviour linked straight to /auth/signin, which re-auths the
       // still-live IdP session and re-triggers the same failure (the loop).
       expect(recovery.getAttribute("href")).not.toContain("/auth/signin");
@@ -82,7 +83,18 @@ describe("<SignInError/>", () => {
       const recovery = screen.getByRole("link", {
         name: /sign out.*try again/i,
       });
-      expect(recovery.getAttribute("href")).toBe(FEDERATED_LOGOUT_PATH);
+      expect(recovery.getAttribute("href")).toBe(UI_SIGN_OUT_PATH);
+    });
+
+    /** @scenario "A person refused for using a social button is told who to ask if their company turns them away" */
+    it("says who to ask when their company's sign-in turns them away", () => {
+      renderError("SSO_PROVIDER_NOT_ALLOWED");
+      expect(screen.getByText(/entering your\s+company email address/i)).toBeTruthy();
+      expect(
+        screen.getByText(
+          "If your company's sign-in turns you away, your company may not have given you access to LangWatch yet. Ask your IT administrator to check.",
+        ),
+      ).toBeTruthy();
     });
   });
 
@@ -96,18 +108,43 @@ describe("<SignInError/>", () => {
         ),
       ).toBeTruthy();
       expect(screen.getByRole("link", { name: "Sign out" }).getAttribute("href")).toBe(
-        FEDERATED_LOGOUT_PATH,
+        UI_SIGN_OUT_PATH,
       );
     });
   });
 
   describe("when linking is refused due to a different email (settings flow)", () => {
-    it("keeps the user in settings rather than offering a logout", () => {
+    /** @scenario "Linking an account with a different email sends me back to Security and says what to do" */
+    it("says what to do and goes back to Security, not the sign-in policy", () => {
       renderError("DIFFERENT_EMAIL_NOT_ALLOWED");
       expect(screen.getByText(/can't link this account/i)).toBeTruthy();
-      const back = screen.getByRole("link", { name: /back to settings/i });
-      expect(back.getAttribute("href")).toBe("/settings/authentication");
+      expect(
+        screen.getByText(
+          "The account you picked uses a different email from your LangWatch address. Link an account that has your LangWatch address as a verified email, or add that address to it first.",
+        ),
+      ).toBeTruthy();
+      const back = screen.getByRole("link", { name: "Back to Settings" });
+      expect(back.getAttribute("href")).toBe("/settings/security");
+      expect(screen.queryByRole("link", { name: /back to sign in/i })).toBeNull();
     });
+  });
+});
+
+describe("given a link from Settings refused because another user holds the provider account", () => {
+  /** @scenario "Linking a provider account that belongs to another LangWatch account says so and sends me back to Security" */
+  it("says to disconnect it from the other account and goes back to Security", () => {
+    renderError("account_already_linked_to_different_user");
+
+    expect(screen.getByText("Already connected to another account")).toBeTruthy();
+    expect(
+      screen.getByText(
+        "The account you picked is already connected to a different LangWatch account. Sign in to that LangWatch account and disconnect it in Settings > Security, or connect a different account here.",
+      ),
+    ).toBeTruthy();
+    const back = screen.getByRole("link", { name: "Back to Settings" });
+    expect(back.getAttribute("href")).toBe("/settings/security");
+    expect(screen.queryByText("Account already exists")).toBeNull();
+    expect(screen.queryByRole("link", { name: /sign out/i })).toBeNull();
   });
 });
 
@@ -202,7 +239,7 @@ describe("given a sign-in method refused until an administrator approves the lin
     expect(screen.getByText("This sign-in method needs approval")).toBeTruthy();
     expect(screen.getByText(/administrator in your organization can review/i)).toBeTruthy();
     const recovery = screen.getByRole("link", { name: /sign out.*try again/i });
-    expect(recovery.getAttribute("href")).toBe(FEDERATED_LOGOUT_PATH);
+    expect(recovery.getAttribute("href")).toBe(UI_SIGN_OUT_PATH);
     expect(screen.queryAllByText(/Something went wrong signing you in/i)).toHaveLength(0);
   });
 });
@@ -265,6 +302,65 @@ describe("given a sign-in fails for a reason the person has to act on", () => {
     expect(screen.getByText("Account already exists")).toBeTruthy();
     expect(screen.getByRole("link", { name: /sign out.*try again/i })).toBeTruthy();
     expect(document.body.textContent).not.toContain("OAuthAccountNotLinked");
+  });
+});
+
+describe("given an identity provider that refused the person", () => {
+  /** @scenario "A provider's access_denied refusal crosses and is logged as a warning" */
+  /** @scenario "A refused person at an organization with seats free is told the provider refused" */
+  it("says the company sign-in refused it, not LangWatch, and who to ask", () => {
+    expect(signInErrorMayCross("access_denied")).toBe(true);
+
+    renderError("access_denied", { idp: "okta", trace: "ref_1" });
+
+    expect(screen.getByText("Sign-in was refused")).toBeTruthy();
+    expect(
+      screen.getByText(
+        "Your company sign-in (Okta) refused this sign-in, not LangWatch. Ask your IT team to assign you the LangWatch app in Okta.",
+      ),
+    ).toBeTruthy();
+    expect(screen.getByTestId("sign-in-error-trace").textContent).toBe("Reference: ref_1");
+    expect(screen.queryAllByText(/Something went wrong signing you in/i)).toHaveLength(0);
+  });
+
+  /** @scenario "A provider of a kind we do not name is called the company's sign-in" */
+  /** @scenario "A provider kind outside the allowlist is ignored" */
+  it.each([undefined, "oidc", "saml", "Evil Corp"])(
+    "calls it the company's sign-in for idp %s and echoes nothing",
+    (idp) => {
+      renderError("access_denied", idp === undefined ? {} : { idp });
+
+      expect(
+        screen.getByText(
+          "Your company's sign-in refused this sign-in, not LangWatch. Ask your IT team to assign you the LangWatch app.",
+        ),
+      ).toBeTruthy();
+      expect(document.body.textContent).not.toContain("Evil Corp");
+    },
+  );
+});
+
+describe("given an organization that is out of seats for the refused person", () => {
+  /** @scenario "A refused person the organization would hold for a seat sees the seat-limit screen first" */
+  /** @scenario "The screen never names the organization or any person" */
+  it("says the administrators were asked for a seat, naming nobody", () => {
+    expect(signInErrorMayCross("seat_limit_reached")).toBe(true);
+
+    renderError("seat_limit_reached", {
+      trace: "ref_2",
+      organization: "Acme Corp",
+      admin: "Foo Bar",
+      idp: "okta",
+    });
+
+    expect(screen.getByText("Waiting for a seat")).toBeTruthy();
+    expect(
+      screen.getByText(
+        "Your organization is over its seat limits. Please contact an administrator to approve your access.",
+      ),
+    ).toBeTruthy();
+    expect(screen.getByTestId("sign-in-error-trace").textContent).toBe("Reference: ref_2");
+    expect(document.body.textContent).not.toMatch(/Acme Corp|Foo Bar|Okta/);
   });
 });
 

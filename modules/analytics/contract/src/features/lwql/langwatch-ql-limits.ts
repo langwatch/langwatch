@@ -18,6 +18,20 @@ export const MAX_LWQL_LENGTH = 50_000;
  */
 export const LWQL_MAX_RESULT_ROWS = 10_000;
 
+/**
+ * The most projects one run may name, and the most one tenant capability may carry. The set rides
+ * in the request URI as a query setting, 65 bytes a project, so this sits well under ClickHouse's
+ * 1 MiB URI ceiling. The capability service takes its ceiling from here, so the two never drift.
+ */
+export const LWQL_MAX_NAMED_PROJECTS = 10_000;
+
+/**
+ * The most projects a member's run or a stored widget query may name. A member's list is proven
+ * readable one project at a time, so it stays far below the key door's ceiling; 100 is more
+ * than an editor's picker can sensibly show.
+ */
+export const LWQL_MAX_MEMBER_PROJECTS = 100;
+
 /** The byte ceiling a finished result may not exceed, pinned server-side as `max_result_bytes`. */
 export const LWQL_MAX_RESULT_BYTES = 8_000_000;
 
@@ -51,15 +65,29 @@ export interface LangWatchQLResourceLimits {
    */
   maxResultRows: number;
   maxResultBytes: number;
+  /**
+   * Spill thresholds: a GROUP BY or ORDER BY past these bytes moves to disk rather than failing
+   * at `maxMemoryUsageBytes` (code 241). Half the memory cap, so the spilled merge has room.
+   */
+  maxBytesBeforeExternalGroupBy: number;
+  maxBytesBeforeExternalSort: number;
+  /**
+   * Join algorithms, first that fits: a grace hash join spills its right side to disk. `hash`
+   * last, for the joins the validator accepts that neither hash join can run (OR'd keys, ON
+   * without an equality); those hold their right side in memory.
+   */
+  joinAlgorithm: string;
+  /** Right-side bytes a grace hash join holds in memory before it splits into more buckets. */
+  maxBytesInJoin: number;
 }
 
 /**
- * The shipped ceilings. `maxExecutionTimeSeconds`/`maxMemoryUsageBytes` were measured against
- * `clickhouse-server:25.10.2.65`; the rest are order-of-magnitude guesses, set to refuse a
- * runaway query without a realistic one noticing -- proven accepted by the integration suites.
+ * The shipped ceilings. `maxMemoryUsageBytes` was measured on `clickhouse-server:25.10.2.65`;
+ * 60 s is the owner's cap for a slow widget, which the UI marks as slow (2026-11-11). The rest
+ * refuse a runaway query, order-of-magnitude guesses proven accepted by the integration suites.
  */
 export const DEFAULT_LWQL_RESOURCE_LIMITS: LangWatchQLResourceLimits = {
-  maxExecutionTimeSeconds: 10,
+  maxExecutionTimeSeconds: 60,
   maxMemoryUsageBytes: 1_000_000_000,
   maxThreads: 4,
   maxConcurrentQueriesForUser: 10,
@@ -67,4 +95,14 @@ export const DEFAULT_LWQL_RESOURCE_LIMITS: LangWatchQLResourceLimits = {
   maxBytesToRead: 10_000_000_000,
   maxResultRows: LWQL_MAX_RESULT_ROWS,
   maxResultBytes: LWQL_MAX_RESULT_BYTES,
+  maxBytesBeforeExternalGroupBy: 500_000_000,
+  maxBytesBeforeExternalSort: 500_000_000,
+  joinAlgorithm: "grace_hash,parallel_hash,hash",
+  maxBytesInJoin: 200_000_000,
 };
+
+/** A widget holds at most this many queries, each naming its own projects. */
+export const LWQL_MAX_QUERIES_PER_WIDGET = 8;
+
+/** The ids one widget write may name across all its queries: a member list per query. */
+export const LWQL_MAX_WIDGET_PROJECTS = LWQL_MAX_MEMBER_PROJECTS * LWQL_MAX_QUERIES_PER_WIDGET;

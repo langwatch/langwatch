@@ -123,8 +123,11 @@ describe("runWrapped", () => {
   });
 
   describe("when the run asks the tool for its help", () => {
-    /** @scenario "A help run sets nothing up" */
-    it.each(["claude", "codex", "copilot", "gemini", "opencode"])(
+    /**
+     * @scenario "A help run sets nothing up"
+     * @scenario Wrapper help passes through to Grok
+     */
+    it.each(["claude", "codex", "copilot", "gemini", "opencode", "grok"])(
       "hands `%s --help` to the tool and sets nothing up",
       async (tool) => {
         spawnMock.mockReturnValue(childClosingWith(3));

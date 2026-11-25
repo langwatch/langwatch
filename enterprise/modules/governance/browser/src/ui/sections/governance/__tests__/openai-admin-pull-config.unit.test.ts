@@ -16,7 +16,8 @@
 import { openaiAdminPullConfigSchema } from "@langwatch/enterprise-governance-contract";
 import { describe, expect, it } from "vitest";
 
-import { buildOpenAiAdminPullConfig, type ComposerState } from "../governance-inventory.screen.tsx";
+import { buildOpenAiAdminPullConfig } from "../inventory/admin-api-pull-config.ts";
+import { type ComposerState } from "../inventory/source-composer-state.ts";
 
 function composer(parserConfig: Record<string, string>, pullSchedule = ""): ComposerState {
   return {

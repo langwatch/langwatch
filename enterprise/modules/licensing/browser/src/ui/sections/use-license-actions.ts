@@ -5,12 +5,15 @@ interface UseLicenseActionsOptions {
   organizationId: string;
   onUploadSuccess: () => void;
   onRemoveSuccess: () => void;
+  /** After a refresh ends either way, so the sync line reads what it recorded. */
+  onRefreshSettled?: () => void;
 }
 
 export function useLicenseActions({
   organizationId,
   onUploadSuccess,
   onRemoveSuccess,
+  onRefreshSettled,
 }: UseLicenseActionsOptions) {
   const host = useLicensingHost();
   // The SSO license gate re-reads a deny within a minute (ADR-027), so a license
@@ -81,6 +84,7 @@ export function useLicenseActions({
       refreshPlanDerivedState();
     },
     onError: (error) => host.failed({ error, fallbackTitle: "Couldn't refresh license" }),
+    onSettled: () => onRefreshSettled?.(),
   });
 
   const upload = (licenseKey: string) => {

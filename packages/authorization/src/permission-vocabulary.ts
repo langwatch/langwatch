@@ -12,6 +12,8 @@ export const Actions = {
   UPDATE: "update",
   DELETE: "delete",
   MANAGE: "manage", // Full CRUD + settings
+  // Points a deploy label at a version of an agent or an evaluator.
+  DEPLOY: "deploy",
   SHARE: "share",
   // Gateway-specific actions: `rotate` is a sub-action of `update` for virtual
   // keys but callers may want to grant it independently. `attach`/`detach`
@@ -25,6 +27,8 @@ export const Actions = {
   // personal VKs during off-boarding sweeps. Personal-VK self-view stays
   // implicit on principalUserId match (no perm needed for "see my own").
   VIEW_OTHER_PERSONAL: "viewOtherPersonal",
+  // Starts a paid subscription for the organization.
+  UPGRADE: "upgrade",
 } as const;
 
 export type Action = (typeof Actions)[keyof typeof Actions];
@@ -74,6 +78,7 @@ export const Resources = {
   GATEWAY_LOGS: "gatewayLogs",
   GATEWAY_USAGE: "gatewayUsage",
   GATEWAY_CACHE_RULES: "gatewayCacheRules",
+  GATEWAY_A2A_TARGETS: "gatewayA2aTargets",
   // AI Governance resources — see specs/ai-gateway/governance/. These are
   // org-level (not project/team-level), so they live in
   // ORGANIZATION_ROLE_PERMISSIONS rather than the team role bags. Custom
@@ -113,6 +118,13 @@ export const Resources = {
   // ADR-122). Organization-tier only: a connection decides how EVERYONE in
   // the organization signs in.
   SSO: "sso",
+  AGENTS: "agents",
+  EVALUATORS: "evaluators",
+  SUBSCRIPTION: "subscription",
+  SEAT_REQUESTS: "seatRequests",
+  MEMBERS: "members",
+  // Who may share matching spans into another project's traces (ADR-201 §2).
+  BRAIDS: "braids",
 } as const;
 
 export type Resource = (typeof Resources)[keyof typeof Resources];

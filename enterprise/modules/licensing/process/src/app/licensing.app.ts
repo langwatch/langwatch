@@ -142,12 +142,17 @@ import { UpgradeDiagnosticsService } from "../services/upgrade-diagnostics.servi
 /** Seat counts over organization's membership rows, read through its shares (R-C1f, Q9). */
 function seatCountsOver(
   organizations: Pick<MemberSeatRepository, "countMemberSeats">,
-): Pick<LicensingInfrastructure["repository"], "getMemberCount" | "getMembersLiteCount"> {
+): Pick<
+  LicensingInfrastructure["repository"],
+  "getMemberCount" | "getMembersLiteCount" | "getMembersDeveloperCount"
+> {
   return {
     getMemberCount: async (organizationId) =>
       (await organizations.countMemberSeats({ organizationId })).fullMembers,
     getMembersLiteCount: async (organizationId) =>
       (await organizations.countMemberSeats({ organizationId })).liteMembers,
+    getMembersDeveloperCount: async (organizationId) =>
+      (await organizations.countMemberSeats({ organizationId })).developers,
   };
 }
 
@@ -561,6 +566,7 @@ export class LicensingModule implements LicensingApiContract {
     id: string;
     maxMembers?: number;
     maxMembersLite?: number;
+    maxMembersDeveloper?: number;
     maxMessagesPerMonth?: number;
     expiresAt: string;
     operatorId: string;
@@ -637,6 +643,10 @@ export class LicensingModule implements LicensingApiContract {
 
   verifyLicenceToken(input: ConnectPresentedCredential): Promise<ConnectLicenceCaller> {
     return this.#sync.verify(input);
+  }
+
+  verifyLicenceTokenForSync(input: ConnectPresentedCredential): Promise<ConnectLicenceCaller> {
+    return this.#sync.verifyForSync(input);
   }
 
   verifyActivationCode(input: ConnectPresentedCredential): Promise<ConnectActivationCaller> {
@@ -741,6 +751,14 @@ export class LicensingModule implements LicensingApiContract {
 
   getContractTerms(input: { organizationId: string }): Promise<ContractTerms> {
     return this.#contractBudgets.termsOf(input.organizationId);
+  }
+
+  countFullSeatsInUse(input: { organizationId: string }): Promise<number> {
+    return this.#service.countFullSeatsInUse(input.organizationId);
+  }
+
+  countDevelopersInUse(input: { organizationId: string }): Promise<number> {
+    return this.#service.countDevelopersInUse(input.organizationId);
   }
 
   getConnectedSeats(input: { organizationId: string }): Promise<ConnectedSeats> {

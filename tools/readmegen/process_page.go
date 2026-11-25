@@ -170,6 +170,9 @@ func addressLine(route *RestRoute, family *RestFamily) string {
 			hidden = append(hidden, paths...)
 		}
 	}
+	if len(shown) == 0 {
+		return "Answers only, undocumented, at " + strings.Join(hidden, ", ") + "."
+	}
 	line := "Answers at " + strings.Join(shown, ", ")
 	if len(hidden) > 0 {
 		line += "; also, undocumented, " + strings.Join(hidden, ", ")
