@@ -382,7 +382,8 @@ Feature: LangWatchQL eval functions — a judged column, computed by the classif
     When the worst cases held for sends in flight leave no room for the next send
     Then that send waits, in the order asked, until enough holds settle and then is held
     And it is refused only once what was billed leaves it no room with nothing held
-    And a caller's stop ends the wait with the stop, holding nothing
+    And a later send that would fit now still waits behind an earlier one
+    And a caller's stop ends the wait with the stop, holding nothing, and wakes the sends behind it
     And a large query whose real cost stays under the ceiling skips no row as "query_cost_ceiling"
 
   @unit

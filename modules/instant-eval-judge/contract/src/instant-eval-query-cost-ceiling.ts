@@ -1,11 +1,11 @@
 /**
  * One routed judged query's cost ceiling (ADR-190 decision 13): what its sends were billed plus
  * the worst cases held for the sends in flight never passes the ceiling, so neither does its spend.
- * A send that fits only once other holds settle waits for them, in the order asked.
+ * A send that fits only once other holds settle waits for them, in the order asked. Per query.
  * @see specs/lwql/eval-functions.feature
  */
 
-import type { InstantEvalJudgeCostCeiling } from "@langwatch/instant-eval-judge-contract";
+import type { InstantEvalJudgeCostCeiling } from "./instant-eval-judge.api.ts";
 
 type Waiter = {
   readonly nanoUsd: number;
@@ -13,19 +13,14 @@ type Waiter = {
   readonly detach: () => void;
 };
 
-export class InstantEvalQueryCostCeilingService implements InstantEvalJudgeCostCeiling {
+export class InstantEvalQueryCostCeiling implements InstantEvalJudgeCostCeiling {
   #heldNanoUsd = 0;
   #billedNanoUsd = 0;
   readonly #waiters: Waiter[] = [];
+  readonly #ceilingNanoUsd: number;
 
-  private constructor(private readonly ceilingNanoUsd: number) {}
-
-  static create({
-    ceilingNanoUsd,
-  }: {
-    ceilingNanoUsd: number;
-  }): InstantEvalQueryCostCeilingService {
-    return new InstantEvalQueryCostCeilingService(ceilingNanoUsd);
+  constructor({ ceilingNanoUsd }: { ceilingNanoUsd: number }) {
+    this.#ceilingNanoUsd = ceilingNanoUsd;
   }
 
   /** A worst case that is not a finite cost (an unpriced backend) is never held. */
@@ -75,10 +70,10 @@ export class InstantEvalQueryCostCeilingService implements InstantEvalJudgeCostC
   }
 
   #canEverFit(nanoUsd: number): boolean {
-    return this.#billedNanoUsd + nanoUsd <= this.ceilingNanoUsd;
+    return this.#billedNanoUsd + nanoUsd <= this.#ceilingNanoUsd;
   }
 
   #fitsNow(nanoUsd: number): boolean {
-    return this.#billedNanoUsd + this.#heldNanoUsd + nanoUsd <= this.ceilingNanoUsd;
+    return this.#billedNanoUsd + this.#heldNanoUsd + nanoUsd <= this.#ceilingNanoUsd;
   }
 }
