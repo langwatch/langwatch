@@ -28,7 +28,7 @@ export type BillingGrantLedger = Pick<
 type AuthzBillingRoleOptions = {
   grants: AuthzBillingGrantRepository;
   standings: AuthzUserStandingRepository;
-  memberships: Pick<AuthzManagedGrantRepository, "isBillingOnlyMember">;
+  bindings: Pick<AuthzManagedGrantRepository, "isBillingOnlyMember">;
   ledger: BillingGrantLedger;
   permissions: Pick<AuthzService, "findPermissionsBeyondCaller">;
   newGrantId: () => string;
@@ -89,7 +89,7 @@ export class AuthzBillingRoleService {
     }
     if (
       held.length > 0 &&
-      (await this.options.memberships.isBillingOnlyMember({ organizationId, userId }))
+      (await this.options.bindings.isBillingOnlyMember({ organizationId, userId }))
     ) {
       throw new AuthzBillingOnlyKeepsBillingError();
     }

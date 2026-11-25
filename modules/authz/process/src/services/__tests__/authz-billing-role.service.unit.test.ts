@@ -94,7 +94,7 @@ describe("AuthzBillingRoleService", () => {
     service = AuthzBillingRoleService.create({
       grants: MemoryAuthzBillingGrantRepository.create({ memory }),
       standings: MemoryAuthzUserStandingRepository.create({ memory }),
-      memberships: MemoryAuthzManagedGrantRepository.create({ memory }),
+      bindings: MemoryAuthzManagedGrantRepository.create({ memory }),
       ledger: memoryLedger(memory),
       permissions: {
         async findPermissionsBeyondCaller(input) {
