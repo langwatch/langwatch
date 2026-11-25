@@ -9,7 +9,6 @@ import {
   A2A_V1_METHODS,
   a2aSpanNameMatch,
   NormalizedSpanKind,
-  type A2aSpanMark,
   type AgentCallGraph,
   type AgentCallGraphEdge,
   type AgentCallGraphNode,
@@ -73,6 +72,16 @@ function hasA2aAttribute(params: AgentCallGraphSpan["params"]): boolean {
   if (!params) return false;
   const keys = Object.keys(params);
   return keys.some((key) => key.startsWith("a2a.")) || isRecord(params.a2a);
+}
+
+/** What the A2A classifier reads off a span it recognises as an A2A call. */
+export interface A2aSpanMark {
+  spanId: string;
+  role: "client" | "server" | "unknown";
+  method: string | null;
+  contextId: string | null;
+  taskId: string | null;
+  taskState: string | null;
 }
 
 export type A2aClassification = { isA2a: false } | { isA2a: true; mark: A2aSpanMark };
@@ -231,7 +240,6 @@ export function buildAgentCallGraph({
 
   const nodes = new Map<string, AgentCallGraphNode>();
   const edges = new Map<string, AgentCallGraphEdge>();
-  const a2aSpans: A2aSpanMark[] = [];
 
   for (const span of spans) {
     const owner = ownerAfterFold(span);
@@ -242,7 +250,6 @@ export function buildAgentCallGraph({
       hasParent: !span.parentSpanId || byId.has(span.parentSpanId),
     });
     const a2a = facts.get(span.spanId)?.a2a ?? { isA2a: false };
-    if (a2a.isA2a) a2aSpans.push(a2a.mark);
     const parent = span.parentSpanId ? byId.get(span.parentSpanId) : undefined;
     if (parent) {
       const above = facts.get(parent.spanId)?.a2a;
@@ -257,7 +264,7 @@ export function buildAgentCallGraph({
   const ordered = [...nodes.values()].toSorted(
     (a, b) => Number(b.id === rootId) - Number(a.id === rootId),
   );
-  return { nodes: ordered, edges: [...edges.values()].toSorted(byErrorsThenCalls), a2aSpans };
+  return { nodes: ordered, edges: [...edges.values()].toSorted(byErrorsThenCalls) };
 }
 
 /** Edges with errors first, then the busiest. */
@@ -510,11 +517,11 @@ export function visibleResourcesOf({
   resources: AgentCallGraphResources;
   spans: readonly Pick<AgentCallGraphSpan, "spanId">[];
 }): AgentCallGraphResources {
-  const visible = new Set(spans.map((span) => span.spanId));
+  const visible = new Set<string | null>(spans.map((span) => span.spanId));
   const rows = resources.spans.filter((row) => visible.has(row.spanId));
   const ownRows = rows.filter((row) => row.ownerProjectId === undefined);
   const root =
     ownRows.find((row) => !row.parentSpanId) ??
-    ownRows.find((row) => !row.parentSpanId || !visible.has(row.parentSpanId));
+    ownRows.find((row) => !visible.has(row.parentSpanId));
   return { resourceAttributes: root?.resourceAttributes ?? {}, spans: rows };
 }
