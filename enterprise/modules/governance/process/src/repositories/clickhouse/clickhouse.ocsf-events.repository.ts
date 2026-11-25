@@ -10,7 +10,10 @@ import { toDate } from "@langwatch/time";
 import { z } from "zod";
 
 import { type GovernanceSeatReportRow, seatReportsOf } from "../../rules/ocsf-seat-report.rules.ts";
-import { OCSF_STORED_SCHEMA_VERSION } from "../governance.repositories.ts";
+import {
+  governanceOcsfExportRowOf,
+  OCSF_STORED_SCHEMA_VERSION,
+} from "../governance.repositories.ts";
 import type {
   GovernanceOcsfEvent,
   GovernanceOcsfEventsReader,
@@ -75,9 +78,6 @@ const INSERT_SETTINGS = { async_insert: 1, wait_for_async_insert: 1 } as const;
 
 const logger = createLogger("langwatch:governance:clickhouse-ocsf-events-repository");
 
-const OCSF_CLASS_API_ACTIVITY = 6003;
-const OCSF_CATEGORY_APPLICATION_ACTIVITY = 6;
-
 /** Cursor-paginated read of `governance_ocsf_events`, ordered EventTime ASC. */
 export interface FindOcsfEventsInput {
   tenantId: string;
@@ -117,8 +117,6 @@ export interface FindOcsfEventsByIngestInput {
 export interface OcsfIngestOrderedReader {
   findAllByIngest(input: FindOcsfEventsByIngestInput): Promise<GovernanceOcsfIngestOrderedRow[]>;
 }
-
-export type { GovernanceSeatReportRow };
 
 /** The licence-seat read `governanceCost.service.ts`'s seats screen needs. */
 export interface OcsfSeatReportReader {
@@ -173,6 +171,7 @@ function toExportRow(r: OcsfExportCHRow): GovernanceOcsfExportRow {
 }
 
 function toOcsfEventValues(row: GovernanceOcsfEvent): Record<string, unknown> {
+  const { classUid, categoryUid, typeUid } = governanceOcsfExportRowOf(row);
   return {
     TenantId: row.tenantId,
     OcsfSchemaVersion: OCSF_STORED_SCHEMA_VERSION,
@@ -180,10 +179,10 @@ function toOcsfEventValues(row: GovernanceOcsfEvent): Record<string, unknown> {
     TraceId: row.traceId,
     SourceId: row.sourceId,
     SourceType: row.sourceType,
-    ClassUid: row.classUid ?? OCSF_CLASS_API_ACTIVITY,
-    CategoryUid: row.categoryUid ?? OCSF_CATEGORY_APPLICATION_ACTIVITY,
+    ClassUid: classUid,
+    CategoryUid: categoryUid,
     ActivityId: row.activityId,
-    TypeUid: row.typeUid ?? (row.classUid ?? OCSF_CLASS_API_ACTIVITY) * 100 + row.activityId,
+    TypeUid: typeUid,
     SeverityId: row.severityId,
     // `eventTime` is a Temporal Instant on this branch; the client wants a Date.
     EventTime: toDate(row.eventTime),
