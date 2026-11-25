@@ -14,6 +14,10 @@ import {
   CHART_FRAME_MAX_HEIGHT_PX,
   CHART_FRAME_MIN_HEIGHT_PX,
 } from "@langwatch/analytics-contract/chart-frame-protocol";
+import {
+  CHART_SERIES_TOKENS,
+  CHART_STYLE_TOKENS,
+} from "@langwatch/analytics-contract/visualization";
 import { Card } from "@langwatch/design-system/card";
 import { getRawColorValue } from "@langwatch/design-system/color-mode";
 import { Box, Button, Text, VStack } from "@langwatch/design-system/primitives";
@@ -43,7 +47,8 @@ function withThemeColors(context: ChartFrameDashboardContext): ChartFrameDashboa
     "border.error",
     "blue.subtle",
     "blue.solid",
-    ...Array.from({ length: 8 }, (_, index) => `chart.${index + 1}`),
+    ...CHART_SERIES_TOKENS,
+    ...Object.values(CHART_STYLE_TOKENS),
   ];
   return {
     ...context,

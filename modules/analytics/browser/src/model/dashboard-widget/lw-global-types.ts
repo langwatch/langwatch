@@ -13,6 +13,26 @@ interface LwTimeWindow {
 
 type LwTheme = "light" | "dark";
 
+/** \`LW.palette\`: the ordered series colours (CSS colour strings) for \`mode\`. */
+interface LwPalette {
+  readonly mode: LwTheme;
+  readonly series: readonly string[];
+}
+
+/** \`LW.chartStyle\`: shape metrics in px, and the greys a chart draws with. */
+interface LwChartStyle {
+  /** Corner radius for bar ends, in px. */
+  readonly barCornerRadius: number;
+  /** Marker diameter for points, in px. */
+  readonly dotSize: number;
+  /** Background bar behind a bar or gauge. */
+  readonly track: string;
+  /** Axis labels and tick text. */
+  readonly axis: string;
+  /** Gridlines. */
+  readonly grid: string;
+}
+
 /**
  * Host-supplied, read-only snapshot of the dashboard's own state —
  * everything a widget did NOT author itself. Set synchronously before
@@ -191,6 +211,18 @@ interface LwApi {
 
   /** The dashboard's current color theme, fixed for the frame's lifetime. */
   readonly theme: LwTheme;
+
+  /**
+   * The chart series colours, in order, for the current mode. Use these instead of
+   * hard-coded hex so a chart reads in light and dark. Series one is the first hue.
+   */
+  readonly palette: LwPalette;
+
+  /**
+   * The chart style set for the current mode: bar corner radius, marker size, and the
+   * track, axis and grid greys. Read it beside \`LW.palette\`.
+   */
+  readonly chartStyle: LwChartStyle;
 
   /**
    * Runs one of the widget's declared queries by name, forwarding the given

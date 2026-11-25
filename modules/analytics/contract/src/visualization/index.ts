@@ -3,6 +3,7 @@
  * validator is in ./validation to avoid loading 8MB of Ajv for browser imports.
  */
 export * from "./build-langwatch-ql-vega-spec.ts";
+export * from "./chart-palette.ts";
 export * from "./langwatch-vega-config.ts";
 export * from "./lwql-chart-failures.ts";
 export * from "./no-network-vega-loader.ts";

@@ -13,13 +13,13 @@ const C = {
   text: dark ? "#f4f4f5" : "#18181b",
   subtle: dark ? "#a1a1aa" : "#52525b",
   faint: dark ? "#71717a" : "#a1a1aa",
-  border: dark ? "#27272a" : "#e4e4e7",
+  border: LW.chartStyle.grid,
   strong: dark ? "#3f3f46" : "#d4d4d8",
-  muted: dark ? "#27272a" : "#f4f4f5",
+  muted: LW.chartStyle.track,
   panel: dark ? "#18181b" : "#ffffff",
-  teal: dark ? "#2dd4bf" : "#0d9488",
-  orange: "#ed8926",
-  pink: "#ed64a6",
+  teal: LW.palette.series[5],
+  orange: LW.palette.series[0],
+  pink: LW.palette.series[7],
   red: dark ? "#f87171" : "#dc2626",
   green: dark ? "#4ade80" : "#16a34a",
 };`;
@@ -75,7 +75,7 @@ function bucketUnit() {
   return seconds >= 604800 ? "week" : seconds >= 86400 ? "day" : "hour";
 }`;
 
-export const CHART_STYLE = `const AXIS = { fontSize: 14, fill: dark ? C.faint : "#666666" };
+export const CHART_STYLE = `const AXIS = { fontSize: 14, fill: LW.chartStyle.axis };
 const TIP = { background: C.panel, border: "1px solid " + C.border, borderRadius: 8, fontSize: 12 };
 const dot = (color) => ({ width: 8, height: 8, borderRadius: 4, background: color });
 
@@ -94,7 +94,7 @@ function Legend({ items, kind = "series" }) {
   );
 }`;
 
-export const BARS = `const RAMP = ["#4299e1", "#ed8926", "#9f7aea", "#48bb78", "#ed64a6", "#38b2ac", "#0bc5ea"];
+export const BARS = `const RAMP = LW.palette.series;
 // A headline model keeps its colour on every chart; any other name takes its rank's.
 const FIXED_COLOURS = {
   "gpt-5": 0,
@@ -109,7 +109,7 @@ const ELLIPSIS = { overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "no
 const bar = (colour) => ({
   display: "block",
   height: "100%",
-  borderRadius: 4,
+  borderRadius: LW.chartStyle.barCornerRadius,
   opacity: 0.8,
   background: colour,
 });
@@ -135,7 +135,7 @@ function Bars({ rows, format, height, kind }) {
           <span style={{ width: 128, flexShrink: 0, color: C.subtle, ...ELLIPSIS }}>
             {row.label || "Unknown"}
           </span>
-          <span style={{ flex: 1, height: 16, borderRadius: 4, background: C.muted,
+          <span style={{ flex: 1, height: 16, borderRadius: LW.chartStyle.barCornerRadius, background: C.muted,
             fontSize: 10.5, lineHeight: "16px", paddingLeft: known(row.value) ? 0 : 6,
             color: C.faint }}>
             {known(row.value) ? (

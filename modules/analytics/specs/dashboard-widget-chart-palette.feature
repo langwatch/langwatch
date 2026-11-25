@@ -1,0 +1,38 @@
+Feature: Widget code draws in the chart palette for the reader's mode
+
+  One palette and one style set serve every chart. Widget code reads them from the runtime
+  as LW.palette and LW.chartStyle, so light and dark both read well with no colour copied in.
+
+  Rule: The runtime resolves the palette for the current mode
+
+    @unit
+    Scenario: Light mode gives the ordered series colours of the light tokens
+      Given the host resolves the chart series tokens for light mode
+      When the runtime builds LW.palette
+      Then LW.palette has mode "light" and its eight series colours in token order
+
+    @unit
+    Scenario: Dark mode gives the dark series colours, not the light ones
+      Given the host resolves the chart series tokens for dark mode
+      When the runtime builds LW.palette
+      Then LW.palette has mode "dark" and each series colour is the dark value
+
+    @unit
+    Scenario: The style set carries the shape metrics and the track, axis and grid greys
+      Given the host resolves the style tokens for light mode
+      When the runtime builds LW.chartStyle
+      Then LW.chartStyle has barCornerRadius, dotSize, and the track, axis and grid colours
+
+  Rule: Widget code with a hard-coded colour gets a hint, never a refusal
+
+    @unit
+    Scenario: A quoted hex colour is hinted
+      Given widget code with a quoted hex colour
+      When the editor checks the source
+      Then the hex is hinted to use LW.palette and no error is raised
+
+    @unit
+    Scenario: Source that reads LW.palette gets no colour hint
+      Given widget code that reads only LW.palette and LW.chartStyle
+      When the editor checks the source
+      Then no colour hint is raised
