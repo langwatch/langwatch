@@ -42,6 +42,7 @@ The agent-side variables (`LANGY_*` apart from the one below) are set on the `la
 |---|---|---|---|
 | `LANGY_MAX_WORKERS` | Max concurrent worker subprocesses before the pod returns 503. | No | `20` |
 | `LANGY_WORKER_IDLE_MS` | Idle-worker reap timeout. | No | `600000` (10 min) |
+| `LANGY_WORKER_MAX_AGE_MS` | Max worker age. A worker older than this is replaced between turns, so its session key (6 hours) never expires mid-conversation. | No | `18000000` (5 hours) |
 | `LANGY_READINESS_TIMEOUT_MS` | How long to wait for a freshly spawned worker to report ready. The Go default is 15000; the chart raises it to 60000 for gVisor cold boot. | No | `60000` (chart) |
 | `LANGY_WORKSPACE_ROOT` | Writable workspace root (an `emptyDir` mount). | No | `/workspace` |
 

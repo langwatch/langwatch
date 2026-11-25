@@ -42,7 +42,11 @@ function evaluateShim() {
   const run = new Function("window", "console", "setInterval", buildShimScript());
   run(win, fakeConsole, () => 0);
 
-  const port = { onmessage: null as ((event: unknown) => void) | null, postMessage: () => {} };
+  const posted: unknown[] = [];
+  const port = {
+    onmessage: null as ((event: unknown) => void) | null,
+    postMessage: (message: unknown) => posted.push(message),
+  };
   const dispatchInit = (source: unknown, widgetSource: string, theme = "light") => {
     const event = {
       data: {
@@ -57,7 +61,7 @@ function evaluateShim() {
     for (const handler of listeners.message ?? []) handler(event);
   };
 
-  return { win, parent, port, activateAuthor, dispatchInit };
+  return { win, parent, port, posted, activateAuthor, dispatchInit };
 }
 
 describe("given the frame's shim is listening for lw:init", () => {
@@ -99,5 +103,28 @@ describe("given the frame paints its own canvas", () => {
       });
       expect(document.documentElement.style.colorScheme).toBe("light");
     });
+  });
+});
+
+describe("given a widget that reports its problem on every render", () => {
+  /** @scenario "AC244 Widget actions: Investigate and Propose a fix show only while the widget reports its problem" */
+  it("posts lw:signal only when the problem appears or goes, as a plain boolean", () => {
+    const { win, parent, posted, dispatchInit } = evaluateShim();
+    dispatchInit(parent, "export default () => null;");
+    const LW = win.LW as { signal: (state: unknown) => void };
+
+    LW.signal({ problem: true });
+    LW.signal({ problem: true });
+    LW.signal({ problem: false });
+    LW.signal({});
+    LW.signal({ problem: "yes" });
+    LW.signal({ problem: true });
+
+    const signals = posted.filter((message) => (message as { type?: string }).type === "lw:signal");
+    expect(signals).toEqual([
+      { type: "lw:signal", signal: { problem: true } },
+      { type: "lw:signal", signal: { problem: false } },
+      { type: "lw:signal", signal: { problem: true } },
+    ]);
   });
 });

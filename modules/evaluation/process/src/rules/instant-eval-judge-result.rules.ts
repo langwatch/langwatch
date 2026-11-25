@@ -56,13 +56,12 @@ export function instantEvalJudgeResult({
 }
 
 /**
- * Who answered a routed judgement, by the backend names the route table gives; never a
- * provider's own words (ADR-190).
+ * A routed judgement names the product and how many questions escalated, never a route table
+ * backend id; `answeredBy` stays on the judgement only (ADR-190 decision 10, amended).
  */
-function routedLine({ answeredBy, escalated }: InstantEvalJudgeRouting): string {
-  const backends = Object.keys(answeredBy).join(", ") || "nobody";
+function routedLine({ escalated }: InstantEvalJudgeRouting): string {
   const escalation = escalated > 0 ? `, ${escalated} escalated` : "";
-  return `LangWatch Judge: answered by ${backends}${escalation}`;
+  return `LangWatch Judge${escalation}`;
 }
 
 function verdictResultOf({

@@ -18,6 +18,7 @@ import {
   DEFAULT_INSERT_COALESCE_MAX_ROWS,
   InsertCoalescer,
 } from "./insert-coalescing.ts";
+import { markInsertFailure } from "./insertFailure.ts";
 import type {
   ClickHouseOverloadErrorFactory,
   ClickHouseStatementAdmission,
@@ -447,10 +448,18 @@ export class ClickHouseQueryClient {
         throw error instanceof InsertNotRetriedInPlace ? error.failure : error;
       }
     };
+    const marked = async (): Promise<void> => {
+      try {
+        await withRetries();
+      } catch (error) {
+        markInsertFailure(error);
+        throw error;
+      }
+    };
     return this.reported({
       operation: "insert",
       params: { table: request.table },
-      task: withRetries,
+      task: marked,
     });
   }
 

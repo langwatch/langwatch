@@ -12,7 +12,7 @@ import { useCallback, useEffect, useMemo, useRef } from "react";
 
 import { api } from "../../../../behavior/langy-api.ts";
 import { useLangyLocalControlStore } from "../../../../behavior/langy-local-control.store.ts";
-import { useLangyStore } from "../../../../behavior/langy.store.ts";
+import { selectConversationReadable, useLangyStore } from "../../../../behavior/langy.store.ts";
 import {
   langyPermissionCards,
   langyQuestionCards,
@@ -93,9 +93,10 @@ export function useLangyLocalWaits({
     useLangyLocalControlStore.getState().reset(activeConversationId);
   }, [activeConversationId]);
 
+  const readable = useLangyStore((s) => selectConversationReadable(s, activeConversationId));
   const localWorkspace = api.langy.getLocalWorkspace.useQuery(
     { projectId: projectId ?? "", conversationId: activeConversationId ?? "" },
-    { select: parseLangyLocalWorkspace, enabled: !!projectId && !!activeConversationId },
+    { select: parseLangyLocalWorkspace, enabled: !!projectId && readable },
   );
 
   return {

@@ -14,7 +14,12 @@ import {
 import { SegmentedControl } from "@langwatch/design-system/segmented-control";
 import { useState } from "react";
 
-import { type BraidEnds, dayInputMs, dayInputValue } from "../../../../model/braids/braid-draft.ts";
+import {
+  type BraidEnds,
+  braidStartsNow,
+  dayInputMs,
+  dayInputValue,
+} from "../../../../model/braids/braid-draft.ts";
 
 export type BraidWindowFieldsProps = {
   fromMs: number;
@@ -39,14 +44,13 @@ function WindowSummary({
   ends,
   nowMs,
 }: Pick<BraidWindowFieldsProps, "fromMs" | "ends" | "nowMs">) {
-  const fromToday = dayInputValue(fromMs) === dayInputValue(nowMs);
   return (
     <>
-      {fromToday ? (
+      {braidStartsNow({ fromMs, nowMs }) ? (
         "From now"
       ) : (
         <>
-          From <FormattedDate value={fromMs} display="date" timeZone="UTC" />
+          From <FormattedDate value={fromMs} display="datetime" timeZone="UTC" showZone />
         </>
       )}
       {" · "}

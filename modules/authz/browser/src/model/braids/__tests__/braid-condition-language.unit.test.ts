@@ -26,6 +26,20 @@ describe("braidConditionCompletions", () => {
       ]);
     });
 
+    /** @scenario Autocomplete never offers reserved or signature keys */
+    it("never offers langwatch.signature or another langwatch.* key", () => {
+      const { items } = braidConditionCompletions({
+        text: 'attributes["',
+        offset: 'attributes["'.length,
+        attributeKeys: [
+          ...KEYS,
+          { key: "langwatch.signature", spanCount: 5000 },
+          { key: "langwatch.origin", spanCount: 4000 },
+        ],
+      });
+      expect(items.map(({ label }) => label)).toEqual(["orchestrator", "team"]);
+    });
+
     it("replaces the typed part and the closing quote and bracket", () => {
       const text = 'attributes["or"] == "web"';
       const offset = 'attributes["or'.length;

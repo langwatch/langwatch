@@ -252,3 +252,13 @@ export class SuiteEvaluatorMappingsMissingError extends HandledError {
     this.name = "SuiteEvaluatorMappingsMissingError";
   }
 }
+
+/** A template id no shipped suite template carries. */
+export class SuiteTemplateNotFoundError extends NotFoundError {
+  declare readonly code: "suite_template_not_found";
+
+  constructor(templateId: string) {
+    super("suite_template_not_found", { resource: "SuiteTemplate", id: templateId });
+    this.name = "SuiteTemplateNotFoundError";
+  }
+}

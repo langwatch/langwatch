@@ -74,15 +74,15 @@ Feature: AI Gateway Governance — Template Cross-Bind Guard
       | 5    | langwatch.user.id   = jane.id        (re-stamped)                   |
       | 6    | langwatch.project.id = "personal-jane" (re-stamped)                 |
       | 7    | emits audit row `gateway.template_ottl_protected_field_attempt`     |
-    And the trace lands at jane's /me/traces (NOT ben's)
+    And the trace lands at jane's /<personal project slug>/traces (NOT ben's)
     And the audit row payload contains the rejected key list:
         [langwatch.tenant.id, langwatch.user.id, langwatch.project.id]
 
   @bdd @cross-bind-guard @token-as-scope @cross-user-receive
   Scenario: User A's key cannot deliver traces to user B's project under any payload manipulation
     When jane fires N OTLP payloads with various forge-attempt variants using `sk-lw-KEY_JANE`
-    Then ALL N traces land at jane's /me/traces (project="personal-jane")
-    And ZERO traces land at ben's /me/traces
+    Then ALL N traces land at jane's /<personal project slug>/traces (project="personal-jane")
+    And ZERO traces land at ben's /<personal project slug>/traces
 
   # ---------------------------------------------------------------------------
   # No-enumeration — collapse-to-NOT_FOUND on cross-org probes

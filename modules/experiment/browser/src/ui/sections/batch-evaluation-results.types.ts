@@ -8,6 +8,10 @@ import {
 } from "@langwatch/experiment-contract";
 import { z } from "zod";
 
+import {
+  rowPassRatesOf,
+  type RowPassRate,
+} from "../../model/batch-evaluation-results.run-repeat.ts";
 import { disambiguateNames } from "./batch-results/presentation.tsx";
 
 const jsonRecordSchema = z.record(z.string(), z.unknown());
@@ -88,7 +92,16 @@ export type BatchResultRow = {
   datasetEntry: Record<string, unknown>;
   /** Target outputs keyed by target ID */
   targets: Record<string, BatchTargetOutput>;
+  /**
+   * A dataset position the run holds nothing for. Rows stay positional so runs line up by
+   * dataset row; a run of rows 10-14 keeps 0-9 here, and they are neither counted nor shown.
+   */
+  notInRun?: true;
 };
+
+/** The rows the run actually holds, without the placeholders that keep rows positional. */
+export const rowsInRun = (rows: BatchResultRow[]): BatchResultRow[] =>
+  rows.filter((row) => !row.notInRun);
 
 /**
  * Target column definition for the table
@@ -226,6 +239,12 @@ export type BatchEvaluationData = {
    * evaluator after target columns.
    */
   comparisonColumns?: BatchComparisonColumn[];
+  /** How many times the run repeated every dataset row; absent ran each once. */
+  repeat?: number;
+  /** A repeated run's pass rate per dataset row and target, keyed `${datasetRow}:${targetId}`. */
+  rowPassRates?: Map<string, RowPassRate>;
+  /** The rows the run planned per target, from its cell count; absent when it recorded none. */
+  plannedRows?: number;
   /** Row data */
   rows: BatchResultRow[];
 };
@@ -487,6 +506,33 @@ const targetOutputOf = ({
   };
 };
 
+/**
+ * A run plans a cell per row and target, plus a cell per row for each comparison evaluator not
+ * hosted by a target column. An SDK may count rows instead; rounding down only hides a warning.
+ */
+const plannedRowsOf = ({
+  cells,
+  targetCount,
+}: {
+  cells: number | null | undefined;
+  targetCount: number;
+}): number | undefined => (cells ? Math.floor(cells / Math.max(targetCount, 1)) : undefined);
+
+/** Comparison evaluators that are not a target column: each adds one planned cell per row. */
+const evaluatorComparisonsOf = ({
+  comparisonColumns,
+  targets,
+  targetColumns,
+}: {
+  comparisonColumns: BatchComparisonColumn[];
+  targets: RunTargets | null | undefined;
+  targetColumns: BatchTargetColumn[];
+}): number => {
+  const targetIds = new Set([...(targets ?? []), ...targetColumns].map((target) => target.id));
+  const evaluatorIds = comparisonColumns.map((column) => column.evaluatorId);
+  return new Set(evaluatorIds.filter((id) => !targetIds.has(id))).size;
+};
+
 export const transformBatchEvaluationData = (data: ExperimentRunWithItems): BatchEvaluationData => {
   const { experimentId, runId, dataset, evaluations, targets, timestamps, progress, total } = data;
   const isV3 = !!targets && targets.length > 0;
@@ -495,7 +541,9 @@ export const transformBatchEvaluationData = (data: ExperimentRunWithItems): Batc
     : inferredTargetColumnsOf({ dataset, evaluations });
   const evaluatorNames = evaluatorNamesOf(evaluations);
   const index = runIndexOf({ dataset, evaluations, isV3 });
-  const rowCount = dataset.length > 0 ? Math.max(...dataset.map((d) => d.index)) + 1 : 0;
+  // A row is in the run when it has a dataset entry or an evaluation; either can land first.
+  const heldRows = new Set([...dataset.map((d) => d.index), ...evaluations.map((e) => e.index)]);
+  const rowCount = heldRows.size > 0 ? Math.max(...heldRows) + 1 : 0;
 
   const rows: BatchResultRow[] = Array.from({ length: rowCount }, (_, row) => ({
     index: row,
@@ -506,7 +554,9 @@ export const transformBatchEvaluationData = (data: ExperimentRunWithItems): Batc
         targetOutputOf({ index, row, targetId: column.id }),
       ]),
     ),
+    ...(heldRows.has(row) ? {} : { notInRun: true as const }),
   }));
+  const comparisonColumns = detectComparisonColumns(evaluations, targetColumns, rows);
 
   return {
     runId,
@@ -517,11 +567,20 @@ export const transformBatchEvaluationData = (data: ExperimentRunWithItems): Batc
     stoppedAt: timestamps.stoppedAt,
     progress,
     total,
+    plannedRows: plannedRowsOf({
+      cells: total || data.completeness?.dataset.expected,
+      targetCount:
+        (targets?.length || targetColumns.length) +
+        evaluatorComparisonsOf({ comparisonColumns, targets, targetColumns }),
+    }),
     datasetColumns: datasetColumnsOf(dataset),
     targetColumns,
     evaluatorIds: Array.from(evaluatorNames.keys()),
     evaluatorNames: Object.fromEntries(evaluatorNames),
-    comparisonColumns: detectComparisonColumns(evaluations, targetColumns, rows),
+    comparisonColumns,
+    ...(data.repeat && data.repeat > 1
+      ? { repeat: data.repeat, rowPassRates: rowPassRatesOf({ rows, repeat: data.repeat }) }
+      : {}),
     rows,
   };
 };

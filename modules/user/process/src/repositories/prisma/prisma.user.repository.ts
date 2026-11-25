@@ -7,6 +7,7 @@ import type { Prisma, PrismaClient } from "@langwatch/prisma-client/generated";
 import { fromDate, toDate, type Instant } from "@langwatch/time";
 import {
   EmailAlreadyRegisteredError,
+  UserNotFoundError,
   userAccountInfoSchema,
   userFullProfileSchema,
   userProfileSchema,
@@ -352,6 +353,14 @@ export class PrismaUserRepository
       if (isUniqueConstraintError(error)) throw new EmailAlreadyRegisteredError();
       throw error;
     }
+  }
+
+  async appendCreatedFact(id: string): Promise<void> {
+    await this.transaction(async (transaction) => {
+      const row = await transaction.user.findUnique({ where: { id }, select: { createdAt: true } });
+      if (!row) throw new UserNotFoundError(id);
+      await this.#appendMintFacts({ transaction, userId: id, createdAt: row.createdAt });
+    });
   }
 
   async createCredentialUser(input: CreateCredentialUserRow): Promise<CreatedCredentialUser> {

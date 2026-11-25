@@ -78,6 +78,7 @@ function useSpanStoredInvalidation(projectId: string | undefined) {
       void trpcUtils.traces.spanLangwatchSignals.invalidate(key);
       void trpcUtils.traces.traceEvents.invalidate(key);
       void trpcUtils.traces.resourceInfo.invalidate(key);
+      void trpcUtils.traces.agentCallGraph.invalidate(key);
     },
     [trpcUtils, projectId],
   );

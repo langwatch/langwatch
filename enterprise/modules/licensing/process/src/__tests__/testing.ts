@@ -223,6 +223,10 @@ export class MemoryLicenseStorage implements LicenseStorage {
   async getMembersLiteCount(): Promise<number> {
     return this.membersLiteCount;
   }
+
+  async getMembersDeveloperCount(): Promise<number> {
+    return 0;
+  }
 }
 
 /** Records every policy written; set `failListing` to make the rule listing throw. */

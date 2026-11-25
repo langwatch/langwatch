@@ -3,7 +3,11 @@
  * `tool_project_keys[tool]` routes a tool's telemetry to a team project
  * instead of personal, and is what the wrapper/login refresh leave untouched.
  */
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import * as fs from "node:fs";
+import * as os from "node:os";
+import * as path from "node:path";
+
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import * as cliApi from "../cli-api";
 import type { GovernanceConfig } from "../config";
@@ -39,6 +43,30 @@ beforeEach(() => {
 });
 
 describe("pinToolToProject", () => {
+  describe("when the config cannot be saved", () => {
+    const prev = process.env.LANGWATCH_CLI_CONFIG;
+    let root: string;
+    beforeEach(() => {
+      // A FILE where the config folder belongs fails the save for any user, root included.
+      root = fs.mkdtempSync(path.join(os.tmpdir(), "lw-scope-"));
+      fs.writeFileSync(path.join(root, "blocked"), "");
+      process.env.LANGWATCH_CLI_CONFIG = path.join(root, "blocked", "config.json");
+    });
+    afterEach(() => {
+      if (prev === undefined) delete process.env.LANGWATCH_CLI_CONFIG;
+      else process.env.LANGWATCH_CLI_CONFIG = prev;
+      fs.rmSync(root, { recursive: true, force: true });
+    });
+
+    /** @scenario "An ingest key is not minted when the config cannot be saved" */
+    it("refuses before the server issues a project key", async () => {
+      await expect(
+        pinToolToProject({ cfg: baseCfg(), tool: "codex", project: "acme-app" }),
+      ).rejects.toMatchObject({ code: "config_not_writable" });
+      expect(cliApi.mintProjectIngestionKey).not.toHaveBeenCalled();
+    });
+  });
+
   describe("when the tool has an ingestion source type", () => {
     it("mints a project key for this device and stores the pin", async () => {
       (cliApi.mintProjectIngestionKey as ReturnType<typeof vi.fn>).mockResolvedValue({

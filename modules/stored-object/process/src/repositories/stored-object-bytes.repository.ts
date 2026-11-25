@@ -71,6 +71,15 @@ export abstract class StoredObjectBytesRepository {
     projectId: StoredObjectProjectId;
   }): Promise<StoredObjectStorageDestination>;
 
+  /** Whether this project's account sends clients' upload bytes through the process. */
+  abstract uploadsThroughProcess(input: { projectId: StoredObjectProjectId }): Promise<boolean>;
+
+  /** Signs a direct upload to a key no object takes and discards it: proves the account can. */
+  abstract signCheckupUpload(input: {
+    projectId: StoredObjectProjectId;
+    expiresAt: Instant;
+  }): Promise<void>;
+
   /** Writes a small object where the project's bytes go, then removes it. */
   abstract probe(input: { projectId: StoredObjectProjectId }): Promise<void>;
 }

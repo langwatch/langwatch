@@ -30,6 +30,12 @@ export interface LangyContextChip {
 }
 
 /**
+ * The label start of a dashboard chip that stands for one widget on the board rather than the
+ * whole board, so the composer says what Langy reads of it.
+ */
+export const LANGY_WIDGET_CHIP_LABEL_PREFIX = "widget: ";
+
+/**
  * A piece of context a SURFACE explicitly hands to Langy — the home briefing's "look at
  * this receipt", a card's "work from this", anything off the current route.
  */
@@ -43,6 +49,8 @@ export interface LangyAttachedContext {
   label: string;
   /** Optional display/agent extras, e.g. `{ value: "8.2s", severity: "error" }`. */
   meta?: Record<string, unknown>;
+  /** What it is apart from its text: attaching the same key again replaces it in place. */
+  key?: string;
 }
 
 /**

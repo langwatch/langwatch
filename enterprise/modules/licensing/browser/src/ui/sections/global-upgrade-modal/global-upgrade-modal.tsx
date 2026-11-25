@@ -10,13 +10,28 @@ import { LiteMemberRestrictionContent } from "./lite-member-restriction-content.
 
 // Store-driven mount for the upgrade/limit dialog: plan limits, seat changes,
 // unavailable features, mounted by licensing's host mount.
-export function GlobalUpgradeModal({ isSaaS }: { isSaaS: boolean }) {
+export function GlobalUpgradeModal({
+  isSaaS,
+  isAdmin = false,
+}: {
+  isSaaS: boolean;
+  /** The viewer holds `organization:manage`: a seat limit offers them Billing only. */
+  isAdmin?: boolean;
+}) {
   const { isOpen, variant, close } = useUpgradeModalStore();
   const SeatProrationPreview = useLent(SeatProrationPreviewToken);
   if (!variant) return null;
 
   if (variant.mode === "limit") {
-    return <LimitContent open={isOpen} variant={variant} isSaaS={isSaaS} onClose={close} />;
+    return (
+      <LimitContent
+        open={isOpen}
+        variant={variant}
+        isSaaS={isSaaS}
+        isAdmin={isAdmin}
+        onClose={close}
+      />
+    );
   }
   if (variant.mode === "liteMemberRestriction") {
     return <LiteMemberRestrictionContent open={isOpen} onClose={close} />;
