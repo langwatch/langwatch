@@ -6,6 +6,7 @@
 
 import type {
   InstantEvalJudgeJob,
+  InstantEvalJudgeReasoningEffort,
   InstantEvalQuestion,
   InstantEvalSkipReason,
 } from "@langwatch/instant-eval-judge-contract";
@@ -30,6 +31,8 @@ export interface InstantEvalLlmJudgeRequest {
   readonly question: InstantEvalQuestion;
   readonly text: string;
   readonly timeoutMs: number;
+  /** From the route table's backend; absent, the request names no effort. */
+  readonly reasoningEffort?: InstantEvalJudgeReasoningEffort;
 }
 
 /**

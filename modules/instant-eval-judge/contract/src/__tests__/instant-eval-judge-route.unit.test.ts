@@ -5,6 +5,8 @@ import {
   INSTANT_EVAL_JUDGE_DEFAULT_ROUTE_TABLE,
   INSTANT_EVAL_JUDGE_JOBS,
   instantEvalJudgeEnabledFallbacksOf,
+  instantEvalJudgeEntryBackends,
+  instantEvalJudgeRouteSlotsOf,
   instantEvalJudgeRouteTableSchema,
   isInstantEvalJudgeEntryEnabled,
 } from "../instant-eval-judge-route.ts";
@@ -47,6 +49,32 @@ function tableWith(overrides: Record<string, unknown> = {}) {
   };
 }
 
+/** A made-up table whose balanced LLM-judge entry is gated; `entry` overrides that entry's keys. */
+function gatedTable({
+  entry = {},
+  backends = {},
+}: { entry?: Record<string, unknown>; backends?: Record<string, unknown> } = {}) {
+  const table = tableWith({
+    backends: {
+      jev: { kind: "jev" },
+      "gate-a": { kind: "jev", timeoutMs: 500 },
+      "decision-a": { kind: "decisions", model: "decision-model-a" },
+      "llm-b": { kind: "openai_responses", model: "llm-model-b", reasoningEffort: "high" },
+      ...backends,
+    },
+  });
+  (table.routes as Record<string, Record<string, unknown>>).llm_judge!.all = {
+    instant: { primary: "jev" },
+    balanced: {
+      primary: "decision-a",
+      escalateTo: "llm-b",
+      gate: { backend: "gate-a", question: "difficulty_v1", easyBelow: 1.5 },
+      ...entry,
+    },
+  };
+  return table;
+}
+
 describe("judge route table", () => {
   describe("given the table the repository ships", () => {
     /** @scenario "The public default table sends every slot to the hosted classifier" */
@@ -85,6 +113,86 @@ describe("judge route table", () => {
       const parsed = instantEvalJudgeRouteTableSchema.safeParse(table);
       expect(parsed.success).toBe(false);
       expect(JSON.stringify(parsed.error?.issues)).toContain("llm_judge / all / instant");
+    });
+
+    /** @scenario "A gate names a hosted classifier backend and an escalation, nothing else" */
+    it("accepts a gate between a primary and an escalation, and an effort on an OpenAI backend", () => {
+      const parsed = instantEvalJudgeRouteTableSchema.parse(gatedTable());
+      expect(parsed.routes.llm_judge.all?.balanced).toEqual({
+        primary: "decision-a",
+        escalateTo: "llm-b",
+        gate: { backend: "gate-a", question: "difficulty_v1", easyBelow: 1.5 },
+      });
+      expect(parsed.backends["llm-b"]?.reasoningEffort).toBe("high");
+      expect(parsed.backends.jev?.reasoningEffort).toBeUndefined();
+    });
+
+    /** @scenario "A gate names a hosted classifier backend and an escalation, nothing else" */
+    it.each([
+      ["a threshold", { threshold: 0.5 }, "a gate takes no threshold and no pair"],
+      ["a pair", { pairWith: "jev" }, "a gate takes no threshold and no pair"],
+      ["no escalation", { escalateTo: undefined }, "a gate needs an escalateTo"],
+      [
+        "a gate backend that is not the hosted classifier",
+        { gate: { backend: "decision-a", question: "difficulty_v1", easyBelow: 1.5 } },
+        "the gate backend decision-a must be a jev backend",
+      ],
+      [
+        "an unknown gate backend",
+        { gate: { backend: "nobody", question: "difficulty_v1", easyBelow: 1.5 } },
+        "unknown backend nobody",
+      ],
+    ])("refuses a gated entry with %s, naming the slot", (_what, entry, issue) => {
+      const parsed = instantEvalJudgeRouteTableSchema.safeParse(gatedTable({ entry }));
+      expect(parsed.success).toBe(false);
+      const issues = JSON.stringify(parsed.error?.issues);
+      expect(issues).toContain("llm_judge / all / balanced");
+      expect(issues).toContain(issue);
+    });
+
+    /** @scenario "A gate names a hosted classifier backend and an escalation, nothing else" */
+    it("refuses an unknown gate question, a threshold outside the levels, and a gate with fallbacks", () => {
+      const gate = { backend: "gate-a", question: "difficulty_v1", easyBelow: 1.5 };
+      for (const bad of [
+        { ...gate, question: "difficulty_v0" },
+        { ...gate, easyBelow: 0 },
+        { ...gate, easyBelow: 4.1 },
+      ]) {
+        const table = gatedTable({ entry: { gate: bad } });
+        expect(instantEvalJudgeRouteTableSchema.validate(table)).toBe(false);
+      }
+      const parsed = instantEvalJudgeRouteTableSchema.safeParse(
+        gatedTable({ backends: { "gate-a": { kind: "jev", fallbacks: ["jev"] } } }),
+      );
+      expect(JSON.stringify(parsed.error?.issues)).toContain(
+        "the gate backend gate-a takes no fallbacks",
+      );
+    });
+
+    /** @scenario "A reasoning effort is sent only when the backend sets one" */
+    it.each([
+      ["jev", { kind: "jev", reasoningEffort: "high" }],
+      ["decisions", { kind: "decisions", model: "decision-model-a", reasoningEffort: "high" }],
+      [
+        "anthropic_messages",
+        { kind: "anthropic_messages", model: "llm-model-a", reasoningEffort: "low" },
+      ],
+    ])("refuses a reasoning effort on a %s backend, naming it", (kind, backend) => {
+      const parsed = instantEvalJudgeRouteTableSchema.safeParse(
+        gatedTable({ backends: { extra: backend } }),
+      );
+      expect(parsed.success).toBe(false);
+      expect(JSON.stringify(parsed.error?.issues)).toContain(
+        `backend extra: a ${kind} backend takes no reasoningEffort`,
+      );
+    });
+
+    /** @scenario "A reasoning effort is sent only when the backend sets one" */
+    it("refuses an effort the provider does not name", () => {
+      const table = gatedTable({
+        backends: { "llm-b": { kind: "openai_responses", model: "m", reasoningEffort: "max" } },
+      });
+      expect(instantEvalJudgeRouteTableSchema.validate(table)).toBe(false);
     });
 
     it("refuses an unknown backend and a missing slot", () => {
@@ -228,6 +336,44 @@ describe("judge route table", () => {
   });
 });
 
+describe("given a gated entry", () => {
+  const table = instantEvalJudgeRouteTableSchema.parse(gatedTable());
+  const gated = table.routes.llm_judge.all!.balanced!;
+
+  /** @scenario "A gate names a hosted classifier backend and an escalation, nothing else" */
+  it("counts the gate among the backends the entry may call, first", () => {
+    expect(instantEvalJudgeEntryBackends(gated)).toEqual(["gate-a", "decision-a", "llm-b"]);
+  });
+
+  /** @scenario "A gate names a hosted classifier backend and an escalation, nothing else" */
+  it("is unusable when its gate backend is switched off", () => {
+    const off = instantEvalJudgeRouteTableSchema.parse(
+      gatedTable({ backends: { "gate-a": { kind: "jev", enabled: false } } }),
+    );
+    expect(isInstantEvalJudgeEntryEnabled({ entry: gated, table: off })).toBe(false);
+    expect(isInstantEvalJudgeEntryEnabled({ entry: gated, table })).toBe(true);
+  });
+
+  /** @scenario "A scenario route's backends never raise a judged query's hold" */
+  it("lists the slots of the named jobs only, with each routed kind's default", () => {
+    const withKinds = instantEvalJudgeRouteTableSchema.parse({
+      ...gatedTable(),
+      kinds: {
+        score: {
+          sureness: "spread",
+          default: { instant: { primary: "llm-b" } },
+          routes: { scenario_judge: { all: { instant: { primary: "decision-a" } } } },
+        },
+      },
+    });
+    const primaries = (jobs?: readonly ("search" | "llm_judge" | "scenario_judge")[]) =>
+      instantEvalJudgeRouteSlotsOf(withKinds, jobs).map((routeSlot) => routeSlot.instant.primary);
+    expect(primaries(["search"])).toEqual(["jev", "jev", "llm-b"]);
+    expect(primaries(["scenario_judge"])).toEqual(["jev", "jev", "llm-b", "decision-a"]);
+    expect(primaries()).toHaveLength(8);
+  });
+});
+
 describe("given backends that are switched off", () => {
   const table = instantEvalJudgeRouteTableSchema.parse(
     tableWith({
@@ -333,7 +479,7 @@ describe("judge route table, given score and category routes", () => {
           default: { instant: { primary: "jev", escalateTo: "llm-a" } },
         },
       }),
-    ).toEqual(["score / default / instant: escalateTo needs a threshold"]);
+    ).toEqual(["score / default / instant: escalateTo needs a threshold or a gate"]);
     expect(
       issuesOf({
         category: {

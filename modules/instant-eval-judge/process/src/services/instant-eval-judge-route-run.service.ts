@@ -1,7 +1,7 @@
 /**
  * One routed call's legs for questions of one kind: the plan's primary (a first send it may share
  * with other kinds), then the pair in parallel or an escalation for unsure answers, with fallbacks
- * for a backend that is down. Each kind reads sureness its own way; the legs are the same.
+ * for a backend that is down. A gated plan asks its gate, then the primary or the escalation alone.
  * @see modules/instant-eval-judge/specs/instant-eval-judge-router.feature
  */
 
@@ -10,6 +10,8 @@ import {
   instantEvalSkipped,
   isInstantEvalSpendBillable,
   type InstantEvalJudgeRoutePricing,
+  type InstantEvalJudgeReasoningEffort,
+  type InstantEvalJudgeRouteGate,
   type InstantEvalJudgeRouteTable,
   type InstantEvalJudgement,
   type InstantEvalQuestion,
@@ -22,6 +24,11 @@ import type {
 } from "../channels/instant-eval-classifier.channel.ts";
 import type { InstantEvalHostedDecisionsChannel } from "../channels/instant-eval-hosted-decisions.channel.ts";
 import type { InstantEvalLlmJudgeChannel } from "../channels/instant-eval-llm-judge.channel.ts";
+import {
+  instantEvalJudgeGateBranchOf,
+  instantEvalJudgeGateInputOf,
+  instantEvalJudgeGateQuestionOf,
+} from "../rules/instant-eval-judge-gate.rules.ts";
 import { instantEvalJudgeCallCostOf } from "../rules/instant-eval-judge-route-cost.rules.ts";
 import {
   instantEvalDecisionAnswersOf,
@@ -58,6 +65,8 @@ export class InstantEvalJudgeRouteRunService {
   private readonly flags: string[] = [];
   private inputTokens = 0;
   private costNanoUsd = 0;
+  /** What the gate's sends waited on the limiter, ahead of the legs that answered. */
+  private gateWaitMs = 0;
 
   private constructor(input: {
     deps: InstantEvalJudgeRouteRunDeps;
@@ -88,19 +97,25 @@ export class InstantEvalJudgeRouteRunService {
   }
 
   /**
-   * One kind's judgement from a first send, its own or one shared with other kinds. A caller's
-   * stop after paid legs carries their spend, so the stopped batch still bills it; any other throw
-   * after paid legs is a skip carrying that spend, so a merged call bills it too.
+   * One kind's judgement from a first send, its own or one shared; a gated plan takes none. A
+   * caller's stop after paid legs carries their spend, so the stopped batch still bills it; any
+   * other throw after paid legs is a skip carrying that spend, so a merged call bills it too.
    */
   async judgeFrom({
     questions,
     first,
   }: {
     questions: readonly InstantEvalQuestion[];
-    first: Promise<InstantEvalJudgeFirstLeg>;
+    first?: Promise<InstantEvalJudgeFirstLeg> | undefined;
   }): Promise<InstantEvalJudgement> {
     try {
-      return await this.judgeLegs({ questions, firstSend: await first });
+      const { gate, escalateTo } = this.plan;
+      // The table refuses a gate with no escalation at boot; without one the plan runs ungated.
+      if (gate && escalateTo) return await this.judgeGated({ questions, gate, escalateTo });
+      return await this.judgeLegs({
+        questions,
+        firstSend: await (first ?? this.firstLeg(questions)),
+      });
     } catch (error) {
       if (!this.isPaid()) throw error;
       if (this.signal?.aborted) {
@@ -145,6 +160,132 @@ export class InstantEvalJudgeRouteRunService {
       return this.result({ questions, legs: [second], escalated: second.answers.size });
     }
     return this.escalateUnsure({ questions, first });
+  }
+
+  /**
+   * A gated plan: the gate rates each question's case, then the primary answers the easy ones
+   * alone and the escalation the rest alone, side by side, and no sureness is read. A branch whose
+   * backend cannot answer is answered by the other one, flagged (ADR-190 decision 11).
+   */
+  private async judgeGated({
+    questions,
+    gate,
+    escalateTo,
+  }: {
+    questions: readonly InstantEvalQuestion[];
+    gate: InstantEvalJudgeRouteGate;
+    escalateTo: string;
+  }): Promise<InstantEvalJudgement> {
+    const { primary } = this.plan;
+    const { easy, hard } = await this.gated({ questions, gate });
+    const easyAsk = this.askBranch({
+      questions: easy,
+      backend: primary,
+      other: escalateTo,
+      failedFlag: "primary_failed",
+    });
+    const hardAsk = this.askBranch({
+      questions: hard,
+      backend: escalateTo,
+      other: primary,
+      failedFlag: "gate_hard_failed",
+    });
+    // Both settle before a stop is rethrown, so a branch answering after the other stopped bills.
+    await Promise.allSettled([easyAsk, hardAsk]);
+    const [easyLegs, hardLegs] = [await easyAsk, await hardAsk];
+    const asked = [easyLegs.own, easyLegs.other, hardLegs.own, hardLegs.other].filter(
+      (leg): leg is Leg => leg !== undefined,
+    );
+    const legs = asked.filter(isInstantEvalJudgeLegAnswered);
+    const failed = asked.findLast((leg) => leg.outcome === "failed");
+    if (legs.length === 0 && failed?.outcome === "failed") return this.nothingAnswered(failed);
+    // The escalation's answers: the hard branch's own, and the easy ones a failed primary left it.
+    const escalated = answersIn(hardLegs.own) + answersIn(easyLegs.other);
+    return this.result({ questions, legs, escalated });
+  }
+
+  /**
+   * Each question's branch, from one gate send per question: the gate reads the question as the
+   * task, so two questions never share a send. A gate that fails, times out or gives no score
+   * sends its question the hard way; only the caller's stop is rethrown, once every send settled.
+   */
+  private async gated({
+    questions,
+    gate,
+  }: {
+    questions: readonly InstantEvalQuestion[];
+    gate: InstantEvalJudgeRouteGate;
+  }): Promise<{ easy: InstantEvalQuestion[]; hard: InstantEvalQuestion[] }> {
+    const { job, fullText } = this.plan;
+    const sends = questions.map((question) => {
+      const asked = instantEvalJudgeGateQuestionOf({ name: gate.question, id: question.id });
+      const text = instantEvalJudgeGateInputOf({
+        job,
+        task: question.instructions,
+        text: fullText,
+      });
+      return this.askOne({ backend: gate.backend, questions: [asked], text });
+    });
+    await Promise.allSettled(sends);
+    const rated = await Promise.all(sends);
+    const easy: InstantEvalQuestion[] = [];
+    const hard: InstantEvalQuestion[] = [];
+    let isUnrated = false;
+    rated.forEach((leg, at) => {
+      const question = questions[at]!;
+      const verdict =
+        leg.outcome === "answered" ? leg.answers.get(question.id)?.verdict : undefined;
+      if (leg.outcome === "answered") this.gateWaitMs += leg.limiterWaitMs;
+      else this.gateFailed({ backend: gate.backend, leg });
+      const { branch, hasScore } = instantEvalJudgeGateBranchOf({
+        verdict,
+        easyBelow: gate.easyBelow,
+      });
+      if (!hasScore) isUnrated = true;
+      (branch === "easy" ? easy : hard).push(question);
+    });
+    if (isUnrated) this.flags.push("gate_no_score");
+    if (easy.length > 0) this.flags.push("gate:easy");
+    if (hard.length > 0) this.flags.push("gate:hard");
+    return { easy, hard };
+  }
+
+  /** A gate that could not rate is never fatal; a channel's throw is logged, not rethrown. */
+  private gateFailed({
+    backend,
+    leg,
+  }: {
+    backend: string;
+    leg: Extract<Leg, { outcome: "failed" }>;
+  }): void {
+    this.flags.push(`${backend}_failed:${leg.reason}`);
+    if (leg.error !== undefined) {
+      this.logger.error({ backend, error: leg.error }, "Instant Evals router gate threw");
+    }
+  }
+
+  /**
+   * One branch's questions from its backend, and those it left from the other backend, flagged.
+   * Neither ask falls back onto the other's backend, so each is asked at most once per question.
+   */
+  private async askBranch({
+    questions,
+    backend,
+    other,
+    failedFlag,
+  }: {
+    questions: readonly InstantEvalQuestion[];
+    backend: string;
+    other: string;
+    failedFlag: string;
+  }): Promise<{ own?: Leg; other?: Leg }> {
+    if (questions.length === 0) return {};
+    const own = await this.ask({ backend, questions, skip: [other] });
+    const left =
+      own.outcome === "failed" ? questions : questions.filter((q) => !own.answers.has(q.id));
+    if (left.length === 0) return { own };
+    this.flags.push(failedFlag);
+    return { own, other: await this.ask({ backend: other, questions: left, skip: [backend] }) };
   }
 
   /**
@@ -260,9 +401,12 @@ export class InstantEvalJudgeRouteRunService {
   private async askOne({
     backend,
     questions,
+    text,
   }: {
     backend: string;
     questions: readonly InstantEvalQuestion[];
+    /** A decision model's own text in place of the plan's view: the gate's framing of the case. */
+    text?: string;
   }): Promise<Leg> {
     const config = this.deps.table.backends[backend];
     if (!config) return { outcome: "failed", reason: "classifier_provider_unavailable" };
@@ -273,6 +417,7 @@ export class InstantEvalJudgeRouteRunService {
         model: config.model,
         questions,
         timeoutMs: config.timeoutMs,
+        reasoningEffort: config.reasoningEffort,
       });
     }
     const deadline = InstantEvalJudgeLegDeadlineService.create(config.timeoutMs);
@@ -283,6 +428,7 @@ export class InstantEvalJudgeRouteRunService {
         model: config.model,
         questions,
         deadline,
+        text,
       });
     } catch (error) {
       if (this.signal?.aborted) throw error;
@@ -301,14 +447,16 @@ export class InstantEvalJudgeRouteRunService {
     model,
     questions,
     deadline,
+    text: ownText,
   }: {
     backend: string;
     kind: "jev" | "decisions";
     model: string | undefined;
     questions: readonly InstantEvalQuestion[];
     deadline: InstantEvalJudgeLegDeadlineService;
+    text: string | undefined;
   }): Promise<Leg> {
-    const text = this.textFor({ backend, kind });
+    const text = ownText ?? this.textFor({ backend, kind });
     const judgement = await this.callDecisionModel({ kind, model, text, questions, deadline });
     if (!judgement) {
       this.flags.push(`${backend}_unavailable`);
@@ -380,12 +528,14 @@ export class InstantEvalJudgeRouteRunService {
     model,
     questions,
     timeoutMs,
+    reasoningEffort,
   }: {
     backend: string;
     wire: "anthropic_messages" | "openai_responses";
     model: string | undefined;
     questions: readonly InstantEvalQuestion[];
     timeoutMs: number;
+    reasoningEffort: InstantEvalJudgeReasoningEffort | undefined;
   }): Promise<Leg> {
     // The table refuses an LLM backend with no model at boot; this keeps the type honest.
     if (!model) return { outcome: "failed", reason: "classifier_not_configured" };
@@ -400,7 +550,8 @@ export class InstantEvalJudgeRouteRunService {
       logger: this.logger,
       paid: (spend) => this.paid({ backend, ...spend }),
     });
-    const { answers, reason } = await leg.ask({ call: { wire, model, timeoutMs }, questions });
+    const call = { wire, model, timeoutMs, ...(reasoningEffort ? { reasoningEffort } : {}) };
+    const { answers, reason } = await leg.ask({ call, questions });
     if (answers.size === 0) return { outcome: "failed", reason };
     if (answers.size < questions.length) this.flags.push(`${backend}_partial:${reason}`);
     return { outcome: "answered", backend, answers, isTextTruncated: false, limiterWaitMs: 0 };
@@ -458,10 +609,11 @@ export class InstantEvalJudgeRouteRunService {
   }): InstantEvalJudgement {
     const { verdicts, answeredBy } = instantEvalRoutedVerdictsOf({ questions, legs, pick });
     const waits = legs.map((leg) => leg.limiterWaitMs);
+    const legsWaitMs = pick ? Math.max(0, ...waits) : waits.reduce((sum, ms) => sum + ms, 0);
     return {
       verdicts,
       isTextTruncated: legs.some((leg) => leg.isTextTruncated),
-      limiterWaitMs: pick ? Math.max(0, ...waits) : waits.reduce((sum, ms) => sum + ms, 0),
+      limiterWaitMs: this.gateWaitMs + legsWaitMs,
       ...this.spent(),
       routing: this.routing({ answeredBy, escalated }),
     };
@@ -486,4 +638,9 @@ export class InstantEvalJudgeRouteRunService {
     const { mode, slot, inputView } = this.plan;
     return { answeredBy, escalated, mode, slot, inputView, flags: [...this.flags] };
   }
+}
+
+/** How many questions a leg answered; none for a leg that was not asked or failed. */
+function answersIn(leg: Leg | undefined): number {
+  return leg?.outcome === "answered" ? leg.answers.size : 0;
 }

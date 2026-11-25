@@ -231,3 +231,64 @@ describe("given a score answer captured from the live API", () => {
     });
   });
 });
+
+describe("given a score question that names its levels", () => {
+  const difficulty: InstantEvalQuestion = {
+    id: "difficulty",
+    kind: "score",
+    instructions: "How hard is this case",
+    range: { min: 0, max: 2 },
+    levels: ["easy: one read decides it", "medium: needs care", "very hard: buried evidence"],
+  };
+  const read = (answer: Record<string, unknown>) =>
+    readClassifierVerdicts({
+      questions: [difficulty],
+      response: classifierResponseSchema.parse({ answers: { difficulty: answer } }),
+    })[0]?.score;
+
+  /** @scenario "The gate reads a frozen framing of the case" */
+  it("sends the names as the criteria in place of the numbers", () => {
+    expect(toClassifierQuestions([difficulty]).difficulty).toEqual({
+      type: "score",
+      instructions: "How hard is this case",
+      criteria: ["easy: one read decides it", "medium: needs care", "very hard: buried evidence"],
+    });
+  });
+
+  /** @scenario "The gate reads a frozen framing of the case" */
+  it("reads the weighted mean level index from position keys", () => {
+    expect(read({ type: "score", probabilities: { "0": 0.5, "1": 0.3, "2": 0.2 } })).toBeCloseTo(
+      0.7,
+      10,
+    );
+  });
+
+  /** @scenario "The gate reads a frozen framing of the case" */
+  it("reads the same mean through a legend that names the levels sent", () => {
+    const legend = {
+      a: "easy: one read decides it",
+      b: "medium: needs care",
+      c: "very hard: buried evidence",
+    };
+    expect(read({ type: "score", legend, probabilities: { a: 0.5, b: 0.3, c: 0.2 } })).toBeCloseTo(
+      0.7,
+      10,
+    );
+  });
+
+  /** @scenario "The gate reads a frozen framing of the case" */
+  it("reads keys that are the levels' labels, whole or with their description", () => {
+    expect(
+      read({
+        type: "score",
+        probabilities: { easy: 0.5, "medium: needs care": 0.3, "very hard": 0.2 },
+      }),
+    ).toBeCloseTo(0.7, 10);
+  });
+
+  /** @scenario "The gate reads a frozen framing of the case" */
+  it("takes a bare score as the level index, and drops a key that names no level", () => {
+    expect(read({ type: "score", score: 1.4 })).toBe(1.4);
+    expect(read({ type: "score", probabilities: { "": 1, harder: 1 } })).toBeUndefined();
+  });
+});

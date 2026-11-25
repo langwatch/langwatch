@@ -9,6 +9,7 @@ import {
 import { describe, expect, it } from "vitest";
 
 import {
+  gatedRouteTable,
   syntheticRouteTable,
   yesNo,
 } from "../../__tests__/support/instant-eval-judge-route.test-fakes.ts";
@@ -17,6 +18,7 @@ import {
   instantEvalJudgeRouteBootIssues,
 } from "../instant-eval-judge-route-boot.rules.ts";
 import { instantEvalJudgeCallCostOf } from "../instant-eval-judge-route-cost.rules.ts";
+import { instantEvalJudgeFirstSendLeadsOf } from "../instant-eval-judge-route-merge.rules.ts";
 import { instantEvalJudgeRoutePlanOf } from "../instant-eval-judge-route.rules.ts";
 import {
   instantEvalVerdictSurenessOf,
@@ -347,6 +349,30 @@ describe("the query hold rate", () => {
     expect(hold).toEqual({ usdPerMillionInputTokens: 2, markup: INSTANT_EVAL_PRICING.markup });
   });
 
+  /** @scenario "A scenario route's backends never raise a judged query's hold" */
+  it("leaves out a backend only scenario judging can reach, and keeps a gate's", () => {
+    const pricing = {
+      version: "t",
+      backends: {
+        "gate-a": priced(3),
+        "decision-a": priced(0.1),
+        "llm-a": priced(9),
+        "llm-b": priced(2),
+      },
+    };
+    const scenarioOnLlmA = gatedRouteTable({ scenarioPrimary: "llm-a" });
+    const hold = instantEvalJudgeQueryHoldPricingOf({ table: scenarioOnLlmA, pricing });
+    expect(hold.usdPerMillionInputTokens).toBe(3);
+    // The boot check still asks a price for it: a scenario judgement is billed too.
+    const { "llm-a": _dear, ...withoutScenarioPrice } = pricing.backends;
+    expect(
+      instantEvalJudgeRouteBootIssues({
+        table: scenarioOnLlmA,
+        pricing: { version: "t", backends: withoutScenarioPrice },
+      }),
+    ).toEqual(["backend llm-a: no price in the route pricing"]);
+  });
+
   /** @scenario "A judged query is held at the dearest rate a route can reach" */
   it("holds at the classifier's published rate under the public table", () => {
     const hold = instantEvalJudgeQueryHoldPricingOf({
@@ -354,6 +380,54 @@ describe("the query hold rate", () => {
       pricing: INSTANT_EVAL_JUDGE_DEFAULT_ROUTE_PRICING,
     });
     expect(hold).toEqual(INSTANT_EVAL_PRICING);
+  });
+});
+
+describe("a gated entry's plan", () => {
+  const gated = gatedRouteTable();
+  const planOn = (mode?: "instant") =>
+    instantEvalJudgeRoutePlanOf({
+      route: { job: "llm_judge", ...(mode ? { mode } : {}) },
+      text: "x",
+      questions: [UPSET],
+      table: gated,
+    });
+
+  /** @scenario "A gate sends an easy case to the primary alone and the rest to the escalation alone" */
+  it("carries the gate with the primary and the escalation, and no threshold", () => {
+    expect(planOn()).toMatchObject({
+      mode: "balanced",
+      primary: "decision-a",
+      escalateTo: "llm-b",
+      gate: { backend: "gate-a", question: "difficulty_v1", easyBelow: 1.5 },
+    });
+    expect(planOn().threshold).toBeUndefined();
+    expect(planOn("instant").gate).toBeUndefined();
+  });
+
+  /** @scenario "A gate sends an easy case to the primary alone and the rest to the escalation alone" */
+  it("never shares its first send with another plan, even one asking the same primary", () => {
+    const { gate: _gate, ...ungated } = planOn();
+    const leads = (plans: Parameters<typeof instantEvalJudgeFirstSendLeadsOf>[0]["plans"]) =>
+      instantEvalJudgeFirstSendLeadsOf({ plans, table: gated });
+    expect(leads([ungated, ungated])).toEqual([0, 0]);
+    expect(leads([planOn(), ungated])).toEqual([0, 1]);
+    expect(leads([ungated, planOn()])).toEqual([0, 1]);
+    expect(leads([planOn(), planOn()])).toEqual([0, 1]);
+  });
+
+  /** @scenario "A route table that cannot bill or call a backend refuses to boot" */
+  it("needs a price and a key for its gate backend too", () => {
+    const price = { usdPerMillionInputTokens: 1, usdPerMillionOutputTokens: 0 };
+    const issues = instantEvalJudgeRouteBootIssues({
+      table: gated,
+      pricing: { version: "t", backends: { "decision-a": price, "llm-b": price } },
+      isHeld: (kind) => kind !== "jev",
+    });
+    expect(issues).toEqual([
+      "backend gate-a: no price in the route pricing",
+      "backend gate-a: no jev key or channel on this install",
+    ]);
   });
 });
 

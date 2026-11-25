@@ -31,6 +31,19 @@ const INSTANT_EVAL_JUDGE_BACKEND_KINDS = [
 ] as const;
 export type InstantEvalJudgeBackendKind = (typeof INSTANT_EVAL_JUDGE_BACKEND_KINDS)[number];
 
+/** The reasoning effort an OpenAI Responses backend may be asked for; unset, the model's own. */
+const INSTANT_EVAL_JUDGE_REASONING_EFFORTS = ["none", "low", "medium", "high"] as const;
+export type InstantEvalJudgeReasoningEffort = (typeof INSTANT_EVAL_JUDGE_REASONING_EFFORTS)[number];
+
+/** The kinds that take a reasoning effort on the wire. */
+const KINDS_TAKING_A_REASONING_EFFORT: readonly InstantEvalJudgeBackendKind[] = [
+  "openai_responses",
+];
+
+/** The gate's frozen questions, versioned by name: a threshold keeps its meaning with its name. */
+const INSTANT_EVAL_JUDGE_GATE_QUESTIONS = ["difficulty_v1"] as const;
+export type InstantEvalJudgeGateQuestionName = (typeof INSTANT_EVAL_JUDGE_GATE_QUESTIONS)[number];
+
 /** Where the arithmetic flag comes from: the caller, the question regex, or the caller first. */
 const INSTANT_EVAL_JUDGE_ARITHMETIC_SOURCES = ["request", "regex", "request_then_regex"] as const;
 
@@ -60,7 +73,24 @@ const modeSchema = z.enum(INSTANT_EVAL_JUDGE_MODES);
 const inputViewSchema = z.enum(INSTANT_EVAL_JUDGE_INPUT_VIEWS);
 const backendKindsSchema = z.array(z.enum(INSTANT_EVAL_JUDGE_BACKEND_KINDS)).readonly();
 
-/** One way to answer: a primary, and either an escalation past a threshold or a parallel pair. */
+/**
+ * A difficulty gate: before any answer, a hosted classifier backend scores how hard the case is
+ * on the named question's levels (0 the easiest). A score under `easyBelow` sends the question to
+ * the entry's `primary` alone, anything else (no score included) to its `escalateTo` alone.
+ */
+const routeGateSchema = z
+  .object({
+    backend: z.string().min(1),
+    question: z.enum(INSTANT_EVAL_JUDGE_GATE_QUESTIONS),
+    easyBelow: z.number().gt(0).lte(4),
+  })
+  .readonly();
+export type InstantEvalJudgeRouteGate = z.infer<typeof routeGateSchema>;
+
+/**
+ * One way to answer: a primary, and either an escalation past a threshold, a parallel pair, or a
+ * gate that picks between the primary and the escalation before either is asked.
+ */
 const routeEntrySchema = z
   .object({
     primary: z.string().min(1),
@@ -71,6 +101,7 @@ const routeEntrySchema = z
      */
     threshold: z.number().gt(0).lte(1).optional(),
     pairWith: z.string().min(1).optional(),
+    gate: routeGateSchema.optional(),
   })
   .readonly();
 export type InstantEvalJudgeRouteEntry = z.infer<typeof routeEntrySchema>;
@@ -94,6 +125,8 @@ const backendSchema = z
     timeoutMs: z.number().int().positive().default(30_000),
     /** Tried in order when this backend cannot answer. */
     fallbacks: z.array(z.string().min(1)).readonly().default([]),
+    /** Sent with every call of an OpenAI Responses backend; unset, the request names none. */
+    reasoningEffort: z.enum(INSTANT_EVAL_JUDGE_REASONING_EFFORTS).optional(),
   })
   .readonly();
 type InstantEvalJudgeBackend = z.infer<typeof backendSchema>;
@@ -220,17 +253,20 @@ function kindIssues({
   return issues;
 }
 
-/** Every slot of the table, yes-or-no and per routed kind, so a check misses none. */
+/**
+ * Every slot of the table, yes-or-no and per routed kind, so a check misses none. With `jobs`,
+ * only the slots those jobs can take: theirs, and each routed kind's default, which any job takes.
+ */
 export function instantEvalJudgeRouteSlotsOf(
   table: InstantEvalJudgeRouteTable,
+  jobs: readonly InstantEvalJudgeJob[] = INSTANT_EVAL_JUDGE_JOBS,
 ): InstantEvalJudgeRouteSlot[] {
-  const slots = INSTANT_EVAL_JUDGE_JOBS.flatMap((job) => Object.values(table.routes[job]));
+  const slots = jobs.flatMap((job) => Object.values(table.routes[job]));
   for (const kind of INSTANT_EVAL_JUDGE_ROUTED_KINDS) {
     const routing = table.kinds[kind];
     if (!routing) continue;
     slots.push(routing.default);
-    for (const job of INSTANT_EVAL_JUDGE_JOBS)
-      slots.push(...Object.values(routing.routes[job] ?? {}));
+    for (const job of jobs) slots.push(...Object.values(routing.routes[job] ?? {}));
   }
   return slots;
 }
@@ -276,6 +312,12 @@ function backendIssues({
   if (KINDS_NEEDING_A_MODEL.includes(backend.kind) && !backend.model) {
     issues.push(`backend ${name}: a ${backend.kind} backend must name its model`);
   }
+  if (
+    backend.reasoningEffort !== undefined &&
+    !KINDS_TAKING_A_REASONING_EFFORT.includes(backend.kind)
+  ) {
+    issues.push(`backend ${name}: a ${backend.kind} backend takes no reasoningEffort`);
+  }
   for (const fallback of backend.fallbacks) {
     if (!table.backends[fallback]) issues.push(`backend ${name}: unknown fallback ${fallback}`);
     if (fallback === name) issues.push(`backend ${name}: lists itself as a fallback`);
@@ -317,9 +359,10 @@ function entryIssues({
   for (const backend of instantEvalJudgeEntryBackends(entry)) {
     if (!table.backends[backend]) issues.push(`${where}: unknown backend ${backend}`);
   }
-  if (entry.escalateTo && entry.threshold === undefined) {
-    issues.push(`${where}: escalateTo needs a threshold`);
+  if (entry.escalateTo && entry.threshold === undefined && !entry.gate) {
+    issues.push(`${where}: escalateTo needs a threshold or a gate`);
   }
+  if (entry.gate) issues.push(...gateIssues({ table, entry, gate: entry.gate, where }));
   if (entry.escalateTo && entry.pairWith) {
     issues.push(`${where}: an entry escalates or pairs, not both`);
   }
@@ -327,6 +370,36 @@ function entryIssues({
     entry.pairWith !== undefined && pairMembersOf({ table, entry }).some(isLlmBackendOf(table));
   if (pairsAnLlm) {
     issues.push(`${where}: a pair or its fallbacks may not be an LLM backend`);
+  }
+  return issues;
+}
+
+/**
+ * A gate picks between the primary and the escalation, so it needs both and neither a threshold
+ * nor a pair; only the hosted classifier answers its question, and it is asked once, no fallback.
+ */
+function gateIssues({
+  table,
+  entry,
+  gate,
+  where,
+}: {
+  table: RouteTableShape;
+  entry: InstantEvalJudgeRouteEntry;
+  gate: InstantEvalJudgeRouteGate;
+  where: string;
+}): string[] {
+  const issues: string[] = [];
+  if (!entry.escalateTo) issues.push(`${where}: a gate needs an escalateTo`);
+  if (entry.threshold !== undefined || entry.pairWith) {
+    issues.push(`${where}: a gate takes no threshold and no pair`);
+  }
+  const backend = table.backends[gate.backend];
+  if (backend && backend.kind !== "jev") {
+    issues.push(`${where}: the gate backend ${gate.backend} must be a jev backend`);
+  }
+  if (backend && backend.fallbacks.length > 0) {
+    issues.push(`${where}: the gate backend ${gate.backend} takes no fallbacks`);
   }
   return issues;
 }
@@ -354,9 +427,9 @@ function isLlmBackendOf(table: RouteTableShape) {
   };
 }
 
-/** Every backend an entry may call, in the order it may call them. */
+/** Every backend an entry may call, its gate included, in the order it may call them. */
 export function instantEvalJudgeEntryBackends(entry: InstantEvalJudgeRouteEntry): string[] {
-  return [entry.primary, entry.pairWith, entry.escalateTo].filter(
+  return [entry.gate?.backend, entry.primary, entry.pairWith, entry.escalateTo].filter(
     (backend): backend is string => backend !== undefined,
   );
 }
@@ -463,11 +536,11 @@ export type InstantEvalJudgeRouteRequest = z.infer<typeof instantEvalJudgeRouteR
 export interface InstantEvalJudgeRouting {
   /** Verdicts each backend supplied, by backend name. */
   readonly answeredBy: Readonly<Record<string, number>>;
-  /** Questions an unsure or failed primary sent to the escalation. */
+  /** Questions an unsure or failed primary, or a gate's hard branch, sent to the escalation. */
   readonly escalated: number;
   readonly mode: InstantEvalJudgeMode;
   readonly slot: string;
   readonly inputView: InstantEvalJudgeInputView;
-  /** e.g. `escalation_failed`, `fallback:decisions->jev`, `tools_view_refused`. */
+  /** e.g. `escalation_failed`, `fallback:decisions->jev`, `tools_view_refused`, `gate:hard`. */
   readonly flags: readonly string[];
 }

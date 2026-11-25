@@ -27,7 +27,7 @@ Feature: Routing an Instant Evals judgement across decision models and LLMs
 
   @unit
   Scenario: The route table refuses a slot without an instant entry
-    Given a route table whose slot names no instant entry, or an escalation without a threshold
+    Given a route table whose slot names no instant entry, or an escalation with neither a threshold nor a gate
     When the deployment boots
     Then the configuration is refused, naming the slot
 
@@ -126,6 +126,59 @@ Feature: Routing an Instant Evals judgement across decision models and LLMs
     And for a score or category the surer answer by its kind's sureness rule is kept
 
   @unit
+  Scenario: A gate names a hosted classifier backend and an escalation, nothing else
+    Given a route table whose entry carries a gate
+    When the deployment boots
+    Then the entry must name an escalation, and neither a threshold nor a pair
+    And the gate's backend must be a hosted classifier backend with no fallbacks
+    And the gate's question must be one the code names, and its threshold inside the question's levels
+    And the gate's backend needs a price and a key like any backend the entry can call
+    And an entry whose gate backend is switched off is unusable, so its mode falls back
+
+  @unit
+  Scenario: The gate reads a frozen framing of the case
+    Given a gated plan
+    When a question is routed
+    Then the gate's backend is asked one score question about how hard the case is to judge
+    And its levels are sent by name, easiest first, and the score read back is the weighted mean level index
+    And it reads the job, the question's first 3,000 characters and the full text
+    And a text over 12,000 characters is shown as its first and last 6,000 with the cut length between
+    And the wording and the cut are fixed under the question's name, so a threshold keeps its meaning
+
+  @unit
+  Scenario: A gate sends an easy case to the primary alone and the rest to the escalation alone
+    Given a gated plan with a threshold
+    When the gate scores the case under the threshold
+    Then the primary answers alone, however unsure, and the escalation is not called
+    When the gate scores the case at or above the threshold
+    Then the escalation answers alone on the full text, and the primary is not called
+    And the judgement counts one escalation, flags the branch taken and sums the gate's cost and that one call's
+    And a gated plan never shares its first send with another kind's plan
+
+  @unit
+  Scenario: A gate that gives no score sends the case to the escalation
+    Given a gated plan
+    When the gate fails, runs past its timeout or answers with no readable score
+    Then the escalation answers alone, the routing flags that no score was read
+    And whatever the gate billed is still billed
+
+  @unit
+  Scenario: A gated branch that cannot answer is answered by the other backend, flagged
+    Given a gated plan
+    When the gate picks the primary and the primary cannot answer
+    Then the escalation answers, flagged as a failed primary
+    When the gate picks the escalation and the escalation cannot answer
+    Then the primary answers, flagged as a failed hard branch
+    And when neither answers the judgement is skipped with the platform's skip reason, the gate still billed
+
+  @unit
+  Scenario: A gate rates each question of a call on its own
+    Given a gated plan and a call that asks two yes-or-no questions
+    When the call is routed
+    Then the gate is asked once per question, since it reads the question as the task
+    And the easy question is answered by the primary and the other by the escalation, side by side
+
+  @unit
   Scenario: A kind the table does not route takes today's classifier call
     Given a route table with no routes for score or category questions, as the public one ships
     When a routed call asks a score or category question, alone or beside yes-or-no questions
@@ -218,6 +271,14 @@ Feature: Routing an Instant Evals judgement across decision models and LLMs
     When each is asked one yes-or-no question
     Then each request forces the evaluation tool, and the answer is read from its result
     And a refused key, a rate limit and an outage map to the platform's skip reasons
+
+  @unit
+  Scenario: A reasoning effort is sent only when the backend sets one
+    Given an OpenAI Responses backend whose table entry sets a reasoning effort
+    When its leg is asked
+    Then the request names that effort, and the reasoning tokens it reports are billed as output
+    And a backend that sets none sends the request it sent before, with no effort named
+    And the table refuses an effort on any other backend kind, or one the provider does not name
 
   @unit
   Scenario: The LLM legs send one forced score or category tool call and read it back

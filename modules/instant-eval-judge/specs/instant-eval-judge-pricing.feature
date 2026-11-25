@@ -59,6 +59,13 @@ Feature: What the Instant Evals judge costs us, and what the customer is charged
     And it is a best-effort hold, not a hard cap on what a routed query can spend
 
   @unit
+  Scenario: A scenario route's backends never raise a judged query's hold
+    Given a route table whose scenario judging route reaches a backend dearer than any other
+    When a judged query's budget hold is priced
+    Then it is priced over the backends a search or LLM-judge route can reach, a gate's included
+    And the scenario route's backend still needs a price to boot, since its judgements are billed
+
+  @unit
   Scenario: A routed cost with no input tokens is still billed
     Given a routed judge call, run, page or judged query whose cost is above zero and whose input tokens are zero
     When its spend is recorded or checked against the budget

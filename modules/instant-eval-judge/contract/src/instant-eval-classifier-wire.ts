@@ -14,8 +14,9 @@ import type {
   InstantEvalVerdict,
 } from "./instant-eval-judge.api.ts";
 
-/** The levels a score question offers, low to high. */
+/** The levels a score question offers, low to high: its named levels' indexes when it has them. */
 function instantEvalScoreLevels(question: InstantEvalScoreQuestion): number[] {
+  if (question.levels) return question.levels.map((_, index) => index);
   const { min, max } = question.range;
   return Array.from({ length: max - min + 1 }, (_, index) => min + index);
 }
@@ -49,7 +50,7 @@ function toClassifierQuestion(question: InstantEvalQuestion): ClassifierWireQues
     return {
       type: "score",
       instructions: question.instructions,
-      criteria: instantEvalScoreLevels(question).map(String),
+      criteria: question.levels ?? instantEvalScoreLevels(question).map(String),
     };
   }
   return {
@@ -153,13 +154,14 @@ function findWeightedScore({
   const levels = instantEvalScoreLevels(question);
   const { probabilities } = answer;
   if (probabilities) {
+    const keyed = {
+      levels,
+      ...(answer.legend ? { legend: answer.legend } : {}),
+      ...(question.levels ? { names: question.levels } : {}),
+    };
     const weighted: { level: number; probability: number }[] = [];
     for (const [key, probability] of Object.entries(probabilities)) {
-      const [level] = findLevelForKey({
-        key,
-        levels,
-        ...(answer.legend ? { legend: answer.legend } : {}),
-      });
+      const [level] = findLevelForKey({ key, ...keyed });
       if (level !== undefined) weighted.push({ level, probability });
     }
     const weight = weighted.reduce((sum, { probability }) => sum + probability, 0);
@@ -170,7 +172,19 @@ function findWeightedScore({
       return [{ score: mean, spread: Math.sqrt(variance) }];
     }
   }
-  return typeof answer.score === "number" ? [{ score: question.range.min + answer.score }] : [];
+  return findBareScore({ question, answer });
+}
+
+/** A score with no distribution is a level position: named levels' index, else a range offset. */
+function findBareScore({
+  question,
+  answer,
+}: {
+  question: InstantEvalScoreQuestion;
+  answer: ClassifierAnswer;
+}): { score: number }[] {
+  if (typeof answer.score !== "number") return [];
+  return [{ score: question.levels ? answer.score : question.range.min + answer.score }];
 }
 
 /**
@@ -182,22 +196,46 @@ function findLevelForKey({
   key,
   levels,
   legend,
+  names,
 }: {
   key: string;
   levels: readonly number[];
   legend?: Readonly<Record<string, string>>;
+  /** The question's named levels, when it sent names in place of numbers. */
+  names?: readonly string[];
 }): number[] {
   const named = legend?.[key];
   if (named !== undefined) {
-    const fromLegend = findOfferedLevel({ value: Number(named), levels });
+    const [value] = names ? findNamedLevelIndex({ said: named, names }) : [Number(named)];
+    const fromLegend = findOfferedLevel({ value, levels });
     if (fromLegend.length > 0) return fromLegend;
   }
-  const position = Number(key);
-  if (Number.isInteger(position)) {
-    const fromPosition = findOfferedLevel({ value: levels[position], levels });
+  // Named levels take digit keys only as positions: `Number("")` is 0, the lowest level's index.
+  const isPosition = names ? /^\d+$/.test(key) : Number.isInteger(Number(key));
+  if (isPosition) {
+    const fromPosition = findOfferedLevel({ value: levels[Number(key)], levels });
     if (fromPosition.length > 0) return fromPosition;
   }
-  return findOfferedLevel({ value: Number(key), levels });
+  const [value] = names ? findNamedLevelIndex({ said: key, names }) : [Number(key)];
+  return findOfferedLevel({ value, levels });
+}
+
+/**
+ * The index of the named level a key or legend entry stands for: the level as sent, or its label,
+ * the part before the first colon ("hard: needs multi-step checking" answers to "hard").
+ */
+function findNamedLevelIndex({
+  said,
+  names,
+}: {
+  said: string;
+  names: readonly string[];
+}): number[] {
+  const at = names.findIndex((name) => {
+    const label = name.split(":", 1)[0] ?? name;
+    return said === name || said === label || said.startsWith(`${label}:`);
+  });
+  return at < 0 ? [] : [at];
 }
 
 function findOfferedLevel({

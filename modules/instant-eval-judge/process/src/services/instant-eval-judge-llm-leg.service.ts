@@ -24,7 +24,10 @@ import {
 } from "../rules/instant-eval-judge-route.rules.ts";
 import { findInstantEvalLlmVerdicts } from "../rules/instant-eval-judge-sureness.rules.ts";
 
-type InstantEvalJudgeLlmCall = Pick<InstantEvalLlmJudgeRequest, "wire" | "model" | "timeoutMs">;
+type InstantEvalJudgeLlmCall = Pick<
+  InstantEvalLlmJudgeRequest,
+  "wire" | "model" | "timeoutMs" | "reasoningEffort"
+>;
 
 /** The answers read, and the last reason a question went unanswered. */
 type InstantEvalJudgeLlmLegAnswers = Readonly<{

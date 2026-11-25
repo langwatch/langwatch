@@ -93,13 +93,14 @@ export class InstantEvalJudgeRouterService {
     );
     const leads = instantEvalJudgeFirstSendLeadsOf({ plans, table });
     const firstSends = runs.map((run, at) => {
-      if (leads[at] !== at) return undefined;
+      // A gated plan sends nothing first: its gate picks the backend that is asked.
+      if (leads[at] !== at || plans[at]!.gate) return undefined;
       return run.firstLeg(
         groups.filter((_, other) => leads[other] === at).flatMap((g) => g.questions),
       );
     });
     return groups.map(async ({ kind, questions }, at) => {
-      const first = firstSends[leads[at]!]!;
+      const first = firstSends[leads[at]!];
       return { kind, judgement: await runs[at]!.judgeFrom({ questions, first }) };
     });
   }

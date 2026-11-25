@@ -9,6 +9,7 @@ import type {
   InstantEvalBooleanQuestion,
   InstantEvalCategoryQuestion,
   InstantEvalJudgeJob,
+  InstantEvalJudgeReasoningEffort,
   InstantEvalQuestion,
   InstantEvalScoreQuestion,
 } from "@langwatch/instant-eval-judge-contract";
@@ -194,14 +195,20 @@ function categoryList(question: InstantEvalCategoryQuestion): string {
     .join("\n");
 }
 
+/**
+ * The request body. A reasoning effort goes on OpenAI Responses alone, and only when the backend
+ * sets one: unset, the body is the one sent before the field existed.
+ */
 export function instantEvalLlmJudgeBodyOf({
   wire,
   model,
   prompt,
+  reasoningEffort,
 }: {
   wire: InstantEvalLlmJudgeWire;
   model: string;
   prompt: InstantEvalLlmJudgePrompt;
+  reasoningEffort?: InstantEvalJudgeReasoningEffort;
 }): Record<string, unknown> {
   const { system, user, tool } = prompt;
   if (wire === "anthropic_messages") {
@@ -221,6 +228,7 @@ export function instantEvalLlmJudgeBodyOf({
       { role: "user", content: user },
     ],
     max_output_tokens: MAX_OUTPUT_TOKENS,
+    ...(reasoningEffort ? { reasoning: { effort: reasoningEffort } } : {}),
     store: false,
     tools: [{ type: "function", ...tool, strict: false }],
     tool_choice: { type: "function", name: tool.name },

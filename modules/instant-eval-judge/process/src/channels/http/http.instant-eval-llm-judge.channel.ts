@@ -58,14 +58,21 @@ export class HttpInstantEvalLlmJudgeChannel implements InstantEvalLlmJudgeChanne
   }
 
   async judge(
-    { wire, model, job, question, text, timeoutMs }: InstantEvalLlmJudgeRequest,
+    { wire, model, job, question, text, timeoutMs, reasoningEffort }: InstantEvalLlmJudgeRequest,
     signal?: AbortSignal,
   ): Promise<InstantEvalLlmJudgeAnswer> {
     const apiKey = this.keys[wire];
     if (!apiKey || !model) return skipped("classifier_not_configured");
     const fitted = prepareInstantEvalText({ text, budgetTokens: LLM_CONTENT_BUDGET_TOKENS });
     const prompt = instantEvalLlmJudgePromptOf({ job, question, text: fitted.text });
-    const body = JSON.stringify(instantEvalLlmJudgeBodyOf({ wire, model, prompt }));
+    const body = JSON.stringify(
+      instantEvalLlmJudgeBodyOf({
+        wire,
+        model,
+        prompt,
+        ...(reasoningEffort ? { reasoningEffort } : {}),
+      }),
+    );
     let response: Awaited<ReturnType<typeof undiciFetch>>;
     try {
       response = await undiciFetch(ENDPOINTS[wire], {
