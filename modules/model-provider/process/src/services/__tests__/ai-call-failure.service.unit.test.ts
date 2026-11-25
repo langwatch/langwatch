@@ -27,14 +27,25 @@ function wrapped(failure: unknown): Promise<unknown> {
     .catch((error: unknown) => error);
 }
 
-function providerAnswered(statusCode: number): APICallError {
+function providerAnswered(statusCode: number, responseBody?: string): APICallError {
   return new APICallError({
     message: `provider answered ${statusCode}`,
     url: "https://provider.example.test/v1/chat/completions",
     requestBodyValues: {},
     statusCode,
+    responseBody,
   });
 }
+
+const AZURE_CONTENT_FILTER_BODY = JSON.stringify({
+  error: {
+    code: "content_filter",
+    innererror: {
+      code: "ResponsibleAIPolicyViolation",
+      content_filter_result: { jailbreak: { detected: true, filtered: true } },
+    },
+  },
+});
 
 describe("AiCallFailureService", () => {
   describe("when the call is refused because the process cannot execute the model", () => {
@@ -76,6 +87,27 @@ describe("AiCallFailureService", () => {
         expect(isPermanentAiCallFailure(error)).toBe(true);
       },
     );
+  });
+
+  describe("when the provider's content filter refuses the input", () => {
+    /** @scenario "A provider content filter refusal is told apart from a model configuration failure" */
+    it("rethrows it as ai_content_filtered, not retryable", async () => {
+      const error = await wrapped(providerAnswered(400, AZURE_CONTENT_FILTER_BODY));
+
+      expect(error).toMatchObject({
+        code: "ai_content_filtered",
+        retryable: false,
+        meta: { featureKey: FEATURE.key, role: "FAST" },
+      });
+      expect(isPermanentAiCallFailure(error)).toBe(true);
+    });
+
+    /** @scenario "A provider content filter refusal is told apart from a model configuration failure" */
+    it("keeps a 400 without a content filter code as ai_call_failed", async () => {
+      const error = await wrapped(providerAnswered(400, '{"error":{"code":"invalid_request"}}'));
+
+      expect(error).toMatchObject({ code: "ai_call_failed" });
+    });
   });
 
   describe("when the failure is one a retry could fix", () => {

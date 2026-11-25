@@ -122,6 +122,13 @@ func TestDeployReadsTheLiveSitemapFirstAndPingsIndexNowLast(t *testing.T) {
 	if ping < invalidate {
 		t.Error("IndexNow must hear of the pages after the distribution serves them")
 	}
+	live := steps(job)["Read the live sitemap"]
+	if !strings.Contains(live, "https://langwatch.ai/docs/sitemap.xml") || strings.Contains(live, "s3://") {
+		t.Errorf("the live sitemap must be read from the public site; the deploy role cannot read the bucket:\n%s", live)
+	}
+	if !strings.Contains(live, "::warning::") {
+		t.Errorf("a failed read of the live sitemap must warn, since IndexNow then hears of every page:\n%s", live)
+	}
 	body := steps(job)["Tell IndexNow what changed"]
 	if !strings.Contains(body, "go run ./cmd/docsdeploy indexnow") || !strings.Contains(body, "::warning::") {
 		t.Errorf("the IndexNow step must run docsdeploy and only warn on a refusal:\n%s", body)

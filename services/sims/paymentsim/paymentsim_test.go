@@ -23,6 +23,9 @@ const (
 	catalog    = "../../../enterprise/modules/billing/contract/src/stripe-catalog.json"
 	seatPrice  = "price_1SzP11IMsTw08cudRhGETYNa" // GROWTH_SEAT_USD_MONTHLY, 3200 usd
 	eventsMtr  = "mtr_test_61UBL0fe0hM4Csg7x41IMsTw08cudQaG"
+	storageMtr = "mtr_test_61VjKmnOYgbfwXOun41IMsTw08cudHtw"
+	// RETENTION_STORAGE_EUR_MONTHLY, 300 eur per GB-month
+	storagePrice = "price_1UZwpSIMsTw08cud1AbkINGw"
 	// GROWTH_PII_REDACTION_USD, 100 usd cents per dollar on the PII redaction meter
 	piiRedactionPrice = "price_1Uat9tIMsTw08cudpWWrZG4a"
 )
@@ -195,6 +198,43 @@ func TestRefusesCallWithoutKey(t *testing.T) {
 	}
 }
 
+// A unit amount keeps a price off the BILLABLE_EVENTS fallback, so only catalogMetered meters it.
+// @scenario "Each dollar usage price is metered on its own meter"
+func TestCatalogMetersEachUsagePriceOnItsOwnMeter(t *testing.T) {
+	raw := []byte(`{
+		"mapping": {
+			"GROWTH_INSTANT_EVAL_USD": {"test": "price_instant"},
+			"GROWTH_PII_REDACTION_USD": {"test": "price_pii"}
+		},
+		"meters": {
+			"INSTANT_EVAL_USD": {"test": "mtr_instant"},
+			"PII_REDACTION_USD": {"test": "mtr_pii"}
+		},
+		"prices": {
+			"price_instant": {"id": "price_instant", "unitAmount": 100, "currency": "usd", "recurring": {"interval": "month", "intervalCount": 1}},
+			"price_pii": {"id": "price_pii", "unitAmount": 100, "currency": "usd", "recurring": {"interval": "month", "intervalCount": 1}}
+		}
+	}`)
+	st := newState()
+	if err := st.seedCatalog(raw, "test", epoch); err != nil {
+		t.Fatal(err)
+	}
+	want := map[string]string{"price_instant": "mtr_instant", "price_pii": "mtr_pii"}
+	for _, p := range st.prices {
+		meter, ok := want[p.ID]
+		if !ok {
+			continue
+		}
+		if !isMetered(p) || p.Recurring.Meter == nil || *p.Recurring.Meter != meter {
+			t.Errorf("%s: recurring %+v, want metered on %s", p.ID, p.Recurring, meter)
+		}
+		delete(want, p.ID)
+	}
+	if len(want) != 0 {
+		t.Fatalf("prices not seeded: %v", want)
+	}
+}
+
 // @scenario "The catalog seeds the product's own price ids"
 func TestCatalogSeedsRealPriceIDs(t *testing.T) {
 	g := newRig(t)
@@ -212,17 +252,16 @@ func TestCatalogSeedsRealPriceIDs(t *testing.T) {
 	}
 	_, meters := g.stripe(http.MethodGet, "/v1/billing/meters", "limit=10")
 	// Meters are seeded from a map, so listing order is not fixed.
-	var m map[string]any
-	for _, candidate := range meters["data"].([]any) {
-		if c := candidate.(map[string]any); c["id"] == eventsMtr {
-			m = c
-		}
+	events := map[string]any{}
+	for _, m := range meters["data"].([]any) {
+		events[m.(map[string]any)["id"].(string)] = m.(map[string]any)["event_name"]
 	}
-	if m == nil {
-		t.Fatalf("meter %s not listed: %v", eventsMtr, meters["data"])
+	if events[eventsMtr] != "langwatch_billable_events" || events[storageMtr] != "langwatch_retention_storage_gb" {
+		t.Fatalf("meters %v", events)
 	}
-	if m["event_name"] != "langwatch_billable_events" {
-		t.Fatalf("meter %v", m)
+	storage, _ := found[storagePrice]["recurring"].(map[string]any)
+	if storage == nil || storage["usage_type"] != "metered" || storage["meter"] != storageMtr {
+		t.Fatalf("storage price %v", found[storagePrice])
 	}
 }
 

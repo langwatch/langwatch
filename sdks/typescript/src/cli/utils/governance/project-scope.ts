@@ -1,6 +1,6 @@
 import { mintProjectIngestionKey } from "./cli-api";
 import type { GovernanceConfig } from "./config";
-import { saveConfig } from "./config";
+import { assertConfigWritable, saveConfig } from "./config";
 import { deviceLabelForThisMachine } from "./device-label";
 import { SOURCE_TYPE_BY_TOOL } from "./otel-env-block";
 
@@ -24,6 +24,7 @@ export async function pinToolToProject({
       `--project is not supported for '${tool}': it has no direct OTLP ingestion path.`,
     );
   }
+  assertConfigWritable();
   const minted = await mintProjectIngestionKey(cfg, {
     sourceType,
     project,

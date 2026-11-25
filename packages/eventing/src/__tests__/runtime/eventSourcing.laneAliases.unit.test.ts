@@ -13,6 +13,8 @@ import { createTenantId } from "../../domain/tenantId.ts";
 import type { Event } from "../../domain/types.ts";
 import { EventSourcing } from "../../eventSourcing.ts";
 import { definePipeline } from "../../pipeline/staticBuilder.ts";
+import type { FoldProjectionStore } from "../../projections/foldProjection.types.ts";
+import type { PeerEvent } from "../../projections/peerProjection.ts";
 import { EventSourcedQueueProcessorMemory } from "../../queues/memory.ts";
 import { testEventSchema } from "../../services/__tests__/testHelpers.ts";
 import { EventStoreMemory } from "../../stores/eventStoreMemory.ts";
@@ -71,6 +73,15 @@ function alias(
   return { ...overrides };
 }
 
+function ownerPipeline() {
+  return definePipeline({ name: "owner", aggregate: defineAggregate({ type: "owner" }) })
+    .withEvents([
+      testEventSchema(SPAN_RECEIVED, spanData),
+      testEventSchema(ORIGIN_RESOLVED, originData),
+    ])
+    .build();
+}
+
 function runtime({ aliases }: { aliases: readonly LaneAlias[] }) {
   const spanSync = vi.fn(async (_data: z.infer<typeof spanData>) => undefined);
   const originSync = vi.fn(async (_data: z.infer<typeof originData>) => undefined);
@@ -82,14 +93,7 @@ function runtime({ aliases }: { aliases: readonly LaneAlias[] }) {
       return new EventSourcedQueueProcessorMemory(definition);
     },
   });
-  eventSourcing.register(
-    definePipeline({ name: "owner", aggregate: defineAggregate({ type: "owner" }) })
-      .withEvents([
-        testEventSchema(SPAN_RECEIVED, spanData),
-        testEventSchema(ORIGIN_RESOLVED, originData),
-      ])
-      .build(),
-  );
+  eventSourcing.register(ownerPipeline());
   eventSourcing.register(
     definePipeline({ name: "successor", aggregate: defineAggregate({ type: "successor" }) })
       .withEvents([notedSchema])
@@ -313,6 +317,102 @@ describe("a successor lane's aliases", () => {
         "global:reactor:usage.meterCount",
         "global:reactor:meterCount",
       ]);
+    });
+  });
+
+  describe("given retired peer subscriber lanes succeeded by a peer map and a peer fold", () => {
+    /** @scenario "A retired peer subscriber lane may be succeeded by its pipeline's peer map or peer fold" */
+    it("processes each former job on the projection lane its alias names", async () => {
+      const peerSpan = [{ type: SPAN_RECEIVED, data: spanData }] as const;
+      type SpanIds = { spanIds: string[]; LastEventOccurredAt: number };
+      const folded = new Map<string, { state: SpanIds; applied: readonly string[] }>();
+      const foldStore: FoldProjectionStore<SpanIds> = {
+        store: async (state, context) => {
+          folded.set(context.aggregateId, { state, applied: context.appliedEventIds ?? [] });
+        },
+        get: async (aggregateId) => {
+          const row = folded.get(aggregateId);
+          return row ? { kind: "folded", state: row.state } : { kind: "empty" };
+        },
+        getWithApplied: async (aggregateId) => {
+          const row = folded.get(aggregateId);
+          return row
+            ? { state: row.state, appliedEventIds: [...row.applied] }
+            : { state: null, appliedEventIds: [], miss: "absent" };
+        },
+      };
+      const mapped: { eventId: string; spanId: string }[] = [];
+      const committed: string[][] = [];
+      const eventStore = EventStoreMemory.createForTesting();
+      const eventSourcing = new EventSourcing({
+        eventStore,
+        queueFactory: (definition) => new EventSourcedQueueProcessorMemory(definition),
+      });
+      eventSourcing.register(ownerPipeline());
+      eventSourcing.register(
+        definePipeline({ name: "successor", aggregate: defineAggregate({ type: "successor" }) })
+          .withEvents([notedSchema])
+          .withPeerMapProjection({
+            events: peerSpan,
+            map: {
+              name: "spanCopy",
+              eventTypes: [SPAN_RECEIVED],
+              map: (event) => ({ eventId: event.id, spanId: event.data.spanId }),
+              store: { append: async (record) => void mapped.push(record) },
+              targetTable: "span_copy",
+            },
+          })
+          .withPeerFoldProjection(
+            {
+              events: peerSpan,
+              fold: {
+                name: "spanTotals",
+                version: "2026-10-08",
+                eventTypes: [SPAN_RECEIVED],
+                init: () => ({ spanIds: [], LastEventOccurredAt: 0 }),
+                apply: (state, event: PeerEvent<typeof peerSpan>) => ({
+                  spanIds: [...state.spanIds, event.data.spanId],
+                  LastEventOccurredAt: Math.max(state.LastEventOccurredAt, event.occurredAt),
+                }),
+                store: foldStore,
+                LastEventOccurredAtKey: "LastEventOccurredAt",
+              },
+            },
+            [
+              {
+                name: "send",
+                handler: async (_event, { state }) => void committed.push([...state.spanIds]),
+              },
+            ],
+          )
+          .withLaneAliases([
+            alias({
+              from: "global:subscriber:successor.spanCopySync",
+              to: { jobType: "handler", lane: "spanCopy" },
+            }),
+            alias({
+              from: "global:subscriber:successor.spanTotalSync",
+              to: { jobType: "projection", lane: "spanTotals" },
+            }),
+          ])
+          .build(),
+      );
+      eventSourcing.startConsumers();
+      await eventStore.seed({ events: [span] });
+
+      for (const key of [
+        "global:subscriber:successor.spanCopySync",
+        "global:subscriber:successor.spanTotalSync",
+      ]) {
+        await sendQueuedByPreviousRelease({ eventSourcing, key, body: { ...span } });
+      }
+
+      await vi.waitFor(() => {
+        expect(mapped).toEqual([{ eventId: "e1", spanId: "s1" }]);
+        expect([...folded.values()].map(({ state }) => state.spanIds)).toEqual([["s1"]]);
+        expect(committed).toEqual([["s1"]]);
+      });
+      await eventSourcing.close();
     });
   });
 

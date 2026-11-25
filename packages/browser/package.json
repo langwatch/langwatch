@@ -143,6 +143,10 @@
       "types": "./dist/wire/query-client.d.ts",
       "default": "./src/wire/query-client.ts"
     },
+    "./query-hints": {
+      "types": "./dist/wire/query-hints.d.ts",
+      "default": "./src/wire/query-hints.ts"
+    },
     "./sse-subscription-link": {
       "types": "./dist/wire/sse-subscription-link.d.ts",
       "default": "./src/wire/sse-subscription-link.ts"

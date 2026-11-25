@@ -7,20 +7,43 @@ import {
   type LangyContextChip,
   type LangyPageContextState,
 } from "@langwatch/langy-contract";
-import { useEffect, useRef } from "react";
+import { createContext, useContext, useEffect, useRef } from "react";
 
 import {
   type AnalyticsLangyAskRequest,
   useAnalyticsHost,
 } from "../../../../model/analytics-host.ts";
-import { boardDraftAbout, LANGY_ASK_PERMISSION, LANGY_RELEASE_FLAG } from "../model/board-langy.ts";
+import {
+  askAboutStoredBoard,
+  boardDraftAbout,
+  LANGY_ASK_PERMISSION,
+  LANGY_RELEASE_FLAG,
+} from "../model/board-langy.ts";
+
+/** On a new board: its id on screen, and the store an ask waits for so Langy reads a real board. */
+type UnsavedBoard = { draftId: string; storedBoardId: () => Promise<string> };
+
+const UnsavedBoardContext = createContext<UnsavedBoard | undefined>(void 0);
+
+/** Wraps a new board, so every ask made on it first stores it. */
+export const UnsavedBoardProvider = UnsavedBoardContext.Provider;
 
 /** Off until the flag answers on and the member may start a conversation. */
 export function useLangyAsk() {
   const host = useAnalyticsHost();
+  const unsaved = useContext(UnsavedBoardContext);
   const enabled =
     host.featureFlag(LANGY_RELEASE_FLAG) === true && host.hasPermission(LANGY_ASK_PERMISSION);
-  return { enabled, ask: (request: AnalyticsLangyAskRequest) => host.askLangy(request) };
+  const ask = (request: AnalyticsLangyAskRequest) => {
+    if (!unsaved) return host.askLangy(request);
+    const { draftId, storedBoardId } = unsaved;
+    storedBoardId()
+      .then((dashboardId) => host.askLangy(askAboutStoredBoard({ request, draftId, dashboardId })))
+      .catch((error: unknown) =>
+        host.failed({ error, fallbackTitle: "Couldn't save the dashboard" }),
+      );
+  };
+  return { enabled, ask };
 }
 
 /**

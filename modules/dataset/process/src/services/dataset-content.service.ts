@@ -38,7 +38,6 @@ import { readChunkOffsets, readSearchOffsets } from "../rules/dataset-chunk-offs
 import { assertStoredRowWithinLimit } from "../rules/dataset-row-limits.rules.ts";
 import {
   matchesDatasetSearch,
-  measureRowsBytes,
   refuseSearchScan,
   type DatasetSearchCaps,
 } from "../rules/dataset-search.rules.ts";
@@ -167,14 +166,14 @@ export class DatasetContentService implements DatasetContent {
         Math.max(measuredBytes, recordedBytes + (offset.byteSize ?? 0)),
         caps,
       );
-      const rows = await storage.readChunk({
+      const { rows, byteSize } = await storage.readMeasuredChunk({
         projectId: input.projectId,
         datasetId: dataset.id,
         index: offset.index,
       });
       rowsRead += rows.length;
       recordedBytes += offset.byteSize ?? 0;
-      measuredBytes += measureRowsBytes(rows);
+      measuredBytes += byteSize;
       refuseSearchScan(rowsRead, Math.max(measuredBytes, recordedBytes), caps);
       for (const row of rows) {
         const record = toDatasetRecord(row, dataset);

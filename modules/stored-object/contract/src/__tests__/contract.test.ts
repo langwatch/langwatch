@@ -1,11 +1,13 @@
-import { HandledError } from "@langwatch/handled-error";
+import { HandledError, remediation } from "@langwatch/handled-error";
 import { describe, expect, expectTypeOf, it } from "vitest";
 import { ZodError } from "zod";
 
 import {
+  STORED_OBJECT_UPLOAD_REQUEST_BODY,
   DirectUploadUnavailableError,
   IdempotencyConflictError,
   StorageUnavailableError,
+  StoredObjectWriteConflictError,
   StoredObjectBytesMissingError,
   StoredObjectDeletedError,
   StoredObjectNotFoundError,
@@ -167,6 +169,11 @@ describe("Stored Objects errors and portable service capability", () => {
     [new StoredObjectNotFoundError(), 404, "stored_object_not_found"],
     [new StoredObjectBytesMissingError("project_1", "prod_so_1"), 404, "stored_object_missing"],
     [new StorageUnavailableError(), 502, "storage_unavailable"],
+    [
+      new StoredObjectWriteConflictError("project_1", "prod_so_1"),
+      409,
+      "stored_object_write_conflict",
+    ],
     [new IdempotencyConflictError(), 409, "idempotency_conflict"],
   ] as const)("serializes %s as a handled problem", (error, status, code) => {
     expect(HandledError.isHandled(error)).toBe(true);
@@ -178,6 +185,14 @@ describe("Stored Objects errors and portable service capability", () => {
         message: error.message,
       }),
     ).toMatchObject({ code, fault: error.fault });
+  });
+
+  /** @scenario "A delete that keeps losing its row write reports a write conflict" */
+  it("takes the write conflict's tips from the remediation registry", () => {
+    const error = new StoredObjectWriteConflictError("project_1", "prod_so_1");
+
+    expect(error.serialize().tips).toEqual(remediation("stored_object_write_conflict").tips);
+    expect(error.retryable).toBe(true);
   });
 
   describe("when a serialized problem crosses the transport boundary", () => {
@@ -221,5 +236,23 @@ describe("Stored Objects errors and portable service capability", () => {
     expectTypeOf<
       Awaited<ReturnType<StoredObjectApi["storeFromBytes"]>>["reference"]
     >().toEqualTypeOf<StoredObjectReference>();
+  });
+});
+
+describe("the upload route's long body allowance", () => {
+  /** @scenario "The api allows a body up to two hours on the upload route only" */
+  it.each([
+    ["/api/stored-objects/uploads/so_2abc/content", true],
+    ["/api/stored-objects/uploads/so_2abc/confirmation", false],
+    ["/api/stored-objects/uploads/../../trpc/content", false],
+    ["/api/stored-objects/uploads/%2e%2e/content", false],
+    ["/api/stored-objects/uploads/a/../content", false],
+    ["/api/stored-objects/uploads/../content", false],
+    ["/api/stored-objects/uploads/./content", false],
+    ["/api/stored-objects/uploads/so:1/content", false],
+    ["/api/trpc/datasets.upsert", false],
+  ])("matches %s: %s", (path, matched) => {
+    expect(STORED_OBJECT_UPLOAD_REQUEST_BODY.path.test(path)).toBe(matched);
+    expect(STORED_OBJECT_UPLOAD_REQUEST_BODY.timeoutMs).toBe(2 * 60 * 60_000);
   });
 });

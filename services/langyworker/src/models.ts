@@ -71,6 +71,49 @@ function uncataloguedCompat(model: LangyWorkerModelConfig): Record<string, unkno
   return { forceAdaptiveThinking: true, ...model.compat };
 }
 
+const GPT_VERSION_PATTERN = /^gpt-(\d+)(?:\.(\d+))?(?:-([a-z]+))?$/;
+
+type GptVersion = { major: number; minor: number; tier: string | undefined };
+
+function parseGptVersion(id: string): GptVersion | undefined {
+  const match = GPT_VERSION_PATTERN.exec(id);
+  if (!match) return undefined;
+  return { major: Number(match[1]), minor: Number(match[2] ?? 0), tier: match[3] };
+}
+
+const isNewer = (a: GptVersion, b: GptVersion) =>
+  a.major !== b.major ? a.major > b.major : a.minor > b.minor;
+
+/**
+ * pi's newest catalog GPT of the same tier (`luna`, `sol`, ...), or of no tier, for a GPT newer
+ * than every entry pi lists. pi's defaults for an unknown model are a 128k window and text-only
+ * input, so a gpt-6 written from config alone compacted at a tenth of its window.
+ */
+function newerGptSibling(model: LangyWorkerModelConfig): CatalogModelEntry | undefined {
+  if (model.api !== "openai-responses" || !model.id.startsWith("openai/")) return undefined;
+  const wanted = parseGptVersion(model.id.slice("openai/".length));
+  if (!wanted) return undefined;
+  let best: { version: GptVersion; entry: CatalogModelEntry } | undefined;
+  for (const [id, entry] of Object.entries(CATALOG_BY_PREFIX.openai ?? {})) {
+    const version = parseGptVersion(id);
+    if (!entry || !version || version.tier !== wanted.tier || entry.api !== model.api) continue;
+    if (!best || isNewer(version, best.version)) best = { version, entry };
+  }
+  if (!best || !isNewer(wanted, best.version)) return undefined;
+  // The sibling lends its request shape and limits, never its name or price.
+  const { name: _name, cost: _cost, ...shape } = best.entry;
+  return shape;
+}
+
+/**
+ * Whether the model reasons is a fact about the model, not about the lane: the manager marks every
+ * model of a reasoning-capable lane, and OpenAI answers a reasoning field on gpt-4o or gpt-4.1
+ * with a 400.
+ */
+function catalogReasoning(catalog: CatalogModelEntry, entry: Record<string, unknown>) {
+  if (typeof catalog.reasoning === "boolean") entry.reasoning = catalog.reasoning;
+}
+
 function buildModelEntry(model: LangyWorkerModelConfig): Record<string, unknown> {
   const {
     baseUrlEnv: _baseUrlEnv,
@@ -88,7 +131,7 @@ function buildModelEntry(model: LangyWorkerModelConfig): Record<string, unknown>
     provider?: unknown;
     apiKey?: unknown;
   };
-  const catalog = catalogEntryFor(model);
+  const catalog = catalogEntryFor(model) ?? newerGptSibling(model);
   if (!catalog) {
     const entry: Record<string, unknown> = { ...configEntry };
     if (entry.reasoning === undefined && REASONING_BY_DEFAULT.has(model.api)) {
@@ -109,6 +152,7 @@ function buildModelEntry(model: LangyWorkerModelConfig): Record<string, unknown>
     ...catalogBase
   } = catalog;
   const entry: Record<string, unknown> = { ...catalogBase, ...configEntry };
+  catalogReasoning(catalog, entry);
   const compat = { ...catalogCompat, ...model.compat };
   if (Object.keys(compat).length > 0) entry.compat = compat;
   return entry;

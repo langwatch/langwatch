@@ -1,4 +1,4 @@
-import type { NavigationTeam } from "@langwatch/navigation-contract";
+import type { NavigationProject, NavigationTeam } from "@langwatch/navigation-contract";
 import { findLandingProjects } from "@langwatch/project-contract";
 
 import { useNavigationHost } from "../model/navigation-host.ts";
@@ -36,4 +36,20 @@ export function useLlmOpsProjectSlug(): string | null {
     rememberedProjectSlug: host.rememberedProjectSlug(),
     openableTeams: host.openableTeams(),
   });
+}
+
+/** The project `useLlmOpsProjectSlug` names, for a page that shows what is in it. */
+export function useLlmOpsProject(): NavigationProject | null {
+  const host = useNavigationHost();
+  const slug = useLlmOpsProjectSlug();
+  if (!slug) return null;
+  const ambient = host.project();
+  if (ambient?.slug === slug) return ambient;
+  return (
+    host
+      .openableTeams()
+      .filter((team) => !team.isPersonal)
+      .flatMap((team) => team.projects)
+      .find((project) => project.slug === slug) ?? null
+  );
 }

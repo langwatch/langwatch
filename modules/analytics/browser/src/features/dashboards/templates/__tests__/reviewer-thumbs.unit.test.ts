@@ -1,5 +1,5 @@
 /**
- * The annotations table holds thumbs from people reviewing traces in LangWatch,
+ * The annotations table holds thumbs from people reviewing answers in LangWatch,
  * not feedback from the agent's users. Widgets that read it say so.
  */
 
@@ -26,13 +26,13 @@ describe("given the template widgets that read reviewer thumbs", () => {
   it("names the thumbs as coming from reviewers, never from users", () => {
     const thumbsDown = READS_ANNOTATIONS.find(({ key }) => key === "thumbs-down");
     expect(thumbsDown?.name).toMatch(/reviewers/);
-    expect(thumbsDown?.definition.code).toContain("reviewing traces in LangWatch");
+    expect(thumbsDown?.definition.code).toContain("Your reviewers gave no thumbs down");
     expect(thumbsDown?.definition.code).not.toMatch(/users (gave|rejected)/);
   });
 
   /** @scenario "AC14 Reviewer thumbs are named as reviewer thumbs" */
   it("keeps the feedback setup step from calling reviewer thumbs feedback from users", () => {
-    expect(CALLS_TO_ACTION.feedback.line).toContain("reviewing traces in LangWatch");
+    expect(CALLS_TO_ACTION.feedback.line).toContain("your team marks answers");
     expect(CALLS_TO_ACTION.feedback.line).not.toMatch(/your users/);
   });
 });

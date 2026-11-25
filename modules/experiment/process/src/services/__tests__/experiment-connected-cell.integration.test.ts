@@ -25,7 +25,9 @@ import type { Agent as TypedAgent, CallOutcome } from "@langwatch/agent-contract
 import { AgentBusyError, AgentOfflineError, AgentOwnerOnlyError } from "@langwatch/agent-contract";
 import type { RunActor } from "@langwatch/scenario-contract";
 
+import { ExperimentRunConcurrencyService } from "../../features/run/services/experiment-run-concurrency.service.ts";
 import { ExperimentWorkbenchPipelineRunService } from "../../features/workbench/services/experiment-workbench-pipeline-run.service.ts";
+import { MemoryExperimentRunActivityRepository } from "../../repositories/memory/memory.experiment-run-activity.repository.ts";
 import { MemoryExperimentRunEventStreamRepository } from "../../repositories/memory/memory.experiment-run-event-stream.repository.ts";
 import { MemoryExperimentRunFoldRepository } from "../../repositories/memory/memory.experiment-run-fold.repository.ts";
 import { MemoryExperimentRunAbortRepository } from "../../repositories/memory/memory.experiment.repositories.ts";
@@ -456,7 +458,10 @@ describe("given a personal development agent of another person", () => {
         publicBaseUrl: undefined,
         services: createApiFixture<ExecutionDataServices>({}, "services"),
         ownership: { assertConnectedAgentsRunnable: assertRunnable },
-        concurrency: 1,
+        concurrency: ExperimentRunConcurrencyService.create({
+          activity: MemoryExperimentRunActivityRepository.create(),
+          config: { runConcurrency: 1, projectCellBudget: 1 },
+        }),
         refusals: {},
       },
     });

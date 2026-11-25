@@ -185,3 +185,16 @@ Feature: The transactional messages LangWatch sends
     When the upgrade alert is rendered
     Then the subject counts the failed steps and names the installation
     And each step shows its id, its release, its attempt, its error and a link that opens that step
+
+  @unit
+  Scenario: Every payment recovery email before the move to Free asks to update the card
+    Given an unpaid renewal reached day 3, day 7 or day 14 of payment recovery
+    When that day's recovery email is rendered
+    Then its button reads "Update card"
+    And none of them reads "Pay now"
+
+  @unit
+  Scenario: The email after the move to Free asks to pay the open invoice
+    Given an unpaid renewal reached day 21 and the organization moved to the Free plan
+    When the paused email is rendered
+    Then its button reads "Pay now"

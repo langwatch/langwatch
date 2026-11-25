@@ -10,7 +10,11 @@ import type {
   StoredObjectBytesRepository,
   StoredObjectStorageAddress,
 } from "../repositories/stored-object-bytes.repository.ts";
-import type { StoredObjectRecordRepository } from "../repositories/stored-object-record.repository.ts";
+import type {
+  StoredObjectRecord,
+  StoredObjectRecordRepository,
+} from "../repositories/stored-object-record.repository.ts";
+import { StoredObjectUploadReapService } from "./stored-object-upload-reap.service.ts";
 
 type StoredObjectCleanupOptions = Readonly<{
   records: StoredObjectRecordRepository;
@@ -27,7 +31,16 @@ export class StoredObjectCleanupService {
     return new StoredObjectCleanupService(options);
   }
 
-  private constructor(private readonly options: StoredObjectCleanupOptions) {}
+  private readonly uploads: StoredObjectUploadReapService;
+
+  private constructor(private readonly options: StoredObjectCleanupOptions) {
+    this.uploads = StoredObjectUploadReapService.create({
+      records: options.records,
+      storage: options.storage,
+      batchSize: options.cleanupBatchSize,
+      now: options.now,
+    });
+  }
 
   async deleteOwnedBy(input: { projectId: string }): Promise<DeleteProjectStoredObjectsResult> {
     let afterId: StoredObjectId | undefined;
@@ -73,42 +86,13 @@ export class StoredObjectCleanupService {
     };
   }
 
-  /** Bounded retry for pending uploads that have expired. */
+  /** Bounded retry for expired pending uploads; the worker's reaper runs the same pass. */
   async cleanupExpiredUploads(input: { projectId: string; limit?: number }): Promise<number> {
-    const now = this.options.now();
-    const page = await this.options.records.findPage({
-      tenantId: input.projectId,
-      status: "pending",
-      expiresBefore: now,
-      limit: input.limit ?? this.options.cleanupBatchSize ?? 100,
-    });
-    let cleaned = 0;
-    for (const value of page) {
-      if (
-        value.storage &&
-        !(await this.deleteStorageBestEffort({
-          projectId: input.projectId,
-          address: value.storage,
-        }))
-      ) {
-        continue;
-      }
-
-      await this.options.records.upsert({
-        ...value,
-        status: "failed",
-        storage: null,
-        updatedAt: now,
-      });
-      cleaned += 1;
-    }
-
-    return cleaned;
+    return this.uploads.reapProject(input);
   }
 
   /** Bounded retry for provider deletion after logical deletion won. */
   async cleanupDeletedObjects(input: { projectId: string; limit?: number }): Promise<number> {
-    const now = this.options.now();
     const page = await this.options.records.findPage({
       tenantId: input.projectId,
       status: "deleted",
@@ -116,28 +100,27 @@ export class StoredObjectCleanupService {
     });
     let cleaned = 0;
     for (const value of page) {
-      if (!value.storage) {
-        continue;
-      }
-
-      if (
-        !(await this.deleteStorageBestEffort({
-          projectId: input.projectId,
-          address: value.storage,
-        }))
-      ) {
-        continue;
-      }
-
-      await this.options.records.upsert({
-        ...value,
-        storage: null,
-        updatedAt: now,
-      });
-      cleaned += 1;
+      if (await this.removeBytesOf(value)) cleaned += 1;
     }
 
     return cleaned;
+  }
+
+  /**
+   * Removes a deleted row's bytes, then clears its address only while the row is still
+   * that deleted row; answers whether the bytes went.
+   */
+  async removeBytesOf(value: StoredObjectRecord): Promise<boolean> {
+    const address = value.storage;
+    if (!address) return false;
+    if (!(await this.deleteStorageBestEffort({ projectId: value.tenantId, address }))) return false;
+
+    await this.options.records.transition({
+      expected: value,
+      next: { ...value, storage: null, expiresAt: null, updatedAt: this.options.now() },
+    });
+
+    return true;
   }
 
   async deleteStorageBestEffort(input: {

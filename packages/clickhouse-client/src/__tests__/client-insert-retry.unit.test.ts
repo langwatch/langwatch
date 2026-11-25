@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { ClickHouseQueryClient } from "../client.ts";
+import { isInsertFailure } from "../insertFailure.ts";
 import { RetryPolicy } from "../retry.ts";
 import { TenantGuard } from "../tenantGuard.ts";
 
@@ -72,6 +73,21 @@ describe("ClickHouseQueryClient insert", () => {
 
         expect(insert).toHaveBeenCalledTimes(2);
       });
+    });
+  });
+
+  describe("given ClickHouse refuses an insert's data", () => {
+    it("marks the failure as an insert's, so a caller can tell it from a read's", async () => {
+      const refused = Object.assign(new Error("Type mismatch in VALUES section"), {
+        code: "53",
+        type: "TYPE_MISMATCH",
+      });
+      const insert = vi.fn(async () => {
+        throw refused;
+      });
+
+      await expect(clientWith(insert).insert(batch)).rejects.toBe(refused);
+      expect(isInsertFailure(refused)).toBe(true);
     });
   });
 });

@@ -5,9 +5,12 @@ import { describe, expect, it } from "vitest";
 import {
   braidAffordances,
   braidAuditHref,
+  braidRowActionsLabel,
   braidProject,
+  braidsPauses,
   braidsPlanState,
   braidsSigningKeysHref,
+  braidsStatus,
   braidsSectionOf,
   organizationBraidRows,
   projectBraidRows,
@@ -60,6 +63,38 @@ describe("plan state", () => {
     expect(braidsPlanState({ isEnterprise: false, braidCount: 0 })).toBe("upsell");
     expect(braidsPlanState({ isEnterprise: false, braidCount: 2 })).toBe("paused");
   });
+
+  /** @scenario With release_braids off below Enterprise the pages say the braids are paused by the plan */
+  it("pauses kept braids by the plan whatever the organisation's setting", () => {
+    for (const turnedOff of [false, true]) {
+      expect(braidsPauses({ planState: "paused", turnedOff })).toEqual({
+        byPlan: true,
+        byOrganization: false,
+      });
+    }
+    for (const settingRead of [false, true]) {
+      expect(braidsStatus({ byPlan: true, byOrganization: false, settingRead })).toBe("plan");
+    }
+  });
+
+  it("pauses an Enterprise organisation's braids only when its setting is off", () => {
+    expect(braidsPauses({ planState: "enterprise", turnedOff: true })).toEqual({
+      byPlan: false,
+      byOrganization: true,
+    });
+    expect(braidsStatus({ byPlan: false, byOrganization: true, settingRead: true })).toBe(
+      "organization",
+    );
+    expect(braidsStatus({ byPlan: false, byOrganization: false, settingRead: true })).toBe(
+      "applying",
+    );
+  });
+
+  it("never says braids apply while the setting is unread and the plan pauses nothing", () => {
+    expect(braidsStatus({ byPlan: false, byOrganization: false, settingRead: false })).toBe(
+      "unknown",
+    );
+  });
 });
 
 describe("what the viewer may do", () => {
@@ -91,6 +126,17 @@ describe("what the viewer may do", () => {
   it("keeps removal open while braids are paused", () => {
     expect(
       braidAffordances({ canManage: true, planState: "paused", keptToOrganizationAdmins: false }),
+    ).toMatchObject({ canCreate: false, canEditInto: false, canRemove: true });
+  });
+
+  it("offers only removal while the organisation has Braids turned off", () => {
+    expect(
+      braidAffordances({
+        canManage: true,
+        planState: "enterprise",
+        keptToOrganizationAdmins: false,
+        turnedOn: false,
+      }),
     ).toMatchObject({ canCreate: false, canEditInto: false, canRemove: true });
   });
 });
@@ -184,5 +230,34 @@ describe("when two braids on one pair start the same day", () => {
         projects: [],
       }).map((row) => row.fromShowsTime),
     ).toEqual([true, true]);
+  });
+});
+
+describe("braidRowActionsLabel", () => {
+  const row = {
+    braidId: "b-1",
+    side: "into" as const,
+    otherProject: { id: "p-orch", name: "orchestrator" },
+    where: 'attributes["orchestrator"] == "web"',
+    fromMs: Date.UTC(2026, 10, 18, 9, 5),
+    fromShowsTime: false,
+    expiresAtMs: null,
+    createdAtMs: 0,
+  };
+
+  /** @scenario Each braid row shows where it goes, its condition, its access and its activity */
+  it("names each row's menu by its reader, condition and start, so no two read alike", () => {
+    const labels = [
+      row,
+      { ...row, braidId: "b-2", where: 'attributes["orchestrator"] == "cli"' },
+      { ...row, braidId: "b-3", fromMs: Date.UTC(2026, 10, 18, 10, 0) },
+      { ...row, braidId: "b-4", where: null },
+    ].map(braidRowActionsLabel);
+
+    expect(labels[0]).toBe(
+      'Actions for the braid into orchestrator, attributes["orchestrator"] == "web", from 2026-11-18 09:05 UTC',
+    );
+    expect(labels[3]).toContain("every span");
+    expect(new Set(labels).size).toBe(labels.length);
   });
 });
