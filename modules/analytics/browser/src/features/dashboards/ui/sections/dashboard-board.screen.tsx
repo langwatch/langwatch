@@ -6,7 +6,10 @@
  */
 
 import { UiPageLoading, UiPageNotFound } from "@langwatch/browser/page-fallbacks";
-import type { DashboardHomeProduct } from "@langwatch/dashboard-contract";
+import {
+  DEFAULT_DASHBOARD_HOME_PRODUCT,
+  type DashboardHomeProduct,
+} from "@langwatch/dashboard-contract";
 import { Spinner, Text, VStack } from "@langwatch/design-system/primitives";
 import { HandledErrorAlert } from "@langwatch/error-views";
 
@@ -139,11 +142,34 @@ function useBoardTitleRename({
     edits.renameBoard({ board: { ...board, project: { id: board.projectId } }, name });
 }
 
+/** Whether the board reads the organization, and its empty-board templates. Off with the
+ * organization area, every board keeps main's project scope and LLM Ops templates. */
+function boardDataHome({
+  board,
+  organizationArea,
+  projectSlug,
+}: {
+  board: SavedBoard;
+  organizationArea: boolean;
+  projectSlug: string;
+}) {
+  const homeProduct = organizationArea ? board.homeProduct : DEFAULT_DASHBOARD_HOME_PRODUCT;
+  return {
+    readsOrganization: ORGANIZATION_DATA_HOMES.includes(homeProduct),
+    templates: templateLinks({ projectSlug, homeProduct }),
+  };
+}
+
 function OpenBoard({ board }: { board: SavedBoard }) {
   const host = useAnalyticsHost();
-  const readsOrganization = ORGANIZATION_DATA_HOMES.includes(board.homeProduct);
+  const organizationArea = useOrganizationLibraryOpen().isOpen;
   const projectId = host.project()?.id ?? "";
   const saved = useSavedDashboards();
+  const { readsOrganization, templates } = boardDataHome({
+    board,
+    organizationArea,
+    projectSlug: saved.projectSlug,
+  });
   const { access, names } = useBoardAccess(board);
   const { canEdit } = access;
   const scope = useBoardScope();
@@ -194,12 +220,7 @@ function OpenBoard({ board }: { board: SavedBoard }) {
   };
   const isEmpty = boardWidgets.status === "success" && widgets.length === 0;
   const isMyDashboard = myDashboardId({ boards: [board], userId: host.userId() }) === board.id;
-  const organizationArea = useOrganizationLibraryOpen().isOpen;
   const renameBoard = useBoardTitleRename({ board, organizationArea });
-  const templates = templateLinks({
-    projectSlug: saved.projectSlug,
-    homeProduct: board.homeProduct,
-  });
   const fromTemplate = useAddTemplate({ existingNames: saved.boards.map(({ name }) => name) });
 
   return (

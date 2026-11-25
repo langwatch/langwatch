@@ -332,15 +332,16 @@ Feature: Organization-wide Dashboards area
     # Evidence: haven browser screenshot
 
   # ---- Data at org level vs project view (1211; D1) ----
-  # Next PR: "All projects" at the organization level (ADR-002, decision 9; D1).
-  @unit @integration @q1-all-projects @unimplemented
-  Scenario: An org-level board reads every project I may read
-    Given an Organization board whose widget stores no projects
-    When I open it at "/dashboards/<id>"
-    Then the widget's run asks for projects "all"
-    And {dashboard_context_projects:Array(String)} is bound to ["Ops", "Shop"] in stable order
-    And the chip reads "All projects", and the card line reads "Projects: All projects"
-    # Evidence: the run's params, and a screenshot of the chip and the card line
+  # D2: a Gateway or Governance board reads the organization; an LLM Ops board reads the project in view.
+  @unit @integration
+  Scenario: A Gateway or Governance board's widget reads every project I may read
+    Given an Organization board homed in Gateway or Governance, whose widget stores no projects
+    When I open it
+    Then the widget's run asks for projects "all", and its header names no project
+    And a widget that stores its own projects asks for those projects instead
+    And with release_dashboards_organization_area off, the run asks for no projects, the header keeps
+      the Project chip and an empty board offers its templates, as before
+    # Evidence: the run's params with the flag on and off, and a screenshot of each header
 
   # Next PR: "All projects" at the organization level (ADR-002, decision 9; D1).
   @unit @integration @q1-all-projects @unimplemented
