@@ -162,7 +162,10 @@ describe("given the Release check widgets", () => {
     expect(sql.traffic).toContain("subtractDays(after_end, 7) AS before_end");
     expect(sql.checks).toContain("after_even_rate");
     expect(sql.checks).toContain("before_judged * after_passed / after_judged");
-    expect(code).toContain("No new prompt version or model in this period, so nothing to compare.");
+    expect(sql.traffic).toContain("AppVersion");
+    expect(code).toContain(
+      "No new release, prompt version or model in this period, so nothing to compare.",
+    );
   });
 
   /** @scenario "AC69 Release check: models are compared from experiments that ran them side by side" */

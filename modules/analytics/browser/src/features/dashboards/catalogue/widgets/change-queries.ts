@@ -1,11 +1,12 @@
 /**
- * The changes a board marks on its time axis: a prompt version saved, or a model that
- * carried no traffic in the 30 days before it first did. LangWatch records no deploys.
+ * The changes a board marks on its time axis: a release (a new application version), a prompt
+ * version saved, or a model that carried no traffic in the 30 days before it first did.
+ * @see specs/lwql/release-check-reads-releases.feature
  */
 
 import { bucketOf, END, inPeriod, START } from "../../templates/model/lwql-period.ts";
 
-/** How far back a model must have been silent for its first call to count as a change. */
+/** How long a model or version must have been silent for its first trace to count as a change. */
 const NEW_MODEL_LOOKBACK_DAYS = 30;
 
 // trace_metrics, not the per-minute rollup: the rollup keeps no origin, so a model only Langy or
@@ -26,6 +27,20 @@ const NEW_MODELS = `SELECT Model, min(OccurredAt) AS first_seen
     AND first_seen >= addDays((SELECT min(OccurredAt) FROM trace_metrics
       WHERE ${MODEL_WINDOW}), 1)`;
 
+const VERSION_WINDOW = `OccurredAt >= subtractDays(${START}, ${NEW_MODEL_LOOKBACK_DAYS})
+      AND OccurredAt < ${END}
+      AND AppVersion != ''`;
+
+// A release is the first trace of an application version (service.version, else
+// metadata.version), by the same rule as a model: the project's first version is no release.
+const NEW_RELEASES = `SELECT AppVersion AS Version, min(OccurredAt) AS first_seen
+  FROM trace_metrics
+  WHERE ${VERSION_WINDOW}
+  GROUP BY Version
+  HAVING first_seen >= ${START}
+    AND first_seen >= addDays((SELECT min(OccurredAt) FROM trace_metrics
+      WHERE ${VERSION_WINDOW}), 1)`;
+
 /** Every change in the period, unordered, with the bucket a chart marks it on. */
 export const CHANGES_SQL = `SELECT ${bucketOf("v.CreatedAt")} AS bucket, toDateTime(v.CreatedAt) AS at,
   concat('Prompt ', p.PromptHandle, ' v', toString(v.VersionNumber)) AS label
@@ -37,6 +52,11 @@ UNION ALL
 SELECT ${bucketOf("first_seen")} AS bucket, toDateTime(first_seen) AS at,
   concat('Model: ', Model) AS label
 FROM (${NEW_MODELS})
+LIMIT 50
+UNION ALL
+SELECT ${bucketOf("first_seen")} AS bucket, toDateTime(first_seen) AS at,
+  concat('Release ', Version) AS label
+FROM (${NEW_RELEASES})
 LIMIT 50`;
 
 /**
@@ -53,4 +73,5 @@ LIMIT 500`;
 /** The moment of the newest change in the period; the epoch when there was none. */
 export const LAST_CHANGE_AT = `greatest(
   (SELECT toDateTime(max(CreatedAt)) FROM prompt_versions WHERE ${inPeriod("CreatedAt")}),
-  (SELECT toDateTime(max(first_seen)) FROM (${NEW_MODELS})))`;
+  (SELECT toDateTime(max(first_seen)) FROM (${NEW_MODELS})),
+  (SELECT toDateTime(max(first_seen)) FROM (${NEW_RELEASES})))`;

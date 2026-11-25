@@ -383,6 +383,11 @@
       "seed": "unplanned",
       "note": "needs traces with managed prompt versions written by the old release; no seed carries them yet"
     },
+    "trace:replay-trace-analytics-app-version": {
+      "status": "pending",
+      "seed": "unplanned",
+      "note": "needs traces with service.version or metadata.version written by the old release; no seed carries them yet"
+    },
     "trace:replay-span-analytics": {
       "status": "seeded",
       "seed": "heavy:otlp",

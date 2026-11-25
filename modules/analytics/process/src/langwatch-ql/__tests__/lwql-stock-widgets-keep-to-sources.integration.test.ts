@@ -174,15 +174,22 @@ describe.skipIf(!url)(
       it("lists only production's new model under the application list", async () => {
         const rows = await rowsOf({ label: "up-errors/changes", list: ["application"] });
 
-        expect(rows.map((row) => row.label)).toEqual(["model text-embed"]);
+        expect(rows.map((row) => row.label)).toEqual(["Model: text-embed"]);
       });
 
       /** @scenario "A model only Langy used is not marked as a change to production" */
       it("lists Langy's new model under the langy list", async () => {
         const rows = await rowsOf({ label: "up-errors/changes", list: ["langy"] });
 
-        expect(rows.map((row) => row.label)).toEqual([`model ${LANGY_MODEL}`]);
+        expect(rows.map((row) => row.label)).toEqual([`Model: ${LANGY_MODEL}`]);
       });
+    });
+
+    /** @scenario "The Release check names production's change, never a model only Langy ran" */
+    it("names production's new model as the Release check's change, not Langy's", async () => {
+      const rows = await rowsOf({ label: "ship-rollout/changes", list: ["application"] });
+
+      expect(rows.map((row) => row.label)).toEqual(["Model: text-embed"]);
     });
 
     /** @scenario "The Release check compares production around a change production made" */

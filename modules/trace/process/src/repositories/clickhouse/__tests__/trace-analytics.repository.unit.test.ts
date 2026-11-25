@@ -447,6 +447,7 @@ describe("TraceAnalyticsClickHouseRepository insert settings", () => {
             "MetadataOutcomeReason",
             "MetadataPromptVersion",
             "MetadataEnvironment",
+            "AppVersion",
           ]),
         );
       });

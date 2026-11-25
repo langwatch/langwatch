@@ -37,6 +37,8 @@ const TRACE_ANALYTICS_METADATA_KEYS = {
   MetadataOutcomeReason: ["metadata.outcome_reason"],
   MetadataPromptVersion: ["metadata.prompt_version"],
   MetadataEnvironment: ["metadata.environment", "metadata.env"],
+  // goose 00134: the application version a release is read from (release-check-reads-releases).
+  AppVersion: ["service.version", "metadata.version", "metadata.app_version"],
 } as const satisfies Record<string, readonly string[]>;
 
 /** The `trace_analytics` metadata columns, by column name. */
@@ -85,6 +87,7 @@ export function traceAnalyticsWrittenMetadataColumns(
     MetadataOutcomeReason: columns.MetadataOutcomeReason,
     MetadataPromptVersion: columns.MetadataPromptVersion,
     MetadataEnvironment: columns.MetadataEnvironment,
+    AppVersion: columns.AppVersion,
   };
 }
 
