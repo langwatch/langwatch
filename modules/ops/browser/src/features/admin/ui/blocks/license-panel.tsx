@@ -247,6 +247,7 @@ export function LicensePanel({
       {part === "extend" ? (
         <LicenseExtendForm
           expiresAt={head.expiresAt}
+          inUseEndsAt={inUse.expiresAt}
           install={changes.install}
           isSaving={isSigning}
           onCancel={() => onPart(null)}

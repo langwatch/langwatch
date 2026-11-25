@@ -14,12 +14,15 @@ import { dateInputToISO } from "../elements/admin-cells.tsx";
 /** Picks the new end of the term; the seats and services stay as they are. */
 export function LicenseExtendForm({
   expiresAt,
+  inUseEndsAt,
   install,
   isSaving,
   onCancel,
   onExtend,
 }: {
   expiresAt: string;
+  /** When the license the install runs today ends; it keeps working until the replacement lands. */
+  inUseEndsAt: string;
   /** The install that picks the replacement up, or null when none is bound. */
   install: string | null;
   isSaving: boolean;
@@ -71,7 +74,7 @@ export function LicenseExtendForm({
       </HStack>
       <Text fontSize="sm" color="fg.muted">
         {install
-          ? `Signs a replacement that ends ${picked ?? "on the new date"}. ${install} picks it up on its next sync, nothing to send. The ${formatDay(expiresAt)} license keeps working until then.`
+          ? `Signs a replacement that ends ${picked ?? "on the new date"}. ${install} picks it up on its next sync, nothing to send. The ${formatDay(inUseEndsAt)} license keeps working until then.`
           : `Signs a new key that ends ${picked ?? "on the new date"}. No install has used this license, so you send the new key and the unused one stops working.`}
       </Text>
       <HStack gap={2} justify="end">

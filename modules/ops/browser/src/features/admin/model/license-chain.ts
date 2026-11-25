@@ -77,6 +77,17 @@ export function formatDay(value: string): string {
   });
 }
 
+/** A moment the way the drawer prints it: "Nov 25, 2026, 4:52 PM". */
+export function formatMoment(value: string): string {
+  return toDate(Temporal.Instant.from(value)).toLocaleString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
+
 /** A term from issue to end: "Oct 1 to Dec 1, 2026". */
 export function formatTerm({ from, to }: { from: string; to: string }): string {
   return `${formatDay(from)} to ${formatDay(to)}`;

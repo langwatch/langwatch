@@ -14,10 +14,26 @@ import type { ReactNode } from "react";
 import {
   customerSyncMessage,
   formatDay,
+  formatMoment,
   nextSyncText,
   type LicenseChainState,
 } from "../../model/license-chain.ts";
-import { formatDateTime } from "../elements/admin-cells.tsx";
+import type { License } from "../../model/license-terms.ts";
+
+/** The last sync line: when, which version, seats in use and when the next one is due. */
+function syncDetail({ license, nowMs }: { license: License; nowMs: number }): string {
+  if (license.lastSyncAt) {
+    return [
+      `Last sync ${formatMoment(license.lastSyncAt)}`,
+      license.lastSyncVersion ?? "an unnamed version",
+      `${license.reportedMembers ?? 0} of ${license.maxMembers} seats in use`,
+      nextSyncText({ lastSyncAt: license.lastSyncAt, nowMs }),
+    ].join(" · ");
+  }
+  if (license.instanceBoundAt)
+    return `Bound ${formatMoment(license.instanceBoundAt)}, never synced`;
+  return "Bound, never synced";
+}
 
 /** Which install holds the license and when it last synced, or that none has used it yet. */
 export function LicenseInstallStatus({
@@ -37,14 +53,7 @@ export function LicenseInstallStatus({
       />
     );
   }
-  const detail = inUse.lastSyncAt
-    ? [
-        `Last sync ${formatDateTime(inUse.lastSyncAt)}`,
-        inUse.lastSyncVersion ?? "an unnamed version",
-        `${inUse.reportedMembers ?? 0} of ${inUse.maxMembers} seats in use`,
-        nextSyncText({ lastSyncAt: inUse.lastSyncAt, nowMs }),
-      ].join(" · ")
-    : `Bound ${formatDateTime(inUse.instanceBoundAt)}, never synced`;
+  const detail = syncDetail({ license: inUse, nowMs });
   return (
     <StatusCard
       title={inUse.instanceId}
