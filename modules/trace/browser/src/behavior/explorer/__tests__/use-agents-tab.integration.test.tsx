@@ -100,7 +100,7 @@ describe("useAgentsTab", () => {
       useAgentsTab({ spanTree: a2aOnly, isSpanTreeLoading: false, isAgentsTabOpen: true }),
     );
     expect(result.current.showsAgents).toBe(true);
-    queryState.data = { nodes: [{ id: "service:svc" }], edges: [], a2aSpans: [] };
+    queryState.data = { nodes: [{ id: "service:svc" }], edges: [] };
     rerender();
     expect(result.current.showsAgents).toBe(true);
     expect(result.current.isSettled).toBe(true);
