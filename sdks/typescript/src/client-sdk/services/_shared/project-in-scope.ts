@@ -16,7 +16,7 @@ const keyProjects = new Map<string, Promise<string | undefined>>();
 /** Same bound as the CLI identity notice reading the same endpoint. */
 const KEY_PROJECT_TIMEOUT_MS = 1_500;
 
-const defaultLogger: Logger = new ConsoleLogger({ level: "warn", prefix: "LangWatch" });
+const moduleLogger: Logger = new ConsoleLogger({ level: "warn", prefix: "LangWatch" });
 
 const warnLookupFailed = ({ logger, reason }: { logger: Logger; reason: string }): void => {
   logger.warn(`Could not read the API key's project from /api/v1/me/project (${reason}).`);
@@ -49,21 +49,19 @@ const fetchKeyProject = async ({
 };
 
 /** The project a legacy project key belongs to; undefined for a user-scoped key or failed read. */
-export const keyProjectId = async ({
+const keyProjectId = async ({
   apiKey,
   endpoint,
-  logger = defaultLogger,
 }: {
   apiKey: string | undefined;
   endpoint?: string;
-  logger?: Logger;
 }): Promise<string | undefined> => {
   if (!apiKey || isUserScopedApiKey(apiKey)) return undefined;
   const base = resolveEndpoint(endpoint);
   const cacheKey = `${base}\n${apiKey}`;
   const cached = keyProjects.get(cacheKey);
   if (cached) return cached;
-  const lookup = fetchKeyProject({ apiKey, endpoint: base, logger });
+  const lookup = fetchKeyProject({ apiKey, endpoint: base, logger: moduleLogger });
   keyProjects.set(cacheKey, lookup);
   const projectId = await lookup;
   if (!projectId) keyProjects.delete(cacheKey);
