@@ -117,7 +117,7 @@ export function answerAgentsPage({
   answerQuery("governanceKillSwitch.pendingApprovals", () => pendingApprovals);
   answerQuery("governanceKillSwitch.plan", () => SUPPORT_BOT_PLAN);
   answerQuery("governanceKillSwitch.awsConnections", () => []);
-  answerQuery("governanceRegistry.settings", () => ({ dormantAfterDays: 30 }));
+  answerQuery("governanceRegistry.settings", () => ({ dormant_after_days: 30 }));
 }
 
 export function renderAgentsPage({

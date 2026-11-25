@@ -86,12 +86,6 @@ export interface FieldDef {
    */
   control?: "select" | "date" | "switch" | "custom";
   /**
-   * True for a pasted multi-line value (a JSON key file), rendered as a textarea. A `custom`
-   * control is drawn by the caller's `renderCustomControl`; the form still owns its label,
-   * required marker, hint and the complaint under it.
-   */
-  multiline?: boolean;
-  /**
    * Where a `control: "switch"` sits before anyone touches it.
    *
    * Declared on the field rather than assumed, because the form holds strings
