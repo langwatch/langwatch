@@ -381,12 +381,12 @@ function ownerColumn(braided: boolean, indent: string): string {
   return braided ? `TenantId,\n${indent}` : "";
 }
 
-/** Spans mapped from full rows; under braids each owner's span names its owner. */
 /** The stored row's span kind, carried beside the legacy span shape. */
 function kindOf(span: NormalizedSpan | undefined): Pick<OwnedSpan, "kind"> {
   return span === undefined ? {} : { kind: span.kind };
 }
 
+/** Spans mapped from full rows; under braids each owner's span names its owner. */
 function ownedSpansOf({
   rows,
   authorization,
