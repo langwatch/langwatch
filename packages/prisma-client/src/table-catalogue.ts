@@ -202,9 +202,11 @@ export const prismaTableCatalogue = {
   "StoredObject": "StoredObject",
   "DiscoveredPerson": "DiscoveredPerson",
   "DiscoveredAgent": "DiscoveredAgent",
+  "DiscoveredAgentListing": "DiscoveredAgentListing",
   "AgentRegistryEntry": "AgentRegistryEntry",
   "AgentRegistryEvent": "AgentRegistryEvent",
   "AgentRegistryBaseline": "AgentRegistryBaseline",
+  "AgentRegistrySettings": "AgentRegistrySettings",
   "AgentStopPlanTarget": "AgentStopPlanTarget",
   "AgentStopPlan": "AgentStopPlan",
   "GovernanceAwsConnection": "GovernanceAwsConnection",
@@ -3305,6 +3307,16 @@ export const prismaModelFieldCatalogue = {
     "createdAt",
     "updatedAt"
   ],
+  "DiscoveredAgentListing": [
+    "id",
+    "organizationId",
+    "ingestionSourceId",
+    "discoveredAgentId",
+    "lastListedAt",
+    "goneAt",
+    "createdAt",
+    "updatedAt"
+  ],
   "AgentRegistryEntry": [
     "id",
     "organizationId",
@@ -3335,6 +3347,11 @@ export const prismaModelFieldCatalogue = {
   "AgentRegistryBaseline": [
     "organizationId",
     "baselinedAt"
+  ],
+  "AgentRegistrySettings": [
+    "organizationId",
+    "dormantAfterDays",
+    "updatedAt"
   ],
   "AgentStopPlanTarget": [
     "id",
@@ -4236,9 +4253,11 @@ export const prismaRelationCatalogue = {
   "StoredObject": {},
   "DiscoveredPerson": {},
   "DiscoveredAgent": {},
+  "DiscoveredAgentListing": {},
   "AgentRegistryEntry": {},
   "AgentRegistryEvent": {},
   "AgentRegistryBaseline": {},
+  "AgentRegistrySettings": {},
   "AgentStopPlanTarget": {},
   "AgentStopPlan": {},
   "GovernanceAwsConnection": {},
