@@ -2,6 +2,7 @@ import type { SharedCredentialStore } from "@langwatch/secrets/shared-credential
 import type { BetterAuthOptions } from "better-auth";
 
 import type { AuthDirectoryRepository } from "./auth-directory.repository.ts";
+import type { AuthMigrationRepository } from "./auth-migration.repository.ts";
 import type { AuthRateLimitRepository } from "./auth-rate-limit.repository.ts";
 import type { AuthSessionCacheRepository } from "./auth-session-cache.repository.ts";
 import type { AuthSessionRepository } from "./auth-session.repository.ts";
@@ -37,6 +38,8 @@ export interface AuthRepositories {
   readonly directory: AuthDirectoryRepository;
   /** The sign-in flag a cleanup task pages and clears. */
   readonly pendingSsoSetup: PendingSsoSetupRepository;
+  /** The data steps over auth's own `Account` rows. */
+  readonly migration: AuthMigrationRepository;
   /** Better Auth's shared session cache, or nothing where this tier keeps none. */
   readonly sessionCache: AuthSessionCacheRepository | null;
 }

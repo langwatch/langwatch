@@ -63,6 +63,7 @@ function withRateLimits(
     betterAuthHooks: memory.betterAuthHooks,
     directory: memory.directory,
     pendingSsoSetup: memory.pendingSsoSetup,
+    migration: memory.migration,
     sessionCache: memory.sessionCache,
   };
 }

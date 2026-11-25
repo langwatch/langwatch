@@ -6,7 +6,7 @@ The server half of [auth](../README.md). Signing in and staying signed in: the b
 
 ## Installation
 
-`defineProcessModule("auth").withRepositories(authRepositories).withChannels(authChannels).withApi(AuthModule).withTransports(authTrpcTransport, signInSecurityTrpcTransport, authCliDeviceFlowRest, authRest).withEventing(authEventing).withEventing(authLifecycleEventing).provideMiddlewareContext(…).withTasks(…).provideMiddlewareBindings(…)`, `src/auth.module.ts:26`.
+`defineProcessModule("auth").withRepositories(authRepositories).withChannels(authChannels).withApi(AuthModule).withTransports(authTrpcTransport, signInSecurityTrpcTransport, authCliDeviceFlowRest, authRest).withEventing(authEventing).withEventing(authLifecycleEventing).withMigrations(…).provideMiddlewareContext(…).withTasks(…).provideMiddlewareBindings(…)`, `src/auth.module.ts:27`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 

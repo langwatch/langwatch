@@ -96,4 +96,35 @@ export class PrismaIdentityMigrationRepository extends IdentityMigrationReposito
        WHERE "IdentitySignInSwitch"."switchedAt" < EXCLUDED."switchedAt"
     `;
   }
+
+  async discardProviderTokens({ dryRun }: { dryRun: boolean }): Promise<number> {
+    if (dryRun) {
+      const [row] = await this.database.$queryRaw<{ count: bigint }[]>`
+        ${skipTenantCheck({
+          // A fleet-wide step over every user's credentials; the user is the key.
+          SKIP_TENANT_CHECK: true,
+        })}
+        SELECT count(*) AS "count"
+          FROM "AccountCredential"
+         WHERE "accessToken" IS NOT NULL
+            OR "refreshToken" IS NOT NULL
+            OR "idToken" IS NOT NULL
+      `;
+      return Number(row?.count ?? 0);
+    }
+    // Raw SQL leaves `updatedAt` alone, so the secret heal sees no new drift.
+    return this.database.$executeRaw`
+      ${skipTenantCheck({
+        // A fleet-wide step over every user's credentials; the user is the key.
+        SKIP_TENANT_CHECK: true,
+      })}
+      UPDATE "AccountCredential"
+         SET "accessToken" = NULL,
+             "refreshToken" = NULL,
+             "idToken" = NULL
+       WHERE "accessToken" IS NOT NULL
+          OR "refreshToken" IS NOT NULL
+          OR "idToken" IS NOT NULL
+    `;
+  }
 }

@@ -42,4 +42,9 @@ export class MemoryIdentityMigrationRepository extends IdentityMigrationReposito
   async carryOverSignInSwitch(_args: { dryRun: boolean }): Promise<number> {
     return 0;
   }
+
+  /** The twin's accounts keep no credential columns, so there is never a token to clear. */
+  async discardProviderTokens(_args: { dryRun: boolean }): Promise<number> {
+    return 0;
+  }
 }
