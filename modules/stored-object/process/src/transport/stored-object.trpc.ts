@@ -4,11 +4,7 @@
  * repeated here.
  */
 import { defineTrpcRouter, type TrpcRouterDeclaration } from "@langwatch/api/trpc";
-import {
-  FILE_VIEW_PERMISSIONS,
-  StoredObjectApi,
-  storedObjectTrpc,
-} from "@langwatch/stored-object-contract";
+import { StoredObjectApi, storedObjectTrpc } from "@langwatch/stored-object-contract";
 
 export const storedObjectTrpcTransport: TrpcRouterDeclaration<
   StoredObjectApi,
@@ -18,7 +14,7 @@ export const storedObjectTrpcTransport: TrpcRouterDeclaration<
   .procedure("headById")
   .withPermission({
     kind: "permission-any",
-    permissions: [...FILE_VIEW_PERMISSIONS],
+    permissions: ["traces:view", "scenarios:view", "datasets:view", "langy:view"],
   })
   .handle(async ({ app, input, actor }) =>
     app.headById({ projectId: input.projectId, id: input.id }, actor),
@@ -28,7 +24,7 @@ export const storedObjectTrpcTransport: TrpcRouterDeclaration<
   .procedure("getReadUrl")
   .withPermission({
     kind: "permission-any",
-    permissions: [...FILE_VIEW_PERMISSIONS],
+    permissions: ["traces:view", "scenarios:view", "datasets:view", "langy:view"],
   })
   .handle(async ({ app, input, actor }) => app.getReadUrl(input, actor))
 
