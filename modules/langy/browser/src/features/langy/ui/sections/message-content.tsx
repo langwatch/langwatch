@@ -34,6 +34,8 @@ import { githubPrsFromToolParts } from "../../../../model/shared/langy/github-pr
 import { LangyFailedCard } from "../../../../ui/elements/derived-cards/langy-failed-card.tsx";
 import { LangyGitHubProgressCard } from "../../../../ui/elements/github/langy-github-progress-card.tsx";
 import { LangyCardBoundary } from "../../../../ui/elements/langy-card-boundary.tsx";
+import { LangyInlineImageChip } from "../../../composer/ui/elements/langy-image-chip.tsx";
+import { LangyImageThumb } from "../../../composer/ui/elements/langy-image-thumb.tsx";
 import {
   type GuidedPullRequest,
   guidedPathCompletedIn,
@@ -169,6 +171,31 @@ function MessageContentImpl(props: MessageContentProps) {
   return <AssistantMessage {...props} />;
 }
 
+/** The images a message carries as file parts, in order. */
+function messageImages(message: UIMessage): { url: string; filename: string }[] {
+  return message.parts.flatMap((part) =>
+    part.type === "file" && part.mediaType.startsWith("image/")
+      ? [{ url: part.url, filename: part.filename ?? "image" }]
+      : [],
+  );
+}
+
+const IMAGE_CHIP_TEXT = /\[▣ [^\]\n]+\]/g;
+
+/** The person's words with each image chip drawn where it was written. */
+function TextWithImageChips({ text }: { text: string }) {
+  const pieces: ReactNode[] = [];
+  let at = 0;
+  for (const match of text.matchAll(IMAGE_CHIP_TEXT)) {
+    const start = match.index;
+    if (start > at) pieces.push(text.slice(at, start));
+    pieces.push(<LangyInlineImageChip key={`chip:${start}`} label={match[0]} />);
+    at = start + match[0].length;
+  }
+  if (at < text.length) pieces.push(text.slice(at));
+  return <>{pieces}</>;
+}
+
 /** The text parts of a message, one paragraph apart; `reasoning` never joins the answer. */
 function messageText(message: UIMessage): string {
   return message.parts
@@ -210,8 +237,23 @@ function PlainMessage({
       </Text>
     );
   }
+  const images = messageImages(message);
   return (
-    <Box alignSelf="flex-end" maxWidth="85%">
+    <Box
+      alignSelf="flex-end"
+      maxWidth="85%"
+      display="flex"
+      flexDirection="column"
+      alignItems="flex-end"
+      gap={1.5}
+    >
+      {images.length > 0 ? (
+        <Box display="flex" gap={2} flexWrap="wrap" justifyContent="flex-end">
+          {images.map((image) => (
+            <LangyImageThumb key={image.url} name={image.filename} src={image.url} status="ready" />
+          ))}
+        </Box>
+      ) : null}
       <Box
         data-testid="langy-user-message"
         paddingX={3}
@@ -229,7 +271,7 @@ function PlainMessage({
         lineHeight="1.5"
         whiteSpace="pre-wrap"
       >
-        {text}
+        <TextWithImageChips text={text} />
       </Box>
     </Box>
   );

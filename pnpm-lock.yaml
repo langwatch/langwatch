@@ -11048,6 +11048,9 @@ importers:
       '@langwatch/secrets':
         specifier: workspace:*
         version: link:../../../packages/secrets
+      '@langwatch/stored-object-contract':
+        specifier: workspace:*
+        version: link:../../stored-object/contract
       '@langwatch/time':
         specifier: workspace:*
         version: link:../../../packages/time
