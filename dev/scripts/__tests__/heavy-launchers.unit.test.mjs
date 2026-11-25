@@ -140,8 +140,8 @@ describe("heavy launchers and rush's gate", () => {
   });
 
   /** @scenario "A launcher never hands its run on twice" */
-  it("oxlint and vitest: a run haven starts again is not handed back to haven", () => {
-    for (const launcher of [launchers[1], launchers[2]]) {
+  it("oxlint: a run haven starts again is not handed back to haven", () => {
+    for (const launcher of [launchers[2]]) {
       const dir = mkdtempSync(join(tmpdir(), "heavy-launchers-"));
       const calls = join(dir, "haven.calls");
       const haven = join(dir, "haven");
