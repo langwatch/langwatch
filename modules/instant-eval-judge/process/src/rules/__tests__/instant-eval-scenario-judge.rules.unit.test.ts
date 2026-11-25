@@ -5,7 +5,10 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { syntheticScenarioRouteTable } from "../../__tests__/support/instant-eval-scenario-judge.test-fakes.ts";
+import {
+  finishTestInput,
+  syntheticScenarioRouteTable,
+} from "../../__tests__/support/instant-eval-scenario-judge.test-fakes.ts";
 import { instantEvalJudgeRoutePlanOf } from "../instant-eval-judge-route.rules.ts";
 import {
   findInstantEvalScenarioVerdictReading,
@@ -68,6 +71,41 @@ describe("findInstantEvalScenarioVerdictReading", () => {
       ["e", "true"],
     ]);
     expect(reading?.reasoning).toBe("because");
+  });
+
+  /** @scenario "The shared verdict call is read in the scenario SDK's per-criterion shape" */
+  it("reads the SDK's requirement, reasoning and status object per criterion", () => {
+    const reading = findInstantEvalScenarioVerdictReading(
+      finishTestInput({
+        criterion_0: "passed",
+        criterion_1: "failed",
+        criterion_2: "inconclusive",
+      }),
+    );
+
+    expect(reading && [...reading.criteria]).toEqual([
+      ["criterion_0", "true"],
+      ["criterion_1", "false"],
+      ["criterion_2", "inconclusive"],
+    ]);
+  });
+
+  /** @scenario "The shared verdict call is read in the scenario SDK's per-criterion shape" */
+  it("reads a bare status, and leaves out an object with an unknown or missing status", () => {
+    const reading = findInstantEvalScenarioVerdictReading({
+      criteria: {
+        a: "passed",
+        b: "failed",
+        c: { requirement: "r", reasoning: "r", status: "maybe" },
+        d: { requirement: "r", reasoning: "r" },
+      },
+      reasoning: "summary",
+    });
+
+    expect(reading && [...reading.criteria]).toEqual([
+      ["a", "true"],
+      ["b", "false"],
+    ]);
   });
 
   /** @scenario "Unsure criteria share one send of the judge's own verdict call" */

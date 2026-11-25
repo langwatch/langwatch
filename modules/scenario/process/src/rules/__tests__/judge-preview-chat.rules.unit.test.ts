@@ -11,9 +11,34 @@ import {
   verdictRequest,
 } from "../../__tests__/support/judge-preview-requests.fixture.ts";
 import {
+  isJudgePreviewWaitOffered,
   judgePreviewChatCompletionOf,
   judgePreviewLeafCallOf,
+  judgePreviewWaitCompletionOf,
 } from "../judge-preview-chat.rules.ts";
+
+type JsonSchema = Readonly<{
+  properties?: Readonly<Record<string, JsonSchema>>;
+  required?: readonly string[];
+  enum?: readonly unknown[];
+  additionalProperties?: boolean;
+}>;
+
+/** The keys and enums of the SDK's strict tool, checked the way the AI SDK validates its input. */
+function strictViolationsOf({ value, schema }: { value: unknown; schema: JsonSchema }): string[] {
+  if (schema.enum) return schema.enum.includes(value) ? [] : [`${String(value)} not offered`];
+  if (!schema.properties) return [];
+  if (typeof value !== "object" || value === null) return ["not an object"];
+  const entries = Object.entries(value);
+  const extra = entries.filter(([key]) => !schema.properties?.[key]).map(([key]) => `+${key}`);
+  const missing = (schema.required ?? []).filter((key) => !(key in value)).map((key) => `-${key}`);
+  const nested = entries.flatMap(([key, inner]) =>
+    schema.properties?.[key]
+      ? strictViolationsOf({ value: inner, schema: schema.properties[key] })
+      : [],
+  );
+  return [...extra, ...missing, ...nested];
+}
 
 const functionCallOf = (completion: ReturnType<typeof judgePreviewChatCompletionOf>) => {
   const call = completion.choices[0]?.message.tool_calls[0]?.function;
@@ -35,6 +60,48 @@ describe("judgePreviewLeafCallOf", () => {
       expect(call.content).toContain("<transcript>");
       expect(call.llmCall.system).toContain("You are an LLM as a judge");
       expect(call.llmCall.user).toBe(call.content);
+    });
+
+    /** @scenario "A criterion's text falls back to its description without the Criterion number, then to its key" */
+    it("takes a description less its Criterion number, else the key, when the block does not list one per key", () => {
+      const request = verdictRequest({ system: "<criteria>\n1. Only one listed\n</criteria>" });
+      const [finishTest] = request.tools ?? [];
+      const parameters = finishTest!.function.parameters as {
+        properties: { criteria: { properties: Record<string, Record<string, unknown>> } };
+      };
+      const entries = parameters.properties.criteria.properties;
+      const call = judgePreviewLeafCallOf({
+        ...request,
+        tools: [
+          {
+            ...finishTest!,
+            function: {
+              ...finishTest!.function,
+              parameters: {
+                ...parameters,
+                properties: {
+                  ...parameters.properties,
+                  criteria: {
+                    ...parameters.properties.criteria,
+                    properties: {
+                      the_agent_offers_a_refund: {
+                        ...entries.the_agent_offers_a_refund,
+                        description: "Criterion 1: The agent offers a refund",
+                      },
+                      the_agent_apologises: entries.the_agent_apologises!,
+                    },
+                  },
+                },
+              },
+            },
+          },
+        ],
+      });
+
+      expect(call.criteria).toEqual([
+        { key: "the_agent_offers_a_refund", text: "The agent offers a refund" },
+        { key: "the_agent_apologises", text: "the_agent_apologises" },
+      ]);
     });
 
     /** @scenario "Trace exploration tools are never passed on" */
@@ -138,7 +205,6 @@ describe("judgePreviewChatCompletionOf", () => {
       [
         { key: "the_agent_offers_a_refund", result: "met" },
         { key: "the_agent_apologises", result: "unmet" },
-        { key: "extra", result: "inconclusive" },
       ],
       "The agent refunded the order and never apologised.",
     );
@@ -159,28 +225,57 @@ describe("judgePreviewChatCompletionOf", () => {
       name: "finish_test",
       arguments: {
         criteria: {
-          the_agent_offers_a_refund: "true",
-          the_agent_apologises: "false",
-          extra: "inconclusive",
+          the_agent_offers_a_refund: {
+            requirement: "The agent offers a refund",
+            reasoning: "Met.",
+            status: "passed",
+          },
+          the_agent_apologises: {
+            requirement: "The agent apologises",
+            reasoning: "Not met.",
+            status: "failed",
+          },
         },
         reasoning: "The agent refunded the order and never apologised.",
-        verdict: "failure",
       },
     });
   });
 
-  /** @scenario "The verdict follows the criteria" */
-  it("fails on any unmet criterion, else is inconclusive on any unsettled one, else passes", () => {
-    const verdictOf = (results: ("met" | "unmet" | "inconclusive")[]) =>
-      (
-        functionCallOf(format(results.map((result, at) => ({ key: `k${at}`, result }))))
-          .arguments as { verdict: string }
-      ).verdict;
+  /** @scenario "A verdict is answered as the judge's finish_test tool call" */
+  it("answers an unsettled criterion as inconclusive", () => {
+    const completion = format([
+      { key: "the_agent_offers_a_refund", result: "inconclusive" },
+      { key: "the_agent_apologises", result: "met" },
+    ]);
 
-    expect(verdictOf(["met", "inconclusive", "unmet"])).toBe("failure");
-    expect(verdictOf(["met", "inconclusive"])).toBe("inconclusive");
-    expect(verdictOf(["met", "met"])).toBe("success");
+    const { criteria } = functionCallOf(completion).arguments as {
+      criteria: Record<string, { status: string }>;
+    };
+    expect(criteria.the_agent_offers_a_refund?.status).toBe("inconclusive");
   });
+
+  /** @scenario "The verdict's arguments fit the scenario SDK's strict finish_test tool" */
+  it.each([
+    ["met", "unmet"],
+    ["met", "inconclusive"],
+    ["met", "met"],
+  ] as const)(
+    "fits the SDK's strict tool for %s and %s, with no verdict field",
+    (first, second) => {
+      const completion = format(
+        [
+          { key: "the_agent_offers_a_refund", result: first },
+          { key: "the_agent_apologises", result: second },
+        ],
+        "summary",
+      );
+      const schema = verdictRequest().tools?.[0]?.function.parameters as JsonSchema;
+
+      expect(strictViolationsOf({ value: functionCallOf(completion).arguments, schema })).toEqual(
+        [],
+      );
+    },
+  );
 
   /** @scenario "A verdict with no explanation lists its criteria, naming no backend" */
   it("lists the criteria by result when the answer carries no reasoning", () => {
@@ -192,6 +287,21 @@ describe("judgePreviewChatCompletionOf", () => {
     expect((functionCallOf(completion).arguments as { reasoning: string }).reasoning).toBe(
       "Met: The agent offers a refund\nNot met: The agent apologises",
     );
+  });
+
+  /** @scenario "A verdict call that offers the one-shot wait for traces is answered with that wait" */
+  it("answers a verdict call offering wait_for_traces with that wait, billing nothing", () => {
+    const request = verdictRequest({ extraTools: ["wait_for_traces"] });
+    const wait = judgePreviewWaitCompletionOf({ id: "chatcmpl_3", createdAtSeconds: 1 });
+
+    expect(isJudgePreviewWaitOffered(request)).toBe(true);
+    expect(functionCallOf(wait)).toEqual({ name: "wait_for_traces", arguments: {} });
+    expect(wait.usage).toEqual({ prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 });
+  });
+
+  /** @scenario "A verdict call that offers the one-shot wait for traces is answered with that wait" */
+  it("answers no wait when the call does not offer one", () => {
+    expect(isJudgePreviewWaitOffered(verdictRequest())).toBe(false);
   });
 
   /** @scenario "A turn decision is answered as the tool the judge offered" */

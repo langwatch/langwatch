@@ -3,7 +3,15 @@ import {
   type InstantEvalJudgeRoutePricing,
   type InstantEvalJudgeRouteTable,
   type InstantEvalScenarioJudgeCall,
+  type InstantEvalScenarioJudgeTool,
 } from "@langwatch/instant-eval-judge-contract";
+import { z } from "zod";
+
+import finishTestTool from "./scenario-sdk-finish-test.json" with { type: "json" };
+
+/** The statuses the SDK's tool offers per criterion, read from the fixture itself. */
+const STATUSES_OF_FIXTURE = finishTestTool.parameters.properties.criteria.properties.criterion_0
+  .properties.status.enum as ["passed", "failed", "inconclusive"];
 
 /**
  * A made-up table shaped like a scenario route: a decision model that escalates unsure criteria
@@ -112,11 +120,35 @@ export const SYNTHETIC_SCENARIO_PRICING: InstantEvalJudgeRoutePricing = {
   },
 };
 
-const FINISH_TEST = {
-  name: "finish_test",
-  description: "Complete the test with a final verdict",
-  parameters: { type: "object", properties: { criteria: { type: "object" } } },
-};
+/**
+ * The verdict tool as `@langwatch/scenario` 1.8.1's judge sends it for the three criteria below,
+ * keys renamed to the call's; apps/scenario-child's judge-preview client test pins it to the SDK.
+ */
+const FINISH_TEST: InstantEvalScenarioJudgeTool = finishTestTool;
+
+type FinishTestStatus = "passed" | "failed" | "inconclusive";
+
+const finishTestEntrySchema = z
+  .object({ requirement: z.string(), reasoning: z.string(), status: z.enum(STATUSES_OF_FIXTURE) })
+  .strict();
+
+/**
+ * A finish_test call's arguments in the SDK's shape, one `{ requirement, reasoning, status }`
+ * entry per criterion key given; checked against the fixture's entry schema so no test answers
+ * in a shape the SDK's tool would refuse.
+ */
+export function finishTestInput(
+  statuses: Readonly<Record<string, FinishTestStatus>>,
+  reasoning = "the transcript settles it",
+): Record<string, unknown> {
+  const criteria = Object.fromEntries(
+    Object.entries(statuses).map(([key, status]) => [
+      key,
+      finishTestEntrySchema.parse({ requirement: `requirement ${key}`, reasoning: "r", status }),
+    ]),
+  );
+  return { criteria, reasoning };
+}
 const CONTINUE_TEST = {
   name: "continue_test",
   description: "Continue the test with the next step",

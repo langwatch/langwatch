@@ -18,8 +18,10 @@ import {
 import type { Instant } from "@langwatch/time";
 
 import {
+  isJudgePreviewWaitOffered,
   judgePreviewChatCompletionOf,
   judgePreviewLeafCallOf,
+  judgePreviewWaitCompletionOf,
 } from "../../../rules/judge-preview-chat.rules.ts";
 import {
   JUDGE_PREVIEW_NOT_ON_CLOUD,
@@ -51,6 +53,11 @@ export class JudgePreviewChatService {
     const call = judgePreviewLeafCallOf(request);
     const availability = await this.deps.availability.availabilityFor({ projectId });
     if (!availability.isAvailable) throw new JudgePreviewNotAvailableError(availability.message);
+    const id = `chatcmpl_${this.deps.ids.next()}`;
+    const createdAtSeconds = Math.floor(this.deps.clock.now().epochMilliseconds / 1000);
+    if (isJudgePreviewWaitOffered(request)) {
+      return judgePreviewWaitCompletionOf({ id, createdAtSeconds });
+    }
     const answer = await this.deps.judges.judgeScenario({
       projectId,
       ...call,
@@ -59,8 +66,8 @@ export class JudgePreviewChatService {
     return judgePreviewChatCompletionOf({
       answer: judgedOrThrow(answer),
       call,
-      id: `chatcmpl_${this.deps.ids.next()}`,
-      createdAtSeconds: Math.floor(this.deps.clock.now().epochMilliseconds / 1000),
+      id,
+      createdAtSeconds,
     });
   }
 }

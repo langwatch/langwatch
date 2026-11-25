@@ -46,6 +46,13 @@ Feature: A scenario judgement answered by the judge router
     And the call's tokens are billed once
 
   @unit @regression
+  Scenario: The shared verdict call is read in the scenario SDK's per-criterion shape
+    Given the finish_test tool as the scenario SDK 1.8.1 builds it
+    When the LLM answers each criterion with its requirement, reasoning and a passed, failed or inconclusive status
+    Then a passed criterion is met, a failed one unmet and an inconclusive one inconclusive
+    And a bare status, or the older true, false or inconclusive string or boolean, is still read
+
+  @unit @regression
   Scenario: The verdict carries the shared call's reasoning only when that call settled every criterion
     Given an unsure criterion read from the judge's own verdict call
     When a sure decision answer settles another criterion of the same verdict

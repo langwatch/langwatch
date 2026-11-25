@@ -510,6 +510,7 @@ export class ScenarioModule implements ScenarioApi {
           cancellationSubscriptions: cancellations,
           config: setup.config,
           host: childHost,
+          judgePreviewAvailability,
         }),
       }),
     });

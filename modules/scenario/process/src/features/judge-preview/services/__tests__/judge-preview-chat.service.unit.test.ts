@@ -60,10 +60,10 @@ function chat({
     ids: { next: () => "id-1" },
     clock: { now: () => Temporal.Instant.fromEpochMilliseconds(1_760_000_000_500) },
   });
-  const complete = (signal?: AbortSignal) =>
+  const complete = (signal?: AbortSignal, request = verdictRequest()) =>
     service.complete({
       projectId: PROJECT_ID,
-      request: verdictRequest(),
+      request,
       ...(signal ? { signal } : {}),
     });
   return { complete, asked, flagChecks };
@@ -85,6 +85,24 @@ describe("JudgePreviewChatService", () => {
       ]);
       expect(completion).toMatchObject({ id: "chatcmpl_id-1", created: 1_760_000_000 });
       expect(completion.choices[0]?.message.tool_calls[0]?.function.name).toBe("finish_test");
+    });
+
+    /** @scenario "A verdict call that offers the one-shot wait for traces is answered with that wait" */
+    it("answers the offered wait without asking the judge leaf, then judges the next call", async () => {
+      const { complete, asked, flagChecks } = chat();
+
+      const waited = await complete(undefined, verdictRequest({ extraTools: ["wait_for_traces"] }));
+      expect(asked).toHaveLength(0);
+      expect(flagChecks).toHaveLength(1);
+      expect(waited.choices[0]?.message.tool_calls[0]?.function).toEqual({
+        name: "wait_for_traces",
+        arguments: "{}",
+      });
+      expect(waited.usage.total_tokens).toBe(0);
+
+      const judged = await complete();
+      expect(asked).toHaveLength(1);
+      expect(judged.choices[0]?.message.tool_calls[0]?.function.name).toBe("finish_test");
     });
 
     /** @scenario "A caller that disconnects stops the judge's legs" */
@@ -162,6 +180,15 @@ describe("JudgePreviewChatService", () => {
 
       await expect(complete()).rejects.toBeInstanceOf(JudgePreviewNotAvailableError);
       expect(asked).toHaveLength(0);
+    });
+
+    /** @scenario "A verdict call that offers the one-shot wait for traces is answered with that wait" */
+    it("refuses a wait where the judge preview is not available, as any call", async () => {
+      const { complete } = chat({ isFlagOn: false });
+
+      await expect(
+        complete(undefined, verdictRequest({ extraTools: ["wait_for_traces"] })),
+      ).rejects.toBeInstanceOf(JudgePreviewNotAvailableError);
     });
   });
 

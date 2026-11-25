@@ -2,7 +2,6 @@ import type { AgentApi } from "@langwatch/agent-contract";
 import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { GatewayApi } from "@langwatch/gateway-contract";
-import type { InstantEvalJudgeApi } from "@langwatch/instant-eval-judge-contract";
 import { DEFAULT_MODEL, type ModelProviderApi } from "@langwatch/model-provider-contract";
 import { createLogger } from "@langwatch/observability";
 import type { ResourceOwnership } from "@langwatch/process";
@@ -19,7 +18,7 @@ import type {
   ScenarioGoChildChannel,
 } from "../channels/scenario-child.channel.ts";
 import { ScenarioChildChoiceService } from "../features/child/services/scenario-child-choice.service.ts";
-import { JudgePreviewAvailabilityService } from "../features/judge-preview/services/judge-preview-availability.service.ts";
+import type { JudgePreviewAvailabilityService } from "../features/judge-preview/services/judge-preview-availability.service.ts";
 import { ScenarioExecutionPrefetcherService } from "../features/prefetch/services/scenario-execution-prefetcher.service.ts";
 import { ScenarioVoiceTargetService } from "../features/voice/services/scenario-voice-target.service.ts";
 import type { VoiceNonceRegistryService } from "../features/voice/services/voice-nonce-registry.service.ts";
@@ -46,8 +45,6 @@ type ScenarioExecutorPeers = Readonly<{
   apiKeys: ApiKeyApi;
   gateway: GatewayApi;
   featureFlags: FeatureFlagApi;
-  /** Whether LangWatch Judge (preview) can answer, asked before a run on it starts. */
-  judges: Pick<InstantEvalJudgeApi, "isScenarioJudgeConfigured">;
 }>;
 
 /** The process facts a child is started with, as the module resolved them. */
@@ -70,6 +67,8 @@ type ScenarioExecutorInput = Readonly<{
   cancellationSubscriptions: CancellationSubscriber;
   config: ScenarioServerConfig;
   host: ScenarioExecutorHost;
+  /** The module's one availability check, asked before a run on LangWatch Judge (preview). */
+  judgePreviewAvailability: JudgePreviewAvailabilityService;
 }>;
 
 /**
@@ -134,12 +133,7 @@ export class ScenarioExecutorService {
       secrets: peers.secrets,
       traces: peers.traces,
       apiKeys: peers.apiKeys,
-      judgePreviewAvailability: JudgePreviewAvailabilityService.create({
-        featureFlags: peers.featureFlags,
-        projects: peers.projects,
-        judges: peers.judges,
-        isSaas: config.isSaas,
-      }),
+      judgePreviewAvailability: this.input.judgePreviewAvailability,
       voiceTargets: ScenarioVoiceTargetService.create({
         agents: peers.agents,
         modelProviders: peers.modelProviders,

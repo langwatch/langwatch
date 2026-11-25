@@ -1,5 +1,4 @@
 import type { AgentApi } from "@langwatch/agent-contract";
-import type { InstantEvalJudgeApi } from "@langwatch/instant-eval-judge-contract";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type * as observability from "@langwatch/observability";
 import type { ProjectApi } from "@langwatch/project-contract";
@@ -16,6 +15,7 @@ vi.mock("@langwatch/observability", async (importOriginal) => ({
 }));
 
 import { MemoryScenarioChildChannel } from "../channels/memory/memory.scenario-child.channel.ts";
+import type { JudgePreviewAvailabilityService } from "../features/judge-preview/services/judge-preview-availability.service.ts";
 import { VoiceNonceRegistryService } from "../features/voice/services/voice-nonce-registry.service.ts";
 import { MemoryScenarioCancellationRepository } from "../repositories/memory/memory.scenario-cancellation.repository.ts";
 import { MemoryVoiceNonceRepository } from "../repositories/memory/memory.voice-nonce.repository.ts";
@@ -48,7 +48,6 @@ function harness({
       traces: createApiFixture<TraceApi>(),
       projects: createApiFixture<ProjectApi>(),
       modelProviders: createApiFixture<ModelProviderApi>(),
-      judges: createApiFixture<InstantEvalJudgeApi>(),
     },
     scenarios: createApiFixture<ScenarioService>(),
     simulations: createApiFixture<SimulationService>(),
@@ -60,6 +59,7 @@ function harness({
       voicePublicUrl: async () => scenarioTestVoicePublicUrl,
       nlpServiceUrl,
     },
+    judgePreviewAvailability: createApiFixture<JudgePreviewAvailabilityService>(),
   });
   const pool = ScenarioExecutionPoolService.create({ concurrency: 1 });
   executor.connect({ pool, resources: { own: (name) => void owned.push(name) } });

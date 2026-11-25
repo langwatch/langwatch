@@ -24,8 +24,9 @@ on a decision model and sent the unsure ones to an LLM that read the judge's who
    description and the judge's content, the same for every criterion, so they share a bucket.
 3. **An LLM leg of a scenario criterion reads the judge's own verdict call.** It sends the judge's
    system and user messages with the `finish_test` tool forced, and reads this criterion by its
-   key: true, false or inconclusive. Inside one judgement that call is sent once per backend and
-   billed once, however many criteria need it.
+   key: the `status` (passed, failed or inconclusive) of the scenario SDK's per-criterion object
+   since 1.8, or an older SDK's true, false or inconclusive. Inside one judgement that call is
+   sent once per backend and billed once, however many criteria need it.
 4. **The turn decision is not routed.** No measurement covers it. The judge's own call, with its
    two decision tools, goes to the LLM backend the table names in `scenarioDecision`. A failure
    lets the conversation go on, because the judge's last turn forces the verdict. A table that
@@ -39,6 +40,8 @@ on a decision model and sent the unsure ones to an LLM that read the judge's who
    decision 3: the summed cost of every call times the one markup. Its request count is the number
    of criteria. A scenario run therefore writes one row per paid turn decision (decision 4) and
    one for its paid verdict; a verdict that billed no tokens records none. An LLM-as-judge evaluation keeps `langwatch-judge`.
+   The SDK sends no stable request id, so a call it retries (a timeout, a 503 after paid legs) runs
+   and bills again. This is accepted for the preview; a request key would need one from the SDK.
 7. **The table decides the backends.** Nothing in the leaf names a provider for this job. Boot
    checks a price and a key for the decision backend as it does for a slot's backends.
 8. **A gated entry works per criterion (2026-11-25).** The gate (ADR-190 decision 11) rates each
@@ -50,6 +53,12 @@ on a decision model and sent the unsure ones to an LLM that read the judge's who
    judged text where the other LLM wires keep 128,000, and bills thinking tokens as output. Its
    model id rides in the request path, so the table holds it to a bare id; its key rides in a
    header, never the URL, and is read on LangWatch Cloud only. It takes no reasoning effort.
+10. **The endpoint speaks the scenario SDK's own tools (2026-11-25).** A criterion's text is the
+   one the system prompt's `<criteria>` block lists at its place, the wording the routes were
+   measured on, since SDK 1.8 sends its tool with no descriptions. The verdict answers each
+   criterion with its requirement, a short reasoning and its status, and no verdict field: the
+   SDK works it out. A verdict call that offers the one-shot `wait_for_traces` is answered with
+   that wait, free, so a verdict waits once for traces still arriving, as the SDK's own judge may.
 
 ## Consequences
 

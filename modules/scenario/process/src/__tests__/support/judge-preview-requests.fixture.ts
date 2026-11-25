@@ -1,25 +1,15 @@
 import type { JudgePreviewChatRequest } from "@langwatch/scenario-contract";
 
+import sdkVerdictRequest from "./scenario-sdk-verdict-request.json" with { type: "json" };
+
 /**
- * The scenario judge's two calls as its OpenAI-compatible client sends them: the prompts and the
- * tool shapes of `@langwatch/scenario`'s JudgeAgent, with made-up criteria.
+ * The scenario judge's two calls as its OpenAI-compatible client sends them, made-up criteria.
+ * The verdict call is what `@langwatch/scenario` 1.8.1's JudgeAgent sent on the runner's judge
+ * model (scenario-sdk-verdict-request.json); apps/scenario-child's client test pins it to the SDK.
  */
-const VERDICT_SYSTEM = `<role>
-You are an LLM as a judge delivering the final verdict on a simulated conversation, determining if the agent under test meets the criteria or not.
-</role>
+const [SDK_SYSTEM, SDK_USER] = sdkVerdictRequest.messages;
 
-<goal>
-Your goal is to deliver the final verdict of the scenario below with the finish_test tool, evaluating each criterion independently against the conversation and the collected evidence.
-</goal>
-
-<scenario>
-A customer asks for a refund on a late order
-</scenario>
-
-<criteria>
-1. The agent offers a refund
-2. The agent apologises
-</criteria>`;
+const VERDICT_SYSTEM = SDK_SYSTEM!.content;
 
 const DECISION_SYSTEM = `<role>
 You are an LLM as a judge watching a simulated conversation as it plays out live to decide if it has collected enough information to evaluate the agent under test.
@@ -39,45 +29,10 @@ const JUDGE_CONTENT = `
     </opentelemetry_traces>
     `;
 
-const criterion = (description: string) => ({
-  type: "string",
-  enum: ["true", "false", "inconclusive"],
-  description,
-});
-
-const FINISH_TEST = {
-  type: "function" as const,
-  function: {
-    name: "finish_test",
-    description: "Complete the test with a final verdict",
-    parameters: {
-      type: "object",
-      properties: {
-        criteria: {
-          type: "object",
-          properties: {
-            the_agent_offers_a_refund: criterion("The agent offers a refund"),
-            the_agent_apologises: criterion("The agent apologises"),
-          },
-          required: ["the_agent_offers_a_refund", "the_agent_apologises"],
-          additionalProperties: false,
-          description: "Strict verdict for each criterion",
-        },
-        reasoning: {
-          type: "string",
-          description: "Explanation of what the final verdict should be",
-        },
-        verdict: {
-          type: "string",
-          enum: ["success", "failure", "inconclusive"],
-          description: "The final verdict of the test",
-        },
-      },
-      required: ["criteria", "reasoning", "verdict"],
-      additionalProperties: false,
-    },
-  },
-};
+/** The SDK's finish_test, as sent: strict, one `{ requirement, reasoning, status }` per key. */
+const FINISH_TEST = sdkVerdictRequest.tools[0]! as NonNullable<
+  JudgePreviewChatRequest["tools"]
+>[number];
 
 const emptyTool = (name: string, description: string) => ({
   type: "function" as const,
@@ -96,7 +51,7 @@ export function verdictRequest({
     model: "langwatch-judge-preview",
     messages: [
       { role: "system", content: system },
-      { role: "user", content: JUDGE_CONTENT },
+      { role: "user", content: SDK_USER!.content },
     ],
     tools: [...extraTools.map((name) => emptyTool(name, "A trace tool")), FINISH_TEST],
     tool_choice: { type: "function", function: { name: "finish_test" } },

@@ -48,7 +48,18 @@ export function instantEvalScenarioQuestionOf({
   };
 }
 
+const ANSWER_OF_STATUS = { passed: "true", failed: "false", inconclusive: "inconclusive" } as const;
+const statusSchema = z.enum(["passed", "failed", "inconclusive"]);
+
+/**
+ * One criterion's entry: the scenario SDK's `{ requirement, reasoning, status }` object (1.8 and
+ * later), or the bare status, `"true"`, `"false"`, `"inconclusive"` or a boolean older SDKs send.
+ */
 const criterionAnswerSchema = z.union([
+  z
+    .object({ status: statusSchema })
+    .transform(({ status }): "true" | "false" | "inconclusive" => ANSWER_OF_STATUS[status]),
+  statusSchema.transform((status): "true" | "false" | "inconclusive" => ANSWER_OF_STATUS[status]),
   z.enum(["true", "false", "inconclusive"]),
   z.boolean().transform((value) => (value ? ("true" as const) : ("false" as const))),
 ]);

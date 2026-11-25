@@ -97,9 +97,19 @@ describe("POST /api/judge-preview/v1/chat/completions", () => {
       const call = body.choices[0]?.message.tool_calls[0]?.function;
       expect(call?.name).toBe("finish_test");
       expect(JSON.parse(call?.arguments ?? "null")).toEqual({
-        criteria: { the_agent_offers_a_refund: "true", the_agent_apologises: "false" },
+        criteria: {
+          the_agent_offers_a_refund: {
+            requirement: "The agent offers a refund",
+            reasoning: "Met.",
+            status: "passed",
+          },
+          the_agent_apologises: {
+            requirement: "The agent apologises",
+            reasoning: "Not met.",
+            status: "failed",
+          },
+        },
         reasoning: "It refunded and never apologised.",
-        verdict: "failure",
       });
     });
 

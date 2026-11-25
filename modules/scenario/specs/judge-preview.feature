@@ -14,9 +14,10 @@ Feature: LangWatch Judge (preview) as the scenario judge
 
   @unit
   Scenario: The judge's verdict call becomes one leaf call with a criterion per tool property
-    Given the scenario judge's verdict request with the finish_test tool
+    Given the scenario judge's verdict request with the finish_test tool, as scenario SDK 1.8.1 sends it
     When it is read
-    Then each property of the tool's criteria is a criterion, keyed by its name with its description as text
+    Then each property of the tool's criteria is a criterion, keyed by its name
+    And its text is the criterion the system prompt's criteria block lists at its place, as the benchmark measured it
     And the description is the text of the system prompt's scenario block
     And the content is the judge's user message
     And a later user message is appended to the content, its text parts read
@@ -32,6 +33,14 @@ Feature: LangWatch Judge (preview) as the scenario judge
     Given a request that offers continue_test and make_verdict
     When it is read
     Then it is a decision call with no criteria and those two tools
+
+  @unit
+  @unit @regression
+  Scenario: A criterion's text falls back to its description without the Criterion number, then to its key
+    Given a verdict request whose criteria block does not list one criterion per key
+    When it is read
+    Then a criterion's text is its property's description less a leading "Criterion N:"
+    And a property with no description is named by its key
 
   @unit
   Scenario: Trace exploration tools are never passed on
@@ -56,17 +65,22 @@ Feature: LangWatch Judge (preview) as the scenario judge
   Scenario: A verdict is answered as the judge's finish_test tool call
     Given a judged verdict with a met, an unmet and an inconclusive criterion
     When the answer is formatted
-    Then the completion carries one finish_test tool call with true, false and inconclusive by key
-    And the verdict is failure
+    Then the completion carries one finish_test tool call with passed, failed and inconclusive by key
     And the usage counts the billed input tokens
 
-  @unit
-  Scenario: The verdict follows the criteria
-    Given judged criteria
+  @unit @regression
+  Scenario: The verdict's arguments fit the scenario SDK's strict finish_test tool
+    Given a judged verdict and the finish_test tool scenario SDK 1.8.1 sends
     When the answer is formatted
-    Then any unmet criterion makes the verdict failure
-    And otherwise any inconclusive criterion makes it inconclusive
-    And otherwise it is success
+    Then each criterion carries its requirement, a reasoning and its status, and nothing else
+    And the arguments carry the summary reasoning and no verdict field, so the SDK works out the verdict
+
+  @unit @regression
+  Scenario: A verdict call that offers the one-shot wait for traces is answered with that wait
+    Given a verdict request that offers wait_for_traces beside finish_test
+    When it is answered
+    Then the answer calls wait_for_traces with no arguments, judging nothing and billing nothing
+    And the next verdict request, which no longer offers the wait, is judged
 
   @unit
   Scenario: A verdict with no explanation lists its criteria, naming no backend
@@ -185,9 +199,10 @@ Feature: LangWatch Judge (preview) as the scenario judge
 
   @unit
   Scenario: The scenario SDK's client reads the endpoint's answer as its tool call
-    Given the client the scenario runner builds for the judge, pointed at the endpoint
+    Given the scenario SDK's own judge on the model the scenario runner builds for it, pointed at the endpoint
     When it asks for a verdict with the finish_test tool forced
-    Then it reads one finish_test tool call with the criteria by key
+    Then it sends the request the module tests read
+    And it reads the endpoint's answer as one passed and one failed criterion
 
   @unit
   Scenario: The judge preview flag is off by default, on Cloud and self-hosted

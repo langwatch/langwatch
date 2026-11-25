@@ -25,6 +25,7 @@ import {
 } from "../../__tests__/support/instant-eval-judge-router.test-fakes.ts";
 import { MemoryInstantEvalRateLimiter } from "../../__tests__/support/instant-eval-rate-limiter.test-fakes.ts";
 import {
+  finishTestInput,
   scenarioJudgeCall,
   SYNTHETIC_SCENARIO_PRICING,
   syntheticGatedScenarioRouteTable,
@@ -68,13 +69,19 @@ function decisionAnswer(
   };
 }
 
+const STATUS_OF = { true: "passed", false: "failed", inconclusive: "inconclusive" } as const;
+
+/** An LLM's finish_test call in the scenario SDK's shape, each status written as "true" etc. */
 const finishTest = (
-  criteria: Record<string, string>,
+  criteria: Readonly<Record<string, keyof typeof STATUS_OF>>,
   reasoning = "the transcript settles it",
 ): InstantEvalLlmToolCallAnswer => ({
   outcome: "answered",
   tool: "finish_test",
-  input: { criteria, reasoning, verdict: "failure" },
+  input: finishTestInput(
+    Object.fromEntries(Object.entries(criteria).map(([key, said]) => [key, STATUS_OF[said]])),
+    reasoning,
+  ),
   inputTokens: 2_000,
   outputTokens: 100,
 });
@@ -342,7 +349,9 @@ describe("given a scenario verdict call on LangWatch Cloud", () => {
       const { service, llmJudge, recorded } = harness({
         probabilities,
         toolCall: () =>
-          finishTest(Object.fromEntries(keys.map((key, at) => [key, String(at % 2 === 0)]))),
+          finishTest(
+            Object.fromEntries(keys.map((key, at) => [key, at % 2 === 0 ? "true" : "false"])),
+          ),
       });
 
       const answer = await service.judge(call);
