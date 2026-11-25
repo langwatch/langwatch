@@ -36,7 +36,7 @@ Feature: Icon rail navigation
   Scenario: The rail lists the reachable products as tiles
     Given I am on the icon-rail mode
     And I can reach every product
-    Then the rail shows a tile for Me, LLM Ops, Gateway and Governance
+    Then the rail shows a tile for Coding agents, LLM Ops, Gateway and Governance
     And the tile of the product I am in carries the active mark
 
   @integration

@@ -112,4 +112,68 @@ describe.skipIf(!databaseUrl)("persisted audit entity history", () => {
     expect(answers[0]?.occurredAt).toBe(keyed.occurredAt);
     expect(await connection.client.auditLog.count({ where: { idempotencyKey } })).toBe(1);
   });
+
+  /** @scenario "A persisted organisation trail pages by its watermark and leaves other organisations out" */
+  it("pages an organisation's trail by its watermark, leaving other organisations out", async () => {
+    if (!connection) throw new Error("DATABASE_URL is required for audit integration tests");
+    const trailProjectId = `${projectId}_trail`;
+    const organizationId = `${trailProjectId}_org`;
+    const otherOrganizationId = `${trailProjectId}_org_other`;
+    await connection.client.auditLog.createMany({
+      data: [
+        {
+          id: `${trailProjectId}_o1`,
+          organizationId,
+          action: "a.update",
+          createdAt: new Date(5000),
+        },
+        {
+          id: `${trailProjectId}_o2`,
+          projectId: trailProjectId,
+          action: "b.update",
+          createdAt: new Date(5000),
+        },
+        {
+          id: `${trailProjectId}_o3`,
+          organizationId,
+          action: "c.update",
+          createdAt: new Date(6000),
+        },
+        {
+          id: `${trailProjectId}_x1`,
+          organizationId: otherOrganizationId,
+          action: "d.update",
+          createdAt: new Date(5500),
+        },
+      ],
+    });
+    const repository = PrismaAuditLogRepository.create({ prisma: connection.client });
+
+    const seen: string[] = [];
+    let after = { afterMs: 0, afterId: "" };
+    for (let page = 0; page < 5; page += 1) {
+      const entries = await repository.findForOrganization({
+        organizationId,
+        projectIds: [trailProjectId],
+        ...after,
+        untilMs: 10_000,
+        limit: 2,
+      });
+      const ours = entries.filter((entry) => entry.id.startsWith(trailProjectId));
+      seen.push(...ours.map((entry) => entry.id));
+      const last = entries.at(-1);
+      if (!last) break;
+      after = { afterMs: last.createdAt.getTime(), afterId: last.id };
+    }
+    await connection.client.auditLog.deleteMany({
+      where: {
+        OR: [
+          { organizationId: { in: [organizationId, otherOrganizationId] } },
+          { projectId: trailProjectId },
+        ],
+      },
+    });
+
+    expect(seen).toEqual([`${trailProjectId}_o1`, `${trailProjectId}_o2`, `${trailProjectId}_o3`]);
+  });
 });

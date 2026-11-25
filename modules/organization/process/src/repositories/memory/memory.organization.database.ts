@@ -106,6 +106,8 @@ export interface MemoryOrganizationUserRow {
   fullSeatSince?: Instant | null;
   /** Set when admission left the person waiting for a seat. */
   seatPendingSince?: Instant | null;
+  /** A Billing-only member (ADR-205). */
+  billingOnly?: boolean;
 }
 
 /** One person, the fields the membership repository joins against. */
@@ -133,6 +135,8 @@ export interface MemoryOrganizationInviteRow {
   subscriptionId: string | null;
   acceptedByUserId: string | null;
   acceptedViaIdentifierId: string | null;
+  /** The Billing grant and no seat (ADR-205). */
+  billingOnly?: boolean;
   createdAt: Instant;
   updatedAt: Instant;
 }

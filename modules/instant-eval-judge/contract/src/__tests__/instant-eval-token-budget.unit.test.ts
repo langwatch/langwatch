@@ -79,12 +79,47 @@ describe("given a piece of judged text", () => {
       ).toBe(250);
     });
 
-    it("prices a whole request as the text plus its questions", () => {
+    /** @scenario "A request is priced with the envelope the judge bills on every call" */
+    it("prices a whole request as the text plus its questions plus the request overhead", () => {
       const text = "x".repeat(2_700);
       const questions = [question("q1", "the customer sounds annoyed")];
 
       expect(estimateInstantEvalRequestTokens({ text, questions })).toBe(
-        estimateJudgedTextTokens({ text }) + instantEvalQuestionTokens(questions),
+        estimateJudgedTextTokens({ text }) +
+          instantEvalQuestionTokens(questions) +
+          INSTANT_EVAL_CLASSIFIER_LIMITS.requestOverheadTokens,
+      );
+    });
+
+    it("honours a classifier that publishes a different request overhead", () => {
+      const text = "x".repeat(2_700);
+      const questions = [question("q1", "the customer sounds annoyed")];
+      const priced = (requestOverheadTokens: number) =>
+        estimateInstantEvalRequestTokens({
+          text,
+          questions,
+          limits: { ...INSTANT_EVAL_CLASSIFIER_LIMITS, requestOverheadTokens },
+        });
+
+      expect(priced(500) - priced(0)).toBe(500);
+    });
+
+    it("prices an empty text at the questions plus the request overhead", () => {
+      const questions = [question("q1", "the customer sounds annoyed")];
+
+      expect(estimateInstantEvalRequestTokens({ text: "", questions })).toBe(
+        instantEvalQuestionTokens(questions) + INSTANT_EVAL_CLASSIFIER_LIMITS.requestOverheadTokens,
+      );
+    });
+
+    // A page is refused past its rows times the state cap, so an overhead past
+    // the reserve would refuse every page of full-length rows.
+    it("keeps a full-length request within the state cap", () => {
+      const questions = [question("q1", "the customer sounds annoyed")];
+      const text = "x".repeat(INSTANT_EVAL_CLASSIFIER_LIMITS.stateTokens * 4);
+
+      expect(estimateInstantEvalRequestTokens({ text, questions })).toBeLessThanOrEqual(
+        INSTANT_EVAL_CLASSIFIER_LIMITS.stateTokens,
       );
     });
   });

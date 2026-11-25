@@ -264,16 +264,28 @@ func TestEnsureLangyWorkerBinary(t *testing.T) {
 
 // @scenario "Langy on the host runs this checkout's langwatch CLI"
 func TestEnsureLangyCLI(t *testing.T) {
-	run := func(t *testing.T, sup *fakeSupervisor, built bool, tier domain.LangyTier) string {
+	// The checkout's CLI before haven runs: absent, built by haven with the
+	// native render, or built some other way (no native stamp).
+	const (
+		missing   = "missing"
+		native    = "native"
+		unstamped = "unstamped"
+	)
+	run := func(t *testing.T, sup *fakeSupervisor, cli string, tier domain.LangyTier) string {
 		t.Helper()
 		repo := t.TempDir()
-		if built {
+		if cli != missing {
 			entry := langyCLIEntry(repo)
 			if err := os.MkdirAll(filepath.Dir(entry), 0o750); err != nil {
 				t.Fatal(err)
 			}
 			if err := os.WriteFile(entry, []byte("#!/usr/bin/env node\n"), 0o600); err != nil {
 				t.Fatal(err)
+			}
+			if cli == native {
+				if err := os.WriteFile(langyCLIRenderStamp(repo), []byte(langyCLIRender), 0o600); err != nil {
+					t.Fatal(err)
+				}
 			}
 		}
 		o := &Orchestrator{sup: sup, sys: &fakeSystem{}, log: zap.NewNop()}
@@ -284,7 +296,7 @@ func TestEnsureLangyCLI(t *testing.T) {
 
 	t.Run("writes langwatch and lw shims that run the built CLI", func(t *testing.T) {
 		sup := &fakeSupervisor{}
-		repo := run(t, sup, true, domain.LangyTierHostUnsafe)
+		repo := run(t, sup, native, domain.LangyTierHostUnsafe)
 		if len(sup.shells) != 0 {
 			t.Fatalf("built CLI was rebuilt: %v", sup.shells)
 		}
@@ -296,19 +308,55 @@ func TestEnsureLangyCLI(t *testing.T) {
 		}
 	})
 
-	t.Run("builds a missing CLI first", func(t *testing.T) {
+	// @scenario "The host-tier Langy CLI is built with the native render"
+	t.Run("builds a missing CLI first, with the native skills render", func(t *testing.T) {
 		sup := &fakeSupervisor{}
-		run(t, sup, false, domain.LangyTierHostUnsafe)
-		if len(sup.shells) != 1 || !strings.Contains(sup.shells[0], "pnpm --filter langwatch build") {
+		run(t, sup, missing, domain.LangyTierHostUnsafe)
+		if len(sup.shells) != 1 || !strings.Contains(sup.shells[0], "LANGWATCH_SKILLS_RENDER=native pnpm --filter langwatch build") {
 			t.Fatalf("expected one CLI build, got %v", sup.shells)
+		}
+	})
+
+	// @scenario "A host-tier Langy CLI built without the native render is rebuilt"
+	t.Run("rebuilds a CLI that lacks the native stamp, then stamps it", func(t *testing.T) {
+		sup := &fakeSupervisor{}
+		repo := run(t, sup, unstamped, domain.LangyTierHostUnsafe)
+		if len(sup.shells) != 1 || !strings.Contains(sup.shells[0], "LANGWATCH_SKILLS_RENDER=native pnpm --filter langwatch build") {
+			t.Fatalf("expected one native CLI build, got %v", sup.shells)
+		}
+		if !langyCLIIsNative(repo) {
+			t.Fatal("rebuilt CLI carries no native stamp")
+		}
+	})
+
+	// @scenario "Building the host-tier Langy CLI leaves the checkout's skills bundle on the cli render"
+	t.Run("regenerates the cli bundle after the native build, keeping its exit status", func(t *testing.T) {
+		sup := &fakeSupervisor{}
+		run(t, sup, missing, domain.LangyTierHostUnsafe)
+		want := "; rc=$?; LANGWATCH_SKILLS_RENDER=cli node sdks/typescript/scripts/generate-skills-bundle.mjs; exit $rc)"
+		if len(sup.shells) != 1 || !strings.Contains(sup.shells[0], want) {
+			t.Fatalf("expected the build to restore the cli bundle, got %v", sup.shells)
 		}
 	})
 
 	t.Run("does nothing for a container tier", func(t *testing.T) {
 		sup := &fakeSupervisor{}
-		repo := run(t, sup, false, domain.LangyTierSandboxed)
+		repo := run(t, sup, missing, domain.LangyTierSandboxed)
 		if _, err := os.Stat(langyCLIBinDir(repo)); len(sup.shells) != 0 || err == nil {
 			t.Fatalf("container tier built or wrote shims: %v", sup.shells)
+		}
+	})
+
+	// The failure hint is the only place a developer learns the manual build
+	// command, so it must be the plain command, not the log-redirected shell.
+	t.Run("failed build prints a plain manual build hint", func(t *testing.T) {
+		sup := &fakeSupervisor{err: errors.New("build boom")}
+		out := captureStdout(t, func() { run(t, sup, missing, domain.LangyTierHostUnsafe) })
+		if !strings.Contains(out, langyCLIBuildCommand) || !strings.Contains(out, langyCLIRestoreBundleCommand) {
+			t.Fatalf("the hint must name the native build and the bundle restore, got %q", out)
+		}
+		if strings.Contains(out, "rc=$?") || strings.Contains(out, "exit $rc") || strings.Contains(out, "2>&1") {
+			t.Fatalf("the hint must be a plain command with no exit capture, got %q", out)
 		}
 	})
 }

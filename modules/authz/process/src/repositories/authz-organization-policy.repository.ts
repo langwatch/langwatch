@@ -9,4 +9,10 @@ export abstract class AuthzOrganizationPolicyRepository {
     braidsOrganizationAdminsOnly: boolean;
     updatedByUserId: string;
   }): Promise<void>;
+
+  abstract setBraidsEnabled(input: {
+    organizationId: string;
+    braidsEnabled: boolean;
+    updatedByUserId: string;
+  }): Promise<void>;
 }

@@ -1,5 +1,5 @@
 import { generate } from "@langwatch/ksuid";
-import { nowInstant } from "@langwatch/time";
+import { nowEpochMs } from "@langwatch/time";
 import { context, trace } from "@opentelemetry/api";
 
 import type { AggregateType } from "../domain/aggregateType.ts";
@@ -85,7 +85,7 @@ function createEvent<
     idempotencyKey,
   } = params;
 
-  const eventCreatedAt = createdAt ?? nowInstant().epochMilliseconds;
+  const eventCreatedAt = createdAt ?? nowEpochMs();
 
   let finalMetadata = metadata;
   if (includeTraceContext === true) {

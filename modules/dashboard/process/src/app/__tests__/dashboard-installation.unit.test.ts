@@ -6,6 +6,7 @@ import { bootInstalledProcess } from "@langwatch/process";
 import { memoryStores } from "@langwatch/process-stores";
 import { testPeer } from "@langwatch/process/testing";
 import { ProjectApi } from "@langwatch/project-contract";
+import { UserApi } from "@langwatch/user-contract";
 import { describe, expect, it } from "vitest";
 
 import { dashboardProcessModule } from "../../dashboard.module.ts";
@@ -14,6 +15,7 @@ import {
   createDashboardTestAuthz,
   createDashboardTestAutomation,
   createDashboardTestProjects,
+  createDashboardTestUsers,
 } from "./dashboard.fixture.ts";
 
 function process(role: "api" | "worker") {
@@ -27,6 +29,7 @@ function process(role: "api" | "worker") {
       testPeer({ token: AuthzApi, instance: createDashboardTestAuthz() }),
       testPeer({ token: AutomationApi, instance: createDashboardTestAutomation() }),
       testPeer({ token: ProjectApi, instance: createDashboardTestProjects() }),
+      testPeer({ token: UserApi, instance: createDashboardTestUsers() }),
     ],
   });
 }

@@ -20,6 +20,10 @@
     "./pii": {
       "types": "./dist/pii.d.ts",
       "default": "./src/pii.ts"
+    },
+    "./secrets": {
+      "types": "./dist/secrets.d.ts",
+      "default": "./src/secrets.ts"
     }
   },
   "scripts": {

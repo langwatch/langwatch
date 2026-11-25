@@ -27,6 +27,8 @@ export interface BoardTemplate {
   readonly id: BoardTemplateId;
   readonly name: string;
   readonly description: string;
+  /** Names the template had before, so a board made under one still reads as added. */
+  readonly formerNames?: readonly string[];
   /** A short, user-facing line for the template card; falls back to `description`. */
   readonly summary?: string;
   readonly widgets: readonly BoardTemplateWidget[];

@@ -17,6 +17,10 @@ export interface RawRunConfigurationRow {
   RepeatCount: string;
   SimulatorModel: string;
   JudgeModel: string;
+  /** The plan's judge quiet period in ms as raw JSON, '' when it set none. */
+  TraceQuietPeriodMs: string;
+  /** The plan's judge trace wait in ms as raw JSON, '' when it set none. */
+  TraceWaitTimeoutMs: string;
   /**
    * The raw merged parameters of the first scenario run against a target with no overrides, or of
    * the first scenario run at all when every target carries some; '' when the run resolved none.

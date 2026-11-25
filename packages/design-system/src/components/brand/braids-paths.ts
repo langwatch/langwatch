@@ -59,3 +59,28 @@ export const BRAIDS_ART_SPANS = [
 
 export const BRAIDS_ART_DIVIDER_PATH = "M509 78.5H727";
 export const BRAIDS_ART_LOCK_SHACKLE_PATH = "M318 226V223.5A3 3 0 0 1 324 223.5V226";
+
+/**
+ * The empty state, from braids-empty-state.svg: three dotted strands, not yet braided, reaching an
+ * empty trace. By project 1 to 3; each `under` names the strand whose path cuts its gap.
+ */
+export const BRAIDS_EMPTY_STRANDS = [
+  { d: "M207 102H230C280 102 280 176 330 176C380 176 380 249 430 249H492", under: 2 },
+  { d: "M207 176H230C280 176 280 102 330 102C395 102 415 141 470 141H492" },
+  { d: "M207 250H330C380 250 380 176 430 176C460 176 460 213 492 213", under: 1 },
+] as const;
+
+/** Each project's chip centre on the left, by project 1 to 3. */
+export const BRAIDS_EMPTY_PROJECT_ROWS = [102, 176, 250] as const;
+
+/** The empty trace's outlined span rows: x, top and width. */
+export const BRAIDS_EMPTY_SPAN_ROWS = [
+  { x: 508, y: 105, width: 201 },
+  { x: 531, y: 141, width: 144 },
+  { x: 548, y: 177, width: 63 },
+  { x: 582, y: 213, width: 88 },
+  { x: 685, y: 249, width: 29 },
+] as const;
+
+export const BRAIDS_EMPTY_DIVIDER_PATH = "M507 95H716";
+export const BRAIDS_EMPTY_PLUS_PATH = "M603 175H621M612 166V184";

@@ -12,7 +12,7 @@ import { TRACE_ID_INDEXES } from "../clickhouse.trace-id-indexes.database.ts";
 import { MemberTraceClickHouseClientRepository } from "../clickhouse.trace-member-client.repository.ts";
 import { ClickHouseTraceExistenceRepository } from "../trace-existence.repository.ts";
 
-/** A ready index answering `indexed` rows for every lookup; the source holds `t1`. */
+/** A ready index answering `indexed` rows for every lookup; the source holds `t1` in project-1. */
 async function existenceOver({ indexed }: { indexed: number }) {
   const sourceReads: string[] = [];
   const execute = vi.fn<ScriptedStatements["execute"]>(async (request) => {
@@ -20,7 +20,7 @@ async function existenceOver({ indexed }: { indexed: number }) {
       return { rows: [{ n: String(indexed), fromMs: "1000", toMs: "2000" }] };
     }
     sourceReads.push(request.sql);
-    return { rows: [{ TraceId: "t1" }] };
+    return { rows: [{ TraceId: "t1", TenantId: "project-1" }] };
   });
   const client = await readyIdIndexedClientDouble({
     indexes: TRACE_ID_INDEXES,
@@ -28,8 +28,10 @@ async function existenceOver({ indexed }: { indexed: number }) {
   });
   const repository = ClickHouseTraceExistenceRepository.create({
     resolveClient: MemberTraceClickHouseClientRepository.resolverFor(client),
+    clickhouse: client,
   });
-  return { repository, sourceReads };
+  execute.mockClear();
+  return { repository, sourceReads, execute };
 }
 
 describe("ClickHouseTraceExistenceRepository.findExistingTraceIds", () => {
@@ -60,6 +62,37 @@ describe("ClickHouseTraceExistenceRepository.findExistingTraceIds", () => {
       expect(found).toEqual(["t1"]);
       expect(sourceReads).toHaveLength(1);
       expect(sourceReads[0]).toContain("OccurredAt >= ");
+    });
+  });
+});
+
+describe("ClickHouseTraceExistenceRepository.findProjectsHoldingTrace", () => {
+  const projectIds = Array.from({ length: 100 }, (_, index) => `project-${index}`);
+
+  describe("given a trace id the ready index has never seen in any project", () => {
+    it("reads each table's index once over the whole project set and no source", async () => {
+      const { repository, sourceReads, execute } = await existenceOver({ indexed: 0 });
+
+      const holding = await repository.findProjectsHoldingTrace({ projectIds, traceId: "t9" });
+
+      expect(holding).toEqual([]);
+      expect(execute).toHaveBeenCalledTimes(2);
+      expect(sourceReads).toEqual([]);
+    });
+  });
+
+  describe("given a trace id the index holds", () => {
+    it("confirms it with one source read per table, bound to the declared set", async () => {
+      const { repository, sourceReads, execute } = await existenceOver({ indexed: 1 });
+
+      const holding = await repository.findProjectsHoldingTrace({ projectIds, traceId: "t1" });
+
+      expect(holding).toEqual(["project-1"]);
+      expect(execute).toHaveBeenCalledTimes(4);
+      expect(sourceReads).toHaveLength(2);
+      expect(
+        sourceReads.every((sql) => sql.includes("TenantId IN ({tenantIds:Array(String)})")),
+      ).toBe(true);
     });
   });
 });

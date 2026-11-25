@@ -1,0 +1,146 @@
+{{- if .Values.piiRedactionModel.enabled }}
+{{- $image := .Values.images.pii_redaction_model }}
+{{- if or (not $image.repository) (not $image.tag) }}
+{{- fail "piiRedactionModel.enabled needs images.pii_redaction_model.repository and images.pii_redaction_model.tag: they default to the public langwatch/pii-redaction-model image at the chart's release. Set both (and piiRedactionModel.imagePullSecrets for a private mirror), or set piiRedactionModel.enabled=false to keep strict PII analysis on Presidio." }}
+{{- end }}
+# The PII redaction model: the strict PII detector the app and the workers call
+# instead of Presidio. It stores nothing and calls nothing.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-pii-redaction-model
+  labels:
+    app.kubernetes.io/name: {{ .Release.Name }}-pii-redaction-model
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/component: pii-redaction-model
+    {{- include "langwatch.componentLabels" . | nindent 4 }}
+    {{- with .Values.piiRedactionModel.deployment.labels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+  {{- with .Values.piiRedactionModel.deployment.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  replicas: {{ .Values.piiRedactionModel.replicaCount }}
+  {{- with .Values.piiRedactionModel.deployment.strategy }}
+  strategy:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  {{- if hasKey (default (dict) .Values.piiRedactionModel.deployment) "revisionHistoryLimit" }}
+  revisionHistoryLimit: {{ .Values.piiRedactionModel.deployment.revisionHistoryLimit }}
+  {{- end }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ .Release.Name }}-pii-redaction-model
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: {{ .Release.Name }}-pii-redaction-model
+        app.kubernetes.io/instance: {{ .Release.Name }}
+        app.kubernetes.io/component: pii-redaction-model
+        {{- with .Values.piiRedactionModel.pod.labels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      {{- with (coalesce .Values.piiRedactionModel.pod.annotations .Values.global.podAnnotations) }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    spec:
+      automountServiceAccountToken: {{ .Values.global.automountServiceAccountToken }}
+      {{- with .Values.piiRedactionModel.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      # A stopping pod drains for up to 80 s: 30 s body read, the 45 s request
+      # deadline, 5 s. The image has no shell for a preStop sleep.
+      terminationGracePeriodSeconds: {{ .Values.piiRedactionModel.terminationGracePeriodSeconds }}
+      # The image is distroless :nonroot (uid 65532); pin that over the chart-wide 1000.
+      securityContext:
+        {{- include "langwatch.podSecurityContext" (dict "ctx" . "component" .Values.piiRedactionModel "base" (dict "runAsUser" 65532 "runAsGroup" 65532 "fsGroup" 65532)) | nindent 8 }}
+      {{- with (coalesce .Values.piiRedactionModel.nodeSelector .Values.global.scheduling.nodeSelector) }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with (coalesce .Values.piiRedactionModel.tolerations .Values.global.scheduling.tolerations) }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with (coalesce .Values.piiRedactionModel.affinity .Values.global.scheduling.affinity) }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with (coalesce .Values.piiRedactionModel.topologySpreadConstraints .Values.global.scheduling.topologySpreadConstraints) }}
+      topologySpreadConstraints:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with (coalesce .Values.piiRedactionModel.priorityClassName .Values.global.scheduling.priorityClassName) }}
+      priorityClassName: {{ . | quote }}
+      {{- end }}
+      containers:
+        - name: {{ .Release.Name }}-pii-redaction-model
+          securityContext:
+            {{- include "langwatch.containerSecurityContext" (dict "ctx" . "component" .Values.piiRedactionModel) | nindent 12 }}
+          image: "{{ $image.repository }}:{{ $image.tag }}"
+          imagePullPolicy: {{ $image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+          env:
+            {{- /* PORT is fixed: the container port, the Service and the probes use
+                   8080. The others give way to an extraEnvs entry of the same name.
+                   The request deadline (45 s) stays under the app's 50 s abort, so a
+                   queued batch is refused before the caller times out. */}}
+            {{- $own := list }}
+            {{- range .Values.piiRedactionModel.extraEnvs }}
+            {{- if eq .name "PORT" }}
+            {{- fail "piiRedactionModel.extraEnvs must not set PORT: the container port, the Service and the probes are fixed at 8080." }}
+            {{- end }}
+            {{- $own = append $own .name }}
+            {{- end }}
+            - name: PORT
+              value: "8080"
+            {{- range $name, $value := dict "PII_COMPONENTS" "level0,gliner,tracer" "PII_WARMUP" "1" "PII_MAX_CONCURRENT_REQUESTS" "1" "PII_REQUEST_TIMEOUT_SECONDS" "45" }}
+            {{- if not (has $name $own) }}
+            - name: {{ $name }}
+              value: {{ $value | quote }}
+            {{- end }}
+            {{- end }}
+            {{- with .Values.piiRedactionModel.extraEnvs }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          resources:
+            {{- toYaml .Values.piiRedactionModel.resources | nindent 12 }}
+          # 180 s to load the models: a cold load took up to 136 s on Lambda.
+          # Liveness waits for it, so a slow load is never killed.
+          startupProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 36
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 6
+          volumeMounts:
+            - name: tmp-dir
+              mountPath: /tmp
+      volumes:
+        - name: tmp-dir
+          emptyDir:
+            sizeLimit: {{ .Values.piiRedactionModel.scratchSizeLimit }}
+{{- end }}

@@ -62,6 +62,7 @@ function collaboratorsFor(
   record: SsoAuthenticationActivityApi["record"] = async () => undefined,
 ): BetterAuthHookCollaborators {
   return {
+    users: createApiFixture<BetterAuthHookCollaborators["users"]>(),
     organizations: createApiFixture<SsoDomainOrganizations>({ findBySsoDomain: async () => null }),
     federation: createApiFixture<BetterAuthFederation>(),
     invites: createApiFixture<Pick<OrganizationApi, "applyPendingInvite">>(),

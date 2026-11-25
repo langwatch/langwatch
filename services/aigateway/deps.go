@@ -154,14 +154,15 @@ func NewDeps(ctx context.Context, cfg Config) (context.Context, *Deps, error) {
 	})
 
 	authSvc, err := authresolver.New(authresolver.Options{
-		Resolver:      cpClient,
-		ConfigFetcher: cpClient,
-		ChangePoller:  changePollerAdapter{client: cpClient},
-		Logger:        logger,
-		Metrics:       metrics,
-		SoftBump:      time.Duration(cfg.AuthCache.SoftBumpSeconds) * time.Second,
-		HardGrace:     time.Duration(cfg.AuthCache.HardGraceSeconds) * time.Second,
-		ConfigTTL:     time.Duration(cfg.AuthCache.ConfigTTLSeconds) * time.Second,
+		Resolver:        cpClient,
+		ConfigFetcher:   cpClient,
+		ChangePoller:    changePollerAdapter{client: cpClient},
+		Logger:          logger,
+		Metrics:         metrics,
+		SoftBump:        time.Duration(cfg.AuthCache.SoftBumpSeconds) * time.Second,
+		HardGrace:       time.Duration(cfg.AuthCache.HardGraceSeconds) * time.Second,
+		ConfigTTL:       time.Duration(cfg.AuthCache.ConfigTTLSeconds) * time.Second,
+		FailClosedAfter: time.Duration(cfg.AuthCache.FailClosedAfterSeconds) * time.Second,
 	})
 	if err != nil {
 		return ctx, nil, fmt.Errorf("auth service init: %w", err)
