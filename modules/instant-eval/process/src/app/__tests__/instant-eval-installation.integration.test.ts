@@ -270,7 +270,8 @@ function installation({
           isEnabled: async (flagKey) =>
             flagKey === INSTANT_EVALS_HOSTED_DISABLED_FLAG ? isHostedOff : isReleased,
         }),
-        // A project runs on LangWatch Evals Preview unless a test names its own model (ADR-182).
+        // A project runs on LangWatch Instant (preview) unless a test names its own model
+        // (ADR-182).
         "model-provider": createApiFixture<ModelProviderApi>({
           resolveDecisionModel: async () => decisionModel,
         }),
@@ -946,7 +947,7 @@ describe("given an organization LangWatch switched its hosted model off for", ()
     });
   });
 
-  describe("when a project on Evals Preview has text classified", () => {
+  describe("when a project on LangWatch Instant (preview) has text classified", () => {
     it("skips as not configured and never reaches LangWatch's classifier", async () => {
       const leaf = judgeLeaf();
 

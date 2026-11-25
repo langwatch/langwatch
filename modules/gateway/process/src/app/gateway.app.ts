@@ -236,6 +236,10 @@ import {
   GatewayUsageService,
   type UsageWindow,
 } from "../features/spend/services/gateway-spend-summary.service.ts";
+import {
+  GatewayUnbudgetedSpendService,
+  type UnbudgetedSpendSweepReport,
+} from "../features/spend/services/gateway-unbudgeted-spend.service.ts";
 import { ModelCatalogGatewaySpendRatingService } from "../features/spend/services/model-catalog-gateway-spend-rating.service.ts";
 import {
   GatewayVirtualKeyDtoService,
@@ -878,6 +882,7 @@ function gatewayControlPlane(options: GatewayControlPlaneOptions): GatewayContro
       repository: repositories.a2aTargets,
       changeEvents: changes,
       auditLog: repositories.audit,
+      projects,
       transactions: repositories.transactions,
     }),
     budgetSpend,
@@ -1303,6 +1308,7 @@ export class GatewayModule implements GatewayApi, GatewayInternalDoorApi, Gatewa
       guardrails,
       spend,
       realtimeSessions,
+      firstRequests: governanceEvents,
     });
 
     return new GatewayModule({
@@ -1364,6 +1370,13 @@ export class GatewayModule implements GatewayApi, GatewayInternalDoorApi, Gatewa
       connectUpstream,
       oneTimeReveals: setup.dependencies.oneTimeReveals,
       governanceEvents,
+      unbudgetedSpend: GatewayUnbudgetedSpendService.create({
+        keys: repositories.virtualKeys,
+        budgets: controlPlane.budgetDecisions,
+        spend: controlPlane.spendLedger,
+        projects: setup.dependencies.projects,
+        facts: governanceEvents,
+      }),
     });
   }
 
@@ -1388,6 +1401,7 @@ export class GatewayModule implements GatewayApi, GatewayInternalDoorApi, Gatewa
   #addresses: GatewayDeploymentAddresses;
   #oneTimeReveals: SecretApi | undefined;
   #governanceEvents: GatewayGovernanceEventsService | undefined;
+  #unbudgetedSpend: GatewayUnbudgetedSpendService | undefined;
 
   private constructor({
     infrastructure,
@@ -1405,6 +1419,7 @@ export class GatewayModule implements GatewayApi, GatewayInternalDoorApi, Gatewa
     connectUpstream,
     oneTimeReveals,
     governanceEvents,
+    unbudgetedSpend,
   }: {
     infrastructure: GatewayInfrastructure;
     voice: GatewayVoiceServices;
@@ -1417,10 +1432,12 @@ export class GatewayModule implements GatewayApi, GatewayInternalDoorApi, Gatewa
     connectUpstream?: GatewayConnectUpstreamService;
     oneTimeReveals?: SecretApi;
     governanceEvents?: GatewayGovernanceEventsService;
+    unbudgetedSpend?: GatewayUnbudgetedSpendService;
   }) {
     this.#addresses = addresses;
     this.#oneTimeReveals = oneTimeReveals;
     this.#governanceEvents = governanceEvents;
+    this.#unbudgetedSpend = unbudgetedSpend;
     this.#connectUpstream = connectUpstream;
     this.#spend = spend;
     this.#spendPipeline = spendPipeline;
@@ -1473,7 +1490,16 @@ export class GatewayModule implements GatewayApi, GatewayInternalDoorApi, Gatewa
 
   /** governance_events_processing: the same commands in every role; webhook subscribes itself. */
   governanceEventsPipeline(): GatewayGovernanceEventsDefinition {
-    return buildGatewayGovernanceEventsPipeline();
+    return buildGatewayGovernanceEventsPipeline({
+      sweepUnbudgetedSpend: () => this.sweepUnbudgetedSpend(),
+    });
+  }
+
+  /** One unbudgeted-spend sweep, what the governance pipeline's scheduled intent runs. */
+  async sweepUnbudgetedSpend(): Promise<UnbudgetedSpendSweepReport> {
+    const unbudgetedSpend = this.#unbudgetedSpend;
+    if (!unbudgetedSpend) throw this.spendStoreUnavailable();
+    return unbudgetedSpend.sweep();
   }
 
   /** gateway_pulled_usage_ledger: the ledger debits governance's priced pulled usage (Q208C). */

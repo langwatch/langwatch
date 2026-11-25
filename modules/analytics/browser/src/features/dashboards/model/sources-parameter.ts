@@ -39,10 +39,10 @@ export const VIEWS_WITH_ORIGIN: readonly string[] = [
   ...TRACE_VIEWS,
 ];
 
-/** The distinct views a query names after FROM or JOIN, in the order first named. */
+/** The distinct views a query names after FROM or JOIN, with or without their database. */
 export function namedViews(sql: string): string[] {
   const named = [
-    ...lwqlExecutedText(sql).matchAll(/\b(?:FROM|JOIN)\s+(?:analytics\.)?([a-z_]+)/gi),
+    ...lwqlExecutedText(sql).matchAll(/\b(?:FROM|JOIN)\s+(?:[a-z_]+\.)?([a-z_]+)/gi),
   ].map((match) => match[1] ?? "");
 
   return [...new Set(named)];

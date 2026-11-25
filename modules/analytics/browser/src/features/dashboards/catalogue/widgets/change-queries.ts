@@ -8,18 +8,22 @@ import { bucketOf, END, inPeriod, START } from "../../templates/model/lwql-perio
 /** How far back a model must have been silent for its first call to count as a change. */
 const NEW_MODEL_LOOKBACK_DAYS = 30;
 
-const MODEL_WINDOW = `BucketStart >= subtractDays(${START}, ${NEW_MODEL_LOOKBACK_DAYS})
-    AND BucketStart < ${END}
-    AND Model != ''`;
+// trace_metrics, not the per-minute rollup: the rollup keeps no origin, so a model only Langy or
+// a simulation ran would read as a change to production. Here the widget's sources apply.
+const MODEL_WINDOW = `OccurredAt >= subtractDays(${START}, ${NEW_MODEL_LOOKBACK_DAYS})
+      AND OccurredAt < ${END}
+      AND notEmpty(Models)`;
 
 // A model is new only once some other model ran a day before it, so the day a
 // project starts sending traffic is not marked as a change.
-const NEW_MODELS = `SELECT Model, min(BucketStart) AS first_seen
-  FROM model_usage_by_minute
-  WHERE ${MODEL_WINDOW}
+const NEW_MODELS = `SELECT Model, min(OccurredAt) AS first_seen
+  FROM (SELECT arrayJoin(Models) AS Model, OccurredAt
+    FROM trace_metrics
+    WHERE ${MODEL_WINDOW})
+  WHERE Model != ''
   GROUP BY Model
   HAVING first_seen >= ${START}
-    AND first_seen >= addDays((SELECT min(BucketStart) FROM model_usage_by_minute
+    AND first_seen >= addDays((SELECT min(OccurredAt) FROM trace_metrics
       WHERE ${MODEL_WINDOW}), 1)`;
 
 /** Every change in the period, unordered, with the bucket a chart marks it on. */

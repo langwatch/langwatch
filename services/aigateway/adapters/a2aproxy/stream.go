@@ -6,6 +6,7 @@ import (
 	"errors"
 	"io"
 	"net/http"
+	"strings"
 )
 
 // errEventTooLarge is an SSE event, or one of its lines, over maxEventBytes.
@@ -41,11 +42,11 @@ func (h *Handler) stream(c *call, resp *http.Response) {
 	if err == nil || c.ctx.Err() != nil {
 		return
 	}
-	c.span.RecordError(err)
 	r := refuseUpstream.withMessage("the A2A agent stream broke off")
 	if errors.Is(err, errEventTooLarge) {
 		r = refuseReplyTooLarge.withMessage("an event from the A2A agent is over the size limit")
 	}
+	h.recordCause(c, r.reason, err)
 	c.markRefused(r)
 	write(c.errorEvent(r))
 }
@@ -94,7 +95,8 @@ func (s *streamText) add(id, text string) {
 		}
 	}
 	if len(joined) > streamTailBytes {
-		joined = joined[len(joined)-streamTailBytes:]
+		// A copy, so the tail no longer holds the whole event's text in memory.
+		joined = strings.Clone(joined[len(joined)-streamTailBytes:])
 	}
 	s.tails = append(s.tails, streamTail{id: id, text: joined})
 	if len(s.tails) > maxStreamTails {
@@ -104,9 +106,11 @@ func (s *streamText) add(id, text string) {
 
 // checkEvent scans every string of one event and its SSE field values each
 // on its own, plus each artifact's text-part text joined to that artifact's
-// text streamed before it.
+// text streamed before it, with the key's response and stream_chunk guardrails.
 func (h *Handler) checkEvent(c *call, event []byte, seen *streamText) *refusal {
-	if !h.cfg.Scanner.Applies(c.bundle, DirectionResponse) {
+	response := h.cfg.Scanner.Applies(c.bundle, DirectionResponse)
+	chunk := h.cfg.Scanner.Applies(c.bundle, DirectionStreamChunk)
+	if !response && !chunk {
 		return nil
 	}
 	p := collectStreamTexts(eventData(event))
@@ -118,12 +122,22 @@ func (h *Handler) checkEvent(c *call, event []byte, seen *streamText) *refusal {
 		if !part.appends {
 			seen.drop(part.id)
 		}
-		if prev := seen.tail(part.id); prev != "" {
+		if prev := seen.tail(part.id); prev != "" || part.split {
 			p.texts = append(p.texts, prev+part.text)
 		}
-		seen.add(part.id, part.text)
+		if part.text != "" {
+			seen.add(part.id, part.text)
+		}
 	}
-	return h.checkTexts(c, DirectionResponse, p.texts)
+	if response {
+		if r := h.checkTexts(c, DirectionResponse, p.texts); r != nil {
+			return r
+		}
+	}
+	if chunk {
+		return h.checkTexts(c, DirectionStreamChunk, p.texts)
+	}
+	return nil
 }
 
 func (c *call) errorEvent(r refusal) []byte {

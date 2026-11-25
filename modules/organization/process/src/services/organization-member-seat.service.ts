@@ -4,7 +4,11 @@
  */
 import { SYSTEM_ACTORS } from "@langwatch/authorization";
 import { newAuthzGrantId, type AuthzGrantCaller } from "@langwatch/authz-contract";
-import { getRoleChangeType, isFullMember } from "@langwatch/entitlement-contract";
+import {
+  classifyMemberType,
+  getRoleChangeType,
+  isFullMember,
+} from "@langwatch/entitlement-contract";
 import { createLogger } from "@langwatch/observability";
 import type { OrganizationUserRole } from "@langwatch/organization-contract";
 
@@ -108,7 +112,8 @@ export class OrganizationMemberSeatService {
 
   /**
    * The seat an enable takes, checked against the member's pool: a full member takes their hold
-   * back or a free full seat, a Lite Member a free Lite seat, a Developer no capped seat.
+   * back or a free full seat, a Lite Member a free Lite seat, a Developer or Billing-only member
+   * no capped seat.
    */
   async seatOnEnable({
     organizationId,
@@ -127,7 +132,7 @@ export class OrganizationMemberSeatService {
       : "FullMember";
     const takesHoldBack =
       type === "FullMember" && (await seatHolds.hasLiveHold({ organizationId, userId }));
-    if (type !== "Developer" && !takesHoldBack) {
+    if (type !== "Developer" && type !== "BillingOnly" && !takesHoldBack) {
       const result = await seats.checkLimit({
         organizationId,
         resource: type === "FullMember" ? "members" : "membersLite",
@@ -151,6 +156,8 @@ export class OrganizationMemberSeatService {
     active: boolean;
     oldRole: OrganizationUserRole;
     oldPermissions: string[] | undefined;
+    /** A Billing-only member holds no seat now, so any role it moves to is metered (ADR-205). */
+    oldBillingOnly?: boolean;
     role: OrganizationUserRole;
     planUser: OrganizationPlanUser | undefined;
   }): Promise<SeatTransition> {
@@ -164,6 +171,7 @@ export class OrganizationMemberSeatService {
         organizationId,
         currentRole: input.oldRole,
         userPermissions: input.oldPermissions,
+        currentBillingOnly: input.oldBillingOnly ?? false,
         role: input.role,
         user: input.planUser,
       });
@@ -242,6 +250,7 @@ export class OrganizationMemberSeatService {
       actorUserId: actingUserId,
     });
     if (!enabled) return false;
+    seatNotices.memberAdmitted({ organizationId, userId, role: "MEMBER", via: "seat_admission" });
     try {
       await this.finishAdmission({ organizationId, userId, grantId, actingUserId, caller });
     } catch (error) {
@@ -418,6 +427,7 @@ export class OrganizationMemberSeatService {
     active,
     oldRole,
     oldPermissions,
+    oldBillingOnly = false,
     role,
   }: {
     organizationId: string;
@@ -425,6 +435,7 @@ export class OrganizationMemberSeatService {
     active: boolean;
     oldRole: OrganizationUserRole;
     oldPermissions: string[] | undefined;
+    oldBillingOnly?: boolean;
     role: OrganizationUserRole;
   }): Promise<SeatTransition> {
     // A disabled membership holds no seat, so changing its role moves none.
@@ -432,13 +443,17 @@ export class OrganizationMemberSeatService {
     const change = getRoleChangeType({
       oldRole,
       oldPermissions,
+      oldBillingOnly,
       newRole: role,
       newPermissions: undefined,
     });
     const { seatHolds } = this.dependencies;
     if (change === "lite-to-full") return seatHolds.takeOf({ organizationId, userId });
+    const wasBillingOnly =
+      classifyMemberType(oldRole, oldPermissions, { billingOnly: oldBillingOnly }) ===
+      "BillingOnly";
     const leavesFullSeat =
-      change === "full-to-lite" ||
+      (change === "full-to-lite" && !wasBillingOnly) ||
       (change === "to-developer" && isFullMember(oldRole, oldPermissions));
     if (!leavesFullSeat) return { kind: "unchanged" };
     return seatHolds.releaseOf({ organizationId, userId, reason: "DEMOTED" });

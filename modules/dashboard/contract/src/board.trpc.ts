@@ -17,7 +17,6 @@ import {
   dashboardNameSchema,
   dashboardProjectSchema,
   dashboardScopeImpactSchema,
-  dashboardScopeProjectsSchema,
   dashboardScopeSchema,
   dashboardStarSchema,
   organizationBoardSchema,
@@ -132,11 +131,6 @@ export const boardTrpc = defineTrpcContract("boards")
   .query("scopeImpact")
   .withInput(boardRefSchema)
   .withOutput(dashboardScopeImpactSchema)
-
-  /** The projects an Organization board can be opened under by this reader. */
-  .query("scopeProjects")
-  .withInput(boardRefSchema)
-  .withOutput(dashboardScopeProjectsSchema)
 
   /** The member's stars for this project, boards and templates, in their own order. */
   .query("listStarred")

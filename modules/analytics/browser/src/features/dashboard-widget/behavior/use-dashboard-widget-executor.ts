@@ -32,12 +32,20 @@ import { createLangWatchQLExecute } from "../../../behavior/lwql-execute.ts";
 import type { LangWatchQLParameterValue } from "../../../model/lwql-request-state.ts";
 import { runSources } from "../../dashboards/model/widget-sources.ts";
 
-/** The diagnostics that say the server limited a run, shown on the card as one (i) line. */
-const LIMIT_DIAGNOSTIC_CODES: readonly string[] = [
-  "SHARE_WINDOW_LIMITED",
-  "SOURCES_IGNORED",
-  "GRANULARITY_COARSENED",
-];
+/**
+ * The diagnostics that say the server limited a run, shown on the card as one (i) line.
+ * SOURCES_IGNORED is left to the sources line: its text is for the query's author.
+ */
+const LIMIT_DIAGNOSTIC_CODES: readonly string[] = ["SHARE_WINDOW_LIMITED", "GRANULARITY_COARSENED"];
+
+/** The messages a card's (i) line shows for one run's diagnostics (dashboards-v2 AC213). */
+export function cardLimitMessages(
+  diagnostics: readonly { code: string; message: string }[],
+): string[] {
+  return diagnostics
+    .filter(({ code }) => LIMIT_DIAGNOSTIC_CODES.includes(code))
+    .map(({ message }) => message);
+}
 
 /**
  * Whether a widget naming no projects reads every project the member may read, not the bound
@@ -140,9 +148,7 @@ export function useDashboardWidgetExecutor(
   const [limitsBySql, setLimitsBySql] = useState<Record<string, readonly string[]>>({});
   const noteLimits = useCallback(
     ({ query, result }: { query: string; result: LangWatchQLQueryResult }) => {
-      const messages = result.diagnostics
-        .filter(({ code }) => LIMIT_DIAGNOSTIC_CODES.includes(code))
-        .map(({ message }) => message);
+      const messages = cardLimitMessages(result.diagnostics);
       setLimitsBySql((prev) =>
         prev[query]?.join() === messages.join() ? prev : { ...prev, [query]: messages },
       );

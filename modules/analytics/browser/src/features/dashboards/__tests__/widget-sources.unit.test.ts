@@ -1,6 +1,6 @@
 /**
  * What a widget's card says about its queries' sources, and when it has none to count.
- * @see modules/dashboard/specs/dashboards-v2.feature AC200, AC200m, AC202i, AC240
+ * @see modules/dashboard/specs/dashboards-v2.feature AC200, AC200m, AC202i, AC213, AC240
  */
 
 import { TRACE_SOURCES } from "@langwatch/analytics-contract";
@@ -13,6 +13,7 @@ import {
   widgetCardSourcesLine,
   widgetSourcesLine,
 } from "../model/widget-sources.ts";
+import { cardLimitMessages } from "../../dashboard-widget/behavior/use-dashboard-widget-executor.ts";
 
 const READS =
   "SELECT count() FROM trace_metrics WHERE Source IN {dashboard_context_sources:Array(String)}";
@@ -150,5 +151,43 @@ describe("runSources", () => {
     expect(runSources(query("main", ["application", "langy"]))).toEqual(["application", "langy"]);
     expect(runSources(query("main", ["application"], IGNORES))).toEqual(["application"]);
     expect(runSources(query("main"))).toBeNull();
+  });
+});
+
+describe("cardLimitMessages", () => {
+  const shareWindow = {
+    code: "SHARE_WINDOW_LIMITED",
+    message: "Some projects share data only from a date, so earlier rows are not included",
+  };
+  const sourcesIgnored = {
+    code: "SOURCES_IGNORED",
+    message: "This query doesn't read {dashboard_context_sources}, so it counts every origin.",
+  };
+
+  /** @scenario "AC213 Diagnostics: a card shows what the server limited as one (i) line" */
+  it("keeps the diagnostics that say the server limited the run", () => {
+    expect(cardLimitMessages([shareWindow])).toEqual([shareWindow.message]);
+  });
+
+  /** @scenario "AC213b Diagnostics: a card leaves SOURCES_IGNORED to its sources line" */
+  it("leaves SOURCES_IGNORED to the sources line, so no footer shows the placeholder", () => {
+    const footer = widgetCardFooter({
+      sourcesLine: widgetSourcesLine([query("a", ["application"], IGNORES)]),
+      projectsLine: "Project: Alpha",
+      limits: cardLimitMessages([sourcesIgnored]).join(" "),
+    });
+
+    expect(cardLimitMessages([sourcesIgnored])).toEqual([]);
+    expect(footer).toBe("Sources: all sources \u00b7 Project: Alpha");
+    expect(footer).not.toContain("{dashboard_context_sources}");
+  });
+
+  /** @scenario "AC213c Sources line: a view named with its database still keeps its origin" */
+  it("reads the view behind any database qualifier", () => {
+    for (const view of ["langwatch.trace_metrics", "analytics.trace_metrics"]) {
+      const line = widgetSourcesLine([query("a", null, `SELECT count() FROM ${view}`)]);
+
+      expect(line).toBe("Sources: all sources");
+    }
   });
 });

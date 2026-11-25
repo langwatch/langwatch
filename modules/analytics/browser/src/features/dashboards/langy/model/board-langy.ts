@@ -164,7 +164,15 @@ export function boardContextChip({
   };
 }
 
-/** A typed question, asked with the board attached. */
+/** What a question from a stored board's ask bar asks for: the answer as a widget on it. */
+export const BOARD_QUESTION_ANSWER =
+  "asked from this dashboard's ask bar: answer by adding a widget that shows the answer to " +
+  "this dashboard, then say the answer in a sentence";
+
+/**
+ * A typed question, asked with the board attached. On a stored board the answer is a widget
+ * on it (AC264); a From LangWatch board is read-only, so there it is a reply.
+ */
 export function boardQuestion({
   question,
   board,
@@ -174,7 +182,12 @@ export function boardQuestion({
   board: BoardSubject;
   period: BoardPeriod;
 }): AnalyticsLangyAskRequest {
-  return { question: question.trim(), context: [boardAskContext({ board, period })] };
+  const attached = boardAskContext({ board, period });
+  const asked =
+    board.templateId === void 0
+      ? context({ ref: `${BOARD_QUESTION_ANSWER}; ${attached.ref}`, label: attached.label })
+      : attached;
+  return { question: question.trim(), context: [asked] };
 }
 
 /** Opens Langy with the board attached and nothing asked, for the reader to write in. */

@@ -5,6 +5,7 @@
  */
 
 import { bucketOf, inPeriod, inPeriodAndPrevious, START } from "./lwql-period.ts";
+import { costByModelSql } from "./model-cost-queries.ts";
 
 /** Cost reads `TotalCost` of each trace, so the completeness report counts the unpriced ones. */
 export const PERIOD_COMPARISON_SQL = `SELECT
@@ -37,13 +38,7 @@ export const COST_SUMMARY_SQL = `SELECT
 FROM trace_metrics
 WHERE ${inPeriod("OccurredAt")}`;
 
-export const COST_BY_MODEL_SQL = `SELECT Model AS model, sum(CostSum) AS cost
-FROM model_usage_by_minute
-WHERE ${inPeriod("BucketStart")}
-  AND Model != ''
-GROUP BY model
-ORDER BY cost DESC
-LIMIT 5`;
+export const COST_BY_MODEL_SQL = costByModelSql({ limit: 5 });
 
 export const FAILURES_SQL = `SELECT
   coalesce(nullIf(ErrorType, ''), 'Error with no type') AS category,

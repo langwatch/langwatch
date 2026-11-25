@@ -32,7 +32,9 @@ export type GatewayDecimal = {
 export type GatewayBudgetBreachAction = "BLOCK" | "WARN";
 export type GatewayProviderHealthStatus = "UNKNOWN" | "HEALTHY" | "DEGRADED" | "CIRCUIT_OPEN";
 export type GatewayProviderRotationPolicy = "MANUAL";
-export type VirtualKeyPurpose = "USER" | "LANGY" | "CONNECT";
+/** `VirtualKey.purpose`: only a USER key has a person behind it. */
+export const virtualKeyPurposeSchema = z.enum(["USER", "LANGY", "CONNECT"]);
+export type VirtualKeyPurpose = z.infer<typeof virtualKeyPurposeSchema>;
 
 /** The service a CONNECT key names when it may dispatch on the platform's own providers. */
 export const MANAGED_MODELS = "managed_models";

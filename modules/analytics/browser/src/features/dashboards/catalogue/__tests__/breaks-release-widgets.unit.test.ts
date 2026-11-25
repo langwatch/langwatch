@@ -24,7 +24,8 @@ describe("given the Where my agent breaks widgets", () => {
     expect(sql.types).toContain("argMin(");
     expect(sql.rate).toContain("countIf(HasError) / count()");
     expect(sql.changes).toContain("FROM prompt_versions");
-    expect(sql.changes).toContain("FROM model_usage_by_minute");
+    expect(sql.changes).toContain("arrayJoin(Models) AS Model");
+    expect(sql.changes).not.toContain("model_usage_by_minute");
     expect(code).toContain("<ReferenceLine");
     expect(code).toContain('stackId="bars"');
   });
@@ -77,7 +78,7 @@ describe("given the Where my agent breaks widgets", () => {
     expect(sql.daily).toContain(
       "GROUP BY sipHash128(TraceId, ifNull(ParentSpanId, ''), if(SpanType = 'llm', 'llm', SpanName))",
     );
-    expect(sql.totals).toContain("sum(CostSum)");
+    expect(sql.totals).toContain("sum(TotalCost) AS cost");
     expect(code).toContain("Cost of the repeats");
     expect(sql.daily).toContain("countIf(unpriced) AS uncosted");
     expect(sql.daily).toContain("countIf(Cost IS NULL AND StatusCode = 2) AS uncosted");

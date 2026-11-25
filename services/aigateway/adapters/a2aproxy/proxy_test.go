@@ -18,9 +18,13 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	"go.opentelemetry.io/otel/sdk/trace/tracetest"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zaptest/observer"
 
 	"github.com/langwatch/langwatch/services/aigateway/domain"
 )
+
+const testPublicBaseURL = "http://gw.acme.test"
 
 type upstreamCall struct {
 	method, path, auth, token, traceparent string
@@ -82,6 +86,8 @@ func (f *fixture) do(method, path, body string, headers ...string) *httptest.Res
 		Bundle:   func(context.Context) *domain.Bundle { return f.bundle },
 		Client:   f.upstream.Client(),
 		Tracer:   sdktrace.NewTracerProvider(sdktrace.WithSpanProcessor(f.spans)).Tracer("test"),
+		// The gateway's configured origin; requests in these tests arrive on the same host.
+		PublicBaseURL: testPublicBaseURL,
 	})
 	req := httptest.NewRequest(method, "http://gw.acme.test"+path, strings.NewReader(body))
 	req.Header.Set("Authorization", "Bearer vk_support_secret")
@@ -227,6 +233,10 @@ func (e fakeEvaluator) EvaluatePre(_ context.Context, _ *domain.Bundle, req *dom
 
 func (e fakeEvaluator) EvaluatePost(_ context.Context, _ *domain.Bundle, _ *domain.Request, resp *domain.Response) (domain.GuardrailVerdict, error) {
 	return e.verdict(resp.Body), nil
+}
+
+func (e fakeEvaluator) EvaluateChunk(_ context.Context, _ *domain.Bundle, _ *domain.Request, chunk []byte) (domain.GuardrailVerdict, error) {
+	return e.verdict(chunk), nil
 }
 
 // @scenario "the outgoing message is scanned and a deny verdict blocks it"
@@ -477,4 +487,80 @@ func TestRootJSONRPCKeepsTheRegisteredPath(t *testing.T) {
 	calls := f.upstreamCalls()
 	require.Len(t, calls, 1)
 	assert.Equal(t, "/rpc/", calls[0].path)
+}
+
+// failingEvaluator cannot reach its policy service.
+type failingEvaluator struct{ fakeEvaluator }
+
+func (failingEvaluator) EvaluatePre(context.Context, *domain.Bundle, *domain.Request) (domain.GuardrailVerdict, error) {
+	return domain.GuardrailVerdict{}, errors.New("guardrail check returned 502")
+}
+
+// hopCause returns the error recorded on the ended hop span and the logged error for msg.
+func hopCause(t *testing.T, f *fixture, logs *observer.ObservedLogs, msg string) (string, string) {
+	t.Helper()
+	ended := f.spans.Ended()
+	require.NotEmpty(t, ended)
+	var recorded string
+	for _, ev := range ended[len(ended)-1].Events() {
+		for _, kv := range ev.Attributes {
+			if kv.Key == "exception.message" {
+				recorded = kv.Value.AsString()
+			}
+		}
+	}
+	entries := logs.FilterMessage(msg).All()
+	require.Len(t, entries, 1, "one %s log line", msg)
+	return recorded, fmt.Sprint(entries[0].ContextMap()["error"])
+}
+
+// @scenario "a refusal caused by an error keeps the cause for the operator"
+func TestScanUnavailableRecordsItsCause(t *testing.T) {
+	f := newFixture(t)
+	f.bundle.Config.Guardrails.Pre = []domain.GuardrailEntry{{ID: "g1"}}
+	f.scanner = GuardrailScanner{Evaluator: failingEvaluator{}}
+	core, logs := observer.New(zap.DebugLevel)
+	rec := f.doWith(Config{Logger: zap.New(core)}, http.MethodPost, "/a2a/billing", sendMessage("SendMessage", "hi"))
+
+	_, reason, _ := rpcError(t, rec)
+	require.Equal(t, "a2a_scan_unavailable", reason)
+	assert.NotContains(t, rec.Body.String(), "502", "the cause stays out of the caller's reply")
+	recorded, logged := hopCause(t, f, logs, "a2a_scan_unavailable")
+	assert.Contains(t, recorded, "guardrail check returned 502")
+	assert.Contains(t, logged, "guardrail check returned 502")
+}
+
+// @scenario "a refusal caused by an error keeps the cause for the operator"
+func TestUpstreamUnreachableRecordsItsCause(t *testing.T) {
+	f := newFixture(t)
+	gone := httptest.NewServer(http.NotFoundHandler())
+	gone.Close()
+	f.setTarget(func(tg *domain.A2ATarget) { tg.UpstreamURL = gone.URL })
+	core, logs := observer.New(zap.DebugLevel)
+	rec := f.doWith(Config{Logger: zap.New(core)}, http.MethodPost, "/a2a/billing", sendMessage("SendMessage", "hi"))
+
+	_, reason, _ := rpcError(t, rec)
+	require.Equal(t, "a2a_upstream_unreachable", reason)
+	recorded, logged := hopCause(t, f, logs, "a2a_upstream_unreachable")
+	assert.Contains(t, recorded, "connection refused")
+	assert.Contains(t, logged, "connection refused")
+}
+
+// @scenario "a refusal caused by an error keeps the cause for the operator"
+func TestRecordedCauseLeavesOutTheUpstreamQuery(t *testing.T) {
+	f := newFixture(t)
+	gone := httptest.NewServer(http.NotFoundHandler())
+	gone.Close()
+	f.setTarget(func(tg *domain.A2ATarget) { tg.UpstreamURL = gone.URL + "/a2a?api_key=target-s3cret" })
+	core, logs := observer.New(zap.DebugLevel)
+	rec := f.doWith(Config{Logger: zap.New(core)}, http.MethodPost, "/a2a/billing?token=caller-s3cret", sendMessage("SendMessage", "hi"))
+
+	_, reason, _ := rpcError(t, rec)
+	require.Equal(t, "a2a_upstream_unreachable", reason)
+	recorded, logged := hopCause(t, f, logs, "a2a_upstream_unreachable")
+	for _, cause := range []string{recorded, logged} {
+		assert.Contains(t, cause, "connection refused")
+		assert.Contains(t, cause, gone.URL+"/a2a")
+		assert.NotContains(t, cause, "s3cret")
+	}
 }

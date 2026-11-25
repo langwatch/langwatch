@@ -104,11 +104,12 @@ describe("given the By customer widgets", () => {
     expect(sql.change).toContain("arrayReverseSort(groupArray(tuple(first_seen, version)))");
     expect(sql.change).toContain("length(versions) > 1");
     expect(sql.units).toContain("GROUP BY unit, version");
-    // The metadata version wins; the managed one is a plain traces column, never the map.
+    // The metadata version wins; the managed one is a plain trace_metrics column, never the map.
     expect(sql.units).toContain("coalesce(nullIf(t.version, ''), t.managed, '')");
     expect(sql.units).toContain("FROM trace_evaluation_metrics");
     expect(sql.change).toContain("MetadataPromptVersion != ''");
-    expect(sql.change).toContain("LastUsedPromptVersionId != ''");
+    expect(sql.change).toContain("argMaxIf(LastUsedPromptVersionId, UpdatedAt, OccurredAt >= ");
+    expect(sql.change).toContain("AND managed != ''");
     for (const text of [sql.units, sql.change]) expect(text).not.toContain("Attributes[");
     expect(code).toContain('row.version === last.version ? "after"');
     expect(code).toContain("No new prompt version in this period.");

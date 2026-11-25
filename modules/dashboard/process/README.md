@@ -14,7 +14,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 Flat operations a door or a peer calls once the dashboard app is composed.
 
-Peers call these through the token, declared at `../contract/src/dashboard.api.ts:52`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/dashboard.api.ts:51`; nothing else in this package is public.
 
 #### `getAll`
 
@@ -204,14 +204,6 @@ Dashboards area: how many other members starred the author's board.
 
 ```typescript
 getDashboardScopeImpact(input: { projectId: string; dashboardId: string; viewer: DashboardViewer; }): Promise<DashboardScopeImpact>;
-```
-
-#### `listDashboardScopeProjects`
-
-Dashboards area: the projects an Organization board opens under for this member.
-
-```typescript
-listDashboardScopeProjects(input: { projectId: string; dashboardId: string; viewer: DashboardViewer; }): Promise<DashboardScopeProjects>;
 ```
 
 #### `getSourcePresence`
@@ -856,7 +848,7 @@ Permission `analytics:create`. Declared at `src/transport/dashboard.rest.ts:157`
 Answers at `/api/v1/analytics/reports`.
 
 ```typescript
-// Body: dashboardRestNameSchema, ../contract/src/dashboard.ts:258
+// Body: dashboardRestNameSchema, ../contract/src/dashboard.ts:247
 interface Body {
   name: string;
 }
@@ -880,7 +872,7 @@ Permission `analytics:update`. Declared at `src/transport/dashboard.rest.ts:172`
 Answers at `/api/v1/analytics/reports/reorder`.
 
 ```typescript
-// Body: dashboardRestReorderSchema, ../contract/src/dashboard.ts:267
+// Body: dashboardRestReorderSchema, ../contract/src/dashboard.ts:256
 interface Body {
   dashboardIds: string[];
 }
@@ -899,7 +891,7 @@ Permission `analytics:view`. Declared at `src/transport/dashboard.rest.ts:192`.
 Answers at `/api/v1/analytics/reports/:reportId`.
 
 ```typescript
-// Params: reportRestParamsSchema, ../contract/src/dashboard.ts:279
+// Params: reportRestParamsSchema, ../contract/src/dashboard.ts:268
 interface Params {
   reportId: string;
 }
@@ -915,8 +907,8 @@ Permission `analytics:update`. Declared at `src/transport/dashboard.rest.ts:210`
 Answers at `/api/v1/analytics/reports/:reportId`.
 
 ```typescript
-type Params = z.infer<typeof reportRestParamsSchema>; // ../contract/src/dashboard.ts:279
-type Body = z.infer<typeof dashboardRestNameSchema>; // ../contract/src/dashboard.ts:258
+type Params = z.infer<typeof reportRestParamsSchema>; // ../contract/src/dashboard.ts:268
+type Body = z.infer<typeof dashboardRestNameSchema>; // ../contract/src/dashboard.ts:247
 type Response = z.infer<typeof dashboardResponseSchema>; // ../contract/src/dashboard.responses.ts:99
 ```
 
@@ -929,7 +921,7 @@ Permission `analytics:manage`. Declared at `src/transport/dashboard.rest.ts:230`
 Answers at `/api/v1/analytics/reports/:reportId`.
 
 ```typescript
-type Params = z.infer<typeof reportRestParamsSchema>; // ../contract/src/dashboard.ts:279
+type Params = z.infer<typeof reportRestParamsSchema>; // ../contract/src/dashboard.ts:268
 type Response = z.infer<typeof dashboardDeletedResponseSchema>; // ../contract/src/dashboard.responses.ts:121
 ```
 
@@ -1165,7 +1157,7 @@ type Response = unknown;
 
 ### `boards`
 
-Contract `../contract/src/board.trpc.ts:31`, router `src/transport/board.trpc.ts:10`.
+Contract `../contract/src/board.trpc.ts:30`, router `src/transport/board.trpc.ts:10`.
 
 | Procedure                   | Kind     | Gate                                               | Input                     | Output                           |
 | --------------------------- | -------- | -------------------------------------------------- | ------------------------- | -------------------------------- |
@@ -1181,7 +1173,6 @@ Contract `../contract/src/board.trpc.ts:31`, router `src/transport/board.trpc.ts
 | `boards.delete`             | mutation | Permission `analytics:delete`                      | `boardRefSchema`          | `boardTrpcRowSchema`             |
 | `boards.setScope`           | mutation | Permission `analytics:update`                      | inline                    | `boardTrpcRowSchema`             |
 | `boards.scopeImpact`        | query    | Permission `analytics:view`                        | `boardRefSchema`          | `dashboardScopeImpactSchema`     |
-| `boards.scopeProjects`      | query    | Permission `analytics:view`                        | `boardRefSchema`          | `dashboardScopeProjectsSchema`   |
 | `boards.listStarred`        | query    | Permission `analytics:view`                        | `projectScopeSchema`      | inline                           |
 | `boards.star`               | mutation | Permission `analytics:view`                        | inline                    | `dashboardReorderResponseSchema` |
 | `boards.unstar`             | mutation | Permission `analytics:view`                        | inline                    | `dashboardReorderResponseSchema` |
@@ -1189,22 +1180,22 @@ Contract `../contract/src/board.trpc.ts:31`, router `src/transport/board.trpc.ts
 
 ```typescript
 // boards.getAll
-// Input: inline, ../contract/src/board.trpc.ts:35
+// Input: inline, ../contract/src/board.trpc.ts:34
 interface Input {
   projectId: string;
   includeOrganization?: boolean;
 }
-// Output: boardTrpcSummarySchema.array() (inline, ../contract/src/board.trpc.ts:41)
+// Output: boardTrpcSummarySchema.array() (inline, ../contract/src/board.trpc.ts:40)
 
 // boards.listInOrganization
-// Input: organizationScopeSchema, ../contract/src/board.trpc.ts:28
+// Input: organizationScopeSchema, ../contract/src/board.trpc.ts:27
 interface Input {
   organizationId: string;
 }
-// Output: organizationBoardSchema.array() (inline, ../contract/src/board.trpc.ts:49)
+// Output: organizationBoardSchema.array() (inline, ../contract/src/board.trpc.ts:48)
 
 // boards.resolve
-// Input: inline, ../contract/src/board.trpc.ts:56
+// Input: inline, ../contract/src/board.trpc.ts:55
 interface Input {
   organizationId: string;
   dashboardId: string;
@@ -1212,8 +1203,8 @@ interface Input {
 type Output = z.infer<typeof organizationBoardSchema>; // ../contract/src/dashboard.ts:149
 
 // boards.storeProjects
-type Input = z.infer<typeof organizationScopeSchema>; // ../contract/src/board.trpc.ts:28
-// Output: inline, ../contract/src/board.trpc.ts:65
+type Input = z.infer<typeof organizationScopeSchema>; // ../contract/src/board.trpc.ts:27
+// Output: inline, ../contract/src/board.trpc.ts:64
 type Output = {
   id: string;
   name: string;
@@ -1221,7 +1212,7 @@ type Output = {
 }[];
 
 // boards.getById
-// Input: boardRefSchema, ../contract/src/board.trpc.ts:29
+// Input: boardRefSchema, ../contract/src/board.trpc.ts:28
 interface Input {
   projectId: string;
   dashboardId: string;
@@ -1229,7 +1220,7 @@ interface Input {
 type Output = z.infer<typeof boardTrpcRowSchema>; // ../contract/src/dashboard.responses.ts:64
 
 // boards.create
-// Input: inline, ../contract/src/board.trpc.ts:77
+// Input: inline, ../contract/src/board.trpc.ts:76
 interface Input {
   projectId: string;
   name: string;
@@ -1238,7 +1229,7 @@ interface Input {
 type Output = z.infer<typeof boardTrpcRowSchema>; // ../contract/src/dashboard.responses.ts:64
 
 // boards.createAtScope
-// Input: inline, ../contract/src/board.trpc.ts:92
+// Input: inline, ../contract/src/board.trpc.ts:91
 interface Input {
   projectId: string;
   name: string;
@@ -1248,7 +1239,7 @@ interface Input {
 type Output = z.infer<typeof boardTrpcRowSchema>; // ../contract/src/dashboard.responses.ts:64
 
 // boards.update
-// Input: inline, ../contract/src/board.trpc.ts:104
+// Input: inline, ../contract/src/board.trpc.ts:103
 interface Input {
   projectId: string;
   dashboardId: string;
@@ -1258,7 +1249,7 @@ interface Input {
 type Output = z.infer<typeof boardTrpcRowSchema>; // ../contract/src/dashboard.responses.ts:64
 
 // boards.move
-// Input: inline, ../contract/src/board.trpc.ts:118
+// Input: inline, ../contract/src/board.trpc.ts:117
 interface Input {
   projectId: string;
   dashboardId: string;
@@ -1267,11 +1258,11 @@ interface Input {
 type Output = z.infer<typeof organizationBoardSchema>; // ../contract/src/dashboard.ts:149
 
 // boards.delete
-type Input = z.infer<typeof boardRefSchema>; // ../contract/src/board.trpc.ts:29
+type Input = z.infer<typeof boardRefSchema>; // ../contract/src/board.trpc.ts:28
 type Output = z.infer<typeof boardTrpcRowSchema>; // ../contract/src/dashboard.responses.ts:64
 
 // boards.setScope
-// Input: inline, ../contract/src/board.trpc.ts:128
+// Input: inline, ../contract/src/board.trpc.ts:127
 interface Input {
   projectId: string;
   dashboardId: string;
@@ -1280,37 +1271,21 @@ interface Input {
 type Output = z.infer<typeof boardTrpcRowSchema>; // ../contract/src/dashboard.responses.ts:64
 
 // boards.scopeImpact
-type Input = z.infer<typeof boardRefSchema>; // ../contract/src/board.trpc.ts:29
+type Input = z.infer<typeof boardRefSchema>; // ../contract/src/board.trpc.ts:28
 // Output: dashboardScopeImpactSchema, ../contract/src/dashboard.ts:160
 interface Output {
   otherStars: number;
 }
 
-// boards.scopeProjects
-type Input = z.infer<typeof boardRefSchema>; // ../contract/src/board.trpc.ts:29
-// Output: dashboardScopeProjectsSchema, ../contract/src/dashboard.ts:171
-interface Output {
-  ownerProject: {
-    id: string;
-    name: string;
-    slug: string;
-  };
-  projects: {
-    id: string;
-    name: string;
-    slug: string;
-  }[];
-}
-
 // boards.listStarred
-// Input: projectScopeSchema, ../contract/src/board.trpc.ts:27
+// Input: projectScopeSchema, ../contract/src/board.trpc.ts:26
 interface Input {
   projectId: string;
 }
-// Output: starredDashboardSchema.array() (inline, ../contract/src/board.trpc.ts:144)
+// Output: starredDashboardSchema.array() (inline, ../contract/src/board.trpc.ts:138)
 
 // boards.star
-// Input: inline, ../contract/src/board.trpc.ts:148
+// Input: inline, ../contract/src/board.trpc.ts:142
 interface Input {
   projectId: string;
   star:
@@ -1326,7 +1301,7 @@ interface Input {
 type Output = z.infer<typeof dashboardReorderResponseSchema>; // ../contract/src/dashboard.responses.ts:128
 
 // boards.unstar
-// Input: inline, ../contract/src/board.trpc.ts:152
+// Input: inline, ../contract/src/board.trpc.ts:146
 interface Input {
   projectId: string;
   star:
@@ -1342,7 +1317,7 @@ interface Input {
 type Output = z.infer<typeof dashboardReorderResponseSchema>; // ../contract/src/dashboard.responses.ts:128
 
 // boards.reorderStars
-// Input: z.object({ ...projectScopeSchema.shape, stars: z.array(dashboardStarSchema) }) (inline, ../contract/src/board.trpc.ts:157)
+// Input: z.object({ ...projectScopeSchema.shape, stars: z.array(dashboardStarSchema) }) (inline, ../contract/src/board.trpc.ts:151)
 type Output = z.infer<typeof dashboardReorderResponseSchema>; // ../contract/src/dashboard.responses.ts:128
 ```
 
@@ -1514,7 +1489,7 @@ type Output = {
 
 // dashboards.sourcePresence
 type Input = z.infer<typeof projectScopeSchema>; // ../contract/src/dashboard.trpc.ts:17
-// Output: dashboardSourcePresenceSchema, ../contract/src/dashboard.ts:249
+// Output: dashboardSourcePresenceSchema, ../contract/src/dashboard.ts:238
 interface Output {
   traces: "present" | "absent" | "failed";
   scenarios: "present" | "absent" | "failed";

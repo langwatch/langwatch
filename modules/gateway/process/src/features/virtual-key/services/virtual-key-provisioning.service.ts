@@ -165,6 +165,7 @@ export class VirtualKeyProvisioningService {
     await this.governanceSignals?.emitVirtualKeyLifecycle({
       virtualKey: created,
       action: "created",
+      actorUserId: input.actorUserId,
     });
 
     return { virtualKey: created, secret };

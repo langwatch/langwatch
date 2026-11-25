@@ -20,11 +20,11 @@ import { PROJECT_KIND, type ProjectApi } from "@langwatch/project-contract";
 import type { SecurityLakeQueue } from "../../../channels/security-lake-queue.channel.ts";
 import type { SecurityLakeCallerRepository } from "../../../repositories/security-lake-caller.repository.ts";
 import { describeAwsFailure } from "../rules/aws-failure.rules.ts";
-import { parseSecurityLakeHealth } from "../rules/security-lake-health.rules.ts";
 import {
   SECURITY_LAKE_EXTERNAL_ID_KEY,
   securityLakeCredentialsOf,
-} from "./security-lake-puller.service.ts";
+} from "../rules/security-lake-credentials.rules.ts";
+import { parseSecurityLakeHealth } from "../rules/security-lake-health.rules.ts";
 
 type Scope = { organizationId: string };
 type SecurityLakeEvents = Pick<SecurityLakeCallerRepository, "countSecurityLakeEvents">;

@@ -1728,6 +1728,10 @@ function registerExperimentCommands(program: Command): void {
       .command("run <slug>")
       .description("Start an experiment run by slug")
       .option("--wait", "Wait for the experiment to complete before returning")
+      .option(
+        "--fail-on-evaluator-failures",
+        "With --wait, exit 1 when an evaluation fails or errors, a cell errors, or the server reports no evaluator results (the summary still prints)",
+      )
       .option("--param <pair>", PARAM_FLAG_HELP, collectParam)
       .option(
         "--concurrency <n>",
@@ -1744,6 +1748,7 @@ function registerExperimentCommands(program: Command): void {
       slug: string,
       options: {
         wait?: boolean;
+        failOnEvaluatorFailures?: boolean;
         param?: string[];
         concurrency?: string;
         datasetVersion?: number;

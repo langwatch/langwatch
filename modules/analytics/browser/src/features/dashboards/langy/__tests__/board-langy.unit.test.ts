@@ -10,6 +10,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   askAboutStoredBoard,
+  BOARD_QUESTION_ANSWER,
   boardContextChip,
   boardPromptDraft,
   boardQuestion,
@@ -59,6 +60,35 @@ describe("the context a board hands Langy", () => {
 
       expect(request.context[0]?.ref).toContain("widgets: none yet");
     });
+  });
+});
+
+describe("a question from a board's ask bar", () => {
+  const ask = (board: { id: string; name: string; templateId?: string }) =>
+    boardQuestion({
+      question: "Is our AI saving us time?",
+      board: boardSubject({ board, widgets: [] }),
+      period: PERIOD,
+    });
+
+  /** @scenario "AC264b Langy widgets: a question from a board's ask bar asks for a widget on that board" */
+  it("asks for the answer as a widget on the board, then a sentence", () => {
+    const [board] = ask({ id: "board-9", name: "Agent impact" }).context;
+
+    expect(board?.ref).toContain(BOARD_QUESTION_ANSWER);
+    expect(board?.ref).toContain('dashboard "Agent impact" (id board-9)');
+    expect(board?.label).toBe("Agent impact");
+  });
+
+  /** @scenario "AC264b Langy widgets: a question from a board's ask bar asks for a widget on that board" */
+  it("asks for no widget on a read-only From LangWatch board", () => {
+    const [board] = ask({
+      id: "curated/release",
+      name: "Release check",
+      templateId: "release",
+    }).context;
+
+    expect(board?.ref).not.toContain(BOARD_QUESTION_ANSWER);
   });
 });
 

@@ -17,6 +17,7 @@ const CONTEXT = {
   granularitySeconds: 60,
   theme: "light" as const,
 };
+const DARK_CONTEXT = { ...CONTEXT, theme: "dark" as const, colors: { "bg.card": "#18181b" } };
 const RESULT = {
   columns: [],
   rows: [],
@@ -35,6 +36,7 @@ afterEach(() => {
 function attach(
   executeQuery: ChartFrameExecuteQuery = () => new Promise(() => undefined),
   queryLane: WidgetQueryLane = createWidgetQueryLane({ limit: 8 }),
+  readDashboardContext: () => typeof CONTEXT | typeof DARK_CONTEXT = () => CONTEXT,
 ) {
   const iframe = document.createElement("iframe");
   document.body.appendChild(iframe);
@@ -47,7 +49,7 @@ function attach(
     source: "export default () => null;",
     executeQuery,
     queryLane,
-    dashboardContext: CONTEXT,
+    readDashboardContext,
     onLog: (entry) => events.push({ log: entry }),
     onHeightChange: (px) => events.push({ height: px }),
     onNavigate: (args) => events.push({ navigate: args }),
@@ -90,6 +92,15 @@ describe("the frame bridge session", () => {
         target: "*",
       },
     ]);
+  });
+
+  /** @scenario "AC260b Langy widgets: switching the theme repaints a widget in the new colours" */
+  it("sends the context as it reads when the frame loads, not when the bridge began", () => {
+    let context: typeof CONTEXT | typeof DARK_CONTEXT = CONTEXT;
+    const { inits, load } = attach(undefined, undefined, () => context);
+    context = DARK_CONTEXT;
+    load();
+    expect(inits).toMatchObject([{ message: { type: "lw:init", dashboardContext: DARK_CONTEXT } }]);
   });
 
   it("forwards height, navigation, logs and errors from the frame", async () => {

@@ -94,13 +94,13 @@ export const CATALOGUE_WIDGETS: readonly CatalogueWidget[] = [
     build: "built",
     scope: "project",
     prompt:
-      "Is my agent using more tokens over time? Query the LangWatchQL view " +
-      "trace_metrics_by_minute over the dashboard period, bucketed at the dashboard grain: " +
-      "sum(PromptTokensSum) and sum(CompletionTokensSum) per bucket of BucketStart. Answer with " +
-      "the first and last bucket's prompt and completion tokens, the change between them as a " +
-      "percentage, and whether the trend is up, flat or down. Quote the real numbers from the " +
-      "query result. If a query returns no rows, say plainly that there is no data for the " +
-      "dashboard period rather than guessing.",
+      "Is my agent using more tokens over time? Query the LangWatchQL view trace_metrics " +
+      "over the dashboard period, bucketed at the dashboard grain: sum(PromptTokens) and " +
+      "sum(CompletionTokens) per bucket of OccurredAt. Answer with the first and last bucket's " +
+      "prompt and completion tokens, the change between them as a percentage, and whether the " +
+      "trend is up, flat or down. Quote the real numbers from the query result. If a query " +
+      "returns no rows, say plainly that there is no data for the dashboard period rather " +
+      "than guessing.",
   },
   {
     id: "conversation-length",
@@ -210,11 +210,11 @@ export const CATALOGUE_WIDGETS: readonly CatalogueWidget[] = [
     prompt:
       "How much is my agent costing me? Query the LangWatchQL view trace_metrics over the " +
       "dashboard period, bucketed at the dashboard grain: sum(TotalCost) per bucket of " +
-      "OccurredAt. Then query model_usage_by_minute for sum(CostSum) by Model over the same " +
-      "period. Answer with total spend in USD, the most expensive bucket, and a top-five table " +
-      "of models by cost with each one's share of the total. Quote the real numbers from the " +
-      "query result. If a query returns no rows, say plainly that there is no data for the " +
-      "dashboard period rather than guessing.",
+      "OccurredAt. Then, from trace_metrics over the same period, arrayJoin(Models) and sum " +
+      "TotalCost / length(Models) by model. Answer with total spend in USD, the most expensive " +
+      "bucket, and a top-five table of models by cost with each one's share of the total. " +
+      "Quote the real numbers from the query result. If a query returns no rows, say plainly " +
+      "that there is no data for the dashboard period rather than guessing.",
   },
   {
     id: "top-models",
@@ -233,10 +233,11 @@ export const CATALOGUE_WIDGETS: readonly CatalogueWidget[] = [
     prompt:
       "Which models does my agent use? Query the LangWatchQL view trace_metrics over the " +
       "dashboard period: arrayJoin(Models) and count uniqExact(TraceId) per model. Add each " +
-      "model's sum(CostSum) from model_usage_by_minute over the same period. Answer with a " +
-      "top-10 table of models: traces, share of the traces that call a model, and cost in " +
-      "USD. Quote the real numbers from the query result. If a query returns no rows, say " +
-      "plainly that there is no data for the dashboard period rather than guessing.",
+      "model's cost from trace_metrics over the same period: arrayJoin(Models) and sum " +
+      "TotalCost / length(Models). Answer with a top-10 table of models: traces, share of the " +
+      "traces that call a model, and cost in USD. Quote the real numbers from the query " +
+      "result. If a query returns no rows, say plainly that there is no data for the " +
+      "dashboard period rather than guessing.",
   },
   {
     id: "lowest-passing-evaluators",

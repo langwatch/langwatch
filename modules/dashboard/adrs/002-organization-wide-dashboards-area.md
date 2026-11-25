@@ -114,15 +114,16 @@ home product is a column on `DashboardsV2` (decision 8, amended 2026-11-23).
    `/:project/dashboards...` draws LLM Ops chrome, and a board draws its home
    product's chrome.
 
-6. **One flag for the area (amended; D4, 2026-11-23).** The organization-wide
-   area ships behind its own frontend flag `release_dashboards_organization_area`,
-   default off, which needs `release_dashboards`. On a page with no project both
-   are evaluated for the organization, and the area exists only when at least one
-   of its projects has Dashboards on. `release_dashboards_in_every_product` stays
-   the flag of the other products' sidebar sections only, so turning those on
-   never opens the area. While the area's flag is off the `/dashboards` addresses
-   answer as before, no dialog opens, home products are ignored so every board
-   lists in LLM Ops, and personal boards are hidden but kept.
+6. **Flags (amended; D4, 2026-11-23).** `release_dashboards_in_every_product`
+   (needs `release_dashboards`) now defaults on and gates only the Dashboards
+   section in the Gateway and Coding agents sidebars. The organization-wide area
+   ships behind its own frontend flag, `release_dashboards_organization_area`,
+   default off, so turning the in-every-product flag on never opens the area. On
+   a page with no project both flags are evaluated for the organization, and the
+   area exists only when at least one of its projects has Dashboards on. While
+   the area's flag is off the `/dashboards` addresses answer as before, no dialog
+   opens, home products are ignored so every board lists in LLM Ops, and personal
+   boards are hidden but kept.
 7. **Release gate.** Hide boards whose owning project has `release_dashboards`
    off. This matches what that project shows today. The gate covers the area,
    not the data: "All projects" (decision 9) still reads a readable project
@@ -145,7 +146,7 @@ home product is a column on `DashboardsV2` (decision 8, amended 2026-11-23).
    **Amended 2026-11-23, by the owner's direction to ship the full feature in one
    PR.** The home product is a column, `"DashboardsV2"."homeProduct" TEXT NOT NULL
 DEFAULT 'llm-ops'`, added by migration
-   `20261123120000_dashboards_v2_home_product`. It is not an event and projection,
+   `20261124130000_dashboards_v2_home_product`. It is not an event and projection,
    because the dashboard module has no eventing pipeline; the constant default
    homes every existing board in LLM Ops with no rewrite. The wording above about
    events, an aggregate and an absent row is superseded. Moves: an author's move

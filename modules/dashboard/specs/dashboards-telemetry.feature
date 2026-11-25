@@ -192,6 +192,41 @@ Feature: Dashboards telemetry: product events and query telemetry
     Then a "LangWatchQL failed" log line carries the caller, the queryHash and the error code
     And lwql_queries_total counts it with outcome set to that error code
 
+  # Owner asked whether we can see if, how and when customer dashboards fail; which project is enough.
+  @unit
+  Scenario: Telemetry: a failed query is logged at its fault's level with the projects it ran over
+    When a LangWatchQL query is refused or fails
+    Then its "LangWatchQL failed" line is a warning when the customer's query is at fault, such as one over its memory limit
+    And it is an error when the platform is at fault, such as a timeout or an unavailable database, or when no module handled the throw
+    And it stays at info when the caller hung up
+    And it carries projectIds, as a list: the projects its scope resolved to, or, for a run refused before its scope resolved, the project it came from, then any project it named, each once
+    And it never carries the SQL text or the error's message
+
+  # Owner: a failure in the browser should not happen, so when one does it is reported as a real error.
+  @integration
+  Scenario: Telemetry: a chart or a board header action that crashes while drawing is reported as an exception
+    Given a chart, an action a peer lends the board header, or a widget's sandboxed frame, throws while drawing
+    And a chart's runtime may instead reject its embed, fail a run, or throw while its specification is built
+    When its error boundary, the frame's error panel or the chart's failed state catches the crash
+    Then the crash goes to PostHog once as an exception, not as a product event
+    And it carries the surface "lwql_chart", "lwql_chart_embed" or "dashboard_widget_frame" with the board's and widget's ids where it has them, or "board_header_action" with the lender and the board
+    And a frame whose own libraries (React, Recharts or the compiler) did not load reports under "dashboard_widget_frame_load", with the board's and widget's ids
+    And the exception carries the trace and span ids active where it was caught, when there is one
+    And its message and stack have tokens, emails and long encoded runs masked, and are cut short past a limit
+    And a frame or a chart that hits the same failure again while mounted reports it once
+    And only the crash's first line is sent, cut to 200 characters at a word boundary, and a repeat of the same first line is sent once
+    And a chart whose specification asked to load a resource reports nothing, since the loader refusing it is the specification's own doing
+    And a frame refusing the widget's own source (a compile error, no default export, a failed import) or the widget's own console error reports nothing
+    And it carries no query text and no SQL
+    And a widget query the server refused is not reported here, since its "LangWatchQL failed" line already counts it
+
+  @integration
+  Scenario: Telemetry: a widget that keeps crashing with new messages stops reporting after five
+    Given a widget's sandboxed frame throws while drawing, with a different first line each time
+    When it has been reported five times while mounted
+    Then the sixth and later distinct crashes send no exception
+    And a crash already reported in that mount still sends nothing more
+
   @unit
   Scenario: Telemetry: query metrics carry only low-cardinality labels
     When a LangWatchQL query runs
