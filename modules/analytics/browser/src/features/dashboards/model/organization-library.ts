@@ -6,6 +6,7 @@
 
 import {
   type DashboardHomeProduct,
+  type DashboardIcon,
   type DashboardProject,
   type DashboardScope,
 } from "@langwatch/dashboard-contract";
@@ -23,6 +24,8 @@ export type LibraryBoard = {
   readonly id: string;
   readonly name: string;
   readonly description: string | null;
+  /** The board's icon; null draws the default glyph. */
+  readonly icon?: DashboardIcon | null;
   readonly createdById: string | null;
   /** The author's display name; null when unknown. */
   readonly ownerName: string | null;
@@ -40,6 +43,7 @@ export function libraryBoardOf({
   id,
   name,
   description,
+  icon,
   createdById,
   ownerName,
   scope,
@@ -51,6 +55,7 @@ export function libraryBoardOf({
     id,
     name,
     description,
+    icon,
     createdById,
     ownerName,
     scope,

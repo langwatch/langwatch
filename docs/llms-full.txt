@@ -91449,8 +91449,8 @@ A dashboard is the page widgets live on. **Use an existing dashboard** when the 
 ```bash
 langwatch dashboard list -f json                          # ids, names, widget counts
 langwatch dashboard get <dashboardId> -f json
-langwatch dashboard create "<name>" -f json               # empty dashboard; prints platformUrl
-langwatch dashboard update <dashboardId> --name "<name>"  # rename; or --description / --clear-description
+langwatch dashboard create "<name>" --icon <icon> -f json  # empty dashboard; prints platformUrl
+langwatch dashboard update <dashboardId> --name "<name>"  # rename; or --description / --clear-description / --icon <icon> / --clear-icon
 langwatch dashboard delete <dashboardId>                  # removes the dashboard and its widgets
 langwatch dashboard widget list <dashboardId> -f json
 langwatch dashboard widget get <dashboardId> <widgetId> -f json   # code, queries, platformUrl
@@ -91460,6 +91460,8 @@ langwatch dashboard widget update <dashboardId> <widgetId> --sources application
 langwatch dashboard widget update <dashboardId> <widgetId> --projects A,B   # every query reads these projects
 langwatch dashboard widget delete <dashboardId> <widgetId>
 ```
+
+Every dashboard has an icon beside its name. When you create a dashboard, or name one from the user's first prompt, pass `--icon` with the name that fits what it shows (cost: `dollar-sign`, quality: `shield-check`, latency: `timer`, users: `users`, anything else: `layout-dashboard`). It must be one of these Lucide names, or the call is refused: `layout-dashboard`, `chart-column`, `chart-bar`, `chart-line`, `chart-area`, `chart-pie`, `trending-up`, `trending-down`, `activity`, `gauge`, `target`, `dollar-sign`, `coins`, `wallet`, `credit-card`, `receipt`, `piggy-bank`, `banknote`, `users`, `user`, `user-check`, `building-2`, `briefcase`, `store`, `shield-check`, `shield-alert`, `lock`, `key-round`, `bell`, `triangle-alert`, `circle-alert`, `siren`, `clock`, `timer`, `calendar`, `hourglass`, `bot`, `brain`, `sparkles`, `cpu`, `wand-sparkles`, `message-square`, `messages-square`, `zap`, `rocket`, `flask-conical`, `bug`, `wrench`, `settings`, `sliders-horizontal`, `terminal`, `code`, `database`, `server`, `cloud`, `globe`, `map-pin`, `network`, `workflow`, `git-branch`, `layers`, `plug`, `radio`, `box`, `package`, `truck`, `shopping-cart`, `flag`, `star`, `bookmark`, `search`, `funnel`, `list-checks`, `clipboard-list`, `scroll-text`, `book-open`, `lightbulb`, `flame`, `award`, `trophy`.
 
 `add` places the widget at the dashboard's next free row — edit it from the widget's menu on that dashboard. `langwatch analytics-report list` lists the old Analytics Reports, which hold no widgets.
 

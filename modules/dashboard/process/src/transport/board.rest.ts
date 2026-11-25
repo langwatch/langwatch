@@ -29,6 +29,7 @@ import {
   dashboardWidgetResourceSchema,
   updateBoardSchema,
   updateDashboardWidgetSchema,
+  type Board,
   type Dashboard,
 } from "@langwatch/dashboard-contract";
 import { z } from "zod";
@@ -72,13 +73,14 @@ const widgetNotFoundResponse: Record<404, RouteResponse> = {
 
 /** The board as the API publishes it. */
 export function boardResource(
-  board: Dashboard,
+  board: Dashboard & Pick<Board, "icon">,
   platformUrl: string,
 ): z.infer<typeof boardResourceSchema> {
   return {
     id: board.id,
     name: board.name,
     description: board.description,
+    icon: board.icon,
     scope: board.scope,
     createdById: board.createdById,
     createdAt: board.createdAt.toISOString(),
@@ -138,6 +140,7 @@ export const boardRest = defineRestRouter(DashboardApi)
     const board = await app.createBoard({
       projectId,
       name: input.name,
+      ...(input.icon === undefined ? {} : { icon: input.icon }),
       ...authorOfActor({ actor }),
     });
     const links = await app.getBoardLinks({ projectId, dashboardIds: [board.id] });
@@ -183,7 +186,7 @@ export const boardRest = defineRestRouter(DashboardApi)
   .withDocs({
     summary: "Update a dashboard",
     description:
-      "Changes a dashboard's name or description; a field the body leaves out keeps its value, and a null description clears it.",
+      "Changes a dashboard's name, description or icon (a Lucide icon name from the allow-list); a field the body leaves out keeps its value, and null clears a description or resets the icon.",
     tags: BOARD_TAGS,
     responses: {
       ...canonicalBaseResponses,
@@ -199,6 +202,7 @@ export const boardRest = defineRestRouter(DashboardApi)
       ...viewerOfActor({ actor }),
       ...(input.name === undefined ? {} : { name: input.name }),
       ...(input.description === undefined ? {} : { description: input.description }),
+      ...(input.icon === undefined ? {} : { icon: input.icon }),
     });
     const links = await app.getBoardLinks({ projectId, dashboardIds: [board.id] });
 

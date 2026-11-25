@@ -5,6 +5,7 @@
 import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
+import { dashboardIconSchema } from "./board-icon.ts";
 import {
   dashboardDescriptionSchema,
   dashboardIdSchema,
@@ -18,6 +19,8 @@ const boardResourceSchemaDefinition = z.object({
   name: dashboardNameSchema,
   /** `null` until a member writes one. */
   description: z.string().nullable(),
+  /** A Lucide icon name from the allow-list; `null` is the default glyph. */
+  icon: dashboardIconSchema.nullable(),
   /** Who sees the dashboard; a project credential never reads one set to Only me. */
   scope: dashboardScopeSchema,
   /** The member who made it; `null` for a dashboard a project credential made. */
@@ -68,7 +71,10 @@ const boardWidgetParamsSchemaDefinition = z.object({
 export interface BoardWidgetParamsSchema extends Named<typeof boardWidgetParamsSchemaDefinition> {}
 export const boardWidgetParamsSchema: BoardWidgetParamsSchema = boardWidgetParamsSchemaDefinition;
 
-const createBoardSchemaDefinition = z.object({ name: dashboardNameSchema });
+const createBoardSchemaDefinition = z.object({
+  name: dashboardNameSchema,
+  icon: dashboardIconSchema.optional(),
+});
 export interface CreateBoardSchema extends Named<typeof createBoardSchemaDefinition> {}
 export const createBoardSchema: CreateBoardSchema = createBoardSchemaDefinition;
 
@@ -77,10 +83,12 @@ const updateBoardSchemaDefinition = z
     name: dashboardNameSchema.optional(),
     /** `null` clears it. */
     description: dashboardDescriptionSchema.nullable().optional(),
+    /** `null` resets to the default glyph. */
+    icon: dashboardIconSchema.nullable().optional(),
   })
   .refine(
-    (body) => body.name !== undefined || body.description !== undefined,
-    "Provide at least one of name or description.",
+    (body) => body.name !== undefined || body.description !== undefined || body.icon !== undefined,
+    "Provide at least one of name, description or icon.",
   )
   .meta({ minProperties: 1 });
 export interface UpdateBoardSchema extends Named<typeof updateBoardSchemaDefinition> {}

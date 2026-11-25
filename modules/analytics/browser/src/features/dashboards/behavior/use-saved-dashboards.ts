@@ -7,6 +7,7 @@
 import { useUiAnalytics } from "@langwatch/browser-host/analytics";
 import type {
   DashboardHomeProduct,
+  DashboardIcon,
   DashboardProject,
   DashboardScope,
 } from "@langwatch/dashboard-contract";
@@ -22,6 +23,8 @@ export type SavedBoard = {
   projectId: string;
   name: string;
   description: string | null;
+  /** A name on the dashboard icon allow-list; null draws the default glyph. */
+  icon?: DashboardIcon | null;
   /** Null for a board older than creators. */
   createdById: string | null;
   scope: DashboardScope;
@@ -42,6 +45,7 @@ function savedBoardOf({
   projectId,
   name,
   description,
+  icon,
   createdById,
   scope,
   homeProduct,
@@ -55,6 +59,7 @@ function savedBoardOf({
     projectId,
     name,
     description,
+    icon,
     createdById,
     scope,
     homeProduct,

@@ -4,6 +4,7 @@
 
 import { Command, Option } from "commander";
 
+import type { DashboardIconName } from "../client-sdk/services/dashboards/dashboards-api.service";
 import { setRequestedProject, setRunsOutsideProject } from "../internal/credentialContext";
 import {
   REDACTION_AUDIT_URL,
@@ -2314,10 +2315,15 @@ function registerDashboardCommands(program: Command): void {
   );
 
   emitsResult(
-    format(dashboardsCmd.command("create <name>").description("Create an empty dashboard")),
-    async (name: string) => {
+    format(
+      dashboardsCmd
+        .command("create <name>")
+        .description("Create an empty dashboard")
+        .option("--icon <icon>", "Lucide icon name from the dashboard icon list, e.g. chart-line"),
+    ),
+    async (name: string, options: { icon?: DashboardIconName }) => {
       const { createDashboardCommand: impl } = await import("./commands/dashboards/dashboards.js");
-      return impl(name);
+      return impl(name, options);
     },
   );
 
@@ -2325,18 +2331,28 @@ function registerDashboardCommands(program: Command): void {
     format(
       dashboardsCmd
         .command("update <dashboardId>")
-        .description("Rename a dashboard or change its description")
+        .description("Rename a dashboard or change its description or icon")
         .option("--name <name>", "New dashboard name")
         .option("--description <description>", "New dashboard description")
         .addOption(
           new Option("--clear-description", "Remove the dashboard's description").conflicts(
             "description",
           ),
+        )
+        .option("--icon <icon>", "Lucide icon name from the dashboard icon list, e.g. chart-line")
+        .addOption(
+          new Option("--clear-icon", "Reset the dashboard to the default icon").conflicts("icon"),
         ),
     ),
     async (
       dashboardId: string,
-      options: { name?: string; description?: string; clearDescription?: boolean },
+      options: {
+        name?: string;
+        description?: string;
+        clearDescription?: boolean;
+        icon?: DashboardIconName;
+        clearIcon?: boolean;
+      },
     ) => {
       const { updateDashboardCommand: impl } = await import("./commands/dashboards/dashboards.js");
       return impl(dashboardId, options);

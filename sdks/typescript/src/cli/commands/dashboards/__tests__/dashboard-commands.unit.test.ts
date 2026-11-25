@@ -72,6 +72,42 @@ describe("the langwatch dashboard command group", () => {
 
     expect(failure).toBe("commander.conflictingOption");
   });
+
+  /** @scenario "The CLI passes the icon and clears it" */
+  it("takes --icon on create and update, and --clear-icon on update", async () => {
+    const { buildProgram } = await import("../../../program.js");
+    const dashboard = child(buildProgram(), "dashboard");
+    const flags = (verb: string) => child(dashboard, verb)?.options.map((option) => option.long);
+
+    expect(flags("create")).toContain("--icon");
+    expect(flags("update")).toEqual(expect.arrayContaining(["--icon", "--clear-icon"]));
+  });
+
+  /** @scenario "The CLI passes the icon and clears it" */
+  it("refuses --icon together with --clear-icon before any request", async () => {
+    const { buildProgram } = await import("../../../program.js");
+    const program = buildProgram();
+    const update = child(child(program, "dashboard"), "update")!;
+    update.exitOverride().configureOutput({ writeErr: () => undefined });
+
+    const failure = await program
+      .parseAsync([
+        "node",
+        "langwatch",
+        "dashboard",
+        "update",
+        "d_1",
+        "--icon",
+        "rocket",
+        "--clear-icon",
+      ])
+      .then(
+        () => undefined,
+        (error: CommanderError) => error.code,
+      );
+
+    expect(failure).toBe("commander.conflictingOption");
+  });
 });
 
 describe("the old command names", () => {

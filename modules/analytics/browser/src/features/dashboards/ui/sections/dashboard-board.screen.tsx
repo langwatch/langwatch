@@ -9,6 +9,7 @@ import { UiPageLoading, UiPageNotFound } from "@langwatch/browser/page-fallbacks
 import {
   DEFAULT_DASHBOARD_HOME_PRODUCT,
   type DashboardHomeProduct,
+  type DashboardIcon,
 } from "@langwatch/dashboard-contract";
 import { Spinner, Text, VStack } from "@langwatch/design-system/primitives";
 import { HandledErrorAlert } from "@langwatch/error-views";
@@ -30,6 +31,7 @@ import {
 import { useBoardAccess } from "../../behavior/use-board-access.ts";
 import { useBoardEditor } from "../../behavior/use-board-editor.ts";
 import { type UnsavedBoard, useBoardHeaderEdits } from "../../behavior/use-board-header-edits.ts";
+import { useBoardIcon } from "../../behavior/use-board-icon.ts";
 import { useBoardPeriod, useBoardRange } from "../../behavior/use-board-period.ts";
 import { useBoardProjects } from "../../behavior/use-board-projects.ts";
 import { useBoardScope } from "../../behavior/use-board-scope.ts";
@@ -129,29 +131,42 @@ function dataSourceLabel({
   return { project: <BoardDataSourceLabel name={projectName} /> };
 }
 
-/** Renames from the title, or undefined where the reader may not: asked in the project that
- * owns the board, as the library and sidebar menus ask it. Off with the organization area: main
- * has no inline rename. */
-function useBoardTitleRename({
+/** What of the title the reader may change: asked in the project that owns the board, as the
+ * library and sidebar menus ask it. Renaming needs the organization area (main has no inline
+ * rename); the icon is metadata, so it needs only the permission. My dashboard keeps its
+ * name, whose spelling marks it, but takes an icon. */
+function useTitleEdits({
   board,
-  unsaved,
   organizationArea,
 }: {
   board: SavedBoard;
-  unsaved: UnsavedBoard | undefined;
   organizationArea: boolean;
+}): { mayRename: boolean; mayChangeIcon: boolean } {
+  const host = useAnalyticsHost();
+  const mayEditInOwner = host.hasPermissionIn({
+    projectId: board.projectId,
+    permission: "analytics:update",
+  });
+  const mayRename = mayRenameBoard({ board, userId: host.userId(), mayEditInOwner });
+  return {
+    mayRename: organizationArea && mayRename,
+    mayChangeIcon: mayEditInOwner,
+  };
+}
+
+/** Renames from the title, or undefined where the reader may not. */
+function useBoardTitleRename({
+  board,
+  unsaved,
+  mayEdit,
+}: {
+  board: SavedBoard;
+  unsaved: UnsavedBoard | undefined;
+  mayEdit: boolean;
 }): ((name: string) => void) | undefined {
   const host = useAnalyticsHost();
   const edits = useLibraryBoardEdits();
-  const mayRename = mayRenameBoard({
-    board,
-    userId: host.userId(),
-    mayEditInOwner: host.hasPermissionIn({
-      projectId: board.projectId,
-      permission: "analytics:update",
-    }),
-  });
-  if (!organizationArea || !mayRename) return void 0;
+  if (!mayEdit) return void 0;
   // A draft's new name is its first edit: it stores the board under that name.
   if (unsaved) {
     return (name) =>
@@ -164,6 +179,31 @@ function useBoardTitleRename({
     void afterDraftWrites(board.id).then(() =>
       edits.renameBoard({ board: { ...board, project: { id: board.projectId } }, name }),
     );
+}
+
+/** The icon shown beside the title and, where the reader may change it, how: a draft's pick
+ * stores the board with it, a stored board's follows the draft's queued writes. */
+function useBoardTitleIcon({
+  board,
+  unsaved,
+  mayEdit,
+}: {
+  board: SavedBoard;
+  unsaved: UnsavedBoard | undefined;
+  mayEdit: boolean;
+}) {
+  const host = useAnalyticsHost();
+  const stored = useBoardIcon({ board });
+  if (unsaved) {
+    const pick = (icon: DashboardIcon | null) =>
+      void unsaved.materialise({ icon }).catch((error: unknown) => {
+        host.failed({ error, fallbackTitle: "Couldn't save the dashboard" });
+      });
+    return { icon: board.icon, ...(mayEdit ? { onPickIcon: pick } : {}) };
+  }
+  const pick = (icon: DashboardIcon | null) =>
+    void afterDraftWrites(board.id).then(() => stored.saveIcon(icon));
+  return { icon: stored.icon, ...(mayEdit ? { onPickIcon: pick } : {}) };
 }
 
 /** What the header's lent actions point at; a board not stored yet offers none. */
@@ -265,7 +305,9 @@ function OpenBoard({ board, unsaved }: { board: SavedBoard; unsaved?: UnsavedBoa
   };
   const isEmpty = boardWidgets.status === "success" && widgets.length === 0;
   const isMyDashboard = myDashboardId({ boards: [board], userId: host.userId() }) === board.id;
-  const renameBoard = useBoardTitleRename({ board, unsaved, organizationArea });
+  const titleEdits = useTitleEdits({ board, organizationArea });
+  const renameBoard = useBoardTitleRename({ board, unsaved, mayEdit: titleEdits.mayRename });
+  const titleIcon = useBoardTitleIcon({ board, unsaved, mayEdit: titleEdits.mayChangeIcon });
   const fromTemplate = useAddTemplate({ existingNames: saved.boards.map(({ name }) => name) });
 
   return (
@@ -283,6 +325,7 @@ function OpenBoard({ board, unsaved }: { board: SavedBoard; unsaved?: UnsavedBoa
                 onPick={pickScope}
               />
             }
+            {...titleIcon}
             onRename={renameBoard}
             onDescribe={canEdit && !isMyDashboard ? saveDescription : void 0}
             {...boardPointer({ board, unsaved, boardWidgets })}

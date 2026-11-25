@@ -6,6 +6,7 @@
 import { defineTrpcContract } from "@langwatch/module";
 import { z } from "zod";
 
+import { dashboardIconSchema } from "./board-icon.ts";
 import {
   boardTrpcRowSchema,
   boardTrpcSummarySchema,
@@ -78,6 +79,7 @@ export const boardTrpc = defineTrpcContract("boards")
       ...projectScopeSchema.shape,
       name: z.string(),
       homeProduct: dashboardHomeProductSchema.optional(),
+      icon: dashboardIconSchema.optional(),
     }),
   )
   .withOutput(boardTrpcRowSchema)
@@ -94,17 +96,20 @@ export const boardTrpc = defineTrpcContract("boards")
       name: z.string(),
       scope: dashboardScopeSchema,
       homeProduct: dashboardHomeProductSchema.optional(),
+      icon: dashboardIconSchema.optional(),
     }),
   )
   .withOutput(boardTrpcRowSchema)
 
-  /** The board's inline name and description; refused while `release_dashboards` is off. */
+  /** The board's inline name, description and icon (`null` resets it); refused while
+   * `release_dashboards` is off. */
   .mutation("update")
   .withInput(
     z.object({
       ...boardRefSchema.shape,
       name: dashboardNameSchema.optional(),
       description: dashboardDescriptionSchema.nullable().optional(),
+      icon: dashboardIconSchema.nullable().optional(),
     }),
   )
   .withOutput(boardTrpcRowSchema)

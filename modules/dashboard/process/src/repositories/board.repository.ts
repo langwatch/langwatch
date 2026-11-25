@@ -1,6 +1,7 @@
 import type {
   Board,
   DashboardHomeProduct,
+  DashboardIcon,
   DashboardScope,
   DashboardStar,
   DashboardSummary,
@@ -11,7 +12,7 @@ import type {
 export type BoardRecord = Board;
 
 /** The stored summary: `graphCount` is its widgets; stars and the owner are per reader. */
-export type BoardSummaryRecord = DashboardSummary & Pick<Board, "homeProduct">;
+export type BoardSummaryRecord = DashboardSummary & Pick<Board, "homeProduct" | "icon">;
 
 /** The editable fields of a stored board; an absent key is left as it is. */
 export type BoardUpdate = Readonly<{
@@ -21,6 +22,7 @@ export type BoardUpdate = Readonly<{
   scope?: DashboardScope;
   organizationId?: string;
   homeProduct?: DashboardHomeProduct;
+  icon?: DashboardIcon | null;
 }>;
 
 /**
@@ -61,6 +63,8 @@ export interface BoardRepository {
     createdById?: string | null;
     scope?: DashboardScope;
     homeProduct?: DashboardHomeProduct;
+    /** No icon (the default glyph) when absent. */
+    icon?: DashboardIcon | null;
     /** Stamped on an Organization board, as setting that scope stamps it. */
     organizationId?: string | null;
   }): Promise<BoardRecord>;

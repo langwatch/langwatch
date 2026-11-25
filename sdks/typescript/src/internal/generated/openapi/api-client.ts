@@ -5451,6 +5451,8 @@ export interface operations {
                             name: string;
                             description: string | null;
                             /** @enum {string} */
+                            icon: "layout-dashboard" | "chart-column" | "chart-bar" | "chart-line" | "chart-area" | "chart-pie" | "trending-up" | "trending-down" | "activity" | "gauge" | "target" | "dollar-sign" | "coins" | "wallet" | "credit-card" | "receipt" | "piggy-bank" | "banknote" | "users" | "user" | "user-check" | "building-2" | "briefcase" | "store" | "shield-check" | "shield-alert" | "lock" | "key-round" | "bell" | "triangle-alert" | "circle-alert" | "siren" | "clock" | "timer" | "calendar" | "hourglass" | "bot" | "brain" | "sparkles" | "cpu" | "wand-sparkles" | "message-square" | "messages-square" | "zap" | "rocket" | "flask-conical" | "bug" | "wrench" | "settings" | "sliders-horizontal" | "terminal" | "code" | "database" | "server" | "cloud" | "globe" | "map-pin" | "network" | "workflow" | "git-branch" | "layers" | "plug" | "radio" | "box" | "package" | "truck" | "shopping-cart" | "flag" | "star" | "bookmark" | "search" | "funnel" | "list-checks" | "clipboard-list" | "scroll-text" | "book-open" | "lightbulb" | "flame" | "award" | "trophy" | null;
+                            /** @enum {string} */
                             scope: "PRIVATE" | "PROJECT" | "ORGANIZATION";
                             createdById: string | null;
                             createdAt: string;
@@ -5594,6 +5596,8 @@ export interface operations {
             content: {
                 "application/json": {
                     name: string;
+                    /** @enum {string} */
+                    icon?: "layout-dashboard" | "chart-column" | "chart-bar" | "chart-line" | "chart-area" | "chart-pie" | "trending-up" | "trending-down" | "activity" | "gauge" | "target" | "dollar-sign" | "coins" | "wallet" | "credit-card" | "receipt" | "piggy-bank" | "banknote" | "users" | "user" | "user-check" | "building-2" | "briefcase" | "store" | "shield-check" | "shield-alert" | "lock" | "key-round" | "bell" | "triangle-alert" | "circle-alert" | "siren" | "clock" | "timer" | "calendar" | "hourglass" | "bot" | "brain" | "sparkles" | "cpu" | "wand-sparkles" | "message-square" | "messages-square" | "zap" | "rocket" | "flask-conical" | "bug" | "wrench" | "settings" | "sliders-horizontal" | "terminal" | "code" | "database" | "server" | "cloud" | "globe" | "map-pin" | "network" | "workflow" | "git-branch" | "layers" | "plug" | "radio" | "box" | "package" | "truck" | "shopping-cart" | "flag" | "star" | "bookmark" | "search" | "funnel" | "list-checks" | "clipboard-list" | "scroll-text" | "book-open" | "lightbulb" | "flame" | "award" | "trophy";
                 };
             };
         };
@@ -5608,6 +5612,8 @@ export interface operations {
                         id: string;
                         name: string;
                         description: string | null;
+                        /** @enum {string} */
+                        icon: "layout-dashboard" | "chart-column" | "chart-bar" | "chart-line" | "chart-area" | "chart-pie" | "trending-up" | "trending-down" | "activity" | "gauge" | "target" | "dollar-sign" | "coins" | "wallet" | "credit-card" | "receipt" | "piggy-bank" | "banknote" | "users" | "user" | "user-check" | "building-2" | "briefcase" | "store" | "shield-check" | "shield-alert" | "lock" | "key-round" | "bell" | "triangle-alert" | "circle-alert" | "siren" | "clock" | "timer" | "calendar" | "hourglass" | "bot" | "brain" | "sparkles" | "cpu" | "wand-sparkles" | "message-square" | "messages-square" | "zap" | "rocket" | "flask-conical" | "bug" | "wrench" | "settings" | "sliders-horizontal" | "terminal" | "code" | "database" | "server" | "cloud" | "globe" | "map-pin" | "network" | "workflow" | "git-branch" | "layers" | "plug" | "radio" | "box" | "package" | "truck" | "shopping-cart" | "flag" | "star" | "bookmark" | "search" | "funnel" | "list-checks" | "clipboard-list" | "scroll-text" | "book-open" | "lightbulb" | "flame" | "award" | "trophy" | null;
                         /** @enum {string} */
                         scope: "PRIVATE" | "PROJECT" | "ORGANIZATION";
                         createdById: string | null;
@@ -5760,6 +5766,8 @@ export interface operations {
                         id: string;
                         name: string;
                         description: string | null;
+                        /** @enum {string} */
+                        icon: "layout-dashboard" | "chart-column" | "chart-bar" | "chart-line" | "chart-area" | "chart-pie" | "trending-up" | "trending-down" | "activity" | "gauge" | "target" | "dollar-sign" | "coins" | "wallet" | "credit-card" | "receipt" | "piggy-bank" | "banknote" | "users" | "user" | "user-check" | "building-2" | "briefcase" | "store" | "shield-check" | "shield-alert" | "lock" | "key-round" | "bell" | "triangle-alert" | "circle-alert" | "siren" | "clock" | "timer" | "calendar" | "hourglass" | "bot" | "brain" | "sparkles" | "cpu" | "wand-sparkles" | "message-square" | "messages-square" | "zap" | "rocket" | "flask-conical" | "bug" | "wrench" | "settings" | "sliders-horizontal" | "terminal" | "code" | "database" | "server" | "cloud" | "globe" | "map-pin" | "network" | "workflow" | "git-branch" | "layers" | "plug" | "radio" | "box" | "package" | "truck" | "shopping-cart" | "flag" | "star" | "bookmark" | "search" | "funnel" | "list-checks" | "clipboard-list" | "scroll-text" | "book-open" | "lightbulb" | "flame" | "award" | "trophy" | null;
                         /** @enum {string} */
                         scope: "PRIVATE" | "PROJECT" | "ORGANIZATION";
                         createdById: string | null;
@@ -6110,6 +6118,8 @@ export interface operations {
                 "application/json": {
                     name?: string;
                     description?: string | null;
+                    /** @enum {string|null} */
+                    icon?: "layout-dashboard" | "chart-column" | "chart-bar" | "chart-line" | "chart-area" | "chart-pie" | "trending-up" | "trending-down" | "activity" | "gauge" | "target" | "dollar-sign" | "coins" | "wallet" | "credit-card" | "receipt" | "piggy-bank" | "banknote" | "users" | "user" | "user-check" | "building-2" | "briefcase" | "store" | "shield-check" | "shield-alert" | "lock" | "key-round" | "bell" | "triangle-alert" | "circle-alert" | "siren" | "clock" | "timer" | "calendar" | "hourglass" | "bot" | "brain" | "sparkles" | "cpu" | "wand-sparkles" | "message-square" | "messages-square" | "zap" | "rocket" | "flask-conical" | "bug" | "wrench" | "settings" | "sliders-horizontal" | "terminal" | "code" | "database" | "server" | "cloud" | "globe" | "map-pin" | "network" | "workflow" | "git-branch" | "layers" | "plug" | "radio" | "box" | "package" | "truck" | "shopping-cart" | "flag" | "star" | "bookmark" | "search" | "funnel" | "list-checks" | "clipboard-list" | "scroll-text" | "book-open" | "lightbulb" | "flame" | "award" | "trophy" | null;
                 };
             };
         };
@@ -6124,6 +6134,8 @@ export interface operations {
                         id: string;
                         name: string;
                         description: string | null;
+                        /** @enum {string} */
+                        icon: "layout-dashboard" | "chart-column" | "chart-bar" | "chart-line" | "chart-area" | "chart-pie" | "trending-up" | "trending-down" | "activity" | "gauge" | "target" | "dollar-sign" | "coins" | "wallet" | "credit-card" | "receipt" | "piggy-bank" | "banknote" | "users" | "user" | "user-check" | "building-2" | "briefcase" | "store" | "shield-check" | "shield-alert" | "lock" | "key-round" | "bell" | "triangle-alert" | "circle-alert" | "siren" | "clock" | "timer" | "calendar" | "hourglass" | "bot" | "brain" | "sparkles" | "cpu" | "wand-sparkles" | "message-square" | "messages-square" | "zap" | "rocket" | "flask-conical" | "bug" | "wrench" | "settings" | "sliders-horizontal" | "terminal" | "code" | "database" | "server" | "cloud" | "globe" | "map-pin" | "network" | "workflow" | "git-branch" | "layers" | "plug" | "radio" | "box" | "package" | "truck" | "shopping-cart" | "flag" | "star" | "bookmark" | "search" | "funnel" | "list-checks" | "clipboard-list" | "scroll-text" | "book-open" | "lightbulb" | "flame" | "award" | "trophy" | null;
                         /** @enum {string} */
                         scope: "PRIVATE" | "PROJECT" | "ORGANIZATION";
                         createdById: string | null;

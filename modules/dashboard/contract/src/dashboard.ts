@@ -1,6 +1,8 @@
 import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
+import { dashboardIconSchema, storedDashboardIconSchema } from "./board-icon.ts";
+
 /** The house id scheme's kind for a dashboard. */
 export const DASHBOARD_KSUID_RESOURCE = "dashboard";
 
@@ -89,7 +91,12 @@ export type Dashboard = z.infer<typeof dashboardSchema>;
 
 /** A Dashboards board (DashboardsV2): the stored row with the product it is homed in. */
 const boardSchemaDefinition = z
-  .object({ ...dashboardSchema.shape, homeProduct: dashboardHomeProductSchema })
+  .object({
+    ...dashboardSchema.shape,
+    homeProduct: dashboardHomeProductSchema,
+    /** A name on the icon allow-list; `null` draws the default board glyph. */
+    icon: storedDashboardIconSchema,
+  })
   .strict();
 export interface BoardSchema extends Named<typeof boardSchemaDefinition> {}
 export const boardSchema: BoardSchema = boardSchemaDefinition;
@@ -116,6 +123,7 @@ const boardSummarySchemaDefinition = z
   .object({
     ...dashboardSummarySchema.shape,
     homeProduct: dashboardHomeProductSchema,
+    icon: storedDashboardIconSchema,
     /** Whether the member reading the list has starred this board. */
     isStarred: z.boolean(),
     /** The project that owns an Organization board listed in another project; null at home. */
@@ -138,6 +146,7 @@ const organizationBoardSchemaDefinition = z
     createdById: z.string().nullable(),
     scope: dashboardScopeSchema,
     homeProduct: dashboardHomeProductSchema,
+    icon: storedDashboardIconSchema,
     updatedAt: z.date(),
     project: dashboardProjectSchema.nullable(),
     openProject: dashboardProjectSchema.nullable(),
@@ -199,11 +208,13 @@ export interface StarredDashboardSchema extends Named<typeof starredDashboardSch
 export const starredDashboardSchema: StarredDashboardSchema = starredDashboardSchemaDefinition;
 export type StarredDashboard = z.infer<typeof starredDashboardSchema>;
 
-/** A board's name and description, as the inline editor saves them. */
+/** A board's name, description and icon, as the inline editor saves them. */
 const dashboardDetailsUpdateSchemaDefinition = z
   .object({
     name: dashboardNameSchema.optional(),
     description: dashboardDescriptionSchema.nullable().optional(),
+    /** `null` resets to the default glyph; a name off the allow-list is refused. */
+    icon: dashboardIconSchema.nullable().optional(),
   })
   .strict();
 export interface DashboardDetailsUpdateSchema extends Named<

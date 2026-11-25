@@ -29,6 +29,7 @@ import {
 import { PRODUCT_BOARDS_SHOWN_MAX, sharingTitle } from "../../model/product-dashboards.ts";
 import { BoardMenu } from "../blocks/board-menu.tsx";
 import { SIDEBAR_ROW_ICON_SIZE, SidebarLinkRow } from "../blocks/sidebar-link-row.tsx";
+import { BoardIconGlyph } from "../elements/board-icon-glyph.tsx";
 import { NewDashboardButton } from "../elements/new-dashboard-button.tsx";
 import { BoardMenuDialogs } from "./board-menu-dialogs.tsx";
 import { hasSharingChoice, NewDashboardDialog } from "./new-dashboard-dialog.tsx";
@@ -181,7 +182,7 @@ function BoardRow({
   });
   const href = libraryBoardPath(board);
   if (!href) return null;
-  const Icon = board.scope === "PRIVATE" ? Lock : LayoutDashboard;
+  const Fallback = board.scope === "PRIVATE" ? Lock : LayoutDashboard;
   const renaming = {
     onCommit: (name: string) => {
       setIsRenaming(false);
@@ -193,7 +194,13 @@ function BoardRow({
     <SidebarLinkRow
       name={board.name}
       href={href}
-      icon={<Icon size={SIDEBAR_ROW_ICON_SIZE} />}
+      icon={
+        <BoardIconGlyph
+          icon={board.icon}
+          size={SIDEBAR_ROW_ICON_SIZE}
+          fallback={<Fallback size={SIDEBAR_ROW_ICON_SIZE} />}
+        />
+      }
       iconTitle={sharingTitle(board)}
       isActive={isOpen}
       menu={<BoardMenu name={board.name} actions={actions} />}

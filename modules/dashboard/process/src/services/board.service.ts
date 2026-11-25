@@ -4,6 +4,7 @@ import {
   dashboardDetailsUpdateSchema,
   DashboardHomeNeedsOrgScopeError,
   dashboardHomeProductSchema,
+  dashboardIconSchema,
   dashboardIdSchema,
   DashboardNotFoundError,
   DEFAULT_DASHBOARD_HOME_PRODUCT,
@@ -13,6 +14,7 @@ import {
   projectIdSchema,
   type Board,
   type DashboardHomeProduct,
+  type DashboardIcon,
   type DashboardScope,
   type BoardSummary,
   type DashboardViewer,
@@ -94,8 +96,9 @@ export class BoardService {
     createdById?: string;
     scope?: DashboardScope;
     homeProduct?: DashboardHomeProduct;
+    icon?: DashboardIcon;
   }): Promise<Board> {
-    const { createdById, scope: asked, homeProduct: home, ...fields } = input;
+    const { createdById, scope: asked, homeProduct: home, icon, ...fields } = input;
     const parsed = dashboardCreateInputSchema.parse(fields);
     const homeProduct = dashboardHomeProductSchema.parse(home ?? DEFAULT_DASHBOARD_HOME_PRODUCT);
     const fallback = newDashboardScope({ name: parsed.name, createdById });
@@ -116,6 +119,7 @@ export class BoardService {
       createdById: createdById ?? null,
       scope,
       homeProduct,
+      icon: icon === undefined ? null : dashboardIconSchema.parse(icon),
       organizationId,
     });
     // Stored as an ordinary star, so unstarring it later removes it for good.
@@ -129,15 +133,16 @@ export class BoardService {
     return board;
   }
 
-  /** The board's name and description; an absent field is left as it is. */
+  /** The board's name, description and icon; an absent field is left as it is. */
   async updateBoard(
-    input: BoardRef & { name?: string; description?: string | null },
+    input: BoardRef & { name?: string; description?: string | null; icon?: DashboardIcon | null },
   ): Promise<Board> {
     const ref = boardRef(input);
     await this.#access.getWritable({ ...ref, viewer: input.viewer });
     const details = dashboardDetailsUpdateSchema.parse({
       ...(input.name === undefined ? {} : { name: input.name }),
       ...(input.description === undefined ? {} : { description: input.description }),
+      ...(input.icon === undefined ? {} : { icon: input.icon }),
     });
 
     return this.#repository.updateBoard({

@@ -278,6 +278,38 @@ describe("given a Reports board and a Dashboards board holding a widget", () => 
       });
     });
 
+    /** @scenario "The REST API sets and reads the icon" */
+    it("creates with an icon, sets another, resets it and refuses a name off the list", async () => {
+      const { send } = await projectWithBothBoards();
+
+      const created = await send("dashboards", BOARDS, {
+        method: "POST",
+        body: { name: "Trends", icon: "chart-line" },
+      });
+      const path = `${BOARDS}/${created.json?.id}`;
+      const rocket = await send("dashboards", path, { method: "PATCH", body: { icon: "rocket" } });
+      const reset = await send("dashboards", path, { method: "PATCH", body: { icon: null } });
+      const refused = await send("dashboards", path, {
+        method: "PATCH",
+        body: { icon: "not-an-icon" },
+      });
+      const read = await send("dashboards", path);
+
+      expect({
+        created: created.json?.icon,
+        rocket: rocket.json?.icon,
+        reset: reset.json?.icon,
+        refused: refused.status,
+        read: read.json?.icon,
+      }).toEqual({
+        created: "chart-line",
+        rocket: "rocket",
+        reset: null,
+        refused: 422,
+        read: null,
+      });
+    });
+
     /** @scenario "AC199n Split: the public API creates, renames and deletes Dashboards boards" */
     it("refuses a rename naming nothing", async () => {
       const { board, send } = await projectWithBothBoards();

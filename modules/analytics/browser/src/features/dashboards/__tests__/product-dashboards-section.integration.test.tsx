@@ -24,15 +24,18 @@ const board = ({
   homeProduct = "gateway",
   scope = "ORGANIZATION",
   project = SHOP,
+  icon = null,
 }: {
   id: string;
   homeProduct?: string;
   scope?: string;
   project?: typeof SHOP;
+  icon?: string | null;
 }) => ({
   id,
   name: id,
   description: null,
+  icon,
   createdById: "someone",
   ownerName: null,
   scope,
@@ -76,6 +79,23 @@ const linkNames = (list: HTMLElement) =>
     .map((link) => link.textContent);
 
 describe("a product's Dashboards section", () => {
+  describe("given boards with and without an icon", () => {
+    /** @scenario "The sidebar shows a board's icon in place of the generic glyph" */
+    it("draws a board's icon in its row, and the default glyph in the other", async () => {
+      render({
+        element: <ProductDashboardsSection product="gateway" />,
+        listed: [board({ id: "Spend", icon: "dollar-sign" }), board({ id: "Plain" })],
+      });
+
+      const list = await screen.findByRole("list", { name: "Dashboards" });
+      const iconOf = (name: string) =>
+        within(list).getByRole("link", { name }).querySelector("[data-board-icon]");
+      expect(iconOf("Spend")?.getAttribute("data-board-icon")).toBe("dollar-sign");
+      expect(iconOf("Plain")).toBeNull();
+      expect(within(list).getByRole("link", { name: "Plain" }).querySelector("svg")).not.toBeNull();
+    });
+  });
+
   describe("given more of the product's boards than the section shows", () => {
     /** @scenario "Each product's sidebar lists its own boards" */
     it("lists 8 by name, then Show N more and Show less, and none from other products", async () => {

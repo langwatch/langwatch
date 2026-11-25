@@ -207,7 +207,7 @@ function libraryRow({
   openProject: DashboardProject | null;
   ownerName: string | null;
 }): OrganizationBoard {
-  const { id, name, description, createdById, scope, homeProduct, updatedAt } = board;
+  const { id, name, description, createdById, scope, homeProduct, icon, updatedAt } = board;
   return {
     id,
     name,
@@ -215,6 +215,7 @@ function libraryRow({
     createdById,
     scope,
     homeProduct,
+    icon,
     updatedAt,
     project,
     openProject,

@@ -1,3 +1,4 @@
+export * from "./board-icon.ts";
 export * from "./dashboard.ts";
 export * from "./dashboard-scope.ts";
 export * from "./dashboard.errors.ts";
