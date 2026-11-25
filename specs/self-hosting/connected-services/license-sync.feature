@@ -264,6 +264,13 @@ Feature: License sync
     And the license page shows 80 seats
 
   @unit
+  Scenario: An extension signed while another waited arrives in one sync
+    Given LangWatch extended the license, and extended it again before the install synced
+    When the install syncs
+    Then the response carries the newest extension
+    And once the install presents it, both licenses before it are superseded and neither copy is held
+
+  @unit
   Scenario: A delivered license that does not verify is not applied
     When the sync response carries a license whose signature does not verify
     Then the install keeps its current license
