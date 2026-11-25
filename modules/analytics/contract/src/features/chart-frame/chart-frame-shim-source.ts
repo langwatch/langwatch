@@ -42,18 +42,30 @@ export function buildShimScript(): string {
 
   // The palette and style set are resolved from the host's colour map, so they follow the
   // mode the frame was given; a theme change remounts the frame, so they never go stale.
+  // A missing token keeps the previous values and logs once: the frame still runs, and the
+  // bundled charts fall back to their own token reads.
+  var colourWarned = false;
   function applyColors(context) {
     LW.theme = context.theme;
-    LW.palette = ${chartPaletteOf.toString()}({
-      colors: context.colors || {},
-      mode: context.theme,
-      seriesTokens: ${JSON.stringify(CHART_SERIES_TOKENS)}
-    });
-    LW.chartStyle = ${chartStyleOf.toString()}({
-      colors: context.colors || {},
-      styleTokens: ${JSON.stringify(CHART_STYLE_TOKENS)},
-      metrics: ${JSON.stringify(CHART_STYLE_METRICS)}
-    });
+    try {
+      var nextPalette = ${chartPaletteOf.toString()}({
+        colors: context.colors || {},
+        mode: context.theme,
+        seriesTokens: ${JSON.stringify(CHART_SERIES_TOKENS)}
+      });
+      var nextStyle = ${chartStyleOf.toString()}({
+        colors: context.colors || {},
+        styleTokens: ${JSON.stringify(CHART_STYLE_TOKENS)},
+        metrics: ${JSON.stringify(CHART_STYLE_METRICS)}
+      });
+      LW.palette = nextPalette;
+      LW.chartStyle = nextStyle;
+    } catch (error) {
+      if (!colourWarned && typeof console !== "undefined") {
+        colourWarned = true;
+        console.warn("LangWatch: " + (error && error.message));
+      }
+    }
     if (typeof document === "undefined" || !document.documentElement) return;
     if (context.theme === "light" || context.theme === "dark") {
       document.documentElement.style.colorScheme = context.theme;

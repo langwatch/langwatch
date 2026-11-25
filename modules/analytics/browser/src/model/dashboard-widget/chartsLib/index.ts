@@ -16,6 +16,9 @@ const TYPE_PX = { micro: 11, caption: 12, bodySm: 13, metric: 18 } as const;
 
 interface LWGlobal {
   dashboardContext?: { colors?: Readonly<Record<string, string>> };
+  /** The same palette and style set widget code reads: one change updates both. */
+  palette?: { readonly series: readonly string[] };
+  chartStyle?: { readonly axis: string; readonly grid: string };
   navigate?: (target: string, params?: Record<string, unknown>) => void;
 }
 
@@ -53,20 +56,38 @@ function token(name: string): string {
   return value;
 }
 
+// Corner radii stay per shape on purpose: legend swatches (2px), stacked segments and tracks
+// (3px) and tooltips (6px) are drawn at their own sizes. `LW.chartStyle.barCornerRadius` is the
+// end radius of a widget's own bars, not these.
+
+/**
+ * A chart-style grey from `LW.chartStyle`. Without it, the token it came from is read directly,
+ * as before the style set existed.
+ */
+function styleColour(name: "axis" | "grid"): string {
+  const value = window.LW?.chartStyle?.[name];
+  return value ? value : token(name === "axis" ? "fg.subtle" : "border.muted");
+}
+
 function chrome() {
   return {
     text: token("fg"),
-    axis: token("fg.subtle"),
-    grid: token("border.muted"),
+    axis: styleColour("axis"),
+    grid: styleColour("grid"),
     tooltipBg: token("bg.card"),
     tooltipBorder: token("border.card"),
   };
 }
 
+/**
+ * The series colours from `LW.palette`, unless a chart is given its own. Without it, the eight
+ * series tokens are read directly, as before the palette existed.
+ */
 function paletteFor(colors?: string[]): string[] {
-  return colors && colors.length > 0
-    ? colors
-    : Array.from({ length: 8 }, (_, index) => token(`chart.${index + 1}`));
+  if (colors && colors.length > 0) return colors;
+  const series = window.LW?.palette?.series;
+  if (series && series.length > 0) return [...series];
+  return Array.from({ length: 8 }, (_, index) => token(`chart.${index + 1}`));
 }
 
 function colorAt(colors: string[], index: number): string {

@@ -139,29 +139,35 @@ export function useWidgetRowTypes({
   }, [mounted, dts]);
 }
 
-/** Raw colours in the widget source as Hint markers: a nudge to `LW.palette`, never an error. */
+/**
+ * Raw colours in the widget source as Hint markers: a nudge to `LW.palette`, never an error.
+ * Reads the model, not the React prop, so it follows the text as the author types.
+ */
 export function useWidgetColourHints({
   mounted,
-  source,
 }: {
   mounted: { readonly monaco: Monaco; readonly editor: editor.IStandaloneCodeEditor } | undefined;
-  source: string;
 }): void {
   useEffect(() => {
     const model = mounted?.editor.getModel();
-    if (!mounted || !model) return;
+    if (!mounted || !model) return undefined;
     const { monaco } = mounted;
-    monaco.editor.setModelMarkers(
-      model,
-      COLOUR_HINT_OWNER,
-      rawColourHints(source).map((hint) => ({
-        severity: monaco.MarkerSeverity.Hint,
-        message: hint.message,
-        startLineNumber: hint.line,
-        startColumn: hint.column,
-        endLineNumber: hint.line,
-        endColumn: hint.column + hint.length,
-      })),
-    );
-  }, [mounted, source]);
+    const mark = () => {
+      monaco.editor.setModelMarkers(
+        model,
+        COLOUR_HINT_OWNER,
+        rawColourHints(model.getValue()).map((hint) => ({
+          severity: monaco.MarkerSeverity.Hint,
+          message: hint.message,
+          startLineNumber: hint.line,
+          startColumn: hint.column,
+          endLineNumber: hint.line,
+          endColumn: hint.column + hint.length,
+        })),
+      );
+    };
+    mark();
+    const subscription = model.onDidChangeContent(mark);
+    return () => subscription.dispose();
+  }, [mounted]);
 }

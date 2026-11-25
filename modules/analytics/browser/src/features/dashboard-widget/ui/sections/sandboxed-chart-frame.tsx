@@ -35,7 +35,7 @@ import {
 } from "../../../../behavior/use-frame-auto-restart.ts";
 
 function withThemeColors(context: ChartFrameDashboardContext): ChartFrameDashboardContext {
-  const names = [
+  const names = new Set([
     "fg",
     "fg.subtle",
     "border.muted",
@@ -49,10 +49,10 @@ function withThemeColors(context: ChartFrameDashboardContext): ChartFrameDashboa
     "blue.solid",
     ...CHART_SERIES_TOKENS,
     ...Object.values(CHART_STYLE_TOKENS),
-  ];
+  ]);
   return {
     ...context,
-    colors: Object.fromEntries(names.map((name) => [name, getRawColorValue(name)])),
+    colors: Object.fromEntries([...names].map((name) => [name, getRawColorValue(name)])),
   };
 }
 

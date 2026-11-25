@@ -36,3 +36,21 @@ Feature: Widget code draws in the chart palette for the reader's mode
       Given widget code that reads only LW.palette and LW.chartStyle
       When the editor checks the source
       Then no colour hint is raised
+
+    @unit
+    Scenario: A hex colour inside a longer string is hinted
+      Given widget code with a hex colour inside a longer string
+      When the editor checks the source
+      Then the hex is hinted and the text around it is not
+
+    @unit
+    Scenario: Hex colours in comments are not hinted
+      Given widget code with a hex colour in a comment
+      When the editor checks the source
+      Then no colour hint is raised
+
+    @unit
+    Scenario: The shipped widget code raises no colour hint
+      Given every widget the catalogue ships
+      When the editor checks each widget's source
+      Then no colour hint is raised for any of them

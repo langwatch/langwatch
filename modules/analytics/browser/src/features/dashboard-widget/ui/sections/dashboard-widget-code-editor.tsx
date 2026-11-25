@@ -52,7 +52,7 @@ export function DashboardWidgetCodeEditor({
     readonly editor: editor.IStandaloneCodeEditor;
   }>();
   useWidgetRowTypes({ mounted, dts: lwQueryRowTypesDts({ queries: queryColumns }) });
-  useWidgetColourHints({ mounted, source: value });
+  useWidgetColourHints({ mounted });
   useEditorValueSync({ editor: mounted?.editor, value });
 
   return (

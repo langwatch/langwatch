@@ -46,19 +46,31 @@ describe("chartPaletteOf", () => {
   });
 
   describe("given a token the host did not resolve", () => {
-    it("returns an empty string for that series rather than dropping it", () => {
-      const palette = chartPaletteOf({
-        colors: { "chart.1": "#only" },
-        mode: "light",
-        seriesTokens: ["chart.1", "chart.2"],
-      });
-
-      expect(palette.series).toEqual(["#only", ""]);
+    it("throws naming the missing token rather than returning an empty colour", () => {
+      expect(() =>
+        chartPaletteOf({
+          colors: { "chart.1": "#only" },
+          mode: "light",
+          seriesTokens: ["chart.1", "chart.2"],
+        }),
+      ).toThrow("Missing chart colour token: chart.2");
     });
   });
 });
 
 describe("chartStyleOf", () => {
+  describe("given a style token the host did not resolve", () => {
+    it("throws naming the missing token", () => {
+      expect(() =>
+        chartStyleOf({
+          colors: { "bg.muted": "#track", "fg.subtle": "#axis" },
+          styleTokens: CHART_STYLE_TOKENS,
+          metrics: CHART_STYLE_METRICS,
+        }),
+      ).toThrow("Missing chart colour token: border.muted");
+    });
+  });
+
   describe("given the host resolved the style tokens", () => {
     /** @scenario "The style set carries the shape metrics and the track, axis and grid greys" */
     it("carries the shape metrics and the track, axis and grid colours", () => {

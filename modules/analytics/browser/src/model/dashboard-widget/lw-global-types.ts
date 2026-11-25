@@ -13,10 +13,15 @@ interface LwTimeWindow {
 
 type LwTheme = "light" | "dark";
 
-/** \`LW.palette\`: the ordered series colours (CSS colour strings) for \`mode\`. */
+/**
+ * \`LW.palette\`: the eight ordered series colours (CSS colour strings) for \`mode\`.
+ * \`series[0]\` is the first hue.
+ */
 interface LwPalette {
   readonly mode: LwTheme;
-  readonly series: readonly string[];
+  readonly series: readonly [
+    string, string, string, string, string, string, string, string,
+  ];
 }
 
 /** \`LW.chartStyle\`: shape metrics in px, and the greys a chart draws with. */
@@ -44,6 +49,11 @@ interface LwChartStyle {
  * every host (e.g. the playground preview) can supply them.
  */
 interface LwDashboardContext {
+  /**
+   * The host's resolved colour map: design tokens such as \`fg\`, \`fg.subtle\`, \`bg.card\` and
+   * \`border.card\`, as CSS colour strings for the current theme. Read these, not hex.
+   */
+  readonly colors: Readonly<Record<string, string>>;
   readonly timeWindow: LwTimeWindow;
   readonly granularitySeconds: number;
   /** IANA zone name, e.g. "America/Sao_Paulo". */

@@ -14,6 +14,8 @@ import { CATALOGUE_WIDGETS, IMPLEMENTED_WIDGET_IDS, implementedWidget } from "..
 import { CATALOGUE_WIDGET_ACTIONS } from "../model/catalogue-widget-actions.ts";
 
 const SUCCESS = /\bsucce(?:ss|ssful|ssfully|ssive|ed|eds|eded)\b/i;
+/** A design token read by name, e.g. `TOKENS["fg.success"]`: the name is not card text. */
+const TOKEN_NAME = /\[\s*["'][a-z]+(?:\.[a-z]+)+["']\s*\]/g;
 const ERRORS_ONLY = /\bHasError\b|\bApiErrors\b|\bInternalErrors\b|\bRetriesExhausted\b/;
 const REAL_OUTCOME = /\bMetadataOutcome\b|\bVerdict\b|\bLabel\b|\boutcome\b/i;
 
@@ -59,7 +61,7 @@ describe("given every stock widget that counts errors alone", () => {
         ...actions.map((action) => action.prompt),
       ];
       return texts
-        .filter((text) => SUCCESS.test(text))
+        .filter((text) => SUCCESS.test(text.replace(TOKEN_NAME, "")))
         .map((text) => `${key}: ${text.slice(0, 80)}`);
     });
 

@@ -1,27 +1,27 @@
 /**
- * The pieces every Flight Deck widget's stored TSX is put together from. The
- * sandbox has no Chakra and no shared module, so each widget carries its own
- * colours and helpers: what a member opens in the edit drawer runs as is.
+ * The pieces every Flight Deck widget's stored TSX is built from. The sandbox has no Chakra
+ * or shared module, so each widget carries its helpers. PALETTE, BARS and CHART_STYLE read
+ * LW.palette, LW.chartStyle and LW.dashboardContext.colors at runtime: no colour is copied.
  */
 
 import { CALLS_TO_ACTION, type WidgetSource } from "./widget-calls-to-action.ts";
 
 export type { WidgetSource } from "./widget-calls-to-action.ts";
 
-export const PALETTE = `const dark = LW.theme === "dark";
+export const PALETTE = `const TOKENS = LW.dashboardContext.colors;
 const C = {
-  text: dark ? "#f4f4f5" : "#18181b",
-  subtle: dark ? "#a1a1aa" : "#52525b",
-  faint: dark ? "#71717a" : "#a1a1aa",
+  text: TOKENS["fg"],
+  subtle: TOKENS["fg.subtle"],
+  faint: TOKENS["fg.subtle"],
   border: LW.chartStyle.grid,
-  strong: dark ? "#3f3f46" : "#d4d4d8",
+  strong: TOKENS["border.card"],
   muted: LW.chartStyle.track,
-  panel: dark ? "#18181b" : "#ffffff",
+  panel: TOKENS["bg.card"],
   teal: LW.palette.series[5],
   orange: LW.palette.series[0],
   pink: LW.palette.series[7],
-  red: dark ? "#f87171" : "#dc2626",
-  green: dark ? "#4ade80" : "#16a34a",
+  red: TOKENS["fg.error"],
+  green: TOKENS["fg.success"],
 };`;
 
 /**
@@ -96,12 +96,13 @@ function Legend({ items, kind = "series" }) {
 
 export const BARS = `const RAMP = LW.palette.series;
 // A headline model keeps its colour on every chart; any other name takes its rank's.
+// Indices into LW.palette.series, each the hue the model had before the palette changed.
 const FIXED_COLOURS = {
-  "gpt-5": 0,
-  "claude-sonnet-4.5": 1,
-  "llama-4-70b": 2,
-  "gemini-2.5-pro": 3,
-  "claude-opus-4.5": 4,
+  "gpt-5": 1,
+  "claude-sonnet-4.5": 0,
+  "llama-4-70b": 4,
+  "gemini-2.5-pro": 2,
+  "claude-opus-4.5": 7,
   "gpt-5-mini": 5,
 };
 const colourFor = (label, index) => RAMP[FIXED_COLOURS[label] ?? index % RAMP.length];
@@ -365,7 +366,7 @@ const BUTTON = `const BUTTON = {
   border: 0,
   borderRadius: 8,
   background: C.teal,
-  color: "#ffffff",
+  color: "rgb(255, 255, 255)",
   fontFamily: "inherit",
   fontSize: 12,
   fontWeight: 500,
@@ -385,7 +386,6 @@ export const FACE_FULL_MIN_HEIGHT_PX = 180;
  */
 const FIT_CSS = `.lw-row { display: none; }
 [data-lw-ask]:hover { background: rgba(127, 127, 127, 0.1); border-radius: 4px; }
-[data-lw-ask]:focus-visible { outline: 2px solid #0d9488; outline-offset: 1px; border-radius: 4px; }
 @media (max-height: ${FACE_ICON_MIN_HEIGHT_PX - 1}px) { .lw-icon { display: none !important; } }
 @media (max-height: ${FACE_FULL_MIN_HEIGHT_PX - 1}px) {
   .lw-full { display: none !important; }
@@ -461,7 +461,9 @@ function panelCode(): string {
   return `const CENTRED = { display: "flex", flexDirection: "column", alignItems: "center",
   justifyContent: "center" };
 const FRAME_CSS = '@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400..700' +
-  '&display=swap"); body { padding: 6px 8px 8px; } ' + ${JSON.stringify(FIT_CSS)};
+  '&display=swap"); body { padding: 6px 8px 8px; } ' + ${JSON.stringify(FIT_CSS)} +
+  ' [data-lw-ask]:focus-visible { outline: 2px solid ' + C.teal +
+  '; outline-offset: 1px; border-radius: 4px; }';
 
 function Panel({ children }) {
   return (
