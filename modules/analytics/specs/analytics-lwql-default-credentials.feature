@@ -85,3 +85,11 @@ Feature: LangWatchQL works on a default install with no LangWatchQL settings
     When the LangWatchQL provisioning task runs
     Then the restricted identity signs in with the derived password
     And it can read a LangWatchQL view
+
+  @integration
+  Scenario: The upgrade task derives from the key pepper the secrets chain resolves
+    Given an environment that sets CREDENTIALS_SECRET
+    And a secrets chain that also answers API_KEY_PEPPER from another source, such as a .env file
+    When the LangWatchQL provisioning task runs
+    Then the passwords are derived from API_KEY_PEPPER, as the api and worker derive them
+    And a password derived from CREDENTIALS_SECRET is refused

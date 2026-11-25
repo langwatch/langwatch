@@ -34,7 +34,7 @@ class AllowTestQueries extends PrismaQueryGuard {
   }
 }
 
-const databaseUrl = process.env.DATABASE_URL;
+const databaseUrl = process.env.LANGWATCH_TEST_DATABASE_URL ?? process.env.DATABASE_URL;
 const enabled = Boolean(process.env.LANGWATCH_TEST_CLICKHOUSE_URL) && Boolean(databaseUrl);
 const UNMAPPED_KEY_HASH = "0".repeat(64);
 
@@ -42,7 +42,9 @@ describe.runIf(enabled)("given an install with no LangWatchQL password set", () 
   let endpoint: { url: string; database: string };
   let admin: ClickHouseClient;
   let restricted: ClickHouseClient;
+  let endpointUrl: URL;
   let source: Record<string, string | undefined>;
+  const chainPepper = `lwql-default-credentials-chain-${randomUUID()}`;
   const postgres = databaseUrl
     ? PrismaConnectionService.create({
         guard: new AllowTestQueries(),
@@ -87,18 +89,21 @@ describe.runIf(enabled)("given an install with no LangWatchQL password set", () 
       DATABASE_URL: databaseUrl,
       CREDENTIALS_SECRET: `lwql-default-credentials-${randomUUID()}`,
     };
+    // The runner's chain answers API_KEY_PEPPER from a source the environment lacks (a .env file).
+    const lookup = (id: string) =>
+      Promise.resolve(id === "API_KEY_PEPPER" ? chainPepper : source[id]);
 
-    await LwqlProvisionTask.create({ database, source, failOnError: true }).run({
+    await LwqlProvisionTask.create({ database, source, lookup, failOnError: true }).run({
       args: [],
       signal: new AbortController().signal,
     });
 
-    const derived = withLwqlDefaultCredentials(source);
-    const url = new URL(endpoint.url);
-    url.username = "";
-    url.password = "";
+    const derived = withLwqlDefaultCredentials({ ...source, API_KEY_PEPPER: chainPepper });
+    endpointUrl = new URL(endpoint.url);
+    endpointUrl.username = "";
+    endpointUrl.password = "";
     restricted = createClient({
-      url: url.toString(),
+      url: endpointUrl.toString(),
       username: `${endpoint.database}_lwql`,
       password: derived.LWQL_CLICKHOUSE_PASSWORD,
     });
@@ -124,6 +129,22 @@ describe.runIf(enabled)("given an install with no LangWatchQL password set", () 
       expect(
         (await result.json<{ rows: number | string }>()).map(({ rows }) => Number(rows)),
       ).toEqual([0]);
+    });
+
+    /** @scenario "The upgrade task derives from the key pepper the secrets chain resolves" */
+    it("refuses the password derived from the environment's weaker pepper source", async () => {
+      const fromEnvironmentOnly = createClient({
+        url: endpointUrl.toString(),
+        username: `${endpoint.database}_lwql`,
+        password: withLwqlDefaultCredentials(source).LWQL_CLICKHOUSE_PASSWORD,
+      });
+      try {
+        await expect(fromEnvironmentOnly.query({ query: "SELECT 1" })).rejects.toMatchObject({
+          type: "AUTHENTICATION_FAILED",
+        });
+      } finally {
+        await fromEnvironmentOnly.close();
+      }
     });
   });
 });

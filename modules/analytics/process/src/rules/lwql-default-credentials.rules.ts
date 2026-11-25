@@ -14,6 +14,16 @@ const DERIVATION_LABELS = {
 /** The key pepper's sources, first set wins, as `intoKeyPepper` reads them. */
 const KEY_PEPPER_SOURCES = ["API_KEY_PEPPER", "CREDENTIALS_SECRET", "NEXTAUTH_SECRET"] as const;
 
+/**
+ * The secrets the task's environment must carry for it to derive what the api and worker derive
+ * through their secrets chain: a runner overlays each from that chain before the task runs.
+ */
+export const LWQL_CREDENTIAL_SECRETS = [
+  "LWQL_CLICKHOUSE_PASSWORD",
+  "LWQL_POSTGRES_READER_PASSWORD",
+  ...KEY_PEPPER_SOURCES,
+] as const;
+
 export interface LwqlCredentialInputs {
   readonly clickHousePassword: string | undefined;
   readonly postgresReaderPassword: string | undefined;

@@ -53,7 +53,10 @@ import {
   postgresErrorCodeFields,
   statementKind,
 } from "../rules/langwatch-ql-config-store.rules.ts";
-import { withLwqlDefaultCredentials } from "../rules/lwql-default-credentials.rules.ts";
+import {
+  LWQL_CREDENTIAL_SECRETS,
+  withLwqlDefaultCredentials,
+} from "../rules/lwql-default-credentials.rules.ts";
 import type { LangWatchQLNames } from "../services/langwatch-ql-access-model.service.ts";
 import { LangWatchQLSqlModeClusterGuardService } from "../services/langwatch-ql-sql-mode-cluster-guard.service.ts";
 
@@ -842,17 +845,39 @@ function connectionLimitFields(databaseUrl: string | undefined): { connectionLim
   }
 }
 
+/** Reads one secret through the runner's chain: the sources the api and worker boot with. */
+export type LwqlSecretLookup = (id: string) => Promise<string | undefined>;
+
+/** The environment with each credential secret the chain answers laid over it. */
+async function withChainedSecrets({
+  environment,
+  lookup,
+}: {
+  environment: Record<string, string | undefined>;
+  lookup: LwqlSecretLookup | undefined;
+}): Promise<Record<string, string | undefined>> {
+  if (!lookup) return environment;
+  const resolved = { ...environment };
+  for (const id of LWQL_CREDENTIAL_SECRETS) {
+    const value = await lookup(id);
+    if (value !== undefined) resolved[id] = value;
+  }
+  return resolved;
+}
+
 async function runLwqlProvisioningTask({
   database,
   source: environment,
+  lookup,
   failOnError,
 }: {
   database: LwqlProvisioningDatabase;
   failOnError: boolean;
   /** The environment the launching process was configured with. */
   source: Record<string, string | undefined>;
+  lookup: LwqlSecretLookup | undefined;
 }): Promise<void> {
-  const source = withLwqlDefaultCredentials(environment);
+  const source = withLwqlDefaultCredentials(await withChainedSecrets({ environment, lookup }));
   const selfProvision = selfProvisioning.request({ source });
   if (!selfProvision.requested) {
     logger.info("LWQL not configured, skipping");
@@ -899,6 +924,7 @@ export class LwqlProvisionTask extends Task {
     private readonly inputs: {
       database: () => LwqlProvisioningDatabase;
       source: Record<string, string | undefined>;
+      lookup: LwqlSecretLookup | undefined;
       skipped: boolean;
       failOnError: boolean;
     },
@@ -914,17 +940,20 @@ export class LwqlProvisionTask extends Task {
   static create({
     database,
     source,
+    lookup,
     skipped = false,
     failOnError = false,
   }: {
     database: () => LwqlProvisioningDatabase;
     /** The environment the launching process was configured with. */
     source: Record<string, string | undefined>;
+    /** The runner's secrets chain, so the passwords match what the api and worker derive. */
+    lookup?: LwqlSecretLookup;
     skipped?: boolean;
     /** The upgrade's reconciler fails its run on a refusal; boot keeps the default. */
     failOnError?: boolean;
   }): LwqlProvisionTask {
-    return new LwqlProvisionTask({ database, source, skipped, failOnError });
+    return new LwqlProvisionTask({ database, source, lookup, skipped, failOnError });
   }
 
   async run(_input: { args: readonly string[]; signal: AbortSignal }): Promise<void> {
@@ -935,6 +964,7 @@ export class LwqlProvisionTask extends Task {
     await runLwqlProvisioningTask({
       database: this.inputs.database(),
       source: this.inputs.source,
+      lookup: this.inputs.lookup,
       failOnError: this.inputs.failOnError,
     });
   }
