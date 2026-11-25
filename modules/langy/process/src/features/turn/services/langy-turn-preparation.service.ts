@@ -40,6 +40,8 @@ const LANGY_TURN_SHARED = LangyTurnSharedService.create();
 
 const logger = createLogger("langwatch:langy:turn-start");
 
+type PrepareArgs = Parameters<LangyTurnPreparationService["prepareAndDispatch"]>[0];
+
 export class LangyTurnPreparationService {
   private readonly override: LangyTurnOverrideService;
 
@@ -117,20 +119,13 @@ export class LangyTurnPreparationService {
     return { conversationId: args.conversation.id, turnId: args.turnId };
   }
 
-  private readPreparation(
-    args: Parameters<LangyTurnPreparationService["prepareAndDispatch"]>[0],
-    mintedRunToken: string | null,
-  ) {
+  private readPreparation(args: PrepareArgs, mintedRunToken: string | null) {
     const { conversation, projectId, userId, credentials } = args;
 
     return Promise.allSettled([
       conversation.isNew
         ? Promise.resolve(null)
-        : this.deps.conversations.findByIdVisible({
-            id: conversation.id,
-            projectId,
-            userId,
-          }),
+        : this.deps.conversations.findByIdVisible({ id: conversation.id, projectId, userId }),
       conversation.isNew
         ? Promise.resolve(null)
         : this.deps.conversations.findPendingHandoff({
@@ -139,20 +134,14 @@ export class LangyTurnPreparationService {
           }),
       mintedRunToken
         ? Promise.resolve(mintedRunToken)
-        : this.deps.conversations.findRunToken({
-            projectId,
-            conversationId: conversation.id,
-          }),
+        : this.deps.conversations.findRunToken({ projectId, conversationId: conversation.id }),
       this.deps.credentials.findModelsAllowed({
         projectId,
         organizationId: credentials.organizationId,
       }),
       conversation.isNew || !this.deps.messages
         ? Promise.resolve<LangyMessageRow[]>([])
-        : this.deps.messages.findAllByConversation({
-            conversationId: conversation.id,
-            projectId,
-          }),
+        : this.deps.messages.findAllByConversation({ conversationId: conversation.id, projectId }),
       this.override.resolve(),
       // The live UI-action channel is flagged (`release_langy_ui_actions`), and the turn block
       // may only advertise it while the dispatch route would answer.
@@ -237,9 +226,7 @@ export class LangyTurnPreparationService {
   }
 
   /** Reads today's opened pull requests; only one that opened counts (the PR count subscriber). */
-  private async checkPrCap(
-    args: Parameters<LangyTurnPreparationService["prepareAndDispatch"]>[0],
-  ): Promise<string> {
+  private async checkPrCap(args: PrepareArgs): Promise<string> {
     if (!args.credentials.githubToken) return "";
     const permit = await this.deps.permits.check({ userId: args.userId });
     if (permit.allowed) return "";
@@ -263,10 +250,7 @@ export class LangyTurnPreparationService {
     );
   }
 
-  private async ensureWorkerAccess(
-    args: Parameters<LangyTurnPreparationService["prepareAndDispatch"]>[0],
-    probeWorker: () => Promise<boolean>,
-  ) {
+  private async ensureWorkerAccess(args: PrepareArgs, probeWorker: () => Promise<boolean>) {
     // A read-only turn never borrows a running worker's key, which may hold writes.
     if (!args.readOnly && (await probeWorker())) return;
 
@@ -469,9 +453,7 @@ export class LangyTurnPreparationService {
     runToken: string;
     imageRefs: readonly LangyAttachmentRef[];
   }) {
-    if (!(await args.attempt.commit())) {
-      return;
-    }
+    if (!(await args.attempt.commit())) return;
 
     void args.worker
       .dispatch({
