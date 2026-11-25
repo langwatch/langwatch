@@ -198,16 +198,16 @@ describe("<DefaultModelOverrideDrawer/> Instant Evals column", () => {
     });
 
     /** @scenario "Without LangWatch Instant (preview), the drawer offers only the project's own decision models" */
-    it("reads Not set as the value when nothing is set", () => {
+    it("reads Choose a decision model as the value when nothing is set", () => {
       renderWithModelProviderHost(<DefaultModelOverrideDrawer editingId="cfg_1" />);
 
       const trigger = within(screen.getByTestId("role-row-instant_evals")).getByRole("combobox");
-      expect(trigger).toHaveTextContent("Not set");
+      expect(trigger).toHaveTextContent("Choose a decision model");
       expect(trigger).not.toHaveTextContent("LangWatch Instant (preview)");
     });
 
-    /** @scenario "Without LangWatch Instant (preview), a config that pinned it reads Not set in the drawer" */
-    it("reads Not set when the config row pinned LangWatch Instant (preview) before", () => {
+    /** @scenario "Without LangWatch Instant (preview), a config that pinned it asks for a decision model in the drawer" */
+    it("asks for a decision model when the config row pinned LangWatch Instant (preview) before", () => {
       const pinned = { ...CONFIG_ROW, config: { INSTANT_EVALS: HOSTED.value } };
       mockGetDefaultModels.mockReturnValue({
         data: { ...PAYLOAD, configs: [pinned] },
@@ -216,7 +216,7 @@ describe("<DefaultModelOverrideDrawer/> Instant Evals column", () => {
       renderWithModelProviderHost(<DefaultModelOverrideDrawer editingId="cfg_1" />);
 
       const trigger = within(screen.getByTestId("role-row-instant_evals")).getByRole("combobox");
-      expect(trigger).toHaveTextContent("Not set");
+      expect(trigger).toHaveTextContent("Choose a decision model");
       expect(trigger).not.toHaveTextContent("LangWatch Instant (preview)");
     });
   });

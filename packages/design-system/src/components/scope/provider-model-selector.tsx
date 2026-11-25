@@ -1,8 +1,8 @@
-import { Search } from "lucide-react";
+import { Plus, Search } from "lucide-react";
 import type React from "react";
 import { useEffect, useState } from "react";
 
-import { Box, createListCollection, Field, HStack, Input, Text } from "../../primitives.ts";
+import { Box, Button, createListCollection, Field, HStack, Input, Text } from "../../primitives.ts";
 import { InputGroup } from "../forms/input-group.tsx";
 import { scrollToListItem, Select } from "../forms/select.tsx";
 import { inferProvider, ProviderIconGlyph } from "./provider-icons.tsx";
@@ -20,7 +20,13 @@ export type ModelPickerOption = {
   disabled?: boolean;
   /** A short tag at the end of the title line, such as "Coming soon". */
   hint?: string;
+  /** A button at the end of the row that lifts what keeps it unpickable, such as "Add key".
+   * Pressing it closes the list and never picks the row. */
+  action?: ModelPickerAction;
 };
+
+/** What a row's button says and does. */
+export type ModelPickerAction = { label: string; onAction: () => void };
 
 /** A query result: the options, whether they are still loading, and why they failed. */
 export type ModelPickerQuery = {
@@ -194,8 +200,17 @@ function InheritItem({
  * ellipsis. A described row is a named entry (a decision model, an alias) and reads in the body
  * font; a bare model id reads in mono.
  */
-function ModelItem({ item, size }: { item: ModelOption; size: SelectorSize }) {
+function ModelItem({
+  item,
+  size,
+  onAction,
+}: {
+  item: ModelOption;
+  size: SelectorSize;
+  onAction: (action: ModelPickerAction) => void;
+}) {
   const isDescribed = !!item.subtitle;
+  const { action } = item;
   const hint = item.hint ? (
     <Text
       fontSize="2xs"
@@ -251,6 +266,26 @@ function ModelItem({ item, size }: { item: ModelOption; size: SelectorSize }) {
             </HStack>
           )}
         </Box>
+        {action && (
+          <Button
+            size="2xs"
+            variant="outline"
+            flexShrink={0}
+            // An unpickable row takes no pointer events; its button still must.
+            pointerEvents="auto"
+            // The row is an option: its own pointer handling would otherwise take the press.
+            onPointerDown={(event) => event.stopPropagation()}
+            onClick={(event) => {
+              event.preventDefault();
+              event.stopPropagation();
+              onAction(action);
+            }}
+            data-testid="model-option-action"
+          >
+            <Plus size={12} />
+            {action.label}
+          </Button>
+        )}
       </HStack>
     </Select.Item>
   );
@@ -270,6 +305,7 @@ export function ProviderModelSelector({
   labelFor = (modelId) => modelId,
   placeholder,
   footer,
+  defaultOpen = false,
 }: {
   model: string;
   /** The options as a query result; the caller fetches, this only draws. */
@@ -293,8 +329,23 @@ export function ProviderModelSelector({
   placeholder?: string;
   /** Pinned under the rows inside the dropdown, such as a "Configure available models" link. */
   footer?: React.ReactNode;
+  /** The list starts open, for an address that leads straight to this picker. */
+  defaultOpen?: boolean;
 }) {
   const [modelSearch, setModelSearch] = useState("");
+  const [isOpen, setIsOpen] = useState(false);
+  // Opened a tick after mount: a list opened in the same commit as the drawer around it would
+  // stack its layer under the drawer's, and the next click inside it would close the drawer.
+  useEffect(() => {
+    if (!defaultOpen) return;
+    const timer = setTimeout(() => setIsOpen(true), 0);
+    return () => clearTimeout(timer);
+  }, [defaultOpen]);
+  const runAction = (action: ModelPickerAction) => {
+    setIsOpen(false);
+    // After the list has closed, so its focus return can't land on what the action opens.
+    setTimeout(action.onAction, 0);
+  };
 
   // Each option carries the icon of its provider prefix.
   const withIcon = (option: ModelPickerOption): ModelOption => ({
@@ -402,6 +453,8 @@ export function ProviderModelSelector({
         }}
         size={SELECT_SIZES[size]}
         disabled={disabled || query.isLoading}
+        open={isOpen}
+        onOpenChange={(details) => setIsOpen(details.open)}
       >
         <Select.Trigger
           className="fix-hidden-inputs"
@@ -458,7 +511,7 @@ export function ProviderModelSelector({
               />
             )}
             {filteredModels.map((item) => (
-              <ModelItem key={item.value} item={item} size={size} />
+              <ModelItem key={item.value} item={item} size={size} onAction={runAction} />
             ))}
           </Select.List>
           {footer ? (

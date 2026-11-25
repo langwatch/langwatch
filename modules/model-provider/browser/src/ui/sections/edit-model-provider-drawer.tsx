@@ -17,11 +17,15 @@ type EditModelProviderDrawerProps = {
   organizationId?: string;
   modelProviderId?: string;
   providerKey: string;
+  /** Opened from a picker for this model: saving goes back to the picker's drawer, handing it the
+   * model as `pick`, rather than closing every drawer. */
+  returnPick?: string;
 };
 
 export const EditModelProviderDrawer = (props: EditModelProviderDrawerProps) => {
-  const { projectId, organizationId, modelProviderId, providerKey } = props;
-  const { closeDrawer } = useDrawer();
+  const { projectId, organizationId, modelProviderId, providerKey, returnPick } = props;
+  const { closeDrawer, goBackWith, canGoBack } = useDrawer();
+  const onSaved = returnPick && canGoBack ? () => goBackWith({ pick: returnPick }) : undefined;
   const [saveState, setSaveState] = useState<ModelProviderSaveState>({
     busy: false,
     label: "Save",
@@ -99,6 +103,7 @@ export const EditModelProviderDrawer = (props: EditModelProviderDrawerProps) => 
         organizationId={organizationId}
         modelProviderId={modelProviderId}
         providerKey={providerKey}
+        onSaved={onSaved}
         formId="model-provider-form"
         onSaveStateChange={setSaveState}
       />

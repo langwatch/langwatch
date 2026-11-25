@@ -39,12 +39,18 @@ import { useEffect, useRef, useState } from "react";
 import { modelProviderApi } from "../../behavior/model-provider-api.ts";
 import { useHostedDecisionModelOffered } from "../../behavior/use-hosted-decision-model.ts";
 import {
+  CHOOSE_DECISION_MODEL,
   DECISION_MODEL_DISPLAY_NAMES,
   decisionModelPickerOptions,
+  isPickableDecisionOption,
   rolePickerOptions,
+  withAddKeyActions,
 } from "../../model/decision-model-options.ts";
 import { MODEL_ROLE_LABEL } from "../../model/default-model-cascade.ts";
-import { useModelProviderHost } from "../../model/model-provider-host.ts";
+import {
+  MODEL_PROVIDER_MANAGE_PERMISSION,
+  useModelProviderHost,
+} from "../../model/model-provider-host.ts";
 
 /** The snapshot as the browser holds one: its instants are ISO strings. */
 type Payload = WireOf<ModelDefaultSnapshot>;
@@ -147,15 +153,18 @@ function nextHydration({
   editing,
   editingId,
   hydratedFor,
+  initialScope,
 }: {
   editing: ConfigRow | undefined;
   editingId: string | undefined;
   hydratedFor: string | null;
+  /** Creating: the scope the address picked, such as the organization for Instant Evals setup. */
+  initialScope?: ScopeTriadEntry;
 }): { config: Record<string, string>; scopes: ScopeTriadEntry[]; target: string } | null {
   if (!editingId) {
     if (hydratedFor === CREATE_TARGET) return null;
 
-    return { config: {}, scopes: [], target: CREATE_TARGET };
+    return { config: {}, scopes: initialScope ? [initialScope] : [], target: CREATE_TARGET };
   }
   if (!editing || hydratedFor === editing.id) return null;
 
@@ -349,11 +358,30 @@ interface Props {
    *  prop so the drawer fits the URL-driven `currentDrawer` pattern used
    *  everywhere else. */
   editingId?: string;
+  /** The role whose picker starts open, for an address that leads straight to it. */
+  focusRole?: string;
+  /** Creating: the one scope to start with. */
+  scopeType?: string;
+  scopeId?: string;
+  /** A decision model handed back by the provider form: picked once it can run. */
+  pick?: string;
 }
 
-export function DefaultModelOverrideDrawer({ editingId }: Props) {
+function isScopeType(value: string | undefined): value is ScopeType {
+  return value === "ORGANIZATION" || value === "TEAM" || value === "PROJECT";
+}
+
+export function DefaultModelOverrideDrawer({
+  editingId,
+  focusRole,
+  scopeType,
+  scopeId,
+  pick,
+}: Props) {
   const host = useModelProviderHost();
-  const { closeDrawer } = useDrawer();
+  const { closeDrawer, openDrawer } = useDrawer();
+  const canManageProviders = host.hasPermission(MODEL_PROVIDER_MANAGE_PERMISSION);
+  const initialScope = isScopeType(scopeType) && scopeId ? { scopeType, scopeId } : void 0;
   const { projectId, organizationId } = host.scope();
   const utils = modelProviderApi.useUtils();
   const saveMutation = modelProviderApi.modelProvider.saveDefaultModelsConfig.useMutation();
@@ -402,7 +430,12 @@ export function DefaultModelOverrideDrawer({ editingId }: Props) {
 
   const hydratedForRef = useRef<string | null>(null);
   useEffect(() => {
-    const next = nextHydration({ editing, editingId, hydratedFor: hydratedForRef.current });
+    const next = nextHydration({
+      editing,
+      editingId,
+      hydratedFor: hydratedForRef.current,
+      initialScope,
+    });
     if (!next) return;
 
     hydratedForRef.current = next.target;
@@ -462,12 +495,44 @@ export function DefaultModelOverrideDrawer({ editingId }: Props) {
     { projectId: NOT_TARGETED, organizationId, enabled: !!projectId && open },
   );
   const isHostedOffered = useHostedDecisionModelOffered({ projectId, enabled: open });
-  const decisionOptions = decisionModelPickerOptions({
+  const listedDecisionOptions = decisionModelPickerOptions({
     pickable: pickableDecisionModels.data,
     isJudgeRouted,
     isOwnModelEnabled,
     isHostedOffered,
   });
+  // A row waiting on a key opens that provider's form over this drawer, which comes back with the
+  // model as `pick` once the key is saved.
+  const decisionOptions = canManageProviders
+    ? withAddKeyActions({
+        options: listedDecisionOptions,
+        onAddKey: ({ provider, model }) =>
+          openDrawer(
+            "editModelProvider",
+            {
+              projectId,
+              organizationId,
+              providerKey: provider,
+              modelProviderId: "new",
+              returnPick: model,
+            },
+            { replace: false },
+          ),
+      })
+    : listedDecisionOptions;
+
+  // Picked once the key behind it reaches every scope; a model it doesn't reach stays unpicked.
+  const [appliedPick, setAppliedPick] = useState<string | null>(null);
+  const isPickableLoaded = pickableDecisionModels.isSuccess && !pickableDecisionModels.isFetching;
+  useEffect(() => {
+    if (!pick || appliedPick === pick || !isPickableLoaded || hydratedForRef.current === null) {
+      return;
+    }
+    setAppliedPick(pick);
+    if (isPickableDecisionOption({ options: listedDecisionOptions, model: pick })) {
+      setConfig((prev) => withOverride(prev, "INSTANT_EVALS", pick));
+    }
+  }, [pick, appliedPick, isPickableLoaded, listedDecisionOptions]);
   const modelOptionsByRole = modelOptionsByRoleFor({
     decisionOptions,
     hasProviderLoadError: projectProviders.isError,
@@ -578,6 +643,7 @@ export function DefaultModelOverrideDrawer({ editingId }: Props) {
               displayNames={displayNames}
               pickerOptionFor={pickerOptionFor}
               pickerFor={(llmOptions) => rolePickerOptions({ role, decisionOptions, llmOptions })}
+              startsOpen={focusRole === role}
             />
           ))}
         </VStack>
@@ -606,6 +672,7 @@ function RoleRow({
   displayNames,
   pickerOptionFor,
   pickerFor,
+  startsOpen = false,
 }: {
   role: ModelRole;
   config: Record<string, string>;
@@ -624,6 +691,8 @@ function RoleRow({
   pickerOptionFor: (modelValue: string) => ModelPickerOption;
   /** This row's picker options from its LLM entries. */
   pickerFor: (llmOptions: ModelPickerOption[]) => ModelPickerOption[];
+  /** The picker starts open, for an address that leads straight to it. */
+  startsOpen?: boolean;
 }) {
   // A pinned LangWatch model the column no longer offers reads as unset, as the table cell does.
   const stored = canonicalModelId(config[role] ?? "");
@@ -671,6 +740,7 @@ function RoleRow({
             onChange={(m) => onSetOverride(role, m)}
             inheritOption={unsetDefault && !current ? undefined : roleInherit}
             disabled={unsupportedAtScope}
+            defaultOpen={startsOpen}
             labelFor={(fullModelId) =>
               modelDisplayLabel({ fullModelId: canonicalModelId(fullModelId), displayNames })
             }
@@ -850,7 +920,7 @@ export function inheritHitOption(entry: InheritedEntry): InheritOptionShape | un
 /**
  * Builds the `inheritOption` payload `ProviderModelSelector` consumes. With no cascade hit it
  * reads "Not configured" with no model attached, so an edit can clear a pinned key back to
- * inherit; Instant Evals falls back to LangWatch Instant (preview), or "Not set" if not offered.
+ * inherit; Instant Evals falls back to LangWatch Instant (preview), or asks for a decision model.
  */
 export function buildInheritOption(
   entry: InheritedEntry,
@@ -860,7 +930,7 @@ export function buildInheritOption(
   const hit = inheritHitOption(entry);
   if (hit) return hit;
   if (role === "INSTANT_EVALS") {
-    if (!isHostedOffered) return { label: "Not set" };
+    if (!isHostedOffered) return { label: CHOOSE_DECISION_MODEL };
     return { model: LANGWATCH_DECISION_MODEL_ID, label: "Default", isUnsetDefault: true };
   }
   return { label: "Not configured" };
@@ -879,7 +949,7 @@ export function roleInheritOption({
   role: ModelRole;
   inherited: Record<string, InheritedEntry>;
   config: Record<string, string>;
-  /** Whether LangWatch Instant (preview) may be offered; if not, unset reads "Not set". */
+  /** Whether LangWatch Instant (preview) may be offered; if not, unset asks for a decision model. */
   isHostedOffered?: boolean;
 }): InheritOptionShape {
   const own = inheritHitOption(inherited[role] ?? null);
