@@ -149,12 +149,8 @@ describe("PrismaGatewayA2aTargetRepository", () => {
       const { repository, unsealed } = recordingDatabase({ rows });
 
       const all = await repository.findAll("org_1", { headers: false });
-      const scoped = await repository.findByProject(
-        { organizationId: "org_1", projectId: "p1" },
-        { headers: false },
-      );
 
-      expect([...all, ...scoped].map((target) => target.upstreamHeaders)).toEqual([{}, {}]);
+      expect(all.map((target) => target.upstreamHeaders)).toEqual([{}]);
       expect(unsealed).toEqual([]);
     });
 

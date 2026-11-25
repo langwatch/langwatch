@@ -93,7 +93,7 @@ describe("given the By customer widgets", () => {
     expect(sql.passRates).toContain("min(TraceOccurredAt) AS at");
     expect(code).toContain("const MIN_JUDGED = 30;");
     expect(code).toContain("drop >= 0.02 && spread > 0 && drop / spread >= 1.96");
-    for (const header of ["Pass rate", "Before", "AI cost"]) {
+    for (const header of ["Checks passed", "Before", "AI cost"]) {
       expect(code).toContain(`header: "${header}"`);
     }
   });
@@ -104,7 +104,7 @@ describe("given the By customer widgets", () => {
     expect(sql.change).toContain("arrayReverseSort(groupArray(tuple(first_seen, version)))");
     expect(sql.change).toContain("length(versions) > 1");
     expect(sql.units).toContain("GROUP BY unit, version");
-    // The metadata version wins; the managed one is a plain traces column, never the map.
+    // The metadata version wins; the managed one is a plain trace_metrics column, never the map.
     expect(sql.units).toContain("coalesce(nullIf(t.version, ''), t.managed, '')");
     expect(sql.units).toContain("FROM trace_evaluation_metrics");
     expect(sql.change).toContain("MetadataPromptVersion != ''");
@@ -112,14 +112,14 @@ describe("given the By customer widgets", () => {
     expect(sql.change).toContain("AND managed != ''");
     for (const text of [sql.units, sql.change]) expect(text).not.toContain("Attributes[");
     expect(code).toContain('row.version === last.version ? "after"');
-    expect(code).toContain("No new prompt version started in this period.");
+    expect(code).toContain("No new prompt version in this period.");
   });
 
   /** @scenario "AC84 By customer: spend by customer, top six" */
   it("ranks the six costliest customers and sums the rest", () => {
     const { code, sql } = built("cost-by-segment");
     expect(sql.units).toContain("ORDER BY cost DESC\nLIMIT 6");
-    expect(code).toContain("and {more} more {unitOf(key).many}, {usd(rest)}");
+    expect(code).toContain("and {more} more, {usd(rest)}");
   });
 });
 
@@ -130,8 +130,8 @@ describe("given the Call quality widgets", () => {
     expect(sql.summary).toContain("HAVING countIf(SpanName IN ('stt', 'tts')) > 0");
     expect(sql.summary).toContain("sumIf(DurationMs, SpanType = 'llm')");
     expect(sql.summary).toContain("speaking_second_p95");
-    expect(code).toContain('label="Reply time, slowest 5%"');
-    expect(code).toContain('label="Grew most, second half"');
+    expect(code).toContain('label="Slow replies take"');
+    expect(code).toContain('label="Grew most lately"');
   });
 
   /** @scenario "AC86 Call quality: calls not ended and repeated sentences" */
@@ -140,7 +140,7 @@ describe("given the Call quality widgets", () => {
     expect(sql.summary).toContain("argMax(ContainsErrorStatus, at) AS not_ended");
     expect(sql.summary).toContain(`EvaluatorName = '${REPEAT_CHECK}'`);
     expect(sql.summary).toContain("AS repeat_checks");
-    expect(code).toContain('"Add the " + REPEAT_CHECK');
+    expect(code).toContain('"Not checked yet: add the repeat check"');
   });
 });
 
@@ -162,7 +162,7 @@ describe("given the Field accuracy widgets", () => {
     expect(sql.summary).toContain("MetadataSentToReview = 'true'");
     expect(sql.summary).toContain("MetadataOutcome = 'handover'");
     expect(sql.byUnit).toContain("ORDER BY documents >= 30 DESC");
-    expect(code).toContain("reports sent_to_review or an outcome");
+    expect(code).toContain("which documents go to a person");
   });
 });
 
@@ -171,7 +171,8 @@ describe("given the Outputs users keep widget", () => {
   it("counts outputs by reported action and names the biggest drop", () => {
     const { code, sql } = built("gen-dropoff");
     expect(sql.main).toContain("MetadataOutputAction IN ('accepted', 'edited')");
-    expect(code).toContain('"biggest drop, at "');
+    expect(code).toContain('" outputs are lost at "');
+    expect(code).toContain("from: index === 0 ? undefined : all[index - 1].label");
   });
 });
 
@@ -184,6 +185,7 @@ describe("given the Risk sign-off widgets", () => {
     expect(sql.backlog).toContain("FROM annotation_queue_items");
     expect(code).toContain("tone: traces >= 30 ? zone(lowest < 0.9, lowest < 0.99) : undefined");
     expect(code).not.toContain("Ready to sign");
+    expect(code).toContain('label: "Lowest safety-check coverage"');
   });
 
   /** @scenario "AC91 Risk sign-off: policy checks with their margin" */
@@ -193,6 +195,8 @@ describe("given the Risk sign-off widgets", () => {
     expect(sql.main).toContain("ORDER BY passed / judged ASC");
     expect(code).toContain("const FLOOR = 0.9;");
     expect(code).toContain("function margin(passed, judged)");
+    expect(code).toContain("margin(num(row.passed), num(row.judged))[0] < FLOOR");
+    expect(code).toContain("else if (low < FLOOR) colour = C.orange;");
   });
 
   /** @scenario "AC92 Risk sign-off: review queue" */

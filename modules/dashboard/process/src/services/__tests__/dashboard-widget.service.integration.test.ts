@@ -243,10 +243,8 @@ describe.skipIf(!databaseUrl)("dashboard widget service (integration)", () => {
         });
 
         expect(updated.definition.code).toBe("new");
-        // Created unset, so each query stores application (AC200o).
-        expect(updated.definition.queries).toEqual(
-          QUERIES.map((query) => ({ ...query, sources: ["application"] })),
-        );
+        // Created unset over SQL that never reads the sources parameter, so none stores a list.
+        expect(updated.definition.queries).toEqual(QUERIES);
       });
     });
 

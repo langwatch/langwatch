@@ -25,7 +25,7 @@ export const PROMPT_VERSION_HISTORY_REBUILDING_NOTICE =
 export const PROMPT_VERSION_HISTORY_UNKNOWN_NOTICE = "Prompt version history unknown";
 
 const MANAGED_PROMPT_VERSION = /\bLastUsedPromptVersionId\b/;
-const FROM_TRACE_METRICS = /\b(?:FROM|JOIN)\s+(?:analytics\.)?trace_metrics(?:__floor)?\b/i;
+const FROM_TRACE_METRICS = /\b(?:FROM|JOIN)\s+(?:[a-z_]+\.)?trace_metrics(?:__floor)?\b/i;
 const UNION = /\bUNION\s+(?:ALL|DISTINCT)\b/i;
 const OPENS_SUBQUERY = /^\s*(?:SELECT|WITH)\b/i;
 const LINE_COMMENT = /--[^\n]*/g;

@@ -1,19 +1,17 @@
 /**
- * `/[project]/dashboards/templates`: the templates finder. A picked category turns the header
- * into its question and pitch; an agent-type chip shows only the templates made for that type.
- * Adding one makes a board for the whole project and drafts its report in Langy (AC140).
+ * `/[project]/dashboards/templates`: the templates finder, one ranked grid under "All". A category
+ * turns the header into its question and pitch; an agent-type chip shows the templates made for
+ * that type, adapted to it. Adding one makes a project board and drafts its report (AC140).
  */
 
 import { Box, Button, Grid, Heading, Text, VStack } from "@langwatch/design-system/primitives";
 import { type ReactNode, useId } from "react";
 
-import { useBoardFromTemplate } from "../../behavior/use-board-from-template.ts";
-import { useBoardPeriod } from "../../behavior/use-board-period.ts";
+import { useAddTemplate } from "../../behavior/use-add-template.ts";
 import { useSavedDashboards } from "../../behavior/use-saved-dashboards.ts";
+import { useStoreProject } from "../../behavior/use-store-project.ts";
 import { useTemplateLibraryFilters } from "../../behavior/use-template-library-filters.ts";
 import { TRUNK_PITCHES, TRUNK_QUESTIONS, type Trunk } from "../../catalogue/index.ts";
-import { useLangyAsk } from "../../langy/behavior/use-board-langy.ts";
-import { boardPromptDraft, boardSubject } from "../../langy/model/board-langy.ts";
 import { boardFromTemplateId, dashboardsPath } from "../../model/boards.ts";
 import { filterCatalogue, trunkCounts } from "../../model/catalogue-filter.ts";
 import {
@@ -29,7 +27,6 @@ import {
   TRUNK_PALETTES,
   TrunkChips,
 } from "../blocks/catalogue-filters.tsx";
-import { OldAnalyticsBanner } from "../blocks/old-analytics-banner.tsx";
 import { AddTemplateButton, TemplateCard } from "../blocks/template-card.tsx";
 import { DashboardsGate } from "./dashboards-gate.tsx";
 
@@ -104,37 +101,88 @@ function TrunkSection({
           {section.items.length}
         </Text>
       </Box>
-      {/* Columns follow the page's own width: one on a phone, up to three on a wide screen. */}
-      <Grid templateColumns="repeat(auto-fill, minmax(min(100%, 340px), 1fr))" gap={5}>
-        {section.items.map(renderCard)}
-      </Grid>
+      <CardGrid templates={section.items} renderCard={renderCard} />
     </VStack>
   );
 }
 
-function TemplatesLibrary() {
+/** Columns follow the page's own width: one on a phone, up to three on a wide screen. */
+function CardGrid({
+  templates,
+  renderCard,
+}: {
+  templates: readonly LibraryTemplate[];
+  renderCard: (template: LibraryTemplate) => ReactNode;
+}) {
+  return (
+    <Grid templateColumns="repeat(auto-fill, minmax(min(100%, 340px), 1fr))" gap={5}>
+      {templates.map(renderCard)}
+    </Grid>
+  );
+}
+
+/** A picked category's section, or under "All" one grid with no headings. */
+function TemplateResults({
+  templates,
+  byTrunk,
+  renderCard,
+}: {
+  templates: readonly LibraryTemplate[];
+  byTrunk: boolean;
+  renderCard: (template: LibraryTemplate) => ReactNode;
+}) {
+  if (!byTrunk) {
+    return <TemplateGrid label="All templates" templates={templates} renderCard={renderCard} />;
+  }
+  return templateSections({ templates }).map((section) => (
+    <TrunkSection key={section.key} section={section} renderCard={renderCard} />
+  ));
+}
+
+/** "All": one grid, one template per job, most needed first, with no category headings. */
+function TemplateGrid({
+  label,
+  templates,
+  renderCard,
+}: {
+  label: string;
+  templates: readonly LibraryTemplate[];
+  renderCard: (template: LibraryTemplate) => ReactNode;
+}) {
+  return (
+    <Box as="section" aria-label={label}>
+      <CardGrid templates={templates} renderCard={renderCard} />
+    </Box>
+  );
+}
+
+/**
+ * The finder. At the organization level (`/dashboards/templates`) a template is always added
+ * anew to the store project, Only me and numbered, so no card reads "Added" (ADR-002).
+ */
+export function TemplatesLibrary({ atOrganization = false }: { atOrganization?: boolean }) {
   const { filters, setFilters, clearFilters } = useTemplateLibraryFilters();
   const saved = useSavedDashboards();
-  const fromTemplate = useBoardFromTemplate();
-  const langy = useLangyAsk();
-  // The library's address carries no period, so this is the one a new board opens on.
-  const { period } = useBoardPeriod();
+  const store = useStoreProject({ enabled: atOrganization });
+  const fromTemplate = useAddTemplate({
+    atOrganization,
+    storeProject: store.storeProject,
+    existingNames: atOrganization ? store.namesInStore : saved.boards.map(({ name }) => name),
+  });
+  // At the organization level a board is made Only me in the store project, so it needs both
+  // grants there (ADR-002); with none, nothing makes a board.
+  const offersAdd = !atOrganization || (store.storeProject !== void 0 && store.mayShare);
   // The agent type picks the pool; the search and the category narrow it.
   const pool = finderPool({ agentKind: filters.agentKind });
   const shown = filterCatalogue({ items: pool, filters });
   const isFiltered = Boolean(filters.search || filters.trunk || filters.agentKind);
 
-  const create = async ({ board: template }: LibraryTemplate) => {
-    const created = await fromTemplate.createFromTemplate({
-      template,
-      existingNames: saved.boards.map(({ name }) => name),
-    });
-    if (!created || !langy.enabled || !template.reportPrompt) return;
-    const board = boardSubject({ board: created, widgets: created.widgets });
-    langy.ask(boardPromptDraft({ prompt: template.reportPrompt, board, period }));
-  };
   const addedHref = ({ board }: LibraryTemplate) => {
-    const dashboardId = boardFromTemplateId({ templateName: board.name, boards: saved.boards });
+    if (atOrganization) return void 0;
+    const dashboardId = boardFromTemplateId({
+      templateNames: [board.name, ...(board.formerNames ?? [])],
+      boards: saved.boards,
+    });
     return dashboardId && dashboardsPath({ projectSlug: saved.projectSlug, dashboardId });
   };
   const renderCard = (template: LibraryTemplate) => (
@@ -142,12 +190,15 @@ function TemplatesLibrary() {
       key={template.board.id}
       template={template}
       actions={
-        <AddTemplateButton
-          name={template.board.name}
-          isCreating={fromTemplate.creatingId === template.board.id}
-          addedHref={addedHref(template)}
-          onCreate={() => void create(template)}
-        />
+        offersAdd ? (
+          <AddTemplateButton
+            name={template.board.name}
+            isCreating={fromTemplate.creatingId === template.board.id}
+            addedHref={addedHref(template)}
+            inProject={!atOrganization}
+            onCreate={() => void fromTemplate.add(template.board)}
+          />
+        ) : null
       }
     />
   );
@@ -196,9 +247,11 @@ function TemplatesLibrary() {
           )}
         </VStack>
       ) : (
-        templateSections({ templates: shown }).map((section) => (
-          <TrunkSection key={section.key} section={section} renderCard={renderCard} />
-        ))
+        <TemplateResults
+          templates={shown}
+          byTrunk={Boolean(filters.trunk)}
+          renderCard={renderCard}
+        />
       )}
     </VStack>
   );
@@ -207,7 +260,6 @@ function TemplatesLibrary() {
 export default function TemplatesLibraryScreen() {
   return (
     <DashboardsGate>
-      <OldAnalyticsBanner />
       <TemplatesLibrary />
     </DashboardsGate>
   );

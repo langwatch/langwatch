@@ -51,6 +51,7 @@ import { MapProjectionExecutor } from "./mapProjectionExecutor.ts";
 import type { ProjectionStoreContext } from "./projectionStoreContext.ts";
 import type { ReplayMarkerChecker } from "./replayMarkerCheck.ts";
 import {
+  type FoldProjectionView,
   type SealedFoldProjection,
   type OpenMapProjection,
   type SealedMapProjection,
@@ -951,6 +952,7 @@ export class ProjectionRouter<
     const entry = this.foldProjections.get(lane);
     if (!entry) throw laneNotRegistered({ kind: "fold", lane });
     if (entry.definition.options?.disabled) return;
+    if (!this.foldEnqueueAccepts({ fold: entry.definition, name: lane, event })) return;
     if (this.queueManager.hasProjectionQueues()) {
       const queue = this.queueManager.getProjectionQueue(lane);
       if (!queue) throw foldQueueNotReady(lane);
@@ -1145,7 +1147,9 @@ export class ProjectionRouter<
   ): Promise<FailedHandoff<EventType>[]> {
     const failures: FailedHandoff<EventType>[] = [];
     for (const [projectionName, { definition: fold }] of this.foldProjections) {
-      const filtered = foldEventsFor(fold, events);
+      const filtered = foldEventsFor(fold, events).filter((event) =>
+        this.foldEnqueueAccepts({ fold, name: projectionName, event }),
+      );
       if (filtered.length === 0) continue;
 
       const queueProcessor = this.queueManager.getProjectionQueue(projectionName);
@@ -1181,6 +1185,7 @@ export class ProjectionRouter<
     for (const event of events) {
       for (const [projectionName, { definition: fold, open: openFold }] of this.foldProjections) {
         if (fold.eventTypes.length > 0 && !fold.eventTypes.includes(event.type)) continue;
+        if (!this.foldEnqueueAccepts({ fold, name: projectionName, event })) continue;
         try {
           await openFold((definition) =>
             this.processFoldProjectionEvent({ projectionName, fold: definition, event, context }),
@@ -1462,6 +1467,38 @@ export class ProjectionRouter<
         },
       });
       return [{ kind: "map", lane: name, events: [event], error: toError(error) }];
+    }
+  }
+
+  /**
+   * The fold's enqueue-time gate, the map's twin: fail-OPEN on a throw, since
+   * admitting costs one job whose apply() ignores the event, declining could drop a count.
+   */
+  private foldEnqueueAccepts({
+    fold,
+    name,
+    event,
+  }: {
+    fold: FoldProjectionView<EventType>;
+    name: string;
+    event: EventType;
+  }): boolean {
+    const filter = fold.options?.enqueue?.filter;
+    if (!filter) return true;
+    try {
+      return filter(event);
+    } catch (error) {
+      this.logger.warn(
+        {
+          projectionName: name,
+          eventId: event.id,
+          eventType: event.type,
+          tenantId: String(event.tenantId),
+          error: error instanceof Error ? error.message : String(error),
+        },
+        "Fold projection enqueue filter threw; admitting the event so no count is lost",
+      );
+      return true;
     }
   }
 

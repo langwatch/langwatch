@@ -308,6 +308,10 @@ import {
   ActivityMonitorService,
   type ActivityMonitorTraces,
 } from "../features/ingestion-source/services/ingestion-source-activity.service.ts";
+import {
+  IngestionSourceFactsService,
+  type IngestionSourceFactSenders,
+} from "../features/ingestion-source/services/ingestion-source-facts.service.ts";
 import { IngestionSourceReadService } from "../features/ingestion-source/services/ingestion-source-read.service.ts";
 import {
   IngestionSecretConfiguration,
@@ -518,6 +522,7 @@ interface GovernanceAppDependencies {
       | "findMemberTeamIds"
       | "assignTeamDepartment"
       | "findPrimaryIntent"
+      | "findMemberById"
       | "getTeam"
       | "getTeamWithMembers"
       | "getMember"
@@ -652,6 +657,7 @@ export class GovernanceModule implements GovernanceRestApi {
       // A self-hosted operator's own AWS identity (an instance or pod role) reads a keyless S3 source.
       deploymentAwsIdentity: readsAwsAsDeployment({ config }),
       bedrockAgentEndpoint: config?.bedrockAgentEndpoint,
+      isSaas: config?.isSaas ?? false,
     });
   }
 
@@ -668,6 +674,7 @@ export class GovernanceModule implements GovernanceRestApi {
     vendorBases,
     deploymentAwsIdentity,
     bedrockAgentEndpoint,
+    isSaas,
   }: {
     ottl: GovernanceOttlGateway;
     ingestionSecrets: IngestionSecretService;
@@ -681,6 +688,7 @@ export class GovernanceModule implements GovernanceRestApi {
     vendorBases: VendorBases;
     deploymentAwsIdentity: boolean;
     bedrockAgentEndpoint: string | undefined;
+    isSaas: boolean;
   }) {
     this.deploymentAwsIdentity = deploymentAwsIdentity;
     this.dependencies = dependencies;
@@ -893,6 +901,7 @@ export class GovernanceModule implements GovernanceRestApi {
       users: dependencies.users,
       featureFlags: dependencies.featureFlags,
       organizations: dependencies.organizations,
+      isSaas,
     });
     this.workspaceViews = DefaultGovernanceAdminWorkspaceViewAuditService.create({
       auditLog: dependencies.auditLog,
@@ -970,6 +979,7 @@ export class GovernanceModule implements GovernanceRestApi {
       providerAccounts: HttpProviderAccountChannel.create({ vendorBases }),
       diagnostics: { warn: (message, context) => logger.warn(context, message) },
       ottl,
+      facts: this.ingestionSourceFacts,
       deploymentAwsIdentity,
     });
     this.ottl = ottl;
@@ -1207,6 +1217,10 @@ export class GovernanceModule implements GovernanceRestApi {
   private readonly workspaceViews: DefaultGovernanceAdminWorkspaceViewAuditService;
   private readonly pullLifecycle: IngestionPullLifecycleService;
   private readonly ingestionSources: IngestionSourceService;
+  /** The created and went-live facts nurturing reacts to; senders arrive at registration. */
+  private readonly ingestionSourceFacts = IngestionSourceFactsService.create({
+    reportError: (error) => logger.warn({ error }, "ingestion source fact not recorded"),
+  });
   private readonly sourceReads: IngestionSourceReadService;
   private readonly securityLakeCallers: SecurityLakeCallersService;
   private readonly securityLakeSources: SecurityLakeSourceService;
@@ -1480,6 +1494,10 @@ export class GovernanceModule implements GovernanceRestApi {
 
   connectPulledUsage(commands: EventingSenders): void {
     this.pulledUsageCommands = commands;
+  }
+
+  connectIngestionSourceFacts(senders: IngestionSourceFactSenders): void {
+    this.ingestionSourceFacts.connect(senders);
   }
 
   connectCodingAssistantBilling(commands: EventingSenders): void {

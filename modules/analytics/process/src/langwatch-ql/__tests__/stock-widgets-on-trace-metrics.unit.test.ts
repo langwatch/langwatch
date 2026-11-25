@@ -42,6 +42,7 @@ const MOVED = [
   "att-share/totals",
   "att-table/units",
   "att-table/passRates",
+  "att-change/units",
   "ask-rising/shares",
   "ask-rising/daily",
 ];
@@ -117,12 +118,8 @@ describe("given the moved stock widget queries", () => {
 
 /** The query that reads the managed prompt version from trace_metrics (goose 00133). */
 const ATT_CHANGE = "att-change/change";
-/** Still on `traces`, unfloored (ADR-006): the two changes queries and att-change's units. */
-const MANAGED_VERSION_ON_TRACES = [
-  "att-change/units",
-  "ck-trend/changes",
-  "ext-cost-per-doc/changes",
-];
+/** Still on `traces`, unfloored (ADR-006): the two changes queries. */
+const MANAGED_VERSION_ON_TRACES = ["ck-trend/changes", "ext-cost-per-doc/changes"];
 
 const sqlOf = (label: string) => queries.find((query) => query.label === label)?.sql ?? "";
 

@@ -2,7 +2,7 @@ import {
   type ErrorExplanation,
   explainHandledError,
   explainUnhandledError,
-  isTipForPeople,
+  supplementalTips,
 } from "@langwatch/handled-error/presentation";
 import { readEnvelopeTraceId, readHandledError } from "@langwatch/handled-error/read-handled-error";
 
@@ -56,35 +56,4 @@ export function resolveErrorCopy({
     // id only invites a support ticket.
     traceId: handled?.traceId || readEnvelopeTraceId(error),
   };
-}
-
-/**
- * The tips that add something the description didn't already say.
- */
-function supplementalTips({
-  tips,
-  description,
-}: {
-  tips: readonly string[];
-  description: string;
-}): readonly string[] {
-  const forPeople = tips.filter(isTipForPeople);
-  if (!description) return forPeople;
-
-  const target = normalise(description);
-  if (!target) return forPeople;
-
-  return forPeople.filter((tip) => {
-    const candidate = normalise(tip);
-    if (!candidate) return false;
-    return !target.includes(candidate) && !candidate.includes(target);
-  });
-}
-
-/** Words only: two sentences that say the same thing must compare equal. */
-function normalise(text: string): string {
-  return text
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, " ")
-    .trim();
 }

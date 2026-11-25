@@ -7,7 +7,7 @@ import { Button } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { Check, Clipboard } from "lucide-react";
 import type React from "react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { useApiKeyHost } from "../../model/api-key-host.ts";
 
@@ -23,15 +23,28 @@ export function InlineCopyButton({
 }): React.ReactElement {
   const host = useApiKeyHost();
   const [copied, setCopied] = useState(false);
+  const copiedTimer = useRef<number | undefined>(undefined);
+  const isMountedRef = useRef(false);
+
+  // Cleanup runs before an await resumes, so the mounted flag guards the resumed copy.
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+      window.clearTimeout(copiedTimer.current);
+    };
+  }, []);
 
   async function handleCopy(): Promise<void> {
     const ok = await host.copyToClipboard({
       text,
       succeeded: { title: "Copied", description: `${label} copied to clipboard` },
     });
+    if (!isMountedRef.current) return;
     if (ok) {
       setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+      window.clearTimeout(copiedTimer.current);
+      copiedTimer.current = window.setTimeout(() => setCopied(false), 2000);
       onCopied?.();
     }
   }

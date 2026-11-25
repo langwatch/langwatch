@@ -2,8 +2,9 @@
  * @vitest-environment node
  * The organization doors' pre-write ceiling: what it asks authz, and what it refuses unasked.
  * @see specs/rbac/grants-rest-api.feature
+ * @see specs/licensing/billing-only-invite.feature
  */
-import type { AuthzApi } from "@langwatch/authz-contract";
+import { BILLING_PERMISSIONS, type AuthzApi } from "@langwatch/authz-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import { OrganizationGrantCeilingService } from "../organization-grant-ceiling.service.ts";
@@ -84,5 +85,43 @@ describe("given a grant write nobody answers for", () => {
       meta: { missingPermissions: ["traces:view", "team:manage"] },
     });
     expect(findPermissionsBeyondCaller).not.toHaveBeenCalled();
+  });
+});
+
+describe("given a Billing-only invite's grant", () => {
+  const billingGrant = {
+    role: "VIEWER",
+    scopeType: "ORGANIZATION",
+    scopeId: ORGANIZATION_ID,
+    billing: true,
+  } as const;
+
+  it("asks for the Billing bag at the organization, for the person sending it", async () => {
+    const { service, findPermissionsBeyondCaller } = ceiling();
+
+    await service.assertWithinCaller({
+      organizationId: ORGANIZATION_ID,
+      caller: { type: "user", id: "admin" },
+      grants: [billingGrant],
+    });
+
+    expect(findPermissionsBeyondCaller).toHaveBeenCalledWith({
+      organizationId: ORGANIZATION_ID,
+      caller: { type: "user", id: "admin" },
+      scope: { type: "organization", id: ORGANIZATION_ID },
+      permissions: [...BILLING_PERMISSIONS],
+    });
+  });
+
+  it("refuses an inviter who does not hold the Billing bag", async () => {
+    const { service } = ceiling({ missing: ["subscription:manage"] });
+
+    await expect(
+      service.assertWithinCaller({
+        organizationId: ORGANIZATION_ID,
+        caller: { type: "user", id: "member" },
+        grants: [billingGrant],
+      }),
+    ).rejects.toMatchObject({ code: "grant_exceeds_caller_permissions" });
   });
 });

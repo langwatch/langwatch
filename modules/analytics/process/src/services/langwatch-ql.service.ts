@@ -28,7 +28,6 @@ import type {
   LangWatchQLExecutorRepository,
   LangWatchQLResultLimits,
 } from "../repositories/langwatch-ql-executor.repository.ts";
-import { langWatchQLPassSql } from "../rules/langwatch-ql-pass-sql.rules.ts";
 import {
   assertNoUnsupportedTableModifiers,
   readableMemberWindows,
@@ -52,6 +51,7 @@ import { LangWatchQLCapabilityService } from "./langwatch-ql-capability.service.
 import { LangWatchQLCompletenessService } from "./langwatch-ql-completeness.service.ts";
 import { LangWatchQLExecutionService } from "./langwatch-ql-execution.service.ts";
 import { LangWatchQLExtractionService } from "./langwatch-ql-extraction.service.ts";
+import { LangWatchQLPassRunService } from "./langwatch-ql-pass-run.service.ts";
 import type { LangWatchQLPlacementGateService } from "./langwatch-ql-placement-gate.service.ts";
 import type { LangWatchQLRunTelemetryService } from "./langwatch-ql-run-telemetry.service.ts";
 import { LangWatchQLSchemaService } from "./langwatch-ql-schema.service.ts";
@@ -66,6 +66,7 @@ const timeWindows = LangWatchQLTimeWindowService.create();
 const lwqlSchema = LangWatchQLSchemaService.create();
 const lwqlCompleteness = LangWatchQLCompletenessService.create();
 const lwqlValidationErrors = LangWatchQLValidationErrorService.create();
+const lwqlPassRun = LangWatchQLPassRunService.create();
 
 const logger = createLogger("langwatch:analytics:lwql");
 
@@ -385,24 +386,16 @@ export class LangWatchQLService {
     assertNoUnsupportedTableModifiers({ sql, views: this.views, database: this.deps.database });
 
     const executor = await this.admit({ projectIds: [project.id], run: "pass" });
-
-    const composed = langWatchQLPassSql({ sql, pass: wrapper });
-    const executionParameters = { ...validation.boundParameters, ...composed.parameters };
-    const execution = await executor.execute({
-      sql: composed.sql,
-      ...(Object.keys(executionParameters).length > 0 ? { parameters: executionParameters } : {}),
+    return lwqlPassRun.runAs({
+      executor,
+      sql,
+      pass: wrapper,
+      database: this.deps.database,
+      views: this.views,
+      bound: validation.boundParameters,
       tenantCapability: lwqlCapability.tenantCapability({ secret: project.lwqlKey }),
       projectIds: [project.id],
     });
-
-    return {
-      columns: execution.columns,
-      rows: execution.rows,
-      statistics: execution.statistics,
-      diagnostics: [],
-      followsTimeWindow: false,
-      followsGranularity: false,
-    };
   }
 
   /** The same, over every project in the set — an API key's readable projects. */

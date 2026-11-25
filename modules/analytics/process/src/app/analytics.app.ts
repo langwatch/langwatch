@@ -116,9 +116,12 @@ import { readLegacyTimeseriesBody } from "../rules/analytics-legacy-body.rules.t
 import { savedWorkbenchChartPlatformUrl as savedWorkbenchChartPlatformUrl_ } from "../rules/analytics-platform-url.rules.ts";
 import type { LwqlAccessModelOwner } from "../rules/langwatch-ql-config-store.rules.ts";
 import { langWatchQLJudgementCalls } from "../rules/langwatch-ql-judgement-questions.rules.ts";
-import { keyRunTelemetry } from "../rules/langwatch-ql-key-caller.rules.ts";
+import { keyReachProjectIds, keyRunTelemetry } from "../rules/langwatch-ql-key-caller.rules.ts";
 import { DEFAULT_LWQL_RESULT_LIMITS } from "../rules/langwatch-ql-result-limits.rules.ts";
-import { langWatchQLQueryHashKey } from "../rules/langwatch-ql-run-telemetry.rules.ts";
+import {
+  langWatchQLQueryHashKey,
+  langWatchQLRunProjectIds,
+} from "../rules/langwatch-ql-run-telemetry.rules.ts";
 import { dashboardsEnabled, lwqlEnabled } from "../rules/lwql-access.rules.ts";
 import { buildQueryReference } from "../rules/query-reference.rules.ts";
 import { LoggingAnalyticsTripwireService } from "../services/analytics-tripwire.service.ts";
@@ -269,6 +272,11 @@ type LwqlProvisioningOperations = Readonly<{
   convergeAppOwned: (drift: LwqlAppOwnedDrift) => Promise<void>;
   fillProjectKeys: (input: { dryRun: boolean }) => Promise<LwqlProjectKeyFillReport>;
 }>;
+
+/** Where a run leaves the projects its scope resolved to, for its failed-run line. */
+interface ResolvedProjectIds {
+  projectIds: readonly string[] | undefined;
+}
 
 const NO_DRIFT: LwqlAppOwnedDrift = { clickHouse: [], postgres: [], isKeyMapMissing: false };
 
@@ -876,10 +884,22 @@ export class AnalyticsModule
   ): Promise<LangWatchQLQueryResult> {
     // The caller, on its runs that answer and on those refused before the engine.
     const telemetry = keyRunTelemetry({ reach: input.reach, door: input.door ?? "rest_api" });
+    const resolved: ResolvedProjectIds = { projectIds: undefined };
     try {
-      return await this.#runLangWatchQLForKey({ ...input, telemetry });
+      return await this.#runLangWatchQLForKey({ ...input, telemetry, resolved });
     } catch (error) {
-      this.#dependencies.runTelemetry.recordFailed({ telemetry, sql: input.sql, error });
+      this.#dependencies.runTelemetry.recordFailed({
+        telemetry,
+        sql: input.sql,
+        error,
+        // A wide key names no project on its own, so the resolved scope speaks when it finished.
+        projectIds:
+          resolved.projectIds ??
+          langWatchQLRunProjectIds({
+            own: [...keyReachProjectIds({ reach: input.reach }), input.projectId],
+            named: input.projects,
+          }),
+      });
       throw error;
     }
   }
@@ -890,6 +910,7 @@ export class AnalyticsModule
         reach: LangWatchQLKeyReach;
         signal?: AbortSignal;
         telemetry: LangWatchQLRunTelemetry;
+        resolved: ResolvedProjectIds;
       } & LangWatchQLKeyStatementRequest
     >,
   ): Promise<LangWatchQLQueryResult> {
@@ -903,6 +924,7 @@ export class AnalyticsModule
           requireProjects: true,
           ...(wanted === undefined ? {} : { projects: wanted }),
         });
+    input.resolved.projectIds = projects.map(({ id }) => id);
     for (const project of projects) {
       await this.#dependencies.lwqlBounds.assertQueryWithinBounds({ projectId: project.id });
     }
@@ -997,8 +1019,9 @@ export class AnalyticsModule
   async executeLangWatchQL(
     input: LangWatchQLExecuteInput & Readonly<{ authorization?: Authorization }>,
   ): Promise<LangWatchQLQueryResult> {
+    const resolved: ResolvedProjectIds = { projectIds: undefined };
     try {
-      return await this.#executeLangWatchQL(input);
+      return await this.#executeLangWatchQL({ ...input, resolved });
     } catch (error) {
       // Every refusal on the way counts, the window and the project scope included, not only
       // the database's: a gate that turns most widget runs away is the failure worth an alert.
@@ -1006,17 +1029,23 @@ export class AnalyticsModule
         telemetry: input.telemetry,
         sql: input.sql,
         error,
+        // The resolved scope speaks when it finished; a run refused earlier names what it asked.
+        projectIds:
+          resolved.projectIds ??
+          langWatchQLRunProjectIds({ own: [input.project.id], named: input.projects }),
       });
       throw error;
     }
   }
 
   async #executeLangWatchQL(
-    input: LangWatchQLExecuteInput & Readonly<{ authorization?: Authorization }>,
+    input: LangWatchQLExecuteInput &
+      Readonly<{ authorization?: Authorization; resolved: ResolvedProjectIds }>,
   ): Promise<LangWatchQLQueryResult> {
-    const { authorization, project, projects: asked, userId, ...run } = input;
+    const { authorization, project, projects: asked, userId, resolved, ...run } = input;
     const selection = this.#runScope.select({ projects: asked });
     const scope = await this.#runScope.resolve({ authorization, project, selection, userId });
+    if (scope.kind !== "own") resolved.projectIds = scope.projects.map(({ id }) => id);
 
     if (scope.kind === "aggregate") {
       // A judged column is charged to one project, so an aggregate's statement may call none.

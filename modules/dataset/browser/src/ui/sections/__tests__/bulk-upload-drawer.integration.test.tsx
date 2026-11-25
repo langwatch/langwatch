@@ -32,7 +32,7 @@ vi.mock("../../../model/parse-header-columns.ts", async (orig) => {
   };
 });
 
-// Each row polls dataset.getById while its file is preparing — resolve ready.
+// Each file's status watcher polls dataset.getById while it is preparing: resolve ready.
 const getByIdQuery = vi.fn(() => ({
   data: { id: "dataset_x", name: "n", status: "ready", columnTypes: [] },
   isFetched: true,
@@ -292,12 +292,43 @@ describe("given the bulk upload drawer", () => {
       await user.upload(fileInput(), [csv("one.csv")]);
       await waitFor(() => expect(screen.getByText("one")).toBeInTheDocument());
       await user.click(uploadButton());
+      // Under load the upload starts a tick after the click; resolving earlier resolves nothing.
+      await waitFor(() => expect(uploadStoredObject).toHaveBeenCalled());
 
       act(() => closeDrawer());
       finishUpload({ id: "so_1" });
 
       await waitFor(() => expect(onUploaded).toHaveBeenCalled());
       expect(onOpenDataset).not.toHaveBeenCalled();
+    });
+
+    /** @scenario Closing the drawer mid-upload keeps the files preparing */
+    it("still reports each file ready when the uploads finish after the drawer has gone", async () => {
+      const user = userEvent.setup();
+      const onUploaded = vi.fn();
+      let finishUploads: (v: unknown) => void = () => {};
+      uploadStoredObject.mockReset().mockReturnValue(
+        new Promise((resolve) => {
+          finishUploads = resolve;
+        }),
+      );
+      let closeDrawer = () => {};
+      function ClosableDrawer() {
+        const [open, setOpen] = useState(true);
+        closeDrawer = () => setOpen(false);
+        return <BulkUploadDrawer open={open} onClose={vi.fn()} onUploaded={onUploaded} />;
+      }
+      renderWithDatasetHost(<ClosableDrawer />, { project: { id: "proj_1", slug: "proj" } });
+      await user.upload(fileInput(), [csv("one.csv"), csv("two.csv")]);
+      await waitFor(() => expect(screen.getByText("one")).toBeInTheDocument());
+      await user.click(uploadButton());
+
+      act(() => closeDrawer());
+      // The rows are gone before either upload lands, as on a slow network.
+      await waitFor(() => expect(screen.queryByText("one")).not.toBeInTheDocument());
+      finishUploads({ id: "so_1" });
+
+      await waitFor(() => expect(onUploaded).toHaveBeenCalledTimes(2));
     });
 
     /** @scenario The types I confirmed are applied to that file's dataset */
