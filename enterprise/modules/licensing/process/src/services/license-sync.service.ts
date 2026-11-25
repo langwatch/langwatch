@@ -73,6 +73,8 @@ const SYNC_REFUSALS: Record<LicenseSyncRefusalCode, () => HandledError> = {
 
 /** How far a chain walk goes before it stops: a guard against a cycle in bad data. */
 const MAX_CHAIN = 100;
+/** Walks of the chain a sync makes before it gives up on a pick that keeps being retired. */
+const MAX_PICK_ATTEMPTS = 3;
 
 export class LicenseSyncService {
   static create(options: LicenseSyncOptions): LicenseSyncService {
@@ -205,21 +207,40 @@ export class LicenseSyncService {
   }
 
   /**
-   * The newest license waiting for this install, or nothing. An extension
-   * signed while another waited replaces that one, so the walk goes to the end.
+   * The newest license waiting for this install, or nothing; the walk goes to
+   * the chain's end. A delivery completing meanwhile can retire the pick, so
+   * it is read again and the walk repeated when it no longer waits.
    */
   private async pendingDelivery(row: IssuedLicenseRecord): Promise<string | undefined> {
-    let held: string | undefined;
+    for (let attempt = 0; attempt < MAX_PICK_ATTEMPTS; attempt++) {
+      const picked = await this.newestHeld(row);
+      if (!picked) return undefined;
+      const fresh = await this.options.repository.findById(picked.id);
+      if (fresh && stillWaiting(fresh) && fresh.pendingDeliveryLicense === picked.license) {
+        return picked.license;
+      }
+    }
+    return undefined;
+  }
+
+  private async newestHeld(
+    row: IssuedLicenseRecord,
+  ): Promise<{ id: string; license: string } | undefined> {
+    let held: { id: string; license: string } | undefined;
     let replacement = await this.options.repository.findByReplacesId(row.id);
     for (let step = 0; replacement && step < MAX_CHAIN; step++) {
-      if (replacement.pendingDeliveryLicense && !replacement.revokedAt) {
-        held = replacement.pendingDeliveryLicense;
+      if (replacement.pendingDeliveryLicense && stillWaiting(replacement)) {
+        held = { id: replacement.id, license: replacement.pendingDeliveryLicense };
       }
       replacement = await this.options.repository.findByReplacesId(replacement.id);
     }
     return held;
   }
 }
+
+/** A held copy is still deliverable while its row is neither revoked nor retired. */
+const stillWaiting = (row: IssuedLicenseRecord): boolean =>
+  row.revokedAt === null && row.supersededAt === null;
 
 function callerOf(
   resolution: Extract<ConnectCredentialOutcome, { ok: true }>,

@@ -559,6 +559,7 @@ export class LicensingModule implements LicensingApiContract {
     id: string;
     operatorId: string;
     reason: string;
+    unusedOnly?: boolean;
   }): Promise<IssuedLicenseView> {
     return this.#registry.revoke(input);
   }

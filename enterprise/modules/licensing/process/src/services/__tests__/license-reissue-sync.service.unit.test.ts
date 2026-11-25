@@ -5,6 +5,7 @@
  */
 import { NodeLicenseCryptographyService } from "@langwatch/enterprise-license-signing";
 import { registryHashForToken } from "@langwatch/gateway-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { Temporal, type Instant } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
@@ -23,6 +24,7 @@ import { ConnectCredentialService } from "../connect-credential.service.ts";
 import { ConnectInstallService } from "../connect-install.service.ts";
 import { InstanceIdentityService } from "../instance-identity.service.ts";
 import { LicenseRefreshService } from "../license-refresh.service.ts";
+import type { ConnectManagedKeys } from "../license-registry.service.ts";
 import { LicenseSyncService } from "../license-sync.service.ts";
 import { appliedConnectFacts } from "./support/applied-connect-facts.ts";
 
@@ -235,63 +237,65 @@ describe("a reissued license over a sync", () => {
   });
 });
 
+/** A registry holding license-1, then two extensions that both wait for delivery. */
+async function chainOfThree() {
+  const first = licenseOf({ licenseId: "lic-1", maxMembers: 50 });
+  const second = licenseOf({ licenseId: "lic-2", maxMembers: 50 });
+  const third = licenseOf({ licenseId: "lic-3", maxMembers: 50 });
+  const registry = MemoryIssuedLicenseRepository.create([
+    await registryRow({ licenseKey: first }),
+    await registryRow({
+      licenseKey: second,
+      id: "license-2",
+      licenseId: "lic-2",
+      replacesId: "license-1",
+      pendingDeliveryLicense: second,
+      virtualKeyId: "vk-2",
+    }),
+    await registryRow({
+      licenseKey: third,
+      id: "license-3",
+      licenseId: "lic-3",
+      replacesId: "license-2",
+      pendingDeliveryLicense: third,
+      virtualKeyId: "vk-3",
+    }),
+  ]);
+  const retired: string[] = [];
+  const managedKeys = createApiFixture<ConnectManagedKeys>({
+    retire: async ({ virtualKeyId }) => void retired.push(virtualKeyId),
+    setConnectServices: async () => undefined,
+    setLicense: async () => undefined,
+  });
+  const sync = LicenseSyncService.create({
+    credentials: ConnectCredentialService.create({
+      repository: registry,
+      managedKeys,
+      cryptography,
+      systemActorId: "system",
+      now: () => NOW,
+    }),
+    repository: registry,
+    managedKeys,
+    rateLimit: { allow: () => Promise.resolve(true) },
+    systemActorId: "system",
+    now: () => NOW,
+  });
+  const syncWith = async (licenseKey: string) =>
+    sync.answer({
+      caller: await sync.verify({
+        bearer: cryptography.getLicenseToken(licenseKey),
+        instanceId: INSTANCE,
+      }),
+      body: { version: "1.42.0", seats: { members: 8, liteMembers: 0 } },
+    });
+  return { first, third, registry, retired, syncWith };
+}
+
 describe("an extension signed while another waited", () => {
   /** @scenario An extension signed while another waited arrives in one sync */
   it("is the one the sync carries, and presenting it retires both licenses before it", async () => {
-    const first = licenseOf({ licenseId: "lic-1", maxMembers: 50 });
-    const second = licenseOf({ licenseId: "lic-2", maxMembers: 50 });
-    const third = licenseOf({ licenseId: "lic-3", maxMembers: 50 });
-    const registry = MemoryIssuedLicenseRepository.create([
-      await registryRow({ licenseKey: first }),
-      await registryRow({
-        licenseKey: second,
-        id: "license-2",
-        licenseId: "lic-2",
-        replacesId: "license-1",
-        pendingDeliveryLicense: second,
-        virtualKeyId: "vk-2",
-      }),
-      await registryRow({
-        licenseKey: third,
-        id: "license-3",
-        licenseId: "lic-3",
-        replacesId: "license-2",
-        pendingDeliveryLicense: third,
-        virtualKeyId: "vk-3",
-      }),
-    ]);
-    const retired: string[] = [];
-    const managedKeys = {
-      issue: async () => undefined,
-      retire: async ({ virtualKeyId }: { virtualKeyId: string }) => {
-        retired.push(virtualKeyId);
-      },
-      invalidate: async () => undefined,
-      setConnectServices: async () => undefined,
-      setLicense: async () => undefined,
-    };
-    const sync = LicenseSyncService.create({
-      credentials: ConnectCredentialService.create({
-        repository: registry,
-        managedKeys,
-        cryptography,
-        systemActorId: "system",
-        now: () => NOW,
-      }),
-      repository: registry,
-      managedKeys,
-      rateLimit: { allow: () => Promise.resolve(true) },
-      systemActorId: "system",
-      now: () => NOW,
-    });
-    const syncWith = async (licenseKey: string) =>
-      sync.answer({
-        caller: await sync.verify({
-          bearer: cryptography.getLicenseToken(licenseKey),
-          instanceId: INSTANCE,
-        }),
-        body: { version: "1.42.0", seats: { members: 8, liteMembers: 0 } },
-      });
+    const { first, third, registry, retired, syncWith } = await chainOfThree();
 
     expect(await syncWith(first)).toMatchObject({ license: third });
 
@@ -302,5 +306,24 @@ describe("an extension signed while another waited", () => {
     expect((await registry.findById("license-2"))?.pendingDeliveryLicense).toBeNull();
     expect((await registry.findById("license-3"))?.pendingDeliveryLicense).toBeNull();
     expect(retired).toEqual(["vk-2", "vk-1"]);
+  });
+
+  /** @scenario A sync never carries a license that a delivery retired while it looked */
+  it("carries nothing when the newest extension's delivery completes during the walk", async () => {
+    const { first, third, registry, syncWith } = await chainOfThree();
+    const lookUp = registry.findByReplacesId.bind(registry);
+    let interleaved = false;
+    registry.findByReplacesId = async (replacesId) => {
+      if (replacesId === "license-2" && !interleaved) {
+        interleaved = true;
+        await syncWith(third);
+      }
+      return lookUp(replacesId);
+    };
+
+    const answer = await syncWith(first);
+
+    expect(interleaved).toBe(true);
+    expect(answer).not.toHaveProperty("license");
   });
 });

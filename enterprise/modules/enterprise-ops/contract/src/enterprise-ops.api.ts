@@ -65,6 +65,7 @@ export interface EnterpriseOpsApi {
   revokeIssuedLicense(input: {
     id: string;
     reason: string;
+    unusedOnly?: boolean;
     operator: OpsOperator | null;
   }): Promise<IssuedLicenseView>;
   reissueLicense(input: {

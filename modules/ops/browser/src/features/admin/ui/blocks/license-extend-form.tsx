@@ -31,7 +31,8 @@ export function LicenseExtendForm({
 }) {
   const [newEnd, setNewEnd] = useState(() => presetEnd({ expiresAt, preset: EXTEND_PRESETS[0] }));
   const problem = extendProblem({ expiresAt, newEnd });
-  const picked = problem === undefined ? formatDay(`${newEnd}T12:00:00Z`) : null;
+  const submitted = problem === undefined ? dateInputToISO(newEnd) : null;
+  const picked = submitted ? formatDay(submitted) : null;
   const isPreset = (preset: ExtendPreset) => presetEnd({ expiresAt, preset }) === newEnd;
 
   return (
@@ -86,8 +87,7 @@ export function LicenseExtendForm({
           disabled={problem !== undefined}
           loading={isSaving}
           onClick={() => {
-            const iso = dateInputToISO(newEnd);
-            if (iso) onExtend(iso);
+            if (submitted) onExtend(submitted);
           }}
         >
           {picked ? `Extend to ${picked}` : "Extend"}

@@ -88,7 +88,7 @@ function license(overrides: Partial<License> = {}): License {
 beforeEach(() => {
   issue.mockClear();
   reissue.mockReset();
-  reissue.mockResolvedValue({ licenseKey: "eyJkZXYiOjd9.signature" });
+  reissue.mockResolvedValue({ licenseKey: "signed-dev-seats" });
 });
 
 describe("LicenseIssueDrawer, Developer seats", () => {
@@ -173,6 +173,15 @@ describe("LicenseDetailDrawer, Developer seats", () => {
     expect(screen.getByTestId("change-seats-form").textContent).toContain(
       "Change full seats and Developer seats one at a time.",
     );
+  });
+
+  /** @scenario The admin console states and shows Developer seats */
+  it("reads a typed 00 Developer seats as the 0 the licence states, so full seats can change", () => {
+    renderDrawer(license({ maxMembersDeveloper: null }));
+    fireEvent.change(openSeats(), { target: { value: "00" } });
+    fireEvent.change(screen.getByLabelText("Full seats"), { target: { value: "60" } });
+
+    expect(screen.getByRole("button", { name: "Change to 60 seats" })).toBeEnabled();
   });
 
   /** @scenario The admin console states and shows Developer seats */

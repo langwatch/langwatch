@@ -14,6 +14,7 @@ import {
   type IssueLicenseInput as ContractIssueLicenseInput,
   IssuedLicenseNotActiveError,
   IssuedLicenseNotFoundError,
+  LicenseInUseError,
   LicenseKeyInvalidError,
   OrganizationNotFoundError,
   type IssuedLicenseCustomerRecord,
@@ -169,11 +170,13 @@ export class LicenseRegistryService {
     id: string;
     operatorId: string;
     reason: string;
+    unusedOnly?: boolean;
   }): Promise<IssuedLicenseView> {
     const row = await this.getRow(input.id);
     // An expired license can still be revoked: its term may be extended by a
     // reissue, and a leaked key should stay dead through that.
     this.refuseIfSettled(row);
+    if (input.unusedOnly && row.instanceId !== null) throw new LicenseInUseError();
     // The key ends first. If the row update then fails, the license reads as
     // active with a dead key, which resolves to a refusal, and revoking again
     // finishes the job. The other order could leave a revoked license whose

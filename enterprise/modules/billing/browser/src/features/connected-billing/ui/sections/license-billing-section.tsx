@@ -17,6 +17,7 @@ import {
   needsLicenseSigned,
   nextPaidTerm,
   onboardPayload,
+  paidTermProblem,
   termEndInstant,
 } from "../../model/connected-billing-form.ts";
 import { ConnectedBillingFields } from "../blocks/connected-billing-fields.tsx";
@@ -127,43 +128,45 @@ function BillingFrame({
 
 const today = (): string => nowInstant().toZonedDateTimeISO("UTC").toPlainDate().toString();
 
-/** The form a paid term starts from, reseeded only when the account or the license term moves. */
-function usePaidTermForm({
+/**
+ * The paid-term form and its run: signs the license to the term first, then
+ * bills, and says which step failed. While a signed term waits for billing the
+ * form keeps that term, so a retry bills it instead of the term after it.
+ */
+function usePaidTerm({
   license,
   overview,
 }: {
   license: LicenseBillingSectionProps;
   overview: ConnectedBillingOverview;
 }) {
+  const [heldExpiry, setHeldExpiry] = useState<string | null>(null);
   const seed = () => ({
     ...billingFormFrom({ account: overview.account, license }),
     ...nextPaidTerm({ account: overview.account, license, today: today() }),
     seats: String(license.maxMembers),
   });
   const [form, setForm] = useState<BillingForm>(seed);
-  const seededKey = `${overview.account?.id ?? "trial"}:${overview.account?.termEndsAt ?? ""}:${license.expiresAt}:${license.maxMembers}`;
+  const seededKey = `${overview.account?.id ?? "trial"}:${overview.account?.termEndsAt ?? ""}:${heldExpiry ?? license.expiresAt}:${license.maxMembers}`;
   const [seededFrom, setSeededFrom] = useState(seededKey);
   if (seededFrom !== seededKey) {
     setSeededFrom(seededKey);
     setForm(seed());
   }
-  return [form, setForm] as const;
-}
-
-/**
- * Signs the license to the paid term first, then bills, and says which step
- * failed. A paid term that already ends with the license signs nothing.
- */
-function usePaidTermRun(license: LicenseBillingSectionProps) {
   const [failure, setFailure] = useState<string | null>(null);
   const [isRunning, setIsRunning] = useState(false);
-  const run = async ({ form, bill }: { form: BillingForm; bill: () => Promise<unknown> }) => {
+  const problem = paidTermProblem(form);
+
+  const run = async (bill: () => Promise<unknown>) => {
+    if (problem) return false;
     setFailure(null);
     setIsRunning(true);
     try {
       if (license.signPaidTerm && needsLicenseSigned({ form, license })) {
+        setHeldExpiry(license.expiresAt);
         const signed = await license.signPaidTerm({ expiresAt: termEndInstant(form) });
         if (!signed) {
+          setHeldExpiry(null);
           setFailure("The license step failed, so nothing was billed.");
           return false;
         }
@@ -176,12 +179,17 @@ function usePaidTermRun(license: LicenseBillingSectionProps) {
         );
         return false;
       }
+      setHeldExpiry(null);
       return true;
     } finally {
       setIsRunning(false);
     }
   };
-  return { run, failure, isRunning };
+  const cancel = () => {
+    setHeldExpiry(null);
+    setFailure(null);
+  };
+  return { form, setForm, problem, run, cancel, failure, isRunning };
 }
 
 function WhatItDoes({ steps }: { steps: string[] }) {
@@ -204,8 +212,10 @@ function TrialPanel({
 }) {
   const commands = useConnectedBillingCommands();
   const [open, setOpen] = useState(false);
-  const [form, setForm] = usePaidTermForm({ license, overview });
-  const { run, failure, isRunning } = usePaidTermRun(license);
+  const { form, setForm, problem, run, cancel, failure, isRunning } = usePaidTerm({
+    license,
+    overview,
+  });
   const signs = needsLicenseSigned({ form, license });
 
   return (
@@ -227,9 +237,10 @@ function TrialPanel({
             showPaymentFields
             seatsFromLicense
           />
+          <PaidTermProblem problem={problem} />
           <WhatItDoes
             steps={[
-              ...(signs
+              ...(signs && !problem
                 ? [
                     `Signs the license to ${formLabel(form.termEndsAt)}. The install picks it up on its next sync.`,
                   ]
@@ -244,17 +255,25 @@ function TrialPanel({
             </Text>
           ) : null}
           <HStack gap={2} justify="end">
-            <Button size="sm" variant="ghost" disabled={isRunning} onClick={() => setOpen(false)}>
+            <Button
+              size="sm"
+              variant="ghost"
+              disabled={isRunning}
+              onClick={() => {
+                cancel();
+                setOpen(false);
+              }}
+            >
               Cancel
             </Button>
             <Button
               size="sm"
               loading={isRunning}
+              disabled={problem !== undefined}
               onClick={() =>
-                void run({
-                  form,
-                  bill: () => commands.onboard.mutateAsync(onboardPayload({ form, license })),
-                }).then((done) => done && setOpen(false))
+                void run(() =>
+                  commands.onboard.mutateAsync(onboardPayload({ form, license })),
+                ).then((done) => done && setOpen(false))
               }
             >
               Start billing
@@ -275,8 +294,10 @@ function BilledPanel({
 }) {
   const commands = useConnectedBillingCommands();
   const [renewing, setRenewing] = useState(false);
-  const [form, setForm] = usePaidTermForm({ license, overview });
-  const { run, failure, isRunning } = usePaidTermRun(license);
+  const { form, setForm, problem, run, cancel, failure, isRunning } = usePaidTerm({
+    license,
+    overview,
+  });
   const signs = needsLicenseSigned({ form, license });
 
   return (
@@ -295,9 +316,10 @@ function BilledPanel({
             showPaymentFields={false}
             seatsFromLicense
           />
+          <PaidTermProblem problem={problem} />
           <WhatItDoes
             steps={[
-              ...(signs
+              ...(signs && !problem
                 ? [
                     `Signs the license to ${formLabel(form.termEndsAt)}. The install picks it up on its next sync.`,
                   ]
@@ -315,21 +337,23 @@ function BilledPanel({
               size="sm"
               variant="ghost"
               disabled={isRunning}
-              onClick={() => setRenewing(false)}
+              onClick={() => {
+                cancel();
+                setRenewing(false);
+              }}
             >
               Cancel
             </Button>
             <Button
               size="sm"
               loading={isRunning}
+              disabled={problem !== undefined}
               onClick={() =>
-                void run({
-                  form,
-                  bill: () =>
-                    commands.renew.mutateAsync(
-                      contractPayload({ form, organizationId: license.organizationId }),
-                    ),
-                }).then((done) => done && setRenewing(false))
+                void run(() =>
+                  commands.renew.mutateAsync(
+                    contractPayload({ form, organizationId: license.organizationId }),
+                  ),
+                ).then((done) => done && setRenewing(false))
               }
             >
               Renew
@@ -345,6 +369,15 @@ function BilledPanel({
         </HStack>
       )}
     </BillingFrame>
+  );
+}
+
+function PaidTermProblem({ problem }: { problem: string | undefined }) {
+  if (!problem) return null;
+  return (
+    <Text color="fg.error" fontSize="sm" data-testid="paid-term-problem">
+      {problem}
+    </Text>
   );
 }
 

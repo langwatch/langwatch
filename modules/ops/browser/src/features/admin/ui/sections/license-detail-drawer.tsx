@@ -38,7 +38,7 @@ import { LicenseStatusBadge } from "../elements/license-status-badge.tsx";
 /** Whether the customer pays for the license: billing says so once its section loads. */
 type BillingState = "trial" | "billed";
 
-type Revoke = (license: License, chain: License[]) => void;
+type Revoke = (license: License) => void;
 
 /**
  * One customer's license in the Ops console (ADR-156): the install that holds
@@ -52,7 +52,7 @@ export function LicenseDetailDrawer({
 }: {
   licenseId: string | null;
   onClose: () => void;
-  /** Revokes the license and every live license of its chain, the replacement included. */
+  /** Opens the revoke on the license in use; the dialog reaches every live license of its chain. */
   onRevoke: Revoke;
 }) {
   const query = api.licenseRegistry.getChain.useQuery(
@@ -341,13 +341,7 @@ function UsagePanel({
   );
 }
 
-function DangerZone({
-  chain,
-  onRevoke,
-}: {
-  chain: LicenseChainState;
-  onRevoke: (license: License, chain: License[]) => void;
-}) {
+function DangerZone({ chain, onRevoke }: { chain: LicenseChainState; onRevoke: Revoke }) {
   const changes = useLicenseChanges();
   const bound = chain.live.some((license) => license.instanceId !== null);
   if (chain.live.length === 0) return null;
@@ -371,7 +365,7 @@ function DangerZone({
             size="xs"
             variant="ghost"
             colorPalette="red"
-            onClick={() => onRevoke(chain.inUse, chain.live)}
+            onClick={() => onRevoke(chain.inUse)}
           >
             Revoke license
           </Button>

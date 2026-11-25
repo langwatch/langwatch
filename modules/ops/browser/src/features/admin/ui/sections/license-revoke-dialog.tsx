@@ -1,34 +1,46 @@
 import { Dialog } from "@langwatch/design-system/dialog";
-import { Field, Textarea } from "@langwatch/design-system/primitives";
+import { Field, Text, Textarea } from "@langwatch/design-system/primitives";
 import { useEffect, useRef, useState } from "react";
 
+import { api } from "../../../../behavior/ops-api.ts";
 import { useShowErrorToast } from "../../../../behavior/ops-feedback.ts";
 import { useLicenseCommands } from "../../behavior/use-license-commands.ts";
+import { licenseChainState } from "../../model/license-chain.ts";
 import type { License } from "../../model/license-terms.ts";
 
 const MIN_REASON_LENGTH = 3;
 
+/**
+ * Revokes a license and every live license of its reissue chain, read here so
+ * the table and the drawer revoke the same set: a replacement waiting for sync
+ * would otherwise stay live. A retry skips the rows an earlier attempt revoked.
+ */
 export function LicenseRevokeDialog({
   license,
-  chain,
   onClose,
 }: {
   license: License | null;
-  /** Every live license revoked with it: a replacement waiting for sync would stay live. */
-  chain: License[];
   onClose: () => void;
 }) {
   const [reason, setReason] = useState("");
   const [attempts, setAttempts] = useState(0);
   const reasonRef = useRef<HTMLTextAreaElement>(null);
+  const revokedRef = useRef(new Set<string>());
   const commands = useLicenseCommands();
   const showErrorToast = useShowErrorToast();
+  const chainQuery = api.licenseRegistry.getChain.useQuery(
+    { id: license?.id ?? "" },
+    { enabled: license !== null, retry: false },
+  );
+  const chain = chainQuery.data ? licenseChainState({ licenses: chainQuery.data.licenses }) : null;
   const invalid = attempts > 0 && reason.trim().length < MIN_REASON_LENGTH;
+  const busy = commands.revoke.isPending || commands.revokeQuietly.isPending;
 
   useEffect(() => {
     if (!license) return;
     setReason("");
     setAttempts(0);
+    revokedRef.current = new Set();
   }, [license]);
 
   useEffect(() => {
@@ -36,15 +48,17 @@ export function LicenseRevokeDialog({
   }, [attempts]);
 
   const submit = () => {
-    if (!license || commands.revoke.isPending || commands.revokeQuietly.isPending) return;
+    if (!license || !chain || busy) return;
     if (reason.trim().length < MIN_REASON_LENGTH) {
       setAttempts((count) => count + 1);
       return;
     }
-    const others = chain.filter((row) => row.id !== license.id);
+    const revoked = revokedRef.current;
+    const others = chain.live.filter((row) => row.id !== license.id && !revoked.has(row.id));
     void (async () => {
       for (const row of others) {
         await commands.revokeQuietly.mutateAsync({ id: row.id, reason: reason.trim() });
+        revoked.add(row.id);
       }
       commands.revoke.mutate({ id: license.id, reason: reason.trim() }, { onSuccess: onClose });
     })().catch((error: unknown) =>
@@ -63,7 +77,10 @@ export function LicenseRevokeDialog({
         label: "Revoke license",
         type: "submit",
         danger: true,
-        loading: commands.revoke.isPending || commands.revokeQuietly.isPending,
+        loading: busy || chainQuery.isLoading,
+        ...(chainQuery.error
+          ? { disabledReason: "The licenses revoked with this one could not be read" }
+          : {}),
       }}
     >
       <Field.Root required invalid={invalid}>
@@ -80,6 +97,11 @@ export function LicenseRevokeDialog({
           Give a reason of at least {MIN_REASON_LENGTH} characters, for the audit log.
         </Field.ErrorText>
       </Field.Root>
+      {chainQuery.error ? (
+        <Text color="fg.error" fontSize="sm">
+          Couldn't read the licenses revoked with this one. Close and try again.
+        </Text>
+      ) : null}
     </Dialog>
   );
 }

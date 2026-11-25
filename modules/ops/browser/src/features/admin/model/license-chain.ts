@@ -21,7 +21,7 @@ export interface LicenseChainState {
   pending: License | null;
   /** The licenses not revoked or superseded: a revoke, reset or terms edit reaches each one. */
   live: License[];
-  /** No install has presented any license of the chain. */
+  /** No live license of the chain is bound; a retired one may still name the old install. */
   unbound: boolean;
 }
 
@@ -36,7 +36,7 @@ export function licenseChainState({ licenses }: { licenses: License[] }): Licens
   const inUse = pending
     ? (licenses.find((license) => isLive(license) && !license.hasPendingDelivery) ?? head)
     : head;
-  const unbound = licenses.every((license) => license.instanceId === null);
+  const unbound = live.every((license) => license.instanceId === null);
   return { licenses, head, inUse, pending, live, unbound };
 }
 

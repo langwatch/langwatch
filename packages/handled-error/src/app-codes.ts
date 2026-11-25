@@ -547,6 +547,7 @@ export const APP_ERROR_CODES = [
   "license_already_reissued",
   "license_expired",
   "license_expiry_in_past",
+  "license_in_use",
   "license_key_invalid",
   "license_organization_mismatch",
   "license_overage_max_requires_overage",

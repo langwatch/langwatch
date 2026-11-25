@@ -138,6 +138,17 @@ export function needsLicenseSigned({
   return form.termEndsAt !== isoDay(license.expiresAt);
 }
 
+const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/;
+
+/** Why a paid term cannot be submitted yet: a day left empty, or an end that is not after the start. */
+export function paidTermProblem(form: BillingForm): string | undefined {
+  if (!ISO_DAY.test(form.termStartsAt) || !ISO_DAY.test(form.termEndsAt)) {
+    return "Enter the day the paid term starts and the day it ends.";
+  }
+  if (form.termEndsAt <= form.termStartsAt) return "The paid term must end after it starts.";
+  return undefined;
+}
+
 /** The instant the license is signed to for a paid term: midday, so every time zone reads the day. */
 export const termEndInstant = (form: BillingForm): string => `${form.termEndsAt}T12:00:00.000Z`;
 

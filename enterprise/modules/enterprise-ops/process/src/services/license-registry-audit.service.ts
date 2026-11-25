@@ -116,7 +116,14 @@ export class LicenseRegistryAuditService {
   async revoke(
     input: Parameters<LicenseRegistry["revokeIssuedLicense"]>[0],
   ): Promise<IssuedLicenseView> {
-    const entry = { args: { id: input.id, reason: input.reason }, targetId: input.id };
+    const entry = {
+      args: {
+        id: input.id,
+        reason: input.reason,
+        ...(input.unusedOnly ? { unusedOnly: true } : {}),
+      },
+      targetId: input.id,
+    };
     const license = await this.audited({
       operatorId: input.operatorId,
       action: "revoke",

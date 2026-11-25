@@ -43,6 +43,18 @@ describe("licenseChainState", () => {
   it("reads a chain no install presented as unbound", () => {
     expect(licenseChainState({ licenses: [row({ instanceId: null })] })?.unbound).toBe(true);
   });
+
+  /** @scenario "After a binding reset the drawer treats the chain as unused" */
+  it("reads a reset chain as unbound though a superseded license names the old install", () => {
+    const state = licenseChainState({
+      licenses: [
+        row({ id: "il_2", instanceId: null }),
+        row({ id: "il_1", status: "superseded", instanceId: "acme-prod" }),
+      ],
+    });
+
+    expect(state?.unbound).toBe(true);
+  });
 });
 
 describe("nextSyncText", () => {

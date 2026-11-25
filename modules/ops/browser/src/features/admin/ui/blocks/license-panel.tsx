@@ -62,11 +62,22 @@ function TermValue({ chain }: { chain: LicenseChainState }) {
   return <Text>{`${formatDay(inUse.issuedAt)} to ${formatDay(head.expiresAt)}`}</Text>;
 }
 
+const developerSeats = (license: License): number => license.maxMembersDeveloper ?? 0;
+
+/** The seat counts a waiting replacement moves, as "25 → 30 full · 0 → 5 Developer". */
+function seatMoves({ from, to }: { from: License; to: License }): string[] {
+  return [
+    ...(to.maxMembers === from.maxMembers ? [] : [`${from.maxMembers} → ${to.maxMembers} full`]),
+    ...(developerSeats(to) === developerSeats(from)
+      ? []
+      : [`${developerSeats(from)} → ${developerSeats(to)} Developer`]),
+  ];
+}
+
 function SeatsValue({ chain }: { chain: LicenseChainState }) {
   const { head, inUse, pending } = chain;
-  if (pending && pending.maxMembers !== inUse.maxMembers) {
-    return <Moving text={`${inUse.maxMembers} → ${pending.maxMembers} full`} />;
-  }
+  const moves = pending ? seatMoves({ from: inUse, to: pending }) : [];
+  if (moves.length > 0) return <Moving text={moves.join(" · ")} />;
   return <Text>{seatsText(head)}</Text>;
 }
 

@@ -12,6 +12,7 @@ import type { License } from "../model/license-terms.ts";
 import { LicenseRevokeDialog } from "../ui/sections/license-revoke-dialog.tsx";
 
 const revoke = vi.hoisted(() => ({ mutate: vi.fn(), mutateAsync: vi.fn() }));
+const chain = vi.hoisted(() => ({ licenses: [] as License[] }));
 
 vi.mock("../../../behavior/ops-api.ts", () => {
   const idle = () => ({ mutate: vi.fn(), mutateAsync: vi.fn(), isPending: false });
@@ -19,6 +20,13 @@ vi.mock("../../../behavior/ops-api.ts", () => {
     api: {
       useContext: () => ({ licenseRegistry: { invalidate: vi.fn() } }),
       licenseRegistry: {
+        getChain: {
+          useQuery: (_input: unknown, opts?: { enabled?: boolean }) => ({
+            data: opts?.enabled ? { licenses: chain.licenses } : undefined,
+            error: null,
+            isLoading: false,
+          }),
+        },
         revoke: { useMutation: () => ({ ...revoke, isPending: false }) },
         resetInstanceBinding: { useMutation: idle },
         updateTerms: { useMutation: idle },
@@ -76,23 +84,57 @@ beforeEach(() => {
   revoke.mutateAsync.mockResolvedValue({});
 });
 
+function revokeWithReason() {
+  fireEvent.change(screen.getByRole("textbox"), { target: { value: "contract ended" } });
+  fireEvent.click(screen.getByRole("button", { name: "Revoke license" }));
+}
+
 describe("LicenseRevokeDialog", () => {
   describe("given a license whose replacement waits for the install", () => {
     /** @scenario "Revoking from the drawer also revokes the replacement waiting for delivery" */
     it("revokes the replacement first, then the license in use, with the same reason", async () => {
-      renderWithOpsHost(
-        <LicenseRevokeDialog
-          license={row("il_1")}
-          chain={[row("il_2"), row("il_1")]}
-          onClose={vi.fn()}
-        />,
-      );
+      chain.licenses = [row("il_2"), row("il_1")];
+      renderWithOpsHost(<LicenseRevokeDialog license={row("il_1")} onClose={vi.fn()} />);
 
-      fireEvent.change(screen.getByRole("textbox"), { target: { value: "contract ended" } });
-      fireEvent.click(screen.getByRole("button", { name: "Revoke license" }));
+      revokeWithReason();
 
       await waitFor(() => expect(revoke.mutate).toHaveBeenCalledTimes(1));
       expect(revoke.mutateAsync).toHaveBeenCalledWith({ id: "il_2", reason: "contract ended" });
+      expect(revoke.mutate.mock.calls[0]?.[0]).toEqual({ id: "il_1", reason: "contract ended" });
+    });
+
+    /** @scenario "Revoking from the table also revokes the license the install still holds" */
+    it("revokes the license in use too when the table row is the waiting replacement", async () => {
+      chain.licenses = [{ ...row("il_2"), hasPendingDelivery: true }, row("il_1")];
+      renderWithOpsHost(<LicenseRevokeDialog license={chain.licenses[0]!} onClose={vi.fn()} />);
+
+      revokeWithReason();
+
+      await waitFor(() => expect(revoke.mutate).toHaveBeenCalledTimes(1));
+      expect(revoke.mutateAsync).toHaveBeenCalledWith({ id: "il_1", reason: "contract ended" });
+      expect(revoke.mutate.mock.calls[0]?.[0]).toEqual({ id: "il_2", reason: "contract ended" });
+    });
+  });
+
+  describe("given a revoke that failed part way", () => {
+    /** @scenario "A revoke that failed part way finishes on retry without repeating a revoked license" */
+    it("skips the license already revoked and finishes with the selected one", async () => {
+      chain.licenses = [row("il_3"), row("il_2"), row("il_1")];
+      revoke.mutateAsync.mockResolvedValueOnce({}).mockRejectedValueOnce(new Error("timeout"));
+      renderWithOpsHost(<LicenseRevokeDialog license={row("il_1")} onClose={vi.fn()} />);
+
+      revokeWithReason();
+      await waitFor(() => expect(revoke.mutateAsync).toHaveBeenCalledTimes(2));
+      expect(revoke.mutate).not.toHaveBeenCalled();
+
+      fireEvent.click(screen.getByRole("button", { name: "Revoke license" }));
+
+      await waitFor(() => expect(revoke.mutate).toHaveBeenCalledTimes(1));
+      expect(revoke.mutateAsync.mock.calls.map(([input]) => input.id)).toEqual([
+        "il_3",
+        "il_2",
+        "il_2",
+      ]);
       expect(revoke.mutate.mock.calls[0]?.[0]).toEqual({ id: "il_1", reason: "contract ended" });
     });
   });

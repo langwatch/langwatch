@@ -328,6 +328,25 @@ describe("the license registry", () => {
     expect(managedKeys.retired).toEqual(["vk-live"]);
   });
 
+  /** @scenario "Retiring an unused key is refused once an install has bound the license" */
+  it("refuses to retire an unused key an install has bound, and keeps it live", async () => {
+    const { registry, repository, managedKeys } = harness();
+    const { license } = await registry.issue(issueInput());
+    await repository.update(license.id, { virtualKeyId: "vk-live", instanceId: "install-1" });
+
+    await expect(
+      registry.revoke({
+        id: license.id,
+        operatorId: "operator-2",
+        reason: "unused",
+        unusedOnly: true,
+      }),
+    ).rejects.toMatchObject({ code: "license_in_use" });
+
+    expect((await repository.findById(license.id))?.revokedAt).toBeNull();
+    expect(managedKeys.retired).toEqual([]);
+  });
+
   /** @scenario "Reissuing a license" */
   it("signs a replacement that points at the license it replaces", async () => {
     const { registry, repository } = harness();

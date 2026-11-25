@@ -130,6 +130,7 @@ export interface LicensingApi {
     id: string;
     operatorId: string;
     reason: string;
+    unusedOnly?: boolean;
   }): Promise<IssuedLicenseView>;
   /** Signs a replacement for a license, held until the install presents it. */
   reissueLicense(input: {

@@ -271,6 +271,13 @@ Feature: License sync
     And once the install presents it, both licenses before it are superseded and neither copy is held
 
   @unit
+  Scenario: A sync never carries a license that a delivery retired while it looked
+    Given LangWatch extended the license, and extended it again before the install synced
+    And a sync on the oldest license is walking the chain
+    When a sync presenting the newest extension completes its delivery during that walk
+    Then the sync on the oldest license carries no license
+
+  @unit
   Scenario: A delivered license that does not verify is not applied
     When the sync response carries a license whose signature does not verify
     Then the install keeps its current license

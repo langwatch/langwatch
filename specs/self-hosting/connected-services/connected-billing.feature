@@ -421,3 +421,18 @@ Feature: Billing a connected self-hosted customer
     When an operator starts billing and the license reissue is refused
     Then nothing is onboarded
     And the drawer says the license step failed
+
+  @integration
+  Scenario: A paid term with an empty end day cannot be submitted
+    Given a trial license with Start billing open
+    When the operator clears the day the paid term ends
+    Then the drawer asks for both days of the paid term
+    And Start billing is disabled
+
+  @integration
+  Scenario: Retrying after billing failed bills the term that was signed
+    Given a trial license ending Dec 14
+    And starting billing signed the license to Dec 14 next year but onboarding failed
+    When the license now ends Dec 14 next year and the operator tries again
+    Then the license is not signed again
+    And the customer is onboarded for the term ending Dec 14 next year

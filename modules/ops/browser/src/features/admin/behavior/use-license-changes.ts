@@ -75,17 +75,22 @@ export function useLicenseChanges() {
     return signed.licenseKey;
   }
 
-  /** No install holds the replaced key, so it stops now rather than on a sync that never comes. */
-  async function retireUnused({ chain }: { chain: LicenseChainState }): Promise<void> {
-    if (chain.unbound) {
-      await eachLicense({
+  /**
+   * No install holds the replaced key, so it stops now rather than on a sync
+   * that never comes. The registry refuses a license an install bound since
+   * the drawer loaded; false, with that refusal on screen.
+   */
+  async function retireUnused({ chain }: { chain: LicenseChainState }): Promise<boolean> {
+    const retired =
+      !chain.unbound ||
+      (await eachLicense({
         licenses: chain.live,
-        step: (id) => retire.mutateAsync({ id, reason: UNUSED_KEY_REASON }),
+        step: (id) => retire.mutateAsync({ id, reason: UNUSED_KEY_REASON, unusedOnly: true }),
         showError,
         failureTitle: "The new key is signed, but the unused one still works: revoke it",
-      });
-    }
+      }));
     await refresh();
+    return retired;
   }
 
   async function saveTerms({ chain, form }: { chain: LicenseChainState; form: TermsForm }) {

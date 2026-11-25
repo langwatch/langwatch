@@ -29,7 +29,7 @@ function seatsChangeOf({
     return { problem: "Enter at least 1 full seat." };
   }
   const fullChanged = requested !== license.maxMembers;
-  const developersChanged = developers !== developerSeatsOf(license);
+  const developersChanged = Number(developers) !== (license.maxMembersDeveloper ?? 0);
   if (fullChanged && developersChanged) {
     return { problem: "Change full seats and Developer seats one at a time." };
   }

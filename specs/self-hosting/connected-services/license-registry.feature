@@ -206,6 +206,13 @@ Feature: License registry
     Then the row is revoked and records who revoked it, when and why
 
   @unit
+  Scenario: Retiring an unused key is refused once an install has bound the license
+    Given a license an install bound after the operator opened the drawer
+    When the drawer retires it as a key no install used
+    Then the registry refuses with license_in_use
+    And the license and its managed key stay live
+
+  @unit
   Scenario: Reissuing a license
     Given an active license for "ACME" with 50 seats
     When an operator reissues it with 80 seats and a new term
@@ -237,6 +244,13 @@ Feature: License registry
     Given a license bound to an instance
     When an operator resets the instance binding
     Then the row has no instance bound
+
+  @unit
+  Scenario: After a binding reset the drawer treats the chain as unused
+    Given a chain whose live license was unbound by a reset
+    And a superseded license of it that still names the old install
+    When the drawer reads the chain
+    Then it reads as unbound, so a new key is shown to send and the unused one is retired
 
   @unit
   Scenario: Editing entitlements does not reissue the license
@@ -364,6 +378,13 @@ Feature: License registry
     And says how to get it now with Refresh license on the install
 
   @integration
+  Scenario: A Developer seat change waiting for delivery shows as waiting for sync
+    Given a bound license with no Developer seats
+    And a replacement with 5 Developer seats the install has not picked up yet
+    When an operator opens the license in use
+    Then the seats row shows the Developer seats moving from 0 to 5, waiting for sync
+
+  @integration
   Scenario: Extending again while a replacement waits extends the replacement
     Given a bound license with a replacement the install has not picked up yet
     When an operator extends the term again
@@ -394,3 +415,18 @@ Feature: License registry
     Given a bound license with a replacement the install has not picked up yet
     When an operator revokes the license from the drawer
     Then both the license and its replacement are revoked
+
+  @integration
+  Scenario: Revoking from the table also revokes the license the install still holds
+    Given a bound license with a replacement the install has not picked up yet
+    And the licenses table lists the chain as its replacement
+    When an operator revokes that row from the table
+    Then both the replacement and the license the install holds are revoked
+
+  @integration
+  Scenario: A revoke that failed part way finishes on retry without repeating a revoked license
+    Given a chain of three live licenses
+    And revoking failed after the first of them was revoked
+    When the operator confirms the revoke again
+    Then the license already revoked is not sent again
+    And the rest of the chain is revoked, the selected license last

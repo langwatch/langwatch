@@ -134,4 +134,45 @@ describe("the Billing section of the license drawer", () => {
       expect(mocks.onboard).not.toHaveBeenCalled();
     });
   });
+
+  describe("given a trial license with Start billing open", () => {
+    /** @scenario "A paid term with an empty end day cannot be submitted" */
+    it("asks for both days and disables Start billing when the end day is cleared", () => {
+      render(<LicenseBillingSection {...license()} />, { wrapper });
+      fireEvent.click(screen.getByRole("button", { name: "Start billing" }));
+
+      fireEvent.change(screen.getByLabelText("Paid term ends"), { target: { value: "" } });
+
+      expect(screen.getByTestId("paid-term-problem")).toHaveTextContent(
+        "Enter the day the paid term starts and the day it ends.",
+      );
+      expect(screen.getByRole("button", { name: "Start billing" })).toBeDisabled();
+    });
+  });
+
+  describe("given a signed paid term whose onboarding failed", () => {
+    /** @scenario "Retrying after billing failed bills the term that was signed" */
+    it("does not sign again and onboards the term that was signed", async () => {
+      const signPaidTerm = vi.fn(async () => true);
+      mocks.onboard.mockRejectedValueOnce(new Error("billing down"));
+      const { rerender } = render(<LicenseBillingSection {...license({ signPaidTerm })} />, {
+        wrapper,
+      });
+      startBilling();
+      expect(await screen.findByTestId("paid-term-failure")).toHaveTextContent(
+        "but billing did not start",
+      );
+
+      const signed = license({ signPaidTerm, expiresAt: "2100-12-14T12:00:00.000Z" });
+      rerender(<LicenseBillingSection {...signed} />);
+      fireEvent.click(screen.getByRole("button", { name: "Start billing" }));
+
+      await waitFor(() => expect(mocks.onboard).toHaveBeenCalledTimes(2));
+      expect(signPaidTerm).toHaveBeenCalledTimes(1);
+      expect(mocks.onboard.mock.calls[1]?.[0]).toMatchObject({
+        termStartsAt: "2099-12-14T00:00:00.000Z",
+        termEndsAt: "2100-12-14T00:00:00.000Z",
+      });
+    });
+  });
 });

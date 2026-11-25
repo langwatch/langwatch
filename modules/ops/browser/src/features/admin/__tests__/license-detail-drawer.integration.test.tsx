@@ -122,10 +122,10 @@ vi.mock("../../../behavior/ops-api.ts", () => {
 
 function openDrawer({
   id,
-  onRevoke = vi.fn<(license: License, chain: License[]) => void>(),
+  onRevoke = vi.fn<(license: License) => void>(),
 }: {
   id: string;
-  onRevoke?: Mock<(license: License, chain: License[]) => void>;
+  onRevoke?: Mock<(license: License) => void>;
 }) {
   const host = fakeOpsHost();
   const view = renderWithOpsHost(
@@ -211,6 +211,18 @@ describe("LicenseDetailDrawer", () => {
     });
   });
 
+  describe("given a replacement with Developer seats waiting for the install", () => {
+    /** @scenario "A Developer seat change waiting for delivery shows as waiting for sync" */
+    it("shows the Developer seats moving from 0 to 5, waiting for sync", () => {
+      state.chain = [replacementOf(bound(), { maxMembersDeveloper: 5 }), bound()];
+      openDrawer({ id: "il_1" });
+
+      const panel = screen.getByTestId("license-panel");
+      expect(panel.textContent).toContain("0 → 5 Developer");
+      expect(panel.textContent).not.toContain("25 → 25 full");
+    });
+  });
+
   describe("given a replacement already waiting for the install", () => {
     /** @scenario "Extending again while a replacement waits extends the replacement" */
     it("reissues the replacement, not the license it replaces", async () => {
@@ -225,8 +237,7 @@ describe("LicenseDetailDrawer", () => {
       expect(state.reissue.mock.calls[0]?.[0]).toMatchObject({ id: "il_2" });
     });
 
-    /** @scenario "Revoking from the drawer also revokes the replacement waiting for delivery" */
-    it("hands the revoke both the license in use and its replacement", () => {
+    it("opens the revoke on the license in use, not on its replacement", () => {
       const pending = replacementOf(bound());
       state.chain = [pending, bound()];
       const { onRevoke } = openDrawer({ id: "il_1" });
@@ -234,9 +245,8 @@ describe("LicenseDetailDrawer", () => {
       fireEvent.click(screen.getByRole("button", { name: "Revoke license" }));
 
       expect(onRevoke).toHaveBeenCalledTimes(1);
-      const [inUse, chain] = onRevoke.mock.calls[0] as [License, License[]];
+      const [inUse] = onRevoke.mock.calls[0] as [License];
       expect(inUse.id).toBe("il_1");
-      expect(chain.map((row) => row.id)).toEqual(["il_2", "il_1"]);
     });
   });
 
@@ -256,7 +266,7 @@ describe("LicenseDetailDrawer", () => {
       expect(await screen.findByDisplayValue(SIGNED)).toBeTruthy();
       expect(screen.getByTestId("send-key").textContent).toContain("Send this key to the customer");
       expect(state.revoke).toHaveBeenCalledTimes(1);
-      expect(state.revoke.mock.calls[0]?.[0]).toMatchObject({ id: "il_1" });
+      expect(state.revoke.mock.calls[0]?.[0]).toMatchObject({ id: "il_1", unusedOnly: true });
     });
 
     /** @scenario "The signed license stays on screen while its row refreshes" */
