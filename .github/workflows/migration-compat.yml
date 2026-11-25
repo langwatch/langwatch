@@ -199,6 +199,25 @@ jobs:
           pnpm start:prepare:files
           pnpm ensure:built
 
+      # Head's upgrade provisions the LangWatchQL access model, which needs the grants the
+      # shipped ClickHouse image gives its administrative user (infra/clickhouse-serverless).
+      - name: Grant the ClickHouse user what LangWatchQL provisioning needs
+        run: |
+          set -euo pipefail
+          docker exec -i "${{ job.services.clickhouse.id }}" \
+            sh -c 'cat > /etc/clickhouse-server/users.d/zz-lwql-access-management.xml' <<'XML'
+          <clickhouse>
+            <users>
+              <default>
+                <access_management>1</access_management>
+                <named_collection_control>1</named_collection_control>
+                <show_named_collections>1</show_named_collections>
+              </default>
+            </users>
+          </clickhouse>
+          XML
+          curl -fsS -u default:ci_password http://localhost:8123/ --data-binary "SYSTEM RELOAD CONFIG"
+
       # Head's upgrade, as its pre-roll Job runs it: the schema plus the ledger a
       # gated base api reads before it serves (specs/upgrade/entry-points.feature).
       # It boots the module tree for code steps, so it gets the Job's shared env.
@@ -550,6 +569,25 @@ jobs:
             --filter "@langwatch/ui..." --filter "@langwatch/tasks..." --filter "@langwatch/workspace"
           pnpm start:prepare:files
           pnpm ensure:built
+
+      # Head's upgrade provisions the LangWatchQL access model, which needs the grants the
+      # shipped ClickHouse image gives its administrative user (infra/clickhouse-serverless).
+      - name: Grant the ClickHouse user what LangWatchQL provisioning needs
+        run: |
+          set -euo pipefail
+          docker exec -i "${{ job.services.clickhouse.id }}" \
+            sh -c 'cat > /etc/clickhouse-server/users.d/zz-lwql-access-management.xml' <<'XML'
+          <clickhouse>
+            <users>
+              <default>
+                <access_management>1</access_management>
+                <named_collection_control>1</named_collection_control>
+                <show_named_collections>1</show_named_collections>
+              </default>
+            </users>
+          </clickhouse>
+          XML
+          curl -fsS -u default:ci_password http://localhost:8123/ --data-binary "SYSTEM RELOAD CONFIG"
 
       - name: Migrate with head's tasks
         env:
