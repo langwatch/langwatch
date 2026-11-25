@@ -376,7 +376,7 @@ function tracesWeekNumbers({
     topModels: Object.entries(focus.models)
       .toSorted(([, left], [, right]) => right - left)
       .slice(0, TOP_ROWS)
-      .map(([name, traces]) => ({ name, traces })),
+      .map(([name, calls]) => ({ name, calls })),
     evaluations: Object.entries(focus.evaluators)
       .filter(([, counts]) => counts.passed + counts.failed > 0)
       .toSorted(([, left], [, right]) => right.runs - left.runs)

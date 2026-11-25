@@ -856,7 +856,8 @@ describe("the digest fold", () => {
       await digest.evaluationCompleted(evaluation("evaluation-2"));
 
       await vi.waitFor(async () => {
-        expect((await digest.projectWeek({ isoWeek: SENT_WEEK }))?.evaluations.runs).toBe(2);
+        const week = await digest.projectWeek({ isoWeek: SENT_WEEK });
+        expect(week?.evaluators["langevals/exact_match"]?.runs).toBe(2);
       });
       expect((await digest.projectWeek({ isoWeek: SENT_WEEK }))?.evaluators).toEqual({
         "langevals/exact_match": { runs: 2, passed: 2, failed: 0 },
@@ -885,7 +886,7 @@ describe("the digest fold", () => {
       });
 
       await vi.waitFor(async () => {
-        expect((await digest.projectWeek({ isoWeek: SENT_WEEK }))?.evaluations.runs).toBe(1);
+        expect((await digest.projectWeek({ isoWeek: SENT_WEEK }))?.evaluators.custom?.runs).toBe(1);
       });
     });
   });

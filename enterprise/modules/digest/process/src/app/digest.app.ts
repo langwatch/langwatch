@@ -72,26 +72,26 @@ export class DigestModule implements DigestApiContract {
   readonly #commands: DigestCommandsService;
   readonly #settings: DigestSettingsService;
   readonly #sends: DigestSendService;
-  readonly #weeks: DigestWeekService;
   readonly #unsubscribes: DigestUnsubscribeService;
   readonly #pipeline: DigestPipeline;
+  readonly #sendPipeline: DigestSendPipeline;
 
   private constructor(parts: {
     operators: DigestOperatorsService;
     commands: DigestCommandsService;
     settings: DigestSettingsService;
     sends: DigestSendService;
-    weeks: DigestWeekService;
     unsubscribes: DigestUnsubscribeService;
     pipeline: DigestPipeline;
+    sendPipeline: DigestSendPipeline;
   }) {
     this.#operators = parts.operators;
     this.#commands = parts.commands;
     this.#settings = parts.settings;
     this.#sends = parts.sends;
-    this.#weeks = parts.weeks;
     this.#unsubscribes = parts.unsubscribes;
     this.#pipeline = parts.pipeline;
+    this.#sendPipeline = parts.sendPipeline;
   }
 
   static create(setup: DigestSetup): Promise<DigestModule> {
@@ -147,7 +147,6 @@ export class DigestModule implements DigestApiContract {
       commands,
       settings: DigestSettingsService.create({ audience: repositories.audience }),
       sends,
-      weeks,
       unsubscribes,
       pipeline: buildDigestPipeline({
         projectWeeks: repositories.projectWeeks,
@@ -159,6 +158,7 @@ export class DigestModule implements DigestApiContract {
           userWeeks: repositories.userWeeks,
         }),
       }),
+      sendPipeline: buildDigestSendPipeline({ runner: sends, weeks }),
     });
   }
 
@@ -171,9 +171,9 @@ export class DigestModule implements DigestApiContract {
     this.#commands.connectActivity(commands);
   }
 
-  /** The send pipeline `digest_send`. */
+  /** The send pipeline `digest_send`, built once by {@link create}. */
   sendPipeline(): DigestSendPipeline {
-    return buildDigestSendPipeline({ runner: this.#sends, weeks: this.#weeks });
+    return this.#sendPipeline;
   }
 
   connectSendCommands(commands: EventingCommands<DigestSendPipeline>): void {

@@ -156,9 +156,9 @@ describe("buildDigestTemplateProps()", () => {
         p50Milliseconds: 0,
         p95Milliseconds: 0,
         topModels: [
-          { name: "gpt-5", traces: 900 },
-          { name: "claude-sonnet", traces: 250 },
-          { name: "mini", traces: 40 },
+          { name: "gpt-5", calls: 900 },
+          { name: "claude-sonnet", calls: 250 },
+          { name: "mini", calls: 40 },
         ],
         evaluations: [{ name: "exact_match", passRatePercent: 80 }],
         tracesUrl: `${BASE}/support-bot/traces`,

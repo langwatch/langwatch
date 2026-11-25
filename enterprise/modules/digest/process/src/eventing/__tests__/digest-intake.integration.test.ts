@@ -209,7 +209,7 @@ describe("the digest fold intake", () => {
       await spanRecorded({ traceId: "trace-b", spanId: "b-root", root: true, error: true });
 
       await vi.waitFor(async () => {
-        expect((await digest.projectWeek({ isoWeek: SENT_WEEK }))?.spans).toBe(3);
+        expect((await digest.projectWeek({ isoWeek: SENT_WEEK }))?.tokens).toBe(45);
       });
       const week = await digest.projectWeek({ isoWeek: SENT_WEEK });
       expect(week).toMatchObject({ traces: 2, errors: 1, tokens: 45 });
@@ -276,7 +276,7 @@ describe("the digest fold intake", () => {
         const week = await digest.userWeek({ isoWeek: SENT_WEEK, userId: MEMBER });
         expect(week && userWeekTotals(week).sessions).toBe(3);
         expect((await digest.projectWeek({ isoWeek: SENT_WEEK }))?.scenarios.runs).toBe(1);
-        expect((await digest.projectWeek({ isoWeek: SENT_WEEK }))?.spans).toBe(1);
+        expect((await digest.projectWeek({ isoWeek: SENT_WEEK }))?.traces).toBe(1);
       });
       const rows = JSON.stringify([
         await digest.projectWeek({ isoWeek: SENT_WEEK }),

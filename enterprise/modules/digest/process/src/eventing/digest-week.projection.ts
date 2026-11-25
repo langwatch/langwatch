@@ -60,20 +60,23 @@ function applySpan({
   state: ProjectWeekState;
   fact: FactOf<"span">;
 }): ProjectWeekState {
-  const bucket = latencyBucketOf(fact.durationMs);
-  return {
+  // Models count calls, not traces: the LLM call is usually a child span, rarely the root.
+  const usage = {
     ...state,
-    spans: state.spans + 1,
-    traces: state.traces + (fact.root ? 1 : 0),
-    errors: state.errors + (fact.error ? 1 : 0),
     tokens: state.tokens + fact.tokens,
     costUsd: state.costUsd + fact.costUsd,
-    latency: state.latency.map((count, index) =>
-      fact.root && index === bucket ? count + 1 : count,
-    ),
     models: fact.model
       ? countCapped({ counts: state.models, key: fact.model, cap: MAX_MODELS })
       : state.models,
+  };
+  // Errors and latency are per trace, read off its root span, so neither can outgrow `traces`.
+  if (!fact.root) return usage;
+  const bucket = latencyBucketOf(fact.durationMs);
+  return {
+    ...usage,
+    traces: state.traces + 1,
+    errors: state.errors + (fact.error ? 1 : 0),
+    latency: state.latency.map((count, index) => (index === bucket ? count + 1 : count)),
   };
 }
 
@@ -84,18 +87,16 @@ function applyEvaluation({
   state: ProjectWeekState;
   fact: FactOf<"evaluation">;
 }): ProjectWeekState {
-  const evaluations = addOutcome({ counts: state.evaluations, outcome: fact.outcome });
   const evaluator = fact.evaluatorType ?? "custom";
   // Own keys only: an evaluator named `constructor` must not read the prototype's.
   const known = Object.hasOwn(state.evaluators, evaluator)
     ? state.evaluators[evaluator]
     : undefined;
   if (known === undefined && Object.keys(state.evaluators).length >= MAX_EVALUATORS) {
-    return { ...state, evaluations };
+    return state;
   }
   return {
     ...state,
-    evaluations,
     evaluators: {
       ...state.evaluators,
       [evaluator]: addOutcome({
