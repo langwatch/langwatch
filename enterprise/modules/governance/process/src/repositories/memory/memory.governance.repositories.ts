@@ -5,6 +5,7 @@ import type { GovernanceTenantRow } from "../governance-tenant-history.repositor
 import type { GovernanceRepositories } from "../governance.repositories.ts";
 import { SuppressionSnapshotRepository } from "../suppression-snapshot.repository.ts";
 import { MemoryActivityMonitorRepository } from "./memory.activity-monitor.repository.ts";
+import { MemoryAgentRegistrySettingsRepository } from "./memory.agent-registry-settings.repository.ts";
 import { MemoryAgentRegistryRepository } from "./memory.agent-registry.repository.ts";
 import { MemoryAgentStopClaimRepository } from "./memory.agent-stop-claim.repository.ts";
 import { MemoryAgentStopPlanRepository } from "./memory.agent-stop-plan.repository.ts";
@@ -71,6 +72,7 @@ export class MemoryGovernanceRepositories {
     return {
       activityMonitor: MemoryActivityMonitorRepository.create(),
       agentRegistry: MemoryAgentRegistryRepository.create(),
+      agentRegistrySettings: MemoryAgentRegistrySettingsRepository.create(),
       agentStopPlans: MemoryAgentStopPlanRepository.create(),
       agentStopClaims: MemoryAgentStopClaimRepository.create(),
       agentStopTargetPriorStates: MemoryAgentStopTargetPriorStateRepository.create(),
