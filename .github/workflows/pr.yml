@@ -61,9 +61,16 @@ jobs:
         id: force
         run: echo "all=true" >> "$GITHUB_OUTPUT"
 
+  # A Dependabot bump of Go modules or Docker images changes no TypeScript:
+  # go-ci, go-services and the image builds cover it, so the app suites and
+  # e2e are skipped for it. A github-actions bump still runs app, the main
+  # user of the bumped actions.
   app:
     needs: changes
-    if: needs.changes.outputs.app == 'true'
+    if: >-
+      needs.changes.outputs.app == 'true' &&
+      !(github.event.pull_request.user.login == 'dependabot[bot]' &&
+        (startsWith(github.head_ref, 'dependabot/go_modules/') || startsWith(github.head_ref, 'dependabot/docker/')))
     uses: ./.github/workflows/langwatch-app-ci.yml
     secrets: inherit
     permissions:
@@ -72,7 +79,11 @@ jobs:
 
   e2e:
     needs: changes
-    if: needs.changes.outputs.e2e == 'true'
+    if: >-
+      needs.changes.outputs.e2e == 'true' &&
+      !(github.event.pull_request.user.login == 'dependabot[bot]' &&
+        (startsWith(github.head_ref, 'dependabot/go_modules/') || startsWith(github.head_ref, 'dependabot/docker/') ||
+         startsWith(github.head_ref, 'dependabot/github_actions/')))
     uses: ./.github/workflows/e2e-ci.yml
     secrets: inherit
     permissions:
