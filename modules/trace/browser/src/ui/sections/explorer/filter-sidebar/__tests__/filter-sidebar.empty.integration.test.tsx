@@ -115,7 +115,7 @@ vi.mock("@langwatch/trace-contract", async (importOriginal) => {
   return {
     ...contract,
     analyzeOrGroups: () => ({ groups: [], fieldToGroupIds: new Map() }),
-    buildFacetStateLookup: () => new Map(),
+    buildFacetDisplayLookup: () => new Map(),
     getFacetValues: () => ({
       include: new Set<string>(),
       exclude: new Set<string>(),

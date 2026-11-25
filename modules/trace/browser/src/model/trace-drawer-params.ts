@@ -2,7 +2,7 @@ import { isPreviewTraceId } from "./preview-trace-id.ts";
 
 export type DrawerViewMode = "trace" | "summary" | "conversation" | "terminal" | "session";
 // Flame's time-weighted blocks show where time is spent better than the indented waterfall does.
-export type VizTab = "waterfall" | "topology" | "sequence" | "flame";
+export type VizTab = "waterfall" | "topology" | "sequence" | "flame" | "agents";
 
 /** The drawer name the trace drawer registers under, and so the address it lives at. */
 export const TRACE_DRAWER_NAME = "traceV2Details";
@@ -28,7 +28,13 @@ export function isViewMode(value: string | null | undefined): value is DrawerVie
 }
 
 function isVizTab(value: string | null | undefined): value is VizTab {
-  return value === "waterfall" || value === "topology" || value === "sequence" || value === "flame";
+  return (
+    value === "waterfall" ||
+    value === "topology" ||
+    value === "sequence" ||
+    value === "flame" ||
+    value === "agents"
+  );
 }
 
 /**

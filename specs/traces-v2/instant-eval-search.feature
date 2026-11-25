@@ -40,10 +40,27 @@ Feature: Instant Evals inside the Trace Explorer
       And the run is estimated and started on the question as written, with the other terms as its filter
       And no model rewrites the question on the way, since the reader wrote it
       And a chip spelled `eval.conversation:` keeps judging conversations, whatever the lens shows
+      And a chip typed under NOT keeps its NOT, so the run lists the rows it judged and did not pass
+      And a chip under an OR is rebuilt beside the other terms, as its run judges only those
+      And a chip a NOT reaches across other terms or an OR is refused instead, as no rebuild keeps what was typed
       And the same question under another target is another chip, kept in the filter of the run that starts
       And a chip a run already answered is applied with no call at all
       And a refusal leaves the typed chip where it is rather than replacing it with a phrase search
       And "Judge these results" under an empty table starts the same run the same way
+
+    @integration
+    Scenario: A NOT the run of a typed chip cannot answer is refused
+      Given the reader types `NOT eval.trace:"the user is annoyed" OR status:error` or `NOT (eval:"the user is annoyed" AND status:error)`
+      And the chip is spelled with a target, was submitted on this page, has a run registered under its key, or is judged by a sibling chip in the same submit
+      When Enter is pressed
+      Then a warning says a NOT on an eval chip must sit beside the other terms with AND
+      And nothing is searched and no run is estimated or started, whether Instant Evals are on or off
+      And the same holds when a run is already registered under the chip's key
+      And the reads send no run for such a chip, so a loaded link shows its rows as not judged
+      And a chip the compiler recognises (a forcing spelling or a registered run) compiles to no rows, so counts and facets list no row the table hides
+      And the empty table says the NOT must be rewritten beside the other terms, with no action to judge it
+      And a sibling chip with the same question that no NOT reaches keeps its run
+      But a bare chip never submitted here, like `NOT eval:my_evaluator OR status:error`, is searched as an evaluator name
 
     @unit
     Scenario: A space belongs to the question being typed
@@ -126,6 +143,21 @@ Feature: Instant Evals inside the Trace Explorer
       When the chips are resolved
       Then the chip is reported as pending and no evalRuns entry is sent for it
 
+    @integration
+    Scenario: A pending chip under NOT is not judged yet
+      Given a chip `NOT eval:"the user is annoyed"` and no run under its key
+      And the chip is spelled with a target, or was submitted on this page
+      When the table and the counts read the results
+      Then the table shows "These results are not judged yet" rather than every row as a non-match
+      And the counts read zero, with no progress of another chip's run, as no row was judged
+      And the sidebar facets show no counts and no trace is counted as new, as neither read is sent
+      And a chip submitted here stays so for its project after the time range changes
+      But a bare chip never submitted here, like `NOT eval:my_evaluator`, keeps its evaluator-name rows
+      And so does one whose refused judgement the reader skipped, declined, closed or replaced with a later Enter, or one submitted in another project
+      But a skip, decline or close keeps a mark made before that submit, so a chip run earlier stays pending
+      And a chip whose run a link restored stays pending after the time range changes, as a submitted one does
+      And a failed read shows its error, not the not-judged state
+
   Rule: tRPC wraps the run service for the Explorer
 
     @unit
@@ -202,7 +234,9 @@ Feature: Instant Evals inside the Trace Explorer
     Scenario: A negated eval chip keeps the traces the judge did not match
       Given a query negating an eval chip with a registered run
       When the filter is compiled
-      Then the verdict subquery is negated whole
+      Then it keeps the rows whose latest verdict for the run is a judged "no", and no row that passed
+      And a row the run never judged, past the cap, after a stop or newer than the run, is left out
+      And a threads run's row is a conversation, so a conversation judged "no" keeps every turn, a later one too, as a matched one does
 
     @unit
     Scenario: A target modifier only resolves a run of that target
@@ -215,6 +249,7 @@ Feature: Instant Evals inside the Trace Explorer
       Given a chip forcing a unit and no run registered for it
       When the filter is compiled
       Then it matches no rows, so the table is empty while the run starts
+      And under NOT it still matches no rows, never every row
 
     @unit
     Scenario: A bare eval chip with no registered run keeps its older meaning
@@ -322,6 +357,21 @@ Feature: Instant Evals inside the Trace Explorer
       Then the list and the facets are read one last time
       And only after they answer do the bar leave, the chip read partial and the counts read the list's total
 
+    # The end of a run reaches the page as a read hint, and the hint can land before the run's
+    # own row says it ended. The run has no later event to hint again, so the page asks.
+    @integration
+    Scenario: A run waiting on its end is read again until it says it ended
+      Given a run that has judged every row, or one the reader asked to stop, that still reads as judging
+      When no hint brings a read that says it ended
+      Then the run is read again 1, 2 and 4 seconds later, then every 8 seconds, for at most two minutes
+      And as soon as a read says it ended, the bar settles as it does after any other end
+
+    @unit
+    Scenario: Only a run waiting on its end is read on a timer
+      Given a run still judging with rows left and no stop asked
+      Then it is never read on a timer, only when a hint arrives
+      And a run that ended, or one waited on for two minutes, is not read on a timer either
+
     @unit
     Scenario: A run that ended long before the page opened is settled at once
       Given a run that finished more than fifteen seconds ago
@@ -357,6 +407,7 @@ Feature: Instant Evals inside the Trace Explorer
         | connect_license_revoked            | 0        | This license is no longer active, so Instant Evals are off. Nothing was charged. |
         | instant_eval_classifier_unavailable | 0       | The judge did not answer. Nothing was charged.                                   |
         | instant_eval_stalled               | 0.02     | This Instant Eval stopped before it finished. Only the rows judged were charged. |
+        | instant_eval_decision_model_key_invalid | 0  | Your model provider refused the key for this Instant Evals model. Check it in Settings > Model Providers. Nothing was charged. |
 
     @integration
     Scenario: Retry starts the same eval again

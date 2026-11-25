@@ -25,9 +25,38 @@ export const LIVE_ROW_LOOKBACK_MS = 24 * 60 * 60 * 1000;
 
 /**
  * How long after an evaluation its trace may still arrive: a younger evaluation of a trace not
- * stored yet is retried, an older one skipped. The queue's 25 attempts span over two hours.
+ * stored yet is retried, an older one skipped.
  */
 export const EVALUATED_TRACE_WAIT_MS = 60 * 60 * 1000;
+
+/** The first wait for a trace not stored yet: a late trace is most often one export behind. */
+export const EVALUATED_TRACE_FIRST_RETRY_MS = 60 * 1000;
+
+/** Each later wait, so the rest of the hour takes four more looks, not a dozen backoff rungs. */
+export const EVALUATED_TRACE_LATER_RETRY_MS = 15 * 60 * 1000;
+
+/** How long to wait before looking for the trace again, given how long the evaluation waited. */
+export function evaluatedTraceRetryAfterMs(waitedMs: number): number {
+  return waitedMs < EVALUATED_TRACE_FIRST_RETRY_MS
+    ? EVALUATED_TRACE_FIRST_RETRY_MS
+    : EVALUATED_TRACE_LATER_RETRY_MS;
+}
+
+/** The all-zero id, W3C's invalid trace id, in hex or in UUID form. */
+const ALL_ZERO_TRACE_ID = /^0+(-0+)*$/;
+
+/**
+ * How an evaluation waits for its trace: a blank id names none, so it never waits; the all-zero
+ * id is invalid but ingest may still store spans under it, so it is looked for once; any other
+ * id waits on the ladder while the trace may still arrive.
+ */
+export type EvaluatedTraceWait = "none" | "once" | "ladder";
+
+export function evaluatedTraceWaitOf(traceId: string | null | undefined): EvaluatedTraceWait {
+  const trimmed = traceId?.trim() ?? "";
+  if (trimmed.length === 0) return "none";
+  return ALL_ZERO_TRACE_ID.test(trimmed) ? "once" : "ladder";
+}
 
 /** Evaluator clocks may run ahead of ours; a time further ahead is a bad or hostile clock. */
 export const EVALUATION_CLOCK_SKEW_MS = 5 * 60 * 1000;

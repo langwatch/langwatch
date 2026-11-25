@@ -13,16 +13,18 @@
 import { anthropicAdminPullConfigSchema } from "@langwatch/enterprise-governance-contract";
 import { describe, expect, it } from "vitest";
 
+import { buildAnthropicAdminPullConfig } from "../inventory/admin-api-pull-config.ts";
+import { parserFieldPresentation } from "../inventory/parser-fields.ts";
 import {
-  buildAnthropicAdminPullConfig,
   isBackfillStartLocked,
-  isEditablePullSource,
   isEditSaveBlocked,
   lockedParserKeys,
-  parserFieldPresentation,
+} from "../inventory/source-edit-rules.ts";
+import {
+  isEditablePullSource,
   seedComposerParserConfig,
   seedPullSchedule,
-} from "../governance-inventory.screen.tsx";
+} from "../inventory/source-submission.ts";
 import { composer } from "./edit-pull-source-config.fixture.ts";
 
 describe("isEditablePullSource", () => {

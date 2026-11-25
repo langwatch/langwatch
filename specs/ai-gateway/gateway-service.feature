@@ -285,6 +285,12 @@ Feature: Gateway service — public HTTP surface and operational basics
     # Bindings: services/aigateway/config_test.go
 
     @unit @regression
+    Scenario: a fail-closed limit out of range or under the long-poll hold is refused
+      Given LW_GATEWAY_AUTH_CACHE_FAIL_CLOSED_AFTER_SECONDS is 10, or a nanosecond count
+      When the gateway starts
+      Then startup fails with an error naming the variable
+
+    @unit @regression
     Scenario: an absurd seconds value is refused instead of overflowing a duration
       Given a seconds-valued env var is set to a nanosecond-scale number
       When the gateway loads its configuration

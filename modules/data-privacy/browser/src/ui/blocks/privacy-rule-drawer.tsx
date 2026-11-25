@@ -22,6 +22,7 @@ import {
   formRestrictsContent,
   ruleHasChange,
 } from "../../model/data-privacy-rule-form.ts";
+import type { PiiRedactionModelOffer } from "../../model/pii-redaction-level-offer.ts";
 import { AudiencePicker } from "../elements/audience-picker.tsx";
 import { RuleScopeLabel } from "../elements/rule-scope-label.tsx";
 import { ContentDispositionFields } from "./content-disposition-fields.tsx";
@@ -51,6 +52,7 @@ export function PrivacyRuleDrawer({
   effectiveOrganization,
   projectId,
   isSaving,
+  piiRedactionModelOffer = null,
   onSave,
   scopePicker,
 }: {
@@ -63,6 +65,8 @@ export function PrivacyRuleDrawer({
   effectiveOrganization: ResolvedDataPrivacy | null;
   projectId: string;
   isSaving: boolean;
+  /** Shows what the PII level runs and its example; null hides them. */
+  piiRedactionModelOffer?: PiiRedactionModelOffer;
   onSave: (scopes: PrivacyScopeEntry[], config: DataPrivacyConfig) => void;
   /** Renders the scope picker in add mode, wired to `value` and `onChange`. */
   scopePicker: (props: {
@@ -196,6 +200,7 @@ export function PrivacyRuleDrawer({
         <PiiRedactionFields
           form={form}
           inheritedLevel={inheritedBaseline.pii.level}
+          piiRedactionModelOffer={piiRedactionModelOffer}
           onChange={update}
         />
 

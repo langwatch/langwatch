@@ -4,6 +4,7 @@
  * ever touching the worker, session keys, or the acceptance command.
  */
 import {
+  LangyAgentUnavailableError,
   LangyEmptyMessageError,
   LangyIdempotencyMismatchError,
   LangyModelNotConfiguredError,
@@ -19,7 +20,10 @@ import {
 } from "../../../../__tests__/support/langy-turn-deps.ts";
 import { LangyTurnService, type StartConversationTurnInput } from "../langy-turn.service.ts";
 
-function makeFixture(over: LangyTurnDepsOverrides = {}) {
+function makeFixture(
+  over: LangyTurnDepsOverrides = {},
+  findByIdVisible = vi.fn(async () => conversationDetail({ status: "idle" })),
+) {
   const ensureConversation = vi.fn(async () => ({ id: "conversation-1", isNew: false }));
   const acceptTurn = vi.fn(async () => ({ turnId: "turn-1" }));
   const dispatch = vi.fn(async () => "accepted" as const);
@@ -38,7 +42,7 @@ function makeFixture(over: LangyTurnDepsOverrides = {}) {
   const deps = langyTurnDeps({
     conversations: {
       ensureConversation,
-      findByIdVisible: vi.fn(async () => conversationDetail({ status: "idle" })),
+      findByIdVisible,
       findPendingHandoff: vi.fn(async () => null),
       findRunToken: vi.fn(async () => "run-token"),
       acceptTurn,
@@ -58,9 +62,7 @@ function makeFixture(over: LangyTurnDepsOverrides = {}) {
       warm: vi.fn(async () => undefined),
     },
     permits: {
-      reserve: vi.fn(async () => ({ reserved: false, allowed: true, resetAt: 0 })),
-      release: vi.fn(async () => undefined),
-      check: vi.fn(async () => ({ allowed: true })),
+      check: vi.fn(async () => ({ allowed: true, resetAt: 0 })),
     },
     perDayPrCap: 5,
     sessionKeys: { mint, revoke: vi.fn(async () => undefined) },
@@ -130,7 +132,11 @@ describe("LangyTurnStartService", () => {
       const probe = vi.fn(async () => false);
       const fixture = makeFixture({
         admission: {
-          claim: vi.fn(async () => ({ kind: "busy" as const })),
+          claim: vi.fn(async () => ({
+            kind: "busy" as const,
+            conversationId: "conversation-1",
+            heldTurnId: "turn-running",
+          })),
           commit: vi.fn(async () => undefined),
           confirmAccepted: vi.fn(async () => undefined),
           abort: vi.fn(async () => undefined),
@@ -151,6 +157,129 @@ describe("LangyTurnStartService", () => {
       expect(probe).not.toHaveBeenCalled();
       expect(fixture.mint).not.toHaveBeenCalled();
       expect(fixture.acceptTurn).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("given the turn holding the conversation already ended on its live edge", () => {
+    const ended = {
+      readTail: vi.fn(async () => ({
+        reads: [
+          { id: "1-0", entry: { type: "delta" as const, text: "done" } },
+          { id: "2-0", entry: { type: "end" as const } },
+        ],
+        lastId: "2-0",
+      })),
+    };
+    const busy = {
+      kind: "busy" as const,
+      conversationId: "conversation-1",
+      heldTurnId: "turn-ended",
+    };
+
+    /** @scenario A message sent right after a reply ends waits for the reply to be saved */
+    it("waits for the ended turn to release the conversation, then admits the send", async () => {
+      const claim = vi
+        .fn()
+        .mockResolvedValueOnce(busy)
+        .mockResolvedValueOnce(busy)
+        .mockImplementation(async ({ conversationId, turnId }) => ({
+          kind: "claimed" as const,
+          claimToken: "claim-1",
+          conversationId,
+          turnId,
+        }));
+      const fixture = makeFixture({
+        tokenBuffer: ended,
+        endedTurnWait: { waitMs: 1_000, pollMs: 1 },
+        admission: {
+          claim,
+          commit: vi.fn(async () => undefined),
+          confirmAccepted: vi.fn(async () => undefined),
+          abort: vi.fn(async () => undefined),
+          release: vi.fn(async () => undefined),
+        },
+      });
+
+      await expect(
+        LangyTurnService.create(fixture.deps).startConversationTurn(input()),
+      ).resolves.toMatchObject({ conversationId: "conversation-1" });
+      expect(claim).toHaveBeenCalledTimes(3);
+      expect(fixture.dispatch).toHaveBeenCalledOnce();
+    });
+
+    /** @scenario A reply whose save outlasts the wait answers retry shortly, not still replying */
+    it("answers retry shortly when the release outlasts the wait", async () => {
+      const fixture = makeFixture({
+        tokenBuffer: ended,
+        endedTurnWait: { waitMs: 5, pollMs: 1 },
+        admission: {
+          claim: vi.fn(async () => busy),
+          commit: vi.fn(async () => undefined),
+          confirmAccepted: vi.fn(async () => undefined),
+          abort: vi.fn(async () => undefined),
+          release: vi.fn(async () => undefined),
+        },
+      });
+
+      await expect(
+        LangyTurnService.create(fixture.deps).startConversationTurn(input()),
+      ).rejects.toBeInstanceOf(LangyAgentUnavailableError);
+      expect(fixture.dispatch).not.toHaveBeenCalled();
+    });
+
+    /** @scenario A fold that still reads running for an ended turn does not refuse the send */
+    it("waits for the fold of the ended turn instead of refusing the send as busy", async () => {
+      const findByIdVisible = vi
+        .fn()
+        .mockResolvedValueOnce(
+          conversationDetail({ status: "running", currentTurnId: "turn-ended" }),
+        )
+        .mockResolvedValueOnce(
+          conversationDetail({ status: "running", currentTurnId: "turn-ended" }),
+        )
+        .mockResolvedValue(conversationDetail({ status: "idle" }));
+      const fixture = makeFixture(
+        { tokenBuffer: ended, endedTurnWait: { waitMs: 1_000, pollMs: 1 } },
+        findByIdVisible,
+      );
+
+      await expect(
+        LangyTurnService.create(fixture.deps).startConversationTurn(input()),
+      ).resolves.toMatchObject({ conversationId: "conversation-1" });
+      expect(findByIdVisible).toHaveBeenCalledTimes(3);
+      expect(fixture.dispatch).toHaveBeenCalledOnce();
+    });
+  });
+
+  describe("given the turn holding the conversation is still replying", () => {
+    /** @scenario A send while Langy is still replying is refused at once */
+    it("refuses the send as in progress without waiting", async () => {
+      const claim = vi.fn(async () => ({
+        kind: "busy" as const,
+        conversationId: "conversation-1",
+        heldTurnId: "turn-running",
+      }));
+      const fixture = makeFixture({
+        tokenBuffer: {
+          readTail: vi.fn(async () => ({
+            reads: [{ id: "1-0", entry: { type: "delta" as const, text: "still going" } }],
+            lastId: "1-0",
+          })),
+        },
+        endedTurnWait: { waitMs: 1_000, pollMs: 1 },
+        admission: {
+          claim,
+          commit: vi.fn(async () => undefined),
+          confirmAccepted: vi.fn(async () => undefined),
+          abort: vi.fn(async () => undefined),
+          release: vi.fn(async () => undefined),
+        },
+      });
+
+      await expect(
+        LangyTurnService.create(fixture.deps).startConversationTurn(input()),
+      ).rejects.toBeInstanceOf(LangyTurnInProgressError);
+      expect(claim).toHaveBeenCalledOnce();
     });
   });
 

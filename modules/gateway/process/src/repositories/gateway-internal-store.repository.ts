@@ -41,6 +41,7 @@ export abstract class GatewayInternalStoreRepository {
       id: string;
       organizationId: string;
       principalUserId: string | null;
+      traceProjectId: string | null;
       lastUsedAt: Instant | null;
     }[]
   >;

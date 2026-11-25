@@ -1,16 +1,20 @@
 /**
  * @vitest-environment jsdom
  * The board header's extension point: what a peer lends is drawn on a stored board and on a
- * From LangWatch board, and told which board it sits on.
+ * From LangWatch board, and told which board it sits on; one that crashes is reported.
  * @see modules/insight/specs/insight-daily-run.feature
  */
 
 import { type BoardHeaderActionProps, BoardHeaderActionToken } from "@langwatch/analytics-client";
+import type { UiAnalytics } from "@langwatch/browser-host/analytics";
 import { UiHostServicesContextProvider } from "@langwatch/browser-host/capabilities";
 import { type UiLend, uiDeclarations } from "@langwatch/browser-host/declarations";
-import { createUiHostServicesFromHost } from "@langwatch/browser-host/testing";
+import {
+  createUiHostServicesFromHost,
+  RecordingUiAnalytics,
+} from "@langwatch/browser-host/testing";
 import type { UiProcedureCall } from "@langwatch/browser/testing-transport";
-import { cleanup, screen } from "@testing-library/react";
+import { cleanup, screen, within } from "@testing-library/react";
 import type { ReactElement } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -20,6 +24,7 @@ vi.mock(import("@langwatch/design-system/color-mode"), async (importOriginal) =>
   getRawColorValue: () => "#123456",
 }));
 
+import type { AnalyticsHostProject } from "../../../model/analytics-host.ts";
 import { ANALYTICS_MEMBER_PERMISSIONS, StubAnalyticsHost } from "../../../testing.tsx";
 import { curatedBoardById } from "../model/curated-boards.ts";
 import CuratedBoardScreen from "../ui/sections/curated-board.screen.tsx";
@@ -63,19 +68,42 @@ const LENT: UiLend = {
   load: () => Promise.resolve({ default: LentProbe }),
 };
 
+const SHOP = { id: "proj-1", slug: "test-project", name: "Test Project", hasFirstMessage: true };
+const OWNER = { id: "proj-owner", slug: "owner-abc", name: "Owner" };
+
+/** A lent action with a bug: it throws while drawing. */
+function CrashingAction(): never {
+  throw new Error("The lent action broke");
+}
+const CRASHING: UiLend = {
+  token: BoardHeaderActionToken,
+  load: () => Promise.resolve({ default: CrashingAction }),
+};
+
 function openScreen({
   element,
   params,
   lends,
+  board = {},
+  organizationArea,
+  project,
+  analytics,
 }: {
   element: ReactElement;
   params: Record<string, string>;
   lends: readonly UiLend[];
+  /** Fields of the stored board that differ from the default board. */
+  board?: Record<string, unknown>;
+  /** The organization's Dashboards area flag, answered once given; unanswered when absent. */
+  organizationArea?: boolean;
+  project?: AnalyticsHostProject;
+  analytics?: UiAnalytics;
 }) {
   const host = new StubAnalyticsHost({
     flags: { release_dashboards: true },
     permissions: [...ANALYTICS_MEMBER_PERMISSIONS],
     route: { params, query: {} },
+    ...(project ? { project } : {}),
   });
   const services = {
     ...createUiHostServicesFromHost({
@@ -83,6 +111,7 @@ function openScreen({
       navigate: () => void 0,
     }),
     declarations: uiDeclarations([{ name: "insight", installation: { capabilities: {}, lends } }]),
+    ...(analytics ? { analytics } : {}),
   };
   renderDashboards({
     element: (
@@ -90,7 +119,15 @@ function openScreen({
     ),
     host,
     answer: (call: UiProcedureCall) => {
-      if (call.path === "boards.getAll") return Promise.resolve([{ ...BOARD }]);
+      if (call.path === "featureFlag.isEnabledForEachOrganization") {
+        return organizationArea === undefined
+          ? NO_PROCEDURES(call)
+          : Promise.resolve({ enabledByOrganizationId: { "org-1": organizationArea } });
+      }
+      if (call.path === "boards.scopeProjects") {
+        return Promise.resolve({ ownerProject: OWNER, projects: [OWNER, SHOP] });
+      }
+      if (call.path === "boards.getAll") return Promise.resolve([{ ...BOARD, ...board }]);
       if (call.path === "boards.listStarred") return Promise.resolve([]);
       if (call.path === "dashboardWidgets.list") return Promise.resolve(WIDGETS);
       return NO_PROCEDURES(call);
@@ -144,8 +181,87 @@ describe("given no module lends an action to the board header", () => {
         lends: [],
       });
 
-      expect(await screen.findByRole("heading", { name: "Release check" })).toBeInTheDocument();
+      expect(await screen.findByRole("heading", { name: "Ready to ship?" })).toBeInTheDocument();
       expect(screen.queryByLabelText("Lent action")).toBeNull();
+    });
+  });
+});
+
+describe("given the organization's Dashboards area is off", () => {
+  describe("when a member opens a stored board", () => {
+    /** @scenario "With the flag off, a board's title has no inline rename, as on main" */
+    it("draws the title with no rename control", async () => {
+      openScreen({
+        element: <DashboardBoardScreen />,
+        params: { dashboardId: "board-1" },
+        lends: [],
+        organizationArea: false,
+      });
+
+      const heading = await screen.findByRole("heading", { name: "Weekly review" });
+      expect(within(heading).queryByRole("button")).toBeNull();
+    });
+  });
+
+  describe("when a member opens an Organization board in a project", () => {
+    /** @scenario "With the flag off, an Organization board keeps the Project chip, as on main" */
+    it("shows the Project chip in place of the data label", async () => {
+      openScreen({
+        element: <DashboardBoardScreen />,
+        params: { dashboardId: "board-1" },
+        lends: [],
+        board: { scope: "ORGANIZATION", projectId: OWNER.id },
+        organizationArea: false,
+        project: SHOP,
+      });
+
+      expect(
+        await screen.findByRole("button", { name: `Project: ${SHOP.name}` }),
+      ).toBeInTheDocument();
+      expect(screen.queryByLabelText(/^Data from /)).toBeNull();
+    });
+  });
+
+  describe("when the organization's Dashboards area is on", () => {
+    /** @scenario "An Organization board in a project reads its data from a label, not a chip" */
+    it("shows the data label, and no Project chip", async () => {
+      openScreen({
+        element: <DashboardBoardScreen />,
+        params: { dashboardId: "board-1" },
+        lends: [],
+        board: { scope: "ORGANIZATION", projectId: OWNER.id },
+        organizationArea: true,
+        project: SHOP,
+      });
+
+      expect(await screen.findByLabelText(`Data from ${SHOP.name}`)).toBeVisible();
+      expect(screen.queryByRole("button", { name: /^Project:/ })).toBeNull();
+    });
+  });
+});
+
+describe("given a module lends an action to the board header that crashes while drawing", () => {
+  describe("when a member opens a stored board", () => {
+    /** @scenario "Telemetry: a chart or a board header action that crashes while drawing is reported as an exception" */
+    it("reports the crash once as an exception naming the lender and the board", async () => {
+      const silenced = vi.spyOn(console, "error").mockImplementation(() => void 0);
+      const analytics = new RecordingUiAnalytics();
+      openScreen({
+        element: <DashboardBoardScreen />,
+        params: { dashboardId: "board-1" },
+        lends: [CRASHING],
+        analytics,
+      });
+
+      expect(await screen.findByText("This action failed to load")).toBeInTheDocument();
+      expect(analytics.exceptions).toHaveLength(1);
+      expect(analytics.exceptions[0]?.error).toEqual(new Error("The lent action broke"));
+      expect(analytics.exceptions[0]?.properties).toEqual({
+        surface: "board_header_action",
+        owner: "insight",
+        dashboardId: "board-1",
+      });
+      silenced.mockRestore();
     });
   });
 });

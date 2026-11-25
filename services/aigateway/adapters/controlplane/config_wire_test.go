@@ -532,3 +532,36 @@ func TestConfigWire_BudgetsValidUntil(t *testing.T) {
 		assert.True(t, (&configWire{}).toDomain().Budget.ValidUntil.IsZero())
 	})
 }
+
+// A null or absent allow list admits any key of the project; an empty list
+// admits none. Decoding the two the same way would open a restricted target.
+func TestConfigWire_A2ATargetAllowList(t *testing.T) {
+	cases := []struct {
+		name       string
+		field      string
+		wantPolicy bool
+		wantIDs    []string
+	}{
+		{"null admits any key", `,"allowed_virtual_key_ids":null`, false, nil},
+		{"absent admits any key", ``, false, nil},
+		{"empty list denies every key", `,"allowed_virtual_key_ids":[]`, true, []string{}},
+		{"listed keys are kept", `,"allowed_virtual_key_ids":["vk_a"]`, true, []string{"vk_a"}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			var wire configWire
+			require.NoError(t, json.Unmarshal(
+				[]byte(`{"a2a_targets":[{"name":"billing","upstream_url":"https://billing.acme.test"`+tc.field+`}]}`),
+				&wire,
+			))
+			targets := wire.toDomain().A2ATargets
+			require.Len(t, targets, 1)
+			if !tc.wantPolicy {
+				assert.Nil(t, targets[0].Policy)
+				return
+			}
+			require.NotNil(t, targets[0].Policy)
+			assert.Equal(t, tc.wantIDs, targets[0].Policy.AllowedVirtualKeyIDs)
+		})
+	}
+}

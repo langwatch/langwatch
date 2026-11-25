@@ -250,7 +250,7 @@ describe.skipIf(!enabled)("the spend record of an Instant Eval outcome (real Cli
         organizationId,
         projectId: judgedProject,
         requestId,
-        model: "langwatch/instant-evals",
+        model: "langwatch/instant-preview",
         rateVersion: "instant_eval@0.8x1.3",
         inputTokens: 900,
         priceNanoUsd,

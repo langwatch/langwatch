@@ -1,19 +1,20 @@
 /**
  * @vitest-environment jsdom
  * Board scope in the browser: the control in a board's header and the sidebar's menu, the
- * confirmation and Undo, the marks and the organization's group, the Project chip, the page
- * for a board that is not available, and view-only with "Duplicate to edit".
+ * confirmation and Undo, the marks and the organization's group, the read-only "Data from"
+ * label, the page for a board that is not available, and view-only with "Duplicate to edit".
  * @see modules/dashboard/specs/dashboards-v2.feature
  */
 
 import type { UiProcedureCall } from "@langwatch/browser/testing-transport";
-import type { DashboardScope } from "@langwatch/dashboard-contract";
+import type { DashboardHomeProduct, DashboardScope } from "@langwatch/dashboard-contract";
 import { Toaster, toaster } from "@langwatch/design-system/toaster";
-import { cleanup, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { ANALYTICS_MEMBER_PERMISSIONS, StubAnalyticsHost } from "../../../testing.tsx";
+import type { SandboxedChartFrameProps } from "../../dashboard-widget/ui/sections/sandboxed-chart-frame.tsx";
 import { BOARD_UNAVAILABLE } from "../model/board-scope.ts";
 import DashboardBoardScreen from "../ui/sections/dashboard-board.screen.tsx";
 import { SavedDashboardsSection } from "../ui/sections/saved-dashboards-section.tsx";
@@ -25,6 +26,22 @@ vi.mock(import("@langwatch/design-system/color-mode"), async (importOriginal) =>
   getRawColorValue: () => "#123456",
 }));
 
+// The sandboxed frame runs no code in jsdom; the stand-in keeps its props so a test can
+// run a query.
+const { frames } = vi.hoisted(() => ({
+  frames: new WeakMap<Element, SandboxedChartFrameProps>(),
+}));
+vi.mock("../../dashboard-widget/ui/sections/sandboxed-chart-frame.tsx", () => ({
+  SandboxedChartFrame: (props: SandboxedChartFrameProps) => (
+    <div
+      data-testid="sandboxed-frame"
+      ref={(element) => {
+        if (element) frames.set(element, props);
+      }}
+    />
+  ),
+}));
+
 type Input = Record<string, unknown>;
 type Project = { id: string; name: string; slug: string };
 type Board = {
@@ -34,6 +51,7 @@ type Board = {
   description: string | null;
   createdById: string | null;
   scope: DashboardScope;
+  homeProduct: DashboardHomeProduct;
   organizationId: string | null;
   ownerProject: Project | null;
   isStarred: boolean;
@@ -47,6 +65,7 @@ const VIEWER = ["analytics:view", "cost:view", "traces:view"];
 /** A board the project in view owns, made by the member unless a test says otherwise. */
 const own = (overrides: Partial<Board> & { id: string; name: string }): Board => ({
   ...HOME_BOARD,
+  homeProduct: "llm-ops",
   description: null,
   createdById: "user-1",
   isStarred: false,
@@ -86,8 +105,11 @@ function scopeServer({
   widgets = [],
   otherStars = 0,
   projects = [HERE, CHECKOUT],
+  organizationArea = false,
 }: {
   boards: Board[];
+  /** The organization's Dashboards area flag; off unless a scenario turns it on. */
+  organizationArea?: boolean;
   widgets?: ReturnType<typeof widget>[];
   otherStars?: number;
   projects?: Project[];
@@ -148,6 +170,11 @@ function scopeServer({
         state.widgets.push(created);
         return Promise.resolve({ ...created });
       }
+      // The organization's Dashboards area is off, so a missing board reads as AC183's page.
+      case "featureFlag.isEnabledForEachOrganization":
+        return Promise.resolve({
+          enabledByOrganizationId: organizationArea ? { "org-1": true } : {},
+        });
       default:
         return NO_PROCEDURES(call);
     }
@@ -327,6 +354,24 @@ describe("a board's scope in the browser", () => {
     });
   });
 
+  describe("given a new board nothing has stored yet", () => {
+    /** @scenario "AC162d Renaming, describing or pinning a new board stores it with that edit" */
+    it("stores the board when its scope is picked, then sets that scope on the stored board", async () => {
+      const server = scopeServer({ boards: [WEEKLY] });
+      const { user } = open({ server, dashboardId: "new" });
+
+      await user.click(await screen.findByRole("button", { name: "Scope: Project" }));
+      await user.click(await screen.findByRole("menuitemradio", { name: "Organization" }));
+
+      await waitFor(() =>
+        expect(inputsTo(server, "boards.setScope")).toEqual([
+          { projectId: "proj-1", dashboardId: "board-new-2", scope: "ORGANIZATION" },
+        ]),
+      );
+      expect(inputsTo(server, "boards.create")).toHaveLength(1);
+    });
+  });
+
   describe("when a change of scope takes the board from someone", () => {
     const pick = async (user: ReturnType<typeof userEvent.setup>, from: string, to: string) => {
       await user.click(await screen.findByRole("button", { name: `Scope: ${from}` }));
@@ -499,7 +544,7 @@ describe("a board's scope in the browser", () => {
     });
 
     /** @scenario "AC182 Organization board: the Project chip says whose data it shows" */
-    it("names the project whose data is on screen in a chip", async () => {
+    it("names the project whose data is on screen in a chip, with the area off", async () => {
       open({ server: scopeServer({ boards: [spend] }) });
 
       const chip = await screen.findByRole("button", { name: "Project: Test Project" });
@@ -531,11 +576,21 @@ describe("a board's scope in the browser", () => {
 
       expect(host.navigations).toEqual(["/checkout/dashboards/board-1"]);
     });
+
+    /** @scenario "AC182 Organization board: the Project chip says whose data it shows" */
+    it("says whose data is on screen, read-only, with no project to switch to", async () => {
+      open({ server: scopeServer({ boards: [spend], organizationArea: true }) });
+
+      const label = await screen.findByLabelText("Data from Test Project");
+
+      expect(label.textContent).toBe("Data fromTest Project");
+      expect(screen.queryByRole("button", { name: /^Project:/ })).toBeNull();
+    });
   });
 
   describe("given a Project board", () => {
     /** @scenario "AC182 Organization board: the Project chip says whose data it shows" */
-    it("has no Project chip, and asks for no list of projects", async () => {
+    it("has no Project chip, and asks for no list of projects, with the area off", async () => {
       const server = scopeServer({ boards: [WEEKLY] });
       open({ server });
       await screen.findByRole("button", { name: "Scope: Project" });
@@ -545,12 +600,81 @@ describe("a board's scope in the browser", () => {
         asked: inputsTo(server, "boards.scopeProjects"),
       }).toEqual({ chip: null, asked: [] });
     });
+
+    /** @scenario "AC182 Organization board: the Project chip says whose data it shows" */
+    it("says its own project's data is on screen, read-only", async () => {
+      open({ server: scopeServer({ boards: [WEEKLY], organizationArea: true }) });
+      await screen.findByRole("button", { name: "Scope: Project" });
+
+      expect(await screen.findByLabelText("Data from Test Project")).toBeVisible();
+      expect(screen.queryByRole("button", { name: /^Project:/ })).toBeNull();
+    });
+  });
+
+  describe("given an Organization board homed in Gateway, at a project's address", () => {
+    const gateway = own({
+      id: "board-1",
+      name: "Gateway spend",
+      scope: "ORGANIZATION",
+      organizationId: "org-1",
+      homeProduct: "gateway",
+    });
+    const withWidget = ({ organizationArea }: { organizationArea: boolean }) =>
+      scopeServer({
+        boards: [gateway],
+        widgets: [widget({ id: "w-1", dashboardId: "board-1", name: "Spend" })],
+        organizationArea,
+      });
+    /** Runs each widget's query as its frame would, then returns what the runs sent. */
+    const widgetRuns = async (server: Server) => {
+      for (const frame of await screen.findAllByTestId("sandboxed-frame")) {
+        const props = frames.get(frame);
+        if (!props) throw new Error("a frame never rendered");
+        await act(async () => {
+          await props
+            .executeQuery({ queryName: "main", params: {}, signal: new AbortController().signal })
+            .catch(() => undefined);
+        });
+      }
+      const runs = inputsTo(server, "analytics.lwql.query");
+      expect(runs).not.toEqual([]);
+      return runs;
+    };
+
+    /** @scenario "A Gateway or Governance board's widget reads every project I may read" */
+    it("names no project and reads every project, with the area on (ADR-002, D2)", async () => {
+      const server = withWidget({ organizationArea: true });
+      open({ server });
+      await screen.findByRole("button", { name: "Scope: Organization" });
+
+      expect(screen.queryByLabelText(/^Data from /)).toBeNull();
+      expect(await widgetRuns(server)).toContainEqual(expect.objectContaining({ projects: "all" }));
+    });
+
+    /** @scenario "A Gateway or Governance board's widget reads every project I may read" */
+    it("keeps the Project chip and the project's data, with the area off", async () => {
+      const server = withWidget({ organizationArea: false });
+      open({ server });
+
+      expect(await screen.findByRole("button", { name: "Project: Test Project" })).toBeVisible();
+      for (const run of await widgetRuns(server)) expect(run).not.toHaveProperty("projects");
+    });
+
+    /** @scenario "A Gateway or Governance board's widget reads every project I may read" */
+    it("offers the empty-board templates, with the area off", async () => {
+      open({ server: scopeServer({ boards: [gateway] }) });
+
+      expect(await screen.findByText("Or start from a template")).toBeInTheDocument();
+    });
   });
 
   describe("given the address of a board the server does not list for this member", () => {
     /** @scenario "AC183 A board the reader may not open is not available" */
     it("says the dashboard is not available, and why it may be", async () => {
-      open({ server: scopeServer({ boards: [WEEKLY] }), dashboardId: "board-private" });
+      open({
+        server: scopeServer({ boards: [WEEKLY] }),
+        dashboardId: "board-private",
+      });
 
       expect(
         await screen.findByRole("heading", { name: BOARD_UNAVAILABLE.title }),

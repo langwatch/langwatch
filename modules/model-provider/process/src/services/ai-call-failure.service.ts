@@ -1,5 +1,9 @@
 import { HandledError } from "@langwatch/handled-error";
-import { AiCallFailedError, type ModelRole } from "@langwatch/model-provider-contract";
+import {
+  AiCallFailedError,
+  AiContentFilteredError,
+  type ModelRole,
+} from "@langwatch/model-provider-contract";
 import { createLogger } from "@langwatch/observability";
 import { APICallError, RetryError } from "ai";
 
@@ -22,6 +26,19 @@ function isRetryableAiFailure(error: unknown): boolean {
   if (APICallError.isInstance(cause)) return cause.isRetryable;
 
   return true;
+}
+
+/** Whether the provider's content filter refused the input: Azure answers 400 `content_filter`. */
+function readContentFilterRefusal(
+  error: unknown,
+): { filtered: true; providerResponse: string } | { filtered: false } {
+  const cause = RetryError.isInstance(error) ? error.lastError : error;
+  if (!APICallError.isInstance(cause) || cause.statusCode !== 400) return { filtered: false };
+  const body = cause.responseBody ?? "";
+
+  return /"code"\s*:\s*"content_filter"/.test(body)
+    ? { filtered: true, providerResponse: body }
+    : { filtered: false };
 }
 
 export class AiCallFailureService {
@@ -47,6 +64,23 @@ export class AiCallFailureService {
       }
 
       const message = err instanceof Error ? err.message : String(err);
+      const refusal = readContentFilterRefusal(err);
+      if (refusal.filtered) {
+        // The body says which filter fired; the request body would repeat the refused text.
+        logger.warn(
+          {
+            featureKey: feature.key,
+            role: feature.role,
+            providerResponse: refusal.providerResponse,
+          },
+          "AI call filtered",
+        );
+        throw new AiContentFilteredError({
+          featureKey: feature.key,
+          role: feature.role,
+          featureDisplayName: feature.displayName,
+        });
+      }
       const retryable = isRetryableAiFailure(err);
       // The provider's own words are diagnostic, not copy: they go in the log
       // line, correlated by trace id, and nowhere a customer can read them.

@@ -39,6 +39,11 @@ interface LwDashboardContext {
    * widget on \`useChartQuery\` re-runs its queries without doing anything.
    */
   readonly refreshedAt?: number;
+  /**
+   * Whether the reader may ask Langy from this chart. Only when it is true
+   * should a bar, point or legend entry call \`LW.askLangy\` and look clickable.
+   */
+  readonly canAskLangy?: boolean;
 }
 
 /** A bound value for one of a query's declared parameters. */
@@ -140,7 +145,9 @@ type LwNavigableTarget =
   | "onlineEvaluations"
   | "annotations"
   | "gatewayVirtualKeys"
-  | "codingSessions";
+  | "codingSessions"
+  | "modelCosts"
+  | "metadataDocs";
 
 /** Return shape of \`LW.useChartQuery\`, matching TanStack Query's \`useQuery\` naming. */
 interface LwChartQueryState<Row = Record<string, unknown>> {
@@ -257,6 +264,27 @@ interface LwApi {
     target: LwNavigableTarget,
     params?: Readonly<Record<string, unknown>>,
   ) => void;
+
+  /**
+   * Opens Langy with a draft about a clicked mark: \`kind\` says what it is
+   * ("day", "model", "topic"), \`label\` the value as shown, \`value\` the raw
+   * value, \`at\` the ISO start of the bucket and \`series\` the series under
+   * the pointer. Fire-and-forget; dropped unless \`LW.dashboardContext.canAskLangy\`.
+   */
+  askLangy: (subject: {
+    kind?: string;
+    label: string;
+    value?: string;
+    at?: string;
+    series?: string;
+  }) => void;
+
+  /**
+   * Tells the host whether the problem this widget watches for is on the card
+   * now. Call it on every render; only a change is sent. The card shows its
+   * Investigate and Propose a fix buttons only while \`problem\` is true.
+   */
+  signal: (state: { problem: boolean }) => void;
 }
 
 declare const LW: LwApi;

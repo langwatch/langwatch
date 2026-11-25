@@ -1,3 +1,7 @@
+import type { DigestCodingAgentWeekProps } from "./templates/digest-coding-agent-week.tsx";
+import type { DigestPlanPressureProps } from "./templates/digest-plan-pressure.tsx";
+import type { DigestScenariosTrendProps } from "./templates/digest-scenarios-trend.tsx";
+import type { DigestTracesWeekProps } from "./templates/digest-traces-week.tsx";
 import type { MonitorAutoPausedEmailProps } from "./templates/monitor-auto-paused-email.tsx";
 import type { PlatformOperatorChangeEmailProps } from "./templates/platform-operator-change-email.tsx";
 import type { TriggerDigestMail } from "./templates/trigger-digest-email.tsx";
@@ -30,13 +34,36 @@ export abstract class MailRender {
     input: UpgradeAlertEmailProps,
   ): Promise<{ subject: string; html: string }>;
 
-  /** An online evaluation that paused itself, sent to each of its organization's admins. */
+  /**
+   * An online evaluation that paused itself, sent to each of its organization's admins. The
+   * template id travels with it so notification can pick the provider by it.
+   */
   abstract renderMonitorAutoPaused(
     input: MonitorAutoPausedEmailProps,
-  ): Promise<{ subject: string; html: string }>;
+  ): Promise<{ subject: string; html: string; template: string }>;
 
   /** Someone was given or lost the platform-operator role, sent to every operator. */
   abstract renderPlatformOperatorChange(
     input: PlatformOperatorChangeEmailProps,
+  ): Promise<{ subject: string; html: string }>;
+
+  /** An admin's weekly digest when the month's usage presses on the plan limit. */
+  abstract renderDigestPlanPressure(
+    input: DigestPlanPressureProps,
+  ): Promise<{ subject: string; html: string }>;
+
+  /** A member's weekly digest when the focus project's scenario failure rate moved. */
+  abstract renderDigestScenariosTrend(
+    input: DigestScenariosTrendProps,
+  ): Promise<{ subject: string; html: string }>;
+
+  /** A person's weekly digest of their own coding-agent sessions. */
+  abstract renderDigestCodingAgentWeek(
+    input: DigestCodingAgentWeekProps,
+  ): Promise<{ subject: string; html: string }>;
+
+  /** A member's weekly digest of the focus project's traces. */
+  abstract renderDigestTracesWeek(
+    input: DigestTracesWeekProps,
   ): Promise<{ subject: string; html: string }>;
 }

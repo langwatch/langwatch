@@ -27,6 +27,9 @@
       "path": "../../user/contract/tsconfig.build.json"
     },
     {
+      "path": "../../../enterprise/modules/nurturing/contract/tsconfig.build.json"
+    },
+    {
       "path": "../../../packages/time/tsconfig.build.json"
     },
     {
@@ -67,6 +70,7 @@
   "nx": {
     "sync": {
       "ignoredDependencies": [
+        "@langwatch/mail",
         "@langwatch/module",
         "@langwatch/process-stores",
         "@langwatch/test-harness",

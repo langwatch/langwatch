@@ -51,6 +51,8 @@ async function application() {
     recordMemberEnabled: accepts,
     recordMemberRemoved: accepts,
     recordMemberDepartmentChanged: accepts,
+    recordMemberRoleChanged: accepts,
+    recordMemberAdmitted: accepts,
   });
 
   return { app, repositories: setup.repositories, permissions };

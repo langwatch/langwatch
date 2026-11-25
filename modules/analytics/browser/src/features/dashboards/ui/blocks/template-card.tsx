@@ -171,12 +171,15 @@ export function AddTemplateButton({
   name,
   isCreating,
   addedHref,
+  inProject = true,
   onCreate,
 }: {
   name: string;
   isCreating: boolean;
   /** The address of the board this project already made from the template, if any. */
   addedHref: string | undefined;
+  /** False at the organization level, where the board is the member's own, in no project. */
+  inProject?: boolean;
   onCreate: () => void;
 }) {
   const host = useAnalyticsHost();
@@ -204,13 +207,13 @@ export function AddTemplateButton({
       size="sm"
       variant="solid"
       colorPalette="accent"
-      aria-label={`Add ${name} to this project`}
+      aria-label={inProject ? `Add ${name} to this project` : `Add ${name}`}
       loading={isCreating}
       loadingText="Adding…"
       onClick={onCreate}
     >
       <Plus size={14} aria-hidden />
-      Add to this project
+      {inProject ? "Add to this project" : "Add"}
     </Button>
   );
 }
