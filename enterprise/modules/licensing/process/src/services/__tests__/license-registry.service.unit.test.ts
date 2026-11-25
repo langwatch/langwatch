@@ -657,6 +657,28 @@ describe("changing the seats of a running license", () => {
 });
 
 describe("the seats a connected customer holds", () => {
+  /** @scenario "The seats a customer uses are read from the license that last synced" */
+  it("reads the seats in use off the license that synced while its replacement waits", async () => {
+    const { registry, repository } = harness();
+    const { license } = await registry.issue(issueInput({ maxMembers: 25 }));
+    await repository.update(license.id, {
+      instanceId: "acme-prod",
+      lastSyncAt: Temporal.Instant.from("2026-06-01T06:00:00.000Z"),
+      reportedMembers: 8,
+    });
+    await registry.reissue({
+      id: license.id,
+      expiresAt: Temporal.Instant.from("2027-06-01T00:00:00.000Z"),
+      operatorId: "operator-9",
+    });
+
+    await expect(registry.getConnectedSeats("org-acme")).resolves.toMatchObject({
+      licensed: 25,
+      reported: 8,
+      lastSyncAt: "2026-06-01T06:00:00Z",
+    });
+  });
+
   it("reads nothing licensed and nothing reported for a customer with no license", async () => {
     const { registry } = harness();
 
@@ -704,6 +726,41 @@ describe("the seats a connected customer holds", () => {
       reported: 47,
       lastSyncAt: "2026-06-02T06:00:00Z",
       managedVirtualKeyId: "vk-managed",
+    });
+  });
+});
+
+describe("the chain a license belongs to", () => {
+  /** @scenario "The chain of a license lists what it replaced and what replaces it" */
+  it("lists every license of the chain, the newest first, from any of them", async () => {
+    const { registry, repository } = harness();
+    const { license: first } = await registry.issue(issueInput());
+    const { license: second } = await registry.reissue({
+      id: first.id,
+      expiresAt: Temporal.Instant.from("2027-02-01T00:00:00.000Z"),
+      operatorId: "operator-1",
+    });
+    await repository.update(first.id, { supersededAt: NOW });
+    const { license: third } = await registry.reissue({
+      id: second.id,
+      expiresAt: Temporal.Instant.from("2027-03-01T00:00:00.000Z"),
+      operatorId: "operator-1",
+    });
+    const unrelated = await registry.issue(issueInput());
+
+    for (const id of [first.id, second.id, third.id]) {
+      const { licenses } = await registry.getChain({ id });
+      expect(licenses.map((license) => license.id)).toEqual([third.id, second.id, first.id]);
+    }
+    const alone = await registry.getChain({ id: unrelated.license.id });
+    expect(alone.licenses.map((license) => license.id)).toEqual([unrelated.license.id]);
+  });
+
+  it("refuses a license that is not in the registry", async () => {
+    const { registry } = harness();
+
+    await expect(registry.getChain({ id: "missing" })).rejects.toMatchObject({
+      code: "issued_license_not_found",
     });
   });
 });

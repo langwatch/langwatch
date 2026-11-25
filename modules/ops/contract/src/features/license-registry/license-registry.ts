@@ -75,6 +75,17 @@ export interface IssuedLicensePageSchema extends Named<typeof issuedLicensePageS
 export const issuedLicensePageSchema: IssuedLicensePageSchema = issuedLicensePageSchemaDefinition;
 export type IssuedLicensePage = z.infer<typeof issuedLicensePageSchema>;
 
+/** Every license one reissue chain holds, the newest first. */
+const issuedLicenseChainSchemaDefinition = z.object({
+  licenses: z.array(issuedLicenseViewSchema),
+});
+export interface IssuedLicenseChainSchema extends Named<
+  typeof issuedLicenseChainSchemaDefinition
+> {}
+export const issuedLicenseChainSchema: IssuedLicenseChainSchema =
+  issuedLicenseChainSchemaDefinition;
+export type IssuedLicenseChain = z.infer<typeof issuedLicenseChainSchema>;
+
 const listIssuedLicensesInputSchemaDefinition = z.object({
   page: z.number().int().min(0).default(0),
   pageSize: z.number().int().min(1).max(100).default(25),

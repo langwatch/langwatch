@@ -22,6 +22,7 @@ import type {
 } from "./connect-install.ts";
 import type {
   ConnectService,
+  IssuedLicenseChain,
   IssuedLicensePage,
   IssuedLicenseSource,
   IssuedLicenseView,
@@ -156,6 +157,8 @@ export interface LicensingApi {
     operatorId: string;
   }): Promise<IssuedLicenseView>;
   getIssuedLicense(input: { id: string }): Promise<IssuedLicenseView>;
+  /** The reissue chain the license belongs to, the newest first. */
+  getIssuedLicenseChain(input: { id: string }): Promise<IssuedLicenseChain>;
   listIssuedLicenses(
     input: {
       page: number;

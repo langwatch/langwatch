@@ -309,3 +309,75 @@ Feature: License registry
     When an operator opens the licenses screen
     Then each license shows its customer, seats, term, status, entitled services and whether an instance is bound
     And a license that has synced shows when it last did and the seats it reported
+
+  # ============================================================================
+  # The license drawer: what the install gets, and when it gets it
+  # ============================================================================
+  # A license is a signed token with its term inside, so a new end date is a
+  # replacement (a reissue) delivered over sync, never an edit of the row.
+
+  @unit
+  Scenario: The chain of a license lists what it replaced and what replaces it
+    Given a license for "ACME" that was reissued twice
+    When an operator reads the chain of any license in it
+    Then every license in the chain is listed, the newest first
+
+  @unit
+  Scenario: The seats a customer uses are read from the license that last synced
+    Given a bound license that reported 8 seats in use
+    And a replacement for it that the install has not picked up yet
+    When billing reads the seats of that customer
+    Then it reads the replacement's seats as licensed and 8 as in use
+
+  @integration
+  Scenario: The drawer opens on the install that holds the license
+    Given a license bound to install "acme-prod" that last synced this morning
+    When an operator opens it in the drawer
+    Then the drawer names the install, when it last synced, its version, the seats in use and when the next daily sync is due
+
+  @integration
+  Scenario: Extending a trial signs a replacement the install picks up on its next sync
+    Given a bound license for "ACME" ending Dec 1 that no billing account was opened for
+    When an operator picks "+2 weeks" under Extend term and saves
+    Then a replacement is signed ending Dec 15 with the same seats
+    And no license key is shown, only a way to show it if the install cannot sync
+    And the drawer says the extension waits for the install's next sync
+
+  @integration
+  Scenario: A replacement waiting for delivery shows on the license it replaces
+    Given a bound license with a replacement the install has not picked up yet
+    When an operator opens the license in use
+    Then the drawer shows the term moving from the old end date to the new one, waiting for sync
+    And says how to get it now with Refresh license on the install
+
+  @integration
+  Scenario: Extending again while a replacement waits extends the replacement
+    Given a bound license with a replacement the install has not picked up yet
+    When an operator extends the term again
+    Then the replacement is the license reissued, not the one it replaces
+
+  @integration
+  Scenario: Extending a license no install has used shows the new key and stops the unused one
+    Given a license no install has used yet
+    When an operator extends its term
+    Then the new license key is shown to send to the customer
+    And the license it replaces is revoked, since no install holds it
+
+  @integration
+  Scenario: A new end date that does not extend the term cannot be saved
+    Given an active license ending Dec 1
+    When an operator picks Nov 20 as the new end date
+    Then the save button is disabled and the form says the date must be after Dec 1
+
+  @integration
+  Scenario: An extension the registry refuses leaves the term as it was
+    Given an active license ending Dec 1
+    When an operator extends it and the registry refuses the reissue
+    Then the drawer says the license was not extended
+    And the term still reads Dec 1
+
+  @integration
+  Scenario: Revoking from the drawer also revokes the replacement waiting for delivery
+    Given a bound license with a replacement the install has not picked up yet
+    When an operator revokes the license from the drawer
+    Then both the license and its replacement are revoked

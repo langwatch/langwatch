@@ -2,6 +2,7 @@ import { Dialog } from "@langwatch/design-system/dialog";
 import { Field, Textarea } from "@langwatch/design-system/primitives";
 import { useEffect, useRef, useState } from "react";
 
+import { useShowErrorToast } from "../../../../behavior/ops-feedback.ts";
 import { useLicenseCommands } from "../../behavior/use-license-commands.ts";
 import type { License } from "../../model/license-terms.ts";
 
@@ -9,15 +10,19 @@ const MIN_REASON_LENGTH = 3;
 
 export function LicenseRevokeDialog({
   license,
+  chain,
   onClose,
 }: {
   license: License | null;
+  /** Every live license revoked with it: a replacement waiting for sync would stay live. */
+  chain: License[];
   onClose: () => void;
 }) {
   const [reason, setReason] = useState("");
   const [attempts, setAttempts] = useState(0);
   const reasonRef = useRef<HTMLTextAreaElement>(null);
   const commands = useLicenseCommands();
+  const showErrorToast = useShowErrorToast();
   const invalid = attempts > 0 && reason.trim().length < MIN_REASON_LENGTH;
 
   useEffect(() => {
@@ -31,12 +36,20 @@ export function LicenseRevokeDialog({
   }, [attempts]);
 
   const submit = () => {
-    if (!license || commands.revoke.isPending) return;
+    if (!license || commands.revoke.isPending || commands.revokeQuietly.isPending) return;
     if (reason.trim().length < MIN_REASON_LENGTH) {
       setAttempts((count) => count + 1);
       return;
     }
-    commands.revoke.mutate({ id: license.id, reason: reason.trim() }, { onSuccess: onClose });
+    const others = chain.filter((row) => row.id !== license.id);
+    void (async () => {
+      for (const row of others) {
+        await commands.revokeQuietly.mutateAsync({ id: row.id, reason: reason.trim() });
+      }
+      commands.revoke.mutate({ id: license.id, reason: reason.trim() }, { onSuccess: onClose });
+    })().catch((error: unknown) =>
+      showErrorToast({ error, fallbackTitle: "The license was not revoked" }),
+    );
   };
 
   return (
@@ -50,7 +63,7 @@ export function LicenseRevokeDialog({
         label: "Revoke license",
         type: "submit",
         danger: true,
-        loading: commands.revoke.isPending,
+        loading: commands.revoke.isPending || commands.revokeQuietly.isPending,
       }}
     >
       <Field.Root required invalid={invalid}>

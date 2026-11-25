@@ -53,6 +53,7 @@ import {
   type PlatformLicenseAccess,
   type RemoveLicenseResult,
   type IssuedLicenseFilters,
+  type IssuedLicenseChain,
   type IssuedLicensePage,
   type LicenseStatus,
   type PlanInfo,
@@ -605,6 +606,10 @@ export class LicensingModule implements LicensingApiContract {
 
   getIssuedLicense(input: { id: string }): Promise<IssuedLicenseView> {
     return this.#registry.getById(input);
+  }
+
+  getIssuedLicenseChain(input: { id: string }): Promise<IssuedLicenseChain> {
+    return this.#registry.getChain(input);
   }
 
   listIssuedLicenses(

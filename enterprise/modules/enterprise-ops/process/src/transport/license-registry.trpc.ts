@@ -31,6 +31,11 @@ export const licenseRegistryTrpcTransport: TrpcRouterDeclaration<
   .withPermission("ops:view", STAFF)
   .handle(({ app, input }, operator) => app.getIssuedLicense({ ...input, operator }))
 
+  .procedure("getChain")
+  .withMiddlewareContext(operatorContext)
+  .withPermission("ops:view", STAFF)
+  .handle(({ app, input }, operator) => app.getIssuedLicenseChain({ ...input, operator }))
+
   .procedure("issue")
   .withMiddlewareContext(operatorContext)
   .withPermission("ops:manage", STAFF)

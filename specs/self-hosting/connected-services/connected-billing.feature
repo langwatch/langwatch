@@ -394,3 +394,30 @@ Feature: Billing a connected self-hosted customer
     Given the spend ledger cannot be read
     When an operator opens the customer in the admin console
     Then the drawn down amount is shown as unavailable rather than zero
+
+  # ============================================================================
+  # Starting billing from the license drawer
+  # ============================================================================
+  # A license with no billing account is a trial. Billing dates follow the
+  # license: starting billing signs the paid term on the license first.
+
+  @integration
+  Scenario: A license with no billing account reads as a trial
+    Given a license whose organization was never onboarded
+    When an operator opens it in the license drawer
+    Then the Billing section is one line saying it is not billed and when the trial ends
+    And it offers Start billing instead of a billing form
+
+  @integration
+  Scenario: Starting billing signs the paid term on the license, then onboards
+    Given a trial license ending Dec 14
+    When an operator starts billing for a paid term ending Dec 14 next year
+    Then the license is reissued to end Dec 14 next year
+    And the customer is onboarded for the same term after that
+
+  @integration
+  Scenario: Starting billing stops before onboarding when the license cannot be signed
+    Given a trial license
+    When an operator starts billing and the license reissue is refused
+    Then nothing is onboarded
+    And the drawer says the license step failed

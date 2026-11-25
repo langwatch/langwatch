@@ -32,7 +32,7 @@ export default function LicensesView() {
   const [page, setPage] = useState(1);
   const [openId, setOpenId] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
-  const [revoking, setRevoking] = useState<License | null>(null);
+  const [revoking, setRevoking] = useState<{ license: License; chain: License[] } | null>(null);
   // Opens on what an operator acts on: customers' licenses still in force.
   const [status, setStatus] = useState<StatusFilter>("active");
   const [audience, setAudience] = useState<AudienceFilter>("customer");
@@ -136,7 +136,7 @@ export default function LicensesView() {
           // Rows kept from the previous query are no reason to say the list is empty.
           isLoading={list.isLoading || list.isPlaceholderData}
           onOpen={setOpenId}
-          onRevoke={setRevoking}
+          onRevoke={(license) => setRevoking({ license, chain: [license] })}
           onResetBinding={(license) => commands.resetInstanceBinding.mutate({ id: license.id })}
           empty={emptyOf({
             counts,
@@ -157,10 +157,14 @@ export default function LicensesView() {
       <LicenseDetailDrawer
         licenseId={openId}
         onClose={() => setOpenId(null)}
-        onRevoke={(license) => setRevoking(license)}
+        onRevoke={(license, chain) => setRevoking({ license, chain })}
       />
       <LicenseIssueDrawer open={creating} onClose={() => setCreating(false)} />
-      <LicenseRevokeDialog license={revoking} onClose={() => setRevoking(null)} />
+      <LicenseRevokeDialog
+        license={revoking?.license ?? null}
+        chain={revoking?.chain ?? []}
+        onClose={() => setRevoking(null)}
+      />
     </>
   );
 }

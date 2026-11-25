@@ -8,6 +8,7 @@ import type {
   ActivationCodePage,
   ActivationCodeView,
   IssuedActivationCode,
+  IssuedLicenseChain,
   IssuedLicenseFilters,
   IssuedLicensePage,
   IssuedLicenseView,
@@ -26,6 +27,7 @@ type LicenseRegistry = Pick<
   LicensingApi,
   | "listIssuedLicenses"
   | "getIssuedLicense"
+  | "getIssuedLicenseChain"
   | "issueLicense"
   | "registerLegacyLicense"
   | "revokeIssuedLicense"
@@ -71,6 +73,11 @@ export class LicenseRegistryAuditService {
   async getById(input: Staff & { id: string }): Promise<IssuedLicenseView> {
     await this.record(input.operatorId, "getById", { args: { id: input.id }, targetId: input.id });
     return this.registry.getIssuedLicense({ id: input.id });
+  }
+
+  async getChain(input: Staff & { id: string }): Promise<IssuedLicenseChain> {
+    await this.record(input.operatorId, "getChain", { args: { id: input.id }, targetId: input.id });
+    return this.registry.getIssuedLicenseChain({ id: input.id });
   }
 
   async issue(input: Parameters<LicenseRegistry["issueLicense"]>[0]): Promise<SignedIssuedLicense> {

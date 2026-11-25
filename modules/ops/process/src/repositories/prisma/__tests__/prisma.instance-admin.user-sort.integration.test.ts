@@ -1,7 +1,7 @@
 /**
  * @vitest-environment node
  * The Back office users list is ordered in SQL across the whole search before it is paged.
- * @see modules/ops/specs/back-office-user-sort.feature
+ * @see modules/ops/specs/admin-user-sort.feature
  */
 import { randomUUID } from "node:crypto";
 

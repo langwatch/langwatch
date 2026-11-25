@@ -17,6 +17,7 @@ import {
   LicenseKeyInvalidError,
   OrganizationNotFoundError,
   type IssuedLicenseCustomerRecord,
+  type IssuedLicenseChain,
   type IssuedLicenseFilters,
   type IssuedLicensePage,
   type IssuedLicenseSource,
@@ -54,6 +55,9 @@ interface LicenseRegistryOptions {
   signingKey: () => string | undefined;
   now: () => Instant;
 }
+
+/** How far a chain is followed each way; a renewal a year is decades of chain. */
+const MAX_CHAIN = 100;
 
 /** What `issue` decides, with the term as an instant rather than a wire string. */
 type IssueLicenseTerms = Omit<ContractIssueLicenseInput, "expiresAt"> & {
@@ -369,20 +373,42 @@ export class LicenseRegistryService {
     const now = this.options.now();
     const active = licenses.filter((row) => statusOfIssuedLicense(row, now) === "active");
     const [current] = active.toSorted((a, b) => Temporal.Instant.compare(b.expiresAt, a.expiresAt));
-    const [lastSyncAt] = active
-      .flatMap((row) => (row.lastSyncAt ? [row.lastSyncAt] : []))
-      .toSorted((a, b) => Temporal.Instant.compare(b, a));
+    // A replacement waiting for delivery has never synced: what is in use is
+    // what the install that holds the license last reported.
+    const [synced] = active
+      .flatMap((row) => (row.lastSyncAt ? [{ row, at: row.lastSyncAt }] : []))
+      .toSorted((a, b) => Temporal.Instant.compare(b.at, a.at));
 
     return {
       licensed: current?.maxMembers ?? 0,
-      reported: current?.lastSyncAt ? (current.reportedMembers ?? 0) : null,
-      lastSyncAt: lastSyncAt?.toString() ?? null,
+      reported: synced ? (synced.row.reportedMembers ?? 0) : null,
+      lastSyncAt: synced?.at.toString() ?? null,
       managedVirtualKeyId: licenses.find((row) => row.virtualKeyId)?.virtualKeyId ?? null,
     };
   }
 
   async getById(input: { id: string }): Promise<IssuedLicenseView> {
     return this.toView(await this.getRow(input.id));
+  }
+
+  /** The licenses one reissue chain holds, followed both ways from any of them. */
+  async getChain(input: { id: string }): Promise<IssuedLicenseChain> {
+    const start = await this.getRow(input.id);
+    const older: IssuedLicenseRecord[] = [];
+    for (let row = start; row.replacesId && older.length < MAX_CHAIN;) {
+      const replaced = await this.options.repository.findById(row.replacesId);
+      if (!replaced) break;
+      older.push(replaced);
+      row = replaced;
+    }
+    const newer: IssuedLicenseRecord[] = [];
+    for (let row = start; newer.length < MAX_CHAIN;) {
+      const replacement = await this.options.repository.findByReplacesId(row.id);
+      if (!replacement) break;
+      newer.unshift(replacement);
+      row = replacement;
+    }
+    return { licenses: [...newer, start, ...older].map((row) => this.toView(row)) };
   }
 
   async list(

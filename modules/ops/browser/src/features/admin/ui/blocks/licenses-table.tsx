@@ -139,6 +139,10 @@ function LicensesTableRow({
 }
 
 function SyncCell({ license }: { license: License }) {
+  // A replacement copies the binding but never synced: it waits for the install to pick it up.
+  if (license.hasPendingDelivery && license.instanceId) {
+    return <Badge colorPalette="orange">waiting for sync</Badge>;
+  }
   if (!license.lastSyncAt) return <EmptyCell>never synced</EmptyCell>;
   return (
     <VStack align="start" gap={0}>
