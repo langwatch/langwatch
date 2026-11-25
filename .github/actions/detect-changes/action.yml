@@ -81,6 +81,9 @@ outputs:
   codeql-javascript:
     description: "'true' if code CodeQL analyses as javascript-typescript changed. Used by codeql.yml to build its language matrix: the single `relevant` filter fires on any of six trees and then runs every analyser, so a TypeScript-only change was paying for the Python one."
     value: ${{ steps.filter.outputs.codeql-javascript || steps.sha.outputs.codeql-javascript || steps.force.outputs.codeql-javascript }}
+  codeql-actions:
+    description: "'true' if a workflow or action under .github changed. Used by codeql.yml to add the actions analyser to its matrix."
+    value: ${{ steps.filter.outputs.codeql-actions || steps.sha.outputs.codeql-actions || steps.force.outputs.codeql-actions }}
   codeql-python:
     description: "'true' if code CodeQL analyses as python changed. See codeql-javascript."
     value: ${{ steps.filter.outputs.codeql-python || steps.sha.outputs.codeql-python || steps.force.outputs.codeql-python }}
@@ -186,5 +189,6 @@ runs:
         echo "lambda-image=true" >> "$GITHUB_OUTPUT"
         echo "ingest=true" >> "$GITHUB_OUTPUT"
         echo "codeql-javascript=true" >> "$GITHUB_OUTPUT"
+        echo "codeql-actions=true" >> "$GITHUB_OUTPUT"
         echo "codeql-python=true" >> "$GITHUB_OUTPUT"
         echo "docs-site=true" >> "$GITHUB_OUTPUT"

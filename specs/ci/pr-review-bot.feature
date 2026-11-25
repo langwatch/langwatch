@@ -10,9 +10,8 @@ Feature: PR Review Bot workflow
   # (1) The PR is not from dependabot (Dependabot has separate secret management)
   # (2) The PR is from the same repository (forks cannot access repo secrets)
   # (3) The PR is not a draft (drafts are not ready for review)
-  # (4) ci-complete succeeded, and then every other check on the head commit
-  #     (the separate workflows: pr conventions, go-ci, code-scanners, ...) has
-  #     finished without failing
+  # (4) ci-complete succeeded, and then every check the base branch requires
+  #     on the head commit (pr conventions, ...) has finished without failing
   # (5) The event is a pull request (the bot reads github.event.pull_request)
   # Additionally, concurrency ensures only one review per PR runs at a time.
   #
@@ -52,33 +51,62 @@ Feature: PR Review Bot workflow
     Then the review job is skipped
 
   # ============================================================================
-  # Gating: the other workflows' checks
+  # Gating: the required checks
   # ============================================================================
   #
   # ci-complete covers only the calls of pr.yml. A step of the review job, run
   # before the bot step (`go run ./cmd/waitforchecks`, tools/waitforchecks),
-  # lists the head commit's check runs, waits while any is unfinished, and fails
-  # the job if one failed or the wait timed out, so the bot step never runs.
-  # It retries transient API errors (network, 5xx, rate limits) until its
-  # deadline. A new push cancels the run (see Concurrency) and with it the wait.
+  # reads the status checks the base branch's rules require, waits while any of
+  # them is unfinished on the head commit (as a check run or a commit status),
+  # and fails the job if one failed or the wait timed out, so the bot step never
+  # runs. Optional workflows are not waited for: the review job is queued
+  # behind ci-complete through needs and holds no runner, and its wait ends as
+  # soon as the few required checks outside pr.yml report. It retries transient
+  # API errors (network, 5xx, rate limits) until its deadline. A new push
+  # cancels the run (see Concurrency) and with it the wait.
 
   @unit
-  Scenario: The review waits for every other check on the head commit
-    Given CI passed and another workflow's check on the head commit is still running
+  Scenario: The review waits for every required check on the head commit
+    Given CI passed and a check the base branch requires is still running on the head commit
     When the review job starts
     Then its wait step keeps polling the check runs
     And no review is posted until that check has finished
 
   @unit
-  Scenario: The review does not start when another check failed
-    Given CI passed and another workflow's check on the head commit failed
+  Scenario: A check the branch does not require never holds the review
+    Given CI passed and every required check passed
+    And an optional workflow's check is still running and another optional one failed
+    When the wait step reads the check runs
+    Then the wait ends at once and the bot step runs
+
+  @unit
+  Scenario: A required check that has not reported yet keeps the review waiting
+    Given the base branch requires a check that has no check run or status on the head commit yet
+    When the wait step reads the check runs
+    Then it counts that check as pending, named "<name> (not reported yet)"
+
+  @unit
+  Scenario: A required check posted as a commit status counts
+    Given the base branch requires a check that ci-complete posts as a commit status
+    When the wait step reads the head commit's statuses
+    Then a success status satisfies it and a failure or error status fails the wait
+
+  @unit
+  Scenario: With no required checks to read, the review waits for every check
+    Given the base branch's rules require no status checks
+    When the wait step reads the check runs
+    Then it waits for every other check on the head commit, as before rules existed
+
+  @unit
+  Scenario: The review does not start when a required check failed
+    Given CI passed and a required check on the head commit failed
     When the wait step reads the check runs
     Then the bot step does not run, because the wait step comes first and fails the job
     And no review is posted to the PR
 
   @unit
-  Scenario: a failed check fails the review job
-    Given CI passed and another workflow's check on the head commit failed
+  Scenario: A failed required check fails the review job
+    Given CI passed and a required check on the head commit failed
     When the wait step reads the check runs
     Then the wait step names the failed check in "another check failed: <names>; fix it and push"
     And the wait step exits non-zero
