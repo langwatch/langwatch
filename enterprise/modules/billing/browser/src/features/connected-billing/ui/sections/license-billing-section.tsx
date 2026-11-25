@@ -36,10 +36,16 @@ const dayLabel = (iso: string): string =>
     .toPlainDate()
     .toLocaleString("en-US", DAY_FORMAT);
 
-/** No billing account means the license is a trial. */
+/**
+ * Billed once onboarding sent the annual invoice, its last step. An account
+ * without one stopped part way, and Start billing finishes it.
+ */
+const isBilled = (overview: ConnectedBillingOverview): boolean =>
+  overview.account !== null && overview.invoices.some((invoice) => invoice.kind === "annual");
+
 function billingStateOf(overview: ConnectedBillingOverview | undefined): "trial" | "billed" | null {
   if (!overview) return null;
-  return overview.account ? "billed" : "trial";
+  return isBilled(overview) ? "billed" : "trial";
 }
 
 /**
@@ -73,7 +79,7 @@ export default function LicenseBillingSection(license: LicenseBillingSectionProp
     );
   }
   if (!query.data) return <BillingFrame summary="Loading…" />;
-  return query.data.account ? (
+  return isBilled(query.data) ? (
     <BilledPanel license={license} overview={query.data} />
   ) : (
     <TrialPanel license={license} overview={query.data} />
@@ -220,7 +226,11 @@ function TrialPanel({
 
   return (
     <BillingFrame
-      summary={`Not billed. The trial ends ${dayLabel(license.expiresAt)}.`}
+      summary={
+        overview.account
+          ? "Billing was started but did not finish. Start billing again to finish it."
+          : `Not billed. The trial ends ${dayLabel(license.expiresAt)}.`
+      }
       actions={
         open ? undefined : (
           <Button size="xs" variant="outline" onClick={() => setOpen(true)}>

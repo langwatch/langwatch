@@ -423,6 +423,13 @@ Feature: Billing a connected self-hosted customer
     And the drawer says the license step failed
 
   @integration
+  Scenario: Billing that stopped part way stays on Start billing
+    Given onboarding opened the billing account but failed before the annual invoice
+    When an operator opens the license in the drawer
+    Then the Billing section says billing did not finish and offers Start billing
+    And it does not offer Renew
+
+  @integration
   Scenario: A paid term with an empty end day cannot be submitted
     Given a trial license with Start billing open
     When the operator clears the day the paid term ends

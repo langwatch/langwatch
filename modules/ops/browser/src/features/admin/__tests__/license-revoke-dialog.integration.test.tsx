@@ -25,6 +25,7 @@ vi.mock("../../../behavior/ops-api.ts", () => {
             data: opts?.enabled ? { licenses: chain.licenses } : undefined,
             error: null,
             isLoading: false,
+            refetch: async () => ({ data: { licenses: chain.licenses } }),
           }),
         },
         revoke: { useMutation: () => ({ ...revoke, isPending: false }) },
@@ -116,11 +117,34 @@ describe("LicenseRevokeDialog", () => {
     });
   });
 
+  describe("given a replacement signed after the dialog opened", () => {
+    /** @scenario "Revoking reaches a replacement signed after the dialog opened" */
+    it("reads the chain again on confirm and revokes the new replacement too", async () => {
+      chain.licenses = [row("il_2"), row("il_1")];
+      renderWithOpsHost(<LicenseRevokeDialog license={row("il_1")} onClose={vi.fn()} />);
+      chain.licenses = [row("il_3"), row("il_2"), row("il_1")];
+
+      revokeWithReason();
+
+      await waitFor(() => expect(revoke.mutate).toHaveBeenCalledTimes(1));
+      expect(revoke.mutateAsync.mock.calls.map(([input]) => input.id)).toEqual(["il_3", "il_2"]);
+      expect(revoke.mutate.mock.calls[0]?.[0]).toEqual({ id: "il_1", reason: "contract ended" });
+    });
+  });
+
   describe("given a revoke that failed part way", () => {
     /** @scenario "A revoke that failed part way finishes on retry without repeating a revoked license" */
     it("skips the license already revoked and finishes with the selected one", async () => {
       chain.licenses = [row("il_3"), row("il_2"), row("il_1")];
-      revoke.mutateAsync.mockResolvedValueOnce({}).mockRejectedValueOnce(new Error("timeout"));
+      const revokedOnServer = async ({ id }: { id: string }) => {
+        chain.licenses = chain.licenses.map((license) =>
+          license.id === id ? { ...license, status: "revoked" } : license,
+        );
+        return {};
+      };
+      revoke.mutateAsync
+        .mockImplementationOnce(revokedOnServer)
+        .mockRejectedValueOnce(new Error("timeout"));
       renderWithOpsHost(<LicenseRevokeDialog license={row("il_1")} onClose={vi.fn()} />);
 
       revokeWithReason();

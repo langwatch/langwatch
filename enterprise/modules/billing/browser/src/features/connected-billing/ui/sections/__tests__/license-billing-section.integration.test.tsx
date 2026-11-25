@@ -135,6 +135,41 @@ describe("the Billing section of the license drawer", () => {
     });
   });
 
+  describe("given an onboarding that opened the account but sent no annual invoice", () => {
+    /** @scenario "Billing that stopped part way stays on Start billing" */
+    it("says billing did not finish and offers Start billing, not Renew", () => {
+      mocks.overview.current = {
+        ...trialOverview,
+        account: {
+          id: "acct-1",
+          organizationId: "org-acme",
+          stripeCustomerId: "cus_test",
+          termStartsAt: "2099-12-14T00:00:00.000Z",
+          termEndsAt: "2100-12-14T00:00:00.000Z",
+          commitUsdCents: 0,
+          seatCurrency: "USD",
+          seatRateCents: 500_00,
+          seats: 25,
+          bankTransferType: null,
+          bankTransferCountry: null,
+          billingEmail: "ops@acme.example",
+          renewalPending: false,
+        },
+      };
+      const onBillingState = vi.fn();
+      render(<LicenseBillingSection {...license({ onBillingState })} />, { wrapper });
+
+      expect(
+        screen.getByText(
+          "Billing was started but did not finish. Start billing again to finish it.",
+        ),
+      ).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Start billing" })).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Renew for the next term" })).toBeNull();
+      expect(onBillingState).toHaveBeenCalledWith("trial");
+    });
+  });
+
   describe("given a trial license with Start billing open", () => {
     /** @scenario "A paid term with an empty end day cannot be submitted" */
     it("asks for both days and disables Start billing when the end day is cleared", () => {

@@ -444,6 +444,13 @@ Feature: License registry
     Then both the replacement and the license the install holds are revoked
 
   @integration
+  Scenario: Revoking reaches a replacement signed after the dialog opened
+    Given the revoke dialog is open on a license
+    And another operator signs a replacement for it
+    When the operator confirms the revoke
+    Then the new replacement is revoked too
+
+  @integration
   Scenario: A revoke that failed part way finishes on retry without repeating a revoked license
     Given a chain of three live licenses
     And revoking failed after the first of them was revoked

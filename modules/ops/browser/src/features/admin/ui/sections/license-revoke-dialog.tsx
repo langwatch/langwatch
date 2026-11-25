@@ -10,10 +10,33 @@ import type { License } from "../../model/license-terms.ts";
 
 const MIN_REASON_LENGTH = 3;
 
+type RevokeInput = { id: string; reason: string };
+
 /**
- * Revokes a license and every live license of its reissue chain, read here so
- * the table and the drawer revoke the same set: a replacement waiting for sync
- * would otherwise stay live. A retry skips the rows an earlier attempt revoked.
+ * Revokes the chain's other live licenses and says whether the selected one is
+ * still live. The server may have revoked it on an attempt whose answer failed.
+ */
+async function revokeOthers({
+  live,
+  licenseId,
+  reason,
+  revokeQuietly,
+}: {
+  live: License[];
+  licenseId: string;
+  reason: string;
+  revokeQuietly: (input: RevokeInput) => Promise<unknown>;
+}): Promise<boolean> {
+  for (const row of live) {
+    if (row.id !== licenseId) await revokeQuietly({ id: row.id, reason });
+  }
+  return live.some((row) => row.id === licenseId);
+}
+
+/**
+ * Revokes a license and every live license of its reissue chain. The chain is
+ * read again when the operator confirms, so a replacement signed since the
+ * dialog opened is revoked too, and a retry skips rows the server revoked.
  */
 export function LicenseRevokeDialog({
   license,
@@ -25,7 +48,6 @@ export function LicenseRevokeDialog({
   const [reason, setReason] = useState("");
   const [attempts, setAttempts] = useState(0);
   const reasonRef = useRef<HTMLTextAreaElement>(null);
-  const revokedRef = useRef(new Set<string>());
   const commands = useLicenseCommands();
   const showErrorToast = useShowErrorToast();
   const chainQuery = api.licenseRegistry.getChain.useQuery(
@@ -40,7 +62,6 @@ export function LicenseRevokeDialog({
     if (!license) return;
     setReason("");
     setAttempts(0);
-    revokedRef.current = new Set();
   }, [license]);
 
   useEffect(() => {
@@ -53,13 +74,16 @@ export function LicenseRevokeDialog({
       setAttempts((count) => count + 1);
       return;
     }
-    const revoked = revokedRef.current;
-    const others = chain.live.filter((row) => row.id !== license.id && !revoked.has(row.id));
     void (async () => {
-      for (const row of others) {
-        await commands.revokeQuietly.mutateAsync({ id: row.id, reason: reason.trim() });
-        revoked.add(row.id);
-      }
+      const fresh = await chainQuery.refetch({ throwOnError: true });
+      if (!fresh.data) throw new Error("the chain could not be read");
+      const stillLive = await revokeOthers({
+        live: licenseChainState({ licenses: fresh.data.licenses })?.live ?? [],
+        licenseId: license.id,
+        reason: reason.trim(),
+        revokeQuietly: (input) => commands.revokeQuietly.mutateAsync(input),
+      });
+      if (!stillLive) return onClose();
       commands.revoke.mutate({ id: license.id, reason: reason.trim() }, { onSuccess: onClose });
     })().catch((error: unknown) =>
       showErrorToast({ error, fallbackTitle: "The license was not revoked" }),
