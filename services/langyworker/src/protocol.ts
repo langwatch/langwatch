@@ -17,7 +17,11 @@ export type TurnCommand = {
   prompt: string;
   system?: string;
   resumeToken?: string;
+  /** Base64 image bytes (no data: prefix) for the turn's first prompt, validated by the manager. */
+  images?: TurnImage[];
 };
+
+export type TurnImage = { name?: string; mediaType: string; data: string };
 
 export type AbortCommand = { type: "abort"; turnId: string };
 export type ShutdownImminentCommand = { type: "shutdown_imminent"; deadlineMs: number };
@@ -50,6 +54,7 @@ export function parseCommand(line: string): ManagerCommand | undefined {
         prompt: cmd.prompt,
         ...(typeof cmd.system === "string" ? { system: cmd.system } : {}),
         ...(typeof cmd.resumeToken === "string" ? { resumeToken: cmd.resumeToken } : {}),
+        ...imagesField(cmd.images),
       };
     case "abort":
       if (typeof cmd.turnId !== "string") return undefined;
@@ -64,6 +69,20 @@ export function parseCommand(line: string): ManagerCommand | undefined {
     default:
       return undefined;
   }
+}
+
+/** Keeps only well-formed images; a malformed entry is dropped, never fatal to the turn. */
+function imagesField(value: unknown): { images?: TurnImage[] } {
+  if (!Array.isArray(value)) return {};
+  const images: TurnImage[] = [];
+  for (const item of value) {
+    if (typeof item !== "object" || item === null) continue;
+    const { name, mediaType, data } = item as Record<string, unknown>;
+    if (typeof mediaType !== "string" || !mediaType.startsWith("image/")) continue;
+    if (typeof data !== "string" || data === "") continue;
+    images.push({ ...(typeof name === "string" ? { name } : {}), mediaType, data });
+  }
+  return images.length > 0 ? { images } : {};
 }
 
 // ---- wrapper -> manager -------------------------------------------------

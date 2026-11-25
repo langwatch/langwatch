@@ -371,12 +371,12 @@ interface Response {
 
 Contract `../contract/src/stored-object.trpc.ts:62`, router `src/transport/stored-object.trpc.ts:12`.
 
-| Procedure                     | Kind     | Gate                                                        | Input                                   | Output                                   |
-| ----------------------------- | -------- | ----------------------------------------------------------- | --------------------------------------- | ---------------------------------------- |
-| `storedObjects.headById`      | query    | Permission `traces:view or scenarios:view or datasets:view` | `storedObjectHeadInputSchema`           | `storedObjectHeadSchema`                 |
-| `storedObjects.getReadUrl`    | query    | Permission `traces:view or scenarios:view or datasets:view` | `storedObjectReadUrlInputSchema`        | `storedObjectReadUrlSchema`              |
-| `storedObjects.createUpload`  | mutation | Permission `project:update`                                 | `storedObjectsCreateUploadInputSchema`  | `storedObjectsCreateUploadOutputSchema`  |
-| `storedObjects.confirmUpload` | mutation | Permission `project:update`                                 | `storedObjectsConfirmUploadInputSchema` | `storedObjectsConfirmUploadOutputSchema` |
+| Procedure                     | Kind     | Gate                                                                      | Input                                   | Output                                   |
+| ----------------------------- | -------- | ------------------------------------------------------------------------- | --------------------------------------- | ---------------------------------------- |
+| `storedObjects.headById`      | query    | Permission `traces:view or scenarios:view or datasets:view or langy:view` | `storedObjectHeadInputSchema`           | `storedObjectHeadSchema`                 |
+| `storedObjects.getReadUrl`    | query    | Permission `traces:view or scenarios:view or datasets:view or langy:view` | `storedObjectReadUrlInputSchema`        | `storedObjectReadUrlSchema`              |
+| `storedObjects.createUpload`  | mutation | Permission `project:update`                                               | `storedObjectsCreateUploadInputSchema`  | `storedObjectsCreateUploadOutputSchema`  |
+| `storedObjects.confirmUpload` | mutation | Permission `project:update`                                               | `storedObjectsConfirmUploadInputSchema` | `storedObjectsConfirmUploadOutputSchema` |
 
 ```typescript
 // storedObjects.headById
