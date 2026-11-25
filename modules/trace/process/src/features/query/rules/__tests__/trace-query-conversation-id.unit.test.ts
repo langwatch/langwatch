@@ -20,7 +20,7 @@ import { FACET_REGISTRY } from "../../../facet/repositories/clickhouse/clickhous
 import type { ExpressionCategoricalDef } from "../../../facet/rules/trace-facet-registry.rules.ts";
 
 function summaryWith(attributes: Record<string, string>): TraceSummaryData {
-  return {
+  const summary: Partial<TraceSummaryData> = {
     traceId: "trace_1",
     spanCount: 0,
     totalDurationMs: 0,
@@ -42,7 +42,8 @@ function summaryWith(attributes: Record<string, string>): TraceSummaryData {
     createdAt: 0,
     updatedAt: 0,
     LastEventOccurredAt: 0,
-  } as TraceSummaryData;
+  };
+  return summary as TraceSummaryData;
 }
 
 function traceWith(attributes: Record<string, string>): InMemoryTrace {

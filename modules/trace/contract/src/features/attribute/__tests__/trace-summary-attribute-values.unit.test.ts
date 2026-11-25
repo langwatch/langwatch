@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import {
   deriveTraceConversationId,
   TRACE_CONVERSATION_ID_CLICKHOUSE_EXPRESSION,
-} from "../derive-trace-conversation-id.ts";
+} from "../trace-summary-attribute-values.ts";
 
 describe("deriveTraceConversationId", () => {
   describe("given attributes carrying the id under different keys", () => {
