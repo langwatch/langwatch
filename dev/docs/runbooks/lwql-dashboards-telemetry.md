@@ -34,8 +34,9 @@ or scan limit, a refused statement), at `error` for ours (timeout, database
 down, unhandled), at `info` when aborted. It carries `projectId` to group by,
 which is the first entry of `projectIds`: the run's own project, or for an
 aggregate board or an organisation-wide key the first project of the resolved
-scope. A run refused before any project resolves, such as an organisation-wide
-key over all projects, carries neither field, so it has no project to group by.
+scope. A run that resolves no project at all, such as an organisation-wide key
+over all projects, carries neither field, so it has no project to group by. Any
+other refused run still carries the project it came from, plus any it named.
 `projectIds` is a list of the project ids the run covered. Logs Insights shows
 each as `projectIds.0`, `projectIds.1`, and so on (the dashboard panel shows the
 first three; open the log line for the full list).

@@ -346,9 +346,7 @@ describe("AnalyticsModule.runLangWatchQLForKey", () => {
         }),
       ).rejects.toBeDefined();
 
-      const failed =
-        logged.lines.findLine("warn", "LangWatchQL failed") ??
-        logged.lines.findLine("error", "LangWatchQL failed");
+      const failed = logged.lines.findLine("warn", "LangWatchQL failed");
       expect(failed).toMatchObject({ projectIds: ["project-a", "project-b"] });
     });
   });
@@ -374,9 +372,7 @@ describe("AnalyticsModule.executeLangWatchQL", () => {
         }),
       ).rejects.toBeDefined();
 
-      const failed =
-        logged.lines.findLine("warn", "LangWatchQL failed") ??
-        logged.lines.findLine("error", "LangWatchQL failed");
+      const failed = logged.lines.findLine("warn", "LangWatchQL failed");
       expect(failed).toMatchObject({ projectIds: ["project-b", "project-c"] });
     });
   });
