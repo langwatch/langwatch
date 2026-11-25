@@ -192,6 +192,21 @@ test_scratch_uncapped() {
     pass "default scratch cap kept" || fail "default scratch cap kept" "1Gi cap missing by default"
 }
 
+# @scenario "Integer tunables render as whole numbers"
+test_integer_tunables_not_floats() {
+  local cm
+  cm="$(render | doc_of ConfigMap)"
+  grep -F 'LANGY_WORKER_MAX_AGE_MS: "18000000"' <<<"$cm" >/dev/null &&
+    pass "default max age is a whole number" || fail "default max age is a whole number" "got: $(grep MAX_AGE <<<"$cm")"
+  cm="$(render --set manager.workerIdleMs=3600000 --set manager.readinessTimeoutMs=1200000 | doc_of ConfigMap)"
+  if grep -F 'LANGY_WORKER_IDLE_MS: "3600000"' <<<"$cm" >/dev/null &&
+     grep -F 'LANGY_READINESS_TIMEOUT_MS: "1200000"' <<<"$cm" >/dev/null; then
+    pass "overridden millisecond tunables are whole numbers"
+  else
+    fail "overridden millisecond tunables are whole numbers" "got: $(grep -E '_MS:' <<<"$cm" | tr '\n' ' ')"
+  fi
+}
+
 test_default_selector
 test_custom_selector_everywhere
 test_pod_labels_keep_selector
@@ -202,6 +217,7 @@ test_extra_config_refuses_owned_key
 test_extra_env_refuses_owned_name
 test_annotations_and_deadline
 test_scratch_uncapped
+test_integer_tunables_not_floats
 
 if [[ "$failures" -gt 0 ]]; then
   echo "$failures assertion(s) failed"

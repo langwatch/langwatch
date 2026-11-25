@@ -76,3 +76,9 @@ Feature: The langyagent chart can take over an existing agent Deployment
     Given scratchSizeLimit is empty
     When the chart is rendered
     Then the tmp emptyDir has no size limit
+
+  @regression
+  Scenario: Integer tunables render as whole numbers
+    Given the default values set the worker max age to 18000000 milliseconds
+    When the chart is rendered
+    Then the ConfigMap carries LANGY_WORKER_MAX_AGE_MS as "18000000", never in exponent form
