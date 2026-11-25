@@ -15,6 +15,11 @@ import {
   type ScenarioChildBootstrap,
   type ScenarioChildExecutionSession,
 } from "../app/scenario.app.ts";
+import {
+  RedTeamReportWriterService,
+  type RedTeamReportRecord,
+} from "../features/red-team/services/red-team-report-writer.service.ts";
+import { redTeamRunEnvironment } from "../rules/red-team-job.rules.ts";
 import { isCustomerActionablePrefetchFailure } from "../rules/scenario-prefetch-failure.rules.ts";
 import {
   capRunHooks,
@@ -238,6 +243,7 @@ export class ScenarioProcessorService implements ScenarioExecutionRunner {
             ? { callerEnv: prefetch.data.adapterData.callerEnv }
             : {}),
           ...hookCallsEnvironment(prefetch.data.adapterData),
+          ...redTeamRunEnvironment(prefetch.data.scenario),
         },
       });
     }
@@ -356,9 +362,9 @@ export class ScenarioProcessorService implements ScenarioExecutionRunner {
     const childDurationMs = nowInstant().epochMilliseconds - childStartedAt;
 
     if (result.success) {
-      this.options.metrics.completed(durationMs);
-      await this.handleSucceeded({ jobData, result, jobLogger });
       await this.recordHooks({ jobData, result, jobLogger });
+      await this.handleSucceeded({ jobData, result, jobLogger });
+      this.options.metrics.completed(durationMs);
       jobLogger.info({ success: true, durationMs, childDurationMs }, "Scenario job completed");
 
       return;
@@ -420,8 +426,8 @@ export class ScenarioProcessorService implements ScenarioExecutionRunner {
 
   /**
    * What a job that ran to the end records: the connected agent instance the child named, and
-   * whether the call was cut at the maximum duration. Each is independent, and a record that
-   * cannot be written never fails a job that already succeeded.
+   * whether the call was cut at the maximum duration. Each is independent; only a red team break
+   * that cannot be written at all fails the job, after the other records were tried.
    */
   async handleSucceeded(input: {
     jobData: ExecutionJobData;
@@ -446,6 +452,16 @@ export class ScenarioProcessorService implements ScenarioExecutionRunner {
       }
     }
 
+    let redTeamReport: RedTeamReportRecord = { outcome: "recorded" };
+    if (input.result.redTeam) {
+      redTeamReport = await RedTeamReportWriterService.create(this.options.execution).record({
+        projectId,
+        scenarioRunId,
+        report: input.result.redTeam,
+        jobLogger,
+      });
+    }
+
     if (input.result.isCutAtLimit) {
       try {
         await this.options.execution.recordCutAtLimit({ projectId, scenarioRunId });
@@ -456,6 +472,7 @@ export class ScenarioProcessorService implements ScenarioExecutionRunner {
         );
       }
     }
+    if (redTeamReport.outcome === "break_not_recorded") throw redTeamReport.error;
   }
 
   private async handleCancelled(

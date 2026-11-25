@@ -568,7 +568,7 @@ describe("pi session fold", () => {
         expect(row?.startedAtMs).toBe(1_000);
       });
 
-      /** @scenario "A pi session falls back to untitled rather than to a span name" */
+      /** @scenario "A pi session falls back to its agent's name rather than to a span name" */
       it("leaves the row untitled when no run carries the prompt that opened it", () => {
         expect(row?.title ?? null).toBeNull();
       });

@@ -117,6 +117,9 @@
           "{workspaceRoot}/modules/scenario/contract/src/suite-fields.ts",
           "{workspaceRoot}/modules/trace/contract/src/trace-format.schemas.ts",
           "{workspaceRoot}/packages/redaction/src/**/*",
+          {
+            "env": "LANGWATCH_SKILLS_RENDER"
+          },
           "jsBuild"
         ],
         "outputs": [
@@ -381,6 +384,9 @@
         "{workspaceRoot}/modules/scenario/contract/src/suite-fields.ts",
         "{workspaceRoot}/modules/trace/contract/src/trace-format.schemas.ts",
         "{workspaceRoot}/packages/redaction/src/**/*",
+        {
+          "env": "LANGWATCH_SKILLS_RENDER"
+        },
         {
           "runtime": "node --version"
         },

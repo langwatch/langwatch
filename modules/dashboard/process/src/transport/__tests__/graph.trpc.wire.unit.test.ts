@@ -3,11 +3,7 @@
  * The chart builder's `graphs.*` wire: the size a new graph lands at and the
  * sizes the eight-column grid may store. Spec: dashboard-service.feature.
  */
-import {
-  CHART_GRID_COLUMNS,
-  CHART_GRID_DEFAULT_COL_SPAN,
-  CHART_GRID_DEFAULT_ROW_SPAN,
-} from "@langwatch/analytics-contract/chart-grid";
+import { CHART_GRID_COLUMNS } from "@langwatch/analytics-contract/chart-grid";
 import type { TrpcProcedureFactory } from "@langwatch/api/trpc";
 import {
   graphApiBatchUpdateLayoutsInputSchema,
@@ -81,8 +77,8 @@ describe("the graphs tRPC namespace", () => {
       );
 
       expect({ colSpan: created.colSpan, rowSpan: created.rowSpan }).toEqual({
-        colSpan: CHART_GRID_DEFAULT_COL_SPAN,
-        rowSpan: CHART_GRID_DEFAULT_ROW_SPAN,
+        colSpan: 4,
+        rowSpan: 3,
       });
     });
 

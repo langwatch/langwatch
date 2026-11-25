@@ -87,6 +87,11 @@ export interface UserApi {
   findByEmail(input: UserEmailInput): Promise<UserProfile | null>;
   /** Mints a directory account with no sign-in method of its own. */
   create(input: CreateUserInput): Promise<UserProfile>;
+  /**
+   * Commits the created fact for an account Better Auth wrote itself (social and single sign-on
+   * sign-up), which never passes a mint here. Keyed by the user, so a repeat records nothing new.
+   */
+  recordCreated(input: UserIdInput): Promise<void>;
   /** Mints an account whose only sign-in method is the passkey about to be registered. */
   createPasskeyUser(input: CreatePasskeyUserInput): Promise<CreatedUser>;
   /**

@@ -1,9 +1,11 @@
 ---
-title: Agent Testing
+title: AI agent testing with simulated users
 sidebarTitle: Overview
 keywords: langwatch, agent testing, agent simulations, scenarios, test suites, run plans, simulated user, judge, voice agents, red teaming
 description: Test your agents through multi-turn conversations with a simulated user to capture issues before production and prevent regressions.
 ---
+
+LangWatch tests AI agents with simulated users. A simulated user talks to your agent over a multi-turn conversation, then a judge reads the conversation and the agent's traces and passes or fails each of your criteria, with its reasoning. Write scenarios in the LangWatch platform with no code, or in code with [Scenario](https://langwatch.ai/scenario/), LangWatch's open-source testing library, as pytest or vitest tests that run in CI.
 
 <Tip>
   **Quick setup?** Paste the [Connect your agent prompt](/agent-testing/connect-your-agent) into your coding agent to connect your agent and run a first test suite, or the [scenarios prompt](/skills/directory) to add code-first scenario tests.
@@ -133,3 +135,7 @@ Use evaluations for the parts inside the agent. Use agent testing to check the a
     The full reference of the Scenario framework.
   </Card>
 </CardGroup>
+
+## Further reading
+
+- [What are AI agent simulations?](https://langwatch.ai/blog/what-are-ai-agent-simulations) explains agent simulation testing, how it differs from multi-agent research, and why scenarios should start from production conversations.

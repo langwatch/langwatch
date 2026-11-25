@@ -13,9 +13,19 @@ import type {
   GatewayVirtualKeyRecord,
   GatewayVirtualKeyScope,
   ResourceMetadata,
+  VirtualKeyPurpose,
 } from "@langwatch/gateway-contract";
 
 import type { GatewayPersistenceTransaction } from "./gateway-transaction.repository.ts";
+
+/** A live key a fleet sweep listed: who it is for and where its traces land, nothing secret. */
+export type GatewayRecentlyUsedKey = Readonly<{
+  id: string;
+  organizationId: string;
+  name: string;
+  principalUserId: string | null;
+  traceProjectId: string | null;
+}>;
 
 /** A CONNECT key with the license facts licensing wrote onto it. */
 export type GatewayLicensedKey = Readonly<{
@@ -111,6 +121,14 @@ export abstract class GatewayVirtualKeyRepository {
     organizationId?: string;
     principalUserId?: string;
   }): Promise<GatewayVirtualKeyRecord[]>;
+  /**
+   * Every organization's active, unrevoked keys of one purpose whose `lastUsedAt` is at or after
+   * `since`, oldest id first: the fleet sweeps' only cross-organization read of the key table.
+   */
+  abstract findLiveUsedSince(input: {
+    purpose: VirtualKeyPurpose;
+    since: Instant;
+  }): Promise<GatewayRecentlyUsedKey[]>;
   abstract findAllForScope(
     scope: GatewayVirtualKeyScope,
     transaction?: GatewayPersistenceTransaction,

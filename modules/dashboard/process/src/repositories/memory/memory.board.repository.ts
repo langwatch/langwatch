@@ -1,11 +1,14 @@
 import {
+  boardSchema,
   DashboardNotFoundError,
-  dashboardSchema,
+  DEFAULT_DASHBOARD_HOME_PRODUCT,
+  type DashboardHomeProduct,
   type DashboardScope,
   type DashboardStar,
   type StarredDashboard,
 } from "@langwatch/dashboard-contract";
 
+import { starredBoardRow } from "../../rules/starred-board-row.rules.ts";
 import type {
   BoardReach,
   BoardRecord,
@@ -40,6 +43,10 @@ export class MemoryBoardRepository implements BoardRepository {
     }));
   }
 
+  async findBoardsInProjects(input: { projectIds: readonly string[] }): Promise<BoardRecord[]> {
+    return this.#database.boards.filter((board) => input.projectIds.includes(board.projectId));
+  }
+
   async findBoardsByIds(
     input: BoardReach & { dashboardIds: readonly string[] },
   ): Promise<BoardRecord[]> {
@@ -54,14 +61,17 @@ export class MemoryBoardRepository implements BoardRepository {
     name: string;
     createdById?: string | null;
     scope?: DashboardScope;
+    homeProduct?: DashboardHomeProduct;
+    organizationId?: string | null;
   }): Promise<BoardRecord> {
-    const board = dashboardSchema.parse({
+    const board = boardSchema.parse({
       ...input,
       order: 0,
       description: null,
       createdById: input.createdById ?? null,
       scope: input.scope ?? "PROJECT",
-      organizationId: null,
+      homeProduct: input.homeProduct ?? DEFAULT_DASHBOARD_HOME_PRODUCT,
+      organizationId: input.organizationId ?? null,
       createdAt: this.#database.now(),
       updatedAt: this.#database.now(),
     });
@@ -75,7 +85,7 @@ export class MemoryBoardRepository implements BoardRepository {
     data: BoardUpdate;
   }): Promise<BoardRecord> {
     const board = this.#requireBoard(input);
-    const updated = dashboardSchema.parse({
+    const updated = boardSchema.parse({
       ...board,
       ...Object.fromEntries(Object.entries(input.data).filter(([, value]) => value !== undefined)),
       updatedAt: this.#database.now(),
@@ -86,7 +96,7 @@ export class MemoryBoardRepository implements BoardRepository {
 
   async deleteBoard(input: { projectId: string; dashboardId: string }): Promise<BoardRecord> {
     const board = this.#findBoard(input);
-    if (!board) throw new DashboardNotFoundError(input.projectId);
+    if (!board) throw new DashboardNotFoundError({ projectId: input.projectId });
     const database = this.#database;
     const onBoard = (row: { projectId: string; dashboardId: string | null }) =>
       row.projectId === board.projectId && row.dashboardId === board.id;
@@ -113,7 +123,7 @@ export class MemoryBoardRepository implements BoardRepository {
       const dashboard = this.#database.boards.find(
         (row) => row.id === favourite.dashboardId && owners.includes(row.projectId),
       );
-      return dashboard ? [{ kind: "board", dashboard }] : [];
+      return dashboard ? [{ kind: "board", dashboard: starredBoardRow({ board: dashboard }) }] : [];
     });
   }
 

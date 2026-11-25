@@ -1,5 +1,5 @@
 import { observableGauge } from "@langwatch/observability/metrics";
-import { nowInstant } from "@langwatch/time";
+import { nowEpochMs } from "@langwatch/time";
 
 /** Fleet-level gauges for process-manager visibility and alerting. */
 
@@ -47,13 +47,13 @@ async function readCounts(): Promise<ProcessFleetMetricsRow[]> {
   const read = readFleet;
   const generation = readGeneration;
   if (!read) return [];
-  if (cached && nowInstant().epochMilliseconds - cached.at < CACHE_TTL_MS) return cached.rows;
+  if (cached && nowEpochMs() - cached.at < CACHE_TTL_MS) return cached.rows;
   if (inFlight?.generation === generation) return inFlight.promise;
   const promise = Promise.resolve()
     .then(read)
     .then((rows) => {
       if (generation !== readGeneration) return [];
-      lastSuccessAt = nowInstant().epochMilliseconds;
+      lastSuccessAt = nowEpochMs();
       cached = { at: lastSuccessAt, rows, success: true };
       return rows;
     })
@@ -61,7 +61,7 @@ async function readCounts(): Promise<ProcessFleetMetricsRow[]> {
       if (generation !== readGeneration) return [];
       // Retain unresolved work, but never advance its freshness on failure.
       const rows = cached?.rows ?? [];
-      cached = { at: nowInstant().epochMilliseconds, rows, success: false };
+      cached = { at: nowEpochMs(), rows, success: false };
       return rows;
     })
     .finally(() => {

@@ -1,8 +1,8 @@
 import { MAX_LWQL_LENGTH } from "@langwatch/analytics-contract";
 import {
-  CHART_GRID_DEFAULT_COL_SPAN,
   chartGridPlacementSchema,
-  fitsChartGridWidth,
+  fitsGridWidthIssue,
+  partialPlacementFitsGridWidth,
 } from "@langwatch/analytics-contract/chart-grid";
 import type { Named } from "@langwatch/module";
 import { z } from "zod";
@@ -76,14 +76,7 @@ const savedWorkbenchChartPlacementSchemaDefinition = z
     dashboardId: z.string().min(1),
     ...chartGridPlacementSchema.partial().shape,
   })
-  .refine(
-    ({ gridColumn = 0, colSpan = CHART_GRID_DEFAULT_COL_SPAN }) =>
-      fitsChartGridWidth({ gridColumn, colSpan }),
-    {
-      message: "gridColumn + colSpan must not exceed the grid's columns",
-      path: ["colSpan"],
-    },
-  );
+  .refine(partialPlacementFitsGridWidth, fitsGridWidthIssue);
 export interface SavedWorkbenchChartPlacementSchema extends Named<
   typeof savedWorkbenchChartPlacementSchemaDefinition
 > {}

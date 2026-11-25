@@ -50,14 +50,13 @@ import {
   peopleCutShows,
   waitsForSeat,
 } from "../../../model/people-cuts.ts";
-import type { OrganizationUserRole } from "../../../model/prisma-types.ts";
 import { heldSeatChipLabel } from "../../../model/seat-removal-copy.ts";
 import { JoinRequestRow } from "../../../ui/blocks/join-requests-table.tsx";
 import { AutomaticJoinsNotice } from "../../../ui/elements/automatic-joins-notice.tsx";
 import { CopyInput } from "../../../ui/elements/copy-input.tsx";
 import { IdentityChip, IdentityRowList } from "../../../ui/elements/identity-row.tsx";
 import { ProvenanceChip } from "../../../ui/elements/member-provenance.tsx";
-import { orgRoleOptions } from "../../../ui/elements/organization-user-role-field.tsx";
+import { seatLabel } from "../../../ui/elements/organization-user-role-field.tsx";
 import { SecondFactorCell } from "../../../ui/elements/second-factor-cell.tsx";
 import { SectionTitle } from "../../../ui/elements/section-title.tsx";
 import { SettingsRowsSkeleton } from "../../../ui/elements/settings-rows-skeleton.tsx";
@@ -252,11 +251,6 @@ function PeopleList({
       />
     </>
   );
-}
-
-/** The seat a member holds, in the words the role picker uses. */
-function orgRoleLabel(role: OrganizationUserRole): string {
-  return orgRoleOptions.find((option) => option.value === role)?.label ?? role;
 }
 
 /** The department a member belongs to, beside their name; nothing when there is none. */
@@ -475,7 +469,7 @@ function MemberListRow({
       onOpen={onOpen}
       badges={
         <>
-          {member.role === "EXTERNAL" && (
+          {member.role === "EXTERNAL" && !member.billingOnly && (
             <Badge colorPalette="gray" size="sm">
               Lite Member
             </Badge>
@@ -523,7 +517,7 @@ function MemberListRow({
             />
           )}
           <Text fontSize="sm" color="fg.muted" minWidth="90px" textAlign="right">
-            {orgRoleLabel(member.role)}
+            {seatLabel({ role: member.role, billingOnly: member.billingOnly })}
           </Text>
           <MemberRowActions
             member={member}

@@ -4,14 +4,15 @@ import { defineRule } from "../define-rule.mjs";
 // a client that picks its own region once sent "auto" to AWS, which refuses it.
 
 const AWS_CLIENT_PACKAGE = "packages/aws-client/";
-const SHARED_RULE = "s3RegionOf";
+/** `s3RegionFor` applies `s3RegionOf` first, then asks the bucket (tasks#1192). */
+const SHARED_RULES = new Set(["s3RegionOf", "s3RegionFor"]);
 const MAX_DEPTH = 8;
 
 function isSharedRuleCall(node) {
   return (
     node?.type === "CallExpression" &&
     node.callee.type === "Identifier" &&
-    node.callee.name === SHARED_RULE
+    SHARED_RULES.has(node.callee.name)
   );
 }
 
@@ -140,19 +141,19 @@ export const s3ClientRegionRule = defineRule({
   applies: (file) => file.isProduction && !file.workspacePath.startsWith(AWS_CLIENT_PACKAGE),
   messages: {
     regionNotShared: {
-      what: "This `new S3Client` takes its region from somewhere other than `s3RegionOf`.",
+      what: "This `new S3Client` takes its region from somewhere other than `s3RegionOf` or `s3RegionFor`.",
       why: "A hand-picked region drifts per client; one sent `auto` to AWS, which refuses to sign with it.",
-      fix: "Pass `region: s3RegionOf({ region, endpoint })` from `@langwatch/aws-client`, or a `const` bound to that call. See the `platform-primitives` skill.",
+      fix: "Pass `region: s3RegionOf({ region, endpoint })` from `@langwatch/aws-client`, or a `const` bound to that call; a client that knows its bucket passes `s3RegionFor({ region, endpoint, bucket, askBucket })`. See the `platform-primitives` skill.",
     },
     missingRegion: {
       what: "This `new S3Client` names no region on at least one path.",
       why: "With no region the SDK guesses from the process environment, not from the configured endpoint.",
-      fix: "Pass `region: s3RegionOf({ region, endpoint })` from `@langwatch/aws-client` on every path. See the `platform-primitives` skill.",
+      fix: "Pass `region: s3RegionOf({ region, endpoint })` from `@langwatch/aws-client` on every path, or `s3RegionFor({ region, endpoint, bucket, askBucket })` for a client that knows its bucket. See the `platform-primitives` skill.",
     },
     unreadableOptions: {
       what: "This `new S3Client` gets options the rule cannot read, so it cannot see their region.",
       why: "A region hidden behind a parameter or a mutable binding escapes the one shared region rule.",
-      fix: "Build the options inline or in a `const` here, with `region: s3RegionOf({ region, endpoint })`. See the `platform-primitives` skill.",
+      fix: "Build the options inline or in a `const` here, with `region: s3RegionOf({ region, endpoint })` or `s3RegionFor({ region, endpoint, bucket, askBucket })`. See the `platform-primitives` skill.",
     },
   },
   create(context) {

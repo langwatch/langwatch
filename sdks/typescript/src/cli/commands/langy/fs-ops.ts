@@ -393,21 +393,32 @@ const appendMatchingLines = ({
   }
 };
 
+/**
+ * The line matcher for a search. A pattern that does not compile as a regular
+ * expression (`create_prompt(`) is searched as plain text, and the note says so.
+ */
+export function grepMatcher(params: Pick<LocalGrepParams, "pattern" | "literal" | "ignoreCase">): {
+  matcher: RegExp;
+  fallbackNote: string | null;
+} {
+  const flags = params.ignoreCase ? "i" : "";
+  if (params.literal)
+    return { matcher: new RegExp(escapeLiteral(params.pattern), flags), fallbackNote: null };
+  try {
+    return { matcher: new RegExp(params.pattern, flags), fallbackNote: null };
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : String(error);
+    return {
+      matcher: new RegExp(escapeLiteral(params.pattern), flags),
+      fallbackNote: `[the pattern is not a valid regular expression (${reason}), so it was searched as plain text; pass literal: true to search text on purpose]`,
+    };
+  }
+}
+
 /** Text search over the folder, with the matching lines and their numbers. */
 export function grep({ params, root }: { params: LocalGrepParams; root: string }): string {
   const from = insideRoot({ target: params.path ?? ".", root });
-  const source = params.literal ? escapeLiteral(params.pattern) : params.pattern;
-  let matcher: RegExp;
-  try {
-    matcher = new RegExp(source, params.ignoreCase ? "i" : "");
-  } catch (error) {
-    throw new LocalCallFailure({
-      code: "exec_failed",
-      message: `The search pattern is not a valid regular expression: ${
-        error instanceof Error ? error.message : String(error)
-      }`,
-    });
-  }
+  const { matcher, fallbackNote } = grepMatcher(params);
   const glob = params.glob === undefined ? null : globToRegExp(params.glob);
   const limit = params.limit ?? DEFAULT_GREP_LIMIT;
   const context = params.context ?? 0;
@@ -420,10 +431,11 @@ export function grep({ params, root }: { params: LocalGrepParams; root: string }
     const lines = searchableLines(path.join(root, relative));
     appendMatchingLines({ relative, lines, matcher, context, limit, found });
   }
-  if (found.length === 0) return `No line matches ${params.pattern}.`;
+  const prefix = fallbackNote ? `${fallbackNote}\n` : "";
+  if (found.length === 0) return `${prefix}No line matches ${params.pattern}.`;
   return found.length >= limit
-    ? `${found.join("\n")}\n[stopped at ${limit} matches]`
-    : found.join("\n");
+    ? `${prefix}${found.join("\n")}\n[stopped at ${limit} matches]`
+    : `${prefix}${found.join("\n")}`;
 }
 
 /** File names under the folder that match a glob. */

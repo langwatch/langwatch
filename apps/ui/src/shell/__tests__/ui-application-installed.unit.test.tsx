@@ -10,7 +10,7 @@ import type { ReactNode } from "react";
 import { describe, expect, it } from "vitest";
 
 import { browserModules } from "../../browser-modules.generated.ts";
-import { uiRouteTable } from "../ui-route-table";
+import { uiMountedRouteTable } from "../ui-route-table";
 
 const publicAppConfig: UiPublicTelemetry = {
   mode: "test",
@@ -28,7 +28,7 @@ function PassThrough({ children }: { children: ReactNode }) {
  */
 function hostRegistryWithoutGovernance(): UiPageLoaderRegistry {
   const loaders: Record<string, () => Promise<{ default: () => null }>> = {};
-  for (const key of uiRoutePageKeys(uiRouteTable)) {
+  for (const key of uiRoutePageKeys(uiMountedRouteTable)) {
     if (key.startsWith("pages/governance/")) continue;
     loaders[key] = async () => ({ default: () => null });
   }
@@ -48,7 +48,7 @@ function applicationFromPackageEntry() {
       isDevelopment: false,
     },
     pages: {
-      table: uiRouteTable,
+      table: uiMountedRouteTable,
       shellLayouts: {
         auth: async () => ({ default: () => null }),
         chrome: async () => ({ default: () => null }),

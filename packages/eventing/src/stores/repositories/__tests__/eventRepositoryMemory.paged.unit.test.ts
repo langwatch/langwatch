@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import type { EventLogPageCursor } from "../../event-log-page-order.ts";
 import type { EventRecord } from "../eventRepository.types.ts";
 import { EventRepositoryMemory } from "../eventRepositoryMemory.ts";
 
@@ -8,7 +9,7 @@ import { EventRepositoryMemory } from "../eventRepositoryMemory.ts";
  * never loads whole. ClickHouse mirrors this exact cursor/order, so locking
  * the behaviour here guards both.
  */
-function record({ eventId, ts }: { eventId: string; ts: number }): EventRecord {
+function record({ eventId, ts, key }: { eventId: string; ts: number; key: string }): EventRecord {
   return {
     TenantId: "tenant",
     AggregateType: "trace",
@@ -20,94 +21,63 @@ function record({ eventId, ts }: { eventId: string; ts: number }): EventRecord {
     EventVersion: "1",
     EventPayload: {},
     ProcessingTraceparent: "",
-    IdempotencyKey: eventId,
+    IdempotencyKey: key,
   };
 }
 
+const cursorAfter = (last: EventRecord): EventLogPageCursor => ({
+  idempotencyKey: last.IdempotencyKey,
+  timestamp: last.EventTimestamp,
+  eventId: last.EventId,
+});
+
 describe("EventRepositoryMemory.getEventRecordsUpToPaged", () => {
-  // e3a and e3b share a timestamp (tiebreak by EventId); e5 is beyond the bound.
+  // Keys run against time order. e3a and e3b are two unmerged copies of key k3 at one timestamp
+  // (tie-break by EventId); e5 is beyond the bound.
   async function seeded() {
     const repo = EventRepositoryMemory.createForTesting();
     await repo.insertEventRecords([
-      record({ eventId: "e4", ts: 4000 }),
-      record({ eventId: "e2", ts: 2000 }),
-      record({ eventId: "e3b", ts: 3000 }),
-      record({ eventId: "e1", ts: 1000 }),
-      record({ eventId: "e3a", ts: 3000 }),
-      record({ eventId: "e5", ts: 5000 }),
+      record({ eventId: "e4", ts: 4000, key: "k1" }),
+      record({ eventId: "e2", ts: 2000, key: "k2" }),
+      record({ eventId: "e3b", ts: 3000, key: "k3" }),
+      record({ eventId: "e1", ts: 1000, key: "k4" }),
+      record({ eventId: "e3a", ts: 3000, key: "k3" }),
+      record({ eventId: "e5", ts: 5000, key: "k0" }),
     ]);
     return repo;
   }
 
   // Include history up to AND including e4 — e5 (later) must be excluded.
-  const upTo = { ts: 4000, id: "e4" };
+  const request = {
+    tenantId: "tenant",
+    aggregateType: "trace",
+    aggregateId: "agg",
+    upToTimestamp: 4000,
+    upToEventId: "e4",
+  };
+
+  async function walk(limit: number): Promise<string[][]> {
+    const repo = await seeded();
+    const pages: string[][] = [];
+    let after: EventLogPageCursor | undefined;
+    for (;;) {
+      const page = await repo.getEventRecordsUpToPaged({ ...request, after, limit });
+      if (page.length > 0) pages.push(page.map((r) => r.EventId));
+      if (page.length < limit) return pages;
+      after = cursorAfter(page[page.length - 1]!);
+    }
+  }
 
   describe("given a history and an upTo bound of e4", () => {
-    it("pages in (timestamp, eventId) order, honouring the after cursor and limit", async () => {
-      const repo = await seeded();
-
-      const page1 = await repo.getEventRecordsUpToPaged({
-        tenantId: "tenant",
-        aggregateType: "trace",
-        aggregateId: "agg",
-        upToTimestamp: upTo.ts,
-        upToEventId: upTo.id,
-        after: undefined,
-        limit: 2,
-      });
-      expect(page1.map((r) => r.EventId)).toEqual(["e1", "e2"]);
-
-      const c1 = page1[page1.length - 1]!;
-      const page2 = await repo.getEventRecordsUpToPaged({
-        tenantId: "tenant",
-        aggregateType: "trace",
-        aggregateId: "agg",
-        upToTimestamp: upTo.ts,
-        upToEventId: upTo.id,
-        after: { timestamp: c1.EventTimestamp, eventId: c1.EventId },
-        limit: 2,
-      });
-      // Same-timestamp events tie-break by EventId.
-      expect(page2.map((r) => r.EventId)).toEqual(["e3a", "e3b"]);
-
-      const c2 = page2[page2.length - 1]!;
-      const page3 = await repo.getEventRecordsUpToPaged({
-        tenantId: "tenant",
-        aggregateType: "trace",
-        aggregateId: "agg",
-        upToTimestamp: upTo.ts,
-        upToEventId: upTo.id,
-        after: { timestamp: c2.EventTimestamp, eventId: c2.EventId },
-        limit: 2,
-      });
-      // e4 is the last within the bound; e5 is excluded.
-      expect(page3.map((r) => r.EventId)).toEqual(["e4"]);
+    it("pages in (idempotency key, timestamp, eventId) order, honouring the cursor and limit", async () => {
+      expect(await walk(2)).toEqual([["e4", "e2"], ["e3a", "e3b"], ["e1"]]);
     });
 
-    it("walks the whole bounded history across pages and stops at the bound", async () => {
-      const repo = await seeded();
-      const all: string[] = [];
-      let after: { timestamp: number; eventId: string } | undefined;
-
-      for (;;) {
-        const page = await repo.getEventRecordsUpToPaged({
-          tenantId: "tenant",
-          aggregateType: "trace",
-          aggregateId: "agg",
-          upToTimestamp: upTo.ts,
-          upToEventId: upTo.id,
-          after,
-          limit: 2,
-        });
-        if (page.length === 0) break;
-        all.push(...page.map((r) => r.EventId));
-        const last = page[page.length - 1]!;
-        after = { timestamp: last.EventTimestamp, eventId: last.EventId };
-        if (page.length < 2) break;
-      }
-
-      expect(all).toEqual(["e1", "e2", "e3a", "e3b", "e4"]);
-      expect(all).not.toContain("e5");
+    it("reads a copy of a key that falls past a page boundary", async () => {
+      expect(await walk(3)).toEqual([
+        ["e4", "e2", "e3a"],
+        ["e3b", "e1"],
+      ]);
     });
   });
 });
