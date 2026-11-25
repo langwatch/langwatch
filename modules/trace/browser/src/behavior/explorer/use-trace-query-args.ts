@@ -8,6 +8,26 @@ import { useOrganizationTeamProject } from "../use-organization-team-project.ts"
 import { useTraceViewer } from "./context/trace-viewer-context.tsx";
 
 /**
+ * The time a read may send: the link's own, never one the header filled in later. Held in the
+ * drawer, not per component, so a panel mounted after the fill reads the same keys.
+ */
+function readableOccurredAtMs({
+  traceId,
+  occurredAtMs,
+  backfilled,
+}: {
+  traceId: string | null;
+  occurredAtMs: number | null;
+  backfilled: { traceId: string; occurredAtMs: number } | null;
+}): number | null {
+  const isBackfilled =
+    backfilled !== null &&
+    backfilled.traceId === traceId &&
+    backfilled.occurredAtMs === occurredAtMs;
+  return isBackfilled ? null : occurredAtMs;
+}
+
+/**
  * Shared base wiring for the per-trace tRPC queries fired off the open drawer (header,
  * span tree, signals, detail prefetch, etc.).
  */
@@ -25,20 +45,21 @@ export function useTraceQueryArgs() {
   const tenantId =
     addressedTenantId !== null && addressedTenantId !== projectId ? addressedTenantId : null;
 
+  const backfilled = useTraceDrawer((s) => s.backfilledOccurredAt);
+  const readOccurredAtMs = readableOccurredAtMs({ traceId, occurredAtMs, backfilled });
+
   const isLive =
     occurredAtMs !== null && nowInstant().epochMilliseconds - occurredAtMs < LIVE_WINDOW_MS;
 
   const queryArgs = {
     projectId,
     traceId: traceId ?? "",
-    ...(occurredAtMs !== null ? { occurredAtMs } : {}),
+    ...(readOccurredAtMs !== null ? { occurredAtMs: readOccurredAtMs } : {}),
     ...(tenantId !== null ? { tenantId } : {}),
   };
 
   const isReady =
     !!projectId && !!traceId && !isPreviewTraceId(traceId ?? "") && !viewer.isReadOnly;
-  // The header read runs without the partition hint and backfills it; every other read waits.
-  const hintReady = occurredAtMs !== null;
 
   return {
     project,
@@ -48,7 +69,6 @@ export function useTraceQueryArgs() {
     tenantId,
     isLive,
     isReady,
-    hintReady,
     queryArgs,
   };
 }

@@ -8,7 +8,11 @@ import type { SubmitHandler } from "react-hook-form";
 import type { MembersForm } from "../model/member-invite-form.ts";
 import { OrganizationUserRole } from "../model/prisma-types.ts";
 import { api } from "./organization-api.ts";
-import { useOrganizationToaster, useShowErrorToast } from "./organization-feedback.ts";
+import {
+  type OrganizationToaster,
+  useOrganizationToaster,
+  useShowErrorToast,
+} from "./organization-feedback.ts";
 import { useLicenseEnforcement } from "./use-license-enforcement.ts";
 
 type SeatDecision =
@@ -78,6 +82,40 @@ function invitesCreatedToast({
   };
 }
 
+/** A batch the server answered with no invitation written: nothing was sent, so say so. */
+function noInvitesCreatedToast() {
+  return {
+    title: "No invitations were sent",
+    description:
+      "None of these addresses could be invited. Check the addresses and teams, then try again.",
+    type: "error",
+    duration: 5000,
+  };
+}
+
+type CreatedInvites = Parameters<typeof unsentInvites>[0];
+
+/** Reports the batch: an empty answer stays open as a failure, never as sent. */
+function afterInvitesCreated({
+  created,
+  toaster,
+  hasEmailProvider,
+  onCreated,
+}: {
+  created: CreatedInvites;
+  toaster: OrganizationToaster;
+  hasEmailProvider: boolean;
+  onCreated: (unsent: { inviteCode: string; email: string }[]) => void;
+}) {
+  const count = created.filter(Boolean).length;
+  if (count === 0) {
+    toaster.create(noInvitesCreatedToast());
+    return;
+  }
+  onCreated(unsentInvites(created));
+  toaster.create(invitesCreatedToast({ count, hasEmailProvider }));
+}
+
 function inviteResentToast({ emailSent }: { emailSent: boolean }) {
   return {
     title: "Invitation resent",
@@ -99,6 +137,7 @@ function toInviteInput(invite: MembersForm["invites"][number]) {
       role: team.role,
       ...(team.customRoleId ? { customRoleId: team.customRoleId } : {}),
     })),
+    ...(invite.billingOnly ? { billingOnly: true } : {}),
   };
 }
 
@@ -158,15 +197,18 @@ export function useInviteActions({
         invites: data.invites.map(toInviteInput),
       },
       {
-        onSuccess: (data) => {
-          onInviteCreated(unsentInvites(data));
-          toaster.create(
-            invitesCreatedToast({ count: data.filter(Boolean).length, hasEmailProvider }),
-          );
-          onClose();
-          refetchInvites();
-          invalidateLimits();
-        },
+        onSuccess: (created) =>
+          afterInvitesCreated({
+            created,
+            toaster,
+            hasEmailProvider,
+            onCreated: (unsent) => {
+              onInviteCreated(unsent);
+              onClose();
+              refetchInvites();
+              invalidateLimits();
+            },
+          }),
         onError: (error) => showErrorToast({ error, fallbackTitle: "Couldn't send the invites" }),
       },
     );
@@ -175,7 +217,11 @@ export function useInviteActions({
   const onSubmit: SubmitHandler<MembersForm> = (data) => {
     const performMutation = performAdminInvite;
     const proceedAfterLiteCheck = () => {
-      if (!data.invites.some((invite) => invite.orgRole === OrganizationUserRole.EXTERNAL)) {
+      // Billing only takes no seat (ADR-205), so only a real Lite invite asks the Lite pool.
+      const asksLiteSeat = data.invites.some(
+        (invite) => invite.orgRole === OrganizationUserRole.EXTERNAL && !invite.billingOnly,
+      );
+      if (!asksLiteSeat) {
         performMutation(data);
         return;
       }

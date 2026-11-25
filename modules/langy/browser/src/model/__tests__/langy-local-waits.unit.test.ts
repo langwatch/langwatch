@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   type LangyLiveWait,
+  langyAnswerStartsNextTurn,
   langyPermissionCards,
   langyQuestionWaitsByToolCall,
   mergeLangyWaitStatus,
@@ -394,6 +395,30 @@ describe("langyQuestionWaitsByToolCall", () => {
         waitId: "wait-q1",
         status: "pending",
       });
+    });
+  });
+});
+
+describe("langyAnswerStartsNextTurn", () => {
+  describe("given a card the platform raised itself, keyed by its own wait", () => {
+    const card = { blockId: "question:wait_1:0", waitId: "wait_1" };
+
+    /** @scenario "A click after the turn ended still counts in the next turn" */
+    it("starts the next turn when no turn runs, and not while one does", () => {
+      expect(langyAnswerStartsNextTurn({ ...card, turnRunning: false })).toBe(true);
+      expect(langyAnswerStartsNextTurn({ ...card, turnRunning: true })).toBe(false);
+    });
+  });
+
+  describe("given a card a question tool call raised", () => {
+    it("never starts a turn of its own", () => {
+      expect(
+        langyAnswerStartsNextTurn({
+          blockId: "question:call_1:0",
+          waitId: "wait_1",
+          turnRunning: false,
+        }),
+      ).toBe(false);
     });
   });
 });

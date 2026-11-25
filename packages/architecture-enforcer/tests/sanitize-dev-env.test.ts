@@ -103,13 +103,13 @@ describe("sanitize-dev-env.sh (lw#3453)", () => {
   });
 
   describe("when a real (non-localhost) override is exported", () => {
-    /** @scenario sanitize leaves https boxd-proxy NEXTAUTH_URL untouched */
-    it("leaves https://*.boxd.sh NEXTAUTH_URL alone (boxd proxy path)", () => {
+    /** @scenario sanitize leaves an https proxy NEXTAUTH_URL untouched */
+    it("leaves an https proxy NEXTAUTH_URL alone (proxy override)", () => {
       const r = runHelper({
         APP_PORT: "5562",
-        NEXTAUTH_URL: "https://langwatch-fork.boxd.sh",
+        NEXTAUTH_URL: "https://langwatch-fork.example.com",
       });
-      expect(r.nextauthUrl).toBe("https://langwatch-fork.boxd.sh");
+      expect(r.nextauthUrl).toBe("https://langwatch-fork.example.com");
     });
 
     /** @scenario sanitize leaves a 127.0.0.1 NEXTAUTH_URL untouched */

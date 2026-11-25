@@ -1,8 +1,9 @@
-import { PrismaRepository } from "@langwatch/prisma-client";
+import { skipTenantCheck } from "@langwatch/prisma-client";
+import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import { prismaTables } from "@langwatch/prisma-client/ownership";
 import type {
   StoredObjectDeliveryAudience,
   StoredObjectId,
-  StoredObjectLifecycleStatus,
   StoredObjectProjectId,
 } from "@langwatch/stored-object-contract";
 import { type Instant, Temporal, fromDate, toDate, toEpochMs } from "@langwatch/time";
@@ -11,14 +12,29 @@ import type {
   StoredObjectRecord,
   StoredObjectRecordPageQuery,
   StoredObjectRecordRepository,
+  StoredObjectRecordStatus,
   StoredObjectSource,
 } from "../stored-object-record.repository.ts";
 
-export class PrismaStoredObjectRecordRepository
-  extends PrismaRepository.for("StoredObject")
-  implements StoredObjectRecordRepository
-{
-  static readonly create = this.factory((prisma) => new PrismaStoredObjectRecordRepository(prisma));
+/** The model delegate, and raw SQL for the one sweep that spans every tenant. */
+type StoredObjectRecordDatabase = Pick<PrismaClient, "storedObject" | "$queryRaw">;
+
+/**
+ * Declared rather than inherited from `PrismaRepository.for`: the upload reaper's
+ * tenant sweep is SQL, and that base class's model-scoped client has no `$queryRaw`.
+ */
+export class PrismaStoredObjectRecordRepository implements StoredObjectRecordRepository {
+  static readonly tables = prismaTables("StoredObject");
+
+  static create({
+    prisma,
+  }: {
+    prisma: StoredObjectRecordDatabase;
+  }): PrismaStoredObjectRecordRepository {
+    return new PrismaStoredObjectRecordRepository(prisma);
+  }
+
+  private constructor(private readonly prisma: StoredObjectRecordDatabase) {}
 
   async findById(input: {
     tenantId: StoredObjectProjectId;
@@ -39,6 +55,33 @@ export class PrismaStoredObjectRecordRepository
       create: row,
       update: row,
     });
+  }
+
+  async insert(value: StoredObjectRecord): Promise<boolean> {
+    const result = await this.prisma.storedObject.createMany({
+      data: [toRow(value)],
+      skipDuplicates: true,
+    });
+
+    return result.count === 1;
+  }
+
+  async transition(input: {
+    expected: Pick<StoredObjectRecord, "status" | "generation">;
+    next: StoredObjectRecord;
+  }): Promise<boolean> {
+    const { tenantId, id, ...data } = toRow(input.next);
+    const result = await this.prisma.storedObject.updateMany({
+      where: {
+        tenantId,
+        id,
+        status: input.expected.status,
+        generation: input.expected.generation,
+      },
+      data,
+    });
+
+    return result.count === 1;
   }
 
   async countActive(input: {
@@ -66,7 +109,11 @@ export class PrismaStoredObjectRecordRepository
       where: {
         tenantId: input.tenantId,
         ...(input.afterId ? { id: { gt: input.afterId } } : {}),
-        ...(input.status ? { status: input.status } : {}),
+        ...(input.status === undefined
+          ? {}
+          : {
+              status: typeof input.status === "string" ? input.status : { in: [...input.status] },
+            }),
         ...(input.expiresBefore ? { expiresAt: { lte: toDate(input.expiresBefore) } } : {}),
       },
       orderBy: { id: "asc" },
@@ -99,6 +146,31 @@ export class PrismaStoredObjectRecordRepository
     });
 
     return rows.map((row) => fromRow(row));
+  }
+
+  async findTenantsWithExpiredUploads(input: {
+    expiresBefore: Instant;
+    afterTenantId?: StoredObjectProjectId;
+    limit: number;
+  }): Promise<StoredObjectProjectId[]> {
+    const rows = await this.prisma.$queryRaw<{ tenantId: string }[]>`
+      ${skipTenantCheck({
+        // Fleet-wide reap of abandoned uploads; each project is cleaned by its own scoped reads.
+        SKIP_TENANT_CHECK: true,
+      })}
+      SELECT DISTINCT "tenantId"
+        FROM "StoredObject"
+       WHERE "expiresAt" <= ${toDate(input.expiresBefore)}
+         AND (
+           "status" IN ('pending', 'uploading')
+           OR ("status" IN ('failed', 'deleted') AND "storageProvider" IS NOT NULL)
+         )
+         AND "tenantId" > ${input.afterTenantId ?? ""}
+       ORDER BY "tenantId"
+       LIMIT ${input.limit}
+    `;
+
+    return rows.map((row) => row.tenantId as StoredObjectProjectId);
   }
 
   async delete(input: { tenantId: StoredObjectProjectId; id: StoredObjectId }): Promise<void> {
@@ -171,7 +243,7 @@ function fromRow(value: unknown): StoredObjectRecord {
   return {
     tenantId: string(row.tenantId, "tenantId") as StoredObjectProjectId,
     id: string(row.id, "id") as StoredObjectId,
-    status: string(row.status, "status") as StoredObjectLifecycleStatus,
+    status: string(row.status, "status") as StoredObjectRecordStatus,
     purpose: string(row.purpose, "purpose"),
     ownerKind: string(row.ownerKind, "ownerKind"),
     ownerId: string(row.ownerId, "ownerId"),

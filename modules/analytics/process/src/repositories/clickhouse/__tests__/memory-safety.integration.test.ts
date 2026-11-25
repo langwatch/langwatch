@@ -16,6 +16,7 @@ import {
 } from "../../../__tests__/migrated-clickhouse.harness.ts";
 import { buildTimeseriesQuery } from "../clickhouse.aggregation-builder.mapper.ts";
 import { resetParamCounter } from "../clickhouse.filter-translator.mapper.ts";
+import { ownProjectReaderOver } from "./support/clickhouse-query-client.support.ts";
 
 const TENANT_ID = "memory-safety-test";
 const WIDE_TENANT_ID = "memory-safety-wide-test";
@@ -126,23 +127,48 @@ function buildQuery(series: AnalyticsSeries[], projectId = TENANT_ID) {
   return buildTimeseriesQuery({ ...baseInput, projectId, series });
 }
 
-/** Runs the query under the memory budget and drains it; a refusal rejects. */
-async function runWithinBudget({
+/** Reads a built statement through the project's own proof, as the repository sends it. */
+async function readRows({
   client,
+  projectId,
+  sql,
+  params,
+  settings,
+}: {
+  client: ClickHouseClient;
+  projectId: string;
+  sql: string;
+  params: Record<string, unknown>;
+  settings?: Record<string, string>;
+}): Promise<Record<string, unknown>[]> {
+  const result = await ownProjectReaderOver({ client, projectId }).query<Record<string, unknown>>({
+    query: sql,
+    query_params: params,
+    format: "JSONEachRow",
+    ...(settings ? { clickhouse_settings: settings } : {}),
+  });
+  return result.json();
+}
+
+/** Runs the query under the memory budget and drains it; a refusal rejects. */
+function runWithinBudget({
+  client,
+  projectId,
   sql,
   params,
 }: {
   client: ClickHouseClient;
+  projectId: string;
   sql: string;
   params: Record<string, unknown>;
 }): Promise<unknown[]> {
-  const result = await client.query({
-    query: sql,
-    query_params: params,
-    format: "JSONEachRow",
-    clickhouse_settings: { max_memory_usage: MEMORY_BUDGET },
+  return readRows({
+    client,
+    projectId,
+    sql,
+    params,
+    settings: { max_memory_usage: MEMORY_BUDGET },
   });
-  return result.json();
 }
 
 function currentPeriodValue(rows: Record<string, unknown>[]): number {
@@ -178,12 +204,8 @@ describe("memory safety of the generated analytics queries", () => {
       /** @scenario All generated analytics queries are valid ClickHouse SQL */
       it(`executes valid SQL for ${label}`, async () => {
         const { sql, params } = buildQuery(series);
-        const result = await client.query({
-          query: sql,
-          query_params: params,
-          format: "JSONEachRow",
-        });
-        expect(await result.json()).toEqual(expect.any(Array));
+        const rows = await readRows({ client, projectId: TENANT_ID, sql, params });
+        expect(rows).toEqual(expect.any(Array));
       });
     }
   });
@@ -212,9 +234,8 @@ describe("memory safety of the generated analytics queries", () => {
       /** @scenario Analytics queries complete within a tight memory budget */
       it(`completes ${label} within the 50MB memory budget`, async () => {
         const { sql, params } = buildQuery(series, WIDE_TENANT_ID);
-        await expect(runWithinBudget({ client, sql, params }), label).resolves.toEqual(
-          expect.any(Array),
-        );
+        const budgeted = runWithinBudget({ client, projectId: WIDE_TENANT_ID, sql, params });
+        await expect(budgeted, label).resolves.toEqual(expect.any(Array));
       });
     }
   });
@@ -225,12 +246,7 @@ describe("memory safety of the generated analytics queries", () => {
       it(`completes ${label} within ${TIME_BUDGET_MS}ms`, async () => {
         const { sql, params } = buildQuery(series);
         const start = performance.now();
-        const result = await client.query({
-          query: sql,
-          query_params: params,
-          format: "JSONEachRow",
-        });
-        await result.json();
+        await readRows({ client, projectId: TENANT_ID, sql, params });
         expect(performance.now() - start).toBeLessThan(TIME_BUDGET_MS);
       });
     }
@@ -270,7 +286,9 @@ describe("memory safety of the generated analytics queries", () => {
         [{ metric: "performance.total_cost", aggregation: "sum" }],
         WIDE_COLUMN_TENANT_ID,
       );
-      await expect(runWithinBudget({ client, sql, params })).resolves.toEqual(expect.any(Array));
+      await expect(
+        runWithinBudget({ client, projectId: WIDE_COLUMN_TENANT_ID, sql, params }),
+      ).resolves.toEqual(expect.any(Array));
     });
 
     it("completes the tokens_per_second query within 50MB on wide-attribute data", async () => {
@@ -278,7 +296,9 @@ describe("memory safety of the generated analytics queries", () => {
         [{ metric: "performance.tokens_per_second", aggregation: "avg" }],
         WIDE_COLUMN_TENANT_ID,
       );
-      await expect(runWithinBudget({ client, sql, params })).resolves.toEqual(expect.any(Array));
+      await expect(
+        runWithinBudget({ client, projectId: WIDE_COLUMN_TENANT_ID, sql, params }),
+      ).resolves.toEqual(expect.any(Array));
     });
   });
 
@@ -311,12 +331,7 @@ describe("memory safety of the generated analytics queries", () => {
 
     async function readCurrentPeriodValue(series: AnalyticsSeries[]): Promise<number> {
       const { sql, params } = buildFullPeriodQuery(series);
-      const result = await client.query({
-        query: sql,
-        query_params: params,
-        format: "JSONEachRow",
-      });
-      return currentPeriodValue(await result.json<Record<string, unknown>>());
+      return currentPeriodValue(await readRows({ client, projectId: TENANT_ID, sql, params }));
     }
 
     /** @scenario Analytics query results are correct on seeded data */

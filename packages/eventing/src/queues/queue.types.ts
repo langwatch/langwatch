@@ -1,6 +1,6 @@
-import type { ExhaustedOutcome, ListedRun } from "@langwatch/group-queue";
+import type { ExhaustedOutcome, ListedRun, QueueSendResult } from "@langwatch/group-queue";
 
-export type { ListedRun };
+export type { ListedRun, QueueSendResult };
 import type { SemConvAttributes } from "langwatch/observability";
 
 export interface EventSourcedQueueProcessorOptions {
@@ -151,6 +151,14 @@ export interface EventSourcedQueueProcessor<Payload extends Record<string, unkno
   send: (payload: Payload, options?: QueueSendOptions<Payload>) => Promise<void>;
   sendBatch: (payloads: Payload[], options?: QueueSendOptions<Payload>) => Promise<void>;
   /**
+   * Stages each payload as `send` would (its own score, dedup and audit) in bounded batches;
+   * one answer per payload, in order. Absent, {@link sendEach} sends them one at a time.
+   */
+  sendEach?: (
+    payloads: Payload[],
+    options?: QueueSendOptions<Payload>,
+  ) => Promise<QueueSendResult[]>;
+  /**
    * Gracefully closes the queue processor, waiting for in-flight jobs to complete.
    * Should be called during application shutdown.
    */
@@ -184,3 +192,29 @@ export type ListedWork<Result> = Readonly<{
   /** `list` is absent where no queue runs the work: nothing then paces it. */
   work: (list?: ListedRun) => Promise<Result>;
 }>;
+
+/**
+ * Each payload through the processor's `sendEach`, or one `send` at a time where it has none.
+ * A send that throws there is `unknown`: it may have staged before failing.
+ */
+export async function sendEach<Payload extends Record<string, unknown>>({
+  processor,
+  payloads,
+  options,
+}: {
+  processor: EventSourcedQueueProcessor<Payload>;
+  payloads: Payload[];
+  options?: QueueSendOptions<Payload>;
+}): Promise<QueueSendResult[]> {
+  if (processor.sendEach) return processor.sendEach(payloads, options);
+  const results: QueueSendResult[] = [];
+  for (const payload of payloads) {
+    try {
+      await processor.send(payload, options);
+      results.push({ status: "staged" });
+    } catch (error) {
+      results.push({ status: "unknown", error });
+    }
+  }
+  return results;
+}

@@ -118,3 +118,49 @@ describe("given a channel module", () => {
     });
   });
 });
+
+// ADR-181: `relay` opts into the feature layout; `eventing` is a framework that has not.
+const framework = createFixtureWorkspace({
+  files: {
+    "packages/relay/package.json": JSON.stringify({
+      name: "@langwatch/relay",
+      exports: { ".": { default: "./src/index.ts" } },
+      langwatch: { group: "framework", layout: "features" },
+    }),
+    "packages/eventing/package.json": JSON.stringify({
+      name: "@langwatch/eventing",
+      langwatch: { group: "framework" },
+    }),
+  },
+});
+
+afterAll(() => framework.cleanup());
+
+const FETCHES = 'export async function ping() { return fetch("https://example.test"); }';
+
+describe("given an opted-in framework package", () => {
+  describe("when a concern's service calls fetch", () => {
+    /** @scenario "A framework service may not open a channel" */
+    it("reports serviceOpensAChannel, and nothing for the same call in a channel", () => {
+      const service = "packages/relay/src/features/claim/services/claim.service.ts";
+      const channel = "packages/relay/src/features/claim/channels/http/http.claim.channel.ts";
+      const run = (filename) =>
+        runRule(serviceDoesNotOpenAChannelRule, { code: FETCHES, cwd: framework.cwd, filename });
+      expect(run(service).map((entry) => entry.messageId)).toEqual(["serviceOpensAChannel"]);
+      expect(run(channel)).toEqual([]);
+    });
+  });
+});
+
+describe("given a framework package that has not opted in", () => {
+  /** @scenario "A framework package that has not opted in is left alone by the layered rules" */
+  it("reports nothing for fetch under its services folder", () => {
+    expect(
+      runRule(serviceDoesNotOpenAChannelRule, {
+        code: FETCHES,
+        cwd: framework.cwd,
+        filename: "packages/eventing/src/services/claim.service.ts",
+      }),
+    ).toEqual([]);
+  });
+});

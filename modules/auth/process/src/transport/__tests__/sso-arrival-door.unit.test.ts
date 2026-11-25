@@ -1,4 +1,3 @@
-import type { AuthzGrantsService } from "@langwatch/authz-contract";
 import type {
   SsoArrivalApi,
   SsoAuthenticationActivityApi,
@@ -41,6 +40,7 @@ const WORKER: BetterAuthHookUser = {
   deactivatedAt: null,
   pendingSsoSetup: false,
   signupConfirmationPending: false,
+  passwordResetRequiredAt: null,
   lastLoginAt: null,
   emailVerified: true,
 };
@@ -62,11 +62,11 @@ function collaboratorsFor(
   record: SsoAuthenticationActivityApi["record"] = async () => undefined,
 ): BetterAuthHookCollaborators {
   return {
+    users: createApiFixture<BetterAuthHookCollaborators["users"]>(),
     organizations: createApiFixture<SsoDomainOrganizations>({ findBySsoDomain: async () => null }),
     federation: createApiFixture<BetterAuthFederation>(),
     invites: createApiFixture<Pick<OrganizationApi, "applyPendingInvite">>(),
     announcements: createApiFixture<BetterAuthAnnouncements>(),
-    authzGrants: createApiFixture<AuthzGrantsService>(),
     arrivals: createApiFixture<SsoArrivalApi>({ admit }),
     ssoActivity: createApiFixture<SsoAuthenticationActivityApi>({ record }),
     linkProposals: createApiFixture<LinkProposals>(),

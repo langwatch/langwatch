@@ -15,12 +15,13 @@ import {
   parseSummedNanoUsd,
 } from "@langwatch/gateway-contract";
 import { createLogger } from "@langwatch/observability";
-import { type Instant, nowInstant, Temporal } from "@langwatch/time";
+import { type Instant, nowInstant, Temporal, toDate } from "@langwatch/time";
 
 import { budgetSpendTargetsFor } from "../../rules/gateway-budget-spend-targets.rules.ts";
 import type {
   GatewayBudgetSpendRepository,
   GatewayBudgetSpendRecord,
+  ModelSpend,
 } from "../gateway-budget-spend.repository.ts";
 import type { GatewayClickHouseResolver } from "./clickhouse.gateway-session.store.ts";
 
@@ -239,14 +240,7 @@ export class GatewayBudgetClickHouseRepository implements GatewayBudgetSpendRepo
       );
     }
 
-    const client = await this.resolveClient(tenantId);
-    const probe = await client.query({
-      query: `SELECT 1 FROM ${EVENTS_TABLE} WHERE TenantId = {tenantId:String} AND GatewayRequestId = {gatewayRequestId:String} LIMIT 1`,
-      query_params: { tenantId, gatewayRequestId },
-      format: "JSONEachRow",
-    });
-    const probeRows = (await probe.json()) as unknown[];
-    if (probeRows.length > 0) {
+    if (await this.requestInLedger({ tenantId, gatewayRequestId })) {
       logger.debug(
         { tenantId, gatewayRequestId, batchSize: rows.length },
         "skipping replay — gateway_request_id already in ledger",
@@ -255,6 +249,28 @@ export class GatewayBudgetClickHouseRepository implements GatewayBudgetSpendRepo
     }
 
     await this.insertRows(rows);
+  }
+
+  /**
+   * Whether the ledger holds the request: bounded by its id index once ready, unbounded before.
+   * An index miss never alone declares a request new: the recent probe confirms it, so a lost
+   * index row cannot double-debit a replay, and a hit there is counted as a found miss.
+   */
+  private async requestInLedger({
+    tenantId,
+    gatewayRequestId,
+  }: {
+    tenantId: string;
+    gatewayRequestId: string;
+  }): Promise<boolean> {
+    const client = await this.resolveClient(tenantId);
+    const probe = await client.query({
+      query: `SELECT 1 FROM ${EVENTS_TABLE} WHERE TenantId = {tenantId:String} AND GatewayRequestId = {gatewayRequestId:String} {{idBound:gateway_budget_ledger_events.GatewayRequestId:gatewayRequestId}} LIMIT 1`,
+      query_params: { tenantId, gatewayRequestId },
+      format: "JSONEachRow",
+      idBound: { fallback: "unbounded" },
+    });
+    return ((await probe.json()) as unknown[]).length > 0;
   }
 
   /** Map + insert debit rows; shared by every probing insert path. */
@@ -281,7 +297,7 @@ export class GatewayBudgetClickHouseRepository implements GatewayBudgetSpendRepo
       ProviderSlot: r.providerSlot ?? "",
       DurationMS: r.durationMs ?? 0,
       Status: r.status.toLowerCase(),
-      OccurredAt: r.occurredAt.epochMilliseconds,
+      OccurredAt: toDate(r.occurredAt),
       EventTimestamp: nowInstant().epochMilliseconds,
     }));
 
@@ -340,7 +356,7 @@ export class GatewayBudgetClickHouseRepository implements GatewayBudgetSpendRepo
       ProviderSlot: "",
       DurationMS: 0,
       Status: "success",
-      OccurredAt: r.occurredAt.epochMilliseconds,
+      OccurredAt: toDate(r.occurredAt),
       // The ReplacingMergeTree version. Pull time, not bucket time: a
       // restatement of period P keeps P's OccurredAt, so ordering versions by
       // it would compare the period against itself.
@@ -380,6 +396,7 @@ export class GatewayBudgetClickHouseRepository implements GatewayBudgetSpendRepo
     const occurredAtMs = rows.map((r) => r.occurredAt.epochMilliseconds);
     const SPAN_SLACK_MS = 24 * 60 * 60 * 1000;
     const probe = await client.query({
+      // ID_BOUND_SKIP: bounded by the pulled rows' own bucket times, which a restatement keeps.
       query: `
         SELECT GatewayRequestId,
                argMax(AmountNanoUSD, EventTimestamp)    AS AmountNanoUSD,
@@ -500,6 +517,29 @@ export class GatewayBudgetClickHouseRepository implements GatewayBudgetSpendRepo
   }
 
   /**
+   * The budgets already on one request, bounded by the id index once ready; a miss confirms
+   * against the recent ledger, so a lost index row cannot double-debit.
+   */
+  private async budgetsOnRequest({
+    tenantId,
+    gatewayRequestId,
+    budgetIds,
+  }: {
+    tenantId: string;
+    gatewayRequestId: string;
+    budgetIds: string[];
+  }): Promise<{ BudgetId: string; ScopeId: string }[]> {
+    const client = await this.resolveClient(tenantId);
+    const probe = await client.query({
+      query: `SELECT DISTINCT BudgetId, ScopeId FROM ${EVENTS_TABLE} WHERE TenantId = {tenantId:String} AND GatewayRequestId = {requestId:String} AND BudgetId IN {budgetIds:Array(String)} {{idBound:gateway_budget_ledger_events.GatewayRequestId:requestId}}`,
+      query_params: { tenantId, requestId: gatewayRequestId, budgetIds },
+      format: "JSONEachRow",
+      idBound: { fallback: "unbounded" },
+    });
+    return (await probe.json()) as { BudgetId: string; ScopeId: string }[];
+  }
+
+  /**
    * One request resolves several budgets, each landing its own row, so the probe is per
    * (BudgetId, GatewayRequestId) rather than the whole-request one `insertDebit` takes — a
    * whole-request probe would silently skip every budget after the first it saw.
@@ -519,18 +559,8 @@ export class GatewayBudgetClickHouseRepository implements GatewayBudgetSpendRepo
       );
     }
     const budgetIds = [...new Set(rows.map((r) => r.budgetId))];
-    const client = await this.resolveClient(tenantId);
-    const probe = await client.query({
-      query: `SELECT DISTINCT BudgetId, ScopeId FROM ${EVENTS_TABLE} WHERE TenantId = {tenantId:String} AND GatewayRequestId = {requestId:String} AND BudgetId IN {budgetIds:Array(String)}`,
-      query_params: { tenantId, requestId: gatewayRequestId, budgetIds },
-      format: "JSONEachRow",
-    });
-    const existing = new Map(
-      ((await probe.json()) as { BudgetId: string; ScopeId: string }[]).map((r) => [
-        r.BudgetId,
-        r.ScopeId,
-      ]),
-    );
+    const probed = await this.budgetsOnRequest({ tenantId, gatewayRequestId, budgetIds });
+    const existing = new Map(probed.map((r) => [r.BudgetId, r.ScopeId]));
     // A budget already on this request suppresses the row (idempotent replay) — unless the
     // existing row names a DIFFERENT bucket, since the ledger key has no bucket in it. That
     // silently drops one side's spend from whichever bucket enforcement reads.
@@ -950,6 +980,76 @@ export class GatewayBudgetClickHouseRepository implements GatewayBudgetSpendRepo
       logger.warn(
         { tenantIds: shape.tenantIds, budgetId: args.budgetId, error },
         "failed to read boundary-floored gateway budget bucket spend",
+      );
+      throw error;
+    }
+  }
+
+  /**
+   * One bucket's successful spend per model since the target's floor, straight off the ledger.
+   * The inner read keeps one row per request, so a replayed request is counted once; the floor
+   * prunes partitions as `readFlooredTargetSpend` does.
+   */
+  async findModelSpendForTarget({
+    tenantIds,
+    target,
+  }: {
+    tenantIds: string[];
+    target: BudgetSpendTarget & { periodFloorMs: number };
+  }): Promise<ModelSpend[]> {
+    if (tenantIds.length === 0) return [];
+    const params: Record<string, string | number> = {
+      ...GatewayBudgetClickHouseRepository.tenantParams(tenantIds),
+      sep: PROVIDER_BUCKET_SEPARATOR,
+      budgetId: target.budgetId,
+      scope: GatewayBudgetClickHouseRepository.scopeToClickHouse(target.scope),
+      scopeId: target.scopeId,
+      window: GatewayBudgetClickHouseRepository.windowToClickHouse(target.window),
+      floor: target.periodFloorMs,
+    };
+    if (target.bucketSuffix) params.suffix = target.bucketSuffix;
+    const bucket = GatewayBudgetClickHouseRepository.bucketMatchSql({
+      target,
+      budgetIdParam: "budgetId",
+      scopeIdParam: "scopeId",
+      suffixParam: "suffix",
+    });
+    try {
+      const client = await this.resolveClient(tenantIds[0]!);
+      const result = await client.query({
+        query: `
+          SELECT
+            RequestModel AS Model,
+            toString(sum(RequestAmountNanoUSD)) AS SpentNanoUSD
+          FROM (
+            SELECT
+              GatewayRequestId,
+              any(Model) AS RequestModel,
+              any(AmountNanoUSD) AS RequestAmountNanoUSD
+            FROM ${EVENTS_TABLE} FINAL
+            WHERE TenantId IN (${GatewayBudgetClickHouseRepository.tenantPlaceholders(tenantIds)})
+              AND Status = 'success'
+              AND Scope = {scope:String}
+              AND ${bucket}
+              AND Window = {window:String}
+              AND OccurredAt >= fromUnixTimestamp64Milli({floor:Int64})
+            GROUP BY GatewayRequestId
+          )
+          GROUP BY Model
+        `,
+        query_params: params,
+        format: "JSONEachRow",
+        tenantIds,
+      });
+      const rows = (await result.json()) as { Model: string; SpentNanoUSD: string }[];
+      return rows.map((row) => ({
+        model: row.Model,
+        spentNanoUsd: BigInt(row.SpentNanoUSD || "0"),
+      }));
+    } catch (error) {
+      logger.warn(
+        { tenantIds, budgetId: target.budgetId, error },
+        "failed to read gateway budget bucket spend by model",
       );
       throw error;
     }

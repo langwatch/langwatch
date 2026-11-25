@@ -434,4 +434,28 @@ describe("generateClickHouseFilterConditions", () => {
       expect(result.conditions[0]).not.toContain("sp.StartTime");
     });
   });
+
+  describe("given a statement read through a proof's fence", () => {
+    it.each<[FilterField, Partial<Record<FilterField, FilterParam>>, "es" | "sp"]>([
+      ["evaluations.evaluator_id", { "evaluations.evaluator_id": ["eval-1"] }, "es"],
+      ["evaluations.passed", { "evaluations.passed": { "eval-1": ["true"] } }, "es"],
+      ["spans.type", { "spans.type": ["llm"] }, "sp"],
+      ["events.event_type", { "events.event_type": ["thumbs_up_down"] }, "sp"],
+    ])(
+      "when %s runs, its subquery takes the fence's tenants and the outer trace's own",
+      (_field, filters, alias) => {
+        const result = generateClickHouseFilterConditions(filters, undefined, { fenced: true });
+
+        expect(result.conditions[0]).toContain(`{{tenantSet}} AND ${alias}.TenantId = ts.TenantId`);
+        expect(result.conditions[0]).not.toContain("{tenantId:String}");
+      },
+    );
+
+    it("names the bound tenant when not fenced, as before", () => {
+      const result = generateClickHouseFilterConditions({ "spans.type": ["llm"] });
+
+      expect(result.conditions[0]).toContain("sp.TenantId = {tenantId:String}");
+      expect(result.conditions[0]).not.toContain("{{tenantSet}}");
+    });
+  });
 });

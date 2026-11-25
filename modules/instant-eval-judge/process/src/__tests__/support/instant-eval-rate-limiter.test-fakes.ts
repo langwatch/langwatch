@@ -1,14 +1,31 @@
-import type { InstantEvalRateLimiter } from "../../channels/instant-eval-classifier.channel.ts";
+import type {
+  InstantEvalPermit,
+  InstantEvalRateLimiter,
+} from "../../channels/instant-eval-classifier.channel.ts";
 
-/** A limiter that never waits, for suites. */
+/** A limiter for suites: never waits unless told to, and keeps every permit it was asked for. */
 export class MemoryInstantEvalRateLimiter implements InstantEvalRateLimiter {
-  private constructor() {}
+  readonly permits: InstantEvalPermit[] = [];
 
-  static create(): MemoryInstantEvalRateLimiter {
-    return new MemoryInstantEvalRateLimiter();
+  private constructor(private readonly waitMs: number) {}
+
+  static create({ waitMs = 0 }: { waitMs?: number } = {}): MemoryInstantEvalRateLimiter {
+    return new MemoryInstantEvalRateLimiter(waitMs);
   }
 
-  async acquire(): Promise<void> {
-    // Nothing is sent, so nothing has to be paced.
+  async acquire(permit: InstantEvalPermit, signal?: AbortSignal): Promise<void> {
+    this.permits.push(permit);
+    if (this.waitMs <= 0) return;
+    await new Promise<void>((resolve, reject) => {
+      const timer = setTimeout(resolve, this.waitMs);
+      signal?.addEventListener(
+        "abort",
+        () => {
+          clearTimeout(timer);
+          reject(signal.reason);
+        },
+        { once: true },
+      );
+    });
   }
 }

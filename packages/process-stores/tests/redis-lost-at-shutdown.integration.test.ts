@@ -114,7 +114,7 @@ describe("given a worker's group queue whose Redis has gone away", () => {
         await until(() => connection.status === "reconnecting");
 
         const started = performance.now();
-        hostedStores(members).stopping();
+        hostedStores({ source: members }).stopping();
         await queue.close();
         await members.close();
 

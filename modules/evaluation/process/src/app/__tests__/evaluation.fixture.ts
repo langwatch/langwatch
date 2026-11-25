@@ -18,6 +18,7 @@ import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { InstantEvalJudgeApi } from "@langwatch/instant-eval-judge-contract";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { MonitorApi } from "@langwatch/monitor-contract";
+import type { ProjectApi } from "@langwatch/project-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { TraceApi } from "@langwatch/trace-contract";
@@ -204,6 +205,7 @@ export function createEvaluationTestApp(
       datasets: DatasetApi;
       judges: InstantEvalJudgeApi;
       authz: AuthzApi;
+      projects: ProjectApi;
     }>;
     clustering?: LangevalsClusteringService;
   }> = {},
@@ -231,6 +233,7 @@ export function createEvaluationTestApp(
         createApiFixture<AuthzApi>({
           authorizeInternal: async ({ projectId }) => ownProof({ projectId }),
         }),
+      projects: input.dependencies?.projects ?? createApiFixture<ProjectApi>(),
     },
     clustering:
       input.clustering ??
@@ -284,4 +287,5 @@ export const EVALUATION_TEST_CONFIG: EvaluationServerConfig = {
   azureContentSafetyEndpoint: undefined,
   enablePresidio: undefined,
   enableLingua: undefined,
+  evaluatorRetryWindowMinutes: 120,
 };

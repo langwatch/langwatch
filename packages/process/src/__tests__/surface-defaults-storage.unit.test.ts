@@ -38,4 +38,33 @@ describe("the browser page policy", () => {
       });
     });
   });
+
+  describe("given a production install whose BASE_HOST is plain http", () => {
+    describe("when the api composes its page policy", () => {
+      /** @scenario "A self-hosted install over plain HTTP is not forced onto HTTPS" */
+      it("leaves out upgrade-insecure-requests, so the browser keeps the page on http", () => {
+        const policy = pagePolicyFor({
+          NODE_ENV: "production",
+          BASE_HOST: "http://langwatch.internal:5560",
+        });
+
+        expect(policy).toContain("default-src");
+        expect(policy).not.toContain("upgrade-insecure-requests");
+      });
+    });
+  });
+
+  describe("given a production install whose BASE_HOST is https", () => {
+    describe("when the api composes its page policy", () => {
+      /** @scenario "An HTTPS production install forces HTTPS on the browser" */
+      it("keeps upgrade-insecure-requests", () => {
+        const policy = pagePolicyFor({
+          NODE_ENV: "production",
+          BASE_HOST: "https://langwatch.example.com",
+        });
+
+        expect(policy).toContain("upgrade-insecure-requests");
+      });
+    });
+  });
 });

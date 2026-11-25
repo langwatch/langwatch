@@ -7,129 +7,36 @@
 
 import { defaultCliKeyPermissions } from "@langwatch/api-key-contract";
 import { CreateProjectDrawerToken } from "@langwatch/organization-client";
+import { nowInstant } from "@langwatch/time";
 import { cleanup, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ApiKeyHostProvider } from "../../../model/api-key-host.ts";
-import { FakeApiKeyHost, renderWithApiKeyHost } from "../../../testing.tsx";
+import { type FakeApiKeyHost, renderWithApiKeyHost } from "../../../testing.tsx";
 import CliAuthScreen from "../cli-auth-screen.tsx";
+import { cliAuthState as state, resetCliAuthState } from "./support/cli-auth-doubles.tsx";
+import { hostFor } from "./support/cli-auth-fixtures.ts";
 
-const { state } = vi.hoisted(() => ({
-  state: {
-    bindings: [] as { scopeType: string; scopeId: string; role: string }[],
-    bindingsLoading: false,
-    bindingsFailed: false,
-    firstMessage: void 0 as boolean | undefined,
-  },
-}));
-
-vi.mock("../../../behavior/api-key-api.ts", () => ({
-  apiKeyApi: {
-    useUtils: () => ({ apiKey: { list: { invalidate: vi.fn() } } }),
-    apiKey: {
-      myBindings: {
-        useQuery: () => ({
-          data: state.bindings,
-          isLoading: state.bindingsLoading,
-          isError: state.bindingsFailed,
-        }),
-      },
-    },
-    project: {
-      getHasFirstMessage: {
-        useQuery: () => ({
-          data: { firstMessage: state.firstMessage ?? true },
-          refetch: async () => undefined,
-        }),
-      },
-    },
-    organization: { getAll: { useQuery: () => ({ data: [] }) } },
-  },
-}));
-
-vi.mock("@langwatch/trace-client", () => ({
-  traceClient: { traces: { onTraceUpdate: { useSubscription: () => undefined } } },
-}));
-
-// The picker is `@langwatch/design-system`'s and has its own suite; what this file
-// is about is which scopes the SCREEN preselects and sends, so the picker
-// renders its value and offers one way to change it.
-vi.mock("@langwatch/design-system/scope-chip-picker", () => ({
-  ScopeChipPicker: ({
-    value,
-    onChange,
-  }: {
-    value: { scopeType: string; scopeId: string }[];
-    onChange: (next: { scopeType: string; scopeId: string }[]) => void;
-  }) => (
-    <div>
-      <span data-testid="selected-scopes">
-        {value.map((entry) => `${entry.scopeType}:${entry.scopeId}`).join(",")}
-      </span>
-      <button data-testid="clear-scopes" aria-label="Clear scopes" onClick={() => onChange([])} />
-      <button
-        data-testid="pick-personal"
-        aria-label="Pick the personal project"
-        onClick={() => onChange([{ scopeType: "PROJECT", scopeId: "proj-personal" }])}
-      />
-    </div>
-  ),
-}));
-
-const ORG_WITH_TEAMS = [
-  {
-    id: "org-1",
-    name: "ACME",
-    teams: [
-      {
-        id: "team-1",
-        name: "Platform",
-        isPersonal: false,
-        projects: [{ id: "proj-1", name: "Web App", slug: "web-app" }],
-      },
-      {
-        id: "team-2",
-        name: "Growth",
-        isPersonal: false,
-        projects: [{ id: "proj-2", name: "Growth App", slug: "growth-app" }],
-      },
-      {
-        id: "team-personal",
-        name: "Jane's Workspace",
-        isPersonal: true,
-        ownerUserId: "user-1",
-        projects: [
-          {
-            id: "proj-personal",
-            name: "Personal Workspace",
-            slug: "jane-personal",
-            isPersonal: true,
-            ownerUserId: "user-1",
-          },
-        ],
-      },
-    ],
-  },
-];
-
-function hostFor(options: Partial<ConstructorParameters<typeof FakeApiKeyHost>[0]> = {}) {
-  return new FakeApiKeyHost({
-    query: { user_code: "WDJB-MJHT" },
-    organizations: ORG_WITH_TEAMS,
-    ...options,
-  });
-}
+vi.mock("../../../behavior/use-grantable-permissions.ts", async () =>
+  (await import("./support/cli-auth-doubles.tsx")).grantablePermissionsModule(),
+);
+vi.mock("../../../behavior/api-key-api.ts", async () =>
+  (await import("./support/cli-auth-doubles.tsx")).apiKeyApiModule(),
+);
+vi.mock("@langwatch/trace-client", async () =>
+  (await import("./support/cli-auth-doubles.tsx")).traceClientModule(),
+);
+vi.mock("@langwatch/design-system/scope-chip-picker", async () =>
+  (await import("./support/cli-auth-doubles.tsx")).scopeChipPickerModule(),
+);
 
 async function confirmCode(user: ReturnType<typeof userEvent.setup>) {
   await user.click(await screen.findByRole("button", { name: "Confirm" }));
 }
 
 beforeEach(() => {
-  state.bindings = [];
-  state.bindingsLoading = false;
-  state.bindingsFailed = false;
-  state.firstMessage = void 0;
+  resetCliAuthState();
 });
 
 afterEach(() => cleanup());
@@ -142,6 +49,24 @@ describe("given a pending device code", () => {
       expect(await screen.findByText("WDJB-MJHT")).toBeInTheDocument();
       expect(screen.getByRole("button", { name: "Confirm" })).toBeInTheDocument();
       expect(screen.queryByText("What the CLI can access")).toBeNull();
+    });
+
+    /** @scenario a freshly minted code reads as 15 minutes */
+    it("tells the reader a fresh code expires in about 15 minutes", async () => {
+      const host = hostFor({
+        lookup: {
+          outcome: "pending",
+          userCode: "WDJB-MJHT",
+          status: "pending",
+          expiresAt: nowInstant().epochMilliseconds + 15 * 60_000,
+          credentialType: "device_session",
+          management: false,
+          client: null,
+        },
+      });
+      renderWithApiKeyHost(<CliAuthScreen />, host);
+
+      expect(await screen.findByText(/Expires in ~15 min/)).toBeInTheDocument();
     });
 
     /** @scenario the CLI stamps itself as the acquisition source */
@@ -266,6 +191,7 @@ describe("given the CLI asked for management access", () => {
     expiresAt: Date.now() + 600_000,
     credentialType: "device_session" as const,
     management: true,
+    client: null,
   };
 
   describe("when an organization admin approves", () => {
@@ -295,6 +221,21 @@ describe("given the CLI asked for management access", () => {
       );
       expect(host.approvals[0]!.keySelection?.permissions).not.toContain("organization:delete");
       expect(request).not.toHaveTextContent("Delete the organization");
+    });
+  });
+
+  describe("when an organization admin opens it before their access has loaded", () => {
+    it("does not claim they hold no management access, and keeps approve unavailable", async () => {
+      const user = userEvent.setup();
+      state.bindings = [{ scopeType: "ORGANIZATION", scopeId: "org-1", role: "ADMIN" }];
+      state.ceilingLoading = true;
+      const host = hostFor({ lookup: managementLookup });
+      renderWithApiKeyHost(<CliAuthScreen />, host);
+      await confirmCode(user);
+
+      expect(await screen.findByRole("button", { name: "Approve" })).toBeDisabled();
+      expect(screen.queryByText("You have no management access here")).toBeNull();
+      expect(host.approvals).toEqual([]);
     });
   });
 
@@ -410,6 +351,7 @@ describe("given the CLI asked for a project API key", () => {
     expiresAt: Date.now() + 600_000,
     credentialType: "project_api_key" as const,
     management: false,
+    client: null,
   };
 
   describe("when the organization has shared projects", () => {
@@ -446,6 +388,111 @@ describe("given the CLI asked for a project API key", () => {
   });
 });
 
+describe("given Laze asked to connect a project", () => {
+  const lazeLookup = {
+    outcome: "pending" as const,
+    userCode: "WDJB-MJHT",
+    status: "pending",
+    expiresAt: Date.now() + 600_000,
+    credentialType: "project_api_key" as const,
+    management: false,
+    client: "laze" as const,
+  };
+  const cliWording = /\bCLI\b|terminal|\.env/;
+
+  describe("when the page opens", () => {
+    /** @scenario the approval page names Laze and says what Laze gets */
+    it("names Laze in the heading and the code step, and never the CLI", async () => {
+      const user = userEvent.setup();
+      renderWithApiKeyHost(<CliAuthScreen />, hostFor({ lookup: lazeLookup }));
+
+      expect(await screen.findByText("Connect Laze to LangWatch")).toBeInTheDocument();
+      expect(
+        screen.getByText("Laze will send its agents' traces to the project you pick."),
+      ).toBeInTheDocument();
+      expect(screen.getByText(/Confirm this matches the code shown in Laze\./)).toBeInTheDocument();
+      expect(document.body.textContent).not.toMatch(cliWording);
+
+      await confirmCode(user);
+
+      expect(await screen.findByRole("button", { name: "Connect project" })).toBeInTheDocument();
+      expect(document.body.textContent).not.toMatch(cliWording);
+    });
+  });
+
+  describe("when the person approves a project", () => {
+    /** @scenario approving connects the picked project and tells the person to go back to Laze */
+    it("sends the picked project and says Laze is connected to it", async () => {
+      const user = userEvent.setup();
+      const host = hostFor({ lookup: lazeLookup });
+      renderWithApiKeyHost(<CliAuthScreen />, host);
+      await confirmCode(user);
+      await user.click(await screen.findByTestId("pick-personal"));
+      await user.click(screen.getByRole("button", { name: "Connect project" }));
+
+      await waitFor(() => expect(host.approvals).toHaveLength(1));
+      expect(host.approvals[0]!.projectId).toBe("proj-personal");
+      expect(await screen.findByText("Laze is connected")).toBeInTheDocument();
+      expect(screen.getByText("Personal Workspace")).toBeInTheDocument();
+      expect(screen.getByText(/You can close this tab and go back to Laze\./)).toBeInTheDocument();
+      expect(document.body.textContent).not.toMatch(cliWording);
+    });
+  });
+
+  describe("when the organization has no projects yet", () => {
+    /** @scenario an organization with no projects asks for one without the CLI wording */
+    it("asks for a project first and never mentions the CLI, a terminal or .env", async () => {
+      const user = userEvent.setup();
+      renderWithApiKeyHost(
+        <CliAuthScreen />,
+        hostFor({ lookup: lazeLookup, organizations: [{ id: "org-1", name: "ACME", teams: [] }] }),
+      );
+      await confirmCode(user);
+
+      expect(await screen.findByText("No projects yet")).toBeInTheDocument();
+      expect(
+        screen.getByText("Create a project in this organization first, then pick it here."),
+      ).toBeInTheDocument();
+      expect(document.body.textContent).not.toMatch(cliWording);
+    });
+  });
+
+  describe("when the code has expired", () => {
+    /** @scenario an expired Laze code sends the person back to Laze */
+    it("tells the person to connect again from Laze, not to run langwatch login", async () => {
+      renderWithApiKeyHost(
+        <CliAuthScreen />,
+        hostFor({ lookup: { outcome: "expired", client: "laze" } }),
+      );
+
+      expect(
+        await screen.findByText(
+          "This code expired. Go back to Laze and press Connect with LangWatch again.",
+        ),
+      ).toBeInTheDocument();
+      expect(screen.getByText("Connect Laze to LangWatch")).toBeInTheDocument();
+      expect(screen.queryByText(/langwatch login/)).toBeNull();
+      expect(document.body.textContent).not.toMatch(cliWording);
+    });
+  });
+
+  describe("when the person denies it", () => {
+    /** @scenario denying tells the person Laze was not connected */
+    it("says Laze was not connected", async () => {
+      const user = userEvent.setup();
+      const host = hostFor({ lookup: lazeLookup });
+      renderWithApiKeyHost(<CliAuthScreen />, host);
+      await user.click(await screen.findByRole("button", { name: "Deny" }));
+
+      await waitFor(() => expect(host.denials).toEqual(["WDJB-MJHT"]));
+      expect(
+        await screen.findByText("Laze was not connected. You can close this tab."),
+      ).toBeInTheDocument();
+      expect(document.body.textContent).not.toMatch(cliWording);
+    });
+  });
+});
+
 describe("given a second login is opened in the same tab", () => {
   /** @scenario a new device code starts the confirmation over */
   it("returns to the confirmation step with no trace of the old flow", async () => {
@@ -468,6 +515,7 @@ describe("given a second login is opened in the same tab", () => {
         expiresAt: Date.now() + 600_000,
         credentialType: "device_session",
         management: false,
+        client: null,
       },
     });
     rerender(
@@ -531,7 +579,10 @@ describe("given a code nothing recognises", () => {
 describe("given a code past its deadline", () => {
   /** @scenario an expired code sends the reader back to their terminal */
   it("says to run langwatch login again rather than showing a generic failure", async () => {
-    renderWithApiKeyHost(<CliAuthScreen />, hostFor({ lookup: { outcome: "expired" } }));
+    renderWithApiKeyHost(
+      <CliAuthScreen />,
+      hostFor({ lookup: { outcome: "expired", client: null } }),
+    );
     expect(await screen.findByText("Code expired")).toBeInTheDocument();
     expect(screen.queryByText("Something went wrong")).toBeNull();
   });

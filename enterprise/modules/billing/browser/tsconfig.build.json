@@ -45,10 +45,16 @@
       "path": "../../../../packages/design-system/tsconfig.build.json"
     },
     {
+      "path": "../../../../modules/data-retention/contract/tsconfig.build.json"
+    },
+    {
       "path": "../../../../packages/browser-host/tsconfig.build.json"
     },
     {
       "path": "../../../../packages/browser/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../modules/auth/client/tsconfig.build.json"
     },
     {
       "path": "../../../../packages/api/tsconfig.build.json"

@@ -20,9 +20,11 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { UserApi } from "@langwatch/user-contract";
 
 import type { OpsCheckupService } from "../../features/checkup/services/ops-checkup.service.ts";
+import type { UpgradeDiagnosticsService } from "../../features/upgrades/services/upgrade-diagnostics.service.ts";
 import { MemoryOpsRepositories } from "../../repositories/memory/memory.ops.repositories.ts";
 import type { OpsRepositories } from "../../repositories/ops.repositories.ts";
 import { AdminAccessService } from "../../services/admin-access.service.ts";
+import type { SeatSharingCheckService } from "../../services/seat-sharing-check.service.ts";
 import {
   OpsModule,
   type OpsAppInfrastructure,
@@ -80,6 +82,8 @@ export type OpsTestAppOptions = Readonly<{
   authz?: AuthzApi;
   repositories?: OpsRepositories;
   checkup?: OpsCheckupService;
+  seatSharing?: SeatSharingCheckService;
+  upgradeDiagnostics?: UpgradeDiagnosticsService;
 }>;
 
 export type OpsTestApp = Readonly<{ app: OpsModule; repositories: OpsRepositories }>;
@@ -155,6 +159,10 @@ export function createOpsTestApp(options: OpsTestAppOptions = {}): OpsTestApp {
     },
     repositories,
     ...(options.checkup === undefined ? {} : { checkup: options.checkup }),
+    ...(options.seatSharing === undefined ? {} : { seatSharing: options.seatSharing }),
+    ...(options.upgradeDiagnostics === undefined
+      ? {}
+      : { upgradeDiagnostics: options.upgradeDiagnostics }),
   });
 
   return { app, repositories };

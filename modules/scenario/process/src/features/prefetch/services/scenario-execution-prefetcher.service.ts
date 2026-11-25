@@ -18,6 +18,8 @@ import type { TraceApi } from "@langwatch/trace-contract";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
 
 import type { ScenarioRunSecretSeal } from "../../../repositories/scenario.repository.ts";
+import { redTeamRunEnvironment } from "../../../rules/red-team-job.rules.ts";
+import { hookCallsEnvironment } from "../../../rules/scenario-run-hooks.rules.ts";
 import { ScenarioExecutionLookupService } from "../../../services/scenario-execution-lookup.service.ts";
 import { ScenarioModelParametersService } from "../../../services/scenario-model-parameters.service.ts";
 import { ScenarioRunKeyService } from "../../../services/scenario-run-key.service.ts";
@@ -172,8 +174,8 @@ export class ScenarioExecutionPrefetcherService {
     );
 
     return {
-      childEnvironment: Promise.all([lookups.scenario, lookups.project, runKey])
-        .then(([scenario, project, apiKey]) => {
+      childEnvironment: Promise.all([lookups.scenario, lookups.project, runKey, lookups.adapter])
+        .then(([scenario, project, apiKey, adapter]) => {
           if (!project.success || apiKey === undefined) {
             return null;
           }
@@ -188,6 +190,8 @@ export class ScenarioExecutionPrefetcherService {
               endpoint: this.options.config.langwatchEndpoint,
               apiKey,
             },
+            ...("success" in adapter ? {} : hookCallsEnvironment(adapter)),
+            ...redTeamRunEnvironment(scenario.config),
           };
         })
         .catch(() => null),

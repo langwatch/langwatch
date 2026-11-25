@@ -11,6 +11,7 @@ import {
   LicenseOverageMaxRequiresOverageError,
   LicenseSigningNotConfiguredError,
   type IssuedLicenseCustomerRecord,
+  type IssuedLicenseFilters,
 } from "@langwatch/enterprise-licensing-contract";
 import { registryHashForToken } from "@langwatch/gateway-contract";
 import { UNLIMITED } from "@langwatch/plans";
@@ -161,24 +162,45 @@ describe("the license registry", () => {
     expect(contractBudgets.synced).toEqual(["org-acme"]);
   });
 
-  /** @scenario "The license list hides inactive and internal test licenses until asked" */
-  it("keeps only active customer licenses when asked, and every license otherwise", async () => {
-    const { registry } = harness();
+  async function threeLicenses() {
+    const harnessed = harness();
+    const { registry } = harnessed;
     await registry.issue(issueInput({ email: "ops@customer.com" }));
     const { license: revoked } = await registry.issue(issueInput({ email: "it@customer.com" }));
     await registry.revoke({ id: revoked.id, reason: "test", operatorId: "operator-1" });
     await registry.issue(issueInput({ email: "selfhost-dogfood@langwatch.ai" }));
+    return harnessed;
+  }
 
-    const filtered = await registry.list({
+  const emails = (page: { licenses: { email: string }[] }) =>
+    page.licenses.map((license) => license.email).toSorted();
+
+  /** @scenario The license list filters by status and by who the license is for */
+  it("lists by status and by audience, each alone or together", async () => {
+    const { registry } = await threeLicenses();
+    const list = (filters: IssuedLicenseFilters) =>
+      registry.list({ page: 0, pageSize: 10, ...filters });
+
+    expect(emails(await list({ status: "active", audience: "customer" }))).toEqual([
+      "ops@customer.com",
+    ]);
+    expect(emails(await list({ status: "inactive" }))).toEqual(["it@customer.com"]);
+    expect(emails(await list({ audience: "internal" }))).toEqual(["selfhost-dogfood@langwatch.ai"]);
+    expect((await list({})).total).toBe(3);
+  });
+
+  /** @scenario Each license filter choice says how many licenses it would list */
+  it("counts each choice with the other filter applied", async () => {
+    const { registry } = await threeLicenses();
+
+    const page = await registry.list({
       page: 0,
       pageSize: 10,
-      onlyActive: true,
-      hideInternal: true,
+      status: "active",
+      audience: "customer",
     });
-    const everything = await registry.list({ page: 0, pageSize: 10 });
 
-    expect(filtered.licenses.map((license) => license.email)).toEqual(["ops@customer.com"]);
-    expect(everything.total).toBe(3);
+    expect(page.counts).toEqual({ active: 1, inactive: 1, customer: 1, internal: 1, all: 3 });
   });
 
   /** @scenario A license is written only once its customer is marked */
@@ -829,5 +851,80 @@ describe("recording that a customer's contract terms moved", () => {
     await registry.revoke({ id: license.id, operatorId: "operator-2", reason: "contract ended" });
 
     expect(contractBudgets.synced).toEqual([]);
+  });
+});
+
+describe("the Developer seats a license sells", () => {
+  const signedDevelopers = (
+    cryptography: NodeLicenseCryptographyService,
+    licenseKey: string,
+  ): number | undefined => cryptography.parseLicenseKey(licenseKey)?.data.plan.maxMembersDeveloper;
+
+  /** @scenario An operator issues a licence with Developer seats */
+  it("signs the Developer seats stated and records them on the row", async () => {
+    const { registry, repository, cryptography } = harness();
+
+    const { licenseKey, license } = await registry.issue(issueInput({ maxMembersDeveloper: 4 }));
+
+    expect(signedDevelopers(cryptography, licenseKey)).toBe(4);
+    expect(license.maxMembersDeveloper).toBe(4);
+    expect((await repository.findById(license.id))?.maxMembersDeveloper).toBe(4);
+  });
+
+  /** @scenario A licence issued with no Developer seats, or 0, signs none and its row holds none */
+  it.each([{ stated: undefined }, { stated: 0 }])(
+    "signs no Developer seat field and records none when $stated are stated",
+    async ({ stated }) => {
+      const { registry, cryptography } = harness();
+
+      const { licenseKey, license } = await registry.issue(
+        issueInput(stated === undefined ? {} : { maxMembersDeveloper: stated }),
+      );
+
+      const plan = cryptography.parseLicenseKey(licenseKey)?.data.plan ?? {};
+      expect("maxMembersDeveloper" in plan).toBe(false);
+      expect(license.maxMembersDeveloper).toBeNull();
+    },
+  );
+
+  /** @scenario A replacement keeps the Developer seats of the licence it replaces */
+  it("keeps them on a reissue and a seat change that do not name them", async () => {
+    const { registry, cryptography } = harness();
+    const { license } = await registry.issue(issueInput({ maxMembersDeveloper: 4 }));
+
+    const reissued = await registry.reissue({
+      id: license.id,
+      expiresAt: Temporal.Instant.from("2028-01-01T00:00:00.000Z"),
+      operatorId: "operator-3",
+    });
+    const changed = await registry.changeSeats({
+      id: reissued.license.id,
+      maxMembers: 60,
+      operatorId: "operator-3",
+    });
+
+    expect(signedDevelopers(cryptography, reissued.licenseKey)).toBe(4);
+    expect(reissued.license.maxMembersDeveloper).toBe(4);
+    expect(signedDevelopers(cryptography, changed.licenseKey)).toBe(4);
+    expect(changed.license.maxMembersDeveloper).toBe(4);
+  });
+
+  /** @scenario A reissue that names Developer seats signs the new count */
+  it.each([
+    { stated: 7, signed: 7, stored: 7 },
+    { stated: 0, signed: undefined, stored: null },
+  ])("signs $signed when a reissue names $stated", async ({ stated, signed, stored }) => {
+    const { registry, cryptography } = harness();
+    const { license } = await registry.issue(issueInput({ maxMembersDeveloper: 4 }));
+
+    const reissued = await registry.reissue({
+      id: license.id,
+      maxMembersDeveloper: stated,
+      expiresAt: Temporal.Instant.from("2028-01-01T00:00:00.000Z"),
+      operatorId: "operator-3",
+    });
+
+    expect(signedDevelopers(cryptography, reissued.licenseKey)).toBe(signed);
+    expect(reissued.license.maxMembersDeveloper).toBe(stored);
   });
 });

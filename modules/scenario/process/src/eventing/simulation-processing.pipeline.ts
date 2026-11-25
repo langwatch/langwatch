@@ -26,6 +26,8 @@ import {
   SimulationRunCancelRequestedEventSchema,
   SimulationRunAgentInstanceRecordedEventSchema,
   SimulationRunCutAtLimitRecordedEventSchema,
+  SimulationRunHooksRecordedEventSchema,
+  SimulationRunRedTeamReportRecordedEventSchema,
   SimulationRunDeletedEventSchema,
   SimulationSetArchivedEventSchema,
 } from "@langwatch/scenario-contract";
@@ -131,6 +133,8 @@ function buildSimulationProcessingPipelineDefinition(
       SimulationRunCancelRequestedEventSchema,
       SimulationRunAgentInstanceRecordedEventSchema,
       SimulationRunCutAtLimitRecordedEventSchema,
+      SimulationRunHooksRecordedEventSchema,
+      SimulationRunRedTeamReportRecordedEventSchema,
       SimulationRunDeletedEventSchema,
       SimulationSetArchivedEventSchema,
     ])
@@ -192,6 +196,8 @@ function buildSimulationProcessingPipelineDefinition(
     .withCommand("deleteRun", commands.deleteRun)
     .withCommand("recordAgentInstance", commands.recordAgentInstance)
     .withCommand("recordCutAtLimit", commands.recordCutAtLimit)
+    .withCommand("recordHooks", commands.recordHooks)
+    .withCommand("recordRedTeamReport", commands.recordRedTeamReport)
     .withCommandInstance({
       name: "computeRunMetrics",
       handlerClass: ComputeRunMetricsCommand,

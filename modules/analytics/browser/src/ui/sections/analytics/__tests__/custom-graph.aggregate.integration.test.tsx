@@ -30,8 +30,11 @@ vi.mock("../../../../behavior/analytics-api.ts", () => ({
         }),
       },
       updateById: { useMutation: () => ({ isPending: false, mutate: () => undefined }) },
+      delete: { useMutation: () => ({ isPending: false, mutate: () => undefined }) },
+      batchUpdateLayouts: { useMutation: () => ({ isPending: false, mutate: () => undefined }) },
       getById: { useQuery: () => ({ data: undefined, isLoading: false, error: null }) },
     },
+    dashboards: { rename: { useMutation: () => ({ isPending: false, mutate: () => undefined }) } },
     analytics: {
       dataForFilter: { useQuery: () => ({ data: { options: [] }, isLoading: false }) },
     },
@@ -43,6 +46,13 @@ vi.mock("../../custom-graph.tsx", async (importOriginal) => ({
   CustomGraph: () => null,
 }));
 vi.mock("../../filter-sidebar.tsx", () => ({ FilterSidebar: () => null }));
+vi.mock("../../custom-dashboards-section.tsx", () => ({ DashboardsTabMenu: () => null }));
+vi.mock("../../../../behavior/use-dashboards.ts", async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  useFirstDashboard: () => ({ data: null }),
+  useDashboards: () => ({ data: [], refetch: () => undefined }),
+  useDashboardGraphs: () => ({ data: [], isLoading: false, refetch: () => undefined }),
+}));
 vi.mock("../../saved-views-scope.tsx", () => ({
   SavedViewsScope: ({ children }: { children: React.ReactNode }) => children,
 }));
@@ -81,7 +91,11 @@ describe("Adding a chart", () => {
     describe("when ana opens its reports or the chart editor", () => {
       /** @scenario "The aggregate's reports offer no chart to add" */
       it("offers neither Add chart nor Save", () => {
-        const host = new StubAnalyticsHost({ project: projectOfKind("aggregate") });
+        // The shell refuses every analytics write on an aggregate, as the server does.
+        const host = new StubAnalyticsHost({
+          project: projectOfKind("aggregate"),
+          permissions: ["analytics:view"],
+        });
 
         render(
           <AnalyticsTestHarness host={host}>

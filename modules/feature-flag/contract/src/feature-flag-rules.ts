@@ -15,12 +15,14 @@ const KNOWN_MATCH_KEYS = [
   "organizationCreatedAfter",
   "percentageRollout",
   "emailDomain",
+  "userId",
 ] as const;
 type KnownMatchKey = (typeof KNOWN_MATCH_KEYS)[number];
 
 const featureFlagRuleMatchSchema = z
   .object({
-    projectId: z.string().optional(),
+    /** One project, or several so one rule carries a per-project allowlist. */
+    projectId: z.union([z.string(), z.array(z.string())]).optional(),
     organizationId: z.string().optional(),
     /**
      * "New users": matches organizations created on or after this instant
@@ -39,6 +41,8 @@ const featureFlagRuleMatchSchema = z
      * part after the last `@` of `userEmail`. No user email, no match.
      */
     emailDomain: z.union([z.string(), z.array(z.string())]).optional(),
+    /** One signed-in user, or several, matched on the user id of the read. */
+    userId: z.union([z.string(), z.array(z.string())]).optional(),
   })
   // Future-proof: keeps unknown fields rather than rejecting them, so a
   // newer writer's rule shape still deserializes here. The matcher itself
@@ -66,12 +70,30 @@ const featureFlagRulesWriteSchemaDefinition = featureFlagRulesSchema
   .refine(
     (rules) =>
       rules.every((rule) =>
-        [rule.match.projectId, rule.match.organizationId].every(
-          (id) => id === undefined || (id.length > 0 && id === id.trim()),
-        ),
+        [
+          rule.match.organizationId,
+          ...projectIdsOf(rule.match.projectId),
+          ...userIdsOf(rule.match.userId),
+        ].every((id) => id === undefined || (id.length > 0 && id === id.trim())),
       ),
     {
-      message: "A targeting rule's project/organization id must not be blank or padded",
+      message: "A targeting rule's project, organization or user id must not be blank or padded",
+    },
+  )
+  .refine(
+    (rules) =>
+      rules.every(
+        (rule) => !Array.isArray(rule.match.projectId) || rule.match.projectId.length > 0,
+      ),
+    {
+      message: "A project rule naming a list needs at least one project id",
+    },
+  )
+  .refine(
+    (rules) =>
+      rules.every((rule) => !Array.isArray(rule.match.userId) || rule.match.userId.length > 0),
+    {
+      message: "A user rule naming a list needs at least one user id",
     },
   )
   .refine(
@@ -115,6 +137,18 @@ export interface FeatureFlagRulesWriteSchema extends Named<
 export const featureFlagRulesWriteSchema: FeatureFlagRulesWriteSchema =
   featureFlagRulesWriteSchemaDefinition;
 
+/** The users a `userId` condition names, one or several, as a list. */
+export function userIdsOf(userId: string | string[] | undefined): string[] {
+  if (userId === undefined) return [];
+  return Array.isArray(userId) ? userId : [userId];
+}
+
+/** The projects a `projectId` condition names, one or several, as a list. */
+export function projectIdsOf(projectId: string | string[] | undefined): string[] {
+  if (projectId === undefined) return [];
+  return Array.isArray(projectId) ? projectId : [projectId];
+}
+
 /** The domains an `emailDomain` condition names, one or several, as a list. */
 export function emailDomainsOf(emailDomain: string | string[] | undefined): string[] {
   if (emailDomain === undefined) return [];
@@ -155,6 +189,8 @@ export interface RuleEvaluationContext {
    * rule can match there.
    */
   userEmail?: string;
+  /** The signed-in user's id, for a user rule. Absent on every read without a session. */
+  userId?: string;
 }
 
 /**
@@ -231,6 +267,12 @@ export function resolveEffectiveForListing({
   return registryDefault;
 }
 
+/** Whether an id condition, one id or several, admits the read's id; no condition admits all. */
+function namesContextId(listed: string | string[] | undefined, id: string | undefined): boolean {
+  if (listed === undefined) return true;
+  return id !== undefined && (Array.isArray(listed) ? listed : [listed]).includes(id);
+}
+
 function matchesContext(
   match: FeatureFlagRuleMatch,
   ctx: RuleEvaluationContext,
@@ -245,12 +287,11 @@ function matchesContext(
   }
   // Every specified field must match the context. An entirely empty
   // match acts as a default-rule and matches every context.
-  if (match.projectId !== undefined && match.projectId !== ctx.projectId) {
-    return false;
-  }
+  if (!namesContextId(match.projectId, ctx.projectId)) return false;
   if (match.organizationId !== undefined && match.organizationId !== ctx.organizationId) {
     return false;
   }
+  if (!namesContextId(match.userId, ctx.userId)) return false;
   if (
     match.percentageRollout !== undefined &&
     !isWithinRolloutPercentage({

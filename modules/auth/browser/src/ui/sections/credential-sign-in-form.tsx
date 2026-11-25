@@ -9,6 +9,7 @@ import { z } from "zod";
 
 import { attemptCredentialSignIn } from "../../behavior/attempt-credential-sign-in.ts";
 import { authApi as api } from "../../behavior/auth-api.ts";
+import { hardNavigate } from "../../behavior/browser-navigation.ts";
 import { useFocusWhenSettled } from "../../behavior/use-focus-when-settled.ts";
 
 import "../elements/auth-front-door.css";
@@ -136,6 +137,11 @@ export function CredentialSignInForm({
       // The card above becomes the code screen; a code box under a live
       // password field would invite a second attempt on top of this one.
       startTwoStepChallenge({ callbackUrl });
+      return;
+    }
+    if (attempt.outcome === "password_reset_required") {
+      // The password was right but may no longer be used: the reset link is the way in.
+      hardNavigate(forgotPasswordHref({ email: address, resetRequired: true }));
       return;
     }
     if (attempt.outcome === "signing_up") {

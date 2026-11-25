@@ -14,7 +14,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 Portable User use cases exposed to process peers and transports.
 
-Peers call these through the token, declared at `../contract/src/user.api.ts:56`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/user.api.ts:57`; nothing else in this package is public.
 
 #### `findById`
 
@@ -122,6 +122,14 @@ Whether the account behind an id holds the platform-operator grant.
 isOperator(input: { userId: string }): Promise<boolean>;
 ```
 
+#### `searchForOperators`
+
+Accounts whose id, name or address holds the query, for a platform operator's search.
+
+```typescript
+searchForOperators(input: { query: string; limit: number }): Promise<UserProfile[]>;
+```
+
 #### `findByEmail`
 
 The account holding an address, matched on its stored lower-cased form, however typed.
@@ -136,6 +144,14 @@ Mints a directory account with no sign-in method of its own.
 
 ```typescript
 create(input: CreateUserInput): Promise<UserProfile>;
+```
+
+#### `recordCreated`
+
+Commits the created fact for an account Better Auth wrote itself (social and single sign-on sign-up), which never passes a mint here. Keyed by the user, so a repeat records nothing new.
+
+```typescript
+recordCreated(input: UserIdInput): Promise<void>;
 ```
 
 #### `createPasskeyUser`
@@ -172,6 +188,22 @@ hasPassword(input: UserIdInput): Promise<boolean>;
 
 ```typescript
 setFirstPassword(input: SetFirstUserPasswordInput): Promise<SetFirstUserPasswordResult>;
+```
+
+#### `findPasswordHolders`
+
+Holders of a credential password, oldest id first; `emails` narrows to those addresses, matched in any case. Read by auth's require-password-reset task.
+
+```typescript
+findPasswordHolders(input: { emails: readonly string[] | null }): Promise<PasswordHolder[]>;
+```
+
+#### `markPasswordResetRequired`
+
+Marks these users' passwords as requiring a reset now; a mark already set keeps its time.
+
+```typescript
+markPasswordResetRequired(input: { userIds: readonly string[] }): Promise<{ marked: number }>;
 ```
 
 #### `getPasskeyOffer`
@@ -346,6 +378,14 @@ The same figures for one organization, counted over the members the caller names
 countUsageForMembers(input: { memberUserIds: readonly string[] }): Promise<UserUsageCount>;
 ```
 
+#### `findSignedInSince`
+
+Which of these people last signed in at or after `since` (epoch ms).
+
+```typescript
+findSignedInSince(input: { userIds: readonly string[]; since: number; }): Promise<readonly string[]>;
+```
+
 #### `hasAccountOnDomain`
 
 Whether anybody with an address on this domain has an account; no address leaves.
@@ -362,23 +402,31 @@ Whether the installation holds any account at all; false only on a fresh install
 hasAnyAccount(): Promise<boolean>;
 ```
 
+#### `isFirstCreatedAccount`
+
+Whether this account is the install's first-created one, deactivated or not. Once the first account was erased no remaining one is.
+
+```typescript
+isFirstCreatedAccount(input: { userId: string }): Promise<boolean>;
+```
+
 ## REST transport
 
 ### `meRest`
 
-|             |                              |
-| ----------- | ---------------------------- |
-| Declared at | `src/transport/me.rest.ts:8` |
-| Base URL    | `/api/me`, twin `/api/v1/me` |
-| Addressing  | dated                        |
-| Credential  | project                      |
-| Versions    | `2026-08-07`                 |
+|             |                               |
+| ----------- | ----------------------------- |
+| Declared at | `src/transport/me.rest.ts:13` |
+| Base URL    | `/api/me`, twin `/api/v1/me`  |
+| Addressing  | dated                         |
+| Credential  | project                       |
+| Versions    | `2026-08-07`                  |
 
 #### `GET /project` · `getApiMeProject`
 
-Identity of the project the calling API key belongs to: id, name, slug and whether it is a personal workspace project. Lets a client (the CLI's identity notice, a widget) say which project a key targets without any further access.
+Identity of the project the calling API key belongs to: id, name, slug and whether it is a personal workspace project. Answers any API key bound to the project, an ingestion key holding only traces:create included, so a client (the CLI's identity notice, a widget, a traces link) can say which project a key targets without any further access.
 
-Permission `project:view`. Declared at `src/transport/me.rest.ts:12`.
+Authenticated: Any key bound to a project, an ingestion key holding only traces:create included, reads only that project's identity (id, name, slug, isPersonal), which the door resolved from the key itself. Declared at `src/transport/me.rest.ts:17`.
 
 Answers at `/api/me/project`, `/api/v1/me/project`; also, undocumented, `/api/me/2026-08-07/project`, `/api/v1/me/2026-08-07/project`, `/api/me/latest/project`, `/api/v1/me/latest/project`.
 
@@ -449,7 +497,7 @@ Contract `../contract/src/user.trpc.ts:39`, router `src/transport/user.trpc.ts:3
 ```typescript
 // user.getAvatarUrl
 type Input = z.infer<typeof userAvatarRestParamsSchema>; // ../contract/src/user-rest.schemas.ts:32
-// Output: userAvatarUrlSchema, ../contract/src/user.ts:383
+// Output: userAvatarUrlSchema, ../contract/src/user.ts:391
 interface Output {
   url: string;
 }
@@ -457,7 +505,7 @@ interface Output {
 // user.getTraceExplorerTourPreference
 // Input: userApiEmptyInputSchema, ../contract/src/user.schemas.ts:18
 type Input = Record<string, unknown>;
-// Output: userTourPreferenceSchema, ../contract/src/user.ts:274
+// Output: userTourPreferenceSchema, ../contract/src/user.ts:282
 interface Output {
   dismissed: boolean;
   dismissedAt: unknown | null;
@@ -465,14 +513,14 @@ interface Output {
 
 // user.dismissTraceExplorerTour
 type Input = z.infer<typeof userApiEmptyInputSchema>; // ../contract/src/user.schemas.ts:18
-type Output = z.infer<typeof userTourPreferenceSchema>; // ../contract/src/user.ts:274
+type Output = z.infer<typeof userTourPreferenceSchema>; // ../contract/src/user.ts:282
 
 // user.getNotificationPreference
 // Input: userApiNotificationTopicInputSchema, ../contract/src/user.schemas.ts:28
 interface Input {
   topic: "langy";
 }
-// Output: userNotificationPreferenceSchema, ../contract/src/user.ts:299
+// Output: userNotificationPreferenceSchema, ../contract/src/user.ts:307
 interface Output {
   topic: "langy";
   choice: "enabled" | "declined" | null;
@@ -484,7 +532,7 @@ interface Input {
   topic: "langy";
   choice: "enabled" | "declined";
 }
-type Output = z.infer<typeof userNotificationPreferenceSchema>; // ../contract/src/user.ts:299
+type Output = z.infer<typeof userNotificationPreferenceSchema>; // ../contract/src/user.ts:307
 
 // user.isAdmin
 type Input = z.infer<typeof userApiEmptyInputSchema>; // ../contract/src/user.schemas.ts:18
@@ -498,14 +546,14 @@ type Input = z.infer<typeof userApiEmptyInputSchema>; // ../contract/src/user.sc
 
 // user.getSsoStatus
 type Input = z.infer<typeof userApiEmptyInputSchema>; // ../contract/src/user.schemas.ts:18
-// Output: userSsoStatusSchema, ../contract/src/user.ts:261
+// Output: userSsoStatusSchema, ../contract/src/user.ts:269
 interface Output {
   pendingSsoSetup: boolean;
 }
 
 // user.getAccountInfo
 type Input = z.infer<typeof userApiEmptyInputSchema>; // ../contract/src/user.schemas.ts:18
-// Output: userAccountInfoSchema, ../contract/src/user.ts:256
+// Output: userAccountInfoSchema, ../contract/src/user.ts:264
 interface Output {
   createdAt: unknown;
 }
@@ -521,7 +569,7 @@ type Output = {
 
 // user.secureAccountNudge
 type Input = z.infer<typeof userApiEmptyInputSchema>; // ../contract/src/user.schemas.ts:18
-// Output: userSecureAccountOfferSchema, ../contract/src/user.ts:511
+// Output: userSecureAccountOfferSchema, ../contract/src/user.ts:519
 interface Output {
   offer: boolean;
   passkey: boolean;
@@ -566,7 +614,7 @@ interface Input {
   organizationId: string;
   imageDataUrl: string;
 }
-// Output: userAvatarResultSchema, ../contract/src/user.ts:377
+// Output: userAvatarResultSchema, ../contract/src/user.ts:385
 interface Output {
   image: string;
 }

@@ -5,15 +5,12 @@
  */
 import { optionalCredential } from "@langwatch/api/access";
 import {
+  callerAddressContext,
   defineRestRouter,
   MANAGEMENT_API_VERSION,
   type RestProtocolRefusal,
 } from "@langwatch/api/rest";
-import {
-  bugReportIntakeHeadersSchema,
-  OpsApi,
-  submitBugReportSchema,
-} from "@langwatch/ops-contract";
+import { OpsApi, submitBugReportSchema } from "@langwatch/ops-contract";
 
 import { bugReportRefusal } from "#rules/ops-intake-refusal.rules";
 
@@ -46,6 +43,7 @@ export const opsBugReportRest = defineRestRouter(OpsApi)
   .withAddressing("literal", { v1Twin: true })
 
   .post("/api/bug-reports", "submitBugReport")
+  .keepsRecords()
   .withoutAudit("report intake")
   .withInput(submitBugReportSchema)
   .withDocs({
@@ -61,17 +59,17 @@ export const opsBugReportRest = defineRestRouter(OpsApi)
       refused: "anonymous",
     }),
   )
-  .withHeaders(bugReportIntakeHeadersSchema)
   .withBodyLimit({ maxBytes: MAX_BODY_BYTES })
   .withResponse("protocol", {
     produces: "application/json",
     because: INTAKE_ANSWERS,
     refusal: intakeRefusal,
   })
-  .handle(async ({ app, input, response, scope }, headers) => {
+  .withMiddlewareContext(callerAddressContext)
+  .handle(async ({ app, input, response, scope }, callerAddress) => {
     const answer = await app.receiveBugReport({
       report: input,
-      forwardedFor: headers["x-forwarded-for"] ?? null,
+      callerAddress,
       linkedProjectId: scope?.id ?? null,
     });
 

@@ -30,44 +30,46 @@ T = TypeVar("T", bound="GetApiTraceIdResponse200SpansItemType2ParamsType0")
 class GetApiTraceIdResponse200SpansItemType2ParamsType0:
     """
     Attributes:
-        frequency_penalty (float | None | Unset):
-        logit_bias (GetApiTraceIdResponse200SpansItemType2ParamsType0LogitBiasType0 | None | Unset):
-        logprobs (bool | None | Unset):
-        top_logprobs (float | None | Unset):
-        max_tokens (float | None | Unset):
-        n (float | None | Unset):
-        presence_penalty (float | None | Unset):
-        seed (float | None | Unset):
-        stop (list[str] | None | str | Unset):
-        stream (bool | None | Unset):
-        temperature (float | None | Unset):
-        top_p (float | None | Unset):
-        tools (list[GetApiTraceIdResponse200SpansItemType2ParamsType0ToolsType0Item] | None | Unset):
-        tool_choice (GetApiTraceIdResponse200SpansItemType2ParamsType0ToolChoiceType0Type0 | None | str | Unset):
-        parallel_tool_calls (bool | None | Unset):
-        functions (list[GetApiTraceIdResponse200SpansItemType2ParamsType0FunctionsType0Item] | None | Unset):
-        user (None | str | Unset):
-        reasoning_effort (None | str | Unset):
+        frequency_penalty (Any | float | None | Unset):
+        logit_bias (Any | GetApiTraceIdResponse200SpansItemType2ParamsType0LogitBiasType0 | None | Unset):
+        logprobs (Any | bool | None | Unset):
+        top_logprobs (Any | float | None | Unset):
+        max_tokens (Any | float | None | Unset):
+        n (Any | float | None | Unset):
+        presence_penalty (Any | float | None | Unset):
+        seed (Any | float | None | Unset):
+        stop (Any | list[str] | None | str | Unset):
+        stream (Any | bool | None | Unset):
+        temperature (Any | float | None | Unset):
+        top_p (Any | float | None | Unset):
+        tools (Any | list[GetApiTraceIdResponse200SpansItemType2ParamsType0ToolsType0Item] | None | Unset):
+        tool_choice (Any | GetApiTraceIdResponse200SpansItemType2ParamsType0ToolChoiceType0Type0 | None | str | Unset):
+        parallel_tool_calls (Any | bool | None | Unset):
+        functions (Any | list[GetApiTraceIdResponse200SpansItemType2ParamsType0FunctionsType0Item] | None | Unset):
+        user (Any | None | str | Unset):
+        reasoning_effort (Any | None | str | Unset):
     """
 
-    frequency_penalty: float | None | Unset = UNSET
-    logit_bias: GetApiTraceIdResponse200SpansItemType2ParamsType0LogitBiasType0 | None | Unset = UNSET
-    logprobs: bool | None | Unset = UNSET
-    top_logprobs: float | None | Unset = UNSET
-    max_tokens: float | None | Unset = UNSET
-    n: float | None | Unset = UNSET
-    presence_penalty: float | None | Unset = UNSET
-    seed: float | None | Unset = UNSET
-    stop: list[str] | None | str | Unset = UNSET
-    stream: bool | None | Unset = UNSET
-    temperature: float | None | Unset = UNSET
-    top_p: float | None | Unset = UNSET
-    tools: list[GetApiTraceIdResponse200SpansItemType2ParamsType0ToolsType0Item] | None | Unset = UNSET
-    tool_choice: GetApiTraceIdResponse200SpansItemType2ParamsType0ToolChoiceType0Type0 | None | str | Unset = UNSET
-    parallel_tool_calls: bool | None | Unset = UNSET
-    functions: list[GetApiTraceIdResponse200SpansItemType2ParamsType0FunctionsType0Item] | None | Unset = UNSET
-    user: None | str | Unset = UNSET
-    reasoning_effort: None | str | Unset = UNSET
+    frequency_penalty: Any | float | None | Unset = UNSET
+    logit_bias: Any | GetApiTraceIdResponse200SpansItemType2ParamsType0LogitBiasType0 | None | Unset = UNSET
+    logprobs: Any | bool | None | Unset = UNSET
+    top_logprobs: Any | float | None | Unset = UNSET
+    max_tokens: Any | float | None | Unset = UNSET
+    n: Any | float | None | Unset = UNSET
+    presence_penalty: Any | float | None | Unset = UNSET
+    seed: Any | float | None | Unset = UNSET
+    stop: Any | list[str] | None | str | Unset = UNSET
+    stream: Any | bool | None | Unset = UNSET
+    temperature: Any | float | None | Unset = UNSET
+    top_p: Any | float | None | Unset = UNSET
+    tools: Any | list[GetApiTraceIdResponse200SpansItemType2ParamsType0ToolsType0Item] | None | Unset = UNSET
+    tool_choice: Any | GetApiTraceIdResponse200SpansItemType2ParamsType0ToolChoiceType0Type0 | None | str | Unset = (
+        UNSET
+    )
+    parallel_tool_calls: Any | bool | None | Unset = UNSET
+    functions: Any | list[GetApiTraceIdResponse200SpansItemType2ParamsType0FunctionsType0Item] | None | Unset = UNSET
+    user: Any | None | str | Unset = UNSET
+    reasoning_effort: Any | None | str | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -78,13 +80,13 @@ class GetApiTraceIdResponse200SpansItemType2ParamsType0:
             GetApiTraceIdResponse200SpansItemType2ParamsType0ToolChoiceType0Type0,
         )
 
-        frequency_penalty: float | None | Unset
+        frequency_penalty: Any | float | None | Unset
         if isinstance(self.frequency_penalty, Unset):
             frequency_penalty = UNSET
         else:
             frequency_penalty = self.frequency_penalty
 
-        logit_bias: dict[str, Any] | None | Unset
+        logit_bias: Any | dict[str, Any] | None | Unset
         if isinstance(self.logit_bias, Unset):
             logit_bias = UNSET
         elif isinstance(self.logit_bias, GetApiTraceIdResponse200SpansItemType2ParamsType0LogitBiasType0):
@@ -92,43 +94,43 @@ class GetApiTraceIdResponse200SpansItemType2ParamsType0:
         else:
             logit_bias = self.logit_bias
 
-        logprobs: bool | None | Unset
+        logprobs: Any | bool | None | Unset
         if isinstance(self.logprobs, Unset):
             logprobs = UNSET
         else:
             logprobs = self.logprobs
 
-        top_logprobs: float | None | Unset
+        top_logprobs: Any | float | None | Unset
         if isinstance(self.top_logprobs, Unset):
             top_logprobs = UNSET
         else:
             top_logprobs = self.top_logprobs
 
-        max_tokens: float | None | Unset
+        max_tokens: Any | float | None | Unset
         if isinstance(self.max_tokens, Unset):
             max_tokens = UNSET
         else:
             max_tokens = self.max_tokens
 
-        n: float | None | Unset
+        n: Any | float | None | Unset
         if isinstance(self.n, Unset):
             n = UNSET
         else:
             n = self.n
 
-        presence_penalty: float | None | Unset
+        presence_penalty: Any | float | None | Unset
         if isinstance(self.presence_penalty, Unset):
             presence_penalty = UNSET
         else:
             presence_penalty = self.presence_penalty
 
-        seed: float | None | Unset
+        seed: Any | float | None | Unset
         if isinstance(self.seed, Unset):
             seed = UNSET
         else:
             seed = self.seed
 
-        stop: list[str] | None | str | Unset
+        stop: Any | list[str] | None | str | Unset
         if isinstance(self.stop, Unset):
             stop = UNSET
         elif isinstance(self.stop, list):
@@ -137,25 +139,25 @@ class GetApiTraceIdResponse200SpansItemType2ParamsType0:
         else:
             stop = self.stop
 
-        stream: bool | None | Unset
+        stream: Any | bool | None | Unset
         if isinstance(self.stream, Unset):
             stream = UNSET
         else:
             stream = self.stream
 
-        temperature: float | None | Unset
+        temperature: Any | float | None | Unset
         if isinstance(self.temperature, Unset):
             temperature = UNSET
         else:
             temperature = self.temperature
 
-        top_p: float | None | Unset
+        top_p: Any | float | None | Unset
         if isinstance(self.top_p, Unset):
             top_p = UNSET
         else:
             top_p = self.top_p
 
-        tools: list[dict[str, Any]] | None | Unset
+        tools: Any | list[dict[str, Any]] | None | Unset
         if isinstance(self.tools, Unset):
             tools = UNSET
         elif isinstance(self.tools, list):
@@ -167,7 +169,7 @@ class GetApiTraceIdResponse200SpansItemType2ParamsType0:
         else:
             tools = self.tools
 
-        tool_choice: dict[str, Any] | None | str | Unset
+        tool_choice: Any | dict[str, Any] | None | str | Unset
         if isinstance(self.tool_choice, Unset):
             tool_choice = UNSET
         elif isinstance(self.tool_choice, GetApiTraceIdResponse200SpansItemType2ParamsType0ToolChoiceType0Type0):
@@ -175,13 +177,13 @@ class GetApiTraceIdResponse200SpansItemType2ParamsType0:
         else:
             tool_choice = self.tool_choice
 
-        parallel_tool_calls: bool | None | Unset
+        parallel_tool_calls: Any | bool | None | Unset
         if isinstance(self.parallel_tool_calls, Unset):
             parallel_tool_calls = UNSET
         else:
             parallel_tool_calls = self.parallel_tool_calls
 
-        functions: list[dict[str, Any]] | None | Unset
+        functions: Any | list[dict[str, Any]] | None | Unset
         if isinstance(self.functions, Unset):
             functions = UNSET
         elif isinstance(self.functions, list):
@@ -193,13 +195,13 @@ class GetApiTraceIdResponse200SpansItemType2ParamsType0:
         else:
             functions = self.functions
 
-        user: None | str | Unset
+        user: Any | None | str | Unset
         if isinstance(self.user, Unset):
             user = UNSET
         else:
             user = self.user
 
-        reasoning_effort: None | str | Unset
+        reasoning_effort: Any | None | str | Unset
         if isinstance(self.reasoning_effort, Unset):
             reasoning_effort = UNSET
         else:
@@ -264,18 +266,18 @@ class GetApiTraceIdResponse200SpansItemType2ParamsType0:
 
         d = dict(src_dict)
 
-        def _parse_frequency_penalty(data: object) -> float | None | Unset:
+        def _parse_frequency_penalty(data: object) -> Any | float | None | Unset:
             if data is None:
                 return data
             if isinstance(data, Unset):
                 return data
-            return cast(float | None | Unset, data)
+            return cast(Any | float | None | Unset, data)
 
         frequency_penalty = _parse_frequency_penalty(d.pop("frequency_penalty", UNSET))
 
         def _parse_logit_bias(
             data: object,
-        ) -> GetApiTraceIdResponse200SpansItemType2ParamsType0LogitBiasType0 | None | Unset:
+        ) -> Any | GetApiTraceIdResponse200SpansItemType2ParamsType0LogitBiasType0 | None | Unset:
             if data is None:
                 return data
             if isinstance(data, Unset):
@@ -288,65 +290,65 @@ class GetApiTraceIdResponse200SpansItemType2ParamsType0:
                 return logit_bias_type_0
             except (TypeError, ValueError, AttributeError, KeyError):
                 pass
-            return cast(GetApiTraceIdResponse200SpansItemType2ParamsType0LogitBiasType0 | None | Unset, data)
+            return cast(Any | GetApiTraceIdResponse200SpansItemType2ParamsType0LogitBiasType0 | None | Unset, data)
 
         logit_bias = _parse_logit_bias(d.pop("logit_bias", UNSET))
 
-        def _parse_logprobs(data: object) -> bool | None | Unset:
+        def _parse_logprobs(data: object) -> Any | bool | None | Unset:
             if data is None:
                 return data
             if isinstance(data, Unset):
                 return data
-            return cast(bool | None | Unset, data)
+            return cast(Any | bool | None | Unset, data)
 
         logprobs = _parse_logprobs(d.pop("logprobs", UNSET))
 
-        def _parse_top_logprobs(data: object) -> float | None | Unset:
+        def _parse_top_logprobs(data: object) -> Any | float | None | Unset:
             if data is None:
                 return data
             if isinstance(data, Unset):
                 return data
-            return cast(float | None | Unset, data)
+            return cast(Any | float | None | Unset, data)
 
         top_logprobs = _parse_top_logprobs(d.pop("top_logprobs", UNSET))
 
-        def _parse_max_tokens(data: object) -> float | None | Unset:
+        def _parse_max_tokens(data: object) -> Any | float | None | Unset:
             if data is None:
                 return data
             if isinstance(data, Unset):
                 return data
-            return cast(float | None | Unset, data)
+            return cast(Any | float | None | Unset, data)
 
         max_tokens = _parse_max_tokens(d.pop("max_tokens", UNSET))
 
-        def _parse_n(data: object) -> float | None | Unset:
+        def _parse_n(data: object) -> Any | float | None | Unset:
             if data is None:
                 return data
             if isinstance(data, Unset):
                 return data
-            return cast(float | None | Unset, data)
+            return cast(Any | float | None | Unset, data)
 
         n = _parse_n(d.pop("n", UNSET))
 
-        def _parse_presence_penalty(data: object) -> float | None | Unset:
+        def _parse_presence_penalty(data: object) -> Any | float | None | Unset:
             if data is None:
                 return data
             if isinstance(data, Unset):
                 return data
-            return cast(float | None | Unset, data)
+            return cast(Any | float | None | Unset, data)
 
         presence_penalty = _parse_presence_penalty(d.pop("presence_penalty", UNSET))
 
-        def _parse_seed(data: object) -> float | None | Unset:
+        def _parse_seed(data: object) -> Any | float | None | Unset:
             if data is None:
                 return data
             if isinstance(data, Unset):
                 return data
-            return cast(float | None | Unset, data)
+            return cast(Any | float | None | Unset, data)
 
         seed = _parse_seed(d.pop("seed", UNSET))
 
-        def _parse_stop(data: object) -> list[str] | None | str | Unset:
+        def _parse_stop(data: object) -> Any | list[str] | None | str | Unset:
             if data is None:
                 return data
             if isinstance(data, Unset):
@@ -359,40 +361,40 @@ class GetApiTraceIdResponse200SpansItemType2ParamsType0:
                 return stop_type_0_type_1
             except (TypeError, ValueError, AttributeError, KeyError):
                 pass
-            return cast(list[str] | None | str | Unset, data)
+            return cast(Any | list[str] | None | str | Unset, data)
 
         stop = _parse_stop(d.pop("stop", UNSET))
 
-        def _parse_stream(data: object) -> bool | None | Unset:
+        def _parse_stream(data: object) -> Any | bool | None | Unset:
             if data is None:
                 return data
             if isinstance(data, Unset):
                 return data
-            return cast(bool | None | Unset, data)
+            return cast(Any | bool | None | Unset, data)
 
         stream = _parse_stream(d.pop("stream", UNSET))
 
-        def _parse_temperature(data: object) -> float | None | Unset:
+        def _parse_temperature(data: object) -> Any | float | None | Unset:
             if data is None:
                 return data
             if isinstance(data, Unset):
                 return data
-            return cast(float | None | Unset, data)
+            return cast(Any | float | None | Unset, data)
 
         temperature = _parse_temperature(d.pop("temperature", UNSET))
 
-        def _parse_top_p(data: object) -> float | None | Unset:
+        def _parse_top_p(data: object) -> Any | float | None | Unset:
             if data is None:
                 return data
             if isinstance(data, Unset):
                 return data
-            return cast(float | None | Unset, data)
+            return cast(Any | float | None | Unset, data)
 
         top_p = _parse_top_p(d.pop("top_p", UNSET))
 
         def _parse_tools(
             data: object,
-        ) -> list[GetApiTraceIdResponse200SpansItemType2ParamsType0ToolsType0Item] | None | Unset:
+        ) -> Any | list[GetApiTraceIdResponse200SpansItemType2ParamsType0ToolsType0Item] | None | Unset:
             if data is None:
                 return data
             if isinstance(data, Unset):
@@ -412,13 +414,15 @@ class GetApiTraceIdResponse200SpansItemType2ParamsType0:
                 return tools_type_0
             except (TypeError, ValueError, AttributeError, KeyError):
                 pass
-            return cast(list[GetApiTraceIdResponse200SpansItemType2ParamsType0ToolsType0Item] | None | Unset, data)
+            return cast(
+                Any | list[GetApiTraceIdResponse200SpansItemType2ParamsType0ToolsType0Item] | None | Unset, data
+            )
 
         tools = _parse_tools(d.pop("tools", UNSET))
 
         def _parse_tool_choice(
             data: object,
-        ) -> GetApiTraceIdResponse200SpansItemType2ParamsType0ToolChoiceType0Type0 | None | str | Unset:
+        ) -> Any | GetApiTraceIdResponse200SpansItemType2ParamsType0ToolChoiceType0Type0 | None | str | Unset:
             if data is None:
                 return data
             if isinstance(data, Unset):
@@ -434,23 +438,23 @@ class GetApiTraceIdResponse200SpansItemType2ParamsType0:
             except (TypeError, ValueError, AttributeError, KeyError):
                 pass
             return cast(
-                GetApiTraceIdResponse200SpansItemType2ParamsType0ToolChoiceType0Type0 | None | str | Unset, data
+                Any | GetApiTraceIdResponse200SpansItemType2ParamsType0ToolChoiceType0Type0 | None | str | Unset, data
             )
 
         tool_choice = _parse_tool_choice(d.pop("tool_choice", UNSET))
 
-        def _parse_parallel_tool_calls(data: object) -> bool | None | Unset:
+        def _parse_parallel_tool_calls(data: object) -> Any | bool | None | Unset:
             if data is None:
                 return data
             if isinstance(data, Unset):
                 return data
-            return cast(bool | None | Unset, data)
+            return cast(Any | bool | None | Unset, data)
 
         parallel_tool_calls = _parse_parallel_tool_calls(d.pop("parallel_tool_calls", UNSET))
 
         def _parse_functions(
             data: object,
-        ) -> list[GetApiTraceIdResponse200SpansItemType2ParamsType0FunctionsType0Item] | None | Unset:
+        ) -> Any | list[GetApiTraceIdResponse200SpansItemType2ParamsType0FunctionsType0Item] | None | Unset:
             if data is None:
                 return data
             if isinstance(data, Unset):
@@ -472,25 +476,27 @@ class GetApiTraceIdResponse200SpansItemType2ParamsType0:
                 return functions_type_0
             except (TypeError, ValueError, AttributeError, KeyError):
                 pass
-            return cast(list[GetApiTraceIdResponse200SpansItemType2ParamsType0FunctionsType0Item] | None | Unset, data)
+            return cast(
+                Any | list[GetApiTraceIdResponse200SpansItemType2ParamsType0FunctionsType0Item] | None | Unset, data
+            )
 
         functions = _parse_functions(d.pop("functions", UNSET))
 
-        def _parse_user(data: object) -> None | str | Unset:
+        def _parse_user(data: object) -> Any | None | str | Unset:
             if data is None:
                 return data
             if isinstance(data, Unset):
                 return data
-            return cast(None | str | Unset, data)
+            return cast(Any | None | str | Unset, data)
 
         user = _parse_user(d.pop("user", UNSET))
 
-        def _parse_reasoning_effort(data: object) -> None | str | Unset:
+        def _parse_reasoning_effort(data: object) -> Any | None | str | Unset:
             if data is None:
                 return data
             if isinstance(data, Unset):
                 return data
-            return cast(None | str | Unset, data)
+            return cast(Any | None | str | Unset, data)
 
         reasoning_effort = _parse_reasoning_effort(d.pop("reasoning_effort", UNSET))
 

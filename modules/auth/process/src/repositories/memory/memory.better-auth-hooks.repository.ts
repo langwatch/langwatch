@@ -47,6 +47,9 @@ export class MemoryBetterAuthHooksRepository extends BetterAuthHooksRepository {
       pendingSsoSetup: user.pendingSsoSetup ?? false,
       signupConfirmationPending: user.signupConfirmationPending ?? false,
       lastLoginAt: user.lastLoginAt ? fromDate(user.lastLoginAt) : null,
+      passwordResetRequiredAt: user.passwordResetRequiredAt
+        ? fromDate(user.passwordResetRequiredAt)
+        : null,
     };
   }
 
@@ -114,5 +117,10 @@ export class MemoryBetterAuthHooksRepository extends BetterAuthHooksRepository {
 
   async recordLastLogin({ userId }: { userId: string }): Promise<void> {
     this.requireUser(userId).lastLoginAt = toDate(nowInstant());
+  }
+
+  async clearPasswordResetRequirement({ userId }: { userId: string }): Promise<void> {
+    const user = this.users().find((row) => row.id === userId);
+    if (user) user.passwordResetRequiredAt = null;
   }
 }

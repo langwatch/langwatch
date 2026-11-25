@@ -89,3 +89,10 @@ Feature: The standalone API process serves its own metrics
       Given the process metrics provider is installed
       When an eventing command, projection, subscriber or process manager records its outcome
       Then the es_ series are written to that provider under their unchanged names and labels
+
+    @unit
+    Scenario: Every pipeline records the events it stores and how long storing took
+      Given the process metrics provider is installed
+      When a pipeline stores a batch of events
+      Then event_sourcing_events_stored_total counts the batch under the pipeline's name
+      And event_sourcing_store_duration_milliseconds records one store

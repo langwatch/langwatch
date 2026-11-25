@@ -1,8 +1,10 @@
 import type { ClickHouseConfiguration } from "./config.ts";
+import { SHARED_CLICKHOUSE_TARGET } from "./idIndexFlags.ts";
 import {
   createTenantRouter,
   type PrivateRouteRefusalFactory,
   type TenantDirectory,
+  type ClickHouseTenantPlacement,
   type TenantRouter,
 } from "./tenancy.ts";
 import { TenantScopeError } from "./tenantGuard.ts";
@@ -98,6 +100,24 @@ export class ClickHouseConnection<Client extends ClickHouseCloseableClient> {
     const route = await this.router.route(tenantId);
     this.assertOpen();
     return route.kind === "shared" ? this.shared() : this.resolveOrganization(route.organizationId);
+  }
+
+  /** The organisation a tenant belongs to, from the router's cache. */
+  organizationOf(tenantId: string): Promise<string> {
+    this.assertOpen();
+    return this.router.organizationOf(tenantId);
+  }
+
+  /** The router's recorded placement and resolved server for a tenant; refuses nothing itself. */
+  async placementOf(tenantId: string): Promise<ClickHouseTenantPlacement> {
+    this.assertOpen();
+    const { organizationId, recordedPrivate, route } = await this.router.placementOf(tenantId);
+    const url = route.kind === "private" ? route.url : this.configuration.shared?.url;
+    return {
+      target: route.kind === "private" ? organizationId : SHARED_CLICKHOUSE_TARGET,
+      recordedPrivate,
+      origin: url === undefined ? null : new URL(url).origin,
+    };
   }
 
   /**

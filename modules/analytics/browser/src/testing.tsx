@@ -29,6 +29,8 @@ export type StubAnalyticsHostOptions = {
   /** The signed-in member; "user-1" unless a test says otherwise. */
   userId?: string | undefined;
   permissions?: readonly string[];
+  /** Grants in projects other than the one in scope, by project id; none unless named. */
+  projectPermissions?: Readonly<Record<string, readonly string[]>>;
   /** Whether the grants have arrived; settled unless a test says otherwise. */
   settled?: boolean;
   /** A flag named here answers its value, `undefined` included; any other is off. */
@@ -51,6 +53,8 @@ export class StubAnalyticsHost extends AnalyticsHostApi {
   readonly successes: AnalyticsSuccessNotice[] = [];
   readonly failures: AnalyticsFailureNotice[] = [];
   readonly navigations: string[] = [];
+  /** The navigations that left no history entry to come back to. */
+  readonly replacements: string[] = [];
   readonly queries: Readonly<Record<string, string | undefined>>[] = [];
   readonly alertAuthorings: AnalyticsAlertAuthoring[] = [];
   readonly langyAsks: AnalyticsLangyAskRequest[] = [];
@@ -88,6 +92,10 @@ export class StubAnalyticsHost extends AnalyticsHostApi {
     return (this.options.permissions ?? ANALYTICS_MEMBER_PERMISSIONS).includes(permission);
   }
 
+  hasPermissionIn({ projectId, permission }: { projectId: string; permission: string }): boolean {
+    return (this.options.projectPermissions?.[projectId] ?? []).includes(permission);
+  }
+
   isSettled(): boolean {
     return this.options.settled ?? true;
   }
@@ -105,8 +113,9 @@ export class StubAnalyticsHost extends AnalyticsHostApi {
     this.queries.push(next);
   }
 
-  navigate(to: string): void {
+  navigate(to: string, options?: { replace?: boolean }): void {
     this.navigations.push(to);
+    if (options?.replace) this.replacements.push(to);
   }
 
   openAutomationDrawer(request: AnalyticsAlertAuthoring): void {

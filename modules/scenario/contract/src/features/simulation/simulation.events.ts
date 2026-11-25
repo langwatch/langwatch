@@ -2,7 +2,9 @@ import type { Named } from "@langwatch/module";
 import { onboardingVariantSchema } from "@langwatch/onboarding-contract";
 import { z } from "zod";
 
+import { redTeamRunReportSchema } from "../../scenario.ts";
 import { scenarioEvaluationResultSchema } from "../../schemas/event-schemas.ts";
+import { scenarioRunHooksSchema } from "../execution/scenario-hooks.ts";
 import { runEvaluatorsSchema } from "../run/scenario-run-evaluators.ts";
 import {
   SIMULATION_EVENT_VERSIONS,
@@ -434,6 +436,63 @@ export type SimulationRunCutAtLimitRecordedEvent = z.infer<
   typeof SimulationRunCutAtLimitRecordedEventSchema
 >;
 
+/** RedTeamReportRecorded: a red team run's held or broke report, folded into metadata `redTeam`. */
+const simulationRunRedTeamReportRecordedEventDataSchemaDefinition = z.object({
+  scenarioRunId: z.string(),
+  report: redTeamRunReportSchema,
+});
+export interface SimulationRunRedTeamReportRecordedEventDataSchema extends Named<
+  typeof simulationRunRedTeamReportRecordedEventDataSchemaDefinition
+> {}
+export const simulationRunRedTeamReportRecordedEventDataSchema: SimulationRunRedTeamReportRecordedEventDataSchema =
+  simulationRunRedTeamReportRecordedEventDataSchemaDefinition;
+
+const SimulationRunRedTeamReportRecordedEventSchemaDefinition = z.object({
+  ...simulationEventSchema.shape,
+  type: z.literal(SIMULATION_RUN_EVENT_TYPES.RED_TEAM_REPORT_RECORDED),
+  version: z.literal(SIMULATION_EVENT_VERSIONS.RED_TEAM_REPORT_RECORDED),
+  data: simulationRunRedTeamReportRecordedEventDataSchema,
+});
+export interface SimulationRunRedTeamReportRecordedEventSchema extends Named<
+  typeof SimulationRunRedTeamReportRecordedEventSchemaDefinition
+> {}
+export const SimulationRunRedTeamReportRecordedEventSchema: SimulationRunRedTeamReportRecordedEventSchema =
+  SimulationRunRedTeamReportRecordedEventSchemaDefinition;
+export type SimulationRunRedTeamReportRecordedEvent = z.infer<
+  typeof SimulationRunRedTeamReportRecordedEventSchema
+>;
+
+/**
+ * HooksRecorded: the setup and teardown results the child reported, folded
+ * into the run's metadata under `langwatch.hooks`. Arrives after the run
+ * finished, like AgentInstanceRecorded, and changes nothing else on the run.
+ */
+const simulationRunHooksRecordedEventDataSchemaDefinition = z.object({
+  scenarioRunId: z.string(),
+  hooks: scenarioRunHooksSchema,
+});
+export interface SimulationRunHooksRecordedEventDataSchema extends Named<
+  typeof simulationRunHooksRecordedEventDataSchemaDefinition
+> {}
+export const simulationRunHooksRecordedEventDataSchema: SimulationRunHooksRecordedEventDataSchema =
+  simulationRunHooksRecordedEventDataSchemaDefinition;
+export type SimulationRunHooksRecordedEventData = z.infer<
+  typeof simulationRunHooksRecordedEventDataSchema
+>;
+
+const SimulationRunHooksRecordedEventSchemaDefinition = z.object({
+  ...simulationEventSchema.shape,
+  type: z.literal(SIMULATION_RUN_EVENT_TYPES.HOOKS_RECORDED),
+  version: z.literal(SIMULATION_EVENT_VERSIONS.HOOKS_RECORDED),
+  data: simulationRunHooksRecordedEventDataSchema,
+});
+export interface SimulationRunHooksRecordedEventSchema extends Named<
+  typeof SimulationRunHooksRecordedEventSchemaDefinition
+> {}
+export const SimulationRunHooksRecordedEventSchema: SimulationRunHooksRecordedEventSchema =
+  SimulationRunHooksRecordedEventSchemaDefinition;
+export type SimulationRunHooksRecordedEvent = z.infer<typeof SimulationRunHooksRecordedEventSchema>;
+
 /**
  * RunDeleted event - emitted when a simulation run is soft-deleted.
  */
@@ -507,6 +566,8 @@ export type SimulationProcessingEvent =
   | SimulationRunCancelRequestedEvent
   | SimulationRunAgentInstanceRecordedEvent
   | SimulationRunCutAtLimitRecordedEvent
+  | SimulationRunHooksRecordedEvent
+  | SimulationRunRedTeamReportRecordedEvent
   | SimulationRunDeletedEvent
   | SimulationSetArchivedEvent;
 
@@ -515,6 +576,8 @@ export {
   isSimulationRunAgentInstanceRecordedEvent,
   isSimulationRunCancelRequestedEvent,
   isSimulationRunCutAtLimitRecordedEvent,
+  isSimulationRunHooksRecordedEvent,
+  isSimulationRunRedTeamReportRecordedEvent,
   isSimulationRunDeletedEvent,
   isSimulationRunEvaluatedEvent,
   isSimulationRunFinishedEvent,

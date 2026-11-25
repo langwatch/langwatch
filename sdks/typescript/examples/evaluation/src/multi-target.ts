@@ -51,14 +51,14 @@ if (DATASET_SLUG) {
 }
 
 // Simulated LLM calls - replace with your actual LLM calls
-const simulateGPT4 = async (question: string): Promise<string> => {
+const simulateGptSol = async (question: string): Promise<string> => {
   await new Promise((resolve) => setTimeout(resolve, 200 + Math.random() * 300));
-  return `[GPT-4] This is a detailed, nuanced answer to: ${question}`;
+  return `[GPT-6 Sol] This is a detailed, nuanced answer to: ${question}`;
 };
 
-const simulateGPT35 = async (question: string): Promise<string> => {
+const simulateGptLuna = async (question: string): Promise<string> => {
   await new Promise((resolve) => setTimeout(resolve, 100 + Math.random() * 150));
-  return `[GPT-3.5] Quick answer to: ${question}`;
+  return `[GPT-6 Luna] Quick answer to: ${question}`;
 };
 
 const simulateClaude = async (question: string): Promise<string> => {
@@ -78,10 +78,10 @@ const main = async () => {
 
       // Run all three models in parallel using withTarget()
       // Each withTarget() creates its own span with automatic latency capture
-      const [gpt4Result, gpt35Result, claudeResult] = await Promise.all([
-        // GPT-4 target
-        evaluation.withTarget("gpt-4", { model: "openai/gpt-4" }, async () => {
-          const response = await simulateGPT4(item.question);
+      const [gptSolResult, gptLunaResult, claudeResult] = await Promise.all([
+        // GPT-6 Sol target
+        evaluation.withTarget("gpt-6-sol", { model: "openai/gpt-6-sol" }, async () => {
+          const response = await simulateGptSol(item.question);
 
           // Log quality score - target and index are auto-inferred from context!
           evaluation.log("response_quality", { score: 0.9 });
@@ -89,9 +89,9 @@ const main = async () => {
           return response;
         }),
 
-        // GPT-3.5 target
-        evaluation.withTarget("gpt-3.5-turbo", { model: "openai/gpt-3.5-turbo" }, async () => {
-          const response = await simulateGPT35(item.question);
+        // GPT-6 Luna target
+        evaluation.withTarget("gpt-6-luna", { model: "openai/gpt-6-luna" }, async () => {
+          const response = await simulateGptLuna(item.question);
           evaluation.log("response_quality", { score: 0.75 });
           return response;
         }),
@@ -105,8 +105,8 @@ const main = async () => {
       ]);
 
       // Log summary
-      console.log(`  GPT-4: ${gpt4Result.duration}ms`);
-      console.log(`  GPT-3.5: ${gpt35Result.duration}ms`);
+      console.log(`  GPT-6 Sol: ${gptSolResult.duration}ms`);
+      console.log(`  GPT-6 Luna: ${gptLunaResult.duration}ms`);
       console.log(`  Claude: ${claudeResult.duration}ms`);
     },
     { concurrency: 2 }, // Process 2 dataset items at a time

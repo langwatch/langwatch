@@ -80,6 +80,16 @@ export const MODEL_PROVIDER_FIELD_METADATA: Record<
       description:
         "Optional: used when calling through your Azure API Management gateway. It is ignored when your traffic routes through the LangWatch AI Gateway, which sets its own version.",
     },
+    AZURE_OPENAI_DECISIONS_DEPLOYMENT: {
+      label: "Decisions Deployment",
+      description:
+        "Optional: your gpt-6-luna deployment name, for Instant Evals. Leave empty if the deployment is named gpt-6-luna.",
+    },
+    AZURE_DECISION_1_DEPLOYMENT: {
+      label: "Microsoft Decision 1 Deployment",
+      description:
+        "Optional: your Microsoft Decision 1 deployment name on Azure AI Foundry, for Instant Evals. Leave empty if it keeps the model's name.",
+    },
   },
   bedrock: {
     AWS_ACCESS_KEY_ID: {
@@ -132,6 +142,12 @@ export const MODEL_PROVIDER_FIELD_METADATA: Record<
     CEREBRAS_API_KEY: {
       label: "API Key",
       description: "Your Cerebras API key from cloud.cerebras.ai",
+    },
+  },
+  doubleword: {
+    DOUBLEWORD_API_KEY: {
+      label: "API Key",
+      description: "An inference API key from app.doubleword.ai/api-keys",
     },
   },
   custom: {

@@ -14,6 +14,7 @@ import {
   planIssue,
   renderDashboard,
   renderMarkdown,
+  renderProgramTrends,
 } from "../codebase-health.mjs";
 
 function health({
@@ -281,15 +282,16 @@ void describe("the UI bundle", () => {
 void describe("the dashboard", () => {
   const issues = [{ number: 5, title: "Codebase health: x", url: "https://example/5" }];
 
-  /** @scenario "The dashboard shows tonight, last night and a week ago" */
-  void it("has a row per metric with both changes and the breach links", () => {
+  /** @scenario "The dashboard shows tonight, last night, a week ago and a month ago" */
+  void it("has a row per metric with three changes and the breach links", () => {
     const body = renderDashboard({
       current: health({ depth: 20 }),
       previous: health({ depth: 10 }),
       weekAgo: health({ depth: 40 }),
+      monthAgo: health({ depth: 16 }),
       breachIssues: issues,
     });
-    assert.match(body, /\| reference chain depth \| 20 \| 100\.0% \| -50\.0% \|/);
+    assert.match(body, /\| reference chain depth \| 20 \| 100\.0% \| -50\.0% \| 25\.0% \|/);
     assert.match(body, /https:\/\/example\/5/);
   });
 
@@ -301,7 +303,7 @@ void describe("the dashboard", () => {
       weekAgo: null,
       breachIssues: [],
     });
-    assert.match(body, /\| reference chain depth \| 17 \| n\/a \| n\/a \|/);
+    assert.match(body, /\| reference chain depth \| 17 \| n\/a \| n\/a \| n\/a \|/);
     assert.match(body, /None\./);
   });
 
@@ -311,7 +313,66 @@ void describe("the dashboard", () => {
     assert.deepEqual(planDashboard({ openIssues: [7], body: "b" }), {
       kind: "edit",
       issue: 7,
+      title: "Nightly dashboard",
       body: "b",
     });
+  });
+});
+
+void describe("typecheck trends", () => {
+  const program = (overrides) => ({
+    config: "apps/api/tsconfig.json",
+    instantiations: 1_000_000,
+    types: 50_000,
+    symbols: 80_000,
+    checkTime: 10,
+    memoryUsed: 2_048_000,
+    hotFiles: [["apps/api/src/router.ts", 900]],
+    hotRelations: [
+      { ms: 120.5, source: "Router<A> (apps/api/src/router.ts:3)", target: "AnyRouter" },
+    ],
+    hotGenerics: [],
+    ...overrides,
+  });
+  const night = (overrides) =>
+    buildHealth({
+      date: "2026-10-10",
+      commit: "0123456789abcdef",
+      programs: [program(overrides)],
+      chain: { depth: 1, path: [] },
+      declarations: [],
+      architecture: {},
+      typecheck: { wallSeconds: 1, peakRssKb: 1 },
+    });
+
+  /** @scenario "Each program records instantiations, check time, memory, types and symbols" */
+  void it("keeps every measured number and the hot spots per program", () => {
+    const [kept] = night().instantiations.programs;
+    assert.equal(kept.instantiations, 1_000_000);
+    assert.equal(kept.symbols, 80_000);
+    assert.equal(kept.types, 50_000);
+    assert.equal(kept.checkTime, 10);
+    assert.equal(kept.memoryUsed, 2_048_000);
+    assert.deepEqual(kept.hotFiles, [["apps/api/src/router.ts", 900]]);
+    assert.equal(kept.hotRelations[0].target, "AnyRouter");
+  });
+
+  /** @scenario "Each program is compared with itself 1, 7 and 30 days ago" */
+  void it("shows each program's change against three older nights and its hot spots", () => {
+    const body = renderProgramTrends({
+      current: night({ instantiations: 1_200_000, checkTime: 12 }),
+      previous: night({ instantiations: 1_000_000, checkTime: 12 }),
+      weekAgo: night({ instantiations: 600_000, checkTime: 6 }),
+      monthAgo: null,
+    });
+    assert.match(
+      body,
+      /\| apps\/api\/tsconfig\.json \| 1200000 \| 20\.0% \| 100\.0% \| n\/a \| 12 \| 0\.0% \| 100\.0% \| n\/a \| 2000 \| n\/a \| 50000 \| 80000 \|/,
+    );
+    assert.match(body, /file `apps\/api\/src\/router\.ts` 900 ms/);
+    assert.match(
+      body,
+      /relation `Router<A> \(apps\/api\/src\/router\.ts:3\)` to `AnyRouter` 120\.5 ms/,
+    );
   });
 });

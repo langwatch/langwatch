@@ -41,18 +41,36 @@ async function serverFor<Client extends RoutableStatementClient>(
   return request.tenantId === "" ? connection.shared() : connection.resolve(request.tenantId);
 }
 
+/** Whether an insert's `async_insert` turns async off: the one rule both insert paths use. */
+export function turnsAsyncInsertOff(value: unknown): boolean {
+  if (typeof value !== "string" && typeof value !== "number" && typeof value !== "boolean") {
+    return false;
+  }
+  const text = String(value).trim().toLowerCase();
+  return text === "0" || text === "false";
+}
+
+export const VIEW_DEDUP = { deduplicate_blocks_in_dependent_materialized_views: 1 } as const;
+
+/**
+ * Only a statement that turns `async_insert` off keeps its view blocks with its dedup: a server
+ * profile may make any other insert async, and ClickHouse refuses this setting there (Code 344).
+ */
+export function insertSettings(
+  settings: Record<string, string | number> | undefined,
+): Record<string, string | number> {
+  if (!turnsAsyncInsertOff(settings?.async_insert)) return { ...settings };
+  return { ...VIEW_DEDUP, ...settings };
+}
+
 function insertParams(request: InsertRequest): Record<string, unknown> {
-  const params: Record<string, unknown> = {
+  return {
     table: request.table,
     values: request.rows,
+    ...(request.columns === undefined ? {} : { columns: [...request.columns] }),
     format: "JSONEachRow",
+    clickhouse_settings: insertSettings(request.settings),
   };
-
-  if (request.settings !== undefined) {
-    params.clickhouse_settings = request.settings;
-  }
-
-  return params;
 }
 
 function queryParams(request: QueryRequest): Record<string, unknown> {
@@ -73,6 +91,35 @@ function queryParams(request: QueryRequest): Record<string, unknown> {
   }
 
   return params;
+}
+
+/**
+ * ClickHouse cancels a query whose client went away only when the query is read-only, and a POST
+ * is read-only only under `readonly` 1 or 2. Every routed read carries both, so a read the app
+ * abandons stops on the server (ADR-197).
+ */
+export const CANCELLED_ON_CLIENT_CLOSE = {
+  readonly: "2",
+  cancel_http_readonly_queries_on_client_close: "1",
+} as const;
+
+/** A read's settings: the caller's, read-only and cancelled on client close, whatever it set. */
+export function readSettings(
+  settings: Record<string, string | number> | undefined,
+): Record<string, string | number> {
+  return { ...settings, ...CANCELLED_ON_CLIENT_CLOSE };
+}
+
+/** One read, sent with the cancellation settings over the caller's own. */
+function sendRead<Client extends RoutableStatementClient>(
+  vendor: Client,
+  request: QueryRequest,
+): ReturnType<RoutableStatementClient["query"]> {
+  return vendor.query({
+    ...queryParams(request),
+    clickhouse_settings: readSettings(request.settings),
+    format: "JSONEachRow",
+  });
 }
 
 /**
@@ -162,7 +209,7 @@ export function routingDriver<Client extends RoutableStatementClient>(
 
       const started = nowInstant().epochMilliseconds;
       const rows = await onTarget(connection, vendor, async () => {
-        const resultSet = await vendor.query({ ...queryParams(request), format: "JSONEachRow" });
+        const resultSet = await sendRead(vendor, request);
         const read = (await resultSet.json()) as Row[];
         refuseInbandException(read);
         return read;
@@ -173,7 +220,7 @@ export function routingDriver<Client extends RoutableStatementClient>(
     async *stream<Row>(request: QueryRequest): AsyncGenerator<Row[]> {
       const vendor = await serverFor(connection, request);
       try {
-        const resultSet = await vendor.query({ ...queryParams(request), format: "JSONEachRow" });
+        const resultSet = await sendRead(vendor, request);
         for await (const batch of resultSet.stream<Row>()) {
           const rows = batch.map((row) => row.json());
           refuseInbandException(rows);

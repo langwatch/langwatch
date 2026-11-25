@@ -1,11 +1,8 @@
-import type { FilterField, AggregationTypes } from "@langwatch/analytics-contract";
+import type { AggregationTypes } from "@langwatch/analytics-contract";
 import { TIME_PARTITIONED_TABLES } from "@langwatch/clickhouse-client";
 import { describe, expect, it } from "vitest";
 
-import {
-  buildDataForFilterQuery,
-  buildTimeseriesQuery,
-} from "../clickhouse.aggregation-builder.mapper.ts";
+import { buildTimeseriesQuery } from "../clickhouse.aggregation-builder.mapper.ts";
 import { resetParamCounter } from "../clickhouse.filter-translator.mapper.ts";
 
 /**
@@ -240,34 +237,6 @@ describe("analytics JOIN time bounds", () => {
     });
   });
 
-  describe("given a filter-values query over evaluation_runs", () => {
-    /**
-     * @scenario Filter-value queries bound evaluation_runs on its own partition column
-     */
-    it("bounds each joined table only on its own partition column", () => {
-      const violations: string[] = [];
-
-      for (const field of [
-        "evaluations.evaluator_id",
-        "evaluations.evaluator_id.guardrails_only",
-      ] as FilterField[]) {
-        resetParamCounter();
-        const { sql } = buildDataForFilterQuery({
-          projectId: baseInput.projectId,
-          field,
-          startDate: baseInput.startDate,
-          endDate: baseInput.endDate,
-        });
-        violations.push(
-          ...missingJoinViolations(sql, "evaluation_runs"),
-          ...partitionBoundViolations(sql),
-        );
-      }
-
-      expect(violations).toEqual([]);
-    });
-  });
-
   describe("given an evaluation_runs bound qualified with the table's own name", () => {
     /** @scenario Bounds qualified with the bounded table's own name are inspected, not skipped */
     it("sees both evaluation_runs bounds and allows the legacy one", () => {
@@ -321,17 +290,17 @@ describe("analytics JOIN time bounds", () => {
     });
   });
 
-  describe("given a query that joins stored_spans", () => {
+  describe("given a timeseries query filtered by a stored_spans subquery", () => {
     /**
      * @scenario The guard is non-vacuous: stored_spans really is bounded, on StartTime
      */
     it("bounds stored_spans on StartTime", () => {
       resetParamCounter();
-      const { sql } = buildDataForFilterQuery({
-        projectId: baseInput.projectId,
-        field: "spans.model" as FilterField,
-        startDate: baseInput.startDate,
-        endDate: baseInput.endDate,
+      const { sql } = buildTimeseriesQuery({
+        ...baseInput,
+        timeScale: "full" as const,
+        series: [COST_SERIES],
+        filters: { "spans.model": ["gpt-5-mini"] },
       });
 
       expect(missingJoinViolations(sql, "stored_spans")).toEqual([]);

@@ -10,6 +10,7 @@ import {
 import { createLogger } from "@langwatch/observability";
 import { nowInstant, toDate } from "@langwatch/time";
 
+import type { LangyDeleteConfirmationRepository } from "../../../repositories/langy-delete-confirmation.repository.ts";
 import type { LangySessionKeyRepository } from "../../../repositories/langy-session-key.repository.ts";
 
 /** Counts minted/revoked/reaped as one series with operation labels so dashboards read
@@ -31,7 +32,15 @@ type LangySessionKeyMintInput = {
   organizationId: string;
   /** Absent means `full`. */
   ceiling?: LangySessionKeyCeiling;
+  /**
+   * The conversation the key works for, and its turn when known. A delete the key asks for
+   * shows its confirmation card there; a key minted with none can delete nothing.
+   */
+  conversation?: { id: string; turnId?: string };
 };
+
+/** Where a minted key's conversation is written, so a delete it asks for can show its card. */
+type LangySessionKeyBindings = Pick<LangyDeleteConfirmationRepository, "saveKeyBinding">;
 
 /** Mints and revokes the restricted worker session credential. */
 export abstract class LangySessionKey {
@@ -77,18 +86,21 @@ export class LangySessionKeyService extends LangySessionKey {
   private readonly apiKeys: ApiKeyApi;
   private readonly authz: Pick<AuthzApi, "effectivePermissions">;
   private readonly metrics: LangySessionKeyMetrics;
+  private readonly bindings: LangySessionKeyBindings | undefined;
 
   private constructor(input: {
     repository: LangySessionKeyRepository;
     apiKeys: ApiKeyApi;
     authz: Pick<AuthzApi, "effectivePermissions">;
     metrics: LangySessionKeyMetrics;
+    bindings?: LangySessionKeyBindings;
   }) {
     super();
     this.repository = input.repository;
     this.apiKeys = input.apiKeys;
     this.authz = input.authz;
     this.metrics = input.metrics;
+    this.bindings = input.bindings;
   }
 
   static create(input: {
@@ -96,6 +108,7 @@ export class LangySessionKeyService extends LangySessionKey {
     apiKeys: ApiKeyApi;
     authz: Pick<AuthzApi, "effectivePermissions">;
     metrics: LangySessionKeyMetrics;
+    bindings?: LangySessionKeyBindings;
   }): LangySessionKeyService {
     return new LangySessionKeyService(input);
   }
@@ -141,6 +154,17 @@ export class LangySessionKeyService extends LangySessionKey {
       expiresAt: toDate(nowInstant().add({ milliseconds: sessionKeyLifetimeMs })),
     });
     this.metrics.record({ operation: "minted" });
+    if (input.conversation && this.bindings) {
+      await this.bindings.saveKeyBinding({
+        apiKeyId: result.apiKey.id,
+        binding: {
+          projectId: input.projectId,
+          conversationId: input.conversation.id,
+          ...(input.conversation.turnId ? { turnId: input.conversation.turnId } : {}),
+        },
+        ttlSeconds: Math.ceil(sessionKeyLifetimeMs / 1000),
+      });
+    }
 
     return { token: result.token, apiKeyId: result.apiKey.id };
   }
@@ -149,11 +173,13 @@ export class LangySessionKeyService extends LangySessionKey {
     userId: string;
     projectId: string;
     organizationId: string;
+    conversation?: { id: string; turnId?: string };
   }): Promise<{ token: string; apiKeyId: string }> {
     return this.mint({
       session: { user: { id: input.userId } },
       projectId: input.projectId,
       organizationId: input.organizationId,
+      ...(input.conversation ? { conversation: input.conversation } : {}),
     });
   }
 

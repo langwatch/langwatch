@@ -4,7 +4,12 @@
  * @see specs/platform/process-installation.feature
  */
 import type { FeatureRestHost } from "@langwatch/api";
-import { RestHost } from "@langwatch/api/rest";
+import {
+  bindMiddlewareContext,
+  callerAddressContext,
+  callerAddressOfRequest,
+  RestHost,
+} from "@langwatch/api/rest";
 import { AuditLogApi } from "@langwatch/audit-log-contract";
 import { AuthApi } from "@langwatch/auth-contract";
 import { AutomationApi } from "@langwatch/automation-contract";
@@ -334,6 +339,8 @@ describe("the api process installation", () => {
         },
         bearers: () => closed,
         audit: { record: async () => {} },
+        // What the governance module provides when installed; this host mounts the family bare.
+        middlewareContext: [bindMiddlewareContext(callerAddressContext, callerAddressOfRequest)],
       });
       const isIngest = (transport: { protocol: string; namespace?: string }) =>
         transport.protocol === "rest" && transport.namespace === "ingest";

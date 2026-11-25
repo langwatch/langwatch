@@ -468,6 +468,25 @@ Feature: Automation ownership
     Then analytics is asked with only the series' query fields, and the evaluation runs
 
   @unit
+  Scenario: A graph alert on a chart that stored its time scale as text still evaluates
+    Given a graph alert on a saved chart whose time scale was stored as the text "60"
+    When the alert is evaluated
+    Then analytics is asked with a 60-minute bucket, which its input schema accepts
+
+  @unit
+  Scenario: A graph alert on a chart saved without a time scale queries hourly
+    Given a graph alert on a saved chart whose stored time scale is empty
+    When the alert is evaluated
+    Then analytics is asked with a 60-minute bucket, as every other chart reader does
+
+  @unit
+  Scenario: A graph alert on a chart with an unreadable time scale is skipped as incomplete
+    Given a graph alert on a saved chart whose time scale is neither "full" nor a number of minutes
+    When the alert is evaluated
+    Then the evaluation is skipped as an incomplete configuration, recorded on the trigger
+    And no analytics query is attempted, so nothing fails and nothing is redelivered
+
+  @unit
   Scenario: A graph alert whose delivery fails retryably is sent again on the retry
     Given a graph alert crossed its threshold and its delivery failed with a retryable error
     When the evaluation is retried

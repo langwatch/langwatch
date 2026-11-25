@@ -5,6 +5,7 @@ import chalk from "chalk";
 
 import {
   saveConfig,
+  warnUnsavedCredential,
   isLoggedIn,
   loadConfig,
   type GovernanceConfig,
@@ -164,9 +165,9 @@ async function resolveCopilotAppKey(
           [sourceType]: { secret: resolved.token },
         },
       });
-    } catch {
-      // The agent env below still carries the key; only the cache write failed.
-      void 0;
+    } catch (error) {
+      // The agent env below still carries the key; the mint checked the config was writable.
+      warnUnsavedCredential(`the ${sourceType} ingest key`, error);
     }
   }
   return { token: resolved.token, endpoint: resolved.endpoint };

@@ -59,13 +59,23 @@ const SSE_ACCESS = handlerManagedAuth({
 });
 
 export class SseLane {
-  static create(options: { members: SseSubscriptionMembers; logger?: Logged }): SseLane {
-    return new SseLane(options.members, options.logger ?? createLogger("langwatch:api:sse"));
+  /** `plainHttp`: the deployment is served without TLS (`BrowserOriginGuard.isOwnEventStream`). */
+  static create(options: {
+    members: SseSubscriptionMembers;
+    logger?: Logged;
+    plainHttp?: boolean;
+  }): SseLane {
+    return new SseLane(
+      options.members,
+      options.logger ?? createLogger("langwatch:api:sse"),
+      options.plainHttp === true,
+    );
   }
 
   private constructor(
     private readonly members: SseSubscriptionMembers,
     private readonly logger: Logged,
+    private readonly plainHttp: boolean,
   ) {
     // The one statement of this lane's access, so the authorization audit and
     // the document generator read the same policy a declared family publishes.
@@ -88,7 +98,7 @@ export class SseLane {
     // cross-site top-level GET as well.
     const header = (name: string) => raw.headers.get(name) ?? undefined;
 
-    if (!BrowserOriginGuard.isFromOwnOrigin({ req: { header } })) {
+    if (!BrowserOriginGuard.isOwnEventStream({ req: { header } }, { plainHttp: this.plainHttp })) {
       throw new LiveStreamCrossSiteBlockedError();
     }
 
@@ -378,8 +388,8 @@ function subscriptionPathOf(url: URL): string {
 
 /**
  * Stream-failure logging, same fault-axis rule as the tRPC and REST request
- * loggers: customer-fault handled errors warn (spike-watched), platform /
- * provider and unhandled errors log at error.
+ * loggers: customer-fault handled errors and access refusals warn
+ * (spike-watched), platform / provider and unhandled errors log at error.
  */
 function logStreamFailure({
   logger,
@@ -393,7 +403,8 @@ function logStreamFailure({
   msg: string;
 }) {
   const handled = handledCauseOf(err);
-  const level = handled && handled.fault === "customer" ? "warn" : "error";
+  const quiet = handled ? handled.fault === "customer" : isAccessRefusal(err);
+  const level = quiet ? "warn" : "error";
 
   logger[level](
     {
@@ -402,6 +413,15 @@ function logStreamFailure({
     },
     msg,
   );
+}
+
+/**
+ * A bare UNAUTHORIZED or FORBIDDEN with no handled cause is the access policy
+ * refusing the subscriber (signed out, or not a member), answered to the
+ * caller and no fault of ours.
+ */
+function isAccessRefusal(err: unknown): boolean {
+  return err instanceof TRPCError && (err.code === "UNAUTHORIZED" || err.code === "FORBIDDEN");
 }
 
 function isAsyncIterable(value: unknown): value is AsyncIterable<unknown> {

@@ -22,11 +22,13 @@ export class MemoryTraceSpanDedupRepository extends TraceSpanDedupRepository {
     super();
   }
 
-  async claimProcessing(span: SpanDedupRef): Promise<SpanDedupClaim> {
-    const key = dedupKey(span);
-    if (this.#claims.has(key)) return { outcome: "held" };
-    this.#claims.add(key);
-    return { outcome: "acquired" };
+  async claimProcessing(spans: readonly SpanDedupRef[]): Promise<SpanDedupClaim[]> {
+    return spans.map((span) => {
+      const key = dedupKey(span);
+      if (this.#claims.has(key)) return { outcome: "held" };
+      this.#claims.add(key);
+      return { outcome: "acquired" };
+    });
   }
 
   async confirmProcessed(): Promise<void> {}

@@ -5,10 +5,12 @@
  */
 
 import type { WireOf } from "@langwatch/api/web";
-import type {
-  ModelDefaultConfigSnapshot as StoredModelDefaultConfigSnapshot,
-  ModelDefaultEffective,
-  ModelProviderScopeType,
+import {
+  UNSET_ROLE_FALLBACK,
+  type ModelDefaultConfigSnapshot as StoredModelDefaultConfigSnapshot,
+  type ModelDefaultEffective,
+  type ModelProviderScopeType,
+  type ModelRole,
 } from "@langwatch/model-provider-contract";
 
 /** A saved default as the browser holds one: its instants are ISO strings. */
@@ -18,15 +20,14 @@ import { toEpochMs } from "@langwatch/time";
 import type { ScopeHierarchy } from "./provider-scope-filter.ts";
 import { scopeBreadthRank } from "./scope-breadth.ts";
 
-/** The four role columns, in the order the table reads them. */
-export const MODEL_ROLES = ["DEFAULT", "FAST", "LANGY", "EMBEDDINGS"] as const;
-export type ModelRoleKey = (typeof MODEL_ROLES)[number];
-
-export const MODEL_ROLE_LABEL: Record<ModelRoleKey, string> = {
+/** Each role column's header; the columns and their order are the contract's `MODEL_ROLES`. */
+export const MODEL_ROLE_LABEL: Record<ModelRole, string> = {
   DEFAULT: "Default",
   FAST: "Fast",
   LANGY: "Langy",
   EMBEDDINGS: "Embeddings",
+  INSTANT_EVALS: "Instant Evals",
+  JUDGE: "Judge",
 };
 
 /** One tier of the cascade: a scope type and the id of the scope at that tier. */
@@ -134,4 +135,27 @@ export function resolveAtScope({
     }
   }
   return null;
+}
+
+/**
+ * A role column's cell at one scope: the role's own cascade, else its fallback role's
+ * (JUDGE reads DEFAULT), flagged `inherited` so the cell renders it faded.
+ */
+export function resolveRoleAtScope({
+  role,
+  configs,
+  anchor,
+  hierarchy,
+}: {
+  role: ModelRole;
+  configs: readonly ModelDefaultConfigSnapshot[];
+  anchor: AnchorScope;
+  hierarchy: ScopeHierarchy;
+}): { model: string; inherited: boolean } | null {
+  const own = resolveAtScope({ key: role, configs, anchor, hierarchy });
+  if (own) return { model: own.model, inherited: false };
+  const fallback = UNSET_ROLE_FALLBACK[role];
+  if (!fallback) return null;
+  const borrowed = resolveAtScope({ key: fallback, configs, anchor, hierarchy });
+  return borrowed ? { model: borrowed.model, inherited: true } : null;
 }

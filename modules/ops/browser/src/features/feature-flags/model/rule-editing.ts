@@ -1,5 +1,5 @@
 import type { FeatureFlagRuleMatch, FeatureFlagRules } from "@langwatch/feature-flag-contract";
-import { emailDomainsOf } from "@langwatch/feature-flag-contract";
+import { emailDomainsOf, projectIdsOf, userIdsOf } from "@langwatch/feature-flag-contract";
 import { toEpochMs, readableDate } from "@langwatch/time";
 
 /**
@@ -16,7 +16,9 @@ export type ScopeKind =
   /** A stable share of users, in percent — shown as "Percentage of users". */
   | "PERCENTAGE"
   /** Signed-in users at one or more email domains — shown as "Email domain". */
-  | "EMAIL_DOMAIN";
+  | "EMAIL_DOMAIN"
+  /** Signed-in users named by id — shown as "User". */
+  | "USER";
 
 export interface UIRule {
   /**
@@ -27,8 +29,8 @@ export interface UIRule {
   id: string;
   scopeKind: ScopeKind;
   /**
-   * An organization or project id, a date for `NEW_USERS`, a percent for
-   * `PERCENTAGE`, or comma-separated domains for `EMAIL_DOMAIN`.
+   * An organization id, comma-separated project ids for `PROJECT` (user ids for `USER`), a date for
+   * `NEW_USERS`, a percent for `PERCENTAGE`, or comma-separated domains for `EMAIL_DOMAIN`.
    */
   target: string;
   enabled: boolean;
@@ -72,12 +74,20 @@ export function rulesToUI(rules: FeatureFlagRules): UIRule[] {
         otherConditions: without({ match: rule.match, key: "organizationId" }),
       };
     }
-    if (rule.match.projectId) {
+    if (projectIdsOf(rule.match.projectId).length > 0) {
       return {
         ...base,
         scopeKind: "PROJECT" as const,
-        target: rule.match.projectId,
+        target: projectIdsOf(rule.match.projectId).join(", "),
         otherConditions: without({ match: rule.match, key: "projectId" }),
+      };
+    }
+    if (userIdsOf(rule.match.userId).length > 0) {
+      return {
+        ...base,
+        scopeKind: "USER" as const,
+        target: userIdsOf(rule.match.userId).join(", "),
+        otherConditions: without({ match: rule.match, key: "userId" }),
       };
     }
     if (rule.match.organizationCreatedAfter) {
@@ -119,7 +129,16 @@ export function uiToRules(rules: UIRule[]): FeatureFlagRules {
       return { match: { ...rest, organizationId: target }, enabled: rule.enabled };
     }
     if (rule.scopeKind === "PROJECT") {
-      return { match: { ...rest, projectId: target }, enabled: rule.enabled };
+      return {
+        match: { ...rest, projectId: singleOrList(parseTargetIds(target)) },
+        enabled: rule.enabled,
+      };
+    }
+    if (rule.scopeKind === "USER") {
+      return {
+        match: { ...rest, userId: singleOrList(parseTargetIds(target)) },
+        enabled: rule.enabled,
+      };
     }
     if (rule.scopeKind === "NEW_USERS") {
       return { match: { ...rest, organizationCreatedAfter: target }, enabled: rule.enabled };
@@ -146,10 +165,18 @@ export function parseEmailDomains(target: string): string[] {
     .filter((domain) => domain !== "");
 }
 
-/** One domain is stored as a string, several as a list. */
-function singleOrList(domains: string[]): string | string[] {
-  const [only] = domains;
-  return domains.length === 1 && only !== undefined ? only : domains;
+/** Ids held in the field, project or user: split on commas, unpadded, empties dropped. */
+export function parseTargetIds(target: string): string[] {
+  return target
+    .split(",")
+    .map((id) => id.trim())
+    .filter((id) => id !== "");
+}
+
+/** One domain or project id is stored as a string, several as a list. */
+function singleOrList(values: string[]): string | string[] {
+  const [only] = values;
+  return values.length === 1 && only !== undefined ? only : values;
 }
 
 /** The rule's other conditions: its match without the one the scope owns. */
@@ -203,6 +230,9 @@ export function findUnfillableRule(rules: UIRule[]): UIRule | undefined {
     if (target === "") return true;
     if (rule.scopeKind === "PERCENTAGE") return !isPercentage(target);
     if (rule.scopeKind === "EMAIL_DOMAIN") return !areEmailDomains(target);
+    if (rule.scopeKind === "PROJECT" || rule.scopeKind === "USER") {
+      return parseTargetIds(target).length === 0;
+    }
     return false;
   });
 }

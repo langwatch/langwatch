@@ -1,10 +1,11 @@
 /**
  * Slim SQL builder for `evaluation_analytics` (ADR-034 Phase 6); `pickAnalyticsTable` routes
- * here and an unsupported shape throws. Every query leads with `TenantId = {tenantId:String}`,
- * filters on `OccurredAt` and dedups with `latestVersionSubquery`.
+ * here and an unsupported shape throws. Every query is fenced on `OccurredAt` by the proof's
+ * `tenantScope` marker and dedups with `latestVersionSubquery`.
  */
 
 import type { AnalyticsAggregation, BuiltAnalyticsQuery } from "@langwatch/analytics-contract";
+import { tenantScope, tenantSet } from "@langwatch/clickhouse-client";
 
 import type { TimeseriesQueryInput } from "./clickhouse.aggregation-builder.mapper.ts";
 import { latestVersionSubquery } from "./clickhouse.latest-version-dedup.mapper.ts";
@@ -141,7 +142,7 @@ function dedupedSlim({
     alias,
     keyColumns,
     columns: columns.map((name) => ({ name })),
-    where: `TenantId = {tenantId:String} ${dateClause}`,
+    where: `${tenantScope("OccurredAt")} ${dateClause}`,
   });
 }
 
@@ -176,12 +177,12 @@ export function buildEvalSlimTimeseriesQuery(input: TimeseriesQueryInput): Built
   const selectExprs: string[] = [];
   selectExprs.push(
     `CASE
-      WHEN ${ea}.OccurredAt >= {currentStart:DateTime64(3)} AND ${ea}.OccurredAt < {currentEnd:DateTime64(3)} THEN 'current'
-      WHEN ${ea}.OccurredAt >= {previousStart:DateTime64(3)} AND ${ea}.OccurredAt < {previousEnd:DateTime64(3)} THEN 'previous'
+      WHEN ${ea}.LatestOccurredAt >= {currentStart:DateTime64(3)} AND ${ea}.LatestOccurredAt < {currentEnd:DateTime64(3)} THEN 'current'
+      WHEN ${ea}.LatestOccurredAt >= {previousStart:DateTime64(3)} AND ${ea}.LatestOccurredAt < {previousEnd:DateTime64(3)} THEN 'previous'
     END AS period`,
   );
   if (typeof input.timeScale === "number") {
-    selectExprs.push(`${dateTrunc(`${ea}.OccurredAt`, input.timeScale, timeZone)} AS date`);
+    selectExprs.push(`${dateTrunc(`${ea}.LatestOccurredAt`, input.timeScale, timeZone)} AS date`);
   }
 
   const groupByColumn = buildEvalSlimGroupByExpression(input.groupBy);
@@ -229,10 +230,8 @@ export function buildEvalSlimTimeseriesQuery(input: TimeseriesQueryInput): Built
 
   const havingClause = groupByColumn ? `HAVING group_key != ''` : "";
 
-  // Outer WHERE is wrapped in one enclosing paren: `dedupedSlim`'s own
-  // tenant predicate sits one bracket deep already, so this OR (and any
-  // filter clause) must nest deeper still to stay outside the tenant guard's
-  // reach — see the matching note on `baseWhere` in aggregation-builder.mapper.ts.
+  // The windowed fence sits inside dedupedSlim; the outer read takes the tenant set alone, since
+  // its time leaves the dedup as LatestOccurredAt (ADR-201 §3). Every OR nests below the fence.
   const sql = `
     SELECT
       ${selectExprs.join(",\n      ")}
@@ -241,13 +240,13 @@ export function buildEvalSlimTimeseriesQuery(input: TimeseriesQueryInput): Built
       dateClause: SLIM_DATE_FILTER_BOTH_PERIODS,
       expressions: selectExprs,
     })}
-    WHERE (${ea}.TenantId = {tenantId:String}
+    WHERE ${tenantSet()}
       AND (
-        (${ea}.OccurredAt >= {currentStart:DateTime64(3)} AND ${ea}.OccurredAt < {currentEnd:DateTime64(3)})
+        (${ea}.LatestOccurredAt >= {currentStart:DateTime64(3)} AND ${ea}.LatestOccurredAt < {currentEnd:DateTime64(3)})
         OR
-        (${ea}.OccurredAt >= {previousStart:DateTime64(3)} AND ${ea}.OccurredAt < {previousEnd:DateTime64(3)})
+        (${ea}.LatestOccurredAt >= {previousStart:DateTime64(3)} AND ${ea}.LatestOccurredAt < {previousEnd:DateTime64(3)})
       )
-      ${filterWhere})
+      ${filterWhere}
     GROUP BY ${groupByExprs.join(", ")}
     ${havingClause}
     ORDER BY period${typeof input.timeScale === "number" ? ", date" : ""}
@@ -256,7 +255,6 @@ export function buildEvalSlimTimeseriesQuery(input: TimeseriesQueryInput): Built
   return {
     sql,
     params: {
-      tenantId: input.projectId,
       currentStart: input.startDate,
       currentEnd: input.endDate,
       previousStart: input.previousPeriodStartDate,

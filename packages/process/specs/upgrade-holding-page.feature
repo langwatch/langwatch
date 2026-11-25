@@ -48,6 +48,13 @@ Feature: The liveness door holds nothing while an upgrade runs
     Then a request is proxied to the main thread again
 
   @unit
+  Scenario: The door forwards to a new loopback port once told
+    Given the liveness thread forwards to one loopback listener
+    When it is told to forward to another loopback port
+    Then later requests and WebSocket upgrades reach the new listener
+    And the first listener sees none of them
+
+  @unit
   Scenario: A request that arrives while the runtime starts reaches its handler only once it has started
     Given a component ahead of the api's runtime is still starting
     When a request reaches the main thread

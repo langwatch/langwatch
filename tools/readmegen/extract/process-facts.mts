@@ -44,6 +44,8 @@ export type RestFamily = {
   name: string;
   namespace: Scalar;
   version: Scalar;
+  /** Set by `.withSupersededAt`: the family answers only its own dates, no latest or bare path. */
+  supersededAt: Scalar | null;
   addressing: string;
   v1Twin: boolean;
   generation: string;
@@ -276,8 +278,9 @@ function gateOf({ link, ...scope }: Scope & { link: Link }): Gate {
     ? foldList({ expression: value, ...scope })
     : [scalar({ expression: value, ...scope })];
   const resolved = permissions.every((item) => item.resolved);
+  // A named array is asked whole (AND); "any of" is the object form, `kind: "permission-any"`.
   const detail = resolved
-    ? permissions.map((item) => item.value).join(" or ")
+    ? permissions.map((item) => item.value).join(" and ")
     : textOf({ node: value, source: scope.source });
   const target = second ? propertyString({ expression: second, name: "at", ...scope }) : "";
 
@@ -344,6 +347,8 @@ function familyLink({ family, link, ...scope }: Scope & { family: RestFamily; li
   const [first, options] = link.args;
   if (link.name === "withNamespace") family.namespace = scalar({ expression: first, ...scope });
   if (link.name === "withVersion") family.version = scalar({ expression: first, ...scope });
+  if (link.name === "withSupersededAt")
+    family.supersededAt = scalar({ expression: first, ...scope });
   if (link.name === "withCredential") family.credential = stringOf({ expression: first, ...scope });
   if (link.name === "withDeprecated") family.deprecated = true;
   if (link.name !== "withAddressing") return;
@@ -378,6 +383,7 @@ function readRest({ root, ...scope }: Scope & { root: ts.CallExpression }): Rest
     name: holderName(root),
     namespace: empty,
     version: empty,
+    supersededAt: null,
     addressing: "dated",
     v1Twin: true,
     generation: "v1",

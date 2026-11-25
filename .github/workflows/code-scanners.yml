@@ -37,10 +37,9 @@ permissions:
 
 concurrency:
   group: code-scanners-${{ github.ref }}
-  # Supersede an outdated run on a PR branch, never on main: every commit
-  # that lands on main has to keep its own validation, and cancelling here
-  # would let a merge silently void the run for the commit before it.
-  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+  # A newer commit supersedes an older run, on main too: the newest verdict
+  # covers the commits before it. Image and release builds keep their own rule.
+  cancel-in-progress: true
 
 jobs:
   # Gate for the two DEPENDENCY scanners only. gitleaks, trufflehog and
@@ -67,6 +66,13 @@ jobs:
           # dorny/paths-filter lists the PR's paths from git trees; nothing
           # here touches the working tree.
           sparse-checkout: .github
+      # dorny diffs a pull request from the event's base commit, which can be
+      # older than the main this merge commit is built on, and so counts main's
+      # newer commits as changed. Diff from the merge commit's first parent.
+      - name: Diff from the main the merge commit is built on
+        if: github.event_name == 'pull_request'
+        id: diff-base
+        run: bash "$GITHUB_WORKSPACE/.github/scripts/pull-request-diff-base.sh" >> "$GITHUB_OUTPUT"
       - uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
         if: github.event_name == 'pull_request'
         id: filter
@@ -74,6 +80,7 @@ jobs:
           # Empty: diff with git, never the files API, which stops at 3,000
           # files (specs/ci/path-filters.feature).
           token: ""
+          base: ${{ steps.diff-base.outputs.sha }}
           # NO NEGATION PATTERNS — dorny ORs a filter's patterns, so a lone
           # `!x` matches everything. See specs/ci/path-filters.feature.
           filters: |
@@ -248,12 +255,28 @@ jobs:
       # the Go 1.27 standard library.
       # One run per workspace module: there is no root go.mod, and
       # govulncheck refuses a directory that is not inside a module.
+      # IGNORED lists advisories with no fixed version whose vulnerable code we
+      # never run. GO-2026-6911: mcp-go's StreamableHTTP client follows
+      # redirects with credentials; only bifrost's MCP client manager calls
+      # it, and the gateway passes no MCPConfig to bifrost.Init, so no
+      # manager is built. Drop an entry once a fixed version ships.
       - name: govulncheck
+        env:
+          IGNORED: GO-2026-6911
         run: |
           rc=0
           for m in cmd pkg services tools; do
             echo "==> govulncheck $m"
-            (cd "$m" && go run golang.org/x/vuln/cmd/govulncheck@v1.8.0 ./...) || rc=1
+            (cd "$m" && go run golang.org/x/vuln/cmd/govulncheck@v1.8.0 -format json ./...) > "/tmp/vuln-$m.json" || { rc=1; continue; }
+            called=$(jq -r 'select(.finding) | .finding | select(.trace[0].function != null) | .osv' "/tmp/vuln-$m.json" | sort -u)
+            for id in $called; do
+              if [[ " $IGNORED " == *" $id "* ]]; then
+                echo "ignored $id (see IGNORED above)"
+              else
+                echo "::error::$m calls code affected by $id: https://pkg.go.dev/vuln/$id (run govulncheck ./... in $m for traces)"
+                rc=1
+              fi
+            done
           done
           exit "$rc"
 

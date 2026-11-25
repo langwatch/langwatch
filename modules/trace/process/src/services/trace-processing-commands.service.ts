@@ -1,10 +1,16 @@
-import type { CommandEnvelope, EventingCommandSender } from "@langwatch/eventing";
+import {
+  type CommandEnvelope,
+  type EventingCommandSender,
+  type QueueSendResult,
+  sendEach,
+} from "@langwatch/eventing";
 import {
   TraceCapabilityUnavailableError,
   type AnnotationAddedEventData,
   type AnnotationRemovedEventData,
   type AssignTopicCommandData,
   type LogTraceContribution,
+  type RecordEvaluationOutcomeCommandData,
   type RecordMetricCorrelationCommandData,
   type RecordSpanCommandData,
   type ResolveOriginCommandData,
@@ -14,6 +20,8 @@ import {
 /** Commands shared by receiver, reviewer, and background callers of Trace. */
 export interface TraceProcessingCommands {
   recordSpan(data: RecordSpanCommandData): Promise<unknown>;
+  /** Each span as `recordSpan` sends it, in bounded batches; one answer per span, in order. */
+  recordSpans(data: readonly RecordSpanCommandData[]): Promise<readonly QueueSendResult[]>;
   changeTraceName(data: TraceNameChangedEventData): Promise<unknown>;
   addAnnotation(data: AnnotationAddedEventData): Promise<unknown>;
   removeAnnotation(data: AnnotationRemovedEventData): Promise<unknown>;
@@ -30,6 +38,7 @@ type TraceProcessingSenders = Readonly<{
   resolveOrigin: EventingCommandSender<ResolveOriginCommandData>;
   recordLogContribution: EventingCommandSender<LogTraceContribution>;
   recordMetricCorrelation: EventingCommandSender<RecordMetricCorrelationCommandData>;
+  recordEvaluationOutcome: EventingCommandSender<RecordEvaluationOutcomeCommandData>;
 }>;
 
 /** trace_processing's senders, bound on connect; unbound, each refuses by name. */
@@ -48,6 +57,10 @@ export class TraceProcessingCommandsService implements TraceProcessingCommands {
 
   async recordSpan(data: RecordSpanCommandData): Promise<void> {
     await this.#connected("recordSpan").recordSpan.send(data);
+  }
+
+  recordSpans(data: readonly RecordSpanCommandData[]): Promise<QueueSendResult[]> {
+    return sendEach({ processor: this.#connected("recordSpan").recordSpan, payloads: [...data] });
   }
 
   async changeTraceName(data: TraceNameChangedEventData & CommandEnvelope): Promise<void> {
@@ -76,6 +89,15 @@ export class TraceProcessingCommandsService implements TraceProcessingCommands {
 
   async recordMetricCorrelations(data: RecordMetricCorrelationCommandData[]): Promise<void> {
     await this.#connected("recordMetricCorrelation").recordMetricCorrelation.sendBatch(data);
+  }
+
+  async recordEvaluationOutcome(data: RecordEvaluationOutcomeCommandData): Promise<void> {
+    await this.#connected("recordEvaluationOutcome").recordEvaluationOutcome.send(data);
+  }
+
+  /** The backfill's page in one send; the queue bounds each batch. */
+  async recordEvaluationOutcomes(data: RecordEvaluationOutcomeCommandData[]): Promise<void> {
+    await this.#connected("recordEvaluationOutcome").recordEvaluationOutcome.sendBatch(data);
   }
 
   #connected(command: string): TraceProcessingSenders {

@@ -85,21 +85,21 @@ export class ExperimentCellExecutionService {
     projectId: string;
     metrics: ExecutionState["metrics"] | undefined;
   }): Promise<number | undefined> {
-    if (!metrics?.model) {
-      return undefined;
-    }
+    if (!metrics?.model) return undefined;
 
     const inputTokens = metrics.prompt_tokens ?? 0;
     const outputTokens = metrics.completion_tokens ?? 0;
-    if (inputTokens === 0 && outputTokens === 0) {
-      return undefined;
-    }
+    const cacheReadTokens = metrics.cache_read_input_tokens ?? 0;
+    const cacheCreationTokens = metrics.cache_creation_input_tokens ?? 0;
+    if (inputTokens + outputTokens + cacheReadTokens + cacheCreationTokens === 0) return undefined;
 
     return this.ports.cost.findTokenPrice({
       projectId,
       model: metrics.model,
       inputTokens,
       outputTokens,
+      cacheReadTokens,
+      cacheCreationTokens,
     });
   }
 

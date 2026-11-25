@@ -24,6 +24,13 @@ Feature: Model Provider List Management
     And I see an "Add Model Provider" button
     And I see a table for listing providers
 
+  @integration
+  Scenario: The providers table spans the page column
+    Given providers are enabled in the project
+    When I am on the Model Providers settings page
+    Then the providers table is as wide as the page column
+    And its right edge lines up with the Default models table below it
+
   @visual
   Scenario: Provider row structure
     Given providers are enabled in the project

@@ -17,14 +17,13 @@ Initializes the LangWatch observability system for Node.js environments, enablin
 import { setupObservability } from "langwatch/observability/node";
 
 setupObservability({
-langwatch: {
-apiKey: process.env.LANGWATCH_API_KEY,
-endpoint: process.env.LANGWATCH_ENDPOINT_URL
-},
-serviceName: "my-service"
+  langwatch: {
+    apiKey: process.env.LANGWATCH_API_KEY,
+    endpoint: process.env.LANGWATCH_ENDPOINT_URL
+  },
+  serviceName: "my-service"
 });
-
-````
+```
 
 ```typescript Advanced Setup
 import { setupObservability } from "langwatch/observability/node";
@@ -47,7 +46,7 @@ setupObservability({
     logLevel: "debug"
   }
 });
-````
+```
 
 ```typescript Custom Configuration
 import { setupObservability } from "langwatch/observability/node";
@@ -103,6 +102,11 @@ Configuration options for setting up LangWatch observability.
 
 <ResponseField name="spanProcessors" type="Optional<SpanProcessor[]>">
   Custom span processors for advanced trace processing.
+</ResponseField>
+
+<ResponseField name="braids" type="Optional<{ copyEntries: string[] }>">
+  The called side of a braid's signed calls: copies these baggage entries, and
+  `langwatch.signature`, onto every span this service starts. See [Braids](#braids-signed-calls).
 </ResponseField>
 
 <ResponseField name="debug" type="Optional<DebugOptions>">
@@ -273,7 +277,7 @@ The `LangWatchSpan` extends the standard OpenTelemetry `Span` with additional me
 
 <ParamField path="setRequestModel" type="(model: string) => this">
   Set the request model name for the span. This is typically the model name sent in the API request
-  (e.g., 'gpt-5', 'claude-sonnet-5').
+  (e.g., 'gpt-6-luna', 'claude-sonnet-5').
 </ParamField>
 
 <ParamField path="setResponseModel" type="(model: string) => this">
@@ -380,6 +384,10 @@ const prompt = await langwatch.prompts.get("prompt-id");
 Creates a new prompt in the LangWatch platform.
 
 ```typescript
+import { LangWatch } from "langwatch";
+
+const langwatch = new LangWatch();
+
 // Create a basic prompt
 const prompt = await langwatch.prompts.create({
   handle: "customer-support-bot",
@@ -404,6 +412,10 @@ const prompt = await langwatch.prompts.create({
 Updates an existing prompt, creating a new version automatically.
 
 ```typescript
+import { LangWatch } from "langwatch";
+
+const langwatch = new LangWatch();
+
 // Update prompt content
 const updatedPrompt = await langwatch.prompts.update("customer-support-bot", {
   prompt: "You are a helpful and friendly customer support assistant.",
@@ -541,6 +553,35 @@ const processor = new FilterableBatchSpanProcessor(
 <ParamField path="excludeRules" type="SpanProcessingExcludeRule[]" required>
   Rules to exclude spans from processing.
 </ParamField>
+
+## Braids: signed calls
+
+A braid can require that the calling project really made a call. The calling service signs the
+baggage entries it names with one of its project's signing keys; the called service copies those
+entries and the signature onto its spans, and LangWatch checks the signature at ingest.
+
+```typescript
+import { context } from "@opentelemetry/api";
+import { signBaggage, withSignedBaggage } from "langwatch/observability/node";
+
+// Calling side, inside an active span: the signature covers the current trace.
+await withSignedBaggage(
+  { signingKey: process.env.LANGWATCH_SIGNING_KEY!, entries: { orchestrator: "web" } },
+  () => callTheOtherService(),
+);
+
+// Or build the context yourself.
+const signed = signBaggage({ signingKey, entries: { orchestrator: "web" }, context: context.active() });
+```
+
+Signing uses `node:crypto`, so it lives on the Node entry. On the called side, pass
+`braids: { copyEntries: ["orchestrator"] }` to `setupObservability`, or add
+`new BraidBaggageSpanProcessor({ copyEntries: ["orchestrator"] })` (from `langwatch/observability`) to
+your own tracer provider. Your
+propagator must carry W3C baggage (the default Node setup does).
+
+Signing throws a `BraidSigningError` whose `code` is `malformed_signing_key`, `empty_entries`,
+`invalid_entry_key` (keys match `[A-Za-z0-9._-]{1,128}`), `invalid_entry_value` or `no_active_trace`.
 
 ## LangChain Integration
 
@@ -993,11 +1034,11 @@ const tracer = getLangWatchTracer("my-service");
 
 await tracer.withActiveSpan("process-request", async (span) => {
   span.setType("llm");
-  span.setRequestModel("gpt-5");
+  span.setRequestModel("gpt-6-luna");
 
   // Your LLM call here
   const response = await openai.chat.completions.create({
-    model: "gpt-5",
+    model: "gpt-6-luna",
     messages: [{ role: "user", content: "Hello!" }],
   });
 
@@ -1089,7 +1130,7 @@ setupObservability();
 const handler = new LangWatchCallbackHandler();
 const llm = new ChatOpenAI({
   callbacks: [handler],
-  model: "gpt-5-mini",
+  model: "gpt-6-luna",
 });
 
 // All operations are automatically traced

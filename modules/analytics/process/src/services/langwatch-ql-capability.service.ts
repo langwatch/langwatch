@@ -6,12 +6,14 @@
 
 import { createHash } from "node:crypto";
 
+import { LWQL_MAX_NAMED_PROJECTS } from "@langwatch/analytics-contract/langwatch-ql-limits";
+
 /**
  * The most projects one tenant capability may carry. The set rides in the request URI as a query
  * setting, 65 bytes a project, so this sits well under ClickHouse's 1 MiB URI ceiling and turns an
  * implausibly wide key into a named failure rather than a silently truncated set.
  */
-export const LWQL_TENANT_CAPABILITY_MAX_PROJECTS = 10_000;
+export const LWQL_TENANT_CAPABILITY_MAX_PROJECTS = LWQL_MAX_NAMED_PROJECTS;
 
 /** Derives the tenant capability a LangWatchQL query is executed under. */
 export class LangWatchQLCapabilityService {

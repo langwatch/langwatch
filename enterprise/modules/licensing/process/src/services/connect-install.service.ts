@@ -31,7 +31,10 @@ import {
   connectServicesNamedBy,
   enabledConnectServices,
 } from "../rules/connect-entitlement.rules.ts";
-import { licenseKeyFingerprint } from "../rules/license-key.rules.ts";
+import {
+  instanceKeyLicensesOrganization,
+  licenseKeyFingerprint,
+} from "../rules/license-key.rules.ts";
 import type { InstanceIdentityService } from "./instance-identity.service.ts";
 import type { LicenseLogger } from "./license.service.ts";
 import type { LicensingCustomerFactsService } from "./licensing-customer-facts.service.ts";
@@ -87,15 +90,16 @@ export class ConnectInstallService {
   private constructor(private readonly deps: ConnectInstallServiceDependencies) {}
 
   /**
-   * The credential this organization calls LangWatch with; empty where it holds
-   * no license, where the license is not a license, or where Connect is off.
+   * The credential this organization calls LangWatch with; empty where Connect is off or
+   * the license is not a signed one naming a hosted service, so an offline license calls
+   * nothing. A lapsed term still yields one: it is how a renewal is collected.
    */
   async findCredential(organizationId: string): Promise<ConnectCredential[]> {
     if (!this.deps.deployment.permitted) return [];
 
     const organization = await this.deps.organizations.findById(organizationId);
-    const licenseKey = this.licenseKeyOf(organization);
-    if (!licenseKey) return [];
+    const licenseKey = this.licenseKeyOf({ organizationId, organization });
+    if (!licenseKey || !this.namesHostedService(licenseKey)) return [];
 
     const token = this.tokenOf(licenseKey);
     if (!token) return [];
@@ -114,7 +118,7 @@ export class ConnectInstallService {
   async findEntitledServices(organizationId: string): Promise<ConnectService[]> {
     if (!this.deps.deployment.permitted) return [];
     const organization = await this.deps.organizations.findById(organizationId);
-    return this.entitledOf(organization);
+    return this.entitledOf({ organizationId, organization });
   }
 
   /** The entitled services, less the ones an administrator switched off. */
@@ -122,7 +126,7 @@ export class ConnectInstallService {
     if (!this.deps.deployment.permitted) return [];
     const organization = await this.deps.organizations.findById(organizationId);
     return enabledConnectServices({
-      entitled: this.entitledOf(organization),
+      entitled: this.entitledOf({ organizationId, organization }),
       disabled: organization?.servicesDisabled ?? [],
     });
   }
@@ -149,7 +153,7 @@ export class ConnectInstallService {
   }): Promise<ConnectServiceState> {
     if (!this.deps.deployment.permitted) return { isEntitled: false, isSwitchedOn: false };
     const organization = await this.deps.organizations.findById(organizationId);
-    const isEntitled = this.entitledOf(organization).includes(service);
+    const isEntitled = this.entitledOf({ organizationId, organization }).includes(service);
     const isSwitchedOff = (organization?.servicesDisabled ?? []).includes(service);
     return { isEntitled, isSwitchedOn: isEntitled && !isSwitchedOff };
   }
@@ -176,6 +180,22 @@ export class ConnectInstallService {
     };
   }
 
+  /** Whether the install holds a licence it could present; reads only, never mints an id. */
+  async holdsInstallLicence(): Promise<boolean> {
+    if (!this.deps.deployment.permitted) return false;
+    const [licenseKey] = await this.findActiveLicenseKey();
+    return licenseKey !== undefined && this.tokenOf(licenseKey) !== undefined;
+  }
+
+  /** The credential this whole install presents: the instance licence, else the first one held. */
+  async findInstallCredential(): Promise<ConnectCredential[]> {
+    if (!this.deps.deployment.permitted) return [];
+    const [licenseKey] = await this.findActiveLicenseKey();
+    const token = licenseKey ? this.tokenOf(licenseKey) : undefined;
+    if (!token) return [];
+    return [{ token, instanceId: await this.deps.identity.getInstanceId() }];
+  }
+
   /** The instance-wide license, else the first organization's; empty where none is held. */
   private async findActiveLicenseKey(): Promise<string[]> {
     const instanceKey = this.deps.instanceLicenseKey();
@@ -195,7 +215,7 @@ export class ConnectInstallService {
     if (!this.deps.deployment.permitted) return false;
     for (const organizationId of await this.deps.organizations.findLicensedOrganizationIds()) {
       const organization = await this.deps.organizations.findById(organizationId);
-      if (this.entitledOf(organization).length > 0) return true;
+      if (this.entitledOf({ organizationId, organization }).length > 0) return true;
     }
     return false;
   }
@@ -206,7 +226,7 @@ export class ConnectInstallService {
     if (!deployment.permitted) return { deployment: "off" };
 
     const organization = await this.deps.organizations.findById(organizationId);
-    const entitled = this.entitledOf(organization);
+    const entitled = this.entitledOf({ organizationId, organization });
     const base = {
       deployment: "on",
       gatewayHost: new URL(deployment.gatewayEndpoint).host,
@@ -297,7 +317,7 @@ export class ConnectInstallService {
     });
     await this.deps.facts.connectServiceSwitched({ organizationId, service, enabled });
     const enabledServices = enabledConnectServices({
-      entitled: this.entitledOf(organization),
+      entitled: this.entitledOf({ organizationId, organization }),
       disabled: servicesDisabled,
     });
     // Organization applies the switch seconds later: the slot follows this answer, not a re-read.
@@ -376,14 +396,34 @@ export class ConnectInstallService {
 
   /**
    * Falls back to the instance-wide license, so a deployment licensed through
-   * one key is entitled on every organization it carries.
+   * one key is entitled on every organization it carries, except one the key
+   * is bound to another organization than.
    */
-  private licenseKeyOf(organization: ConnectOrganizationRecord | null): string | undefined {
-    return organization?.license ?? this.deps.instanceLicenseKey() ?? void 0;
+  private licenseKeyOf({
+    organizationId,
+    organization,
+  }: {
+    organizationId: string;
+    organization: ConnectOrganizationRecord | null;
+  }): string | undefined {
+    if (organization?.license) return organization.license;
+    const instanceKey = this.deps.instanceLicenseKey();
+    if (!instanceKey) return void 0;
+    const boundOrganizationId =
+      this.deps.cryptography.parseLicenseKey(instanceKey)?.data.organizationId;
+    return instanceKeyLicensesOrganization({ boundOrganizationId, organizationId })
+      ? instanceKey
+      : void 0;
   }
 
-  private entitledOf(organization: ConnectOrganizationRecord | null): ConnectService[] {
-    const licenseKey = this.licenseKeyOf(organization);
+  private entitledOf({
+    organizationId,
+    organization,
+  }: {
+    organizationId: string;
+    organization: ConnectOrganizationRecord | null;
+  }): ConnectService[] {
+    const licenseKey = this.licenseKeyOf({ organizationId, organization });
     if (!licenseKey) return [];
 
     const result = this.deps.cryptography.validateLicense({
@@ -393,6 +433,15 @@ export class ConnectInstallService {
     if (!result.valid) return [];
 
     return connectServicesNamedBy(result.licenseData.connectServices);
+  }
+
+  /** Whether a license LangWatch signed names a hosted service, whatever its term. */
+  private namesHostedService(licenseKey: string): boolean {
+    const signed = this.deps.cryptography.parseLicenseKey(licenseKey);
+    if (!signed || !this.deps.cryptography.verifySignature(signed, this.deps.publicKey)) {
+      return false;
+    }
+    return connectServicesNamedBy(signed.data.connectServices).length > 0;
   }
 
   /** A pasted key that is not a license yields no credential, not a crash. */

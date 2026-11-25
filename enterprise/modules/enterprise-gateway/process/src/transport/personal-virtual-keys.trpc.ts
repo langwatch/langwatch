@@ -27,7 +27,7 @@ export const personalVirtualKeysTrpcTransport: TrpcRouterDeclaration<
   )
 
   .procedure("issuePersonal")
-  .mintsCredential("virtualKeys:create")
+  .mintsCredential()
   .withPermission("organization:view")
   .handle(({ app, input, actor }) =>
     app.issuePersonalVirtualKey({

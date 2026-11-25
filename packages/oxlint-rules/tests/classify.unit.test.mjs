@@ -257,3 +257,132 @@ describe("given the one classification every rule gates on", () => {
     });
   });
 });
+
+// ADR-181: a framework package opts into the feature layout in its own package.json.
+const frameworkWorkspace = createFixtureWorkspace({
+  files: {
+    "packages/eventing/package.json": JSON.stringify({
+      name: "@langwatch/eventing",
+      exports: {
+        ".": { types: "./dist/index.d.ts", default: "./src/index.ts" },
+        "./server": { types: "./dist/server/index.d.ts", default: "./src/server/index.ts" },
+      },
+      langwatch: { group: "framework", layout: "features" },
+    }),
+    "packages/group-queue/package.json": JSON.stringify({
+      name: "@langwatch/group-queue",
+      exports: { ".": { default: "./src/index.ts" } },
+      langwatch: { group: "framework" },
+    }),
+    "packages/fixture-framework/package.json": JSON.stringify({
+      name: "@langwatch/fixture-framework",
+      exports: "./src/index.ts",
+      langwatch: { layout: "features" },
+    }),
+  },
+});
+
+afterAll(() => frameworkWorkspace.cleanup());
+
+function classifyFrameworkPath(workspacePath) {
+  resetClassificationCache();
+
+  return classify({
+    cwd: frameworkWorkspace.cwd,
+    filename: workspacePath,
+    physicalFilename: undefined,
+  });
+}
+
+const FRAMEWORK_CASES = [
+  {
+    path: "packages/eventing/src/features/claim/services/claimed-job.service.ts",
+    expected: {
+      role: "framework",
+      kind: "framework",
+      feature: undefined,
+      module: undefined,
+      relative: "src/features/claim/services/claimed-job.service.ts",
+      sourcePath: "features/claim/services/claimed-job.service.ts",
+      layer: "services",
+      isServiceModule: true,
+      isPrismaSeam: false,
+      strictSource: {
+        enterprise: false,
+        entry: false,
+        feature: "eventing",
+        name: "claimed-job.service.ts",
+        role: "framework",
+        sourcePath: "features/claim/services/claimed-job.service.ts",
+      },
+    },
+  },
+  {
+    path: "packages/eventing/src/index.ts",
+    expected: { role: "framework", layer: undefined, strictSource: { entry: true } },
+  },
+  {
+    path: "packages/eventing/src/server/index.ts",
+    expected: { role: "framework", strictSource: { entry: true, sourcePath: "server/index.ts" } },
+  },
+  {
+    path: "packages/eventing/src/server/maintenance.ts",
+    expected: { role: "framework", strictSource: { entry: false } },
+  },
+  {
+    path: "packages/eventing/src/app/event-sourcing.app.ts",
+    expected: { role: "framework", layer: undefined, strictSource: { entry: false } },
+  },
+  {
+    path: "packages/eventing/src/vocabulary/eventing.errors.ts",
+    expected: { role: "framework", layer: "vocabulary" },
+  },
+  {
+    path: "packages/eventing/src/telemetry/eventing.metrics.ts",
+    expected: { role: "framework", layer: "telemetry" },
+  },
+  {
+    path: "packages/eventing/src/features/process-managers/repositories/prisma/prisma.process-store.repository.ts",
+    expected: { role: "framework", layer: "repositories", isPrismaSeam: true },
+  },
+  {
+    path: "packages/eventing/src/features/replay/channels/redis/redis.queue-activity.channel.ts",
+    expected: { role: "framework", layer: "channels" },
+  },
+  {
+    path: "packages/eventing/src/features/claim/services/__tests__/claimed-job.service.unit.test.ts",
+    expected: { role: "framework", isTest: true, layer: "services", strictSource: undefined },
+  },
+  {
+    path: "packages/eventing/vitest.config.ts",
+    expected: { role: "framework", kind: undefined, layer: undefined, strictSource: undefined },
+  },
+  {
+    path: "packages/group-queue/src/groupQueue.ts",
+    expected: {
+      role: "framework",
+      kind: undefined,
+      sourcePath: undefined,
+      layer: undefined,
+      strictSource: undefined,
+    },
+  },
+  {
+    path: "packages/fixture-framework/src/index.ts",
+    expected: { role: "framework", strictSource: { entry: true, feature: "fixture-framework" } },
+  },
+  {
+    path: "packages/unlisted/src/services/unlisted.service.ts",
+    expected: { role: "other", layer: undefined, strictSource: undefined },
+  },
+];
+
+describe("given a framework package and its own manifest", () => {
+  describe("when the manifest opts into the feature layout", () => {
+    for (const testCase of FRAMEWORK_CASES) {
+      it(`classifies ${testCase.path}`, () => {
+        expect(classifyFrameworkPath(testCase.path)).toMatchObject(testCase.expected);
+      });
+    }
+  });
+});

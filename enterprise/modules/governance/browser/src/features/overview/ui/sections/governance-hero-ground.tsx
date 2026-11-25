@@ -21,7 +21,7 @@ const MESH = {
 
 /**
  * How far the light spills past its content — wider than the lantern's own
- * -14%, since this column (900px) is narrower than the project home's 7xl,
+ * -14%, since this column (the narrow page body) is narrower than the project home's 7xl,
  * so the same percentage would squeeze the mesh into a stain, not a room.
  */
 const BLEED_INLINE = { base: "-12%", md: "-30%" };

@@ -90,7 +90,7 @@ describe.skipIf(!databaseUrl)("given project's and organization's tables", () =>
       const placement = await repository.getPlacement({ projectId });
 
       expect(placement).toEqual({ outcome: "known", organizationId });
-      await expect(milestones.countEvaluation({ organizationId })).resolves.toMatchObject([
+      await expect(milestones.countEvaluation({ organizationId, by: 1 })).resolves.toMatchObject([
         { organizationId, evaluationCount: 1 },
       ]);
     });
@@ -105,11 +105,44 @@ describe.skipIf(!databaseUrl)("given project's and organization's tables", () =>
     });
   });
 
+  describe("when an organization's creation is read", () => {
+    /** @scenario "Nurturing reads an organization's creation through its share" */
+    it("answers when its owners created it", async () => {
+      const organization = await connection.client.organization.findUnique({
+        where: { id: organizationId },
+      });
+
+      await expect(repository.getOrganizationCreatedAt({ organizationId })).resolves.toEqual({
+        organizationCreatedAt: organization?.createdAt.getTime(),
+      });
+    });
+
+    it("answers null for an organization they do not hold", async () => {
+      await expect(
+        repository.getOrganizationCreatedAt({ organizationId: `${namespace}-absent` }),
+      ).resolves.toEqual({ organizationCreatedAt: null });
+    });
+  });
+
   describe("when the project is one its owners do not hold", () => {
     it("answers unknown", async () => {
       await expect(repository.getPlacement({ projectId: `${namespace}-absent` })).resolves.toEqual({
         outcome: "unknown",
       });
+    });
+  });
+
+  describe("when no project of the organization received a first message, then one did", () => {
+    /** @scenario "A member who joins an organization whose traces predate the stored time gets has_traces alone" */
+    it("answers from the first-message flag", async () => {
+      await expect(repository.hasTracedProject({ organizationId })).resolves.toBe(false);
+
+      await connection.client.project.update({
+        where: { id: archivedProjectId },
+        data: { firstMessage: true },
+      });
+
+      await expect(repository.hasTracedProject({ organizationId })).resolves.toBe(true);
     });
   });
 });

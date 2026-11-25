@@ -2,13 +2,34 @@ import { type LedgerTableNames, ledgerTables } from "../ledger-tables.ts";
 import { type UpgradeLease, upgradeLeaseSchema, type UpgradeStepStatus } from "../ledger.ts";
 import type { ManifestStep } from "../manifest/manifest.ts";
 import type { UpgradePostgres } from "../ports.ts";
-import { PROJECTION_REPLAY_CURSOR } from "../step/projection-replay-step.ts";
+import {
+  PROJECTION_REPLAY_CURSOR,
+  PROJECTION_REPLAY_PAGED,
+} from "../step/projection-replay-step.ts";
+import { type LedgerTextRedactor, ledgerText } from "../step/step-log.ts";
+import { redactSecrets } from "./run-log.ts";
 
 const NOW_UTC = `(now() AT TIME ZONE 'UTC')`;
 const SETTLED: ReadonlySet<UpgradeStepStatus> = new Set(["done", "not-needed", "failed"]);
 
 /** The key a Prisma step's report holds while an operator's Retry waits to be spent. */
 export const OPERATOR_RETRY_KEY = "operatorRetryAt";
+
+/**
+ * The report with a projection replay's paged aggregates kept, each at no unfinished attempt: a
+ * worker roll counts as one, so each deploy or Retry of a failed step gets fresh attempts while
+ * its aggregates still skip the bulk read. `key` is the statement's text parameter naming the key.
+ */
+const pagedAttemptsCleared = (key: string) => `CASE
+  WHEN jsonb_typeof("report" -> ${key}::text) = 'object' THEN jsonb_set(
+    "report",
+    ARRAY[${key}::text],
+    COALESCE(
+      (SELECT jsonb_object_agg(paged.key, 0) FROM jsonb_each("report" -> ${key}::text) AS paged),
+      '{}'::jsonb
+    )
+  )
+  ELSE "report" END`;
 
 /** A step the runner registers: a manifest step with the release that shipped it. */
 export type RegisteredStep = ManifestStep & { release: string | null };
@@ -18,10 +39,20 @@ export type RegisteredStep = ManifestStep & { release: string | null };
  * release attribution and the run's plan. Same tables, same package, as the reader's repository.
  */
 export class UpgradeRunnerRepository {
-  private constructor(private readonly postgres: UpgradePostgres) {}
+  private constructor(
+    private readonly postgres: UpgradePostgres,
+    private readonly redact: LedgerTextRedactor,
+  ) {}
 
-  static create({ postgres }: { postgres: UpgradePostgres }): UpgradeRunnerRepository {
-    return new UpgradeRunnerRepository(postgres);
+  /** `redact` masks stored step errors; the gate passes one that knows its store URLs. */
+  static create({
+    postgres,
+    redact = redactSecrets,
+  }: {
+    postgres: UpgradePostgres;
+    redact?: LedgerTextRedactor;
+  }): UpgradeRunnerRepository {
+    return new UpgradeRunnerRepository(postgres, redact);
   }
 
   /** Runs `text` against this installation's ledger tables (`ledgerTables`). */
@@ -143,12 +174,15 @@ export class UpgradeRunnerRepository {
     runId,
     lastError = null,
     report,
+    logTail,
   }: {
     ids: readonly string[];
     status: UpgradeStepStatus;
     runId: string;
     lastError?: string | null;
     report?: Record<string, unknown>;
+    /** The attempt's last log lines; omitted keeps the stored tail. */
+    logTail?: readonly string[];
   }): Promise<void> {
     if (ids.length === 0) return;
     await this.query(
@@ -156,15 +190,17 @@ export class UpgradeRunnerRepository {
           SET "status" = $2, "run_id" = $3, "last_error" = $4, "inferred" = false,
               "report" = COALESCE($5::jsonb, "report"),
               "finished_at" = CASE WHEN $6::boolean THEN ${NOW_UTC} ELSE NULL END,
+              "log_tail" = COALESCE($7::jsonb, "log_tail"),
               "updated_at" = ${NOW_UTC}
         WHERE "id" = ANY($1::text[])`,
       [
         ids,
         status,
         runId,
-        lastError,
+        lastError === null ? null : ledgerText({ text: lastError, redact: this.redact }),
         report === undefined ? null : JSON.stringify(report),
         SETTLED.has(status),
+        logTail === undefined ? null : JSON.stringify(logTail),
       ],
     );
   }
@@ -268,9 +304,9 @@ export class UpgradeRunnerRepository {
   }
 
   /**
-   * Sets one failed step pending in a single conditional write, error cleared and checkpoint kept.
-   * A Prisma step's report records the retry: the operator's consent to re-run the folder.
-   * Answers false when the step is not failed, so of two concurrent retries only one wins.
+   * Sets one failed step pending in a single conditional write: error and paged attempts cleared,
+   * checkpoint kept. A Prisma step's report records the retry: the operator's consent to re-run the
+   * folder. Answers false when the step is not failed, so of two concurrent retries only one wins.
    */
   async retryFailedStep({ id }: { id: string }): Promise<boolean> {
     const { rows } = await this.query<{ id: string }>(
@@ -278,11 +314,11 @@ export class UpgradeRunnerRepository {
           SET "status" = 'pending', "last_error" = NULL, "inferred" = false, "finished_at" = NULL,
               "report" = CASE WHEN "id" LIKE 'prisma:%'
                 THEN COALESCE("report", '{}'::jsonb) || jsonb_build_object($2::text, ${NOW_UTC})
-                ELSE "report" END,
+                ELSE ${pagedAttemptsCleared("$3")} END,
               "updated_at" = ${NOW_UTC}
         WHERE "id" = $1 AND "status" = 'failed'
        RETURNING "id"`,
-      [id, OPERATOR_RETRY_KEY],
+      [id, OPERATOR_RETRY_KEY, PROJECTION_REPLAY_PAGED],
     );
     return rows.length > 0;
   }
@@ -297,7 +333,10 @@ export class UpgradeRunnerRepository {
     );
   }
 
-  /** Sets failed steps of one mode pending again, error and checkpoint kept; answers their ids. */
+  /**
+   * Sets failed steps of one mode pending again, error and checkpoint kept, but paged attempts
+   * cleared; answers their ids.
+   */
   async resetFailedSteps({
     mode,
     runId,
@@ -307,10 +346,11 @@ export class UpgradeRunnerRepository {
   }): Promise<string[]> {
     const { rows } = await this.query<{ id: string }>(
       (t) => `UPDATE ${t.step}
-          SET "status" = 'pending', "run_id" = $2, "finished_at" = NULL, "updated_at" = ${NOW_UTC}
+          SET "status" = 'pending', "run_id" = $2, "finished_at" = NULL, "updated_at" = ${NOW_UTC},
+              "report" = ${pagedAttemptsCleared("$3")}
         WHERE "mode" = $1 AND "status" = 'failed'
        RETURNING "id"`,
-      [mode, runId],
+      [mode, runId, PROJECTION_REPLAY_PAGED],
     );
     return rows.map((row) => row.id).toSorted();
   }

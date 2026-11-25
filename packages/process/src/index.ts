@@ -122,6 +122,15 @@ export {
   migrationStepsOf,
 } from "./migration/migration-steps.ts";
 export { migrationStepsOverMemory } from "./migration/memory-migration-steps.ts";
+export type {
+  IdIndexFillOptions,
+  IdIndexFillStep,
+  IdIndexRetention,
+} from "./migration/id-index-fill-step.ts";
+export {
+  ID_INDEX_FILL_STEP,
+  IdIndexRetentionUnavailableError,
+} from "./migration/id-index-fill-step.ts";
 export {
   loadTaskModules,
   parseTaskModuleSpecifiers,
@@ -138,6 +147,7 @@ export {
   type UpgradeDoor,
   hostedRuntime,
 } from "./server.ts";
+export { type LongRequestBody } from "./lifecycle/request-body-deadline.ts";
 export { processOwner } from "./owner.ts";
 export { observabilityOwner } from "./observability-owner.ts";
 export {

@@ -285,7 +285,8 @@ func TestTheHighlightedRowKeepsItsColumns(t *testing.T) {
 // print "→ colima + docker CLI (←/→ to change)" against an installed colima.
 // @scenario "The picker lists what needs deciding, not the whole inventory"
 func TestNothingOffersAChoiceThatIsAlreadySettled(t *testing.T) {
-	found := map[string]domain.Found{"colima": {Present: true}}
+	// Redis offers valkey or redis too; one installed settles that choice as well.
+	found := map[string]domain.Found{"colima": {Present: true}, "redis": {Present: true}}
 	view := newModel(domain.PlanPrereqs(found, nil, "darwin")).View()
 	if strings.Contains(view, "←/→") {
 		t.Errorf("the runtime is installed — nothing should offer to pick between runtimes:\n%s", view)

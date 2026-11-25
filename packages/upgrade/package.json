@@ -33,6 +33,7 @@
     "@langwatch/ksuid": "workspace:*",
     "@langwatch/observability": "workspace:*",
     "@langwatch/process-stores": "workspace:*",
+    "@langwatch/redaction": "workspace:*",
     "@langwatch/redis-client": "workspace:*",
     "@langwatch/secrets": "workspace:*",
     "@langwatch/system-migrations": "workspace:*",

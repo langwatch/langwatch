@@ -25,6 +25,7 @@ const CONSOLES: Record<string, { label: string; group?: string }> = {
   lambda: { label: "Lambda", group: "Sims" },
   "design-system": { label: "Design system", group: "Tools" },
   "mail-room": { label: "Mail room", group: "Tools" },
+  docs: { label: "Docs", group: "Tools" },
   observability: { label: "Grafana", group: "Tools" },
 };
 

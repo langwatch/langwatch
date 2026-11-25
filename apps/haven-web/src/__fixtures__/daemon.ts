@@ -78,6 +78,7 @@ const LIVE_SEEDS: SurfaceSeed[] = [
     hint: "haven up +design-system",
   },
   { name: "mail-room", role: "Mail room", status: "not-selected", hint: "haven up +mail-room" },
+  { name: "docs", role: "Docs site", status: "not-selected", hint: "haven up +docs" },
   { name: "observability", role: "Grafana, shared by every stack", status: "live", port: 3000 },
 ];
 

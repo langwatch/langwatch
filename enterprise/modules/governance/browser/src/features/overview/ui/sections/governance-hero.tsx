@@ -30,9 +30,6 @@ import { GovernanceWelcomeHeader } from "../elements/governance-welcome-header.t
  */
 const ASK_MEASURE = "680px";
 
-/** The whole column's width: header, hero ground and the two lists below. */
-export const HOME_MEASURE = "900px";
-
 export const INVENTORY_SOURCES_HREF = "/governance/inventory?tab=sources";
 export const ADD_DEPARTMENT_HREF = "/governance/people?tab=departments&add=1";
 export const ADD_AGENT_HREF = "/governance/agents?add=1";

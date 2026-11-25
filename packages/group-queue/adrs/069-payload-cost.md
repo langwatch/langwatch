@@ -27,6 +27,11 @@ Waiting work carries the smallest sufficient representation:
 - a bounded derivation when the handler needs only a closed set of facts; or
 - the typed body when it is already within the inline budget.
 
+In eventing, an event subscriber derives its staged payload with `enqueue.stage`, and a fold
+projection subscriber may declare a compact job (`withProjectionSubscriber({ job })`): the
+event's identity plus a body its own schema parses, never the event's data or the fold state.
+Readers accept both bodies before any writer queues the compact one (Alex, 2026-10-20).
+
 A representation the consumer cannot validate fails through the queue's
 normal error path. It is not treated as irrelevant work or successful
 completion.

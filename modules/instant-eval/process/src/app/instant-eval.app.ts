@@ -28,11 +28,13 @@ import {
   isInstantEvalBounded,
 } from "@langwatch/instant-eval-contract";
 import {
+  INSTANT_EVALS_HOSTED_DISABLED_FLAG,
   type InstantEvalClassifierLimits,
   type InstantEvalJudgement,
   type InstantEvalQuestion,
   isLangWatchJudgeHost,
 } from "@langwatch/instant-eval-judge-contract";
+import { ModelProviderApi } from "@langwatch/model-provider-contract";
 import { OrganizationApi } from "@langwatch/organization-contract";
 import type { FeatureSetup } from "@langwatch/process";
 import type { ProjectApi } from "@langwatch/project-contract";
@@ -69,7 +71,10 @@ import {
   toInstantEvalJudgmentWire,
   toInstantEvalRunWire,
 } from "../rules/instant-eval-wire.rules.ts";
-import { InstantEvalAccessService } from "../services/instant-eval-access.service.ts";
+import {
+  InstantEvalAccessService,
+  type InstantEvalHostedSwitchReader,
+} from "../services/instant-eval-access.service.ts";
 import { InstantEvalCancelService } from "../services/instant-eval-cancel.service.ts";
 import { InstantEvalClassifySearchService } from "../services/instant-eval-classify-search.service.ts";
 import { InstantEvalClassifyService } from "../services/instant-eval-classify.service.ts";
@@ -77,12 +82,15 @@ import { InstantEvalCloudJudgeService } from "../services/instant-eval-cloud-jud
 import { InstantEvalCommandDispatcherService } from "../services/instant-eval-command-dispatcher.service.ts";
 import { InstantEvalConnectJudgeService } from "../services/instant-eval-connect-judge.service.ts";
 import { InstantEvalCreateService } from "../services/instant-eval-create.service.ts";
+import { InstantEvalDecisionModelJudgeService } from "../services/instant-eval-decision-model-judge.service.ts";
 import {
   InstantEvalEstimateService,
   type InstantEvalTextSource,
 } from "../services/instant-eval-estimate.service.ts";
 import { InstantEvalFinishService } from "../services/instant-eval-finish.service.ts";
 import { InstantEvalFreeBudgetService } from "../services/instant-eval-free-budget.service.ts";
+import { InstantEvalGatewayBudgetService } from "../services/instant-eval-gateway-budget.service.ts";
+import { InstantEvalHostedSwitchJudgeService } from "../services/instant-eval-hosted-switch-judge.service.ts";
 import { InstantEvalJudgeChoiceService } from "../services/instant-eval-judge-choice.service.ts";
 import { InstantEvalJudgePageService } from "../services/instant-eval-judge-page.service.ts";
 import { InstantEvalJudgeRowsService } from "../services/instant-eval-judge-rows.service.ts";
@@ -134,6 +142,8 @@ type InstantEvalDependencies = Readonly<{
   organizations: typeof OrganizationApi;
   /** Asks whether a member may throw the organization's switch, as `enable` declares. */
   authz: typeof AuthzApi;
+  /** The project's Instant Evals column of Default models (ADR-182). */
+  modelProviders: typeof ModelProviderApi;
 }>;
 
 type InstantEvalSetup = FeatureSetup<
@@ -153,6 +163,7 @@ export class InstantEvalModule implements InstantEvalApiContract, InstantEvalBro
     traces: TraceApi,
     organizations: OrganizationApi,
     authz: AuthzApi,
+    modelProviders: ModelProviderApi,
   };
   static readonly config = instantEvalConfig;
 
@@ -196,8 +207,21 @@ export class InstantEvalModule implements InstantEvalApiContract, InstantEvalBro
 
   static async create(setup: InstantEvalSetup): Promise<InstantEvalModule> {
     const repositories = setup.repositories;
-    const judge = InstantEvalModule.judgeOf(setup);
-    setup.resources.own("Instant Evals judge", () => judge.close?.() ?? Promise.resolve());
+    // A project on its own decision model judges through the leaf with its key (ADR-182).
+    const hostedSwitch = InstantEvalModule.hostedSwitchOf(setup);
+    const hosted = InstantEvalHostedSwitchJudgeService.create({
+      hosted: InstantEvalModule.judgeOf(setup),
+      peers: {
+        findOrganizationId: (projectId) => setup.channels.projects.findOrganizationId(projectId),
+        isHostedOff: (input) => hostedSwitch.isHostedOff(input),
+      },
+    });
+    const judge = InstantEvalDecisionModelJudgeService.create({
+      hosted,
+      own: setup.channels.judges,
+      decisionModels: setup.dependencies.modelProviders,
+    });
+    setup.resources.own("Instant Evals judge", () => judge.close());
 
     const { analytics, plans, gateway, traces } = setup.dependencies;
     const { projects } = setup.channels;
@@ -218,8 +242,15 @@ export class InstantEvalModule implements InstantEvalApiContract, InstantEvalBro
       hostedPlans: setup.config.isSaas
         ? { isEnterprisePlan: InstantEvalModule.isEnterprisePlanOf(setup) }
         : null,
+      // Own models answer to their own flag, never to `release_instant_evals` (ADR-182).
+      ownModels: {
+        runsOnOwnModel: async ({ projectId }) =>
+          (await setup.dependencies.modelProviders.resolveDecisionModel({ projectId })).kind ===
+          "own",
+      },
+      hostedSwitch,
     });
-    const optIns = InstantEvalModule.optInsOf({ setup, access });
+    const optIns = InstantEvalModule.optInsOf({ setup, access, hostedSwitch });
     const reads = InstantEvalReadsService.create({
       runs: repositories.runs,
       judgments: repositories.judgments,
@@ -251,9 +282,16 @@ export class InstantEvalModule implements InstantEvalApiContract, InstantEvalBro
         isFreePlan: async ({ organizationId }) =>
           (await plans.getActivePlan({ organizationId })).free,
         sumSpendNanoUsdByRequestType: (input) => gateway.sumSpendNanoUsdByRequestType(input),
+        isOwnDecisionModel: (input) => judge.isOwnDecisionModel(input),
       },
       reservations: repositories.budgetReservations,
       isBounded,
+    });
+    const gatewayBudget = InstantEvalGatewayBudgetService.create({
+      peers: {
+        findSpendAttribution: spendAttributionOf(projects),
+        checkBudget: (input) => gateway.checkBudget(input),
+      },
     });
     const context = InstantEvalRunContextService.create({
       runs: repositories.runs,
@@ -289,8 +327,9 @@ export class InstantEvalModule implements InstantEvalApiContract, InstantEvalBro
     const queries = InstantEvalQueryJudgingService.create({
       rows: InstantEvalJudgeRowsService.create({ judge }),
       budget,
+      gatewayBudget,
       spend: judgedSpend,
-      pricing: judge.pricing,
+      holdPricing: () => setup.channels.judges.queryHoldPricing(),
       queryTokenBudget: setup.config.queryTokenBudget,
     });
 
@@ -309,8 +348,10 @@ export class InstantEvalModule implements InstantEvalApiContract, InstantEvalBro
       access,
       optIns,
       classifications,
+      // The search bar stays on LangWatch's classifier whatever the column says (ADR-182); where
+      // LangWatch switched hosted off, that classifier skips and the sentence is not routed.
       searchClassifications: InstantEvalClassifySearchService.create({
-        classifications,
+        classifications: InstantEvalClassifyService.create({ judge: hosted }),
         peers: {
           isReleased: (input) => access.isReleased(input),
           traces,
@@ -339,14 +380,17 @@ export class InstantEvalModule implements InstantEvalApiContract, InstantEvalBro
             textSource,
           }),
           budget,
+          gatewayBudget,
           proofs: InstantEvalTraceProofService.create({ authz: setup.dependencies.authz }),
         },
         peers: {
           compileFilter: (input) => traces.compileLangWatchQLTraceFilter(input),
           selectTraceIds: (input) => traces.findTraceIdsForFilter(input),
+          spanAnalyticsFloor: () => traces.getSpanAnalyticsFloor(),
           isEnabled: (input) => access.isEnabled(input),
           isReleased: (input) => access.isReleased(input),
           isQueryIdentityAvailable: () => analytics.isLangWatchQLAvailable(),
+          ensureQueryTenant: (input) => analytics.ensureLwqlKeyMapRow(input),
           resolveCaller: (input) => InstantEvalModule.callerOf({ analytics, ...input }),
           getPlan: async ({ projectId }) => {
             const plan = await plans.getActivePlan({
@@ -370,8 +414,10 @@ export class InstantEvalModule implements InstantEvalApiContract, InstantEvalBro
             judgments: repositories.judgments,
             cancellations,
             budget,
+            gatewayBudget,
             analytics,
             judgedSpend,
+            ownModels: judge,
           }),
           commands: () => dispatcher.outcomeCommands(),
         },
@@ -388,13 +434,28 @@ export class InstantEvalModule implements InstantEvalApiContract, InstantEvalBro
       isEnterpriseTier((await plans.getActivePlan({ organizationId })).type);
   }
 
+  /** LangWatch's own switch for its hosted model, read for the project within its organization. */
+  private static hostedSwitchOf(setup: InstantEvalSetup): InstantEvalHostedSwitchReader {
+    const { featureFlags } = setup.dependencies;
+    return {
+      isHostedOff: ({ projectId, organizationId }) =>
+        featureFlags.isEnabled(INSTANT_EVALS_HOSTED_DISABLED_FLAG, {
+          kind: "project",
+          projectId,
+          organizationId,
+        }),
+    };
+  }
+
   /** The offer and the switch, each peer narrowed to the one question it answers. */
   private static optInsOf({
     setup,
     access,
+    hostedSwitch,
   }: {
     setup: InstantEvalSetup;
     access: InstantEvalAccessService;
+    hostedSwitch: InstantEvalHostedSwitchReader;
   }): InstantEvalOptInService {
     const { organizations, authz } = setup.dependencies;
     const { projects, licensing } = setup.channels;
@@ -421,6 +482,8 @@ export class InstantEvalModule implements InstantEvalApiContract, InstantEvalBro
             scope: { type: "organization", id: organizationId },
           }),
         isReleased: (input) => access.isReleased(input),
+        isHostedReleased: (input) => access.isHostedReleased(input),
+        isHostedOff: (input) => hostedSwitch.isHostedOff(input),
         recordOptIn: (input) => organizations.recordInstantEvalsOptIn(input),
       },
     });
@@ -461,8 +524,10 @@ export class InstantEvalModule implements InstantEvalApiContract, InstantEvalBro
     judgments,
     cancellations,
     budget,
+    gatewayBudget,
     analytics,
     judgedSpend,
+    ownModels,
   }: {
     context: InstantEvalRunContextService;
     rowSource: InstantEvalRowSourceService;
@@ -471,8 +536,10 @@ export class InstantEvalModule implements InstantEvalApiContract, InstantEvalBro
     judgments: InstantEvalRepositories["judgments"];
     cancellations: InstantEvalCancellationRepository;
     budget: InstantEvalFreeBudgetService;
+    gatewayBudget: InstantEvalGatewayBudgetService;
     analytics: AnalyticsApi;
     judgedSpend: InstantEvalJudgedSpendService;
+    ownModels: Pick<InstantEvalDecisionModelJudgeService, "isOwnDecisionModel">;
   }): InstantEvalRunExecutor {
     const plans = InstantEvalPlanService.create({
       context,
@@ -488,6 +555,8 @@ export class InstantEvalModule implements InstantEvalApiContract, InstantEvalBro
       judgments,
       cancellation: cancellations,
       budget,
+      gatewayBudget,
+      ownModels,
     });
     const finishes = InstantEvalFinishService.create({
       spend: judgedSpend,
@@ -502,6 +571,7 @@ export class InstantEvalModule implements InstantEvalApiContract, InstantEvalBro
         pages.discardReadAhead({ runId: input.runId });
         return finishes.finish(input);
       },
+      billLatePage: (input) => finishes.billLatePage(input),
     };
   }
 

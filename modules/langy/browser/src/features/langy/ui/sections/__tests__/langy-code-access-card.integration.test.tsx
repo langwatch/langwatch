@@ -2,22 +2,84 @@
  * @vitest-environment jsdom
  * The code access card's four states (ADR-129): fixtures are
  * `langy.getLocalWorkspace` answers, not tool payloads. Boundary mocks:
- * tRPC hooks and the GitHub connect popup.
+ * tRPC hooks, the GitHub connect popup, the host and the browser clipboard.
  * @see specs/langy/langy-code-access.feature
  */
 import { DesignSystemProvider } from "@langwatch/design-system/provider";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+import {
+  LangyHostApi,
+  LangyHostProvider,
+  type LangyHostUser,
+  type LangyRouteReading,
+} from "../../../../../model/langy-host.ts";
 
 const setPreference = vi.fn();
 const refetchWorkspace = vi.fn();
 const renewRequest = vi.fn();
 let workspaceData: unknown = null;
 let workspaceError: unknown = null;
+const workspaceReadEnabled: boolean[] = [];
+const refetch = vi.fn();
 let githubInstallations: {
   installationId: string;
   accountLogin: string;
 }[] = [];
+let githubConfigured = true;
+let sessionUser: LangyHostUser | undefined;
+let namesAskerFlag = false;
+const writeText = vi.fn((_text: string) => Promise.resolve());
+
+vi.mock("@langwatch/feature-flag-client", () => ({
+  useFeatureFlag: (token: { name: string }) => ({
+    enabled: token.name === "release_ui_langy_share_command_names_asker" && namesAskerFlag,
+    isLoading: false,
+  }),
+}));
+
+/** The signed-in reader comes from the host, as the app supplies it. */
+class FakeLangyHost extends LangyHostApi {
+  project() {
+    return { id: "p_1", slug: "acme", name: "acme" };
+  }
+  organization() {
+    return { id: "org_1" };
+  }
+  team() {
+    return { id: "team_1" };
+  }
+  organizationRole() {
+    return "MEMBER";
+  }
+  currentUser() {
+    return sessionUser;
+  }
+  hasOrganizationPermission() {
+    return false;
+  }
+  hasPermission() {
+    return true;
+  }
+  isLoading() {
+    return false;
+  }
+  isDemoProject() {
+    return false;
+  }
+  route(): LangyRouteReading {
+    return { params: {}, query: {}, pathname: "/" };
+  }
+  setQuery() {}
+  navigate() {}
+  planManagementUrl() {
+    return undefined;
+  }
+  succeeded() {}
+  failed() {}
+}
+const host = new FakeLangyHost();
 
 vi.mock("@langwatch/browser-host/use-router", () => ({
   useRouter: () => ({ push: vi.fn() }),
@@ -33,13 +95,20 @@ vi.mock("../../../../../behavior/langy-api.ts", () => ({
   api: {
     langy: {
       getLocalWorkspace: {
-        useQuery: () => ({
-          data: workspaceData,
-          isLoading: workspaceData === null && workspaceError === null,
-          isError: workspaceError !== null,
-          error: workspaceError,
-          refetch: refetchWorkspace,
-        }),
+        useQuery: (_input: unknown, options?: { enabled?: boolean }) => {
+          workspaceReadEnabled.push(options?.enabled !== false);
+          // A disabled query never asks the server, so it holds nothing.
+          if (options?.enabled === false) {
+            return { data: undefined, isLoading: false, isError: false, error: null, refetch };
+          }
+          return {
+            data: workspaceData,
+            isLoading: workspaceData === null && workspaceError === null,
+            isError: workspaceError !== null,
+            error: workspaceError,
+            refetch: refetchWorkspace,
+          };
+        },
       },
       renewLocalControlRequest: {
         useMutation: () => ({
@@ -63,7 +132,7 @@ vi.mock("../../../../../behavior/langy-api.ts", () => ({
     github: {
       getConnectionStatus: {
         useQuery: () => ({
-          data: { installations: githubInstallations },
+          data: { configured: githubConfigured, installations: githubInstallations },
           isLoading: false,
           refetch: vi.fn(),
         }),
@@ -72,6 +141,7 @@ vi.mock("../../../../../behavior/langy-api.ts", () => ({
   },
 }));
 
+import { useLangyStore } from "../../../../../behavior/langy.store.ts";
 import { writeLocalFolderPick } from "../../../../tools/model/langy-code-access-pick.ts";
 import { LangyCodeAccessCard } from "../../../../tools/ui/sections/langy-code-access-card.tsx";
 
@@ -82,7 +152,13 @@ beforeEach(() => {
   refetchWorkspace.mockClear();
   renewRequest.mockClear();
   workspaceError = null;
+  sessionUser = undefined;
+  namesAskerFlag = false;
+  writeText.mockClear();
+  Object.defineProperty(navigator, "clipboard", { value: { writeText }, configurable: true });
+  workspaceReadEnabled.length = 0;
   githubInstallations = [{ installationId: "i1", accountLogin: "acme" }];
+  githubConfigured = true;
   // The local-folder pick persists per browser, so one test's click would
   // otherwise open the next test's card already waiting.
   localStorage.clear();
@@ -101,15 +177,17 @@ const ASKING = {
 function renderCard(over: Partial<Parameters<typeof LangyCodeAccessCard>[0]> = {}) {
   return render(
     <DesignSystemProvider forcedTheme="light">
-      <LangyCodeAccessCard
-        projectId="p_1"
-        conversationId="c_1"
-        callId="call-1"
-        organizationId="org_1"
-        onChoiceSelect={vi.fn()}
-        onAskAgain={vi.fn()}
-        {...over}
-      />
+      <LangyHostProvider value={host}>
+        <LangyCodeAccessCard
+          projectId="p_1"
+          conversationId="c_1"
+          callId="call-1"
+          organizationId="org_1"
+          onChoiceSelect={vi.fn()}
+          onAskAgain={vi.fn()}
+          {...over}
+        />
+      </LangyHostProvider>
     </DesignSystemProvider>,
   );
 }
@@ -206,6 +284,40 @@ describe("given no folder and nothing remembered", () => {
     expect(screen.getByText("Run this in the folder you want me to work in:")).toBeDefined();
     expect(screen.getByText("npx langwatch@latest langy --share-control")).toBeDefined();
     expect(screen.getByText(/Waiting for you to approve in the terminal/)).toBeDefined();
+  });
+
+  /** @scenario "The waiting card's command names who asked" */
+  it("names the signed-in person in the command it shows and copies", async () => {
+    workspaceData = {
+      ...ASKING,
+      requestState: "open",
+      pendingRequest: { id: "req_1", expiresAt: new Date(10_000 + 5 * 60_000).toISOString() },
+    };
+    sessionUser = { id: "user_1", email: "riley@acme.test" };
+    namesAskerFlag = true;
+    renderCard({ now: () => 10_000 });
+    fireEvent.click(screen.getByText("Share local folder"));
+
+    const command = "npx langwatch@latest langy --share-control --as riley@acme.test";
+    expect(screen.getByText(command)).toBeDefined();
+    await act(async () => {
+      fireEvent.click(screen.getByLabelText("Copy the command"));
+    });
+    expect(writeText).toHaveBeenCalledWith(command);
+  });
+
+  // Until the CLI release that accepts --as is on npm, an older CLI refuses the option.
+  it("shows the bare command while the release flag is off", () => {
+    workspaceData = {
+      ...ASKING,
+      requestState: "open",
+      pendingRequest: { id: "req_1", expiresAt: new Date(10_000 + 5 * 60_000).toISOString() },
+    };
+    sessionUser = { id: "user_1", email: "riley@acme.test" };
+    renderCard({ now: () => 10_000 });
+    fireEvent.click(screen.getByText("Share local folder"));
+
+    expect(screen.getByText("npx langwatch@latest langy --share-control")).toBeDefined();
   });
 
   /** @scenario "Choosing GitHub continues on the existing pull request path" */
@@ -481,5 +593,52 @@ describe("given GitHub was remembered", () => {
       preference: null,
     });
     expect(onAskAgain).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("given the first message of a conversation whose record is not written yet", () => {
+  const NOT_FOUND = { data: { error: { code: "langy_conversation_not_found", httpStatus: 404 } } };
+
+  beforeEach(() => {
+    act(() => {
+      useLangyStore.getState().startNewConversation();
+      useLangyStore.getState().beginTurn({ conversationId: "c_new", turnId: "t_1" });
+    });
+    // What the server answers until the conversation's projection folds.
+    workspaceData = null;
+    workspaceError = NOT_FOUND;
+  });
+
+  /** @scenario "The card of a conversation that is still being created waits for it" */
+  it("reads nothing and keeps its checking line until the conversation is confirmed", () => {
+    renderCard({ conversationId: "c_new" });
+
+    expect(workspaceReadEnabled.every((enabled) => !enabled)).toBe(true);
+    expect(screen.queryByRole("alert")).toBeNull();
+    expect(screen.queryByText("Conversation not found")).toBeNull();
+    expect(screen.getByText("Checking how I can reach your code")).toBeDefined();
+
+    workspaceData = ASKING;
+    workspaceError = null;
+    act(() => useLangyStore.getState().confirmConversation("c_new"));
+
+    expect(workspaceReadEnabled.at(-1)).toBe(true);
+    expect(screen.getByText("How should I reach your code?")).toBeDefined();
+  });
+});
+
+describe("given an instance with no GitHub App configured", () => {
+  beforeEach(() => {
+    workspaceData = ASKING;
+    githubConfigured = false;
+    githubInstallations = [];
+  });
+
+  /** @scenario "Langy offers the local folder when GitHub is not set up on the instance" */
+  it("offers only the local folder, never the GitHub install", () => {
+    renderCard();
+
+    expect(screen.getByText("Share local folder")).toBeDefined();
+    expect(screen.queryByText("Connect to GitHub")).toBeNull();
   });
 });

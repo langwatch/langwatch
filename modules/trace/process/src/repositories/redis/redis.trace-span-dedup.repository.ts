@@ -70,27 +70,46 @@ export class RedisTraceSpanDedupRepository extends TraceSpanDedupRepository {
     this.#logger = logger;
   }
 
-  async claimProcessing(span: SpanDedupRef): Promise<SpanDedupClaim> {
+  async claimProcessing(spans: readonly SpanDedupRef[]): Promise<SpanDedupClaim[]> {
+    if (spans.length === 0) return [];
     try {
-      const claimed = await this.#connection.set(
-        dedupKey(span),
-        "processing",
-        "EX",
-        PROCESSING_TTL_SECONDS,
-        "NX",
-      );
-      return claimed === "OK" ? { outcome: "acquired" } : { outcome: "held" };
+      const replies = await this.#setEach({
+        spans,
+        value: "processing",
+        ttlSeconds: PROCESSING_TTL_SECONDS,
+        onlyIfAbsent: true,
+      });
+      return spans.map((span, index): SpanDedupClaim => {
+        const [error, reply] = replies[index] ?? [new Error("no reply to the claim"), null];
+        if (error) {
+          this.#logger.warn({ error, ...span }, "span dedup claim failed; ingesting anyway");
+          return { outcome: "unknown" };
+        }
+        return reply === "OK" ? { outcome: "acquired" } : { outcome: "held" };
+      });
     } catch (error) {
-      this.#logger.warn({ error, ...span }, "span dedup claim failed; ingesting anyway");
-      return { outcome: "unknown" };
+      this.#logger.warn(
+        { error, spans: spans.length },
+        "span dedup claim failed; ingesting anyway",
+      );
+      return spans.map(() => ({ outcome: "unknown" }));
     }
   }
 
-  async confirmProcessed(span: SpanDedupRef): Promise<void> {
+  async confirmProcessed(spans: readonly SpanDedupRef[]): Promise<void> {
+    if (spans.length === 0) return;
     try {
-      await this.#connection.set(dedupKey(span), "processed", "EX", CONFIRMED_TTL_SECONDS);
+      const replies = await this.#setEach({
+        spans,
+        value: "processed",
+        ttlSeconds: CONFIRMED_TTL_SECONDS,
+        onlyIfAbsent: false,
+      });
+      replies.forEach(([error], index) => {
+        if (error) this.#logger.warn({ error, ...spans[index] }, "span dedup confirmation failed");
+      });
     } catch (error) {
-      this.#logger.warn({ error, ...span }, "span dedup confirmation failed");
+      this.#logger.warn({ error, spans: spans.length }, "span dedup confirmation failed");
     }
   }
 
@@ -124,5 +143,42 @@ export class RedisTraceSpanDedupRepository extends TraceSpanDedupRepository {
     } catch (error) {
       this.#logger.warn({ error, ...record }, "usage record release failed");
     }
+  }
+
+  /**
+   * One SET per span, as one pipeline. A cluster spreads these keys over slots it
+   * will not pipeline together, so there each SET goes on its own, all at once.
+   */
+  async #setEach({
+    spans,
+    value,
+    ttlSeconds,
+    onlyIfAbsent,
+  }: {
+    spans: readonly SpanDedupRef[];
+    value: string;
+    ttlSeconds: number;
+    onlyIfAbsent: boolean;
+  }): Promise<[Error | null, unknown][]> {
+    if (this.#connection.isCluster) {
+      return Promise.all(
+        spans.map(async (span): Promise<[Error | null, unknown]> => {
+          try {
+            const reply = onlyIfAbsent
+              ? await this.#connection.set(dedupKey(span), value, "EX", ttlSeconds, "NX")
+              : await this.#connection.set(dedupKey(span), value, "EX", ttlSeconds);
+            return [null, reply];
+          } catch (error) {
+            return [error instanceof Error ? error : new Error(String(error)), null];
+          }
+        }),
+      );
+    }
+    const pipeline = this.#connection.pipeline();
+    for (const span of spans) {
+      if (onlyIfAbsent) pipeline.set(dedupKey(span), value, "EX", ttlSeconds, "NX");
+      else pipeline.set(dedupKey(span), value, "EX", ttlSeconds);
+    }
+    return (await pipeline.exec()) ?? [];
   }
 }

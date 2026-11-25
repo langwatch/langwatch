@@ -1,10 +1,30 @@
-import { createWriteStream } from "node:fs";
+import { createHash } from "node:crypto";
+import { createReadStream, createWriteStream } from "node:fs";
 import { Readable, Transform } from "node:stream";
 import { pipeline } from "node:stream/promises";
 
 import { nowInstant } from "@langwatch/time";
 
+import type { SupportedPlatform } from "../shared/platform.ts";
 import type { PredepTask } from "./types.ts";
+
+const RELEASE_ASSET_SLUGS: Partial<Record<SupportedPlatform, string>> = {
+  "darwin-arm64": "darwin-arm64",
+  "darwin-x64": "darwin-amd64",
+  "linux-arm64": "linux-arm64",
+  "linux-x64": "linux-amd64",
+};
+
+/** The platform's spelling in release asset names (`aigateway-<slug>`, `langwatch-app-<slug>`). */
+export function releaseAssetSlug(platform: string): string | undefined {
+  return RELEASE_ASSET_SLUGS[platform as SupportedPlatform];
+}
+
+export async function sha256OfFile(path: string): Promise<string> {
+  const hash = createHash("sha256");
+  await pipeline(createReadStream(path), hash);
+  return hash.digest("hex");
+}
 
 // Download URL to disk with progress reporting. Throttled for spinner updates.
 export async function downloadWithProgress({

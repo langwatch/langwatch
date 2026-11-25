@@ -66,4 +66,16 @@ export class ScenarioRunDispatchService extends ScenarioExecutionService {
       new Error("Recording a run cut at the call limit is not reached through run dispatch."),
     );
   }
+
+  recordRedTeamReport(): Promise<never> {
+    return Promise.reject(
+      new Error("Recording a red team run's report is not reached through run dispatch."),
+    );
+  }
+
+  recordHooks(): Promise<never> {
+    return Promise.reject(
+      new Error("Recording a run's hook results is not reached through run dispatch."),
+    );
+  }
 }

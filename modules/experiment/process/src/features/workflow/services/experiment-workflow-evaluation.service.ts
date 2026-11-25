@@ -3,6 +3,7 @@ import {
   type DatasetColumn,
   type DatasetReference,
   type EvaluationsV3State,
+  ExperimentEvaluationInputError,
   ExperimentRunLoopUnavailableError,
   extractPersistedState,
   findOrCreateWorkflowExperimentInputSchema,
@@ -39,8 +40,10 @@ import type {
 } from "../../../services/experiment-execution-data.service.ts";
 import { ExperimentExecutionDataService } from "../../../services/experiment-execution-data.service.ts";
 import { ExperimentResultDispatchService } from "../../../services/experiment-result-dispatch.service.ts";
+import { ExperimentRunDatasetVersionService } from "../../../services/experiment-run-dataset-version.service.ts";
 import type { ExperimentService } from "../../../services/experiment.service.ts";
 import type { ExperimentRunCommandDispatcherService } from "../../run/services/experiment-run-command-dispatcher.service.ts";
+import type { ExperimentRunConcurrencyService } from "../../run/services/experiment-run-concurrency.service.ts";
 import { ExperimentRunPlanService } from "../../run/services/experiment-run-plan.service.ts";
 import type { ExperimentRunErrorReporting } from "../../run/services/experiment-run-results-writer.service.ts";
 
@@ -48,8 +51,7 @@ type WorkflowEvaluationParameters = Record<string, string | number | boolean>;
 
 const logger = createLogger("langwatch:experiment:workflow-evaluation");
 
-// Stable id for the single workflow target of a workflow experiment.
-const WORKFLOW_TARGET_ID = "workflow-target";
+const WORKFLOW_TARGET_ID = "workflow-target"; // Stable id of a workflow experiment's one target.
 
 /**
  * Runs a studio workflow as an evaluations-v3 evaluation. The single
@@ -61,8 +63,8 @@ type WorkflowEvaluationDependencies = {
   workflowSource: ExperimentWorkflowDsl;
   /** The datasets, prompts, agents and evaluators the load reads through. */
   services: ExecutionDataServices;
-  /** Cells in flight at once for a run (`EVAL_V3_CONCURRENCY`). */
-  concurrency: number;
+  /** The cells in flight a run starts with, claimed against the shared budget until it ends. */
+  concurrency: Pick<ExperimentRunConcurrencyService, "startClaimed">;
   /** The run's progress fold: a start answers once it holds the run, and a redelivery reads it. */
   folds: ExperimentRunFoldRepository;
   /** What this process refuses of a run, for want of Redis or a public address. */
@@ -87,7 +89,7 @@ type PreparedEvaluation = {
 
 type WorkflowEvaluationInputs = Pick<
   WorkflowEvaluationRequest,
-  "projectId" | "workflowId" | "versionId" | "data" | "datasetId" | "parameters"
+  "projectId" | "workflowId" | "versionId" | "data" | "datasetId" | "datasetVersion" | "parameters"
 >;
 
 export class WorkflowEvaluationService {
@@ -127,6 +129,7 @@ export class WorkflowEvaluationService {
       total,
       ...(input.data ? { data: input.data } : {}),
       ...(input.datasetId ? { datasetId: input.datasetId } : {}),
+      ...(input.datasetVersion !== undefined ? { datasetVersion: input.datasetVersion } : {}),
       ...(input.parameters ? { parameters: input.parameters } : {}),
       ...(input.rowIndices ? { rowIndices: input.rowIndices } : {}),
     });
@@ -173,6 +176,7 @@ export class WorkflowEvaluationService {
           versionId: request.workflowVersionId,
           data: request.data,
           datasetId: request.datasetId,
+          datasetVersion: request.datasetVersion,
           parameters: request.parameters,
         }),
         runUrl: getRunUrl({
@@ -186,38 +190,47 @@ export class WorkflowEvaluationService {
       await this.failRequested({ request, error });
       return;
     }
-    const { prepared, runUrl } = started;
-    const { state, dataResult } = prepared;
-    const plan = ExperimentRunPlanService.create().buildPlan({
-      request: {
-        state,
-        scope: request.rowIndices
-          ? { type: "rows", rowIndices: request.rowIndices }
-          : { type: "full" },
-      },
-      data: dataResult,
-      concurrency: this.dependencies.concurrency,
-      origin: "workflow",
-      persistResults: false,
-      experimentSlug: request.experimentSlug,
-      runUrl,
+    const { state, dataResult, version } = started.prepared;
+    const { tenantId: projectId, runId } = request;
+    await this.dependencies.concurrency.startClaimed({ projectId, runId }, async (concurrency) => {
+      const plan = ExperimentRunPlanService.create().buildPlan({
+        request: {
+          state,
+          scope: request.rowIndices
+            ? { type: "rows", rowIndices: request.rowIndices }
+            : { type: "full" },
+        },
+        data: dataResult,
+        concurrency,
+        origin: "workflow",
+        persistResults: false,
+        experimentSlug: request.experimentSlug,
+        runUrl: started.runUrl,
+      });
+      await this.dependencies.requests.startExperimentRun({
+        tenantId: request.tenantId,
+        occurredAt: nowInstant().epochMilliseconds,
+        runId: request.runId,
+        experimentId: request.experimentId,
+        workflowVersionId: version.id,
+        total: plan.cells.length,
+        targets: ExperimentResultDispatchService.create().buildTargetMetadata({
+          targets: state.targets,
+          loadedPrompts: dataResult.loadedPrompts,
+          loadedAgents: dataResult.loadedAgents,
+          loadedEvaluators: dataResult.loadedEvaluators,
+          loadedWorkflows: dataResult.loadedWorkflows,
+        }),
+        plan,
+      });
     });
-
-    await this.dependencies.requests.startExperimentRun({
-      tenantId: request.tenantId,
-      occurredAt: nowInstant().epochMilliseconds,
+    await ExperimentRunDatasetVersionService.create({
+      datasets: this.dependencies.services.datasets,
+    }).link({
+      projectId: request.tenantId,
       runId: request.runId,
       experimentId: request.experimentId,
-      workflowVersionId: prepared.version.id,
-      total: plan.cells.length,
-      targets: ExperimentResultDispatchService.create().buildTargetMetadata({
-        targets: state.targets,
-        loadedPrompts: dataResult.loadedPrompts,
-        loadedAgents: dataResult.loadedAgents,
-        loadedEvaluators: dataResult.loadedEvaluators,
-        loadedWorkflows: dataResult.loadedWorkflows,
-      }),
-      plan,
+      datasetVersion: dataResult.datasetVersion,
     });
   }
 
@@ -253,6 +266,7 @@ export class WorkflowEvaluationService {
     versionId,
     data,
     datasetId,
+    datasetVersion,
     parameters,
   }: WorkflowEvaluationInputs): Promise<PreparedEvaluation> {
     const workflow = await this.dependencies.workflowSource.findEvaluableWorkflow({
@@ -282,11 +296,18 @@ export class WorkflowEvaluationService {
     });
 
     // Dataset precedence: caller data, then caller dataset id, then the workflow's attached
-    // dataset — a saved id loads fresh, and an inline one rides as the reference.
+    // dataset; a saved id loads fresh, and an inline one rides as the reference.
     const { resolvedDatasetId, datasetRef } =
       data || datasetId
         ? { resolvedDatasetId: datasetId, datasetRef: emptyDatasetRef(workflow.name) }
         : WorkflowEvaluationService.attachedDataset({ entry, workflowName: workflow.name });
+    if (datasetVersion !== undefined && !resolvedDatasetId) {
+      throw new ExperimentEvaluationInputError({
+        status: 400,
+        reason:
+          "A dataset_version names a saved dataset's version, and this run reads no saved dataset",
+      });
+    }
 
     const dataResult = await ExperimentExecutionDataService.create().loadExecutionData({
       projectId,
@@ -294,7 +315,12 @@ export class WorkflowEvaluationService {
       targets: [target],
       evaluators: [],
       services: this.dependencies.services,
-      inputs: { data, datasetId: resolvedDatasetId, parameters },
+      inputs: {
+        data,
+        datasetId: resolvedDatasetId,
+        ...(datasetVersion !== undefined ? { datasetVersion } : {}),
+        parameters,
+      },
     });
     const state = WorkflowEvaluationService.evaluationState({
       workflowName: workflow.name,
@@ -403,8 +429,7 @@ export class WorkflowEvaluationService {
   }): EvaluationsV3State {
     return {
       name: workflowName,
-      // The persisted dataset reference reflects what was actually evaluated, so the results page
-      // renders the right columns.
+      // What was actually evaluated, so the results page renders the right columns.
       datasets: [
         persistedDatasetRef({
           workflowName,

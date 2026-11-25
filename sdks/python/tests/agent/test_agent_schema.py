@@ -147,6 +147,7 @@ def test_turn_fields_are_never_parameters():
         new_messages,
         thread_id: str,
         session=None,
+        state=None,
         trace_id: str = "",
         plan: str = "free",
     ):
@@ -159,6 +160,7 @@ def test_turn_fields_are_never_parameters():
         "new_messages",
         "thread_id",
         "session",
+        "state",
         "trace_id",
     ]
     assert list(signature.parameters) == ["plan"]
@@ -167,6 +169,7 @@ def test_turn_fields_are_never_parameters():
         "new_messages",
         "thread_id",
         "session",
+        "state",
         "trace_id",
     }
 

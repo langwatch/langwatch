@@ -149,6 +149,7 @@ export const webhookRest = defineRestRouter(WebhookApi)
   .withAddressing("v1-in-path")
 
   .post("/endpoints", "postApiWebhooksV1Endpoints")
+  .keepsRecords()
   .withInput(createEndpointSchema)
   .withPermission("webhookEndpoints:manage")
   .withOutput(endpointWithSecretResponseSchema)
@@ -211,6 +212,7 @@ export const webhookRest = defineRestRouter(WebhookApi)
   })
 
   .patch("/endpoints/:id", "patchApiWebhooksV1EndpointsById")
+  .keepsRecords()
   .withParams(endpointIdParams)
   .withInput(updateEndpointSchema)
   .withPermission("webhookEndpoints:manage")
@@ -251,6 +253,7 @@ export const webhookRest = defineRestRouter(WebhookApi)
     description: "Archive a webhook endpoint",
   })
   .withAudit("management.webhook-endpoints.archive")
+  .withoutConfirmation("Langy keys cannot hold webhookEndpoints:manage")
   .handle(async ({ app, input, scope }) => {
     await app.assertEndpointsEntitled(scope.id);
 
@@ -259,6 +262,7 @@ export const webhookRest = defineRestRouter(WebhookApi)
   })
 
   .post("/endpoints/:id/roll-secret", "postApiWebhooksV1EndpointsByIdRollSecret")
+  .keepsRecords()
   .withParams(endpointIdParams)
   .withInput(rollEndpointSecretBodySchema)
   .withPermission("webhookEndpoints:manage")
@@ -281,6 +285,7 @@ export const webhookRest = defineRestRouter(WebhookApi)
   })
 
   .post("/endpoints/:id/test", "postApiWebhooksV1EndpointsByIdTest")
+  .keepsRecords()
   .withoutAudit("run, not a change")
   .withParams(endpointIdParams)
   .withInput(testEndpointBodySchema)

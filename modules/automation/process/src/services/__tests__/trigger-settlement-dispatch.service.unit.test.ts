@@ -12,7 +12,8 @@ import { AutomationTraceRecordUnavailableError } from "../../repositories/automa
 
 const loggerWarn = vi.hoisted(() => vi.fn());
 
-vi.mock("@langwatch/observability", () => ({
+vi.mock("@langwatch/observability", async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
   createLogger: () => ({
     debug: vi.fn(),
     info: vi.fn(),

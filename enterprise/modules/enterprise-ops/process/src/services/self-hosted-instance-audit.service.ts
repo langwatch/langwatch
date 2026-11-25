@@ -7,11 +7,17 @@ import type {
   SelfHostedInstanceFilters,
   SelfHostedInstancePage,
   SelfHostedInstanceSummary,
+  UpgradeDiagnosticsDownload,
+  UpgradeDiagnosticsReport,
 } from "@langwatch/enterprise-licensing-contract";
 
 type Instances = Pick<
   LicensingApi,
-  "listSelfHostedInstances" | "getSelfHostedInstance" | "summarizeSelfHostedInstances"
+  | "listSelfHostedInstances"
+  | "getSelfHostedInstance"
+  | "summarizeSelfHostedInstances"
+  | "findUpgradeDiagnostics"
+  | "getUpgradeDiagnosticsDownload"
 >;
 
 export class SelfHostedInstanceAuditService {
@@ -72,5 +78,33 @@ export class SelfHostedInstanceAuditService {
       targetId: input.id,
     });
     return this.instances.getSelfHostedInstance({ id: input.id });
+  }
+
+  async findDiagnostics(input: {
+    operatorId: string;
+    instanceRowId: string;
+  }): Promise<UpgradeDiagnosticsReport[]> {
+    await this.auditLog.record({
+      userId: input.operatorId,
+      action: "selfHostedInstances.findDiagnostics",
+      args: { instanceRowId: input.instanceRowId },
+      targetKind: "selfHostedInstance",
+      targetId: input.instanceRowId,
+    });
+    return this.instances.findUpgradeDiagnostics({ instanceRowId: input.instanceRowId });
+  }
+
+  async getDiagnosticsDownload(input: {
+    operatorId: string;
+    id: string;
+  }): Promise<UpgradeDiagnosticsDownload> {
+    await this.auditLog.record({
+      userId: input.operatorId,
+      action: "selfHostedInstances.getDiagnosticsDownload",
+      args: { id: input.id },
+      targetKind: "upgradeDiagnostics",
+      targetId: input.id,
+    });
+    return this.instances.getUpgradeDiagnosticsDownload({ id: input.id });
   }
 }

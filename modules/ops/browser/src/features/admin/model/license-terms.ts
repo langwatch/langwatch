@@ -1,6 +1,8 @@
 /** A registry row as Cloud admin reads it (ADR-156). Declared here, not
  * derived from `RouterOutputs`: model stays pure and behavior depends on it,
  * never the reverse. */
+import { developerSeatsInputSchema } from "@langwatch/ops-contract";
+
 export interface License {
   id: string;
   licenseId: string;
@@ -11,6 +13,8 @@ export interface License {
   maxMembers: number;
   maxMembersLite: number | null;
   liteSeatsUnlimited: boolean;
+  /** Null when the licence states none, which sells none. */
+  maxMembersDeveloper: number | null;
   issuedAt: string;
   expiresAt: string;
   source: string;
@@ -32,6 +36,9 @@ export interface License {
   status: "active" | "revoked" | "superseded" | "expired";
   hasPendingDelivery: boolean;
 }
+
+/** What each list filter choice would show, the other applied; `all`: the search alone. */
+export type LicenseCounts = Record<"active" | "inactive" | "customer" | "internal" | "all", number>;
 
 /** The hosted services an operator can put on a license (ADR-156); kept a
  * plain array here since a core browser package names no enterprise one. */
@@ -101,4 +108,14 @@ export function termsPayload(form: TermsForm) {
     overageEnabled: form.overageEnabled,
     overageMaxUsdCents: form.overageEnabled ? dollarsToCents(form.overageMax) : null,
   };
+}
+
+/** Why a typed Developer seat count cannot be sent, or undefined when it can (or is empty). */
+export function developerSeatsProblem(value: string): string | undefined {
+  if (value.trim() === "") return undefined;
+  const parsed = developerSeatsInputSchema.safeParse(Number(value));
+  if (parsed.success) return undefined;
+  return parsed.error.issues[0]?.code === "too_big"
+    ? parsed.error.issues[0].message
+    : "Enter a whole number of Developer seats, 0 or more.";
 }

@@ -1,6 +1,6 @@
 /** Spec: specs/migration/system-migrations-runner.feature */
 import { SCHEDULED_SINGLETON_PROJECT_ID } from "@langwatch/eventing";
-import type { MigrationPassSummary } from "@langwatch/system-migrations";
+import type { HeldReason, MigrationPassSummary } from "@langwatch/system-migrations";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { nowInstant } from "@langwatch/time";
 import type { TenantStepStateRow } from "@langwatch/upgrade/step/tenant-state";
@@ -25,10 +25,10 @@ const QUIET: MigrationPassSummary = {
   advanced: 0,
 };
 
-function heldRow(heldReason: "proof" | "pending"): TenantStepStateRow {
+function heldRow(heldReason: HeldReason, tenantId = "tenant"): TenantStepStateRow {
   return {
     migrationName: "step",
-    tenantId: "tenant",
+    tenantId,
     status: "migrated",
     report: null,
     heldReason,
@@ -47,6 +47,12 @@ function serviceWith({
   for (const pass of passes) runPass.mockResolvedValueOnce(pass);
   runPass.mockResolvedValue(QUIET);
   const requestPass = vi.fn<SystemMigrationsServiceDependencies["requestPass"]>(async () => {});
+  const findRecordsByStatus = vi.fn<SystemMigrationStateReader["findRecordsByStatus"]>(
+    async ({ heldReason, limit }) =>
+      held
+        .filter((row) => heldReason === undefined || row.heldReason === heldReason)
+        .slice(0, limit),
+  );
   const service = SystemMigrationsService.create(
     createApiFixture<SystemMigrationsServiceDependencies>(
       {
@@ -54,14 +60,14 @@ function serviceWith({
         requestPass,
         hasTenantAwaitingRedrive: vi.fn(async () => true),
         state: createApiFixture<SystemMigrationStateReader>(
-          { findRecordsByStatus: async () => held },
+          { findRecordsByStatus },
           "system migration state",
         ),
       },
       "system migration deps",
     ),
   );
-  return { service, runPass, requestPass };
+  return { service, runPass, requestPass, findRecordsByStatus };
 }
 
 async function run(promise: Promise<void>): Promise<void> {
@@ -123,6 +129,24 @@ describe("SystemMigrationsService.executePass", () => {
 
       await run(service.executePass({ redrive: true }));
 
+      expect(requestPass).toHaveBeenCalledOnce();
+    });
+  });
+
+  describe("when many tenants wait on a person and one waits on its queued work", () => {
+    /** @scenario "A tenant held for queued work is pending however many tenants wait on a person" */
+    it("asks only for tenants held for queued work and reports the pass pending", async () => {
+      const waiting = Array.from({ length: 500 }, (_, index) => heldRow("person", `user-${index}`));
+      const { service, requestPass, findRecordsByStatus } = serviceWith({
+        passes: [QUIET],
+        held: [...waiting, heldRow("pending")],
+      });
+
+      await run(service.executePass({ redrive: true }));
+
+      expect(findRecordsByStatus).toHaveBeenCalledWith(
+        expect.objectContaining({ statuses: ["migrated"], heldReason: "pending" }),
+      );
       expect(requestPass).toHaveBeenCalledOnce();
     });
   });

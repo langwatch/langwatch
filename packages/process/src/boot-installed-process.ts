@@ -8,6 +8,7 @@ import type {
   ModuleSecretsScope,
   ServerRole,
 } from "./feature-installer.ts";
+import type { IdIndexRetention } from "./migration/id-index-fill-step.ts";
 import type { ExposedSurface } from "./process-supply.ts";
 import type { TestPeer } from "./testing.ts";
 
@@ -23,6 +24,8 @@ export async function bootInstalledProcess(options: {
   /** Scopes the stores' operator reads per module; omitted where the stores mint none. */
   operatorReads?: ModuleOperatorReadsScope;
   surface?: (peers: TransportPeers) => ExposedSurface<unknown, unknown>;
+  /** Raises an id index's retention for each module's fill step; omitted where none runs. */
+  idIndexRetention?: IdIndexRetention;
   /** Stand-ins for uninstalled peers: `testPeer` from `@langwatch/process/testing`. */
   peers?: readonly TestPeer[];
 }) {

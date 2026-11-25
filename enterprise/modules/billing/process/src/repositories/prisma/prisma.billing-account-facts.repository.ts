@@ -118,6 +118,28 @@ export class PrismaBillingOrganizationRepository extends BillingAccountFactsRepo
     };
   }
 
+  async findMemberEmails({
+    organizationId,
+    userIds,
+  }: {
+    organizationId: string;
+    userIds: readonly string[];
+  }): Promise<{ userId: string; email: string }[]> {
+    if (userIds.length === 0) return [];
+    const members = await this.prisma.organizationUser.findMany({
+      where: {
+        organizationId,
+        userId: { in: [...userIds] },
+        disabledAt: null,
+        user: { deactivatedAt: null },
+      },
+      select: { userId: true, user: { select: { email: true } } },
+    });
+    return members.flatMap((member) =>
+      member.user.email ? [{ userId: member.userId, email: member.user.email }] : [],
+    );
+  }
+
   async findActiveMemberIds(organizationId: string): Promise<string[]> {
     const members = await this.prisma.organizationUser.findMany({
       where: { organizationId, disabledAt: null, user: { deactivatedAt: null } },

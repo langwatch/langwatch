@@ -206,6 +206,13 @@ const ARITHMETIC_FUNCTIONS = [
 ] as const;
 
 /**
+ * A 128-bit or 64-bit key for an id or a tuple of ids, so a join, group or set over millions of
+ * traces or spans holds 16 or 8 bytes a row instead of the ids (analytics ADR-004). Deterministic
+ * and pure.
+ */
+const HASH_FUNCTIONS = ["sipHash128", "cityHash64"] as const;
+
+/**
  * Strings, for grouping and filtering on names, models and attribute values. The
  * regular-expression members are RE2 through ClickHouse, and the cost of one is bounded by the
  * same server-side execution ceilings as everything else.
@@ -379,6 +386,7 @@ const FUNCTION_NAME_SOURCES: readonly string[] = [
   ...WINDOW_FUNCTIONS,
   ...DATE_TIME_FUNCTIONS,
   ...ARITHMETIC_FUNCTIONS,
+  ...HASH_FUNCTIONS,
   ...STRING_FUNCTIONS,
   ...CONDITIONAL_FUNCTIONS,
   ...COLLECTION_FUNCTIONS,

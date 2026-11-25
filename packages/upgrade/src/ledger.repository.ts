@@ -25,6 +25,8 @@ import {
   upcastStepStatus,
 } from "./ledger.ts";
 import type { UpgradePostgres } from "./ports.ts";
+import { redactSecrets } from "./runner/run-log.ts";
+import { type LedgerTextRedactor, ledgerText } from "./step/step-log.ts";
 
 // The columns are TIMESTAMP(3) holding UTC, as Prisma writes them; read back as instants.
 const NOW_UTC = `(now() AT TIME ZONE 'UTC')`;
@@ -90,10 +92,20 @@ const ROSTER_COLUMNS = [
 
 /** The runner's own ledger tables. Only the runner package reads or writes them. */
 export class UpgradeLedgerRepository {
-  private constructor(private readonly postgres: UpgradePostgres) {}
+  private constructor(
+    private readonly postgres: UpgradePostgres,
+    private readonly redact: LedgerTextRedactor,
+  ) {}
 
-  static create({ postgres }: { postgres: UpgradePostgres }): UpgradeLedgerRepository {
-    return new UpgradeLedgerRepository(postgres);
+  /** `redact` masks stored step and target errors; the gate passes one that knows its URLs. */
+  static create({
+    postgres,
+    redact = redactSecrets,
+  }: {
+    postgres: UpgradePostgres;
+    redact?: LedgerTextRedactor;
+  }): UpgradeLedgerRepository {
+    return new UpgradeLedgerRepository(postgres, redact);
   }
 
   /** Runs `text` against this installation's ledger tables (`ledgerTables`). */
@@ -168,7 +180,11 @@ export class UpgradeLedgerRepository {
         steps.map((step) => step.kind),
         steps.map((step) => step.mode),
         steps.map((step) => step.status),
-        steps.map((step) => step.lastError),
+        steps.map((step) =>
+          step.lastError === null
+            ? null
+            : ledgerText({ text: step.lastError, redact: this.redact }),
+        ),
         runId,
       ],
     );
@@ -268,7 +284,13 @@ export class UpgradeLedgerRepository {
               "last_error" = EXCLUDED."last_error",
               "updated_at" = EXCLUDED."updated_at"
        RETURNING ${TARGET_COLUMNS}`,
-      [stepId, target, status, version, lastError],
+      [
+        stepId,
+        target,
+        status,
+        version,
+        lastError === null ? null : ledgerText({ text: lastError, redact: this.redact }),
+      ],
     );
     return upgradeTargetSchema.parse(rows[0]);
   }

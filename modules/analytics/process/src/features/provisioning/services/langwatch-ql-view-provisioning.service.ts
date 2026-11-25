@@ -4,20 +4,23 @@
  * @see ./langwatch-ql-view-statements.service.ts — the views
  * @see ./langwatch-ql-access-model.service.ts — the access model applied over them
  */
+
 import { LWQL_VIEW_CATALOG, TENANT_COLUMN } from "../../../rules/lwql-view-catalog.rules.ts";
+import type { LangWatchQLDedupStrategy } from "../../../rules/lwql-view-dedup-shape.rules.ts";
 import type {
   LangWatchQLNames,
   LangWatchQLTable,
 } from "../../../services/langwatch-ql-access-model.service.ts";
 import {
   LangWatchQLCatalogShapesService,
-  type LangWatchQLDedupStrategy,
   type LangWatchQLViewDefinition,
 } from "../../../services/langwatch-ql-catalog-shapes.service.ts";
 import { LangWatchQLViewStatementsService } from "./langwatch-ql-view-statements.service.ts";
+import { LangWatchQLViewTwinStatementsService } from "./langwatch-ql-view-twin-statements.service.ts";
 
 const catalogShapes = LangWatchQLCatalogShapesService.create();
 const viewStatements = LangWatchQLViewStatementsService.create();
+const twinStatements = LangWatchQLViewTwinStatementsService.create();
 
 /** The grants, row-policy sources and ordered setup list the views need. */
 export class LangWatchQLViewProvisioningService {
@@ -91,8 +94,10 @@ export class LangWatchQLViewProvisioningService {
     dedup: LangWatchQLDedupStrategy;
   }): string[] {
     // Grants and row policies are the access model's (ADR-159), emitted from its definition.
-    return views.map((view) =>
+    return views.flatMap((view) => [
       viewStatements.viewStatement({ names, sourceDatabase, view, dedup }),
-    );
+      ...twinStatements.flooredViewStatements({ names, sourceDatabase, view, dedup }),
+      ...twinStatements.traceIdsViewStatements({ names, sourceDatabase, view, dedup }),
+    ]);
   }
 }

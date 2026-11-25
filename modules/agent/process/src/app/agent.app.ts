@@ -54,6 +54,12 @@ import {
   type AgentOverviewPage,
   type AgentPage,
   type AgentOverview,
+  type AgentCaller,
+  type AgentLabel,
+  type AgentVersions,
+  type AgentVersionSelector,
+  type AssignAgentLabelInput,
+  type RemoveAgentLabelInput,
 } from "@langwatch/agent-contract";
 import { AuditLogApi } from "@langwatch/audit-log-contract";
 import { type AuthzPermission } from "@langwatch/authorization";
@@ -61,6 +67,7 @@ import { AuthzApi } from "@langwatch/authz-contract";
 import type { EventingCommands } from "@langwatch/eventing";
 import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { generate } from "@langwatch/ksuid";
+import { createLogger } from "@langwatch/observability";
 import type { FeatureSetup } from "@langwatch/process";
 import { ProjectApi, ProjectNotFoundError } from "@langwatch/project-contract";
 import { SecretApi } from "@langwatch/secret-contract";
@@ -81,6 +88,7 @@ import { agentPlatformUrl } from "../rules/agent-platform-url.rules.ts";
 import { agentWithResolvedFields, declaredAgentParameters } from "../rules/agent-view.rules.ts";
 import { AgentCopyService } from "../services/agent-copy.service.ts";
 import { AgentHttpSecretsService } from "../services/agent-http-secrets.service.ts";
+import { AgentVersionService } from "../services/agent-version.service.ts";
 import { AgentVoiceReleaseService } from "../services/agent-voice-release.service.ts";
 import { AgentWorkflowFieldsService } from "../services/agent-workflow-fields.service.ts";
 import { AgentService } from "../services/agent.service.ts";
@@ -96,6 +104,11 @@ import { ConnectedAgentService } from "../services/connected-agent.service.ts";
  * the id format already written to the store, so it belongs with the writer.
  */
 const THREAD_KSUID_RESOURCE = "thread";
+
+/** The KSUID resource for one agent write's change id, minted once per write. */
+const AGENT_CHANGE_KSUID_RESOURCE = "agentchange";
+
+const logger = createLogger("langwatch:agent:read-hints");
 
 /**
  * The relay behind connected agents runs on the live tier's Redis state and
@@ -124,6 +137,7 @@ export class AgentModule implements AgentApi {
   };
 
   readonly #agents: AgentService;
+  readonly #versions: AgentVersionService;
   readonly #presence = ConnectedAgentPresenceService.create();
   readonly #copies: AgentCopyService;
   readonly #voiceRelease: AgentVoiceReleaseService;
@@ -139,6 +153,12 @@ export class AgentModule implements AgentApi {
 
   private constructor({ repositories, channels, dependencies, config, resources }: AgentSetup) {
     this.#agents = AgentService.create(repositories.agents);
+    this.#versions = AgentVersionService.create({
+      repository: repositories.agents,
+      users: dependencies.users,
+      permissions: dependencies.permissions,
+      auditLog: dependencies.auditLog,
+    });
     this.#httpSecrets = AgentHttpSecretsService.create({
       secrets: dependencies.secrets,
       agents: this.#agents,
@@ -186,10 +206,32 @@ export class AgentModule implements AgentApi {
     return this.#enrich(await this.#agents.getAll(input), input);
   }
 
-  async getById(input: GetAgentInput & { viewerUserId?: string | null }): Promise<AgentOverview> {
-    const agent = await this.#agents.getById(input);
+  async getById(
+    input: GetAgentInput & { viewerUserId?: string | null } & AgentVersionSelector,
+  ): Promise<AgentOverview> {
+    const { agent, pinned } = await this.#versions.resolve({
+      projectId: input.projectId,
+      address: input.id,
+      label: input.label,
+      version: input.version,
+    });
     const [enriched] = await this.#enrich([agent], input);
-    return enriched!;
+    return { ...enriched!, version: pinned ?? enriched!.version };
+  }
+
+  listVersions(input: { projectId: string; agentId: string }): Promise<AgentVersions> {
+    return this.#versions.listVersions(input);
+  }
+
+  async assignLabel(input: AssignAgentLabelInput & { caller?: AgentCaller }): Promise<AgentLabel> {
+    const label = await this.#versions.assignLabel(input);
+    await this.#recordChanged({ id: input.agentId, projectId: input.projectId });
+    return label;
+  }
+
+  async removeLabel(input: RemoveAgentLabelInput): Promise<void> {
+    await this.#versions.removeLabel(input);
+    await this.#recordChanged({ id: input.agentId, projectId: input.projectId });
   }
 
   list(input: ListAgentsInput): Promise<AgentPage> {
@@ -203,27 +245,38 @@ export class AgentModule implements AgentApi {
     return { ...page, data: await this.#enrich(page.data, input) };
   }
 
-  async create(input: CreateAgentCommand): Promise<AgentWithFields> {
+  async create(input: CreateAgentCommand & { caller?: AgentCaller }): Promise<AgentWithFields> {
     await this.#voiceRelease.assertWritable({ type: input.type, projectIds: [input.projectId] });
-    return agentWithResolvedFields(
-      await this.#agents.create(await this.#httpSecrets.forCreate(input)),
-    );
+    const created = await this.#agents.create({
+      ...(await this.#httpSecrets.forCreate(input)),
+      caller: input.caller,
+    });
+    await this.#recordChanged(created);
+    return agentWithResolvedFields(created);
   }
 
-  async update(input: UpdateAgentCommand): Promise<AgentWithFields> {
+  async update(input: UpdateAgentCommand & { caller?: AgentCaller }): Promise<AgentWithFields> {
     // A config-only save of a stored voice agent names no type, so the stored row is asked too.
     const type =
       input.type === "voice"
         ? input.type
         : (await this.#agents.getById({ id: input.id, projectId: input.projectId })).type;
     await this.#voiceRelease.assertWritable({ type, projectIds: [input.projectId] });
-    return agentWithResolvedFields(
-      await this.#agents.update(await this.#httpSecrets.forUpdate(input)),
-    );
+    const updated = await this.#agents.update({
+      ...(await this.#httpSecrets.forUpdate(input)),
+      caller: input.caller,
+    });
+    await this.#recordChanged(updated);
+    return agentWithResolvedFields(updated);
   }
 
-  async archive(input: GetAgentInput): Promise<Agent> {
-    const agent = await this.#agents.archive(input);
+  async archive(input: GetAgentInput & { caller?: AgentCaller }): Promise<Agent> {
+    await this.#versions.assertArchivable({
+      projectId: input.projectId,
+      agentId: input.id,
+      caller: input.caller,
+    });
+    const agent = await this.#agents.archive({ id: input.id, projectId: input.projectId });
     await this.#recordArchived({ agent, cascadedWorkflowId: null });
     return agent;
   }
@@ -281,14 +334,20 @@ export class AgentModule implements AgentApi {
     return this.#agents.getConnectedByNameAndEnvironment(input);
   }
 
-  async cascadeArchive(input: GetAgentInput): Promise<{
+  async cascadeArchive(input: GetAgentInput & { caller?: AgentCaller }): Promise<{
     agent: Agent;
     archivedWorkflow: {
       id: string;
     } | null;
   }> {
-    const [workflowId] = findLinkedWorkflowIds(await this.#agents.getById(input));
-    const agent = await this.#agents.archive(input);
+    const target = { id: input.id, projectId: input.projectId };
+    const [workflowId] = findLinkedWorkflowIds(await this.#agents.getById(target));
+    await this.#versions.assertArchivable({
+      projectId: input.projectId,
+      agentId: input.id,
+      caller: input.caller,
+    });
+    const agent = await this.#agents.archive(target);
     // Workflow archives the graph from its own side on the fact, seconds later (plan §7, R7).
     await this.#recordArchived({ agent, cascadedWorkflowId: workflowId ?? null });
     return { agent, archivedWorkflow: workflowId ? { id: workflowId } : null };
@@ -307,15 +366,40 @@ export class AgentModule implements AgentApi {
   /** Keeps linked graphs' fields from workflow's facts, from agent's own side (§9). */
   workflowFieldsPipeline(): AgentWorkflowFieldsPipeline {
     return buildAgentWorkflowFieldsPipeline({
-      fields: AgentWorkflowFieldsService.create({ agents: this.#agents }),
+      fields: AgentWorkflowFieldsService.create({
+        agents: this.#agents,
+        recordChanged: (agent) => this.#recordChanged(agent),
+      }),
     });
   }
 
-  async #recordArchived(input: { agent: Agent; cascadedWorkflowId: string | null }): Promise<void> {
+  /** Every write says so, so each read refetches; the write already committed, so a miss logs. */
+  async #recordChanged(agent: { id: string; projectId: string }): Promise<void> {
+    try {
+      await this.#connectedLifecycle().recordAgentChanged.send({
+        tenantId: agent.projectId,
+        occurredAt: nowInstant().epochMilliseconds,
+        agentId: agent.id,
+        projectId: agent.projectId,
+        changeId: generate(AGENT_CHANGE_KSUID_RESOURCE).toString(),
+      });
+    } catch (error) {
+      logger.warn(
+        { error, agentId: agent.id, projectId: agent.projectId },
+        "agent changed read hint was not recorded",
+      );
+    }
+  }
+
+  #connectedLifecycle(): EventingCommands<AgentLifecyclePipeline> {
     if (!this.#lifecycleCommands) {
       throw new Error("agent_lifecycle pipeline senders are not connected yet");
     }
-    await this.#lifecycleCommands.recordAgentArchived.send({
+    return this.#lifecycleCommands;
+  }
+
+  async #recordArchived(input: { agent: Agent; cascadedWorkflowId: string | null }): Promise<void> {
+    await this.#connectedLifecycle().recordAgentArchived.send({
       tenantId: input.agent.projectId,
       occurredAt: nowInstant().epochMilliseconds,
       agentId: input.agent.id,
@@ -342,22 +426,31 @@ export class AgentModule implements AgentApi {
     });
   }
 
-  createCopy(input: CopyAgentCommand): Promise<AgentCopyCreated> {
-    return this.#copies.createCopy(input);
+  async createCopy(input: CopyAgentCommand): Promise<AgentCopyCreated> {
+    const copy = await this.#copies.createCopy(input);
+    await this.#recordChanged(copy);
+    await this.#recordChanged({ id: input.sourceAgentId, projectId: input.sourceProjectId });
+    return copy;
   }
-  pushToCopies(input: PushAgentCopiesInput): Promise<{
+  async pushToCopies(input: PushAgentCopiesInput): Promise<{
     pushedTo: number;
     selectedCopies: number;
   }> {
-    return this.#copies.pushToCopies(input);
+    const { written, ...pushed } = await this.#copies.pushToCopies(input);
+    for (const copy of written) await this.#recordChanged(copy);
+    await this.#recordChanged({ id: input.sourceAgentId, projectId: input.sourceProjectId });
+    return pushed;
   }
   getSourceOfCopy(input: AgentReferenceInput): Promise<Agent> {
     return this.#copies.getSourceOfCopy(input);
   }
-  syncFromSource(input: AgentReferenceInput): Promise<{
+  async syncFromSource(input: AgentReferenceInput): Promise<{
     ok: true;
   }> {
-    return this.#copies.syncFromSource(input);
+    const { source, ...synced } = await this.#copies.syncFromSource(input);
+    await this.#recordChanged({ id: input.agentId, projectId: input.projectId });
+    await this.#recordChanged(source);
+    return synced;
   }
 
   async getCopiesForActor(input: AgentReferenceInput & { actorId: string }): Promise<AgentCopy[]> {
@@ -470,6 +563,9 @@ export class AgentModule implements AgentApi {
         session: input.session,
         traceparent: input.traceparent ?? context.traceparent,
         run: input.run ?? {},
+        kind: input.kind,
+        state: input.state,
+        timeoutMs: input.timeoutMs,
       },
       signal: context.signal,
     });
@@ -477,6 +573,7 @@ export class AgentModule implements AgentApi {
     return {
       output: outcome.output,
       ...(outcome.session !== void 0 ? { session: outcome.session } : {}),
+      ...(outcome.state != null ? { state: outcome.state } : {}),
       instance: { hostname: outcome.instance.hostname, label: outcome.instance.label },
       durationMs: outcome.durationMs,
     };
@@ -539,14 +636,24 @@ export class AgentModule implements AgentApi {
 
   async #enrich(agents: Agent[], input: AgentProjectInput & { viewerUserId?: string | null }) {
     const owned = agents.map((agent) => ({ ...agent, ownerUserId: agent.ownerUserId ?? null }));
-    const [owners, presence] = await Promise.all([
+    const [owners, presence, summaries, people] = await Promise.all([
       this.ownersOf(owned),
       this.#connected?.listPresence({ projectId: input.projectId, agents }) ??
         Promise.resolve(new Map<string, AgentPresence>()),
+      this.#versions.summaries({
+        projectId: input.projectId,
+        ids: agents.map((agent) => agent.id),
+      }),
+      this.#peopleNamed(agents.flatMap((agent) => [agent.createdById, agent.updatedById])),
     ]);
+    const person = (id: string | null | undefined) => (id ? (people.get(id) ?? null) : null);
 
     return owned.map((agent) => ({
       ...agentWithResolvedFields(agent),
+      version: summaries.get(agent.id)?.version ?? null,
+      labels: summaries.get(agent.id)?.labels ?? [],
+      createdBy: person(agent.createdById),
+      updatedBy: person(agent.updatedById),
       environment: agent.environment ?? null,
       ownerUserId: agent.ownerUserId ?? null,
       hostLabel: agent.hostLabel ?? null,
@@ -559,6 +666,14 @@ export class AgentModule implements AgentApi {
         viewerUserId: input.viewerUserId,
       }),
     }));
+  }
+
+  async #peopleNamed(
+    ids: readonly (string | null | undefined)[],
+  ): Promise<Map<string, { id: string; name: string | null }>> {
+    const userIds = [...new Set(ids.flatMap((id) => (id ? [id] : [])))];
+    const users = userIds.length ? await this.#users.getProfiles({ userIds }) : [];
+    return new Map(users.map((user) => [user.id, { id: user.id, name: user.name ?? user.email }]));
   }
 
   async #permittedCopies(

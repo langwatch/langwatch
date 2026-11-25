@@ -3,17 +3,17 @@
  * page's created facts, then department assignments, then presence settings sent as one batch
  * each. Spec: modules/project/specs/project-service.feature
  */
-import { nowInstant } from "@langwatch/time";
-
-import type { ProjectBackfillRow, ProjectRepository } from "../repositories/project.repository.ts";
+import type { ProjectRepository } from "../repositories/project.repository.ts";
 import type { ProjectCreatedNoticeService } from "./project-created-notice.service.ts";
-
-const PAGE_SIZE = 2000;
+import { ProjectTablePagingService } from "./project-table-paging.service.ts";
 
 export type ProjectFactsBackfillReport = {
   projects: number;
   departmentAssignments: number;
   presenceSettings: number;
+  /** Projects whose team or organization is gone, so the step records nothing for them. */
+  skippedOrphans: number;
+  orphanProjectIds: string[];
 };
 
 export type ProjectFactsBackfillRun = Readonly<{
@@ -31,14 +31,20 @@ export type ProjectFactsBackfillRun = Readonly<{
 type Dependencies = Readonly<{
   projects: Pick<ProjectRepository, "findBackfillPage">;
   lifecycle: Pick<ProjectCreatedNoticeService, "recordBackfillPage">;
+  logger: Readonly<{ warn(payload: Readonly<Record<string, unknown>>, message: string): void }>;
 }>;
 
 /**
  * Every project is recorded as created, archived ones included; a live project also has its
  * department and presence setting recorded. Keyed per project, so a rerun adds nothing new.
+ * A project left without a team or organization is skipped and counted, never retried.
  */
 export class ProjectFactsBackfillService {
-  private constructor(private readonly deps: Dependencies) {}
+  readonly #table: ProjectTablePagingService;
+
+  private constructor(private readonly deps: Dependencies) {
+    this.#table = ProjectTablePagingService.create(deps);
+  }
 
   static create(deps: Dependencies): ProjectFactsBackfillService {
     return new ProjectFactsBackfillService(deps);
@@ -51,24 +57,28 @@ export class ProjectFactsBackfillService {
     countedBefore,
     onPageDone,
   }: ProjectFactsBackfillRun): Promise<ProjectFactsBackfillReport> {
-    const report: ProjectFactsBackfillReport = { ...countedBefore };
-    let cursor = afterProjectId;
-    while (!signal.aborted) {
-      // Taken before the read, so a change saved meanwhile is the newer fact.
-      const occurredAt = nowInstant().epochMilliseconds;
-      const page = await this.deps.projects.findBackfillPage({ afterId: cursor, limit: PAGE_SIZE });
-      const last = page.at(-1);
-      if (!last) break;
-      const live: ProjectBackfillRow[] = page.filter((project) => !project.isArchived);
-      if (!dryRun) {
-        await this.deps.lifecycle.recordBackfillPage({ created: page, live, occurredAt });
-      }
-      report.projects += page.length;
-      report.departmentAssignments += live.length;
-      report.presenceSettings += live.length;
-      cursor = last.id;
-      if (!dryRun) await onPageDone({ afterProjectId: cursor, report: { ...report } });
-    }
+    const report: ProjectFactsBackfillReport = {
+      ...countedBefore,
+      orphanProjectIds: [...countedBefore.orphanProjectIds],
+    };
+    await this.#table.walk({
+      stepName: "the project facts step",
+      afterProjectId,
+      orphans: report,
+      signal,
+      onPage: async ({ projects, orphans, afterProjectId: cursor, occurredAt }) => {
+        const live = projects.filter((project) => !project.isArchived);
+        if (!dryRun && projects.length > 0) {
+          await this.deps.lifecycle.recordBackfillPage({ created: projects, live, occurredAt });
+        }
+        report.projects += projects.length;
+        report.departmentAssignments += live.length;
+        report.presenceSettings += live.length;
+        report.skippedOrphans = orphans.skippedOrphans;
+        report.orphanProjectIds = orphans.orphanProjectIds;
+        if (!dryRun) await onPageDone({ afterProjectId: cursor, report: { ...report } });
+      },
+    });
     return report;
   }
 }

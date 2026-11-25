@@ -20,11 +20,15 @@
     "./pii": {
       "types": "./dist/pii.d.ts",
       "default": "./src/pii.ts"
+    },
+    "./secrets": {
+      "types": "./dist/secrets.d.ts",
+      "default": "./src/secrets.ts"
     }
   },
   "scripts": {
     "typecheck": "GOMAXPROCS=2 GOMEMLIMIT=2GiB tsc -b",
-    "test": "vitest run",
+    "test": "vitest run --fsModuleCache",
     "bench": "vitest bench --run"
   },
   "dependencies": {

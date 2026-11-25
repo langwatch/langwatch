@@ -46,6 +46,42 @@ Feature: Durable hand-off from an append to its lanes
     Then the row holds every event and the newest cursor
 
   @unit
+  Scenario: A state projection that missed a re-send under a held key rebuilds from the log's copy
+    Given a state projection that applied an event under an idempotency key
+    And it missed a re-send of that key under another id
+    When the log's history read returns only the first copy of the key
+    Then the rebuild folds the re-send in at its own position instead of retrying until its retries run out
+    And the projection holds what the live lane would have written, the re-send's time included
+
+  @unit
+  Scenario: A fold that does not depend on event order rebuilds a page at a time
+    Given a fold that does not depend on event order and can read its history in pages
+    And an aggregate whose history spans many pages, including events after the missed one
+    When the rebuild of the aggregate runs
+    Then the rebuild reads the history one page at a time, never all of it at once
+    And the fold's state equals a full replay of the log
+
+  # event_log is ORDER BY (TenantId, AggregateType, AggregateId, IdempotencyKey).
+  # Paged by EventTimestamp, every page re-read the whole aggregate to sort it.
+  @unit
+  Scenario: A paged history read seeks through the event log's sort key
+    Given a fold that does not depend on event order and can read its history in pages
+    When it reads the next page of an aggregate's history
+    Then the page is ordered by idempotency key, with arrival time and id as tie-breaks
+    And it resumes after the previous page's furthest key, which the primary index can seek to
+    And the upper bound on arrival time only filters
+    And the applied set it stores still holds the newest events by arrival
+
+  @unit
+  Scenario: A paged rebuild retries a history that lags behind what the fold applied
+    Given a fold that does not depend on event order and can read its history in pages
+    And the fold already applied an event the log does not return yet
+    When the rebuild of the aggregate runs
+    Then the rebuild re-reads the history from its first page instead of folding the gap
+    And once the log returns the event, the fold's state equals a full replay, nothing folded twice
+    And if the log never returns it, the rebuild refuses the incomplete history and leaves the job to retry
+
+  @unit
   Scenario: The rebuild job runs in the aggregate's own ordered lane
     Given a fold's queued lanes
     When a rebuild is requested for one aggregate
@@ -58,10 +94,42 @@ Feature: Durable hand-off from an append to its lanes
     Then the fold holds that event exactly once
 
   @unit
-  Scenario: A lane keyed across aggregates cannot rebuild from one aggregate and retires dead
+  Scenario: A rebuild for a redelivered key folds the event log's copy, not the redelivery
+    Given a fold that already applied an event under an idempotency key
+    And the missed event carries the same key under another id
+    When the rebuild reads a history that does not yet hold the key
+    Then the rebuild retries instead of folding the redelivery
+    And once the log returns its copy, the fold holds that copy and not the redelivery
+
+  @unit
+  Scenario: A keyed lane that does not accept redelivery cannot rebuild from one aggregate and retires dead
     Given a fold whose key spans aggregates
+    And the fold does not accept a re-sent event
     When its missed hand-off is re-driven
     Then the row retires dead naming why it cannot rebuild
+
+  @unit
+  Scenario: A keyed lane that accepts redelivery gets the single event re-sent
+    Given a fold whose key spans aggregates
+    And the fold declares that applying an event twice leaves its state unchanged
+    When its missed hand-off is re-driven
+    Then the missed event is folded onto the live lane once
+    And no rebuild of the aggregate is requested
+
+  @unit
+  Scenario: A keyed lane whose queue is not open yet keeps its hand-off for a retry
+    Given a fold whose key spans aggregates and that accepts a re-sent event
+    And this process has not opened the fold's queue yet
+    When its missed hand-off is re-driven
+    Then the row stays in the outbox to be retried
+    And no rebuild of the aggregate is requested
+
+  @unit
+  Scenario: An unkeyed lane rebuilds its aggregate even when it accepts redelivery
+    Given a fold keyed by its own aggregate that declares it accepts a re-sent event
+    When its missed hand-off is re-driven
+    Then a rebuild of the aggregate is requested
+    And the single event is not re-sent onto the live lane
 
   @unit
   Scenario: A global lane missed while the registry is closed is re-driven once it routes

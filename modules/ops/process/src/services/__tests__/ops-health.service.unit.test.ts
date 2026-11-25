@@ -135,6 +135,7 @@ const MIGRATIONS: OpsMigrationOverview[] = [
     enrolledAutomatically: true,
     tenant: "organization",
     migratedIsSteady: false,
+    waitingOnPerson: 0,
     counts: { migrated: 9, finalized: 0, parked: 2, rolled_back: 0 },
     enrollment: null,
     attention: [
@@ -156,6 +157,7 @@ const MIGRATIONS: OpsMigrationOverview[] = [
     enrolledAutomatically: true,
     tenant: "organization",
     migratedIsSteady: false,
+    waitingOnPerson: 0,
     counts: { migrated: 0, finalized: 5, parked: 0, rolled_back: 0 },
     enrollment: null,
     attention: [],
@@ -180,6 +182,7 @@ const UPGRADE: OpsUpgradeStatus = {
   deprecations: [],
   version: { kind: "release", release: "3.21.0" },
   latestRelease: null,
+  notices: [],
 };
 
 function health(overrides: Partial<OpsHealthReaders> = {}) {

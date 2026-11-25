@@ -213,8 +213,8 @@ it("renders error badge on ClickHouse memory limit", () => {
 Shell behavior tested with [bats](https://github.com/bats-core/bats-core) (e.g. `dev/scripts/__tests__/*.bats`) uses the same `@scenario` token, expressed as a hash-comment directly above the `@test` line:
 
 ```bash
-# @scenario "Stale localhost NEXTAUTH_URL is rewritten to the fork's proxy URL"
-@test "boxd_rewrite_env: rewrites NEXTAUTH_URL allowlist key" {
+# @scenario "all-local overrides only DATABASE_URL, REDIS_URL, CLICKHOUSE_URL"
+@test "all-local rewrites DATABASE_URL, REDIS_URL, CLICKHOUSE_URL only" {
   # ...
 }
 ```

@@ -2,6 +2,7 @@ import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 import {
+  EVALUATION_ATTEMPT_FAILED_EVENT_TYPE,
   EVALUATION_COMPLETED_EVENT_TYPE,
   EVALUATION_REPORTED_EVENT_TYPE,
   EVALUATION_SCHEDULED_EVENT_TYPE,
@@ -179,10 +180,49 @@ export type EvaluationReportedEventData = z.infer<typeof evaluationReportedEvent
 export type EvaluationReportedEvent = z.infer<typeof evaluationReportedEventSchema>;
 
 /**
+ * An attempt failed because the evaluator service was not up, and another attempt is due at
+ * `nextAttemptAt` (epoch ms). `attempt` counts from 1; `error` is safe to show the customer.
+ */
+const evaluationAttemptFailedEventDataSchemaDefinition = z.object({
+  evaluationId: z.string(),
+  evaluatorId: z.string(),
+  evaluatorType: z.string(),
+  evaluatorName: z.string().optional(),
+  traceId: z.string().optional(),
+  isGuardrail: z.boolean().optional(),
+  attempt: z.number().int().positive(),
+  error: z.string(),
+  nextAttemptAt: z.number().int().nonnegative(),
+});
+export interface EvaluationAttemptFailedEventDataSchema extends Named<
+  typeof evaluationAttemptFailedEventDataSchemaDefinition
+> {}
+export const evaluationAttemptFailedEventDataSchema: EvaluationAttemptFailedEventDataSchema =
+  evaluationAttemptFailedEventDataSchemaDefinition;
+
+const evaluationAttemptFailedEventSchemaDefinition = z.object({
+  ...evaluationEventSchema.shape,
+  type: z.literal(EVALUATION_ATTEMPT_FAILED_EVENT_TYPE),
+  data: evaluationAttemptFailedEventDataSchema,
+  metadata: evaluationEventMetadataSchema.optional(),
+});
+export interface EvaluationAttemptFailedEventSchema extends Named<
+  typeof evaluationAttemptFailedEventSchemaDefinition
+> {}
+export const evaluationAttemptFailedEventSchema: EvaluationAttemptFailedEventSchema =
+  evaluationAttemptFailedEventSchemaDefinition;
+
+export type EvaluationAttemptFailedEventData = z.infer<
+  typeof evaluationAttemptFailedEventDataSchema
+>;
+export type EvaluationAttemptFailedEvent = z.infer<typeof evaluationAttemptFailedEventSchema>;
+
+/**
  * Union of all evaluation processing event types.
  */
 export type EvaluationProcessingEvent =
   | EvaluationScheduledEvent
   | EvaluationStartedEvent
   | EvaluationCompletedEvent
-  | EvaluationReportedEvent;
+  | EvaluationReportedEvent
+  | EvaluationAttemptFailedEvent;

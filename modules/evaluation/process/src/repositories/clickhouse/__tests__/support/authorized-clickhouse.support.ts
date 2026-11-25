@@ -1,4 +1,5 @@
-// A raw test ClickHouse behind the proof-checked reader, as the trace suites wrap one.
+// A raw test ClickHouse behind the proof-checked reader, as the trace suites wrap one, with
+// evaluation's id indexes declared as the module declares them, so an id-bound read expands.
 import type { ClickHouseClient } from "@clickhouse/client";
 import {
   AuthorizedClickHouse,
@@ -6,6 +7,11 @@ import {
   type QueryDriver,
   TenantGuard,
 } from "@langwatch/clickhouse-client";
+
+import {
+  EVALUATION_ID_INDEXES,
+  EVALUATION_SECOND_ID_INDEXES,
+} from "../../clickhouse.evaluation-id-indexes.database.ts";
 
 export function authorizedClickHouseFor(client: ClickHouseClient): AuthorizedClickHouse {
   const driver: QueryDriver = {
@@ -35,5 +41,8 @@ export function authorizedClickHouseFor(client: ClickHouseClient): AuthorizedCli
     },
   };
   const queryClient = new ClickHouseQueryClient({ tenantGuard: new TenantGuard(), driver });
+  queryClient.declareIdIndexes({
+    indexes: [...EVALUATION_ID_INDEXES, ...EVALUATION_SECOND_ID_INDEXES],
+  });
   return new AuthorizedClickHouse({ resolveClient: async () => queryClient });
 }

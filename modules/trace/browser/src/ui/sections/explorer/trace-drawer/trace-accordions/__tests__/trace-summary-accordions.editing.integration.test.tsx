@@ -60,6 +60,7 @@ vi.mock("../../../../../../features/trace-drawer/behavior/use-trace-evaluations.
   useTraceEvaluations: () => ({
     rich: [],
     pendingCount: 0,
+    retrying: [],
     isLoading: false,
   }),
 }));

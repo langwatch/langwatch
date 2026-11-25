@@ -21,6 +21,17 @@ Feature: Langy minimal worker
     And the shell, file, skill and todo tools stay available, since Langy
       answers questions whose answers are not in LangWatch's docs
 
+  # A cloud replay passed "$HOME/work/<repo>/file" to read and edit. The file
+  # tools took the text literally, failed with ENOENT, and the model fell back
+  # to sed. A shell spelling of the home folder now means the sandbox home.
+  @unit
+  Scenario: The sandbox file tools read a home folder spelled the way a shell spells it
+    Given a file at "work/agent/main.py" under the worker's home
+    When the model reads, edits or writes it as "$HOME/work/agent/main.py", "${HOME}/work/agent/main.py" or "~/work/agent/main.py"
+    Then the tool works on the file under the worker's home
+    And a "$HOME" that is not at the start of the path is left as written
+    And the tools on the user's machine get the path unchanged
+
   @unit
   Scenario: The worker runs only the skills we ship it
     Given the host account has its own agent skills installed
@@ -75,3 +86,18 @@ Feature: Langy minimal worker
     When they are compared with the origins the platform stamps
     Then the prompt names all of them and invents none
     And an origin the prompt never learned cannot silently return zero rows
+
+  # Langy's CLI runs in its own sandbox on a provisioned key, yet when a call
+  # failed it told the user to sign in, which they cannot do (issue #8770). A
+  # credential failure is Langy's internal error; a permission refusal is the
+  # user's missing access, and the two stay apart.
+  @unit
+  Scenario: The prompt reports a sandbox credential failure as an internal error
+    When the prompt asset is checked
+    Then on missing_api_key, unauthorized, not_authenticated or "Not logged in" it tells Langy to
+      report an internal error naming the read or write that failed
+    And it forbids telling the user to sign in or claiming Langy has no CLI
+    And it names a forbidden or permission_denied refusal as a permission
+      refusal, not an internal error
+    And on a denial reason of owner-ceiling, no-membership or membership-disabled it tells
+      Langy the access was removed or reduced, with no retry

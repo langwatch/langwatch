@@ -5,13 +5,17 @@ import {
 } from "@langwatch/api";
 import {
   AggregateProjectHasNoCredentialError,
-  ApiKeyPermissionDeniedError,
   ApiKeyPermissionNotDelegableError,
   type ApiKeyApi,
 } from "@langwatch/api-key-contract";
-import { assertKeyKind, keyCredentialOf, type RestKeyKind } from "@langwatch/api/rest";
 import {
-  PermissionDeniedError,
+  assertKeyKind,
+  keyCredentialOf,
+  routeTemplateOf,
+  type RestKeyKind,
+  keyPrincipalOfApiKey,
+} from "@langwatch/api/rest";
+import {
   type AuthzPermission,
   type PermissionDecision,
   type RestKeyDoorPrincipal,
@@ -19,8 +23,8 @@ import {
   type RestResolvedProjectCredential,
 } from "@langwatch/authorization";
 import type { AuthzApi } from "@langwatch/authz-contract";
+import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { HandledError } from "@langwatch/handled-error";
-import { classifyForLangy } from "@langwatch/langy-contract";
 import { createLogger, type Logger } from "@langwatch/observability";
 import { type OrganizationApi } from "@langwatch/organization-contract";
 import { isAggregateProjectKind } from "@langwatch/project-contract";
@@ -31,11 +35,14 @@ import {
   extractApiKeyRequestCredentials,
   type ApiKeyRequestCredentials,
 } from "../rules/api-credential-request.rules.ts";
+import { isUndelegatedForLangy } from "../rules/langy-key-delegation.rules.ts";
+import { ApiCredentialRefusalService } from "./api-credential-refusal.service.ts";
 import { ApiKeyHoldsService } from "./api-key-holds.service.ts";
 import {
   ApiOrganizationCredentialsService,
   type ApiOrganizationCredential,
 } from "./api-organization-credentials.service.ts";
+import { LegacyProjectKeyScopeService } from "./legacy-project-key-scope.service.ts";
 
 export type ApiProjectCredential = Readonly<{
   project: RestProjectIdentity;
@@ -84,7 +91,13 @@ export type ApiRestCredentialPeers = Readonly<{
     getCliAccessProject: (input: { authorization: string }) => Promise<CliAccessProject>;
   }>;
   organizations: Pick<OrganizationApi, "getSettings">;
-  logger?: Pick<Logger, "error">;
+  /** Reads which projects' legacy keys keep full access (`legacy_project_key_full_access`). */
+  featureFlags: Pick<FeatureFlagApi, "isEnabled">;
+  logger?: Pick<Logger, "error" | "warn">;
+  /** Where legacy key outside-scope and census lines go; the legacy key logger by default. */
+  legacyKeyLogger?: Pick<Logger, "info" | "warn">;
+  /** Epoch milliseconds the ceiling-refusal window is read against. */
+  now?: () => number;
 }>;
 
 /** Resolves project and organization API-key credentials for the API door (record §8). */
@@ -93,6 +106,8 @@ export class ApiRestCredentialsService {
     return new ApiRestCredentialsService({
       ...peers,
       logger: peers.logger ?? createLogger("langwatch:api:rest:credential"),
+      now: peers.now ?? Date.now,
+      legacyKeyLogger: peers.legacyKeyLogger,
     });
   }
 
@@ -100,18 +115,29 @@ export class ApiRestCredentialsService {
   private readonly authz: ApiRestCredentialPeers["authz"];
   private readonly organizations: ApiRestCredentialPeers["organizations"];
   private readonly cliProjects: ApiRestCredentialPeers["cliProjects"];
-  private readonly logger: Pick<Logger, "error">;
+  private readonly logger: Pick<Logger, "error" | "warn">;
+  private readonly refusals: ApiCredentialRefusalService;
   private readonly keyHolds: ApiKeyHoldsService;
+  private readonly legacyKeys: LegacyProjectKeyScopeService;
   private readonly organizationCredentials: ApiOrganizationCredentialsService;
 
-  private constructor(peers: Required<ApiRestCredentialPeers>) {
-    this.keyHolds = ApiKeyHoldsService.create({ authz: peers.authz });
+  private constructor(
+    peers: Required<Omit<ApiRestCredentialPeers, "legacyKeyLogger">> &
+      Pick<ApiRestCredentialPeers, "legacyKeyLogger">,
+  ) {
+    this.legacyKeys = LegacyProjectKeyScopeService.create({
+      featureFlags: peers.featureFlags,
+      now: peers.now,
+      ...(peers.legacyKeyLogger ? { logger: peers.legacyKeyLogger } : {}),
+    });
+    this.keyHolds = ApiKeyHoldsService.create({ authz: peers.authz, legacyKeys: this.legacyKeys });
     this.organizationCredentials = ApiOrganizationCredentialsService.create(peers);
     this.apiKeys = peers.apiKeys;
     this.authz = peers.authz;
     this.organizations = peers.organizations;
     this.cliProjects = peers.cliProjects;
     this.logger = peers.logger;
+    this.refusals = ApiCredentialRefusalService.create({ logger: peers.logger, now: peers.now });
   }
 
   /** Every permission the route asks, in order, after one resolve; the first missing refuses. */
@@ -120,8 +146,10 @@ export class ApiRestCredentialsService {
     permissions: readonly AuthzPermission[];
     /** The key kinds the route admits (E7): refused once the key resolves, before permission. */
     keyKinds?: readonly RestKeyKind[];
+    /** The flags that open the route to a legacy project key (`withPermission`'s `legacyKey`). */
+    legacyKeyScopes?: readonly string[];
   }): Promise<ApiProjectCredential> {
-    const credential = await this.identify({
+    const credential = await this.#resolveProjectCredential({
       request: input.request,
       permissions: input.permissions,
     });
@@ -136,8 +164,10 @@ export class ApiRestCredentialsService {
     }
 
     for (const permission of asked(input.permissions)) {
-      if (!(await this.#projectHolds({ credential, permission }))) {
-        throw this.#projectRefusal({ credential, permission });
+      const routeScopes = input.legacyKeyScopes;
+      const route = routeTemplateOf(input.request);
+      if (!(await this.#projectHolds({ credential, permission, route, routeScopes }))) {
+        throw this.refusals.project({ credential, permission });
       }
     }
 
@@ -149,22 +179,26 @@ export class ApiRestCredentialsService {
     credential: ApiProjectCredential;
     permission: AuthzPermission;
     projectId: string;
+    /** The route that asked, which a legacy key's census line names. */
+    route: string;
   }): Promise<PermissionDecision> {
-    const { credential, permission, projectId } = input;
+    const { credential, permission, projectId, route } = input;
     if (projectId !== credential.project.id) return { permitted: false, organizationRole: null };
 
     return {
-      permitted: await this.#projectHolds({ credential, permission }),
+      permitted: await this.#projectHolds({ credential, permission, route }),
       organizationRole: null,
     };
   }
 
-  /** A person is asked their own access, a key its ceiling; a legacy key holds all by its class. */
+  /** A person is asked their own access, a key its ceiling, a legacy key its ingestion scope. */
   #projectHolds(input: {
     credential: ApiProjectCredential;
     permission: AuthzPermission;
+    route: string;
+    routeScopes?: readonly string[];
   }): Promise<boolean> {
-    const { credential, permission } = input;
+    const { credential, permission, route, routeScopes } = input;
     if (credential.actsAsPerson) {
       return this.authz.hasProjectPermission({
         userId: credential.actsAsPerson.userId,
@@ -173,24 +207,33 @@ export class ApiRestCredentialsService {
       });
     }
     const { resolved } = credential;
+    if (resolved.type === "legacyProjectKey") {
+      return this.legacyKeys.holds({
+        project: resolved.project,
+        permission,
+        route,
+        ...(routeScopes ? { routeScopes } : {}),
+      });
+    }
     if (resolved.type !== "apiKey") return Promise.resolve(true);
 
     return this.isWithinCeiling({ resolved, permission });
   }
 
-  #projectRefusal(input: {
-    credential: ApiProjectCredential;
-    permission: AuthzPermission;
-  }): HandledError {
-    const { credential, permission } = input;
-    if (!credential.actsAsPerson && credential.resolved.type === "apiKey") {
-      return apiKeyCeilingRefusal(credential.resolved, permission, this.logger);
+  /** The caller with nothing asked of it; a legacy key passes on full access or report-only. */
+  async identify(input: { request: Request }): Promise<ApiProjectCredential> {
+    const credential = await this.#resolveProjectCredential(input);
+    if (!credential.actsAsPerson && credential.resolved.type === "legacyProjectKey") {
+      await this.legacyKeys.assertMayIdentify({
+        project: credential.resolved.project,
+        route: routeTemplateOf(input.request),
+      });
     }
 
-    return new ApiKeyPermissionDeniedError(permission);
+    return credential;
   }
 
-  async identify(input: {
+  async #resolveProjectCredential(input: {
     request: Request;
     /** What the route asks, so a key naming no project is told the ones it may name. */
     permissions?: readonly AuthzPermission[];
@@ -224,6 +267,18 @@ export class ApiRestCredentialsService {
    * through its organization. A project-bound access token is its person in that project.
    */
   async identifyKey(input: { request: Request }): Promise<ApiKeyDoorCredential> {
+    const credential = await this.#resolveKeyCredential(input);
+    if (credential.principal.kind === "project") {
+      await this.legacyKeys.assertMayIdentify({
+        project: { id: credential.principal.projectId, organizationId: credential.organizationId },
+        route: routeTemplateOf(input.request),
+      });
+    }
+
+    return credential;
+  }
+
+  async #resolveKeyCredential(input: { request: Request }): Promise<ApiKeyDoorCredential> {
     const person = await this.#cliAccessCredential(input.request);
     if (person) {
       return {
@@ -250,26 +305,27 @@ export class ApiRestCredentialsService {
         markUsed: () => {},
       };
     }
-    if (resolved) {
+    const keyPrincipal = resolved ? keyPrincipalOfApiKey(resolved) : undefined;
+    if (keyPrincipal) {
       return {
-        principal: {
-          kind: "apiKey",
-          apiKeyId: resolved.apiKeyId,
-          userId: resolved.userId,
-          organizationId: resolved.organizationId,
-          resolvedProject: { id: resolved.project.id, teamId: resolved.project.teamId },
-        },
-        organizationId: resolved.organizationId,
-        markUsed: () => this.apiKeys.markUsed({ id: resolved.apiKeyId }),
+        principal: keyPrincipal,
+        organizationId: keyPrincipal.organizationId,
+        markUsed: () => this.apiKeys.markUsed({ id: keyPrincipal.apiKeyId }),
       };
     }
 
     const organization = await this.apiKeys.resolveOrganizationToken({ token: credentials.token });
     if (!organization.ok) throw new ProjectInvalidCredentialsError();
-    const { apiKeyId, userId, organizationId } = organization.resolved;
+    const { apiKeyId, userId, organizationId, isLangySessionKey } = organization.resolved;
 
     return {
-      principal: { kind: "apiKey", apiKeyId, userId, organizationId },
+      principal: {
+        kind: "apiKey",
+        apiKeyId,
+        userId,
+        organizationId,
+        ...(isLangySessionKey ? { isLangySessionKey: true } : {}),
+      },
       organizationId,
       markUsed: () => this.apiKeys.markUsed({ id: apiKeyId }),
     };
@@ -286,15 +342,21 @@ export class ApiRestCredentialsService {
     reach?: ApiKeyPermissionReach;
   }): Promise<ApiKeyDoorCredential> {
     const { reach } = input;
-    const credential = await this.identifyKey({ request: input.request });
+    const credential = await this.#resolveKeyCredential({ request: input.request });
     for (const permission of asked(input.permissions)) {
+      if (isUndelegatedForLangy({ key: credential.principal, permission })) {
+        throw new ApiKeyPermissionNotDelegableError(permission, { subject: "Langy" });
+      }
       const allowed = await this.keyHolds.holds({
         principal: credential.principal,
+        organizationId: credential.organizationId,
         permission,
         reach,
+        route: routeTemplateOf(input.request),
       });
-      if (!allowed)
-        throw keyPermissionRefusal({ credential, permission, ...(reach ? { reach } : {}) });
+      if (!allowed) {
+        throw this.refusals.key({ credential, permission, ...(reach ? { reach } : {}) });
+      }
     }
 
     return credential;
@@ -394,7 +456,8 @@ export class ApiRestCredentialsService {
           markUsed: () => {},
         };
         for (const permission of input.permissions) {
-          if (!(await this.#projectHolds({ credential, permission }))) return [];
+          const route = "(reachable project listing)";
+          if (!(await this.#projectHolds({ credential, permission, route }))) return [];
         }
         return [{ id: project.id, name: project.name }];
       }),
@@ -416,45 +479,4 @@ export class ApiRestCredentialsService {
       permission,
     });
   }
-}
-
-/** The one denial every tier answers with, at the scope the key was asked at. */
-function keyPermissionRefusal(input: {
-  credential: ApiKeyDoorCredential;
-  permission: AuthzPermission;
-  reach?: ApiKeyPermissionReach;
-}): PermissionDeniedError {
-  const { principal, organizationId } = input.credential;
-  const projectId =
-    principal.kind === "apiKey" ? principal.resolvedProject?.id : principal.projectId;
-
-  return new PermissionDeniedError({
-    permission: input.permission,
-    scope:
-      input.reach !== "organization" && projectId
-        ? { type: "project", id: projectId }
-        : { type: "organization", id: organizationId },
-    denialReason: "no-grant",
-  });
-}
-
-function apiKeyCeilingRefusal(
-  resolved: Extract<RestResolvedProjectCredential, { type: "apiKey" }>,
-  permission: AuthzPermission,
-  logger: Pick<Logger, "error">,
-): HandledError {
-  logger.error(
-    {
-      apiKeyId: resolved.apiKeyId,
-      userId: resolved.userId ?? null,
-      projectId: resolved.project.id,
-      permission,
-    },
-    "API key ceiling denial",
-  );
-  const langy = resolved.isLangySessionKey ? classifyForLangy(permission) : null;
-  if (langy && langy.disposition !== "granted") {
-    return new ApiKeyPermissionNotDelegableError(permission, { subject: "Langy" });
-  }
-  return new ApiKeyPermissionDeniedError(permission);
 }

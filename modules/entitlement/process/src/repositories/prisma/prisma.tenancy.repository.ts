@@ -1,4 +1,5 @@
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import { NON_DESTINATION_PROJECT_KINDS } from "@langwatch/project-contract";
 
 import type { ProjectPlacement, TenancyRepository } from "../tenancy.repository.ts";
 
@@ -32,13 +33,32 @@ export class PrismaTenancyRepository implements TenancyRepository {
     return projects.map((project) => project.id);
   }
 
+  findProjectNames({
+    organizationId,
+  }: {
+    organizationId: string;
+  }): Promise<{ id: string; name: string }[]> {
+    return this.prisma.project.findMany({
+      // The governance project's usage stays in the org total; an aggregate holds none (ADR-177).
+      where: { team: { organizationId }, kind: { notIn: [...NON_DESTINATION_PROJECT_KINDS] } },
+      select: { id: true, name: true },
+      orderBy: { name: "asc" },
+    });
+  }
+
   async findMeteredOrganizationIds(): Promise<string[]> {
     const projects = await this.prisma.project.findMany({
       distinct: ["teamId"],
       select: { team: { select: { organizationId: true } } },
     });
 
-    return [...new Set(projects.map((project) => project.team.organizationId))];
+    // relationMode "prisma" keeps no foreign key, so a project can outlive its
+    // team; the generated type still claims `team` is present, hence the optional
+    // chaining. Skip orphans rather than let one dead row stop the sweep for every
+    // organization.
+    const organizationIds = projects.flatMap((project) => project.team?.organizationId ?? []);
+
+    return [...new Set(organizationIds)];
   }
 
   async getCurrency({ organizationId }: { organizationId: string }): Promise<"USD" | "EUR"> {

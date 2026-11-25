@@ -188,6 +188,7 @@ function forwarded(app: ModelProviderModule): ModelProviderApi {
     findProviderForProject: (...args) => app.findProviderForProject(...args),
     findRowServingModel: (...args) => app.findRowServingModel(...args),
     getExecutionProviders: (...args) => app.getExecutionProviders(...args),
+    listForProjectWithServedModels: (...args) => app.listForProjectWithServedModels(...args),
     prepareExecution: (...args) => app.prepareExecution(...args),
     prepareEvaluatorModelEnv: (...args) => app.prepareEvaluatorModelEnv(...args),
     generateStructured: (...args) => app.generateStructured(...args),
@@ -224,5 +225,8 @@ function forwarded(app: ModelProviderModule): ModelProviderApi {
     deleteCost: (...args) => app.deleteCost(...args),
     translate: (...args) => app.translate(...args),
     applyCodexCodingDefaults: (...args) => app.applyCodexCodingDefaults(...args),
+    resolveDecisionModel: (...args) => app.resolveDecisionModel(...args),
+    listDecisionModelsForProject: (...args) => app.listDecisionModelsForProject(...args),
+    listDecisionModelsForScopes: (...args) => app.listDecisionModelsForScopes(...args),
   };
 }

@@ -19,6 +19,7 @@ export * from "./model-cost.trpc-schemas.ts";
 export * from "./custom-model.ts";
 export * from "./catalog/codex-refusal-message.ts";
 export * from "./catalog/codex-restrictions.ts";
+export * from "./catalog/decision-models.ts";
 export * from "./catalog/langy-skip-permissions.ts";
 export * from "./catalog/latest-aliases.ts";
 export * from "./catalog/recommended-chat-models.ts";

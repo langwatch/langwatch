@@ -55,6 +55,28 @@ export type SubscriberSpec<E extends Event = Event, State = unknown> = TriggerSp
     handler: (event: E, context: TriggerContext<State>) => Promise<void>;
   };
 
+/**
+ * A fold subscriber's compact job (ADR-069): `stage` derives the body `schema` parses for
+ * `handler`. A full delivery is staged after `when`; a compact one is not re-guarded. Turn
+ * `stageOnSend` (default false) on only once every worker reads the compact body.
+ */
+export interface SubscriberJobSpec<E extends Event, State, Job extends ParsingSchema> {
+  schema: Job;
+  stage: (event: E, context: TriggerContext<State>) => z.input<Job>;
+  stageOnSend?: boolean;
+  handler: (
+    job: z.output<Job>,
+    context: { tenantId: string; aggregateId: string },
+  ) => Promise<void>;
+}
+
+/** A fold subscriber whose queued job is a compact body rather than its event and fold state. */
+export type JobSubscriberSpec<
+  E extends Event = Event,
+  State = unknown,
+  Job extends ParsingSchema = ParsingSchema,
+> = TriggerSpec & TriggerOptions<E, State> & { job: SubscriberJobSpec<E, State, Job> };
+
 /** The schema an intent declares, read off its spec: what `IntentSpecs` checks `run` against. */
 export type SchemaOf<Spec> = Spec extends { schema: infer Schema extends ParsingSchema }
   ? Schema

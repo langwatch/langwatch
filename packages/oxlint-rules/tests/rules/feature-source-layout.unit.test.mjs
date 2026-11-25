@@ -1,5 +1,6 @@
 import { afterAll, describe, expect, it } from "vitest";
 
+import { FRAMEWORK_HOMES } from "../../grammar/feature-layout-policy.mjs";
 import { featureSourceLayoutRule } from "../../src/index.mjs";
 import { createFixtureWorkspace, runRule } from "../../src/testing.mjs";
 
@@ -257,5 +258,74 @@ describe("given a channel in a strict feature process module", () => {
 
       expect(found.map((e) => e.messageId)).toEqual(["processPath"]);
     });
+  });
+});
+
+// ADR-181: `relay` opts into the feature layout; `eventing` is a framework that has not.
+const framework = createFixtureWorkspace({
+  files: {
+    "packages/relay/package.json": JSON.stringify({
+      name: "@langwatch/relay",
+      exports: { ".": { default: "./src/index.ts" } },
+      langwatch: { group: "framework", layout: "features" },
+    }),
+    "packages/eventing/package.json": JSON.stringify({
+      name: "@langwatch/eventing",
+      langwatch: { group: "framework" },
+    }),
+  },
+});
+
+afterAll(() => framework.cleanup());
+
+function frameworkReport(filename) {
+  return runRule(featureSourceLayoutRule, {
+    code: "export const x = 1;",
+    cwd: framework.cwd,
+    filename,
+  }).map(({ data, message, messageId }) => ({ message, messageId, path: data.path }));
+}
+
+describe("given an opted-in framework package", () => {
+  describe("when a file sits in a framework home or is an entry", () => {
+    /** @scenario "A framework file outside its homes is reported with the framework allowlist" */
+    it("reports nothing", () => {
+      for (const path of [
+        "index.ts",
+        "app/relay.app.ts",
+        "vocabulary/relay.errors.ts",
+        "telemetry/relay.metrics.ts",
+        "features/claim/services/claimed-job.service.ts",
+        "features/claim/repositories/redis/redis.claim.script.ts",
+        "features/claim/channels/memory/memory.lane.channel.ts",
+      ]) {
+        expect(frameworkReport(`packages/relay/src/${path}`)).toEqual([]);
+      }
+    });
+  });
+
+  describe("when a file has no framework home", () => {
+    /** @scenario "A framework file outside its homes is reported with the framework allowlist" */
+    it("reports frameworkPath, naming the framework allowlist", () => {
+      for (const path of [
+        "services/claim.service.ts",
+        "utils/keys.ts",
+        "repositories/relay.registry.ts",
+      ]) {
+        const found = frameworkReport(`packages/relay/src/${path}`);
+        expect(found.map(({ messageId, path: reported }) => [messageId, reported])).toEqual([
+          ["frameworkPath", path],
+        ]);
+        expect(found[0].message).toContain(FRAMEWORK_HOMES);
+      }
+    });
+  });
+});
+
+describe("given a framework package that has not opted in", () => {
+  /** @scenario "A framework package that has not opted in is left alone by the layered rules" */
+  it("reports nothing for a path no home names", () => {
+    expect(frameworkReport("packages/eventing/src/utils/keys.ts")).toEqual([]);
+    expect(frameworkReport("packages/eventing/src/services/fold.service.ts")).toEqual([]);
   });
 });

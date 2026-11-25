@@ -11,7 +11,7 @@ The platform's own browser telemetry, proxied to its collector (ADR-058).
 | Classification | core (`modules/catalogue.json`)                                                     |
 | Subjects       | rum                                                                                 |
 | Halves         | [contract](contract) · [process](process/README.md)                                 |
-| Api token      | `RumApi` = `moduleApi<RumApi>()("rum")`, `contract/src/rum.api.ts:29` (1 operation) |
+| Api token      | `RumApi` = `moduleApi<RumApi>()("rum")`, `contract/src/rum.api.ts:28` (1 operation) |
 | Installed by   | api, worker, tasks (process)                                                        |
 
 ## What rum owns

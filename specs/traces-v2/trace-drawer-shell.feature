@@ -129,6 +129,40 @@ Rule: Drawer maximise and restore
     And `drawerChrome.widthPx` returns to the previously remembered width
 
 
+Rule: The drawer never covers Ask Langy
+  The dragged width is a preference. The drawer renders narrower when that width
+  would reach over the search bar's Ask Langy button, and narrows again (instead
+  of sliding left at the same width) while the docked Langy panel holds the right edge.
+
+  @unit @integration @regression
+  Scenario: A wide trace drawer leaves the Ask Langy button visible
+    Given the reader dragged the trace drawer wider than the space beside Ask Langy
+    When the drawer is open on Trace Explorer
+    Then the drawer's left edge stops a gap to the right of the Ask Langy button
+    And the button can still be clicked
+
+  @integration
+  Scenario: Narrowing the window keeps the drawer clear of Ask Langy
+    Given a wide trace drawer is open on Trace Explorer
+    When the reader makes the window narrower
+    Then the drawer narrows with it and the Ask Langy button stays uncovered
+
+  @unit
+  Scenario: With less room than the minimum width the drawer still leaves Ask Langy clear
+    Given the room right of Ask Langy is narrower than the drawer's minimum width
+    When the trace drawer is open
+    Then the drawer takes only the room there is and the button stays uncovered
+
+  @unit @integration @regression
+  Scenario: Opening Langy beside a wide trace drawer narrows the drawer
+    Given a wide trace drawer is open on Trace Explorer and the Langy panel is closed
+    When the reader clicks Ask Langy
+    Then the Langy panel opens, not the floating ask bar that would sit under the drawer
+    And with the panel docked the drawer gets narrower and sits left of it
+    And the Ask Langy button stays uncovered
+    And closing Langy brings back the width the reader dragged
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # UNIFIED DRAWER MODEL
 # ─────────────────────────────────────────────────────────────────────────────
@@ -985,9 +1019,8 @@ Rule: The drawer's state is the address
 Rule: Deep links carry the partition hint
   A row click writes `drawer.t` with the trace's start time, and every
   per-trace read prunes ClickHouse partitions by it. A link from an API
-  response, a Slack message or an email used to carry the id alone, so the
-  drawer opened with every read scanning by id across every partition,
-  cold storage included, and sat on a skeleton for seconds.
+  response, a Slack message or an email may carry the id alone: the drawer then
+  reads by id, and the id index bounds each read server-side.
 
   @unit
   Scenario: A trace link built by the platform carries the trace timestamp
@@ -1013,11 +1046,11 @@ Rule: Deep links carry the partition hint
     And a t that is not a positive whole number is dropped
 
   @unit
-  Scenario: Sibling reads wait for the partition hint on a deep link
+  Scenario: The browser opens a trace by id alone
     Given the drawer opened from a link with no t
-    Then the header read runs without the hint and backfills it from its result
-    And the span tree, events, signals, full spans and span detail reads wait for the hint
-    And they run once the hint is known
+    Then the header, span tree, events, signals, full spans and span detail reads run at once
+    And they name the trace and send no occurredAtMs, so the id index bounds them server-side
+    And a drawer that already knows t, from the URL or a list row, sends it as occurredAtMs
 
   @unit
   Scenario: The evaluations read does not wait for the partition hint

@@ -1,5 +1,8 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
-import type { AiToolEntry } from "@langwatch/enterprise-governance-contract";
+import {
+  ingestionSourceStatusIsOff,
+  type AiToolEntry,
+} from "@langwatch/enterprise-governance-contract";
 
 function isDepartmentBound(entry: AiToolEntry): boolean {
   return entry.departmentIds.length > 0 || entry.scope === "department";
@@ -36,7 +39,9 @@ export function selectClaudeCodeOtlpEndpoint(
   sources: readonly { id: string; sourceType: string; status: string; createdAtMs: number }[],
 ): { endpoint: string | null } {
   const [first] = sources
-    .filter((source) => source.sourceType === "claude_code" && source.status !== "disabled")
+    .filter(
+      (source) => source.sourceType === "claude_code" && !ingestionSourceStatusIsOff(source.status),
+    )
     .toSorted((left, right) => left.createdAtMs - right.createdAtMs);
   return { endpoint: first ? `/api/ingest/otel/${first.id}` : null };
 }

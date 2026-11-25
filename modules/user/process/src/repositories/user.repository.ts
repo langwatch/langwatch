@@ -71,17 +71,34 @@ export type StoredProfileChange = UpdateUserProfileInput &
   Partial<Pick<UpdateUserEmailInput, "email">> &
   Partial<Pick<UserProfile, "emailVerified">>;
 
+/** A user holding a credential password, and whether it is already marked for a reset. */
+export type PasswordHolderRow = Readonly<{
+  id: string;
+  email: string | null;
+  passwordResetRequiredAt: Instant | null;
+}>;
+
 export interface UserRepository {
   findProfiles(userIds: string[]): Promise<UserFullProfile[]>;
   findById(id: string): Promise<UserProfile | null>;
+  /** Accounts whose id, name or address holds the query, case aside, by address. */
+  searchProfiles(input: { query: string; limit: number }): Promise<UserProfile[]>;
   /** The account holding exactly this address; addresses are stored lower-cased. */
   findByEmail(email: string): Promise<UserProfile[]>;
   /** Every account on this address, case aside, oldest first: rows stored before lower-casing. */
   findByEmailAnyCase(email: string): Promise<UserProfile[]>;
   create(input: CreateUserInput): Promise<UserProfile>;
+  /** The created fact for a row written outside these mints, stamped with its stored creation. */
+  appendCreatedFact(id: string): Promise<void>;
   createCredentialUser(input: CreateCredentialUserRow): Promise<CreatedCredentialUser>;
   createPasskeyUser(input: CreatePasskeyUserRow): Promise<CreatedUser>;
   hasPassword(id: string): Promise<boolean>;
+  /** Users holding a credential password, oldest id first; `emails` narrows to those addresses,
+   *  matched case-insensitively. */
+  findPasswordHolders(input: { emails: readonly string[] | null }): Promise<PasswordHolderRow[]>;
+  /** Marks these passwords as requiring a reset; a mark already set keeps its time. Answers how
+   *  many were newly marked. */
+  markPasswordResetRequired(input: { ids: readonly string[]; at: Instant }): Promise<number>;
   setFirstPassword(input: SetFirstUserPasswordRow): Promise<SetFirstUserPasswordResult>;
   /**
    * Confirms an unfinished account and drops every account row and passkey it holds, as ONE
@@ -125,10 +142,17 @@ export interface UserRepository {
   countUsage(): Promise<UserUsageCount>;
   /** The same count, among these people only. */
   countUsageAmong(input: { userIds: readonly string[] }): Promise<UserUsageCount>;
+  /** Which of these people last signed in at or after `since` (epoch ms). */
+  findSignedInSince(input: { userIds: readonly string[]; since: number }): Promise<string[]>;
   /** Whether any account's address is on this domain, install-wide, case aside. */
   hasAccountOnDomain(domain: string): Promise<boolean>;
   /** Whether any account exists, install-wide. */
   hasAnyAccount(): Promise<boolean>;
+  /**
+   * The id of the earliest-created account, deactivated or not; null when there is none, or when
+   * an erased account was created at or before it, since that one came first.
+   */
+  findFirstCreatedId(): Promise<string | null>;
   /** One page of every account, in id order after `afterId`, for user's lifecycle-fact step. */
   findBackfillPage(input: { afterId: string | null; limit: number }): Promise<UserBackfillRow[]>;
   /** One page of accounts whose stored address is not lower-case, in id order after `afterId`. */

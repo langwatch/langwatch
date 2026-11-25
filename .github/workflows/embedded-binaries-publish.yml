@@ -41,6 +41,10 @@ jobs:
     runs-on: ${{ matrix.target.runner }}
     container: ${{ matrix.target.container || null }}
     timeout-minutes: 30
+    # id-token lets the upload step assume the publisher role by OIDC.
+    permissions:
+      contents: read
+      id-token: write
 
     strategy:
       fail-fast: false
@@ -49,7 +53,7 @@ jobs:
         target:
           # Native runners (no container).
           - { platform: darwin-arm64, runner: macos-latest, container: "" }
-          - { platform: darwin-x64, runner: macos-13, container: "" }
+          - { platform: darwin-x64, runner: macos-15-intel, container: "" }
           - { platform: linux-x64, runner: ubuntu-22.04, container: "" }
           - { platform: linux-arm64, runner: ubuntu-22.04-arm, container: "" }
           # Alpine (musl) build for x64. 3.19 specifically — older musl
@@ -288,13 +292,15 @@ jobs:
           cat "${tarball}.sha256"
           echo "tarball=$tarball" >> "$GITHUB_OUTPUT"
 
-      - name: Configure AWS credentials
+      # The publisher role, named by the EMBEDS_AWS_ROLE_ARN repository
+      # variable, trusts this workflow on main only. No AWS key is stored.
+      - name: Configure AWS credentials (OIDC)
         if: ${{ !inputs.dry_run }}
         uses: aws-actions/configure-aws-credentials@e6de054238d6b7531b4efff3b6587d9aade6a06c # v6.2.3
         with:
           aws-region: ${{ env.AWS_REGION }}
-          aws-access-key-id: ${{ secrets.EMBEDS_AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.EMBEDS_AWS_SECRET_ACCESS_KEY }}
+          role-to-assume: ${{ vars.EMBEDS_AWS_ROLE_ARN }}
+          role-session-name: embedded-binaries-${{ github.run_id }}
 
       - name: Upload to S3 (and verify via embeds.langwatch.ai)
         if: ${{ !inputs.dry_run }}

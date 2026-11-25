@@ -1,4 +1,5 @@
 import type { RunParameterValues } from "../../scenario.parameters.ts";
+import type { RedTeamRunReport } from "../../scenario.ts";
 import type { ResolvedRunModels } from "../run/run-models.ts";
 import type { RunSecretCiphertext } from "../run/run-parameters.ts";
 import type {
@@ -8,6 +9,7 @@ import type {
   ScenarioAgentInstance,
   TargetConfig,
 } from "./scenario-execution-data.ts";
+import type { ScenarioRunHooks } from "./scenario-hooks.ts";
 
 export interface ScenarioExecutionJob {
   projectId: string;
@@ -29,6 +31,8 @@ export interface ScenarioExecutionJob {
   startedByUserId?: string;
   /** The API key that member started it with, which also bounds the run's key. */
   startedByApiKeyId?: string;
+  /** Skip the agent's teardown so the run's test data stays (ADR-180). */
+  keepData?: boolean;
 }
 
 export type ScenarioModelParametersFailureReason =
@@ -92,6 +96,8 @@ export type ScenarioUnsuccessfulExecutionInput = {
   error?: string;
   cancelled?: boolean;
   target?: { type: string; referenceId: string };
+  /** Setup failed or timed out: the run finishes with no verdict, so no pass rate counts it. */
+  notScored?: boolean;
 };
 
 /** Worker-lifecycle boundary recorded in Scenario ADR-002. */
@@ -115,4 +121,16 @@ export abstract class ScenarioExecutionService {
   }): Promise<void>;
   /** Marks a voice run LangWatch ended at the maximum call duration (AC28). */
   abstract recordCutAtLimit(input: { projectId: string; scenarioRunId: string }): Promise<void>;
+  /** Records the setup and teardown results the child reported, like the agent instance. */
+  abstract recordHooks(input: {
+    projectId: string;
+    scenarioRunId: string;
+    hooks: ScenarioRunHooks;
+  }): Promise<void>;
+  /** Records a red team run's held or broke report on the run's metadata. */
+  abstract recordRedTeamReport(input: {
+    projectId: string;
+    scenarioRunId: string;
+    report: RedTeamRunReport;
+  }): Promise<void>;
 }

@@ -7,11 +7,12 @@ import type { CollectedBinding } from "@langwatch/authz-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import type { RecordAggregateReadCommandData } from "../../eventing/authz-aggregate-read.events.ts";
+import { AuthzAggregateReadAuditService } from "../../features/read-audit/services/authz-aggregate-read-audit.service.ts";
 import { StubAuthzListingRepository } from "../../repositories/__tests__/support/authz-listing.stub.ts";
 import { StubAuthzManagedGrantRepository } from "../../repositories/__tests__/support/authz-managed-grant.stub.ts";
 import { makeReader } from "../../repositories/__tests__/support/authz-read.stub.ts";
 import type { SharedReadRow } from "../../repositories/authz-read.repository.ts";
-import { AuthzAggregateReadAuditService } from "../authz-aggregate-read-audit.service.ts";
+import { MemoryAuthzOrganizationPolicyRepository } from "../../repositories/memory/memory.authz-organization-policy.repository.ts";
 import { AuthzService } from "../authz.service.ts";
 
 const ORG = "org_acme";
@@ -44,6 +45,7 @@ function harness() {
     },
   });
   const authz = AuthzService.create({
+    policies: MemoryAuthzOrganizationPolicyRepository.create(),
     isOnEngine: async () => true,
     repository: makeReader({
       findOrganizationMembership: vi.fn().mockResolvedValue({ role: "ADMIN", disabled: false }),
@@ -68,14 +70,16 @@ function harness() {
     projectId,
     route,
     actor = "user_ana",
+    permission = "traces:view",
   }: {
     projectId: string;
     route: string;
     actor?: string;
+    permission?: "traces:view" | "analytics:view";
   }) =>
     authz.authorize({
       principal: { type: "user", id: actor },
-      permission: "traces:view",
+      permission,
       scope: { type: "project", id: projectId, teamId: TEAM, organizationId: ORG },
       proof: { actor: { type: "user", id: actor }, purpose: { kind: "route", route } },
     });
@@ -127,6 +131,31 @@ describe("Feature: every read of an aggregate is audited", () => {
         await read({ projectId: AGGREGATE, route: "traces.spanTree" });
 
         expect(sent.map((row) => row.aggregateProjectId)).toEqual([AGGREGATE]);
+      });
+    });
+  });
+
+  describe("given an aggregate project queried through LangWatchQL", () => {
+    describe("when ana runs two statements on it within five minutes", () => {
+      /** @scenario "Every run on the aggregate is audited" */
+      it("writes one row of kind aggregate for ana from the query route's proof", async () => {
+        const { read, sent, advance } = harness();
+
+        await read({
+          projectId: AGGREGATE,
+          route: "analyticsLwql.query",
+          permission: "analytics:view",
+        });
+        advance(MINUTE);
+        await read({
+          projectId: AGGREGATE,
+          route: "analyticsLwql.query",
+          permission: "analytics:view",
+        });
+
+        expect(sent.map((row) => [row.actorUserId, row.aggregateProjectId])).toEqual([
+          ["user_ana", AGGREGATE],
+        ]);
       });
     });
   });

@@ -8,12 +8,14 @@ import {
   type GuidedOnboardingState,
   type GuidedPath,
 } from "@langwatch/onboarding-contract";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
+  fireGuidedOnboardingBackfill,
   fireGuidedOnboardingPaths,
   fireGuidedOnboardingPostHog,
   fireGuidedOnboardingProgress,
+  fireOnboardingVariantAssigned,
   guidedOnboardingOrgTraits,
   guidedOnboardingPersonTraits,
 } from "../nurturing-guided-onboarding-service.rules.ts";
@@ -183,8 +185,13 @@ describe("fireGuidedOnboardingProgress()", () => {
   });
 
   describe("when the gateway path is completed with llmops already done", () => {
+    afterEach(() => vi.useRealTimers());
+
     /** @scenario 'completing a path identifies the completed paths and fires the completion event' */
+    /** @scenario "Customer.io date attributes are sent as Unix seconds" */
     it("decides to identify the completed paths with the time, group them and track the completion", () => {
+      vi.useFakeTimers();
+      vi.setSystemTime(1_792_664_000_123);
       const calls = fireGuidedOnboardingProgress({
         userId: "user-1",
         organizationId: "org-1",
@@ -197,7 +204,7 @@ describe("fireGuidedOnboardingProgress()", () => {
         type: "identify",
         traits: {
           guided_onboarding_completed_paths: "gateway,llmops",
-          guided_onboarding_completed_at: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T/) as unknown,
+          guided_onboarding_completed_at: 1_792_664_000,
         },
       });
       expect(calls[1]).toMatchObject({
@@ -213,7 +220,118 @@ describe("fireGuidedOnboardingProgress()", () => {
   });
 });
 
+describe("fireGuidedOnboardingProgress() for Langy's governance start", () => {
+  function chosen(start: string) {
+    return fireGuidedOnboardingProgress({
+      userId: "user-1",
+      organizationId: "org-1",
+      event: "start_chosen",
+      payload: { start },
+      state: { paths: ["governance"], donePaths: [] },
+    });
+  }
+
+  describe("when the coding start is chosen", () => {
+    /** @scenario "choosing the coding start identifies the start and tracks the choice" */
+    it("decides to identify langy_start coding and track langy_start_chosen with the start", () => {
+      expect(chosen("coding")).toEqual([
+        { type: "identify", userId: "user-1", traits: { langy_start: "coding" } },
+        {
+          type: "track",
+          userId: "user-1",
+          event: "langy_start_chosen",
+          properties: { start: "coding" },
+        },
+      ]);
+    });
+  });
+
+  describe("when the call start is chosen", () => {
+    /** @scenario "choosing the call start records the choice, never a booking" */
+    it("decides to identify langy_start call and track the choice, with nothing about a booking", () => {
+      const calls = chosen("call");
+
+      expect(calls).toEqual([
+        { type: "identify", userId: "user-1", traits: { langy_start: "call" } },
+        {
+          type: "track",
+          userId: "user-1",
+          event: "langy_start_chosen",
+          properties: { start: "call" },
+        },
+      ]);
+      expect(JSON.stringify(calls)).not.toMatch(/book|schedul/i);
+    });
+  });
+
+  describe("when the start is neither coding nor call", () => {
+    /** @scenario "a start that is neither coding nor call sends nothing" */
+    it("decides no call", () => {
+      expect(chosen("meeting")).toEqual([]);
+    });
+  });
+});
+
+describe("fireOnboardingVariantAssigned()", () => {
+  describe("when an organization is assigned the guided variant", () => {
+    /** @scenario "the assigned experiment variant reaches the creator and the organization" */
+    it("decides to identify the creator and group the organization with the variant alone", () => {
+      const calls = fireOnboardingVariantAssigned({
+        userId: "user-1",
+        organizationId: "org-1",
+        variant: "guided",
+      });
+
+      expect(calls).toEqual([
+        { type: "identify", userId: "user-1", traits: { onboarding_variant: "guided" } },
+        {
+          type: "group",
+          userId: "user-1",
+          groupId: "org-1",
+          traits: { onboarding_variant: "guided" },
+        },
+      ]);
+      expect(JSON.stringify(calls)).not.toContain("onboarding_primary_path");
+    });
+  });
+});
+
+describe("fireGuidedOnboardingBackfill()", () => {
+  /** @scenario "an organization with picks but no variant sends no backfill" */
+  it("decides no call for an organization with picks but no variant", () => {
+    expect(
+      fireGuidedOnboardingBackfill({
+        userId: "user-1",
+        organizationId: "org-1",
+        variant: null,
+        state: { paths: ["gateway"], donePaths: [] },
+      }),
+    ).toEqual([]);
+  });
+
+  it("decides no call for an organization with no picks", () => {
+    expect(
+      fireGuidedOnboardingBackfill({
+        userId: "user-1",
+        organizationId: "org-1",
+        variant: "guided",
+        state: EMPTY,
+      }),
+    ).toEqual([]);
+  });
+});
+
 describe("the traits a guided onboarding state reads as", () => {
+  /** @scenario "the backfill carries the start the state holds" */
+  it("reads the start the state holds as langy_start", () => {
+    expect(
+      guidedOnboardingPersonTraits({
+        variant: "guided",
+        state: { paths: ["governance"], donePaths: [], langyStart: "call" },
+      }),
+    ).toMatchObject({ onboarding_primary_path: "governance", langy_start: "call" });
+  });
+
   /** @scenario 'skipping the provider, replaying the tour and attaching a conversation send nothing' */
   it("reads nothing extra from events the paths and progress hooks never route", () => {
     expect(
@@ -287,6 +405,7 @@ describe("fireGuidedOnboardingPostHog()", () => {
     "tour_skipped",
     "tour_replayed",
     "path_completed",
+    "start_chosen",
   ] as const;
 
   function decide({
@@ -351,6 +470,17 @@ describe("fireGuidedOnboardingPostHog()", () => {
       ["guided_onboarding_path_begun", "llmops"],
       ["guided_onboarding_path_completed", "llmops"],
     ]);
+  });
+
+  /** @scenario "choosing Langy's start is tracked with the start" */
+  it("names the start choice and carries the start", () => {
+    const decided = decide({ event: "start_chosen", payload: { start: "call" } });
+
+    expect(decided).toMatchObject({
+      userId: "user-1",
+      event: "guided_onboarding_start_chosen",
+      properties: { start: "call", organization_id: "org_1" },
+    });
   });
 
   /** @scenario "connecting a provider tracks the provider and the model, never a key" */

@@ -37,6 +37,7 @@ import { GatewaySpendDebitService } from "../features/spend/services/gateway-spe
 import { ModelCatalogGatewaySpendRatingService } from "../features/spend/services/model-catalog-gateway-spend-rating.service.ts";
 import {
   createTestClickHouseClient,
+  gatewayClickHouseOver,
   testClickHouseUrl,
 } from "../repositories/clickhouse/__tests__/support/clickhouse-endpoint.support.ts";
 import { GatewayBudgetClickHouseRepository } from "../repositories/clickhouse/clickhouse.gateway-budget.repository.ts";
@@ -943,8 +944,8 @@ describe.skipIf(!databaseUrl || !chUrl)(
   "given a key with a 5 USD blocking budget on a project with a 50 USD one",
   () => {
     beforeAll(async () => {
-      chRepo = new GatewayBudgetClickHouseRepository(async () =>
-        createTestClickHouseClient(chUrl!),
+      chRepo = new GatewayBudgetClickHouseRepository(
+        gatewayClickHouseOver(createTestClickHouseClient(chUrl!)),
       );
       await prisma.organization.create({
         data: { id: METERED_ORG_ID, name: `Org ${suffix}`, slug: METERED_ORG_ID },

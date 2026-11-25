@@ -1,7 +1,9 @@
 import {
   AgentBusyError,
+  AgentCallFailedError,
   AgentInstanceLostError,
   BUSY_RETRY_AFTER_MS,
+  type CallKind,
 } from "@langwatch/agent-contract";
 
 import type { LiveInstance } from "../services/connected-agent-runtime.service.ts";
@@ -11,6 +13,31 @@ export function pinnedInstance(live: LiveInstance[], pinned: string): LiveInstan
   const target = live.find((instance) => instance.instanceId === pinned);
   if (!target) throw new AgentInstanceLostError({ instanceId: pinned });
   return target;
+}
+
+/**
+ * The live instances that may take a call of this kind. An instance whose SDK did not declare the
+ * hook would run the agent function and answer it as a pass, so it never takes one (ADR-180).
+ * @throws AgentCallFailedError (`hook_not_declared`) when instances are live but none declared it.
+ */
+export function instancesForCall({
+  live,
+  agentId,
+  kind = "turn",
+}: {
+  live: LiveInstance[];
+  agentId: string;
+  kind?: CallKind;
+}): LiveInstance[] {
+  if (kind === "turn") return live;
+  const declaring = live.filter((instance) => instance.hooks?.[agentId]?.[kind] === true);
+  if (live.length > 0 && declaring.length === 0) {
+    throw new AgentCallFailedError({
+      remoteCode: "hook_not_declared",
+      remoteMessage: `No live instance of this agent declares a ${kind} hook.`,
+    });
+  }
+  return declaring;
 }
 
 /** The instance that takes the thread, or the refusal when all are busy. */

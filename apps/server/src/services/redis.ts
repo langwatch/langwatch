@@ -3,6 +3,7 @@ import { dirname } from "node:path";
 
 import { nowInstant } from "@langwatch/time";
 
+import { DEFAULT_LOG_LEVEL, redisLogLevel } from "../shared/log-level.ts";
 import type { RuntimeContext } from "../shared/runtime-contract.ts";
 import type { EventBus } from "./event-bus.ts";
 import { execCheck, pollUntilHealthy } from "./health.ts";
@@ -22,7 +23,12 @@ export async function startRedis(ctx: RuntimeContext, bus: EventBus): Promise<Su
   // are pure functions of ctx, and skipping when the file exists baked
   // the FIRST run's port into redis.conf forever, which auto-port-shift
   // on subsequent runs would leave stale.
-  writeRedisConf(conf, ctx.ports.redis, ctx.paths.redisData);
+  writeRedisConf({
+    path: conf,
+    port: ctx.ports.redis,
+    dataDir: ctx.paths.redisData,
+    logLevel: ctx.logLevel ?? DEFAULT_LOG_LEVEL,
+  });
 
   const handle = supervise({
     spec: {
@@ -57,7 +63,17 @@ export async function startRedis(ctx: RuntimeContext, bus: EventBus): Promise<Su
   return handle;
 }
 
-function writeRedisConf(path: string, port: number, dataDir: string): void {
+function writeRedisConf({
+  path,
+  port,
+  dataDir,
+  logLevel,
+}: {
+  path: string;
+  port: number;
+  dataDir: string;
+  logLevel: string;
+}): void {
   mkdirSync(dirname(path), { recursive: true });
   mkdirSync(dataDir, { recursive: true });
   const lines = [
@@ -69,7 +85,7 @@ function writeRedisConf(path: string, port: number, dataDir: string): void {
     "save 900 1",
     "save 300 10",
     "save 60 10000",
-    "loglevel notice",
+    `loglevel ${redisLogLevel(logLevel)}`,
     "maxmemory-policy allkeys-lru",
     "",
   ];

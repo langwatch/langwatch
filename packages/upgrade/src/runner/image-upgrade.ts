@@ -39,6 +39,7 @@ import {
   type MigrationStep,
   type TenantMigrationStep,
 } from "../step/migration-step.ts";
+import { ledgerRedactor } from "../step/step-log.ts";
 import { applyRelease } from "../stepping/apply-release.ts";
 import { SteppingError } from "../stepping/release-directory.ts";
 import {
@@ -551,6 +552,7 @@ export async function withImageUpgradeRunner<Result>({
         release,
         steps: imageSteps({ release: release ?? "0.0.0", tree }),
         prismaFolders: imagePrismaFolders(),
+        gooseFiles: tree.gooseFiles,
       },
       // Registered on the ledger, run only here: tenant steps are ops' pass (S6-WIRE).
       codeSteps: inputs.steps.filter(isMigrationStep),
@@ -568,6 +570,13 @@ export async function withImageUpgradeRunner<Result>({
       log: upgradeRunnerLog(),
       ...(inputs.publish ? { hints: readHints({ inputs }) } : {}),
       ...(inputs.upcasts === undefined ? {} : { upcasts: inputs.upcasts }),
+      redact: ledgerRedactor({
+        secretValues: [
+          inputs.databaseUrl,
+          inputs.environment.REDIS_URL,
+          ...targets.map((target) => target.url),
+        ],
+      }),
     });
     return await use({ runner, release, withClickHouse: targets.length > 0 });
   } finally {
@@ -575,8 +584,8 @@ export async function withImageUpgradeRunner<Result>({
   }
 }
 
-/** One upgrade run, narrated from its first line to its closing lines; never throws a failure. */
-export function runImageUpgrade({
+/** One upgrade run, narrated from first line to closing lines; a failed run is an outcome. */
+export async function runImageUpgrade({
   inputs,
   signal,
 }: {

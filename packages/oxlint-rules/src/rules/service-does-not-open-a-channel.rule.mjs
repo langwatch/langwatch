@@ -76,9 +76,10 @@ function isFetchCallee(callee) {
   return callee.computed ? callee.property?.value === "fetch" : callee.property?.name === "fetch";
 }
 
+/** A module's service, or an opted-in framework package's (ADR-181); a plain package is neither. */
 function isService(file) {
   return (
-    file.role === "process" &&
+    (file.role === "process" || file.kind === "framework") &&
     file.isProduction &&
     Boolean(file.sourcePath && stripFeaturePrefix(file.sourcePath).startsWith("services/"))
   );

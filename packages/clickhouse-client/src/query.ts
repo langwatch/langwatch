@@ -6,6 +6,8 @@
 
 import type { AbortSignalLike } from "@langwatch/limiter";
 
+import type { IdBoundOptions } from "./idBound.ts";
+
 /** Whether a statement reads or writes, which several policies branch on. */
 export type QueryKind = "read" | "write";
 
@@ -36,6 +38,11 @@ export interface QueryRequest {
   /** Cooperative cancellation. Policies should stop retrying when aborted. */
   signal?: AbortSignalLike | undefined;
   /**
+   * False when hitting the statement's own time cap (TIMEOUT_EXCEEDED) is its answer, so
+   * retrying would only hit the cap again. Absent keeps the timeout transient.
+   */
+  retryOnTimeout?: false | undefined;
+  /**
    * Skips the tenant predicate check (DDL, `system.*`, a cross-tenant sweep). `tenantId` still
    * routes the statement; every skip is counted and logged. A comment directly above the flag
    * gives the reason (`langwatch/skip-tenant-check-reason`).
@@ -46,6 +53,8 @@ export interface QueryRequest {
    * sweep), so the cold-scan warning stays for accidental ones. A comment above gives the reason.
    */
   SKIP_COLD_SCAN_CHECK?: true | undefined;
+  /** For a statement carrying `{{idBound}}`: a time the caller has, and today's fallback. */
+  idBound?: IdBoundOptions | undefined;
 }
 
 /**
@@ -75,6 +84,11 @@ export interface InsertRequest {
    * copying every row.
    */
   rows: readonly Readonly<Record<string, unknown>>[];
+  /**
+   * The columns the rows carry, named in the statement. Needed to write a MATERIALIZED column
+   * (with `insert_allow_materialized_columns`); absent, ClickHouse takes the insertable ones.
+   */
+  columns?: readonly [string, ...string[]] | undefined;
   /** Skips the one-tenant batch check; counted and logged like a statement's skip. */
   SKIP_TENANT_CHECK?: true | undefined;
   /** Per-insert ClickHouse settings, e.g. `async_insert`. */

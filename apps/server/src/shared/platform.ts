@@ -58,6 +58,42 @@ function detectLibc(): "glibc" | "musl" {
   return "glibc";
 }
 
+/** The backend's own floor: apps/backend runs TypeScript through Node's type stripping. */
+export const MINIMUM_NODE_MAJOR = 24;
+
+export class UnsupportedHostError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "UnsupportedHostError";
+  }
+}
+
+/** Why this host cannot run the prebuilt app (ADR-180), or null when it can. */
+export function unsupportedHostReason({
+  nodeVersion,
+  platform,
+}: {
+  nodeVersion: string;
+  platform: SupportedPlatform;
+}): string | null {
+  const major = Number.parseInt(nodeVersion.replace(/^v/, ""), 10);
+  if (!(major >= MINIMUM_NODE_MAJOR)) {
+    return `LangWatch needs Node ${MINIMUM_NODE_MAJOR} or newer, and this is Node ${nodeVersion}. Install Node ${MINIMUM_NODE_MAJOR} from https://nodejs.org and run it again.`;
+  }
+  if (platform.endsWith("-musl")) {
+    return "LangWatch has no npx build for Linux on musl (Alpine and similar). Run the Docker image instead: https://docs.langwatch.ai/self-hosting/docker-compose";
+  }
+  return null;
+}
+
+/** Refuses an unsupported OS, an old Node or musl before anything installs; returns the platform */
+export function assertSupportedHost(): SupportedPlatform {
+  const platform = detectPlatform();
+  const reason = unsupportedHostReason({ nodeVersion: process.versions.node, platform });
+  if (reason) throw new UnsupportedHostError(reason);
+  return platform;
+}
+
 export function isMac(): boolean {
   return platform() === "darwin";
 }

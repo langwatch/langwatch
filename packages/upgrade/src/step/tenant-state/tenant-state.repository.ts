@@ -1,5 +1,6 @@
 import {
   HELD_REASONS,
+  type HeldReason,
   SystemMigrationRecordNotFoundError,
   type SystemMigrationStateRepository,
   TENANT_MIGRATION_STATUSES,
@@ -13,6 +14,16 @@ import type { UpgradePostgres } from "../../ports.ts";
 
 /** One tenant's state with when it last moved, as Ops' attention list reads it. */
 export type TenantStepStateRow = TenantMigrationRecord & { updatedAt: Instant };
+
+/** Which rows Ops' drill-down reads: by status, and optionally by why they are held. */
+export type TenantStepStateQuery = {
+  migrationName?: string | undefined;
+  statuses: TenantMigrationStatus[];
+  heldReason?: HeldReason | undefined;
+  exceptHeldReason?: HeldReason | undefined;
+  limit: number;
+  offset?: number;
+};
 
 type StateRow = {
   status: string;
@@ -90,12 +101,32 @@ export class TenantStepStateRepository implements SystemMigrationStateRepository
   /** A tenant the step has parked or holds (its proof disagreed, or its queued work waits). */
   async hasUnsettledTenant({ migrationName }: { migrationName: string }): Promise<boolean> {
     const table = await this.table();
+    // A hold waiting on a person settles the step; no pass can move it (`isWaitingOnPerson`).
     const { rows } = await this.postgres.query<{ found: number }>(
       `SELECT 1 AS "found" FROM ${table}
-       WHERE "step_id" = $1 AND ("status" = 'parked' OR "held_reason" IS NOT NULL) LIMIT 1`,
+       WHERE "step_id" = $1
+         AND ("status" = 'parked' OR ("held_reason" IS NOT NULL AND "held_reason" <> 'person'))
+       LIMIT 1`,
       [migrationName],
     );
     return rows.length > 0;
+  }
+
+  /** Ops' rollup: how many of one step's tenants are held for this reason. */
+  async countHeld({
+    migrationName,
+    heldReason,
+  }: {
+    migrationName: string;
+    heldReason: HeldReason;
+  }): Promise<number> {
+    const table = await this.table();
+    const { rows } = await this.postgres.query<{ count: string }>(
+      `SELECT count(*)::text AS "count" FROM ${table}
+       WHERE "step_id" = $1 AND "status" = 'migrated' AND "held_reason" = $2`,
+      [migrationName, heldReason],
+    );
+    return Number(rows[0]?.count ?? 0);
   }
 
   /** Whether a later pass could still move a tenant of these steps: parked or migrated. */
@@ -139,18 +170,18 @@ export class TenantStepStateRepository implements SystemMigrationStateRepository
     return counts;
   }
 
-  /** Ops' drill-down: tenants in these statuses, newest movement first; no step reads every one. */
+  /**
+   * Ops' drill-down: tenants in these statuses, newest movement first; no step reads every one.
+   * `heldReason` keeps only rows held for it; `exceptHeldReason` drops them, keeping unheld rows.
+   */
   async findRecordsByStatus({
     migrationName,
     statuses,
+    heldReason,
+    exceptHeldReason,
     limit,
     offset = 0,
-  }: {
-    migrationName?: string | undefined;
-    statuses: TenantMigrationStatus[];
-    limit: number;
-    offset?: number;
-  }): Promise<TenantStepStateRow[]> {
+  }: TenantStepStateQuery): Promise<TenantStepStateRow[]> {
     const table = await this.table();
     const { rows } = await this.postgres.query<
       StateRow & { step_id: string; tenant_id: string; updated_at_ms: string }
@@ -160,9 +191,18 @@ export class TenantStepStateRepository implements SystemMigrationStateRepository
         (extract(epoch FROM "held_since") * 1000)::bigint::text AS "held_since_ms"
        FROM ${table}
        WHERE ($1::text IS NULL OR "step_id" = $1) AND "status" = ANY($2::text[])
+         AND ($5::text IS NULL OR "held_reason" = $5)
+         AND ($6::text IS NULL OR "held_reason" IS DISTINCT FROM $6)
        ORDER BY "updated_at" DESC, "step_id" ASC, "tenant_id" ASC
        LIMIT $3 OFFSET $4`,
-      [migrationName ?? null, [...statuses], limit, offset],
+      [
+        migrationName ?? null,
+        [...statuses],
+        limit,
+        offset,
+        heldReason ?? null,
+        exceptHeldReason ?? null,
+      ],
     );
     return rows.map((row) => ({
       ...recordOf({ migrationName: row.step_id, tenantId: row.tenant_id, row }),

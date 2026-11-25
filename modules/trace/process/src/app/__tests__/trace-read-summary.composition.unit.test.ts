@@ -13,6 +13,7 @@ import { traceSummaryDataSchema, type TraceSummaryData } from "@langwatch/trace-
 import { describe, expect, it } from "vitest";
 
 import { ownProof } from "../../__tests__/support/authorization-proofs.fixture.ts";
+import { fakeTraceProcessingCommands } from "../../__tests__/support/trace-processing-commands.fake.ts";
 import { S3TraceLegacySpoolChannel } from "../../channels/s3/s3.trace-legacy-spool.channel.ts";
 import { TraceCanonicalisationService } from "../../features/derivation/services/trace-canonicalisation.service.ts";
 import { TraceBlobStoreService } from "../../features/media/services/trace-blob-store.service.ts";
@@ -20,7 +21,7 @@ import { MemoryTraceSpanDedupRepository } from "../../repositories/memory/memory
 import { MemoryTraceRepositories } from "../../repositories/memory/memory.trace.repositories.ts";
 import type { TraceRepositories } from "../../repositories/trace.repositories.ts";
 import { TraceModule } from "../trace.app.ts";
-import { createTraceAppHarness } from "./support/trace-app.harness.ts";
+import { braidTwins, createTraceAppHarness } from "./support/trace-app.harness.ts";
 
 const FOLDED: TraceSummaryData = traceSummaryDataSchema.parse({
   traceId: "trace-1",
@@ -109,6 +110,7 @@ function compose({
   const refuse = () => Promise.reject(new Error("no datastore in this test"));
 
   return TraceModule.composeDependencies({
+    ...braidTwins(),
     repositories,
     ...(withClickHouse ? { resolveClickHouseClient: refuse } : {}),
     ...(summaryStore ? { summaryStore } : {}),
@@ -118,13 +120,7 @@ function compose({
       legacySpool: S3TraceLegacySpoolChannel.create({ resolveS3Client: refuse }),
     }),
     dedup: MemoryTraceSpanDedupRepository.create(),
-    commands: {
-      recordSpan: async () => undefined,
-      changeTraceName: async () => undefined,
-      addAnnotation: async () => undefined,
-      removeAnnotation: async () => undefined,
-      assignTopic: async () => undefined,
-    },
+    commands: fakeTraceProcessingCommands(),
     broadcast: {
       getTenantEmitter: () => {
         throw new Error("no broadcast fabric in this test");

@@ -29,6 +29,7 @@ export {
   getStatusCodeFromError,
   hasAuthorizationToken,
   logHttpRequest,
+  REQUEST_LOGGER_NAME,
   type RequestLogData,
 } from "./request/requestLogging.ts";
 export {
@@ -42,6 +43,7 @@ export {
 export {
   MAX_VALIDATION_ISSUES,
   validationMeta,
+  type SchemaPathDescriber,
   type ValidationIssueMeta,
   type ValidationMeta,
 } from "./validation/validationMeta.ts";

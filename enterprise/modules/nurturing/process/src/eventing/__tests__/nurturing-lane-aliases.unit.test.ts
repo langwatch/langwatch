@@ -21,11 +21,18 @@ import {
 function laneAliases() {
   return buildNurturingPipeline({
     deliver: async () => undefined,
-    projectCreated: async () => undefined,
     guidedTurnFailed: async () => undefined,
     usageReportReceived: async () => undefined,
-    evaluationCompleted: async () => [],
-    simulationRunFinished: async () => [],
+    evaluationsCompleted: async () => undefined,
+    simulationRunsFinished: async () => undefined,
+    codingSessionsStored: async () => undefined,
+    forgetErasedUser: async () => undefined,
+    virtualKeyCreated: async () => undefined,
+    keyBudgetCrossed: async () => undefined,
+    keyFirstRequested: async () => undefined,
+    unbudgetedSpendRecorded: async () => undefined,
+    governanceSourceConnected: async () => undefined,
+    governanceSourceLive: async () => undefined,
   }).laneAliases;
 }
 
@@ -94,13 +101,13 @@ describe("nurturing's aliases of main's Customer.io sync lanes", () => {
     });
 
     /** @scenario "Evaluation sync jobs the previous release queued reach nurturing as a settled evaluation" */
-    it("reads it as the project's settled-evaluation fact the lane parses", () => {
+    it("reads it as the settled-evaluation fact the lane parses, keyed by the evaluation", () => {
       const body = mainEvaluationSyncAsLifecycleCompleted(mainEvaluationSyncJob());
 
       expect(body).toMatchObject({
         id: "evt-1",
         tenantId: "project-1",
-        aggregateId: "project-1",
+        aggregateId: "eval-1",
         type: EVALUATION_LIFECYCLE_COMPLETED_EVENT_TYPE,
       });
       expect(evaluationLifecycleCompletedEventDataSchema.parse(body.data)).toEqual({

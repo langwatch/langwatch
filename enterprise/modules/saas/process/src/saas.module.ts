@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
+import { callerAddressOfRequest } from "@langwatch/api/rest";
 import type { SaasApi, SaasServerConfig } from "@langwatch/enterprise-saas-contract";
 import { defineProcessModule, type PublishedProcessModule } from "@langwatch/process";
 
@@ -12,4 +13,5 @@ export const saasProcessModule: PublishedProcessModule<"saas", SaasApi, SaasServ
     .withRepositories(saasRepositories)
     .withApi(SaasModule)
     .withTransports(usageReportRest)
+    .provideMiddlewareContext({ callerAddress: callerAddressOfRequest })
     .withEventing(saasUsageReportEventing);

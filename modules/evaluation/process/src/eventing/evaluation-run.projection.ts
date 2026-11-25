@@ -1,10 +1,12 @@
 import {
   type EvaluationRunData,
+  type EvaluationAttemptFailedEvent,
   type EvaluationCompletedEvent,
   type EvaluationReportedEvent,
   type EvaluationScheduledEvent,
   type EvaluationStartedEvent,
   EVALUATION_PROJECTION_VERSIONS,
+  evaluationAttemptFailedEventSchema,
   evaluationCompletedEventSchema,
   evaluationReportedEventSchema,
   evaluationScheduledEventSchema,
@@ -23,11 +25,13 @@ const evaluationRunEvents = [
   evaluationStartedEventSchema,
   evaluationCompletedEventSchema,
   evaluationReportedEventSchema,
+  evaluationAttemptFailedEventSchema,
 ] as const;
 
 /**
  * Type-safe fold projection for evaluation run state. Implements FoldEventHandlers;
- * events applied in order: scheduled → in_progress → terminal (processed/error/skipped).
+ * events applied in order: scheduled → in_progress (each failed attempt) → terminal
+ * (processed/error/skipped). A terminal run keeps its attempts and has no next attempt.
  */
 export class EvaluationRunFoldProjection
   extends AbstractFoldProjection<
@@ -85,6 +89,12 @@ export class EvaluationRunFoldProjection
       startedAt: null,
       completedAt: null,
       costId: null,
+      attempts: 0,
+      lastAttemptAt: null,
+      lastAttemptError: null,
+      nextAttemptAt: null,
+      // A run never stored mints its id in the corrected layout (#9575)
+      idLayout: "v2",
     };
   }
 
@@ -141,6 +151,7 @@ export class EvaluationRunFoldProjection
       errorDetails: event.data.errorDetails ?? null,
       completedAt: event.occurredAt,
       costId: event.data.costId ?? null,
+      nextAttemptAt: null,
     };
   }
 
@@ -169,6 +180,30 @@ export class EvaluationRunFoldProjection
       costId: event.data.costId ?? null,
       startedAt: event.occurredAt,
       completedAt: event.occurredAt,
+      nextAttemptAt: null,
+    };
+  }
+
+  handleEvaluationAttemptFailed(
+    event: EvaluationAttemptFailedEvent,
+    state: EvaluationRunData,
+  ): EvaluationRunData {
+    // A run that already ended stays ended; its attempts are history.
+    if (state.completedAt !== null) return state;
+    return {
+      ...state,
+      evaluationId: state.evaluationId || event.data.evaluationId,
+      evaluatorId: state.evaluatorId || event.data.evaluatorId,
+      evaluatorType: state.evaluatorType || event.data.evaluatorType,
+      evaluatorName: state.evaluatorName ?? event.data.evaluatorName ?? null,
+      traceId: state.traceId ?? event.data.traceId ?? null,
+      isGuardrail: event.data.isGuardrail ?? state.isGuardrail,
+      status: "in_progress",
+      startedAt: state.startedAt ?? event.occurredAt,
+      attempts: Math.max(state.attempts ?? 0, event.data.attempt),
+      lastAttemptAt: event.occurredAt,
+      lastAttemptError: event.data.error,
+      nextAttemptAt: event.data.nextAttemptAt,
     };
   }
 }

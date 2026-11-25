@@ -1,16 +1,38 @@
 diff --git a/lib/tsc.js b/lib/tsc.js
-index eb869b715737e45fcf1af33d1af3157b59ba08de..bda11650f6b68415f9171710c74002a51350c9f0 100644
+index eb869b715737e45fcf1af33d1af3157b59ba08de..4393e84adfe8175b0933a634c2943ea8abc5023c 100644
 --- a/lib/tsc.js
 +++ b/lib/tsc.js
-@@ -2,21 +2,142 @@
+@@ -2,21 +2,168 @@
  
  import getExePath from "#getExePath";
  import { execFileSync } from "node:child_process";
 +import { accessSync, constants, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
++import { createRequire } from "node:module";
 +import { homedir } from "node:os";
-+import { delimiter, join } from "node:path";
++import { delimiter, dirname, join } from "node:path";
++import { pathToFileURL } from "node:url";
  
- const exe = getExePath();
+-const exe = getExePath();
++// LangWatch: `tsc` runs tsrs, the Rust port of this compiler (ADR-181). LANGWATCH_TSC=tsgo,
++// or a platform tsrs ships no binary for, runs the Go binary this package carries. On a
++// platform tsrs does support, a missing binary is an install fault and stops the run.
++async function tsrsExe() {
++    if (process.env.LANGWATCH_TSC === "tsgo") return undefined;
++    try {
++        const root = dirname(createRequire(import.meta.url).resolve("tsrs/package.json"));
++        const lib = (file) => import(pathToFileURL(join(root, "lib", file)).href);
++        const optional = JSON.parse(readFileSync(join(root, "package.json"), "utf8")).optionalDependencies ?? {};
++        if (!((await lib("platform.js")).getPlatformPackageName() in optional)) return undefined;
++        return (await lib("getExePath.js")).default();
++    }
++    catch (error) {
++        process.stderr.write(`tsc: cannot run tsrs: ${error.message}\nReinstall, or set LANGWATCH_TSC=tsgo to run the Go compiler.\n`);
++        process.exit(1);
++    }
++}
++
++const rust = await tsrsExe();
++const exe = rust ?? getExePath();
  
 -if (process.platform !== "win32" && typeof process.execve === "function") {
 -    // > v22.15.0
@@ -21,6 +43,11 @@ index eb869b715737e45fcf1af33d1af3157b59ba08de..bda11650f6b68415f9171710c74002a5
 +const args = process.argv.slice(2);
 +const exempt = args.some((arg) => /^(-w|--watch|-v|--version|-h|--help|--lsp)$/.test(arg));
 +const held = process.env.RUSH_GATE_HELD || process.env.CHECK_QUEUE_HELD || process.env.LANGWATCH_TSC_SLOT;
++// tsrs ignores GOMAXPROCS; its checker threads take the same cap as a flag, watch included.
++const informational = args.some((arg) => /^(-v|--version|-h|--help|--lsp)$/.test(arg));
++if (rust && !informational && !args.some((arg) => /^--(checkers|singleThreaded)$/.test(arg))) {
++    args.push("--checkers", process.env.GOMAXPROCS ?? "2");
++}
 +const canExec = process.platform !== "win32" && typeof process.execve === "function";
 +
 +function findBin(name, override) {
@@ -56,10 +83,12 @@ index eb869b715737e45fcf1af33d1af3157b59ba08de..bda11650f6b68415f9171710c74002a5
 +        // execve refused: haven's slot below
 +    }
 +    const haven = findBin("haven", process.env.HAVEN_BIN);
-+    try {
+     try {
+-        process.execve(exe, [exe, ...process.argv.slice(2)]);
 +        if (haven) process.execve(haven, [haven, "machine", "slot", "run", "--class", "typecheck", "--label", "tsc", "--", exe, ...args]);
-+    }
-+    catch {
+     }
+     catch {
+-        // may not be available, ignore the error and fallback
 +        // execve refused: fall back to the lock folder below
 +    }
 +}
@@ -72,12 +101,10 @@ index eb869b715737e45fcf1af33d1af3157b59ba08de..bda11650f6b68415f9171710c74002a5
 +
 +function ownerAlive(lock) {
 +    let pid;
-     try {
--        process.execve(exe, [exe, ...process.argv.slice(2)]);
++    try {
 +        pid = Number(readFileSync(join(lock, "pid"), "utf8"));
-     }
-     catch {
--        // may not be available, ignore the error and fallback
++    }
++    catch {
 +        return Date.now() - statSync(lock).mtimeMs < 10_000;
 +    }
 +    try {

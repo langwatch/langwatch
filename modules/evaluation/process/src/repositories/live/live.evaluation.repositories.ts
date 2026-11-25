@@ -12,6 +12,7 @@ import { ObjectStorageEvaluationInputRepository } from "../object-storage/object
 import { ObjectStorageEvaluationLangevalsStagingRepository } from "../object-storage/object-storage.evaluation-langevals-staging.repository.ts";
 import { PostgresEvaluationRepositories } from "../prisma/prisma.evaluation.repositories.ts";
 import { RedisEvaluationAnalyticsFoldCacheRepository } from "../redis/redis.evaluation-analytics-fold-cache.repository.ts";
+import { RedisMonitorErrorRateRepository } from "../redis/redis.monitor-error-rate.repository.ts";
 
 /**
  * Evaluation's live stores: the cost ledger in Prisma, run history and the
@@ -49,6 +50,7 @@ export class LiveEvaluationRepositories {
         redis,
         ttlSeconds: config.foldCacheTtlSeconds,
       }),
+      monitorErrorRates: RedisMonitorErrorRateRepository.create({ redis }),
       inputs: ObjectStorageEvaluationInputRepository.create({ objectStorage }),
       langevalsStaging: ObjectStorageEvaluationLangevalsStagingRepository.create({ objectStorage }),
     };

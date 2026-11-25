@@ -74,10 +74,14 @@ export function useScenarioRunDetail({
     scenarioRunId,
     isOpen: open,
   });
+  const reserved = stream.scenarioState?.metadata?.langwatch;
   const actions = useRunAgainActions({
     scenarioId,
     projectId: project?.id,
     projectSlug: project?.slug,
+    runTarget: reserved?.targetType
+      ? { type: reserved.targetType, id: reserved.targetReferenceId }
+      : null,
     runCallbacks,
   });
   const handleOpenInTraces = useOpenRunInTraces({

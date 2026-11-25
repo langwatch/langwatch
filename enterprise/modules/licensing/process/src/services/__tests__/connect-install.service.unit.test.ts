@@ -34,7 +34,7 @@ const ORGANIZATION = "org-acme";
 const cryptography = NodeLicenseCryptographyService.create({ publicKey: TEST_PUBLIC_KEY });
 
 /** A license signed here, so the services it names are part of the signature. */
-function licenseNaming(services: string[]): string {
+function licenseNaming(services: string[], organizationId: string = ORGANIZATION): string {
   return cryptography.encodeLicenseKey(
     cryptography.signLicense(
       {
@@ -51,7 +51,7 @@ function licenseNaming(services: string[]): string {
           maxMessagesPerMonth: 1_000_000,
           canPublish: true,
         },
-        organizationId: ORGANIZATION,
+        organizationId,
         ...(services.length > 0 ? { connectServices: services } : {}),
       },
       TEST_PRIVATE_KEY,
@@ -72,6 +72,7 @@ function install({
   upstream = new RecordingUpstreamFacts(),
   instanceLicense,
   override = true,
+  minted = { count: 0 },
 }: {
   license: string | null;
   servicesDisabled?: string[];
@@ -82,6 +83,8 @@ function install({
   instanceLicense?: string;
   /** Whether LANGWATCH_LICENSE_PUBLIC_KEY names the test key. */
   override?: boolean;
+  /** Counts each instance id the identity service mints. */
+  minted?: { count: number };
 }) {
   const rows = new Map<string, ConnectOrganizationRecord>([
     [
@@ -109,7 +112,10 @@ function install({
     },
     identity: InstanceIdentityService.create({
       repository: MemoryInstanceIdentityRepository.create({ now: () => NOW }),
-      newInstanceId: () => "instance-1",
+      newInstanceId: () => {
+        minted.count += 1;
+        return "instance-1";
+      },
     }),
     cryptography,
     deployment: {
@@ -133,7 +139,7 @@ describe("what a self-hosted install may call", () => {
     expect(await service.findEnabledServices(ORGANIZATION)).toEqual([]);
 
     const status = await service.getStatus(ORGANIZATION);
-    expect(status).toMatchObject({ deployment: "on", licensed: true });
+    expect(status).toMatchObject({ deployment: "on", licensed: false });
     expect(gateway.classifications).toEqual([]);
   });
 
@@ -444,6 +450,23 @@ describe("the hosted provider slot of the install's own gateway", () => {
     ]);
   });
 
+  /** @scenario An environment licence for another organization gives this one no hosted services */
+  it("ignores an instance-wide licence bound to another organization", async () => {
+    const gateway = MemoryConnectGatewayChannel.create();
+    const { service, upstream } = install({
+      license: null,
+      gateway,
+      instanceLicense: licenseNaming(["managed_models"], "org-other"),
+    });
+
+    await service.publishUpstream(ORGANIZATION);
+
+    expect(upstream.last).toBe("cleared");
+    expect(await service.findCredential(ORGANIZATION)).toEqual([]);
+    expect(await service.findEntitledServices(ORGANIZATION)).toEqual([]);
+    expect(await service.getStatus(ORGANIZATION)).toMatchObject({ licensed: false });
+  });
+
   it("serves no upstream where Connect is off or no licence is held", async () => {
     for (const setup of [
       install({ license: licenseNaming(["managed_models"]), permitted: false }),
@@ -557,3 +580,24 @@ function activate(
     license,
   });
 }
+
+describe("whether the install holds a licence it could present", () => {
+  describe("when asked before any instance id exists", () => {
+    /** @scenario "Asking whether sending is available mints no instance id" */
+    it("answers from the licence and mints no instance id", async () => {
+      const minted = { count: 0 };
+      const { service } = install({ license: licenseNaming([]), minted });
+
+      expect(await service.holdsInstallLicence()).toBe(true);
+      expect(minted.count).toBe(0);
+    });
+  });
+
+  describe("when no organization holds a licence", () => {
+    it("answers that it holds none", async () => {
+      const { service } = install({ license: null });
+
+      expect(await service.holdsInstallLicence()).toBe(false);
+    });
+  });
+});

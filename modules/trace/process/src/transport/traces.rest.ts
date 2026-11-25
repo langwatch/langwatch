@@ -28,6 +28,7 @@ import {
   traceSearchBodySchema,
   traceSearchResponseSchema,
   tracesRestCredentialSchema,
+  traceSettleSettingsSchema,
   transcriptRestResponseSchema,
   type CompiledProjection,
   type Protections,
@@ -242,7 +243,8 @@ async function searchTraces({
 
   logger.info({ projectId: scope.id }, "Searching traces for project");
 
-  const pageSize = rawPageSize ?? DEFAULT_TRACES_PAGE_SIZE;
+  // With spans the app picks the page size: it refuses above its spans bound, never clamps.
+  const pageSize = includeSpans ? rawPageSize : (rawPageSize ?? DEFAULT_TRACES_PAGE_SIZE);
   const protections = await app.resolveApiKeyProtections({
     projectId: scope.id,
     principal: caller.principal,
@@ -309,9 +311,10 @@ function createTracesRest() {
     .withVersion(MANAGEMENT_API_VERSION)
 
     .post("/search", "searchTraces")
+    .keepsRecords()
     .withoutAudit("read sent as a POST")
     .withInput(traceSearchBodySchema)
-    .withPermission("traces:view")
+    .withPermission("traces:view", { legacyKey: "legacy_project_key_traces_read" })
     .withResponse("bytes", { produces: "application/json" })
     .withMiddlewareContext(projectRequestContext, tracesRestCredential)
     .withDocs({
@@ -331,12 +334,36 @@ function createTracesRest() {
       }),
     );
 
+  // GET /settle-settings - the project's recommended verdict-time trace wait for a scenario
+  // judge. Registered BEFORE :traceId so "settle-settings" is never read as a trace id.
+  router = router
+    .get("/settle-settings", "getTraceSettleSettings")
+    .withPermission("traces:view", { legacyKey: "legacy_project_key_traces_read" })
+    .withOutput(traceSettleSettingsSchema)
+    .withDocs({
+      operationId: "getApiTracesSettleSettings",
+      summary: "Recommended trace wait for a scenario judge",
+      description:
+        "How long a scenario judge should wait for this project's traces before a verdict: " +
+        "the first wait, the one extension it may ask for, and how long the span set must " +
+        "hold still. Measured on the project's own ingest; defaults without history.",
+      tags: ["Traces"],
+      responses: {
+        200: {
+          description: "The recommended wait, extension and quiet period, in milliseconds",
+          content: { "application/json": { schema: resolver(traceSettleSettingsSchema) } },
+        },
+        ...SHARED_ERROR_ANSWERS,
+      },
+    })
+    .handle(({ app, scope }) => app.resolveTraceSettleSettings({ projectId: scope.id }));
+
   // GET /facets - what the trace filter fields hold. Registered BEFORE
   // :traceId so "facets" is never read as a trace id.
   router = router
     .get("/facets", "getTraceFacets")
     .withQuery(traceFacetsQuerySchema)
-    .withPermission("traces:view")
+    .withPermission("traces:view", { legacyKey: "legacy_project_key_traces_read" })
     .withOutput(traceFacetsResponseSchema)
     .withMiddlewareContext(projectRequestContext, tracesRestCredential)
     .withDocs({
@@ -369,7 +396,7 @@ function createTracesRest() {
   router = router
     .get("/:traceId/transcript", "getTraceTranscript")
     .withParams(traceIdParamsSchema)
-    .withPermission("traces:view")
+    .withPermission("traces:view", { legacyKey: "legacy_project_key_traces_read" })
     .withOutput(transcriptRestResponseSchema)
     .withMiddlewareContext(projectRequestContext, tracesRestCredential)
     .withDocs({
@@ -407,6 +434,7 @@ function createTracesRest() {
 
   router = router
     .patch("/:traceId/metadata", "updateTraceMetadata")
+    .keepsRecords()
     .withAudit("traces.changeMetadata")
     .withParams(traceIdParamsSchema)
     .withInput(traceMetadataBodySchema)
@@ -434,7 +462,7 @@ function createTracesRest() {
     .get("/:traceId", "getTrace")
     .withParams(traceIdParamsSchema)
     .withQuery(traceFormatQuerySchema)
-    .withPermission("traces:view")
+    .withPermission("traces:view", { legacyKey: "legacy_project_key_traces_read" })
     .withOutput(traceDetailResponseSchema)
     .withMiddlewareContext(projectRequestContext, tracesRestCredential)
     .withDocs({

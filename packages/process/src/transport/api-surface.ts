@@ -13,6 +13,7 @@ import {
 import {
   type ApiDoor,
   BrowserBundle,
+  EmbeddedDocument,
   FramedDocument,
   type HttpFailureAnswer,
   HttpMux,
@@ -24,13 +25,18 @@ import {
   SessionReader,
   type TransportSelection,
 } from "@langwatch/api/hosting";
-import { ClientAddress, SecurityHeaders } from "@langwatch/api/policy";
+import { ClientAddress, SecurityHeaders, servesPlainHttp } from "@langwatch/api/policy";
 import {
   BrowserSessionIdentity,
   canonicalErrorAnswer,
   IdempotencyLedger,
   type IdempotentRunner,
+  loggerMiddleware,
+  openConfirmationGate,
+  recordAnsweredCause,
+  recordRequestPrincipal,
   RestHost,
+  type RestConfirmationGate,
 } from "@langwatch/api/rest";
 import {
   bindTrpcMiddlewareContext,
@@ -40,13 +46,18 @@ import {
   type TrpcRequestContext,
 } from "@langwatch/api/trpc";
 import type { Logger } from "@langwatch/observability";
+import { noteRouteTemplate } from "@langwatch/observability/metrics";
 import type { ProcessMemberSource } from "@langwatch/process-stores";
+import { TRPCError } from "@trpc/server";
 import { fetchRequestHandler } from "@trpc/server/adapters/fetch";
-import { Hono } from "hono";
+import { type Context, Hono } from "hono";
+import { matchedRoutes } from "hono/route";
 import { z } from "zod";
 
 import type { ExposedSurface } from "../process-supply.ts";
 import type { ApiUiBundle } from "./bundle-config.ts";
+import { docsCrossOrigin } from "./docs-cross-origin.ts";
+import { idempotencyReceiptsOn } from "./idempotency-receipts.ts";
 
 export type ApiSurfaceComposition = Readonly<{
   members: ProcessMemberSource;
@@ -55,9 +66,13 @@ export type ApiSurfaceComposition = Readonly<{
   bundle: ApiUiBundle | undefined;
   instanceAdmin: RestIdentity;
   trustedProxies: readonly string[] | undefined;
+  /** TRUST_CLOUDFLARE_CLIENT_IP: honour CF-Connecting-IP from a peer inside `trustedProxies`. */
+  trustCloudflare: boolean;
   executionProxyBaseUrl: string | undefined;
   /** The deployment's public address, which a proxy in front of the API may hide from it. */
   publicBaseUrl: string | undefined;
+  /** The documentation sites whose playground may call REST cross-origin (ADR-185). */
+  docsOrigins: readonly string[];
   production: boolean;
   selection: TransportSelection;
   /** The process's one upgrade router, where every declared socket protocol mounts. */
@@ -85,13 +100,23 @@ class ApiSurface {
     const sessions = SessionReader.create({ verify: door.sessions });
     const idempotency = stores.database
       ? IdempotencyLedger.create({
-          receipts: members.read("prisma"),
+          receipts: idempotencyReceiptsOn(members.read("prisma")),
           cipher: members.read("encryption"),
         }).run
       : void 0;
     const rateLimiter = stores.redis ? members.read("rateLimiter") : void 0;
 
-    return new ApiSurface({ composition, door, sessions, idempotency, rateLimiter });
+    // The module that shows confirmation cards binds the gate; none bound refuses Langy deletes.
+    const confirmations = openConfirmationGate(peers);
+
+    return new ApiSurface({
+      composition,
+      door,
+      sessions,
+      idempotency,
+      rateLimiter,
+      confirmations,
+    });
   }
 
   readonly #rest: RestHost | undefined;
@@ -107,24 +132,33 @@ class ApiSurface {
     sessions,
     idempotency,
     rateLimiter,
+    confirmations,
   }: {
     composition: ApiSurfaceComposition;
     door: ApiDoor;
     sessions: SessionReader;
     idempotency: IdempotentRunner | undefined;
     rateLimiter: RateLimiter | undefined;
+    confirmations: RestConfirmationGate | undefined;
   }) {
     this.composition = composition;
     this.door = door;
     this.sessions = sessions;
-    if (composition.selection.selected.rest) this.#rest = this.#restHost(idempotency, rateLimiter);
+    if (composition.selection.selected.rest) {
+      this.#rest = this.#restHost({ idempotency, rateLimiter, confirmations });
+    }
     if (composition.selection.selected.trpc) this.#trpc = this.#trpcHost(rateLimiter);
   }
 
-  #restHost(
-    idempotency: IdempotentRunner | undefined,
-    rateLimiter: RateLimiter | undefined,
-  ): RestHost {
+  #restHost({
+    idempotency,
+    rateLimiter,
+    confirmations,
+  }: {
+    idempotency: IdempotentRunner | undefined;
+    rateLimiter: RateLimiter | undefined;
+    confirmations: RestConfirmationGate | undefined;
+  }): RestHost {
     return RestHost.create({
       identities: {
         ...this.door.identities,
@@ -136,6 +170,7 @@ class ApiSurface {
       rateLimiter,
       entitlements: this.door.entitlements,
       authz: this.door.authz,
+      confirmations,
     });
   }
 
@@ -178,16 +213,43 @@ class ApiSurface {
         : {}),
     });
     this.#rest?.assertEveryRouteDeclared();
-    const api = composeApiApplication({ rest: this.#rest, trpc: this.#trpc }, selected);
+    const api = composeApiApplication(
+      {
+        rest: this.#rest,
+        trpc: this.#trpc,
+        docsOrigins: composition.docsOrigins,
+        plainHttp: servesPlainHttp(composition.publicBaseUrl),
+      },
+      selected,
+    );
+    const clientAddress = ClientAddress.fromTrustedProxies({
+      addresses: composition.trustedProxies,
+      trustCloudflare: composition.trustCloudflare,
+    });
     const mux = HttpMux.create({ reporter: composition.logger })
-      .use(ClientAddress.fromTrustedProxies({ addresses: composition.trustedProxies }))
-      .use(SecurityHeaders.strict({ production: composition.production }))
+      .use(clientAddress)
+      .use(
+        SecurityHeaders.strict({
+          production: composition.production,
+          publicBaseUrl: composition.publicBaseUrl,
+        }),
+      )
       .route("/api", api, { onFailure: answerApiFailure });
     for (const path of apiRootPaths(api))
       mux.route(path, api, { onFailure: answerApiFailure, exact: true });
     for (const document of selected.documents)
       mux.route(document.path, FramedDocument.create(document));
-    return composition.doors.ahead(mux.route("/", page).handler);
+    for (const selection of selected.embedded)
+      mux.route(
+        selection.path,
+        EmbeddedDocument.create({ selection, embedders: composition.docsOrigins }),
+      );
+    const listener = composition.doors.ahead(mux.route("/", page).handler);
+    // A raw door (hosted MCP) answers ahead of the mux, so it reads the same resolved address.
+    return (request, response) => {
+      clientAddress.handleIncoming(request);
+      return listener(request, response);
+    };
   }
 
   #browserDoor(): RestIdentity {
@@ -313,6 +375,18 @@ const shareViewerContext = defineMiddlewareContext(
 );
 
 /**
+ * The most specific non-wildcard route that matched is the request's template;
+ * the mux labels its HTTP metric with it rather than the raw path.
+ */
+export function noteMatchedRouteTemplate(context: Context): void {
+  const template = matchedRoutes(context)
+    .map((route) => route.path)
+    .reverse()
+    .find((path) => path !== "*" && path !== "/*");
+  if (template) noteRouteTemplate(context.req.raw, template);
+}
+
+/**
  * The API's whole surface: the tRPC lanes, every REST family, then the 404 — mount order is
  * match order, and only here is every declaration known to have mounted (ARCHITECTURE.md §4).
  */
@@ -320,13 +394,19 @@ export function composeApiApplication(
   hosts: {
     rest?: RestHost | undefined;
     trpc?: TrpcHost | undefined;
+    docsOrigins?: readonly string[] | undefined;
+    /** The deployment is served without TLS, so live streams arrive without `Sec-Fetch-Site`. */
+    plainHttp?: boolean | undefined;
   },
   policies: { trpc?: SecurityHeaders; rest?: SecurityHeaders } = {},
 ): Hono {
   const root = new Hono();
+  root.use("*", docsCrossOrigin({ origins: hosts.docsOrigins ?? [] }));
 
   root.use("*", async (context, next) => {
     await next();
+
+    noteMatchedRouteTemplate(context);
 
     const policy =
       context.req.path === TrpcHost.path || context.req.path.startsWith(`${TrpcHost.path}/`)
@@ -336,7 +416,7 @@ export function composeApiApplication(
     for (const [name, value] of Object.entries(policy?.headers ?? {})) context.header(name, value);
   });
 
-  if (hosts.trpc) root.route("/", trpcLanes(hosts.trpc));
+  if (hosts.trpc) root.route("/", trpcLanes(hosts.trpc, { plainHttp: hosts.plainHttp === true }));
 
   if (hosts.rest) {
     mountApiDiscovery({ root, restApp: hosts.rest.app });
@@ -375,9 +455,14 @@ const answerApiFailure: HttpFailureAnswer = (failure) => canonicalErrorAnswer(fa
  * and the subscription lane at `/api/sse`, so a procedure is reachable live
  * exactly when it is reachable at all.
  */
-function trpcLanes(trpc: TrpcHost): Hono {
+function trpcLanes(trpc: TrpcHost, { plainHttp }: { plainHttp: boolean }): Hono {
   const app = new Hono();
   app.onError((failure) => answerApiFailure(failure));
+  // The same access record every REST family writes, so a dashboard 5xx is seen and alerted
+  // on; the procedure's own failure line stays tRPC's (policy.ts). Spec:
+  // specs/observability/request-log-cause-and-level.feature
+  app.use(`${TrpcHost.path}/*`, loggerMiddleware({ name: "trpc" }));
+  app.use("/api/sse/*", loggerMiddleware({ name: "sse" }));
 
   app.all(`${TrpcHost.path}/*`, async (context) => {
     const request = context.req.raw;
@@ -399,6 +484,7 @@ function trpcLanes(trpc: TrpcHost): Hono {
       ...(await trpc.sessionVersionHeaders({ context: createContext })),
       ...trpc.schemaHashHeaders({ path }),
     };
+    let failure: unknown;
     const response = await fetchRequestHandler({
       endpoint: TrpcHost.path,
       req: bodylessAsNoInput(request),
@@ -406,29 +492,65 @@ function trpcLanes(trpc: TrpcHost): Hono {
       createContext,
       allowBatching: false,
       responseMeta: ({ errors }) => ({ headers: trpc.retryAfterHeaders({ errors }) }),
+      onError: ({ error }) => {
+        failure = error;
+      },
     });
     for (const [name, value] of Object.entries(versionHeaders)) response.headers.set(name, value);
+    recordTrpcFailure({ context, failure, status: response.status });
+    const caller = resolved ? await resolved.catch(() => void 0) : void 0;
+    recordRequestPrincipal({ context, read: () => trpcPrincipalOf(caller) });
 
     return response;
   });
 
+  // The context each subscription's caller was built over, so its access record names the user.
+  const sseContexts = new WeakMap<Request, TrpcRequestContext>();
   const sse = SseLane.create({
+    plainHttp,
     members: {
       procedureTypeAt: (path) => trpc.procedureTypeAt(path),
-      createCaller: async ({ request, signal }) =>
-        trpc.router.createCaller(
+      createCaller: async ({ request, signal }) => {
+        const resolvedContext = await trpc.context({ request, signal });
+        sseContexts.set(request, resolvedContext);
+        return trpc.router.createCaller(
           // On the context AND in the caller's options: a subscription
           // procedure reads whichever its own transport gives it, and only
           // the context reaches one resolved through a v10-shaped caller.
-          { ...(await trpc.context({ request, signal })), signal },
+          { ...resolvedContext, signal },
           signal ? { signal } : {},
-        ),
+        );
+      },
     },
   });
 
-  app.get("/api/sse/*", (context) => sse.answer(context.req.raw, context.res.headers));
+  app.get("/api/sse/*", async (context) => {
+    const request = context.req.raw;
+    try {
+      return await sse.answer(request, context.res.headers);
+    } finally {
+      recordRequestPrincipal({ context, read: () => trpcPrincipalOf(sseContexts.get(request)) });
+    }
+  });
 
   return app;
+}
+
+/** The user a tRPC request's session resolved, for its access record. */
+function trpcPrincipalOf(context: TrpcRequestContext | undefined): { userId?: string } {
+  const userId = context?.tryActor()?.id;
+  return userId ? { userId } : {};
+}
+
+/** Records a failed answer's handled cause, not tRPC's wrapper, with its code and fault. */
+function recordTrpcFailure({
+  context,
+  failure,
+  status,
+}: Readonly<{ context: Context; failure: unknown; status: number }>): void {
+  if (failure === undefined || status < 400) return;
+  const cause = failure instanceof TRPCError && failure.cause ? failure.cause : failure;
+  recordAnsweredCause(context, { error: cause, status });
 }
 
 /** httpLink posts a no-input mutation with no body; tRPC would parse it as JSON and refuse. */

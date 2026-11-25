@@ -20,6 +20,7 @@ import type { AppendGatewayChangeEventInput } from "../../gateway-change-event.r
 import { GatewayBudgetClickHouseRepository } from "../clickhouse.gateway-budget.repository.ts";
 import {
   createTestClickHouseClient,
+  gatewayClickHouseOver,
   testClickHouseUrl,
 } from "./support/clickhouse-endpoint.support.ts";
 
@@ -85,7 +86,9 @@ describe.skipIf(!chUrl)("given a debit whose crossing could not be recorded", ()
   let firstAttempt: unknown;
 
   beforeAll(async () => {
-    repo = new GatewayBudgetClickHouseRepository(async () => createTestClickHouseClient(chUrl!));
+    repo = new GatewayBudgetClickHouseRepository(
+      gatewayClickHouseOver(createTestClickHouseClient(chUrl!)),
+    );
     const debits = GatewaySpendDebitService.create({
       budgets: { resolveApplicableBudgets: async () => [resolved] },
       spend: repo,

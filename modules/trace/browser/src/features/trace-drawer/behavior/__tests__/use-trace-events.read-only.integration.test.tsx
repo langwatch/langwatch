@@ -15,7 +15,6 @@ import { useTraceEvents } from "../use-trace-events.ts";
 vi.mock("../../../../behavior/explorer/use-trace-query-args.ts", () => ({
   useTraceQueryArgs: () => ({
     isReady: true,
-    hintReady: true,
     queryArgs: { projectId: "project-1", traceId: "trace-1", occurredAtMs: 1000 },
   }),
 }));

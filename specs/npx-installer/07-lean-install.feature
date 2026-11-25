@@ -39,10 +39,9 @@ Feature: A laptop install only pays for what it uses
     Given the installer has finished preparing the application
     When the server is running
     Then the application tree holds only what running it needs
-    And the compilers, test runners, and linters that built it are gone
-    # The production container image is built exactly this way: install
-    # everything, build, then prune to runtime dependencies. A laptop install
-    # deserves the same diet, and it is on the order of a gigabyte.
+    And no compiler, test runner or linter was ever installed on the machine
+    # The app arrives prebuilt and pruned by the recipe the production image
+    # uses (ADR-180, 09-prebuilt-app.feature), so nothing is pruned locally.
 
   # ===========================================================================
   # Absent is not the same as broken

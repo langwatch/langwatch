@@ -104,6 +104,7 @@ function healthyDeps(overrides: Partial<CheckupFacts> = {}): CheckupFacts {
           lastReportAt: "2026-09-20T12:00:00.000Z",
           optionalMetricsOptOut: false,
           hostnameOptOut: false,
+          upgradeDiagnosticsOptOut: false,
         },
       ],
       getEndpoint: async () => "https://connect.langwatch.ai/v1/stats",
@@ -545,6 +546,7 @@ describe("CheckupService", () => {
               lastReportError: "usage_report_refused_413",
               optionalMetricsOptOut: false,
               hostnameOptOut: false,
+              upgradeDiagnosticsOptOut: false,
             },
           ],
           getEndpoint: async () => "https://connect.langwatch.ai/v1/stats",
@@ -591,6 +593,93 @@ describe("CheckupService", () => {
       expect(verdict.outcome).toBe("unchecked");
       expect(verdict.detail).toContain("Instant Evals");
       expect(verdict.fix).toContain("activation code");
+    });
+  });
+
+  describe("when an active license names no hosted service", () => {
+    /** @scenario "An active license without hosted services is not asked for an activation code" */
+    it("says the license includes no hosted services and asks for no code", async () => {
+      const deps = healthyDeps({
+        connect: async () => ({ ...CONNECTED, entitledServices: [], lastSyncAt: undefined }),
+      });
+      const verdict = rowOf((await CheckupService.create(deps).cheap()).rows, "connect");
+
+      expect(verdict.outcome).toBe("unchecked");
+      expect(verdict.detail).toContain("includes no hosted services");
+      expect(verdict.fix).not.toContain("activation code");
+    });
+  });
+
+  describe("when the hosted services the license names could not be read", () => {
+    /** @scenario "A license whose hosted services could not be read is not called empty" */
+    it("shows the recorded sync failure instead of saying the license has none", async () => {
+      const deps = healthyDeps({
+        connect: async () => ({
+          ...CONNECTED,
+          entitledServices: null,
+          lastSyncError: "connect_license_revoked",
+        }),
+      });
+      const verdict = rowOf((await CheckupService.create(deps).cheap()).rows, "connect");
+
+      expect(verdict.outcome).toBe("refused");
+      expect(verdict.detail).not.toContain("includes no hosted services");
+    });
+
+    /** @scenario "A license whose hosted services could not be read is not called empty" */
+    it("reports a good sync without naming services it could not read", async () => {
+      const deps = healthyDeps({ connect: async () => ({ ...CONNECTED, entitledServices: null }) });
+      const verdict = rowOf((await CheckupService.create(deps).cheap()).rows, "connect");
+
+      expect(verdict.outcome).toBe("verified");
+      expect(verdict.detail).not.toContain("Services:");
+    });
+  });
+
+  describe("when the last license sync was refused", () => {
+    const refusedWith = async (code: string) =>
+      rowOf(
+        (
+          await CheckupService.create(
+            healthyDeps({ connect: async () => ({ ...CONNECTED, lastSyncError: code }) }),
+          ).cheap()
+        ).rows,
+        "connect",
+      );
+
+    /** @scenario "A refused license sync reads as a plain sentence, never as its code" */
+    it.each([
+      ["connect_unreachable", "This install could not reach LangWatch"],
+      ["connect_license_revoked", "LangWatch revoked this license"],
+      ["connect_license_expired", "The license has expired"],
+      ["connect_wrong_instance", "The license is bound to another install"],
+      ["hosted_service_unavailable", "LangWatch did not answer with a result"],
+    ])("words %s as a sentence", async (code, sentence) => {
+      const verdict = await refusedWith(code);
+
+      expect(verdict.outcome).toBe("refused");
+      expect(verdict.detail).toContain(sentence);
+      expect(verdict.detail).not.toContain(code);
+    });
+
+    /** @scenario "A license sync refused with a code the checkup does not know still reads as a sentence" */
+    it("words an unknown code without showing it", async () => {
+      const verdict = await refusedWith("connect_something_new");
+
+      expect(verdict.outcome).toBe("refused");
+      expect(verdict.detail).toContain("LangWatch refused the sync");
+      expect(verdict.detail).not.toContain("connect_something_new");
+    });
+
+    /** @scenario "An unreachable license sync names the host and port to allow" */
+    it("names the connect host and port 443 for an unreachable sync", async () => {
+      const verdict = await refusedWith("connect_unreachable");
+
+      expect(verdict.outcome === "refused" && verdict.meta).toEqual({
+        host: "connect.langwatch.ai",
+        port: 443,
+      });
+      expect(verdict.outcome === "refused" && verdict.fix).toContain("connect.langwatch.ai");
     });
   });
 

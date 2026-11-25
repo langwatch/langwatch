@@ -17,7 +17,9 @@ import (
 	"github.com/langwatch/langwatch/services/nlpgo"
 	"github.com/langwatch/langwatch/services/nlpgo/adapters/dispatcheradapter"
 	"github.com/langwatch/langwatch/services/nlpgo/adapters/httpapi"
+	"github.com/langwatch/langwatch/services/nlpgo/adapters/litellm"
 	"github.com/langwatch/langwatch/services/nlpgo/adapters/llmexecutor"
+	"github.com/langwatch/langwatch/services/nlpgo/adapters/modelcatalog"
 	"github.com/langwatch/langwatch/services/nlpgo/app"
 	"github.com/langwatch/langwatch/services/nlpgo/app/engine"
 	"github.com/langwatch/langwatch/services/nlpgo/app/engine/blocks/agentblock"
@@ -79,7 +81,7 @@ func Run(ctx context.Context, opts Options) error {
 	)
 
 	httpExec := newHTTPExecutor(cfg.Engine, ssrfOpts)
-	codeExec, err := newCodeExecutor(cfg.Engine, os.Getenv)
+	codeExec, err := newCodeExecutor(cfg.Engine, os.Getenv, deps.Logger)
 	if err != nil {
 		return err
 	}
@@ -99,14 +101,18 @@ func Run(ctx context.Context, opts Options) error {
 		return err
 	}
 	defer disp.Close()
-	llm := llmexecutor.New(dispatcheradapter.New(disp))
+	catalog := loadModelCatalog(deps.Logger, cfg.ModelCatalogDir)
+	llm := llmexecutor.New(dispatcheradapter.New(disp), llmexecutor.WithModelCatalog(catalog))
 	deps.Logger.Info("nlpgo_llm_wired", zap.String("transport", "in_process_dispatcher"))
 
 	// Playground proxy uses the SAME dispatcher (no second Bifrost
 	// process). It bridges the OpenAI-shape /go/proxy/v1/* surface
 	// (used by the prompt playground + model.factory.ts) into the
 	// in-process gateway. Header-based auth: x-litellm-* → Credential.
-	playground := httpapi.NewPlaygroundProxyFromShim(playgroundDispatcherShim{disp: disp})
+	playground := nlpgo.PlaygroundWiring{
+		Proxy:        httpapi.NewPlaygroundProxyFromShim(playgroundDispatcherShim{disp: disp}),
+		ModelCatalog: catalog,
+	}
 
 	eng := newEngine(&cfg, engineParts{http: httpExec, ssrf: ssrfOpts, code: codeExec, llm: llm})
 	executor := engineAdapter{eng: eng}
@@ -116,7 +122,7 @@ func Run(ctx context.Context, opts Options) error {
 		app.WithWorkflowExecutor(executor),
 	)
 
-	return nlpgo.Serve(ctx, application, deps, cfg, playground)
+	return nlpgo.Serve(ctx, nlpgo.ServeInput{App: application, Deps: deps, Cfg: cfg, Playground: playground})
 }
 
 // withPublicServiceName stamps the operator-facing service identity on ctx.
@@ -179,8 +185,14 @@ func newEngine(cfg *nlpgo.Config, parts engineParts) *engine.Engine {
 // standing up the whole service.
 //
 // `getenv` is injected so tests don't need to mutate process env.
-func newCodeExecutor(engineCfg nlpgo.EngineConfig, getenv func(string) string) (*codeblock.Executor, error) {
-	return codeblock.New(codeblock.Options{
+func newCodeExecutor(engineCfg nlpgo.EngineConfig, getenv func(string) string, logger *zap.Logger) (*codeblock.Executor, error) {
+	return codeblock.New(codeExecutorOptions(engineCfg, getenv, logger))
+}
+
+// codeExecutorOptions maps the operator's engine config to executor options.
+func codeExecutorOptions(engineCfg nlpgo.EngineConfig, getenv func(string) string, logger *zap.Logger) codeblock.Options {
+	return codeblock.Options{
+		Logger: logger,
 		Python: resolveSandboxPython(engineCfg.SandboxPython, getenv),
 		// The instance a code node's LangWatch SDK calls. It is the same URL
 		// the evaluator blocks call back on, and it is injected only next to
@@ -189,8 +201,24 @@ func newCodeExecutor(engineCfg nlpgo.EngineConfig, getenv func(string) string) (
 			engineCfg.LangWatchBaseURL,
 			getenv,
 		),
-		DefaultTimeout: resolveTimeoutSeconds(engineCfg.CodeBlockTimeoutSeconds),
-	})
+		DefaultTimeout:      resolveTimeoutSeconds(engineCfg.CodeBlockTimeoutSeconds),
+		AllowVisibleProcess: allowVisibleProcess(engineCfg.CodeBlockAllowVisibleProcess, getenv, logger),
+	}
+}
+
+// allowVisibleProcess honors the setting only on AWS Lambda, the one platform
+// whose seccomp refuses the hide step; elsewhere it is ignored with a warning.
+func allowVisibleProcess(setting bool, getenv func(string) string, logger *zap.Logger) bool {
+	if logger == nil {
+		logger = zap.NewNop()
+	}
+	onLambda := getenv("AWS_LAMBDA_FUNCTION_NAME") != "" && getenv("AWS_LAMBDA_RUNTIME_API") != ""
+	if setting && !onLambda {
+		logger.Warn("nlpgo_code_block_allow_visible_process_ignored",
+			zap.String("setting", codeblock.AllowVisibleProcessSetting),
+			zap.String("hint", "only honored on AWS Lambda; elsewhere the hide step stays required"))
+	}
+	return setting && onLambda
 }
 
 // newHTTPExecutor builds the HTTP-block executor from the operator-facing
@@ -278,6 +306,31 @@ func resolveSandboxPython(explicit string, getenv func(string) string) string {
 		return fromEnv
 	}
 	return nlpgo.DefaultSandboxPython
+}
+
+// loadModelCatalog reads the model catalog the image ships with, or the
+// checkout's in a development run. Without one the engine still serves, and
+// every model keeps the name rule the engine applied before the catalog; the
+// error says so once at boot.
+func loadModelCatalog(logger *zap.Logger, dir string) litellm.OutputTokensLookup {
+	if dir == "" {
+		wd, err := os.Getwd()
+		found := false
+		if err == nil {
+			dir, found = modelcatalog.FindDir(wd)
+		}
+		if !found {
+			logger.Error("nlpgo_model_catalog_missing", zap.String("env", "LANGWATCH_MODEL_CATALOG_DIR"))
+			return nil
+		}
+	}
+	catalog, err := modelcatalog.Load(dir)
+	if err != nil {
+		logger.Error("nlpgo_model_catalog_unreadable", zap.String("dir", dir), zap.Error(err))
+		return nil
+	}
+	logger.Info("nlpgo_model_catalog_loaded", zap.String("dir", dir))
+	return catalog
 }
 
 // splitCSV splits "a,b,c" into ["a","b","c"], trimming whitespace and

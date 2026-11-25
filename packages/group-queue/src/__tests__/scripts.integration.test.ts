@@ -2,7 +2,7 @@ import IORedis, { type Redis } from "ioredis";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import { BlobLeases } from "../blobLeases.ts";
-import { GroupStagingScripts } from "../scripts.ts";
+import { GROUP_KEY_TTL_MS, GroupStagingScripts, TTL_HELPER_LUA } from "../scripts.ts";
 import { createTenantId } from "../storage.ts";
 
 /**
@@ -347,6 +347,119 @@ describe("GroupStagingScripts — heartbeat staleness after retry", () => {
           backoffTtl,
         );
         expect(Number(await redis.zscore(`${keyPrefix()}ready`, "group-a"))).toBe(5_000);
+      });
+    });
+  });
+});
+
+describe("GroupStagingScripts — a blocked group's keys stay persistent", () => {
+  const jobsKey = (groupId: string) => `${keyPrefix()}group:${groupId}:jobs`;
+  const dataKey = (groupId: string) => `${keyPrefix()}group:${groupId}:data`;
+
+  async function blockGroup(scripts: GroupStagingScripts, groupId: string): Promise<void> {
+    await scripts.stage(
+      makeJob(scripts, { stagedJobId: `${groupId}-spent`, groupId, dispatchAfterMs: 100 }),
+    );
+    const claimed = await scripts.dispatch({ nowMs: 200, activeTtlSec: 300 });
+    expect(claimed?.groupId).toBe(groupId);
+    const blocked = await scripts.restageAndBlock({
+      groupId,
+      newStagedJobId: claimed!.stagedJobId,
+      score: 100,
+      jobDataJson: claimed!.jobDataJson,
+      errorMessage: "retry budget spent",
+      claimToken: claimed!.claimToken,
+    });
+    expect(blocked).toBe(true);
+  }
+
+  /** The ops unblock script's writes to these keys; it lives with the ops module, a dependant. */
+  async function unblock(groupId: string, nowMs: number): Promise<void> {
+    await redis.srem(`${keyPrefix()}blocked`, groupId);
+    await redis.del(`${keyPrefix()}group:${groupId}:active`);
+    await redis.zadd(`${keyPrefix()}ready`, 1, groupId);
+    await redis.eval(
+      `${TTL_HELPER_LUA}\nrefreshGroupKeyTtl(KEYS[1], KEYS[2], tonumber(ARGV[1]))`,
+      2,
+      jobsKey(groupId),
+      dataKey(groupId),
+      String(nowMs),
+    );
+  }
+
+  describe("given a group blocked after its job used up its retry budget", () => {
+    describe("when a batch stages into it and into an open group", () => {
+      /** @scenario "Jobs staged as a batch into a blocked group carry no expiry" */
+      it("leaves the blocked group's keys without expiry and gives the open group its expiry", async () => {
+        const scripts = scriptsFor();
+        await blockGroup(scripts, "g-blocked");
+        const dedup = { dedupId: "d-blocked", dedupTtlMs: 60_000 };
+
+        const { outcomes } = await scripts.stageBatch([
+          makeJob(scripts, {
+            stagedJobId: "b1",
+            groupId: "g-blocked",
+            dispatchAfterMs: 300,
+            ...dedup,
+          }),
+          makeJob(scripts, {
+            stagedJobId: "b1-again",
+            groupId: "g-blocked",
+            dispatchAfterMs: 350,
+            jobDataJson: "replacement",
+            ...dedup,
+          }),
+          makeJob(scripts, { stagedJobId: "b2", groupId: "g-blocked", dispatchAfterMs: 400 }),
+          makeJob(scripts, { stagedJobId: "b2", groupId: "g-blocked", dispatchAfterMs: 400 }),
+          makeJob(scripts, { stagedJobId: "o1", groupId: "g-open", dispatchAfterMs: 400 }),
+        ]);
+
+        expect(outcomes).toEqual(["inserted", "deduplicated", "inserted", "updated", "inserted"]);
+        expect(await inspectGroupJobs("g-blocked")).toEqual(["g-blocked-spent", "b1", "b2"]);
+        expect(await redis.hget(dataKey("g-blocked"), "b1")).toBe("replacement");
+        expect(await redis.pttl(jobsKey("g-blocked"))).toBe(-1);
+        expect(await redis.pttl(dataKey("g-blocked"))).toBe(-1);
+        expect(await redis.pttl(jobsKey("g-open"))).toBeGreaterThan(0);
+        expect(await redis.pttl(dataKey("g-open"))).toBeGreaterThan(0);
+      });
+    });
+  });
+
+  describe("given a blocked group holding jobs staged after the block", () => {
+    describe("when an operator unblocks it", () => {
+      /** @scenario "An unblocked group gets its expiry back and runs every job it held" */
+      it("restores expiry from the latest due time and claims every held job in order", async () => {
+        const scripts = scriptsFor();
+        await blockGroup(scripts, "g-held");
+        const nowMs = Date.now();
+        const laterMs = nowMs + 10 * 60 * 60 * 1000;
+        await scripts.stage(
+          makeJob(scripts, { stagedJobId: "h1", groupId: "g-held", dispatchAfterMs: 300 }),
+        );
+        await scripts.stageBatch([
+          makeJob(scripts, { stagedJobId: "h2", groupId: "g-held", dispatchAfterMs: laterMs }),
+        ]);
+        expect(await redis.pttl(jobsKey("g-held"))).toBe(-1);
+
+        await unblock("g-held", nowMs);
+
+        const floor = laterMs - nowMs + GROUP_KEY_TTL_MS - 60_000;
+        expect(await redis.pttl(jobsKey("g-held"))).toBeGreaterThan(floor);
+        expect(await redis.pttl(dataKey("g-held"))).toBeGreaterThan(floor);
+
+        const claimedOrder: string[] = [];
+        for (let i = 0; i < 3; i++) {
+          const claimed = await scripts.dispatch({ nowMs: laterMs + 1_000, activeTtlSec: 60 });
+          if (!claimed) break;
+          claimedOrder.push(claimed.stagedJobId);
+          await scripts.complete({
+            groupId: "g-held",
+            stagedJobId: claimed.stagedJobId,
+            claimToken: claimed.claimToken,
+          });
+        }
+        expect(claimedOrder).toEqual(["g-held-spent", "h1", "h2"]);
+        expect(await inspectTotalPending()).toBe(0);
       });
     });
   });

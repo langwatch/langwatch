@@ -198,6 +198,7 @@ export class OrganizationInvitationDoorService {
       membersToAdd: input.totalSeats,
       ...(input.currency === undefined ? {} : { currency: input.currency }),
       ...(input.billingInterval === undefined ? {} : { billingInterval: input.billingInterval }),
+      ...(input.retentionDays === undefined ? {} : { retentionDays: input.retentionDays }),
       customerEmail: by.email ?? null,
     });
     if (invites.length > 0) {
@@ -284,6 +285,7 @@ export class OrganizationInvitationDoorService {
     // An invitation targets an address, so a session carrying none cannot be
     // matched to one at all.
     if (!by.email) throw new SignedInAddressRequiredError();
+    // A spent invitation writes nothing again: its grants may since have been changed (ADR-205).
     if (invite.status === "ACCEPTED") throw new InviteAlreadyAcceptedError();
     if (this.deps.invitations.displayStatus(invite) === "EXPIRED") throw new InviteExpiredError();
     if (invite.status !== "PENDING") throw new InviteNotReadyForAcceptanceError();
@@ -309,7 +311,10 @@ export class OrganizationInvitationDoorService {
     // invitation is marked ACCEPTED only once everything before it has landed.
     await this.deps.invitations.apply({ userId: by.id, invite, viaIdentifierId });
 
-    await this.#provisionPersonalWorkspace({ organizationId: invite.organizationId, by });
+    // Billing only reaches no team or project, its own workspace included (ADR-205).
+    if (!invite.billingOnly) {
+      await this.#provisionPersonalWorkspace({ organizationId: invite.organizationId, by });
+    }
 
     void this.deps.signals
       .announceJoin({
@@ -327,6 +332,7 @@ export class OrganizationInvitationDoorService {
       userId: by.id,
       inviteId: invite.id,
       organizationName: invite.organization.name,
+      role: invite.role,
     });
 
     const projectSlug = await this.deps.invitations.findLandingProjectSlug({ invite });
@@ -335,6 +341,7 @@ export class OrganizationInvitationDoorService {
       success: true,
       invite: { organization: { id: invite.organization.id, name: invite.organization.name } },
       project: projectSlug ? { slug: projectSlug } : null,
+      ...(invite.billingOnly ? { billingOnly: true } : {}),
     };
   }
 
@@ -436,6 +443,7 @@ function intendedGrants(
     role: OrganizationUserRole;
     teamIds?: string;
     teams?: OrganizationApiCreateInvitationsInput["invites"][number]["teams"];
+    billingOnly?: boolean;
   }>,
 ): OrganizationIntendedGrant[] {
   const organizationGrant: OrganizationIntendedGrant = {
@@ -443,6 +451,8 @@ function intendedGrants(
     scopeType: "ORGANIZATION",
     scopeId: organizationId,
   };
+  // Billing only writes the Billing grant at the organization and nothing else (ADR-205).
+  if (invite.billingOnly) return [{ ...organizationGrant, billing: true }];
   // As invite-team-assignment.service.ts resolves: explicit teams, else legacy ids at the
   // default team role.
   if (!invite.teams || invite.teams.length === 0) {

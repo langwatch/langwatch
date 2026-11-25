@@ -101,6 +101,7 @@ function viewRecorded({
     attempt: row.attempt,
     lastError: row.last_error,
     report: row.report,
+    logTail: row.log_tail ?? [],
     progress: progressOf({ report: row.report }),
     waitingOn: waitingOnOf({
       id: row.id,
@@ -142,6 +143,7 @@ function viewDeclared({
     attempt: 0,
     lastError: null,
     report: null,
+    logTail: [],
     progress: null,
     waitingOn: waitingOnOf({
       id: step.id,

@@ -130,6 +130,11 @@ const foldRefoldOnMissTotal = counter("es_fold_refold_on_miss_total", "Store-mis
   "projection_name",
   "outcome",
 ]);
+const foldStoreMissProbeTotal = counter(
+  "es_fold_store_miss_probe_total",
+  "Event-log probes after a fold store miss, by what the fold did next",
+  ["projection_name", "outcome"],
+);
 const foldReadWindowFallbackTotal = counter(
   "es_fold_read_window_fallback_total",
   "Unwindowed retries after a fold read miss",
@@ -224,6 +229,11 @@ const processIntentsSuppressed = counter(
   "es_process_intents_suppressed_total",
   "Already-dispatched process-manager intents suppressed",
   ["process_name"],
+);
+const jobsProjectGone = counter(
+  "es_jobs_project_gone_total",
+  "Jobs and outbox messages completed as no-ops because their project no longer exists",
+  ["queue", "job_type"],
 );
 
 export const incrementEsProjectionTotal = ({
@@ -406,6 +416,14 @@ export const incrementEsFoldRefoldOnMissTotal = (
   projectionName: string,
   outcome: "performed" | "absent",
 ) => foldRefoldOnMissTotal.labels(projectionName, outcome).inc();
+export const incrementEsFoldStoreMissProbeTotal = (
+  projectionName: string,
+  outcome:
+    | "new_aggregate"
+    | "retried_state_not_visible"
+    | "retried_log_not_visible"
+    | "refold_after_retries",
+) => foldStoreMissProbeTotal.labels(projectionName, outcome).inc();
 export const incrementEsFoldReadWindowFallbackTotal = (
   projectionName: string,
   outcome: "recovered" | "absent",
@@ -515,6 +533,20 @@ export const incrementEsProcessIntentsSuppressed = ({
 }) => processIntentsSuppressed.labels(processName).inc(count);
 
 /**
+ * Counts jobs and outbox messages completed as no-ops because their project no longer
+ * exists. `count` is the number of payloads, not batches: a coalesced batch adds its size.
+ */
+export const incrementEsJobsProjectGone = ({
+  queue,
+  jobType,
+  count,
+}: {
+  queue: string;
+  jobType: string;
+  count: number;
+}) => jobsProjectGone.labels(queue, jobType).inc(count);
+
+/**
  * Store-side metrics series. Colocated with es_* family and the code that increments them.
  */
 const eventsStoredTotal = counter(
@@ -529,23 +561,22 @@ const storeDurationMs = histogram({
   labelNames: ["pipeline_name"],
 });
 
-export type EventSourcingStoreMetrics = {
-  eventsStored(pipelineName: string, count: number): void;
-  storeDuration(pipelineName: string, durationMs: number): void;
-};
-
-/** Publishes the two store-side series through the process's metrics facade. */
-export const PROMETHEUS_EVENT_SOURCING_METRICS: EventSourcingStoreMetrics = {
-  eventsStored: (pipelineName, count) => eventsStoredTotal.labels(pipelineName).inc(count),
-  storeDuration: (pipelineName, durationMs) =>
-    storeDurationMs.labels(pipelineName).observe(durationMs),
-};
-
-/** Records nothing. The default for a process that publishes no registry. */
-export const NOOP_EVENT_SOURCING_METRICS: EventSourcingStoreMetrics = {
-  eventsStored: () => undefined,
-  storeDuration: () => undefined,
-};
+/** Counts the events a pipeline stored, on `event_sourcing_events_stored_total`. */
+export const incrementEventSourcingEventsStored = ({
+  pipelineName,
+  count,
+}: {
+  pipelineName: string;
+  count: number;
+}) => eventsStoredTotal.labels(pipelineName).inc(count);
+/** Times one `storeEvents` call on `event_sourcing_store_duration_milliseconds`. */
+export const observeEventSourcingStoreDuration = ({
+  pipelineName,
+  durationMs,
+}: {
+  pipelineName: string;
+  durationMs: number;
+}) => storeDurationMs.labels(pipelineName).observe(durationMs);
 
 export async function withMetrics<T>({
   fn,
@@ -566,3 +597,27 @@ export async function withMetrics<T>({
     throw error;
   }
 }
+
+const eventLogIndexReadTotal = counter(
+  "es_event_log_index_read_total",
+  "Event log reads by how they were bounded: the aggregate index, an event id's time, or unbounded",
+  ["read", "outcome"],
+);
+
+/** How one event log read was bounded (dev/docs/plans/id-index-2026-10-10.md §4). */
+export type EventLogIndexReadOutcome =
+  | "index_hit"
+  | "index_miss"
+  | "unindexed"
+  | "window_hit"
+  | "window_fallback"
+  | "not_ksuid";
+
+/** Counts one event log read by how its time bound was chosen. */
+export const incrementEventLogIndexRead = ({
+  read,
+  outcome,
+}: {
+  read: "aggregate" | "event" | "replay";
+  outcome: EventLogIndexReadOutcome;
+}) => eventLogIndexReadTotal.labels(read, outcome).inc();

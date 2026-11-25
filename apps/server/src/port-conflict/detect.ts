@@ -22,21 +22,36 @@ export type ConflictReport = {
   suggestedBase: number | null;
 };
 
-async function pidHoldingPort(port: number): Promise<number | null> {
+/**
+ * Every TCP port something listens on, with the pid holding it, from one `lsof` run. One run
+ * per port, each resolving host and port names, cost seconds before anything else could start.
+ */
+async function listeningPids(): Promise<Map<number, number>> {
   try {
-    const { stdout } = await execa("lsof", ["-tiTCP:" + port, "-sTCP:LISTEN"], {
+    const { stdout } = await execa("lsof", ["-nP", "-iTCP", "-sTCP:LISTEN", "-Fpn"], {
       reject: false,
     });
-    const first = stdout
-      .split("\n")
-      .map((s) => s.trim())
-      .filter(Boolean)[0];
-    if (!first) return null;
-    const pid = Number.parseInt(first, 10);
-    return Number.isFinite(pid) ? pid : null;
+    return parseListeners(stdout);
   } catch {
-    return null;
+    // No lsof: nothing is reported held, as before.
+    return new Map();
   }
+}
+
+/** `lsof -F pn` output: a `p<pid>` line, then one `n<host>:<port>` line per socket it holds. */
+function parseListeners(stdout: string): Map<number, number> {
+  const held = new Map<number, number>();
+  let pid = Number.NaN;
+  for (const line of stdout.split("\n")) {
+    const field = line.slice(0, 1);
+    const value = line.slice(1);
+    if (field === "p") pid = Number.parseInt(value, 10);
+    if (field !== "n" || Number.isNaN(pid)) continue;
+    const port = Number.parseInt(value.slice(value.lastIndexOf(":") + 1), 10);
+    const isFirstHolder = !Number.isNaN(port) && !held.has(port);
+    if (isFirstHolder) held.set(port, pid);
+  }
+  return held;
 }
 
 async function commandForPid(pid: number): Promise<string> {
@@ -52,30 +67,32 @@ async function commandForPid(pid: number): Promise<string> {
 
 export async function detectConflicts(base: number): Promise<ConflictReport> {
   const alloc = allocatePorts(base);
-  const checks = portsToCheck(alloc);
-  const conflicts: PortConflict[] = [];
-  for (const { port, label } of checks) {
-    const pid = await pidHoldingPort(port);
-    if (pid != null) {
-      conflicts.push({ port, label, pid, command: await commandForPid(pid) });
-    }
-  }
-  let suggestedBase: number | null = null;
-  if (conflicts.length > 0) {
-    suggestedBase = await findFreeBase(base);
-  }
+  const held = await listeningPids();
+  const conflicts = await Promise.all(
+    portsToCheck(alloc).flatMap(({ port, label }) => {
+      const pid = held.get(port);
+      return pid == null
+        ? []
+        : [commandForPid(pid).then((command) => ({ port, label, pid, command }))];
+    }),
+  );
+  const suggestedBase = conflicts.length > 0 ? findFreeBase({ start: base, held }) : null;
   return { base, alloc, conflicts, suggestedBase };
 }
 
-async function findFreeBase(start: number): Promise<number | null> {
+function findFreeBase({
+  start,
+  held,
+}: {
+  start: number;
+  held: Map<number, number>;
+}): number | null {
   let candidate = start;
   for (let i = 0; i < MAX_PORT_SLOT_ATTEMPTS; i++) {
     candidate += PORT_SLOT_INCREMENT;
-    const allocCandidate = allocatePorts(candidate);
-    const taken = await Promise.all(
-      portsToCheck(allocCandidate).map(async ({ port }) => (await pidHoldingPort(port)) != null),
-    );
-    if (!taken.some(Boolean)) return candidate;
+    const slot = portsToCheck(allocatePorts(candidate));
+    const isTaken = slot.some(({ port }) => held.has(port));
+    if (!isTaken) return candidate;
   }
   return null;
 }

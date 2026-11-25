@@ -176,8 +176,7 @@ function useOpenLatestTrace(): (group: ConversationGroup) => void {
         projectId: project?.id,
       });
       // `t` (timestamp) is the partition-pruning hint the drawer's reads
-      // take, so opening on a conversation's last activity does not walk
-      // every weekly partition by id.
+      // take; without it the id index bounds them.
       openDrawer("traceV2Details", traceDrawerParams({ traceId, occurredAtMs, tenantId }));
     },
     [openDrawer, project?.id],

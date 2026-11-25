@@ -100,6 +100,12 @@ export function EvaluatorListItem({
                 <span style={{ margin: "0 4px" }}>{" • "}</span>
               </>
             )}
+            {evaluator.createdBy?.name && (
+              <>
+                <span>Created by {evaluator.createdBy.name}</span>
+                <span style={{ margin: "0 4px" }}>{" • "}</span>
+              </>
+            )}
             <span>Updated {updatedAtLabel}</span>
           </Text>
         </VStack>

@@ -296,7 +296,7 @@ export class AgentCallForeignProjectError extends HandledError {
   }
 }
 
-/** A body, a result or a session is above its cap. */
+/** A body, a result, a session or a hook's state is above its cap. */
 export class AgentPayloadTooLargeError extends HandledError {
   declare readonly code: "agent_payload_too_large";
 
@@ -305,7 +305,7 @@ export class AgentPayloadTooLargeError extends HandledError {
     sizeBytes,
     limitBytes,
   }: {
-    what: "envelope" | "result" | "session";
+    what: "envelope" | "result" | "session" | "state";
     /**
      * What the payload weighed, when it was measured; absent when the cap
      * stopped the read before the whole body arrived.

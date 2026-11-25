@@ -35,11 +35,12 @@ export const projectProcessModule: PublishedProcessModule<"project", ProjectApi>
         run: async ({ checkpoint, dryRun, signal }) => {
           const resumed = checkpoint.resumeFrom?.afterProjectId;
           const count = (
-            key: "projects" | "departmentAssignments" | "presenceSettings",
+            key: "projects" | "departmentAssignments" | "presenceSettings" | "skippedOrphans",
           ): number => {
             const counted = checkpoint.resumeFrom?.[key];
             return typeof counted === "number" ? counted : 0;
           };
+          const orphans = checkpoint.resumeFrom?.orphanProjectIds;
           const report = await app.recordExistingFacts({
             dryRun,
             signal,
@@ -48,10 +49,47 @@ export const projectProcessModule: PublishedProcessModule<"project", ProjectApi>
               projects: count("projects"),
               departmentAssignments: count("departmentAssignments"),
               presenceSettings: count("presenceSettings"),
+              skippedOrphans: count("skippedOrphans"),
+              orphanProjectIds: Array.isArray(orphans)
+                ? orphans.filter((id): id is string => typeof id === "string")
+                : [],
             },
             onPageDone: ({ afterProjectId, report: page }) =>
               checkpoint.save({ report: { afterProjectId, ...page } }),
           });
+          return { ...report, dryRun };
+        },
+      }),
+      defineMigrationStep({
+        id: "project:list-personal-owner-and-first-message-facts",
+        kind: "data",
+        mode: "background",
+        // An old worker runs no subscriber of these facts' peers, so list once it is gone.
+        needsOldWritersGone: true,
+        description:
+          "Lists every personal project's owner and every project that already received its first message, archived ones included.",
+        run: async ({ checkpoint, dryRun, signal }) => {
+          const report = await app.sendHistoryFacts({
+            dryRun,
+            signal,
+            resumeFrom: checkpoint.resumeFrom,
+            onPageDone: (saved) => checkpoint.save({ report: saved }),
+          });
+          return { ...report, dryRun };
+        },
+      }),
+      // `/dashboards` became a top-level address (ADR-002 in modules/dashboard). No release
+      // since slugs gained their id suffix can mint it; the step waits for old writers as every
+      // step does.
+      defineMigrationStep({
+        id: "project:reslug-reserved-dashboards",
+        kind: "data",
+        mode: "background",
+        needsOldWritersGone: true,
+        description:
+          "Gives a project whose address is exactly /dashboards the usual name-and-id address instead.",
+        run: async ({ dryRun, signal }) => {
+          const report = await app.reslugReservedProjects({ dryRun, signal });
           return { ...report, dryRun };
         },
       }),

@@ -242,7 +242,8 @@ export type AuthDiagnostics = {
   method: string;
   userAgent: string | null;
   traceparent: string | null;
-  forwardedFor: string | null;
+  /** The address the door resolved (ClientAddress), never a forwarding header as sent. */
+  clientAddress: string | null;
   hasEmptyAuthToken: boolean;
 };
 
@@ -250,6 +251,7 @@ export function collectAuthDiagnostics(request: {
   path: string;
   method: string;
   header: (name: string) => string | undefined;
+  clientAddress: string | undefined;
 }): AuthDiagnostics {
   const get = (name: string) => request.header(name) ?? null;
   const xAuthToken = request.header("x-auth-token");
@@ -259,7 +261,7 @@ export function collectAuthDiagnostics(request: {
     method: request.method,
     userAgent: get("user-agent"),
     traceparent: get("traceparent"),
-    forwardedFor: get("x-forwarded-for") ?? get("x-real-ip"),
+    clientAddress: request.clientAddress ?? null,
     hasEmptyAuthToken: xAuthToken !== undefined && xAuthToken === "",
   };
 }

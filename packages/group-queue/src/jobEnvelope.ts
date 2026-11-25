@@ -140,6 +140,12 @@ export interface EnvelopeHeader {
   t?: string;
   n?: string;
   /**
+   * When the job was first staged, in epoch ms; queue lag counts from the later of this and the
+   * ready score, which can be a day old. A header field, not a `__*` key, so it never reaches
+   * handler payloads on a worker that does not strip machinery.
+   */
+  a?: number;
+  /**
    * GQ2: queue-machinery fields (every `__*` key) lifted out so they don't
    * perturb the content hash — the same event fanned out to N subscribers then
    * collapses to one stored blob (ADR-029). Allowlist-free: any `__*` is machinery.
@@ -180,7 +186,8 @@ function mergeMachinery(
   const hasRouting =
     typeof header.p === "string" || typeof header.t === "string" || typeof header.n === "string";
   if (!header.m && !hasRouting) return body;
-  const merged: Record<string, unknown> = { ...body, ...header.m };
+  // The body was just parsed for this call alone, so it takes the machinery in place.
+  const merged = Object.assign(body, header.m);
   if (typeof header.p === "string") merged.__pipelineName = header.p;
   if (typeof header.t === "string") merged.__jobType = header.t;
   if (typeof header.n === "string") merged.__jobName = header.n;
@@ -330,6 +337,7 @@ export async function encodeJobEnvelope<Destination>({
   payloadCodec = "json",
   queueName,
   logger,
+  stagedAtMs,
 }: {
   jobData: Record<string, unknown>;
   tieredBlobs?: TieredBlobStore<Destination>;
@@ -340,22 +348,21 @@ export async function encodeJobEnvelope<Destination>({
   queueName?: string;
   /** Optional logger for tenant-attributed size warnings. */
   logger?: Logger;
+  /** When the job was first staged; see {@link EnvelopeHeader.a}. */
+  stagedAtMs?: number;
 }): Promise<string> {
   const header = routingHeader(jobData, 2);
+  if (stagedAtMs !== undefined && Number.isSafeInteger(stagedAtMs)) header.a = stagedAtMs;
   const { machinery, payload } = splitMachineryFromBody(jobData);
   delete machinery.__pipelineName;
   delete machinery.__jobType;
   delete machinery.__jobName;
   if (Object.keys(machinery).length > 0) header.m = machinery;
 
-  const {
-    bytes,
-    codec,
-    json: payloadJson,
-  } = encodePayload(payload, {
+  const encoded = encodePayload(payload, {
     msgpackEnabled: payloadCodec === "msgpack",
   });
-  const payloadBytes = bytes.length;
+  const { codec, json: payloadJson, byteLength: payloadBytes } = encoded;
   assertPayloadWithinCap(payloadBytes, { projectId, queueName, logger });
   header.s = payloadBytes;
 
@@ -365,6 +372,7 @@ export async function encodeJobEnvelope<Destination>({
         "Group Queue needs a tenant id and tiered blob storage for an offloaded payload",
       );
     }
+    const bytes = encoded.codec === "msgpack" ? encoded.bytes : Buffer.from(payloadJson);
     const ref = await tieredBlobs.put({
       projectId,
       data: await compress(bytes, compression),
@@ -381,7 +389,7 @@ export async function encodeJobEnvelope<Destination>({
     ENVELOPE_PREFIX_V2,
     header,
     await inlineBody({
-      json: payloadJson ?? bytes.toString("utf-8"),
+      json: payloadJson,
       jsonBytes: payloadBytes,
       header,
       compression,
@@ -513,6 +521,36 @@ export function readJobAttempt(value: string): number | null {
 }
 
 /**
+ * The overload retries the job already spent, read off the header like the attempt so a
+ * transient blob-store failure can size its budget without the body. Never throws; absent is 0.
+ */
+export function readJobOverloadAttempts(value: string): number {
+  try {
+    if (!isEnvelope(value)) return 0;
+    const count = splitEnvelope(value).header.m?.__overloadAttempts;
+    return typeof count === "number" && Number.isInteger(count) && count > 0 ? count : 0;
+  } catch {
+    return 0;
+  }
+}
+
+/**
+ * When the job was first staged, read off the header like the attempt. Never throws; a value
+ * staged by a release that did not record it, or anything not an integer, is null.
+ */
+export function readJobStagedAt(value: string): number | null {
+  try {
+    if (!isEnvelope(value)) return null;
+    const stagedAt = splitEnvelope(value).header.a;
+    return typeof stagedAt === "number" && Number.isSafeInteger(stagedAt) && stagedAt > 0
+      ? stagedAt
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Rewrites the HEADER ONLY; the body is reused byte for byte, since it's what
  * the blob store content-addresses — re-encoding it would split a shared
  * copy and churn the lease identity. Unsupported values return unchanged.
@@ -616,10 +654,7 @@ export function splitEnvelope(value: string): {
       reason: "malformed_envelope",
     });
   }
-  // Prefix and length digits are ASCII, so lenEnd is the same offset in bytes
-  // and code units; the header itself must be sliced as bytes to match Lua.
-  const buf = Buffer.from(value, "utf8");
-  const headerJson = buf.subarray(lenEnd + 1, lenEnd + 1 + headerLen).toString("utf8");
+  const { headerJson, body } = sliceEnvelope({ value, headerStart: lenEnd + 1, headerLen });
   // Guarded like the body parses: a corrupt header makes V8 echo raw bytes
   // back, and the header carries `m.__context` (traceId/userId/projectId)
   // that would reach the drop log via the raw-Error path (strips only
@@ -639,8 +674,31 @@ export function splitEnvelope(value: string): {
       reason: "malformed_envelope",
     });
   }
+  return { header, body };
+}
+
+/**
+ * `headerStart` is the same offset in bytes and code units (prefix and digits are
+ * ASCII). The header length counts bytes, as Lua does: a code-unit slice measuring
+ * that many bytes is all ASCII, which spares copying the whole value to a buffer.
+ */
+function sliceEnvelope({
+  value,
+  headerStart,
+  headerLen,
+}: {
+  value: string;
+  headerStart: number;
+  headerLen: number;
+}): { headerJson: string; body: string } {
+  const headerEnd = headerStart + headerLen;
+  const asciiHeader = value.slice(headerStart, headerEnd);
+  if (asciiHeader.length === headerLen && Buffer.byteLength(asciiHeader, "utf8") === headerLen) {
+    return { headerJson: asciiHeader, body: value.slice(headerEnd) };
+  }
+  const buf = Buffer.from(value, "utf8");
   return {
-    header,
-    body: buf.subarray(lenEnd + 1 + headerLen).toString("utf8"),
+    headerJson: buf.subarray(headerStart, headerEnd).toString("utf8"),
+    body: buf.subarray(headerEnd).toString("utf8"),
   };
 }

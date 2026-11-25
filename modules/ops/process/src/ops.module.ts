@@ -1,5 +1,10 @@
 import { ClientAddress } from "@langwatch/api/policy";
-import { bindRestCredential, browserSessionOfRequest } from "@langwatch/api/rest";
+import {
+  bindRestCredential,
+  browserSessionOfRequest,
+  callerAddressOfRequest,
+} from "@langwatch/api/rest";
+import { EVENT_LOG_ID_INDEX } from "@langwatch/eventing/server";
 import type { OpsApi, OpsServerConfig } from "@langwatch/ops-contract";
 import { defineProcessModule, type PublishedProcessModule } from "@langwatch/process";
 import { type CodeStepId, defineMigrationStep } from "@langwatch/upgrade/step";
@@ -10,6 +15,7 @@ import { anomalyDetectionEventing } from "#eventing/ops-anomaly-detection.pipeli
 import { groupQueueReaperEventing } from "#eventing/ops-group-queue-reaper.pipeline";
 import { platformOperatorSeedEventing } from "#eventing/ops-platform-operator-seed.pipeline";
 import { projectionReplayEventing } from "#eventing/ops-projection-replay.pipeline";
+import { seatSharingEventing } from "#eventing/ops-seat-sharing.pipeline";
 import { storageStatsEventing } from "#eventing/ops-storage-stats.pipeline";
 import { systemMigrationsEventing } from "#eventing/ops-system-migrations.pipeline";
 import { usageReportEventing } from "#eventing/ops-usage-report.pipeline";
@@ -58,6 +64,7 @@ export const opsProcessModule: PublishedProcessModule<"ops", OpsApi, OpsServerCo
     // The impersonation routes record against the session the browser door resolved.
     .provideMiddlewareContext({
       browserSession: browserSessionOfRequest,
+      callerAddress: callerAddressOfRequest,
       adminAuditRequest: (request) => ({
         headers: Object.fromEntries(request.headers),
         remoteAddress: ClientAddress.resolvedFor(request) ?? undefined,
@@ -66,6 +73,7 @@ export const opsProcessModule: PublishedProcessModule<"ops", OpsApi, OpsServerCo
     .withEventing(usageReportEventing)
     .withEventing(anomalyDetectionEventing)
     .withEventing(storageStatsEventing)
+    .withEventing(seatSharingEventing)
     .withEventing(groupQueueReaperEventing)
     .withEventing(upgradeAlertsEventing)
     .withEventing(projectionReplayEventing)
@@ -188,4 +196,11 @@ export const opsProcessModule: PublishedProcessModule<"ops", OpsApi, OpsServerCo
           return dryRun ? { wouldGrant: granted } : { granted };
         },
       }),
-    ]);
+    ])
+    // Ops hosts operator work over the event tables (§7); the index itself is eventing's.
+    .withIdIndexes([EVENT_LOG_ID_INDEX], {
+      step: "fill-event-log-id-index",
+      after: ["gateway:fill-id-indexes"],
+      description:
+        "Fills the event log's aggregate index from older events, then marks it ready on each ClickHouse target.",
+    });

@@ -2,7 +2,9 @@ import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 import { scenarioCriterionResultSchema } from "../../scenario-criterion-result.ts";
+import { redTeamRunReportSchema } from "../../scenario.ts";
 import { scenarioEvaluationResultSchema } from "../../schemas/event-schemas.ts";
+import { scenarioRunHooksSchema } from "../execution/scenario-hooks.ts";
 import { runEvaluatorsSchema } from "../run/scenario-run-evaluators.ts";
 import {
   simulationQueuedTargetSchema,
@@ -139,6 +141,30 @@ export interface SimulationRecordAgentInstanceSchema extends Named<
 export const simulationRecordAgentInstanceSchema: SimulationRecordAgentInstanceSchema =
   simulationRecordAgentInstanceSchemaDefinition;
 export type SimulationRecordAgentInstance = z.infer<typeof simulationRecordAgentInstanceSchema>;
+
+/** The setup and teardown results of a run, reported by the child (ADR-180). */
+const simulationRecordHooksSchemaDefinition = z.object({
+  ...simulationRunIdentitySchema.shape,
+  hooks: scenarioRunHooksSchema,
+});
+export interface SimulationRecordHooksSchema extends Named<
+  typeof simulationRecordHooksSchemaDefinition
+> {}
+export const simulationRecordHooksSchema: SimulationRecordHooksSchema =
+  simulationRecordHooksSchemaDefinition;
+export type SimulationRecordHooks = z.infer<typeof simulationRecordHooksSchema>;
+
+/** A red team run's report, reported by the child. */
+const simulationRecordRedTeamReportSchemaDefinition = z.object({
+  ...simulationRunIdentitySchema.shape,
+  report: redTeamRunReportSchema,
+});
+export interface SimulationRecordRedTeamReportSchema extends Named<
+  typeof simulationRecordRedTeamReportSchemaDefinition
+> {}
+export const simulationRecordRedTeamReportSchema: SimulationRecordRedTeamReportSchema =
+  simulationRecordRedTeamReportSchemaDefinition;
+export type SimulationRecordRedTeamReport = z.infer<typeof simulationRecordRedTeamReportSchema>;
 
 /** A voice run LangWatch ended at the maximum call duration, reported by the child. */
 export const simulationRecordCutAtLimitSchema = simulationRunIdentitySchema;

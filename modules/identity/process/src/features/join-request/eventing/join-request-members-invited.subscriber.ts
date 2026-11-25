@@ -3,7 +3,7 @@
  * organization names the invitees who hold an account on its batch fact and holds no identity peer.
  * Spec: specs/identity/join-requests.feature
  */
-import type { PeerSubscriberDefinition } from "@langwatch/eventing";
+import type { PeerEventSubscriberDefinition } from "@langwatch/eventing";
 import type { JoinRequestsApi } from "@langwatch/identity-contract";
 import {
   MEMBERS_INVITED_EVENT_TYPE,
@@ -20,7 +20,7 @@ export function joinRequestMembersInvitedSubscriber({
   joinRequests,
 }: {
   joinRequests: () => Pick<JoinRequestsApi, "resolveByInvitation">;
-}): PeerSubscriberDefinition<typeof membersInvitedEventDataSchema> {
+}): PeerEventSubscriberDefinition<typeof membersInvitedEventDataSchema> {
   return {
     eventType: MEMBERS_INVITED_EVENT_TYPE,
     data: membersInvitedEventDataSchema,

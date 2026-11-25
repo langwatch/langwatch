@@ -32,12 +32,55 @@ export type LangWatchQLTimeWindowParameter = (typeof LWQL_TIME_WINDOW_PARAMETERS
  */
 export const LWQL_PERIOD_GRANULARITY_PARAMETER = "dashboard_context_granularity_seconds";
 
-/** Reserved surface parameters: window bounds and granularity. */
+/** The trace origins a run is bound to (`Array(String)`), set by the surface from `sources`. */
+export const LWQL_SOURCES_PARAMETER = "dashboard_context_sources";
+
+/** SQL without its comments and with its string literals emptied: what a statement executes. */
+export function lwqlExecutedText(sql: string): string {
+  // One left-to-right pass, so `--` inside a literal and a quote inside a comment stay inert.
+  return sql.replace(/\/\*[\s\S]*?\*\/|--[^\n]*|'(?:[^'\\]|\\.|'')*'/g, (token) =>
+    token.startsWith("'") ? "''" : " ",
+  );
+}
+
+/** The sources placeholder, with the spacing inside its type the server's type check allows. */
+const SOURCES_PLACEHOLDER = new RegExp(
+  `\\{${LWQL_SOURCES_PARAMETER}:\\s*Array\\(\\s*String\\s*\\)\\s*\\}`,
+);
+
+/** Whether a statement reads the sources placeholder in an expression, not a comment or literal. */
+export function readsSourcesParameter(sql: string): boolean {
+  return SOURCES_PLACEHOLDER.test(lwqlExecutedText(sql));
+}
+
+/** The projects a run reads (`Array(String)`), set by the surface from `projects`. */
+export const LWQL_PROJECTS_PARAMETER = "dashboard_context_projects";
+
+/** The reserved names that carry a list of strings rather than an instant or a step. */
+export const LWQL_LIST_PARAMETERS = [LWQL_SOURCES_PARAMETER, LWQL_PROJECTS_PARAMETER] as const;
+
+export type LangWatchQLListParameter = (typeof LWQL_LIST_PARAMETERS)[number];
+
+/** Reserved surface parameters: window bounds, granularity, sources and projects. */
 export const LWQL_SURFACE_PARAMETERS = [
   LWQL_PERIOD_START_PARAMETER,
   LWQL_PERIOD_END_PARAMETER,
   LWQL_PERIOD_GRANULARITY_PARAMETER,
+  ...LWQL_LIST_PARAMETERS,
 ] as const;
+
+/** Whether a parameter name is one of the two that carry a list. */
+export function isLangWatchQLListParameter(name: string): name is LangWatchQLListParameter {
+  return (LWQL_LIST_PARAMETERS as readonly string[]).includes(name);
+}
+
+/** Exactly `Array(String)`: no `Nullable`, no `LowCardinality`, so a list binds as written. */
+const LWQL_LIST_PARAMETER_TYPE = /^Array\(\s*String\s*\)$/;
+
+/** Whether a declared ClickHouse type can carry a list of strings. */
+export function isLangWatchQLListParameterType(type: string): boolean {
+  return LWQL_LIST_PARAMETER_TYPE.test(type.trim());
+}
 
 export type LangWatchQLSurfaceParameter = (typeof LWQL_SURFACE_PARAMETERS)[number];
 

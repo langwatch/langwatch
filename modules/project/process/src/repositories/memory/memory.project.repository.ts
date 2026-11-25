@@ -2,6 +2,7 @@ import type { PersonalFeatures } from "@langwatch/organization-contract";
 import {
   NEVER_LANDED_ON_PROJECT_KINDS,
   NON_DESTINATION_PROJECT_KINDS,
+  UNMANAGED_PROJECT_KEY_KINDS,
   aggregateRuleSchema,
   type AggregateMemberCandidate,
   type AggregateRule,
@@ -38,9 +39,13 @@ import {
 } from "@langwatch/project-contract";
 import { fromDate, nowInstant, toDate, type Instant } from "@langwatch/time";
 
+import { isLegacyKeyRevoked } from "../../rules/legacy-project-key.rules.ts";
 import type {
-  ProjectBackfillRow,
+  LiveLegacyKey,
+  ProjectBackfillEntry,
   ProjectRepository,
+  ProjectSlugHolder,
+  ProjectSlugMove,
   ProjectWithOrgAdmin,
   TouchCodingAgentActivityInput,
 } from "../project.repository.ts";
@@ -137,6 +142,25 @@ export class MemoryProjectRepository implements ProjectRepository {
       .projects()
       .filter((row) => row.kind === kind && row.archivedAt === null)
       .map((row) => row.id);
+  }
+
+  async findSlugHolders({ slug }: { slug: string }): Promise<ProjectSlugHolder[]> {
+    return this.#database
+      .projects()
+      .filter((row) => row.slug === slug)
+      .map(({ id, name, slug: held }) => ({ id, name, slug: held }));
+  }
+
+  async replaceSlug(input: {
+    projectId: string;
+    from: string;
+    to: string;
+  }): Promise<ProjectSlugMove> {
+    const project = this.#database.findProject(input.projectId);
+    if (!project || project.slug !== input.from) return "gone";
+    if (this.#database.projects().some((row) => row.slug === input.to)) return "taken";
+    this.#database.putProject({ ...project, slug: input.to });
+    return "moved";
   }
 
   async findInternalBySlug(slug: string): Promise<InternalProject | null> {
@@ -244,29 +268,32 @@ export class MemoryProjectRepository implements ProjectRepository {
   }: {
     afterId: string | null;
     limit: number;
-  }): Promise<ProjectBackfillRow[]> {
-    return this.#database
+  }): Promise<ProjectBackfillEntry[]> {
+    const page = this.#database
       .projects()
       .filter((project) => afterId === null || project.id > afterId)
       .toSorted((left, right) => (left.id < right.id ? -1 : 1))
-      .flatMap((project) => {
-        const organization = this.#database.findOrganizationOf(project);
-        if (!organization) return [];
-        return [
-          {
-            id: project.id,
-            createdAt: fromDate(project.createdAt),
-            organizationId: organization.id,
-            teamId: project.teamId,
-            isPersonal: project.isPersonal,
-            departmentId: project.departmentId,
-            presenceEnabled: project.presenceEnabled,
-            isArchived: project.archivedAt !== null,
-            adminUserId: organization.adminUserIds[0] ?? null,
-          },
-        ];
-      })
       .slice(0, limit);
+    return page.map((project): ProjectBackfillEntry => {
+      const organization = this.#database.findOrganizationOf(project);
+      if (!organization) return { kind: "orphan", id: project.id };
+      return {
+        kind: "whole",
+        project: {
+          id: project.id,
+          createdAt: fromDate(project.createdAt),
+          organizationId: organization.id,
+          teamId: project.teamId,
+          isPersonal: project.isPersonal,
+          departmentId: project.departmentId,
+          presenceEnabled: project.presenceEnabled,
+          isArchived: project.archivedAt !== null,
+          adminUserId: organization.adminUserIds[0] ?? null,
+          ownerUserId: project.ownerUserId,
+          firstMessage: project.firstMessage,
+        },
+      };
+    });
   }
 
   async findTraceSharingConfig(id: string): Promise<TraceSharingConfig | null> {
@@ -418,17 +445,21 @@ export class MemoryProjectRepository implements ProjectRepository {
     after,
     limit,
   }: ProjectIdPageInput = {}): Promise<ProjectOrganizationPage> {
-    const projects = this.#database
+    const rows = this.#database
       .projects()
       .filter((project) => after === undefined || project.id > after)
-      .toSorted((left, right) => (left.id < right.id ? -1 : 1))
-      .flatMap((project) => {
-        const organizationId = this.#database.findTeam(project.teamId)?.organizationId;
-        return organizationId === undefined ? [] : [{ id: project.id, organizationId }];
-      });
-    if (limit === undefined || projects.length <= limit) return { projects, next: null };
-    const page = projects.slice(0, limit);
-    return { projects: page, next: page[page.length - 1]?.id ?? null };
+      .toSorted((left, right) => (left.id < right.id ? -1 : 1));
+    const more = limit !== undefined && rows.length > limit;
+    const page = more ? rows.slice(0, limit) : rows;
+    const organizationOf = (teamId: string) => this.#database.findTeam(teamId)?.organizationId;
+    const projects = page.flatMap((project) => {
+      const organizationId = organizationOf(project.teamId);
+      return organizationId === undefined ? [] : [{ id: project.id, organizationId }];
+    });
+    const orphanIds = page
+      .filter((project) => organizationOf(project.teamId) === undefined)
+      .map((project) => project.id);
+    return { projects, orphanIds, next: more ? (page.at(-1)?.id ?? null) : null };
   }
 
   async listAllWithPrivateS3({
@@ -646,6 +677,34 @@ export class MemoryProjectRepository implements ProjectRepository {
       .find((row) => row.apiKey === input.token && row.archivedAt === null);
 
     return project?.id ?? null;
+  }
+
+  async markLegacyApiKeyUsed(input: { projectId: string; at: Instant }): Promise<void> {
+    this.#database.putLegacyKeyUse(input.projectId, input.at);
+  }
+
+  async findLegacyApiKeyLastUsedAt(input: { projectId: string }): Promise<Instant | null> {
+    return this.#database.findLegacyKeyUse(input.projectId) ?? null;
+  }
+
+  async findLiveLegacyKeys(input: { organizationId: string }): Promise<LiveLegacyKey[]> {
+    return this.#database
+      .projects()
+      .filter(
+        (project) =>
+          project.archivedAt === null &&
+          !UNMANAGED_PROJECT_KEY_KINDS.includes(project.kind) &&
+          this.#database.isInOrganization(project, input.organizationId) &&
+          !isLegacyKeyRevoked(project.apiKey),
+      )
+      .toSorted((left, right) => left.name.localeCompare(right.name))
+      .map((project) => ({
+        projectId: project.id,
+        teamId: project.teamId,
+        projectName: project.name,
+        projectSlug: project.slug,
+        lastUsedAt: this.#database.findLegacyKeyUse(project.id) ?? null,
+      }));
   }
 
   /** Answers false for a project this memory holds no live row for, as the fenced UPDATE does. */

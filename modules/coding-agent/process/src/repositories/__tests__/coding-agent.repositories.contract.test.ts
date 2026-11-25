@@ -63,6 +63,76 @@ describe.each(backends)("given the $name coding-agent repositories", ({ create }
     });
   });
 
+  describe("when asked what other session a project holds", () => {
+    const kindOf = (repositories: ReturnType<typeof create>, excluded: string) =>
+      repositories.sessions.findOtherSessionKind({
+        tenantId: "project-1",
+        excludeSessionIds: [excluded],
+      });
+
+    /** @scenario "A project with an older session is never first" */
+    it("answers main when a different main session of the tenant is stored", async () => {
+      const repositories = create();
+      await repositories.sessions.upsert(
+        session({ tenantId: "project-1", sessionId: "session-1" }),
+        30,
+        [],
+      );
+
+      await expect(kindOf(repositories, "session-2")).resolves.toBe("main");
+    });
+
+    it("answers none when the only stored session is the excluded one", async () => {
+      const repositories = create();
+      await repositories.sessions.upsert(
+        session({ tenantId: "project-1", sessionId: "session-1" }),
+        30,
+        [],
+      );
+
+      await expect(kindOf(repositories, "session-1")).resolves.toBe("none");
+    });
+
+    /** @scenario "A helper-thread session in the history never blocks the first" */
+    it("answers helpers_only when the only other session is a helper thread", async () => {
+      const repositories = create();
+      await repositories.sessions.upsert(
+        session({ tenantId: "project-1", sessionId: "helper-1", auxiliary: true }),
+        30,
+        [],
+      );
+
+      await expect(kindOf(repositories, "session-1")).resolves.toBe("helpers_only");
+    });
+
+    it("answers main when a helper thread and a main session are both stored", async () => {
+      const repositories = create();
+      await repositories.sessions.upsert(
+        session({ tenantId: "project-1", sessionId: "helper-1", auxiliary: true }),
+        30,
+        [],
+      );
+      await repositories.sessions.upsert(
+        session({ tenantId: "project-1", sessionId: "session-3" }),
+        30,
+        [],
+      );
+
+      await expect(kindOf(repositories, "session-1")).resolves.toBe("main");
+    });
+
+    it("answers none when only another tenant holds sessions", async () => {
+      const repositories = create();
+      await repositories.sessions.upsert(
+        session({ tenantId: "project-2", sessionId: "session-9" }),
+        30,
+        [],
+      );
+
+      await expect(kindOf(repositories, "session-1")).resolves.toBe("none");
+    });
+  });
+
   describe("when a session's events are appended", () => {
     it("lists them in time order, bounded by the caller's page size", async () => {
       const repositories = create();
@@ -120,6 +190,52 @@ describe.each(backends)("given the $name coding-agent repositories", ({ create }
       await expect(
         repositories.traceSessions.findByTraceId({ tenantId: "project-2", traceId: "trace-1" }),
       ).resolves.toBeNull();
+    });
+
+    /**
+     * @scenario "The session's latest stored trace is found through its own trace map"
+     * @scenario "The repository answers a session's newest mapped traces, newest first"
+     */
+    it("answers the session's mappings inside the window, newest first, up to the limit", async () => {
+      const repositories = create();
+      const mapping = (traceId: string, sessionId: string, occurredAtMs: number) => ({
+        tenantId: "project-1",
+        traceId,
+        sessionId,
+        occurredAtMs,
+      });
+      await repositories.traceSessions.ensure(
+        [
+          mapping("trace-1", "session-1", 1_000),
+          mapping("trace-2", "session-1", 3_000),
+          mapping("trace-5", "session-1", 2_000),
+          mapping("trace-3", "session-2", 5_000),
+          mapping("trace-4", "session-1", 90_000),
+        ],
+        30,
+      );
+
+      await expect(
+        repositories.traceSessions.findRecentBySessionId({
+          tenantId: "project-1",
+          sessionId: "session-1",
+          fromMs: 0,
+          toMs: 10_000,
+          limit: 2,
+        }),
+      ).resolves.toEqual([
+        mapping("trace-2", "session-1", 3_000),
+        mapping("trace-5", "session-1", 2_000),
+      ]);
+      await expect(
+        repositories.traceSessions.findRecentBySessionId({
+          tenantId: "project-2",
+          sessionId: "session-1",
+          fromMs: 0,
+          toMs: 100_000,
+          limit: 10,
+        }),
+      ).resolves.toEqual([]);
     });
   });
 

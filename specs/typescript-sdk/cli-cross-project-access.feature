@@ -288,7 +288,9 @@ Feature: CLI cross-project access with the user-scoped login key
       Given the user is logged in with a working API key
       When the user runs `langwatch query "SELECT 1" -o json`
       Then the query runs against the configured API key with no project header
-      And stdout is exactly one JSON array of the returned rows
+      # Changed (owner, 2026-10-29: params come back "as part of the success or final state object"): the
+      # earlier text was exactly one JSON array of the returned rows.
+      And stdout is exactly one JSON object holding the returned rows, the run's params and its diagnostics
       And the command exits 0
 
     @unit

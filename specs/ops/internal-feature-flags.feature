@@ -475,6 +475,38 @@ Feature: Internal feature flag system for system-level kill switches
       Then the saved rule still carries both conditions, because dropping one
            would widen the rollout to that organization's whole history
 
+  Rule: A project rule may name several projects
+
+    # A per-project allowlist, such as the projects whose legacy keys keep
+    # full access, is one rule naming every project rather than one rule per
+    # project, so the writable rule cap stays at 50.
+
+    @unit
+    Scenario: a project rule naming several projects matches each of them
+      Given a rule naming the projects "project_a" and "project_b", with enabled true
+      When the flag is read for either project
+      Then the rule matches
+      And a read for a third project does not match
+
+    @unit
+    Scenario: an operator cannot save a project rule that names no project
+      Given an operator writes a project rule from the Ops UI
+      When its list of projects is empty, or an id in it is blank or padded
+      Then the write is rejected with a message naming the expected form
+
+    @unit
+    Scenario: a rules write still holds at most 50 rules
+      Given an operator writes the rules of one flag
+      When the write carries 51 rules
+      Then the write is rejected
+
+    @unit
+    Scenario: the ops page reads and writes a project rule naming several projects
+      Given a stored rule enabling the flag for three projects
+      When the rule is opened in the targeting rules dialog
+      Then it shows as a "Project" rule with every id, comma-separated
+      And saving it after removing one id stores the remaining two
+
   Rule: A rollout can name the email domain of the signed-in user
 
     # The team QAs a flag in production by signing up with fresh accounts at
@@ -561,6 +593,39 @@ Feature: Internal feature flag system for system-level kill switches
       When a signed-in user at acme.com reads the flag with no project and no organization
       Then the flag resolves enabled
       And a signed-in user at another domain reads it disabled
+
+  Rule: A rollout can name signed-in users by id
+
+    # An operator turns a flag on for one person, such as a teammate who
+    # asked to try it, without switching it on for their whole organization.
+
+    @unit
+    Scenario: a user rule enables the flag for a named user
+      Given a flag that is off by default
+      And a rule naming the users "user_a" and "user_b", with enabled true
+      When the flag is read for a signed-in user "user_a"
+      Then the flag resolves enabled from the rule
+      And a read for a third user does not match
+
+    @unit
+    Scenario: a read with no signed-in user matches no user rule
+      Given a flag whose only rule names a user
+      When the flag is read from a surface with no signed-in user, such as a
+           job or an anonymous visitor
+      Then the rule does not match
+
+    @unit
+    Scenario: an operator cannot save a user rule that names no user
+      Given an operator writes a user rule from the Ops UI
+      When its list of users is empty, or an id in it is blank or padded
+      Then the write is rejected with a message naming the expected form
+
+    @unit
+    Scenario: the ops page reads and writes a user rule
+      Given a stored rule enabling the flag for two users
+      When the rule is opened in the targeting rules dialog
+      Then it shows as a "User" rule with both users
+      And saving it back stores the same two user ids
 
   Rule: Self-hosted parity
 

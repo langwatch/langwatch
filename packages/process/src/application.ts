@@ -42,6 +42,7 @@ import {
   type RuntimeService,
 } from "./lifecycle/runtime-lifecycle.ts";
 import { LocalFeatureApis } from "./local-feature-api.ts";
+import type { IdIndexRetention } from "./migration/id-index-fill-step.ts";
 import { migrationStepsOf } from "./migration/migration-steps.ts";
 import { processProjectionReplayer } from "./migration/projection-replayer.ts";
 import {
@@ -345,6 +346,8 @@ export interface ApplicationOptions<Config extends ModuleConfigRecord = ModuleCo
   readonly secrets?: ModuleSecretsScope;
   /** Scopes the stores' operator reads to one module's declared handles (§7). */
   readonly operatorReads?: ModuleOperatorReadsScope;
+  /** Raises an id index's retention for each module's fill step; omitted where none runs. */
+  readonly idIndexRetention?: IdIndexRetention;
   /** Stand-ins for peers the process does not install: `testPeer` or `.provide()` values. */
   readonly peers?: readonly TestPeer[];
 }
@@ -362,6 +365,7 @@ export class ApplicationBuilder<
   private readonly stores: StoresMemberSource;
   private readonly secrets: ModuleSecretsScope | undefined;
   private readonly operatorReads: ModuleOperatorReadsScope | undefined;
+  private readonly idIndexRetention: IdIndexRetention | undefined;
   readonly name: string;
 
   constructor(options: ApplicationOptions<Config>, state?: BuilderState<Rest, Trpc>) {
@@ -370,6 +374,7 @@ export class ApplicationBuilder<
     this.stores = options.stores ?? NO_STORES;
     this.secrets = options.secrets;
     this.operatorReads = options.operatorReads;
+    this.idIndexRetention = options.idIndexRetention;
     this.name = options.role;
     this.state = state ?? { features: [], services: [], provisions: [], hosts: {} };
     for (const peer of options.peers ?? []) {
@@ -392,6 +397,7 @@ export class ApplicationBuilder<
         stores: this.stores,
         ...(this.secrets ? { secrets: this.secrets } : {}),
         ...(this.operatorReads ? { operatorReads: this.operatorReads } : {}),
+        ...(this.idIndexRetention ? { idIndexRetention: this.idIndexRetention } : {}),
       },
       { ...this.state, hosts, serve },
     );
@@ -545,6 +551,8 @@ export class ApplicationBuilder<
     const apis = new LocalFeatureApis();
     const declared: DeclaredTransports[] = [];
     this.allocateApiClients(apis, providerOf, provided);
+    // Resolved when a fill step runs, after every module's API exists.
+    const retention = idIndexRetentionArgs({ retention: this.idIndexRetention, apis });
     let transports: MountedTransports<Rest, Trpc> = { rest: [], trpc: {} };
     let handler: unknown;
     try {
@@ -559,6 +567,7 @@ export class ApplicationBuilder<
           role,
           replayer,
           declaredMigrationSteps,
+          ...retention,
           ...listedWorkOf(eventing),
           resolve: (token) =>
             trackedForRole({ role, dependency: resolveInstallToken({ token, provided, apis }) }),
@@ -885,6 +894,18 @@ function contributionsFor({
   if (role === "worker") return declaration.workers;
   if (role === "tasks") return declaration.tasks;
   return [];
+}
+
+/** The fill steps' retention raise, its API resolved when a step runs; none where not composed. */
+function idIndexRetentionArgs({
+  retention,
+  apis,
+}: {
+  retention: IdIndexRetention | undefined;
+  apis: LocalFeatureApis;
+}): Pick<FeatureInstallArguments, "idIndexRetention"> {
+  if (retention === undefined) return {};
+  return { idIndexRetention: retention({ api: (token) => apis.reference(token) }) };
 }
 
 function resolveInstallToken({

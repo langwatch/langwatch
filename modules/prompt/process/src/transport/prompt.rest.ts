@@ -71,7 +71,7 @@ export const promptRest = defineRestRouter(PromptApi)
   .withAddressing("literal", { v1Twin: true })
 
   .get("/api/prompts", "getApiPrompts")
-  .withPermission("prompts:view")
+  .withPermission("prompts:view", { legacyKey: "legacy_project_key_prompts_read" })
   .withOutput(z.array(promptWireSchema))
   .withMiddlewareContext(promptRestContext)
   .withDocs({
@@ -102,10 +102,11 @@ export const promptRest = defineRestRouter(PromptApi)
   // deployment, and it belongs with the grain that administers the prompt
   // rather than with the one that edits its text.
   .put("/api/prompts/:id{.+?}/tags/:tag", "putApiPromptsByIdTagsByTag")
+  .keepsRecords()
   .withAudit("prompts.assignTag")
   .withParams(idTagParamsSchema)
   .withInput(assignTagInputSchema)
-  .withPermission("prompts:manage")
+  .withPermission("prompts:manage", { legacyKey: "legacy_project_key_prompts_write" })
   .withOutput(assignTagResponseSchema)
   .withMiddlewareContext(promptRestContext)
   .withDocs({
@@ -140,7 +141,7 @@ export const promptRest = defineRestRouter(PromptApi)
   // --- Tag definition CRUD (org-level) ---
 
   .get("/api/prompts/tags", "getApiPromptsTags")
-  .withPermission("prompts:view")
+  .withPermission("prompts:view", { legacyKey: "legacy_project_key_prompts_read" })
   .withOutput(z.array(tagDefinitionSchema))
   .withMiddlewareContext(promptRestContext)
   .withDocs({
@@ -157,9 +158,10 @@ export const promptRest = defineRestRouter(PromptApi)
   })
 
   .post("/api/prompts/tags", "postApiPromptsTags")
+  .keepsRecords()
   .withAudit("promptTags.create")
   .withInput(createTagInputSchema)
-  .withPermission("prompts:manage")
+  .withPermission("prompts:manage", { legacyKey: "legacy_project_key_prompts_write" })
   .withOutput(tagDefinitionSchema)
   .withStatus(201)
   .withMiddlewareContext(promptRestContext)
@@ -180,10 +182,11 @@ export const promptRest = defineRestRouter(PromptApi)
   })
 
   .put("/api/prompts/tags/:tag", "putApiPromptsTagsByTag")
+  .keepsRecords()
   .withAudit("promptTags.rename")
   .withParams(tagParamsSchema)
   .withInput(renameTagInputSchema)
-  .withPermission("prompts:manage")
+  .withPermission("prompts:manage", { legacyKey: "legacy_project_key_prompts_write" })
   .withOutput(tagDefinitionSchema)
   .withMiddlewareContext(promptRestContext)
   .withDocs({
@@ -207,6 +210,12 @@ export const promptRest = defineRestRouter(PromptApi)
   .withAudit("promptTags.delete")
   .withParams(tagParamsSchema)
   .withPermission("prompts:manage")
+  .withConfirmation({
+    resource: "prompt tag",
+    action: "delete",
+    idParam: "tag",
+    name: async ({ id }) => id,
+  })
   .withOutput(z.void())
   .withMiddlewareContext(promptRestContext)
   .withDocs({
@@ -219,7 +228,7 @@ export const promptRest = defineRestRouter(PromptApi)
 
   .get("/api/prompts/:id{.+?}/versions", "getApiPromptsByIdVersions")
   .withParams(idParamsSchema)
-  .withPermission("prompts:view")
+  .withPermission("prompts:view", { legacyKey: "legacy_project_key_prompts_read" })
   .withOutput(z.array(promptWireSchema))
   .withMiddlewareContext(promptRestContext)
   .withDocs({
@@ -257,10 +266,11 @@ export const promptRest = defineRestRouter(PromptApi)
     "/api/prompts/:id{.+?}/versions/:versionId/restore",
     "postApiPromptsByIdVersionsByVersionIdRestore",
   )
+  .keepsRecords()
   .withAudit("prompts.restoreVersion")
   .withParams(idVersionParamsSchema)
   .withInput(restorePromptVersionBodySchema)
-  .withPermission("prompts:update")
+  .withPermission("prompts:update", { legacyKey: "legacy_project_key_prompts_write" })
   .withOutput(promptWireSchema)
   .withMiddlewareContext(promptRestContext)
   .withDocs({
@@ -304,7 +314,7 @@ export const promptRest = defineRestRouter(PromptApi)
   .get("/api/prompts/:id{.+}", "getApiPromptsById")
   .withParams(idParamsSchema)
   .withQuery(promptWindowQuerySchema)
-  .withPermission("prompts:view")
+  .withPermission("prompts:view", { legacyKey: "legacy_project_key_prompts_read" })
   .withOutput(promptWireSchema)
   .withMiddlewareContext(promptRestContext)
   .withDocs({
@@ -341,9 +351,10 @@ export const promptRest = defineRestRouter(PromptApi)
   // still implies it, so no existing caller changes, and a viewer holding only
   // `prompts:view` is declined exactly as before.
   .post("/api/prompts", "postApiPrompts")
+  .keepsRecords()
   .withAudit("prompts.create")
   .withInput(createPromptInputSchema)
-  .withPermission("prompts:create")
+  .withPermission("prompts:create", { legacyKey: "legacy_project_key_prompts_write" })
   .withOutput(promptWireSchema)
   .withMiddlewareContext(promptRestContext)
   .withDocs({
@@ -368,10 +379,11 @@ export const promptRest = defineRestRouter(PromptApi)
   })
 
   .post("/api/prompts/:id{.+?}/sync", "postApiPromptsByIdSync")
+  .keepsRecords()
   .withAudit("prompts.syncFromSource")
   .withParams(idParamsSchema)
   .withInput(syncInputSchema)
-  .withPermission("prompts:manage")
+  .withPermission("prompts:manage", { legacyKey: "legacy_project_key_prompts_write" })
   .withOutput(promptSyncResultSchema)
   .withMiddlewareContext(promptRestContext)
   .withDocs({
@@ -397,10 +409,11 @@ export const promptRest = defineRestRouter(PromptApi)
   )
 
   .put("/api/prompts/:id{.+}", "putApiPromptsById")
+  .keepsRecords()
   .withAudit("prompts.update")
   .withParams(idParamsSchema)
   .withInput(updatePromptInputSchema)
-  .withPermission("prompts:update")
+  .withPermission("prompts:update", { legacyKey: "legacy_project_key_prompts_write" })
   .withOutput(promptWireSchema)
   .withMiddlewareContext(promptRestContext)
   .withDocs({
@@ -436,6 +449,15 @@ export const promptRest = defineRestRouter(PromptApi)
   .withAudit("prompts.delete")
   .withParams(idParamsSchema)
   .withPermission("prompts:manage")
+  .withConfirmation({
+    resource: "prompt",
+    action: "delete",
+    idParam: "id",
+    name: async ({ app, projectId, id }) => {
+      const prompt = await app.findByIdOrHandle({ idOrHandle: id, projectId });
+      return prompt ? (prompt.handle ?? prompt.name) : undefined;
+    },
+  })
   .withOutput(successSchema)
   .withMiddlewareContext(promptRestContext)
   .withDocs({

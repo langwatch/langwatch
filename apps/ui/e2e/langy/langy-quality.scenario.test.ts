@@ -79,8 +79,8 @@ function withTurnTimings(adapter: ReturnType<typeof makeLangyAdapter>): {
 
 describe("Langy quality bar", () => {
   // A fresh local project holds only Langy's own mirrored runs (origin: langy), which
-  // rule 27 makes Langy exclude — so every data question would truthfully answer "no
-  // traces".
+  // AGENTS.md's "Trace origins" makes Langy exclude — so every data question would
+  // truthfully answer "no traces".
   beforeAll(async () => {
     await seedApplicationTraces();
   }, 90_000);
@@ -186,8 +186,8 @@ describe("Langy quality bar", () => {
   });
 
   /**
-   * #1099 — AGENTS.md line 149 tells the model that its own working `langwatch.*` tools
-   * are hallucinations.
+   * #1099 — an earlier AGENTS.md told the model that its own working `langwatch.*`
+   * tools are hallucinations.
    */
   describe("when the answer needs one of the langwatch.* tools", () => {
     it("owns the tools it actually has instead of declaring them unavailable", async () => {

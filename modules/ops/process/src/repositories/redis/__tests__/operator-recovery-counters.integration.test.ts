@@ -106,4 +106,49 @@ describe.skipIf(!hasRedis)("operator recovery clears every per-group counter", (
       });
     });
   });
+
+  describe("given a blocked group whose job the pending counter counts", () => {
+    const pending = async () => Number(await redis.get(`${prefix}stats:total-pending`));
+
+    beforeEach(async () => {
+      await redis.set(`${prefix}stats:total-pending`, "1");
+    });
+
+    describe("when an operator moves it to the dead-letter queue and replays it", () => {
+      /** @scenario Operator dead-letter moves and replays keep the pending counter without a reconcile */
+      it("takes the job off the counter on the move and puts it back on the replay", async () => {
+        await repo.moveToDlq({ queueName, groupId });
+        expect(await pending()).toBe(0);
+
+        const { jobsReplayed } = await repo.replayFromDlq({ queueName, groupId });
+
+        expect(jobsReplayed).toBe(1);
+        expect(await pending()).toBe(1);
+      });
+
+      /** @scenario Operator dead-letter moves and replays keep the pending counter without a reconcile */
+      it("does not drift when the move and the replay are repeated", async () => {
+        await repo.moveToDlq({ queueName, groupId });
+        await repo.moveToDlq({ queueName, groupId });
+        expect(await pending()).toBe(0);
+
+        await repo.replayFromDlq({ queueName, groupId });
+        await repo.replayFromDlq({ queueName, groupId });
+        expect(await pending()).toBe(1);
+      });
+    });
+
+    describe("when an operator moves every blocked group and redrives the shown set", () => {
+      /** @scenario Operator dead-letter moves and replays keep the pending counter without a reconcile */
+      it("keeps the counter equal to the live jobs through the bulk paths", async () => {
+        await repo.moveAllBlockedToDlq({ queueName });
+        expect(await pending()).toBe(0);
+
+        await repo.redriveManyFromDlq({ queueName, groupIds: [groupId] });
+
+        expect(await pending()).toBe(await redis.zcard(`${prefix}group:${groupId}:jobs`));
+        expect(await pending()).toBe(1);
+      });
+    });
+  });
 });

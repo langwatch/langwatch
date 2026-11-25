@@ -23,6 +23,7 @@ export {
   allowInsecureLocalUrls,
   allowLoopbackVoiceProviders,
   blockLocalHttpCalls,
+  clickhouseCluster,
   foldCacheTtlSeconds,
   gatewayAddressOf,
   gatewayInternalUrl,
@@ -41,6 +42,7 @@ export {
   nlpCodeBlockTimeoutSeconds,
   nlpServiceUrl,
   nodeEnvironment,
+  nodeEnvProxy,
   otelResourceAttributes,
   outboundProxy,
   passkeysEnabled,
@@ -73,5 +75,13 @@ export {
   nonNegativeSafeIntegerOrUndefined,
   positiveSafeIntegerOrUndefined,
 } from "./env-schemas.ts";
+export {
+  canonicalOriginOf,
+  docsOrigins,
+  isExactOrigin,
+  isRegisteredDocsOrigin,
+  registeredDocsOrigins,
+  SAAS_DOCS_ORIGIN,
+} from "./docs-origins.ts";
 export { zodErrorMessage } from "./zod-error-message.ts";
 export { mapZodIssuesToLogContext } from "./zod-issues.ts";

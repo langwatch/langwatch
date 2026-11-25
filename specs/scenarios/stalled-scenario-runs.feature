@@ -33,6 +33,23 @@ Feature: Detect and display stalled scenario runs
     When the stall watchdog wake fires
     Then the run finishes with status ERROR and reason "stalled"
 
+  # The first deploy of the watchdog caught up a backlog of runs dead since
+  # spring and finished each one "today". Trace metrics then looked for the
+  # run's traces around today, missed every one, and logged a failure per
+  # trace for two days. A finish records when the outcome became true.
+  @unit
+  Scenario: A run caught up long after it stalled is finished at its stall time
+    Given a scenario run went quiet months ago and no RUN_FINISHED event exists
+    When the stall watchdog wake fires today
+    Then the run finishes with status ERROR and reason "stalled"
+    And the finished event is dated when the stall threshold passed, not today
+
+  @unit
+  Scenario: A finish that names no outcome time is dated when it is written
+    Given a finish intent queued before finishes carried their outcome time
+    When the finish executor writes the terminal event
+    Then the finished event is dated when it is written
+
   # A run reported from outside opens with RUN_STARTED: only the platform
   # emits QUEUED. The watchdog must decide the stall from the activity the
   # process really saw, not from the identity only the queued path stamps,

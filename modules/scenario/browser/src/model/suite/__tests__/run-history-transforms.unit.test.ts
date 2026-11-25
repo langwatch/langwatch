@@ -5,6 +5,7 @@
  * @see specs/features/suites/run-history-group-by.feature
  * @see specs/features/suites/all-runs-scenario-names.feature
  * @see specs/features/agent-testing/comparison-mode.feature
+ * @see modules/scenario/specs/scenario-run-hooks.feature
  */
 
 import { ScenarioRunStatus } from "@langwatch/scenario-contract";
@@ -13,6 +14,8 @@ import { targetKeyOf } from "@langwatch/suite-contract";
 import { describe, expect, it } from "vitest";
 
 import {
+  type BatchRun,
+  computeBatchRunSummary,
   computeIterationMap,
   getScenarioDisplayNames,
   groupRunsByBatchId,
@@ -256,6 +259,61 @@ describe("naming and numbering runs", () => {
       expect(iterations.get("run_a")).toBe(1);
       expect(iterations.get("run_b")).toBe(2);
       expect(iterations.has("run_c")).toBe(false);
+    });
+  });
+});
+
+describe("summarising a batch whose runs called setup", () => {
+  const SETUP_FAILED: ScenarioRunData["metadata"] = {
+    langwatch: {
+      targetReferenceId: "agent_1",
+      targetType: "connected",
+      hooks: { setup: { status: "failed", durationMs: 40, error: "no such customer" } },
+    },
+  };
+
+  function batchOf(scenarioRuns: ScenarioRunData[]): BatchRun {
+    return {
+      groupKey: "batch_1",
+      groupLabel: "batch_1",
+      groupType: "none",
+      batchRunId: "batch_1",
+      timestamp: 0,
+      scenarioRuns,
+    };
+  }
+
+  describe("when one run of four failed in setup", () => {
+    /** @scenario "Setup failures are excluded from the batch pass rate" */
+    it("counts the pass rate over the three scored runs and the fourth as not scored", () => {
+      const summary = computeBatchRunSummary({
+        batchRun: batchOf([
+          run({ scenarioRunId: "run_1" }),
+          run({ scenarioRunId: "run_2" }),
+          run({ scenarioRunId: "run_3", status: ScenarioRunStatus.FAILED }),
+          run({ scenarioRunId: "run_4", status: ScenarioRunStatus.ERROR, metadata: SETUP_FAILED }),
+        ]),
+      });
+
+      expect(summary.passedCount).toBe(2);
+      expect(summary.failedCount).toBe(1);
+      expect(summary.notScoredCount).toBe(1);
+      expect(summary.passRate).toBeCloseTo((2 / 3) * 100);
+    });
+  });
+
+  describe("when every run failed in setup", () => {
+    /** @scenario "A batch where every setup failed has no pass rate" */
+    it("has no pass rate rather than zero", () => {
+      const summary = computeBatchRunSummary({
+        batchRun: batchOf([
+          run({ scenarioRunId: "run_1", status: ScenarioRunStatus.ERROR, metadata: SETUP_FAILED }),
+          run({ scenarioRunId: "run_2", status: ScenarioRunStatus.ERROR, metadata: SETUP_FAILED }),
+        ]),
+      });
+
+      expect(summary.notScoredCount).toBe(2);
+      expect(summary.passRate).toBeNull();
     });
   });
 });

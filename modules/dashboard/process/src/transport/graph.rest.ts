@@ -1,11 +1,12 @@
 /**
  * REST for the custom graphs a dashboard is built from, under `/api/graphs`.
  * The two timestamps leave as ISO strings, as this family has always sent them.
- * A graph posted without a size is 1 by 1 here, as on main; tRPC's default is 4 by 3.
+ * A graph posted without a size takes the grid's default footprint, as over tRPC.
  */
-import { defineRestRouter, MANAGEMENT_API_VERSION } from "@langwatch/api/rest";
+import { defineRestRouter, MANAGEMENT_API_VERSION, nameUnlessMissing } from "@langwatch/api/rest";
 import {
   DashboardApi,
+  GraphNotFoundError,
   graphDeletedResponseSchema,
   graphListRestResponseSchema,
   graphRestCreateSchema,
@@ -16,7 +17,7 @@ import {
   type Graph,
 } from "@langwatch/dashboard-contract";
 
-import { viewerOfActor } from "../rules/dashboard-viewer.rules.ts";
+import { viewerOfActor, viewerOfOwner } from "../rules/dashboard-viewer.rules.ts";
 
 const graphResponse = (graph: Graph) => ({
   id: graph.id,
@@ -67,6 +68,7 @@ export const graphRest = defineRestRouter(DashboardApi)
 
   // Creating asks for `analytics:create`; `:manage` still implies it.
   .post("/", "postApiGraphs")
+  .keepsRecords()
   .withAudit("graphs.create")
   .withInput(graphRestCreateSchema)
   .withPermission("analytics:create")
@@ -85,14 +87,15 @@ export const graphRest = defineRestRouter(DashboardApi)
         layout: {
           ...(input.gridColumn === undefined ? {} : { gridColumn: input.gridColumn }),
           ...(input.gridRow === undefined ? {} : { gridRow: input.gridRow }),
-          colSpan: input.colSpan ?? 1,
-          rowSpan: input.rowSpan ?? 1,
+          ...(input.colSpan === undefined ? {} : { colSpan: input.colSpan }),
+          ...(input.rowSpan === undefined ? {} : { rowSpan: input.rowSpan }),
         },
       }),
     ),
   )
 
   .patch("/:id", "patchApiGraphsById")
+  .keepsRecords()
   .withAudit("graphs.updateById")
   .withParams(graphRestParamsSchema)
   .withInput(graphRestUpdateSchema)
@@ -120,6 +123,17 @@ export const graphRest = defineRestRouter(DashboardApi)
   .withAudit("graphs.delete")
   .withParams(graphRestParamsSchema)
   .withPermission("analytics:manage")
+  .withConfirmation({
+    resource: "graph",
+    action: "delete",
+    idParam: "id",
+    name: ({ app, projectId, id, ownerUserId }) =>
+      nameUnlessMissing({
+        read: app.getGraph({ projectId, graphId: id, ...viewerOfOwner({ ownerUserId }) }),
+        missing: GraphNotFoundError,
+        nameOf: (graph) => graph.name,
+      }),
+  })
   .withOutput(graphDeletedResponseSchema)
   .withDocs({ tags: ["Graphs"], description: "Delete a custom graph" })
   .handle(async ({ app, input, scope, actor }) => {

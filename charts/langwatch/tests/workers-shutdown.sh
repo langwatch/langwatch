@@ -234,6 +234,49 @@ test_raised_drain_alone_refuses_to_render() {
     "too short for a 60s shutdown drain"
 }
 
+# @scenario "The app pod sleeps before SIGTERM so its endpoint removal propagates"
+test_app_pre_stop_sleep() {
+  local block
+  block=$(render_component "app" "$BASE")
+  case "$block" in
+    *'command: ["sleep", "15"]'*) echo "ok   [app preStop] sleeps 15s before SIGTERM" ;;
+    *) fail "app preStop" "the app container has no 15s preStop sleep" ;;
+  esac
+  expect_render_refused "preStop too long for the grace" \
+    "--set app.preStopSleepSeconds=20" \
+    "too short for a 20s preStop sleep"
+  local bad
+  for bad in "--set-string app.preStopSleepSeconds=5.5" "--set-string app.preStopSleepSeconds=abc" \
+    "--set app.preStopSleepSeconds=-1" "--set-string app.preStopSleepSeconds=99999999999999999999"; do
+    expect_render_refused "preStop ${bad#*=}" "$bad" \
+      "app.preStopSleepSeconds must be a whole number of seconds"
+  done
+  block=$(render_component "app" "$BASE --set app.preStopSleepSeconds=0")
+  case "$block" in
+    *preStop*) fail "app preStop off" "preStopSleepSeconds=0 still rendered a preStop" ;;
+    *) echo "ok   [app preStop off] zero renders no preStop" ;;
+  esac
+}
+
+# @scenario "An unset preStop sleep fits a grace period an install pinned before the default rose"
+test_app_pre_stop_sleep_fits_a_pinned_grace() {
+  local block
+  block=$(render_component "app" "$BASE --set app.terminationGracePeriodSeconds=55")
+  case "$block" in
+    *'command: ["sleep", "5"]'*) echo "ok   [pinned grace 55] unset sleep shortened to 5s" ;;
+    *) fail "pinned grace 55" "an unset sleep did not shorten to the 5s a 55s grace has room for" ;;
+  esac
+  block=$(render_component "app" \
+    "$BASE --set app.shutdownDrainSeconds=60 --set app.terminationGracePeriodSeconds=90")
+  case "$block" in
+    *'command: ["sleep", "5"]'*) echo "ok   [drain 60, grace 90] unset sleep shortened to 5s" ;;
+    *) fail "drain 60, grace 90" "an unset sleep did not shorten to fit a 60s drain in 90s" ;;
+  esac
+  expect_render_refused "explicit sleep beside a pinned grace" \
+    "--set app.terminationGracePeriodSeconds=55 --set app.preStopSleepSeconds=15" \
+    "too short for a 15s preStop sleep"
+}
+
 # Raising both together is the supported path and must still render.
 test_raising_both_together_renders() {
   local block got
@@ -256,6 +299,8 @@ test_raised_drain_alone_refuses_to_render
 test_junk_drain_refuses_to_render
 test_extra_envs_cannot_override_the_drain
 test_raising_both_together_renders
+test_app_pre_stop_sleep
+test_app_pre_stop_sleep_fits_a_pinned_grace
 
 if [ "$failures" -gt 0 ]; then
   echo "$failures assertion(s) failed"

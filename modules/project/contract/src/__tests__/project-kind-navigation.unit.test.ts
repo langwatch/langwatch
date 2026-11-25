@@ -1,5 +1,5 @@
 /**
- * ADR-177 decision 8: an aggregate project's navigation is Traces only.
+ * ADR-177 decision 8: an aggregate project's navigation is Traces and Analytics (v4.15).
  *
  * @see specs/governance/aggregate-project.feature
  */
@@ -10,11 +10,11 @@ import { projectNavigation } from "../project.kinds.ts";
 describe("given the project navigation", () => {
   describe("when the open project is an aggregate", () => {
     /** @scenario "Test, Build and Online Evals are hidden on the aggregate" */
-    it("shows Traces, and hides Analytics, Online Evals, Test and Build", () => {
+    it("shows Traces and Analytics, and hides Online Evals, Test and Build", () => {
       expect(projectNavigation("aggregate")).toEqual({
         home: false,
         observe: true,
-        analytics: false,
+        analytics: true,
         onlineEvaluations: false,
         test: false,
         build: false,

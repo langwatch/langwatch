@@ -2,9 +2,11 @@ import {
   AccessNotGrantedError,
   type Authorization,
   AuthorizationExpiredError,
+  BRAID_CONDITION_EVERY_SPAN,
   ForgedAuthorizationError,
   narrowAuthorization,
   sealAuthorization,
+  SPAN_BRAID_PERMISSION,
 } from "@langwatch/authorization";
 import { tenantScope, tenantSet } from "@langwatch/clickhouse-markers";
 import { describe, expect, it, vi } from "vitest";
@@ -117,6 +119,41 @@ describe("AuthorizedClickHouse", () => {
         expect(sent().SKIP_COLD_SCAN_CHECK).toBe(true);
       });
 
+      it("carries a read's timeout opt-out through to the routed client", async () => {
+        const { sent, clickhouse } = clientWith();
+        const reader = clickhouse.as(proof(), { reads: "traces" });
+
+        await reader.query({
+          query: `SELECT TraceId FROM trace_summaries WHERE ${tenantScope("OccurredAt")}`,
+          format: "JSONEachRow",
+          retryOnTimeout: false,
+        });
+
+        expect(sent().retryOnTimeout).toBe(false);
+      });
+
+      /** @scenario "A column always wins over an alias of its name" */
+      it("pins a column over an alias of its name, whatever the caller's settings", async () => {
+        const { sent, clickhouse } = clientWith();
+        const reader = clickhouse.as(proof(), { reads: "traces" });
+
+        await reader.query({
+          query: `SELECT TraceId FROM trace_summaries WHERE ${tenantScope("OccurredAt")}`,
+          format: "JSONEachRow",
+          clickhouse_settings: {
+            prefer_column_name_to_alias: 0,
+            enable_global_with_statement: 0,
+            max_threads: 2,
+          },
+        });
+
+        expect(sent().settings).toMatchObject({
+          prefer_column_name_to_alias: 1,
+          enable_global_with_statement: 1,
+          max_threads: 2,
+        });
+      });
+
       // @scenario "The client adds the tenant set from the proof"
       it("restricts the query to tenants aggregate, A and B, and A and B to their windows", async () => {
         const { sent, resolveClient, clickhouse } = clientWith();
@@ -160,9 +197,9 @@ describe("AuthorizedClickHouse", () => {
             query_params: { tenantScope_all: ["proj_elsewhere"] },
           }),
         ).rejects.toMatchObject({ violation: { kind: "reserved-param" } });
-        expect(
+        expect(() =>
           narrowAuthorization({ authorization: proof(), projectId: "proj_elsewhere" }),
-        ).toBeNull();
+        ).toThrow(AccessNotGrantedError);
         expect(execute).not.toHaveBeenCalled();
       });
 
@@ -274,10 +311,15 @@ describe("AuthorizedClickHouse", () => {
             },
             {
               projectId: B,
-              permissions: ["traces:view"],
+              permissions: [SPAN_BRAID_PERMISSION],
               via: ["grant_b"],
               kind: "shared",
-              condition: { type: "span", from: 0, until: null },
+              condition: {
+                type: "span",
+                compiledWhere: BRAID_CONDITION_EVERY_SPAN,
+                from: 0,
+                until: null,
+              },
             },
           ],
         });
@@ -348,6 +390,23 @@ describe("AuthorizedClickHouse", () => {
         );
         expect(query).toContain("SELECT TenantId, TraceId FROM t WHERE (TenantId IN");
       });
+
+      it("still allows a join key that equates two tenant columns", () => {
+        const { query } = expand(
+          `SELECT 1 FROM (SELECT TenantId, TraceId FROM t WHERE ${tenantScope("OccurredAt")}) ts JOIN (SELECT TenantId, TraceId FROM s WHERE ${tenantSet()}) ss ON ts.TenantId = ss.TenantId AND ts.TraceId = ss.TraceId`,
+        );
+        expect(query).toContain("ON ts.TenantId = ss.TenantId AND");
+      });
+
+      it("refuses an equality whose other side is not a tenant column", () => {
+        for (const predicate of ["ts.TenantId = ss.TraceId", "TenantId == {t:String}"]) {
+          expect(() =>
+            expand(`SELECT 1 FROM t WHERE ${tenantScope("OccurredAt")} AND ${predicate}`),
+          ).toThrow(
+            expect.objectContaining({ violation: { kind: "hand-written-tenant-predicate" } }),
+          );
+        }
+      });
     });
 
     describe("when the marker names the evaluation table's own occurrence time", () => {
@@ -356,6 +415,25 @@ describe("AuthorizedClickHouse", () => {
           `SELECT 1 FROM evaluation_runs WHERE ${tenantScope("ScheduledAt")}`,
         );
         expect(query).toContain(windowedFence("ScheduledAt"));
+      });
+    });
+
+    describe("when the marker names the analytics rollups' minute bucket", () => {
+      /** @scenario "A rollup bucket a grant's edge cuts through is left out" */
+      it("admits a bucket from the grant's start and only once it ends by the grant's end", () => {
+        const { query } = expand(
+          `SELECT 1 FROM trace_analytics_rollup WHERE ${tenantScope("BucketStart")}`,
+        );
+        const until =
+          "transform(TenantId, {tenantScope_ids:Array(String)}, {tenantScope_until:Array(Int64)}, toInt64(0))";
+        expect(query).toContain(
+          "BucketStart >= fromUnixTimestamp64Milli(transform(TenantId, {tenantScope_ids:Array(String)}, {tenantScope_from:Array(Int64)}, toInt64(0)))",
+        );
+        // An open grant still reads as `until = 0`; a closed one keeps a bucket that ends by it.
+        expect(query).toContain(
+          `(${until} = 0 OR BucketStart <= fromUnixTimestamp64Milli(${until} - 60000))`,
+        );
+        expect(query).not.toContain("BucketStart < fromUnixTimestamp64Milli");
       });
     });
 
@@ -457,6 +535,21 @@ describe("AuthorizedClickHouse", () => {
           }),
         ).rejects.toBeInstanceOf(TenantReaderClientUnavailableError);
       });
+
+      it("wraps a resolver that throws before returning a promise", async () => {
+        const clickhouse = new AuthorizedClickHouse({
+          resolveClient: () => {
+            throw new Error("no ClickHouse configured");
+          },
+          now: () => NOW,
+        });
+
+        await expect(
+          clickhouse.as(proof(), { reads: "traces" }).query({
+            query: `SELECT 1 FROM trace_summaries WHERE ${tenantScope("OccurredAt")}`,
+          }),
+        ).rejects.toBeInstanceOf(TenantReaderClientUnavailableError);
+      });
     });
   });
 
@@ -547,14 +640,8 @@ describe("AuthorizedClickHouse", () => {
   });
 
   describe("given an aggregate's proof narrowed to one member", () => {
-    const narrowedTo = (projectId: string): Authorization => {
-      const narrowed = narrowAuthorization({
-        authorization: proof(),
-        projectId,
-      });
-      if (!narrowed) throw new Error(`expected ${projectId} in the proof`);
-      return narrowed;
-    };
+    const narrowedTo = (projectId: string): Authorization =>
+      narrowAuthorization({ authorization: proof(), projectId });
 
     describe("when the fence is built", () => {
       it("fences that member alone, inside its grant's window", () => {

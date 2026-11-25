@@ -2,6 +2,8 @@
  * @vitest-environment node
  *
  * @see specs/scenarios/go-scenario-runner-choice.feature
+ * @see modules/scenario/specs/scenario-run-hooks.feature
+ * @see modules/scenario/specs/red-team-scenario.feature
  */
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
@@ -104,6 +106,47 @@ describe("ScenarioChildChoiceService", () => {
       const { choice, nodeStart, goStart, isEnabled } = harness({ flag: true });
 
       await choice.start({ jobData: job("voice"), environment });
+
+      expect(nodeStart).toHaveBeenCalledTimes(1);
+      expect(goStart).not.toHaveBeenCalled();
+      expect(isEnabled).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("given the flag is on and the run's agent declares scenario hooks", () => {
+    /** @scenario "A run of an agent with hooks goes to the Node child when the Go runner is on" */
+    it("starts the run on the Node child", async () => {
+      const { choice, nodeStart, goStart } = harness({ flag: true });
+
+      await choice.start({
+        jobData: job("connected"),
+        environment: { ...environment, callsHooks: true },
+      });
+
+      expect(nodeStart).toHaveBeenCalledTimes(1);
+      expect(goStart).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "A run of an agent without hooks still goes to the Go runner when the flag is on" */
+    it("starts a connected run without hooks on the Go runner", async () => {
+      const { choice, nodeStart, goStart } = harness({ flag: true });
+
+      await choice.start({ jobData: job("connected"), environment });
+
+      expect(goStart).toHaveBeenCalledTimes(1);
+      expect(nodeStart).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("given the flag is on and the run is a red team scenario", () => {
+    /** @scenario "A red team run starts on the Node child whatever the Go runner flag says" */
+    it("starts the run on the Node child without reading the flag", async () => {
+      const { choice, nodeStart, goStart, isEnabled } = harness({ flag: true });
+
+      await choice.start({
+        jobData: job("http"),
+        environment: { ...environment, runsRedTeam: true },
+      });
 
       expect(nodeStart).toHaveBeenCalledTimes(1);
       expect(goStart).not.toHaveBeenCalled();

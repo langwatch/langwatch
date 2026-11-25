@@ -5,7 +5,7 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { questionToolCardParts } from "../langy-question-tool.ts";
+import { questionToolCardParts, questionWaitCardParts } from "../langy-question-tool.ts";
 
 function questionPart(question: Record<string, unknown>, toolCallId = "call-1") {
   return {
@@ -67,6 +67,30 @@ describe("questionToolCardParts", () => {
       if (plain?.card.kind !== "choices") throw new Error("expected choices");
       expect(plain.card).not.toHaveProperty("bare");
       expect(plain.card.allowOther).toBe(true);
+    });
+  });
+});
+
+describe("questionWaitCardParts", () => {
+  describe("given a confirmation card the platform raised, which takes no typed answer", () => {
+    it("offers its two options and no Other row, with the ids its stored options carry", () => {
+      const [part] = questionWaitCardParts({
+        toolCallId: "wait_1",
+        questions: [
+          {
+            question: 'Delete evaluator "Toxicity check"?',
+            options: [{ label: "Yes, delete" }, { label: "No, keep it" }],
+            multiple: false,
+            allowOther: false,
+          },
+        ],
+      });
+
+      expect(part?.blockId).toBe("question:wait_1:0");
+      expect(part?.card).not.toHaveProperty("allowOther");
+      expect(part?.card.kind === "choices" && part.card.options.map((option) => option.id)).toEqual(
+        ["opt-1", "opt-2"],
+      );
     });
   });
 });

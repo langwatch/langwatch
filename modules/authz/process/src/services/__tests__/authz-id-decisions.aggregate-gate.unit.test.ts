@@ -6,6 +6,7 @@ import { StubAuthzLineageEpoch } from "../../repositories/__tests__/support/auth
 import { StubAuthzListingRepository } from "../../repositories/__tests__/support/authz-listing.stub.ts";
 import { StubAuthzManagedGrantRepository } from "../../repositories/__tests__/support/authz-managed-grant.stub.ts";
 import { makeReader } from "../../repositories/__tests__/support/authz-read.stub.ts";
+import { MemoryAuthzOrganizationPolicyRepository } from "../../repositories/memory/memory.authz-organization-policy.repository.ts";
 import { AuthzService } from "../authz.service.ts";
 
 /** ADR-177 decision 5 (M8487-BATCH-GATE): a batch never admits what a single check refuses. */
@@ -20,6 +21,7 @@ const admin: CollectedBinding[] = [
 
 function makeAuthz({ role, kind }: { role: "ADMIN" | "MEMBER"; kind: string }) {
   return AuthzService.create({
+    policies: MemoryAuthzOrganizationPolicyRepository.create(),
     isOnEngine: async () => true,
     repository: makeReader({
       findOrganizationMembership: vi.fn().mockResolvedValue({ role, disabled: false }),
@@ -58,12 +60,36 @@ async function askBatchPaths(
   return [anyOf.allowed, batch.byPermission.get("traces:view")?.projects.get(PROJECT)];
 }
 
+async function askWidgetWrite(authz: AuthzService) {
+  const batch = await authz.canBatchByIds({
+    principal: alice,
+    permission: "analytics:view",
+    organizationId: ORG,
+    teams: [],
+    projects: [{ projectId: PROJECT, teamId: "team-1" }],
+  });
+  return batch.projects.get(PROJECT);
+}
+
 describe("AuthzService batch decisions on an aggregate project", () => {
   describe("when a permitted member who is not an organization admin asks", () => {
     it("closes the aggregate in canAnyByIds and canBatchPermissionsByIds", async () => {
       const authz = makeAuthz({ role: "MEMBER", kind: "aggregate" });
 
       expect(await askBatchPaths(authz)).toEqual([false, false]);
+    });
+
+    /** @scenario "AC210f Compatibility: a member who is no admin cannot name an aggregate project in a widget" */
+    it("closes the aggregate in canBatchByIds for analytics:view, which the widget write asks", async () => {
+      const authz = makeAuthz({ role: "MEMBER", kind: "aggregate" });
+
+      expect(await askWidgetWrite(authz)).toBe(false);
+    });
+
+    it("opens a non-aggregate project to the same member and permission", async () => {
+      const authz = makeAuthz({ role: "MEMBER", kind: "application" });
+
+      expect(await askWidgetWrite(authz)).toBe(true);
     });
 
     it("leaves an ordinary project open", async () => {
@@ -74,6 +100,12 @@ describe("AuthzService batch decisions on an aggregate project", () => {
   });
 
   describe("when an organization admin asks", () => {
+    it("opens the same aggregate to the widget write", async () => {
+      const authz = makeAuthz({ role: "ADMIN", kind: "aggregate" });
+
+      expect(await askWidgetWrite(authz)).toBe(true);
+    });
+
     it("opens the aggregate", async () => {
       const authz = makeAuthz({ role: "ADMIN", kind: "aggregate" });
 

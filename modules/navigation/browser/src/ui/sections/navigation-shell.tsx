@@ -13,6 +13,7 @@ import {
   type NavigationShellReadyState,
   type NavigationShellState,
 } from "../../behavior/use-navigation-shell-state.ts";
+import { OpenBoardContext } from "../../behavior/use-open-board.ts";
 import { useOrglessAddressRedirect } from "../../behavior/use-orgless-address-redirect.ts";
 import { useProjectAddressRedirect } from "../../behavior/use-project-address-redirect.ts";
 import { APP_HEADER_HEIGHT } from "../../model/menu-widths.ts";
@@ -71,41 +72,45 @@ export function NavigationShell({
   // a full-screen menu replace the sidebar and the rail in both modes.
   if (state.isMobile) {
     return (
-      <Box width="full" minHeight="100vh" background="bg.page">
-        <ShellTitle pageTitle={pageTitle} state={state} />
-        <MobileShell state={state}>
-          <ShellPageBody personalScope={personalScope}>{page}</ShellPageBody>
-        </MobileShell>
-      </Box>
+      <OpenBoardContext.Provider value={state.openBoard}>
+        <Box width="full" minHeight="100vh" background="bg.page">
+          <ShellTitle pageTitle={pageTitle} state={state} />
+          <MobileShell state={state}>
+            <ShellPageBody personalScope={personalScope}>{page}</ShellPageBody>
+          </MobileShell>
+        </Box>
+      </OpenBoardContext.Provider>
     );
   }
 
   return (
-    <Box
-      width="full"
-      minHeight="100vh"
-      background="bg.page"
-      overflowX={["auto", "auto", "hidden"]}
-      display="flex"
-      alignItems="stretch"
-    >
-      <ShellTitle pageTitle={pageTitle} state={state} />
+    <OpenBoardContext.Provider value={state.openBoard}>
+      <Box
+        width="full"
+        minHeight="100vh"
+        background="bg.page"
+        overflowX={["auto", "auto", "hidden"]}
+        display="flex"
+        alignItems="stretch"
+      >
+        <ShellTitle pageTitle={pageTitle} state={state} />
 
-      {isIconRail && (
-        <ProductIconRail
-          activeProductId={state.activeProductId}
-          isSettingsActive={state.isSettingsRoute}
-        />
-      )}
+        {isIconRail && (
+          <ProductIconRail
+            activeProductId={state.activeProductId}
+            isSettingsActive={state.isSettingsRoute}
+          />
+        )}
 
-      <Box flex={1} minWidth={0}>
-        <ShellTopBar state={state} shouldShowProductCluster={!isIconRail} />
+        <Box flex={1} minWidth={0}>
+          <ShellTopBar state={state} shouldShowProductCluster={!isIconRail} />
 
-        <ShellContentRow state={state} isIconRail={isIconRail}>
-          <ShellPageBody personalScope={personalScope}>{page}</ShellPageBody>
-        </ShellContentRow>
+          <ShellContentRow state={state} isIconRail={isIconRail}>
+            <ShellPageBody personalScope={personalScope}>{page}</ShellPageBody>
+          </ShellContentRow>
+        </Box>
       </Box>
-    </Box>
+    </OpenBoardContext.Provider>
   );
 }
 

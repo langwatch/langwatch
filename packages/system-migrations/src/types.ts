@@ -14,8 +14,11 @@ export const TENANT_MIGRATION_STATUSES = [
 
 export type TenantMigrationStatus = (typeof TENANT_MIGRATION_STATUSES)[number];
 
-/** Why a tenant is held: its own proof disagreed, or work it queued has not drained. */
-export const HELD_REASONS = ["proof", "pending"] as const;
+/**
+ * Why a tenant is held: its own proof disagreed, work it queued has not drained, or it waits on a
+ * person (the user proving the account, an operator lifting a pin): expected, never a failure.
+ */
+export const HELD_REASONS = ["proof", "pending", "person"] as const;
 
 export type HeldReason = (typeof HELD_REASONS)[number];
 
@@ -49,10 +52,20 @@ export type TenantMigrationRecord = {
   heldSince?: Instant;
 };
 
+/**
+ * A tenant held until a person acts: no pass can move it, so its step counts it settled, as a
+ * `migratedIsSteady` step's `migrated` (dev/docs/ARCHITECTURE.md, "No stuck states").
+ */
+export function isWaitingOnPerson(
+  record: Pick<TenantMigrationRecord, "status" | "heldReason">,
+): boolean {
+  return record.status === "migrated" && record.heldReason === "person";
+}
+
 /** Held longer than this reads as failed. A chosen value, pending Alex's ruling. */
 export const HELD_FAILED_AFTER = Temporal.Duration.from({ hours: 24 });
 
-/** Failed is worked out on read, never stored: held, and held too long. */
+/** Failed is worked out on read, never stored: held, and held too long; a person's hold never. */
 export function isHeldTenantFailed({
   record,
   now,
@@ -60,14 +73,14 @@ export function isHeldTenantFailed({
   record: TenantMigrationRecord;
   now: Instant;
 }): boolean {
-  if (record.status !== "migrated" || !record.heldSince) return false;
+  if (record.status !== "migrated" || !record.heldSince || isWaitingOnPerson(record)) return false;
   return Temporal.Instant.compare(record.heldSince.add(HELD_FAILED_AFTER), now) < 0;
 }
 
 /**
  * What one pass over one tenant concluded. `migrated` is the held state: the
  * tenant stays on its legacy path until a later pass's proof passes. Reason
- * defaults to `proof`; work queued but not yet drained says `pending`.
+ * defaults to `proof`; work queued but not yet drained says `pending`; `person` waits on one.
  */
 export type TenantMigrationOutcome =
   | { status: "finalized"; report?: unknown }

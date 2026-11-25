@@ -25,7 +25,7 @@ async function main() {
   // Initialize LangChain chat model
   const chatModelBase = new ChatOpenAI({
     // use "model" in recent LC, not "modelName"
-    model: "gpt-5",
+    model: "gpt-6-luna",
   });
 
   const langWatchCallback = new LangWatchCallbackHandler();

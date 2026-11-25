@@ -8,13 +8,11 @@ import { TeamsApiService, type Team } from "@/client-sdk/services/teams/teams-ap
 
 import { commandValidationError } from "../../utils/errorOutput";
 import type { CommandResult } from "../../utils/output";
+import { pickByReference, ReferenceNotResolvedError } from "../../utils/pickByReference";
 import { runManagement } from "../management/_shared";
 
 /** Largest page the listings answer, so a lookup takes as few requests as it can. */
 const PAGE_LIMIT = 100;
-
-/** Thrown when a name the user typed matches nothing, or more than one thing. */
-class ReferenceNotResolvedError extends Error {}
 
 /** Every page of a paginated listing, walked to the end. */
 const allPages = async <T>(
@@ -27,36 +25,6 @@ const allPages = async <T>(
     rows.push(...(await fetchPage(page)).data);
   }
   return rows;
-};
-
-/**
- * The one row a reference names: its id, then its slug, then its name, case
- * insensitive. Two rows sharing a name is a refusal that lists their ids,
- * never a guess.
- */
-export const pickByReference = <Row extends { id: string; slug: string; name: string }>({
-  rows,
-  reference,
-  what,
-}: {
-  rows: readonly Row[];
-  reference: string;
-  what: "project" | "team";
-}): Row => {
-  const byId = rows.find((row) => row.id === reference);
-  if (byId) return byId;
-  const bySlug = rows.find((row) => row.slug === reference);
-  if (bySlug) return bySlug;
-  const byName = rows.filter((row) => row.name.toLowerCase() === reference.toLowerCase());
-  if (byName.length === 1) return byName[0]!;
-  if (byName.length > 1) {
-    throw new ReferenceNotResolvedError(
-      `More than one ${what} is named "${reference}" (${byName.map((row) => row.id).join(", ")}). Pass the id instead.`,
-    );
-  }
-  throw new ReferenceNotResolvedError(
-    `No ${what} with the id, slug or name "${reference}" in this organization. List them with \`langwatch ${what}s list\`.`,
-  );
 };
 
 /** The project and team a move names, or a validation refusal saying which one was not found. */
@@ -73,8 +41,20 @@ const resolveTarget = ({
 }): { project: Project; team: Team } => {
   try {
     return {
-      project: pickByReference({ rows: projectRows, reference: projectReference, what: "project" }),
-      team: pickByReference({ rows: teamRows, reference: teamReference, what: "team" }),
+      project: pickByReference({
+        rows: projectRows,
+        reference: projectReference,
+        what: "project",
+        scope: "organization",
+        listCommand: "langwatch projects list",
+      }),
+      team: pickByReference({
+        rows: teamRows,
+        reference: teamReference,
+        what: "team",
+        scope: "organization",
+        listCommand: "langwatch teams list",
+      }),
     };
   } catch (error) {
     if (!(error instanceof ReferenceNotResolvedError)) throw error;

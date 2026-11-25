@@ -316,6 +316,7 @@ describe("the Scenarios tab", () => {
     renderTab();
 
     await user.click(screen.getByTestId("agent-testing-rail-new-suite"));
+    await user.click(await screen.findByTestId("agent-testing-rail-new-blank-suite"));
     await user.type(screen.getByLabelText("Test suite name"), "Billing");
     await user.click(screen.getByTestId("suite-name-confirm"));
 

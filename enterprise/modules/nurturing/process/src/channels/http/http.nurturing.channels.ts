@@ -5,6 +5,7 @@ import {
 import type { ScopedSecrets } from "@langwatch/secrets";
 
 import type { NurturingChannels } from "../nurturing.channels.ts";
+import { HttpCustomerIoTransactionalChannel } from "./http.customer-io-transactional.channel.ts";
 import { HttpCustomerIoChannel } from "./http.customer-io.channel.ts";
 import { HttpPostHogChannel } from "./http.posthog.channel.ts";
 
@@ -30,10 +31,21 @@ export class HttpNurturingChannels {
           })
         : void 0,
     );
+    const customerIoTransactional = await secrets.into(
+      nurturingSecrets.customerIoAppApiKey,
+      (apiKey) =>
+        apiKey
+          ? HttpCustomerIoTransactionalChannel.create({
+              apiKey,
+              region: config.customerIoRegion,
+              baseUrl: config.customerIoAppApiBaseUrl,
+            })
+          : void 0,
+    );
     const { posthogKey: key, posthogHost: host } = config;
     const posthog = key
       ? HttpPostHogChannel.create({ targets: () => [{ key, ...(host ? { host } : {}) }] })
       : void 0;
-    return { customerIo, posthog };
+    return { customerIo, customerIoTransactional, posthog };
   }
 }

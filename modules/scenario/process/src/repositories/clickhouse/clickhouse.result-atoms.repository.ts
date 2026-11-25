@@ -24,7 +24,11 @@ import {
   type RawTotalsRow,
   ResultAtomsRepository,
 } from "../result-atoms.repository.ts";
-import { RUN_NOTE_EXPR, TABLE_NAME } from "./simulation-clickhouse.repository.ts";
+import {
+  RUN_NOT_SCORED_EXPR,
+  RUN_NOTE_EXPR,
+  TABLE_NAME,
+} from "./simulation-clickhouse.repository.ts";
 import { mapStatus } from "./simulation-run.mapper.ts";
 
 /** How many scenarios that ran from code the filter lists at most. */
@@ -45,11 +49,15 @@ export const PASSED_STATUS_VALUES = ["SUCCESS"] as const;
 
 const quoted = (values: readonly string[]): string => values.map((value) => `'${value}'`).join(",");
 
-/** How an atom's status reads: passed, failed or still pending. */
+/** How an atom's status reads: passed, failed, not scored (its setup failed) or still pending. */
 const OUTCOME_EXPR = `multiIf(
   Status IN (${quoted(PASSED_STATUS_VALUES)}), 'passed',
+  ${RUN_NOT_SCORED_EXPR}, 'not_scored',
   Status IN (${quoted(FAILED_STATUS_VALUES)}), 'failed',
   'pending')`;
+
+/** The outcomes a pass rate divides by: a not-scored run is finished but never graded. */
+const GRADED_OUTCOMES = "('passed','failed')";
 
 /**
  * When the run started (epoch ms): ORDER BY, the cursor predicate and the
@@ -244,7 +252,11 @@ function buildOutcomePart(outcome: ResultsFilter["outcome"]): string | null {
   }
 
   if (outcome === "failed") {
-    return `Status IN (${quoted(FAILED_STATUS_VALUES)})`;
+    return `Status IN (${quoted(FAILED_STATUS_VALUES)}) AND NOT ${RUN_NOT_SCORED_EXPR}`;
+  }
+
+  if (outcome === "not_scored") {
+    return RUN_NOT_SCORED_EXPR;
   }
 
   if (outcome === "pending") {
@@ -586,7 +598,7 @@ export class ResultAtomsClickHouseRepository extends ResultAtomsRepository {
       `SELECT
          toString(count())                                        AS Atoms,
          toString(countIf(Outcome = 'passed'))                    AS Passed,
-         toString(countIf(Outcome != 'pending'))                  AS Settled,
+         toString(countIf(Outcome IN ${GRADED_OUTCOMES}))                  AS Settled,
          toString(uniqExact(BatchRunId))                          AS RunCount,
          toString(uniqExactIf(ScenarioId, Outcome = 'failed'))    AS FailingScenarios,
          toString(sum(CostUsd))                                   AS CostTotal,
@@ -627,7 +639,7 @@ export class ResultAtomsClickHouseRepository extends ResultAtomsRepository {
          argMax(TargetParameters, RunAt)         AS TargetParameters,
          toString(count())                       AS Atoms,
          toString(countIf(Outcome = 'passed'))   AS Passed,
-         toString(countIf(Outcome != 'pending')) AS Settled,
+         toString(countIf(Outcome IN ${GRADED_OUTCOMES})) AS Settled,
          toString(uniqExact(BatchRunId))         AS RunCount,
          toString(uniqExact(ScenarioId))         AS ScenarioCount,
          toString(max(RunAt))                    AS LastRunAt,
@@ -746,7 +758,7 @@ export class ResultAtomsClickHouseRepository extends ResultAtomsRepository {
            TrendKey,
            min(RunAtMs)                   AS RunAtMs,
            countIf(Outcome = 'passed')    AS Passed,
-           countIf(Outcome != 'pending')  AS Settled
+           countIf(Outcome IN ${GRADED_OUTCOMES})  AS Settled
          FROM (
            SELECT
              ${ResultAtomsClickHouseRepository.groupKeyExpr(groupBy)} AS GroupKey,
@@ -781,7 +793,7 @@ export class ResultAtomsClickHouseRepository extends ResultAtomsRepository {
       `SELECT
          toString(toUnixTimestamp(Bucket) * 1000)  AS Bucket,
          toString(countIf(Outcome = 'passed'))     AS Passed,
-         toString(countIf(Outcome != 'pending'))   AS Settled
+         toString(countIf(Outcome IN ${GRADED_OUTCOMES}))   AS Settled
        FROM (
          SELECT
            toStartOfInterval(

@@ -88,6 +88,9 @@
       "path": "../../../packages/handled-error/tsconfig.build.json"
     },
     {
+      "path": "../../../packages/group-queue/tsconfig.build.json"
+    },
+    {
       "path": "../../../packages/eventing/tsconfig.build.json"
     },
     {

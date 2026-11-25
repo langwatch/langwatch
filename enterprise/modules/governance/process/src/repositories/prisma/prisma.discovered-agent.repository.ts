@@ -8,6 +8,7 @@ import {
   mergeAgentMetadata,
 } from "../../features/agents/rules/discovered-agent-metadata.rules.ts";
 import {
+  type DiscoveredAgentRegistryRow,
   DiscoveredAgentRepository,
   type DiscoveredAgentRow,
 } from "../discovered-agent.repository.ts";
@@ -35,6 +36,35 @@ export class PrismaDiscoveredAgentRepository extends DiscoveredAgentRepository {
     });
     return rows.map((row) => ({
       ...row,
+      firstSeenAt: fromDate(row.firstSeenAt),
+      lastSeenAt: fromDate(row.lastSeenAt),
+    }));
+  }
+
+  async findForRegistry({
+    organizationId,
+  }: {
+    organizationId: string;
+  }): Promise<DiscoveredAgentRegistryRow[]> {
+    const rows = await this.prisma.discoveredAgent.findMany({
+      where: { organizationId },
+      select: {
+        id: true,
+        provider: true,
+        rawAgentId: true,
+        displayText: true,
+        metadata: true,
+        firstSeenAt: true,
+        lastSeenAt: true,
+      },
+      orderBy: { id: "asc" },
+    });
+    return rows.map((row) => ({
+      ...row,
+      metadata:
+        row.metadata !== null && typeof row.metadata === "object" && !Array.isArray(row.metadata)
+          ? (row.metadata as Record<string, unknown>)
+          : {},
       firstSeenAt: fromDate(row.firstSeenAt),
       lastSeenAt: fromDate(row.lastSeenAt),
     }));

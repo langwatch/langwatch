@@ -1,5 +1,6 @@
 import type { FilterField } from "@langwatch/analytics-contract";
 import { evaluationRunDataSchema } from "@langwatch/evaluation-contract";
+import type { SpanAnalyticsSource } from "@langwatch/trace-contract";
 
 import {
   ATTRIBUTE_KEYS,
@@ -7,10 +8,15 @@ import {
   buildQueryFilter,
   buildScopeConditions,
   buildStoredSpansConditions,
+  buildTraceScopeJoin,
   buildTraceSummariesConditions,
   extractStandardResults,
+  spanTypeOptionsSource,
 } from "./clickhouse.filter-query-helpers.mapper.ts";
-import type { ClickHouseFilterDefinition } from "./clickhouse.filter-shapes.mapper.ts";
+import type {
+  ClickHouseFilterDefinition,
+  ClickHouseFilterQueryParams,
+} from "./clickhouse.filter-shapes.mapper.ts";
 
 /** Label values that represent pass/fail status rather than classification labels. */
 const STATUS_LABEL_VALUES = ["succeeded", "failed"] as const;
@@ -23,10 +29,7 @@ function buildEvaluatorIdClickHouseFilter(additionalWhere: string): ClickHouseFi
   return {
     tableName: "evaluation_runs",
     buildQuery: (params) => {
-      const { sql: scopeSql } = buildScopeConditions(params);
-      const scopeJoin = scopeSql
-        ? `AND TraceId IN (SELECT TraceId FROM trace_summaries ts WHERE ${buildTraceSummariesConditions(params)} ${scopeSql})`
-        : "";
+      const scopeJoin = buildTraceScopeJoin(params);
       return `
         SELECT
           EvaluatorId as field,
@@ -44,6 +47,48 @@ function buildEvaluatorIdClickHouseFilter(additionalWhere: string): ClickHouseFi
     },
     extractResults: extractStandardResults,
   };
+}
+
+/**
+ * The spans.type picker over span_analytics' plain `SpanType`, with the stored_spans map read
+ * only before a split floor. A span without a type is '' in both tables.
+ */
+function buildLightSpanTypeOptionsQuery(
+  params: ClickHouseFilterQueryParams,
+  source: SpanAnalyticsSource,
+): string {
+  const scopeJoin = buildTraceScopeJoin(params);
+  const branch = ({ table, column, bound }: { table: string; column: string; bound: string }) => `
+          SELECT ${column} AS field
+          FROM ${table}
+          WHERE ${buildStoredSpansConditions(params)}${bound}
+            AND ${column} != ''
+            ${buildQueryFilter(column, params)}
+            ${scopeJoin}`;
+  const from = "fromUnixTimestamp64Milli({spanAnalyticsFrom:UInt64})";
+  const branches =
+    source.kind === "split"
+      ? [
+          branch({
+            table: "span_analytics",
+            column: "SpanType",
+            bound: ` AND StartTime >= ${from}`,
+          }),
+          branch({
+            table: "stored_spans",
+            column: "SpanAttributes['langwatch.span.type']",
+            bound: ` AND StartTime < ${from}`,
+          }),
+        ]
+      : [branch({ table: "span_analytics", column: "SpanType", bound: "" })];
+  return `
+        SELECT field, field AS label, count() AS count
+        FROM (${branches.join("\n          UNION ALL")}
+        )
+        GROUP BY field
+        ORDER BY field ASC
+        LIMIT 10000
+      `;
 }
 
 /**
@@ -340,10 +385,9 @@ export const clickHouseFilters: Record<FilterField, ClickHouseFilterDefinition |
   "spans.type": {
     tableName: "stored_spans",
     buildQuery: (params) => {
-      const { sql: scopeSql } = buildScopeConditions(params);
-      const scopeJoin = scopeSql
-        ? `AND TraceId IN (SELECT TraceId FROM trace_summaries ts WHERE ${buildTraceSummariesConditions(params)} ${scopeSql})`
-        : "";
+      const source = spanTypeOptionsSource(params);
+      if (source.kind !== "stored_spans") return buildLightSpanTypeOptionsQuery(params, source);
+      const scopeJoin = buildTraceScopeJoin(params);
       return `
         SELECT
           SpanAttributes['langwatch.span.type'] as field,
@@ -429,10 +473,7 @@ export const clickHouseFilters: Record<FilterField, ClickHouseFilterDefinition |
       if (!params.key) {
         return null;
       }
-      const { sql: scopeSql } = buildScopeConditions(params);
-      const scopeJoin = scopeSql
-        ? `AND TraceId IN (SELECT TraceId FROM trace_summaries ts WHERE ${buildTraceSummariesConditions(params)} ${scopeSql})`
-        : "";
+      const scopeJoin = buildTraceScopeJoin(params);
       return `
         SELECT
           if(Passed = 1, 'true', 'false') as field,
@@ -456,10 +497,7 @@ export const clickHouseFilters: Record<FilterField, ClickHouseFilterDefinition |
       if (!params.key) {
         return null;
       }
-      const { sql: scopeSql } = buildScopeConditions(params);
-      const scopeJoin = scopeSql
-        ? `AND TraceId IN (SELECT TraceId FROM trace_summaries ts WHERE ${buildTraceSummariesConditions(params)} ${scopeSql})`
-        : "";
+      const scopeJoin = buildTraceScopeJoin(params);
       return `
         SELECT
           min(Score) as min_score,
@@ -489,10 +527,7 @@ export const clickHouseFilters: Record<FilterField, ClickHouseFilterDefinition |
       if (!params.key) {
         return null;
       }
-      const { sql: scopeSql } = buildScopeConditions(params);
-      const scopeJoin = scopeSql
-        ? `AND TraceId IN (SELECT TraceId FROM trace_summaries ts WHERE ${buildTraceSummariesConditions(params)} ${scopeSql})`
-        : "";
+      const scopeJoin = buildTraceScopeJoin(params);
       return `
         SELECT
           Status as field,
@@ -530,10 +565,7 @@ export const clickHouseFilters: Record<FilterField, ClickHouseFilterDefinition |
       if (!params.key) {
         return null;
       }
-      const { sql: scopeSql } = buildScopeConditions(params);
-      const scopeJoin = scopeSql
-        ? `AND TraceId IN (SELECT TraceId FROM trace_summaries ts WHERE ${buildTraceSummariesConditions(params)} ${scopeSql})`
-        : "";
+      const scopeJoin = buildTraceScopeJoin(params);
       return `
         SELECT
           Label as field,
@@ -560,10 +592,7 @@ export const clickHouseFilters: Record<FilterField, ClickHouseFilterDefinition |
   "events.event_type": {
     tableName: "stored_spans",
     buildQuery: (params) => {
-      const { sql: scopeSql } = buildScopeConditions(params);
-      const scopeJoin = scopeSql
-        ? `AND TraceId IN (SELECT TraceId FROM trace_summaries ts WHERE ${buildTraceSummariesConditions(params)} ${scopeSql})`
-        : "";
+      const scopeJoin = buildTraceScopeJoin(params);
       return `
         SELECT
           SpanAttributes['event.type'] as field,
@@ -588,10 +617,7 @@ export const clickHouseFilters: Record<FilterField, ClickHouseFilterDefinition |
       if (!params.key) {
         return null;
       }
-      const { sql: scopeSql } = buildScopeConditions(params);
-      const scopeJoin = scopeSql
-        ? `AND TraceId IN (SELECT TraceId FROM trace_summaries ts WHERE ${buildTraceSummariesConditions(params)} ${scopeSql})`
-        : "";
+      const scopeJoin = buildTraceScopeJoin(params);
       return `
         SELECT
           arrayJoin(arrayFilter(k -> startsWith(k, 'event.metrics.'), mapKeys(SpanAttributes))) as full_key,
@@ -618,10 +644,7 @@ export const clickHouseFilters: Record<FilterField, ClickHouseFilterDefinition |
       if (!params.key || !params.subkey) {
         return null;
       }
-      const { sql: scopeSql } = buildScopeConditions(params);
-      const scopeJoin = scopeSql
-        ? `AND TraceId IN (SELECT TraceId FROM trace_summaries ts WHERE ${buildTraceSummariesConditions(params)} ${scopeSql})`
-        : "";
+      const scopeJoin = buildTraceScopeJoin(params);
       // Note: subkey is passed via query_params, we construct the full attribute key there
       return `
         SELECT
@@ -652,10 +675,7 @@ export const clickHouseFilters: Record<FilterField, ClickHouseFilterDefinition |
       if (!params.key) {
         return null;
       }
-      const { sql: scopeSql } = buildScopeConditions(params);
-      const scopeJoin = scopeSql
-        ? `AND TraceId IN (SELECT TraceId FROM trace_summaries ts WHERE ${buildTraceSummariesConditions(params)} ${scopeSql})`
-        : "";
+      const scopeJoin = buildTraceScopeJoin(params);
       return `
         SELECT
           arrayJoin(arrayFilter(k -> startsWith(k, 'event.details.'), mapKeys(SpanAttributes))) as full_key,

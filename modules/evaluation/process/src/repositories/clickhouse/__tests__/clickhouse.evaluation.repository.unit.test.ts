@@ -1,6 +1,7 @@
+import { idIndexedClientDouble } from "@langwatch/clickhouse-client/testing";
 import type { EvaluationRunData } from "@langwatch/evaluation-contract";
 import { SecurityError } from "@langwatch/eventing";
-import { clickHouseQueryClientDouble } from "@langwatch/test-harness/client-doubles/clickhouse";
+import { parse } from "@langwatch/ksuid";
 import { describe, expect, it, vi } from "vitest";
 
 import {
@@ -8,6 +9,10 @@ import {
   ownProof,
 } from "../../../__tests__/support/authorization-proofs.fixture.ts";
 import type { EvaluationRetentionLookup } from "../../evaluation.repository.ts";
+import {
+  EVALUATION_ID_INDEXES,
+  EVALUATION_SECOND_ID_INDEXES,
+} from "../clickhouse.evaluation-id-indexes.database.ts";
 import type {
   EvaluationClickHouseClient,
   EvaluationClickHouseInsert,
@@ -64,10 +69,10 @@ function fixtureRow(overrides: Record<string, unknown> = {}): Record<string, unk
     Error: null,
     ErrorDetails: null,
     CreatedAt: 1_700_000_000_000,
-    UpdatedAt: 1_700_000_001_000,
+    UpdatedAtMs: 1_700_000_001_000,
     ArchivedAt: null,
-    ScheduledAt: 1_700_000_000_000,
-    StartedAt: 1_700_000_000_100,
+    ScheduledAtMs: 1_700_000_000_000,
+    StartedAtMs: 1_700_000_000_100,
     CompletedAt: 1_700_000_001_000,
     CostId: null,
     LastProcessedEventId: "projection_1",
@@ -117,7 +122,14 @@ function harness(rows: Record<string, unknown>[][] = []): {
     }),
   };
   const floor = new TestRetention();
-  const queryClient = clickHouseQueryClientDouble({ query: reader });
+  // Every column present: the column list is the schema's, never a scripted answer.
+  const queryClient = idIndexedClientDouble({
+    indexes: [...EVALUATION_ID_INDEXES, ...EVALUATION_SECOND_ID_INDEXES],
+    driver: {
+      execute: async (request) =>
+        request.sql.includes("system.columns") ? { rows: [] } : reader(request),
+    },
+  });
   return {
     client,
     reader,
@@ -155,6 +167,46 @@ describe("ClickHouseEvaluationRepository", () => {
     expect(record._retention_days).toBe(31);
     expect(String(record.Details)).toContain("[lw-truncated]");
     expect(String(record.Error)).toContain("[lw-truncated]");
+  });
+
+  describe("given a run row stored without an IdLayout", () => {
+    /**
+     * @scenario "An evaluation run stored before its id layout was recorded keeps its id on the next write"
+     */
+    it("reads it back as v1-legacy and writes the same legacy id again", async () => {
+      const { client, floor, repository } = harness([
+        [{ scheduledAtMs: null }],
+        [{ scheduledAtMs: null }],
+        [fixtureRow()],
+      ]);
+      const stored = await repository.getByEvaluationId({
+        authorization: ownProof({ projectId: "org_1" }),
+        evaluationId: "evaluation_1",
+        retention: floor,
+      });
+      await repository.upsert({ tenantId: "org_1", data: stored });
+      await repository.upsert({ tenantId: "org_1", data: run });
+
+      const [rewritten, beforeTheColumn] = client.inserts as Record<string, unknown>[];
+      expect(stored.idLayout).toBe("v1-legacy");
+      expect(rewritten?.IdLayout).toBe("v1-legacy");
+      expect(parse(String(rewritten?.ProjectionId)).layout).toBe("v1-legacy");
+      expect(rewritten?.ProjectionId).toBe(beforeTheColumn?.ProjectionId);
+      expect(rewritten?.LastProcessedEventId).toBe(rewritten?.ProjectionId);
+    });
+  });
+
+  describe("given a run that was never stored", () => {
+    /** @scenario "A new evaluation run mints a corrected id and records its layout" */
+    it("writes a v2 id and records IdLayout v2", async () => {
+      const { client, repository } = harness();
+      await repository.upsert({ tenantId: "org_1", data: { ...run, idLayout: "v2" } });
+
+      const record = client.inserts[0] as Record<string, unknown>;
+      expect(record.IdLayout).toBe("v2");
+      expect(parse(String(record.ProjectionId)).layout).toBe("v2");
+      expect(record.LastProcessedEventId).toBe(record.ProjectionId);
+    });
   });
 
   /** @scenario evaluation rows stay merge-safe regardless of input size */
@@ -202,7 +254,7 @@ describe("ClickHouseEvaluationRepository", () => {
     });
     expect(client.queries[0]).toContain("argMax(ScheduledAt, UpdatedAt)");
     expect(client.queries.at(-1)).toContain("PREWHERE");
-    expect(client.queries.at(-1)).toContain("scheduledAtFrom");
+    expect(client.queries.at(-1)).toContain("idBound_fromMs");
     expect(client.queries.at(-1)).toContain("max(UpdatedAt)");
   });
 
@@ -265,9 +317,8 @@ describe("ClickHouseEvaluationRepository", () => {
       expect(client.queries[heavyIndex]).toContain("t.ScheduledAt >=");
       expect(client.queries[heavyIndex]).not.toContain("t.ScheduledAt <=");
       expect(client.queryParams[heavyIndex]).toMatchObject({
-        scheduledAtFrom: floorMs,
+        idBound_fromMs: floorMs,
       });
-      expect(client.queryParams[heavyIndex]).not.toHaveProperty("scheduledAtTo");
     } finally {
       vi.useRealTimers();
     }

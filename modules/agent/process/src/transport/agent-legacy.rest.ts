@@ -22,6 +22,7 @@ import {
 import { z } from "zod";
 
 import { agentConfigWithoutSecrets } from "../rules/agent-secrets.rules.ts";
+import { agentCallerOf } from "../rules/agent-version-caller.rules.ts";
 
 const legacyResponse = agentResponseSchema.pick({
   id: true,
@@ -83,15 +84,21 @@ export const agentLegacyRest = defineRestRouter(AgentApi)
   })
 
   .post("/", "createAgent")
+  .keepsRecords()
   .withAudit("agents.create")
   .withInput(createAgentRequestSchema)
+  .withCredential("project", { key: true })
   .withPermission("project:update")
   .withOutput(legacyResponse)
   .withStatus(201)
   .withDocs({ summary: "Create an agent; superseded by /api/v1/agents", hide: true })
   .withMiddlewareContext(projectRequestContext)
-  .handle(async ({ app, input, scope }, context) => {
-    const agent = await app.create({ ...input, projectId: scope.id });
+  .handle(async ({ app, input, scope, actor, key }, context) => {
+    const agent = await app.create({
+      ...input,
+      projectId: scope.id,
+      caller: agentCallerOf({ actor, key }),
+    });
 
     return response(agent, app, context.projectSlug);
   })
@@ -107,21 +114,29 @@ export const agentLegacyRest = defineRestRouter(AgentApi)
   )
 
   .patch("/:id", "updateAgent")
+  .keepsRecords()
   .withAudit("agents.update")
   .withParams(agentRestParamsSchema)
   .withInput(updateAgentRequestSchema)
+  .withCredential("project", { key: true })
   .withPermission("project:update")
   .withOutput(legacyResponse)
   .withDocs({ summary: "Update an agent; superseded by /api/v1/agents", hide: true })
   .withMiddlewareContext(projectRequestContext)
-  .handle(async ({ app, input, scope }, context) =>
-    response(await app.update({ ...input, projectId: scope.id }), app, context.projectSlug),
+  .handle(async ({ app, input, scope, actor, key }, context) =>
+    response(
+      await app.update({ ...input, projectId: scope.id, caller: agentCallerOf({ actor, key }) }),
+      app,
+      context.projectSlug,
+    ),
   )
 
   .put("/:id", "replaceAgent")
+  .keepsRecords()
   .withAudit("agents.update")
   .withParams(agentRestParamsSchema)
   .withInput(updateAgentRequestSchema)
+  .withCredential("project", { key: true })
   .withPermission("project:update")
   .withOutput(legacyResponse)
   .withDocs({
@@ -129,18 +144,28 @@ export const agentLegacyRest = defineRestRouter(AgentApi)
     hide: true,
   })
   .withMiddlewareContext(projectRequestContext)
-  .handle(async ({ app, input, scope }, context) =>
-    response(await app.update({ ...input, projectId: scope.id }), app, context.projectSlug),
+  .handle(async ({ app, input, scope, actor, key }, context) =>
+    response(
+      await app.update({ ...input, projectId: scope.id, caller: agentCallerOf({ actor, key }) }),
+      app,
+      context.projectSlug,
+    ),
   )
 
   .delete("/:id", "archiveAgent")
   .withAudit("agents.delete")
+  .withoutConfirmation("Langy keys cannot hold project:delete")
   .withParams(agentRestParamsSchema)
+  .withCredential("project", { key: true })
   .withPermission("project:delete")
   .withOutput(archiveResultSchema)
   .withDocs({ summary: "Archive an agent; superseded by /api/v1/agents", hide: true })
-  .handle(async ({ app, input, scope }) => {
-    const agent = await app.archive({ ...input, projectId: scope.id });
+  .handle(async ({ app, input, scope, actor, key }) => {
+    const agent = await app.archive({
+      ...input,
+      projectId: scope.id,
+      caller: agentCallerOf({ actor, key }),
+    });
 
     return { id: agent.id, name: agent.name, type: agent.type, archivedAt: agent.archivedAt };
   })

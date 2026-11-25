@@ -103,7 +103,7 @@ Feature: Single-file datasets keep working where the previous release kept them
     Scenario: A single-file dataset copies its records into the new dataset
       Given a single-file dataset holding three records
       When a caller copies it
-      Then the copy holds the same three entries
+      Then the copy holds the same three entries, in the same order
 
   Rule: Other datasets are unaffected
 

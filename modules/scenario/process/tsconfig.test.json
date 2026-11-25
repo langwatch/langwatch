@@ -25,6 +25,9 @@
       "path": "./tsconfig.build.json"
     },
     {
+      "path": "../../../packages/clickhouse-migrations/tsconfig.build.json"
+    },
+    {
       "path": "../../../packages/config/tsconfig.build.json"
     },
     {

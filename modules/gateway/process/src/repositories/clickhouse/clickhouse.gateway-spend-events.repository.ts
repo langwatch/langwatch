@@ -1,3 +1,4 @@
+import type { IdBoundOptions } from "@langwatch/clickhouse-client";
 import {
   type GatewaySpendDay,
   type GatewayUsageCount,
@@ -17,7 +18,7 @@ import {
  * every read here is FINAL since RMT dedup is eventual. CostNanoUSD is canonical.
  */
 import { createLogger } from "@langwatch/observability";
-import { Temporal } from "@langwatch/time";
+import { Temporal, toDate } from "@langwatch/time";
 import { z } from "zod";
 
 import type { GatewaySpendState } from "../../eventing/gateway-spend.projection.ts";
@@ -225,7 +226,9 @@ export class ClickHouseGatewaySpendEventsRepository extends GatewaySpendEventsRe
       PodId: state.podId,
       PodSeq: state.podSeq,
       DurationMS: state.durationMs,
-      OccurredAt: state.occurredAtMs || state.LastEventOccurredAt,
+      OccurredAt: toDate(
+        Temporal.Instant.fromEpochMilliseconds(state.occurredAtMs || state.LastEventOccurredAt),
+      ),
       Version: GATEWAY_SPEND_PROJECTION_VERSION_LATEST,
       CreatedAt: state.createdAt,
       LastEventOccurredAt: state.LastEventOccurredAt,
@@ -264,17 +267,19 @@ export class ClickHouseGatewaySpendEventsRepository extends GatewaySpendEventsRe
       query: `
         SELECT ${SPEND_ROW_COLUMNS}, SettleReason, PodId, PodSeq,
                TokensCacheWrite1h, TokensInputAudio, TokensOutputAudio,
-               CharsInput, AudioMS,
+               CharsInput, AudioMS, WebSearchRequests,
                Version, CreatedAt, LastEventOccurredAt, EventTimestamp
         FROM ${TABLE} FINAL
         WHERE TenantId = {tenantId:String}
           AND GatewayRequestId = {gatewayRequestId:String}
+          {{idBound:gateway_spend.GatewayRequestId:gatewayRequestId}}
         LIMIT 1
       `,
       query_params: { tenantId, gatewayRequestId },
       format: "JSONEachRow",
+      idBound: { fallback: "unbounded" },
     });
-    const raw = (await result.json()) as Record<string, unknown>[];
+    const raw = await result.json<Record<string, unknown>>();
     const r = raw[0];
     if (!r) return null;
     if (String(r.Version) !== GATEWAY_SPEND_PROJECTION_VERSION_LATEST) {
@@ -483,8 +488,10 @@ export class ClickHouseGatewaySpendEventsRepository extends GatewaySpendEventsRe
         WHERE TenantId = {tenantId:String}
           AND GatewayRequestId = {gatewayRequestId:String}
           AND Status IN {statuses:Array(String)}
+          {{idBound:gateway_spend.GatewayRequestId:gatewayRequestId}}
         LIMIT 1`,
           params: { gatewayRequestId: input.gatewayRequestId, statuses: input.statuses },
+          idBound: { fallback: "unbounded" },
         }),
       ),
     );
@@ -496,16 +503,19 @@ export class ClickHouseGatewaySpendEventsRepository extends GatewaySpendEventsRe
     tenantId,
     query,
     params,
+    idBound,
   }: {
     tenantId: string;
     query: string;
     params: Record<string, unknown>;
+    idBound?: IdBoundOptions;
   }): Promise<SpendEventRow[]> {
     const client = await this.resolveClient(tenantId);
     const result = await client.query({
       query,
       query_params: { ...params, tenantId },
       format: "JSONEachRow",
+      ...(idBound === undefined ? {} : { idBound }),
     });
     const raw = await result.json<Record<string, unknown>>();
     return raw.map((row) => ClickHouseGatewaySpendEventsRepository.mapSpendEventRow(row));
@@ -1103,6 +1113,7 @@ export class ClickHouseGatewaySpendEventsRepository extends GatewaySpendEventsRe
       TokensInputImage: quantities.input_image_tokens,
       TokensOutputImage: quantities.output_image_tokens,
       ImageCount: quantities.image_count,
+      WebSearchRequests: quantities.web_search_requests,
     };
   }
 
@@ -1124,6 +1135,7 @@ export class ClickHouseGatewaySpendEventsRepository extends GatewaySpendEventsRe
       quantity("TokensInputImage"),
       quantity("TokensOutputImage"),
       quantity("ImageCount"),
+      quantity("WebSearchRequests"),
     ];
     const outcome = row.status === "confirmed" || row.status === "failed";
     if (!outcome && !measured.some((value) => value > 0)) return null;
@@ -1141,6 +1153,7 @@ export class ClickHouseGatewaySpendEventsRepository extends GatewaySpendEventsRe
       input_image_tokens: quantity("TokensInputImage"),
       output_image_tokens: quantity("TokensOutputImage"),
       image_count: quantity("ImageCount"),
+      web_search_requests: quantity("WebSearchRequests"),
     };
   }
 

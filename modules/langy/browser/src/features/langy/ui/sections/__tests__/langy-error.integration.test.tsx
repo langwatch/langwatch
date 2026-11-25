@@ -43,6 +43,25 @@ describe("LangyError", () => {
     });
   });
 
+  describe("given a turn an AI gateway spending limit refused", () => {
+    /** @scenario A spending limit reads as the limit, not as a failed reply */
+    it("links to the budgets page and offers no retry", () => {
+      renderError({
+        code: "langy_agent_errored",
+        httpStatus: 502,
+        reasons: [
+          { kind: "budget_exceeded", meta: { budget_scope: "team", budget_window: "month" } },
+        ],
+      });
+
+      expect(screen.getByText("Your team's monthly AI spending limit is reached")).toBeTruthy();
+      expect(screen.getByRole("link", { name: /view budgets/i }).getAttribute("href")).toBe(
+        "/gateway/budgets",
+      );
+      expect(screen.queryByRole("button", { name: /try again/i })).toBeNull();
+    });
+  });
+
   describe("given an error Langy does not recognise", () => {
     /** @scenario "An unknown error stays calm and traceable" */
     it("shows one calm generic message and the trace id to quote", () => {

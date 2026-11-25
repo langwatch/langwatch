@@ -8,24 +8,39 @@ const NOW = 1_800_000_000_000;
 
 /**
  * A Redis double holding only what the reaper reads: the job zsets, the ready
- * zset, the blocked set, the active keys and the pending counter.
+ * zset, the blocked set, the active keys, the tenant and lane parked sets and
+ * the pending counter.
  */
 function fakeRedis(state: {
   jobs: Record<string, number[]>;
   ready?: string[];
   blocked?: string[];
   active?: string[];
+  parked?: Record<string, string[]>;
+  laneParked?: Record<string, string[]>;
 }) {
   const deleted: string[] = [];
   const written: Record<string, string> = {};
   const jobs = { ...state.jobs };
+  const membersOf = (key: string): readonly string[] | undefined => {
+    if (key === `${PREFIX}ready`) return state.ready;
+    if (key.startsWith(`${PREFIX}parked:`))
+      return state.parked?.[key.slice(`${PREFIX}parked:`.length)];
+    if (key.startsWith(`${PREFIX}parked-lane:`)) {
+      return state.laneParked?.[key.slice(`${PREFIX}parked-lane:`.length)];
+    }
+    return undefined;
+  };
   const redis = redisDouble({
     scan: vi.fn(async () => [
       "0",
       Object.keys(jobs).map((groupId) => `${PREFIX}group:${groupId}:jobs`),
     ]),
-    zscore: vi.fn(async (_key: string, groupId: string) =>
-      state.ready?.includes(groupId) ? "1" : null,
+    zscore: vi.fn(async (key: string, groupId: string) => {
+      return membersOf(key)?.includes(groupId) ? "1" : null;
+    }),
+    smembers: vi.fn(async (key: string) =>
+      key === `${PREFIX}parked-lanes` ? Object.keys(state.laneParked ?? {}) : [],
     ),
     exists: vi.fn(async (key: string) =>
       state.active?.some((groupId) => key === `${PREFIX}group:${groupId}:active`) ? 1 : 0,
@@ -43,13 +58,12 @@ function fakeRedis(state: {
       const groupId = key.slice(`${PREFIX}group:`.length, -":jobs".length);
       return jobs[groupId]?.length ?? 0;
     }),
-    del: vi.fn(async (...keys: string[]) => {
-      deleted.push(...keys);
-      for (const key of keys) {
-        if (!key.endsWith(":jobs")) continue;
-        delete jobs[key.slice(`${PREFIX}group:`.length, -":jobs".length)];
-      }
-      return keys.length;
+    // The delete's own re-check is Lua, proven against Redis in
+    // parked-group-retention.integration.test.ts; here it deletes what discovery chose.
+    evalsha: vi.fn(async (_sha: string, _numKeys: number, jobsKey: string, dataKey: string) => {
+      deleted.push(jobsKey, dataKey);
+      delete jobs[jobsKey.slice(`${PREFIX}group:`.length, -":jobs".length)];
+      return 1;
     }),
     set: vi.fn(async (key: string, value: string) => {
       written[key] = value;
@@ -105,6 +119,34 @@ describe("reapStrandedGroups", () => {
 
       expect(report.groups).toEqual([]);
       expect(deleted).toEqual([]);
+    });
+  });
+
+  describe("when stale groups are parked at their tenant's cap or behind a paused lane", () => {
+    /** @scenario "The stranded-group reaper never deletes a parked group" */
+    it("lists neither and deletes none of their keys", async () => {
+      const { redis, deleted } = fakeRedis({
+        jobs: {
+          "project_A/fold/trace:1": [hoursAgo(30)],
+          "project_B/fold/trace:2": [hoursAgo(30)],
+          "project_C/fold/trace:3": [hoursAgo(30)],
+        },
+        parked: { project_A: ["project_A/fold/trace:1"] },
+        laneParked: { "trace_processing/projection": ["project_B/fold/trace:2"] },
+      });
+
+      const report = await reapStrandedGroups({
+        redis,
+        keyPrefix: PREFIX,
+        apply: true,
+        now: () => NOW,
+      });
+
+      expect(report.groups.map((group) => group.groupId)).toEqual(["project_C/fold/trace:3"]);
+      expect(deleted).toEqual([
+        `${PREFIX}group:project_C/fold/trace:3:jobs`,
+        `${PREFIX}group:project_C/fold/trace:3:data`,
+      ]);
     });
   });
 

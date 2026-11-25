@@ -59,7 +59,8 @@ def add(a: int, b: int) -> int:
 
 
 # Model with tools
-model = init_chat_model("gpt-5-mini")
+# gpt-6 models only accept function tools on Chat Completions with reasoning off
+model = init_chat_model("gpt-6-luna", reasoning_effort="none")
 tools = [add]
 tools_by_name = {t.name: t for t in tools}
 model_with_tools = model.bind_tools(tools)
@@ -133,6 +134,12 @@ if __name__ == "__main__":
 The `@langwatch.trace()` decorator creates a parent trace for your graph execution. `get_langchain_callback()` goes in the config of `agent.invoke()`, and the same config argument works for `ainvoke()` and `stream()`. From there LangGraph passes it down: each node becomes a chain span named after the node, model calls become LLM spans, and tool calls become tool spans.
 
 A callback attached only to the model call inside one node produces LLM spans alone. The tool nodes and the plain function nodes never appear, so the trace does not show which step the graph ran.
+
+## Check it worked
+
+Run the example. Then open your project in LangWatch: a new trace named "LangGraph - Calculator Agent" appears in the traces list within a few seconds. Open it to see the graph's nodes, tool calls and LLM calls nested inside it.
+
+If no trace appears, check that `LANGWATCH_API_KEY` is set in the environment the script runs in.
 
 ## Related
 

@@ -8,6 +8,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/langwatch/langwatch/tools/thuishaven/adapters/redisbrew"
 )
 
 // LocalStores reads the three database servers haven manages against the limits
@@ -79,7 +81,7 @@ func (s LocalStores) postgres(ctx context.Context) StoreStat {
 func (s LocalStores) redis(ctx context.Context) StoreStat {
 	stat := StoreStat{Name: "redis", Measure: "memory", Unit: "bytes", Limit: s.RedisCapBytes}
 	//nolint:gosec // every argument is a constant or a port number out of haven's own registry
-	out, err := exec.CommandContext(ctx, "redis-cli", "-h", "127.0.0.1",
+	out, err := exec.CommandContext(ctx, redisbrew.CLI(), "-h", "127.0.0.1",
 		"-p", strconv.Itoa(s.RedisPort), "info", "memory").Output()
 	if err != nil {
 		return stat

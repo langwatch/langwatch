@@ -494,3 +494,86 @@ export const mergeRunResults = ({
 
   return merged;
 };
+
+/** A sparse row array moved to new positions; a row with no new position is left out. */
+const remapRows = <T>(rows: T[], rowIndices: readonly (number | null)[]): T[] => {
+  const moved: T[] = [];
+  for (const index of Object.keys(rows)) {
+    const to = rowIndices[Number(index)];
+    if (to === undefined || to === null) continue;
+    moved[to] = rows[Number(index)] as T;
+  }
+  return moved;
+};
+
+const remapRecord = <T>(
+  record: Record<string, T[]> | undefined,
+  rowIndices: readonly (number | null)[],
+): Record<string, T[]> =>
+  Object.fromEntries(
+    Object.entries(record ?? {}).map(([key, rows]) => [key, remapRows(rows, rowIndices)]),
+  );
+
+/** Cells keyed by row, as both a run's draft and the saved board hold them. */
+type RowKeyedResults = Pick<
+  RunResultsDraft,
+  "targetOutputs" | "targetMetadata" | "evaluatorResults" | "errors"
+>;
+
+/**
+ * The same cells moved to other row positions: row `i` moves to `rowIndices[i]`, and a row
+ * whose position is null or absent is skipped.
+ */
+export const remapResultRows = ({
+  results,
+  rowIndices,
+}: {
+  results: Partial<RowKeyedResults>;
+  rowIndices: readonly (number | null)[];
+}): RowKeyedResults => ({
+  targetOutputs: remapRecord(results.targetOutputs, rowIndices),
+  targetMetadata: remapRecord(results.targetMetadata, rowIndices),
+  evaluatorResults: Object.fromEntries(
+    Object.entries(results.evaluatorResults ?? {}).map(([targetId, byEvaluator]) => [
+      targetId,
+      remapRecord(byEvaluator, rowIndices),
+    ]),
+  ),
+  errors: remapRecord(results.errors, rowIndices),
+});
+
+/** The opposite move: for each new position, the row that moved there. */
+export const invertRowIndices = (rowIndices: readonly (number | null)[]): (number | null)[] => {
+  const inverted: (number | null)[] = [];
+  rowIndices.forEach((to, from) => {
+    if (to !== null) inverted[to] = from;
+  });
+  return Array.from(inverted, (from) => from ?? null);
+};
+
+/**
+ * The draft of a run over a dataset version, keyed by the board's rows instead: each run row goes
+ * to the board row with its id, and a row the board no longer has is skipped.
+ */
+export const remapRunResultsDraft = ({
+  draft,
+  boardRowIndices,
+}: {
+  draft: RunResultsDraft;
+  /** The board row of each run row; null when the board no longer has it. */
+  boardRowIndices: readonly (number | null)[];
+}): RunResultsDraft => {
+  const startedCells = new Set<string>();
+  for (const key of draft.startedCells) {
+    const cell = parseCellKey(key);
+    const boardIndex = cell ? boardRowIndices[cell.rowIndex] : undefined;
+    if (!cell || boardIndex === undefined || boardIndex === null) continue;
+    startedCells.add(cellKey({ rowIndex: boardIndex, targetId: cell.targetId }));
+  }
+
+  return {
+    ...(draft.runId !== undefined ? { runId: draft.runId } : {}),
+    startedCells,
+    ...remapResultRows({ results: draft, rowIndices: boardRowIndices }),
+  };
+};

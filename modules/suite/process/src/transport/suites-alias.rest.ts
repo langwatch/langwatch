@@ -6,6 +6,7 @@ import {
   projectRequestContext,
   type RestDoorCredential,
   type RestTransportDeclaration,
+  nameUnlessMissing,
 } from "@langwatch/api/rest";
 import { ValidationError } from "@langwatch/handled-error";
 /**
@@ -57,7 +58,14 @@ function storedTargetsRefusal(): ValidationError {
   return new ValidationError(message, { meta: { fieldErrors: { targets: [message] } } });
 }
 
-const PLAN_EXECUTION_FIELDS = ["targets", "repeatCount", "simulatorModel", "judgeModel"] as const;
+const PLAN_EXECUTION_FIELDS = [
+  "targets",
+  "repeatCount",
+  "simulatorModel",
+  "judgeModel",
+  "traceQuietPeriodMs",
+  "traceWaitTimeoutMs",
+] as const;
 
 /** A run plan runs its stored configuration: one refusal naming every execution field sent. */
 function refuseExecutionFields(
@@ -337,6 +345,12 @@ async function scheduleRun(params: {
             ...(input.repeatCount !== undefined && { repeatCount: input.repeatCount }),
             ...(input.simulatorModel !== undefined && { simulatorModel: input.simulatorModel }),
             ...(input.judgeModel !== undefined && { judgeModel: input.judgeModel }),
+            ...(input.traceQuietPeriodMs !== undefined && {
+              traceQuietPeriodMs: input.traceQuietPeriodMs,
+            }),
+            ...(input.traceWaitTimeoutMs !== undefined && {
+              traceWaitTimeoutMs: input.traceWaitTimeoutMs,
+            }),
           },
           idempotencyKey,
           ...(input.parameters !== undefined && { parameters: input.parameters }),
@@ -455,6 +469,7 @@ export function createSuitesAliasRest(): Readonly<{
       // for `scenarios:create`, not `scenarios:manage`. `:manage` still implies `:create`,
       // so every role and key that could create a suite yesterday still can.
       .post("/", "postApiSuites")
+      .keepsRecords()
       .withInput(createSuiteInputSchema)
       .withPermission("scenarios:create")
       .withAudit("suites.create")
@@ -474,6 +489,7 @@ export function createSuitesAliasRest(): Readonly<{
       // ── Update Suite ─────────────────────────────────────────── `:update` for the same
       // reason as `:create` above.
       .patch("/:id", "patchApiSuitesById")
+      .keepsRecords()
       .withParams(suiteAliasIdParamsSchema)
       .withInput(updateSuiteInputSchema)
       .withPermission("scenarios:update")
@@ -493,6 +509,7 @@ export function createSuitesAliasRest(): Readonly<{
       // ── Duplicate Suite ──────────────────────────────────────── A duplicate is a create:
       // it leaves the source suite untouched and produces a new one.
       .post("/:id/duplicate", "postApiSuitesByIdDuplicate")
+      .keepsRecords()
       .withParams(suiteAliasIdParamsSchema)
       .withInput(duplicateSuiteBodySchema)
       .withPermission("scenarios:create")
@@ -514,6 +531,7 @@ export function createSuitesAliasRest(): Readonly<{
       // ADMINISTERING IT. The run creates scenario runs; the suite definition, its scenarios
       // and its targets are left exactly as they were.
       .post("/:id/run", "postApiSuitesByIdRun")
+      .keepsRecords()
       .withParams(suiteAliasIdParamsSchema)
       .withInput(runSuiteInputSchema)
       .withPermission("scenarios:create")
@@ -542,6 +560,17 @@ export function createSuitesAliasRest(): Readonly<{
       .withParams(suiteAliasIdParamsSchema)
       .withPermission("scenarios:manage")
       .withAudit("suites.archive")
+      .withConfirmation({
+        resource: "suite",
+        action: "delete",
+        idParam: "id",
+        name: ({ app, projectId, id }) =>
+          nameUnlessMissing({
+            read: app.getByIdOrTestSuite({ id, projectId }),
+            missing: SuiteNotFoundError,
+            nameOf: (found) => (found.kind === "suite" ? found.suite.name : found.testSuite.name),
+          }),
+      })
       .withOutput(archivedSuiteSchema)
       .withDocs({
         description:

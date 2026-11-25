@@ -15,6 +15,8 @@ import {
   secretLogRedactPaths,
 } from "@langwatch/secrets";
 
+import type { LongRequestBody } from "./lifecycle/request-body-deadline.ts";
+import type { IdIndexRetention } from "./migration/id-index-fill-step.ts";
 import {
   assertGatedRole,
   type UpgradeGatedRole,
@@ -101,8 +103,10 @@ export class ServerPreamble<Owners extends readonly PreambleOwner[] = readonly [
       metrics?: (context: MetricsContext<Owners>) => Metrics | Promise<Metrics>;
       healthPort?: number;
       ownsProcess?: boolean;
+      longRequestBodies?: readonly LongRequestBody[];
       environment?: PreambleEnvironment;
       upgradeGate?: Readonly<{ role: UpgradeGatedRole; gate: UpgradeGateFactory<Owners> }>;
+      idIndexRetention?: IdIndexRetention;
     }>,
   ) {}
 
@@ -131,6 +135,14 @@ export class ServerPreamble<Owners extends readonly PreambleOwner[] = readonly [
     return new ServerPreamble(this.name, { ...this.state, upgradeGate: { role, gate } });
   }
 
+  /**
+   * How each module's id-index fill raises its indexes' retention before their ready markers:
+   * the application passes a function over the retention owner's API (id-index plan §3).
+   */
+  withIdIndexRetention(raise: IdIndexRetention): ServerPreamble<Owners> {
+    return new ServerPreamble(this.name, { ...this.state, idIndexRetention: raise });
+  }
+
   withTelemetry(
     factory: (context: FactoryContext<Owners>) => Telemetry | Promise<Telemetry>,
   ): ServerPreamble<Owners> {
@@ -149,6 +161,11 @@ export class ServerPreamble<Owners extends readonly PreambleOwner[] = readonly [
     }
 
     return new ServerPreamble(this.name, { ...this.state, healthPort: port });
+  }
+
+  /** Routes whose request body may outlast Node's 300s; every other body stays held to it. */
+  withLongRequestBodies(bodies: readonly LongRequestBody[]): ServerPreamble<Owners> {
+    return new ServerPreamble(this.name, { ...this.state, longRequestBodies: bodies });
   }
 
   /** What config and the secrets chain read; only an app's main hands the environment in. */
@@ -212,11 +229,13 @@ export class ServerPreamble<Owners extends readonly PreambleOwner[] = readonly [
    */
   private bootModulesInTasksRole(): UpgradeGateModules {
     const { owners, chain, environment } = this.state;
+    const { idIndexRetention } = this.state;
     return async (use) => {
       const server = await new ServerPreamble(`${this.name}-upgrade`, {
         owners,
         ...(chain ? { chain } : {}),
         ...(environment ? { environment } : {}),
+        ...(idIndexRetention ? { idIndexRetention } : {}),
         healthPort: 0,
         ownsProcess: false,
       }).start();
@@ -263,10 +282,14 @@ export class ServerPreamble<Owners extends readonly PreambleOwner[] = readonly [
       resolver,
       ownsProcess: this.state.ownsProcess,
       modules: owners.filter(isProcessModule),
+      ...(this.state.idIndexRetention ? { idIndexRetention: this.state.idIndexRetention } : {}),
     };
 
     if (this.state.healthPort !== undefined) {
       boundary.healthPort = this.state.healthPort;
+    }
+    if (this.state.longRequestBodies !== undefined) {
+      boundary.longRequestBodies = this.state.longRequestBodies;
     }
 
     const server = ProcessServer.create(boundary);
@@ -305,6 +328,7 @@ function hostLogger(name: string): ServerLogger {
     info: (fields, line) => logger().info(fields, line),
     warn: (fields, line) => logger().warn(fields, line),
     error: (fields, line) => logger().error(fields, line),
+    fatal: (fields, line) => logger().fatal(fields, line),
   };
 }
 

@@ -105,6 +105,8 @@ const handle = setupObservability({
 ### Development Environment
 
 ```typescript
+import { setupObservability } from "langwatch/observability/node";
+
 const handle = setupObservability({
   langwatch: {
     apiKey: process.env.LANGWATCH_API_KEY,
@@ -122,6 +124,8 @@ const handle = setupObservability({
 ### Production Environment
 
 ```typescript
+import { setupObservability } from "langwatch/observability/node";
+
 const handle = setupObservability({
   langwatch: {
     apiKey: process.env.LANGWATCH_API_KEY,

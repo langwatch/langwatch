@@ -3,6 +3,7 @@ import { Temporal, type Instant } from "@langwatch/time";
 import type {
   IssuedLicenseDraft,
   IssuedLicensePatch,
+  IssuedLicenseQuery,
   IssuedLicenseRecord,
   IssuedLicenseRepository,
 } from "../issued-license.repository.ts";
@@ -87,33 +88,36 @@ export class MemoryIssuedLicenseRepository implements IssuedLicenseRepository {
   async listAll({
     page,
     pageSize,
-    search,
-    activeAt,
-    excludeEmailSuffixes = [],
-  }: {
-    page: number;
-    pageSize: number;
-    search?: string;
-    /** Keeps only the rows active at this instant: not revoked, superseded or expired. */
-    activeAt?: Instant;
-    /** Drops the rows whose email ends with any of these, case aside. */
-    excludeEmailSuffixes?: readonly string[];
-  }): Promise<{ rows: IssuedLicenseRecord[]; total: number }> {
-    const term = search?.trim().toLowerCase();
-    const matched = this.all()
-      .filter((row) => (term ? matches(row, term) : true))
-      .filter((row) => !activeAt || activeAtInstant(row, activeAt))
-      .filter(
-        (row) =>
-          !excludeEmailSuffixes.some((suffix) =>
-            row.email.toLowerCase().endsWith(suffix.toLowerCase()),
-          ),
-      )
-      .toSorted((left, right) => Temporal.Instant.compare(right.createdAt, left.createdAt));
+    ...query
+  }: IssuedLicenseQuery & { page: number; pageSize: number }): Promise<{
+    rows: IssuedLicenseRecord[];
+    total: number;
+  }> {
+    const matched = this.matching(query).toSorted((left, right) =>
+      Temporal.Instant.compare(right.createdAt, left.createdAt),
+    );
     return {
       rows: matched.slice(page * pageSize, page * pageSize + pageSize).map((row) => ({ ...row })),
       total: matched.length,
     };
+  }
+
+  async countAll(query: IssuedLicenseQuery): Promise<number> {
+    return this.matching(query).length;
+  }
+
+  private matching({ search, status, emailSuffixes }: IssuedLicenseQuery): IssuedLicenseRecord[] {
+    const term = search?.trim().toLowerCase();
+    return this.all()
+      .filter((row) => (term ? matches(row, term) : true))
+      .filter((row) => !status || activeAtInstant(row, status.at) === status.active)
+      .filter(
+        (row) =>
+          !emailSuffixes ||
+          emailSuffixes.suffixes.some((suffix) =>
+            row.email.toLowerCase().endsWith(suffix.toLowerCase()),
+          ) === emailSuffixes.matching,
+      );
   }
 
   async update(id: string, data: IssuedLicensePatch): Promise<IssuedLicenseRecord> {

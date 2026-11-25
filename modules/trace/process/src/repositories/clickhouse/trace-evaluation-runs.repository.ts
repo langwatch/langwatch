@@ -1,5 +1,10 @@
 import type { Authorization } from "@langwatch/authorization";
-import { type AuthorizedClickHouse, tenantScope } from "@langwatch/clickhouse-client";
+import {
+  type AuthorizedClickHouse,
+  ClickHouseColumns,
+  ownProjectIdOf,
+  tenantScope,
+} from "@langwatch/clickhouse-client";
 /**
  * Evaluation's `evaluation_runs`, shared with trace for reading (R40, EF-5): each
  * read collapses a run to its latest version, as evaluation's own reads collapse it.
@@ -38,16 +43,37 @@ const TRACE_EVALUATION_COLUMNS_LIGHT = [
   "Label",
   "Details",
   "Error",
-  `toUnixTimestamp64Milli(${RUNS}.ScheduledAt) AS ScheduledAt`,
-  `toUnixTimestamp64Milli(${RUNS}.StartedAt) AS StartedAt`,
+  `toUnixTimestamp64Milli(${RUNS}.ScheduledAt) AS ScheduledAtMs`,
+  `toUnixTimestamp64Milli(${RUNS}.StartedAt) AS StartedAtMs`,
   `toUnixTimestamp64Milli(${RUNS}.CompletedAt) AS CompletedAt`,
 ].join(", ");
 const TRACE_EVALUATION_COLUMNS_WITH_INPUTS = `${TRACE_EVALUATION_COLUMNS_LIGHT}, Inputs`;
 const logger = createLogger("langwatch:trace:clickhouse.trace-evaluation-runs");
 
+/** The attempt columns migration 00122 adds, each with the default it reads as until it lands. */
+const ATTEMPT_COLUMNS = {
+  Attempts: "toUInt16(0)",
+  LastAttemptAt: "CAST(NULL AS Nullable(DateTime64(3)))",
+  LastAttemptError: "CAST(NULL AS Nullable(String))",
+  NextAttemptAt: "CAST(NULL AS Nullable(DateTime64(3)))",
+} as const;
+
+/** The attempt moments in epoch ms, read off the attempt columns' aliases. */
+const ATTEMPT_MOMENTS = [
+  "toUnixTimestamp64Milli(LastAttemptAt) AS LastAttemptAtMs",
+  "toUnixTimestamp64Milli(NextAttemptAt) AS NextAttemptAtMs",
+].join(", ");
+
 const chFlag = z.union([z.boolean(), z.number(), z.string()]);
 const nullableString = z.string().nullable();
 const nullableNumber = chNumber.nullable();
+
+const attemptRowShape = {
+  Attempts: chNumber.optional(),
+  LastAttemptAtMs: nullableNumber.optional(),
+  LastAttemptError: nullableString.optional(),
+  NextAttemptAtMs: nullableNumber.optional(),
+};
 
 const summaryRowSchema = z.looseObject({
   EvaluationId: chString,
@@ -66,16 +92,17 @@ const traceEvaluationRowSchema = summaryRowSchema.safeExtend({
   Details: nullableString,
   Error: nullableString,
   Inputs: nullableString.optional(),
-  ScheduledAt: nullableNumber,
-  StartedAt: nullableNumber,
+  ScheduledAtMs: nullableNumber,
+  StartedAtMs: nullableNumber,
   CompletedAt: nullableNumber,
+  ...attemptRowShape,
 });
 
 const runRowSchema = traceEvaluationRowSchema.safeExtend({
   Inputs: nullableString,
   ErrorDetails: nullableString,
   CreatedAt: chNumber,
-  UpdatedAt: chNumber,
+  UpdatedAtMs: chNumber,
   ArchivedAt: nullableNumber,
   CostId: nullableString,
   LastEventOccurredAt: nullableNumber.optional(),
@@ -86,6 +113,17 @@ const traceEvaluationRowsSchema = z.array(traceEvaluationRowSchema);
 const runRowsSchema = z.array(runRowSchema);
 
 type SummaryRow = z.infer<typeof summaryRowSchema>;
+type AttemptRow = z.infer<z.ZodObject<typeof attemptRowShape>>;
+
+/** The attempt fields of a run row; a target without the columns reads as no attempts. */
+function attemptFields(row: AttemptRow) {
+  return {
+    attempts: row.Attempts ?? 0,
+    lastAttemptAt: row.LastAttemptAtMs ?? null,
+    lastAttemptError: row.LastAttemptError ?? null,
+    nextAttemptAt: row.NextAttemptAtMs ?? null,
+  };
+}
 
 function isSet(flag: SummaryRow["IsGuardrail"]): boolean {
   return flag === true || flag === 1 || flag === "1" || flag === "true";
@@ -145,9 +183,11 @@ export class ClickHouseTraceEvaluationRunsRepository extends TraceEvaluationRuns
   }): Promise<EvaluationRunData[]> {
     EventUtils.validateTenantId(input, "ClickHouseTraceEvaluationRunsRepository.findRunsByTraceId");
     try {
+      const own = await this.ownTenant(input.tenantId);
       return await this.queryRuns({
-        ...(await this.ownTenant(input.tenantId)),
+        ...own,
         traceId: input.traceId,
+        attempts: await this.attemptColumns({ client: own.client }),
       });
     } catch (error) {
       logger.warn(
@@ -170,6 +210,7 @@ export class ClickHouseTraceEvaluationRunsRepository extends TraceEvaluationRuns
         dedupTenantPredicate: tenantScope("ScheduledAt"),
         params: {},
         traceId: input.traceId,
+        attempts: await this.attemptColumnsOf({ authorization: input.authorization }),
       });
     } catch (error) {
       logger.warn(
@@ -186,17 +227,19 @@ export class ClickHouseTraceEvaluationRunsRepository extends TraceEvaluationRuns
     dedupTenantPredicate: string;
     params: Record<string, string>;
     traceId: string;
+    attempts: string;
   }): Promise<EvaluationRunData[]> {
+    // ID_BOUND_SKIP: evaluation's index, registered by evaluation; moves there with trace-review.
     const result = await input.client.query({
       query: `
         SELECT EvaluationId, EvaluatorId, EvaluatorType, EvaluatorName, TraceId,
           IsGuardrail, Status, Score, Passed, Label, Details, Inputs, Error, ErrorDetails,
           toUnixTimestamp64Milli(${RUNS}.CreatedAt) AS CreatedAt,
-          toUnixTimestamp64Milli(${RUNS}.UpdatedAt) AS UpdatedAt,
+          toUnixTimestamp64Milli(${RUNS}.UpdatedAt) AS UpdatedAtMs,
           toUnixTimestamp64Milli(${RUNS}.ArchivedAt) AS ArchivedAt,
-          toUnixTimestamp64Milli(${RUNS}.ScheduledAt) AS ScheduledAt,
-          toUnixTimestamp64Milli(${RUNS}.StartedAt) AS StartedAt,
-          toUnixTimestamp64Milli(${RUNS}.CompletedAt) AS CompletedAt, CostId,
+          toUnixTimestamp64Milli(${RUNS}.ScheduledAt) AS ScheduledAtMs,
+          toUnixTimestamp64Milli(${RUNS}.StartedAt) AS StartedAtMs,
+          toUnixTimestamp64Milli(${RUNS}.CompletedAt) AS CompletedAt, CostId, ${input.attempts}, ${ATTEMPT_MOMENTS},
           toUnixTimestamp64Milli(${RUNS}.LastEventOccurredAt) AS LastEventOccurredAt
         FROM ${EVALUATION_RUNS_TABLE} AS ${RUNS}
         WHERE ${input.tenantPredicate}
@@ -223,13 +266,14 @@ export class ClickHouseTraceEvaluationRunsRepository extends TraceEvaluationRuns
         error: row.Error,
         errorDetails: row.ErrorDetails,
         createdAt: row.CreatedAt,
-        updatedAt: row.UpdatedAt,
+        updatedAt: row.UpdatedAtMs,
         LastEventOccurredAt: row.LastEventOccurredAt ?? 0,
         archivedAt: row.ArchivedAt,
-        scheduledAt: row.ScheduledAt,
-        startedAt: row.StartedAt,
+        scheduledAt: row.ScheduledAtMs,
+        startedAt: row.StartedAtMs,
         completedAt: row.CompletedAt,
         costId: row.CostId,
+        ...attemptFields(row),
       }),
     );
   }
@@ -246,6 +290,7 @@ export class ClickHouseTraceEvaluationRunsRepository extends TraceEvaluationRuns
     if (input.traceIds.length === 0) return [];
     try {
       const client = this.clickhouse.as(input.authorization, { reads: "traces" });
+      // ID_BOUND_SKIP: evaluation's index, registered by evaluation; moves there with trace-review.
       const result = await client.query({
         query: `
           SELECT TenantId, EvaluationId, EvaluatorId, EvaluatorType, EvaluatorName,
@@ -292,10 +337,13 @@ export class ClickHouseTraceEvaluationRunsRepository extends TraceEvaluationRuns
       input,
       "ClickHouseTraceEvaluationRunsRepository.findTraceEvaluations",
     );
+    const own = await this.ownTenant(input.tenantId);
+    const attempts = await this.attemptColumns({ client: own.client });
     try {
       return await this.queryTraceEvaluations({
         ...input,
-        ...(await this.ownTenant(input.tenantId)),
+        ...own,
+        attempts,
         columns: TRACE_EVALUATION_COLUMNS_WITH_INPUTS,
       });
     } catch (error) {
@@ -312,7 +360,8 @@ export class ClickHouseTraceEvaluationRunsRepository extends TraceEvaluationRuns
       );
       return this.queryTraceEvaluations({
         ...input,
-        ...(await this.ownTenant(input.tenantId)),
+        ...own,
+        attempts,
         columns: TRACE_EVALUATION_COLUMNS_LIGHT,
       });
     }
@@ -330,8 +379,30 @@ export class ClickHouseTraceEvaluationRunsRepository extends TraceEvaluationRuns
       tenantPredicate: tenantScope("ScheduledAt"),
       dedupTenantPredicate: tenantScope("ScheduledAt"),
       params: {},
+      attempts: await this.attemptColumnsOf({ authorization: input.authorization }),
       columns: TRACE_EVALUATION_COLUMNS_WITH_INPUTS,
     });
+  }
+
+  /** The attempt columns the tenant's target answers, the missing ones as their defaults. */
+  private async attemptColumns({ client }: { client: TraceClickHouseClient }): Promise<string> {
+    const input = { table: EVALUATION_RUNS_TABLE, alias: RUNS, columns: ATTEMPT_COLUMNS };
+    return (await client.select?.(input)) ?? ClickHouseColumns.named(input);
+  }
+
+  /** As `attemptColumns`, for the proof's own project; an unreachable client names every column. */
+  private async attemptColumnsOf({
+    authorization,
+  }: {
+    authorization: Authorization;
+  }): Promise<string> {
+    const client = await this.resolveClient(
+      ownProjectIdOf({ authorization, reads: "traces" }),
+    ).catch(() => undefined);
+    if (!client) {
+      return ClickHouseColumns.named({ alias: RUNS, columns: ATTEMPT_COLUMNS });
+    }
+    return this.attemptColumns({ client });
   }
 
   private async ownTenant(tenantId: string) {
@@ -350,10 +421,12 @@ export class ClickHouseTraceEvaluationRunsRepository extends TraceEvaluationRuns
     params: Record<string, string>;
     traceIds: readonly string[];
     columns: string;
+    attempts: string;
   }): Promise<Record<string, TraceEvaluationData[]>> {
+    // ID_BOUND_SKIP: evaluation's index, registered by evaluation; moves there with trace-review.
     const result = await input.client.query({
       query: `
-        SELECT ${input.columns}
+        SELECT ${input.columns}, ${input.attempts}, ${ATTEMPT_MOMENTS}
         FROM ${EVALUATION_RUNS_TABLE} AS ${RUNS}
         WHERE ${input.tenantPredicate}
           AND ${RUNS}.TraceId IN ({traceIds:Array(String)})
@@ -379,10 +452,11 @@ export class ClickHouseTraceEvaluationRunsRepository extends TraceEvaluationRuns
         error: row.Error,
         ...(row.Inputs === undefined ? {} : { inputs: parseObject(row.Inputs) }),
         timestamps: {
-          scheduledAt: row.ScheduledAt,
-          startedAt: row.StartedAt,
+          scheduledAt: row.ScheduledAtMs,
+          startedAt: row.StartedAtMs,
           completedAt: row.CompletedAt,
         },
+        ...attemptFields(row),
       });
       (output[row.TraceId] ??= []).push(evaluation);
     }

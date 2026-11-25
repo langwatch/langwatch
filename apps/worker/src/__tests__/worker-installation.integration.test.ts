@@ -193,6 +193,7 @@ describe("the worker process installation", () => {
       expect(pipelines).toContain("workflow_agent_archive_cascade");
       expect(pipelines).toContain("evaluator_workflow_archive_cascade");
       expect(pipelines).toContain("share_trace_sharing_revocation");
+      expect(pipelines).toContain("api_key_docs_playground_revocation");
       expect(pipelines).toContain("topic_clustering_processing");
       expect(pipelines).toContain("automations");
       expect(pipelines).toContain("evaluation_processing");
@@ -210,6 +211,8 @@ describe("the worker process installation", () => {
       expect(pipelines).toContain("ingestion_pull_processing");
       expect(pipelines).toContain("ingestion_pull_reconcile");
       expect(pipelines).toContain("governance_activity_monitor");
+      expect(pipelines).toContain("digest");
+      expect(pipelines).toContain("digest_send");
       expect(pipelines).toContain("blob_maintenance");
       expect(pipelines).toContain("process_manager_maintenance");
       // Every process that is not producing resolves trace commands from this registration.
@@ -226,6 +229,8 @@ describe("the worker process installation", () => {
       expect(schedules).toContain("aggregateProjectReconcile");
       // user's fact outbox: its delivered intents are pruned on the worker's daily wake.
       expect(schedules).toContain("userLifecycleFacts");
+      // digest's weekly send: an hourly wake that plans from Monday 08:00 UTC.
+      expect(schedules).toContain("digestWeeklyPlan");
     } finally {
       await runtime.stop();
     }

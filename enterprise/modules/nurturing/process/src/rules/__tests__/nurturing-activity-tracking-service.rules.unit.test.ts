@@ -20,15 +20,18 @@ describe("fire", () => {
   describe("given a person whose session has just been established", () => {
     describe("when the session callback fires", () => {
       /** @scenario "User login pushes last_active_at to Customer.io" */
-      it("decides to identify them with the moment they were last active", () => {
+      /** @scenario "Customer.io date attributes are sent as Unix seconds" */
+      it("decides to identify them with the moment they were last active, in Unix seconds", () => {
+        vi.useFakeTimers();
+        vi.setSystemTime(1_792_664_000_123);
+
         const calls = fire({ userId: "user-1" });
 
-        const [call] = calls as [
-          { type: "identify"; userId: string; traits: { last_active_at: string } },
-        ];
-        expect(call.type).toBe("identify");
-        expect(call.userId).toBe("user-1");
-        expect(Date.parse(call.traits.last_active_at)).not.toBeNaN();
+        expect(calls[0]).toEqual({
+          type: "identify",
+          userId: "user-1",
+          traits: { last_active_at: 1_792_664_000 },
+        });
       });
 
       it("decides to track app_active for them next to the identify", () => {

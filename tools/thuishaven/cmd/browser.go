@@ -491,8 +491,14 @@ type browserTarget struct {
 func browserStack(d deps, inv invocation, slug string) (map[string]any, error) {
 	dir, home := browserDir(slug), browserHomeFor(d.worktree, slug)
 	appURL := telemetryOverlayValue(telemetryOverlay(d, inv), "LANGWATCH_ENDPOINT")
+	appLog := appLogPath(d.orch.LogDir(slug))
 	if appURL == "" {
-		return nil, errors.New("this worktree has no running stack; run haven up --agent -d")
+		// `haven up --only docs`: no app to wait on, so the docs host stands in for it.
+		run, _ := d.orch.DocsOnly(authParams(d, inv))
+		appURL, appLog = run.URL, ""
+	}
+	if appURL == "" {
+		return nil, errors.New("this worktree has no running stack; run haven up --agent -d (or haven up --only docs)")
 	}
 	if _, err := localApp(appURL); err != nil {
 		return nil, err
@@ -506,7 +512,6 @@ func browserStack(d deps, inv invocation, slug string) (map[string]any, error) {
 			return nil, err
 		}
 	}
-	appLog := appLogPath(d.orch.LogDir(slug))
 	return map[string]any{"slug": slug, "app": appURL, "appLog": appLog, "dir": dir, "haven": self}, nil
 }
 

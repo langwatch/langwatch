@@ -15,3 +15,20 @@ Feature: A later trace tells nurturing, against the organization's admin
     Given a project that already received its first message and resolves no organization admin
     When another real trace is processed
     Then nurturing receives nothing
+
+  # Keyed by the project and instant (2026-10-20): keyed by project alone, a busy project's
+  # received-trace facts all queued behind each other in one queue group.
+  @unit
+  Scenario: A later trace's fact is keyed by its project and instant
+    Given two later traces in the same project are received at different instants
+    When their received facts are recorded
+    Then each fact is keyed by the project and its instant, so neither waits for the other
+    And the fact still names its project
+
+  # Per-email usage (2026-11-10): nurturing throttles its trace-usage read per organization, so the
+  # fact names the admin's organization when the project resolves one.
+  @unit
+  Scenario: A later trace's fact names the admin's organization
+    Given a project whose organization admin resolves together with its organization
+    When another real trace is processed
+    Then trace_received carries the organization's id

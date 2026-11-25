@@ -303,8 +303,8 @@ $(cat "$err")"
   fi
   # On UPGRADE (and ROLLBACK — both set .Release.IsUpgrade) the render Job MUST be
   # a pre-upgrade,pre-rollback hook: the new access Secret has to be written
-  # BEFORE the StatefulSet's catalog annotation rolls the pods, or every subPath
-  # mount freezes the previous release's model. Rollback reverts the annotation
+  # BEFORE the StatefulSet's catalog annotation rolls the pods, or the rolled
+  # pods boot on the previous release's model. Rollback reverts the annotation
   # and rolls the pods too, so it needs the same pre-hook render. The input
   # Secrets already exist on an upgrade/rollback, so the hook has what it needs.
   local upgrade_only="${TMPDIR:-/tmp}/lwql-render-upgrade-only.yaml"
@@ -337,12 +337,15 @@ $(cat "$err")"
     fail "topology-role-scope" "the access-render Role is not resourceName-scoped to lw-lwql-clickhouse-access."
   fi
 
-  # Every ClickHouse pod mounts the Secret at the two contract paths.
-  local mount_users mount_config
-  mount_users=$(grep -c "mountPath: /etc/clickhouse-server/users.d/lwql-access.yaml" "$out")
-  mount_config=$(grep -c "mountPath: /etc/clickhouse-server/config.d/lwql-named-collection.yaml" "$out")
-  if [[ "$mount_users" -lt 1 || "$mount_config" -lt 1 ]]; then
-    fail "topology-mount" "the ClickHouse pod does not mount the access Secret at both users.d and config.d paths."
+  # Every ClickHouse pod mounts the Secret as a directory, which kubelet updates
+  # in place, and points the image at it; the image links the two files into
+  # users.d and config.d.
+  if ! grep -q "mountPath: /etc/clickhouse-server/lwql$" "$out" \
+     || ! grep -A1 "name: LWQL_ACCESS_DIR" "$out" | grep -q "value: /etc/clickhouse-server/lwql"; then
+    fail "topology-mount" "the ClickHouse pod does not mount the access Secret at /etc/clickhouse-server/lwql with LWQL_ACCESS_DIR set."
+  fi
+  if grep -q "subPath: lwql-" "$out"; then
+    fail "topology-mount-subpath" "a subPath mount of the access Secret never sees an update; mount the directory."
   fi
   if ! grep -q "secretName: 'lw-lwql-clickhouse-access'" "$out" \
      && ! grep -q 'secretName: lw-lwql-clickhouse-access' "$out"; then
@@ -370,4 +373,4 @@ if [[ $failures -gt 0 ]]; then
   exit 1
 fi
 
-echo "PASS: all LangWatchQL connection/mode/delivery postures pinned — (1) chart-managed ClickHouse emits exactly the two passwords, each a secretKeyRef, on app and workers, and no CLICKHOUSE_LWQL_* config; (2) external ClickHouse emits the same two secretKeyRef vars only; (3) external PostgreSQL emits the same two secretKeyRef vars only and renders successfully; (4) lwql.enabled=false emits no LWQL env at all; (5) chart-managed ClickHouse leaves LWQL_ACCESS_MODEL_MODE unset (rendered default); (6) the clickhouse-external overlay selects sql mode and acknowledges single-node scope; (7) chart-managed ClickHouse renders one render Job (main-phase on install, pre-upgrade,pre-rollback hook on upgrade/rollback) with its RBAC and the LWQL password Secret as pre-install,pre-upgrade,pre-rollback hooks at a lower weight, a name-scoped Role, mounts the access Secret on every pod at both paths, and carries the catalog-version roll annotation"
+echo "PASS: all LangWatchQL connection/mode/delivery postures pinned — (1) chart-managed ClickHouse emits exactly the two passwords, each a secretKeyRef, on app and workers, and no CLICKHOUSE_LWQL_* config; (2) external ClickHouse emits the same two secretKeyRef vars only; (3) external PostgreSQL emits the same two secretKeyRef vars only and renders successfully; (4) lwql.enabled=false emits no LWQL env at all; (5) chart-managed ClickHouse leaves LWQL_ACCESS_MODEL_MODE unset (rendered default); (6) the clickhouse-external overlay selects sql mode and acknowledges single-node scope; (7) chart-managed ClickHouse renders one render Job (main-phase on install, pre-upgrade,pre-rollback hook on upgrade/rollback) with its RBAC and the LWQL password Secret as pre-install,pre-upgrade,pre-rollback hooks at a lower weight, a name-scoped Role, mounts the access Secret on every pod as a directory with LWQL_ACCESS_DIR set, and carries the catalog-version roll annotation"

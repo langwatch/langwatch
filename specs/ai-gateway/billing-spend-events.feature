@@ -21,6 +21,13 @@ Feature: Billing spend events, one durable record per gateway request
       And its attribution is already resolved
 
     @unit
+    Scenario: A request that names no model opens no spend record
+      Given a request whose body names no model
+      When it enters the gateway pipeline
+      Then no admit or fail command is emitted
+      And the caller is answered with the missing-model error
+
+    @unit
     Scenario: A gateway rejection admits and fails with its own taxonomy token
       Given a request a budget or guardrail rejects
       When the gateway refuses it

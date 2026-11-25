@@ -1,9 +1,12 @@
-/** Analytics' saved and starred dashboards, drawn where navigation places them (§10.1). */
+/** Analytics' saved dashboards and its Dashboards section, placed by navigation (§10.1). */
 
 import {
+  ProductDashboardsToken,
+  type ProductDashboardsProps,
   SavedDashboardsToken,
   type SavedDashboardsProps,
   StarredDashboardsToken,
+  type StarredDashboardsProps,
 } from "@langwatch/analytics-client";
 import { Lent } from "@langwatch/browser-host/lent";
 
@@ -11,7 +14,12 @@ export function SavedDashboards(props: SavedDashboardsProps) {
   return <Lent of={SavedDashboardsToken} props={props} />;
 }
 
-/** The member's starred dashboards; analytics draws nothing when there are none. */
-export function StarredDashboards() {
-  return <Lent of={StarredDashboardsToken} props={{}} />;
+/** The Dashboards section: the member's pinned dashboards and the "+" that adds one. */
+export function StarredDashboards(props: StarredDashboardsProps) {
+  return <Lent of={StarredDashboardsToken} props={props} />;
+}
+
+/** A product's "Dashboards" section with the organization's area on: its boards and "+". */
+export function ProductDashboards(props: ProductDashboardsProps) {
+  return <Lent of={ProductDashboardsToken} props={props} />;
 }

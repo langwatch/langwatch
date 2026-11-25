@@ -33,11 +33,13 @@ export class ClickHouseExperimentIdLookupRepository extends ExperimentIdLookupRe
         FROM ${TABLE_NAME}
         WHERE TenantId = {tenantId:String}
           AND RunId = {runId:String}
+          {{idBound:experiment_runs.RunId:runId}}
         ORDER BY UpdatedAt DESC
         LIMIT 1
       `,
       query_params: { tenantId, runId },
       format: "JSONEachRow",
+      idBound: { fallback: "unbounded" },
     });
 
     const rows = await result.json<{ ExperimentId: string }>();

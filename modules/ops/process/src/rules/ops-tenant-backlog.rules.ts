@@ -22,3 +22,24 @@ export function countWaitingJobsByTenant({
 
   return counts;
 }
+
+/**
+ * Jobs that arrived per tenant between two scans: the growth of its waiting jobs, never the
+ * absolute. A steady or draining backlog arrives nothing; a tenant absent last scan had none.
+ * Arrivals drained between scans go unseen; see specs/event-queue-anomaly-detection.feature.
+ */
+export function countArrivalsByTenant({
+  previous,
+  current,
+}: {
+  previous: ReadonlyMap<string, number>;
+  current: ReadonlyMap<string, number>;
+}): Map<string, number> {
+  const arrivals = new Map<string, number>();
+  for (const [tenantId, waiting] of current) {
+    const growth = waiting - (previous.get(tenantId) ?? 0);
+    if (growth > 0) arrivals.set(tenantId, growth);
+  }
+
+  return arrivals;
+}

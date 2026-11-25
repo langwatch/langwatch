@@ -94,6 +94,8 @@ export const LWQL_POSTGRES_CATALOGUE = defineLwqlCatalog({
       identityKey: "omit", // secret
       LastSeenAt: { source: "lastSeenAt" },
       ArchivedAt: { source: "archivedAt" },
+      CreatedById: { source: "createdById" },
+      UpdatedById: { source: "updatedById" },
       CreatedAt: { source: "createdAt" },
       UpdatedAt: { source: "updatedAt" },
     },
@@ -394,6 +396,8 @@ export const LWQL_POSTGRES_CATALOGUE = defineLwqlCatalog({
       CreatedById: { source: "createdById" },
       Scope: { source: "scope" },
       organizationId: "omit", // set only once a board is shared with the organization
+      excludedOrigins: "omit", // deprecated, unread since queries name their sources (AC200)
+      homeProduct: "omit", // which product's sidebar lists the board; navigation only
       CreatedAt: { source: "createdAt" },
       UpdatedAt: { source: "updatedAt" },
     },
@@ -550,6 +554,8 @@ export const LWQL_POSTGRES_CATALOGUE = defineLwqlCatalog({
       WorkflowId: { source: "workflowId" },
       CopiedFromEvaluatorId: { source: "copiedFromEvaluatorId" },
       ArchivedAt: { source: "archivedAt" },
+      CreatedById: { source: "createdById" },
+      UpdatedById: { source: "updatedById" },
       CreatedAt: { source: "createdAt" },
       UpdatedAt: { source: "updatedAt" },
     },
@@ -920,7 +926,8 @@ export const LWQL_POSTGRES_CATALOGUE = defineLwqlCatalog({
       Description: { source: "description", content: "output" },
       IconAsset: { source: "iconAsset", content: "output" },
       credentialSchema: "omit", // secret
-      OttlRules: { source: "ottlRules", content: "output" },
+      // Organization configuration: the console and the API serve it only to aiTools:manage.
+      OttlRules: { source: "ottlRules", content: "output", access: { allOf: ["aiTools:manage"] } },
       PlatformPublished: { source: "platformPublished" },
       Enabled: { source: "enabled" },
       ArchivedAt: { source: "archivedAt" },
@@ -971,6 +978,7 @@ export const LWQL_POSTGRES_CATALOGUE = defineLwqlCatalog({
       PendingHandoffTurnId: "inherit",
       RunToken: "omit", // secret
       ArchivedAt: "inherit",
+      CiFollowUpsInARow: "inherit",
       CreatedAt: "inherit",
       UpdatedAt: "inherit",
       OccurredAt: "inherit",
@@ -1124,6 +1132,11 @@ export const LWQL_POSTGRES_CATALOGUE = defineLwqlCatalog({
       ThreadIdleTimeout: { source: "threadIdleTimeout" },
       CreatedAt: { source: "createdAt" },
       UpdatedAt: { source: "updatedAt" },
+      AutoPausedAt: { source: "autoPausedAt" },
+      AutoPausedReason: { source: "autoPausedReason", content: "output" },
+      EvaluatorLabel: { source: "evaluatorLabel" },
+      CreatedById: { source: "createdById" },
+      UpdatedById: { source: "updatedById" },
     },
   }),
   notifications: defineTableCatalogue({
@@ -1161,6 +1174,7 @@ export const LWQL_POSTGRES_CATALOGUE = defineLwqlCatalog({
       ProjectName: { source: "name" },
       ProjectSlug: { source: "slug" },
       apiKey: "omit", // secret
+      legacyApiKeyLastUsedAt: "omit", // operator column for retiring legacy keys
       lwqlKey: "omit", // secret
       TeamId: { source: "teamId" },
       Language: { source: "language", content: "output" },
@@ -1339,10 +1353,15 @@ export const LWQL_POSTGRES_CATALOGUE = defineLwqlCatalog({
       Parameters: { source: "parameters", content: "output" },
       SimulatorModel: { source: "simulatorModel" },
       JudgeModel: { source: "judgeModel" },
+      TraceQuietPeriodMs: { source: "traceQuietPeriodMs" },
+      TraceWaitTimeoutMs: { source: "traceWaitTimeoutMs" },
       MaxTurns: { source: "maxTurns" },
       MinTurns: { source: "minTurns" },
       Fields: { source: "fields", content: "output" },
       CallerVoice: { source: "callerVoice", content: "output" },
+      Kind: { source: "kind" },
+      RedTeam: { source: "redTeam", content: "output" },
+      sourceTemplateId: "omit", // internal bookkeeping: the template a scenario came from
       TestSuiteId: { source: "testSuiteId" },
       Version: { source: "version" },
       LastUpdatedById: { source: "lastUpdatedById" },
@@ -1405,10 +1424,14 @@ export const LWQL_POSTGRES_CATALOGUE = defineLwqlCatalog({
       Labels: { source: "labels" },
       SimulatorModel: { source: "simulatorModel" },
       JudgeModel: { source: "judgeModel" },
+      TraceQuietPeriodMs: { source: "traceQuietPeriodMs" },
+      TraceWaitTimeoutMs: { source: "traceWaitTimeoutMs" },
       Kind: { source: "kind" },
       ScopeConfig: { source: "scope", content: "output" }, // not a scope label
       Fields: { source: "fields", content: "output" },
       Evaluators: { source: "evaluators", content: "output" },
+      TemplateId: { source: "templateId" },
+      TemplateVersion: { source: "templateVersion" },
       ArchivedAt: { source: "archivedAt" },
       CreatedAt: { source: "createdAt" },
       UpdatedAt: { source: "updatedAt" },

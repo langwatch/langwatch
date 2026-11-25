@@ -3,7 +3,7 @@
 Scoping document (not yet implemented). Citations are `file:line` under
 `tools/thuishaven/` unless noted.
 
-## Problem & how it differs from boxd
+## Problem
 
 Trying a teammate's PR locally today is a manual chore: `git fetch`, `git
 worktree add`, copy `.env`s, `pnpm install`, regen Prisma/Zod, migrate, seed,
@@ -18,13 +18,10 @@ identity, the overlay env file, process supervision, and a daemon that reaps dea
 stacks. **`haven pr` is the missing front-half** — resolve a PR to a worktree —
 bolted onto haven's existing `up` back-half, plus a throwaway-teardown story.
 
-**vs boxd** (`dev/docs/runbooks/boxd-makefile.md`): boxd forks a _cloud VM_ from a golden
-image — durable, shareable, production-shaped, minutes to provision. `haven pr`
-is the opposite end: **local native processes, seconds to a hostname, disposable**
-— reuses your warm pnpm store, already-running shared Postgres/ClickHouse, and
-local colima VM, and self-destructs on idle. Use `haven pr` to glance at a PR's
-behaviour in your browser right now; use boxd when you need an isolated machine
-that outlives your terminal. Complementary, not competing.
+`haven pr` is **local native processes, seconds to a hostname, disposable** —
+it reuses your warm pnpm store, already-running shared Postgres/ClickHouse, and
+local colima VM, and self-destructs on idle. Use it to glance at a PR's
+behaviour in your browser right now.
 
 ## CLI surface
 
@@ -67,8 +64,8 @@ provision→codegen→migrate→seed→supervise pipeline with zero refactor.
 
 1. **Resolve the PR** (new). Parse a bare number or `github.com/.../pull/N` URL,
    then `gh pr view <N> --repo langwatch/langwatch --json headRefName,headRefOid,isCrossRepository,...`.
-   `gh` is already a documented prereq, used at `dev/scripts/worktree.sh:86-92` and
-   `dev/scripts/boxd-fork.sh:468-487`. Refuse a non-OPEN PR unless `--force`.
+   `gh` is already a documented prereq, used at `dev/scripts/worktree.sh:86-92`.
+   Refuse a non-OPEN PR unless `--force`.
 2. **Create/reuse the worktree** (new). First check `Hygiene.Worktrees(repoRoot)`
    (`adapters/hygiene/hygiene.go:25-51`) — if the branch is already checked out
    (e.g. `worktrees/pr-5015` exists), skip the add and just `up` there. Otherwise
@@ -159,7 +156,6 @@ dirty** (`Hygiene.Dirty`, `hygiene.go:54-60`) — never delete uncommitted work.
 - Depends on `haven-private-redis-plan.md` (Redis is always private here).
 - Extend `dev/docs/adr/004-docker-dev-environment.md` (worktree isolation,
   stateful volumes, in-process workers amendments).
-- Reference `dev/docs/runbooks/boxd-makefile.md` (local-vs-cloud complementarity) and
-  `tools/thuishaven/README.md` "Forward ideas" (this ships two of them).
+- Reference `tools/thuishaven/README.md` "Forward ideas" (this ships two of them).
 - Ruled out: `specs/langy/langy-github-prs-plan.md` is the _Langy agent_ opening
   PRs on a user's behalf — unrelated to haven trying PRs locally.

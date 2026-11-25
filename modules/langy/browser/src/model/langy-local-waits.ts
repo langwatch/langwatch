@@ -33,6 +33,8 @@ export interface LangyLiveWait {
   kind: "permission" | "question";
   status: LangyWaitStatus;
   toolCallId?: string;
+  /** The turn this tab was streaming when the entry arrived, so a Stop closes only its cards. */
+  turnId?: string;
   callId?: string;
   summary?: string;
   pattern?: string;
@@ -462,6 +464,23 @@ export function routeLangyChoiceAnswer({
   return wait && wait.status === "pending"
     ? { kind: "wait", waitId: wait.waitId }
     : { kind: "message" };
+}
+
+/**
+ * Whether answering a card in place also has to start the next turn. A card no tool call raised
+ * is one the platform asked itself (a confirmation card), and it outlives its turn: answered
+ * while no turn runs, nobody is waiting on it, so the answer rides the send path as well.
+ */
+export function langyAnswerStartsNextTurn({
+  turnRunning,
+  blockId,
+  waitId,
+}: {
+  turnRunning: boolean;
+  blockId: string;
+  waitId: string;
+}): boolean {
+  return !turnRunning && toolCallIdOfQuestionBlock(blockId) === waitId;
 }
 
 /**

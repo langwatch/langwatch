@@ -8,6 +8,7 @@ import type { MonitorWithEvaluator } from "@langwatch/monitor-contract";
 import { createLogger } from "@langwatch/observability";
 import type { EvaluationTraceEvent } from "@langwatch/trace-contract";
 
+import { isEvaluationSampled } from "../../../rules/evaluation-sampling.rules.ts";
 import type { AzureSafetyCredentialsService } from "../../evaluators/services/azure-safety-credentials.service.ts";
 import {
   EvaluatorSettingsService,
@@ -30,7 +31,7 @@ export type PreparedEvaluation = {
 export type EvaluationPreparationResult =
   | { kind: "ready"; value: PreparedEvaluation }
   | { kind: "reported-skip"; details: string }
-  | { kind: "drop" };
+  | { kind: "drop"; reason: string };
 
 export class EvaluationExecutionPreparationService {
   static create(input: {
@@ -80,7 +81,7 @@ export class EvaluationExecutionPreparationService {
     }
 
     if (!this.isSampled(data, monitor.sample)) {
-      return { kind: "drop" };
+      return { kind: "drop", reason: "Excluded by sampling" };
     }
 
     const spans = await this.deps.traces.getEvaluationSpans({
@@ -98,7 +99,7 @@ export class EvaluationExecutionPreparationService {
         "Evaluator required fields not met — skipping evaluation",
       );
 
-      return { kind: "drop" };
+      return { kind: "drop", reason: "Evaluator required fields not met" };
     }
 
     const events = await this.loadEvents(data, monitor.preconditions);
@@ -119,7 +120,7 @@ export class EvaluationExecutionPreparationService {
         "Preconditions not met — skipping evaluation",
       );
 
-      return { kind: "drop" };
+      return { kind: "drop", reason: "Preconditions not met" };
     }
 
     const resolved = this.settings.resolve({
@@ -165,10 +166,17 @@ export class EvaluationExecutionPreparationService {
   }
 
   private isSampled(data: ExecuteEvaluationCommandData, sample: number): boolean {
-    const sampled = Math.random() <= sample;
+    // A retry was already picked by the first attempt; keep it even if the rate changed since.
+    if ((data.attempt ?? 1) > 1) return true;
+
+    const sampled = isEvaluationSampled({
+      traceId: data.traceId,
+      monitorId: data.evaluatorId,
+      sample,
+    });
     if (!sampled) {
       logger.debug(
-        { tenantId: data.tenantId, evaluatorId: data.evaluatorId, sample },
+        { tenantId: data.tenantId, evaluatorId: data.evaluatorId, traceId: data.traceId, sample },
         "Evaluation excluded by sampling",
       );
     }

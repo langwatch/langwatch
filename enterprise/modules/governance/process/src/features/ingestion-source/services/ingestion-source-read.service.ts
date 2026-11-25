@@ -8,6 +8,7 @@ import { createTenantId } from "@langwatch/eventing";
 import { PROJECT_KIND, type ProjectApi } from "@langwatch/project-contract";
 
 import type { IngestionPullRunRepository } from "../../../repositories/ingestion-pull-run.repository.ts";
+import { findPullConfigComplaints } from "../../ingestion-pull/rules/pull-config-shape.rules.ts";
 import {
   type PullRunSummary,
   sourcePullStatus,
@@ -53,6 +54,15 @@ export class IngestionSourceReadService {
   async present(row: GovernanceIngestionSource): Promise<IngestionSourceDto> {
     const live = await this.sources.liveTraceProjectIds([row], row.organizationId);
     return this.toDto({ row, live, pullRun: null });
+  }
+
+  /** The last pull run's error for a scheduled source; null when it never failed or never ran. */
+  async getLastPullOutcome(input: {
+    id: string;
+    organizationId: string;
+  }): Promise<{ lastError: string | null }> {
+    const run = await this.lastPullRun(input);
+    return { lastError: run?.LastRunError ?? null };
   }
 
   private async lastPullRun({
@@ -108,6 +118,7 @@ export class IngestionSourceReadService {
         cursor: row.pollerCursor,
         pullRun,
       }),
+      configComplaints: findPullConfigComplaints(row.parserConfig),
       traceProjectId,
       traceProjectArchived: traceProjectId ? !live.has(traceProjectId) : false,
       lastEventAt: row.lastEventAt,

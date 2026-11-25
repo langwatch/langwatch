@@ -6,7 +6,7 @@ Spec: specs/evaluators/langevals-judge-long-content.feature
 import litellm
 import pytest
 
-from langevals_core.base_evaluator import EvaluationResultSkipped
+from langevals_core.base_evaluator import DEFAULT_MAX_TOKENS, EvaluationResultSkipped
 from langevals_core.token_budget import (
     FittedContent,
     count_tokens,
@@ -129,6 +129,15 @@ def test_unknown_model_keeps_the_setting(monkeypatch):
     monkeypatch.setattr(litellm, "get_model_info", unknown)
 
     assert judge_token_budget("custom/judge", 50_000) == 50_000
+
+
+def test_unset_max_tokens_reads_as_the_default(monkeypatch):
+    def unknown(model):
+        raise Exception("This model isn't mapped yet")
+
+    monkeypatch.setattr(litellm, "get_model_info", unknown)
+
+    assert judge_token_budget("custom/judge", None) == DEFAULT_MAX_TOKENS
 
 
 # @scenario "A prompt that leaves no room for content is skipped with the reason"

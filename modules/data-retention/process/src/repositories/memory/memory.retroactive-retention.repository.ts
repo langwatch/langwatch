@@ -1,5 +1,8 @@
+import type { IdIndexDeclaration } from "@langwatch/clickhouse-client";
 import {
   RetroactiveMutationInProgressError,
+  retentionCategories,
+  type ResolvedRetention,
   type RetentionCategory,
   type RetroactiveMutationProgress,
 } from "@langwatch/data-retention-contract";
@@ -8,6 +11,11 @@ import { EventLogRetention } from "@langwatch/eventing/server";
 import { type Instant, nowInstant, toDate } from "@langwatch/time";
 
 import { EVENT_LOG_RETENTION_CLASSIFICATION } from "../../rules/event-log-retention.rules.ts";
+import { idIndexCategories } from "../../rules/id-index-categories.rules.ts";
+import type {
+  RetentionDriftWindow,
+  StoredRetentionStamp,
+} from "../../rules/retention-drift.rules.ts";
 import type {
   ClickHouseTarget,
   KeepForeverRewrite,
@@ -28,9 +36,30 @@ export class MemoryRetroactiveRetentionRepository implements RetroactiveRetentio
   #nextId = 1;
   /** Eventing's own check of a category, over a store this twin does not have. */
   readonly #eventLogRetention = EventLogRetention.create({
-    client: { command: async () => {} },
+    client: {
+      command: async () => {},
+      query: async ({ params }) => ({
+        rows: this.idIndexTenants.has(String(params?.table)) ? [{ name: params?.table }] : [],
+      }),
+    },
     classification: EVENT_LOG_RETENTION_CLASSIFICATION,
   });
+
+  /** The id indexes the process declared, as the live client holds them; tests set it. */
+  idIndexDeclarations: readonly IdIndexDeclaration[] = [];
+
+  /** Each declared id index this twin rewrites itself, with its source's category. */
+  #idIndexCategories(): ReadonlyMap<string, RetentionCategory> {
+    return idIndexCategories({
+      declarations: this.idIndexDeclarations,
+      eventLogIndex: this.#eventLogRetention.idIndexTable,
+    });
+  }
+
+  /** The id indexes this twin's targets hold, with the tenants that have rows; tests set it. */
+  idIndexTenants: ReadonlyMap<string, readonly string[]> = new Map();
+  /** The retention each id index row was raised to, keyed `index/tenant/category`. */
+  readonly idIndexRetention = new Map<string, number>();
 
   /** Keep-forever rewrites by target (`""` is the shared one), newest first; done at once. */
   readonly #keepForever = new Map<string, KeepForeverRewrite[]>();
@@ -39,16 +68,94 @@ export class MemoryRetroactiveRetentionRepository implements RetroactiveRetentio
 
   private constructor(private readonly now: () => Instant) {}
 
+  /** Each raise this twin was asked for, in order; tests read it. */
+  readonly raises: { projectId: string; category: RetentionCategory; retentionDays: number }[] = [];
+  /** Raises to refuse as a running rewrite would, before any is applied; tests set it. */
+  refuseNextRaises = 0;
+
+  /** Stored items keyed `project/category`: each one's age and stamped days; tests set it. */
+  readonly storedItems = new Map<string, { ageDays: number; retentionDays: number }[]>();
+
+  async countPastRetention(input: {
+    projectId: string;
+    category: RetentionCategory;
+    retentionDays: number;
+    nowMs: number;
+  }): Promise<number> {
+    if (input.retentionDays === 0) return 0;
+    return (this.storedItems.get(`${input.projectId}/${input.category}`) ?? []).filter(
+      (item) =>
+        item.ageDays > input.retentionDays &&
+        (item.retentionDays === 0 || item.retentionDays > input.retentionDays),
+    ).length;
+  }
+
+  /** Sampled stamps keyed `project/category`; tests set them. */
+  readonly sampledStamps = new Map<string, StoredRetentionStamp[]>();
+  /** Projects whose sample read fails as an unreachable server would; tests set them. */
+  readonly refuseSampleFor = new Set<string>();
+
+  async sampleStoredRetention(input: {
+    projectId: string;
+    category: RetentionCategory;
+    windows: readonly RetentionDriftWindow[];
+  }): Promise<StoredRetentionStamp[]> {
+    if (this.refuseSampleFor.has(input.projectId)) {
+      throw new Error(`Stored rows of ${input.projectId} could not be read`);
+    }
+    return this.sampledStamps.get(`${input.projectId}/${input.category}`) ?? [];
+  }
+
   async triggerUpdate(input: {
     projectId: string;
     category: RetentionCategory;
     newRetentionDays: number;
   }): Promise<{ tables: string[] }> {
+    const result = await this.#rewrite({ ...input, raiseOnly: false });
+    this.applies.push({
+      projectId: input.projectId,
+      category: input.category,
+      retentionDays: input.newRetentionDays,
+    });
+    return result;
+  }
+
+  /** Each exact rewrite this twin was asked for, in order; tests read it. */
+  readonly applies: { projectId: string; category: RetentionCategory; retentionDays: number }[] =
+    [];
+
+  async raiseRetention(input: {
+    projectId: string;
+    category: RetentionCategory;
+    newRetentionDays: number;
+  }): Promise<{ tables: string[] }> {
+    if (this.refuseNextRaises > 0) {
+      this.refuseNextRaises -= 1;
+      throw new RetroactiveMutationInProgressError([]);
+    }
+    const result = await this.#rewrite({ ...input, raiseOnly: true });
+    this.raises.push({
+      projectId: input.projectId,
+      category: input.category,
+      retentionDays: input.newRetentionDays,
+    });
+    return result;
+  }
+
+  async #rewrite(input: {
+    projectId: string;
+    category: RetentionCategory;
+    newRetentionDays: number;
+    raiseOnly: boolean;
+  }): Promise<{ tables: string[] }> {
     const categoryTables = Object.entries(RETENTION_TABLE_CATEGORY_MAP)
       .filter(([, category]) => category === input.category)
       .map(([table]) => table);
+    const categoryIndexes = [...this.#idIndexCategories()]
+      .filter(([, category]) => category === input.category)
+      .map(([index]) => index);
     const eventingTables: readonly string[] = this.#eventLogRetention.tables;
-    const tables = [...new Set([...categoryTables, ...eventingTables])];
+    const tables = [...new Set([...categoryTables, ...categoryIndexes, ...eventingTables])];
 
     // Another category's eventing rewrite touches disjoint rows, so only this category's blocks.
     const active = (this.#mutations.get(input.projectId) ?? []).filter(
@@ -58,15 +165,31 @@ export class MemoryRetroactiveRetentionRepository implements RetroactiveRetentio
         (!eventingTables.includes(mutation.table) || mutation.category === input.category),
     );
     if (active.length > 0) throw new RetroactiveMutationInProgressError(active);
-    await this.#eventLogRetention.retainCategory({
+    const eventLogRewrite = {
       tenantId: input.projectId,
       category: input.category,
       retentionDays: input.newRetentionDays,
-    });
+    };
+    const eventingRewritten = input.raiseOnly
+      ? await this.#eventLogRetention.raiseCategory(eventLogRewrite)
+      : await this.#eventLogRetention.retainCategory(eventLogRewrite);
+    const heldIndexes = [
+      ...categoryIndexes.filter((index) => this.idIndexTenants.has(index)),
+      ...eventingRewritten.filter((table) => table === this.#eventLogRetention.idIndexTable),
+    ];
+    for (const index of heldIndexes) {
+      this.#raise({
+        index,
+        tenantId: input.projectId,
+        category: input.category,
+        retentionDays: input.newRetentionDays,
+      });
+    }
 
+    const rewritten = [...new Set([...categoryTables, ...heldIndexes, ...eventingRewritten])];
     const started = this.#mutations.get(input.projectId) ?? [];
     started.push(
-      ...tables.map((table) => ({
+      ...rewritten.map((table) => ({
         mutationId: `mutation_${this.#nextId++}`,
         table,
         isDone: false,
@@ -77,7 +200,7 @@ export class MemoryRetroactiveRetentionRepository implements RetroactiveRetentio
     );
     this.#mutations.set(input.projectId, started);
 
-    return { tables };
+    return { tables: rewritten };
   }
 
   /** The unfinished mutations of one project, newest first. */
@@ -114,5 +237,65 @@ export class MemoryRetroactiveRetentionRepository implements RetroactiveRetentio
       latestFailReason: "",
     };
     this.#keepForever.set(key, [rewrite, ...(this.#keepForever.get(key) ?? [])]);
+  }
+
+  async findHeldIdIndexes(
+    input: ClickHouseTarget & { indexes: readonly string[] },
+  ): Promise<string[]> {
+    return this.#governedIdIndexes(input.indexes).filter((index) => this.idIndexTenants.has(index));
+  }
+
+  async findIdIndexTenantIds(
+    input: ClickHouseTarget & { indexes: readonly string[] },
+  ): Promise<string[]> {
+    const held = await this.findHeldIdIndexes(input);
+    return [...new Set(held.flatMap((index) => this.idIndexTenants.get(index) ?? []))].toSorted(
+      (left, right) => left.localeCompare(right),
+    );
+  }
+
+  async raiseIdIndexRetention(
+    input: ClickHouseTarget & {
+      indexes: readonly string[];
+      retentionByTenant: ReadonlyMap<string, ResolvedRetention>;
+    },
+  ): Promise<string[]> {
+    const held = await this.findHeldIdIndexes(input);
+    for (const index of held) {
+      const categories =
+        index === this.#eventLogRetention.idIndexTable
+          ? retentionCategories
+          : [this.#idIndexCategories().get(index)].filter((category) => category !== undefined);
+      for (const [tenantId, retention] of input.retentionByTenant) {
+        for (const category of categories) {
+          this.#raise({ index, tenantId, category, retentionDays: retention[category] });
+        }
+      }
+    }
+    return held;
+  }
+
+  /** Raise-only, with a source's `0` (kept forever) written as the highest value. */
+  #raise({
+    index,
+    tenantId,
+    category,
+    retentionDays,
+  }: {
+    index: string;
+    tenantId: string;
+    category: RetentionCategory;
+    retentionDays: number;
+  }): void {
+    const key = `${index}/${tenantId}/${category}`;
+    const days = retentionDays === 0 ? 65_535 : retentionDays;
+    this.idIndexRetention.set(key, Math.max(this.idIndexRetention.get(key) ?? 0, days));
+  }
+
+  #governedIdIndexes(indexes: readonly string[]): string[] {
+    return [...new Set(indexes)].filter(
+      (index) =>
+        index === this.#eventLogRetention.idIndexTable || this.#idIndexCategories().has(index),
+    );
   }
 }

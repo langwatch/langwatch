@@ -11,6 +11,7 @@ import {
 } from "@langwatch/model-provider-contract";
 
 import type { ModelDefaultRepository } from "../../../repositories/model-default.repository.ts";
+import type { ModelProviderDecisionModelService } from "../../../services/model-provider-decision-model.service.ts";
 import type { ModelProviderScopeService } from "../../../services/model-provider-scope.service.ts";
 import type { ModelProviderWriteAuthorizationService } from "../../../services/model-provider-write-authorization.service.ts";
 import type { ModelProviderIdService } from "../../../services/prefixed-model-provider-id.service.ts";
@@ -22,6 +23,8 @@ type ModelProviderDefaultsWriteOptions = {
   writeAuthorization: ModelProviderWriteAuthorizationService;
   ids: ModelProviderIdService;
   scopes: ModelProviderScopeService;
+  /** Refuses an own decision model without the flag, or on a scope with no key for it (ADR-182). */
+  decisionModels: Pick<ModelProviderDecisionModelService, "assertMayStore">;
 };
 
 export class ModelProviderDefaultsWriteService {
@@ -33,8 +36,8 @@ export class ModelProviderDefaultsWriteService {
 
   async set(input: ModelDefaultAssignmentInput): Promise<void> {
     const parsed = modelDefaultAssignmentInputSchema.parse(input);
-    const config = this.options.catalog.sanitizeDefaultConfig({
-      [parsed.key]: parsed.model ?? "",
+    const { config } = this.options.catalog.sanitizeDefaultConfig({
+      config: { [parsed.key]: parsed.model ?? "" },
     });
     if (parsed.model !== null && !config[parsed.key]) {
       throw new ModelProviderInvalidError(`Model is not allowed for default key: ${parsed.key}`);
@@ -46,10 +49,16 @@ export class ModelProviderDefaultsWriteService {
     }
 
     const organizationId = await this.options.scopes.getOrganizationIdForScope(parsed.scope);
+    await this.options.decisionModels.assertMayStore({
+      organizationId,
+      config,
+      scopes: [parsed.scope],
+    });
     await this.options.defaults.set({
       id: this.options.ids.generate({ type: "default" }),
       organizationId,
       ...parsed,
+      model: parsed.model === null ? null : config[parsed.key]!,
       authorId: parsed.authorId ?? null,
     });
   }
@@ -63,9 +72,15 @@ export class ModelProviderDefaultsWriteService {
       return this.deleteEmptyConfig(parsed.actorId, existing);
     }
 
-    const config = this.options.catalog.sanitizeDefaultConfig(
-      parsed.config ?? existing?.config ?? {},
-    );
+    const { config, droppedRestricted } = this.options.catalog.sanitizeDefaultConfig({
+      config: parsed.config ?? existing?.config ?? {},
+      stored: existing?.config,
+    });
+    if (Object.keys(config).length === 0 && droppedRestricted) {
+      throw new ModelDefaultValidationError(
+        "Every model in this config is restricted to coding-assistant surfaces. Pick another model, or remove the config.",
+      );
+    }
     if (Object.keys(config).length === 0) {
       if (existing) {
         return this.deleteEmptyConfig(parsed.actorId, existing);
@@ -91,6 +106,12 @@ export class ModelProviderDefaultsWriteService {
     }
 
     const organizationId = await this.options.scopes.getOrganizationIdForScopes(scopes);
+    await this.options.decisionModels.assertMayStore({
+      organizationId,
+      config,
+      scopes,
+      ...(existing ? { stored: existing.config, storedScopes: existing.scopes } : {}),
+    });
 
     return this.options.defaults.save({
       id: parsed.id ?? this.options.ids.generate({ type: "default" }),

@@ -1,5 +1,7 @@
 /** Audit-log filters: pure functions reading from and returning whole query. */
 
+import { BRAID_AUDIT_TARGET_KIND } from "@langwatch/authz-contract";
+
 const DEFAULT_PAGE_SIZE = 25;
 
 /** How far into the trail the table is, and how much of it it shows. */
@@ -25,26 +27,34 @@ export function readAuditPaging(query: Readonly<Record<string, string | undefine
 }
 
 /**
- * The gateway deep-link a Virtual Key or Budget detail page arrives with:
- * `/settings/audit-log?targetKind=virtual_key&targetId=vk_xxx` is a link one
- * screen writes and this one reads — the two spellings are a contract.
+ * A detail page's deep-link: `?targetKind=virtual_key&targetId=vk_xxx` is a link one screen
+ * writes and this one reads, so the spellings are a contract; `targetLabel` names the chip.
  */
-export type AuditTargetFilter = { targetKind: string; targetId: string } | undefined;
+export type AuditTargetFilter =
+  | { targetKind: string; targetId: string; targetLabel?: string }
+  | undefined;
 
 export function readAuditTarget(
   query: Readonly<Record<string, string | undefined>>,
 ): AuditTargetFilter {
-  const targetKind = query.targetKind;
-  const targetId = query.targetId;
+  const { targetKind, targetId, targetLabel } = query;
   if (!targetKind || !targetId) return void 0;
-  return { targetKind, targetId };
+  return targetLabel ? { targetKind, targetId, targetLabel } : { targetKind, targetId };
+}
+
+/** The chip naming the target filter: a braid by its projects, never by its grant id. */
+export function auditTargetChipText(target: NonNullable<AuditTargetFilter>): string {
+  if (target.targetKind === BRAID_AUDIT_TARGET_KIND) {
+    return target.targetLabel ? `Braid: ${target.targetLabel.slice(0, 80)}` : "Braid";
+  }
+  return `${target.targetKind} = ${target.targetId.slice(0, 24)}…`;
 }
 
 /** The next whole query with the target filter taken back off. */
 export function withoutAuditTarget(
   query: Readonly<Record<string, string | undefined>>,
 ): Record<string, string | undefined> {
-  const { targetKind: _kind, targetId: _id, ...rest } = query;
+  const { targetKind: _kind, targetId: _id, targetLabel: _label, ...rest } = query;
   return rest;
 }
 
@@ -122,4 +132,22 @@ export function searchMatchesNobody(
 ): boolean {
   if (!members || !search.trim()) return false;
   return matchMemberId(members, search) === undefined;
+}
+
+/** The project filter, remembered together with the organization it was picked in. */
+export type AuditProjectFilter = { organizationId: string; projectId: string | null };
+
+/**
+ * The filter rebased onto the organization in scope. One picked in an
+ * organization the reader has left is gone for good: it names a project the
+ * new one never heard of, and returning must not revive a forgotten choice.
+ */
+export function auditProjectFilterIn({
+  filter,
+  organizationId,
+}: {
+  filter: AuditProjectFilter;
+  organizationId: string;
+}): AuditProjectFilter {
+  return filter.organizationId === organizationId ? filter : { organizationId, projectId: null };
 }

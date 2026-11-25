@@ -2,6 +2,10 @@ import { createLogger } from "@langwatch/observability";
 import { type Instant, Temporal } from "@langwatch/time";
 
 import type { CodingAgentClock } from "./coding-agent-clock.service.ts";
+import {
+  CODING_AGENT_SESSION_SEEN_WINDOW_MS,
+  CodingAgentHoldWindowService,
+} from "./coding-agent-hold-window.service.ts";
 
 /** Single throttled write to mark projects as having seen agent activity. */
 export interface CodingAgentProjectActivity {
@@ -14,12 +18,10 @@ export interface CodingAgentProjectActivity {
 }
 
 const logger = createLogger("langwatch:coding-agent-processing:session-seen-touch");
-export const CODING_AGENT_SESSION_SEEN_WINDOW_MS = 5 * 60 * 1000;
-const WINDOW_MAP_SWEEP_THRESHOLD = 10_000;
 
 /** Records recent Coding Agent activity without turning a hot fold into Postgres traffic. */
 export class CodingAgentSessionSeenService {
-  private readonly heldUntil = new Map<string, number>();
+  private readonly holds = CodingAgentHoldWindowService.create();
 
   private constructor(
     private readonly projects: CodingAgentProjectActivity,
@@ -35,30 +37,20 @@ export class CodingAgentSessionSeenService {
 
   async record(projectIds: Iterable<string>): Promise<void> {
     const at = this.clock.nowMs();
-    if (this.heldUntil.size >= WINDOW_MAP_SWEEP_THRESHOLD) {
-      this.sweepExpiredHolds(at);
-    }
+    this.holds.sweepIfLarge(at);
 
     const due = this.claimDueProjects(projectIds, at);
     await Promise.all(due.map((projectId) => this.touchProject(projectId, at)));
   }
 
-  private sweepExpiredHolds(at: number): void {
-    for (const [key, until] of this.heldUntil) {
-      if (until <= at) {
-        this.heldUntil.delete(key);
-      }
-    }
-  }
-
   private claimDueProjects(projectIds: Iterable<string>, at: number): string[] {
     const due: string[] = [];
     for (const projectId of new Set(projectIds)) {
-      if ((this.heldUntil.get(projectId) ?? 0) > at) {
+      if (this.holds.isHeld(projectId, at)) {
         continue;
       }
 
-      this.heldUntil.set(projectId, at + CODING_AGENT_SESSION_SEEN_WINDOW_MS);
+      this.holds.hold(projectId, at);
       due.push(projectId);
     }
 
@@ -73,9 +65,7 @@ export class CodingAgentSessionSeenService {
         at: Temporal.Instant.fromEpochMilliseconds(at),
       });
     } catch (error) {
-      if (this.heldUntil.get(projectId) === holdSetTo) {
-        this.heldUntil.delete(projectId);
-      }
+      this.holds.release(projectId, holdSetTo);
 
       logger.warn(
         { error, tenantId: projectId },

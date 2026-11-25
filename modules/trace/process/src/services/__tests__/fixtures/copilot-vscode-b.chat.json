@@ -1,0 +1,45 @@
+{
+	"scopeName": "copilot-chat",
+	"spanName": "chat gpt-6-luna",
+	"vendorVersion": "0.67.0",
+	"resourceAttributes": {
+		"service.name": "copilot-chat",
+		"service.version": "0.67.0",
+		"session.id": "00000000-0000-4000-8000-0000000000131792414498335"
+	},
+	"attributes": {
+		"gen_ai.operation.name": "chat",
+		"gen_ai.provider.name": "github",
+		"gen_ai.request.model": "gpt-6-luna",
+		"gen_ai.conversation.id": "00000000-0000-4000-8000-000000000014",
+		"gen_ai.request.max_tokens": 128000,
+		"copilot_chat.request.max_prompt_tokens": 872000,
+		"copilot_chat.session_id": "00000000-0000-4000-8000-000000000014",
+		"copilot_chat.chat_session_id": "00000000-0000-4000-8000-000000000014",
+		"gen_ai.agent.name": "panel/editAgent",
+		"copilot_chat.user_request": "[{\"type\":\"input_text\",\"text\":\"<redacted>\",\"prompt_cache_breakpoint\":{\"mode\":\"<redacted>\"}}]",
+		"gen_ai.system_instructions": "[{\"type\":\"text\",\"content\":\"<redacted>\"}]",
+		"gen_ai.input.messages": "[{\"role\":\"user\",\"parts\":[{\"type\":\"text\",\"content\":\"<redacted>\"}]},{\"role\":\"user\",\"parts\":[{\"type\":\"text\",\"content\":\"<redacted>\"}]}]",
+		"gen_ai.tool.definitions": "[{\"type\":\"function\",\"name\":\"apply_patch\",\"description\":\"<redacted>\",\"parameters\":{\"type\":\"object\",\"properties\":{\"input\":{\"type\":\"string\",\"description\":\"<redacted>\"},\"explanation\":{\"type\":\"string\",\"description\":\"<redacted>\"}},\"required\":[\"<redacted>\",\"<redacted>\"]}},{\"type\":\"function\",\"name\":\"create_file\",\"description\":\"<redacted>\",\"parameters\":{\"type\":\"object\",\"properties\":{\"filePath\":{\"type\":\"string\",\"description\":\"<redacted>\"},\"content\":{\"type\":\"string\",\"description\":\"<redacted>\"}},\"required\":[\"<redacted>\",\"<redacted>\"]}},{\"type\":\"function\",\"name\":\"fetch_webpage\",\"description\":\"<redacted>\",\"parameters\":{\"type\":\"object\",\"properties\":{\"urls\":{\"type\":\"array\",\"items\":{\"type\":\"string\"},\"description\":\"<redacted>\"},\"query\":{\"type\":\"string\",\"description\":\"<redacted>\"}},\"required\":[\"<redacted>\",\"<redacted>\"]}}]",
+		"copilot_chat.request.options": "{\"reasoning\":{\"effort\":\"<redacted>\"},\"text\":{\"verbosity\":\"<redacted>\"},\"truncation\":\"<redacted>\",\"store\":false,\"stream\":true,\"include\":[\"<redacted>\"]}",
+		"copilot_chat.request.shape": "{\"api\":\"responses\",\"inputItemCount\":3,\"inputItemTypes\":[\"message\",\"message\",\"message\"]}",
+		"gen_ai.usage.input_tokens": 24441,
+		"gen_ai.usage.output_tokens": 87,
+		"gen_ai.response.model": "gpt-6-luna",
+		"gen_ai.response.id": "<id>",
+		"gen_ai.response.finish_reasons": [
+			"stop"
+		],
+		"gen_ai.usage.cache_read.input_tokens": 0,
+		"copilot_chat.time_to_first_token": 1234,
+		"gen_ai.request.stream": true,
+		"gen_ai.response.time_to_first_chunk": 2.61,
+		"copilot_chat.server_request_id": "<server_request_id>",
+		"gen_ai.usage.reasoning_tokens": 16,
+		"gen_ai.usage.reasoning.output_tokens": 16,
+		"copilot_chat.copilot_usage_nano_aiu": 309855000,
+		"gen_ai.output.messages": "[{\"role\":\"assistant\",\"parts\":[{\"type\":\"text\",\"content\":\"<redacted>\"},{\"type\":\"tool_call\",\"id\":\"<redacted>\",\"name\":\"list_dir\",\"arguments\":\"<redacted>\"}]}]",
+		"copilot_chat.reasoning_content": "<redacted>"
+	},
+	"events": []
+}

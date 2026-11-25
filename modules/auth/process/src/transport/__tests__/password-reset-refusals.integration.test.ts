@@ -71,9 +71,11 @@ function transportOver({ db }: { db: MemoryDb }) {
           deactivatedAt: null,
           pendingSsoSetup: false,
           signupConfirmationPending: false,
+          passwordResetRequiredAt: null,
           lastLoginAt: null,
           emailVerified: true,
         }),
+        clearPasswordResetRequirement: async () => undefined,
       }),
       sendResetPassword: async (mail) => {
         sent.push(mail);

@@ -1,6 +1,7 @@
 import {
   IdentityPasskeyAlreadyRegisteredError,
   IdentityPasswordRejectedError,
+  IdentityPasswordResetRequiredError,
   IdentityResetLinkInvalidError,
   IdentitySignInRefusedError,
   TwoStepPasswordInvalidError,
@@ -74,6 +75,11 @@ const BETTER_AUTH_REFUSALS: readonly BetterAuthRefusal[] = [
     family: "/sign-in/",
     betterAuthCode: "INVALID_PASSWORD",
     error: IdentitySignInRefusedError,
+  },
+  {
+    family: "/sign-in/",
+    betterAuthCode: "PASSWORD_RESET_REQUIRED",
+    error: IdentityPasswordResetRequiredError,
   },
   {
     family: "/sign-up/",

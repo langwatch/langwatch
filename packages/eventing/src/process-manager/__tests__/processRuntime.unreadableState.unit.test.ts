@@ -67,7 +67,10 @@ describe("a stored process state its schema no longer reads", () => {
         )
         .mockResolvedValue({ outcome: "staleWake" });
       const worker = new ProcessWakeWorker({
-        store: { findDueWakes: vi.fn().mockResolvedValue([dueWake("key-1"), dueWake("key-2")]) },
+        store: {
+          leaseDueWakes: vi.fn().mockResolvedValue([dueWake("key-1"), dueWake("key-2")]),
+          releaseWakeClaim: vi.fn().mockResolvedValue({ applied: true }),
+        },
         managers: { sweep: { handleWake } },
         logger,
         now: () => 10,

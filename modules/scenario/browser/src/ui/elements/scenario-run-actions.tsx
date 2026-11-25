@@ -1,7 +1,15 @@
 import { Menu } from "@langwatch/design-system/menu";
 import { Button, HStack, Icon, Text } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { Edit2, ExternalLink, ListTree, MessagesSquare, MoreVertical, Play } from "lucide-react";
+import {
+  DatabaseZap,
+  Edit2,
+  ExternalLink,
+  ListTree,
+  MessagesSquare,
+  MoreVertical,
+  Play,
+} from "lucide-react";
 
 import type { Scenario } from "../../behavior/scenario-api.ts";
 
@@ -15,6 +23,11 @@ interface ScenarioRunActionsProps {
    * so the caller can offer the same action from its own control.
    */
   onRunAgain: (() => void) | null;
+  /**
+   * When set, the overflow menu offers "Rerun and keep data": a rerun that skips the agent's
+   * teardown (ADR-180). Set only for a run whose agent declared a teardown.
+   */
+  onRunAgainKeepingData?: (() => void) | null;
   /**
    * Called when the user clicks "Edit scenario". Pass `null` to hide the
    * button so the caller can offer the same action from its own control.
@@ -40,13 +53,15 @@ export function ScenarioRunActions({
   scenario,
   isRunning,
   onRunAgain,
+  onRunAgainKeepingData,
   onEditScenario,
   onOpenThread,
   onOpenInTraces,
   dejaViewHref,
 }: ScenarioRunActionsProps) {
   const isArchived = !!scenario && scenario.archivedAt !== null;
-  const hasOverflow = !!onOpenThread || !!onOpenInTraces || !!dejaViewHref;
+  const showKeepData = !!scenario && !isArchived && !!onRunAgainKeepingData;
+  const hasOverflow = showKeepData || !!onOpenThread || !!onOpenInTraces || !!dejaViewHref;
   const showRunAgain = !!scenario && onRunAgain !== null;
   const showEditScenario = !!scenario && !isArchived && onEditScenario !== null;
 
@@ -98,6 +113,18 @@ export function ScenarioRunActions({
             </Button>
           </Menu.Trigger>
           <Menu.Content minWidth="200px">
+            {showKeepData && (
+              <Menu.Item
+                value="run-again-keep-data"
+                onClick={onRunAgainKeepingData ?? undefined}
+                disabled={isRunning}
+              >
+                <HStack gap={2}>
+                  <Icon as={DatabaseZap} boxSize={3.5} />
+                  <Text>Rerun and keep data</Text>
+                </HStack>
+              </Menu.Item>
+            )}
             {onOpenThread && (
               <Menu.Item value="open-thread" onClick={onOpenThread}>
                 <HStack gap={2}>

@@ -193,6 +193,30 @@ export class KeyKindRefusedError extends HandledError {
   }
 }
 
+/**
+ * A Langy session key asked to remove or disable something the person has not confirmed on a
+ * card. The message is written for Langy to read and act on, so the confirmation gate composes it.
+ */
+export class ConfirmationRequiredError extends HandledError {
+  constructor({
+    message,
+    resource,
+    action,
+  }: {
+    message: string;
+    resource: string;
+    action: string;
+  }) {
+    super("langy_confirmation_required", message, {
+      httpStatus: 409,
+      fault: "customer",
+      meta: { resource, action },
+      ...remediation("langy_confirmation_required"),
+    });
+    this.name = "ConfirmationRequiredError";
+  }
+}
+
 export class RateLimitedError extends HandledError {
   constructor() {
     super("rate_limited", "Too many requests", { httpStatus: 429, retryable: true });

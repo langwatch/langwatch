@@ -5,93 +5,142 @@
 
 import { bucketOf, inPeriod } from "../../templates/model/lwql-period.ts";
 
-/** A trace field the boards lean on, and how a trace shows it carries it. */
+/** A trace field the boards lean on, and the widgets that read it. */
 export interface HealthField {
-  readonly key: "model" | "cost" | "user" | "conversation" | "labels" | "outcome";
+  readonly key: "model" | "cost" | "conversation" | "user" | "labels" | "outcome";
   readonly label: string;
-  /** What to send, in the words of the SDK's trace metadata. */
-  readonly send: string;
-  /** The LangWatchQL view and condition a trace that carries the field meets. */
-  readonly view: "trace_metrics" | "traces";
-  readonly condition: string;
   /** A widget reads the field when one of its queries matches, or the catalogue lists `need`. */
   readonly readBy: RegExp;
   readonly need: string;
 }
 
 export const HEALTH_FIELDS: readonly HealthField[] = [
-  {
-    key: "model",
-    label: "Model",
-    send: "the model name on each LLM call",
-    view: "trace_metrics",
-    condition: "notEmpty(Models)",
-    readBy: /\bModels?\b/,
-    need: "model",
-  },
-  {
-    key: "cost",
-    label: "Cost",
-    send: "token counts or a cost on each LLM call",
-    view: "trace_metrics",
-    // A trace that called no model (tools, retrieval, an evaluator) stores no cost and owes none.
-    condition: "(TotalCost IS NOT NULL OR empty(Models))",
-    readBy: /\b(?:TotalCost|Cost|CostSum)\b/,
-    need: "cost",
-  },
-  {
-    key: "user",
-    label: "User",
-    send: "a user_id in the trace metadata",
-    view: "trace_metrics",
-    condition: "UserId IS NOT NULL",
-    readBy: /\bUserId\b/,
-    need: "user",
-  },
+  { key: "model", label: "Model name", readBy: /\bModels?\b/, need: "model" },
+  { key: "cost", label: "Cost", readBy: /\b(?:TotalCost|Cost|CostSum)\b/, need: "cost" },
   {
     key: "conversation",
-    label: "Conversation",
-    send: "a thread_id in the trace metadata",
-    view: "trace_metrics",
-    condition: "ConversationId IS NOT NULL",
+    label: "Conversation id",
     readBy: /\bConversationId\b/,
     need: "thread",
   },
+  { key: "user", label: "User id", readBy: /\bUserId\b/, need: "user" },
   {
     key: "labels",
-    label: "Labels",
-    send: "labels in the trace metadata",
-    view: "trace_metrics",
-    condition: "notEmpty(Labels)",
-    readBy: /\bLabels\b/,
+    label: "Customer or labels",
+    readBy: /\b(?:Labels|CustomerId)\b/,
     need: "labels",
   },
   {
     key: "outcome",
-    label: "Outcome",
-    send: "an outcome, such as resolved, in the trace metadata",
-    view: "traces",
-    condition: "Attributes['metadata.outcome'] != ''",
-    readBy: /metadata\.outcome/,
+    label: "How it ended",
+    readBy: /metadata\.outcome|\bMetadataOutcome\b/,
     need: "outcome",
   },
 ];
 
-// Each field is a filter, never a column the result reads, so the completeness report does
-// not swap a missing field for a setup view: showing the gap is this widget's whole job.
-const branch = ({ field, view, filter }: { field: string; view: string; filter: string }) =>
-  `SELECT '${field}' AS field, uniqExact(TraceId) AS traces
-FROM ${view}
-WHERE ${inPeriod("OccurredAt")}${filter}
-LIMIT 1`;
+/** A row of the coverage result: what it counts, out of which requests, and one that misses. */
+interface CoverageRow {
+  readonly field: string;
+  readonly present: string;
+  readonly base: string;
+  /** The requests a missing one is picked from; absent when nothing can miss. */
+  readonly missing?: string;
+}
 
-/** Traces in the period ("all"), and how many carry each field. */
-export const FIELD_COVERAGE_SQL = [
-  branch({ field: "all", view: "trace_metrics", filter: "" }),
-  ...HEALTH_FIELDS.map(({ key, view, condition }) =>
-    branch({ field: key, view, filter: `\n  AND ${condition}` }),
-  ),
-].join("\nUNION ALL\n");
+// `has_calls`: a step LangWatch types as a model call (set from gen_ai attributes when the app
+// sends no type), or a model name on the request. `has_named`: the request names a model.
+const COVERAGE: readonly CoverageRow[] = [
+  { field: "all", present: "true", base: "true" },
+  {
+    field: "model",
+    present: "has_calls AND has_named",
+    base: "has_calls",
+    missing: "has_calls AND NOT has_named",
+  },
+  {
+    field: "cost",
+    present: "has_named AND has_priced",
+    base: "has_named",
+    missing: "has_named AND NOT has_priced",
+  },
+  {
+    field: "no_tokens",
+    present: "has_named AND NOT has_priced AND NOT has_unpriced",
+    base: "has_named",
+    missing: "has_named AND NOT has_priced AND NOT has_unpriced",
+  },
+  {
+    field: "no_price",
+    present: "has_named AND has_unpriced",
+    base: "has_named",
+    missing: "has_named AND has_unpriced",
+  },
+  ...["conversation", "user", "labels", "outcome"].map((field) => ({
+    field,
+    present: `has_${field}`,
+    base: "true",
+    missing: `NOT has_${field}`,
+  })),
+  {
+    field: "neither",
+    present: "NOT has_conversation AND NOT has_user",
+    base: "true",
+    missing: "NOT has_conversation AND NOT has_user",
+  },
+];
+
+const pick = (part: (row: CoverageRow) => string, otherwise = "0") =>
+  `multiIf(${COVERAGE.map((row) => `field = '${row.field}', ${part(row)}`).join(", ")}, ${otherwise})`;
+
+/** The per-trace flags each side of the scan writes; the other side writes 0. */
+const FLAGS = ["llm", "named", "priced", "unpriced", "conversation", "user", "labels", "outcome"];
+const flags = (values: Readonly<Record<string, string>>) =>
+  FLAGS.map((flag) => `toUInt8(${values[flag] ?? "0"}) AS ${flag}`).join(", ");
+
+/**
+ * Each field over the requests it applies to (dashboards-v2 AC166b): one scan of each view, folded
+ * per trace on its 128-bit hash (a set of ids ran out of memory over 60 days). Rows unfold from a
+ * split string, as LangWatchQL allows no array literal.
+ */
+export const FIELD_COVERAGE_SQL = `SELECT arrayJoin(splitByChar(',', '${COVERAGE.map(({ field }) => field).join(",")}')) AS field,
+  ${pick(({ field }) => (field === "all" ? "total" : `${field}_present`))} AS present,
+  ${pick(({ base }) => (base === "true" ? "total" : `${base.slice(4)}_base`))} AS base,
+  ${pick(({ field, missing }) => (missing ? `${field}_example` : "''"), "''")} AS example
+FROM (
+  SELECT count() AS total, countIf(has_calls) AS calls_base, countIf(has_named) AS named_base,
+    ${COVERAGE.filter(({ field }) => field !== "all")
+      .map(
+        ({ field, present, missing }) =>
+          `countIf(${present}) AS ${field}_present, minIf(example_id, ${missing}) AS ${field}_example`,
+      )
+      .join(",\n    ")}
+  FROM (
+    SELECT trace, min(id) AS example_id, max(llm OR named) AS has_calls,
+      ${FLAGS.filter((flag) => flag !== "llm")
+        .map((flag) => `max(${flag}) AS has_${flag}`)
+        .join(", ")}
+    FROM (
+      SELECT sipHash128(TraceId) AS trace, TraceId AS id, ${flags({ llm: "1" })}, false AS isTrace
+      FROM span_metrics
+      WHERE SpanType = 'llm' AND ${inPeriod("StartTime")}
+      UNION ALL
+      SELECT sipHash128(TraceId) AS trace, TraceId AS id, ${flags({
+        named: "notEmpty(Models)",
+        priced: "TotalCost IS NOT NULL AND UnpricedSpanCount = 0",
+        unpriced: "UnpricedSpanCount > 0",
+        conversation: "ConversationId IS NOT NULL",
+        user: "UserId IS NOT NULL",
+        labels: "notEmpty(Labels) OR CustomerId IS NOT NULL",
+        outcome: "MetadataOutcome != ''",
+      })}, true AS isTrace
+      FROM trace_metrics
+      WHERE ${inPeriod("OccurredAt")}
+    )
+    GROUP BY trace
+    HAVING countIf(isTrace) > 0
+  )
+  HAVING total > 0
+)`;
 
 /**
  * Traces with a model, and those with a span whose model has no price, per bucket. Traces
@@ -133,35 +182,48 @@ export const NON_PRODUCTION_ENVIRONMENTS = [
 const list = (values: readonly string[]) => `[${values.map((value) => `'${value}'`).join(", ")}]`;
 const ENVIRONMENTS = list(NON_PRODUCTION_ENVIRONMENTS);
 
+/** A trace's test origin, kept apart from the environment positions below it. */
+const ORIGIN_CODE = 16;
+/** Room for a code below a row's time, so one `min` picks the first row and its code together. */
+const CODE_SPAN = 32;
+
+/** The first trace row's code, read back from below its time. */
+const TRACE_CODE = `first % ${CODE_SPAN}`;
+
 /**
  * Traces and cost per noise source (owner, 2026-10-08): a test origin, else a non-production
- * environment from a span, the metadata or a label; empty is production. Cost comes from spans
- * and stays unknown, never $0, where none was sent; traces come first for the report.
- */
-export const NOISE_SOURCES_SQL = `SELECT source, uniqExact(TraceId) AS traces, sum(cost) AS cost
+ * environment from a span, the metadata or a label; empty is production. Unsent cost stays
+ * unknown, never $0. Spans and trace rows meet in one fixed-size group per trace (ADR-004). */
+export const NOISE_SOURCES_SQL = `SELECT multiIf(
+    ${TRACE_CODE} > ${ORIGIN_CODE}, arrayElement(${list(TEST_ORIGINS)}, ${TRACE_CODE} - ${ORIGIN_CODE}),
+    environment > 0, arrayElement(${ENVIRONMENTS}, environment),
+    arrayElement(${ENVIRONMENTS}, ${TRACE_CODE})) AS source,
+  count() AS traces,
+  sum(cost) AS cost
 FROM (
-  SELECT s.TraceId AS TraceId, s.cost AS cost,
-    multiIf(has(${list(TEST_ORIGINS)}, t.origin), t.origin,
-      has(${ENVIRONMENTS}, s.environment), s.environment,
-      has(${ENVIRONMENTS}, t.environment), t.environment,
-      arrayFirst((label) -> has(${ENVIRONMENTS}, label), t.labels)) AS source
+  SELECT trace,
+    sum(cost) AS cost,
+    any(environment) AS environment,
+    minIf(dateDiff('millisecond', toDateTime64(0, 3), at) * ${CODE_SPAN} + code, isTrace) AS first
   FROM (
-    SELECT TraceId, Attributes['langwatch.origin'] AS origin,
-      lower(coalesce(nullIf(Attributes['metadata.environment'], ''),
-        nullIf(Attributes['metadata.env'], ''), '')) AS environment,
-      arrayMap((label) -> lower(label),
-        JSONExtract(Attributes['langwatch.labels'], 'Array(String)')) AS labels
-    FROM traces
-    WHERE ${inPeriod("OccurredAt")}
-  ) AS t
-  INNER JOIN (
-    SELECT TraceId, sum(Cost) AS cost,
-      lower(any(coalesce(nullIf(ResourceAttributes['deployment.environment'], ''),
-        nullIf(ResourceAttributes['deployment.environment.name'], '')))) AS environment
-    FROM spans
+    SELECT sipHash128(TraceId) AS trace, Cost AS cost,
+      if(DeploymentEnvironment = '', NULL,
+        toUInt8(indexOf(${ENVIRONMENTS}, lower(DeploymentEnvironment)))) AS environment,
+      toUInt8(0) AS code, toDateTime64(0, 3) AS at, false AS isTrace
+    FROM span_metrics
     WHERE ${inPeriod("StartTime")}
-    GROUP BY TraceId
-  ) AS s ON s.TraceId = t.TraceId
+    UNION ALL
+    SELECT sipHash128(TraceId) AS trace, CAST(NULL AS Nullable(Float64)) AS cost,
+      CAST(NULL AS Nullable(UInt8)) AS environment,
+      toUInt8(if(has(${list(TEST_ORIGINS)}, Origin), ${ORIGIN_CODE} + indexOf(${list(TEST_ORIGINS)}, Origin),
+        indexOf(${ENVIRONMENTS}, if(has(${ENVIRONMENTS}, lower(MetadataEnvironment)), lower(MetadataEnvironment),
+          arrayFirst((label) -> has(${ENVIRONMENTS}, label), arrayMap((label) -> lower(label), Labels)))))) AS code,
+      OccurredAt AS at, true AS isTrace
+    FROM trace_metrics
+    WHERE ${inPeriod("OccurredAt")}
+  )
+  GROUP BY trace
+  HAVING countIf(NOT isTrace) > 0 AND first > 0
 )
 GROUP BY source
 ORDER BY traces DESC

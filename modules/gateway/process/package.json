@@ -23,7 +23,7 @@
   },
   "scripts": {
     "typecheck": "GOMAXPROCS=2 GOMEMLIMIT=2GiB tsc -b",
-    "test": "vitest run --exclude \"**/*.integration.test.ts\"",
+    "test": "vitest run --fsModuleCache --exclude \"**/*.integration.test.ts\"",
     "test:integration": "vitest run --config vitest.integration.config.ts"
   },
   "dependencies": {
@@ -32,6 +32,8 @@
     "@langwatch/api-key-contract": "workspace:*",
     "@langwatch/authorization": "workspace:*",
     "@langwatch/authz-contract": "workspace:*",
+    "@langwatch/clickhouse-client": "workspace:*",
+    "@langwatch/data-privacy-contract": "workspace:*",
     "@langwatch/egress": "workspace:*",
     "@langwatch/enterprise-governance-contract": "workspace:*",
     "@langwatch/enterprise-licensing-contract": "workspace:*",
@@ -60,6 +62,7 @@
     "@langwatch/task": "workspace:*",
     "@langwatch/time": "workspace:*",
     "@langwatch/trace-contract": "workspace:*",
+    "@langwatch/user-contract": "workspace:*",
     "@langwatch/webhook-contract": "workspace:*",
     "@trpc/server": "catalog:",
     "hono": "catalog:",
@@ -71,7 +74,6 @@
   },
   "devDependencies": {
     "@clickhouse/client": "catalog:",
-    "@langwatch/clickhouse-client": "workspace:*",
     "@langwatch/clickhouse-migrations": "workspace:*",
     "@langwatch/evaluation-process": "workspace:*",
     "@langwatch/handled-error": "workspace:*",

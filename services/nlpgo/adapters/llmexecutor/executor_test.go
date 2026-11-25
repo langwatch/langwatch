@@ -232,6 +232,39 @@ func TestExecute_ReasoningModelOverridesTempAndMaxTokens(t *testing.T) {
 	}
 }
 
+// markedCatalog marks the models it lists as taking max_completion_tokens.
+type markedCatalog map[string]bool
+
+func (c markedCatalog) OutputTokensParameter(modelID string) (string, bool) {
+	if c[modelID] {
+		return "max_completion_tokens", true
+	}
+	return "", false
+}
+
+// @scenario "A workflow LLM call on a marked model sends max_completion_tokens"
+func TestExecute_CatalogMarkedModelSendsMaxCompletionTokens(t *testing.T) {
+	// A model the name rule does not recognize: only the catalog can say.
+	gw := &fakeGateway{respStatus: 200, respBody: successResponse("ok")}
+	exec := New(gw, WithModelCatalog(markedCatalog{"openai/acme-reasoner": true}))
+
+	maxTok := 900
+	_, err := exec.Execute(context.Background(), app.LLMRequest{
+		Model:         "openai/acme-reasoner",
+		MaxTokens:     &maxTok,
+		LiteLLMParams: map[string]any{"api_key": "k"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if hasField(t, gw.lastReq.Body, "max_tokens") {
+		t.Errorf("max_tokens must be absent for a catalog-marked model")
+	}
+	if got := bodyFloat(t, gw.lastReq.Body, "max_completion_tokens"); got != 900 {
+		t.Errorf("expected max_completion_tokens 900, got %v", got)
+	}
+}
+
 // TestExecute_AnthropicReasoningEnabledFloorsMaxTokens pins the
 // non-OpenAI half of langwatch_nlp regression ead6141a4. When the
 // customer config sets a reasoning field on a non-reasoning-class
@@ -547,7 +580,7 @@ func TestExecute_StreamHeaderTrueWhenStreaming(t *testing.T) {
 		Model:         "openai/gpt-5-mini",
 		LiteLLMParams: map[string]any{"api_key": "k"},
 	}
-	gwReq, err := buildGatewayRequest(context.Background(), req, true)
+	gwReq, err := (&Executor{}).buildGatewayRequest(context.Background(), req, true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -561,7 +594,7 @@ func TestExecute_NoStreamFieldWhenNotStreaming(t *testing.T) {
 		Model:         "openai/gpt-5-mini",
 		LiteLLMParams: map[string]any{"api_key": "k"},
 	}
-	gwReq, err := buildGatewayRequest(context.Background(), req, false)
+	gwReq, err := (&Executor{}).buildGatewayRequest(context.Background(), req, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1217,5 +1250,35 @@ func TestExecute_PropagatesProviderMessageOnNon2xx(t *testing.T) {
 	}
 	if strings.Contains(err.Error(), "non-2xx status 429") {
 		t.Errorf("error message still wraps with 'non-2xx status' when provider message is present: %q", err.Error())
+	}
+}
+
+// @scenario "The runner reads cache-read and cache-write counts from every gateway usage shape"
+func TestParseChatCompletionResponse_CachedTokens(t *testing.T) {
+	tests := []struct {
+		name      string
+		usage     string
+		wantRead  int
+		wantWrite int
+	}{
+		{"gateway read and write", `{"prompt_tokens":10000,"completion_tokens":5,"total_tokens":10005,"prompt_tokens_details":{"cached_read_tokens":9000,"cached_write_tokens":500,"cached_tokens":9500}}`, 9000, 500},
+		{"openai cached_tokens only", `{"prompt_tokens":10000,"completion_tokens":5,"total_tokens":10005,"prompt_tokens_details":{"cached_tokens":9000}}`, 9000, 0},
+		{"anthropic top-level counts", `{"prompt_tokens":10000,"completion_tokens":5,"total_tokens":10005,"cache_read_input_tokens":7000,"cache_creation_input_tokens":300}`, 7000, 300},
+		{"no cache", `{"prompt_tokens":10,"completion_tokens":5,"total_tokens":15}`, 0, 0},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			body := []byte(`{"choices":[{"message":{"role":"assistant","content":"ok"},"finish_reason":"stop"}],"usage":` + tc.usage + `}`)
+			resp, err := parseChatCompletionResponse(body, 1)
+			if err != nil {
+				t.Fatalf("parse: %v", err)
+			}
+			if resp.Usage.CacheReadInputTokens != tc.wantRead || resp.Usage.CacheCreationInputTokens != tc.wantWrite {
+				t.Errorf("cache read/write = %d/%d, want %d/%d", resp.Usage.CacheReadInputTokens, resp.Usage.CacheCreationInputTokens, tc.wantRead, tc.wantWrite)
+			}
+			if resp.Usage.PromptTokens == 0 {
+				t.Errorf("prompt tokens must stay the gateway's inclusive count")
+			}
+		})
 	}
 }

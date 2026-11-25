@@ -8,6 +8,7 @@ import type {
   TraceEventRollup,
   NormalizedSpan,
   ElasticSearchEvent,
+  OwnedSpan,
   Span,
   SpanInsertData,
 } from "@langwatch/trace-contract";
@@ -47,7 +48,7 @@ export interface TraceEventRollupParams {
   /**
    * The list's time range. Every trace on the page occurred inside it, so the
    * read is padded by {@link DEFAULT_PARTITION_WINDOW_MS} and pruned to those
-   * partitions rather than scanning every week including the cold tier.
+   * partitions.
    */
   timeRange: { from: number; to: number };
 }
@@ -73,16 +74,41 @@ export type LangwatchSignalBucket = (typeof LANGWATCH_SIGNAL_BUCKETS)[number];
 export interface SpanLangwatchSignalsRow {
   spanId: string;
   signals: LangwatchSignalBucket[];
+  /** Set only on a span braided in from another project (ADR-201 §5); absent: the reader's own. */
+  ownerProjectId?: string;
+}
+
+/** The trace view reads `spans`, where a proof's braids apply; other reads, `traces` (ADR-201). */
+export interface TraceViewRead {
+  reads?: "spans" | "traces";
 }
 
 /**
  * Optional partition-pruning hint. stored_spans partitions by
  * toYearWeek(StartTime); an approximate timestamp restricts the scan to a
- * small window instead of walking every weekly partition (incl. cold S3).
+ * small window. Without it the trace id index bounds the read.
  */
 export interface OccurredAtHint {
   occurredAtMs?: number;
 }
+
+/**
+ * One page of a trace's spans and the count of all of them. Under braids the count holds owners'
+ * spans past the page too, so it names those owners for the audit (ADR-201 §8).
+ */
+export type PagedOwnedSpans = {
+  spans: OwnedSpan[];
+  total: number;
+  totalOwnerProjectIds: string[];
+};
+
+/** One span by id; under braids `ownerProjectId` names its owner, else the reader (ADR-201). */
+export type SingleSpanParams = {
+  authorization: Authorization;
+  traceId: string;
+  spanId: string;
+  ownerProjectId?: string | undefined;
+} & OccurredAtHint;
 
 // @see ADR-069 — partition hint is REQUIRED here for windowed claim-check reads
 export interface NormalizedSpanByIdParams {
@@ -111,8 +137,9 @@ export abstract class SpanStorageRepository {
       authorization: Authorization;
       traceId: string;
       limit?: number;
-    } & OccurredAtHint,
-  ): Promise<Span[]>;
+    } & OccurredAtHint &
+      TraceViewRead,
+  ): Promise<OwnedSpan[]>;
   /**
    * Normalized spans for a trace, for read-time derivations (trace events +
    * scenario role cost/latency), bounded by MAX_DERIVATION_SPANS. Property-
@@ -123,7 +150,8 @@ export abstract class SpanStorageRepository {
       authorization: Authorization;
       traceId: string;
       limit?: number;
-    } & OccurredAtHint,
+    } & OccurredAtHint &
+      TraceViewRead,
   ) => Promise<NormalizedSpan[]>;
   /**
    * A trace's spans with their attributes as stored, unparsed. Same scope and partition
@@ -136,13 +164,9 @@ export abstract class SpanStorageRepository {
       limit?: number;
     } & OccurredAtHint,
   ): Promise<StoredTraceSpan[]>;
-  abstract findSpanByIds(
-    params: {
-      authorization: Authorization;
-      traceId: string;
-      spanId: string;
-    } & OccurredAtHint,
-  ): Promise<Span | null>;
+  abstract findSpanByIds(params: SingleSpanParams): Promise<Span | null>;
+  /** One whole span as stored, its offloaded body unresolved; braided under `ownerProjectId`. */
+  abstract findNormalizedSpanByIds(params: SingleSpanParams): Promise<NormalizedSpan | null>;
   /**
    * @see ADR-069
    * Claim-check resolution read: one canonical span by identity, windowed
@@ -156,7 +180,7 @@ export abstract class SpanStorageRepository {
    * Events.*, no heavy attribute scan) — far cheaper than fetching whole spans.
    */
   abstract findTraceEventsByTraceId(
-    params: { authorization: Authorization; traceId: string } & OccurredAtHint,
+    params: { authorization: Authorization; traceId: string } & OccurredAtHint & TraceViewRead,
   ): Promise<DerivedTraceEvent[]>;
   /**
    * Event rollups for a page of traces (the list's Events column). Same
@@ -169,15 +193,9 @@ export abstract class SpanStorageRepository {
   abstract findEventsByTraceId(
     params: { authorization: Authorization; traceId: string } & OccurredAtHint,
   ): Promise<ElasticSearchEvent[]>;
-  abstract findSpanEvents(
-    params: {
-      authorization: Authorization;
-      traceId: string;
-      spanId: string;
-    } & OccurredAtHint,
-  ): Promise<ElasticSearchEvent[]>;
+  abstract findSpanEvents(params: SingleSpanParams): Promise<ElasticSearchEvent[]>;
   abstract findSpanSummaryByTraceId(
-    params: { authorization: Authorization; traceId: string } & OccurredAtHint,
+    params: { authorization: Authorization; traceId: string } & OccurredAtHint & TraceViewRead,
   ): Promise<SpanSummaryRow[]>;
   /**
    * Per-span LangWatch instrumentation signals — projected separately from
@@ -185,10 +203,10 @@ export abstract class SpanStorageRepository {
    * the attribute scan. Callers fire this in parallel and merge in the UI.
    */
   abstract findLangwatchSignalsByTraceId(
-    params: { authorization: Authorization; traceId: string } & OccurredAtHint,
+    params: { authorization: Authorization; traceId: string } & OccurredAtHint & TraceViewRead,
   ): Promise<SpanLangwatchSignalsRow[]>;
   abstract findSpanResourcesByTraceId(
-    params: { authorization: Authorization; traceId: string } & OccurredAtHint,
+    params: { authorization: Authorization; traceId: string } & OccurredAtHint & TraceViewRead,
   ): Promise<SpanResourceInfo[]>;
   abstract listSpansPaginated(
     params: {
@@ -196,15 +214,17 @@ export abstract class SpanStorageRepository {
       traceId: string;
       limit: number;
       offset: number;
-    } & OccurredAtHint,
-  ): Promise<{ spans: Span[]; total: number }>;
+    } & OccurredAtHint &
+      TraceViewRead,
+  ): Promise<PagedOwnedSpans>;
   abstract findSpansSince(
     params: {
       authorization: Authorization;
       traceId: string;
       sinceStartTimeMs: number;
-    } & OccurredAtHint,
-  ): Promise<Span[]>;
+    } & OccurredAtHint &
+      TraceViewRead,
+  ): Promise<OwnedSpan[]>;
   /**
    * Distinct model names seen on the tenant's spans since `fromMs`, with
    * span counts, ordered by traffic. Cross-trace by design (no traceId),
@@ -279,13 +299,11 @@ export class NullSpanStorageRepository implements SpanStorageRepository {
     return null;
   }
 
-  async findSpanByIds(
-    _params: {
-      authorization: Authorization;
-      traceId: string;
-      spanId: string;
-    } & OccurredAtHint,
-  ): Promise<Span | null> {
+  async findSpanByIds(_params: SingleSpanParams): Promise<Span | null> {
+    return null;
+  }
+
+  async findNormalizedSpanByIds(_params: SingleSpanParams): Promise<NormalizedSpan | null> {
     return null;
   }
 
@@ -307,13 +325,7 @@ export class NullSpanStorageRepository implements SpanStorageRepository {
     return [];
   }
 
-  async findSpanEvents(
-    _params: {
-      authorization: Authorization;
-      traceId: string;
-      spanId: string;
-    } & OccurredAtHint,
-  ): Promise<ElasticSearchEvent[]> {
+  async findSpanEvents(_params: SingleSpanParams): Promise<ElasticSearchEvent[]> {
     return [];
   }
 
@@ -342,8 +354,8 @@ export class NullSpanStorageRepository implements SpanStorageRepository {
       limit: number;
       offset: number;
     } & OccurredAtHint,
-  ): Promise<{ spans: Span[]; total: number }> {
-    return { spans: [], total: 0 };
+  ): Promise<PagedOwnedSpans> {
+    return { spans: [], total: 0, totalOwnerProjectIds: [] };
   }
 
   async findSpansSince(

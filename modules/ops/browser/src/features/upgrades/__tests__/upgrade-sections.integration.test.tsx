@@ -1,7 +1,7 @@
 /**
  * @vitest-environment jsdom
  * What the Upgrades overview, steps, step and run sections show for the reader's answers.
- * Spec: modules/ops/specs/upgrades.feature
+ * Specs: modules/ops/specs/upgrades.feature, modules/ops/specs/self-hosted-notices.feature
  */
 import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
@@ -42,6 +42,7 @@ function statusWith(overrides: Partial<UpgradeStatusView>): UpgradeStatusView {
     deprecations: [],
     version: { kind: "release", release: "3.23.0" },
     latestRelease: null,
+    notices: [],
     ...overrides,
   };
 }
@@ -171,6 +172,59 @@ describe("UpgradesOverview", () => {
 
       renderOverview({ status: statusWith({}) });
       expect(screen.queryByTestId("upgrade-latest-release")).toBeNull();
+    });
+  });
+
+  describe("when cloud sent a security notice and an info notice", () => {
+    /** @scenario "The Upgrades overview shows notices above everything else" */
+    it("shows the security notice first with its mark, body, fix and link, then the info one", () => {
+      renderOverview({
+        status: statusWith({
+          version: { kind: "release", release: "3.4.0" },
+          latestRelease: { release: "3.4.2", notesUrl: "https://example.com/notes/3.4.2" },
+          notices: [
+            {
+              id: "n1",
+              severity: "security",
+              title: "Vulnerability in prompt sharing",
+              body: "Shared prompts could be read without a session.",
+              url: "https://langwatch.ai/security/n1",
+              fixed_in: "3.4.2",
+              published_at: "2026-10-20T09:00:00.000Z",
+            },
+            {
+              id: "n2",
+              severity: "info",
+              title: "New evaluators available",
+              body: "",
+              url: null,
+              fixed_in: null,
+              published_at: "2026-10-19T09:00:00.000Z",
+            },
+          ],
+        }),
+      });
+
+      const [security, info] = screen.getAllByTestId("upgrade-notice");
+      if (!security || !info) throw new Error("expected two notices");
+      expect(security).toHaveTextContent("Security");
+      expect(security).toHaveTextContent("Vulnerability in prompt sharing");
+      expect(security).toHaveTextContent("Shared prompts could be read without a session.");
+      expect(security).toHaveTextContent("Fixed in 3.4.2");
+      expect(within(security).getByRole("link", { name: /Read more/ })).toHaveAttribute(
+        "href",
+        "https://langwatch.ai/security/n1",
+      );
+      expect(info).toHaveTextContent("New evaluators available");
+      expect(info).not.toHaveTextContent("Security");
+      const version = screen.getByTestId("upgrade-version");
+      expect(
+        security.compareDocumentPosition(version) & Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+      cleanup();
+
+      renderOverview({ status: statusWith({}) });
+      expect(screen.queryByTestId("upgrade-notice")).toBeNull();
     });
   });
 
@@ -556,6 +610,7 @@ describe("UpgradeStepDetail", () => {
               report: { checkpoint: "org_42" },
             }),
             targets: [],
+            logTail: [],
           }}
         />,
       );

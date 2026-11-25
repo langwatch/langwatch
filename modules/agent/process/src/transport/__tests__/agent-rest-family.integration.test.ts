@@ -61,10 +61,12 @@ describe("given a project with a valid API key", () => {
       expect(Object.keys(row ?? {}).toSorted()).toEqual([
         "config",
         "createdAt",
+        "createdBy",
         "environment",
         "hostLabel",
         "id",
         "instances",
+        "labels",
         "lastSeenAt",
         "name",
         "notSelectableReason",
@@ -76,6 +78,8 @@ describe("given a project with a valid API key", () => {
         "status",
         "type",
         "updatedAt",
+        "updatedBy",
+        "version",
       ]);
     });
 
@@ -459,5 +463,105 @@ describe("given an HTTP agent still holding credentials typed inline", () => {
     expect(body).not.toContain("tenant-literal");
     expect(body).not.toContain("token-literal");
     expect(body).toContain("application/json");
+  });
+});
+
+describe("given an agent with two versions over REST", () => {
+  async function twoVersions(api: Awaited<ReturnType<typeof buildAgentApps>>) {
+    const agent = await api.createAgent({ name: "Support bot", config: { prompt: "v1" } });
+    await api.v1(`/api/v1/agents/${agent.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ config: { prompt: "v2" } }),
+    });
+    return agent;
+  }
+
+  /** @scenario "REST reads an agent by label or version" */
+  it("reads the agent at a label, at a version suffix and lists its versions", async () => {
+    const api = await buildAgentApps();
+    const agent = await twoVersions(api);
+    const deployed = await api.v1(`/api/v1/agents/${agent.id}/labels/production`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ version: 1 }),
+    });
+    expect(deployed.status).toBe(200);
+
+    const atLabel = (await (
+      await api.v1(`/api/v1/agents/${agent.id}?label=production`)
+    ).json()) as {
+      version: number;
+      config: { prompt?: string };
+    };
+    expect([atLabel.version, atLabel.config.prompt]).toEqual([1, "v1"]);
+    const atVersion = (await (await api.v1(`/api/v1/agents/${agent.id}:2`)).json()) as {
+      version: number;
+      config: { prompt?: string };
+    };
+    expect([atVersion.version, atVersion.config.prompt]).toEqual([2, "v2"]);
+    const listed = (await (await api.v1(`/api/v1/agents/${agent.id}/versions`)).json()) as {
+      data: { version: number; labels: string[] }[];
+    };
+    expect(listed.data.map((row) => [row.version, row.labels])).toEqual([
+      [2, []],
+      [1, ["production"]],
+    ]);
+  });
+
+  /** @scenario "Moving a label needs the deploy permission" */
+  it("refuses a caller without agents:deploy before the handler runs", async () => {
+    const api = await buildAgentApps({ denyPermission: "agents:deploy" });
+    const agent = await twoVersions(api);
+
+    const response = await api.v1(`/api/v1/agents/${agent.id}/labels/production`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ version: 1 }),
+    });
+
+    expect(response.status).toBe(403);
+    const labels = await api.repository.findLabels({ projectId: PROJECT_ID, ids: [agent.id] });
+    expect(labels).toEqual([]);
+  });
+
+  /** @scenario "The deprecated agents REST alias names its caller like the v1 routes" */
+  it("refuses archiving a labelled agent through the deprecated alias without agents:deploy", async () => {
+    const api = await buildAgentApps({ canDeploy: false });
+    const agent = await twoVersions(api);
+    const [newest] = await api.repository.findVersions({
+      projectId: PROJECT_ID,
+      agentId: agent.id,
+    });
+    await api.repository.assignLabel({
+      projectId: PROJECT_ID,
+      agentId: agent.id,
+      label: "production",
+      versionId: newest?.id ?? "",
+      actorId: null,
+    });
+
+    const response = await api.legacy(`/api/agents/${agent.id}`, { method: "DELETE" });
+
+    expect(response.status).toBe(403);
+    expect(await response.json()).toMatchObject({ code: "agent_deployed_label_protected" });
+    const stored = await api.repository.getById({ id: agent.id, projectId: PROJECT_ID });
+    expect(stored.archivedAt).toBeNull();
+  });
+
+  /** @scenario "The deprecated agents REST alias names its caller like the v1 routes" */
+  it("records the caller as the creator of an agent made through the deprecated alias", async () => {
+    const api = await buildAgentApps();
+
+    const response = await api.legacy("/api/agents", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: "Aliased", type: "signature", config: {} }),
+    });
+
+    expect(response.status).toBe(201);
+    const { id } = (await response.json()) as { id: string };
+    const stored = await api.repository.getById({ id, projectId: PROJECT_ID });
+    expect(stored.createdById).toBe("user_test");
   });
 });

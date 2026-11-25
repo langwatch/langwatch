@@ -55,6 +55,8 @@ const claimedOpsRepositories = prismaRepositories({
 type NotPostgres =
   | "migrationLease"
   | "cloudLatestRelease"
+  | "cloudNotices"
+  | "seatSharingChecks"
   | "snapshots"
   | "metrics"
   | "queues"
@@ -68,6 +70,7 @@ type NotPostgres =
   | "anomalyState"
   | "rateTracker"
   | "storageReadings"
+  | "processFleetReadings"
   | "redisHealth"
   | "clickhouseHealth"
   | "events"

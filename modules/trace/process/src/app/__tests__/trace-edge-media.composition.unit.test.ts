@@ -16,12 +16,14 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { RecordSpanCommandData } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 
+import { fakeTraceProcessingCommands } from "../../__tests__/support/trace-processing-commands.fake.ts";
 import { S3TraceLegacySpoolChannel } from "../../channels/s3/s3.trace-legacy-spool.channel.ts";
 import { TraceCanonicalisationService } from "../../features/derivation/services/trace-canonicalisation.service.ts";
 import { TraceBlobStoreService } from "../../features/media/services/trace-blob-store.service.ts";
 import { MemoryTraceSpanDedupRepository } from "../../repositories/memory/memory.trace-span-dedup.repository.ts";
 import { MemoryTraceRepositories } from "../../repositories/memory/memory.trace.repositories.ts";
 import { TraceModule } from "../trace.app.ts";
+import { braidTwins } from "./support/trace-app.harness.ts";
 
 const PNG_DATA_URI =
   "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=";
@@ -44,18 +46,15 @@ function compose({
     legacySpool: S3TraceLegacySpoolChannel.create({ resolveS3Client: refuse }),
   });
   const deps = TraceModule.composeDependencies({
+    ...braidTwins(),
     repositories: MemoryTraceRepositories.create(),
     storedObjects: createApiFixture<StoredObjectApi>({ storeFromBytes } as never),
     canonicalisation: TraceCanonicalisationService.create(),
     blobStore,
     dedup: MemoryTraceSpanDedupRepository.create(),
-    commands: {
+    commands: fakeTraceProcessingCommands({
       recordSpan: async (data) => void recorded.push(data),
-      changeTraceName: async () => undefined,
-      addAnnotation: async () => undefined,
-      removeAnnotation: async () => undefined,
-      assignTopic: async () => undefined,
-    },
+    }),
     broadcast: {
       getTenantEmitter: () => {
         throw new Error("no broadcast fabric in this test");

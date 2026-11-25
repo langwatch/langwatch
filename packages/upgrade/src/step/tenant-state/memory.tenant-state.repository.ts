@@ -1,4 +1,6 @@
 import {
+  type HeldReason,
+  isWaitingOnPerson,
   SystemMigrationRecordNotFoundError,
   type SystemMigrationStateRepository,
   type TenantMigrationRecord,
@@ -6,7 +8,7 @@ import {
 } from "@langwatch/system-migrations";
 import { nowInstant, Temporal } from "@langwatch/time";
 
-import type { TenantStepStateRow } from "./tenant-state.repository.ts";
+import type { TenantStepStateQuery, TenantStepStateRow } from "./tenant-state.repository.ts";
 import type { TenantStepLedger } from "./tenant-step-settle.service.ts";
 
 /** The tenant step state table's twin, for tests and the memory tier. */
@@ -86,19 +88,18 @@ export class MemoryTenantStepStateRepository implements SystemMigrationStateRepo
   async findRecordsByStatus({
     migrationName,
     statuses,
+    heldReason,
+    exceptHeldReason,
     limit,
     offset = 0,
-  }: {
-    migrationName?: string | undefined;
-    statuses: TenantMigrationStatus[];
-    limit: number;
-    offset?: number;
-  }): Promise<TenantStepStateRow[]> {
+  }: TenantStepStateQuery): Promise<TenantStepStateRow[]> {
     return [...this.records.values()]
       .filter(
         (record) =>
           (migrationName === undefined || record.migrationName === migrationName) &&
-          statuses.includes(record.status),
+          statuses.includes(record.status) &&
+          (heldReason === undefined || record.heldReason === heldReason) &&
+          (exceptHeldReason === undefined || record.heldReason !== exceptHeldReason),
       )
       .toSorted((left, right) => Temporal.Instant.compare(right.updatedAt, left.updatedAt))
       .slice(offset, offset + limit);
@@ -114,8 +115,24 @@ export class MemoryTenantStepStateRepository implements SystemMigrationStateRepo
     return [...this.records.values()].some(
       (record) =>
         record.migrationName === migrationName &&
-        (record.status === "parked" || record.heldReason !== undefined),
+        (record.status === "parked" ||
+          (record.heldReason !== undefined && !isWaitingOnPerson(record))),
     );
+  }
+
+  async countHeld({
+    migrationName,
+    heldReason,
+  }: {
+    migrationName: string;
+    heldReason: HeldReason;
+  }): Promise<number> {
+    return [...this.records.values()].filter(
+      (record) =>
+        record.migrationName === migrationName &&
+        record.status === "migrated" &&
+        record.heldReason === heldReason,
+    ).length;
   }
 }
 

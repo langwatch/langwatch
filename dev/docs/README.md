@@ -24,7 +24,7 @@
 
 - **[plans/](plans/)** - a plan for work in flight or recently finished: scope, sequencing, definition of done. [strict-feature-layout.md](plans/strict-feature-layout.md) is the live one
 - **[research/](research/)** - findings, comparisons and historical records. Nothing here tells you what to do
-- **[runbooks/](runbooks/)** - step-by-step operational procedures: replays, purges, dogfood setup, boxd workflows
+- **[runbooks/](runbooks/)** - step-by-step operational procedures: replays, purges, dogfood setup
 - **[identity-platform/](identity-platform/)** - the identity programme's deliverable specs, D01 to D13, with its delivery plan
 
 ## Where a new document goes

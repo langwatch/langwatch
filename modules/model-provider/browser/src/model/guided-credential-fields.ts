@@ -1,7 +1,7 @@
 /**
  * What the guided connect panel asks per provider: its short name, a one-line hint, and only
  * the credentials needed to get started (the settings drawer keeps the full list).
- * Providers with no readable model list carry the typed model's placeholder.
+ * A provider with no model list types its model; Azure borrows OpenAI's chips instead.
  */
 
 export type GuidedCredentialField = {
@@ -19,7 +19,14 @@ export type GuidedPanelSpec = {
   hint: string;
   fields: GuidedCredentialField[];
   modelPlaceholder?: string;
+  /** Whose catalog the chips come from, when the provider hosts another vendor's models. */
+  modelCatalog?: string;
+  /** A typed name under the chips, for a deployment named other than its model. */
+  deploymentField?: GuidedDeploymentField;
 };
+
+/** The typed deployment name a provider offers under its chips. */
+export type GuidedDeploymentField = { label: string; placeholder: string; hint: string };
 
 const apiKey = (placeholder: string, key: string): GuidedCredentialField => ({
   key,
@@ -51,7 +58,7 @@ export const GUIDED_PANEL_SPECS: Record<string, GuidedPanelSpec> = {
   },
   azure: {
     name: "Azure",
-    hint: "Endpoint, key and your deployment name",
+    hint: "Endpoint, key and the model you deployed",
     fields: [
       {
         key: "AZURE_OPENAI_ENDPOINT",
@@ -61,7 +68,12 @@ export const GUIDED_PANEL_SPECS: Record<string, GuidedPanelSpec> = {
       },
       apiKey("", "AZURE_OPENAI_API_KEY"),
     ],
-    modelPlaceholder: "your deployment name",
+    modelCatalog: "openai",
+    deploymentField: {
+      label: "Deployment name",
+      placeholder: "only if it differs from the model",
+      hint: "Pick the model you deployed. If your deployment has a different name, type it instead.",
+    },
   },
   bedrock: {
     name: "Bedrock",
@@ -77,6 +89,11 @@ export const GUIDED_PANEL_SPECS: Record<string, GuidedPanelSpec> = {
     name: "DeepSeek",
     hint: "Platform API key",
     fields: [apiKey("sk-...", "DEEPSEEK_API_KEY")],
+  },
+  doubleword: {
+    name: "Doubleword",
+    hint: "Inference API key",
+    fields: [apiKey("sk-...", "DOUBLEWORD_API_KEY")],
   },
   groq: { name: "Groq", hint: "Console API key", fields: [apiKey("gsk_...", "GROQ_API_KEY")] },
   custom: {
@@ -112,6 +129,16 @@ export function guidedPanelSpecFor({
     hint: "API key",
     fields: apiKeyField ? [apiKey("", apiKeyField)] : [],
   };
+}
+
+/** The catalog a provider's guided chips are read from: its own unless it borrows one. */
+export function guidedModelCatalogFor({ providerKey }: { providerKey: string }): string {
+  return GUIDED_PANEL_SPECS[providerKey]?.modelCatalog ?? providerKey;
+}
+
+/** A refusal about the chosen model, not the credentials: it reads under the model field. */
+export function isModelRefusal({ code }: { code: string | undefined }): boolean {
+  return code === "provider_deployment_not_found";
 }
 
 /** Every required field typed: what makes Connect clickable. */

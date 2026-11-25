@@ -2,6 +2,7 @@ import type { Authorization } from "@langwatch/authorization";
 import { moduleApi } from "@langwatch/module";
 import type { z } from "zod";
 
+import type { DecisionModelResolution } from "./catalog/decision-models.ts";
 import type { CostRuleMatchingSpansPreview, ModelLimits } from "./model-cost-preview.ts";
 import type { PlatformProviderEntry } from "./model-provider-platform-chain.ts";
 import type {
@@ -42,6 +43,7 @@ import type {
   TranslateInput,
   TranslateOutput,
 } from "./model-provider.ts";
+import type { BuiltInModel } from "./model-selection.ts";
 
 export interface ModelProviderCaller {
   readonly id: string;
@@ -133,6 +135,8 @@ export interface ModelProviderCredentialProbeRequest {
   readonly organizationId?: string;
   readonly provider: string;
   readonly customKeys: Record<string, string>;
+  /** The model about to run on it; Azure probes this deployment and skips without one. */
+  readonly model?: string;
 }
 /** A credential that is already stored, probed against a base URL. */
 export interface ModelProviderStoredCredentialProbeRequest {
@@ -191,6 +195,11 @@ export interface ModelProviderUsageCount {
 export type ModelProviderCustomKeys = Pick<ModelProvider, "id" | "provider" | "organizationId"> &
   Readonly<{ customKeys: Record<string, unknown> }>;
 
+/** A listed provider and the model ids its own model list answers with, null when unknown. */
+export type ModelProviderWithServedModels = ModelProviderSummary & {
+  servedModels: string[] | null;
+};
+
 /** Callable model-provider operations shared by process peers after composition. */
 export interface ModelProviderApi {
   estimateCost(input: ModelCostEstimateInput): number;
@@ -218,6 +227,13 @@ export interface ModelProviderApi {
   getExecutionProviders(
     input: ModelProviderListProjectInput,
   ): Promise<Record<string, ModelProviderExecution>>;
+  /**
+   * `listForProject`, each row carrying the bare ids its provider's own model list answers with
+   * (cached per credential), or null when the provider was not asked or did not answer.
+   */
+  listForProjectWithServedModels(
+    input: ModelProviderListProjectInput,
+  ): Promise<ModelProviderWithServedModels[]>;
   prepareExecution(
     input: ModelProviderExecutionPrepareInput,
   ): Promise<ModelProviderExecutionParameters>;
@@ -297,6 +313,26 @@ export interface ModelProviderApi {
   }): Promise<ModelDefaultInheritedValues>;
   findResolvedDefault(input: ModelDefaultResolveInput): Promise<ModelDefaultEffective | null>;
   resolveModelForFeature(input: ModelDefaultResolveInput): Promise<ModelProviderResolution>;
+  /**
+   * What the project's Instant Evals run on, or `model` when a caller picked one: LangWatch's
+   * classifier, or the organization's own decision model with its key. One that cannot run
+   * answers `own_unavailable`, never `langwatch`; a non-decision model id is ignored (ADR-182).
+   */
+  resolveDecisionModel(input: {
+    projectId: string;
+    model?: string;
+  }): Promise<DecisionModelResolution>;
+  /** The decision models this project may be offered, hosted first; see `resolveDecisionModel`. */
+  listDecisionModelsForProject(input: { projectId: string }): Promise<readonly BuiltInModel[]>;
+  /**
+   * The decision models a Default models config on these scopes may hold, hosted first: an own
+   * one only when it runs from every scope's own chain. Scopes outside the project's
+   * organization are refused.
+   */
+  listDecisionModelsForScopes(input: {
+    projectId: string;
+    scopes: readonly ModelDefaultScope[];
+  }): Promise<readonly BuiltInModel[]>;
   findAlternateModel(input: {
     projectId: string;
     featureKey: string;

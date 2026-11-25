@@ -19,8 +19,8 @@ export const supportAgent = connectAgent(
     // dialog, `.default()` the default, `.describe()` the description.
     parameters: z.object({
       model: z
-        .enum(["gpt-5-mini", "gpt-5"])
-        .default("gpt-5-mini")
+        .enum(["gpt-6-luna", "gpt-6-sol"])
+        .default("gpt-6-luna")
         .describe("The model that answers"),
       plan: z
         .string()

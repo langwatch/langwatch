@@ -69,6 +69,31 @@ export class MemoryOrganizationInviteRepository extends OrganizationInviteReposi
     );
   }
 
+  async hasPendingInviteForEmail(input: {
+    email: string;
+    organizationId: string;
+  }): Promise<boolean> {
+    const now = nowInstant();
+    return this.#invitesOf(input.organizationId).some(
+      (invite) =>
+        sameAddress(invite.email, input.email.trim()) &&
+        invite.status === "PENDING" &&
+        isUnexpired(invite, now),
+    );
+  }
+
+  async deletePaymentPendingInvitesForEmail(input: {
+    email: string;
+    organizationId: string;
+  }): Promise<number> {
+    const held = this.#invitesOf(input.organizationId).filter(
+      (invite) =>
+        sameAddress(invite.email, input.email.trim()) && invite.status === "PAYMENT_PENDING",
+    );
+    for (const invite of held) this.memory.invites.delete(invite.id);
+    return held.length;
+  }
+
   async findMemberEmails(input: { organizationId: string; emails: string[] }): Promise<string[]> {
     return this.#membersOf(input.organizationId).flatMap((member) => {
       const email = this.memory.users.get(member.userId)?.email ?? null;
@@ -331,6 +356,7 @@ export class MemoryOrganizationInviteRepository extends OrganizationInviteReposi
     organizationId: string;
     role: OrganizationUserRole;
     admission?: { inviteId: string; actorUserId: string | null };
+    billingOnly?: boolean;
   }): Promise<void> {
     if (await this.hasMembership(input)) return;
     const now = nowInstant();
@@ -338,6 +364,7 @@ export class MemoryOrganizationInviteRepository extends OrganizationInviteReposi
       userId: input.userId,
       organizationId: input.organizationId,
       role: input.role,
+      ...(input.billingOnly ? { billingOnly: true } : {}),
       disabledAt: null,
       createdAt: now,
       updatedAt: now,
@@ -436,6 +463,7 @@ export class MemoryOrganizationInviteRepository extends OrganizationInviteReposi
       subscriptionId: input.subscriptionId,
       acceptedByUserId: null,
       acceptedViaIdentifierId: null,
+      ...(input.billingOnly ? { billingOnly: true } : {}),
       createdAt: now,
       updatedAt: now,
     };

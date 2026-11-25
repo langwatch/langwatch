@@ -1,6 +1,10 @@
-import { resolve } from "node:path";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { join, resolve } from "node:path";
 
-import { FEATURE_PREFIX } from "@langwatch/oxlint-rules/grammar/feature-layout-policy.mjs";
+import {
+  FEATURE_PREFIX,
+  optsIntoFeatureLayout,
+} from "@langwatch/oxlint-rules/grammar/feature-layout-policy.mjs";
 import ts from "typescript";
 
 import type { ArchitectureViolation } from "../../types.ts";
@@ -47,9 +51,29 @@ const COMPLEXITY_SHORT_CIRCUIT = new Set([
 ]);
 
 const STRICT_SERVICE = new RegExp(`/process/src/${FEATURE_PREFIX}services/.+\\.service\\.ts$`);
+const FRAMEWORK_SERVICE = new RegExp(
+  `/packages/[^/]+/src/${FEATURE_PREFIX}services/.+\\.service\\.ts$`,
+);
 
 function isStrictService(path: string): boolean {
-  return STRICT_SERVICE.test(path);
+  return STRICT_SERVICE.test(path) || FRAMEWORK_SERVICE.test(path);
+}
+
+function optsIn(directory: string): boolean {
+  const manifest = join(directory, "package.json");
+
+  return existsSync(manifest) && optsIntoFeatureLayout(JSON.parse(readFileSync(manifest, "utf8")));
+}
+
+/** The `packages/*` roots whose own manifest opts into the feature layout (ADR-181). */
+function featureLayoutPackageRoots(root: string): string[] {
+  const packagesRoot = join(root, "packages");
+  if (!existsSync(packagesRoot)) return [];
+
+  return readdirSync(packagesRoot, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory())
+    .map((entry) => join(packagesRoot, entry.name))
+    .filter(optsIn);
 }
 
 const FUNCTION_LIKE_KINDS = new Set([
@@ -164,15 +188,17 @@ export function lintServiceCeilingsFile(root: string, path: string): Architectur
 }
 
 /**
- * A service module stays inside the default ceiling. The per-file inventory
- * that once raised it reached zero and is gone.
+ * A service module stays inside the default ceiling, in a module's process package
+ * and in a framework package that opts into the feature layout. The per-file
+ * inventory that once raised it reached zero and is gone.
  */
 export function lintServiceCeilings(snapshot: WorkspaceSnapshot): ArchitectureViolation[] {
-  const packages = snapshot.packages;
-
-  return packages
+  const processRoots = snapshot.packages
     .filter((pkg) => pkg.kind === "process" && pkg.featureRoot)
-    .flatMap((pkg) => snapshot.files({ directory: pkg.root, accept: isStrictService }))
+    .map((pkg) => pkg.root);
+
+  return [...processRoots, ...featureLayoutPackageRoots(snapshot.root)]
+    .flatMap((directory) => snapshot.files({ directory, accept: isStrictService }))
     .map(ceilingViolation)
     .filter((violation): violation is ArchitectureViolation => violation !== void 0);
 }

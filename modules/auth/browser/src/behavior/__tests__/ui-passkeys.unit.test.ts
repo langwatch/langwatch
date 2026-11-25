@@ -211,13 +211,53 @@ describe("given a reader linking an additional sign-in method", () => {
   });
 
   describe("when the provider refuses", () => {
+    /** Better Auth's error body, as the account-linking endpoint answers a refusal. */
+    const refusal = (body: string) => stubFetch({ ok: false, text: () => Promise.resolve(body) });
+    const link = () => linkUiSignInMethod("github", { callbackUrl: "/settings/authentication" });
+
     /** @scenario Linking an additional sign-in method goes through the account-linking route */
     it("hands back the reason rather than throwing", async () => {
-      stubFetch({ ok: false, text: () => Promise.resolve("account already linked") });
+      refusal('{"code":"SOCIAL_ACCOUNT_ALREADY_LINKED","message":"Social account already linked"}');
 
-      await expect(
-        linkUiSignInMethod("github", { callbackUrl: "/settings/authentication" }),
-      ).resolves.toEqual({ ok: false, reason: "account already linked" });
+      await expect(link()).resolves.toEqual({ ok: false, reason: expect.any(String) });
+    });
+
+    /** @scenario "A refused link says why in plain words, never the server's raw answer" */
+    it("explains PROVIDER_NOT_FOUND in a plain sentence", async () => {
+      refusal(
+        JSON.stringify({ code: "PROVIDER_NOT_FOUND", message: "Account not linked - raw text" }),
+      );
+
+      await expect(link()).resolves.toEqual({
+        ok: false,
+        reason: "This sign-in method is not available here.",
+      });
+    });
+
+    /** @scenario "A refused link says why in plain words, never the server's raw answer" */
+    it.each([
+      ['{"code":"SOMETHING_NEW","message":"Internal: adapter refused"}'],
+      ['{"message":"Internal: adapter refused"}'],
+      ['{"code":"constructor"}'],
+      ["<html>502 Bad Gateway</html>"],
+      [""],
+    ])("answers %j with the generic sentence, never the raw text", async (body) => {
+      refusal(body);
+
+      await expect(link()).resolves.toEqual({
+        ok: false,
+        reason: "We could not connect this sign-in method. Try again in a moment.",
+      });
+    });
+
+    /** @scenario "A refused link says why in plain words, never the server's raw answer" */
+    it("answers a body that cannot be read with the generic sentence", async () => {
+      stubFetch({ ok: false, text: () => Promise.reject(new TypeError("body used")) });
+
+      await expect(link()).resolves.toEqual({
+        ok: false,
+        reason: "We could not connect this sign-in method. Try again in a moment.",
+      });
     });
   });
 });

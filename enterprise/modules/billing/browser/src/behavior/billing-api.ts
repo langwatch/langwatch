@@ -5,13 +5,22 @@
 
 import { createModuleApi, type ContractApiMap } from "@langwatch/api/web";
 import type {
+  OrganizationRetention,
+  OrganizationStorageEstimate,
+} from "@langwatch/data-retention-contract";
+import type {
   Currency,
   currencyTrpc,
   SubscriptionBillingInterval,
   subscriptionTrpc,
 } from "@langwatch/enterprise-billing-contract";
 import type { LicenseStatus } from "@langwatch/enterprise-licensing-contract";
-import type { Plan, SeatLimitInfo } from "@langwatch/entitlement-contract";
+import type {
+  MessageLimitInfo,
+  Plan,
+  SeatLimitInfo,
+  usageLimitsTrpc,
+} from "@langwatch/entitlement-contract";
 
 import type { OrganizationUserRole, PricingModel, TeamUserRole } from "../model/prisma-types.ts";
 
@@ -30,15 +39,20 @@ export type UsageRead = {
   usageUnit?: string;
   membersCount: number;
   membersLiteCount: number;
+  membersDeveloperCount: number;
   currentMonthMessagesCount: number | null;
   /** Seats used against the plan, counted the way enforcement counts them. */
   seatLimitInfo?: SeatLimitInfo;
+  /** This month's events against the plan's allowance, with pre-formatted figures. */
+  messageLimitInfo?: MessageLimitInfo;
 };
 
 /** A member row, as the seat count and the seat drawer read it. */
 export type OrganizationMemberRead = {
   userId: string;
   role: OrganizationUserRole;
+  /** A Lite membership that pays and takes no seat (ADR-205). */
+  billingOnly?: boolean;
   user: { id: string; name: string | null; email: string | null };
 };
 
@@ -47,18 +61,26 @@ export type PendingInviteRead = {
   id: string;
   email: string;
   role: OrganizationUserRole;
+  billingOnly?: boolean;
   status: string;
   displayStatus: string;
 };
 
-/** Procedures from features not yet split: plan, limits, license, organization, invite. */
+/** Procedures from features not yet split: plan, license, organization, invite, data retention. */
 type BorrowedProcedures = {
-  plan: {
-    getActivePlan: { query: { input: OrganizationScope; output: ActivePlan } };
+  dataRetention: {
+    /** The organization's stored bytes, for the upgrade dialog's storage estimate. */
+    getOrganizationStorageEstimate: {
+      query: { input: OrganizationScope; output: OrganizationStorageEstimate };
+    };
+    /** The organization's traces retention, for the current plan card. */
+    getOrganizationRetention: {
+      query: { input: OrganizationScope; output: OrganizationRetention };
+    };
   };
 
-  limits: {
-    getUsage: { query: { input: OrganizationScope; output: UsageRead } };
+  plan: {
+    getActivePlan: { query: { input: OrganizationScope; output: ActivePlan } };
   };
 
   license: {
@@ -87,6 +109,14 @@ type BorrowedProcedures = {
         output: { members: OrganizationMemberRead[] };
       };
     };
+
+    /** Full seats still held after their person was removed, disabled or demoted. */
+    listHeldSeats: {
+      query: {
+        input: OrganizationScope;
+        output: { heldSeats: { userId: string; email: string | null; seatFreesAt: string }[] };
+      };
+    };
   };
 
   invite: {
@@ -102,6 +132,7 @@ type BorrowedProcedures = {
           billingInterval?: SubscriptionBillingInterval;
           totalSeats: number;
           invites: { email: string; role: OrganizationUserRole }[];
+          retentionDays?: number;
         };
         output: { url: string | null };
       };
@@ -121,9 +152,10 @@ type BorrowedProcedures = {
   };
 };
 
-/** Everything this family calls: the declared namespaces plus the borrowed five. */
+/** Everything this family calls: its namespaces, entitlement's `limits` and the borrowed four. */
 export type BillingApiMap = ContractApiMap<typeof subscriptionTrpc> &
   ContractApiMap<typeof currencyTrpc> &
+  ContractApiMap<typeof usageLimitsTrpc> &
   BorrowedProcedures;
 
 /**

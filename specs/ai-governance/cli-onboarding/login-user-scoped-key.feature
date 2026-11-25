@@ -40,6 +40,19 @@ Feature: CLI login mints a user-scoped API key that inherits the user's permissi
         action are not shown yet
 
     @integration
+    Scenario: the primary action and Deny are the same height on a phone
+      Given the user opened the authorize screen on a phone-width window
+      When the confirm and deny actions stack one above the other
+      Then the confirm action is drawn as tall as the deny action
+      And the same holds for the approve action after the code is confirmed
+
+    @integration
+    Scenario: a freshly minted code reads as 15 minutes
+      Given the CLI minted a code that expires in 15 minutes
+      When the user opens the authorize screen
+      Then the screen says the code expires in about 15 minutes
+
+    @integration
     Scenario: confirming the code reveals the access selection
       When the user confirms the code matches the one in their terminal
       Then the code section goes away
@@ -92,6 +105,25 @@ Feature: CLI login mints a user-scoped API key that inherits the user's permissi
         Read on the authorize screen
 
   Rule: the user can customize scopes and permissions before approving
+
+    @unit
+    Scenario: a CLI login key never carries organization:delete
+      Given an organization admin approves a CLI login, with or without --management
+      When they open Customize, or set Organization to Write
+      Then the key's permission list keeps "organization:manage" when picked
+        but never "organization:delete"
+      And the approval and the exchange both drop "organization:delete" if a
+        client sends it anyway, so an older screen cannot put it on a key
+
+    @unit
+    Scenario: on the approval screen, Organization at Write means managing it, not deleting it
+      Given a CLI login key never carries "organization:delete"
+      When the approver opens Customize on a --management login and changes nothing
+      Then Organization shows at Write and the key keeps "organization:manage"
+      And a caller who may manage the organization but not delete it can still
+        pick Organization at Write
+      But a regular API key's Organization at Write still requires
+        "organization:delete" held directly
 
     @integration
     Scenario: narrowing the selection narrows the minted key

@@ -1,5 +1,6 @@
 import { type AnalyticsApi, type AnalyticsServerConfig } from "@langwatch/analytics-contract";
 import { keyCredentialOfRequest } from "@langwatch/api/rest";
+import { censusClientOf } from "@langwatch/observability/credential-census";
 import { defineProcessModule, type PublishedProcessModule } from "@langwatch/process";
 import { defineMigrationStep } from "@langwatch/upgrade/step";
 
@@ -7,6 +8,8 @@ import { AnalyticsModule } from "./app/analytics.app.ts";
 import { analyticsChannels } from "./channels/analytics-channels.registry.ts";
 import { lwqlReconvergenceEventing } from "./eventing/analytics-lwql-reconvergence.pipeline.ts";
 import { analyticsRepositories } from "./repositories/analytics-repositories.registry.ts";
+import { ANALYTICS_ID_INDEXES } from "./repositories/clickhouse/clickhouse.analytics-id-indexes.database.ts";
+import { keyDoorOfClient } from "./rules/langwatch-ql-key-caller.rules.ts";
 import { AnalyticsComparisonWindowService } from "./services/analytics-comparison-window.service.ts";
 import { analyticsLegacyRest } from "./transport/analytics-legacy.rest.ts";
 import { analyticsLwqlTrpcTransport } from "./transport/analytics-lwql.trpc.ts";
@@ -32,6 +35,9 @@ export const analyticsProcessModule: PublishedProcessModule<
   // The query door fans the key it authenticated out to the projects it may read.
   .provideMiddlewareContext({
     langWatchQLKeyReach: (request) => keyCredentialOfRequest(request),
+    // Its client, by the identity headers the CLI and MCP servers send: a metric label only.
+    langWatchQLKeyDoor: (request) =>
+      keyDoorOfClient({ client: censusClientOf((name) => request.headers.get(name)).client }),
   })
   // Worker-hosted: the access-model reconvergence watch (ADR-159) and the key-map row (§9).
   .withEventing(lwqlReconvergenceEventing)
@@ -44,7 +50,12 @@ export const analyticsProcessModule: PublishedProcessModule<
       // Level-triggered: a rerun reads the map again and inserts only what is still missing.
       run: ({ dryRun }) => app.fillLwqlProjectKeys({ dryRun }),
     }),
-  ]);
+  ])
+  .withIdIndexes(ANALYTICS_ID_INDEXES, {
+    after: ["evaluation:fill-second-id-indexes"],
+    description:
+      "Fills the evaluation analytics id index from rows older than its view, then turns the lookup on per ClickHouse target.",
+  });
 
 /** Where the window immediately before a requested period begins. */
 export function createAnalyticsComparisonWindow(): AnalyticsComparisonWindowService {

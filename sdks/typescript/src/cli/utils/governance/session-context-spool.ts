@@ -194,9 +194,9 @@ export function pruneSpool({ stateDir, now }: { stateDir: string; now: () => num
 }
 
 /**
- * Sends every queued declaration, newest per session, recording what
- * landed. Never throws or reports failure in a way that changes exit
- * status -- a seam's own work has already succeeded by the time this runs.
+ * Sends every queued declaration, newest per session, recording what landed.
+ * A send that throws got no answer: the rest wait for the next seam rather
+ * than spend its time budget on the same silence. Never throws itself.
  */
 export async function drainSessionContextSpool({
   stateDir,
@@ -205,7 +205,10 @@ export async function drainSessionContextSpool({
 }: {
   stateDir: string;
   now: () => number;
-  /** Send one OTLP body. False means "keep the entry for the next turn". */
+  /**
+   * Send one OTLP body. False means "keep the entry for the next turn";
+   * throwing means the collector did not answer, which ends the drain.
+   */
   post: (payload: unknown) => Promise<boolean>;
 }): Promise<number> {
   let delivered = 0;
@@ -215,7 +218,7 @@ export async function drainSessionContextSpool({
       try {
         sent = await post(entry.payload);
       } catch {
-        sent = false;
+        break;
       }
       if (!sent) continue;
 

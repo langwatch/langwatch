@@ -6,6 +6,7 @@ import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { ClickHouseTraceExistenceRepository } from "../trace-existence.repository.ts";
+import { traceResolverFor } from "./support/authorized-clickhouse.support.ts";
 import {
   startMigratedTraceClickHouse,
   testClickHouseConfigured,
@@ -66,7 +67,7 @@ beforeAll(async () => {
   if (!clickHouseConfigured) return;
   ch = await startMigratedTraceClickHouse();
   repo = ClickHouseTraceExistenceRepository.create({
-    resolveClient: async () => ch,
+    resolveClient: traceResolverFor(ch),
   });
 
   await ch.insert({

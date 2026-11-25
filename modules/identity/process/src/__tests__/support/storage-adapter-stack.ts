@@ -116,9 +116,18 @@ function authOver(
     database,
     plugins: [passkeySchemaPlugin, oauthUserInfoProbePlugin],
     emailAndPassword: { enabled: true },
+    // As auth declares it: Better Auth no longer keys accounts by issuer, auth's hook stores it.
+    account: { additionalFields: { issuer: { type: "string", required: false, input: false } } },
     ...(databaseHooks === undefined ? {} : { databaseHooks }),
   });
 }
+
+/** An account write's `issuer`, which the internal adapter's types leave out of its row. */
+export const withIssuer = (issuer: string): object => ({ issuer });
+
+/** The `issuer` a served account row carries under that declaration. */
+export const issuerOf = (row: object | undefined): unknown =>
+  row && "issuer" in row ? row.issuer : undefined;
 
 export type AuthUnderTest = ReturnType<typeof authOver>;
 

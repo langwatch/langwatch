@@ -7,6 +7,7 @@ import type {
   aiToolsTrpc,
   governanceAgentsTrpc,
   governanceCostTrpc,
+  governanceKillSwitchTrpc,
   governancePeopleTrpc,
   sessionPolicyTrpc,
   AnomalyRule,
@@ -21,6 +22,13 @@ import type {
   OttlStarterTemplate,
   OttlValidationResult,
   QuarantineFillStats,
+  SecurityLakeCallers,
+  SecurityLakeConnectionTest,
+  SecurityLakeConnectionTestRequest,
+  SecurityLakeSource,
+  SecurityLakeSourceCreateRequest,
+  SecurityLakeSourceHealth,
+  SecurityLakeSourceUpdateRequest,
 } from "@langwatch/enterprise-governance-contract";
 import type * as enterpriseGovernanceContractModule from "@langwatch/enterprise-governance-contract";
 
@@ -53,6 +61,8 @@ export type GovernanceIngestionSourceView = {
     backfillThrough: string | null;
     hasMore: boolean | null;
   } | null;
+  /** What the adapter refuses about the stored configuration; absent on an older fixture. */
+  configComplaints?: readonly string[];
   lastSuccessAt: string | null;
 };
 
@@ -93,7 +103,8 @@ export type GovernanceApiMap = ContractApiMap<typeof activityMonitorTrpc> &
   ContractApiMap<typeof governancePeopleTrpc> &
   ContractApiMap<typeof governanceAgentsTrpc> &
   ContractApiMap<typeof aiToolsTrpc> &
-  ContractApiMap<typeof governanceCostTrpc> & {
+  ContractApiMap<typeof governanceCostTrpc> &
+  ContractApiMap<typeof governanceKillSwitchTrpc> & {
     modelProvider: {
       getResolvedDefault: {
         query: {
@@ -218,6 +229,42 @@ export type GovernanceApiMap = ContractApiMap<typeof activityMonitorTrpc> &
     };
 
     ingestionSources: {
+      securityLakeCreate: {
+        mutation: {
+          input: { organizationId: string } & SecurityLakeSourceCreateRequest;
+          output: SecurityLakeSource;
+        };
+      };
+      securityLakeUpdate: {
+        mutation: {
+          input: { organizationId: string; id: string } & SecurityLakeSourceUpdateRequest;
+          output: SecurityLakeSource;
+        };
+      };
+      securityLakeGet: {
+        query: {
+          input: { organizationId: string; id: string };
+          output: SecurityLakeSource;
+        };
+      };
+      securityLakeTestConnection: {
+        mutation: {
+          input: { organizationId: string; id: string } & SecurityLakeConnectionTestRequest;
+          output: SecurityLakeConnectionTest;
+        };
+      };
+      securityLakeHealth: {
+        query: {
+          input: { organizationId: string; id: string };
+          output: SecurityLakeSourceHealth;
+        };
+      };
+      securityLakeCallersWithoutTraces: {
+        query: {
+          input: { organizationId: string };
+          output: SecurityLakeCallers;
+        };
+      };
       list: {
         query: {
           input: { organizationId: string };

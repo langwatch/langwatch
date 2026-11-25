@@ -8,24 +8,21 @@
 import type { SavedDashboardsProps } from "@langwatch/analytics-client";
 import type { DashboardStar } from "@langwatch/dashboard-contract";
 import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
-import {
-  Box,
-  Button,
-  HStack,
-  IconButton,
-  Spinner,
-  Text,
-  VStack,
-} from "@langwatch/design-system/primitives";
+import { Box, Button, HStack, Spinner, Text, VStack } from "@langwatch/design-system/primitives";
 import { HandledErrorAlert } from "@langwatch/error-views";
-import { ChevronRight, Plus } from "lucide-react";
-import { type ReactNode, useState } from "react";
+import { ChevronRight } from "lucide-react";
+import { type ReactNode, useEffect, useState } from "react";
 
 import { useAnalyticsHost } from "../../../../model/analytics-host.ts";
 import { useBoardAccess, useBoardReader } from "../../behavior/use-board-access.ts";
 import { useBoardFromTemplate } from "../../behavior/use-board-from-template.ts";
 import { type ScopeRequest, useBoardScope } from "../../behavior/use-board-scope.ts";
 import { useCuratedFold } from "../../behavior/use-curated-fold.ts";
+import {
+  restartStoredDraft,
+  useDraftBoard,
+  useStartDraft,
+} from "../../behavior/use-draft-board.ts";
 import { useDuplicateCurated } from "../../behavior/use-duplicate-curated.ts";
 import { useFavourites } from "../../behavior/use-favourites.ts";
 import { useSavedDashboards } from "../../behavior/use-saved-dashboards.ts";
@@ -35,6 +32,7 @@ import {
   dashboardsPath,
   type DashboardsPlace,
   dashboardsPlace,
+  draftBoardPath,
 } from "../../model/boards.ts";
 import {
   CURATED_BOARDS,
@@ -55,6 +53,7 @@ import {
 } from "../blocks/saved-dashboard-row.tsx";
 import { ScopeConfirmDialog } from "../blocks/scope-confirm-dialog.tsx";
 import { WidgetInfoTip } from "../blocks/widget-info-tip.tsx";
+import { NewDashboardButton } from "../elements/new-dashboard-button.tsx";
 import { ScopeMark } from "../elements/scope-mark.tsx";
 
 const GROUP_LABEL_STYLE = {
@@ -64,7 +63,10 @@ const GROUP_LABEL_STYLE = {
 
 type Favourites = ReturnType<typeof useFavourites>;
 
-/** A row's star, and its Move up / Move down while it sits in the Starred group. */
+/** The renaming key of the new board's row, which has no id yet. */
+const DRAFT_ROW = "draft";
+
+/** A row's star, and its Move up / Move down while it sits in the Pinned group. */
 function starActionsFor({
   favourites,
   star,
@@ -73,7 +75,7 @@ function starActionsFor({
 }: {
   favourites: Favourites;
   star: DashboardStar;
-  /** Its place among the shown stars; absent outside the Starred group. */
+  /** Its place among the shown stars; absent outside the Pinned group. */
   index: number | undefined;
   shown: readonly DashboardStar[];
 }): StarActions {
@@ -156,6 +158,56 @@ function BoardRow({
   );
 }
 
+/**
+ * The new board on screen, listed while nothing is stored: its pin and its rename store it,
+ * and leaving it unedited takes the row away with it.
+ */
+function DraftRow({
+  isRenaming,
+  onRenaming,
+}: {
+  isRenaming: boolean;
+  onRenaming: (isRenaming: boolean) => void;
+}) {
+  const host = useAnalyticsHost();
+  const saved = useSavedDashboards();
+  const draft = useDraftBoard({ takenNames: saved.boards.map(({ name }) => name) });
+  const { projectId } = useBoardReader();
+  useEffect(() => restartStoredDraft(projectId), [projectId]);
+  // Stored and about to move to its own address, where its own row takes over.
+  if (draft.savedId !== void 0) return null;
+  const store = ({
+    edit,
+    fallbackTitle,
+  }: {
+    edit: Parameters<typeof draft.materialise>[0];
+    fallbackTitle: string;
+  }) =>
+    void draft.materialise(edit).catch((error: unknown) => host.failed({ error, fallbackTitle }));
+  return (
+    <SavedDashboardRow
+      name={draft.board.name}
+      href={draftBoardPath({ projectSlug: saved.projectSlug })}
+      isActive
+      actions={{
+        isStarred: draft.board.isStarred,
+        // Pinning stores the board; unpinning a board not stored yet only takes the pin off.
+        onToggleStar: () => {
+          if (draft.board.isStarred) draft.unpin();
+          else store({ edit: { pin: true }, fallbackTitle: "Couldn't pin the dashboard" });
+        },
+        isRenaming,
+        rename: { onStart: () => onRenaming(true) },
+        onRenameCommit: (name) => {
+          onRenaming(false);
+          store({ edit: { name }, fallbackTitle: "Couldn't rename the dashboard" });
+        },
+        onRenameCancel: () => onRenaming(false),
+      }}
+    />
+  );
+}
+
 function CuratedRow({ curated, place, shown, index }: RowPlace & { curated: CuratedBoard }) {
   const { projectSlug } = useSavedDashboards();
   const favourites = useFavourites();
@@ -174,7 +226,7 @@ function CuratedRow({ curated, place, shown, index }: RowPlace & { curated: Cura
   );
 }
 
-/** "Your dashboards", "Starred" and the organization's boards, or their loading or error state. */
+/** "Your dashboards", "Pinned" and the organization's boards, or their loading or error state. */
 function BoardGroups({
   groups,
   place,
@@ -242,11 +294,17 @@ function BoardGroups({
       <RowList label="Your dashboards">
         {groups.myBoard && boardRow(groups.myBoard, { isMine: true })}
         {groups.yourBoards.map((board) => boardRow(board))}
+        {place.kind === "draft" && (
+          <DraftRow
+            isRenaming={renamingId === DRAFT_ROW}
+            onRenaming={(isRenaming) => setRenamingId(isRenaming ? DRAFT_ROW : void 0)}
+          />
+        )}
       </RowList>
       {groups.starred.length > 0 && (
         <>
-          <GroupLabel>Starred</GroupLabel>
-          <RowList label="Starred dashboards">{groups.starred.map(starredRow)}</RowList>
+          <GroupLabel>Pinned</GroupLabel>
+          <RowList label="Pinned dashboards">{groups.starred.map(starredRow)}</RowList>
         </>
       )}
       {groups.fromOrganization.length > 0 && (
@@ -269,7 +327,8 @@ export function SavedDashboardsSection({ openPath }: SavedDashboardsProps) {
   const favourites = useFavourites();
   const fold = useCuratedFold();
   const scope = useBoardScope();
-  const { mayCreate } = useBoardReader();
+  const startDraft = useStartDraft();
+  const { mayCreate, projectId } = useBoardReader();
   const [pendingDelete, setPendingDelete] = useState<SidebarBoard | undefined>();
   const { projectSlug } = saved;
   const place = dashboardsPlace(openPath ?? "");
@@ -298,8 +357,9 @@ export function SavedDashboardsSection({ openPath }: SavedDashboardsProps) {
     <VStack align="stretch" gap={0.5} width="full" marginTop={3.5}>
       <HStack paddingX={2} marginBottom={0.5} gap={1}>
         <Text {...GROUP_LABEL_STYLE}>Your dashboards</Text>
+        {/* A new board at once, stored on its first edit; it offers the templates, so no menu. */}
         {mayCreate && (
-          <NewDashboardButton isCreating={saved.isCreating} onCreate={saved.createBoard} />
+          <NewDashboardButton onCreate={() => startDraft({ projectId, projectSlug })} />
         )}
       </HStack>
 
@@ -384,36 +444,5 @@ function RowList({ label, children }: { label: string; children: ReactNode }) {
     <VStack as="ul" aria-label={label} align="stretch" gap={0.5} margin={0} padding={0}>
       {children}
     </VStack>
-  );
-}
-
-/**
- * The "+" anchored to the heading creates a blank board at once. Templates stay one step away:
- * the new board offers them, so the sidebar needs no menu or library link.
- */
-function NewDashboardButton({
-  isCreating,
-  onCreate,
-}: {
-  isCreating: boolean;
-  onCreate: () => void;
-}) {
-  return (
-    <Box marginLeft="auto" display="flex">
-      <IconButton
-        size="2xs"
-        variant="ghost"
-        minWidth={0}
-        boxSize={4}
-        color="fg.subtle"
-        _hover={{ color: "fg", background: "border/60" }}
-        aria-label="New dashboard"
-        title="New dashboard"
-        loading={isCreating}
-        onClick={onCreate}
-      >
-        <Plus size={12} aria-hidden />
-      </IconButton>
-    </Box>
   );
 }

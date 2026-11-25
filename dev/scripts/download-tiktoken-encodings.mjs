@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 /**
- * Downloads every tiktoken encoding file into <target-dir> for TIKTOKENS_PATH,
- * each checked against a pinned SHA-256. Run from a package that depends on tiktoken
- * (modules/trace/process): `node ../../../dev/scripts/download-tiktoken-encodings.mjs <dir>`.
+ * Downloads every tiktoken encoding into <dir> (TIKTOKENS_PATH), each against a pinned SHA-256.
+ * Run from modules/trace/process; an optional [py-dir] gets the same files under Python
+ * tiktoken's cache names (sha1 of the URL), for TIKTOKEN_CACHE_DIR.
  */
 
 import { createHash } from "node:crypto";
@@ -11,8 +11,9 @@ import { createRequire } from "node:module";
 import path from "node:path";
 
 const target = process.argv[2];
+const pythonCache = process.argv[3];
 if (!target) {
-  console.error("usage: download-tiktoken-encodings.mjs <target-dir>");
+  console.error("usage: download-tiktoken-encodings.mjs <target-dir> [python-cache-dir]");
   process.exit(1);
 }
 
@@ -44,6 +45,7 @@ const collect = (node) => {
 collect(registry);
 
 await fs.mkdir(target, { recursive: true });
+if (pythonCache) await fs.mkdir(pythonCache, { recursive: true });
 for (const url of urls) {
   const response = await fetch(url);
   if (!response.ok) {
@@ -61,5 +63,9 @@ for (const url of urls) {
   }
   const file = path.join(target, name);
   await fs.writeFile(file, body);
+  if (pythonCache) {
+    const cacheKey = createHash("sha1").update(url).digest("hex");
+    await fs.writeFile(path.join(pythonCache, cacheKey), body);
+  }
   console.log(`${path.basename(url)} <- ${url}`);
 }

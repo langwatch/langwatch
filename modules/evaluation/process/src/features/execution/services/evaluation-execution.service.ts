@@ -1,3 +1,5 @@
+import { type Authorization, internalActor } from "@langwatch/authorization";
+import type { AuthzApi } from "@langwatch/authz-contract";
 import { mappingsReadEvaluationsSource, mappingStateSchema } from "@langwatch/dataset-contract";
 import type { MappingState } from "@langwatch/dataset-contract";
 import {
@@ -17,12 +19,15 @@ import {
   isNativeEvaluatorType,
 } from "@langwatch/evaluator-contract";
 import type { InstantEvalJudgeApi } from "@langwatch/instant-eval-judge-contract";
+import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { Protections, Trace, TraceApi } from "@langwatch/trace-contract";
 
+import type { EvaluationRunRepository } from "../../../repositories/evaluation.repository.ts";
 import { maxCausalityDepthOfSpans } from "../../../rules/evaluation-causality.rules.ts";
 import { executionResultOf } from "../../../rules/evaluation-execution-result.rules.ts";
 import { evaluationRenderBudget } from "../../../rules/evaluation-render-budget.rules.ts";
 import { hasThreadMappings } from "../../../rules/evaluation-thread-mapping-service.rules.ts";
+import { traceEvaluationOf } from "../../../rules/evaluation-trace-evaluations.rules.ts";
 import { type EvaluatorInstallEnvironment } from "../../../rules/evaluator-availability-service.rules.ts";
 import { instantEvalJudgeOf } from "../../../rules/instant-eval-judge-dispatch.rules.ts";
 import { EvaluationDataService } from "../../../services/evaluation-data.service.ts";
@@ -31,7 +36,10 @@ import type { LangevalsEvaluatorService } from "../../evaluators/services/langev
 import type { WorkflowEvaluationService } from "../../evaluators/services/workflow-evaluation.service.ts";
 import { EvaluationCustomEvaluationService } from "./evaluation-custom-evaluation.service.ts";
 import type { EvaluationExecutionMetricsService } from "./evaluation-execution-metrics.service.ts";
-import { EvaluationJudgingService } from "./evaluation-judging.service.ts";
+import {
+  EvaluationJudgingService,
+  type EvaluationJudgeRouting,
+} from "./evaluation-judging.service.ts";
 import type { EvaluationSpanDigestService } from "./evaluation-span-digest.service.ts";
 
 // Evaluations need full access to trace data — no user-facing redaction.
@@ -47,12 +55,19 @@ const INTERNAL_PROTECTIONS: ReadProtections = {
   canSeeCapturedOutput: true,
 };
 
+/** The internal actor the earlier-evaluations read mints its proof as. */
+const EVALUATION_READ_CODE_PATH = "evaluation.execution-read";
+
 // ---------------------------------------------------------------------------
 // Dependency interfaces (colocated — not shared)
 // ---------------------------------------------------------------------------
 
 export interface EvaluationExecutionDeps {
-  traces: Pick<TraceApi, "readTracesWithSpans" | "readEvaluations" | "readThreadsTraces">;
+  traces: Pick<TraceApi, "readTracesWithSpans" | "readThreadsTraces">;
+  /** Where a field mapping's earlier evaluations are read: evaluation's own runs. */
+  runs: Pick<EvaluationRunRepository, "findTraceEvaluations">;
+  /** Mints the own-only proof the runs read is fenced by (ruling AGG-EVAL-PROOF). */
+  authz: Pick<AuthzApi, "authorizeInternal">;
   spanDigest: Pick<EvaluationSpanDigestService, "format" | "formatThread">;
   modelEnvResolver: Pick<EvaluatorModelEnvService, "resolveForEvaluator">;
   langevalsClient: Pick<LangevalsEvaluatorService, "evaluate">;
@@ -60,6 +75,10 @@ export interface EvaluationExecutionDeps {
   workflowExecutor: Pick<WorkflowEvaluationService, "run">;
   /** Answers a judge whose model is Instant Evals (ADR-174 decision 1). */
   judges: Pick<InstantEvalJudgeApi, "judge">;
+  /** The project's Instant Evals column: LangWatch's classifier or its own model (ADR-182). */
+  decisionModels: Pick<ModelProviderApi, "resolveDecisionModel">;
+  /** Whether an organization's Instant Evals judges go through the judge router (ADR-190). */
+  judgeRouting: EvaluationJudgeRouting;
   /**
    * The install environment the optional evaluators read their opt-out
    * switches from. Stated by the process rather than read here, because a
@@ -107,6 +126,19 @@ type ScoredTrace =
 // ---------------------------------------------------------------------------
 // Service
 // ---------------------------------------------------------------------------
+
+type RunEvaluationParams = {
+  projectId: string;
+  evaluatorType: string;
+  data: DataForEvaluation;
+  settings?: Record<string, unknown>;
+  trace?: Trace;
+  workflowId?: string | null;
+  parentCausalityDepth?: number;
+  idempotencyKey?: string;
+  signal?: AbortSignal | undefined;
+  guardrailDirection?: GuardrailCheckDirection | undefined;
+};
 
 export class EvaluationExecutionService {
   static create(deps: EvaluationExecutionDeps): EvaluationExecutionService {
@@ -254,15 +286,24 @@ export class EvaluationExecutionService {
     }
 
     if (mappingsReadEvaluationsSource(mappings)) {
-      const evaluationsByTrace = await this.deps.traces.readEvaluations({
-        projectId,
+      const evaluations = await this.deps.runs.findTraceEvaluations({
+        authorization: await this.ownProof({ projectId }),
         traceIds: [traceId],
-        protections,
       });
-      trace.evaluations = (evaluationsByTrace[traceId] ?? []) as Trace["evaluations"];
+      trace.evaluations = evaluations.map((evaluation) => traceEvaluationOf({ evaluation }));
     }
 
     return trace;
+  }
+
+  /** The platform reads the one project as itself: a monitor or queued run holds a tenant only. */
+  private ownProof({ projectId }: { projectId: string }): Promise<Authorization> {
+    return this.deps.authz.authorizeInternal({
+      actor: internalActor(EVALUATION_READ_CODE_PATH),
+      projectId,
+      permission: "traces:view",
+      purpose: { kind: "operator", entry: "EvaluationExecutionService.loadTraceForEvaluation" },
+    });
   }
 
   /**
@@ -285,18 +326,25 @@ export class EvaluationExecutionService {
   // Evaluation execution (built-in vs custom/workflow)
   // ---------------------------------------------------------------------------
 
-  private async runEvaluation(params: {
-    projectId: string;
-    evaluatorType: string;
-    data: DataForEvaluation;
-    settings?: Record<string, unknown>;
-    trace?: Trace;
-    workflowId?: string | null;
-    parentCausalityDepth?: number;
-    idempotencyKey?: string;
-    signal?: AbortSignal | undefined;
-    guardrailDirection?: GuardrailCheckDirection | undefined;
+  private answerInstantEval({
+    params,
+    dispatch,
+    droppedCategories,
+  }: {
+    params: RunEvaluationParams;
+    dispatch: Extract<ReturnType<typeof instantEvalJudgeOf>, { kind: "instant_eval" }>;
+    droppedCategories: string[];
   }): Promise<SingleEvaluationResult> {
+    return this.instantEvals.answer({
+      ...params,
+      judge: dispatch.judge,
+      ...(dispatch.decisionModel === undefined ? {} : { decisionModel: dispatch.decisionModel }),
+      ...(dispatch.isRoutable ? { isRoutable: true } : {}),
+      droppedCategories,
+    });
+  }
+
+  private async runEvaluation(params: RunEvaluationParams): Promise<SingleEvaluationResult> {
     const {
       projectId,
       evaluatorType,
@@ -331,17 +379,11 @@ export class EvaluationExecutionService {
     // Before any provider lookup, so a project with no model provider can judge too.
     const dispatch = instantEvalJudgeOf({ evaluatorType: builtInType, settings });
     if (dispatch.kind === "instant_eval") {
-      return this.instantEvals.answer({
-        ...params,
-        judge: dispatch.judge,
-        data,
-        droppedCategories,
-      });
+      return this.answerInstantEval({ params, dispatch, droppedCategories });
     }
 
-    // Native (in-process) evaluators skip the analysis service; both they and
-    // the remote ones run through the shared augmenter so redaction or drop at
-    // ingestion never hides a leak from the result.
+    // Native evaluators skip the analysis service; both kinds run through the shared
+    // augmenter so redaction or drop at ingestion never hides a leak from the result.
     if (isNativeEvaluatorType(builtInType)) {
       return this.runNativeEvaluation({
         builtInType,
@@ -364,6 +406,7 @@ export class EvaluationExecutionService {
       settings: settings ?? {},
       env: evaluatorEnv,
       idempotencyKey,
+      projectId,
       signal,
     });
 

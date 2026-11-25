@@ -1,5 +1,6 @@
 export * from "./constants.ts";
 export * from "./json.ts";
+export * from "./langy-call-stopped.ts";
 export * from "./event-sourcing/contracts/langy.events.ts";
 export * from "./event-sourcing/contracts/cursor.ts";
 export * from "./event-sourcing/contracts/turn-wire.ts";
@@ -29,8 +30,11 @@ export * from "./langy-conversation.ts";
 export * from "./langy.api.ts";
 export {
   langyStreamEntrySchema,
+  langyStreamFrameSchema,
   type LangyStreamEntry,
   type LangyStreamEntrySchema,
+  type LangyStreamFrame,
+  type LangyStreamFrameSchema,
 } from "./langy.stream-entry.ts";
 export * from "./langy-kickoff.ts";
 export * from "./langy-shown-once.ts";

@@ -7,6 +7,7 @@ import { randomUUID } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
+import { DEFAULT_DASHBOARD_HOME_PRODUCT } from "@langwatch/dashboard-contract";
 import { createLogger } from "@langwatch/observability";
 import {
   PrismaConfigService,
@@ -305,6 +306,10 @@ describe.skipIf(!databaseUrl)("the Dashboards v2 split migration", () => {
           createdById: source?.createdById,
           scope: source?.scope,
           organizationId: source?.organizationId,
+          // Unused since sources replaced it; the column stays until its drop lands.
+          excludedOrigins: null,
+          // Added after the split; its default homes every copied board in LLM Ops (ADR-002, 8).
+          homeProduct: DEFAULT_DASHBOARD_HOME_PRODUCT,
           createdAt: source?.createdAt,
           updatedAt: source?.updatedAt,
         });

@@ -272,7 +272,7 @@ function overviewItemsForUser({
         ...budget,
         scopeClass,
         scopePhrase: scopePhraseFor(scopeClass, budget.scopeLabel),
-        resetsAt: computeResetsAt(budget.window),
+        resetsAt: computeResetsAt(budget.window, budget.timezone),
         ...(topModels && topModels.length > 0 && scopeClass === "personal" ? { topModels } : {}),
       };
     })
@@ -385,12 +385,16 @@ function scopePhraseFor(scopeClass: BudgetOverviewScopeClass, scopeLabel: string
   }
 }
 
-function computeResetsAt(window: string): string | null {
+function computeResetsAt(window: string, timezone: string | null): string | null {
   if (window === "TOTAL") {
     return null;
   }
 
   return toDate(
-    GatewayWindow.nextResetAt(window as Parameters<typeof GatewayWindow.nextResetAt>[0]),
+    GatewayWindow.nextResetAt(
+      window as Parameters<typeof GatewayWindow.nextResetAt>[0],
+      undefined,
+      timezone,
+    ),
   ).toISOString();
 }
