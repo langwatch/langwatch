@@ -165,7 +165,7 @@
  },
  {
   "label": "fd-cost-efficiency/summary",
-  "sql": "SELECT\n  uniqExact(TraceId) AS traces,\n  sum(TotalCost) AS cost,\n  countIf(NOT HasError) AS successes,\n  sum(PromptTokens) AS tokens_in,\n  sum(CompletionTokens) AS tokens_out\nFROM trace_metrics\nWHERE trace_metrics.Source IN {dashboard_context_sources:Array(String)} AND ( OccurredAt >= {dashboard_context_period_start:DateTime} AND OccurredAt < {dashboard_context_period_end:DateTime})"
+  "sql": "SELECT\n  uniqExact(TraceId) AS traces,\n  sum(TotalCost) AS cost,\n  countIf(NOT HasError) AS error_free,\n  sum(PromptTokens) AS tokens_in,\n  sum(CompletionTokens) AS tokens_out\nFROM trace_metrics\nWHERE trace_metrics.Source IN {dashboard_context_sources:Array(String)} AND ( OccurredAt >= {dashboard_context_period_start:DateTime} AND OccurredAt < {dashboard_context_period_end:DateTime})"
  },
  {
   "label": "fd-cost-efficiency/models",
@@ -177,7 +177,7 @@
  },
  {
   "label": "fd-failures/main",
-  "sql": "SELECT\n  coalesce(nullIf(SpanAttributes['exception.type'], ''), nullIf(SpanAttributes['error.type'], ''), 'Unclassified error') AS category,\n  SpanName AS operation,\n  min(StartTime) AS first_seen,\n  count() AS failures\nFROM spans\nWHERE (spans.TenantId, spans.TraceId) IN (SELECT TenantId, TraceId FROM trace_metrics WHERE Source IN {dashboard_context_sources:Array(String)} AND OccurredAt >= subtractDays(subtractSeconds({dashboard_context_period_start:DateTime}, dateDiff('second', {dashboard_context_period_start:DateTime}, {dashboard_context_period_end:DateTime})), 1)) AND ( StartTime >= {dashboard_context_period_start:DateTime} AND StartTime < {dashboard_context_period_end:DateTime}\n  AND StatusCode = 2)\nGROUP BY category, operation\nORDER BY failures DESC\nLIMIT 7"
+  "sql": "SELECT\n  coalesce(nullIf(SpanAttributes['exception.type'], ''), nullIf(SpanAttributes['error.type'], ''), 'Error with no type') AS category,\n  SpanName AS operation,\n  min(StartTime) AS first_seen,\n  count() AS failures\nFROM spans\nWHERE (spans.TenantId, spans.TraceId) IN (SELECT TenantId, TraceId FROM trace_metrics WHERE Source IN {dashboard_context_sources:Array(String)} AND OccurredAt >= subtractDays(subtractSeconds({dashboard_context_period_start:DateTime}, dateDiff('second', {dashboard_context_period_start:DateTime}, {dashboard_context_period_end:DateTime})), 1)) AND ( StartTime >= {dashboard_context_period_start:DateTime} AND StartTime < {dashboard_context_period_end:DateTime}\n  AND StatusCode = 2)\nGROUP BY category, operation\nORDER BY failures DESC\nLIMIT 7"
  },
  {
   "label": "fd-failures/present",
@@ -217,7 +217,7 @@
  },
  {
   "label": "fd-coding-agents/agents",
-  "sql": "SELECT Agent AS agent,\n  count() AS sessions,\n  sum(InputTokens + OutputTokens) AS tokens,\n  sum(CostUsd) AS cost,\n  countIf(ApiErrors = 0 AND InternalErrors = 0 AND RetriesExhausted = 0) / count() AS success_rate\nFROM coding_sessions\nWHERE StartedAt >= {dashboard_context_period_start:DateTime} AND StartedAt < {dashboard_context_period_end:DateTime}\nGROUP BY agent\nORDER BY cost DESC\nLIMIT 10"
+  "sql": "SELECT Agent AS agent,\n  count() AS sessions,\n  sum(InputTokens + OutputTokens) AS tokens,\n  sum(CostUsd) AS cost,\n  countIf(ApiErrors = 0 AND InternalErrors = 0 AND RetriesExhausted = 0) / count() AS error_free_rate\nFROM coding_sessions\nWHERE StartedAt >= {dashboard_context_period_start:DateTime} AND StartedAt < {dashboard_context_period_end:DateTime}\nGROUP BY agent\nORDER BY cost DESC\nLIMIT 10"
  },
  {
   "label": "fd-coding-agents/trend",
@@ -649,7 +649,7 @@
  },
  {
   "label": "so-changes/main",
-  "sql": "SELECT at, kind, name\nFROM (\n  SELECT v.CreatedAt AS at, 'Prompt version' AS kind,\n    concat(p.PromptName, ' v', toString(v.VersionNumber)) AS name\n  FROM prompt_versions AS v\n  LEFT JOIN prompts AS p ON p.PromptId = v.PromptId\n  WHERE v.CreatedAt >= {dashboard_context_period_start:DateTime} AND v.CreatedAt < {dashboard_context_period_end:DateTime}\n  LIMIT 50\n  UNION ALL\n  SELECT CreatedAt AS at, 'Evaluator added' AS kind, Name AS name\n  FROM evaluators\n  WHERE CreatedAt >= {dashboard_context_period_start:DateTime} AND CreatedAt < {dashboard_context_period_end:DateTime}\n  LIMIT 50\n  UNION ALL\n  SELECT UpdatedAt AS at, 'Online evaluation changed' AS kind, Name AS name\n  FROM monitors\n  WHERE UpdatedAt >= {dashboard_context_period_start:DateTime} AND UpdatedAt < {dashboard_context_period_end:DateTime}\n  LIMIT 50\n)\nORDER BY at DESC\nLIMIT 8"
+  "sql": "SELECT at, kind, name\nFROM (\n  SELECT v.CreatedAt AS at, 'New prompt version' AS kind,\n    concat(p.PromptName, ' v', toString(v.VersionNumber)) AS name\n  FROM prompt_versions AS v\n  LEFT JOIN prompts AS p ON p.PromptId = v.PromptId\n  WHERE v.CreatedAt >= {dashboard_context_period_start:DateTime} AND v.CreatedAt < {dashboard_context_period_end:DateTime}\n  LIMIT 50\n  UNION ALL\n  SELECT CreatedAt AS at, 'New automatic check' AS kind, Name AS name\n  FROM evaluators\n  WHERE CreatedAt >= {dashboard_context_period_start:DateTime} AND CreatedAt < {dashboard_context_period_end:DateTime}\n  LIMIT 50\n  UNION ALL\n  SELECT UpdatedAt AS at, 'Automatic check changed' AS kind, Name AS name\n  FROM monitors\n  WHERE UpdatedAt >= {dashboard_context_period_start:DateTime} AND UpdatedAt < {dashboard_context_period_end:DateTime}\n  LIMIT 50\n)\nORDER BY at DESC\nLIMIT 8"
  },
  {
   "label": "so-changes/present",
