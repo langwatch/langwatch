@@ -5,7 +5,7 @@
 import type { Model } from "@langwatch/model-provider-contract";
 import { describe, expect, it } from "vitest";
 
-import { mergeListedModels } from "../model-listing-import.rules.ts";
+import { MAX_IMPORTED_LIST_SIZE, mergeListedModels } from "../model-listing-import.rules.ts";
 
 const chat = (id: string, extra: Partial<Model> = {}): Model => ({
   id,
@@ -120,6 +120,44 @@ describe("mergeListedModels", () => {
       expect(merged.customModels).toEqual([]);
       expect(merged.customEmbeddingsModels).toHaveLength(1);
       expect(merged.added).toBe(0);
+    });
+  });
+
+  describe("given lists that grow toward the cap across imports", () => {
+    /** @scenario Imports stop filling the lists at the listing cap */
+    it("adds only up to the cap and leaves the rest unrecorded for a later import", () => {
+      const existing = Array.from({ length: MAX_IMPORTED_LIST_SIZE - 1 }, (_, index) =>
+        chat(`kept-${index}`),
+      );
+
+      const merged = mergeListedModels({
+        listed: [{ id: "new-b" }, { id: "new-a" }, { id: `kept-0` }],
+        customModels: existing,
+        customEmbeddingsModels: [],
+        previouslyListedIds: null,
+      });
+
+      expect(merged.customModels).toHaveLength(MAX_IMPORTED_LIST_SIZE);
+      expect(merged.customModels.at(-1)?.id).toBe("new-b");
+      expect(merged.added).toBe(1);
+      expect(merged.listedModelIds).toEqual(["new-b", "kept-0"]);
+    });
+
+    it("keeps every user entry when the lists are already past the cap", () => {
+      const existing = Array.from({ length: MAX_IMPORTED_LIST_SIZE + 5 }, (_, index) =>
+        chat(`kept-${index}`),
+      );
+
+      const merged = mergeListedModels({
+        listed: [{ id: "new-a" }],
+        customModels: existing,
+        customEmbeddingsModels: [],
+        previouslyListedIds: ["gone"],
+      });
+
+      expect(merged.customModels).toEqual(existing);
+      expect(merged.added).toBe(0);
+      expect(merged.listedModelIds).toEqual([]);
     });
   });
 });

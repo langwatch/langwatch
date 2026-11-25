@@ -82,6 +82,13 @@ Feature: Import a custom provider's models on save
     Then "model-a" is not added back
 
   @unit
+  Scenario: Imports stop filling the lists at the listing cap
+    Given a provider whose custom models already reach the listing cap
+    When the listing names models the provider does not have
+    Then none of them is added
+    And they are not stored as listed, so a later import can still add them
+
+  @unit
   Scenario: An embeddings model is not duplicated as a chat model
     Given a custom embeddings model "embed-a"
     When the listing names "embed-a"
