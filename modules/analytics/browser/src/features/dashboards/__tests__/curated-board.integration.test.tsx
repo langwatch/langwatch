@@ -174,7 +174,7 @@ describe("given a member opens a From LangWatch board", () => {
       const user = userEvent.setup({ pointerEventsCheck: 0 });
       const { server } = openCurated({ templateId: "release" });
 
-      expect(await screen.findByRole("heading", { name: "Release check" })).toBeInTheDocument();
+      expect(await screen.findByRole("heading", { name: "Ready to ship?" })).toBeInTheDocument();
       expect(await screen.findByRole("button", { name: "Add a widget" })).toBeInTheDocument();
       expect(screen.getByText("From LangWatch")).toBeInTheDocument();
       expect(screen.getByRole("button", { name: "Use this template" })).toBeInTheDocument();
@@ -199,7 +199,7 @@ describe("given a member opens a From LangWatch board", () => {
       const user = userEvent.setup({ pointerEventsCheck: 0 });
       const { server } = openCurated({ templateId: "release", permissions: NO_CREATE });
 
-      expect(await screen.findByRole("heading", { name: "Release check" })).toBeInTheDocument();
+      expect(await screen.findByRole("heading", { name: "Ready to ship?" })).toBeInTheDocument();
       expect(screen.queryByRole("button", { name: "Add a widget" })).toBeNull();
       expect(screen.queryByRole("button", { name: "Use this template" })).toBeNull();
       expect(screen.queryByTitle("Edit name")).toBeNull();
@@ -217,7 +217,7 @@ describe("given a member opens a From LangWatch board", () => {
     it("offers no edit control, though the member may create dashboards", async () => {
       const { server } = openCurated({ templateId: "release", organizationArea: false });
 
-      expect(await screen.findByRole("heading", { name: "Release check" })).toBeInTheDocument();
+      expect(await screen.findByRole("heading", { name: "Ready to ship?" })).toBeInTheDocument();
       expect(screen.queryByRole("button", { name: "Add a widget" })).toBeNull();
       expect(screen.queryByRole("button", { name: "Use this template" })).toBeNull();
       expect(screen.queryByTitle("Edit name")).toBeNull();
@@ -270,7 +270,7 @@ describe("given a member opens a From LangWatch board", () => {
         await user.click(await screen.findByRole("button", { name: "Cancel" }));
 
         await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
-        expect(screen.getByRole("heading", { name: "Release check" })).toBeInTheDocument();
+        expect(screen.getByRole("heading", { name: "Ready to ship?" })).toBeInTheDocument();
         expect(host.navigations).toEqual([]);
         expect(server.calls.filter(({ path }) => WRITES.test(path))).toEqual([]);
       });
@@ -292,7 +292,7 @@ describe("given a member opens a From LangWatch board", () => {
           expect(host.navigations).toEqual(["/test-project/dashboards/board-1?addBlock=open"]),
         );
         expect(inputsTo(server, "boards.create")).toEqual([
-          { projectId: "proj-1", name: "Release check" },
+          { projectId: "proj-1", name: "Ready to ship?" },
         ]);
         expect(inputsTo(server, "boards.update")).toEqual([
           { projectId: "proj-1", dashboardId: "board-1", description: RELEASE.job },
@@ -332,7 +332,7 @@ describe("given a member opens a From LangWatch board", () => {
         const user = userEvent.setup({ pointerEventsCheck: 0 });
         const { host } = openCurated({ templateId: "release" });
 
-        await screen.findByRole("heading", { name: "Release check" });
+        await screen.findByRole("heading", { name: "Ready to ship?" });
         await pickWidgetAction({ user, action: "Edit code" });
         await user.click(await screen.findByRole("button", { name: "Yes, modify it" }));
 
@@ -350,7 +350,7 @@ describe("given a member opens a From LangWatch board", () => {
         const user = userEvent.setup({ pointerEventsCheck: 0 });
         const { host, server } = openCurated({ templateId: "release" });
 
-        await screen.findByRole("heading", { name: "Release check" });
+        await screen.findByRole("heading", { name: "Ready to ship?" });
         await pickWidgetAction({ user, action: "Delete" });
         await user.click(await screen.findByRole("button", { name: "Yes, modify it" }));
 
@@ -403,7 +403,7 @@ describe("given a member opens a From LangWatch board", () => {
         );
         await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
         expect(host.navigations).toEqual([]);
-        expect(screen.getByRole("heading", { name: "Release check" })).toBeInTheDocument();
+        expect(screen.getByRole("heading", { name: "Ready to ship?" })).toBeInTheDocument();
       });
     });
   });
@@ -427,41 +427,39 @@ describe("given a member opens a From LangWatch board", () => {
     });
   });
 
-  /** @scenario "AC3i The Dashboards pages point back to the old Analytics" */
-  it("points back to the old Analytics", async () => {
+  /** @scenario "AC3t No other Dashboards page shows the old-Analytics banner" */
+  it("shows no old-Analytics banner", async () => {
     openCurated({ templateId: "release" });
 
-    expect(await screen.findByTestId("old-analytics-banner")).toHaveTextContent(
-      "Looking for the old Analytics? It is still here.",
-    );
-    expect(screen.getByRole("link", { name: "Open Analytics" })).toHaveAttribute(
-      "href",
-      "/test-project/analytics",
-    );
+    expect(await screen.findByRole("heading", { name: "Ready to ship?" })).toBeInTheDocument();
+    expect(screen.queryByTestId("old-analytics-banner")).toBeNull();
   });
 
-  describe("when the board is Can I trust my numbers?", () => {
+  describe("when the board is Fix missing data", () => {
     /** @scenario "From LangWatch: every widget on a template board has code" */
     it("shows its four widgets and no placeholder", async () => {
       openCurated({ templateId: "data" });
 
-      expect(
-        await screen.findByRole("heading", { name: "Can I trust my numbers?" }),
-      ).toBeInTheDocument();
-      expect(screen.getByText("Is my data complete?")).toBeInTheDocument();
-      expect(screen.getByText("Which of my traces are noise?")).toBeInTheDocument();
-      expect(screen.queryByText("Not built yet")).toBeNull();
+      expect(await screen.findByRole("heading", { name: "Fix missing data" })).toBeInTheDocument();
+      const widgets = curatedBoardById("data")?.widgets ?? [];
+      expect(widgets).toHaveLength(4);
+      for (const { name, definition } of widgets) {
+        expect(screen.getByText(name)).toBeInTheDocument();
+        expect(definition.code.trim(), name).not.toBe("");
+      }
+      expect(await screen.findAllByTitle("Custom chart")).toHaveLength(4);
     });
   });
 
   describe("when Langy is available", () => {
     /** @scenario "AC120b Ask Langy: every widget on every board has Ask Langy, From LangWatch boards included" */
-    it("gives every widget an Ask Langy button that drafts that widget's prompt", async () => {
+    /** @scenario "AC121b Ask Langy: clicking opens the widget large beside Langy" */
+    it("gives every widget an Ask Langy button that drafts that widget's prompt and opens it large", async () => {
       const user = userEvent.setup({ pointerEventsCheck: 0 });
       const { host } = openCurated({ templateId: "release" });
       const names = curatedBoardById("release")?.widgets.map(({ name }) => name) ?? [];
 
-      await screen.findByRole("heading", { name: "Release check" });
+      await screen.findByRole("heading", { name: "Ready to ship?" });
       const asks = screen.getAllByRole("button", { name: /^Ask Langy about / });
       expect(asks.map((button) => button.getAttribute("aria-label") ?? "").toSorted()).toEqual(
         names.map((name) => `Ask Langy about ${name}`).toSorted(),
@@ -473,6 +471,7 @@ describe("given a member opens a From LangWatch board", () => {
       expect(host.langyAsks[0]?.question).toBeUndefined();
       expect(host.langyAsks[0]?.draft).toContain(names[0]);
       expect(host.langyAsks[0]?.context[0]?.ref).toContain("From LangWatch dashboard");
+      expect(await screen.findByRole("dialog", { name: names[0] })).toBeInTheDocument();
       expect(host.lastQuery).not.toEqual(PICKER_OPEN);
       expect(screen.queryByRole("heading", { name: "Add a widget" })).toBeNull();
     });
@@ -483,7 +482,7 @@ describe("given a member opens a From LangWatch board", () => {
     it("shows no Ask Langy on any widget", async () => {
       openCurated({ templateId: "release", flags: { release_dashboards: true } });
 
-      await screen.findByRole("heading", { name: "Release check" });
+      await screen.findByRole("heading", { name: "Ready to ship?" });
       expect(screen.queryByRole("button", { name: /^Ask Langy about / })).toBeNull();
     });
   });
@@ -594,7 +593,7 @@ describe("given a member opens a From LangWatch board", () => {
         query: PICKER_OPEN,
       });
 
-      await screen.findByRole("heading", { name: "Where my agent breaks" });
+      await screen.findByRole("heading", { name: "Errors and failures" });
       await screen.findByRole("button", { name: "What do you want to know?" });
       await expect(
         screen.findByRole("heading", { name: "Add a widget" }, { timeout: 300 }),
@@ -692,7 +691,7 @@ describe("given a member opens a From LangWatch board", () => {
         query: PICKER_OPEN,
       });
 
-      await screen.findByRole("heading", { name: "Where my agent breaks" });
+      await screen.findByRole("heading", { name: "Errors and failures" });
       await screen.findByRole("button", { name: "What do you want to know?" });
       expect(screen.queryByRole("heading", { name: "Add a widget" })).toBeNull();
     });

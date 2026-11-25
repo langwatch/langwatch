@@ -1,7 +1,7 @@
 /**
- * A From LangWatch board's widgets on the board grid. Ask Langy and Export CSV change nothing; a
- * member who may make boards also moves, edits and deletes, each asking first as it makes their
- * own copy. Each widget runs its own queries over the board's period.
+ * A From LangWatch board's widgets on the board grid. Ask Langy, its actions and Export CSV change
+ * nothing; a member who may make boards also moves, edits and deletes, each asking first as it
+ * makes their own copy. Each widget runs its own queries over the board's period.
  */
 
 import { useMemo } from "react";
@@ -15,6 +15,7 @@ import {
 } from "../../model/board-grid.ts";
 import type { BoardPeriod } from "../../model/board-period.ts";
 import type { BoardTemplateWidget } from "../../templates/index.ts";
+import type { WidgetCardLangy } from "./board-widget-card.tsx";
 import { CuratedWidgetCard } from "./curated-widget-card.tsx";
 
 export function CuratedWidgetsGrid({
@@ -25,7 +26,7 @@ export function CuratedWidgetsGrid({
   widgets,
   period,
   periodKey,
-  onAskLangy,
+  langyFor,
   onEdit,
   onDelete,
   onPlacementsCommit,
@@ -40,8 +41,8 @@ export function CuratedWidgetsGrid({
   period: BoardPeriod;
   /** The reader's chosen period, such as "1h:auto"; only a new choice restarts the widget. */
   periodKey: string;
-  /** Drafts a prompt about the widget in Langy; absent when Langy is not available. */
-  onAskLangy?: (widget: BoardTemplateWidget) => void;
+  /** What each card asks of Langy; absent when Langy is not available. */
+  langyFor?: (widget: BoardTemplateWidget) => Pick<WidgetCardLangy, "ask" | "askAbout" | "act">;
   /** These three are absent for a member who may not make boards: the grid is then read-only. */
   onEdit?: (widget: BoardTemplateWidget) => void;
   onDelete?: (widget: BoardTemplateWidget) => void;
@@ -82,7 +83,7 @@ export function CuratedWidgetsGrid({
             timeWindow={timeWindow}
             granularitySeconds={granularitySeconds}
             periodKey={periodKey}
-            onAskLangy={onAskLangy && (() => onAskLangy(widget))}
+            {...(langyFor ? { langy: langyFor(widget) } : {})}
             onEdit={onEdit && (() => onEdit(widget))}
             onDelete={onDelete && (() => onDelete(widget))}
             onEmptyChange={onEmptyChange && ((empty) => onEmptyChange({ widget, empty }))}

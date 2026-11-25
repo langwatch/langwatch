@@ -11,6 +11,7 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 
 import { StubAnalyticsHost } from "../../../testing.tsx";
+import { useStartDraft } from "../behavior/use-draft-board.ts";
 import { FROM_LANGWATCH_ABOUT } from "../model/curated-boards.ts";
 import { SavedDashboardsSection } from "../ui/sections/saved-dashboards-section.tsx";
 import { HOME_BOARD, NO_PROCEDURES, renderDashboards } from "./render-dashboards.test-helpers.tsx";
@@ -51,7 +52,7 @@ type Star =
   | { kind: "board"; dashboard: ReturnType<typeof board> }
   | { kind: "template"; templateId: string };
 
-/** The member starred Latency, then the Release check template. */
+/** The member starred Latency, then the Ready to ship? template. */
 const STARS: Star[] = [
   { kind: "board", dashboard: LATENCY },
   { kind: "template", templateId: "release" },
@@ -136,11 +137,8 @@ describe("the Dashboards sidebar", () => {
       renderSection();
 
       expect(await namesIn("Your dashboards")).toEqual(["My dashboard", "Costs", "Weekly review"]);
-      expect(await namesIn("Pinned dashboards")).toEqual(["Latency", "Release check"]);
-      expect(await namesIn("From LangWatch")).toEqual([
-        "Can I trust my numbers?",
-        "Where my agent breaks",
-      ]);
+      expect(await namesIn("Pinned dashboards")).toEqual(["Latency", "Ready to ship?"]);
+      expect(await namesIn("From LangWatch")).toEqual(["Fix missing data", "Errors and failures"]);
       expect(screen.queryByRole("link", { name: /Browse templates/ })).toBeNull();
       expect(screen.queryByText("All dashboards")).toBeNull();
     });
@@ -163,7 +161,7 @@ describe("the Dashboards sidebar", () => {
       renderSection({ openPath: "curated/data" });
 
       const data = within(await listNamed("From LangWatch")).getByRole("link", {
-        name: /Can I trust my numbers\?/,
+        name: /Fix missing data/,
       });
       expect(data).toHaveAttribute("href", "/test-project/dashboards/curated/data");
       expect(data).toHaveAttribute("aria-current", "page");
@@ -192,14 +190,122 @@ describe("the Dashboards sidebar", () => {
   });
 
   describe("when the member presses the '+' on Your dashboards", () => {
-    /** @scenario "AC162 The '+' on Your dashboards makes a blank board at once" */
-    it("makes a blank board at once, with no menu", async () => {
-      const { user, calls } = renderSection();
+    /** @scenario "AC162 The '+' on Your dashboards opens a new board without storing it" */
+    it("opens a new board at once, with no menu, and stores nothing", async () => {
+      const { user, calls, host } = renderSection();
       await listNamed("Your dashboards");
 
       await user.click(screen.getByRole("button", { name: "New dashboard" }));
+
       expect(screen.queryByRole("menuitem")).toBeNull();
+      expect(host.navigations).toEqual(["/test-project/dashboards/new"]);
+      expect(inputsTo(calls, "boards.create")).toEqual([]);
+    });
+  });
+
+  describe("given the new board is open", () => {
+    /** @scenario "AC162 The '+' on Your dashboards opens a new board without storing it" */
+    it("lists it under Your dashboards as the open, numbered untitled board", async () => {
+      renderSection({ openPath: "new" });
+
+      expect(await namesIn("Your dashboards")).toEqual([
+        "My dashboard",
+        "Costs",
+        "Weekly review",
+        "Untitled dashboard 1",
+      ]);
+      const row = screen.getByRole("link", { name: "Untitled dashboard 1" });
+      expect(row).toHaveAttribute("aria-current", "page");
+      expect(row).toHaveAttribute("href", "/test-project/dashboards/new");
+    });
+
+    /** @scenario "AC162b Leaving a new board unedited stores nothing" */
+    it("drops the row once the member is elsewhere, having stored nothing", async () => {
+      const { calls } = renderSection({ openPath: "board-1" });
+
+      expect(await namesIn("Your dashboards")).not.toContain("Untitled dashboard 1");
+      expect(inputsTo(calls, "boards.create")).toEqual([]);
+    });
+
+    /** @scenario "AC162d Renaming, describing or pinning a new board stores it with that edit" */
+    it("stores the board under the name it is renamed to, in one call", async () => {
+      const { user, calls } = renderSection({ openPath: "new" });
+      await listNamed("Your dashboards");
+
+      await user.click(screen.getByRole("button", { name: "Actions for Untitled dashboard 1" }));
+      await user.click(await screen.findByRole("menuitem", { name: /Rename/ }));
+      const field = screen.getByRole("textbox", { name: "Dashboard name" });
+      await user.clear(field);
+      await user.type(field, "Refunds{Enter}");
+
+      await waitFor(() =>
+        expect(inputsTo(calls, "boards.create")).toEqual([
+          { projectId: "proj-1", name: "Refunds", homeProduct: "llm-ops" },
+        ]),
+      );
+      expect(inputsTo(calls, "boards.update")).toEqual([]);
+    });
+
+    /** @scenario "AC162d Renaming, describing or pinning a new board stores it with that edit" */
+    it("stores and pins the board when its pin is pressed", async () => {
+      const { user, calls } = renderSection({ openPath: "new" });
+      const draftLink = await screen.findByRole("link", { name: "Untitled dashboard 1" });
+
+      await user.click(within(draftLink).getByRole("button", { name: "Pin dashboard" }));
+
+      await waitFor(() =>
+        expect(inputsTo(calls, "boards.star")).toEqual([
+          { projectId: "proj-1", star: { kind: "board", dashboardId: "board-new" } },
+        ]),
+      );
+      expect(inputsTo(calls, "boards.create")).toHaveLength(1);
+    });
+  });
+
+  describe("given a new board opened to be pinned once stored", () => {
+    /** Presses a "+" that opens a new board pinned, as the Pinned group's does. */
+    function PinnedPlus() {
+      const startDraft = useStartDraft();
+      return (
+        <button
+          type="button"
+          onClick={() =>
+            startDraft({ projectId: "proj-1", projectSlug: "test-project", pin: true })
+          }
+        >
+          New pinned dashboard
+        </button>
+      );
+    }
+
+    /** @scenario "AC162d Renaming, describing or pinning a new board stores it with that edit" */
+    it("takes the pin off when unpinned, storing nothing, and stores the board unpinned later", async () => {
+      const host = new StubAnalyticsHost({ flags: { release_dashboards: true } });
+      const { calls, answer } = project({});
+      renderDashboards({
+        element: (
+          <>
+            <PinnedPlus />
+            <SavedDashboardsSection openPath="new" />
+          </>
+        ),
+        host,
+        answer,
+      });
+      const user = userEvent.setup({ pointerEventsCheck: 0 });
+      await listNamed("Your dashboards");
+      await user.click(screen.getByRole("button", { name: "New pinned dashboard" }));
+      const draftLink = await screen.findByRole("link", { name: "Untitled dashboard 1" });
+
+      await user.click(within(draftLink).getByRole("button", { name: "Unpin dashboard" }));
+
+      expect(within(draftLink).getByRole("button", { name: "Pin dashboard" })).toBeInTheDocument();
+      expect(inputsTo(calls, "boards.create")).toEqual([]);
+      await user.click(screen.getByRole("button", { name: "Actions for Untitled dashboard 1" }));
+      await user.click(await screen.findByRole("menuitem", { name: /Rename/ }));
+      await user.type(screen.getByRole("textbox", { name: "Dashboard name" }), "!{Enter}");
       await waitFor(() => expect(inputsTo(calls, "boards.create")).toHaveLength(1));
+      expect(inputsTo(calls, "boards.star")).toEqual([]);
     });
   });
 
@@ -251,7 +357,7 @@ describe("the Dashboards sidebar", () => {
       const { user, calls, host } = renderSection();
       const data = within(await listNamed("From LangWatch"))
         .getAllByRole("listitem")
-        .find((item) => item.textContent?.includes("Can I trust my numbers?"));
+        .find((item) => item.textContent?.includes("Fix missing data"));
 
       await user.click(within(data!).getByRole("button", { name: "Pin dashboard" }));
 
@@ -330,7 +436,7 @@ describe("the Dashboards sidebar", () => {
       const { user } = renderSection();
       const starred = within(await listNamed("Pinned dashboards"));
 
-      await user.click(starred.getByRole("button", { name: "Actions for Release check" }));
+      await user.click(starred.getByRole("button", { name: "Actions for Ready to ship?" }));
       await screen.findByRole("menuitem", { name: "Duplicate to edit" });
 
       expect(menuItemNames()).toEqual(["Unpin", "Move up", "Move down", "Duplicate to edit"]);
@@ -350,9 +456,9 @@ describe("the Dashboards sidebar", () => {
         expect(screen.queryByRole("menuitem", { name: "Move Latency up" })).toBeNull(),
       );
 
-      await user.click(screen.getByRole("button", { name: "Actions for Release check" }));
+      await user.click(screen.getByRole("button", { name: "Actions for Ready to ship?" }));
       expect(
-        await screen.findByRole("menuitem", { name: "Move Release check down" }),
+        await screen.findByRole("menuitem", { name: "Move Ready to ship? down" }),
       ).toHaveAttribute("aria-disabled", "true");
     });
 
@@ -361,8 +467,8 @@ describe("the Dashboards sidebar", () => {
       const { user, calls } = renderSection();
       const starred = within(await listNamed("Pinned dashboards"));
 
-      await user.click(starred.getByRole("button", { name: "Actions for Release check" }));
-      await user.click(await screen.findByRole("menuitem", { name: "Move Release check up" }));
+      await user.click(starred.getByRole("button", { name: "Actions for Ready to ship?" }));
+      await user.click(await screen.findByRole("menuitem", { name: "Move Ready to ship? up" }));
 
       await waitFor(() =>
         expect(inputsTo(calls, "boards.reorderStars")).toEqual([
@@ -383,10 +489,10 @@ describe("the Dashboards sidebar", () => {
         stars: [{ kind: "board", dashboard: MINE }, ...STARS],
       });
       const starred = within(await listNamed("Pinned dashboards"));
-      expect(await namesIn("Pinned dashboards")).toEqual(["Latency", "Release check"]);
+      expect(await namesIn("Pinned dashboards")).toEqual(["Latency", "Ready to ship?"]);
 
-      await user.click(starred.getByRole("button", { name: "Actions for Release check" }));
-      await user.click(await screen.findByRole("menuitem", { name: "Move Release check up" }));
+      await user.click(starred.getByRole("button", { name: "Actions for Ready to ship?" }));
+      await user.click(await screen.findByRole("menuitem", { name: "Move Ready to ship? up" }));
 
       await waitFor(() =>
         expect(inputsTo(calls, "boards.reorderStars")).toEqual([
@@ -424,13 +530,13 @@ describe("the Dashboards sidebar", () => {
       const { user, calls } = renderSection();
 
       await user.click(
-        await screen.findByRole("button", { name: "Actions for Where my agent breaks" }),
+        await screen.findByRole("button", { name: "Actions for Errors and failures" }),
       );
       await user.click(await screen.findByRole("menuitem", { name: "Duplicate to edit" }));
 
       await waitFor(() =>
         expect(inputsTo(calls, "boards.create")).toEqual([
-          { projectId: "proj-1", name: "Where my agent breaks (copy)" },
+          { projectId: "proj-1", name: "Errors and failures (copy)" },
         ]),
       );
     });

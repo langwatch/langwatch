@@ -11,33 +11,18 @@ import { toaster } from "@langwatch/design-system/toaster";
 import { analyticsApi } from "../../../behavior/analytics-api.ts";
 import { useAnalyticsHost } from "../../../model/analytics-host.ts";
 import { organizationBoardPath } from "../model/boards.ts";
-import { dashboardCreated, dashboardDeleted } from "../model/dashboard-usage-events.ts";
+import { dashboardDeleted } from "../model/dashboard-usage-events.ts";
 import { HOME_PRODUCT_LABELS, type LibraryBoard } from "../model/organization-library.ts";
 import { useBoardFromTemplate } from "./use-board-from-template.ts";
+import { useStartLibraryDraft } from "./use-draft-board.ts";
 import { useStoreProject } from "./use-store-project.ts";
 
-/** Re-reads the library and the written project's lists, so every sidebar and list shows it. */
-function useLibraryRefresh() {
-  const utils = analyticsApi.useUtils();
-  const organizationId = useAnalyticsHost().organizationId() ?? "";
-  return ({ projectId }: { projectId: string }) =>
-    Promise.all([
-      utils.boards.listInOrganization.invalidate({ organizationId }),
-      utils.boards.getAll.invalidate({ projectId }),
-      utils.boards.listStarred.invalidate({ projectId }),
-    ]);
-}
-
+/** The dialog's Create opens the new board unsaved; its first edit stores it (AC162). */
 export function useLibraryCreate() {
-  const host = useAnalyticsHost();
-  const analytics = useUiAnalytics();
-  const refresh = useLibraryRefresh();
   const { storeProject } = useStoreProject();
-  const create = analyticsApi.boards.create.useMutation();
-  const createAtScope = analyticsApi.boards.createAtScope.useMutation();
+  const startDraft = useStartLibraryDraft();
 
-  /** Makes the board at the scope and home picked, in one write, and opens it; true once made. */
-  const createBoard = async ({
+  const createBoard = ({
     name,
     scope,
     homeProduct,
@@ -46,27 +31,12 @@ export function useLibraryCreate() {
     scope: DashboardScope;
     homeProduct: DashboardHomeProduct;
   }) => {
-    if (!storeProject) return false;
-    const projectId = storeProject.id;
-    try {
-      // Another scope also asks analytics:update, so a seat refused it is refused before a write.
-      const { id: dashboardId } =
-        scope === "PROJECT"
-          ? await create.mutateAsync({ projectId, name, homeProduct })
-          : await createAtScope.mutateAsync({ projectId, name, scope, homeProduct });
-      analytics.track(dashboardCreated({ createdFrom: "blank" }));
-      void refresh({ projectId });
-      host.succeeded({ title: "Dashboard created" });
-      // A board made in the library stays in Dashboards, whatever its scope (ADR-002, decision 4).
-      host.navigate(organizationBoardPath({ dashboardId }));
-      return true;
-    } catch (error) {
-      host.failed({ error, fallbackTitle: "Couldn't create the dashboard" });
-      return false;
-    }
+    if (!storeProject) return Promise.resolve(false);
+    startDraft({ project: storeProject, name, scope, homeProduct });
+    return Promise.resolve(true);
   };
 
-  return { createBoard, isCreating: create.isPending || createAtScope.isPending };
+  return { createBoard, isCreating: false };
 }
 
 /** Copies a board and its widgets into the store project, keeping its scope, and opens it. */
