@@ -1,5 +1,75 @@
 # Changelog
 
+## [3.29.0](https://github.com/langwatch/langwatch/compare/langwatch@v3.28.0...langwatch@v3.29.0) (2026-11-25)
+
+
+### Features
+
+* **dashboards:** add the organisation-wide Dashboards page and its navigation ([#9789](https://github.com/langwatch/langwatch/issues/9789)) ([6ede0a2](https://github.com/langwatch/langwatch/commit/6ede0a2d23fc042029a09c8b41b5fa396cfce91b))
+* **dashboards:** see which project's dashboard queries fail, and report browser crashes ([#9827](https://github.com/langwatch/langwatch/issues/9827)) ([84d84a2](https://github.com/langwatch/langwatch/commit/84d84a26a219b4e1ee9367c4da42dfff5ee84b99))
+* **dashboards:** show the Dashboards section in every product by default ([#9788](https://github.com/langwatch/langwatch/issues/9788)) ([279b2f7](https://github.com/langwatch/langwatch/commit/279b2f79c454e22360d2f2d635cc121b5cfa80db))
+* **data-privacy:** lock in the PII redaction model's Cloud price ([#9816](https://github.com/langwatch/langwatch/issues/9816)) ([3eeb191](https://github.com/langwatch/langwatch/commit/3eeb1910ba4a6f1608718f844576530e111bca56))
+* **digest:** weekly digest email sent through our own mailer ([#9728](https://github.com/langwatch/langwatch/issues/9728)) ([1003f03](https://github.com/langwatch/langwatch/commit/1003f03afed5242c9d5fb8c0a49323343fa04bfe))
+* **experiment:** share a cell budget between active runs for the default concurrency ([#9482](https://github.com/langwatch/langwatch/issues/9482)) ([6b755fe](https://github.com/langwatch/langwatch/commit/6b755feac1535bc4678d027ba01e41b9c6a228fb))
+* **experiments:** opt-in CI gate on evaluator failures; TS run() sends every input ([#9501](https://github.com/langwatch/langwatch/issues/9501)) ([eff2dac](https://github.com/langwatch/langwatch/commit/eff2dac43c18163cd5fac4f3cf850a55d9587d8c))
+* **feature-flag:** turn LangWatchQL and Instant Evals on by default on self-hosted installs ([#9860](https://github.com/langwatch/langwatch/issues/9860)) ([dbf9219](https://github.com/langwatch/langwatch/commit/dbf9219442efdf14beec4033e0feb80a4c2f2baa))
+* **governance:** discover agents on AWS, Google Cloud and ARD registries with shadow and dormant posture ([#9635](https://github.com/langwatch/langwatch/issues/9635)) ([46094f6](https://github.com/langwatch/langwatch/commit/46094f64f06b17f5de3b475af769140260e3a09c))
+* **langy:** link admins to the GitHub App setup guide when GitHub is not set up ([#9832](https://github.com/langwatch/langwatch/issues/9832)) ([ac5cf92](https://github.com/langwatch/langwatch/commit/ac5cf924094420592638c635c7ddee9c76676758))
+* **langy:** link organization admins to the GitHub App setup guide ([ac5cf92](https://github.com/langwatch/langwatch/commit/ac5cf924094420592638c635c7ddee9c76676758))
+* **lwql:** per-reader row scoping for LangWatchQL Postgres views ([#9515](https://github.com/langwatch/langwatch/issues/9515)) ([f30322e](https://github.com/langwatch/langwatch/commit/f30322e6b42493bc0b4afd20ccddea54bd1d3e47))
+* **model-provider:** rename LangWatch model ids to a -preview suffix, old ids stay accepted ([#9782](https://github.com/langwatch/langwatch/issues/9782)) ([822e94b](https://github.com/langwatch/langwatch/commit/822e94b1cf43c35ce457f6601a0faccbf7a4f8e9))
+* **notification:** send 8 non-security app emails through Customer.io on Cloud ([#9766](https://github.com/langwatch/langwatch/issues/9766)) ([93a4541](https://github.com/langwatch/langwatch/commit/93a4541dae13624b58525f1053d603a899112d10))
+* **nurturing:** send langy_start, backfill the onboarding path, and retry a key's first request ([#9893](https://github.com/langwatch/langwatch/issues/9893)) ([fbb0277](https://github.com/langwatch/langwatch/commit/fbb0277e6592191cda34928f4f2bc42b26706714))
+* **nurturing:** send the PLG Customer.io data: plan, copy tables, trace days, gateway facts, seats, team evaluations and governance sources ([#9644](https://github.com/langwatch/langwatch/issues/9644)) ([b5c8c70](https://github.com/langwatch/langwatch/commit/b5c8c70c08c291332393c1ce9bbe0710a59c130c))
+* **ops:** sort the Back office users list by any column ([#9920](https://github.com/langwatch/langwatch/issues/9920)) ([e44e010](https://github.com/langwatch/langwatch/commit/e44e010096c2ba3e2857449172804f7d864442d5))
+* **organization:** invite the person who pays as Billing only, taking no seat ([#9841](https://github.com/langwatch/langwatch/issues/9841)) ([025aeaf](https://github.com/langwatch/langwatch/commit/025aeaf5b7b0fbc3d95d931491f8056b429b1b07))
+
+
+### Bug Fixes
+
+* **aigateway:** usage warning rides an SSE comment, never a data frame ([#7446](https://github.com/langwatch/langwatch/issues/7446)) ([0bf7251](https://github.com/langwatch/langwatch/commit/0bf725134a125a826f9e96ff4e745befdfaea68b))
+* **analytics:** att-change/units reads the managed prompt version from trace_metrics ([#9877](https://github.com/langwatch/langwatch/issues/9877)) ([aa31596](https://github.com/langwatch/langwatch/commit/aa31596e8c056fac9b0e9f3bbf26ffeb0bec9057))
+* **analytics:** attribution change widget memory no longer grows with trace history ([#9651](https://github.com/langwatch/langwatch/issues/9651)) ([b09d2db](https://github.com/langwatch/langwatch/commit/b09d2db81b04792772d549657e2e717a3d99372b))
+* **analytics:** dashboards work by default on pnpm dev and docker compose ([#9905](https://github.com/langwatch/langwatch/issues/9905)) ([3ab78e1](https://github.com/langwatch/langwatch/commit/3ab78e196cbd842b85c2de01913c83bd63cea296))
+* **analytics:** derived LangWatchQL identity no longer blocks the upgrade when ClickHouse lacks grants ([#9921](https://github.com/langwatch/langwatch/issues/9921)) ([2bbe70b](https://github.com/langwatch/langwatch/commit/2bbe70bf104efdbde088bb60044d58350dc9c1d5))
+* **analytics:** keep production stock widgets off the origin-less per-minute rollups ([#9878](https://github.com/langwatch/langwatch/issues/9878)) ([e546ac2](https://github.com/langwatch/langwatch/commit/e546ac2e0304baac1c87ab0c131efdcf121451bf))
+* **analytics:** pick Instant Evals row ids before reading the thread id in key and sample passes ([#9858](https://github.com/langwatch/langwatch/issues/9858)) ([a05b7ca](https://github.com/langwatch/langwatch/commit/a05b7ca24125c255682f6e2404c0dee65d6a4cfc))
+* **api-key:** clear the copied-state reset timer on unmount ([#9889](https://github.com/langwatch/langwatch/issues/9889)) ([5c99d77](https://github.com/langwatch/langwatch/commit/5c99d77984731dc3d34de9de9863b1264d44b317))
+* **auth:** own screen for an account linked to another user, readable link refusals ([#9823](https://github.com/langwatch/langwatch/issues/9823)) ([a9bc94a](https://github.com/langwatch/langwatch/commit/a9bc94a2c353d0779f57d4a5e3959a35026fea19))
+* **billing-only:** land on the plan page from home, keep Billing on a Billing-only member ([#9873](https://github.com/langwatch/langwatch/issues/9873)) ([bdcd970](https://github.com/langwatch/langwatch/commit/bdcd970f111d96f8f6a36c66e89db25348220e08))
+* **billing:** report Instant Evals usage only to a subscription that prices it ([#9828](https://github.com/langwatch/langwatch/issues/9828)) ([14ffb4a](https://github.com/langwatch/langwatch/commit/14ffb4a1b55562e9b9e1e59af007756a84f94a9a))
+* **ci:** green main after self-hosted flag defaults (prose, chart README, chart e2e teardown) ([#9865](https://github.com/langwatch/langwatch/issues/9865)) ([b12c0e4](https://github.com/langwatch/langwatch/commit/b12c0e498f3515583969c75fee58aae90854e608))
+* **dashboards:** langy widgets follow the theme, fill their card and come from a dashboard question ([#9869](https://github.com/langwatch/langwatch/issues/9869)) ([af7953d](https://github.com/langwatch/langwatch/commit/af7953db2ec84d3c3c943340d4e0a234a8e7631d))
+* **dashboards:** pop Langy up beside the widget large view as beside the trace drawer ([#9900](https://github.com/langwatch/langwatch/issues/9900)) ([855b7b5](https://github.com/langwatch/langwatch/commit/855b7b55984fefd1ce3834960bbce0310953f6a8))
+* **dashboards:** restore the stock widget baselines lost in the [#9847](https://github.com/langwatch/langwatch/issues/9847) merge ([#9904](https://github.com/langwatch/langwatch/issues/9904)) ([2e50c40](https://github.com/langwatch/langwatch/commit/2e50c40f2e80d74da871a0f881f90cbd818e6be8))
+* **dashboards:** store a new dashboard on its first edit, not on + ([#9847](https://github.com/langwatch/langwatch/issues/9847)) ([4a36e5b](https://github.com/langwatch/langwatch/commit/4a36e5bfb9d798627e9c702e40c6aca8de675517))
+* **experiment:** a subset run shows and counts only its own rows ([#9516](https://github.com/langwatch/langwatch/issues/9516)) ([5c2d403](https://github.com/langwatch/langwatch/commit/5c2d403402048312c4eb7c3a579e945ab727a0a1))
+* **gateway:** settle the A2A proxy review follow-ups ([#9824](https://github.com/langwatch/langwatch/issues/9824)) ([5714ee1](https://github.com/langwatch/langwatch/commit/5714ee1d46c4768290d8bb1f233542f22579dfdd))
+* **gateway:** show header names on listed A2A targets again ([#9870](https://github.com/langwatch/langwatch/issues/9870)) ([8eb81cc](https://github.com/langwatch/langwatch/commit/8eb81ccb77d9c5a1395fcfcdfc192413621268d4))
+* **governance:** follow-ups from the OCSF export review ([#9678](https://github.com/langwatch/langwatch/issues/9678)) ([d887971](https://github.com/langwatch/langwatch/commit/d88797186ee12ee5cc71c5eaa169b89d4db0fc8c))
+* **governance:** settle the Security Lake ingest follow-ups from the [#9638](https://github.com/langwatch/langwatch/issues/9638) review ([#9842](https://github.com/langwatch/langwatch/issues/9842)) ([0481270](https://github.com/langwatch/langwatch/commit/0481270d969680b5df0b04a5bc3357d25000eb54))
+* **haven:** a rush preload that gates nothing no longer stands in for a slot ([#9919](https://github.com/langwatch/langwatch/issues/9919)) ([fd4f86d](https://github.com/langwatch/langwatch/commit/fd4f86d5a090e78705714f52888fa829f5da4023))
+* **instant-evals:** judge on the Conversations lens, settle ended runs, judge questions typed in search ([#9876](https://github.com/langwatch/langwatch/issues/9876)) ([24af415](https://github.com/langwatch/langwatch/commit/24af415ff68747952f2669cc5bde7611fcb85024))
+* **langy:** drop tips that repeat the failure card's sentence; humanise an unregistered code ([#9859](https://github.com/langwatch/langwatch/issues/9859) review) ([#9871](https://github.com/langwatch/langwatch/issues/9871)) ([3b0dda6](https://github.com/langwatch/langwatch/commit/3b0dda66bd8fd7e8bc826da8a006e37fe68274ab))
+* **langy:** keep a next step on the failure card when API-caller tips are hidden ([#9842](https://github.com/langwatch/langwatch/issues/9842) follow-ups) ([#9859](https://github.com/langwatch/langwatch/issues/9859)) ([f0d514d](https://github.com/langwatch/langwatch/commit/f0d514d49739ccff6ffe9bee67e12ba65fcaf88d))
+* **models:** name PII redaction rows on billing events; correct Instant Evals billing and judge docs ([#9849](https://github.com/langwatch/langwatch/issues/9849)) ([de0e337](https://github.com/langwatch/langwatch/commit/de0e337b09a8052ef4e76f5d93f6c90c275c6ef1))
+* **paymentsim:** meter the Instant Evals price on its own meter ([#9852](https://github.com/langwatch/langwatch/issues/9852)) ([101bcd9](https://github.com/langwatch/langwatch/commit/101bcd93018fab5dba74410add2c027536f1333f))
+* **security:** bump soupsieve, opentelemetry-api and tornado, drop unused arize-phoenix ([#9895](https://github.com/langwatch/langwatch/issues/9895)) ([95c5195](https://github.com/langwatch/langwatch/commit/95c5195023d83cab52121fea0098d2ff8db6b0cc))
+* **security:** raise the hono floor to 4.13.16 ([#9896](https://github.com/langwatch/langwatch/issues/9896)) ([92219d8](https://github.com/langwatch/langwatch/commit/92219d84371bb33ad5fd63485e2013d0cdc337b7))
+* **security:** raise zod to 4.6.6 in the SDK examples and move AG-UI to 1.0 ([#9897](https://github.com/langwatch/langwatch/issues/9897)) ([0a9c1a3](https://github.com/langwatch/langwatch/commit/0a9c1a3f22711ba5a72bc4289bfbe0e1ed6b59ea))
+* **skills:** the CLI skills bundle keeps the login steps Langy's render leaves out ([#9829](https://github.com/langwatch/langwatch/issues/9829)) ([cad58b0](https://github.com/langwatch/langwatch/commit/cad58b0dbe761ba531e33d3900efee0ff1b18b51))
+* **test:** restore real timers so fake timers never leak into the next test file ([#9902](https://github.com/langwatch/langwatch/issues/9902)) ([6db924c](https://github.com/langwatch/langwatch/commit/6db924c1b3b60f33a3ad4c8fde7889e68dd8747a))
+* **trace,analytics,instant-eval:** read span type from span_analytics, dedup trace versions by superseded set, match event metric keys without a lambda ([#9814](https://github.com/langwatch/langwatch/issues/9814)) ([d86b90e](https://github.com/langwatch/langwatch/commit/d86b90e23eb550f1952d72e7aca8e709c1c57bea))
+* **trace,analytics:** "in group" sidebar rows say what a click does, and Instant Evals passes stay within memory ([#9867](https://github.com/langwatch/langwatch/issues/9867)) ([8fc33e5](https://github.com/langwatch/langwatch/commit/8fc33e5024902556d5afc88656e22eb3d1eab621))
+* **trace:** mark sidebar values a search group makes optional as "in group" ([#9851](https://github.com/langwatch/langwatch/issues/9851)) ([a47d532](https://github.com/langwatch/langwatch/commit/a47d532672a97da16ea72ee1cda7fb21e5f3c23a))
+* **traces:** follow-ups from the agent call graph review ([#9675](https://github.com/langwatch/langwatch/issues/9675)) ([3e19706](https://github.com/langwatch/langwatch/commit/3e19706a6386ec24d8522e1b67a564ae05baab6c))
+
+
+### Documentation
+
+* generate every navigable page into llms-full.txt ([#7461](https://github.com/langwatch/langwatch/issues/7461)) ([5e359f9](https://github.com/langwatch/langwatch/commit/5e359f9158a94b404c127ebadd420fdf43dc7ac0))
+* point the writing rules and the video guide to the Laze wiki ([#9574](https://github.com/langwatch/langwatch/issues/9574)) ([00d8e8e](https://github.com/langwatch/langwatch/commit/00d8e8eb0861821921ce12c02edf0b2f6179795d))
+
 ## [3.28.0](https://github.com/langwatch/langwatch/compare/langwatch@v3.27.0...langwatch@v3.28.0) (2026-11-23)
 
 
