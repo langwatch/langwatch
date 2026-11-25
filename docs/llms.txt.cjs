@@ -250,7 +250,7 @@ const excludeRegexes = excludePaths.map((glob) => globToRegExp(glob));
 const files = walkFiles(".")
   .filter((file) => includeRegexes.some((regex) => regex.test(file)))
   .filter((file) => !excludeRegexes.some((regex) => regex.test(file)))
-  .sort()
+  .toSorted()
   .map((file) => `./${file}`);
 
 files.forEach((file) => {
