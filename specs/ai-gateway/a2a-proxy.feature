@@ -70,6 +70,13 @@ Feature: A2A proxy on the gateway
     And a move that sends a new header set is saved
 
   @unit
+  Scenario: listed targets show their header names, never their values
+    Given a target saved with the upstream headers "X-Agent-Tenant" and "X-Agent-Region"
+    When an admin lists the organization's targets or the project's targets
+    Then the listed target names the headers "X-Agent-Region" and "X-Agent-Tenant"
+    And no listed target carries a header value
+
+  @unit
   Scenario: every A2A target write is audited without header values
     When an admin creates, edits, blocks, unblocks or archives a target
     Then a gateway audit row records the action, the actor and the target before and after
