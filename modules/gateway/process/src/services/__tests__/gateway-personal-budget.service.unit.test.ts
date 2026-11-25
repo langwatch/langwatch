@@ -95,7 +95,7 @@ describe("GatewayPersonalBudgetService", () => {
 
       expect(budget).toMatchObject({
         requestIncreaseUrl:
-          "https://app.example.com/me/budget/request?scope=principal&scope_id=user-1&limit_usd=100&spent_usd=85",
+          "https://app.example.com/coding-agents/budget/request?scope=principal&scope_id=user-1&limit_usd=100&spent_usd=85",
       });
     });
   });

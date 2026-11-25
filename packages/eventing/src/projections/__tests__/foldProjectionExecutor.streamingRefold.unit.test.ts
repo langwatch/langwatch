@@ -8,6 +8,12 @@ import {
   createTestTenantId,
   TEST_CONSTANTS,
 } from "../../services/__tests__/testHelpers.ts";
+import {
+  compareEventLogPageOrder,
+  compareEventLogPagePositions,
+  type EventLogPageCursor,
+  eventLogPagePositionOf,
+} from "../../stores/event-log-page-order.ts";
 import { FoldProjectionExecutor } from "../foldProjectionExecutor.ts";
 import type { ProjectionStoreContext } from "../projectionStoreContext.ts";
 
@@ -47,8 +53,8 @@ describe("FoldProjectionExecutor streaming store-miss re-fold", () => {
   }
 
   /**
-   * A paginated loader that serves a fixed (createdAt, id)-sorted history like
-   * the real store: honours the strict `after` cursor and the `limit`.
+   * A paginated loader that serves a fixed history like the real store: in page
+   * order, honouring the strict `after` cursor and the `limit`.
    */
   function pagedLoaderFrom(history: Event[]) {
     return vi.fn(
@@ -56,32 +62,31 @@ describe("FoldProjectionExecutor streaming store-miss re-fold", () => {
         tenantId: string;
         aggregateId: string;
         upToEvent: Event;
-        after: { timestamp: number; eventId: string } | undefined;
+        after: EventLogPageCursor | undefined;
         limit: number;
       }): Promise<Event[]> => {
         const { after, limit } = ctx;
-        let start = 0;
-        if (after) {
-          const idx = history.findIndex(
-            (e) =>
-              e.createdAt > after.timestamp ||
-              (e.createdAt === after.timestamp && e.id > after.eventId),
-          );
-          start = idx === -1 ? history.length : idx;
-        }
-        return history.slice(start, start + limit);
+        return history
+          .toSorted(compareEventLogPageOrder)
+          .filter(
+            (e) => !after || compareEventLogPagePositions(eventLogPagePositionOf(e), after) > 0,
+          )
+          .slice(0, limit);
       },
     );
   }
 
-  function makeFold(loader: ReturnType<typeof pagedLoaderFrom>) {
+  function makeFold(
+    loader: (ctx: Parameters<ReturnType<typeof pagedLoaderFrom>>[0]) => Promise<Event[]>,
+    eventOrdering?: "acceptedAt",
+  ) {
     const store = createMockFoldProjectionStore<CountState>();
     (store.get as ReturnType<typeof vi.fn>).mockResolvedValue({ kind: "empty" });
     const foldDef = createMockFoldProjectionDefinition("slim", {
       store,
       init,
       apply,
-      options: { refoldOnStoreMiss: true, refoldOnOutOfOrder: false },
+      options: { refoldOnStoreMiss: true, refoldOnOutOfOrder: false, eventOrdering },
     });
     foldDef.eventLoaderUpToPaged = loader;
     // The unbounded array loader must NOT be used when the streaming path runs.
@@ -107,6 +112,51 @@ describe("FoldProjectionExecutor streaming store-miss re-fold", () => {
           result,
           expect.objectContaining({ aggregateId: context.aggregateId }),
         );
+      });
+    });
+
+    describe("when the history's keys run against its time order", () => {
+      /** @scenario "A paged history read seeks through the event log's sort key" */
+      it("pages by key from the furthest event of each page, folding every event once", async () => {
+        const history = [
+          ev("e1", 1, "k4"),
+          ev("e2", 2, "k3"),
+          ev("e3", 3, "k2"),
+          ev("e4", 4, "k1"),
+          ev("e5", 5, "k0"),
+        ];
+        const keyOrdered = pagedLoaderFrom(history);
+        // Hands each page back in arrival order, as the memory store does.
+        const loader = vi.fn(async (ctx: Parameters<typeof keyOrdered>[0]) =>
+          (await keyOrdered(ctx)).toSorted((a, b) => a.createdAt - b.createdAt),
+        );
+        const { foldDef } = makeFold(loader);
+        const executor = new FoldProjectionExecutor({ refoldPageSize: 2 });
+
+        const result = (await executor.execute(foldDef, history[4]!, context)) as CountState;
+
+        expect(result.ids.toSorted()).toEqual(["e1", "e2", "e3", "e4", "e5"]);
+        expect(loader).toHaveBeenCalledTimes(3);
+        expect(loader.mock.calls[1]![0].after).toEqual({
+          idempotencyKey: "k1",
+          timestamp: 4,
+          eventId: "e4",
+        });
+      });
+    });
+
+    describe("when the fold follows accepted order", () => {
+      it("reads its history in time order, never in key-ordered pages", async () => {
+        const history = [ev("e1", 1, "z"), ev("e2", 2, "a")];
+        const loader = pagedLoaderFrom(history);
+        const { foldDef } = makeFold(loader, "acceptedAt");
+        foldDef.eventLoaderUpTo = vi.fn().mockResolvedValue(history);
+        const executor = new FoldProjectionExecutor({ refoldPageSize: 1 });
+
+        const result = (await executor.execute(foldDef, history[1]!, context)) as CountState;
+
+        expect(loader).not.toHaveBeenCalled();
+        expect(result.ids).toEqual(["e1", "e2"]);
       });
     });
 

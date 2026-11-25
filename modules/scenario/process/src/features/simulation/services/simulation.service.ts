@@ -5,6 +5,7 @@ import {
   simulationRecordAgentInstanceSchema,
   simulationRecordCutAtLimitSchema,
   simulationRecordHooksSchema,
+  simulationRecordRedTeamReportSchema,
   simulationFinishRunSchema,
   recordEvaluationsCommandDataSchema,
   simulationMessageSnapshotSchema,
@@ -26,6 +27,7 @@ import type {
   SimulationRecordAgentInstance,
   SimulationRecordCutAtLimit,
   SimulationRecordHooks,
+  SimulationRecordRedTeamReport,
   SimulationExportFilterInput,
   SimulationExportRunsInput,
   SimulationExternalSetCountInput,
@@ -206,5 +208,9 @@ export class SimulationService extends SimulationServiceContract {
 
   recordHooks(input: SimulationRecordHooks): Promise<void> {
     return this.execution.recordHooks(simulationRecordHooksSchema.parse(input));
+  }
+
+  recordRedTeamReport(input: SimulationRecordRedTeamReport): Promise<void> {
+    return this.execution.recordRedTeamReport(simulationRecordRedTeamReportSchema.parse(input));
   }
 }

@@ -13,7 +13,13 @@ import {
 } from "@langwatch/analytics-contract";
 import { describe, expect, it } from "vitest";
 
-import { langWatchQLPassSql } from "../langwatch-ql-pass-sql.rules.ts";
+import {
+  langWatchQLPassKeysOfTracesSql,
+  langWatchQLPassRowIdsSql,
+  langWatchQLPassSql,
+  LWQL_PASS_TRACE_IDS_PARAMETER,
+  readsKeysByTraceIds,
+} from "../langwatch-ql-pass-sql.rules.ts";
 
 const SQL = `SELECT ConversationId, eval(conversation_bounded(ConversationId, 8000, ''), 'annoyed') AS annoyed
 FROM analytics.trace_metrics
@@ -144,7 +150,7 @@ describe("given a statement that projects a span id", () => {
         sql: SPAN_SQL,
       });
 
-      expect(pass.sql).toContain(`WHERE q.TraceId > {${LWQL_PASS_AFTER_TRACE_PARAMETER}:String}`);
+      expect(pass.sql).toContain(`WHERE k.TraceId > {${LWQL_PASS_AFTER_TRACE_PARAMETER}:String}`);
       expect(pass.sql).not.toContain(LWQL_PASS_AFTER_SPAN_PARAMETER);
       expect(pass.parameters).toEqual({ [LWQL_PASS_AFTER_TRACE_PARAMETER]: "t0" });
     });
@@ -171,7 +177,7 @@ describe("given a selection to sample", () => {
       const pass = sampleKeys(["ThreadId"]);
 
       expect(pass.sql).toContain(
-        `WHERE cityHash64(q.TraceId) % {${LWQL_PASS_SAMPLE_BUCKET_PARAMETER}:UInt64} = 0`,
+        `WHERE cityHash64(k.TraceId) % {${LWQL_PASS_SAMPLE_BUCKET_PARAMETER}:UInt64} = 0`,
       );
       expect(pass.sql).toContain("LIMIT 50");
       expect(pass.sql).toContain(SQL);
@@ -189,8 +195,132 @@ describe("given a selection to sample", () => {
     it("hashes the trace and span pair when the rows are spans", () => {
       const { sql } = sampleKeys(["SpanId", "OccurredAt"]);
 
-      expect(sql).toContain("cityHash64(q.TraceId, q.SpanId) %");
-      expect(sql).not.toContain("cityHash64(q.TraceId) %");
+      expect(sql).toContain("cityHash64(k.TraceId, k.SpanId) %");
+      expect(sql).not.toContain("cityHash64(k.TraceId) %");
+    });
+  });
+});
+
+describe("given a statement projecting the thread id", () => {
+  describe("when the sample pass is composed", () => {
+    /** @scenario "A key or sample pass reads the other key columns only for the page's row ids" */
+    it("picks the sampled trace ids alone, then reads the thread id only for them", () => {
+      const { sql } = sampleKeys(["ThreadId", "OccurredAt"]);
+
+      expect(sql).toBe(
+        `SELECT q.TraceId AS TraceId, q.ThreadId AS ThreadId, q.OccurredAt AS OccurredAt\n` +
+          `FROM (\n${SQL}\n) AS q\nWHERE q.TraceId IN (\n` +
+          `SELECT k.TraceId\nFROM (\n${SQL}\n) AS k\n` +
+          `WHERE cityHash64(k.TraceId) % {${LWQL_PASS_SAMPLE_BUCKET_PARAMETER}:UInt64} = 0\n` +
+          `ORDER BY k.TraceId\nLIMIT 50\n)\nORDER BY q.TraceId\nLIMIT 50`,
+      );
+    });
+
+    /** @scenario "A key or sample pass reads the other key columns only for the page's row ids" */
+    it("restricts by the trace and span pair when the rows are spans", () => {
+      const { sql } = sampleKeys(["SpanId", "OccurredAt"]);
+
+      expect(sql).toContain("WHERE (q.TraceId, q.SpanId) IN (\nSELECT k.TraceId, k.SpanId\n");
+      expect(sql).toContain("ORDER BY (k.TraceId, k.SpanId)\nLIMIT 50\n)");
+    });
+  });
+
+  describe("when a later page's key pass is composed", () => {
+    /** @scenario "A key or sample pass reads the other key columns only for the page's row ids" */
+    it("pages on the trace ids alone, then reads the thread id only for that page", () => {
+      const { sql } = keyPass({
+        keyColumns: ["ThreadId"],
+        after: { traceId: "t0", spanId: null },
+      });
+
+      expect(sql).toBe(
+        `SELECT q.TraceId AS TraceId, q.ThreadId AS ThreadId\n` +
+          `FROM (\n${SQL}\n) AS q\nWHERE q.TraceId IN (\n` +
+          `SELECT k.TraceId\nFROM (\n${SQL}\n) AS k\n` +
+          `WHERE k.TraceId > {${LWQL_PASS_AFTER_TRACE_PARAMETER}:String}\n` +
+          `ORDER BY k.TraceId\nLIMIT 501\n)\nORDER BY q.TraceId\nLIMIT 501`,
+      );
+    });
+  });
+
+  describe("when the pass projects no key column beyond the ids", () => {
+    /** @scenario "A key or sample pass reads the other key columns only for the page's row ids" */
+    it("reads the statement once", () => {
+      const { sql } = keyPass({ keyColumns: ["SpanId"], sql: SPAN_SQL });
+
+      expect(sql.split(SPAN_SQL)).toHaveLength(2);
+      expect(sql).not.toContain(" IN (");
+    });
+  });
+});
+
+describe("given a pass that reads its keys in two steps", () => {
+  const SAMPLE = { kind: "sample", keyColumns: ["ThreadId"], limit: 50, buckets: 7 } as const;
+  const LATER = {
+    kind: "keys",
+    keyColumns: ["SpanId", "ThreadId"],
+    limit: 501,
+    after: { traceId: "t0", spanId: "s0" },
+  } as const;
+
+  describe("when it projects a key column beyond the ids", () => {
+    /** @scenario "A key or sample pass reads its keys over the trace-ids twin, cut by its page's traces" */
+    it("reads in two steps; a pass of the ids alone, a probe, a count or a page does not", () => {
+      expect(readsKeysByTraceIds(SAMPLE)).toBe(true);
+      expect(readsKeysByTraceIds(LATER)).toBe(true);
+      expect(readsKeysByTraceIds({ kind: "keys", keyColumns: ["SpanId"], limit: 5 })).toBe(false);
+      expect(readsKeysByTraceIds({ kind: "page", traceIds: ["t1"] })).toBe(false);
+      expect(readsKeysByTraceIds({ kind: "count", limit: 5 })).toBe(false);
+    });
+  });
+
+  describe("when the first step is composed", () => {
+    /** @scenario "A key or sample pass reads its keys over the trace-ids twin, cut by its page's traces" */
+    it("reads the page's row ids alone, with the page's own values", () => {
+      expect(langWatchQLPassRowIdsSql({ sql: SQL, pass: SAMPLE })).toEqual({
+        sql:
+          `SELECT k.TraceId\nFROM (\n${SQL}\n) AS k\n` +
+          `WHERE cityHash64(k.TraceId) % {${LWQL_PASS_SAMPLE_BUCKET_PARAMETER}:UInt64} = 0\n` +
+          `ORDER BY k.TraceId\nLIMIT 50`,
+        parameters: { [LWQL_PASS_SAMPLE_BUCKET_PARAMETER]: 7 },
+      });
+    });
+  });
+
+  describe("when the second step is composed", () => {
+    /** @scenario "A key or sample pass reads its keys over the trace-ids twin, cut by its page's traces" */
+    it("reads the keys of the page's traces under the same condition, order and limit", () => {
+      expect(langWatchQLPassKeysOfTracesSql({ sql: SQL, pass: SAMPLE, traceIds: ["t1"] })).toEqual({
+        sql:
+          `SELECT q.TraceId AS TraceId, q.ThreadId AS ThreadId\nFROM (\n${SQL}\n) AS q\n` +
+          `WHERE cityHash64(q.TraceId) % {${LWQL_PASS_SAMPLE_BUCKET_PARAMETER}:UInt64} = 0 ` +
+          `AND q.TraceId IN ({${LWQL_PASS_TRACE_IDS_PARAMETER}:Array(String)})\n` +
+          `ORDER BY q.TraceId\nLIMIT 50`,
+        parameters: {
+          [LWQL_PASS_SAMPLE_BUCKET_PARAMETER]: 7,
+          [LWQL_PASS_TRACE_IDS_PARAMETER]: ["t1"],
+        },
+      });
+    });
+
+    /** @scenario "A key or sample pass reads its keys over the trace-ids twin, cut by its page's traces" */
+    it("keeps a span page's cursor and order beside the traces", () => {
+      const { sql, parameters } = langWatchQLPassKeysOfTracesSql({
+        sql: SPAN_SQL,
+        pass: LATER,
+        traceIds: ["t1", "t2"],
+      });
+
+      expect(sql).toContain(
+        `WHERE (q.TraceId, q.SpanId) > ({${LWQL_PASS_AFTER_TRACE_PARAMETER}:String}, ` +
+          `{${LWQL_PASS_AFTER_SPAN_PARAMETER}:String}) AND q.TraceId IN (`,
+      );
+      expect(sql).toContain("ORDER BY (q.TraceId, q.SpanId)\nLIMIT 501");
+      expect(parameters).toEqual({
+        [LWQL_PASS_AFTER_TRACE_PARAMETER]: "t0",
+        [LWQL_PASS_AFTER_SPAN_PARAMETER]: "s0",
+        [LWQL_PASS_TRACE_IDS_PARAMETER]: ["t1", "t2"],
+      });
     });
   });
 });

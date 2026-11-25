@@ -1,6 +1,7 @@
 package scenariorunner
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -81,6 +82,22 @@ func TestParseJobRefusals(t *testing.T) {
 			require.ErrorContains(t, err, tc.want)
 		})
 	}
+}
+
+// @scenario "A red team job fails on the Go runner instead of passing"
+func TestParseJobRefusesARedTeamScenario(t *testing.T) {
+	job := strings.Replace(simulationJobJSON, `"maxTurns": 3}`, `"maxTurns": 3, "kind": "red_team"}`, 1)
+	require.NotEqual(t, simulationJobJSON, job)
+	_, err := ParseJob([]byte(job))
+	require.ErrorContains(t, err, "Failed to parse job data: ")
+	require.ErrorContains(t, err, "red team scenarios run only on the Node scenario child")
+}
+
+func TestParseJobReadsAStandardKind(t *testing.T) {
+	job := strings.Replace(simulationJobJSON, `"maxTurns": 3}`, `"maxTurns": 3, "kind": "standard"}`, 1)
+	parsed, err := ParseJob([]byte(job))
+	require.NoError(t, err)
+	assert.Equal(t, "standard", parsed.Simulation.Scenario.Kind)
 }
 
 func TestParseJobAcceptsAScriptedRunWithoutModels(t *testing.T) {

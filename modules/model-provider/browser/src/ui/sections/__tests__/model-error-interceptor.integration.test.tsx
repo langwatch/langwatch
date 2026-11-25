@@ -1,4 +1,5 @@
 import { isHandledByGlobalHandler } from "@langwatch/browser-host/errors";
+import { setUiFeedbackHost } from "@langwatch/browser-host/toaster";
 /**
  * @vitest-environment jsdom
  * The interceptor that turns a failed call's serialised refusal into the toast.
@@ -50,6 +51,29 @@ describe("the model error interceptor", () => {
       expect(reported).toBe(true);
       expect(isHandledByGlobalHandler(error)).toBe(true);
       expect(await screen.findByText(/Model not configured for AI search/i)).toBeInTheDocument();
+    });
+  });
+
+  describe("given a failed call that carries AI_CONTENT_FILTERED", () => {
+    afterEach(() => setUiFeedbackHost(undefined));
+
+    /** @scenario "A content filter refusal is reported even where the screen has no error handler" */
+    it("reports the refusal once through the feedback host and marks it handled", () => {
+      const failed = vi.fn();
+      setUiFeedbackHost({ succeeded: vi.fn(), warned: vi.fn(), informed: vi.fn(), failed });
+      const error = failedCall({
+        code: "AI_CONTENT_FILTERED",
+        featureKey: "workflow.commit_message",
+        featureDisplayName: "Workflow commit message",
+        role: "FAST",
+      });
+
+      const reported = interceptor()(error);
+
+      expect(reported).toBe(true);
+      expect(failed).toHaveBeenCalledTimes(1);
+      expect(failed.mock.calls[0]?.[0]).toMatchObject({ error });
+      expect(isHandledByGlobalHandler(error)).toBe(true);
     });
   });
 

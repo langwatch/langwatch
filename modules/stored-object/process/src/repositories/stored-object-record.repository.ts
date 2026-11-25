@@ -14,10 +14,13 @@ import type { StoredObjectStorageAddress } from "./stored-object-bytes.repositor
 
 export type StoredObjectSource = "canonical" | "imported";
 
+/** The row's status: the lifecycle callers read, plus bytes still streaming through the process. */
+export type StoredObjectRecordStatus = StoredObjectLifecycleStatus | "uploading";
+
 export type StoredObjectRecord = Readonly<{
   tenantId: StoredObjectProjectId;
   id: StoredObjectId;
-  status: StoredObjectLifecycleStatus;
+  status: StoredObjectRecordStatus;
   purpose: string;
   ownerKind: string;
   ownerId: string;
@@ -41,7 +44,7 @@ export type StoredObjectRecord = Readonly<{
 export type StoredObjectRecordPageQuery = Readonly<{
   tenantId: StoredObjectProjectId;
   afterId?: StoredObjectId;
-  status?: StoredObjectLifecycleStatus;
+  status?: StoredObjectRecordStatus | readonly StoredObjectRecordStatus[];
   expiresBefore?: Instant;
   limit: number;
 }>;
@@ -53,6 +56,15 @@ export interface StoredObjectRecordRepository {
   }): Promise<StoredObjectRecord | null>;
 
   upsert(value: StoredObjectRecord): Promise<void>;
+
+  /** Writes `value` only where no row holds its id yet; false when one already does. */
+  insert(value: StoredObjectRecord): Promise<boolean>;
+
+  /** Writes `next` only while the row still holds `expected`'s status and generation. */
+  transition(input: {
+    expected: Pick<StoredObjectRecord, "status" | "generation">;
+    next: StoredObjectRecord;
+  }): Promise<boolean>;
 
   countActive(input: {
     tenantId: StoredObjectProjectId;
@@ -67,6 +79,13 @@ export interface StoredObjectRecordRepository {
     after?: Readonly<{ tenantId: StoredObjectProjectId; id: StoredObjectId }>;
     limit: number;
   }): Promise<StoredObjectRecord[]>;
+
+  /** Projects with an expired open upload or leftover bytes, after the cursor, any tenant. */
+  findTenantsWithExpiredUploads(input: {
+    expiresBefore: Instant;
+    afterTenantId?: StoredObjectProjectId;
+    limit: number;
+  }): Promise<StoredObjectProjectId[]>;
 
   /** Removes the row; a row that is not there is not an error. */
   delete(input: { tenantId: StoredObjectProjectId; id: StoredObjectId }): Promise<void>;

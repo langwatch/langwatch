@@ -2,7 +2,7 @@
 /** The claude_code export block both the inventory and the ingestion-source secret modals show. */
 import { describe, expect, it } from "vitest";
 
-import { buildClaudeCodeEnvBlock } from "../governance-inventory.screen.tsx";
+import { buildClaudeCodeEnvBlock } from "../inventory/secret-modal-commands.ts";
 
 describe("buildClaudeCodeEnvBlock", () => {
   const snippet = buildClaudeCodeEnvBlock({

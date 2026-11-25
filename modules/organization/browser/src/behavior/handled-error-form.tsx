@@ -3,7 +3,7 @@
 import { Banner } from "@langwatch/design-system/banner";
 import { Alert, List } from "@langwatch/design-system/primitives";
 import { ErrorActions } from "@langwatch/error-views";
-import { explainAnyError } from "@langwatch/handled-error/presentation";
+import { explainAnyError, isTipForPeople } from "@langwatch/handled-error/presentation";
 import {
   readEnvelopeTraceId,
   readHandledError as readHandledEnvelope,
@@ -118,7 +118,9 @@ export function HandledErrorAlert({ error, title, fallbackTitle }: HandledErrorA
   const explanation = explainAnyError(error);
   const headline =
     title ?? (explanation.isRegistered ? explanation.title : (fallbackTitle ?? explanation.title));
-  const tips = (handled?.tips ?? []).filter((tip) => tip !== explanation.description);
+  const tips = (handled?.tips ?? []).filter(
+    (tip) => isTipForPeople(tip) && tip !== explanation.description,
+  );
 
   return (
     <Alert.Root status="error" role="alert">

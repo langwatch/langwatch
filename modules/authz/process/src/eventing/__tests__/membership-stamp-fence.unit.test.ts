@@ -4,7 +4,6 @@
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { BindingMissingError } from "../../repositories/authz-grant.repository.ts";
 import { ACTOR, binding, harness, ORG_ID } from "./support/eventing.authz-ledger-fork.harness.ts";
 
 beforeEach(() => {
@@ -33,7 +32,7 @@ describe("given a live attach naming a member", () => {
 });
 
 describe("given an attach naming a user with no live membership", () => {
-  /** @scenario "A live USER attach carries the membership lifetime it locked" */
+  /** @scenario "A grant for a user with no live membership is refused as outside the organisation" */
   it("refuses the batch rather than stating an unfenced grant", async () => {
     const { writer, queryRaw, sent } = harness({});
     queryRaw.mockResolvedValue([]);
@@ -46,7 +45,7 @@ describe("given an attach naming a user with no live membership", () => {
         onDuplicate: "skip",
         awaitProjection: false,
       }),
-    ).rejects.toBeInstanceOf(BindingMissingError);
+    ).rejects.toMatchObject({ code: "grant_principal_not_found", httpStatus: 422 });
     expect(sent).toHaveLength(0);
   });
 });

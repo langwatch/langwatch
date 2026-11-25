@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.5.0](https://github.com/langwatch/langwatch/compare/clickhouse-serverless@v0.4.0...clickhouse-serverless@v0.5.0) (2026-11-17)
+
+
+### Bug Fixes
+
+* **clickhouse-serverless:** build on 26.8.36.3 and find backups in renamed backup_log copies ([#9490](https://github.com/langwatch/langwatch/issues/9490)) ([e41fb25](https://github.com/langwatch/langwatch/commit/e41fb2517f607ebca3fa00188ade958df8912717))
+* **helm:** bump chart images for CVE fixes (postgres, redis, curl, prometheus, alpine/k8s) ([#9208](https://github.com/langwatch/langwatch/issues/9208)) ([ad7c623](https://github.com/langwatch/langwatch/commit/ad7c623567ba6fa783fa317e353da28941dc6f5d))
+* **release:** cut the clickhouse-serverless chart as 0.5.0 to match its image ([#9645](https://github.com/langwatch/langwatch/issues/9645)) ([ce9bf33](https://github.com/langwatch/langwatch/commit/ce9bf338fd3f6a15447899eb3209ef22f2e92855))
+
 ## [0.4.0](https://github.com/langwatch/langwatch/compare/clickhouse-serverless@v0.3.0...clickhouse-serverless@v0.4.0) (2026-09-12)
 
 

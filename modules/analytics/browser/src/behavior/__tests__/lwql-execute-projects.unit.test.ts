@@ -9,7 +9,10 @@ import { createLangWatchQLExecute } from "../lwql-execute.ts";
 
 const RESULT = {} as LangWatchQLQueryResult;
 
-async function sentFor(request: { projects?: readonly string[] }) {
+async function sentFor(
+  request: { projects?: readonly string[] },
+  { readsEveryProject = false }: { readsEveryProject?: boolean } = {},
+) {
   const sent: Record<string, unknown>[] = [];
   const execute = createLangWatchQLExecute({
     transport: {
@@ -19,6 +22,7 @@ async function sentFor(request: { projects?: readonly string[] }) {
       },
     },
     projectId: "board",
+    readsEveryProject,
   });
   await execute({ sql: "SELECT 1", ...request }, { signal: new AbortController().signal });
 
@@ -37,5 +41,22 @@ describe("given a card run", () => {
   /** @scenario "AC206 Project: a card reads the board's project unless its query names others" */
   it("sends none when the query stores none, so the board's project is read", async () => {
     expect(await sentFor({})).not.toHaveProperty("projects");
+  });
+});
+
+describe("given a card run on a board that reads the organization (ADR-002, D2)", () => {
+  /** @scenario "A Gateway or Governance board's widget reads every project I may read" */
+  it('sends "all" when the query stores no projects', async () => {
+    expect(await sentFor({}, { readsEveryProject: true })).toMatchObject({
+      projectId: "board",
+      projects: "all",
+    });
+  });
+
+  /** @scenario "A Gateway or Governance board's widget reads every project I may read" */
+  it("still sends the projects the query stores", async () => {
+    expect(await sentFor({ projects: ["B"] }, { readsEveryProject: true })).toMatchObject({
+      projects: ["B"],
+    });
   });
 });

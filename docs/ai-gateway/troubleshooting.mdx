@@ -171,11 +171,11 @@ You changed a limit, an allowlist or a credential, and requests still behave the
 
 | Path                                                       | Timing                                                 |
 | ---------------------------------------------------------- | ------------------------------------------------------ |
-| The change feed, a long poll against the control plane     | About 10 seconds                                       |
+| The change feed, a long poll against the control plane     | Usually a second or two                                |
 | The configuration re-fetch, for changes that emit no event | `LW_GATEWAY_AUTH_CACHE_CONFIG_TTL_SECONDS`, default 60 |
 | The key's own token expiring                               | 15 minutes                                             |
 
-Rotations, revocations, budget edits, routing changes and cache-rule edits all travel on the change feed, so 10 seconds is the normal case.
+Rotations, revocations, budget edits, routing changes and cache-rule edits all travel on the change feed, so a second or two is the normal case. An idle poll is held open about 10 seconds and answers as soon as a change lands.
 
 **Confirm the feed is running:** the pod log carries an `auth_cache_change_evict` line with the change kind and the key id when a change lands. A `change_feed_poll_failed` line instead means the pod cannot reach the control plane, and every cached key stays as it is until the poll recovers.
 
@@ -218,6 +218,10 @@ A `401`, `403` or `404` from the control plane about the key itself is not an ou
 | `auth_cache_serve_stale`                                | info  | The grace window is active and keys are still being served                            |
 | `auth_cache_refresh_transport_failure`                  | warn  | Each refresh is failing. This is the outage signal, and cached keys are still serving |
 | `auth_cache_hard_evict` with `reason=hard_cap_exceeded` | error | The grace window is spent and requests are now refused                                |
+| `auth_cache_key_denied`                                 | info  | The change feed revoked or disabled a key, and every cache tier now refuses it        |
+| `auth_cache_refused` with `reason=denied_vk_revoked` or `denied_vk_disabled` | info | A request presented a denied key and got its `403`, even with the control plane down |
+| `auth_cache_refused` with `reason=fail_closed`          | info  | `LW_GATEWAY_AUTH_CACHE_FAIL_CLOSED_AFTER_SECONDS` refused a key it could not re-check   |
+| `auth_cache_denial_cleared`                             | info  | A re-enable or a later key check lifted a denial                                      |
 
 **Fix:** restore the control plane. Raise `LW_GATEWAY_AUTH_CACHE_HARD_GRACE_SECONDS` while an outage is still running if you would rather extend than refuse. Set it to a negative value to switch stale serving off entirely, which is what a strict revocation policy wants.
 

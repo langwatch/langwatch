@@ -6,6 +6,7 @@
  */
 import type { DashboardWidgetQuery } from "@langwatch/analytics-contract/dashboard-widget-definition";
 import { renderHook } from "@testing-library/react";
+import type { ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
 
 const { mutate } = vi.hoisted(() => ({ mutate: vi.fn() }));
@@ -16,11 +17,17 @@ vi.mock("../../../../behavior/analytics-api.ts", () => ({
   },
 }));
 
-import { useDashboardWidgetExecutor } from "../use-dashboard-widget-executor.ts";
+import {
+  useDashboardWidgetExecutor,
+  WidgetReadsEveryProjectContext,
+} from "../use-dashboard-widget-executor.ts";
 
 const QUERY: DashboardWidgetQuery = { name: "main", sql: "SELECT 1 AS n" };
 
-async function runUnder(projectId: string): Promise<{ projectId: string; projects?: unknown }> {
+async function runUnder(
+  projectId: string,
+  { readsEveryProject = false }: { readsEveryProject?: boolean } = {},
+): Promise<{ projectId: string; projects?: unknown }> {
   mutate.mockReset();
   mutate.mockResolvedValue({
     columns: [],
@@ -30,7 +37,12 @@ async function runUnder(projectId: string): Promise<{ projectId: string; project
     followsTimeWindow: false,
     followsGranularity: false,
   });
-  const { result } = renderHook(() => useDashboardWidgetExecutor(projectId, [QUERY]));
+  const wrapper = ({ children }: { children: ReactNode }) => (
+    <WidgetReadsEveryProjectContext.Provider value={readsEveryProject}>
+      {children}
+    </WidgetReadsEveryProjectContext.Provider>
+  );
+  const { result } = renderHook(() => useDashboardWidgetExecutor(projectId, [QUERY]), { wrapper });
   await result.current.executeQuery({
     queryName: "main",
     params: {},
@@ -49,5 +61,14 @@ describe("given an Organization board opened under two different projects", () =
     expect(underOwner.projectId).toBe("proj-owner");
     expect(underViewer.projectId).toBe("proj-viewer");
     expect(underViewer).not.toHaveProperty("projects");
+  });
+});
+
+describe("given a Gateway or Governance board, which reads the organization (ADR-002, D2)", () => {
+  /** @scenario "A Gateway or Governance board's widget reads every project I may read" */
+  it('runs a widget that names no projects over "all" the member may read', async () => {
+    const run = await runUnder("proj-anchor", { readsEveryProject: true });
+
+    expect(run).toMatchObject({ projectId: "proj-anchor", projects: "all" });
   });
 });

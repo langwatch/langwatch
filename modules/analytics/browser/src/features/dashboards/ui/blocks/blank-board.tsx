@@ -1,12 +1,13 @@
 /**
  * What every empty board shows under its ask bar and suggested questions: "Or start from a
- * template" with the From LangWatch boards, each card opening its live board, then a card into
- * the full library. The footer "Add a widget" stays only below a board's widgets.
+ * template" with the From LangWatch boards, each card making the member's own board from it, then
+ * a card into the full library. The footer "Add a widget" stays only below a board's widgets.
  */
 
 import {
   Box,
   Button,
+  chakra,
   Grid,
   Heading,
   Link as ChakraLink,
@@ -89,13 +90,58 @@ function CardLink({ href, label, children }: { href: string; label: string; chil
   );
 }
 
+/** A template card that makes a board when pressed; a button role, as it holds a heading. */
+function CardButton({
+  label,
+  isBusy,
+  onPress,
+  children,
+}: {
+  label: string;
+  isBusy: boolean;
+  onPress: () => void;
+  children: ReactNode;
+}) {
+  return (
+    <chakra.button
+      type="button"
+      aria-label={label}
+      aria-busy={isBusy}
+      display="flex"
+      alignItems="stretch"
+      minWidth={0}
+      borderRadius="xl"
+      cursor={isBusy ? "progress" : "pointer"}
+      opacity={isBusy ? 0.6 : 1}
+      transition="box-shadow 0.15s"
+      _hover={{ boxShadow: "sm" }}
+      outline="none"
+      _focusVisible={{ boxShadow: "0 0 0 2px var(--chakra-colors-color-palette-solid)" }}
+      background="none"
+      border="none"
+      padding={0}
+      margin={0}
+      font="inherit"
+      color="inherit"
+      textAlign="left"
+      onClick={onPress}
+    >
+      {children}
+    </chakra.button>
+  );
+}
+
 export function EmptyBoard({
   boards,
-  boardHref,
+  creatingId,
+  onUse,
   templatesHref,
 }: {
   boards: readonly CuratedBoard[];
-  boardHref: (board: CuratedBoard) => string;
+  /** The template a board is being made from, while one is. */
+  creatingId: string | undefined;
+  /** Makes the member's own board from the template and opens it. */
+  onUse: (board: CuratedBoard) => void;
   templatesHref: string;
 }) {
   return (
@@ -112,9 +158,14 @@ export function EmptyBoard({
         gap={4}
       >
         {boards.map((board) => (
-          <CardLink key={board.templateId} href={boardHref(board)} label={board.name}>
+          <CardButton
+            key={board.templateId}
+            label={`Use ${board.name}`}
+            isBusy={creatingId === board.card.board.id}
+            onPress={() => onUse(board)}
+          >
             <TemplateCard template={board.card} />
-          </CardLink>
+          </CardButton>
         ))}
         <CardLink href={templatesHref} label="View all templates">
           <VStack

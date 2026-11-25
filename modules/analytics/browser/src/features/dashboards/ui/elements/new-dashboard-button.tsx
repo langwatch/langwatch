@@ -1,15 +1,9 @@
-/** The "+" beside a sidebar heading that makes a new dashboard. */
+/** The "+" beside a sidebar heading that opens a new dashboard, stored on its first edit. */
 
 import { Box, IconButton } from "@langwatch/design-system/primitives";
 import { Plus } from "lucide-react";
 
-export function NewDashboardButton({
-  isCreating,
-  onCreate,
-}: {
-  isCreating: boolean;
-  onCreate: () => void;
-}) {
+export function NewDashboardButton({ onCreate }: { onCreate: () => void }) {
   return (
     <Box marginLeft="auto" display="flex">
       <IconButton
@@ -21,7 +15,6 @@ export function NewDashboardButton({
         _hover={{ color: "fg", background: "border/60" }}
         aria-label="New dashboard"
         title="New dashboard"
-        loading={isCreating}
         onClick={onCreate}
       >
         <Plus size={12} aria-hidden />

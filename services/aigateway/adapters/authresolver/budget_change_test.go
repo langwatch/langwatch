@@ -71,7 +71,7 @@ func seedProjectKey(t *testing.T, svc *Service, rawKey string) [64]byte {
 	b := projectBundle("vk_" + rawKey)
 	b.Config = projectBudgetConfig(0)
 	b.Credentials = b.Config.Credentials
-	svc.storeL1(h, b, "etag-1")
+	seedL1(svc, h, b, "etag-1")
 	return h
 }
 
@@ -203,8 +203,8 @@ func TestBudgetUpdated_WithoutProject_MarksTheOrganizationOnly(t *testing.T) {
 	svc, _ := newService(t, Options{Resolver: resolver, ConfigFetcher: resolver})
 	sameOrg := hashKey(domain.PresentedKey{Token: "vk-lw-org-1"})
 	otherOrg := hashKey(domain.PresentedKey{Token: "vk-lw-org-2"})
-	svc.storeL1(sameOrg, &domain.Bundle{OrganizationID: "org-1"}, "")
-	svc.storeL1(otherOrg, &domain.Bundle{OrganizationID: "org-2"}, "")
+	seedL1(svc, sameOrg, &domain.Bundle{OrganizationID: "org-1"}, "")
+	seedL1(svc, otherOrg, &domain.Bundle{OrganizationID: "org-2"}, "")
 
 	svc.applyChange("org-1", CacheChange{Kind: ChangeKindBudgetUpdated})
 

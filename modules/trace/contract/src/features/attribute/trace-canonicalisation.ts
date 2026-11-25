@@ -32,6 +32,7 @@ const canonicalizeLogRecordInputSchemaDefinition = z.object({
   scopeName: z.string(),
   body: z.string(),
   attributes: canonicalAttributesSchema,
+  resourceAttributes: canonicalAttributesSchema.optional(),
 });
 export interface CanonicalizeLogRecordInputSchema extends Named<
   typeof canonicalizeLogRecordInputSchemaDefinition

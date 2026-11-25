@@ -370,6 +370,90 @@ describe("given a run that ended", () => {
   });
 });
 
+describe("given a run that has judged every row but still reads as judging", () => {
+  describe("when no hint brings the read that says it ended", () => {
+    /** @scenario "A run waiting on its end is read again until it says it ended" */
+    it("reads the run again on a backoff and stops once a read says it ended", () => {
+      vi.useFakeTimers();
+      harness.getResults = answer(progress({ progress: 10_000, matched: 412 }));
+      const { rerender } = renderHook(() => useInstantEvalRunWatch());
+      expect(harness.invalidate.instantEvalGet).not.toHaveBeenCalled();
+
+      act(() => {
+        vi.advanceTimersByTime(1_000);
+      });
+      expect(harness.invalidate.instantEvalGet).toHaveBeenCalledTimes(1);
+      expect(harness.invalidate.instantEvalGet).toHaveBeenCalledWith({
+        projectId: "project-1",
+        runId: "run-1",
+      });
+      act(() => {
+        vi.advanceTimersByTime(2_000);
+      });
+      expect(harness.invalidate.instantEvalGet).toHaveBeenCalledTimes(2);
+
+      harness.getResults = answer(progress({ status: "finished", progress: 10_000, matched: 412 }));
+      rerender();
+      const afterEnd = harness.invalidate.instantEvalGet.mock.calls.length;
+      act(() => {
+        vi.advanceTimersByTime(60_000);
+      });
+      expect(harness.invalidate.instantEvalGet).toHaveBeenCalledTimes(afterEnd);
+    });
+
+    it("keeps each run's own backoff when another run starts waiting beside it", () => {
+      vi.useFakeTimers();
+      const first = progress({ progress: 10_000, matched: 412 });
+      harness.getResults = answer(first);
+      const { rerender } = renderHook(() => useInstantEvalRunWatch());
+      act(() => {
+        vi.advanceTimersByTime(3_000);
+      });
+      const readsOf = (runId: string) =>
+        harness.invalidate.instantEvalGet.mock.calls.filter(([input]) => input.runId === runId)
+          .length;
+      expect(readsOf("run-1")).toBe(2);
+
+      answeredAt += 1;
+      harness.getResults = [
+        { data: first, dataUpdatedAt: answeredAt },
+        {
+          data: { ...progress({ progress: 500, matched: 1 }), id: "run-2", total: 500 },
+          dataUpdatedAt: answeredAt,
+        },
+      ];
+      rerender();
+      act(() => {
+        vi.advanceTimersByTime(1_000);
+      });
+      expect(readsOf("run-2")).toBe(1);
+      expect(readsOf("run-1")).toBe(2);
+      act(() => {
+        vi.advanceTimersByTime(3_000);
+      });
+      expect(readsOf("run-1")).toBe(3);
+    });
+
+    it("reads a run the reader stopped again until it says it was cancelled", () => {
+      vi.useFakeTimers();
+      harness.getResults = answer(progress({ progress: 3_200, matched: 10 }));
+      renderHook(() => useInstantEvalRunWatch());
+      act(() => {
+        vi.advanceTimersByTime(10_000);
+      });
+      expect(harness.invalidate.instantEvalGet).not.toHaveBeenCalled();
+
+      act(() => {
+        useInstantEvalRunStore.getState().markStopped("run-1");
+      });
+      act(() => {
+        vi.advanceTimersByTime(1_000);
+      });
+      expect(harness.invalidate.instantEvalGet).toHaveBeenCalledTimes(1);
+    });
+  });
+});
+
 describe("given a run behind the query's eval chip that LangWatch could not reach", () => {
   describe("when its status turns failed with nothing charged", () => {
     /** @scenario "A run that fails on the server shows the failure instead of judging" */
