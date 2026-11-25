@@ -33,15 +33,26 @@ const defaultLogger: Logger = createLogger("langwatch:instant-evals:llm-judge");
 /** The one level the leg logs at, injected so a test can read what a failure was named. */
 type InstantEvalLlmJudgeLogger = Pick<Logger, "warn">;
 
-const ENDPOINTS: Record<InstantEvalLlmJudgeWire, string> = {
-  anthropic_messages: "https://api.anthropic.com/v1/messages",
-  openai_responses: "https://api.openai.com/v1/responses",
-};
+const GEMINI_MODELS_URL = "https://generativelanguage.googleapis.com/v1beta/models";
+
+/** Gemini names its model in the path; the key never rides in the URL. */
+function endpointOf({ wire, model }: { wire: InstantEvalLlmJudgeWire; model: string }): string {
+  if (wire === "anthropic_messages") return "https://api.anthropic.com/v1/messages";
+  if (wire === "openai_responses") return "https://api.openai.com/v1/responses";
+  return `${GEMINI_MODELS_URL}/${encodeURIComponent(model)}:generateContent`;
+}
 
 const ANTHROPIC_VERSION = "2023-06-01";
 
-/** Content an LLM leg keeps, as langevals' judge fit does. */
+/** Content an LLM leg keeps, as langevals' judge fit does; the long-context wire keeps more. */
 const LLM_CONTENT_BUDGET_TOKENS = 128_000;
+const GEMINI_CONTENT_BUDGET_TOKENS = 900_000;
+
+function contentBudgetOf(wire: InstantEvalLlmJudgeWire): number {
+  return wire === "gemini_generate_content"
+    ? GEMINI_CONTENT_BUDGET_TOKENS
+    : LLM_CONTENT_BUDGET_TOKENS;
+}
 
 type Keys = Readonly<Partial<Record<InstantEvalLlmJudgeWire, string>>>;
 
@@ -75,7 +86,7 @@ export class HttpInstantEvalLlmJudgeChannel implements InstantEvalLlmJudgeChanne
   ): Promise<InstantEvalLlmJudgeAnswer> {
     const apiKey = this.keys[wire];
     if (!apiKey || !model) return skipped("classifier_not_configured");
-    const fitted = prepareInstantEvalText({ text, budgetTokens: LLM_CONTENT_BUDGET_TOKENS });
+    const fitted = prepareInstantEvalText({ text, budgetTokens: contentBudgetOf(wire) });
     const prompt = instantEvalLlmJudgePromptOf({ job, question, text: fitted.text });
     const body = instantEvalLlmJudgeBodyOf({
       wire,
@@ -83,7 +94,7 @@ export class HttpInstantEvalLlmJudgeChannel implements InstantEvalLlmJudgeChanne
       prompt,
       ...(reasoningEffort ? { reasoningEffort } : {}),
     });
-    const sent = await this.post({ wire, apiKey, body, signal, timeoutMs });
+    const sent = await this.post({ wire, model, apiKey, body, signal, timeoutMs });
     if (sent.outcome === "skipped") return sent;
     const reading = readInstantEvalLlmJudgeAnswer({ wire, body: sent.body, question });
     const { inputTokens, outputTokens } = reading;
@@ -100,15 +111,21 @@ export class HttpInstantEvalLlmJudgeChannel implements InstantEvalLlmJudgeChanne
   }
 
   async call(
-    { wire, model, system, user, tools, forcedTool, timeoutMs }: InstantEvalLlmToolCallRequest,
+    request: InstantEvalLlmToolCallRequest,
     signal?: AbortSignal,
   ): Promise<InstantEvalLlmToolCallAnswer> {
+    const { wire, model, system, user, tools, forcedTool, timeoutMs, reasoningEffort } = request;
     const apiKey = this.keys[wire];
     if (!apiKey || !model) return skipped("classifier_not_configured");
-    const fitted = prepareInstantEvalText({ text: user, budgetTokens: LLM_CONTENT_BUDGET_TOKENS });
+    const fitted = prepareInstantEvalText({ text: user, budgetTokens: contentBudgetOf(wire) });
     const prompt = { system, user: fitted.text, tools, ...(forcedTool ? { forcedTool } : {}) };
-    const body = instantEvalLlmToolCallBodyOf({ wire, model, prompt });
-    const sent = await this.post({ wire, apiKey, body, signal, timeoutMs });
+    const body = instantEvalLlmToolCallBodyOf({
+      wire,
+      model,
+      prompt,
+      ...(reasoningEffort ? { reasoningEffort } : {}),
+    });
+    const sent = await this.post({ wire, model, apiKey, body, signal, timeoutMs });
     if (sent.outcome === "skipped") return sent;
     const offered = forcedTool ? [forcedTool] : tools.map((tool) => tool.name);
     const reading = readInstantEvalLlmToolCall({ wire, body: sent.body, tools: offered });
@@ -124,12 +141,14 @@ export class HttpInstantEvalLlmJudgeChannel implements InstantEvalLlmJudgeChanne
   /** One send, never a retry: the parsed answer, or the platform's skip for what went wrong. */
   private async post({
     wire,
+    model,
     apiKey,
     body,
     signal,
     timeoutMs,
   }: {
     wire: InstantEvalLlmJudgeWire;
+    model: string;
     apiKey: string;
     body: Record<string, unknown>;
     signal: AbortSignal | undefined;
@@ -137,7 +156,7 @@ export class HttpInstantEvalLlmJudgeChannel implements InstantEvalLlmJudgeChanne
   }): Promise<Readonly<{ outcome: "sent"; body: unknown }> | SkippedAnswer> {
     let response: Awaited<ReturnType<typeof undiciFetch>>;
     try {
-      response = await undiciFetch(ENDPOINTS[wire], {
+      response = await undiciFetch(endpointOf({ wire, model }), {
         method: "POST",
         headers: { ...authHeadersOf({ wire, apiKey }), "content-type": "application/json" },
         body: JSON.stringify(body),
@@ -183,9 +202,11 @@ function authHeadersOf({
   wire: InstantEvalLlmJudgeWire;
   apiKey: string;
 }): Record<string, string> {
-  return wire === "anthropic_messages"
-    ? { "x-api-key": apiKey, "anthropic-version": ANTHROPIC_VERSION }
-    : { authorization: `Bearer ${apiKey}` };
+  if (wire === "anthropic_messages") {
+    return { "x-api-key": apiKey, "anthropic-version": ANTHROPIC_VERSION };
+  }
+  if (wire === "gemini_generate_content") return { "x-goog-api-key": apiKey };
+  return { authorization: `Bearer ${apiKey}` };
 }
 
 function requestSignal({

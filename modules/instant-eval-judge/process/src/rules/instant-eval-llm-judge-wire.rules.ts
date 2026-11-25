@@ -1,7 +1,7 @@
 /**
- * The LLM legs' request and answer: one question as a forced `evaluation` tool call, on
- * Anthropic Messages or OpenAI Responses. Yes or no reads the tool's `result`, a score its
- * `score` inside the question's range, a category its `label` among the offered options.
+ * The LLM legs' request and answer: one question as a forced `evaluation` tool call, on each LLM
+ * wire. Yes or no reads the tool's `result`, a score its `score` inside the question's range, a
+ * category its `label` among the offered options.
  * @see modules/instant-eval-judge/specs/instant-eval-judge-router.feature
  */
 
@@ -11,16 +11,21 @@ import {
   type InstantEvalBooleanQuestion,
   type InstantEvalCategoryQuestion,
   type InstantEvalJudgeJob,
+  type InstantEvalJudgeLlmKind,
   type InstantEvalJudgeReasoningEffort,
   type InstantEvalQuestion,
   type InstantEvalScoreQuestion,
 } from "@langwatch/instant-eval-judge-contract";
 import { z } from "zod";
 
+import {
+  instantEvalGeminiBodyOf,
+  readInstantEvalGeminiAnswer,
+} from "./instant-eval-gemini-wire.rules.ts";
 import type { InstantEvalLlmJudgeValue } from "./instant-eval-judge-sureness.rules.ts";
 
-const INSTANT_EVAL_LLM_JUDGE_WIRES = ["anthropic_messages", "openai_responses"] as const;
-export type InstantEvalLlmJudgeWire = (typeof INSTANT_EVAL_LLM_JUDGE_WIRES)[number];
+/** An LLM leg's wire is its backend kind. */
+export type InstantEvalLlmJudgeWire = InstantEvalJudgeLlmKind;
 
 const SEARCH_SYSTEM_PROMPT =
   "You are an LLM evaluator answering a yes/no question about a trace or conversation";
@@ -223,6 +228,15 @@ export function instantEvalLlmJudgeBodyOf({
       tool_choice: { type: "tool", name: tool.name },
     };
   }
+  if (wire === "gemini_generate_content") {
+    return instantEvalGeminiBodyOf({
+      system,
+      user,
+      tools: [tool],
+      allowed: [tool.name],
+      maxOutputTokens: MAX_OUTPUT_TOKENS,
+    });
+  }
   return {
     model,
     input: [
@@ -291,6 +305,11 @@ export function readInstantEvalLlmJudgeAnswer({
       (part) => part.type === "tool_use" && part.name === TOOL_NAME,
     );
     return { ...valueOf({ input: call?.input, question }), ...usageOf(parsed.data.usage) };
+  }
+  if (wire === "gemini_generate_content") {
+    const { calls, inputTokens, outputTokens } = readInstantEvalGeminiAnswer(body);
+    const call = calls.find((one) => one.name === TOOL_NAME);
+    return { ...valueOf({ input: call?.args, question }), inputTokens, outputTokens };
   }
   const parsed = openAiResponseSchema.safeParse(body);
   if (!parsed.success) return UNREADABLE;

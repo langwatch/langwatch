@@ -133,9 +133,9 @@ Added by the router (ADR-190), all read on LangWatch cloud only:
 - `INSTANT_EVAL_JUDGE_PRICING` (JSON, optional): per-backend input and output prices, with an
   optional long-context tier and a version. A backend a route can reach with no price refuses boot.
   Unset, the hosted classifier is priced at its published rate.
-- `INSTANT_EVAL_DECISIONS_API_KEY`, `INSTANT_EVAL_ANTHROPIC_API_KEY` and
-  `INSTANT_EVAL_OPENAI_API_KEY` (secrets, optional): LangWatch's keys for the router's decision
-  model, Anthropic and OpenAI legs.
+- `INSTANT_EVAL_DECISIONS_API_KEY`, `INSTANT_EVAL_ANTHROPIC_API_KEY`,
+  `INSTANT_EVAL_OPENAI_API_KEY` and `INSTANT_EVAL_GEMINI_API_KEY` (secrets, optional):
+  LangWatch's keys for the router's decision model, Anthropic, OpenAI and Gemini legs.
 
 ## Errors
 

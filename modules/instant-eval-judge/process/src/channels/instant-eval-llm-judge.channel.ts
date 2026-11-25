@@ -24,6 +24,9 @@ export const llmJudgeAnthropicApiKey = Secret.load("INSTANT_EVAL_ANTHROPIC_API_K
 /** LangWatch's OpenAI key for the router's OpenAI Responses legs; read on LangWatch Cloud only. */
 export const llmJudgeOpenAiApiKey = Secret.load("INSTANT_EVAL_OPENAI_API_KEY", { optional: true });
 
+/** LangWatch's Gemini key for the router's Gemini legs; read on LangWatch Cloud only. */
+export const llmJudgeGeminiApiKey = Secret.load("INSTANT_EVAL_GEMINI_API_KEY", { optional: true });
+
 export interface InstantEvalLlmJudgeRequest {
   readonly wire: InstantEvalLlmJudgeWire;
   /** The provider's model id, from the route table; there is no default. */
@@ -61,6 +64,8 @@ export interface InstantEvalLlmToolCallRequest {
   /** The one tool the model must call; absent, it must call one of `tools`. */
   readonly forcedTool?: string;
   readonly timeoutMs: number;
+  /** From the route table's backend; absent, the request names no effort. */
+  readonly reasoningEffort?: InstantEvalJudgeReasoningEffort;
 }
 
 /** The tool called with its arguments and the tokens billed, or a skip that may still bill. */

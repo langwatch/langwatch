@@ -23,7 +23,17 @@ const ALL_KEYS = {
   INSTANT_EVAL_DECISIONS_API_KEY: "decisions-key",
   INSTANT_EVAL_ANTHROPIC_API_KEY: "anthropic-key",
   INSTANT_EVAL_OPENAI_API_KEY: "openai-key",
+  INSTANT_EVAL_GEMINI_API_KEY: "gemini-key",
 };
+
+/** The same table with a Gemini backend answering the turn decision. */
+const GEMINI_TABLE = syntheticScenarioRouteTable({
+  backends: {
+    "llm-a": { kind: "anthropic_messages", model: "llm-model-a" },
+    "llm-c": { kind: "gemini_generate_content", model: "llm-model-c" },
+  },
+  scenarioDecision: { backend: "llm-c" },
+});
 
 /** A table whose only use of `llm-c` is the turn decision, so only that key and price reach it. */
 const TABLE = syntheticScenarioRouteTable({
@@ -46,7 +56,9 @@ async function boot({
   keys = ALL_KEYS,
   pricing = PRICING,
   isSaas = true,
+  table = TABLE,
 }: {
+  table?: typeof TABLE;
   keys?: Record<string, string>;
   pricing?: InstantEvalJudgeRoutePricing;
   isSaas?: boolean;
@@ -57,7 +69,7 @@ async function boot({
     classifierModel: undefined,
     globalTokensPerSecond: 300_000,
     tenantTokensPerSecond: 150_000,
-    judgeRoutes: isSaas ? TABLE : undefined,
+    judgeRoutes: isSaas ? table : undefined,
     judgeRoutePricing: isSaas ? pricing : undefined,
     isSaas,
     nodeEnvironment: "production",
@@ -101,6 +113,22 @@ describe("InstantEvalJudgeModule.create with a scenario decision backend", () =>
 
     await expect(boot({ keys: rest })).rejects.toThrow(
       /backend llm-c: no openai_responses key or channel on this install/,
+    );
+  });
+});
+
+describe("InstantEvalJudgeModule.create with a Gemini backend", () => {
+  /** @scenario "Boot refuses a Gemini backend when the install holds no Gemini key" */
+  it("boots when the install holds the Gemini key", async () => {
+    await expect(boot({ table: GEMINI_TABLE })).resolves.toBeInstanceOf(InstantEvalJudgeModule);
+  });
+
+  /** @scenario "Boot refuses a Gemini backend when the install holds no Gemini key" */
+  it("refuses when the install holds no Gemini key, naming the backend and its kind", async () => {
+    const { INSTANT_EVAL_GEMINI_API_KEY: _gemini, ...rest } = ALL_KEYS;
+
+    await expect(boot({ table: GEMINI_TABLE, keys: rest })).rejects.toThrow(
+      /backend llm-c: no gemini_generate_content key or channel on this install/,
     );
   });
 });

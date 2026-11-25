@@ -12,6 +12,7 @@ import {
   InstantEvalJudgeStoppedError,
   instantEvalJudgeEnabledFallbacksOf,
   isInstantEvalJudgeLlmBackend,
+  isInstantEvalJudgeLlmKind,
   isInstantEvalSpendBillable,
   type InstantEvalJudgeRoutePricing,
   type InstantEvalJudgeRouteTable,
@@ -213,7 +214,7 @@ export class InstantEvalScenarioJudgeService {
     const offered: readonly string[] = Object.values(INSTANT_EVAL_SCENARIO_DECISION_TOOLS);
     const tools = llmCall.tools.filter((tool) => offered.includes(tool.name));
     if (!config?.model || tools.length === 0) return void 0;
-    if (config.kind !== "anthropic_messages" && config.kind !== "openai_responses") return void 0;
+    if (!isInstantEvalJudgeLlmKind(config.kind)) return void 0;
     try {
       await this.deps.limiter.acquire(
         {
@@ -228,6 +229,7 @@ export class InstantEvalScenarioJudgeService {
           wire: config.kind,
           model: config.model,
           timeoutMs: config.timeoutMs,
+          ...(config.reasoningEffort ? { reasoningEffort: config.reasoningEffort } : {}),
           system,
           user,
           tools,

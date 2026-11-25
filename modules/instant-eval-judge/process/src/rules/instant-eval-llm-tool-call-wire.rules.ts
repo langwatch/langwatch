@@ -5,9 +5,16 @@
  * @see modules/instant-eval-judge/specs/instant-eval-scenario-judge.feature
  */
 
-import type { InstantEvalScenarioJudgeTool } from "@langwatch/instant-eval-judge-contract";
+import type {
+  InstantEvalJudgeReasoningEffort,
+  InstantEvalScenarioJudgeTool,
+} from "@langwatch/instant-eval-judge-contract";
 import { z } from "zod";
 
+import {
+  instantEvalGeminiBodyOf,
+  readInstantEvalGeminiAnswer,
+} from "./instant-eval-gemini-wire.rules.ts";
 import type { InstantEvalLlmJudgeWire } from "./instant-eval-llm-judge-wire.rules.ts";
 
 const MAX_OUTPUT_TOKENS = 8_000;
@@ -20,14 +27,17 @@ export interface InstantEvalLlmToolCallPrompt {
   readonly forcedTool?: string;
 }
 
+/** A reasoning effort goes on OpenAI Responses alone, and only when the backend sets one. */
 export function instantEvalLlmToolCallBodyOf({
   wire,
   model,
   prompt,
+  reasoningEffort,
 }: {
   wire: InstantEvalLlmJudgeWire;
   model: string;
   prompt: InstantEvalLlmToolCallPrompt;
+  reasoningEffort?: InstantEvalJudgeReasoningEffort;
 }): Record<string, unknown> {
   const { system, user, tools, forcedTool } = prompt;
   if (wire === "anthropic_messages") {
@@ -44,6 +54,15 @@ export function instantEvalLlmToolCallBodyOf({
       tool_choice: forcedTool ? { type: "tool", name: forcedTool } : { type: "any" },
     };
   }
+  if (wire === "gemini_generate_content") {
+    return instantEvalGeminiBodyOf({
+      system,
+      user,
+      tools,
+      allowed: forcedTool ? [forcedTool] : tools.map((tool) => tool.name),
+      maxOutputTokens: MAX_OUTPUT_TOKENS,
+    });
+  }
   return {
     model,
     input: [
@@ -51,6 +70,7 @@ export function instantEvalLlmToolCallBodyOf({
       { role: "user", content: user },
     ],
     max_output_tokens: MAX_OUTPUT_TOKENS,
+    ...(reasoningEffort ? { reasoning: { effort: reasoningEffort } } : {}),
     store: false,
     tools: tools.map((tool) => ({ type: "function", ...tool, strict: false })),
     tool_choice: forcedTool ? { type: "function", name: forcedTool } : "required",
@@ -101,6 +121,12 @@ export function readInstantEvalLlmToolCall({
     );
     if (!call?.name) return { outcome: "none", ...usage };
     return { outcome: "called", tool: call.name, input: call.input, ...usage };
+  }
+  if (wire === "gemini_generate_content") {
+    const { calls, ...usage } = readInstantEvalGeminiAnswer(body);
+    const call = calls.find((one) => tools.includes(one.name));
+    if (!call) return { outcome: "none", ...usage };
+    return { outcome: "called", tool: call.name, input: call.args, ...usage };
   }
   const parsed = openAiResponseSchema.safeParse(body);
   if (!parsed.success) return { outcome: "none", inputTokens: 0, outputTokens: 0 };

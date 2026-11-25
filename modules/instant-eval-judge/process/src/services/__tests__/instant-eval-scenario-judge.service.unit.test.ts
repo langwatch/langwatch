@@ -27,6 +27,7 @@ import { MemoryInstantEvalRateLimiter } from "../../__tests__/support/instant-ev
 import {
   scenarioJudgeCall,
   SYNTHETIC_SCENARIO_PRICING,
+  syntheticGatedScenarioRouteTable,
   syntheticScenarioRouteTable,
 } from "../../__tests__/support/instant-eval-scenario-judge.test-fakes.ts";
 import type {
@@ -85,8 +86,11 @@ const LLM_DOWN: InstantEvalLlmToolCallAnswer = {
   outputTokens: 0,
 };
 
+const GATE_TOKENS = 400;
+
 function harness({
   probabilities = SURE,
+  gateScores = {},
   toolCall = () => finishTest({}),
   table = syntheticScenarioRouteTable(),
   pricing = SYNTHETIC_SCENARIO_PRICING,
@@ -95,6 +99,8 @@ function harness({
   spentNanoUsd = 0n,
 }: {
   probabilities?: Probabilities;
+  /** The gate's difficulty score per criterion key; a key left out is a case it did not rate. */
+  gateScores?: Readonly<Record<string, number>>;
   toolCall?: (
     request: InstantEvalLlmToolCallRequest,
     signal?: AbortSignal,
@@ -115,10 +121,21 @@ function harness({
     answer: ({ questions }) => decisionAnswer(probabilities, questions[0]?.id),
   });
   const classifierRequests: string[] = [];
+  const gateRequests: string[] = [];
   const classifier = MemoryInstantEvalClassifierChannel.create({
     answer: async ({ questions }) => {
-      classifierRequests.push(questions[0]?.id ?? "");
-      return decisionAnswer(probabilities, questions[0]?.id);
+      const asked = questions[0];
+      if (asked?.kind === "score") {
+        gateRequests.push(asked.id);
+        const score = gateScores[asked.id];
+        return {
+          verdicts: score === undefined ? [] : [{ questionId: asked.id, score }],
+          inputTokens: GATE_TOKENS,
+          isTextTruncated: false,
+        };
+      }
+      classifierRequests.push(asked?.id ?? "");
+      return decisionAnswer(probabilities, asked?.id);
     },
   });
   const llmJudge = ScriptedInstantEvalLlmJudgeChannel.create({
@@ -173,7 +190,16 @@ function harness({
       occurredAtMs: 1,
     });
   };
-  return { service, hostedDecisions, classifierRequests, llmJudge, recorded, lines, seed };
+  return {
+    service,
+    hostedDecisions,
+    classifierRequests,
+    gateRequests,
+    llmJudge,
+    recorded,
+    lines,
+    seed,
+  };
 }
 
 describe("given a scenario verdict call on LangWatch Cloud", () => {
@@ -587,6 +613,113 @@ describe("given a scenario judge call that may not be answered", () => {
         code: "instant_eval_free_budget_exhausted",
       });
       expect(hostedDecisions.requests).toHaveLength(0);
+    });
+  });
+});
+
+describe("given a gated scenario route", () => {
+  const table = syntheticGatedScenarioRouteTable();
+  const gateScores = { criterion_0: 0.2, criterion_1: 0.75, criterion_2: 2 };
+
+  describe("when the gate rates one criterion easy and two hard", () => {
+    /** @scenario "A gated route sends an easy criterion to the primary and a hard one to the shared call" */
+    it("asks the decision model the easy one alone and the LLM the hard ones in one send", async () => {
+      const { service, hostedDecisions, gateRequests, llmJudge, recorded } = harness({
+        table,
+        gateScores,
+        // Unsure on purpose: after a gate no sureness is read, so the easy answer stands.
+        probabilities: { criterion_0: 0.6 },
+        toolCall: () => finishTest({ criterion_1: "false", criterion_2: "true" }),
+      });
+
+      const answer = await service.judge(scenarioJudgeCall());
+
+      expect(gateRequests.toSorted()).toEqual(["criterion_0", "criterion_1", "criterion_2"]);
+      expect(hostedDecisions.requests.map((request) => request.questions[0]?.id)).toEqual([
+        "criterion_0",
+      ]);
+      expect(llmJudge.calls).toHaveLength(1);
+      expect(answer).toMatchObject({
+        outcome: "judged",
+        criteria: [
+          { key: "criterion_0", result: "met" },
+          { key: "criterion_1", result: "unmet" },
+          { key: "criterion_2", result: "met" },
+        ],
+      });
+      // Three gate sends at 5, one decision request at 1, one LLM call at 10 in and 100 out.
+      expect(recorded).toHaveLength(1);
+      expect(recorded[0]?.costNanoUsd).toBe(
+        3 * GATE_TOKENS * 5_000 + 1_000 * 1_000 + 2_000 * 10_000 + 100 * 100_000,
+      );
+      expect(recorded[0]?.model).toBe("langwatch-judge-preview");
+    });
+
+    /** @scenario "The shared verdict call carries the backend's reasoning effort" */
+    it("names the escalation backend's effort on the judge's own verdict call", async () => {
+      const { service, llmJudge } = harness({ table, gateScores });
+
+      await service.judge(scenarioJudgeCall());
+
+      expect(llmJudge.calls[0]).toMatchObject({
+        wire: "openai_responses",
+        model: "llm-model-a",
+        reasoningEffort: "medium",
+      });
+    });
+  });
+
+  describe("when a long conversation's criterion gets an unsure classifier answer", () => {
+    const content = "x".repeat(40_000);
+
+    /** @scenario "A Gemini backend answers the judge's own call as a forced function call" */
+    it("escalates to the Gemini backend on the router's sureness scale, with no effort", async () => {
+      const { service, llmJudge, classifierRequests, recorded } = harness({
+        table,
+        // abs(2p - 1): 0.95 is 0.9 and kept, 0.949 is under it, 0.04 is 0.92 and kept.
+        probabilities: { criterion_0: 0.95, criterion_1: 0.949, criterion_2: 0.04 },
+        toolCall: () => finishTest({ criterion_1: "true" }),
+      });
+
+      const answer = await service.judge(scenarioJudgeCall({ content }));
+
+      expect(classifierRequests.toSorted()).toEqual(["criterion_0", "criterion_1", "criterion_2"]);
+      expect(llmJudge.calls).toHaveLength(1);
+      expect(llmJudge.calls[0]).toMatchObject({
+        wire: "gemini_generate_content",
+        model: "llm-model-c",
+        forcedTool: "finish_test",
+      });
+      expect(llmJudge.calls[0]).not.toHaveProperty("reasoningEffort");
+      expect(answer).toMatchObject({
+        criteria: [
+          { key: "criterion_0", result: "met" },
+          { key: "criterion_1", result: "met" },
+          { key: "criterion_2", result: "unmet" },
+        ],
+      });
+      expect(recorded[0]?.costNanoUsd).toBe(3 * 1_000 * 2_000 + 2_000 * 30_000 + 100 * 300_000);
+    });
+  });
+
+  describe("when the turn decision's backend is a Gemini backend", () => {
+    /** @scenario "The turn decision is the judge's own call on the table's decision backend" */
+    it("sends the judge's own decision call on that wire", async () => {
+      const { service, llmJudge } = harness({
+        table,
+        toolCall: () => ({
+          outcome: "answered",
+          tool: "make_verdict",
+          input: {},
+          inputTokens: 500,
+          outputTokens: 10,
+        }),
+      });
+
+      const answer = await service.judge(scenarioJudgeCall({ phase: "decision" }));
+
+      expect(llmJudge.calls[0]).toMatchObject({ wire: "gemini_generate_content" });
+      expect(answer).toMatchObject({ outcome: "judged", phase: "decision", decision: "verdict" });
     });
   });
 });

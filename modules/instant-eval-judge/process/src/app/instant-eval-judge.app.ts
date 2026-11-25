@@ -33,6 +33,7 @@ import { hostedDecisionsApiKey } from "../channels/instant-eval-hosted-decisions
 import type { InstantEvalJudgeChannels } from "../channels/instant-eval-judge.channels.ts";
 import {
   llmJudgeAnthropicApiKey,
+  llmJudgeGeminiApiKey,
   llmJudgeOpenAiApiKey,
 } from "../channels/instant-eval-llm-judge.channel.ts";
 import {
@@ -81,6 +82,7 @@ export class InstantEvalJudgeModule implements InstantEvalJudgeApi {
     classifierApiKey,
     hostedDecisionsApiKey,
     llmJudgeAnthropicApiKey,
+    llmJudgeGeminiApiKey,
     llmJudgeOpenAiApiKey,
   } as const;
 

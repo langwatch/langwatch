@@ -8,7 +8,9 @@
 import {
   InstantEvalJudgeStoppedError,
   instantEvalSkipped,
+  isInstantEvalJudgeLlmKind,
   isInstantEvalSpendBillable,
+  type InstantEvalJudgeLlmKind,
   type InstantEvalJudgeRoutePricing,
   type InstantEvalJudgeReasoningEffort,
   type InstantEvalJudgeRouteGate,
@@ -39,7 +41,10 @@ import { instantEvalScenarioLlmVerdictOf } from "../rules/instant-eval-scenario-
 import { InstantEvalJudgeDecisionLegService } from "./instant-eval-judge-decision-leg.service.ts";
 import { InstantEvalJudgeGatedLegsService } from "./instant-eval-judge-gated-legs.service.ts";
 import { InstantEvalJudgeLlmLegService } from "./instant-eval-judge-llm-leg.service.ts";
-import type { InstantEvalScenarioLlmVerdictService } from "./instant-eval-scenario-llm-verdict.service.ts";
+import type {
+  InstantEvalScenarioLlmVerdictCall,
+  InstantEvalScenarioLlmVerdictService,
+} from "./instant-eval-scenario-llm-verdict.service.ts";
 
 export type InstantEvalJudgeRouteRunDeps = Readonly<{
   table: InstantEvalJudgeRouteTable;
@@ -290,8 +295,7 @@ export class InstantEvalJudgeRouteRunService {
   }
 
   private isLlm(backend: string): boolean {
-    const kind = this.deps.table.backends[backend]?.kind;
-    return kind === "anthropic_messages" || kind === "openai_responses";
+    return isInstantEvalJudgeLlmKind(this.deps.table.backends[backend]?.kind);
   }
 
   /**
@@ -346,7 +350,7 @@ export class InstantEvalJudgeRouteRunService {
     reasoningEffort,
   }: {
     backend: string;
-    wire: "anthropic_messages" | "openai_responses";
+    wire: InstantEvalJudgeLlmKind;
     model: string | undefined;
     questions: readonly InstantEvalQuestion[];
     timeoutMs: number;
@@ -354,8 +358,8 @@ export class InstantEvalJudgeRouteRunService {
   }): Promise<Leg> {
     // The table refuses an LLM backend with no model at boot; this keeps the type honest.
     if (!model) return { outcome: "failed", reason: "classifier_not_configured" };
+    const call = { wire, model, timeoutMs, ...(reasoningEffort ? { reasoningEffort } : {}) };
     if (this.scenario) {
-      const call = { wire, model, timeoutMs };
       return this.readScenarioVerdict({ scenario: this.scenario, backend, call, questions });
     }
     const { llmJudge, limiter } = this.deps;
@@ -369,7 +373,6 @@ export class InstantEvalJudgeRouteRunService {
       logger: this.logger,
       paid: (spend) => this.paid({ backend, ...spend }),
     });
-    const call = { wire, model, timeoutMs, ...(reasoningEffort ? { reasoningEffort } : {}) };
     const { answers, reason } = await leg.ask({ call, questions });
     if (answers.size === 0) return { outcome: "failed", reason };
     if (answers.size < questions.length) this.flags.push(`${backend}_partial:${reason}`);
@@ -385,7 +388,7 @@ export class InstantEvalJudgeRouteRunService {
   }: {
     scenario: InstantEvalJudgeScenarioLeg;
     backend: string;
-    call: { wire: "anthropic_messages" | "openai_responses"; model: string; timeoutMs: number };
+    call: InstantEvalScenarioLlmVerdictCall;
     questions: readonly InstantEvalQuestion[];
   }): Promise<Leg> {
     const reading = await verdicts.read({

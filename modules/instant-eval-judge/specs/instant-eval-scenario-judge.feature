@@ -156,3 +156,47 @@ Feature: A scenario judgement answered by the judge router
     Given a configured table whose scenario decision backend has no price or no key
     When the judge boots
     Then it refuses with an issue naming that backend
+
+  @unit
+  Scenario: A gated route sends an easy criterion to the primary and a hard one to the shared call
+    Given a scenario route whose entry has a gate, a decision primary and an LLM escalation
+    And the gate rates one criterion under the threshold and two at or above it
+    When the verdict call is judged
+    Then the easy criterion is one decision request and is answered by it
+    And the two hard criteria share one send of the judge's own verdict call
+    And the gate's sends, the decision request and the shared call are billed in the one fact
+
+  @unit
+  Scenario: The shared verdict call carries the backend's reasoning effort
+    Given an escalation backend that sets a reasoning effort
+    When a criterion reaches it
+    Then the judge's own verdict call names that effort
+    And a backend that sets none sends a call that names none
+
+  @unit
+  Scenario: A Gemini backend answers the judge's own call as a forced function call
+    Given a backend of kind gemini_generate_content naming its model
+    When the judge's own call is sent on it
+    Then the request goes to that model's generateContent path with the key in a header, never the URL
+    And the system text, the one user turn and the tools are sent with the tool's call required
+    And JSON-schema keys the API refuses are left out of the tool parameters
+    And the function call's arguments are read back, with thinking tokens billed as output
+
+  @unit
+  Scenario: A Gemini backend answers a routed question of any kind
+    Given a routed yes or no, score or category question that reaches a Gemini backend
+    When the leg answers by calling the evaluation function
+    Then the answer is read as on the other LLM wires
+
+  @unit
+  Scenario: A route table holds a Gemini backend to a bare model id and no reasoning effort
+    Given a gemini_generate_content backend with no model, a model that is not a bare id, or a reasoning effort
+    When the table is parsed
+    Then it is refused naming the backend
+
+  @unit
+  Scenario: Boot refuses a Gemini backend when the install holds no Gemini key
+    Given a configured table that reaches a gemini_generate_content backend
+    And the install holds no Gemini key
+    When the judge boots
+    Then it refuses, naming the backend and its kind

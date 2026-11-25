@@ -107,10 +107,11 @@ Declared at `src/eventing/instant-eval-judge-spend.pipeline.ts:41`. Events: `ins
 
 | Kind   | Leaf                      | Environment variable                    | Declared at                                       |
 | ------ | ------------------------- | --------------------------------------- | ------------------------------------------------- |
-| secret | `classifierApiKey`        | `JEV_API_KEY`                           | `src/app/instant-eval-judge.app.ts:81`            |
-| secret | `hostedDecisionsApiKey`   | `INSTANT_EVAL_DECISIONS_API_KEY`        | `src/app/instant-eval-judge.app.ts:82`            |
-| secret | `llmJudgeAnthropicApiKey` | `INSTANT_EVAL_ANTHROPIC_API_KEY`        | `src/app/instant-eval-judge.app.ts:83`            |
-| secret | `llmJudgeOpenAiApiKey`    | `INSTANT_EVAL_OPENAI_API_KEY`           | `src/app/instant-eval-judge.app.ts:84`            |
+| secret | `classifierApiKey`        | `JEV_API_KEY`                           | `src/app/instant-eval-judge.app.ts:82`            |
+| secret | `hostedDecisionsApiKey`   | `INSTANT_EVAL_DECISIONS_API_KEY`        | `src/app/instant-eval-judge.app.ts:83`            |
+| secret | `llmJudgeAnthropicApiKey` | `INSTANT_EVAL_ANTHROPIC_API_KEY`        | `src/app/instant-eval-judge.app.ts:84`            |
+| secret | `llmJudgeGeminiApiKey`    | `INSTANT_EVAL_GEMINI_API_KEY`           | `src/app/instant-eval-judge.app.ts:85`            |
+| secret | `llmJudgeOpenAiApiKey`    | `INSTANT_EVAL_OPENAI_API_KEY`           | `src/app/instant-eval-judge.app.ts:86`            |
 | config | `classifierBaseUrl`       | `JEV_BASE_URL`                          | `../contract/src/instant-eval-judge.config.ts:32` |
 | config | `classifierModel`         | `JEV_MODEL`                             | `../contract/src/instant-eval-judge.config.ts:40` |
 | config | `globalTokensPerSecond`   | `INSTANT_EVAL_GLOBAL_TOKENS_PER_SECOND` | `../contract/src/instant-eval-judge.config.ts:42` |

@@ -57,6 +57,48 @@ export function syntheticScenarioRouteTable(
   });
 }
 
+/**
+ * A made-up table shaped like a gated scenario route: under the bound a gate picks a decision
+ * model or an LLM that sets an effort, above it a classifier escalates to a long-context LLM.
+ */
+export function syntheticGatedScenarioRouteTable(): InstantEvalJudgeRouteTable {
+  const base = syntheticScenarioRouteTable({
+    backends: {
+      "gate-a": { kind: "jev", timeoutMs: 5000 },
+      "llm-a": {
+        kind: "openai_responses",
+        model: "llm-model-a",
+        timeoutMs: 5000,
+        reasoningEffort: "medium",
+      },
+      "llm-c": { kind: "gemini_generate_content", model: "llm-model-c", timeoutMs: 5000 },
+    },
+    scenarioDecision: { backend: "llm-c" },
+  });
+  const short = {
+    instant: { primary: "llm-a" },
+    balanced: {
+      primary: "decision-a",
+      escalateTo: "llm-a",
+      gate: { backend: "gate-a", question: "difficulty_v1", easyBelow: 0.75 },
+    },
+  };
+  return instantEvalJudgeRouteTableSchema.parse({
+    ...base,
+    routes: {
+      ...base.routes,
+      scenario_judge: {
+        short,
+        long: {
+          instant: { primary: "llm-c" },
+          balanced: { primary: "decision-b", escalateTo: "llm-c", threshold: 0.9 },
+        },
+        arithmetic: short,
+      },
+    },
+  });
+}
+
 /** Round prices, so a judgement's cost is read off its tokens. */
 export const SYNTHETIC_SCENARIO_PRICING: InstantEvalJudgeRoutePricing = {
   version: "scenario-test",
@@ -65,6 +107,8 @@ export const SYNTHETIC_SCENARIO_PRICING: InstantEvalJudgeRoutePricing = {
     "decision-b": { usdPerMillionInputTokens: 2, usdPerMillionOutputTokens: 0 },
     "llm-a": { usdPerMillionInputTokens: 10, usdPerMillionOutputTokens: 100 },
     "llm-b": { usdPerMillionInputTokens: 20, usdPerMillionOutputTokens: 200 },
+    "llm-c": { usdPerMillionInputTokens: 30, usdPerMillionOutputTokens: 300 },
+    "gate-a": { usdPerMillionInputTokens: 5, usdPerMillionOutputTokens: 0 },
   },
 };
 

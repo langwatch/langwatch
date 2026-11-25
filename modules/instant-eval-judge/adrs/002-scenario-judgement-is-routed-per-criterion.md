@@ -37,6 +37,15 @@ on a decision model and sent the unsure ones to an LLM that read the judge's who
    of criteria. An LLM-as-judge evaluation keeps `langwatch-judge`.
 7. **The table decides the backends.** Nothing in the leaf names a provider for this job. Boot
    checks a price and a key for the decision backend as it does for a slot's backends.
+8. **A gated entry works per criterion (2026-11-25).** The gate (ADR-190 decision 11) rates each
+   criterion's case. An easy one is answered by the primary alone; the hard ones share the one
+   verdict call on the escalation. The call carries the backend's reasoning effort when it sets one.
+9. **`gemini_generate_content` is a third LLM kind (2026-11-25).** It exists for long
+   conversations, which the measured routes send to a long-context model. It answers the judge's
+   own call and a routed question as a required function call, keeps up to 900,000 tokens of the
+   judged text where the other LLM wires keep 128,000, and bills thinking tokens as output. Its
+   model id rides in the request path, so the table holds it to a bare id; its key rides in a
+   header, never the URL, and is read on LangWatch Cloud only. It takes no reasoning effort.
 
 ## Consequences
 

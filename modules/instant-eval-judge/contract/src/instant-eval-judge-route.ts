@@ -28,8 +28,26 @@ const INSTANT_EVAL_JUDGE_BACKEND_KINDS = [
   "decisions",
   "anthropic_messages",
   "openai_responses",
+  "gemini_generate_content",
 ] as const;
 export type InstantEvalJudgeBackendKind = (typeof INSTANT_EVAL_JUDGE_BACKEND_KINDS)[number];
+
+/** The kinds that answer as an LLM: one question per call, taken as sure. */
+export const INSTANT_EVAL_JUDGE_LLM_KINDS = [
+  "anthropic_messages",
+  "openai_responses",
+  "gemini_generate_content",
+] as const satisfies readonly InstantEvalJudgeBackendKind[];
+export type InstantEvalJudgeLlmKind = (typeof INSTANT_EVAL_JUDGE_LLM_KINDS)[number];
+
+export function isInstantEvalJudgeLlmKind(
+  kind: InstantEvalJudgeBackendKind | undefined,
+): kind is InstantEvalJudgeLlmKind {
+  return kind !== undefined && (INSTANT_EVAL_JUDGE_LLM_KINDS as readonly string[]).includes(kind);
+}
+
+/** A Gemini model id rides in the request path, so it is held to the characters an id uses. */
+const GEMINI_MODEL_ID = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
 
 /**
  * The reasoning effort an OpenAI Responses backend may be asked for; unset, the model's own.
@@ -357,8 +375,7 @@ function bucketIssues(buckets: RouteTableShape["buckets"]): string[] {
 /** The kinds that cannot answer without a model id in the table: there is no default. */
 const KINDS_NEEDING_A_MODEL: readonly InstantEvalJudgeBackendKind[] = [
   "decisions",
-  "anthropic_messages",
-  "openai_responses",
+  ...INSTANT_EVAL_JUDGE_LLM_KINDS,
 ];
 
 function backendIssues({
@@ -373,6 +390,13 @@ function backendIssues({
   const issues: string[] = [];
   if (KINDS_NEEDING_A_MODEL.includes(backend.kind) && !backend.model) {
     issues.push(`backend ${name}: a ${backend.kind} backend must name its model`);
+  }
+  if (
+    backend.kind === "gemini_generate_content" &&
+    backend.model &&
+    !GEMINI_MODEL_ID.test(backend.model)
+  ) {
+    issues.push(`backend ${name}: a gemini_generate_content model is a bare model id`);
   }
   if (
     backend.reasoningEffort !== undefined &&
@@ -499,8 +523,7 @@ function pairMembersOf({
  */
 function isLlmBackendOf(table: RouteTableShape) {
   return (name: string): boolean => {
-    const kind = table.backends[name]?.kind;
-    return kind === "anthropic_messages" || kind === "openai_responses";
+    return isInstantEvalJudgeLlmKind(table.backends[name]?.kind);
   };
 }
 

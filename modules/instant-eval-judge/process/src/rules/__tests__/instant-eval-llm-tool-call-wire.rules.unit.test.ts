@@ -18,6 +18,32 @@ const CONTINUE = { name: "continue_test", description: "Continue", parameters: {
 const VERDICT = { name: "make_verdict", description: "Judge now", parameters: { type: "object" } };
 
 describe("instantEvalLlmToolCallBodyOf", () => {
+  /** @scenario "The shared verdict call carries the backend's reasoning effort" */
+  it("names a set effort on OpenAI Responses, before store, and on no other wire", () => {
+    const prompt = { system: "judge", user: "transcript", tools: [FINISH] };
+    const openAi = instantEvalLlmToolCallBodyOf({
+      wire: "openai_responses",
+      model: "llm-model-b",
+      prompt,
+      reasoningEffort: "medium",
+    });
+    const others = (["anthropic_messages", "gemini_generate_content"] as const).map((wire) =>
+      instantEvalLlmToolCallBodyOf({ wire, model: "m", prompt, reasoningEffort: "medium" }),
+    );
+
+    expect(openAi.reasoning).toEqual({ effort: "medium" });
+    expect(Object.keys(openAi)).toEqual([
+      "model",
+      "input",
+      "max_output_tokens",
+      "reasoning",
+      "store",
+      "tools",
+      "tool_choice",
+    ]);
+    expect(JSON.stringify(others)).not.toContain("medium");
+  });
+
   /** @scenario "The judge's own call is sent on the leg's wire with its tool forced" */
   it("forces the named tool on Anthropic Messages, with the judge's own messages", () => {
     const body = instantEvalLlmToolCallBodyOf({

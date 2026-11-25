@@ -22,6 +22,12 @@ import {
   type InstantEvalScenarioVerdictReading,
 } from "../rules/instant-eval-scenario-judge.rules.ts";
 
+/** Which backend sends the judge's own call: its wire, model, time allowance and effort. */
+export type InstantEvalScenarioLlmVerdictCall = Pick<
+  InstantEvalLlmToolCallRequest,
+  "wire" | "model" | "timeoutMs" | "reasoningEffort"
+>;
+
 type ScenarioLlmVerdict =
   | (Readonly<{ outcome: "read" }> & InstantEvalScenarioVerdictReading)
   | Readonly<{ outcome: "failed"; reason: InstantEvalSkipReason }>;
@@ -60,7 +66,7 @@ export class InstantEvalScenarioLlmVerdictService {
     paid,
   }: {
     backend: string;
-    call: Pick<InstantEvalLlmToolCallRequest, "wire" | "model" | "timeoutMs">;
+    call: InstantEvalScenarioLlmVerdictCall;
     paid: (spend: { inputTokens: number; outputTokens: number }) => void;
   }): Promise<ScenarioLlmVerdict> {
     const sent = this.sends.get(backend);
@@ -74,7 +80,7 @@ export class InstantEvalScenarioLlmVerdictService {
     call,
     paid,
   }: {
-    call: Pick<InstantEvalLlmToolCallRequest, "wire" | "model" | "timeoutMs">;
+    call: InstantEvalScenarioLlmVerdictCall;
     paid: (spend: { inputTokens: number; outputTokens: number }) => void;
   }): Promise<ScenarioLlmVerdict> {
     const { llmJudge, limiter, projectId, llmCall, signal } = this.input;
