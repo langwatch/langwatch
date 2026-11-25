@@ -10,6 +10,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   startHeartbeat,
+  PUBLIC_LISTENER_TIMEOUTS,
   startLivenessThread,
   type Heartbeat,
   type LivenessThread,
@@ -53,6 +54,7 @@ async function bootThread({ onProxied }: { onProxied: () => void }): Promise<Liv
   const heartbeat = startHeartbeat({ intervalMs: 5 });
   heartbeats.push(heartbeat);
   const thread = await startLivenessThread({
+    requestTimeoutMs: PUBLIC_LISTENER_TIMEOUTS.requestTimeout,
     port: 0,
     heartbeat: heartbeat.buffer,
     proxyPort: address.port,

@@ -27,6 +27,10 @@ export class TestModelProviderService implements ModelProviderApi {
 
   constructor(private readonly providers: Record<string, ModelProviderSummary> = {}) {}
 
+  listForProjectWithServedModels(): Promise<[]> {
+    return Promise.resolve([]);
+  }
+
   listForProject(): Promise<ModelProviderSummary[]> {
     return Promise.resolve(Object.values(this.providers));
   }

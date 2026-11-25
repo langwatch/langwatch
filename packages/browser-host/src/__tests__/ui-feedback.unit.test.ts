@@ -121,6 +121,25 @@ describe("given a failure a screen hands over", () => {
     });
   });
 
+  describe("when the first tip points an API caller at a meta field", () => {
+    /** @scenario "A tip written for an API caller is not shown to a person" */
+    it("keeps that tip out of the toast", () => {
+      const copy = resolveUiFailureCopy({
+        error: trpcFailure("enterprise_plan_required", {
+          meta: { feature: "OCSF_EXPORT" },
+          tips: [
+            "This part of the API is available on the Enterprise plan; meta.feature names which capability was refused",
+            "Talk to your account team or visit the pricing page to upgrade the organization's plan",
+          ],
+        }),
+        fallbackTitle: "Couldn't add the source",
+      });
+
+      expect(copy.title).toBe("This needs the Enterprise plan");
+      expect(copy.description).not.toContain("meta.");
+    });
+  });
+
   describe("when the server sent remediation for a code this client cannot name", () => {
     /** @scenario "Remediation reaches the customer when we have nothing better" */
     it("shows the most actionable tip and keeps the docs link", () => {

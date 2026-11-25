@@ -8,7 +8,6 @@ import {
   DECISION_MODELS,
   decisionModelPickerTitle,
   findDecisionModel,
-  LANGWATCH_DECISION_MODEL_ID,
   LANGWATCH_DECISION_PREVIEWS,
   ownDecisionModelPickerOptions,
   type BuiltInModel,
@@ -22,15 +21,12 @@ export const DECISION_MODEL_DISPLAY_NAMES: Readonly<Record<string, string>> = Ob
   DECISION_MODELS.map((entry) => [entry.id, decisionModelPickerTitle(entry)]),
 );
 
-/** Evals Preview's line when the judge router answers for it (ADR-190). */
-export const ROUTED_HOSTED_DECISION_MODEL_SUBTITLE = "Optimized for evals, routed";
-
 /** Offers that leave LangWatch's own model one switch away: the organization's, or its admin's. */
 const HOSTED_ONE_SWITCH_AWAY: ReadonlySet<string> = new Set(["enable", "ask_admin"]);
 
 /**
- * Whether the column may offer Evals Preview: released, or one switch away. Not answered yet
- * counts as offered, so a released organization never sees it flicker to "Not set".
+ * Whether the column may offer LangWatch Instant (preview): released, or one switch away. Not
+ * answered yet counts as offered, so a released organization never sees it flicker to "Not set".
  */
 export function isHostedDecisionModelOffered(
   access: { hostedReleased: boolean; offer: string } | undefined,
@@ -48,9 +44,9 @@ export function isShownDecisionModel(id: string | null | undefined): id is strin
 const COMING_SOON_HINT = "Coming soon";
 
 /**
- * LangWatch's decision models in the Instant Evals picker: pickable where the catalogue says it
- * fills the column, otherwise listed as coming soon. The judge router flag (ADR-190) shows the
- * rest; off, only the ones that fill the column are listed.
+ * LangWatch's decision models in the Instant Evals picker: pickable where they fill the column,
+ * else coming soon, shown only with the judge router flag (ADR-190). Never LangWatch Evals
+ * (preview): only an LLM judge picks it, and nothing the column feeds is routed.
  */
 function langwatchDecisionOptions({
   isJudgeRouted,
@@ -60,15 +56,10 @@ function langwatchDecisionOptions({
   const fillsColumn = (preview: LangWatchDecisionPreview) =>
     preview.fills.includes("INSTANT_EVALS");
   const shown = LANGWATCH_DECISION_PREVIEWS.filter(
-    (preview) => isJudgeRouted || fillsColumn(preview),
+    (preview) => !preview.isJudgeRouter && (isJudgeRouted || fillsColumn(preview)),
   );
   return shown.map((preview) => {
-    const isRouted = isJudgeRouted && preview.id === LANGWATCH_DECISION_MODEL_ID;
-    const option = {
-      label: preview.label,
-      value: preview.id,
-      subtitle: isRouted ? ROUTED_HOSTED_DECISION_MODEL_SUBTITLE : preview.description,
-    };
+    const option = { label: preview.label, value: preview.id, subtitle: preview.description };
     if (fillsColumn(preview)) return option;
     return { ...option, disabled: true, hint: COMING_SOON_HINT };
   });

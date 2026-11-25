@@ -1,5 +1,5 @@
 import { createLogger } from "@langwatch/observability";
-import { nowInstant } from "@langwatch/time";
+import { nowEpochMs } from "@langwatch/time";
 import { SpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
 import type { SemConvAttributes } from "langwatch/observability";
@@ -93,7 +93,7 @@ export class EventSourcedQueueProcessorMemory<
     const jobId = this.generateJobId(payload);
     const deduplicationId = dedup?.makeId(payload);
 
-    const now = nowInstant().epochMilliseconds;
+    const now = nowEpochMs();
     const dispatchAt = now + (effectiveDelay ?? 0);
     const dedupExpiresAt = dedup?.ttlMs === undefined ? undefined : now + dedup.ttlMs;
 
@@ -210,7 +210,7 @@ export class EventSourcedQueueProcessorMemory<
       return;
     }
 
-    const now = nowInstant().epochMilliseconds;
+    const now = nowEpochMs();
     const { readyIndex, earliestPending } = this.findDueJob(now);
 
     if (readyIndex === -1) {
@@ -265,7 +265,7 @@ export class EventSourcedQueueProcessorMemory<
    * Keeps at most one timer, moving it earlier when a nearer job arrives.
    */
   private scheduleWake(delayMs: number): void {
-    const wakeAt = nowInstant().epochMilliseconds + Math.max(0, delayMs);
+    const wakeAt = nowEpochMs() + Math.max(0, delayMs);
     if (this.dispatchTimer !== null && this.dispatchTimerAt <= wakeAt) {
       return;
     }

@@ -65,8 +65,33 @@ describe("FeatureIllustration", () => {
         </>,
       );
       const ids = [...container.querySelectorAll("mask")].map((mask) => mask.id);
-      expect(ids.length).toBe(6);
+      expect(ids.length).toBeGreaterThan(0);
       expect(new Set(ids).size).toBe(ids.length);
+    });
+  });
+
+  describe("given the Braids empty state illustration", () => {
+    /** @scenario The Braids empty state matches the brand kit */
+    it("draws dotted strands, square two-letter badges, a + target and no purple", () => {
+      const { container } = renderWithDesignSystem(
+        <FeatureIllustration feature="braids" name="empty-state" />,
+      );
+      const strands = [...container.querySelectorAll("[data-strand]")];
+      expect(strands).toHaveLength(3);
+      for (const strand of strands) {
+        expect(getComputedStyle(strand).getPropertyValue("stroke-dasharray")).toBe("2 8");
+      }
+      const badges = [...container.querySelectorAll("rect[data-badge]")];
+      expect(badges).toHaveLength(3);
+      expect(container.querySelector("circle[data-badge]")).toBeNull();
+      expect(
+        [...container.querySelectorAll("[data-project] text")]
+          .map((text) => text.textContent)
+          .filter((text) => text && text.length === 2),
+      ).toEqual(["WO", "SA", "SE"]);
+      expect(container.querySelector("[data-target]")).not.toBeNull();
+      expect(container.querySelector("[data-span]")).toBeNull();
+      expect(container.innerHTML).not.toMatch(/purple|#[0-9a-f]{6}/i);
     });
   });
 

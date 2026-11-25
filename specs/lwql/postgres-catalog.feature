@@ -56,6 +56,53 @@ Feature: Every catalogued Postgres model is queryable through LangWatchQL
       When a caller in the first project queries the virtual_keys view
       Then they see only keys belonging to their own organization
 
+    # tasks#1212: the fan-out above emits the row once per project, so a query
+    # over two sibling projects would see an organization's budget twice.
+    @integration
+    Scenario: An organization-level row is counted once in a multi-project query
+      Given an organization with two projects and one gateway budget with a known limit
+      When a caller who can read both projects sums the budget limit and counts budgets in one query over both
+      Then the sum equals the budget's own limit
+      And the count is one
+
+    @integration
+    Scenario: A single project still reads its organization's row once
+      Given an organization with two projects and one gateway budget with a known limit
+      When a caller queries each project on its own, summing the budget limit and counting budgets
+      Then each read's sum equals the budget's own limit
+      And each read's count is one
+
+    # tasks#1212: the view keeps the copy under the lowest project id, so TenantId names that project.
+    @integration
+    Scenario: A multi-project read filters and groups an organization-level row under the lowest project only
+      Given an organization with two projects and one gateway budget with a known limit
+      When a caller who can read both projects filters and groups the budget by TenantId in queries over both
+      Then filtering on the lower project id reads the budget once
+      And filtering on the other project's id reads no budget
+      And grouping by TenantId puts the budget once under the lower project id and nowhere else
+
+    @unit
+    Scenario: A fanned-out view keeps one row per entity across the projects read
+      Given a model whose tenant column is organizationId or teamId
+      When its LangWatchQL view is rendered
+      Then the view keeps one row per primary key, the lowest in-scope project's, after the tenant predicate
+      And a project-scoped view is rendered without that step
+
+    @unit
+    Scenario: A fanned-out view keyed on its scope field keeps its fan-out
+      Given an organization-scoped model whose primary key holds organizationId
+      When its LangWatchQL view is derived
+      Then the view names no entity key, so no step collapses its rows
+      And the same model keyed by id alone names that id as its entity key
+
+    # tasks#1212: collapsing keeps one copy per key, so the key must name one row in its table.
+    @unit
+    Scenario: A fanned-out view collapses only on a key that names one row in its table
+      Given every view in the catalog that collapses its fan-out
+      When its entity key is compared with its model's primary key
+      Then the entity key is the whole primary key
+      And the primary key holds no organizationId, teamId or projectId
+
     @unit
     Scenario: A team-scoped model fans out to one row per project in the team
       Given a model whose tenant column is teamId
@@ -92,6 +139,12 @@ Feature: Every catalogued Postgres model is queryable through LangWatchQL
       When a caller without content access selects that column
       Then the query is refused with the GATED_COLUMN rule
       And a caller with content access reads it
+
+    @unit
+    Scenario: LWQL reads a template's OTTL rules only with aiTools:manage
+      Given the derived ingestion templates view
+      When a caller without aiTools:manage queries it
+      Then the OTTL rules column is not readable
 
     @unit
     Scenario: Identity tables are skipped and person columns stay opaque

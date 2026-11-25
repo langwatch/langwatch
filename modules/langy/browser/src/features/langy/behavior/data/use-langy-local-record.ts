@@ -9,6 +9,7 @@ import { useEffect } from "react";
 
 import { api } from "../../../../behavior/langy-api.ts";
 import { useLangyLocalControlStore } from "../../../../behavior/langy-local-control.store.ts";
+import { selectConversationReadable, useLangyStore } from "../../../../behavior/langy.store.ts";
 import type { LangyRecordWait } from "../../../../model/langy-local-waits.ts";
 
 export interface LangyLocalRecordResult {
@@ -40,10 +41,11 @@ export function useLangyLocalRecord({
   conversationId: string | null;
   cursor: LangyEventCursor | null | undefined;
 }): LangyLocalRecordResult {
+  const readable = useLangyStore((s) => selectConversationReadable(s, conversationId));
   const query = api.langy.localRecord.useQuery(
     { projectId: projectId ?? "", conversationId: conversationId ?? "" },
     {
-      enabled: !!projectId && !!conversationId,
+      enabled: !!projectId && readable,
       staleTime: 30_000,
       refetchOnWindowFocus: false,
     },
@@ -52,9 +54,9 @@ export function useLangyLocalRecord({
   const refetch = query.refetch;
   const cursorKey = cursor ? `${cursor.acceptedAt}:${cursor.eventId}` : null;
   useEffect(() => {
-    if (cursorKey === null) return;
+    if (cursorKey === null || !readable) return;
     void refetch();
-  }, [cursorKey, refetch]);
+  }, [cursorKey, refetch, readable]);
 
   // The folder connecting is what the code access card has to hear about, and
   // on the turn the connect itself started this browser has no live entry to

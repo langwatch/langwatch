@@ -471,6 +471,17 @@ function reportModeResult(modeResult: WrapperModeResult): void {
       `${lwTag()} removed the langwatch telemetry env from ` +
         `.claude/settings.local.json (the gateway captures this session).\n`,
     );
+  } else if (pin?.action === "tracked") {
+    process.stderr.write(
+      `${lwTag()} did not pin claude telemetry in .claude/settings.local.json: ` +
+        `git tracks that file, so the ingest key would land in your next commit. ` +
+        `Run \`git rm --cached .claude/settings.local.json\` to keep it local.\n`,
+    );
+  } else if (pin?.action === "unverified") {
+    process.stderr.write(
+      `${lwTag()} did not pin claude telemetry in .claude/settings.local.json this run: ` +
+        `git did not say in time whether it tracks that file.\n`,
+    );
   } else if (pin?.action === "skipped") {
     process.stderr.write(
       `${lwTag()} left the OTLP env in .claude/settings.local.json alone, ` +
@@ -527,6 +538,8 @@ async function gatewayPreflight({
   if (exceeded) {
     process.stderr.write(
       renderBudgetExceeded(exceeded, {
+        // /me is kept so the link works on servers with and without the /coding-agents route,
+        // which redirect /me.
         fallbackUrl: `${cfg.control_plane_url}/me/budget/request`,
       }),
     );

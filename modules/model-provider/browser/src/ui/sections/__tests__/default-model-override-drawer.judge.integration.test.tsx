@@ -57,7 +57,7 @@ vi.mock("@langwatch/design-system/scope-chip-picker", async () => {
 
 vi.mock("../../../behavior/model-provider-api.ts", () => ({
   modelProviderApi: {
-    // Not answered yet: Evals Preview stays offered, as before the read lands.
+    // Not answered yet: LangWatch Instant (preview) stays offered, as before the read lands.
     instantEval: { access: { useQuery: () => ({ data: undefined, isLoading: true }) } },
     useUtils: () => ({ modelProvider: { invalidate: vi.fn() } }),
     modelProvider: {
@@ -166,7 +166,7 @@ describe("<DefaultModelOverrideDrawer/> Judge row", () => {
     flagsOn.add(OWN_DECISION_MODEL_FLAG);
     mockListDecisionModels.mockReturnValue({
       data: [
-        { value: LANGWATCH_DECISION_MODEL_ID, label: "Evals Preview" },
+        { value: LANGWATCH_DECISION_MODEL_ID, label: "LangWatch Instant (preview)" },
         { value: "openai/decisions:gpt-6-luna", label: "OpenAI Decisions" },
       ],
       isLoading: false,

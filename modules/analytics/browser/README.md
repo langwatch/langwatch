@@ -4,7 +4,7 @@ The browser half of [analytics](../README.md). What a browser installs when it i
 
 <!-- readme:generated:start (tools/readmegen; edit the code, then `pnpm generate:readmes`) -->
 
-Declared in `src/analytics.web.ts:33` (`defineBrowserModule("analytics")`), exported as `analyticsWeb` at `./declaration`.
+Declared in `src/analytics.web.ts:34` (`defineBrowserModule("analytics")`), exported as `analyticsWeb` at `./declaration`.
 
 Installed by ui, from the app's generated module list (`pnpm generate:modules`).
 
@@ -24,6 +24,10 @@ Installed by ui, from the app's generated module list (`pnpm generate:modules`).
 | `pages/[project]/dashboards/templates`            | `/:project/dashboards/templates` (route table)           | –      | –     | –                | –     |
 | `pages/[project]/dashboards/curated/[templateId]` | `/:project/dashboards/curated/:templateId` (route table) | –      | –     | –                | –     |
 | `pages/[project]/dashboards/[dashboardId]`        | `/:project/dashboards/:dashboardId` (route table)        | –      | –     | –                | –     |
+| `pages/dashboards/index`                          | `/dashboards` (route table)                              | –      | –     | –                | –     |
+| `pages/dashboards/templates`                      | `/dashboards/templates` (route table)                    | –      | –     | –                | –     |
+| `pages/dashboards/curated/[templateId]`           | `/dashboards/curated/:templateId` (route table)          | –      | –     | –                | –     |
+| `pages/dashboards/[dashboardId]`                  | `/dashboards/:dashboardId` (route table)                 | –      | –     | –                | –     |
 
 A URL marked (route table) is joined from `apps/ui/src/shell/ui-route-table.ts`; the screen declares no `path`.
 
@@ -41,7 +45,7 @@ Opened from lists the other modules (and `ui`, the app) whose browser source nam
 
 - `withApi(analyticsApi)`, tRPC contracts: `analytics.*`, `analytics.lwql.*`, `savedViews.*`.
 - Client packages (package.json): `@langwatch/analytics-client`, `@langwatch/langy-client`.
-- Lends: `SavedDashboardsToken`, `StarredDashboardsToken`, `DashboardPointerToken`, `LwqlReplayChartToken`, `FilterSidebarToken`, `CustomGraphToken`.
+- Lends: `SavedDashboardsToken`, `StarredDashboardsToken`, `ProductDashboardsToken`, `DashboardPointerToken`, `LwqlReplayChartToken`, `FilterSidebarToken`, `CustomGraphToken`.
 - Host APIs it requires: `AnalyticsHostApi`.
 - Capabilities: `traceFilters`.
 

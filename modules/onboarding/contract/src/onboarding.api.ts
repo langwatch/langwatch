@@ -2,7 +2,7 @@ import { HandledError } from "@langwatch/handled-error";
 import { moduleApi } from "@langwatch/module";
 
 import { GUIDED_PATHS } from "./onboarding-guided-paths.ts";
-import type { OnboardingVariant, GuidedOnboardingState } from "./onboarding-schemas.ts";
+import type { LangyStart, OnboardingVariant, GuidedOnboardingState } from "./onboarding-schemas.ts";
 import type { OrganizationInitialized } from "./onboarding.responses.ts";
 import type {
   OnboardingInitializeOrganizationInput,
@@ -56,6 +56,10 @@ export interface OnboardingApi {
   ): Promise<GuidedOnboardingStateWithInstance>;
   completePath(
     input: Readonly<{ organizationId: string; userId: string | null; path: string }>,
+  ): Promise<GuidedOnboardingState>;
+  /** The start picked on Langy's governance opener; called with a project credential. */
+  recordLangyStart(
+    input: Readonly<{ organizationId: string; userId: string | null; start: LangyStart }>,
   ): Promise<GuidedOnboardingState>;
   attachConversation(
     input: OnboardingCallerInput & Readonly<{ conversationId: string }>,

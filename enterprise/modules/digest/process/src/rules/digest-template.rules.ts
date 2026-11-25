@@ -45,7 +45,7 @@ const digestTemplatePickSchema = z.discriminatedUnion("template", [
   z.object({ template: z.literal("digest-traces-week") }),
   z.object({ template: z.literal("digest-whats-new") }),
 ]);
-type DigestTemplatePick = z.infer<typeof digestTemplatePickSchema>;
+export type DigestTemplatePick = z.infer<typeof digestTemplatePickSchema>;
 
 /** Every eligible template in send order; what's new is always last. */
 export function eligibleDigestTemplates(input: DigestTemplateInput): DigestTemplatePick[] {

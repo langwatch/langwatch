@@ -26,10 +26,17 @@ export const CHART_GRID_MAX_ROW_SPAN = 20;
 
 /**
  * The size a chart lands at when nothing chose one: half the row wide and
- * three rows tall — the same footprint the old grid's single default cell had.
+ * three rows tall, the same footprint the old grid's single default cell had.
  */
 export const CHART_GRID_DEFAULT_COL_SPAN = 4;
 export const CHART_GRID_DEFAULT_ROW_SPAN = 3;
+
+/**
+ * A board widget's default height. Boards render 44px rows, not 100px, so five
+ * rows (284px) keep a chart room beside its KPI and legend. Only new widgets
+ * take it; saved placements keep their stored size.
+ */
+export const BOARD_WIDGET_DEFAULT_ROW_SPAN = 5;
 
 /**
  * The ceiling a grid row may carry. Far beyond any real dashboard, but within
@@ -75,6 +82,24 @@ export const fitsChartGridWidth = ({
   gridColumn: number;
   colSpan: number;
 }): boolean => gridColumn + colSpan <= CHART_GRID_COLUMNS;
+
+/**
+ * Width check for a placement whose fields are each optional: an omitted
+ * one is stored at the grid's default, so the check runs on that placement.
+ */
+export const partialPlacementFitsGridWidth = ({
+  gridColumn = 0,
+  colSpan = CHART_GRID_DEFAULT_COL_SPAN,
+}: {
+  gridColumn?: number;
+  colSpan?: number;
+}): boolean => fitsChartGridWidth({ gridColumn, colSpan });
+
+/** The refusal every grid width check raises, on the span that overran. */
+export const fitsGridWidthIssue = {
+  message: "gridColumn + colSpan must not exceed the grid's columns",
+  path: ["colSpan"],
+};
 
 /**
  * The rendered height of a card spanning `rowSpan` rows: the rows themselves

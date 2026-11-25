@@ -68,9 +68,9 @@ import {
   type LangyTranscriptRun,
   langyTranscriptRuns,
 } from "../../../transcript/model/langy-transcript.ts";
-import { LangyDerivedCardView } from "../../../transcript/ui/sections/langy-derived-card-view.tsx";
 import { LangyGitHubPrCard } from "../elements/github/langy-git-hub-pr-card.tsx";
 import { GuidedTourCard } from "./derived-cards/guided-tour-card.tsx";
+import { LangyDerivedCardView } from "./derived-cards/langy-derived-card-view.tsx";
 import { StreamingAnswerWithCards } from "./derived-cards/streaming-answer-with-cards.tsx";
 import { LangyGuidedPrCard } from "./github/langy-guided-pr-card.tsx";
 import { LangyFeedback } from "./langy-feedback.tsx";

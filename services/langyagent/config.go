@@ -63,6 +63,7 @@ type Config struct {
 
 	MaxWorkers         int    `env:"LANGY_MAX_WORKERS"          validate:"gt=0"`
 	WorkerIdleMS       int64  `env:"LANGY_WORKER_IDLE_MS"       validate:"gt=0"`
+	WorkerMaxAgeMS     int64  `env:"LANGY_WORKER_MAX_AGE_MS"    validate:"gt=0"`
 	ReaperIntervalMS   int64  `env:"LANGY_REAPER_INTERVAL_MS"   validate:"gt=0"`
 	ReadinessTimeoutMS int64  `env:"LANGY_READINESS_TIMEOUT_MS" validate:"gt=0"`
 	SessionsRoot       string `env:"SESSIONS_ROOT"              validate:"required"`
@@ -159,9 +160,10 @@ type Config struct {
 const (
 	defaultPort               = 8080
 	defaultMaxWorkers         = 20
-	defaultWorkerIdleMS       = 600_000 // 10 min
-	defaultReadinessTimeoutMS = 15_000  // 15s (the chart raises this to 60s for gVisor cold boot)
-	defaultReaperIntervalMS   = 30_000  // 30s
+	defaultWorkerIdleMS       = 600_000    // 10 min
+	defaultWorkerMaxAgeMS     = 18_000_000 // 5h: one hour inside the 6h Langy session key lifetime
+	defaultReadinessTimeoutMS = 15_000     // 15s (the chart raises this to 60s for gVisor cold boot)
+	defaultReaperIntervalMS   = 30_000     // 30s
 	defaultSessionsRoot       = "/workspace/sessions"
 	defaultWorkspaceRoot      = "/workspace"
 	defaultGracefulSeconds    = 10
@@ -187,6 +189,7 @@ func defaultConfig() Config {
 		},
 		MaxWorkers:                defaultMaxWorkers,
 		WorkerIdleMS:              defaultWorkerIdleMS,
+		WorkerMaxAgeMS:            defaultWorkerMaxAgeMS,
 		ReaperIntervalMS:          defaultReaperIntervalMS,
 		ReadinessTimeoutMS:        defaultReadinessTimeoutMS,
 		SessionsRoot:              defaultSessionsRoot,
@@ -301,6 +304,11 @@ func environmentPermitsUnsafeDev(env string) bool {
 // WorkerIdle is the idle duration after which a worker is reaped.
 func (c Config) WorkerIdle() time.Duration {
 	return time.Duration(c.WorkerIdleMS) * time.Millisecond
+}
+
+// WorkerMaxAge is the age after which a worker is retired between turns.
+func (c Config) WorkerMaxAge() time.Duration {
+	return time.Duration(c.WorkerMaxAgeMS) * time.Millisecond
 }
 
 // ReadinessTimeout is how long a spawn waits for a worker to become ready.

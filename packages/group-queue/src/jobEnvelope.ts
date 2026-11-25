@@ -140,6 +140,12 @@ export interface EnvelopeHeader {
   t?: string;
   n?: string;
   /**
+   * When the job was first staged, in epoch ms; queue lag counts from the later of this and the
+   * ready score, which can be a day old. A header field, not a `__*` key, so it never reaches
+   * handler payloads on a worker that does not strip machinery.
+   */
+  a?: number;
+  /**
    * GQ2: queue-machinery fields (every `__*` key) lifted out so they don't
    * perturb the content hash — the same event fanned out to N subscribers then
    * collapses to one stored blob (ADR-029). Allowlist-free: any `__*` is machinery.
@@ -331,6 +337,7 @@ export async function encodeJobEnvelope<Destination>({
   payloadCodec = "json",
   queueName,
   logger,
+  stagedAtMs,
 }: {
   jobData: Record<string, unknown>;
   tieredBlobs?: TieredBlobStore<Destination>;
@@ -341,8 +348,11 @@ export async function encodeJobEnvelope<Destination>({
   queueName?: string;
   /** Optional logger for tenant-attributed size warnings. */
   logger?: Logger;
+  /** When the job was first staged; see {@link EnvelopeHeader.a}. */
+  stagedAtMs?: number;
 }): Promise<string> {
   const header = routingHeader(jobData, 2);
+  if (stagedAtMs !== undefined && Number.isSafeInteger(stagedAtMs)) header.a = stagedAtMs;
   const { machinery, payload } = splitMachineryFromBody(jobData);
   delete machinery.__pipelineName;
   delete machinery.__jobType;
@@ -521,6 +531,22 @@ export function readJobOverloadAttempts(value: string): number {
     return typeof count === "number" && Number.isInteger(count) && count > 0 ? count : 0;
   } catch {
     return 0;
+  }
+}
+
+/**
+ * When the job was first staged, read off the header like the attempt. Never throws; a value
+ * staged by a release that did not record it, or anything not an integer, is null.
+ */
+export function readJobStagedAt(value: string): number | null {
+  try {
+    if (!isEnvelope(value)) return null;
+    const stagedAt = splitEnvelope(value).header.a;
+    return typeof stagedAt === "number" && Number.isSafeInteger(stagedAt) && stagedAt > 0
+      ? stagedAt
+      : null;
+  } catch {
+    return null;
   }
 }
 

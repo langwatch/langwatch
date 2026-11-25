@@ -42,3 +42,13 @@ Feature: Every settings page keeps the settings chrome
       When somebody opens the old address
       Then they are forwarded to the page it moved to
       And no settings frame is drawn around the forwarding itself
+
+  Rule: a settings page reads in one centred column
+
+    @unit
+    Scenario: On a wide window the column sits in the middle
+      Given a settings page on a window wider than the settings column
+      When the page opens
+      Then its body sits in one column with equal space either side
+      And the header's title and actions line up with that column's edges
+      And the header's rule still spans the full width

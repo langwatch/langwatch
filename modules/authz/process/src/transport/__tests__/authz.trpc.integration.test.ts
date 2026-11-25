@@ -163,6 +163,7 @@ describe("the application's AuthZ tRPC adapter", () => {
         "removeBraid",
         "getBraidsPolicy",
         "setBraidsPolicy",
+        "setBraidsEnabled",
         "listOrganizationBraids",
         "countProjectTraceViewers",
         "listBraidTargets",
@@ -183,7 +184,7 @@ describe("the application's AuthZ tRPC adapter", () => {
       const { accesses } = harness();
 
       // The grant, braid and billing procedures beside it each declare a permission.
-      expect(accesses).toEqual(["service-authorized", ...Array(18).fill("permission")]);
+      expect(accesses).toEqual(["service-authorized", ...Array(19).fill("permission")]);
     });
   });
 });
