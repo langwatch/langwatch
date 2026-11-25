@@ -30,6 +30,20 @@ const adminSortSchema = z.object({
   order: z.enum(["ASC", "DESC"]).optional(),
 });
 
+/** The columns the Back office users list sorts by; the server orders before it pages. */
+export const adminUserSortFieldSchema = z.enum([
+  "id",
+  "name",
+  "email",
+  "organizations",
+  "projects",
+  "createdAt",
+  "lastLoginAt",
+  "status",
+]);
+export type AdminUserSortField = z.infer<typeof adminUserSortFieldSchema>;
+export type AdminSortOrder = "ASC" | "DESC";
+
 const adminOperationParamsSchemaDefinition = z
   .object({
     pagination: adminPaginationSchema.optional(),
