@@ -3,18 +3,16 @@ import type { SendEmailCommand } from "@langwatch/notification-contract";
 
 /**
  * Templates LangWatch Cloud sends through Customer.io; the rest stays on the own mailer. Never
- * security mail, nor HTML carrying a per-recipient token, a one-click action link or customer
- * content. Full exclusions: modules/notification/README.md, "Customer.io on LangWatch Cloud".
+ * security mail, a per-recipient token, a one-click action link, customer content or a third
+ * party's address. Exclusions: modules/notification/README.md, "Customer.io on LangWatch Cloud".
  */
 export const CUSTOMER_IO_ROUTES: ReadonlySet<string> = new Set([
-  "invite-re-request",
   "join-request-arrived",
   "join-request-reminder",
   "join-request-approved",
   "join-request-rejected",
   "join-request-expired",
   "domain-auto-joined",
-  "seat-request",
   "usage-limit",
   "automation-limit",
 ]);

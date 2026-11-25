@@ -1,11 +1,11 @@
 Feature: The app's product mail goes through Customer.io on LangWatch Cloud
 
   On LangWatch Cloud a fixed list of product messages leaves through Customer.io's
-  transactional API instead of the install's own mailer, ten in all: invitation re-requests,
-  the five join-request messages, automatic domain joins, seat requests, and usage and
-  automation limits. Each message is still rendered here; Customer.io only delivers it. A
-  message whose HTML carries a per-recipient token, a one-click action link or customer
-  content stays on the own mailer, so none of that reaches Customer.io.
+  transactional API instead of the install's own mailer, eight in all: the five join-request
+  messages, automatic domain joins, and usage and automation limits. Each message is still
+  rendered here; Customer.io only delivers it. A message whose subject or HTML carries a
+  per-recipient token, a one-click action link, customer content or a third party's address
+  stays on the own mailer, so none of that reaches Customer.io.
 
   Nurturing alone talks to Customer.io, so notification keeps the routing list and the
   fallback and asks nurturing to hand each message over. Nurturing holds the App API key
@@ -27,20 +27,18 @@ Feature: The app's product mail goes through Customer.io on LangWatch Cloud
 
     Examples:
       | template              |
-      | invite-re-request     |
       | join-request-arrived  |
       | join-request-reminder |
       | join-request-approved |
       | join-request-rejected |
       | join-request-expired  |
       | domain-auto-joined    |
-      | seat-request          |
       | usage-limit           |
       | automation-limit      |
 
   @unit
   Scenario: Each routed message's sender names its template
-    When the app's own sender hands notification any of the ten routed messages
+    When the app's own sender hands notification any of the eight routed messages
     Then the message carries its template id, so the routing list can pick it out
 
   @unit
@@ -102,13 +100,32 @@ Feature: The app's product mail goes through Customer.io on LangWatch Cloud
     Then the send rejects with the own mailer's error
 
   @unit
+  Scenario: One recipient's failed fallback does not cost the next recipient the message
+    Given a routed message to two recipients
+    And Customer.io refuses the send to both
+    And the own mailer fails for the first recipient only
+    When the message is sent
+    Then the own mailer still sends to the second recipient
+    And the own mailer's failure is logged
+    And the send rejects with the first recipient's error
+
+  @unit
+  Scenario: Every failed fallback is logged and the first one is raised
+    Given a routed message to two recipients
+    And Customer.io refuses the send to both
+    And the own mailer fails for both recipients
+    When the message is sent
+    Then one error is logged per failed fallback
+    And the send rejects with the first recipient's error
+
+  @unit
   Scenario: The routing list holds the agreed product messages and no security mail
-    Then the routing list holds exactly the ten agreed template ids
+    Then the routing list holds exactly the eight agreed template ids
     And no security message is on it
     And every id on it is a template the app sends
 
   @unit
-  Scenario Outline: A message carrying a token or customer content stays on the own mailer
+  Scenario Outline: A message carrying a token, customer content or a third party's address stays on the own mailer
     Given IS_SAAS is set and nurturing holds CUSTOMER_IO_APP_API_KEY
     When a "<template>" message is sent
     Then nothing reaches Customer.io
@@ -118,6 +135,8 @@ Feature: The app's product mail goes through Customer.io on LangWatch Cloud
       | template                |
       | trigger-digest          |
       | budget-increase-request |
+      | invite-re-request       |
+      | seat-request            |
 
   @unit
   Scenario: No log line carries the key or a recipient address

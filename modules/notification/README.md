@@ -44,11 +44,12 @@ On a deployment with `IS_SAAS` set, a fixed list of templates goes through Custo
 transactional API: the list is `CUSTOMER_IO_ROUTES` in
 `process/src/rules/customer-io-routing.rules.ts`. Security mail is never on it (verification,
 password reset, invitations, MFA, SSO, licences, statements, operator notices), nor a message
-whose HTML carries a per-recipient token, a one-click action link or customer content. That
-keeps three product messages off: the trigger digest (a per-recipient unsubscribe token and
-trace previews), budget increase requests (the requester's own words) and the paused online
-evaluation notice (its top error). Payment recovery mail is not routed. Nurturing
-alone talks to Customer.io, so notification hands each message to `NurturingApi.sendTransactionalEmail`
+whose subject or HTML carries a per-recipient token, a one-click action link, customer content
+or a third party's address. That keeps five product messages off: the trigger digest (a
+per-recipient unsubscribe token and trace previews), budget increase requests (the requester's
+own words), the paused online evaluation notice (its top error), invitation re-requests (the
+invited person's address) and seat requests (the asking person's address). Payment recovery
+mail is not routed. Nurturing alone talks to Customer.io, so notification hands each message to `NurturingApi.sendTransactionalEmail`
 through its `customerIoMail` channel (a binding, not a peer) and keeps the routing and the
 fallback. Nurturing holds `CUSTOMER_IO_APP_API_KEY` and posts to `/v1/send/email` (EU unless
 `CUSTOMER_IO_REGION=us`; `CUSTOMER_IO_APP_API_BASE_URL` replaces the host). Behaviour:
@@ -61,8 +62,10 @@ fallback. Nurturing holds `CUSTOMER_IO_APP_API_KEY` and posts to `/v1/send/email
   is never evaluated by Customer.io.
 - **Any refusal falls back.** A non-2xx reply, a timeout (10 s) or a network error sends that
   recipient through the install's own mailer, once, with a warning naming the template. Both
-  failing raises the own mailer's error. A 2xx counts as taken even when its reply holds no
-  delivery id (logged with the template, a recipient hash and the status), so it is not sent twice.
+  failing raises the own mailer's error, after every other recipient has had its attempt; each
+  own-mailer failure is logged and the first is raised. A 2xx counts as taken even when its
+  reply holds no delivery id (logged with the template, a recipient hash and the status), so it
+  is not sent twice.
 - **Self-hosted never sees it.** Without `IS_SAAS` notification never asks; without the key
   nurturing answers `off` and the own mailer sends the message as before, one envelope under the
   caller's key, with no warning. The key is not in the Helm

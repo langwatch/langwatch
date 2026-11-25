@@ -26,6 +26,7 @@ import {
 import { MailDeliveryService } from "../mail-delivery.service.ts";
 
 const WARN_LEVEL = 40;
+const ERROR_LEVEL = 50;
 const DEFAULT_FROM = "LangWatch <contact@langwatch.test>";
 
 const settings: MailGatewaySettings = {
@@ -36,9 +37,13 @@ const settings: MailGatewaySettings = {
   resend: {},
 };
 
-/** The install's own mailer, recorded rather than delivered; told to fail, it refuses all sends. */
+/**
+ * The install's own mailer, recorded rather than delivered; told to fail, it refuses all sends,
+ * or only those to the recipients in `failuresFor`.
+ */
 class OwnMailer extends EmailDelivery {
   readonly sent: EmailContent[] = [];
+  readonly failuresFor = new Map<string, Error>();
   failure: Error | undefined;
 
   defaultFrom(): string {
@@ -46,7 +51,10 @@ class OwnMailer extends EmailDelivery {
   }
 
   async send(content: EmailContent): Promise<void> {
-    if (this.failure) throw this.failure;
+    const recipientFailure =
+      typeof content.to === "string" ? this.failuresFor.get(content.to) : undefined;
+    const failure = this.failure ?? recipientFailure;
+    if (failure) throw failure;
     this.sent.push(content);
   }
 }
@@ -240,9 +248,11 @@ describe("given a replyless routed message", () => {
 describe.each([
   ["trigger-digest", "its unsubscribe token and trace previews"],
   ["budget-increase-request", "the requester's own words"],
+  ["invite-re-request", "the invited person's address"],
+  ["seat-request", "the asking person's address"],
 ])("given a %s message, which carries %s", (template) => {
   describe("when it is sent", () => {
-    /** @scenario "A message carrying a token or customer content stays on the own mailer" */
+    /** @scenario "A message carrying a token, customer content or a third party's address stays on the own mailer" */
     it("sends it through the own mailer and nothing to Customer.io", async () => {
       const { customerIo, ownMailer, mail } = compose();
 
@@ -270,6 +280,49 @@ describe("given Customer.io and the own mailer both refuse a routed send", () =>
       ownMailer.failure = refusal;
 
       await expect(mail.sendEmail(usageLimit())).rejects.toBe(refusal);
+    });
+  });
+});
+
+describe("given Customer.io refuses both recipients of a routed send", () => {
+  describe("when the own mailer fails for the first recipient only", () => {
+    /** @scenario "One recipient's failed fallback does not cost the next recipient the message" */
+    it("still sends to the second, logs the failure and rejects with the first's error", async () => {
+      const { customerIo, ownMailer, mail } = compose();
+      customerIo.refuse({ outcome: "refused", reason: "status", status: 500 });
+      const refusal = new TypeError("SMTP relay refused ada");
+      ownMailer.failuresFor.set("ada@acme.test", refusal);
+
+      await expect(
+        mail.sendEmail({ ...usageLimit(), to: ["ada@acme.test", "grace@acme.test"] }),
+      ).rejects.toBe(refusal);
+
+      expect(ownMailer.sent.map((content) => content.to)).toEqual(["grace@acme.test"]);
+      expect(captured.lines.filter((line) => line.level === ERROR_LEVEL)).toEqual([
+        expect.objectContaining({
+          errorName: "TypeError",
+          msg: "The own mailer failed to send an email",
+        }),
+      ]);
+    });
+  });
+
+  describe("when the own mailer fails for both recipients", () => {
+    /** @scenario "Every failed fallback is logged and the first one is raised" */
+    it("logs one error per failure and rejects with the first", async () => {
+      const { customerIo, ownMailer, mail } = compose();
+      customerIo.refuse({ outcome: "refused", reason: "status", status: 500 });
+      const first = new TypeError("SMTP relay refused ada");
+      ownMailer.failuresFor.set("ada@acme.test", first);
+      ownMailer.failuresFor.set("grace@acme.test", new RangeError("SMTP relay refused grace"));
+
+      await expect(
+        mail.sendEmail({ ...usageLimit(), to: ["ada@acme.test", "grace@acme.test"] }),
+      ).rejects.toBe(first);
+
+      expect(
+        captured.lines.filter((line) => line.level === ERROR_LEVEL).map((line) => line.errorName),
+      ).toEqual(["TypeError", "RangeError"]);
     });
   });
 });
