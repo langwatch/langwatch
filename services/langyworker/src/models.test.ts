@@ -143,9 +143,26 @@ describe("buildModelsJson", () => {
           reasoning: true,
           contextWindow: 272000,
           maxTokens: 32000,
+          input: ["text", "image"],
           compat: { supportsStore: false },
         });
       }
+    });
+
+    /** @scenario A model pi's catalog does not list is told it can see images */
+    it("declares text and image input unless the config names its own", () => {
+      const env = { OPENAI_BASE_URL: "http://x", OPENAI_API_KEY: "k" };
+      const entryFor = (config: LangyWorkerModelConfig) =>
+        (
+          buildModelsJson({ model: config, env }).providers[PROVIDER_ID] as {
+            models: Record<string, unknown>[];
+          }
+        ).models[0];
+      const unknown = { ...model, id: "gemini/gemini-3-flash", api: "openai-completions" as const };
+      expect(entryFor(unknown)?.input).toEqual(["text", "image"]);
+      expect(entryFor({ ...unknown, input: ["text"] } as LangyWorkerModelConfig)?.input).toEqual([
+        "text",
+      ]);
     });
   });
 

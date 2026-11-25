@@ -68,6 +68,7 @@
     "@langwatch/redis-client": "workspace:*",
     "@langwatch/scenario-contract": "workspace:*",
     "@langwatch/secret-contract": "workspace:*",
+    "@langwatch/stored-object-contract": "workspace:*",
     "@langwatch/secrets": "workspace:*",
     "@langwatch/time": "workspace:*",
     "@langwatch/trace-contract": "workspace:*",

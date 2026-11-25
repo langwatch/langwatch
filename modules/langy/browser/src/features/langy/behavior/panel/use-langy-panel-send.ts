@@ -4,6 +4,11 @@ import type { UIMessage } from "ai";
 import { type RefObject, useCallback, useRef } from "react";
 
 import { useLangyStore } from "../../../../behavior/langy.store.ts";
+import {
+  imageFileParts,
+  imagesAllowSend,
+  useLangyComposerImages,
+} from "../../../composer/behavior/langy-composer-images.store.ts";
 import { langyDraftToRestore } from "../../../composer/model/langy-draft-recovery.ts";
 import { useLangyDevLog } from "../stores/langy-dev-log.ts";
 
@@ -37,6 +42,7 @@ export function useLangyDraftRestore({
     });
     lastSentTextRef.current = null;
     if (text) setDraft(text);
+    if (text) useLangyComposerImages.getState().restoreLastSent();
     useLangyStore.getState().abandonSend();
   }, [setDraft, lastSentTextRef]);
 }
@@ -50,6 +56,18 @@ function sendLabel(text: string): string {
  * The panel's send, kept stable for the composer while its implementation reads this render's
  * context. `/feedback` is a client command: it summons the rating card and sends nothing.
  */
+/** An image still uploading, or one that failed, holds back the person's own send. */
+function composerImagesHoldSend({ askedFrom }: Pick<LangySendOptions, "askedFrom">): boolean {
+  if (askedFrom !== "composer") return false;
+  return !imagesAllowSend(useLangyComposerImages.getState().images);
+}
+
+/** Only the person's own words carry the composer's images; a message sent for them never does. */
+function composerImagesFor({ askedFrom }: Pick<LangySendOptions, "askedFrom">) {
+  if (askedFrom !== "composer") return [];
+  return useLangyComposerImages.getState().takeForSend();
+}
+
 export function useLangyPanelSend({
   projectId,
   isBusy,
@@ -74,7 +92,8 @@ export function useLangyPanelSend({
     text: string,
     { keepOnFailure = true, askedFrom }: LangySendOptions = {},
   ) => {
-    if (!text.trim() || !projectId || isBusy) return;
+    if (!text.trim() || !projectId || isBusy || composerImagesHoldSend({ askedFrom })) return;
+    const images = composerImagesFor({ askedFrom });
     setDraft("");
     if (text.trim().toLowerCase() === "/feedback") {
       if (latestAssistantMessageId) useLangyStore.getState().pinFeedback(latestAssistantMessageId);
@@ -93,7 +112,10 @@ export function useLangyPanelSend({
         text,
         conversationId: useLangyStore.getState().activeConversationId,
       });
-      await sendMessage({ role: "user", parts: [{ type: "text", text }] });
+      await sendMessage({
+        role: "user",
+        parts: [{ type: "text", text }, ...imageFileParts(images)],
+      });
     } catch {
       restoreDraftOnFailure();
     }
