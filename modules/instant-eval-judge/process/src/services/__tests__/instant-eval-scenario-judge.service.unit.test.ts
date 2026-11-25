@@ -676,9 +676,11 @@ describe("given a gated scenario route", () => {
     it("escalates to the Gemini backend on the router's sureness scale, with no effort", async () => {
       const { service, llmJudge, classifierRequests, recorded } = harness({
         table,
-        // abs(2p - 1): 0.95 is 0.9 and kept, 0.949 is under it, 0.04 is 0.92 and kept.
-        probabilities: { criterion_0: 0.95, criterion_1: 0.949, criterion_2: 0.04 },
-        toolCall: () => finishTest({ criterion_1: "true" }),
+        // abs(2p - 1) against 0.9: 0.96 is 0.92 and kept, 0.94 is 0.88 and escalates, 0.04 is
+        // 0.92 and kept. The LLM contradicts the kept ones, so a wrong escalation would show.
+        probabilities: { criterion_0: 0.96, criterion_1: 0.94, criterion_2: 0.04 },
+        toolCall: () =>
+          finishTest({ criterion_0: "false", criterion_1: "true", criterion_2: "true" }),
       });
 
       const answer = await service.judge(scenarioJudgeCall({ content }));

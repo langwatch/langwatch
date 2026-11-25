@@ -55,3 +55,6 @@ on a decision model and sent the unsure ones to an LLM that read the judge's who
   included. A dear scenario backend raises the judged-query hold until the hold is limited to the
   jobs a query can reach.
 - An `isInconclusive` verdict carries no probability. Only a scenario criterion produces one.
+- A threshold is compared in floats on the router's scale, `abs(2p - 1)`. `abs(2 * 0.95 - 1)` is
+  just under 0.9, so a table that means "an answer of 0.95 stands" names a threshold just under
+  0.9 (0.899999), not 0.9. A test pins this.
