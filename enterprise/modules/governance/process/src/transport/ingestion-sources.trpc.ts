@@ -76,4 +76,12 @@ export const ingestionSourcesTrpcTransport: TrpcRouterDeclaration<
   .procedure("ottlStarter")
   .withPermission("ingestionSources:view")
   .handle(({ app, input }) => app.ingestionSourceOttlStarter(input))
+
+  .procedure("testAgentListing")
+  .withPermission("ingestionSources:manage")
+  .handle(({ app, input }) => app.ingestionSourceTestAgentListing(input))
+
+  .procedure("testAgentListingForSource")
+  .withPermission("ingestionSources:manage")
+  .handle(({ app, input }) => app.ingestionSourceTestAgentListingForSource(input))
   .build();

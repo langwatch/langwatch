@@ -10,6 +10,10 @@ export const AGENT_SOURCE_LABELS: Record<AgentSource, string> = {
   custom: "Custom",
   databricks: "Databricks",
   copilot_studio: "Copilot Studio",
+  aws: "AWS",
+  gcp: "Google Cloud",
+  ard: "ARD registry",
+  traffic: "Traces",
 };
 
 /** Spelled out, never abbreviated — the words the summary strip says. */
@@ -20,9 +24,9 @@ export const AGENT_HEALTH_LABELS: Record<AgentHealth, string> = {
 };
 
 /**
- * The invented set: ten generic agents over three sources, including one never run (a missing
- * figure is a dash). Canonical across governance pages; the environment is a column because ADR-128
- * keys on the pair.
+ * The invented set: fourteen generic agents over every source, including one never run (a missing
+ * figure is a dash) and one of each posture. Canonical across governance pages; the environment is
+ * a column because ADR-128 keys on the pair.
  */
 export const SAMPLE_AGENT_ROWS: GovernanceAgentRow[] = [
   {
@@ -37,6 +41,8 @@ export const SAMPLE_AGENT_ROWS: GovernanceAgentRow[] = [
     lastActiveMinutesAgo: 4,
     health: "responding",
     registeredDaysAgo: 320,
+    posture: "governed",
+    platform: null,
   },
   {
     id: "sample-checkout-agent",
@@ -50,6 +56,8 @@ export const SAMPLE_AGENT_ROWS: GovernanceAgentRow[] = [
     lastActiveMinutesAgo: 12,
     health: "responding",
     registeredDaysAgo: 295,
+    posture: "governed",
+    platform: null,
   },
   {
     id: "sample-genie-revenue",
@@ -63,6 +71,8 @@ export const SAMPLE_AGENT_ROWS: GovernanceAgentRow[] = [
     lastActiveMinutesAgo: 55,
     health: "responding",
     registeredDaysAgo: 210,
+    posture: "governed",
+    platform: null,
   },
   {
     id: "sample-fraud-triage",
@@ -79,6 +89,8 @@ export const SAMPLE_AGENT_ROWS: GovernanceAgentRow[] = [
     // `lastActiveMinutesAgo` could ever tell apart from the two above.
     health: "erroring",
     registeredDaysAgo: 260,
+    posture: "governed",
+    platform: null,
   },
   {
     id: "sample-genie-supply",
@@ -92,6 +104,8 @@ export const SAMPLE_AGENT_ROWS: GovernanceAgentRow[] = [
     lastActiveMinutesAgo: 260,
     health: "idle",
     registeredDaysAgo: 150,
+    posture: "governed",
+    platform: null,
   },
   {
     id: "sample-churn-predictor",
@@ -105,6 +119,8 @@ export const SAMPLE_AGENT_ROWS: GovernanceAgentRow[] = [
     lastActiveMinutesAgo: 180,
     health: "idle",
     registeredDaysAgo: 120,
+    posture: "governed",
+    platform: null,
   },
   {
     id: "sample-hr-helpdesk",
@@ -118,6 +134,8 @@ export const SAMPLE_AGENT_ROWS: GovernanceAgentRow[] = [
     lastActiveMinutesAgo: 95,
     health: "responding",
     registeredDaysAgo: 88,
+    posture: "governed",
+    platform: null,
   },
   {
     id: "sample-it-triage",
@@ -136,6 +154,8 @@ export const SAMPLE_AGENT_ROWS: GovernanceAgentRow[] = [
     lastActiveMinutesAgo: 1500,
     health: "idle",
     registeredDaysAgo: 74,
+    posture: "governed",
+    platform: null,
   },
   {
     id: "sample-docs-rag",
@@ -149,6 +169,8 @@ export const SAMPLE_AGENT_ROWS: GovernanceAgentRow[] = [
     lastActiveMinutesAgo: 2880,
     health: "idle",
     registeredDaysAgo: 45,
+    posture: "governed",
+    platform: null,
   },
   {
     // The never-run case. It is deliberately an agent no other page bills for:
@@ -170,6 +192,71 @@ export const SAMPLE_AGENT_ROWS: GovernanceAgentRow[] = [
     // It still registered, and recently — the one agent behind the fleet
     // card's "in the last thirty days".
     registeredDaysAgo: 11,
+    posture: "governed",
+    platform: null,
+  },
+  // The cloud listers. No cost: a listed agent's spend is not read from its cloud, and a share of
+  // measured spend must not move when a lister is connected.
+  {
+    id: "sample-refund-bot",
+    name: "refund-bot",
+    environment: "production",
+    owner: "Payments",
+    models: ["anthropic.claude-sonnet-5"],
+    source: "aws",
+    costUsd30d: null,
+    requests30d: 18400,
+    lastActiveMinutesAgo: 35,
+    health: "responding",
+    registeredDaysAgo: 64,
+    posture: "governed",
+    platform: "aws_bedrock",
+  },
+  {
+    id: "sample-claims-agent",
+    name: "claims-agent",
+    environment: "production",
+    owner: "Claims",
+    models: ["gemini-2.5-pro"],
+    source: "gcp",
+    costUsd30d: null,
+    requests30d: null,
+    lastActiveMinutesAgo: null,
+    health: null,
+    registeredDaysAgo: 140,
+    posture: "dormant",
+    platform: "gcp_vertex",
+  },
+  {
+    id: "sample-triage-agent",
+    name: "triage-agent",
+    environment: "staging",
+    owner: "IT Operations",
+    models: [],
+    source: "ard",
+    costUsd30d: null,
+    requests30d: 2100,
+    lastActiveMinutesAgo: 300,
+    health: "idle",
+    registeredDaysAgo: 52,
+    posture: "governed",
+    platform: "ard",
+  },
+  {
+    // Seen in traces, listed by no source: the agent the shadow alert points at.
+    id: "sample-pricing-bot",
+    name: "pricing-bot",
+    environment: null,
+    owner: null,
+    models: ["gpt-5-mini"],
+    source: "traffic",
+    costUsd30d: null,
+    requests30d: 9300,
+    lastActiveMinutesAgo: 18,
+    health: "responding",
+    registeredDaysAgo: 41,
+    posture: "shadow",
+    platform: null,
   },
 ];
 

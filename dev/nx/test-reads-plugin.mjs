@@ -20,6 +20,7 @@ export const reads = {
     "docs/features/instant-evals/limits-and-cost.mdx",
     "docs/features/braids.mdx",
     "docs/self-hosting/data-and-telemetry.mdx",
+    "docs/ai-governance/cloud-agent-discovery.mdx",
     "docs/workflows/overview.mdx",
     "docs/governance/agent-registry.mdx",
     "docs/governance/kill-switch.mdx",

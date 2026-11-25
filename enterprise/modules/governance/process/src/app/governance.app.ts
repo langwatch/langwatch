@@ -157,6 +157,8 @@ import {
   type AgentRegistryEntry,
   type AgentRegistryEventPage,
   type AgentRegistryPage,
+  type AgentRegistryPosture,
+  type AgentRegistrySettings,
   type AgentRegistryStatus,
   type ArdManifest,
   type ArdSearchRequest,
@@ -172,6 +174,8 @@ import {
   type PeopleScreenSuggestion,
   type SessionCeilingApplied,
   type GovernanceMcpSessionTools,
+  type TestAgentListingInput,
+  type TestAgentListingResult,
   type OcsfEventsPage,
   type OcsfExportWindow,
   type OcsfIngestRequest,
@@ -196,6 +200,7 @@ import { isZodLikeError, ValidationError } from "@langwatch/handled-error";
 import { LogApi } from "@langwatch/log-contract";
 import { MetricApi } from "@langwatch/metric-contract";
 import { ModelProviderApi } from "@langwatch/model-provider-contract";
+import { NotificationService } from "@langwatch/notification-contract";
 import { createLogger } from "@langwatch/observability";
 import {
   MemberNotFoundError,
@@ -216,6 +221,7 @@ import { ClaudeComplianceReferencePullerAdapter } from "../channels/http/http.cl
 import { HttpCopilotStudioDataverseChannel } from "../channels/http/http.copilot-studio-dataverse.channel.ts";
 import { HttpCopilotStudioChannel } from "../channels/http/http.copilot-studio.channel.ts";
 import {
+  createGovernanceUrlValidator,
   createSsrfSafeFetch,
   type GovernanceEgressPolicy,
 } from "../channels/http/http.governance-http.channel.ts";
@@ -357,10 +363,15 @@ import { PersonalUsageKeyService } from "../features/personal/services/personal-
 import { DefaultGovernancePersonalUsageService } from "../features/personal/services/personal-usage.service.ts";
 import {
   OutboxAgentRegistryDelivery,
+  requestAgentRegistryAlert,
   requestAgentRegistryDelivery,
 } from "../features/registry/eventing/agent-registry-delivery.intent.ts";
-import type { AgentRegistryDeliveryIntent } from "../features/registry/eventing/agent-registry-delivery.process.ts";
+import type {
+  AgentRegistryAlertIntent,
+  AgentRegistryDeliveryIntent,
+} from "../features/registry/eventing/agent-registry-delivery.process.ts";
 import { AgentRegistryReadsService } from "../features/registry/services/agent-registry-reads.service.ts";
+import { AgentRegistrySettingsService } from "../features/registry/services/agent-registry-settings.service.ts";
 import {
   AgentRegistryService,
   type AgentRegistryTrafficPass,
@@ -401,6 +412,8 @@ type EventingSenders = Readonly<Record<string, EventingCommandSender<unknown>>>;
 interface GovernanceAppDependencies {
   /** Anomaly alerts to a rule's registered endpoints, and the endpoints W-11's step creates. */
   webhooks: Pick<WebhookApi, "requestDelivery" | "create" | "archive" | "getAll">;
+  /** The push alert each organisation admin gets for a new shadow agent. */
+  notifications: Pick<NotificationService, "requestWebPushDelivery">;
   /**
    * The organization a project belongs to, for the project-scoped REST family,
    * and the organization's hidden governance project, which is the tenant an
@@ -532,6 +545,7 @@ interface GovernanceAppDependencies {
       | "getSettings"
       | "getOrganizationIdByTeamId"
       | "listAllIds"
+      | "findAdministrators"
     >;
   /** The SSO directory's external ids, which the identity match reads as proof. */
   scim: Pick<ScimApi, "findDirectoryExternalIds">;
@@ -588,6 +602,8 @@ export class GovernanceModule implements GovernanceRestApi {
     logs: LogApi,
     metrics: MetricApi,
     webhooks: WebhookApi,
+    /** Push alerts to organisation admins about new shadow agents. */
+    notifications: NotificationService,
     /** Each tenant's retention, which the pull and usage event rows are stamped with. */
     retention: DataRetentionApi,
   };
@@ -642,6 +658,7 @@ export class GovernanceModule implements GovernanceRestApi {
         logs: dependencies.logs,
         metrics: dependencies.metrics,
         webhooks: dependencies.webhooks,
+        notifications: dependencies.notifications,
         retention: dependencies.retention,
       },
       repositories,
@@ -803,6 +820,7 @@ export class GovernanceModule implements GovernanceRestApi {
       projects: dependencies.projects,
       organizations: dependencies.organizations,
       discoveredAgents: repositories.discoveredAgents,
+      registry: repositories.agentRegistry,
     });
     this.agentRegistry = AgentRegistryService.create({
       registry: repositories.agentRegistry,
@@ -819,7 +837,11 @@ export class GovernanceModule implements GovernanceRestApi {
           ),
       },
       outbox: () => this.#agentRegistryOutbox,
+      settings: repositories.agentRegistrySettings,
       publicBaseUrl: publicBaseUrl ?? "",
+    });
+    this.agentRegistrySettings = AgentRegistrySettingsService.create({
+      settings: repositories.agentRegistrySettings,
     });
     this.agentRegistryReads = AgentRegistryReadsService.create({
       registry: repositories.agentRegistry,
@@ -976,6 +998,10 @@ export class GovernanceModule implements GovernanceRestApi {
       destinations: PullDestinationService.create({
         configuredBase: vendorBases.databricksWorkspace,
         dataverseEnvironmentBase: vendorBases.dataverseEnvironment,
+        validateUrl: createGovernanceUrlValidator({
+          policy: pullEgress,
+          exemptOrigins: exemptOriginsOf({ bases: vendorBases }),
+        }),
       }),
       providerAccounts: HttpProviderAccountChannel.create({ vendorBases }),
       diagnostics: { warn: (message, context) => logger.warn(context, message) },
@@ -1019,6 +1045,10 @@ export class GovernanceModule implements GovernanceRestApi {
       signIn,
       genieSpaces: channels.genieSpaces.create({ http }),
       copilotBots: channels.copilotBots.create({ http, vendorBases }),
+      awsAgentInventory: channels.awsAgentInventory.create({ vendorBases }),
+      vertexAgentEngine: channels.vertexAgentEngine.create({ http, vendorBases }),
+      ardRegistry: channels.ardRegistry.create({ http }),
+      awsConnections: repositories.awsConnections,
       registry: this.agentRegistry,
     });
     this.personListing = PersonListingService.create({
@@ -1205,6 +1235,7 @@ export class GovernanceModule implements GovernanceRestApi {
   private readonly awsConnections: GovernanceAwsConnectionService;
   private agentStopCommands: EventingSenders | undefined;
   private readonly agentRegistryReads: AgentRegistryReadsService;
+  private readonly agentRegistrySettings: AgentRegistrySettingsService;
   private readonly costBreakdown: GovernanceCostBreakdownService;
   private readonly costSummary: GovernanceCostSummaryService;
   private readonly aiTools: DefaultGovernanceAiToolCatalogService;
@@ -1404,6 +1435,23 @@ export class GovernanceModule implements GovernanceRestApi {
     context: IntentContext,
   ): Promise<void> {
     return requestAgentRegistryDelivery(this.dependencies.webhooks)(intent, context);
+  }
+
+  /** The shadow alert intent's handler: one web push to one admin, on the governance project. */
+  requestAgentRegistryAlert(
+    intent: AgentRegistryAlertIntent,
+    context: IntentContext,
+  ): Promise<void> {
+    return requestAgentRegistryAlert({
+      notifications: this.dependencies.notifications,
+      governanceProjectId: async (organizationId) =>
+        (
+          await this.tenantHistory.ensureInternal({
+            organizationId,
+            kind: PROJECT_KIND.INTERNAL_GOVERNANCE,
+          })
+        ).id,
+    })(intent, context);
   }
 
   /** A built pipeline means an outbox: endpoint deliveries are recorded in it from here on. */
@@ -1628,6 +1676,19 @@ export class GovernanceModule implements GovernanceRestApi {
     const pulledUsage: PulledUsageDispatcher = {
       recordPulledUsage: (input) => this.pulledUsageSender("recordPulledUsage").send(input),
     };
+    const listing = IngestionPullListingService.create({
+      sources: repositories.ingestionSources,
+      agents: this.agentDiscovery,
+      people: this.personListing,
+      outcomes: {
+        agentsListed: (input) => this.ingestionPullSender("recordAgentsListed").send(input),
+        agentsListingRefused: (input) =>
+          this.ingestionPullSender("recordAgentsListingRefused").send(input),
+        peopleListed: (input) => this.ingestionPullSender("recordPeopleListed").send(input),
+        peopleListingRefused: (input) =>
+          this.ingestionPullSender("recordPeopleListingRefused").send(input),
+      },
+    });
     return IngestionPullProcess.create({
       schedule: { nextRunAt: nextIngestionPullRunAt },
       execution: IngestionPullService.create({
@@ -1637,20 +1698,9 @@ export class GovernanceModule implements GovernanceRestApi {
           failed: (input) => this.ingestionPullSender("recordRunFailed").send(input),
         },
         metrics: IngestionPullMetricsService.create(),
+        scheduledListing: listing,
       }),
-      listing: IngestionPullListingService.create({
-        sources: repositories.ingestionSources,
-        agents: this.agentDiscovery,
-        people: this.personListing,
-        outcomes: {
-          agentsListed: (input) => this.ingestionPullSender("recordAgentsListed").send(input),
-          agentsListingRefused: (input) =>
-            this.ingestionPullSender("recordAgentsListingRefused").send(input),
-          peopleListed: (input) => this.ingestionPullSender("recordPeopleListed").send(input),
-          peopleListingRefused: (input) =>
-            this.ingestionPullSender("recordPeopleListingRefused").send(input),
-        },
-      }),
+      listing,
     });
   }
 
@@ -1947,6 +1997,33 @@ export class GovernanceModule implements GovernanceRestApi {
     return this.ottl.validate(input.statements);
   }
 
+  ingestionSourceTestAgentListing({
+    organizationId,
+    sourceType,
+    config,
+    credentials,
+  }: TestAgentListingInput): Promise<TestAgentListingResult> {
+    return this.agentDiscovery.testListingForConfig({
+      organizationId,
+      sourceType,
+      config,
+      credentials: credentials ?? {},
+    });
+  }
+
+  ingestionSourceTestAgentListingForSource({
+    organizationId,
+    sourceId,
+  }: {
+    organizationId: string;
+    sourceId: string;
+  }): Promise<TestAgentListingResult> {
+    return this.agentDiscovery.testListingForSource({
+      organizationId,
+      ingestionSourceId: sourceId,
+    });
+  }
+
   ingestionSourceOttlStarter({ sourceType }: { sourceType: string }): OttlStarterTemplate {
     return {
       enabled: isOttlEnabledSourceType(sourceType),
@@ -2083,8 +2160,20 @@ export class GovernanceModule implements GovernanceRestApi {
     cursor?: string;
     updatedSince?: string;
     status?: AgentRegistryStatus;
+    posture?: AgentRegistryPosture;
   }): Promise<AgentRegistryPage> {
     return this.agentRegistryReads.listEntries(input);
+  }
+
+  getRegistrySettings(input: { organizationId: string }): Promise<AgentRegistrySettings> {
+    return this.agentRegistrySettings.get(input);
+  }
+
+  saveRegistrySettings(input: {
+    organizationId: string;
+    dormantAfterDays: number;
+  }): Promise<AgentRegistrySettings> {
+    return this.agentRegistrySettings.save(input);
   }
 
   getRegistryAgent(input: { organizationId: string; id: string }): Promise<AgentRegistryEntry> {
