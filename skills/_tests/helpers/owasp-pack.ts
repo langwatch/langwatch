@@ -185,7 +185,14 @@ export async function runTypescriptPack({ config, verdict }: PackRunInput): Prom
       {
         // The SDK writes a redteam-reports folder into the working directory.
         cwd: outDir,
-        env: { ...env, OWASP_E2E_CONFIG: config, OWASP_E2E_VERDICT: verdict },
+        // CI forces colour, which splits the error text the tests match with escape codes.
+        env: {
+          ...env,
+          FORCE_COLOR: "0",
+          NO_COLOR: "1",
+          OWASP_E2E_CONFIG: config,
+          OWASP_E2E_VERDICT: verdict,
+        },
       },
     );
     const report = JSON.parse(fs.readFileSync(outputFile, "utf8")) as VitestReport;
