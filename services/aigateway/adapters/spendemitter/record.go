@@ -46,7 +46,8 @@ type Record struct {
 //
 // InputAudioTokens and OutputAudioTokens are DISJOINT from InputTokens and
 // OutputTokens (domain.Usage.SplitAudioTokens makes them so), because they
-// price at their own, much higher, rate. CacheReadTokens and
+// price at their own, much higher, rate. InputImageTokens and
+// OutputImageTokens follow the same rule, through SplitImageTokens. CacheReadTokens and
 // CacheCreationTokens are disjoint from InputTokens for the same reason
 // (domain.Usage.BillableInputTokens takes them out), and the customer span
 // states the identical split. ReasoningTokens is the one exception: it stays
@@ -60,10 +61,18 @@ type UsagePayload struct {
 	ReasoningTokens       int `json:"reasoning_tokens"`
 	InputAudioTokens      int `json:"input_audio_tokens"`
 	OutputAudioTokens     int `json:"output_audio_tokens"`
-	InputChars            int `json:"input_chars"`
+	InputImageTokens      int `json:"input_image_tokens"`
+	OutputImageTokens     int `json:"output_image_tokens"`
+	// ImageCount is how many images the call returned, the quantity a vendor
+	// that prices per image bills.
+	ImageCount int `json:"image_count"`
+	InputChars int `json:"input_chars"`
 	// Audio duration in whole MILLISECONDS. Every quantity on this wire is
 	// an integer, and the rating seam divides by 1000 once.
 	AudioMS int `json:"audio_ms"`
+	// WebSearchRequests is the server-side web searches the call ran, which
+	// providers price per query.
+	WebSearchRequests int `json:"web_search_requests"`
 }
 
 // AdmittedPayload records that a request entered the gateway: identity and
@@ -165,8 +174,12 @@ func usageFromDomain(u domain.Usage) UsagePayload {
 		ReasoningTokens:       u.ReasoningTokens,
 		InputAudioTokens:      u.InputAudioTokens,
 		OutputAudioTokens:     u.OutputAudioTokens,
+		InputImageTokens:      u.InputImageTokens,
+		OutputImageTokens:     u.OutputImageTokens,
+		ImageCount:            u.ImageCount,
 		InputChars:            u.InputChars,
 		AudioMS:               audioMillis(u.AudioSeconds),
+		WebSearchRequests:     u.WebSearchRequests,
 	}
 }
 

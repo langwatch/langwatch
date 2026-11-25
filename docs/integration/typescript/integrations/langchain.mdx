@@ -7,7 +7,7 @@ keywords: langchain, instrumentation, callback, langwatch, typescript, tracing
 ---
 
 <Tip>
-  **Quick setup?** Instead of following these steps manually, [copy a prompt](/skills/code-prompts#instrument-my-code) into your coding agent and it will set this up for you automatically.
+  **Quick setup?** Instead of following these steps manually, [copy a prompt](/skills/directory) into your coding agent and it will set this up for you automatically.
 </Tip>
 
 LangWatch integrates with Langchain to provide detailed observability into your chains, agents, LLM calls, and tool usage.
@@ -30,12 +30,13 @@ yarn add langwatch @langchain/openai @langchain/core
 ```bash bun
 bun add langwatch @langchain/openai @langchain/core
 ```
+
 </CodeGroup>
 
 ## Usage
 
 <Info>
-The LangWatch API key is configured by default via the `LANGWATCH_API_KEY` environment variable.
+  The LangWatch API key is configured by default via the `LANGWATCH_API_KEY` environment variable.
 </Info>
 
 Use `LangWatchCallbackHandler` to capture Langchain events as spans within your trace.
@@ -49,7 +50,7 @@ import { HumanMessage } from "@langchain/core/messages";
 setupObservability({ serviceName: "<project_name>" });
 
 async function main(message: string): Promise<string> {
-  const chatModel = new ChatOpenAI({ model: "gpt-5" }).withConfig({
+  const chatModel = new ChatOpenAI({ model: "gpt-6-luna" }).withConfig({
     callbacks: [new LangWatchCallbackHandler()],
   });
 
@@ -61,6 +62,12 @@ console.log(await main("Hey, tell me a joke"));
 ```
 
 The `LangWatchCallbackHandler` captures Langchain events and converts them into detailed LangWatch spans. Pass the callback handler to your Langchain components via the `callbacks` option in `withConfig()`.
+
+## Check it worked
+
+Run the example. The SDK flushes pending spans when the process exits. Then open your project in LangWatch: a new trace appears in the traces list within a few seconds. Open it to see the LangChain steps and the LLM call.
+
+If no trace appears, check that `LANGWATCH_API_KEY` is set in the environment the process runs in.
 
 ## Related
 

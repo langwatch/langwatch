@@ -44,6 +44,19 @@ Feature: CLI Wrappers — `langwatch <tool>` mints and uses an ingestion key (Pa
     Then the wrapper reuses the cached `ik-lw-` token
     And it does NOT mint a new key
 
+  # A device that cannot reach the platform keeps exporting with the key it
+  # has, which is what an offline laptop needs. A device the platform refuses
+  # to authenticate looks the same from here and is not the same thing: its
+  # key may have been revoked weeks ago, and no mint can replace it while the
+  # session is dead. The key is still used, and the run says so.
+
+  @unit @cli-wrappers @ingest-key @reuse
+  Scenario: A signed-out device is told its wiring was not confirmed
+    Given a cached ingestion key and a platform that refuses the device session
+    When the user runs `langwatch instrument claude`
+    Then the tool is wired with the cached key
+    And the run says the machine is signed out and names how to sign it in
+
   @bdd @cli-wrappers @ingest-key @per-tool
   Scenario Outline: Each tool gets an ingest key for its own sourceType
     When the user runs `langwatch <tool>` in ingestion mode
@@ -115,3 +128,20 @@ Feature: CLI Wrappers — `langwatch <tool>` mints and uses an ingestion key (Pa
       And no personal key is minted
       # Rerouting silently would move the project's telemetry, and its
       # billing, onto the personal gateway path.
+
+  Rule: `langwatch ingest install` says what it did with the key
+
+    @unit @cli-wrappers @ingest-key @install-report
+    Scenario: The install says it minted a key only when it minted one
+      Given no ingestion key is cached for "claude_code"
+      When the user runs `langwatch ingest install claude_code`
+      Then the run says it minted a new ingestion key
+      And the json report records the key as minted
+
+    @unit @cli-wrappers @ingest-key @install-report
+    Scenario: The install says it reused the key it already had
+      Given a live ingestion key is cached for "claude_code"
+      When the user runs `langwatch ingest install claude_code`
+      Then the run says it reused the existing ingestion key
+      And it never says it minted one
+      And the json report records the key as reused

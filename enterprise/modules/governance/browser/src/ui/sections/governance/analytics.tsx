@@ -1,0 +1,308 @@
+import { Card } from "@langwatch/design-system/card";
+import { ContentTabs } from "@langwatch/design-system/content-tabs";
+import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
+import { PageLayout } from "@langwatch/design-system/page-layout";
+import {
+  Badge,
+  Box,
+  Button,
+  createListCollection,
+  Field,
+  HStack,
+  Spacer,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
+import { SegmentedControl } from "@langwatch/design-system/segmented-control";
+import { Select } from "@langwatch/design-system/select";
+import { ChartNoAxesCombined, LayoutDashboard } from "lucide-react";
+import { useState } from "react";
+
+import { useGovernanceScope } from "../../../behavior/governance-session.ts";
+import {
+  DEFAULT_EXPLORE_SELECTION,
+  DEFAULT_EXPLORE_WINDOW,
+  EXPLORE_BREAKDOWNS,
+  EXPLORE_INTERVALS,
+  EXPLORE_MEASURES,
+  EXPLORE_TEMPLATES,
+  EXPLORE_WINDOWS,
+  type ExploreBreakdown,
+  type ExploreInterval,
+  type ExploreMeasure,
+  type ExploreSelection,
+  type ExploreWindow,
+  exploreChartTitle,
+  exploreQueryLine,
+  matchesTemplate,
+} from "../../../model/explore-query.ts";
+import {
+  GOVERNANCE_BILLED_COST_FLAG,
+  withGovernanceSection,
+} from "../../../ui/sections/governance-section-gate.tsx";
+import GovernanceLayout from "../governance-layout.tsx";
+
+type AnalyticsView = "explore" | "dashboards";
+
+const ANALYTICS_TABS_ID = "governance-analytics-views";
+
+// Explore surface before engine: real controls, unreal chart body. Preview badge, no inert.
+function AnalyticsPage() {
+  const { organization } = useGovernanceScope();
+  const orgName = organization?.name ?? "your organization";
+  const [timeWindow, setTimeWindow] = useState<ExploreWindow>(DEFAULT_EXPLORE_WINDOW);
+  const [selection, setSelection] = useState<ExploreSelection>(DEFAULT_EXPLORE_SELECTION);
+  const [view, setView] = useState<AnalyticsView>("explore");
+  const openExplore = () => {
+    setView("explore");
+    // The pressed button leaves with its panel; the Explore tab keeps focus where the reader was.
+    document.getElementById(`${ANALYTICS_TABS_ID}-tab-explore`)?.focus();
+  };
+
+  return (
+    <GovernanceLayout pageTitle="Analytics · AI Governance · LangWatch">
+      <PageLayout.Header>
+        <PageLayout.Heading>Analytics</PageLayout.Heading>
+        <Badge colorPalette="purple" size="sm" variant="surface">
+          Preview
+        </Badge>
+        <Spacer />
+        <SegmentedControl
+          size="sm"
+          value={timeWindow}
+          onValueChange={({ value }) => {
+            if (value) setTimeWindow(value as ExploreWindow);
+          }}
+          items={[...EXPLORE_WINDOWS]}
+          flexShrink={0}
+        />
+      </PageLayout.Header>
+
+      <PageLayout.Container>
+        <VStack align="stretch" gap={6} width="full">
+          <Text color="fg.muted">
+            A preview of how you will explore activity in {orgName}. The controls below shape a
+            query; running it is coming.
+          </Text>
+
+          <ContentTabs
+            label="Analytics views"
+            id={ANALYTICS_TABS_ID}
+            value={view}
+            onValueChange={({ value }) => setView(value)}
+            mount="active"
+            items={[
+              {
+                value: "explore",
+                label: "Explore",
+                content: (
+                  <ExploreTab
+                    orgName={orgName}
+                    timeWindow={timeWindow}
+                    selection={selection}
+                    onSelectionChange={setSelection}
+                  />
+                ),
+              },
+              {
+                value: "dashboards",
+                label: "Dashboards",
+                count: 0,
+                content: (
+                  <NoDataInfoBlock
+                    icon={<LayoutDashboard />}
+                    title="Dashboards are not available yet."
+                    description="Saved dashboards will appear here once this preview is connected to your data."
+                    primaryAction={
+                      <Button size="sm" onClick={openExplore}>
+                        Build a query in Explore
+                      </Button>
+                    }
+                  />
+                ),
+              },
+            ]}
+          />
+        </VStack>
+      </PageLayout.Container>
+    </GovernanceLayout>
+  );
+}
+
+/** Template chips, the three controls, the chart body and the query line. */
+function ExploreTab({
+  orgName,
+  timeWindow,
+  selection,
+  onSelectionChange,
+}: {
+  orgName: string;
+  timeWindow: ExploreWindow;
+  selection: ExploreSelection;
+  onSelectionChange: (selection: ExploreSelection) => void;
+}) {
+  const patch = (next: Partial<ExploreSelection>) => onSelectionChange({ ...selection, ...next });
+
+  return (
+    <VStack align="stretch" gap={4}>
+      <TemplateChips selection={selection} onPick={onSelectionChange} />
+      <HStack
+        gap={4}
+        flexWrap="wrap"
+        borderWidth="1px"
+        borderColor="border.muted"
+        borderRadius="lg"
+        paddingX={4}
+        paddingY={3}
+      >
+        <ControlSelect
+          label="Measure"
+          value={selection.measure}
+          onChange={(value) => patch({ measure: value as ExploreMeasure })}
+          options={EXPLORE_MEASURES}
+        />
+        <ControlSelect
+          label="Break down by"
+          value={selection.breakdown}
+          onChange={(value) => patch({ breakdown: value as ExploreBreakdown })}
+          options={EXPLORE_BREAKDOWNS}
+        />
+        <ControlSelect
+          label="Over time"
+          value={selection.interval}
+          onChange={(value) => patch({ interval: value as ExploreInterval })}
+          options={EXPLORE_INTERVALS}
+        />
+      </HStack>
+      <ExploreChart selection={selection} orgName={orgName} timeWindow={timeWindow} />
+      <QueryLine selection={selection} />
+    </VStack>
+  );
+}
+
+function TemplateChips({
+  selection,
+  onPick,
+}: {
+  selection: ExploreSelection;
+  onPick: (selection: ExploreSelection) => void;
+}) {
+  return (
+    <HStack gap={2} flexWrap="wrap">
+      <Text fontSize="xs" fontWeight="semibold" color="fg.muted" paddingRight={1}>
+        Templates
+      </Text>
+      {EXPLORE_TEMPLATES.map((template) => {
+        const active = matchesTemplate(selection, template);
+        return (
+          <Button
+            key={template.label}
+            size="sm"
+            variant={active ? "subtle" : "outline"}
+            colorPalette={active ? "accent" : "gray"}
+            fontWeight={active ? "medium" : "normal"}
+            onClick={() => onPick(template.selection)}
+          >
+            {template.label}
+          </Button>
+        );
+      })}
+    </HStack>
+  );
+}
+
+/** The chart body is not connected to anything yet and says so. */
+function ExploreChart({
+  selection,
+  orgName,
+  timeWindow,
+}: {
+  selection: ExploreSelection;
+  orgName: string;
+  timeWindow: ExploreWindow;
+}) {
+  return (
+    <Box display="flex" minHeight="320px">
+      <Card variant="showcase" padding="lg" bodyLayout="stack">
+        <Text fontWeight="semibold">{exploreChartTitle(selection)}</Text>
+        <Text fontSize="sm" color="fg.muted">
+          {orgName} · last {timeWindow}
+        </Text>
+        <NoDataInfoBlock
+          icon={<ChartNoAxesCombined />}
+          title="This chart is not connected to your data yet"
+          description="Choose a template or adjust the controls to preview a query. Running it is coming."
+        />
+      </Card>
+    </Box>
+  );
+}
+
+function QueryLine({ selection }: { selection: ExploreSelection }) {
+  return (
+    <HStack
+      justify="space-between"
+      gap={4}
+      flexWrap="wrap"
+      background="bg.muted"
+      borderRadius="lg"
+      paddingX={4}
+      paddingY={3}
+    >
+      <HStack gap={3}>
+        <Badge background="fg" color="bg" fontFamily="mono" fontSize="xs">
+          lwql
+        </Badge>
+        <Text fontFamily="mono" fontSize="sm">
+          {exploreQueryLine(selection)}
+        </Text>
+      </HStack>
+      <Text fontSize="sm" color="fg.muted">
+        the query these controls describe, once queries run
+      </Text>
+    </HStack>
+  );
+}
+
+function ControlSelect({
+  label,
+  value,
+  onChange,
+  options,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  options: readonly { value: string; label: string }[];
+}) {
+  const collection = createListCollection({ items: [...options] });
+  return (
+    <Field.Root width={{ base: "full", sm: "auto" }} gap={2}>
+      <Field.Label fontSize="sm" color="fg.muted" fontWeight="normal" whiteSpace="nowrap">
+        {label}
+      </Field.Label>
+      <Select.Root
+        collection={collection}
+        size="sm"
+        width={{ base: "full", sm: "180px" }}
+        value={[value]}
+        onValueChange={({ value: next }) => {
+          if (next[0]) onChange(next[0]);
+        }}
+      >
+        <Select.Trigger fontWeight="medium">
+          <Select.ValueText />
+        </Select.Trigger>
+        <Select.Content>
+          {options.map((option) => (
+            <Select.Item key={option.value} item={option}>
+              {option.label}
+            </Select.Item>
+          ))}
+        </Select.Content>
+      </Select.Root>
+    </Field.Root>
+  );
+}
+
+export default withGovernanceSection(AnalyticsPage, { releaseFlag: GOVERNANCE_BILLED_COST_FLAG });

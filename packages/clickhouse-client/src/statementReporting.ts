@@ -1,47 +1,26 @@
 /**
- * Everything the vendor-client policy says about a statement, and nowhere it
- * decides anything.
- *
- * Split from ./vendorClient.ts because the two answer different questions. That
- * module decides what happens to a statement — retry it, refuse it, guard its
- * stream. This one decides how the outcome is described: which sink, which
- * level, which fields, which counter.
- *
- * ## Why the ports are guarded here and not at the call sites
- *
- * The rule is ./observability.ts: reporting must not change what it reports.
- * Most of these calls run inside a `catch`, where a throw from a counter or a
- * log sink propagates *in place of* the ClickHouse error — the caller is handed
- * a telemetry failure and never learns what actually broke.
- *
- * Holding that rule by wrapping each call is a discipline, and disciplines are
- * forgotten by the next person to add a metric. So the ports are wrapped once,
- * on the way in: {@link StatementReporter} stores guarded views of whatever the
- * host passed, and every method below is then a plain call. Being unable to
- * throw is a property of the port, not of the code that uses it.
- *
- * The outcome sink is the one exception, and deliberately: its failure is worth
- * a line, so it is called raw and its throw reported on the notice sink. The
- * notice sink is guarded because it is the last resort — there is nowhere left
- * to report *its* failure, which also covers the host that passes one logger
- * for both and so breaks both at once.
+ * Everything the vendor-client policy says about a statement — split from
+ * ./vendorClient.ts, which decides what happens to it. Ports are wrapped once
+ * so a catch-site throw from a counter or log sink never masks the real error.
  */
 
-import { quietly } from "./observability";
-import { QUERY_CAUSE_FIELD, RETRY_CAUSE_FIELD } from "./resilience";
-import type { RetryAttemptNotice } from "./retry";
+import { createWarnThrottle, type WarnThrottle } from "@langwatch/observability";
+import { nowInstant } from "@langwatch/time";
+
+import { QUERY_CAUSE_FIELD, quietly, RETRY_CAUSE_FIELD } from "./resilience.ts";
+import type { RetryAttemptNotice } from "./retry.ts";
 import {
   extractQueryPreview,
   extractRawQuery,
+  queryShapeOf,
   safeQueryMeta,
   type VendorQueryType,
-} from "./statementShape";
+} from "./statementShape.ts";
 
 /**
  * How a statement ended, as the metric counts it. `inband_error` is a
  * transport-level success whose streamed body carried the server's exception
- * line — a dedicated outcome so one query is never counted under two terminal
- * ones.
+ * — its own outcome so one query is never counted under two terminal ones.
  */
 export type StatementOutcome = "success" | "error" | "inband_error";
 
@@ -55,10 +34,7 @@ export interface StatementMetrics {
     table: string;
     durationSeconds: number;
   }): void;
-  incrementCount(input: {
-    queryType: VendorQueryType;
-    outcome: StatementOutcome;
-  }): void;
+  incrementCount(input: { queryType: VendorQueryType; outcome: StatementOutcome }): void;
 }
 
 /** The subset of a structured logger this package writes through. */
@@ -69,11 +45,9 @@ export interface StatementLogSink {
 }
 
 /**
- * A view of `metrics` that cannot throw.
- *
- * Written out rather than derived by walking the object's keys: a host may pass
- * a class instance whose methods live on the prototype, and reflection over own
- * properties would silently hand back a port with nothing guarded.
+ * A view of `metrics` that cannot throw. Written out rather than derived by
+ * walking keys: a host may pass a class instance whose methods live on the
+ * prototype, and reflecting over own properties would silently guard nothing.
  */
 export function guardedMetrics(metrics: StatementMetrics): StatementMetrics {
   return {
@@ -91,6 +65,16 @@ export function guardedLogSink(sink: StatementLogSink): StatementLogSink {
   };
 }
 
+/** Whether the caller set `SKIP_COLD_SCAN_CHECK`: a read declared to walk every partition. */
+function declaresFullScan(params: unknown): boolean {
+  return (
+    typeof params === "object" &&
+    params !== null &&
+    "SKIP_COLD_SCAN_CHECK" in params &&
+    params.SKIP_COLD_SCAN_CHECK === true
+  );
+}
+
 const NOOP_SINK: StatementLogSink = {
   debug: () => undefined,
   warn: () => undefined,
@@ -102,7 +86,12 @@ const NOOP_METRICS: StatementMetrics = {
   incrementCount: () => undefined,
 };
 
+/** How long a cold-scan warning for one query shape stays quiet after it is logged. */
+const COLD_SCAN_WARN_INTERVAL_MS = 60 * 60 * 1000;
+
 export interface StatementReporterOptions {
+  /** Epoch milliseconds; injectable so a test steps the cold-scan quiet window. */
+  now?: (() => number) | undefined;
   cluster?: string | undefined;
   metrics?: StatementMetrics | undefined;
   noticeLogger?: StatementLogSink | undefined;
@@ -119,8 +108,12 @@ export class StatementReporter {
   /** Raw on purpose: a failure here is worth a line on the notice sink. */
   private readonly outcomeLogger: StatementLogSink;
   private readonly detectColdScan: (rawQuery: string) => string | null;
+  private readonly now: () => number;
+  /** One cold-scan warning per query shape per interval; per reporter, so tests stay apart. */
+  private readonly coldScanThrottle: WarnThrottle = createWarnThrottle(COLD_SCAN_WARN_INTERVAL_MS);
 
   constructor({
+    now = () => nowInstant().epochMilliseconds,
     cluster = "shared",
     metrics = NOOP_METRICS,
     noticeLogger = NOOP_SINK,
@@ -132,6 +125,17 @@ export class StatementReporter {
     this.noticeLogger = guardedLogSink(noticeLogger);
     this.outcomeLogger = outcomeLogger;
     this.detectColdScan = detectColdScan;
+    this.now = now;
+  }
+
+  /** Null while the shape is quiet; otherwise how many warnings it held back since the last. */
+  private claimColdScanWarning(rawQuery: string): { suppressedSincePrevious: number } | null {
+    const suppressed = this.coldScanThrottle.claim({
+      key: queryShapeOf(rawQuery),
+      now: this.now(),
+    });
+
+    return suppressed === undefined ? null : { suppressedSincePrevious: suppressed };
   }
 
   /** Count one finished statement. */
@@ -155,37 +159,18 @@ export class StatementReporter {
   }
 
   /**
-   * Count an outcome with no new duration sample.
-   *
-   * The in-band case only: the transport outcome — success plus one histogram
-   * observation — was already recorded when the query resolved. Observing a
-   * second duration for the same statement would double-count it.
+   * Count an outcome with no new duration sample. The in-band case only:
+   * transport outcome plus one histogram observation was already recorded
+   * when the query resolved, so a second duration would double-count it.
    */
-  count({
-    queryType,
-    outcome,
-  }: {
-    queryType: VendorQueryType;
-    outcome: StatementOutcome;
-  }): void {
+  count({ queryType, outcome }: { queryType: VendorQueryType; outcome: StatementOutcome }): void {
     this.metrics.incrementCount({ queryType, outcome });
   }
 
   /**
-   * Report an attempt that failed and was raised to the caller.
-   *
-   * Warn, not error, and the cause off the `error` field — the same two rules
-   * as the vendor-log policy in ./logging.ts.
-   *
-   * The level is the substantive half. This layer does not know the outcome: a
-   * read's translated error is reported at the request boundary, and an insert
-   * is issued from a job the queue retries, which logs its own error and counts
-   * what it drops if it ever truly gives up. Claiming a verdict here made
-   * recovered work read as lost work — 17k records a day against zero jobs
-   * actually dropped.
-   *
-   * The failure is still counted: {@link outcome} runs at every call site, and
-   * a rate is what the alerting is built on.
+   * Report a failed attempt raised to the caller. Warn, not error: this
+   * layer can't know the outcome (a retried job may still succeed) —
+   * claiming a verdict here once read 17k recovered records/day as loss.
    */
   failure({
     operation,
@@ -204,14 +189,10 @@ export class StatementReporter {
       this.outcomeLogger.warn(
         {
           source: "clickhouse",
-          // Which ClickHouse refused it. Not every deployment has one cluster:
-          // an organization can be routed to its own, so without this field a
-          // rejection from a customer's dedicated instance is
-          // indistinguishable from one on the shared cluster. On 2026-08-13
-          // that ambiguity is what made a three-hour saturation take an
-          // afternoon to attribute — the answer had to be inferred from a
-          // concurrency limit quoted in the vendor's error text and matched
-          // against terraform.
+          // Which ClickHouse refused it — an org may be routed to its own
+          // cluster, so without this a dedicated-instance rejection reads as
+          // the shared cluster. On 2026-08-13 that ambiguity took an
+          // afternoon to attribute a 3-hour saturation.
           cluster: this.cluster,
           operation,
           durationMs: Math.round(durationMs),
@@ -223,10 +204,7 @@ export class StatementReporter {
         `ClickHouse ${operation} failed`,
       );
     } catch (loggingError) {
-      this.noticeLogger.error(
-        { loggingError },
-        "Failed to log ClickHouse query failure",
-      );
+      this.noticeLogger.error({ loggingError }, "Failed to log ClickHouse query failure");
     }
   }
 
@@ -248,12 +226,12 @@ export class StatementReporter {
       // including any cold tier on object storage - a burst of GET requests
       // per call. Worth warning even when fast, because the cost is request
       // count, not latency.
+      const rawQuery = extractRawQuery(params);
       const coldScanTable =
-        operation === "query"
-          ? this.detectColdScan(extractRawQuery(params))
-          : null;
+        operation === "query" && !declaresFullScan(params) ? this.detectColdScan(rawQuery) : null;
+      const coldScanClaim = coldScanTable === null ? null : this.claimColdScanWarning(rawQuery);
 
-      if (coldScanTable !== null) {
+      if (coldScanTable !== null && coldScanClaim !== null) {
         this.outcomeLogger.warn(
           {
             source: "clickhouse",
@@ -265,6 +243,7 @@ export class StatementReporter {
             query: extractQueryPreview(params),
             coldScan: true,
             coldScanTable,
+            suppressedSincePrevious: coldScanClaim.suppressedSincePrevious,
           },
           `ClickHouse cold-scan ${operation}: cold scan of ${coldScanTable} (no time filter, walks S3 partitions)`,
         );
@@ -280,29 +259,14 @@ export class StatementReporter {
         );
       }
     } catch (loggingError) {
-      this.noticeLogger.error(
-        { loggingError },
-        "Failed to log ClickHouse query success",
-      );
+      this.noticeLogger.error({ loggingError }, "Failed to log ClickHouse query success");
     }
   }
 
   /**
-   * Report an attempt that failed and is about to be retried.
-   *
-   * For a transient failure that later succeeds this is the ONLY line emitted —
-   * {@link failure} never runs — so the cluster belongs here too, or a
-   * recovered failure on a customer's private instance is indistinguishable
-   * from one on the shared cluster.
-   *
-   * The only reporting method with no `catch`, and the one place a log line
-   * was deliberately dropped. {@link failure} and {@link success} write to the
-   * outcome sink and report their own failure on the notice sink — two
-   * different sinks, so the second line is worth emitting. This method already
-   * writes to the notice sink, so the old fallback reported a broken sink
-   * through the sink that had just broken. It only ever produced output for a
-   * host whose `debug`/`warn` threw while its `error` still worked, and the
-   * guard now covers the failure either way.
+   * Report an attempt that failed and is about to be retried. The only
+   * reporting method with no `catch`, deliberately: this already writes to
+   * the notice sink, so a fallback would report a broken sink through itself.
    */
   retryNotice({
     operation,

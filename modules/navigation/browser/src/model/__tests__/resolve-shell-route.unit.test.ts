@@ -1,0 +1,260 @@
+/** Product and scope resolver; written after platform sweep; cases: settings/personal/boundary */
+
+import { describe, expect, it } from "vitest";
+
+import { resolveShellRoute } from "../resolve-shell-route.ts";
+
+function resolve(
+  pathname: string,
+  {
+    isPersonalScope = false,
+    isOrgScope = false,
+    isOnOwnPersonalProject = false,
+    organizationRole = "MEMBER",
+    sidebarHint = null,
+  }: {
+    isPersonalScope?: boolean;
+    isOrgScope?: boolean;
+    isOnOwnPersonalProject?: boolean;
+    organizationRole?: string;
+    sidebarHint?: "llm-ops" | "dashboards" | null;
+  } = {},
+) {
+  return resolveShellRoute({
+    pathname,
+    isPersonalScope,
+    isOrgScope,
+    isOnOwnPersonalProject,
+    organizationRole,
+    sidebarHint,
+  });
+}
+
+describe("resolveShellRoute", () => {
+  describe("given a product address", () => {
+    it("names the gateway, and reads it as organization scope", () => {
+      expect(resolve("/gateway/virtual-keys")).toEqual({
+        isSettingsRoute: false,
+        isPersonalScopeRoute: false,
+        isOrgScopeRoute: true,
+        isResolverRoute: false,
+        activeProductId: "gateway",
+        seatRefusal: null,
+      });
+    });
+
+    it("names governance, and reads it as organization scope", () => {
+      expect(resolve("/governance/people").activeProductId).toBe("governance");
+      expect(resolve("/governance/people").isOrgScopeRoute).toBe(true);
+    });
+
+    it("reads a bare project address as LLM Ops", () => {
+      expect(resolve("/acme-app/traces")).toEqual({
+        isSettingsRoute: false,
+        isPersonalScopeRoute: false,
+        isOrgScopeRoute: false,
+        isResolverRoute: false,
+        activeProductId: "llm-ops",
+        seatRefusal: null,
+      });
+    });
+  });
+
+  describe("given a project's Dashboards area", () => {
+    it("names Dashboards, a project product", () => {
+      expect(resolve("/acme-app/dashboards/agent-flight-deck")).toEqual({
+        isSettingsRoute: false,
+        isPersonalScopeRoute: false,
+        isOrgScopeRoute: false,
+        isResolverRoute: false,
+        activeProductId: "dashboards",
+        seatRefusal: null,
+      });
+    });
+
+    it("keeps Dashboards on the reader's own personal project", () => {
+      expect(
+        resolve("/personal-mia-abc123/dashboards", { isOnOwnPersonalProject: true })
+          .activeProductId,
+      ).toBe("dashboards");
+    });
+  });
+
+  describe("given the reader came to a dashboard from LLM Ops", () => {
+    /** @scenario A dashboard opened from LLM Ops keeps the LLM Ops sidebar */
+    it("draws the LLM Ops sidebar and leaves the address's product alone", () => {
+      const route = resolve("/acme-app/dashboards/agent-flight-deck", { sidebarHint: "llm-ops" });
+      expect(route.activeProductId).toBe("llm-ops");
+      expect(route.seatRefusal).toBeNull();
+    });
+
+    /** @scenario A deep link to a dashboard draws the Dashboards sidebar */
+    it("draws the Dashboards sidebar with no hint", () => {
+      expect(resolve("/acme-app/dashboards").activeProductId).toBe("dashboards");
+    });
+
+    /** @scenario Choosing Dashboards in the product switcher or icon rail draws the Dashboards sidebar */
+    it("draws the Dashboards sidebar when the hint says dashboards", () => {
+      expect(resolve("/acme-app/dashboards", { sidebarHint: "dashboards" }).activeProductId).toBe(
+        "dashboards",
+      );
+    });
+
+    it("ignores the hint away from Dashboards", () => {
+      expect(resolve("/gateway/budgets", { sidebarHint: "llm-ops" }).activeProductId).toBe(
+        "gateway",
+      );
+    });
+  });
+
+  describe("given the last workspace was my personal one", () => {
+    /** @scenario A sticky personal workspace does not follow me onto an org-wide page */
+    it.each(["/gateway/virtual-keys", "/governance/people"])(
+      "keeps %s on the organization scope its address asks for",
+      (pathname) => {
+        const route = resolve(pathname, { isPersonalScope: true });
+
+        expect(route.isPersonalScopeRoute).toBe(false);
+        expect(route.isOrgScopeRoute).toBe(true);
+        expect(route.activeProductId).not.toBe("me");
+      },
+    );
+  });
+
+  describe("given the settings detour", () => {
+    /**
+     * Two specs name the same detour from different angles — the ops feature
+     * file calls it the detour, the modes file calls it the shell that draws
+     * around an ops page. One classifier decides both.
+     *
+     * @scenario The internal ops pages take the settings detour
+     * @scenario Internal ops pages render in the new settings shell
+     */
+    it("is not a product, and carries organization scope", () => {
+      for (const pathname of ["/settings/members", "/ops/users", "/ops/cloud/licenses"]) {
+        expect(resolve(pathname)).toEqual({
+          isSettingsRoute: true,
+          isPersonalScopeRoute: false,
+          isOrgScopeRoute: true,
+          isResolverRoute: false,
+          activeProductId: null,
+          seatRefusal: null,
+        });
+      }
+    });
+  });
+
+  describe("given a personal address", () => {
+    it("names Coding agents for /coding-agents itself", () => {
+      expect(resolve("/coding-agents/sessions").activeProductId).toBe("me");
+      expect(resolve("/coding-agents/sessions").isPersonalScopeRoute).toBe(true);
+    });
+
+    it("names Me when the reader is on their own personal project", () => {
+      expect(
+        resolve("/personal-mia-abc123", { isOnOwnPersonalProject: true }).activeProductId,
+      ).toBe("me");
+    });
+
+    it("keeps the settings detour out of the personal scope", () => {
+      expect(resolve("/settings/members", { isPersonalScope: true }).isPersonalScopeRoute).toBe(
+        false,
+      );
+    });
+  });
+
+  describe("given a project whose slug starts with a reserved base", () => {
+    /**
+     * A plain `startsWith` reads "metadata" as the Me product and
+     * "settings-team" as Settings. Project slugs are top-level addresses and
+     * neither name is reserved, so the test has to be on the segment boundary.
+     */
+    /** @scenario A project whose slug reads like a product keeps the project shell */
+    it("reads it as the project it is, not as the product it prefixes", () => {
+      expect(resolve("/metadata/traces").activeProductId).toBe("llm-ops");
+      expect(resolve("/settings-team").isSettingsRoute).toBe(false);
+      expect(resolve("/settings-team").activeProductId).toBe("llm-ops");
+    });
+  });
+
+  describe("given a Developer seat", () => {
+    describe("when the address names an organization-wide product", () => {
+      it.each([
+        ["/gateway/virtual-keys", "gateway", "virtualKeys:view"],
+        ["/governance/people", "governance", "governance:view"],
+      ])("refuses %s with the product's grant named", (pathname, productId, permission) => {
+        expect(resolve(pathname, { organizationRole: "DEVELOPER" }).seatRefusal).toEqual({
+          productId,
+          permission,
+        });
+      });
+    });
+
+    describe("when the address names their own Me workspace or a project", () => {
+      it.each(["/coding-agents/sessions", "/personal-ada-abc123/traces"])(
+        "opens %s",
+        (pathname) => {
+          expect(resolve(pathname, { organizationRole: "DEVELOPER" }).seatRefusal).toBeNull();
+        },
+      );
+    });
+
+    describe("when the address belongs to no product", () => {
+      it.each(["/settings/profile", "/onboarding/welcome", "/"])(
+        "leaves %s to the permission gate",
+        (pathname) => {
+          expect(resolve(pathname, { organizationRole: "DEVELOPER" }).seatRefusal).toBeNull();
+        },
+      );
+    });
+  });
+
+  describe("given a Full seat", () => {
+    it("opens an organization-wide product, the seat gate being for the Developer seat only", () => {
+      expect(
+        resolve("/gateway/virtual-keys", { organizationRole: "MEMBER" }).seatRefusal,
+      ).toBeNull();
+    });
+  });
+});
+
+describe("resolveShellRoute with the organization's Dashboards library", () => {
+  const withLibrary = (pathname: string, boardHomeProduct: "gateway" | "llm-ops" | null = null) =>
+    resolveShellRoute({
+      pathname,
+      isPersonalScope: false,
+      isOrgScope: false,
+      isOnOwnPersonalProject: false,
+      organizationRole: "MEMBER",
+      boardHomeProduct,
+      hasOrganizationLibrary: true,
+    });
+
+  describe("given a board homed in Gateway", () => {
+    /** @scenario "An org-level board draws its home product's chrome, with no project chip" */
+    it.each(["/dashboards/board_1", "/shop/dashboards/board_1"])(
+      "draws Gateway at %s, as organization scope",
+      (pathname) => {
+        const route = withLibrary(pathname, "gateway");
+
+        expect(route.activeProductId).toBe("gateway");
+        expect(route.isOrgScopeRoute).toBe(true);
+      },
+    );
+  });
+
+  describe("given a project's Dashboards pages", () => {
+    it.each(["/shop/dashboards", "/shop/dashboards/templates", "/shop/dashboards/board_1"])(
+      "draws LLM Ops at %s",
+      (pathname) => {
+        expect(withLibrary(pathname).activeProductId).toBe("llm-ops");
+      },
+    );
+  });
+
+  describe("given the library's own pages", () => {
+    it.each(["/dashboards", "/dashboards/templates"])("draws Dashboards at %s", (pathname) => {
+      expect(withLibrary(pathname).activeProductId).toBe("dashboards");
+    });
+  });
+});

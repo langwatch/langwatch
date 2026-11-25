@@ -5,7 +5,7 @@
 # specs/migration/system-migrations-runner.feature.
 #
 # The ADR-110 one-shot migration is registered
-# (platform/app/src/server/app-layer/authz/authz-engine.migration.ts); the
+# ([gone] src/server/app-layer/authz/authz-engine.migration.ts); the
 # scenarios still tagged @unimplemented are the integration-level ones its
 # unit harness cannot honestly bind.
 
@@ -17,10 +17,9 @@ Feature: Moving an organization onto the grants projection
   So that organizations move one at a time with no operator running a script,
   no second step, and no customer noticing
 
-  # ONE migration. It reads every legacy table, states each row as an event,
-  # and checks. Finishing IS the switch — there is no cutover step, no flag
-  # and no gate. An organization whose migration is finalized reads from the
-  # projection; one that is not reads from legacy.
+  # ONE migration reads every legacy table, states each row as an event, and
+  # proves the projection heads. Runtime authorization always reads current
+  # grants; migration status records inventory and proof progress only.
 
   Background:
     Given an organization "org_acme"
@@ -64,6 +63,12 @@ Feature: Moving an organization onto the grants projection
     When it is stated as a fact
     Then the fact carries the row's original time, not the migration's clock
 
+  @unit
+  Scenario: Reassigning a grant's role clears the role it was imported with
+    Given a grant imported with a legacy role alongside its new custom role
+    When the grant is reassigned to a different role
+    Then the projected row no longer carries the legacy role it was imported with
+
   # ═══ How it runs ══════════════════════════════════════════════════════
 
   @unit
@@ -72,6 +77,20 @@ Feature: Moving an organization onto the grants projection
     Then it states every fact
     And it reads the projection once
     And it does not poll waiting for the projection
+
+  @integration
+  Scenario: A delayed migration attach cannot cross a membership lifetime
+    Given a migration USER fact captured for a current membership
+    When its projection arrives after offboarding and rejoining
+    Then the old fact is rejected
+    And the new membership receives no access from that old fact
+
+  @integration
+  Scenario: A disabled membership keeps its migration lifetime
+    Given a disabled member with a migration USER fact
+    When the fact is projected with the member's lifetime
+    Then the Grant is retained for replay
+    And runtime access remains denied while the member is disabled
 
   @unit
   Scenario: A projection that has not caught up holds the organization
@@ -110,6 +129,18 @@ Feature: Moving an organization onto the grants projection
     And a share link whose head only lags on views is not stated again
     And the first pass over an organization still states everything
     And the held report is unchanged by what the pass skipped
+
+  # One cloud organization can hold tens of thousands of members, and every
+  # grant fans out into more jobs. Pacing between organizations alone let one
+  # organization fill the queue with every command it had (2026-10-12).
+  @unit
+  Scenario: One large organization sends its grants a page at a time
+    Given an organization whose legacy rows state 20,000 grants
+    When a pass on a queue list runs it
+    Then it waits for the pass's queue room between pages of commands
+    And no more than the pass's limit plus one page of its jobs are ever outstanding
+    And every grant is stated
+    And the check runs once, after the last page
 
   @unit
   Scenario: A pass that failed partway is safe to repeat
@@ -172,17 +203,18 @@ Feature: Moving an organization onto the grants projection
     And no separate switch is performed
 
   @unit
-  Scenario: An organization that has not finalized reads from legacy
-    Given "org_acme" is still in progress
+  Scenario: A permission check uses the caller's current grants
+    Given "org_acme" has a live grant for the caller
     When a permission is checked
-    Then the answer comes from the legacy path
+    Then the answer comes from that grant
+    And migration status does not select another resolver
 
   @unit
-  Scenario: An organization that has not completed the genesis import keeps writing legacy rows imperatively
-    Given "org_acme" has not completed the genesis import
-    When a role binding, custom role or share link is written
-    Then the legacy table row is written directly
-    And nothing is appended to the ledger
+  Scenario: An authorization write emits a grant command
+    Given "org_acme" receives an authorization change
+    When the grants service handles the write
+    Then it emits a grant command for the current authorization state
+    And no legacy write path is selected
 
   @unit
   Scenario: Completing the authz migration moves an organization's writes onto the ledger
@@ -210,21 +242,39 @@ Feature: Moving an organization onto the grants projection
     Then the organization's migration status is the only fork
     And no separate cutover record exists
 
-  # ═══ Self-hosted installations ════════════════════════════════════════
+  # ═══ Who this migration reaches ═══════════════════════════════════════
   #
-  # Cloud paces this migration per organization by enrollment. Self-hosted
-  # has no enrollment: a migration either runs for every organization or for
-  # none, and which it is comes from the migration's own release
-  # declaration. Releasing it is the prerequisite for ever removing the
-  # legacy authorization path, because that removal is only safe once every
-  # installation that might upgrade into it has already had a release that
-  # runs this migration.
+  # Every organization, on every installation. The per-organization cloud
+  # rollout is finished, and what enrollment would still decide is only
+  # whether an organization created SINCE ever migrates - which must not
+  # depend on an operator remembering it. So the migration declares itself
+  # automatically enrolled and the cohort admits every organization with no
+  # row and no operator action. The generic mechanism is
+  # specs/migration/system-migrations-runner.feature; what is authz-specific
+  # is that this migration is the one that has made the declaration.
+  #
+  # Self-hosted never had enrollment: a migration either runs for every
+  # organization or for none, and which it is comes from the migration's own
+  # release declaration. Releasing it is the prerequisite for ever removing
+  # the legacy authorization path, because that removal is only safe once
+  # every installation that might upgrade into it has already had a release
+  # that runs this migration.
 
   @unit
   Scenario: The migration is released for self-hosted installations
     When the migration's release declaration is read
     Then it runs automatically on a self-hosted installation
     And every organization there migrates without anyone enrolling it
+
+  # A brand-new organization starts with no legacy authorization facts. Its
+  # authorization writes use the grants path, while the migration only adopts
+  # legacy rows that predate it.
+  @unit
+  Scenario: The migration reaches every cloud organization without enrollment
+    Given a cloud installation
+    When the migration's cohort declaration is read
+    Then every organization is in its cohort
+    And an organization created after the rollout finished migrates on the next pass
 
   # ═══ Undoing it ═══════════════════════════════════════════════════════
   # The operator action and its mechanics are the runner's. What is authz-

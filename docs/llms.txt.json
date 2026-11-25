@@ -1,10 +1,4 @@
 {
-  "includePaths": [
-    "**/*.mdx"
-  ],
-  "excludePaths": [
-    "**/node_modules/**",
-    "snippets/**",
-    "essentials/**"
-  ]
+  "includePaths": ["**/*.mdx"],
+  "excludePaths": ["**/node_modules/**", "snippets/**"]
 }

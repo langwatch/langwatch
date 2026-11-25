@@ -1,0 +1,244 @@
+import { afterAll, describe, expect, it } from "vitest";
+
+import { moduleLayersRule } from "../../src/rules/module-layers.rule.mjs";
+import { createFixtureWorkspace, runRule } from "../../src/testing.mjs";
+
+const workspace = createFixtureWorkspace({
+  features: { agent: { layoutVersion: 0, roles: { process: {} } } },
+});
+
+afterAll(() => workspace.cleanup());
+
+const PROCESS = "modules/agent/process/src";
+const REPOSITORY = `${PROCESS}/repositories/prisma/prisma.agent.repository.ts`;
+const CHANNEL = `${PROCESS}/channels/slack/slack.agent.channel.ts`;
+const TRANSPORT = `${PROCESS}/transport/agent.rest.ts`;
+const SERVICE = `${PROCESS}/services/agent.service.ts`;
+
+function report(filename, code) {
+  return runRule(moduleLayersRule, { code, cwd: workspace.cwd, filename }).map(
+    ({ data, line, messageId }) => ({ crossed: data.crossed, line, messageId }),
+  );
+}
+
+describe("given a repository", () => {
+  describe("when it value-imports a service, the app or a pipeline artifact", () => {
+    /** @scenario "A repository takes the store it reads and nothing above it" */
+    it("reports repositoryCrossing on each import's line", () => {
+      const code = [
+        'import { z } from "zod";',
+        'import { AgentService } from "../../services/agent.service.ts";',
+        'import { AgentModule } from "#app/agent.app";',
+        'import { AgentDerived } from "../../eventing/agent-derived.projection.ts";',
+      ].join("\n");
+
+      expect(report(REPOSITORY, code)).toEqual([
+        { crossed: "a service", line: 2, messageId: "repositoryCrossing" },
+        { crossed: "the app", line: 3, messageId: "repositoryCrossing" },
+        { crossed: "the eventing pipeline", line: 4, messageId: "repositoryCrossing" },
+      ]);
+    });
+  });
+
+  describe("when it names its siblings, a rules module, an eventing store or a type", () => {
+    /** @scenario "A repository takes the store it reads and nothing above it" */
+    it("reports nothing", () => {
+      const code = [
+        'import { AgentRow } from "../agent.repository.ts";',
+        'import { agentRules } from "../../rules/agent.rules.ts";',
+        'import { AgentStore } from "../../eventing/agent-item.store.ts";',
+        'import type { AgentService } from "../../services/agent.service.ts";',
+        'import { type AgentModule } from "../../app/agent.app.ts";',
+      ].join("\n");
+
+      expect(report(REPOSITORY, code)).toEqual([]);
+    });
+  });
+});
+
+describe("given a channel", () => {
+  /** @scenario "A channel takes the client it speaks to" */
+  it("reports channelCrossing for a repository or a service and passes its own client", () => {
+    const code = [
+      'import { WebClient } from "@slack/web-api";',
+      'import { agentRepository } from "../../repositories/agent.repository.ts";',
+      'import { AgentService } from "../../services/agent.service.ts";',
+      'import { render } from "../teams/teams.agent.channel.ts";',
+    ].join("\n");
+
+    expect(report(CHANNEL, code)).toEqual([
+      { crossed: "a repository", line: 2, messageId: "channelCrossing" },
+      { crossed: "a service", line: 3, messageId: "channelCrossing" },
+    ]);
+  });
+});
+
+describe("given a transport", () => {
+  /** @scenario "A transport never names a repository, even as a type" */
+  it("reports transportCrossing for a repository by path or alias, value or type", () => {
+    const code = [
+      'import { agentRules } from "../rules/agent.rules.ts";',
+      'import type { AgentRepository } from "../repositories/agent.repository.ts";',
+      'import { RedisAgentRuntime } from "#repositories/redis/redis.agent-runtime.repository";',
+    ].join("\n");
+
+    expect(report(TRANSPORT, code)).toEqual([
+      { crossed: "a repository", line: 2, messageId: "transportCrossing" },
+      { crossed: "a repository", line: 3, messageId: "transportCrossing" },
+    ]);
+  });
+
+  /** @scenario "A transport never names a service or a channel, even as a type" */
+  it("reports transportCrossing for a service or a channel, value or type, and passes app and contract", () => {
+    const code = [
+      'import { agentInput } from "@langwatch/agent-contract";',
+      'import type { AgentApi } from "../app/agent.app.ts";',
+      'import { AgentService } from "../services/agent.service.ts";',
+      'import type { AgentChannel } from "#channels/agent.channel";',
+      "import {",
+      "  type SlackAgentChannel,",
+      '} from "../channels/slack/slack.agent.channel.ts";',
+    ].join("\n");
+
+    expect(report(TRANSPORT, code)).toEqual([
+      { crossed: "a service", line: 3, messageId: "transportCrossing" },
+      { crossed: "a channel", line: 4, messageId: "transportCrossing" },
+      { crossed: "a channel", line: 5, messageId: "transportCrossing" },
+    ]);
+  });
+});
+
+describe("given a service nested under features/<concern>/", () => {
+  /** @scenario "A nested service is held to the same layers as a top-level one" */
+  it("reads its layer from the folder below features/<concern>/ and reports a backend", () => {
+    const code = [
+      'import type { AgentRepository } from "../repositories/agent.repository.ts";',
+      'import { PrismaAgentRepository } from "../repositories/prisma/prisma.agent.repository.ts";',
+    ].join("\n");
+
+    expect(report(`${PROCESS}/features/billing/services/billing.service.ts`, code)).toEqual([
+      { crossed: "a repository backend", line: 2, messageId: "serviceNamesABackend" },
+    ]);
+  });
+});
+
+describe("given a service", () => {
+  /** @scenario "A service works over repository interfaces, never a backend" */
+  it("reports serviceNamesABackend for a backend, value or type, and passes the interface", () => {
+    const code = [
+      'import type { AgentRepository } from "../repositories/agent.repository.ts";',
+      'import { PrismaAgentRepository } from "../repositories/prisma/prisma.agent.repository.ts";',
+      "import {",
+      "  type ClickHouseAgentRepository,",
+      '} from "#repositories/clickhouse/clickhouse.agent.repository";',
+    ].join("\n");
+
+    expect(report(SERVICE, code)).toEqual([
+      { crossed: "a repository backend", line: 2, messageId: "serviceNamesABackend" },
+      { crossed: "a repository backend", line: 3, messageId: "serviceNamesABackend" },
+    ]);
+  });
+
+  /** @scenario "A service works over channel interfaces, never a tier implementation" */
+  it("reports serviceNamesAChannelImplementation for a tier or memory twin and passes the interface", () => {
+    const code = [
+      'import type { AgentChannel } from "../channels/agent.channel.ts";',
+      'import { SlackAgentChannel } from "../channels/slack/slack.agent.channel.ts";',
+      'import type { MemoryAgentChannel } from "#channels/memory/memory.agent.channel";',
+    ].join("\n");
+
+    expect(report(SERVICE, code)).toEqual([
+      {
+        crossed: "a channel implementation",
+        line: 2,
+        messageId: "serviceNamesAChannelImplementation",
+      },
+      {
+        crossed: "a channel implementation",
+        line: 3,
+        messageId: "serviceNamesAChannelImplementation",
+      },
+    ]);
+  });
+});
+
+describe("given a test beside a repository", () => {
+  /** @scenario "A test composing a layer is not this rule's business" */
+  it("reports nothing", () => {
+    expect(
+      report(
+        `${PROCESS}/repositories/__tests__/agent.repository.unit.test.ts`,
+        'import { AgentService } from "../../services/agent.service.ts";',
+      ),
+    ).toEqual([]);
+  });
+});
+
+// ADR-181: `relay` opts into the feature layout; `eventing` is a framework that has not.
+const framework = createFixtureWorkspace({
+  files: {
+    "packages/relay/package.json": JSON.stringify({
+      name: "@langwatch/relay",
+      exports: { ".": { default: "./src/index.ts" } },
+      langwatch: { group: "framework", layout: "features" },
+    }),
+    "packages/eventing/package.json": JSON.stringify({
+      name: "@langwatch/eventing",
+      langwatch: { group: "framework" },
+    }),
+  },
+});
+
+afterAll(() => framework.cleanup());
+
+function frameworkReport(filename, code) {
+  return runRule(moduleLayersRule, { code, cwd: framework.cwd, filename }).map(
+    ({ data, line, messageId }) => ({ crossed: data.crossed, line, messageId }),
+  );
+}
+
+describe("given an opted-in framework package", () => {
+  describe("when its vocabulary value-imports a service", () => {
+    /** @scenario "A framework layer that crosses its row is reported" */
+    it("reports vocabularyCrossing and lets rules, telemetry and a type through", () => {
+      const code = [
+        'import { compareOrdinal } from "../rules/compare-ordinal.rules.ts";',
+        'import { foldsTotal } from "../telemetry/relay.metrics.ts";',
+        'import type { ClaimService } from "../features/claim/services/claim.service.ts";',
+        'import { ClaimService as Live } from "../features/claim/services/claim.service.ts";',
+      ].join("\n");
+      expect(frameworkReport("packages/relay/src/vocabulary/relay.ts", code)).toEqual([
+        { crossed: "a service", line: 4, messageId: "vocabularyCrossing" },
+      ]);
+    });
+  });
+
+  describe("when its telemetry value-imports the vocabulary", () => {
+    /** @scenario "A framework layer that crosses its row is reported" */
+    it("reports telemetryCrossing", () => {
+      const code = 'import { RelayError } from "../vocabulary/relay.errors.ts";';
+      expect(frameworkReport("packages/relay/src/telemetry/relay.metrics.ts", code)).toEqual([
+        { crossed: "the vocabulary", line: 1, messageId: "telemetryCrossing" },
+      ]);
+    });
+  });
+
+  describe("when a concern's service names a repository backend", () => {
+    /** @scenario "A framework layer that crosses its row is reported" */
+    it("reports serviceNamesABackend", () => {
+      const code =
+        'import { RedisClaimRepository } from "../repositories/redis/redis.claim.repository.ts";';
+      expect(
+        frameworkReport("packages/relay/src/features/claim/services/claim.service.ts", code),
+      ).toEqual([{ crossed: "a repository backend", line: 1, messageId: "serviceNamesABackend" }]);
+    });
+  });
+});
+
+describe("given a framework package that has not opted in", () => {
+  /** @scenario "A framework package that has not opted in is left alone by the layered rules" */
+  it("reports nothing for the same crossing", () => {
+    const code = 'import { ClaimService } from "../services/claim.service.ts";';
+    expect(frameworkReport("packages/eventing/src/vocabulary/relay.ts", code)).toEqual([]);
+  });
+});

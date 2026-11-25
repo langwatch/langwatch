@@ -104,7 +104,12 @@ type Request struct {
 }
 
 // Dispatch sends a non-streaming request through the provider router.
-// Suitable for chat completions, messages, responses, embeddings.
+// Suitable for chat completions, messages, responses, embeddings and image
+// generation, all of which carry a JSON body.
+//
+// Image EDITS are not expressible here: the source images arrive as multipart
+// files, which Request has no field for. A caller needing them goes through
+// the HTTP route.
 func (d *Dispatcher) Dispatch(ctx context.Context, req Request) (*domain.Response, error) {
 	if err := validate(req); err != nil {
 		return nil, err

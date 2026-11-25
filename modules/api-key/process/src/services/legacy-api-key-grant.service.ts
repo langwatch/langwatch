@@ -1,0 +1,188 @@
+import type { ApiKey } from "@langwatch/api-key-contract";
+import type {
+  AuthzApi,
+  AuthzLedgerBindingAttach,
+  LedgerPrincipal,
+  LedgerScope,
+} from "@langwatch/authz-contract";
+import type { Logger } from "@langwatch/observability";
+import { Temporal, fromDate, nowInstant, type Instant } from "@langwatch/time";
+
+const MINT_GUARD_TTL_MS = 60_000;
+const MINT_GUARD_MAX_ENTRIES = 10_000;
+
+/** Authz's own grant id, asked for: the stored one, revoked or not, else a new one. */
+type AuthzBindingIdResolver = (input: {
+  organizationId: string;
+  principal: LedgerPrincipal;
+  scope: LedgerScope;
+  occurredAtMs: number;
+}) => Promise<string>;
+
+/**
+ * Records the implicit organization grant held by credentials created before
+ * the AuthZ engine cutover. Authentication never waits for or fails on this
+ * compatibility write; Eventing deduplicates its content-derived identity.
+ */
+export class LegacyApiKeyGrantService {
+  private readonly emitted = new Map<string, number>();
+
+  static keyPredatesAuthzEngine(input: {
+    apiKey: Pick<ApiKey, "createdAt">;
+    cutoverAt: Instant | null;
+  }): boolean {
+    return (
+      input.cutoverAt !== null &&
+      Temporal.Instant.compare(fromDate(input.apiKey.createdAt), input.cutoverAt) < 0
+    );
+  }
+
+  /** The grant a credential with no grant of its own implies; empty when it implies none. */
+  static async findLegacyGrantsForApiKey({
+    apiKey,
+    resolveBindingId,
+  }: {
+    apiKey: ApiKey;
+    resolveBindingId: AuthzBindingIdResolver;
+  }): Promise<AuthzLedgerBindingAttach[]> {
+    if (!LegacyApiKeyGrantService.impliesLegacyGrant(apiKey)) return [];
+
+    return [
+      {
+        bindingId: await resolveBindingId({
+          organizationId: apiKey.organizationId,
+          principal: { type: "apiKey", id: apiKey.id },
+          scope: { type: "ORGANIZATION", id: apiKey.organizationId },
+          occurredAtMs: apiKey.createdAt.getTime(),
+        }),
+        principal: { apiKeyId: apiKey.id },
+        role: "ADMIN",
+        customRoleId: null,
+        scopeType: "ORGANIZATION",
+        scopeId: apiKey.organizationId,
+      },
+    ];
+  }
+
+  private static impliesLegacyGrant(apiKey: ApiKey): boolean {
+    return apiKey.grants.length === 0 && apiKey.ingestSourceType === null && apiKey.userId === null;
+  }
+
+  static create(options: {
+    authz: AuthzApi;
+    grants: AuthzApi;
+    resolveBindingId: AuthzBindingIdResolver;
+    diagnostics: Pick<Logger, "warn">;
+    now?: () => number;
+  }): LegacyApiKeyGrantService {
+    return new LegacyApiKeyGrantService(options);
+  }
+
+  private constructor(
+    private readonly options: {
+      authz: AuthzApi;
+      grants: AuthzApi;
+      resolveBindingId: AuthzBindingIdResolver;
+      diagnostics: Pick<Logger, "warn">;
+      now?: () => number;
+    },
+  ) {}
+
+  mint(apiKey: ApiKey): void {
+    if (!LegacyApiKeyGrantService.impliesLegacyGrant(apiKey) || this.guardHeld(apiKey.id)) {
+      return;
+    }
+
+    this.holdGuard(apiKey.id);
+    void this.persist(apiKey).catch((error: unknown) => this.failed(apiKey, error));
+  }
+
+  private async persist(apiKey: ApiKey): Promise<void> {
+    const cutoverAt = await this.options.authz.findEngineCutoverAt({
+      organizationId: apiKey.organizationId,
+    });
+    if (cutoverAt === null) {
+      this.emitted.delete(apiKey.id);
+
+      return;
+    }
+
+    if (
+      !LegacyApiKeyGrantService.keyPredatesAuthzEngine({
+        apiKey,
+        cutoverAt,
+      })
+    ) {
+      return;
+    }
+
+    // After the cutover reads: an organization off the engine costs no grant lookup.
+    const bindings = await LegacyApiKeyGrantService.findLegacyGrantsForApiKey({
+      apiKey,
+      resolveBindingId: this.options.resolveBindingId,
+    });
+    await this.options.grants.attachBindings({
+      organizationId: apiKey.organizationId,
+      bindings,
+      caller: { type: "system" },
+      actor: { type: "system", id: "system:read-through-mint" },
+      source: "read-through-mint",
+      onDuplicate: "skip",
+      commandId: `read-through-mint:${apiKey.id}`,
+      occurredAtMs: apiKey.createdAt.getTime(),
+      awaitProjection: false,
+    });
+  }
+
+  private now(): number {
+    return this.options.now?.() ?? nowInstant().epochMilliseconds;
+  }
+
+  private guardHeld(apiKeyId: string): boolean {
+    const expiresAt = this.emitted.get(apiKeyId);
+    if (expiresAt === void 0) {
+      return false;
+    }
+
+    if (this.now() < expiresAt) {
+      return true;
+    }
+
+    this.emitted.delete(apiKeyId);
+
+    return false;
+  }
+
+  private holdGuard(apiKeyId: string): void {
+    if (this.emitted.size >= MINT_GUARD_MAX_ENTRIES) {
+      this.sweepGuard();
+    }
+
+    this.emitted.set(apiKeyId, this.now() + MINT_GUARD_TTL_MS);
+  }
+
+  private sweepGuard(): void {
+    const now = this.now();
+    for (const [apiKeyId, expiresAt] of this.emitted) {
+      if (expiresAt <= now) {
+        this.emitted.delete(apiKeyId);
+      }
+    }
+
+    if (this.emitted.size >= MINT_GUARD_MAX_ENTRIES) {
+      this.emitted.clear();
+    }
+  }
+
+  private failed(apiKey: ApiKey, error: unknown): void {
+    this.emitted.delete(apiKey.id);
+    this.options.diagnostics.warn(
+      {
+        error,
+        apiKeyId: apiKey.id,
+        organizationId: apiKey.organizationId,
+      },
+      "failed to mint the legacy API key grant; authentication continues and the next request retries",
+    );
+  }
+}

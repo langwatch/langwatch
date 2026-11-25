@@ -1,0 +1,263 @@
+Feature: PR Review Bot workflow
+  As a repository maintainer
+  I want the PR Review Bot to selectively run code reviews on pull requests
+  So that reviews are accurate, timely, and respect repository permissions
+
+  # The review is the job `review` in pr.yml, the last job, so it spends tokens
+  # only on a change CI passed. The ruleset requires a check of that name.
+  #
+  # The job gates on these conditions to determine whether it runs at all:
+  # (1) The PR is not from dependabot (Dependabot has separate secret management)
+  # (2) The PR is from the same repository (forks cannot access repo secrets)
+  # (3) The PR is not a draft (drafts are not ready for review)
+  # (4) ci-complete succeeded, and then every other check on the head commit
+  #     (the separate workflows: pr conventions, go-ci, code-scanners, ...) has
+  #     finished without failing
+  # (5) The event is a pull request (the bot reads github.event.pull_request)
+  # Additionally, concurrency ensures only one review per PR runs at a time.
+  #
+  # Whether a job that runs actually POSTS a review is decided inside
+  # langwatch/langwatch-pr-review-bot (a separate repository, including any
+  # base-branch restriction it applies) — this workflow's gate can only
+  # promise that its own job ran, not that a review lands.
+
+  Background:
+    Given a pull request is created in the langwatch/langwatch repository
+    And the pr workflow is triggered
+
+  # ============================================================================
+  # Gating: CI
+  # ============================================================================
+
+  @unit
+  Scenario: The review starts only after CI passed
+    Given a check pr.yml calls failed for the pull request
+    When ci-complete fails
+    Then the review job is skipped
+    And no review is posted to the PR
+
+  # On a job, GitHub's implicit success() checks every job upstream, not only
+  # `needs`. Path filters skip calls above ci-complete, so without !cancelled()
+  # the review would be skipped on most PRs, and a skipped check passes.
+  @unit
+  Scenario: The review still starts when CI skipped checks the change does not reach
+    Given pr.yml skipped a call the change does not reach
+    When ci-complete succeeds
+    Then the review job still starts
+
+  @unit
+  Scenario: The merge queue gets no review
+    Given a merge queue run of pr.yml
+    When ci-complete succeeds
+    Then the review job is skipped
+
+  # ============================================================================
+  # Gating: the other workflows' checks
+  # ============================================================================
+  #
+  # ci-complete covers only the calls of pr.yml. A step of the review job, run
+  # before the bot step (`go run ./cmd/waitforchecks`, tools/waitforchecks),
+  # lists the head commit's check runs, waits while any is unfinished, and fails
+  # the job if one failed or the wait timed out, so the bot step never runs.
+  # It retries transient API errors (network, 5xx, rate limits) until its
+  # deadline. A new push cancels the run (see Concurrency) and with it the wait.
+
+  @unit
+  Scenario: The review waits for every other check on the head commit
+    Given CI passed and another workflow's check on the head commit is still running
+    When the review job starts
+    Then its wait step keeps polling the check runs
+    And no review is posted until that check has finished
+
+  @unit
+  Scenario: The review does not start when another check failed
+    Given CI passed and another workflow's check on the head commit failed
+    When the wait step reads the check runs
+    Then the bot step does not run, because the wait step comes first and fails the job
+    And no review is posted to the PR
+
+  @unit
+  Scenario: a failed check fails the review job
+    Given CI passed and another workflow's check on the head commit failed
+    When the wait step reads the check runs
+    Then the wait step names the failed check in "another check failed: <names>; fix it and push"
+    And the wait step exits non-zero
+    And the review job ends red, never green-skipped
+
+  @unit
+  Scenario: A check that ran twice counts only its newest run
+    Given a workflow's check on the head commit was cancelled by a newer run of the same workflow
+    And the newer run passed
+    When the wait step reads the check runs
+    Then only the newest run of that check counts
+    And the review is not blocked by the cancelled run
+
+  @unit
+  Scenario: A cancelled check that a newer run of its workflow renamed does not block the review
+    Given a workflow run on the head commit was cancelled before its matrix job expanded, leaving a check named "app / test-unit"
+    And a newer run of the same workflow passed with the expanded checks "app / test-unit (worker)" and "app / test-unit (ui)"
+    When the wait step reads the check runs
+    Then the cancelled "app / test-unit" check does not count
+    And the review is not blocked by it
+
+  @unit
+  Scenario: A failed check from an older run of the workflow still blocks the review
+    Given a check failed in an older run of a workflow
+    And a newer run of the same workflow does not run a check of that name
+    When the wait step reads the check runs
+    Then the wait step names that check as failed
+
+  @unit
+  Scenario: Same-named checks from different workflows are counted separately
+    Given two workflows each have a check named "test" on the head commit
+    And one passed and the other failed
+    When the wait step reads the check runs
+    Then the wait step names "test (failure)" as a failed check
+
+  @unit
+  Scenario: A check whose workflow run is unknown is never merged with another
+    Given a check run whose check suite is not in the head commit's workflow runs
+    When the wait step reads the check runs
+    Then that check run is keyed on its own check suite
+    And it is never merged with a same-named check from another suite
+
+  @unit
+  Scenario: A slow CI fails the wait with its own message, not the job timeout
+    Given the wait step has a timeout-minutes above the wait's own 45-minute deadline
+    And the bot step passes review_timeout_minutes
+    When the review job's timeout-minutes is checked
+    Then it is at least the wait step's limit plus twice review_timeout_minutes plus 5
+    And a slow CI ends with the wait step's message naming the pending checks
+
+  # ============================================================================
+  # Gating: Dependabot PRs
+  # ============================================================================
+
+  @unit
+  Scenario: Dependabot PRs are skipped
+    Given the pull request is authored by dependabot[bot]
+    When the workflow runs
+    Then the review job is skipped
+    And no review is posted to the PR
+
+  # ============================================================================
+  # Gating: Fork PRs
+  # ============================================================================
+
+  @unit
+  Scenario: Pull requests from forks are skipped
+    Given the pull request originates from a fork
+    And the fork does not have access to repository secrets
+    When the workflow runs
+    Then the review job is skipped
+    And no review is posted to the PR
+
+  # ============================================================================
+  # Gating: Draft PRs
+  # ============================================================================
+
+  @unit
+  Scenario: Draft pull requests are skipped
+    Given the pull request is marked as draft
+    When the workflow runs
+    Then the review job is skipped
+    And no review is posted to the PR
+
+  # ============================================================================
+  # Trigger Events
+  # ============================================================================
+  #
+  # Each scenario below asserts the workflow's own gate lets the job run for
+  # that event — not that a review is posted, since posting is decided by
+  # langwatch-pr-review-bot outside this repository.
+
+  @unit
+  Scenario: Review runs on pull request opened
+    Given a pull request is opened in the same repository
+    And the PR is not a draft
+    And the PR author is not dependabot
+    When the workflow runs
+    Then the review job executes
+
+  @unit
+  Scenario: Review runs on pull request synchronize
+    Given a pull request is open in the same repository
+    And new commits are pushed to the PR
+    And the PR is not a draft
+    And the PR author is not dependabot
+    When the workflow runs
+    Then the review job executes
+
+  @unit
+  Scenario: Review runs on pull request reopened
+    Given a pull request was previously closed
+    And the PR is reopened
+    And the PR is not a draft
+    And the PR author is not dependabot
+    When the workflow runs
+    Then the review job executes
+
+  @unit
+  Scenario: Review runs on ready for review
+    Given a draft pull request exists
+    And the draft is marked ready for review
+    And the PR author is not dependabot
+    When the workflow runs
+    Then the review job executes
+
+  # pr.yml is shared with the product checks, which may declare more
+  # pull_request types (edited, labeled, ...). A review costs tokens, so the job
+  # lists the four types itself.
+  @unit
+  Scenario: Review does not run on other pull request event types
+    Given pr.yml also triggers on a pull_request type other than the four above
+    When the workflow runs for that type
+    Then the review job is skipped
+
+  # ============================================================================
+  # Concurrency
+  # ============================================================================
+
+  # The guard cannot observe a run being canceled; it asserts the workflow
+  # configuration that makes GitHub cancel one — a concurrency group keyed on
+  # the PR number, with cancel-in-progress: true.
+  @unit
+  Scenario: In-progress review is canceled for the same PR
+    Given the concurrency group is keyed on github.event.pull_request.number
+    And cancel-in-progress is set to true
+    When a new run for a PR starts while an earlier run for that same PR is in progress
+    Then GitHub cancels the earlier run for that PR
+
+  # ============================================================================
+  # Permissions
+  # ============================================================================
+
+  # contents: write is required so the default GITHUB_TOKEN can call
+  # resolveReviewThread; anything less only loses thread auto-resolution.
+  @unit
+  Scenario: The review workflow grants exactly actions read, checks read, contents write and pull-requests write
+    When the workflow runs
+    Then the workflow grants permissions: actions: read, checks: read, contents: write, pull-requests: write
+    And the workflow does not grant any extra permissions
+
+  # ============================================================================
+  # Action Pinning
+  # ============================================================================
+  #
+  # Stated as an invariant rather than as named SHAs: a literal SHA in this
+  # file goes stale the moment the workflow is repinned (dependabot /
+  # renovate), and a feature file re-asserting a value CI has already moved
+  # past is worse than no assertion — it reads as coverage that does not
+  # exist.
+
+  @unit
+  Scenario: Every action the workflow uses is pinned to a full commit SHA
+    When the workflow runs
+    Then every "uses:" step references a full 40-character commit SHA, never a tag or branch
+    And every pinned step carries a trailing comment documenting what the pin means
+
+  @unit
+  Scenario: Local composite actions are left out of the pin check
+    Given a step whose "uses:" value starts with "./"
+    When the workflow runs
+    Then the pin check reports nothing for that step, because a local action has no ref to pin

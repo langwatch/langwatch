@@ -1,0 +1,189 @@
+---
+title: Go
+description: Call the LangWatch AI Gateway from Go with the OpenAI SDK or the Anthropic SDK, and link the gateway span to your own trace.
+sidebarTitle: Go SDK
+---
+
+## What changes in your code
+
+Two settings change: the base URL points at the gateway, and the API key is a virtual key. The request body, streaming, tools and every other SDK feature stay the same. Name the model as `provider/model` on the OpenAI-shaped and Anthropic-shaped routes; see [Model naming](/ai-gateway/model-naming).
+
+| SDK       | Base URL                           | Where the key goes                                 |
+| --------- | ---------------------------------- | -------------------------------------------------- |
+| OpenAI    | `https://gateway.langwatch.ai/v1/` | `option.WithAPIKey`, sent as `Authorization: Bearer` |
+| Anthropic | `https://gateway.langwatch.ai/`    | `option.WithAPIKey`, sent as `X-Api-Key`           |
+
+Keep the trailing slash on the base URL: the Go SDKs append the route to it.
+
+## Install
+
+```bash
+go get github.com/openai/openai-go/v3
+# add the SDK you use: github.com/anthropics/anthropic-sdk-go
+# and go.opentelemetry.io/otel, to link the gateway span to your trace
+```
+
+The virtual key (`vk-lw-...`) is not your LangWatch API key. `LANGWATCH_API_KEY` is only needed by the LangWatch SDK, to trace your own code.
+
+## OpenAI SDK
+
+```go
+package main
+
+import (
+	"context"
+	"fmt"
+	"os"
+
+	"github.com/openai/openai-go/v3"
+	"github.com/openai/openai-go/v3/option"
+)
+
+func main() {
+	client := openai.NewClient(
+		option.WithBaseURL("https://gateway.langwatch.ai/v1/"),
+		option.WithAPIKey(os.Getenv("LANGWATCH_VIRTUAL_KEY")),
+	)
+
+	response, err := client.Chat.Completions.New(context.Background(), openai.ChatCompletionNewParams{
+		Model: openai.ChatModel("openai/gpt-5-mini"),
+		Messages: []openai.ChatCompletionMessageParamUnion{
+			openai.UserMessage("Say hi in one word"),
+		},
+	})
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println(response.Choices[0].Message.Content)
+}
+```
+
+The same client serves the Responses API and embeddings. With an Anthropic or Gemini model name the gateway translates the chat request to the provider's format.
+
+## Anthropic SDK
+
+```go
+package main
+
+import (
+	"context"
+	"fmt"
+	"os"
+
+	"github.com/anthropics/anthropic-sdk-go"
+	"github.com/anthropics/anthropic-sdk-go/option"
+)
+
+func main() {
+	client := anthropic.NewClient(
+		option.WithBaseURL("https://gateway.langwatch.ai/"),
+		option.WithAPIKey(os.Getenv("LANGWATCH_VIRTUAL_KEY")),
+	)
+
+	message, err := client.Messages.New(context.Background(), anthropic.MessageNewParams{
+		Model:     anthropic.Model("anthropic/claude-haiku-4-5"),
+		MaxTokens: 64,
+		Messages: []anthropic.MessageParam{
+			anthropic.NewUserMessage(anthropic.NewTextBlock("Say hi in one word")),
+		},
+	})
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println(message.Content[0].Text)
+}
+```
+
+## Check it worked
+
+Run the OpenAI SDK sample. It prints the model's answer. Then open the project the virtual key traces to in LangWatch: the gateway's `gen_ai.<request type>` span appears in the traces list within a few seconds, as its own trace, with the model, the tokens and the cost.
+
+## Link the gateway span to your trace
+
+The gateway records one `gen_ai.<request type>` span per request in the trace project of the virtual key. Send a W3C `traceparent` header and the gateway nests that span under your span. Without it, each request is its own trace.
+
+Any OpenTelemetry-instrumented application has the current context. Inject it into the request headers, per request, inside the span you want the gateway span under:
+
+```go
+import (
+	"context"
+	"net/http"
+
+	"github.com/openai/openai-go/v3"
+	"github.com/openai/openai-go/v3/option"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/propagation"
+)
+
+func traceOptions(ctx context.Context) []option.RequestOption {
+	carrier := propagation.HeaderCarrier(http.Header{})
+	otel.GetTextMapPropagator().Inject(ctx, carrier) // traceparent: 00-<trace id>-<span id>-01
+	opts := []option.RequestOption{}
+	for key, values := range carrier {
+		opts = append(opts, option.WithHeader(key, values[0]))
+	}
+	return opts
+}
+
+func ask(ctx context.Context, client openai.Client) (*openai.ChatCompletion, error) {
+	return client.Chat.Completions.New(ctx, openai.ChatCompletionNewParams{
+		Model: openai.ChatModel("openai/gpt-5-mini"),
+		Messages: []openai.ChatCompletionMessageParamUnion{
+			openai.UserMessage("Say hi in one word"),
+		},
+	}, traceOptions(ctx)...)
+}
+```
+
+`otel.GetTextMapPropagator()` returns a no-op until you register a propagator, for example `otel.SetTextMapPropagator(propagation.TraceContext{})`. The [LangWatch Go SDK](/integration/go/guide) is built on OpenTelemetry, so the same code works inside a `langwatch` span. Do not also add the LangWatch OpenAI middleware to clients that call the gateway: the gateway already records the span with the model, the tokens and the cost.
+
+## Headers you can send
+
+| Header                    | Purpose                                                                                                   |
+| ------------------------- | --------------------------------------------------------------------------------------------------------- |
+| `traceparent`             | Nests the gateway span in your trace.                                                                     |
+| `X-LangWatch-End-User-Id` | The end user of your product, for per-end-user budgets and spend. The OpenAI `user` body field works too. |
+| `X-LangWatch-Metadata`    | A JSON object, at most 4096 bytes, copied onto the spend event.                                           |
+
+Pass them per request with `option.WithHeader("X-LangWatch-End-User-Id", "cust_8841")` as an extra argument to the call. The gateway removes them before it forwards the request to the provider. See [Billing and spend events](/ai-gateway/billing-events#attribution-what-the-request-carries).
+
+## Read the response headers
+
+```go
+var httpResponse *http.Response
+
+response, err := client.Chat.Completions.New(ctx, params, option.WithResponseInto(&httpResponse))
+if err != nil {
+	return err
+}
+fmt.Println(httpResponse.Header.Get("X-LangWatch-Gateway-Request-Id")) // quote this to support
+fmt.Println(httpResponse.Header.Get("X-LangWatch-Budget-Warning"))     // "project:84" when a budget is at 80 percent or more
+fmt.Println(httpResponse.Header.Get("Traceparent"))                    // the gateway span in your project
+_ = response
+```
+
+## Manage keys and budgets from Go
+
+The LangWatch Go SDK has no helpers for virtual keys, budgets or spend events. Call the management routes over REST with a LangWatch API key. See [Virtual keys](/ai-gateway/virtual-keys#manage-keys-over-rest) and [Billing and spend events](/ai-gateway/billing-events#read-events-over-rest).
+
+## Self-hosted gateway
+
+Replace the host with your gateway's URL. Everything else is the same.
+
+```go
+client := openai.NewClient(
+	option.WithBaseURL("https://gateway.acme.internal/v1/"),
+	option.WithAPIKey(os.Getenv("LANGWATCH_VIRTUAL_KEY")),
+)
+```
+
+## Troubleshooting
+
+| Symptom                              | Cause                                                                                                                                                                |
+| ------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `401` on every request               | The key is wrong, revoked, or sent in a header the gateway does not read. The gateway reads `Authorization: Bearer`, `X-Api-Key`, `X-Goog-Api-Key` and `Xi-Api-Key`. |
+| `400 model_not_allowed`              | The key restricts its models under **Provider access**, or its routing policy does.                                                                                  |
+| Two spans per call in Trace Explorer | The client also carries the LangWatch OpenAI middleware. Remove it for gateway calls.                                                                                |
+| The gateway span is its own trace    | No `traceparent` on the request, no propagator registered, or the headers were computed outside the active span.                                                     |
+
+See [Errors](/ai-gateway/api/errors) for every error code.

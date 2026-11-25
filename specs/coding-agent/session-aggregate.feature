@@ -53,6 +53,19 @@ Feature: Coding-agent sessions
     When a coding-agent trace arrives whose telemetry carries no session id
     Then it appears as a single-trace session of its own
 
+  Scenario: a launcher's declared session groups every harness session it runs
+    Given a launcher stamps langwatch.session.id on its agent's spans, logs or resource
+    When the agent runs several Claude Code sessions, each with its own session.id
+    Then their spans, logs and metrics all fold into the one declared session
+    And the declared session wins over the agent's own session key, codex's thread id included
+    And each trace's conversation is the declared session, so the replay walks every run
+    And a thread the launcher declared stays on its spans as langwatch.thread.id to filter by
+
+  Scenario: a session with no declared session is keyed by the agent's own session id
+    When a plain Claude Code session exports telemetry with no LangWatch attributes
+    Then its spans, logs and metrics fold into one session keyed by Claude Code's session.id
+    And each trace's conversation is that session id, even when a launcher declared a thread
+
   Scenario: a Cowork session is an agent session
     When Claude Cowork exports its session telemetry as events only, under one session id
     Then the session appears with its turns, tool activity, costs and token totals
@@ -121,6 +134,14 @@ Feature: Coding-agent sessions
     Given several of a session's contributions written together
     When the session is assembled from them
     Then they apply in the order the agent produced them
+
+  # Claude Code logs both ends of every hook run. Only the completion says what
+  # the hook did, so the start is dropped rather than paid for as a contribution.
+  Scenario: a hook's start is not contributed, its completion is
+    Given a Claude Code session whose hooks log their start and their completion
+    When those log records are lifted into contributions
+    Then no contribution is made for a hook's start, bare or namespaced
+    And the completion is contributed with its outcome
 
   Scenario: an agent that reports only logs keeps its model-call sequence
     Given an agent whose model calls are reported as logs rather than spans
@@ -203,3 +224,39 @@ Feature: Coding-agent sessions
     When the log dispatcher considers it
     Then no session contribution is made for it
     And the record itself is still stored
+
+  # Codex helper threads. Codex 0.154's TUI starts hidden threads of its own,
+  # with their own thread id, on the same telemetry exporter: the thread title
+  # generator right after the first prompt, and the recap. Neither carries a
+  # link to the thread it serves. What Codex does state is how it started
+  # them: its temporary structured request helper mints the app-server request
+  # ids (`temporary-structured-turn-<uuid>` on the turn/start request), and
+  # ingestion stores that request span stamped with the helper's thread id.
+  # Its contribution carries the auxiliary fact; the thread's turn span and
+  # log events arrive in other batches, in either order.
+
+  Scenario: a codex helper thread's request span marks its session as auxiliary
+    When a codex helper thread's request span contributes the auxiliary fact
+    Then the session it folds into is marked auxiliary
+    And the thread's turn span and log events, before or after it, do not clear the mark
+    And the request span itself counts no model call
+
+  Scenario: a codex turn without the fact keeps its session unmarked
+    When a codex turn span arrives for a session with no auxiliary fact
+    Then the session it folds into is not marked auxiliary
+
+  Scenario: an auxiliary session round-trips through its stored row
+    Given a session marked auxiliary
+    When its row is stored and read back
+    Then the read-back state is still marked auxiliary
+    And a row from before the mark existed reads back as not auxiliary
+
+  # Codex 0.154 names no parent on a helper thread's spans or events, so
+  # there is nothing to attribute the helper's tokens by. They stay on the
+  # helper's own trace, priced and counted in project usage, until Codex
+  # emits the link. Recorded as the target.
+  @unimplemented
+  Scenario: a codex helper thread's cost lands on the session it served
+    Given a codex helper thread whose telemetry names the thread it served
+    When its turn is folded
+    Then its tokens and cost count toward that session

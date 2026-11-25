@@ -1,11 +1,15 @@
 package app
 
 import (
+	"context"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
+
+	"go.uber.org/zap"
 
 	"github.com/langwatch/langwatch/tools/thuishaven/domain"
 )
@@ -14,7 +18,7 @@ import (
 // container tiers. Local-only (never pushed/pulled), built from infra/docker/Dockerfile.langyagent.
 const langyImage = "langyagent:dev"
 
-// Langy is intentionally constrained in local development. OpenCode workers are
+// Langy is intentionally constrained in local development. Workers are
 // heavyweight processes (roughly 600-650 MiB each in normal use), and an uncapped
 // manager can otherwise consume the entire small Colima VM before the ten-minute
 // production-shaped idle timeout has a chance to help. These are local launcher
@@ -115,29 +119,23 @@ func (o *Orchestrator) langyChild(st domain.Stack, opts PlanOptions, base []stri
 	// PORT, not SERVER_ADDR (see services/langyagent/config.go) — PORT always wins.
 	// Its sessions/workspace roots default to the in-container /workspace, which is
 	// read-only on a dev host; point them at writable per-slug dirs under haven's
-	// home and create them so the manager boots (session spawn still needs an
-	// `opencode` binary on PATH, but the service itself comes up). The UID sandbox
+	// home and create them so the manager boots (session spawn still needs the
+	// built `langy-worker` binary, but the service itself comes up). The UID sandbox
 	// is disabled — on the host the worker runs as the developer's own unprivileged
 	// user, where the setuid + chown the sandbox needs would fail with EPERM.
 	laRoot := filepath.Join(o.cfg.Home, "langyagent", st.Slug)
 	_ = os.MkdirAll(filepath.Join(laRoot, "sessions"), 0o755)
 	_ = os.MkdirAll(filepath.Join(laRoot, "workspace"), 0o755)
-	piWorkerPath := filepath.Join(opts.RepoRoot, "services", "langyworker", "out", "langy-worker")
-	// A missing wrapper binary fails every pi spawn with exec-not-found, which
-	// reads as a harness bug rather than a setup gap. Say so at startup, once,
-	// while the operator is still looking at the terminal.
-	if !isExecutableFile(piWorkerPath) {
-		fmt.Printf(
-			"  warning: the pi worker binary is not built at %s.\n"+
-				"  Every pi-harness worker spawn will fail until you run\n"+
-				"  `pnpm --filter @langwatch/langyworker build:binary`.\n",
-			piWorkerPath,
-		)
-	}
+	piWorkerPath := langyWorkerBinaryPath(opts.RepoRoot)
 	return Child{
 		Name: "langyagent", Dir: opts.RepoRoot, Color: palette[6],
-		Shell: goServiceShell(opts.RepoRoot, "langyagent", opts.ShouldGoWatch),
+		// Langy's `langwatch` calls run this checkout's CLI, not a global one. Set in
+		// the shell: the lane runs under `bash -lc`, whose path_helper would demote an
+		// env PATH entry behind /etc/paths.d (ensureLangyCLI writes the shims).
+		Shell: "export PATH=" + shQuote(langyCLIBinDir(opts.RepoRoot)) + `:"$PATH"; ` +
+			goServiceShell(opts.RepoRoot, "langyagent", opts.ShouldGoWatch),
 		Env: append(append([]string{}, base...),
+			domain.LaneEnv("langyagent"),
 			fmt.Sprintf("PORT=%d", port),
 			"SESSIONS_ROOT="+filepath.Join(laRoot, "sessions"),
 			"LANGY_WORKSPACE_ROOT="+filepath.Join(laRoot, "workspace"),
@@ -145,15 +143,150 @@ func (o *Orchestrator) langyChild(st domain.Stack, opts PlanOptions, base []stri
 			fmt.Sprintf("LANGY_WORKER_IDLE_MS=%d", langyWorkerIdleMS(localLangyWorkerIdleHostMS)),
 			fmt.Sprintf("LANGY_REAPER_INTERVAL_MS=%d", localLangyReaperIntervalMS),
 			"LANGY_UNSAFE_DEV_DISABLE_ISOLATION=true",
-			// The pi harness spawns this worktree's own built wrapper binary
-			// (`pnpm --filter @langwatch/langyworker build:binary`). Without an
-			// explicit path the manager falls back to bare `langy-worker` on
-			// PATH, which no dev machine has: every pi spawn then fails with
-			// exec-not-found while opencode keeps working, which reads as a
-			// harness bug instead of a setup gap.
+			// The worker reaches the manager's loopback relay over plain HTTP, which
+			// the always-on TLS egress rung would refuse; this tier has already
+			// accepted reduced isolation (troubleshooting gotcha 3).
+			"LANGY_EGRESS_REQUIRE_TLS=false",
+			// The manager spawns this worktree's own built wrapper binary
+			// (`nx run @langwatch/langyworker:build:binary`). Without an
+			// explicit path it falls back to bare `langy-worker` on PATH, which
+			// no dev machine has: every spawn then fails with exec-not-found,
+			// which reads as a bug instead of a setup gap.
 			"LANGY_PI_WORKER_BINARY_PATH="+piWorkerPath,
 		),
 	}
+}
+
+// The build's prebuild re-runs generate; the native render keeps the login
+// steps out of the skills bundled into the CLI that Langy runs.
+const langyCLIBuildCommand = nxCacheEnv + "LANGWATCH_SKILLS_RENDER=native pnpm --filter langwatch build"
+
+// The native build leaves the checkout's generated skills bundle in Langy's
+// render; regenerating the default keeps the SDK's tests, which pin the cli
+// render, green in this checkout.
+const langyCLIRestoreBundleCommand = "LANGWATCH_SKILLS_RENDER=cli node sdks/typescript/scripts/generate-skills-bundle.mjs"
+
+// langyCLIRender is what a successful native build stamps beside the CLI.
+const langyCLIRender = "render=native\n"
+
+// langyCLIManualBuildCommand is what the failed-build hint tells a developer to
+// run by hand. It ends with the bundle restore, so following it leaves no native
+// bundle in the checkout.
+const langyCLIManualBuildCommand = langyCLIBuildCommand + "; " + langyCLIRestoreBundleCommand
+
+// langyCLIBuildShell restores the default bundle even when the build fails
+// (its prebuild may already have written the native one) and keeps the
+// build's exit status.
+func langyCLIBuildShell(logPath string) string {
+	return "(" + langyCLIBuildCommand + "; rc=$?; " + langyCLIRestoreBundleCommand + "; exit $rc) >" + shQuote(logPath) + " 2>&1"
+}
+
+// langyCLIEntry is the checkout's built CLI; langyCLIBinDir holds the
+// `langwatch` and `lw` shims that run it, first on the host tier's PATH.
+func langyCLIEntry(repoRoot string) string {
+	return filepath.Join(repoRoot, "sdks", "typescript", "dist", "cli", "index.js")
+}
+
+// langyCLIRenderStamp sits inside dist, so any other build of the CLI (whose
+// `rm -rf dist` drops it) makes haven rebuild with the native render.
+func langyCLIRenderStamp(repoRoot string) string {
+	return filepath.Join(repoRoot, "sdks", "typescript", "dist", "cli", ".skills-render")
+}
+
+// langyCLIIsNative reports a built CLI that carries haven's native stamp.
+func langyCLIIsNative(repoRoot string) bool {
+	if _, err := os.Stat(langyCLIEntry(repoRoot)); err != nil {
+		return false
+	}
+	stamp, err := os.ReadFile(langyCLIRenderStamp(repoRoot)) //nolint:gosec // G304: haven's own stamp in the checkout
+	return err == nil && string(stamp) == langyCLIRender
+}
+
+func langyCLIBinDir(repoRoot string) string {
+	return filepath.Join(repoRoot, ".bin", "langwatch-cli")
+}
+
+// ensureLangyCLI builds the checkout's CLI when it is missing or was not built
+// with the native render, and writes the shims Langy's PATH names. A failed
+// build keeps Langy and says the CLI on PATH is used instead, with the command
+// and the log.
+func (o *Orchestrator) ensureLangyCLI(ctx context.Context, st domain.Stack, opts *PlanOptions) {
+	if !opts.Selection.Langy || st.LangyTier.RunsInContainer() {
+		return
+	}
+	entry := langyCLIEntry(opts.RepoRoot)
+	if !langyCLIIsNative(opts.RepoRoot) {
+		dir, _ := domain.StackLogPaths(st.WorktreeDir, st.Slug)
+		_ = os.MkdirAll(dir, 0o700)
+		logPath := filepath.Join(dir, "langwatch-cli-build.log")
+		fmt.Printf("  langyagent: building this checkout's langwatch CLI (output in %s)…\n", logPath)
+		job := onceJob{Slug: st.Slug, WorktreeDir: st.WorktreeDir, Name: "langwatch-cli-build", Dir: opts.RepoRoot, Shell: langyCLIBuildShell(logPath)}
+		if err := o.runOnceJob(ctx, job); err != nil {
+			fmt.Printf("  langyagent: the CLI build failed, so Langy uses the langwatch on PATH.\n  Build it with `%s`; log: %s\n", langyCLIManualBuildCommand, logPath)
+			o.log.Warn("langwatch CLI build failed — Langy uses the CLI on PATH", zap.String("log", logPath), zap.Error(err))
+			return
+		}
+		if err := os.WriteFile(langyCLIRenderStamp(opts.RepoRoot), []byte(langyCLIRender), 0o600); err != nil {
+			o.log.Warn("langwatch CLI render stamp", zap.Error(err))
+		}
+	}
+	binDir := langyCLIBinDir(opts.RepoRoot)
+	if err := os.MkdirAll(binDir, 0o750); err != nil {
+		o.log.Warn("langwatch CLI shim directory", zap.Error(err))
+		return
+	}
+	shim := "#!/bin/sh\nexec node " + shQuote(entry) + " \"$@\"\n"
+	for _, name := range []string{"langwatch", "lw"} {
+		//nolint:gosec // G306: a shim the developer's own Langy runs needs the exec bit
+		if err := os.WriteFile(filepath.Join(binDir, name), []byte(shim), 0o750); err != nil {
+			o.log.Warn("langwatch CLI shim", zap.String("name", name), zap.Error(err))
+		}
+	}
+}
+
+const langyWorkerBuildCommand = nxCacheEnv + "pnpm exec nx run @langwatch/langyworker:build:binary --outputStyle=static"
+
+func langyWorkerBinaryPath(repoRoot string) string {
+	return filepath.Join(repoRoot, ".bin", "langy-worker", "langy-worker")
+}
+
+// ensureLangyWorkerBinary builds the langy-worker wrapper the host tier spawns
+// when it is missing. A failed build deselects Langy (the rest of the stack
+// still comes up) and names the command and the log.
+func (o *Orchestrator) ensureLangyWorkerBinary(ctx context.Context, st domain.Stack, opts *PlanOptions) {
+	if !opts.Selection.Langy || st.LangyTier.RunsInContainer() || isExecutableFile(langyWorkerBinaryPath(opts.RepoRoot)) {
+		return
+	}
+	if _, err := exec.LookPath("bun"); err != nil {
+		fmt.Println("  langyagent: bun is missing: run `haven self install`. Langy is off for this run.")
+		o.log.Warn("bun is missing — skipping langyagent", zap.Error(err))
+		opts.Selection.Langy = false
+		return
+	}
+	dir, _ := domain.StackLogPaths(st.WorktreeDir, st.Slug)
+	_ = os.MkdirAll(dir, 0o700)
+	logPath := filepath.Join(dir, "langy-worker-build.log")
+	fmt.Printf("  langyagent: building the langy-worker binary (output in %s)…\n", logPath)
+	shell := langyWorkerBuildCommand + " >" + shQuote(logPath) + " 2>&1"
+	job := onceJob{Slug: st.Slug, WorktreeDir: st.WorktreeDir, Name: "langy-worker-build", Dir: opts.RepoRoot, Shell: shell}
+	if err := o.runOnceJob(ctx, job); err != nil {
+		fmt.Printf("  langyagent: the langy-worker build failed, so Langy is off for this run.\n  Build it with `%s`; log: %s\n", langyWorkerBuildCommand, logPath)
+		o.log.Warn("langy-worker build failed — skipping langyagent", zap.String("log", logPath), zap.Error(err))
+		opts.Selection.Langy = false
+	}
+}
+
+// dropLocalLangyAgent zeroes the port of a langyagent this stack meant to run
+// itself, as provision does for one it never selected, so a Langy deselected
+// after provision emits no LANGY_AGENT_URL for a socket nothing listens on.
+func dropLocalLangyAgent(st *domain.Stack) bool {
+	for i, svc := range st.Services {
+		if svc.Name == "langyagent" && !svc.IsFallback && svc.Port != 0 {
+			st.Services[i].Port = 0
+			return true
+		}
+	}
+	return false
 }
 
 // langyContainerOpts are the inputs to the `docker run` command for a
@@ -218,10 +351,11 @@ func langyContainerShell(o langyContainerOpts) string {
 		"-p", fmt.Sprintf("127.0.0.1:%d:%d", o.Port, o.Port),
 		"-e", fmt.Sprintf("PORT=%d", o.Port),
 		"-e", "ENVIRONMENT=local",
-		// Pretty, human-readable console logging (clog reads LOG_FORMAT), matching the
+		// The shared structured format (clog reads LOG_FORMAT), which haven renders
+		// for the terminal like every other lane. Matching the
 		// host-run Go services and the TS app so every haven dev lane reads the same.
 		// Unconditional in the container tier — it is always a human at the console.
-		"-e", "LOG_FORMAT=pretty",
+		"-e", "LOG_FORMAT=json",
 		"-e", "LANGY_INTERNAL_SECRET=" + o.Secret,
 		"-e", fmt.Sprintf("LANGY_MAX_WORKERS=%d", localLangyMaxWorkers),
 		"-e", fmt.Sprintf("LANGY_WORKER_IDLE_MS=%d", langyWorkerIdleMS(localLangyWorkerIdleMS)),

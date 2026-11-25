@@ -1,20 +1,20 @@
 import chalk from "chalk";
-import { createSpinner } from "../../utils/spinner";
+
 import { ExperimentsApiService } from "@/client-sdk/services/experiments/experiments-api.service";
 import { deriveRunStatus } from "@/client-sdk/services/experiments/run-status";
+
 import { resolveCredentials } from "../../utils/apiKey";
-import { failSpinner } from "../../utils/spinnerError";
 import type { CommandResult } from "../../utils/output";
+import { createSpinner } from "../../utils/spinner";
+import { failSpinner } from "../../utils/spinnerError";
 import { resolveRunId } from "./resolve-run";
 
-const statusColor = (status: string) =>
-  status === "completed"
-    ? chalk.green
-    : status === "failed" || status === "interrupted"
-      ? chalk.red
-      : status === "running"
-        ? chalk.yellow
-        : chalk.gray;
+const statusColor = (status: string) => {
+  if (status === "completed") return chalk.green;
+  if (status === "failed" || status === "interrupted") return chalk.red;
+  if (status === "running") return chalk.yellow;
+  return chalk.gray;
+};
 
 // SDK-logged runs (langwatch.experiment + evaluation.log) never populate the
 // Redis run-state that GET /runs/:runId reads, so that endpoint 404s for them.
@@ -60,9 +60,49 @@ const statusFromResults = async ({
   }
 };
 
+/** A run in one of these states will not move again. */
+const TERMINAL_STATUSES = new Set(["completed", "failed", "stopped", "interrupted"]);
+
+/** How long `--wait` waits when the caller names no limit. */
+const DEFAULT_WAIT_SECONDS = 60;
+/** How long the command sleeps between reads while waiting. */
+const DEFAULT_POLL_MS = 3_000;
+
+const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
+
+export interface ExperimentStatusOptions {
+  runId?: string;
+  /**
+   * Keep reading until the run reaches a terminal state or the limit is up.
+   * The alternative, `sleep 30; langwatch experiment status`, shows as idle
+   * progress and can lose the run if a turn ends mid-sleep.
+   */
+  wait?: boolean;
+  /** Seconds to keep waiting for, as the CLI hands it over. */
+  timeout?: string;
+  /** Poll interval, for tests. */
+  pollMs?: number;
+}
+
+type RunStatus = {
+  runId?: string;
+  status: string;
+  progress: number;
+  total: number;
+  startedAt?: number;
+  finishedAt?: number;
+  stoppedAt?: number;
+  summary?: {
+    completedCells?: number;
+    failedCells?: number;
+    duration?: number;
+    runUrl?: string;
+  };
+};
+
 export const experimentStatusCommand = async (
   experimentSlug: string,
-  options?: { runId?: string },
+  options?: ExperimentStatusOptions,
 ): Promise<CommandResult | void> => {
   await resolveCredentials();
 
@@ -76,40 +116,32 @@ export const experimentStatusCommand = async (
       runId: options?.runId,
     });
 
-    let status: {
-      runId?: string;
-      status: string;
-      progress: number;
-      total: number;
-      startedAt?: number;
-      finishedAt?: number;
-      stoppedAt?: number;
-      summary?: {
-        completedCells?: number;
-        failedCells?: number;
-        duration?: number;
-        runUrl?: string;
-      };
+    const readStatus = async (): Promise<RunStatus> => {
+      try {
+        return await service.getRunStatus(runId);
+      } catch (error) {
+        // Only a missing Redis run-state warrants the ClickHouse fallback. Real
+        // 5xx / auth / network failures must propagate, otherwise a working
+        // results call would mask them as a healthy derived status.
+        const message = error instanceof Error ? error.message : String(error);
+        if (!/404|not found/i.test(message)) {
+          throw error;
+        }
+
+        const fallback = await statusFromResults({
+          service,
+          runId,
+          experimentSlug,
+        });
+        if (!fallback) throw error;
+        return fallback;
+      }
     };
 
-    try {
-      status = await service.getRunStatus(runId);
-    } catch (error) {
-      // Only a missing Redis run-state warrants the ClickHouse fallback. Real
-      // 5xx / auth / network failures must propagate, otherwise a working
-      // results call would mask them as a healthy derived status.
-      const message = error instanceof Error ? error.message : String(error);
-      if (!/404|not found/i.test(message)) {
-        throw error;
-      }
+    let status = await readStatus();
 
-      const fallback = await statusFromResults({
-        service,
-        runId,
-        experimentSlug,
-      });
-      if (!fallback) throw error;
-      status = fallback;
+    if (options?.wait) {
+      status = await waitForTerminalStatus({ status, readStatus, spinner, runId, options });
     }
 
     const color = statusColor(status.status);
@@ -117,43 +149,105 @@ export const experimentStatusCommand = async (
 
     return {
       data: status,
-      table: () => {
-        console.log();
-        console.log(`  ${chalk.gray("Status:")}   ${color(status.status)}`);
-        console.log(`  ${chalk.gray("Progress:")} ${status.progress}/${status.total} cells`);
-
-        if (status.startedAt) {
-          console.log(`  ${chalk.gray("Started:")}  ${new Date(status.startedAt).toLocaleString()}`);
-        }
-        if (status.finishedAt) {
-          console.log(`  ${chalk.gray("Finished:")} ${new Date(status.finishedAt).toLocaleString()}`);
-        }
-        if (status.stoppedAt) {
-          console.log(`  ${chalk.gray("Stopped:")}  ${new Date(status.stoppedAt).toLocaleString()}`);
-        }
-
-        if (status.summary) {
-          console.log();
-          console.log(chalk.bold("  Summary:"));
-          if (status.summary.completedCells !== undefined) {
-            console.log(`    ${chalk.gray("Completed:")} ${chalk.green(String(status.summary.completedCells))}`);
-          }
-          if (status.summary.failedCells) {
-            console.log(`    ${chalk.gray("Failed:")}    ${chalk.red(String(status.summary.failedCells))}`);
-          }
-          if (status.summary.duration) {
-            console.log(`    ${chalk.gray("Duration:")}  ${(status.summary.duration / 1000).toFixed(1)}s`);
-          }
-          if (status.summary.runUrl) {
-            console.log(`    ${chalk.gray("View:")}      ${status.summary.runUrl}`);
-          }
-        }
-
-        console.log();
-      },
+      table: () => printRunStatus({ status, color }),
     };
   } catch (error) {
     failSpinner({ spinner, error, action: "check experiment status" });
     process.exit(1);
   }
 };
+
+function printRunStatus({
+  status,
+  color,
+}: {
+  status: RunStatus;
+  color: ReturnType<typeof statusColor>;
+}): void {
+  console.log();
+  console.log(`  ${chalk.gray("Status:")}   ${color(status.status)}`);
+  console.log(`  ${chalk.gray("Progress:")} ${status.progress}/${status.total} cells`);
+
+  if (status.startedAt) {
+    console.log(`  ${chalk.gray("Started:")}  ${new Date(status.startedAt).toLocaleString()}`);
+  }
+  if (status.finishedAt) {
+    console.log(`  ${chalk.gray("Finished:")} ${new Date(status.finishedAt).toLocaleString()}`);
+  }
+  if (status.stoppedAt) {
+    console.log(`  ${chalk.gray("Stopped:")}  ${new Date(status.stoppedAt).toLocaleString()}`);
+  }
+
+  if (status.summary) {
+    console.log();
+    console.log(chalk.bold("  Summary:"));
+    if (status.summary.completedCells !== undefined) {
+      console.log(
+        `    ${chalk.gray("Completed:")} ${chalk.green(String(status.summary.completedCells))}`,
+      );
+    }
+    if (status.summary.failedCells) {
+      console.log(
+        `    ${chalk.gray("Failed:")}    ${chalk.red(String(status.summary.failedCells))}`,
+      );
+    }
+    if (status.summary.duration) {
+      console.log(
+        `    ${chalk.gray("Duration:")}  ${(status.summary.duration / 1000).toFixed(1)}s`,
+      );
+    }
+    if (status.summary.runUrl) {
+      console.log(`    ${chalk.gray("View:")}      ${status.summary.runUrl}`);
+    }
+  }
+
+  console.log();
+}
+
+/** Polls until the run is over or the wait limit is up, keeping the last status read. */
+async function waitForTerminalStatus({
+  status: initial,
+  readStatus,
+  spinner,
+  runId,
+  options,
+}: {
+  status: RunStatus;
+  readStatus: () => Promise<RunStatus>;
+  spinner: ReturnType<typeof createSpinner>;
+  runId: string;
+  options: ExperimentStatusOptions;
+}): Promise<RunStatus> {
+  let status = initial;
+  const seconds = Number(options.timeout ?? DEFAULT_WAIT_SECONDS);
+  const limitMs =
+    Number.isFinite(seconds) && seconds >= 0 ? seconds * 1000 : DEFAULT_WAIT_SECONDS * 1000;
+  const deadline = Date.now() + limitMs;
+  const pollMs = options.pollMs ?? DEFAULT_POLL_MS;
+
+  let lastReadError: Error | null = null;
+  while (true) {
+    if (TERMINAL_STATUSES.has(status.status)) break;
+    if (Date.now() >= deadline) break;
+
+    spinner.text = `Waiting for run ${runId}: ${status.progress}/${status.total} cells...`;
+    await sleep(pollMs);
+    try {
+      status = await readStatus();
+      lastReadError = null;
+    } catch (error) {
+      // One unreadable poll says nothing about the run. The wait keeps the
+      // status it already has and looks again, so a dropped socket at
+      // second 12 of a 60 second wait no longer reports a healthy run as
+      // failed.
+      lastReadError = error instanceof Error ? error : new Error(String(error));
+    }
+  }
+  // Still unreadable when the wait ended: the caller has no current answer,
+  // so they get the failure rather than a stale status dressed up as fresh.
+  if (lastReadError) throw lastReadError;
+  // A run still going when the limit is up is not a failure: the caller
+  // asked how far it had got, and that is what it gets. Failing here would
+  // make a slow run indistinguishable from a broken one.
+  return status;
+}

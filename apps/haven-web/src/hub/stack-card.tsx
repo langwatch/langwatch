@@ -1,0 +1,168 @@
+import {
+  Button,
+  ConfirmButton,
+  Link,
+  Panel,
+  StatusDot,
+  Table,
+  type TableColumn,
+} from "@langwatch/design-system-internal";
+import { useState } from "react";
+
+import { msOf } from "../shared/clock.ts";
+import type { HubAnalytics, HubStack, Surface } from "../shared/contract.ts";
+import { formatAge, formatBytes, formatCount } from "../shared/format.ts";
+import { logsPath } from "../shared/route.ts";
+import { ownSurfaces, surfaceState } from "../shared/surfaces.ts";
+import { DestroyDialog } from "./destroy-dialog.tsx";
+
+const columns: TableColumn<Surface>[] = [
+  {
+    key: "status",
+    header: "Status",
+    width: "120px",
+    cell: (surface) => <StatusDot {...surfaceState({ status: surface.status })} />,
+  },
+  { key: "name", header: "Surface", width: "144px", cell: (surface) => surface.name },
+  {
+    key: "host",
+    header: "Hostname",
+    mono: true,
+    hideOnNarrow: true,
+    title: (surface) => surface.url || surface.hostname,
+    cell: (surface) => {
+      if (surface.status === "not-selected") return `off: haven up +${surface.name}`;
+      if (surface.url === "") return surface.hostname || "no hostname";
+      return (
+        <Link href={surface.url} mono>
+          {surface.hostname || surface.url}
+        </Link>
+      );
+    },
+  },
+  {
+    key: "port",
+    header: "Port",
+    width: "72px",
+    align: "end",
+    mono: true,
+    muted: true,
+    cell: (surface) => (surface.port === 0 ? "—" : String(surface.port)),
+  },
+];
+
+/** Branch, memory, databases and heartbeat: the old card's chips, on one quiet line. */
+const summaryOf = ({ stack, now }: { stack: HubStack; now: number }) => {
+  const { facts } = stack;
+  return [
+    facts.branch,
+    facts.baseline ? "baseline" : "",
+    stack.live && facts.rssBytes > 0 ? `~${formatBytes({ bytes: facts.rssBytes })}` : "",
+    facts.databases.clickhouse.name === "" ? "" : `clickhouse ${facts.databases.clickhouse.name}`,
+    facts.databases.redis.db === null ? "" : `redis db ${facts.databases.redis.db}`,
+    facts.heartbeatAt === null ? "" : `heartbeat ${formatAge({ at: facts.heartbeatAt, now })}`,
+  ]
+    .filter((part) => part.length > 0)
+    .join(" · ");
+};
+
+/** The analyticssim line: live while an event arrived in the last minute. */
+const ActivityLine = ({ analytics, now }: { analytics: HubAnalytics; now: number }) => {
+  const at = analytics.lastReceivedAt;
+  const recent = at !== null && now - msOf({ iso: at }) < 60_000;
+  const last =
+    at === null ? "no events yet" : `last ${analytics.lastName} ${formatAge({ at, now })}`;
+  const label = `${formatCount({ count: analytics.lastFiveMinutes })} events / 5m · ${formatCount({ count: analytics.distinctIds })} users · ${last}`;
+  return <StatusDot state={recent ? "live" : "unknown"} label={label} />;
+};
+
+export type StackCardProps = {
+  stack: HubStack;
+  now: number;
+  /** An action on this stack is in flight. */
+  busy: boolean;
+  onRestart: () => void;
+  onDown: () => void;
+  onDestroy: () => void;
+};
+
+export const StackCard = ({ stack, now, busy, onRestart, onDown, onDestroy }: StackCardProps) => {
+  const summary = summaryOf({ stack, now });
+  const [destroying, setDestroying] = useState(false);
+  return (
+    <Panel
+      title={stack.homeUrl === "" ? stack.slug : <Link href={stack.homeUrl}>{stack.slug}</Link>}
+      meta={
+        <span title={`${stack.facts.worktreeDir}\n${summary}`}>
+          <StatusDot state={stack.live ? "live" : "down"} label={stack.live ? "Live" : "Stale"} />
+          {` · ${summary}`}
+          {stack.analytics !== undefined && (
+            <>
+              <br />
+              <ActivityLine analytics={stack.analytics} now={now} />
+            </>
+          )}
+        </span>
+      }
+      actions={
+        <>
+          <Button size="sm" href={logsPath({ stack: stack.slug })}>
+            Logs
+          </Button>
+          {stack.canRestart && (
+            <ConfirmButton
+              size="sm"
+              variant="secondary"
+              label="Restart"
+              confirmLabel="Restart?"
+              disabled={busy}
+              onConfirm={onRestart}
+            />
+          )}
+          {stack.canDown && (
+            <ConfirmButton
+              size="sm"
+              variant="secondary"
+              label="Down"
+              confirmLabel="Down?"
+              disabled={busy}
+              onConfirm={onDown}
+            />
+          )}
+          {stack.canDestroy && (
+            <>
+              <Button
+                size="sm"
+                variant="danger"
+                disabled={busy}
+                title="Stop the stack and drop its databases"
+                onClick={() => setDestroying(true)}
+              >
+                Destroy
+              </Button>
+              <DestroyDialog
+                slug={stack.slug}
+                open={destroying}
+                onClose={() => setDestroying(false)}
+                onConfirm={onDestroy}
+              />
+            </>
+          )}
+          {stack.appUrl !== "" && (
+            <Button size="sm" href={stack.appUrl}>
+              Open
+            </Button>
+          )}
+        </>
+      }
+    >
+      <Table
+        columns={columns}
+        rows={ownSurfaces({ surfaces: stack.surfaces })}
+        rowKey={(surface) => surface.name}
+        caption={`${stack.slug} surfaces`}
+        empty="No surfaces registered yet."
+      />
+    </Panel>
+  );
+};

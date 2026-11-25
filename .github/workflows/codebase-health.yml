@@ -1,0 +1,140 @@
+name: codebase-health
+
+# Nightly codebase health: type-check cost per program, root typecheck time and
+# peak RSS, longest reference chain, emitted .d.ts size, architecture findings
+# per policy, UI bundle size and test:repo time, compared with last night's,
+# a week ago's and a month ago's health.json. A jump opens (or comments on) the
+# issue labelled codebase-health. Its section of the nightly dashboard (the
+# pinned issue labelled codebase-health-dashboard) is the dashboard-body.md
+# artifact; the nightly suite's last job writes the issue. A failing typecheck
+# or UI build is a breach, not an aborted job.
+#
+# Runs inside .github/workflows/nightly.yml, which owns the schedule. Its runs
+# are the nightly's, so earlier nights are found by artifact name
+# (.github/scripts/nightly-artifacts.ts), never by this workflow's run list.
+#
+# Spec: specs/tooling/codebase-health.feature, specs/ci/nightly-suite.feature
+
+on:
+  workflow_call:
+    inputs:
+      publish:
+        description: "Open or comment on the codebase-health issue on a regression"
+        type: boolean
+        default: true
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: "Open or comment on the codebase-health issue on a regression"
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+  issues: write
+  actions: read
+
+concurrency:
+  group: codebase-health
+  cancel-in-progress: false
+
+jobs:
+  health:
+    name: measure and compare
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      GH_TOKEN: ${{ github.token }}
+      SKIP_ENV_VALIDATION: "true"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
+
+      - uses: ./.github/actions/setup-pnpm-node
+        with:
+          install: all
+
+      - uses: ./.github/actions/prepare-generated-files
+
+      # The Nx cache would replay the typecheck and measure nothing.
+      # A type error must not stop the other measurements: the exit code is
+      # kept for the script, which reports it as a breach.
+      - name: Root typecheck, timed
+        run: |
+          set +e
+          /usr/bin/time -v -o typecheck-time.txt pnpm typecheck --skip-nx-cache > typecheck.log 2>&1
+          echo $? > typecheck-exit.txt
+          tail -n 40 typecheck.log
+          exit 0
+
+      - name: Type-check cost per program
+        run: node dev/scripts/ts-program-metrics.mjs --out=ts-program-metrics.jsonl
+
+      # A red suite must not stop the bundle and architecture measurements.
+      - name: Repo-scanning suites
+        continue-on-error: true
+        run: |
+          start=$(date +%s)
+          status=0
+          pnpm exec nx run-many -t test:repo --outputStyle=static || status=$?
+          echo $(( $(date +%s) - start )) > test-repo-seconds.txt
+          exit $status
+
+      # Bundle size does not need a cold cache, so the Nx cache is used here.
+      - uses: ./.github/actions/nx-cache
+        with:
+          suffix: health-build
+
+      # Same build as the app CI's build job. A failure is recorded, not fatal.
+      - name: Build the UI
+        run: |
+          set +e
+          (pnpm start:prepare:files && pnpm ensure:built && pnpm run build:types && pnpm exec nx run @langwatch/ui:build --outputStyle=static)
+          echo $? > ui-build-exit.txt
+          exit 0
+
+      # Exit 1 means findings, which are what this step counts.
+      - name: Architecture findings
+        run: pnpm lint:architecture > architecture.txt 2>&1 || test $? -eq 1
+
+      # Last night's, the newest at least six days old and the newest at least
+      # 29 days old, all from the default branch. The artifact is kept 35 days
+      # so the month-ago one still exists.
+      - name: Health.json from earlier nights
+        run: |
+          node --experimental-strip-types .github/scripts/nightly-artifacts.ts --name codebase-health --min-age-days 0 --dir previous
+          node --experimental-strip-types .github/scripts/nightly-artifacts.ts --name codebase-health --min-age-days 6 --dir weekago
+          node --experimental-strip-types .github/scripts/nightly-artifacts.ts --name codebase-health --min-age-days 29 --dir monthago
+
+      - name: Compare and report
+        env:
+          PUBLISH: ${{ inputs.publish }}
+        run: >-
+          node dev/scripts/codebase-health.mjs
+          --metrics=ts-program-metrics.jsonl
+          --architecture=architecture.txt
+          --time=typecheck-time.txt
+          --typecheck-log=typecheck.log
+          --typecheck-exit=typecheck-exit.txt
+          --bundle-dir=apps/ui/dist/client
+          --bundle-exit=ui-build-exit.txt
+          --test-repo-seconds=test-repo-seconds.txt
+          --previous=previous/health.json
+          --weekago=weekago/health.json
+          --monthago=monthago/health.json
+          --out=health.json
+          --dashboard=dashboard-body.md
+          --commit="$GITHUB_SHA"
+          --publish="$PUBLISH"
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: always()
+        with:
+          name: codebase-health
+          path: |
+            health.json
+            ts-program-metrics.jsonl
+            architecture.txt
+            typecheck.log
+            dashboard-body.md
+          retention-days: 35
+          if-no-files-found: warn

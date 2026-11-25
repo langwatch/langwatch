@@ -4,10 +4,8 @@ from collections.abc import Mapping
 from typing import Any, TypeVar, cast
 
 from attrs import define as _attrs_define
-from attrs import field as _attrs_field
 
 from ..models.post_api_monitors_response_201_execution_mode import PostApiMonitorsResponse201ExecutionMode
-from ..types import UNSET, Unset
 
 T = TypeVar("T", bound="PostApiMonitorsResponse201")
 
@@ -25,13 +23,18 @@ class PostApiMonitorsResponse201:
         sample (float):
         level (str):
         evaluator_id (None | str):
+        preconditions (Any):
+        parameters (Any):
+        mappings (Any | None):
         thread_idle_timeout (float | None):
         created_at (str):
         updated_at (str):
+        auto_paused_at (None | str): When the monitor paused itself because its evaluations mostly failed.
+        auto_paused_reason (None | str): Why the monitor paused itself.
+        evaluator_label (None | str): The evaluator deploy label the monitor runs; null runs the latest version.
+        created_by_id (None | str): The user who created the monitor, when recorded.
+        updated_by_id (None | str): The user who changed the monitor last.
         platform_url (str):
-        preconditions (Any | Unset):
-        parameters (Any | Unset):
-        mappings (None | Unset):
     """
 
     id: str
@@ -43,14 +46,18 @@ class PostApiMonitorsResponse201:
     sample: float
     level: str
     evaluator_id: None | str
+    preconditions: Any
+    parameters: Any
+    mappings: Any | None
     thread_idle_timeout: float | None
     created_at: str
     updated_at: str
+    auto_paused_at: None | str
+    auto_paused_reason: None | str
+    evaluator_label: None | str
+    created_by_id: None | str
+    updated_by_id: None | str
     platform_url: str
-    preconditions: Any | Unset = UNSET
-    parameters: Any | Unset = UNSET
-    mappings: None | Unset = UNSET
-    additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         id = self.id
@@ -72,6 +79,13 @@ class PostApiMonitorsResponse201:
         evaluator_id: None | str
         evaluator_id = self.evaluator_id
 
+        preconditions = self.preconditions
+
+        parameters = self.parameters
+
+        mappings: Any | None
+        mappings = self.mappings
+
         thread_idle_timeout: float | None
         thread_idle_timeout = self.thread_idle_timeout
 
@@ -79,16 +93,25 @@ class PostApiMonitorsResponse201:
 
         updated_at = self.updated_at
 
+        auto_paused_at: None | str
+        auto_paused_at = self.auto_paused_at
+
+        auto_paused_reason: None | str
+        auto_paused_reason = self.auto_paused_reason
+
+        evaluator_label: None | str
+        evaluator_label = self.evaluator_label
+
+        created_by_id: None | str
+        created_by_id = self.created_by_id
+
+        updated_by_id: None | str
+        updated_by_id = self.updated_by_id
+
         platform_url = self.platform_url
 
-        preconditions = self.preconditions
-
-        parameters = self.parameters
-
-        mappings = self.mappings
-
         field_dict: dict[str, Any] = {}
-        field_dict.update(self.additional_properties)
+
         field_dict.update(
             {
                 "id": id,
@@ -100,18 +123,20 @@ class PostApiMonitorsResponse201:
                 "sample": sample,
                 "level": level,
                 "evaluatorId": evaluator_id,
+                "preconditions": preconditions,
+                "parameters": parameters,
+                "mappings": mappings,
                 "threadIdleTimeout": thread_idle_timeout,
                 "createdAt": created_at,
                 "updatedAt": updated_at,
+                "autoPausedAt": auto_paused_at,
+                "autoPausedReason": auto_paused_reason,
+                "evaluatorLabel": evaluator_label,
+                "createdById": created_by_id,
+                "updatedById": updated_by_id,
                 "platformUrl": platform_url,
             }
         )
-        if preconditions is not UNSET:
-            field_dict["preconditions"] = preconditions
-        if parameters is not UNSET:
-            field_dict["parameters"] = parameters
-        if mappings is not UNSET:
-            field_dict["mappings"] = mappings
 
         return field_dict
 
@@ -141,6 +166,17 @@ class PostApiMonitorsResponse201:
 
         evaluator_id = _parse_evaluator_id(d.pop("evaluatorId"))
 
+        preconditions = d.pop("preconditions")
+
+        parameters = d.pop("parameters")
+
+        def _parse_mappings(data: object) -> Any | None:
+            if data is None:
+                return data
+            return cast(Any | None, data)
+
+        mappings = _parse_mappings(d.pop("mappings"))
+
         def _parse_thread_idle_timeout(data: object) -> float | None:
             if data is None:
                 return data
@@ -152,13 +188,42 @@ class PostApiMonitorsResponse201:
 
         updated_at = d.pop("updatedAt")
 
+        def _parse_auto_paused_at(data: object) -> None | str:
+            if data is None:
+                return data
+            return cast(None | str, data)
+
+        auto_paused_at = _parse_auto_paused_at(d.pop("autoPausedAt"))
+
+        def _parse_auto_paused_reason(data: object) -> None | str:
+            if data is None:
+                return data
+            return cast(None | str, data)
+
+        auto_paused_reason = _parse_auto_paused_reason(d.pop("autoPausedReason"))
+
+        def _parse_evaluator_label(data: object) -> None | str:
+            if data is None:
+                return data
+            return cast(None | str, data)
+
+        evaluator_label = _parse_evaluator_label(d.pop("evaluatorLabel"))
+
+        def _parse_created_by_id(data: object) -> None | str:
+            if data is None:
+                return data
+            return cast(None | str, data)
+
+        created_by_id = _parse_created_by_id(d.pop("createdById"))
+
+        def _parse_updated_by_id(data: object) -> None | str:
+            if data is None:
+                return data
+            return cast(None | str, data)
+
+        updated_by_id = _parse_updated_by_id(d.pop("updatedById"))
+
         platform_url = d.pop("platformUrl")
-
-        preconditions = d.pop("preconditions", UNSET)
-
-        parameters = d.pop("parameters", UNSET)
-
-        mappings = d.pop("mappings", UNSET)
 
         post_api_monitors_response_201 = cls(
             id=id,
@@ -170,30 +235,18 @@ class PostApiMonitorsResponse201:
             sample=sample,
             level=level,
             evaluator_id=evaluator_id,
-            thread_idle_timeout=thread_idle_timeout,
-            created_at=created_at,
-            updated_at=updated_at,
-            platform_url=platform_url,
             preconditions=preconditions,
             parameters=parameters,
             mappings=mappings,
+            thread_idle_timeout=thread_idle_timeout,
+            created_at=created_at,
+            updated_at=updated_at,
+            auto_paused_at=auto_paused_at,
+            auto_paused_reason=auto_paused_reason,
+            evaluator_label=evaluator_label,
+            created_by_id=created_by_id,
+            updated_by_id=updated_by_id,
+            platform_url=platform_url,
         )
 
-        post_api_monitors_response_201.additional_properties = d
         return post_api_monitors_response_201
-
-    @property
-    def additional_keys(self) -> list[str]:
-        return list(self.additional_properties.keys())
-
-    def __getitem__(self, key: str) -> Any:
-        return self.additional_properties[key]
-
-    def __setitem__(self, key: str, value: Any) -> None:
-        self.additional_properties[key] = value
-
-    def __delitem__(self, key: str) -> None:
-        del self.additional_properties[key]
-
-    def __contains__(self, key: str) -> bool:
-        return key in self.additional_properties

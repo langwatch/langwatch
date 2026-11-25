@@ -88,6 +88,116 @@ app.kubernetes.io/component: keeper
   {{- if and (gt (int .Values.replicas) 1) (eq (mod (int .Values.replicas) 2) 0) }}
     {{- fail "replicas must be odd when greater than 1 (required for Keeper raft quorum)" }}
   {{- end }}
+  {{- include "clickhouse-serverless.validateTransition" . }}
+  {{- if and .Values.access.enabled (not .Values.access.existingConfigMap) (empty .Values.access.config) }}
+    {{- fail "access.enabled needs access.config or access.existingConfigMap" }}
+  {{- end }}
+  {{- if and (include "clickhouse-serverless.backupSidecar" .) (gt (int .Values.replicas) 1) (not .Values.auth.clusterSecretEnabled) }}
+    {{- fail "backup.mode sidecar or cronjob-observe with replicas > 1 needs auth.clusterSecretEnabled: the sidecar reads every replica's backup log, and without the secret the replicas refuse each other's queries" }}
+  {{- end }}
+  {{- if .Values.access.dynamicOnly.enabled }}
+    {{- if not .Values.access.enabled }}
+      {{- fail "access.dynamicOnly.enabled needs access.enabled: token logins are verified by the access sidecar" }}
+    {{- end }}
+    {{- if and (gt (int .Values.replicas) 1) (not .Values.auth.clusterSecretEnabled) }}
+      {{- fail "access.dynamicOnly.enabled with replicas > 1 needs auth.clusterSecretEnabled: replicas would otherwise log in to each other as default, which is locked" }}
+    {{- end }}
+    {{- if and .Values.backup.enabled (ne (include "clickhouse-serverless.backupMode" .) "sidecar") }}
+      {{- fail "access.dynamicOnly.enabled cannot run the backup CronJobs: they log in as default with the static password, which this mode removes. Set backup.mode=sidecar: the sidecar logs in as the per-boot local admin" }}
+    {{- end }}
+    {{- if and .Values.backup.enabled (gt (int .Values.replicas) 1) }}
+      {{- fail "access.dynamicOnly.enabled with replicas > 1 cannot run backups: the sidecar logs in as the per-boot local admin, which the other replicas refuse, so it cannot read their backup history or poll a restore" }}
+    {{- end }}
+    {{- if .Values.access.passwordSecrets }}
+      {{- fail "access.dynamicOnly.enabled refuses access.passwordSecrets: rolling passwords are long-lived, use token logins" }}
+    {{- end }}
+    {{- if .Values.lwqlAccess.secretName }}
+      {{- fail "access.dynamicOnly.enabled refuses lwqlAccess.secretName: the LangWatchQL access model logs its user in with a static password" }}
+    {{- end }}
+  {{- end }}
+{{- end -}}
+
+{{/* True when the pod runs in dynamic-only mode (ADR-198). */}}
+{{- define "clickhouse-serverless.dynamicOnly" -}}
+{{- if and .Values.access.enabled .Values.access.dynamicOnly.enabled }}true{{ end }}
+{{- end -}}
+
+{{/* clickhouse-client login for exec probes: the per-boot local admin in
+     dynamic-only mode, default with the Secret's password otherwise. */}}
+{{- define "clickhouse-serverless.probeLogin" -}}
+{{- if include "clickhouse-serverless.dynamicOnly" . -}}
+--user local_admin --password "$(cat /run/clickhouse-access/password)"
+{{- else -}}
+--user default --password "$(cat /mnt/secrets/password)"
+{{- end -}}
+{{- end -}}
+
+{{/* Access file and password Secrets, mounted read-only into ClickHouse (for
+     ch-config generate at startup) and the sidecar (for every later sync). */}}
+{{- define "clickhouse-serverless.accessMounts" -}}
+- name: access-config
+  mountPath: /etc/clickhouse-access/config
+  readOnly: true
+{{- if include "clickhouse-serverless.dynamicOnly" . }}
+# The local admin's per-boot password: ClickHouse writes it, the sidecar reads it.
+- name: access-bootstrap
+  mountPath: /run/clickhouse-access
+{{- end }}
+{{- range $i, $name := .Values.access.passwordSecrets }}
+- name: access-secret-{{ $i }}
+  mountPath: /etc/clickhouse-access/secrets/{{ $name }}
+  readOnly: true
+{{- end }}
+{{- end -}}
+
+{{/* Transition guard: refuse to scale an EXISTING single-node release into a
+     replicated topology.
+
+     Measured on kind against langwatch/clickhouse-serverless (issue #1168,
+     P1.7), upgrading a release from replicas=1 to replicas=3 leaves the
+     existing tables as plain MergeTree on pod-0 only. The new replicas come up
+     with empty data directories: per-pod `SELECT count()` returned the full
+     count on pod-0 and `Code: 81 ... Database up does not exist
+     (UNKNOWN_DATABASE)` on pods 1 and 2, and five identical distributed
+     `SELECT count()` calls returned the full count four times and
+     UNKNOWN_DATABASE once. A user issuing the same query twice gets different
+     answers, with no error to tell them the topology changed underneath. The
+     five SQL-defined access-entity classes are likewise not migrated. There is
+     no migration code on this path, so the chart refuses it rather than letting
+     it half-succeed.
+
+     LOOKUP SOURCE. The current replica count is read from the live
+     StatefulSet's spec.replicas, not from the release's recorded values: Helm
+     does not expose the previous release's values to templates, and
+     spec.replicas is the topology that actually exists — it stays correct even
+     if someone scaled the StatefulSet outside Helm.
+
+     WHEN THE GUARD IS INERT, DECLARED. `lookup` returns nil whenever the
+     renderer has no cluster access. Under ArgoCD the repo-server renders
+     without a cluster connection (see secret.yaml's HISTORY note — the same
+     nil-lookup behaviour caused the credential-rotation postmortem), and
+     `helm template` behaves the same way. In those contexts this guard is
+     SILENTLY INERT and a 1 -> 3 transition will not be blocked. That is
+     accepted deliberately: a lookup-based guard cannot do better, and failing
+     closed on nil would break every ArgoCD sync and every `helm template`,
+     including legitimate ones. The guard is a safety net for the interactive
+     `helm upgrade` path, not a security boundary.
+
+     It is also scoped to upgrades only (.Release.IsUpgrade), so a fresh
+     install at any replica count is never blocked — including a fresh install
+     into a namespace where an unrelated StatefulSet of the same name lingers. */}}
+{{- define "clickhouse-serverless.validateTransition" -}}
+  {{- if .Release.IsUpgrade }}
+    {{- $desired := int .Values.replicas }}
+    {{- if gt $desired 1 }}
+      {{- $sts := lookup "apps/v1" "StatefulSet" .Release.Namespace (include "clickhouse-serverless.fullname" .) }}
+      {{- if $sts }}
+        {{- if eq (int $sts.spec.replicas) 1 }}
+          {{- fail (printf "unsupported transition: this release is running replicas=1 and this upgrade requests replicas=%d. Scaling an existing single-node ClickHouse release into a replicated topology is not supported: existing tables stay plain MergeTree on pod-0, so the new replicas start with empty data directories and identical distributed queries return different answers depending on which replica they land on. SQL-defined access entities (users, grants, row policies, settings profiles, named collections) are not migrated either. To run replicated, install a NEW release at replicas=%d and migrate data explicitly; or set replicas=1 to leave this release unchanged." $desired $desired) }}
+        {{- end }}
+      {{- end }}
+    {{- end }}
+  {{- end }}
 {{- end -}}
 
 {{/* Auth wiring fail-fast: hard-stop the render when neither path to a
@@ -115,3 +225,22 @@ app.kubernetes.io/component: keeper
 {{- default "clusterSecret" .Values.auth.secretKeys.clusterSecretKey -}}
 {{- end -}}
 
+
+{{/* Backup mode (ADR-199): "cronjob", "sidecar" or "cronjob-observe". */}}
+{{- define "clickhouse-serverless.backupMode" -}}
+{{- $mode := .Values.backup.mode | default "cronjob" -}}
+{{- if not (has $mode (list "cronjob" "sidecar" "cronjob-observe")) -}}
+{{- fail (printf "backup.mode must be cronjob, sidecar or cronjob-observe, got %q" $mode) -}}
+{{- end -}}
+{{- $mode -}}
+{{- end -}}
+
+{{/* "true" when backup CronJobs render. */}}
+{{- define "clickhouse-serverless.backupCronJobs" -}}
+{{- if and .Values.backup.enabled (ne (include "clickhouse-serverless.backupMode" .) "sidecar") }}true{{ end -}}
+{{- end -}}
+
+{{/* "true" when the ch-config sidecar runs backups (or observes them). */}}
+{{- define "clickhouse-serverless.backupSidecar" -}}
+{{- if and .Values.backup.enabled (ne (include "clickhouse-serverless.backupMode" .) "cronjob") }}true{{ end -}}
+{{- end -}}

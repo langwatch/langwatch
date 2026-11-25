@@ -1,4 +1,5 @@
-import { listSimulationRuns as apiListSimulationRuns } from "../langwatch-api-simulation-runs.js";
+import { listSimulationRuns as apiListSimulationRuns } from "../langwatch-api-simulation-runs.ts";
+import { formatRunStatus } from "./format-suite-details.ts";
 
 /**
  * Handles the platform_list_simulation_runs MCP tool invocation.
@@ -22,14 +23,16 @@ export async function handleListSimulationRuns(params: {
   const { runs } = result;
 
   if (runs.length === 0) {
-    return "No simulation runs found.\n\n> Run a suite first with `platform_run_suite` to create simulation runs.";
+    return "No simulation runs found.\n\n> Run scenarios first with `platform_run_plan` or `platform_run_test_suite` to create simulation runs.";
   }
 
   const lines: string[] = [];
-  lines.push(`# Simulation Runs (${runs.length} results${result.hasMore ? ", more available" : ""})\n`);
+  lines.push(
+    `# Simulation Runs (${runs.length} results${result.hasMore ? ", more available" : ""})\n`,
+  );
 
   for (const run of runs) {
-    const statusIcon = run.status === "SUCCESS" ? "pass" : run.status === "FAILED" ? "FAIL" : run.status;
+    const statusIcon = formatRunStatus(run.status);
     const duration = run.durationInMs > 0 ? `${(run.durationInMs / 1000).toFixed(1)}s` : "—";
     const verdict = run.results?.verdict ?? "";
 
@@ -40,10 +43,15 @@ export async function handleListSimulationRuns(params: {
     if (run.totalCost) {
       lines.push(`**Cost**: $${run.totalCost.toFixed(4)}`);
     }
+    if (run.note) {
+      lines.push(`**Note**: ${run.note}`);
+    }
     lines.push("");
   }
 
-  lines.push("> Use `platform_get_simulation_run` with a run ID to see full details (messages, results).");
+  lines.push(
+    "> Use `platform_get_simulation_run` with a run ID to see full details (messages, results).",
+  );
 
   return lines.join("\n");
 }

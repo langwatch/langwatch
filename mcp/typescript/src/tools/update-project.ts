@@ -1,4 +1,4 @@
-import { updateProject as apiUpdateProject } from "../langwatch-api-projects.js";
+import { updateProject as apiUpdateProject } from "../langwatch-api-projects.ts";
 
 export async function handleUpdateProject(params: {
   id: string;

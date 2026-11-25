@@ -1,0 +1,71 @@
+from __future__ import annotations
+
+from collections.abc import Mapping
+from typing import Any, TypeVar
+
+from attrs import define as _attrs_define
+
+from ..models.get_api_key_response_200_role_bindings_item_role import GetApiKeyResponse200RoleBindingsItemRole
+from ..models.get_api_key_response_200_role_bindings_item_scope_type import (
+    GetApiKeyResponse200RoleBindingsItemScopeType,
+)
+
+T = TypeVar("T", bound="GetApiKeyResponse200RoleBindingsItem")
+
+
+@_attrs_define
+class GetApiKeyResponse200RoleBindingsItem:
+    """
+    Attributes:
+        id (str):
+        role (GetApiKeyResponse200RoleBindingsItemRole):
+        scope_type (GetApiKeyResponse200RoleBindingsItemScopeType):
+        scope_id (str):
+    """
+
+    id: str
+    role: GetApiKeyResponse200RoleBindingsItemRole
+    scope_type: GetApiKeyResponse200RoleBindingsItemScopeType
+    scope_id: str
+
+    def to_dict(self) -> dict[str, Any]:
+        id = self.id
+
+        role = self.role.value
+
+        scope_type = self.scope_type.value
+
+        scope_id = self.scope_id
+
+        field_dict: dict[str, Any] = {}
+
+        field_dict.update(
+            {
+                "id": id,
+                "role": role,
+                "scopeType": scope_type,
+                "scopeId": scope_id,
+            }
+        )
+
+        return field_dict
+
+    @classmethod
+    def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
+        d = dict(src_dict)
+        id = d.pop("id")
+
+        role = GetApiKeyResponse200RoleBindingsItemRole(d.pop("role"))
+
+        scope_type = GetApiKeyResponse200RoleBindingsItemScopeType(d.pop("scopeType"))
+
+        scope_id = d.pop("scopeId")
+
+        get_api_key_response_200_role_bindings_item = cls(
+            id=id,
+            role=role,
+            scope_type=scope_type,
+            scope_id=scope_id,
+        )
+
+        return get_api_key_response_200_role_bindings_item

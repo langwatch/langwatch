@@ -1,0 +1,270 @@
+/**
+ * Declarations that could not be delivered, held for a seam that can.
+ * Codex's sandboxed shell has no network, but its notify program runs
+ * outside it, so a declaration queues here and drains on the next seam.
+ */
+
+import * as fs from "node:fs";
+import * as os from "node:os";
+import * as path from "node:path";
+
+import { stateFilePath, writeFingerprint } from "./hook-state";
+
+/** Past this age a queued declaration is dropped rather than sent. */
+export const SPOOL_MAX_AGE_MS = 60 * 60 * 1_000;
+
+/** How many queued declarations the directory may hold. */
+export const SPOOL_MAX_ENTRIES = 50;
+
+/** A declaration waiting for a seam that can reach the collector. */
+export interface SpooledDeclaration {
+  agent: string;
+  sessionId: string;
+  fingerprint: string;
+  /** The OTLP body, exactly as the declaration built it. */
+  payload: unknown;
+  queuedAtMs: number;
+  /** The file it came from, so a delivered entry can be removed. */
+  file: string;
+}
+
+/** `<stateDir>/spool`, beside the fingerprints the same seams keep. */
+export function spoolDir(stateDir: string): string {
+  return path.join(stateDir, "spool");
+}
+
+/** Where a sandboxed agent can still queue, the home directory being denied. */
+export function fallbackSpoolDir(): string {
+  return path.join(os.tmpdir(), "langwatch-session-context-spool");
+}
+
+/**
+ * Ours and private: on a shared machine anyone could otherwise drop an entry
+ * there and move somebody else's session onto a checkout of their choosing.
+ */
+function isPrivateToThisUser(dir: string): boolean {
+  try {
+    const stats = fs.statSync(dir);
+    if (!stats.isDirectory()) return false;
+    const uid = process.getuid?.();
+    if (uid !== undefined && stats.uid !== uid) return false;
+    // Anything group- or world-writable is not ours alone.
+    return (stats.mode & 0o022) === 0;
+  } catch {
+    return false;
+  }
+}
+
+/** One entry per agent and session, so a newer declaration replaces an older. */
+export function spoolFileName({ agent, sessionId }: { agent: string; sessionId: string }): string {
+  const name = `${agent}-${sessionId}`.replace(/[^A-Za-z0-9._-]/g, "_");
+  return `${name.slice(0, 128)}.json`;
+}
+
+/** That entry in the state directory, which is where an unsandboxed run puts it. */
+export function spoolFilePath({
+  stateDir,
+  agent,
+  sessionId,
+}: {
+  stateDir: string;
+  agent: string;
+  sessionId: string;
+}): string {
+  return path.join(spoolDir(stateDir), spoolFileName({ agent, sessionId }));
+}
+
+/**
+ * Queue a declaration the command could not deliver. The state directory is
+ * tried first, the temp directory second, because a sandboxed agent can write
+ * only the latter. Throws when neither accepts it.
+ */
+export function writeSpooledDeclaration({
+  stateDir,
+  agent,
+  sessionId,
+  fingerprint,
+  payload,
+  now,
+}: {
+  stateDir: string;
+  agent: string;
+  sessionId: string;
+  fingerprint: string;
+  payload: unknown;
+  now: () => number;
+}): void {
+  const body = JSON.stringify({
+    agent,
+    session_id: sessionId,
+    fingerprint,
+    payload,
+    queued_at: new Date(now()).toISOString(),
+    queued_at_ms: now(),
+  });
+  const name = spoolFileName({ agent, sessionId });
+
+  let lastError: unknown;
+  for (const dir of [spoolDir(stateDir), fallbackSpoolDir()]) {
+    try {
+      fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
+      fs.writeFileSync(path.join(dir, name), body, { mode: 0o600 });
+      pruneSpool({ stateDir, now });
+      return;
+    } catch (error) {
+      lastError = error;
+    }
+  }
+  throw lastError;
+}
+
+function parseEntry(file: string): SpooledDeclaration | null {
+  try {
+    const parsed: unknown = JSON.parse(fs.readFileSync(file, "utf8"));
+    if (parsed === null || typeof parsed !== "object") return null;
+    const record = parsed as Record<string, unknown>;
+    const agent = record.agent;
+    const sessionId = record.session_id;
+    const fingerprint = record.fingerprint;
+    const queuedAtMs = record.queued_at_ms;
+    if (typeof agent !== "string") return null;
+    if (typeof sessionId !== "string") return null;
+    if (typeof fingerprint !== "string") return null;
+    if (typeof queuedAtMs !== "number") return null;
+    if (record.payload === undefined) return null;
+    return {
+      agent,
+      sessionId,
+      fingerprint,
+      payload: record.payload,
+      queuedAtMs,
+      file,
+    };
+  } catch {
+    return null;
+  }
+}
+
+function removeQuietly(file: string): void {
+  try {
+    fs.unlinkSync(file);
+  } catch {
+    /* raced with another seam draining the same entry */
+    void 0;
+  }
+}
+
+/**
+ * Every queued declaration still worth sending. Entries past the age limit
+ * and entries that do not parse are deleted rather than returned.
+ */
+export function readSpooledDeclarations({
+  stateDir,
+  now,
+}: {
+  stateDir: string;
+  now: () => number;
+}): SpooledDeclaration[] {
+  const entries: SpooledDeclaration[] = [];
+  const fallback = fallbackSpoolDir();
+  for (const dir of [spoolDir(stateDir), fallback]) {
+    if (dir === fallback && !isPrivateToThisUser(dir)) continue;
+    let names: string[];
+    try {
+      names = fs.readdirSync(dir);
+    } catch {
+      continue;
+    }
+    appendSpooledDeclarations(entries, dir, names, now);
+  }
+  return entries.toSorted((a, b) => a.queuedAtMs - b.queuedAtMs);
+}
+
+/** Keep the directory small: the newest entries are the ones worth keeping. */
+export function pruneSpool({ stateDir, now }: { stateDir: string; now: () => number }): void {
+  try {
+    const entries = readSpooledDeclarations({ stateDir, now });
+    for (const entry of entries.slice(0, -SPOOL_MAX_ENTRIES)) {
+      removeQuietly(entry.file);
+    }
+  } catch {
+    /* the directory is bookkeeping: never worth failing a seam over */
+    void 0;
+  }
+}
+
+/**
+ * Sends every queued declaration, newest per session, recording what landed.
+ * A send that throws got no answer: the rest wait for the next seam rather
+ * than spend its time budget on the same silence. Never throws itself.
+ */
+export async function drainSessionContextSpool({
+  stateDir,
+  now,
+  post,
+}: {
+  stateDir: string;
+  now: () => number;
+  /**
+   * Send one OTLP body. False means "keep the entry for the next turn";
+   * throwing means the collector did not answer, which ends the drain.
+   */
+  post: (payload: unknown) => Promise<boolean>;
+}): Promise<number> {
+  let delivered = 0;
+  try {
+    for (const entry of readSpooledDeclarations({ stateDir, now })) {
+      let sent = false;
+      try {
+        sent = await post(entry.payload);
+      } catch {
+        break;
+      }
+      if (!sent) continue;
+
+      removeQuietly(entry.file);
+      delivered++;
+      try {
+        writeFingerprint({
+          stateFile: stateFilePath({
+            stateDir,
+            agent: entry.agent,
+            sessionId: entry.sessionId,
+          }),
+          fingerprint: entry.fingerprint,
+          now,
+        });
+      } catch {
+        // The record landed. A fingerprint we cannot write costs one
+        // duplicate next turn and nothing more.
+        void 0;
+      }
+    }
+  } catch {
+    /* a drain must never be why a seam reported failure */
+    void 0;
+  }
+  return delivered;
+}
+
+function appendSpooledDeclarations(
+  entries: SpooledDeclaration[],
+  dir: string,
+  names: string[],
+  now: () => number,
+): void {
+  for (const name of names) {
+    if (!name.endsWith(".json")) continue;
+    const file = path.join(dir, name);
+    const entry = parseEntry(file);
+    if (!entry) {
+      removeQuietly(file);
+      continue;
+    }
+    if (now() - entry.queuedAtMs > SPOOL_MAX_AGE_MS) {
+      removeQuietly(file);
+      continue;
+    }
+    entries.push(entry);
+  }
+}

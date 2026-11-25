@@ -1,0 +1,125 @@
+import { useRouter } from "@langwatch/browser-host/use-router";
+import { useColorRawValue } from "@langwatch/design-system/color-mode";
+import { Box, HStack, Spinner, Text } from "@langwatch/design-system/primitives";
+import { nowInstant } from "@langwatch/time";
+import type React from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { CheckCircle } from "react-feather";
+
+import { api } from "../../../behavior/onboarding-api.ts";
+import { useActiveProject } from "../active-project-context.tsx";
+
+export function WaitingForTracesChip(): React.ReactElement {
+  const accent = useColorRawValue("orange.fg");
+  const success = useColorRawValue("green.fg");
+  const router = useRouter();
+  const { project } = useActiveProject();
+
+  const [detected, setDetected] = useState(false);
+  const [secondsLeft, setSecondsLeft] = useState<number | null>(null);
+
+  const timeBounds = useMemo(() => {
+    const now = nowInstant().epochMilliseconds;
+    const sevenDays = 7 * 24 * 60 * 60 * 1000;
+    const oneDay = 24 * 60 * 60 * 1000;
+    return { startDate: now - sevenDays, endDate: now + oneDay };
+  }, []);
+
+  const tracesQuery = api.traces.getAllForProject.useQuery(
+    {
+      projectId: project?.id ?? "",
+      startDate: timeBounds.startDate,
+      endDate: timeBounds.endDate,
+      filters: {},
+      groupBy: "none",
+      pageSize: 1,
+    },
+    {
+      enabled: !!project?.id && !detected,
+      refetchOnWindowFocus: false,
+    },
+  );
+
+  useEffect(() => {
+    const count = tracesQuery.data?.groups?.flat().length ?? 0;
+    if (!detected && count > 0) {
+      setDetected(true);
+    }
+  }, [tracesQuery.data, detected]);
+
+  const goToTraces = useCallback((): void => {
+    if (!project?.slug) return;
+
+    const traceId = tracesQuery.data?.groups?.flat().at(0)?.trace_id ?? void 0;
+
+    if (!traceId) {
+      window.location.href = `/${project.slug}/traces`;
+      return;
+    }
+
+    const params = new URLSearchParams({
+      "drawer.open": "traceV2Details",
+      "drawer.traceId": traceId,
+    });
+
+    window.location.href = `/${project.slug}/traces?${params.toString()}`;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [project?.slug, router, tracesQuery.status, tracesQuery.data?.groups?.length]);
+
+  useEffect(() => {
+    if (!detected) return;
+    if (secondsLeft === null) setSecondsLeft(3);
+  }, [detected, secondsLeft]);
+
+  useEffect(() => {
+    if (!detected || secondsLeft === null) return;
+    if (secondsLeft <= 0) {
+      goToTraces();
+      return;
+    }
+    const t = setTimeout(() => setSecondsLeft((s) => (s ?? 1) - 1), 1000);
+    return () => clearTimeout(t);
+  }, [detected, secondsLeft, goToTraces]);
+
+  return (
+    <Box position="fixed" left="50%" bottom="24px" transform="translateX(-50%)" zIndex={10}>
+      <Box position="relative" display="inline-block">
+        <HStack
+          position="relative"
+          bg="bg.panel/50"
+          backdropFilter="blur(24px) saturate(1.4)"
+          borderWidth="1px"
+          borderColor="border"
+          boxShadow="0 4px 30px color-mix(in srgb, var(--chakra-colors-bg-scrim) 8%, transparent)"
+          borderRadius="full"
+          px={4}
+          py={2}
+          gap={2}
+          overflow="hidden"
+          transition="all 0.2s ease"
+          aria-live="polite"
+        >
+          {detected ? (
+            <>
+              <Box color={success} display="flex" alignItems="center">
+                <CheckCircle size={16} />
+              </Box>
+              <Text fontWeight="medium" fontSize="sm">
+                Traces detected.
+                {secondsLeft !== null && secondsLeft > 0 && ` redirecting in ${secondsLeft}..`}
+                {secondsLeft !== null && secondsLeft === 0 && ` redirecting...`}
+              </Text>
+            </>
+          ) : (
+            <>
+              <Spinner color={accent} borderWidth="2px" animationDuration="2s" size="sm" />
+              <Text fontWeight="medium" fontSize="sm">
+                Waiting to receive traces…
+              </Text>
+            </>
+          )}
+        </HStack>
+      </Box>
+    </Box>
+  );
+}

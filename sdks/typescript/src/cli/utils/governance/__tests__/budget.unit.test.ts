@@ -1,4 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
+
 import { checkBudget, renderBudgetExceeded } from "../budget";
 import type { GovernanceConfig } from "../config";
 
@@ -52,7 +53,7 @@ describe("checkBudget", () => {
       limit_usd: "500.00",
       spent_usd: "500.00",
       period: "month",
-      request_increase_url: "http://app.example/me/budget/request?abc",
+      request_increase_url: "http://app.example/coding-agents/budget/request?abc",
       admin_email: "platform-team@miro.com",
     };
     const fetchImpl = vi.fn().mockResolvedValue(status(402, { error: payload }));
@@ -85,7 +86,7 @@ describe("renderBudgetExceeded", () => {
     limit_usd: "500.00",
     spent_usd: "500.00",
     period: "month",
-    request_increase_url: "http://app.example/me/budget/request",
+    request_increase_url: "http://app.example/coding-agents/budget/request",
     admin_email: "platform-team@miro.com",
   };
 
@@ -96,7 +97,7 @@ describe("renderBudgetExceeded", () => {
     expect(out).toContain("To continue, ask your team admin to raise your limit.");
     expect(out).toContain("Admin: platform-team@miro.com");
     expect(out).toContain("Need urgent access? Request an increase:");
-    expect(out).toContain("http://app.example/me/budget/request");
+    expect(out).toContain("http://app.example/coding-agents/budget/request");
   });
 
   /** @scenario "The box falls back to the static request page when the payload has no signed URL" */
@@ -124,7 +125,7 @@ describe("renderBudgetExceeded", () => {
     expect(out).not.toContain("Admin:");
   });
 
-  describe("period rendering — gateway emits lowercased GatewayBudgetWindow root form", () => {
+  describe("when the gateway emits a lowercased GatewayBudgetWindow root form", () => {
     it.each([
       ["month", "monthly budget"],
       ["week", "weekly budget"],
@@ -153,7 +154,6 @@ describe("renderBudgetExceeded", () => {
 
   it("contains no ANSI escape sequences (pipe-safe)", () => {
     const out = renderBudgetExceeded(baseEvent);
-    // eslint-disable-next-line no-control-regex
-    expect(out).not.toMatch(/\[/);
+    expect(out).not.toContain("\u001b[");
   });
 });

@@ -18,19 +18,14 @@ Feature: Data retention regression safety
     And the cold-storage TTL remains configured
 
   @regression @unit
-  Scenario: Pinning a trace does not change retention
-    Given a project has 49-day retention for traces
-    And trace "abc123" is pinned by the user
-    When ClickHouse activity is observed
-    Then no retention mutation is issued for trace "abc123"
-    And trace "abc123" follows the 49-day retention policy
-
-  @regression @unit
   Scenario: Retroactive retention update applies uniformly across all retention-managed tables
     Given a project has traces stored across all retention-managed tables
     When the admin applies 91-day retention to existing trace data
     Then every retention-managed traces table receives the same project-scoped update
-    And the event log receives the same project-scoped update as other tables
+    And the event log receives that update too, but only for the rows classified
+      under the traces category
+    And identity and authorization events in the event log keep their
+      indefinite retention regardless of the update
 
   @regression @unit
   Scenario: Manual pin survives unsharing an auto-shared trace

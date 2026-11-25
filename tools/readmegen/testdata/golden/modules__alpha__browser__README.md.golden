@@ -1,0 +1,36 @@
+# @lw/alpha-browser
+
+The browser half of [alpha](../README.md). What a browser installs for alpha: its item screens and drawer.
+
+<!-- readme:generated:start (tools/readmegen; edit the code, then `pnpm generate:readmes`) -->
+
+Declared in `src/alpha.web.ts:4` (`defineBrowserModule("alpha")`), exported as `alphaWeb` at `./declaration`.
+
+Installed by ui, from the app's generated module list (`pnpm generate:modules`).
+
+## Screens
+
+| Page key                        | URL                                     | Within  | Label | Permission   | Flags                  |
+| ------------------------------- | --------------------------------------- | ------- | ----- | ------------ | ---------------------- |
+| `pages/[project]/alpha`         | `/:project/alpha`                       | project | Alpha | `alpha:view` | –                      |
+| `pages/[project]/alpha/archive` | `/:project/alpha/archive` (route table) | –       | –     | –            | ≈ `ALPHA_ARCHIVE_FLAG` |
+
+A URL marked (route table) is joined from `apps/ui/src/shell/ui-route-table.ts`; the screen declares no `path`.
+
+## Drawers (the name is the wire: `?drawer.open=<name>`)
+
+| Drawer      | Opens                                   | Opened from |
+| ----------- | --------------------------------------- | ----------- |
+| `alphaItem` | `src/ui/sections/alpha-item-drawer.tsx` | gamma, ui   |
+
+Opened from lists the other modules (and `ui`, the app) whose browser source names the drawer in a
+`…Drawer("<name>")` call, a `?drawer.open=<name>` link or by its token; a name held in a constant is not followed.
+
+## Calls
+
+- `withApi(alphaApi)`, tRPC contracts: `alpha.*`.
+- Client packages (package.json): `@lw/alpha-client`.
+- Lends: `AlphaBodyToken`.
+- Host APIs it requires: `AlphaHostApi`.
+
+<!-- readme:generated:end -->

@@ -1,0 +1,135 @@
+/**
+ * @vitest-environment node
+ * Verifies error handling consistency for GET /api/trace/:id (F4 of e2e-walk).
+ */
+import { bindMiddlewareContext, createRestRuntime } from "@langwatch/api/rest";
+import { HandledError } from "@langwatch/handled-error";
+import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
+import { describe, expect, it, vi } from "vitest";
+
+import {
+  traceLegacyRest,
+  type TraceLegacyRestMembers,
+  type TraceLegacySearchFields,
+} from "../trace-legacy.rest.ts";
+import { tracesRestCredential } from "../traces.rest.ts";
+
+const project = { id: "project-123" };
+
+const INTERNAL_MESSAGE = "TraceService requires EvaluationService for evaluation reads";
+
+const runtime = createRestRuntime({
+  audit: { record: () => {} },
+  authorization: restTestAuthorization(),
+  identity: {
+    authenticate: () => ({
+      actor: { type: "user" as const, id: "user-1" },
+      scope: { tier: "project" as const, id: project.id },
+    }),
+  },
+});
+
+function buildApi(findTrace: () => Promise<never>) {
+  const members: TraceLegacyRestMembers<TraceLegacySearchFields, unknown> = {
+    traces: () => ({
+      findTrace,
+      readEvaluations: vi.fn(),
+      listTraces: vi.fn(),
+      readThreadTraces: vi.fn(),
+    }),
+    shares: () => ({ createShare: vi.fn(), unshare: vi.fn() }),
+    resolveApiKeyProtections: async () => ({}),
+    searchBodySchema: {} as TraceLegacyRestMembers<
+      TraceLegacySearchFields,
+      unknown
+    >["searchBodySchema"],
+    describeValidationError: () => "invalid search body",
+    formatSpansDigest: vi.fn(),
+  };
+
+  const family = runtime.mount(traceLegacyRest.router(), {
+    app: () => members,
+    middlewareContext: [bindMiddlewareContext(tracesRestCredential, () => ({ principal: null }))],
+    // The boundary the process installs, restated: a handled refusal answers
+    // with its code, and anything else degrades to the generic unknown.
+    onError: (error, context) => {
+      if (HandledError.isHandled(error)) {
+        const serialized = error.serialize();
+
+        return context.json({ error: serialized.code }, serialized.httpStatus as 422);
+      }
+
+      return context.json(
+        { error: "Internal Server Error", message: "An unknown error occurred" },
+        500,
+      );
+    },
+  });
+
+  return (path: string, init?: RequestInit) => family.request(path, init);
+}
+
+describe("given a legacy single-trace read that fails for an unanticipated reason", () => {
+  describe("when the caller asks for the trace", () => {
+    /** @scenario "An unanticipated legacy trace read failure answers the generic unknown" */
+    it("puts no internal message, source path or stack frame in the response body", async () => {
+      const failure = new Error(INTERNAL_MESSAGE);
+      failure.stack = `Error: ${INTERNAL_MESSAGE}\n    at TraceService.evaluations (/Users/someone/langwatch/modules/trace/process/src/services/trace-legacy-read.service.ts:711:13)`;
+      const fetchTrace = buildApi(() => Promise.reject(failure));
+
+      const response = await fetchTrace("/api/trace/trace-1");
+      const body = await response.text();
+
+      expect(response.status).toBe(500);
+      expect(body).not.toContain(INTERNAL_MESSAGE);
+      expect(body).not.toContain("stack");
+      expect(body).not.toContain("/Users/");
+      expect(body).not.toContain(".service.ts");
+    });
+
+    /** @scenario "An unanticipated legacy trace read failure answers the generic unknown" */
+    it("answers the same generic body its sibling route answers", async () => {
+      const fetchTrace = buildApi(() => Promise.reject(new Error(INTERNAL_MESSAGE)));
+
+      const response = await fetchTrace("/api/trace/trace-1");
+
+      expect(await response.json()).toEqual({
+        error: "Internal Server Error",
+        message: "An unknown error occurred",
+      });
+    });
+  });
+});
+
+describe("given the deprecated trace search", () => {
+  describe("when the body is not sent as json", () => {
+    it("answers the framework's 400 malformed_request before the handler", async () => {
+      const findTrace = vi.fn(() => Promise.reject(new Error("never reached")));
+      const search = buildApi(findTrace);
+
+      const response = await search("/api/trace/search", {
+        method: "POST",
+        headers: { "content-type": "text/plain" },
+        body: "{}",
+      });
+
+      expect(response.status).toBe(400);
+      await expect(response.json()).resolves.toMatchObject({ error: "malformed_request" });
+    });
+  });
+
+  describe("when the body is sent as json but does not parse", () => {
+    it("answers the same framework refusal", async () => {
+      const search = buildApi(() => Promise.reject(new Error("never reached")));
+
+      const response = await search("/api/trace/search", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: "{not json",
+      });
+
+      expect(response.status).toBe(400);
+      await expect(response.json()).resolves.toMatchObject({ error: "malformed_request" });
+    });
+  });
+});

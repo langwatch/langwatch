@@ -1,10 +1,12 @@
 import chalk from "chalk";
-import { createSpinner } from "../../utils/spinner";
+
 import { AgentsApiService } from "@/client-sdk/services/agents/agents-api.service";
+
 import { resolveCredentials } from "../../utils/apiKey";
-import { failSpinner } from "../../utils/spinnerError";
 import { commandValidationError } from "../../utils/errorOutput";
 import type { CommandResult } from "../../utils/output";
+import { createSpinner } from "../../utils/spinner";
+import { failSpinner } from "../../utils/spinnerError";
 
 /**
  * Returns the created agent rather than printing it: the output port renders it
@@ -20,9 +22,7 @@ export const createAgentCommand = async (
   const spinner = createSpinner(`Creating agent "${name}"...`).start();
 
   try {
-    const config = options.config
-      ? (JSON.parse(options.config) as Record<string, unknown>)
-      : {};
+    const config = options.config ? (JSON.parse(options.config) as Record<string, unknown>) : {};
 
     const agent = await service.create({
       name,
@@ -30,9 +30,7 @@ export const createAgentCommand = async (
       config,
     });
 
-    spinner.succeed(
-      `Created agent "${chalk.cyan(agent.name)}" ${chalk.gray(`(id: ${agent.id})`)}`,
-    );
+    spinner.succeed(`Created agent "${chalk.cyan(agent.name)}" ${chalk.gray(`(id: ${agent.id})`)}`);
 
     return {
       data: agent,

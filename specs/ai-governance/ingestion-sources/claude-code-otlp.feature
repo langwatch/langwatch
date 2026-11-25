@@ -54,7 +54,7 @@ Feature: OTTL-driven OTLP ingestion source — extract usage + spend
   # Source creation — Use this template flow (claude_code)
   # -------------------------------------------------------------------
   Scenario: Admin creates a Claude Code source — clicks Use this template
-    When Alex visits "/governance/ingestion-sources" and clicks
+    When Alex visits "/governance/inventory?tab=sources" and clicks
       "Add ingestion source"
     And selects source type "Claude Code (OTLP)"
     Then the OTTL editor renders empty with a callout offering the
@@ -198,7 +198,7 @@ Feature: OTTL-driven OTLP ingestion source — extract usage + spend
     Then /governance dashboard's "Spend (30d)" reflects the spend for
       that traffic
     And /governance dashboard's "active users" counts Bob
-    And /me dashboard's "Recent activity" lists per-request rows with
+    And /coding-agents dashboard's "Recent activity" lists per-request rows with
       model name and request_id
     And the source row's "events received" counter increments
 

@@ -56,9 +56,9 @@ describe("CLI agent usability", () => {
       description: "Agent discovers and uses the CLI to accomplish a task",
       agents: [
         myAgent,
-        scenario.userSimulatorAgent({ model: openai("gpt-5-mini") }),
+        scenario.userSimulatorAgent({ model: openai("gpt-6-luna") }),
         scenario.judgeAgent({
-          model: openai("gpt-5-mini"),
+          model: openai("gpt-6-luna"),
           criteria: [
             "Agent used the CLI command correctly",
             "Agent did not get stuck on interactive prompts",
@@ -78,9 +78,9 @@ Add this assertion to every test:
 
 ```typescript
 function assertNoInteractiveWorkarounds(state) {
-  const output = state.messages.map(m =>
-    typeof m.content === 'string' ? m.content : JSON.stringify(m.content)
-  ).join('\n');
+  const output = state.messages
+    .map((m) => (typeof m.content === "string" ? m.content : JSON.stringify(m.content)))
+    .join("\n");
 
   expect(output).not.toMatch(/echo\s+["']?[yY](?:es)?["']?\s*\|/);
   expect(output).not.toMatch(/\byes\s*\|/);

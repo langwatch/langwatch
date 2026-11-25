@@ -1,0 +1,48 @@
+/**
+ * Restoring an older version of a scenario: the confirmation the reader gives first,
+ * and the write that follows.
+ * @see specs/scenarios/scenario-version-restore.feature
+ */
+
+import { showErrorToast } from "@langwatch/browser-host/errors";
+import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
+import { toaster } from "@langwatch/design-system/toaster";
+import { scenarioClient } from "@langwatch/scenario-client";
+import { useState } from "react";
+
+export type VersionRestore = ReturnType<typeof useVersionRestore>;
+
+export function useVersionRestore({ scenarioId }: { scenarioId: string }) {
+  const { project } = useOrganizationTeamProject();
+  const utils = scenarioClient.useUtils();
+  const [confirmingVersion, setConfirmingVersion] = useState<number | null>(null);
+
+  const mutation = scenarioClient.scenarios.restoreVersion.useMutation({
+    onSuccess: (_result, variables) => {
+      void utils.scenarios.listVersions.invalidate();
+      void utils.scenarios.getAll.invalidate();
+      void utils.scenarios.getById.invalidate();
+      void utils.scenarios.getByIdIncludingArchived.invalidate();
+      toaster.create({
+        title: `Restored version ${variables.version}`,
+        type: "success",
+      });
+    },
+    onError: (error) => showErrorToast({ error, fallbackTitle: "Couldn't restore this version" }),
+    onSettled: () => setConfirmingVersion(null),
+  });
+
+  return {
+    confirmingVersion,
+    ask: (version: number) => setConfirmingVersion(version),
+    cancel: () => setConfirmingVersion(null),
+    confirm: (version: number) =>
+      mutation.mutate({
+        projectId: project?.id ?? "",
+        scenarioId,
+        version,
+      }),
+    isRestoringVersion: (version: number) =>
+      mutation.isPending && mutation.variables?.version === version,
+  };
+}

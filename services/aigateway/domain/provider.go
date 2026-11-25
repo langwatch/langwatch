@@ -7,50 +7,6 @@ import (
 	"strings"
 )
 
-// ProviderID identifies a model provider (e.g. "openai", "anthropic", "azure").
-type ProviderID string
-
-const (
-	ProviderOpenAI    ProviderID = "openai"
-	ProviderAnthropic ProviderID = "anthropic"
-	ProviderAzure     ProviderID = "azure"
-	ProviderBedrock   ProviderID = "bedrock"
-	ProviderVertex    ProviderID = "vertex"
-	ProviderGemini    ProviderID = "gemini"
-	// XAI, Groq, and Cerebras are Bifrost-native providers routed with a
-	// plain API key (see mapProvider / credentialToBifrostKey defaults).
-	ProviderXAI      ProviderID = "xai"
-	ProviderGroq     ProviderID = "groq"
-	ProviderCerebras ProviderID = "cerebras"
-	// DeepSeek is not in Bifrost's ModelProvider enum. Its API is
-	// OpenAI-compatible, so the gateway routes it through Bifrost's vLLM
-	// (openai-compat) provider with DeepSeek's public endpoint as the
-	// default base URL.
-	ProviderDeepSeek ProviderID = "deepseek"
-	// Voyage is direct-API only. Bifrost has no Voyage ModelProvider
-	// enum; the gateway proxies Voyage embeddings via a thin direct
-	// HTTP path. Voyage's wire format is OpenAI-compatible so no body
-	// translation is needed. Voyage ships embeddings only; chat,
-	// messages, and responses calls against a Voyage credential land
-	// on a clean unsupported-request-type error.
-	ProviderVoyage ProviderID = "voyage"
-	// Custom is any OpenAI-compatible endpoint the customer hosts
-	// themselves (vLLM, LiteLLM proxy, ...). Requires a base URL; the
-	// API key is optional (many self-hosted servers run unauthenticated).
-	ProviderCustom ProviderID = "custom"
-	// ElevenLabs is a Bifrost-native provider (enum value "elevenlabs",
-	// plain API key). It ships speech (TTS) and transcription (STT) only;
-	// chat-family calls against an ElevenLabs credential surface the
-	// provider's reject directly, same policy as Anthropic embeddings.
-	ProviderElevenLabs ProviderID = "elevenlabs"
-	// OpenAICodex is the user's own ChatGPT subscription, reached through
-	// OpenAI's codex backend (chatgpt.com/backend-api/codex) with an OAuth
-	// access token instead of an API key. Responses-API + SSE only; the
-	// gateway proxies directly (no Bifrost enum) and refreshes a 401'd
-	// token once via the control plane. See adapters/providers/codex.go.
-	ProviderOpenAICodex ProviderID = "openai_codex"
-)
-
 // NormalizeProviderID maps the provider spellings that reach the gateway
 // onto the canonical ProviderID constants above.
 //
@@ -119,10 +75,12 @@ var knownProviderFamilies = map[string]struct{}{
 	"groq":                  {},
 	"cerebras":              {},
 	"deepseek":              {},
+	"doubleword":            {},
 	"voyage":                {},
 	"custom":                {},
 	"elevenlabs":            {},
 	"cloudflare":            {},
+	"langwatch":             {},
 }
 
 // KnownProviderFamily reports whether a model string's first segment names a
@@ -204,10 +162,20 @@ func (c Credential) DeclaresCatalog() bool {
 	return len(c.Models) > 0 || len(c.DeploymentMap) > 0
 }
 
+// ServesBareModels reports whether a model name with no provider prefix may
+// be routed to this credential. The LangWatch-managed models slot is reached
+// only through an explicit "langwatch/<model>" prefix: a bare name never
+// lands there, neither by catalog match, by the no-catalog step, as the lone
+// credential, nor as a fallback, so prompts leave the install only when the
+// caller named LangWatch.
+func (c Credential) ServesBareModels() bool {
+	return c.ProviderID != ProviderLangWatch
+}
+
 // WithDeploymentSelfMap ensures Azure / Bedrock / Vertex credentials carry a
-// deployment entry for bareModel so Bifrost's per-key readers resolve a
-// deployment ("deployment not found for model X" / "deployments not set"
-// otherwise). By default the model id IS the deployment name
+// deployment entry for bareModel, so every dispatch lane can read the
+// deployment for a model out of one place instead of each rediscovering the
+// provider's own naming. By default the model id IS the deployment name
 // (azure/gpt-5-mini → deployment "gpt-5-mini"), so a {bareModel: bareModel}
 // self-map suffices; when the provider defines an explicit deployment (the
 // model id need not equal the deployment name), the control plane / gateway
@@ -216,9 +184,11 @@ func (c Credential) DeclaresCatalog() bool {
 //
 // Every dispatch path shares this so Azure resolves its deployment identically
 // regardless of entry point: dispatcheradapter (Studio / workflows /
-// runSignature) and the gatewayproxy /go/proxy path (scenario User Simulator,
-// playground). The /go/proxy path previously skipped it, so Azure calls that
-// got past the endpoint check then failed deployment resolution (#5760).
+// runSignature), the gatewayproxy /go/proxy path (scenario User Simulator,
+// playground), and the gateway's own dispatch lanes. The /go/proxy path
+// previously skipped it, so Azure calls that got past the endpoint check then
+// failed deployment resolution (#5760); the gateway skipped it too, and sent
+// Azure the model id where the provider had named a deployment (#7765).
 func WithDeploymentSelfMap(cred Credential, bareModel string) Credential {
 	if bareModel == "" {
 		return cred

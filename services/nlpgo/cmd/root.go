@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"time"
 
 	"go.uber.org/zap"
 
@@ -16,7 +17,9 @@ import (
 	"github.com/langwatch/langwatch/services/nlpgo"
 	"github.com/langwatch/langwatch/services/nlpgo/adapters/dispatcheradapter"
 	"github.com/langwatch/langwatch/services/nlpgo/adapters/httpapi"
+	"github.com/langwatch/langwatch/services/nlpgo/adapters/litellm"
 	"github.com/langwatch/langwatch/services/nlpgo/adapters/llmexecutor"
+	"github.com/langwatch/langwatch/services/nlpgo/adapters/modelcatalog"
 	"github.com/langwatch/langwatch/services/nlpgo/app"
 	"github.com/langwatch/langwatch/services/nlpgo/app/engine"
 	"github.com/langwatch/langwatch/services/nlpgo/app/engine/blocks/agentblock"
@@ -25,29 +28,34 @@ import (
 	"github.com/langwatch/langwatch/services/nlpgo/app/engine/blocks/httpblock"
 )
 
+// Options are the per-instance overrides a host applies on top of the
+// service's own configuration.
+//
+// Addr exists because two services sharing one process cannot both read
+// SERVER_ADDR: the combined Go development process (`service combined`) hands
+// each one the port it was allocated instead. Empty means "whatever the
+// service's own configuration resolved", which is what every deployment uses.
+type Options struct {
+	Addr string
+}
+
 // Root is the service entrypoint called by cmd/service.
 func Root(ctx context.Context, _ []string) error {
+	return Run(ctx, Options{})
+}
+
+// Run boots the NLP engine with the host's overrides applied.
+func Run(ctx context.Context, opts Options) error {
 	cfg, err := nlpgo.LoadConfig(ctx)
 	if err != nil {
 		return err
 	}
-
-	info := contexts.MustGetServiceInfo(ctx)
-	info.Environment = cfg.Environment
-	// Override the OTel-facing service.name. The mono-binary subcommand
-	// is `nlpgo` (Helm chart, Lambda task, dev shell invoke `service
-	// nlpgo`), but everywhere operators look at this service — charts,
-	// architecture diagrams, deployment names — it's "langwatch-service-nlp".
-	// Studio's trace drawer reads `service.name` for its SERVICE column,
-	// so the "nlpgo" label there leaked an implementation detail of the
-	// Python→Go migration (rchaves dogfood 2026-05-14). Keep the binary
-	// command name as-is and rename only the public-facing identity.
-	info.Service = "langwatch-service-nlp"
-	ctx = contexts.SetServiceInfo(ctx, *info)
-	allowedProxyHosts := splitCSV(cfg.AllowedProxyHosts)
-	if len(allowedProxyHosts) == 0 {
-		allowedProxyHosts = splitCSV(cfg.Engine.AllowedProxyHosts)
+	if opts.Addr != "" {
+		cfg.Server.Addr = opts.Addr
 	}
+
+	ctx = withPublicServiceName(ctx, &cfg)
+	allowedProxyHosts := resolveAllowedProxyHosts(&cfg)
 
 	ctx, deps, err := nlpgo.NewDeps(ctx, cfg)
 	if err != nil {
@@ -72,10 +80,8 @@ func Root(ctx context.Context, _ []string) error {
 		zap.Int("allowed_hosts", len(allowedProxyHosts)),
 	)
 
-	httpExec := httpblock.New(httpblock.Options{SSRF: ssrfOpts})
-	codeExec, err := codeblock.New(codeblock.Options{
-		Python: cfg.Engine.SandboxPython,
-	})
+	httpExec := newHTTPExecutor(cfg.Engine, ssrfOpts)
+	codeExec, err := newCodeExecutor(cfg.Engine, os.Getenv, deps.Logger)
 	if err != nil {
 		return err
 	}
@@ -95,32 +101,20 @@ func Root(ctx context.Context, _ []string) error {
 		return err
 	}
 	defer disp.Close()
-	llm := llmexecutor.New(dispatcheradapter.New(disp))
+	catalog := loadModelCatalog(deps.Logger, cfg.ModelCatalogDir)
+	llm := llmexecutor.New(dispatcheradapter.New(disp), llmexecutor.WithModelCatalog(catalog))
 	deps.Logger.Info("nlpgo_llm_wired", zap.String("transport", "in_process_dispatcher"))
 
 	// Playground proxy uses the SAME dispatcher (no second Bifrost
 	// process). It bridges the OpenAI-shape /go/proxy/v1/* surface
 	// (used by the prompt playground + model.factory.ts) into the
 	// in-process gateway. Header-based auth: x-litellm-* → Credential.
-	playground := httpapi.NewPlaygroundProxyFromShim(playgroundDispatcherShim{disp: disp})
+	playground := nlpgo.PlaygroundWiring{
+		Proxy:        httpapi.NewPlaygroundProxyFromShim(playgroundDispatcherShim{disp: disp}),
+		ModelCatalog: catalog,
+	}
 
-	// Evaluator + agent-workflow blocks call the LangWatch app's own
-	// HTTP API. Both share the same LangWatchBaseURL.
-	// Per-block timeouts default to 12min (Lambda max 15min minus 3min margin).
-	evalExec := evaluatorblock.New(evaluatorblock.Options{})
-	agentWfRunner := agentblock.NewWorkflowRunner(agentblock.WorkflowRunnerOptions{})
-
-	eng := engine.New(engine.Options{
-		HTTP: httpExec,
-		// Remote prompt attachments are fetched under the same SSRF policy
-		// (and customer allow-list) as the HTTP block.
-		SSRF:             ssrfOpts,
-		Code:             codeExec,
-		LLM:              llm,
-		Evaluator:        evalExec,
-		AgentWorkflow:    agentWfRunner,
-		LangWatchBaseURL: resolveLangWatchBaseURL(cfg.Engine.LangWatchBaseURL, os.Getenv),
-	})
+	eng := newEngine(&cfg, engineParts{http: httpExec, ssrf: ssrfOpts, code: codeExec, llm: llm})
 	executor := engineAdapter{eng: eng}
 
 	application := app.New(
@@ -128,7 +122,144 @@ func Root(ctx context.Context, _ []string) error {
 		app.WithWorkflowExecutor(executor),
 	)
 
-	return nlpgo.Serve(ctx, application, deps, cfg, playground)
+	return nlpgo.Serve(ctx, nlpgo.ServeInput{App: application, Deps: deps, Cfg: cfg, Playground: playground})
+}
+
+// withPublicServiceName stamps the operator-facing service identity on ctx.
+func withPublicServiceName(ctx context.Context, cfg *nlpgo.Config) context.Context {
+	info := contexts.MustGetServiceInfo(ctx)
+	info.Environment = cfg.Environment
+	// Override the OTel-facing service.name. The mono-binary subcommand
+	// is `nlpgo` (Helm chart, Lambda task, dev shell invoke `service
+	// nlpgo`), but everywhere operators look at this service — charts,
+	// architecture diagrams, deployment names — it's "langwatch-service-nlp".
+	// Studio's trace drawer reads `service.name` for its SERVICE column,
+	// so the "nlpgo" label there leaked an implementation detail of the
+	// Python→Go migration (rchaves dogfood 2026-05-14). Keep the binary
+	// command name as-is and rename only the public-facing identity.
+	info.Service = "langwatch-service-nlp"
+	ctx = contexts.SetServiceInfo(ctx, *info)
+	return ctx
+}
+
+// resolveAllowedProxyHosts prefers the top-level allow-list over the engine's.
+func resolveAllowedProxyHosts(cfg *nlpgo.Config) []string {
+	allowedProxyHosts := splitCSV(cfg.AllowedProxyHosts)
+	if len(allowedProxyHosts) == 0 {
+		allowedProxyHosts = splitCSV(cfg.Engine.AllowedProxyHosts)
+	}
+	return allowedProxyHosts
+}
+
+// engineParts are the executors Run has already built for the engine.
+type engineParts struct {
+	http *httpblock.Executor
+	ssrf httpblock.SSRFOptions
+	code *codeblock.Executor
+	llm  *llmexecutor.Executor
+}
+
+// newEngine wires the executors and the LangWatch callbacks into one engine.
+func newEngine(cfg *nlpgo.Config, parts engineParts) *engine.Engine {
+	// Evaluator + agent-workflow blocks call the LangWatch app's own
+	// HTTP API. Both share the same LangWatchBaseURL.
+	evalExec := newEvaluatorExecutor(cfg.Engine)
+	agentWfRunner := newAgentWorkflowRunner(cfg.Engine)
+
+	return engine.New(engine.Options{
+		HTTP: parts.http,
+		// Remote prompt attachments are fetched under the same SSRF policy
+		// (and customer allow-list) as the HTTP block.
+		SSRF:             parts.ssrf,
+		Code:             parts.code,
+		LLM:              parts.llm,
+		Evaluator:        evalExec,
+		AgentWorkflow:    agentWfRunner,
+		LangWatchBaseURL: resolveLangWatchBaseURL(cfg.Engine.LangWatchBaseURL, os.Getenv),
+	})
+}
+
+// newCodeExecutor builds the code-block executor from the operator-facing
+// engine config. Extracted from Root so the wiring itself — which operator
+// knob reaches which executor option — is reachable from a test without
+// standing up the whole service.
+//
+// `getenv` is injected so tests don't need to mutate process env.
+func newCodeExecutor(engineCfg nlpgo.EngineConfig, getenv func(string) string, logger *zap.Logger) (*codeblock.Executor, error) {
+	return codeblock.New(codeExecutorOptions(engineCfg, getenv, logger))
+}
+
+// codeExecutorOptions maps the operator's engine config to executor options.
+func codeExecutorOptions(engineCfg nlpgo.EngineConfig, getenv func(string) string, logger *zap.Logger) codeblock.Options {
+	return codeblock.Options{
+		Logger: logger,
+		Python: resolveSandboxPython(engineCfg.SandboxPython, getenv),
+		// The instance a code node's LangWatch SDK calls. It is the same URL
+		// the evaluator blocks call back on, and it is injected only next to
+		// a run's own sandbox key.
+		SandboxEndpoint: resolveLangWatchBaseURL(
+			engineCfg.LangWatchBaseURL,
+			getenv,
+		),
+		DefaultTimeout:      resolveTimeoutSeconds(engineCfg.CodeBlockTimeoutSeconds),
+		AllowVisibleProcess: allowVisibleProcess(engineCfg.CodeBlockAllowVisibleProcess, getenv, logger),
+	}
+}
+
+// allowVisibleProcess honors the setting only on AWS Lambda, the one platform
+// whose seccomp refuses the hide step; elsewhere it is ignored with a warning.
+func allowVisibleProcess(setting bool, getenv func(string) string, logger *zap.Logger) bool {
+	if logger == nil {
+		logger = zap.NewNop()
+	}
+	onLambda := getenv("AWS_LAMBDA_FUNCTION_NAME") != "" && getenv("AWS_LAMBDA_RUNTIME_API") != ""
+	if setting && !onLambda {
+		logger.Warn("nlpgo_code_block_allow_visible_process_ignored",
+			zap.String("setting", codeblock.AllowVisibleProcessSetting),
+			zap.String("hint", "only honored on AWS Lambda; elsewhere the hide step stays required"))
+	}
+	return setting && onLambda
+}
+
+// newHTTPExecutor builds the HTTP-block executor from the operator-facing
+// engine config. `agent_type=http` nodes run through this same executor, so
+// NLPGO_ENGINE_HTTP_BLOCK_TIMEOUT_SECONDS bounds both.
+func newHTTPExecutor(engineCfg nlpgo.EngineConfig, ssrfOpts httpblock.SSRFOptions) *httpblock.Executor {
+	return httpblock.New(httpblock.Options{
+		SSRF:           ssrfOpts,
+		DefaultTimeout: resolveTimeoutSeconds(engineCfg.HTTPBlockTimeoutSeconds),
+	})
+}
+
+// newAgentWorkflowRunner builds the `agent_type=workflow` sub-workflow runner
+// from the operator-facing engine config.
+func newAgentWorkflowRunner(engineCfg nlpgo.EngineConfig) *agentblock.WorkflowRunner {
+	return agentblock.NewWorkflowRunner(agentblock.WorkflowRunnerOptions{
+		DefaultTimeout: resolveTimeoutSeconds(engineCfg.AgentWorkflowTimeoutSeconds),
+	})
+}
+
+// newEvaluatorExecutor builds the evaluator-block executor from the
+// operator-facing engine config.
+func newEvaluatorExecutor(engineCfg nlpgo.EngineConfig) *evaluatorblock.Executor {
+	return evaluatorblock.New(evaluatorblock.Options{
+		DefaultTimeout: resolveTimeoutSeconds(engineCfg.EvaluatorTimeoutSeconds),
+	})
+}
+
+// resolveTimeoutSeconds converts one of the operator's `_SECONDS` engine knobs
+// into the wall-clock timeout the matching executor enforces.
+//
+// A zero or negative value returns zero, which hands the decision back to the
+// executor's own constructor and its documented fallback — one default, in one
+// place. Returning a negative duration instead would build an already-expired
+// context and abandon every call before it started, turning a typo in a config
+// file into a total outage of the feature.
+func resolveTimeoutSeconds(seconds int) time.Duration {
+	if seconds <= 0 {
+		return 0
+	}
+	return time.Duration(seconds) * time.Second
 }
 
 // resolveLangWatchBaseURL returns the base URL the evaluator and
@@ -149,6 +280,57 @@ func resolveLangWatchBaseURL(explicit string, getenv func(string) string) string
 		return explicit
 	}
 	return strings.TrimRight(getenv("LANGWATCH_ENDPOINT"), "/")
+}
+
+// resolveSandboxPython returns the interpreter a code block subprocess runs.
+//
+// The config hydrator prefixes every field of EngineConfig, so the name that
+// reaches `cfg.Engine.SandboxPython` is `NLPGO_ENGINE_SANDBOX_PYTHON`. Both
+// runtime images set the unprefixed `SANDBOX_PYTHON` next to the PYTHONPATH
+// that holds the sandbox libraries, so that setting selected nothing: the
+// images ran on whatever `python3` resolved to, which happens to be the same
+// 3.11 the variable names. It stays true only while the image keeps a
+// `python3` alias beside the interpreter, and it silently ignores an operator
+// who points the documented variable at their own interpreter.
+//
+// Same shape and same class of miss as resolveLangWatchBaseURL above, so the
+// same answer: the prefixed setting wins, the unprefixed one is honored, and
+// the default applies when neither is set.
+//
+// `getenv` is injected so tests don't need to mutate process env.
+func resolveSandboxPython(explicit string, getenv func(string) string) string {
+	if explicit != "" && explicit != nlpgo.DefaultSandboxPython {
+		return explicit
+	}
+	if fromEnv := strings.TrimSpace(getenv("SANDBOX_PYTHON")); fromEnv != "" {
+		return fromEnv
+	}
+	return nlpgo.DefaultSandboxPython
+}
+
+// loadModelCatalog reads the model catalog the image ships with, or the
+// checkout's in a development run. Without one the engine still serves, and
+// every model keeps the name rule the engine applied before the catalog; the
+// error says so once at boot.
+func loadModelCatalog(logger *zap.Logger, dir string) litellm.OutputTokensLookup {
+	if dir == "" {
+		wd, err := os.Getwd()
+		found := false
+		if err == nil {
+			dir, found = modelcatalog.FindDir(wd)
+		}
+		if !found {
+			logger.Error("nlpgo_model_catalog_missing", zap.String("env", "LANGWATCH_MODEL_CATALOG_DIR"))
+			return nil
+		}
+	}
+	catalog, err := modelcatalog.Load(dir)
+	if err != nil {
+		logger.Error("nlpgo_model_catalog_unreadable", zap.String("dir", dir), zap.Error(err))
+		return nil
+	}
+	logger.Info("nlpgo_model_catalog_loaded", zap.String("dir", dir))
+	return catalog
 }
 
 // splitCSV splits "a,b,c" into ["a","b","c"], trimming whitespace and

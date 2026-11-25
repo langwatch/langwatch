@@ -1,7 +1,10 @@
 package httpmiddleware
 
 import (
+	"bufio"
+	"context"
 	"errors"
+	"net"
 	"net/http"
 	"time"
 
@@ -39,6 +42,9 @@ func Telemetry() func(http.Handler) http.Handler {
 				zap.Int("bytes", rec.bytes),
 				zap.Duration("duration", time.Since(start)),
 			}
+			if rec.hijacked {
+				fields = append(fields, zap.Bool("hijacked", true))
+			}
 
 			// Level follows fault attribution, the same rule the TS boundaries
 			// (tRPC, Hono, SSE) apply: a handled error with a customer fault is
@@ -46,7 +52,8 @@ func Telemetry() func(http.Handler) http.Handler {
 			// provider faults are incidents and log at error; a handled error
 			// with no fault annotation stays at info; a plain (unhandled)
 			// error — the "unknown" WriteHTTP hides behind a generic 500 —
-			// always logs at error for alerting.
+			// always logs at error for alerting. A client abort (the request's
+			// context canceled) is the exception: it logs at info.
 			level := zapcore.InfoLevel
 			if rec.err != nil {
 				var e herr.E
@@ -65,12 +72,19 @@ func Telemetry() func(http.Handler) http.Handler {
 					switch e.Meta["fault"] {
 					case "customer":
 						level = zapcore.WarnLevel
-					case "platform", "provider":
+					case "platform", "provider", "presumed_platform":
 						level = zapcore.ErrorLevel
 					}
 				} else {
 					level = zapcore.ErrorLevel
 					fields = append(fields, zap.NamedError("error", rec.err))
+				}
+				// A request whose context was canceled is the caller going
+				// away, not a failure of ours: nobody's fault, nothing to page.
+				// Both must hold: a handler can surface a Canceled of its own.
+				if errors.Is(r.Context().Err(), context.Canceled) && errors.Is(rec.err, context.Canceled) {
+					level = zapcore.InfoLevel
+					fields = append(fields, zap.Bool("client_aborted", true))
 				}
 			}
 
@@ -84,6 +98,18 @@ type responseRecorder struct {
 	status int
 	bytes  int
 	err    error
+	// hijacked is set once a handler took the connection over.
+	hijacked bool
+}
+
+// Hijack hands the connection to the handler, which is how a WebSocket
+// upgrade leaves HTTP. Bytes written on it afterwards are not counted.
+func (r *responseRecorder) Hijack() (net.Conn, *bufio.ReadWriter, error) {
+	conn, rw, err := http.NewResponseController(r.ResponseWriter).Hijack()
+	if err == nil {
+		r.hijacked = true
+	}
+	return conn, rw, err
 }
 
 func (r *responseRecorder) RecordError(err error) {

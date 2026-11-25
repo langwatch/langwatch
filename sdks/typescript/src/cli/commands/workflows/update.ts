@@ -1,14 +1,16 @@
-import { scopedApiKey } from "@/internal/credentialContext";
 import chalk from "chalk";
-import { createSpinner } from "../../utils/spinner";
-import { resolveCredentials } from "../../utils/apiKey";
-import { formatFetchError } from "../../utils/formatFetchError";
-import { failSpinner } from "../../utils/spinnerError";
-import { commandValidationError } from "../../utils/errorOutput";
-import { buildAuthHeaders } from "@/internal/api/auth";
-import type { CommandResult } from "../../utils/output";
 
 import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
+import { buildRequestHeaders } from "@/internal/api/request-headers";
+import { scopedApiKey } from "@/internal/credentialContext";
+import { langwatchFetch } from "@/internal/http/langwatchFetch";
+
+import { resolveCredentials } from "../../utils/apiKey.ts";
+import { commandValidationError } from "../../utils/errorOutput.ts";
+import { failSpinnerFromResponse } from "../../utils/failFromResponse.ts";
+import type { CommandResult } from "../../utils/output.ts";
+import { createSpinner } from "../../utils/spinner.ts";
+import { failSpinner } from "../../utils/spinnerError.ts";
 export const updateWorkflowCommand = async (
   id: string,
   options: { name?: string; icon?: string; description?: string },
@@ -29,33 +31,30 @@ export const updateWorkflowCommand = async (
     if (Object.keys(body).length === 0) {
       failSpinner({
         spinner,
-        error: commandValidationError(
-          "No fields to update. Use --name, --icon, or --description.",
-        ),
+        error: commandValidationError("No fields to update. Use --name, --icon, or --description."),
         action: "update workflow",
       });
       process.exit(1);
     }
 
-    const response = await fetch(
-      `${endpoint}/api/workflows/${encodeURIComponent(id)}`,
+    const response = await langwatchFetch(
+      `${endpoint}/api/v1/workflows/${encodeURIComponent(id)}`,
       {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
-          ...buildAuthHeaders({ apiKey }),
+          ...buildRequestHeaders({ apiKey }),
         },
         body: JSON.stringify(body),
       },
     );
 
     if (!response.ok) {
-      const message = await formatFetchError(response);
-      failSpinner({ spinner, error: new Error(message), action: "update workflow" });
+      await failSpinnerFromResponse({ spinner, response, action: "update workflow" });
       process.exit(1);
     }
 
-    const workflow = await response.json() as {
+    const workflow = (await response.json()) as {
       id: string;
       name: string;
       icon: string | null;

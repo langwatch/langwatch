@@ -1,27 +1,26 @@
-import { scopedApiKey } from "@/internal/credentialContext";
 import chalk from "chalk";
-import { createSpinner } from "../../utils/spinner";
-import { resolveCredentials } from "../../utils/apiKey";
-import { formatFetchError } from "../../utils/formatFetchError";
-import { failSpinner } from "../../utils/spinnerError";
-import type { CommandResult } from "../../utils/output";
-import { buildAuthHeaders } from "@/internal/api/auth";
 
 import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
+import { scopedApiKey } from "@/internal/credentialContext";
+
+import { resolveCredentials } from "../../utils/apiKey.ts";
+import { failSpinnerFromResponse } from "../../utils/failFromResponse.ts";
+import type { CommandResult } from "../../utils/output.ts";
+import { createSpinner } from "../../utils/spinner.ts";
+import { failSpinner } from "../../utils/spinnerError.ts";
+import { findMonitor } from "./findMonitor";
+
 /**
  * Returns the monitor rather than printing it: the output port renders it in
  * whatever format the caller asked for (utils/output.ts).
  */
-export const getMonitorCommand = async (
-  id: string
-): Promise<CommandResult | void> => {
+export const getMonitorCommand = async (idOrSlugOrName: string): Promise<CommandResult | void> => {
   await resolveCredentials();
 
   const apiKey = scopedApiKey() ?? process.env.LANGWATCH_API_KEY ?? "";
-  const endpoint =
-    resolveControlPlaneUrl();
+  const endpoint = resolveControlPlaneUrl();
 
-  const spinner = createSpinner(`Fetching monitor "${id}"...`).start();
+  const spinner = createSpinner(`Fetching monitor "${idOrSlugOrName}"...`).start();
 
   let monitor: {
     id: string;
@@ -38,30 +37,16 @@ export const getMonitorCommand = async (
     platformUrl?: string;
   };
   try {
-    const response = await fetch(`${endpoint}/api/monitors/${id}`, {
-      headers: buildAuthHeaders({ apiKey }),
+    const found = await findMonitor<typeof monitor>({
+      endpoint,
+      apiKey,
+      reference: idOrSlugOrName,
     });
-
-    if (!response.ok) {
-      const message = await formatFetchError(response);
-      failSpinner({ spinner, error: new Error(message), action: "fetch monitor" });
+    if ("failed" in found) {
+      await failSpinnerFromResponse({ spinner, response: found.failed, action: "fetch monitor" });
       process.exit(1);
     }
-
-    monitor = (await response.json()) as {
-      id: string;
-      name: string;
-      slug: string;
-      checkType: string;
-      enabled: boolean;
-      executionMode: string;
-      sample: number;
-      level: string;
-      evaluatorId: string | null;
-      preconditions: unknown;
-      createdAt: string;
-      platformUrl?: string;
-    };
+    monitor = found.monitor;
 
     spinner.succeed(`Monitor "${monitor.name}"`);
   } catch (error) {
@@ -80,19 +65,15 @@ export const getMonitorCommand = async (
       console.log(`  ${chalk.gray("Slug:")}      ${monitor.slug}`);
       console.log(`  ${chalk.gray("Type:")}      ${monitor.checkType}`);
       console.log(
-        `  ${chalk.gray("Status:")}    ${monitor.enabled ? chalk.green("enabled") : chalk.gray("disabled")}`
+        `  ${chalk.gray("Status:")}    ${monitor.enabled ? chalk.green("enabled") : chalk.gray("disabled")}`,
       );
       console.log(`  ${chalk.gray("Mode:")}      ${monitor.executionMode}`);
       console.log(`  ${chalk.gray("Sample:")}    ${Math.round(monitor.sample * 100)}%`);
       console.log(`  ${chalk.gray("Level:")}     ${monitor.level}`);
       if (monitor.evaluatorId) {
-        console.log(
-          `  ${chalk.gray("Evaluator:")} ${monitor.evaluatorId}`
-        );
+        console.log(`  ${chalk.gray("Evaluator:")} ${monitor.evaluatorId}`);
       }
-      console.log(
-        `  ${chalk.gray("Created:")}   ${new Date(monitor.createdAt).toLocaleString()}`
-      );
+      console.log(`  ${chalk.gray("Created:")}   ${new Date(monitor.createdAt).toLocaleString()}`);
       if (monitor.platformUrl) {
         console.log(`  ${chalk.bold("View:")}     ${chalk.underline(monitor.platformUrl)}`);
       }

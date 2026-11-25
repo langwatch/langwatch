@@ -1,0 +1,145 @@
+import { SESSION_NAME_FACT_KEY, type TranscriptEntry } from "@langwatch/coding-agent-contract";
+import { Text, VStack } from "@langwatch/design-system/primitives";
+import { useMemo } from "react";
+
+import { useTraceQueryArgs } from "../../../../../behavior/explorer/use-trace-query-args.ts";
+import {
+  useCodingAgentSession,
+  useCodingAgentTranscript,
+} from "../../../../../behavior/reads/use-coding-agent-reads.ts";
+import {
+  useResourceInfoRead,
+  useSpansFullRead,
+  useTraceEventsRead,
+  useTraceLogsRead,
+} from "../../../../../behavior/reads/use-trace-detail-reads.ts";
+import { TERMINAL_TOKENS } from "../../../../../model/coding-agent/trace/terminal-palette.ts";
+import { deriveSessionBanner } from "../../../../../model/coding-agent/trace/terminal-session-banner.ts";
+import { promptLineText } from "../../../../../model/coding-agent/trace/terminal-session.ts";
+import { indexToolSpansBySpanId } from "../../../../../model/coding-agent/trace/terminal-tool-spans.ts";
+import { TerminalSkeleton } from "../../../../elements/coding-agent/trace/terminal-skeleton.tsx";
+import { TerminalView } from "../../../../elements/coding-agent/trace/terminal-view.tsx";
+import { useSessionScrollback } from "./use-session-scrollback.ts";
+
+/** Stable identity while the transcript is still in flight. */
+const NO_ENTRIES: TranscriptEntry[] = [];
+
+interface TerminalTabProps {
+  projectId: string;
+  traceId: string;
+  /** Partition-pruning hint for the span read. */
+  occurredAtMs?: number;
+  /** The trace's own name, shown in the bottom bar. */
+  sessionName?: string | null;
+  /**
+   * The agent's session id: the other turns of this session are the traces
+   * that share it. Null on a trace that belongs to no session, which is what
+   * limits the view to the one turn it opened on.
+   */
+  conversationId: string | null;
+}
+
+/**
+ * The Terminal tab's data boundary.
+ */
+export function TerminalTab({
+  projectId,
+  traceId,
+  occurredAtMs,
+  sessionName,
+  conversationId,
+}: TerminalTabProps) {
+  // On an aggregate, the member the drawer is on: the opened turn and the
+  // session's earlier turns are both read from it.
+  const { tenantId } = useTraceQueryArgs();
+  const turn = { projectId, traceId, occurredAtMs, tenantId };
+  const transcriptQuery = useCodingAgentTranscript(turn);
+  const spansQuery = useSpansFullRead(turn);
+  const eventsQuery = useTraceEventsRead(turn);
+  // The version/model/repo Claude Code itself would print above the prompt,
+  // off the resource attributes (the session fold deliberately carries no
+  // identity strings, ADR-041).
+  const resourceQuery = useResourceInfoRead(turn);
+  // A logs-only agent (Grok, ADR-192) names itself only on its log records.
+  const logsQuery = useTraceLogsRead({
+    ...turn,
+    enabled: spansQuery.isSuccess && spansQuery.data.length === 0,
+  });
+  const sessionRow = useCodingAgentSession({ projectId, traceId }).data ?? null;
+
+  const toolSpans = useMemo(
+    () =>
+      indexToolSpansBySpanId({
+        spans: spansQuery.data ?? [],
+        events: eventsQuery.data ?? [],
+      }),
+    [spansQuery.data, eventsQuery.data],
+  );
+
+  const banner = deriveSessionBanner({
+    resourceAttributes: resourceQuery.data?.resourceAttributes ?? {},
+    spans: spansQuery.data ?? [],
+    logs: logsQuery.data ?? [],
+  });
+
+  const session = useSessionScrollback({
+    projectId,
+    tenantId,
+    traceId,
+    occurredAtMs,
+    conversationId,
+    openedTranscript: transcriptQuery.data?.entries ?? NO_ENTRIES,
+    openedToolSpans: toolSpans,
+  });
+  const scrollback = useMemo(
+    () => ({
+      status: session.status,
+      earlierCount: session.earlierCount,
+      onLoadEarlier: session.loadEarlier,
+    }),
+    [session.status, session.earlierCount, session.loadEarlier],
+  );
+
+  const promptLine = promptLineText({
+    sessionName,
+    declaredSessionName:
+      sessionRow?.title || resourceQuery.data?.resourceAttributes[SESSION_NAME_FACT_KEY] || null,
+    traceId,
+    spans: spansQuery.data ?? [],
+    entries: session.entries,
+  });
+
+  // The loading state has to look like a terminal too — see TerminalSkeleton.
+  if (transcriptQuery.isLoading) {
+    return <TerminalSkeleton />;
+  }
+
+  if (transcriptQuery.isError) {
+    return <TranscriptError />;
+  }
+
+  return (
+    <TerminalView
+      entries={session.entries}
+      rowKeys={session.rowKeys}
+      toolSpans={session.toolSpans}
+      turnDividers={session.turnDividers}
+      scrollback={scrollback}
+      earlierTotals={session.earlierTotals}
+      sessionStartAtMs={session.sessionStartAtMs}
+      sessionCostUsd={sessionRow?.costUsd ?? null}
+      banner={banner}
+      promptLine={promptLine}
+    />
+  );
+}
+
+function TranscriptError() {
+  return (
+    <VStack align="center" justify="center" height="full" bg={TERMINAL_TOKENS.screenBg}>
+      <Text textStyle="xs" color={TERMINAL_TOKENS.red} fontFamily="mono">
+        Couldn&apos;t load this session&apos;s transcript
+      </Text>
+    </VStack>
+  );
+}

@@ -6,24 +6,28 @@ license: MIT
 compatibility: Works with Claude Code and similar coding agents. The `langwatch` CLI is the only interface.
 ---
 
-import CliSetup from '../_shared/cli-setup.mdx'
-import ProjectsAndApiKeys from '../_shared/projects-and-api-keys.mdx'
-import PlanLimits from '../_shared/plan-limits.mdx'
+import CliSetup from "../_shared/cli-setup.mdx";
+import ProjectsAndApiKeys from "../_shared/projects-and-api-keys.mdx";
+import PlanLimits from "../_shared/plan-limits.mdx";
 
 # Version Your Prompts with LangWatch Prompts CLI
 
 ## Determine Scope
 
 If the user's request is **general** ("set up prompt versioning", "version my prompts"):
+
 - Read the full codebase to find all hardcoded prompt strings
 - Study git history to understand what changed and why: focus on agent behavior changes, prompt tweaks, bug fixes. Read commit messages for context.
 - Set up the Prompts CLI and create managed prompts for each hardcoded prompt
 - Update all application code to use `langwatch.prompts.get()`
 
 If the user's request is **specific** ("version this prompt", "create a new prompt version"):
+
 - Focus on the specific prompt
 - Create or update the managed prompt
 - Update the relevant code to use `langwatch.prompts.get()`
+
+In Langy, do not print the code change for the user to apply by hand: call `code_access` and follow the `code-changes` skill to make it on their machine or through GitHub.
 
 ## Plan Limits
 
@@ -68,8 +72,8 @@ every release. Do not default a new prompt to a legacy model like
 `gpt-4o-mini`; pick one only when the user is trading quality for cost or
 latency on purpose.
 
-**Temperature:** the gpt-5 family rejects a custom `temperature`, so do not add
-`modelParameters.temperature` for those models. `create` omits it on purpose.
+**Temperature:** the gpt-5 and gpt-6 families reject a custom `temperature`, so
+do not add `modelParameters.temperature` for those models. `create` omits it on purpose.
 
 **Structured outputs:** if the prompt must return strict JSON, add a
 `response_format` block instead of asking for JSON in prose:
@@ -94,9 +98,11 @@ response_format:
 Replace every hardcoded prompt string with a call to `langwatch.prompts.get()`.
 
 **Python (BAD → GOOD):**
+
 ```python
 agent = Agent(instructions="You are a helpful assistant.")
 ```
+
 ```python
 import langwatch
 prompt = langwatch.prompts.get("my-agent")
@@ -104,9 +110,11 @@ agent = Agent(instructions=prompt.compile().messages[0]["content"])
 ```
 
 **TypeScript (BAD → GOOD):**
+
 ```typescript
 const systemPrompt = "You are a helpful assistant.";
 ```
+
 ```typescript
 const langwatch = new LangWatch();
 const prompt = await langwatch.prompts.get("my-agent");
@@ -127,6 +135,7 @@ Three built-in tags: `latest` (auto-assigned), `production`, `staging`. Update c
 ```python
 prompt = langwatch.prompts.get("my-agent", tag="production")
 ```
+
 ```typescript
 const prompt = await langwatch.prompts.get("my-agent", { tag: "production" });
 ```
@@ -150,5 +159,5 @@ Run `langwatch prompt list` to confirm everything synced, or open the Prompts se
 - Do NOT manually edit `prompts.json`. Use the CLI
 - Do NOT skip `langwatch prompt sync` after creating prompts
 - Prefer the flagship alias `openai/latest` (or `openai/latest-mini` for the fast tier). Pin a version only when a prompt is tuned to one, and pick an older model like `gpt-4o-mini` only when intentionally optimizing for cost or latency
-- Do NOT set `modelParameters.temperature` on a gpt-5-family model; the family rejects it
+- Do NOT set `modelParameters.temperature` on a gpt-5 or gpt-6 family model; both families reject it
 - Do NOT ask for JSON in the prompt text when output must be structured. Use a `response_format` block

@@ -1,0 +1,33 @@
+"""Connect the function that runs your agent to LangWatch Agent Testing.
+
+    import langwatch
+
+    @langwatch.connect_agent(name="support-agent")
+    def support_agent(messages: list[langwatch.Message], plan: str = "free") -> str:
+        ...
+
+    langwatch.agent.serve()
+
+See `dev/docs/adr/128-connected-agents.md` and `specs/python-sdk/agent-decorator.feature`.
+"""
+
+from .client import AgentClient, default_client, serve
+from .decorator import AgentCall, AgentReply, ConnectedAgent, ScenarioRun, connect_agent
+from .protocol import PROTOCOL_VERSION, Message
+from .schema import AgentParameterInvalid, AgentReplyInvalid, Param
+
+__all__ = [
+    "PROTOCOL_VERSION",
+    "AgentCall",
+    "AgentClient",
+    "AgentParameterInvalid",
+    "AgentReply",
+    "AgentReplyInvalid",
+    "ConnectedAgent",
+    "Message",
+    "Param",
+    "ScenarioRun",
+    "connect_agent",
+    "default_client",
+    "serve",
+]

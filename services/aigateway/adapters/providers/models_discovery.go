@@ -6,12 +6,10 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"net"
 	"net/http"
 	"sort"
 	"strings"
 	"sync"
-	"syscall"
 	"time"
 
 	"go.uber.org/zap"
@@ -111,13 +109,14 @@ const anthropicModelsAPIVersion = "2023-06-01"
 // prefixes IDs with "models/"; Groq nests its OpenAI surface under
 // /openai; the rest serve a stock /v1/models.
 var hostedModelCatalogs = map[domain.ProviderID]catalogProbe{
-	domain.ProviderOpenAI:    {modelsURL: "https://api.openai.com/v1/models"},
-	domain.ProviderAnthropic: {modelsURL: "https://api.anthropic.com/v1/models?limit=1000", headers: map[string]string{"anthropic-version": anthropicModelsAPIVersion}},
-	domain.ProviderGemini:    {modelsURL: "https://generativelanguage.googleapis.com/v1beta/openai/models", stripIDPrefix: "models/"},
-	domain.ProviderGroq:      {modelsURL: "https://api.groq.com/openai/v1/models"},
-	domain.ProviderXAI:       {modelsURL: "https://api.x.ai/v1/models"},
-	domain.ProviderCerebras:  {modelsURL: "https://api.cerebras.ai/v1/models"},
-	domain.ProviderDeepSeek:  {modelsURL: deepseekBaseURL + "/v1/models"},
+	domain.ProviderOpenAI:     {modelsURL: "https://api.openai.com/v1/models"},
+	domain.ProviderAnthropic:  {modelsURL: "https://api.anthropic.com/v1/models?limit=1000", headers: map[string]string{"anthropic-version": anthropicModelsAPIVersion}},
+	domain.ProviderGemini:     {modelsURL: "https://generativelanguage.googleapis.com/v1beta/openai/models", stripIDPrefix: "models/"},
+	domain.ProviderGroq:       {modelsURL: "https://api.groq.com/openai/v1/models"},
+	domain.ProviderXAI:        {modelsURL: "https://api.x.ai/v1/models"},
+	domain.ProviderCerebras:   {modelsURL: "https://api.cerebras.ai/v1/models"},
+	domain.ProviderDeepSeek:   {modelsURL: deepseekBaseURL + "/v1/models"},
+	domain.ProviderDoubleword: {modelsURL: doublewordBaseURL + "/v1/models"},
 }
 
 // newModelsDiscoveryClient builds the HTTP client discovery probes use.
@@ -136,7 +135,7 @@ var hostedModelCatalogs = map[domain.ProviderID]catalogProbe{
 //     the host itself, so a name that answers with a public address then
 //     a private one (DNS rebinding) would otherwise slip past it.
 func newModelsDiscoveryClient(policy customerEndpointPolicy) *http.Client {
-	dialer := policyDialer(policy, modelsDiscoveryTimeout)
+	dialer := policy.egress.Dialer(modelsDiscoveryTimeout)
 	return &http.Client{
 		Timeout:   modelsDiscoveryTimeout,
 		Transport: &http.Transport{DialContext: dialer.DialContext},
@@ -144,40 +143,6 @@ func newModelsDiscoveryClient(policy customerEndpointPolicy) *http.Client {
 			return http.ErrUseLastResponse
 		},
 	}
-}
-
-// policyDialer builds a dialer that re-checks every resolved address against
-// the endpoint policy immediately before connecting. Shared by the direct
-// HTTP lanes that carry a customer credential to a customer-configured host:
-// catalog discovery and the realtime session mint.
-func policyDialer(policy customerEndpointPolicy, timeout time.Duration) *net.Dialer {
-	return &net.Dialer{
-		Timeout:   timeout,
-		KeepAlive: 30 * time.Second,
-		ControlContext: func(_ context.Context, _, address string, _ syscall.RawConn) error {
-			return policy.allowsDialAddress(address)
-		},
-	}
-}
-
-// allowsDialAddress applies the endpoint policy to a resolved
-// "host:port" the dialer is about to connect to. Host allowlisting is
-// intentionally not consulted here: the allowlist names hosts, and by
-// this point the name is gone. The pre-flight check is where an
-// allowlisted host earns its exemption.
-func (p customerEndpointPolicy) allowsDialAddress(address string) error {
-	host, _, err := net.SplitHostPort(address)
-	if err != nil {
-		return fmt.Errorf("customer endpoint address is not host:port")
-	}
-	ip := net.ParseIP(host)
-	if ip == nil {
-		return fmt.Errorf("customer endpoint did not resolve to an IP address")
-	}
-	// Same classifier the pre-flight check runs, so a dial cannot reach an
-	// address the URL check would have refused. Not allowlisted: the
-	// allowlist names hosts, and by this point the name is gone.
-	return endpointAddressError(ip, p.blockLocal, false)
 }
 
 // discoveredCatalog is one round's answer: the models plus the gaps

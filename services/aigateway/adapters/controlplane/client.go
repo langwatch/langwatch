@@ -99,13 +99,46 @@ func NewClient(opts ClientOptions) *Client {
 	}
 }
 
-// ResolveKey exchanges a raw virtual key for a domain.Bundle.
-func (c *Client) ResolveKey(ctx context.Context, rawKey string) (*domain.Bundle, error) {
-	payload, _ := json.Marshal(map[string]string{"key_presented": rawKey})
+// forbiddenKeyRefusal reads a 403 from resolve-key. The control plane
+// distinguishes the reversible disable and the self-serve expiry from the
+// one-way revoke in its error code; forward the distinction so neither tenant
+// is told its credential is gone for good. The decoded code decides it, never
+// a substring of the body: the human-readable message travels in the same
+// payload and may name a code this is not. An unrecognized or undecodable 403
+// still reads as revoked, which is the safe answer for a gateway older than the
+// code.
+func forbiddenKeyRefusal(ctx context.Context, respBody []byte) error {
+	var rejection struct {
+		Error struct {
+			Code string `json:"code"`
+		} `json:"error"`
+	}
+	_ = json.Unmarshal(respBody, &rejection)
+	switch rejection.Error.Code {
+	case "virtual_key_disabled":
+		return herr.New(ctx, domain.ErrKeyDisabled, herr.M{
+			"message": domain.KeyDisabledMessage,
+		})
+	case "virtual_key_expired":
+		return herr.New(ctx, domain.ErrKeyExpired, herr.M{
+			"message": domain.KeyExpiredMessage,
+		})
+	}
+	return herr.New(ctx, domain.ErrKeyRevoked, herr.M{"message": domain.KeyRevokedMessage})
+}
+
+// ResolveKey exchanges a presented credential for a domain.Bundle: a raw
+// virtual key, or a license token with the id of the install presenting it.
+func (c *Client) ResolveKey(ctx context.Context, key domain.PresentedKey) (*domain.Bundle, error) {
+	body := map[string]string{"key_presented": key.Token}
+	if key.InstanceID != "" {
+		body["instance_id"] = key.InstanceID
+	}
+	payload, _ := json.Marshal(body)
 	endpoint, _ := url.JoinPath(c.baseURL, "/api/internal/gateway/resolve-key")
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(payload))
 	if err != nil {
-		return nil, herr.New(ctx, domain.ErrAuthUpstream, nil, err)
+		return nil, herr.New(ctx, domain.ErrAuthUpstream, nil, err).WithRetryable(true)
 	}
 	req.Header.Set("Content-Type", "application/json")
 	c.setCommonHeaders(req)
@@ -113,57 +146,71 @@ func (c *Client) ResolveKey(ctx context.Context, rawKey string) (*domain.Bundle,
 
 	resp, err := c.client.Do(req)
 	if err != nil {
-		return nil, herr.New(ctx, domain.ErrAuthUpstream, nil, err)
+		return nil, herr.New(ctx, domain.ErrAuthUpstream, nil, err).WithRetryable(true)
 	}
 	defer func() { _ = resp.Body.Close() }()
 	respBody, _ := io.ReadAll(resp.Body)
+
+	if refusal, ok := connectRefusal(resp.StatusCode, respBody); ok {
+		return nil, herr.New(ctx, refusal, nil)
+	}
 
 	switch {
 	case resp.StatusCode == http.StatusNotFound || resp.StatusCode == http.StatusUnauthorized:
 		return nil, herr.New(ctx, domain.ErrInvalidAPIKey, nil)
 	case resp.StatusCode == http.StatusForbidden:
-		// The control plane distinguishes the reversible disable and the
-		// self-serve expiry from the one-way revoke in its error code;
-		// forward the distinction so neither tenant is told its credential
-		// is gone for good. The decoded code decides it, never a substring
-		// of the body: the human-readable message travels in the same
-		// payload and may name a code this is not. An unrecognized or
-		// undecodable 403 still reads as revoked, which is the safe answer
-		// for a gateway older than the code.
-		var rejection struct {
-			Error struct {
-				Code string `json:"code"`
-			} `json:"error"`
-		}
-		_ = json.Unmarshal(respBody, &rejection)
-		switch rejection.Error.Code {
-		case "virtual_key_disabled":
-			return nil, herr.New(ctx, domain.ErrKeyDisabled, herr.M{
-				"message": "This key is disabled. An administrator can re-enable it; the key material is unchanged.",
-			})
-		case "virtual_key_expired":
-			return nil, herr.New(ctx, domain.ErrKeyExpired, herr.M{
-				"message": domain.KeyExpiredMessage,
-			})
-		}
-		return nil, herr.New(ctx, domain.ErrKeyRevoked, nil)
+		return nil, forbiddenKeyRefusal(ctx, respBody)
 	case resp.StatusCode != http.StatusOK:
-		return nil, herr.New(ctx, domain.ErrAuthUpstream, nil, fmt.Errorf("control plane returned %d", resp.StatusCode))
+		return nil, herr.New(ctx, domain.ErrAuthUpstream, nil, fmt.Errorf("control plane returned %d", resp.StatusCode)).WithRetryable(true)
 	}
 
 	var result struct {
 		Token string `json:"jwt"`
 	}
 	if err := json.Unmarshal(respBody, &result); err != nil {
-		return nil, herr.New(ctx, domain.ErrAuthUpstream, nil, err)
+		return nil, herr.New(ctx, domain.ErrAuthUpstream, nil, err).WithRetryable(true)
 	}
 
 	mapClaims, err := c.verifier.Verify(result.Token)
 	if err != nil {
-		return nil, herr.New(ctx, domain.ErrAuthUpstream, nil, err)
+		return nil, herr.New(ctx, domain.ErrAuthUpstream, nil, err).WithRetryable(true)
 	}
 
 	return claimsToBundle(extractClaims(mapClaims)), nil
+}
+
+// connectRefusals are the control plane's refusals of a license token. Each is
+// final for the token as presented, so it has to reach the caller under its own
+// code: folded into the generic mapping, a wrong instance would read as a
+// revoked key and a missing instance id as a retryable upstream failure.
+var connectRefusals = map[string]herr.Code{
+	string(domain.ErrConnectInstanceRequired):     domain.ErrConnectInstanceRequired,
+	string(domain.ErrConnectLicenseNotRegistered): domain.ErrConnectLicenseNotRegistered,
+	string(domain.ErrConnectLicenseRevoked):       domain.ErrConnectLicenseRevoked,
+	string(domain.ErrConnectLicenseExpired):       domain.ErrConnectLicenseExpired,
+	string(domain.ErrConnectWrongInstance):        domain.ErrConnectWrongInstance,
+	string(domain.ErrConnectCredentialPending):    domain.ErrConnectCredentialPending,
+}
+
+// connectRefusal decodes a license token refusal from a 4xx answer, or the
+// pending answer from a 503. The decoded code decides it, never a substring.
+func connectRefusal(status int, body []byte) (herr.Code, bool) {
+	if status < http.StatusBadRequest || status > http.StatusServiceUnavailable {
+		return "", false
+	}
+	var rejection struct {
+		Error struct {
+			Code string `json:"code"`
+		} `json:"error"`
+	}
+	if err := json.Unmarshal(body, &rejection); err != nil {
+		return "", false
+	}
+	code, ok := connectRefusals[rejection.Error.Code]
+	if ok && status >= http.StatusInternalServerError && code != domain.ErrConnectCredentialPending {
+		return "", false
+	}
+	return code, ok
 }
 
 // Change is one mutation observed by the control plane that the gateway
@@ -312,6 +359,10 @@ func (c *Client) FetchConfig(ctx context.Context, vkID, ifNoneMatch string) (dom
 	if ifNoneMatch != "" && resp.StatusCode == http.StatusNotModified {
 		return domain.ConfigFetchResult{ETag: ifNoneMatch, NotModified: true}, nil
 	}
+	if resp.StatusCode == http.StatusNotFound {
+		// The key no longer exists: a definitive answer, not an outage.
+		return domain.ConfigFetchResult{}, herr.New(ctx, domain.ErrInvalidAPIKey, nil)
+	}
 	if resp.StatusCode != http.StatusOK {
 		return domain.ConfigFetchResult{}, fmt.Errorf("config fetch returned %d", resp.StatusCode)
 	}
@@ -346,6 +397,7 @@ func (c *Client) FetchConfig(ctx context.Context, vkID, ifNoneMatch string) (dom
 		ETag:                  resp.Header.Get("ETag"),
 		VirtualKeyExpiresAt:   keyExpiry,
 		VirtualKeyExpiryKnown: keyExpiryKnown,
+		KeyInactive:           wire.Status != "" && wire.Status != "active",
 	}, nil
 }
 
@@ -428,6 +480,15 @@ type Claims struct {
 	// than the claim sees nothing at all; both decode to 0, which means the
 	// key never expires.
 	VirtualKeyExpiresAt int64
+	// SecretValidUntil is the secret_valid_until claim in unix seconds: the
+	// rotation grace end of a previous secret, 0 for any other credential.
+	SecretValidUntil int64
+	// ConnectServices is the connect_services claim: the hosted services the
+	// license behind the presented token is entitled to. Non-nil only when the
+	// control plane sent the claim, which it does for a license token and for
+	// nothing else, so an absent claim stays nil and a license entitled to
+	// nothing decodes to an empty non-nil slice.
+	ConnectServices []string
 }
 
 func extractClaims(m map[string]any) *Claims {
@@ -450,21 +511,44 @@ func extractClaims(m map[string]any) *Claims {
 	if v, ok := m["vk_expires_at"].(float64); ok {
 		c.VirtualKeyExpiresAt = int64(v)
 	}
+	if v, ok := m["secret_valid_until"].(float64); ok {
+		c.SecretValidUntil = int64(v)
+	}
+	if v, ok := m["connect_services"].([]any); ok {
+		c.ConnectServices = connectServicesClaim(v)
+	}
 	return c
+}
+
+// connectServicesClaim reads the claim's array as service names. Built with a
+// zero-length make rather than a nil slice so a license entitled to nothing
+// still reports as a license credential.
+func connectServicesClaim(raw []any) []string {
+	services := make([]string, 0, len(raw))
+	for _, entry := range raw {
+		if name, ok := entry.(string); ok && name != "" {
+			services = append(services, name)
+		}
+	}
+	return services
 }
 
 func claimsToBundle(c *Claims) *domain.Bundle {
 	b := &domain.Bundle{
-		VirtualKeyID:   c.VirtualKeyID,
-		ProjectID:      c.ProjectID,
-		TeamID:         c.TeamID,
-		OrganizationID: c.OrganizationID,
-		ExpiresAt:      time.Unix(c.ExpiresAt, 0),
+		VirtualKeyID:    c.VirtualKeyID,
+		ProjectID:       c.ProjectID,
+		TeamID:          c.TeamID,
+		OrganizationID:  c.OrganizationID,
+		ExpiresAt:       time.Unix(c.ExpiresAt, 0),
+		ConnectServices: c.ConnectServices,
 	}
 	// A zero claim stays the zero time rather than becoming 1970, which every
 	// clock comparison would read as an expired key.
 	if c.VirtualKeyExpiresAt > 0 {
 		b.VirtualKeyExpiresAt = time.Unix(c.VirtualKeyExpiresAt, 0)
+	}
+	if c.SecretValidUntil > 0 {
+		b.SecretValidUntil = time.Unix(c.SecretValidUntil, 0)
 	}
 	return b
 }

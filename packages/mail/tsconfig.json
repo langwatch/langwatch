@@ -1,0 +1,31 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "tsBuildInfoFile": "dist/tsconfig.typecheck.tsbuildinfo",
+    "lib": ["es2023"],
+    "jsx": "react-jsx",
+    "noUncheckedIndexedAccess": true,
+    "verbatimModuleSyntax": true,
+    "types": ["node"],
+
+    "rootDir": ".",
+
+    "outDir": "dist/typecheck",
+    "composite": true,
+    "noEmit": false
+  },
+  "files": [],
+  "include": [],
+
+  "references": [
+    {
+      "path": "./tsconfig.build.json"
+    },
+    {
+      "path": "./tsconfig.test.json"
+    },
+    {
+      "path": "./preview/tsconfig.json"
+    }
+  ]
+}

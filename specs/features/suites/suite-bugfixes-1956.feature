@@ -38,10 +38,9 @@ Feature: Suite bugfixes - drawer navigation, table width, and quick run
     Then I see an error toast
     And the toast action opens the scenario run detail drawer for the failed run
 
-  # Regression guard: standalone run page still works
-
   @integration
-  Scenario: Run Again from standalone run page stays on the standalone page
-    Given I am on the standalone scenario run page
+  Scenario: Run Again from the standalone run page stays on that page
+    Given I am viewing a run on the standalone run page at its set, batch and run address
     When I click Run Again and the run completes
-    Then I remain on the standalone run page with the new run displayed
+    Then I remain on the standalone run page
+    And the page shows the new run

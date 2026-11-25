@@ -1,13 +1,20 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import Any, TypeVar, cast
+from typing import TYPE_CHECKING, Any, TypeVar, cast
 
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
 
+from ..models.patch_api_webhooks_v1_endpoints_by_id_body_destination_kind import (
+    PatchApiWebhooksV1EndpointsByIdBodyDestinationKind,
+)
 from ..models.patch_api_webhooks_v1_endpoints_by_id_body_status import PatchApiWebhooksV1EndpointsByIdBodyStatus
 from ..types import UNSET, Unset
+
+if TYPE_CHECKING:
+    from ..models.patch_api_webhooks_v1_endpoints_by_id_body_sqs import PatchApiWebhooksV1EndpointsByIdBodySqs
+
 
 T = TypeVar("T", bound="PatchApiWebhooksV1EndpointsByIdBody")
 
@@ -16,7 +23,9 @@ T = TypeVar("T", bound="PatchApiWebhooksV1EndpointsByIdBody")
 class PatchApiWebhooksV1EndpointsByIdBody:
     """
     Attributes:
+        destination_kind (PatchApiWebhooksV1EndpointsByIdBodyDestinationKind | Unset):
         url (str | Unset):
+        sqs (PatchApiWebhooksV1EndpointsByIdBodySqs | Unset):
         enabled_events (list[str] | Unset):
         status (PatchApiWebhooksV1EndpointsByIdBodyStatus | Unset):
         max_batch_size (int | Unset):
@@ -24,7 +33,9 @@ class PatchApiWebhooksV1EndpointsByIdBody:
         max_in_flight (int | Unset):
     """
 
+    destination_kind: PatchApiWebhooksV1EndpointsByIdBodyDestinationKind | Unset = UNSET
     url: str | Unset = UNSET
+    sqs: PatchApiWebhooksV1EndpointsByIdBodySqs | Unset = UNSET
     enabled_events: list[str] | Unset = UNSET
     status: PatchApiWebhooksV1EndpointsByIdBodyStatus | Unset = UNSET
     max_batch_size: int | Unset = UNSET
@@ -33,7 +44,15 @@ class PatchApiWebhooksV1EndpointsByIdBody:
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
+        destination_kind: str | Unset = UNSET
+        if not isinstance(self.destination_kind, Unset):
+            destination_kind = self.destination_kind.value
+
         url = self.url
+
+        sqs: dict[str, Any] | Unset = UNSET
+        if not isinstance(self.sqs, Unset):
+            sqs = self.sqs.to_dict()
 
         enabled_events: list[str] | Unset = UNSET
         if not isinstance(self.enabled_events, Unset):
@@ -52,8 +71,12 @@ class PatchApiWebhooksV1EndpointsByIdBody:
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
         field_dict.update({})
+        if destination_kind is not UNSET:
+            field_dict["destination_kind"] = destination_kind
         if url is not UNSET:
             field_dict["url"] = url
+        if sqs is not UNSET:
+            field_dict["sqs"] = sqs
         if enabled_events is not UNSET:
             field_dict["enabled_events"] = enabled_events
         if status is not UNSET:
@@ -69,8 +92,24 @@ class PatchApiWebhooksV1EndpointsByIdBody:
 
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
+        from ..models.patch_api_webhooks_v1_endpoints_by_id_body_sqs import PatchApiWebhooksV1EndpointsByIdBodySqs
+
         d = dict(src_dict)
+        _destination_kind = d.pop("destination_kind", UNSET)
+        destination_kind: PatchApiWebhooksV1EndpointsByIdBodyDestinationKind | Unset
+        if isinstance(_destination_kind, Unset):
+            destination_kind = UNSET
+        else:
+            destination_kind = PatchApiWebhooksV1EndpointsByIdBodyDestinationKind(_destination_kind)
+
         url = d.pop("url", UNSET)
+
+        _sqs = d.pop("sqs", UNSET)
+        sqs: PatchApiWebhooksV1EndpointsByIdBodySqs | Unset
+        if isinstance(_sqs, Unset):
+            sqs = UNSET
+        else:
+            sqs = PatchApiWebhooksV1EndpointsByIdBodySqs.from_dict(_sqs)
 
         enabled_events = cast(list[str], d.pop("enabled_events", UNSET))
 
@@ -88,7 +127,9 @@ class PatchApiWebhooksV1EndpointsByIdBody:
         max_in_flight = d.pop("max_in_flight", UNSET)
 
         patch_api_webhooks_v1_endpoints_by_id_body = cls(
+            destination_kind=destination_kind,
             url=url,
+            sqs=sqs,
             enabled_events=enabled_events,
             status=status,
             max_batch_size=max_batch_size,

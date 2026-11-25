@@ -127,7 +127,7 @@ func TestBodyFromBody_RoundTripsTypedChain(t *testing.T) {
 	inner := New(ctx, "no_provider_configured", M{
 		"message":     "no model provider configured",
 		"http_status": 400,
-	})
+	}).WithRetryable(true)
 	outer := New(ctx, "agent_error", M{"message": "the agent hit an error"},
 		inner, errors.New("raw internal detail"))
 
@@ -138,6 +138,8 @@ func TestBodyFromBody_RoundTripsTypedChain(t *testing.T) {
 	require.Len(t, body.Reasons, 2)
 	assert.Equal(t, "no_provider_configured", body.Reasons[0].Type)
 	assert.Equal(t, "no model provider configured", body.Reasons[0].Message)
+	assert.False(t, body.Retryable)
+	assert.True(t, body.Reasons[0].Retryable)
 	assert.Equal(t, "unknown", body.Reasons[1].Type)
 
 	// Simulate the wire: encode/decode the envelope, then reconstruct.
@@ -152,6 +154,9 @@ func TestBodyFromBody_RoundTripsTypedChain(t *testing.T) {
 	require.Len(t, e.Reasons, 2)
 	assert.True(t, IsCode(e.Reasons[0], "no_provider_configured"))
 	assert.True(t, IsCode(e.Reasons[1], "unknown"))
+	assert.False(t, e.Retryable)
+	assert.True(t, e.Reasons[0].(E).Retryable)
+	assert.False(t, e.Reasons[1].(E).Retryable)
 
 	// Re-serializing the reconstruction is lossless: same envelope again
 	// (message re-promoted from Meta["message"], meta preserved).
@@ -160,6 +165,29 @@ func TestBodyFromBody_RoundTripsTypedChain(t *testing.T) {
 	assert.Equal(t, "no model provider configured", again.Reasons[0].Message)
 	// json numbers decode to float64; compare loosely.
 	assert.EqualValues(t, 400, again.Reasons[0].Meta["http_status"])
+	assert.False(t, again.Retryable)
+	assert.True(t, again.Reasons[0].Retryable)
+}
+
+func TestWriteHTTP_AlwaysEmitsRetryable(t *testing.T) {
+	RegisterStatus("retryable_error", http.StatusBadGateway)
+
+	rec := httptest.NewRecorder()
+	WriteHTTP(rec, New(context.Background(), "retryable_error", nil).WithRetryable(true))
+
+	var response ErrorResponse
+	raw := rec.Body.String()
+	require.NoError(t, json.Unmarshal([]byte(raw), &response))
+	assert.True(t, response.Error.Retryable)
+	assert.Contains(t, raw, `"retryable":true`)
+
+	rec = httptest.NewRecorder()
+	WriteHTTP(rec, New(context.Background(), "retryable_error", nil))
+
+	raw = rec.Body.String()
+	require.NoError(t, json.Unmarshal([]byte(raw), &response))
+	assert.False(t, response.Error.Retryable)
+	assert.Contains(t, raw, `"retryable":false`)
 }
 
 func TestFromBody_ParsesTraceIDsAndTolerantOfGarbage(t *testing.T) {

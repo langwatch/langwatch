@@ -1,0 +1,51 @@
+import type { AuthzAdmissionRepository } from "./authz-admission.repository.ts";
+import type { AuthzAuditTrailRepository } from "./authz-audit-trail.repository.ts";
+import type { AuthzBillingGrantRepository } from "./authz-billing-grant.repository.ts";
+import type { AuthzBraidLockRepository } from "./authz-braid-lock.repository.ts";
+import type { AuthzBraidWriteRepository } from "./authz-braid-write.repository.ts";
+import type { AuthzCutoverRepository } from "./authz-cutover.repository.ts";
+import type { AuthzEpochRepository } from "./authz-epoch.repository.ts";
+import type { AuthzGrantProjectionRepository } from "./authz-grant-projection.repository.ts";
+import type { AuthzLedgerReadRepository } from "./authz-ledger-read.repository.ts";
+import type { AuthzLineageEpochRepository } from "./authz-lineage-epoch.repository.ts";
+import type { AuthzListingRepository } from "./authz-listing.repository.ts";
+import type { AuthzManagedGrantRepository } from "./authz-managed-grant.repository.ts";
+import type { AuthzMembershipStampRepository } from "./authz-membership-stamp.repository.ts";
+import type { AuthzMigrationRepository } from "./authz-migration.repository.ts";
+import type { AuthzOrganizationPolicyRepository } from "./authz-organization-policy.repository.ts";
+import type { AuthzPlatformGrantRepository } from "./authz-platform-grant.repository.ts";
+import type { AuthzReadRepository } from "./authz-read.repository.ts";
+import type { AuthzRevocationRepository } from "./authz-revocation.repository.ts";
+import type { AuthzSessionVersionRepository } from "./authz-session-version.repository.ts";
+import type { AuthzUserStandingRepository } from "./authz-user-standing.repository.ts";
+
+/** The rows the authz module selects at boot: Postgres facts, and the three Redis counters. */
+export interface AuthzRepositories {
+  readonly bindings: AuthzManagedGrantRepository;
+  readonly cutover: AuthzCutoverRepository;
+  readonly admissions: AuthzAdmissionRepository;
+  readonly userStandings: AuthzUserStandingRepository;
+  readonly epoch: AuthzEpochRepository;
+  /** Moved by project's moved and archived facts; a held lineage is checked against it. */
+  readonly lineageEpochs: AuthzLineageEpochRepository;
+  readonly sessionVersions: AuthzSessionVersionRepository;
+  readonly auditTrail: AuthzAuditTrailRepository;
+  readonly platformGrants: AuthzPlatformGrantRepository;
+  readonly billingGrants: AuthzBillingGrantRepository;
+  readonly membershipStamps: AuthzMembershipStampRepository;
+  readonly grantProjection: AuthzGrantProjectionRepository;
+  readonly revocation: AuthzRevocationRepository;
+  /** What every decision reads: the grant heads, memberships and lineage. */
+  readonly read: AuthzReadRepository;
+  readonly listing: AuthzListingRepository;
+  /** The ADR-110 import's reads of the legacy tables and the heads it proves. */
+  readonly migration: AuthzMigrationRepository;
+  /** What the ledger's read-your-writes hold and the grant writer read. */
+  readonly ledgerReads: AuthzLedgerReadRepository;
+  /** Serialises braid writes into one reader (ADR-201 §1). */
+  readonly braidLocks: AuthzBraidLockRepository;
+  /** The braid writes sent into a reader, by command id (ADR-201 §1). */
+  readonly braidWrites: AuthzBraidWriteRepository;
+  /** An organisation's settings, read into its snapshot (ADR-201 §2). */
+  readonly organizationPolicies: AuthzOrganizationPolicyRepository;
+}

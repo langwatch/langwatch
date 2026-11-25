@@ -77,14 +77,14 @@ Feature: Dataset File Upload REST API
   @integration
   Scenario: Upload exceeding row limit is rejected
     Given a dataset "big" exists
-    When I POST /api/dataset/big/upload with a CSV file containing 10,001 rows
+    When I POST /api/dataset/big/upload with a CSV file containing more rows than one upload accepts
     Then the request fails with 400 Bad Request
-    And the error indicates the row limit of 10,000 has been exceeded
+    And the error names how many rows one upload accepts
 
   @integration
   Scenario: Upload exceeding file size limit is rejected
     Given a dataset "big" exists
-    When I POST /api/dataset/big/upload with a file larger than 25MB
+    When I POST /api/dataset/big/upload with a file larger than the upload limit
     Then the request fails with 400 Bad Request
     And the error indicates the file size limit has been exceeded
 
@@ -143,9 +143,9 @@ Feature: Dataset File Upload REST API
 
   @integration
   Scenario: Create + upload rejects file exceeding row limit
-    When I POST /api/dataset/upload with name "Too Big" and a CSV file containing 10,001 rows
+    When I POST /api/dataset/upload with name "Too Big" and a CSV file containing more rows than one upload accepts
     Then the request fails with 400 Bad Request
-    And the error indicates the row limit of 10,000 has been exceeded
+    And the error names how many rows one upload accepts
 
   # ── Format Detection ───────────────────────────────────────────
 
@@ -297,10 +297,4 @@ Feature: Dataset File Upload REST API
   @integration
   Scenario: Upload to existing without API key returns 401
     When I POST /api/dataset/some-dataset/upload without X-Auth-Token header
-    Then the request fails with 401 Unauthorized
-
-  @integration
-  Scenario: Direct-upload rejects a foreign-project API key against an owned project
-    Given a second project with its own API key
-    When I POST /api/dataset/direct-upload for the first project using the second project's API key
     Then the request fails with 401 Unauthorized

@@ -1,0 +1,349 @@
+import type {
+  Actor,
+  Authorization,
+  AuthorizationPurpose,
+  AuthzGetDecisionInput,
+  AuthzGetProjectAnyDecisionInput,
+  AuthzPermission,
+  AuthzScopeLineageInput,
+  AuthzScopeLineageResult,
+  DeclaredScopeTier,
+  PermissionDecision,
+  PermissionScopeArg,
+  TierOfScopeArg,
+} from "@langwatch/authorization";
+import { generate } from "@langwatch/ksuid";
+import { moduleApi } from "@langwatch/module";
+import type { Instant } from "@langwatch/time";
+
+import type * as Billing from "./authz-billing-role.commands.ts";
+import type * as Braids from "./authz-braids.commands.ts";
+import type * as authzGrantEventsModule from "./authz-grant.events.ts";
+import type * as Grants from "./authz-grants-rest.schemas.ts";
+import type * as Platform from "./authz-platform-operators.commands.ts";
+import type { RoleBindingRest } from "./authz-rest.schemas.ts";
+import type {
+  AuthzAdmissionScope,
+  AuthzPendingAdmissionRead,
+  AuthzResolveAdmissionInput,
+} from "./authz.admission.ts";
+import type * as Commands from "./authz.commands.ts";
+import type * as Binding from "./authz.grant-management.ts";
+import type * as Queries from "./authz.queries.ts";
+import type { Authorized, AuthzDecision, AuthzPrincipalRef, AuthzScopeRef } from "./authz.ts";
+
+export interface AuthzCaller {
+  readonly id: string;
+}
+/** `organizationPermissions` is the same caller's set at the scope's organization. */
+export type EffectivePermissions =
+  | Readonly<{ scope: null; permissions: string[]; organizationPermissions: string[] }>
+  | Readonly<{
+      scope: Readonly<{ type: AuthzScopeRef["type"]; id: string }>;
+      permissions: Queries.AuthzEffectivePermissionsOutput;
+      organizationPermissions: Queries.AuthzEffectivePermissionsOutput;
+    }>;
+
+/**
+ * The complete callable authorization boundary.  This is deliberately a
+ * structural interface: callers can use an installed AuthzModule without
+ * receiving its services, repositories, or transport adapters.
+ */
+export interface AuthzApi {
+  /** Whether this is the configured shared demo project. */
+  isDemoProject(input: { projectId: string }): boolean;
+  /**
+   * The shared demo project's identity. `DEMO_PROJECT_ID`/`DEMO_PROJECT_USER_ID`
+   * have one owner, this module; a peer asks rather than redeclaring them.
+   * Blank fields mean the deployment configured no demo project.
+   */
+  demoProject(): Readonly<{ projectId: string; userId: string }>;
+  effectivePermissionsFor(
+    input: Readonly<{ projectId?: string; organizationId?: string }>,
+    by: AuthzCaller,
+  ): Promise<EffectivePermissions>;
+  check(args: Queries.AuthzCheckInput): Promise<AuthzDecision>;
+  checkDetailed(args: Queries.AuthzCheckInput): Promise<Queries.AuthzCheckDetailedOutput>;
+  can(args: Queries.AuthzCanInput): Promise<boolean>;
+  /**
+   * With `proof` on a project scope, also mints the sealed `Authorization` its reads carry
+   * (ADR-166, ADR-177 block B); `authorization` is null everywhere else.
+   */
+  authorize<Tier extends DeclaredScopeTier, Permission extends AuthzPermission>(args: {
+    principal: AuthzPrincipalRef;
+    permission: Permission;
+    scope: Extract<AuthzScopeRef, { type: Tier }>;
+    proof?: Readonly<{ actor: Actor; purpose: AuthorizationPurpose }>;
+  }): Promise<Authorized<Tier, Permission> & Readonly<{ authorization: Authorization | null }>>;
+  /** The own-only proof platform code reads its own project with (ADR-177); evaluates nothing.
+   *  A project that no longer exists throws `ProjectNotFoundError`. */
+  authorizeInternal(args: {
+    actor: Extract<Actor, { type: "internal" | "system" }>;
+    projectId: string;
+    permission: AuthzPermission;
+    purpose: AuthorizationPurpose;
+  }): Promise<Authorization>;
+  effectivePermissions(
+    args: Queries.AuthzEffectivePermissionsInput,
+  ): Promise<Queries.AuthzEffectivePermissionsOutput>;
+  checkByIds(args: Queries.AuthzCheckByIdsInput): Promise<Queries.AuthzCheckByIdsOutput>;
+  canAnyByIds(args: Queries.AuthzCanAnyByIdsInput): Promise<Queries.AuthzCanAnyByIdsOutput>;
+  canBatchByIds(args: Queries.AuthzCanBatchByIdsInput): Promise<Queries.AuthzCanBatchByIdsOutput>;
+  canBatchPermissionsByIds(
+    args: Queries.AuthzCanBatchPermissionsByIdsInput,
+  ): Promise<Queries.AuthzCanBatchPermissionsByIdsOutput>;
+  /** Throws `AuthzScopeNotFoundError` when no id names a live scope. */
+  getScope(args: Queries.AuthzResolveScopeInput): Promise<AuthzScopeRef>;
+  checkScopeLineage(args: AuthzScopeLineageInput): Promise<AuthzScopeLineageResult>;
+  explainDecision(
+    args: Queries.AuthzExplainDecisionInput,
+  ): Promise<Queries.AuthzExplainDecisionOutput>;
+  getDecision(args: AuthzGetDecisionInput): Promise<PermissionDecision>;
+  getProjectAnyDecision(args: AuthzGetProjectAnyDecisionInput): Promise<PermissionDecision>;
+  hasPermission<Permission extends AuthzPermission>(
+    check: {
+      userId: string;
+      permission: Permission;
+    } & PermissionScopeArg<Permission>,
+  ): Promise<boolean>;
+  authorizePermission<
+    Permission extends AuthzPermission,
+    ScopeArg extends PermissionScopeArg<Permission>,
+  >(
+    check: { userId: string; permission: Permission } & ScopeArg,
+  ): Promise<Authorized<TierOfScopeArg<ScopeArg>, Permission>>;
+  authorizeProjectPermission(args: Queries.AuthzRequireProjectPermissionInput): Promise<void>;
+  hasApiKeyPermission(args: Queries.ApiKeyPermissionCheck): Promise<boolean>;
+  getApiKeyProjectDecision(
+    args: Queries.AuthzGetApiKeyProjectDecisionInput,
+  ): Promise<Queries.ApiKeyProjectDecision>;
+  listUserBindings(
+    args: Queries.AuthzListUserBindingsInput,
+  ): Promise<Queries.AuthzAccessBindingsOutput>;
+  listOrganizationBindings(
+    args: Queries.AuthzListOrganizationBindingsInput,
+  ): Promise<Queries.AuthzAccessBindingsOutput>;
+  listUserAndGroupBindings(
+    args: Queries.AuthzListUserAndGroupBindingsInput,
+  ): Promise<Queries.AuthzAccessBindingsOutput>;
+  listScopeBindings(
+    args: Queries.AuthzListScopeBindingsInput,
+  ): Promise<Queries.AuthzAccessBindingsOutput>;
+  listGroupBindings(
+    args: Queries.AuthzListGroupBindingsInput,
+  ): Promise<Queries.AuthzAccessBindingsOutput>;
+  /** The grants each of these keys holds, read off the grants head. */
+  listApiKeyBindings(
+    args: Queries.AuthzListApiKeyBindingsInput,
+  ): Promise<Queries.AuthzAccessBindingsOutput>;
+  listTeamMemberBindings(
+    args: Queries.AuthzListTeamMemberBindingsInput,
+  ): Promise<Map<string, Queries.AuthzTeamMemberBinding[]>>;
+  listBindingsForSynthesis(
+    args: Queries.AuthzListBindingsForSynthesisInput,
+  ): Promise<Queries.AuthzBindingForSynthesis[]>;
+  listUserCreatedRoles(
+    args: Queries.AuthzListOrganizationBindingsInput,
+  ): Promise<Queries.AuthzCustomRole[]>;
+  /** The permission sets of these roles in this organization, whatever their kind. */
+  findRolePermissions(
+    args: Queries.AuthzFindRolePermissionsInput,
+  ): Promise<Queries.AuthzRolePermissions[]>;
+  wouldFirstBindingDisableLegacyAccess(
+    args: Binding.AuthzLegacyAccessNoticeInput,
+  ): Promise<boolean>;
+  listManagedBindingsForUser(
+    args: Binding.AuthzListManagedBindingsForUserInput,
+  ): Promise<Binding.AuthzListManagedBindingsForUserOutput>;
+  listManagedBindingsForOrganization(
+    args: Binding.AuthzListManagedBindingsForOrganizationInput,
+  ): Promise<Binding.AuthzListManagedBindingsForOrganizationOutput>;
+  getAccessBreakdown(
+    args: Binding.AuthzAccessBreakdownInput,
+  ): Promise<Binding.AuthzAccessBreakdownOutput>;
+  isOnEngine(args: Queries.AuthzListOrganizationBindingsInput): Promise<boolean>;
+  findEngineCutoverAt(args: Queries.AuthzListOrganizationBindingsInput): Promise<Instant | null>;
+  /** User ids holding organisation role ADMIN on a seat not disabled; empty for an unknown one. */
+  findActiveOrganizationAdministrators(
+    args: Queries.AuthzFindActiveOrganizationAdministratorsInput,
+  ): Promise<Queries.AuthzActiveOrganizationAdministrators>;
+  /** The caller's session version (ADR-170): 0 until first bumped; throws when unreadable. */
+  getSessionVersion(input: { userId: string }): Promise<number>;
+  revoke(args: Commands.AuthzRevokeGrantInput): Promise<void>;
+  offboard(args: Commands.AuthzOffboardInput): Promise<Commands.AuthzOffboardOutput>;
+  invalidateOrganization(args: { organizationId: string }): Promise<void>;
+  attachBindings(
+    args: Commands.AuthzAttachBindingsInput,
+  ): Promise<Commands.AuthzAttachBindingsOutput>;
+  attachResourceGrant(
+    args: Commands.AuthzAttachResourceGrantInput,
+  ): Promise<Commands.AuthzAttachResourceGrantOutput>;
+  revokeResourceGrants(
+    args: Commands.AuthzRevokeResourceGrantsInput,
+  ): Promise<Commands.AuthzRevokeResourceGrantsOutput>;
+  /** The live shared reads (ADR-177) one reader project holds, one per member project. */
+  findLiveSharedProjectGrants(
+    args: Commands.AuthzFindLiveSharedProjectGrantsInput,
+  ): Promise<Commands.AuthzSharedProjectGrant[]>;
+  /** A `project-reader` grant from reader to member carrying `condition`; idempotent per pair. */
+  attachSharedProjectGrant(
+    args: Commands.AuthzAttachSharedProjectGrantInput,
+  ): Promise<Commands.AuthzAttachSharedProjectGrantOutput>;
+  /** One read-your-writes wait for shared reads attached with `awaitProjection: false`. */
+  awaitSharedProjectGrants(args: Commands.AuthzAwaitSharedProjectGrantsInput): Promise<void>;
+  /** Revokes a reader's live shared reads (all, or those on `memberProjectIds`); answers ids. */
+  revokeSharedProjectGrants(args: Commands.AuthzRevokeSharedProjectGrantsInput): Promise<string[]>;
+  /** ADR-201: the live braids out of a project and into it; lists with `release_braids` off too. */
+  listBraids(args: Braids.AuthzListBraidsInput): Promise<Braids.AuthzProjectBraids>;
+  /** A braid from the owner (`projectId`) into the reader, its condition compiled on save. */
+  createBraid(args: Braids.AuthzCreateBraidInput): Promise<Braids.AuthzBraid>;
+  /** Attaches the changed braid naming the one it replaces, then revokes that one. */
+  changeBraid(args: Braids.AuthzChangeBraidInput): Promise<Braids.AuthzBraid>;
+  /** Revokes a braid touching `projectId` with reason `braid_removed`. */
+  removeBraid(args: Braids.AuthzRemoveBraidInput): Promise<Braids.AuthzBraidRemoved>;
+  /**
+   * ADR-201 §8: one `braided_spans.viewed` audit row per actor, reader and owner per five
+   * minutes, naming the braids and never a span. Never fails the read that calls it.
+   */
+  recordBraidedSpansView(args: Braids.AuthzRecordBraidedSpansViewInput): Promise<void>;
+  /** The organisation's authz settings; one with no stored row has every setting off. */
+  getOrganizationPolicy(
+    args: Braids.AuthzOrganizationInput,
+  ): Promise<Braids.AuthzOrganizationPolicy>;
+  /** The Braids screen's policy; answers while `release_braids` is off, so it can be turned off. */
+  getOrganizationPolicyForScreen(
+    args: Braids.AuthzOrganizationInput,
+  ): Promise<Braids.AuthzOrganizationPolicy>;
+  /** Keeps braids to organisation admins or opens them again; audited, and bumps the epoch. */
+  setBraidsPolicy(args: Braids.AuthzSetBraidsPolicyInput): Promise<Braids.AuthzOrganizationPolicy>;
+  /** Turns Braids on or off for the organisation; off pauses braids and keeps them. Audited. */
+  setBraidsEnabled(
+    args: Braids.AuthzSetBraidsEnabledInput,
+  ): Promise<Braids.AuthzOrganizationPolicy>;
+  /** Every live braid in the organisation. */
+  listOrganizationBraids(
+    args: Braids.AuthzOrganizationInput,
+  ): Promise<Braids.AuthzOrganizationBraids>;
+  /** ADR-201 §7: the organisation's active members holding `permission` at the project. */
+  countProjectMembersHolding(
+    args: Braids.AuthzCountProjectMembersHoldingInput,
+  ): Promise<Braids.AuthzProjectMembersHolding>;
+  /** The braid dialog's count: refuses `braids_not_enabled` while `release_braids` is off. */
+  countProjectMembersHoldingForScreen(
+    args: Braids.AuthzCountProjectMembersHoldingInput,
+  ): Promise<Braids.AuthzProjectMembersHolding>;
+  /**
+   * Refuses `braids_not_enabled` unless `release_braids` is on for the project's organisation,
+   * and `braids_turned_off` unless the organisation turned Braids on in settings.
+   */
+  assertBraidsReleased(args: Braids.AuthzListBraidsInput): Promise<void>;
+  /** The braid dialog's picker: which projects the caller may braid into, one batched decision. */
+  listBraidTargets(args: Braids.AuthzListBraidTargetsInput): Promise<Braids.AuthzBraidTargets>;
+  changeBindingRole(
+    args: Commands.AuthzChangeBindingRoleInput,
+  ): Promise<Commands.AuthzChangeBindingRoleOutput>;
+  revokeBindings(
+    args: Commands.AuthzRevokeBindingsInput,
+  ): Promise<Commands.AuthzRevokeBindingsOutput>;
+  revokeBindingsWhere(
+    args: Commands.AuthzRevokeBindingsWhereInput,
+  ): Promise<Commands.AuthzRevokeBindingsWhereOutput>;
+  /**
+   * Retires the grants the directory itself wrote at the organization scope
+   * for these people, leaving an administrator's own grant at the same scope
+   * where it is. Answers how many it retired.
+   */
+  retireDirectoryGrants(
+    args: Commands.AuthzRetireDirectoryGrantsInput,
+  ): Promise<Commands.AuthzRetireDirectoryGrantsOutput>;
+  /**
+   * What the directory has attached and removed lately, newest first — the
+   * grant side of a reconciliation view. Authz owns these rows; a peer asks.
+   */
+  findDirectoryCausedChanges(
+    args: Commands.AuthzDirectoryCausedChangesInput,
+  ): Promise<Commands.AuthzDirectoryCausedChangesOutput>;
+  offboardMember(
+    args: Commands.AuthzOffboardMemberInput,
+  ): Promise<Commands.AuthzOffboardMemberOutput>;
+  defineRole(args: Commands.AuthzDefineRoleInput): Promise<Commands.AuthzDefineRoleOutput>;
+  deleteRole(args: Commands.AuthzDeleteRoleInput): Promise<Commands.AuthzDeleteRoleOutput>;
+  createBinding(args: Binding.AuthzCreateBindingInput): Promise<Binding.AuthzCreateBindingOutput>;
+  updateBinding(args: Binding.AuthzUpdateBindingInput): Promise<Binding.AuthzCreateBindingOutput>;
+  /** `PATCH /role-bindings/:id`: the update, read back as the list reports it. */
+  updateRoleBinding(args: Binding.AuthzUpdateBindingInput): Promise<RoleBindingRest>;
+  deleteBinding(
+    args: Binding.AuthzDeleteBindingInput,
+  ): Promise<Binding.AuthzBindingMutationSuccess>;
+  /** `GET /api/grants`: filtered, one cursor page at a time. */
+  listGrants(args: Grants.AuthzListGrantsInput): Promise<Grants.GrantPage>;
+  /** One grant; another organization's id is `grant_not_found`. */
+  getGrant(args: Grants.AuthzGetGrantInput): Promise<Grants.Grant>;
+  /** Grants a role, never beyond what the caller holds at that scope. */
+  createGrant(args: Grants.AuthzCreateGrantInput): Promise<Grants.Grant>;
+  /** Changes only the role, under the same ceiling as a create. */
+  changeGrantRole(args: Grants.AuthzChangeGrantRoleInput): Promise<Grants.Grant>;
+  revokeGrant(args: Grants.AuthzRevokeGrantByIdInput): Promise<Grants.GrantRevoked>;
+  /** Grants platform-operator to a user: by an ops:manage holder, never to yourself. */
+  grantPlatformOperator(
+    args: Platform.AuthzGrantPlatformOperatorInput,
+  ): Promise<Platform.PlatformOperator>;
+  /** Revokes one platform-operator grant; never the last, unless user erasure asks as `system`. */
+  revokePlatformOperator(args: Platform.AuthzRevokePlatformOperatorInput): Promise<void>;
+  /** Every live platform operator, oldest first. */
+  listPlatformOperators(): Promise<Platform.AuthzListPlatformOperatorsOutput>;
+  /** Who holds the Billing role on an enabled membership, oldest grant first. */
+  listBillingMembers(
+    args: Billing.AuthzListBillingMembersInput,
+  ): Promise<readonly Billing.AuthzBillingMember[]>;
+  /**
+   * Grants or revokes the Billing role; idempotent. Refuses a person with no membership, and
+   * taking a held grant from a Billing-only member (`billing_only_keeps_billing`, ADR-205).
+   */
+  setBillingRole(args: Billing.AuthzSetBillingRoleInput): Promise<void>;
+  /** The escalation rule every door shares: what of these the caller lacks at that scope. */
+  findPermissionsBeyondCaller(
+    args: Grants.AuthzFindPermissionsBeyondCallerInput,
+  ): Promise<string[]>;
+  applyMemberBindings(
+    args: Binding.AuthzApplyMemberBindingsInput,
+  ): Promise<Binding.AuthzBindingMutationSuccess>;
+  /**
+   * Where this membership's automatic admission stands. The marker is minted
+   * with the membership row so a process that stopped before the grant landed
+   * still has a retry signal; the state is read off the ledger.
+   */
+  readPendingAdmission(args: AuthzAdmissionScope): Promise<AuthzPendingAdmissionRead>;
+  /** Clears the marker once the grant is confirmed. False means it no longer applied. */
+  completeAdmission(args: AuthzResolveAdmissionInput): Promise<boolean>;
+  /** Clears a revoked marker without treating the admission as successful. */
+  clearPendingAdmission(args: AuthzResolveAdmissionInput): Promise<boolean>;
+  hasProjectPermission(input: {
+    userId: string;
+    projectId: string;
+    permission: AuthzPermission;
+  }): Promise<boolean>;
+  /**
+   * The deterministic grant id a writer that may run twice attaches under (ADR-092 s13): the
+   * stored one when a grant already holds either layout's id, revoked or not, else a new v2 id.
+   * A revoked grant is never minted afresh beside itself.
+   */
+  resolveGrantId(input: AuthzGrantIdInput): Promise<string>;
+}
+
+/** What a deterministic grant id is derived from. */
+export type AuthzGrantIdInput = {
+  organizationId: string;
+  principal: authzGrantEventsModule.LedgerPrincipal;
+  scope: authzGrantEventsModule.LedgerScope;
+  resourceToken?: string;
+  occurredAtMs: number;
+};
+
+export const AuthzApi = moduleApi<AuthzApi>()("authz");
+
+// A binding's id is caller-minted, in the persisted format shared across processes.
+const GRANT_KSUID_RESOURCE = "rolebinding";
+
+/** The id a new role binding gets: one scheme, minted by whoever calls `attachBindings`. */
+export const newAuthzGrantId = (): string => generate(GRANT_KSUID_RESOURCE).toString();

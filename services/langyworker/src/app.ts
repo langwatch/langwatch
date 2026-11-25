@@ -1,22 +1,51 @@
 /**
- * The worker application: config -> session -> ready, then the stdin command
- * loop. Commands are dispatched as they arrive (abort/ping are never queued
- * behind a running turn); turn commands chain through the runner, which
- * preempts a running turn per PROTOCOL.md.
+ * The worker application: config -> session -> ready, then the stdin
+ * command loop, dispatched per PROTOCOL.md.
  */
 
 import { readFileSync } from "node:fs";
+
 import { rawStdoutWrite } from "./boot.js";
 import { loadConfig } from "./config.js";
-import { PROTOCOL_VERSION, parseCommand } from "./protocol.js";
+import { type ManagerCommand, PROTOCOL_VERSION, parseCommand } from "./protocol.js";
 import { TurnRunner } from "./runner.js";
 import { createLangySession } from "./session.js";
 import { attachJsonlReader } from "./stdin.js";
 import { composeSystemPrompt } from "./system-prompt.js";
+import { readSkillBody } from "./tools/skill.js";
+import { createTurnContext } from "./tools/turn-context.js";
 import { ProtocolWriter } from "./writer.js";
 
 function warn(message: string): void {
   process.stderr.write(`langy-worker: ${message}\n`);
+}
+
+/** Dispatches one parsed stdin command; abort/ping never queue behind a running turn. */
+function dispatchCommand({
+  command,
+  writer,
+  runner,
+}: {
+  command: ManagerCommand;
+  writer: ProtocolWriter;
+  runner: TurnRunner;
+}): void {
+  switch (command.type) {
+    case "ping":
+      void writer.emit({ type: "pong" });
+      break;
+    case "turn":
+      void runner.submitTurn(command).catch((error) => {
+        warn(`turn crashed: ${error instanceof Error ? error.message : String(error)}`);
+      });
+      break;
+    case "abort":
+      runner.abortTurn(command.turnId);
+      break;
+    case "shutdown_imminent":
+      runner.shutdownImminent();
+      break;
+  }
 }
 
 export async function runApp(): Promise<void> {
@@ -45,7 +74,13 @@ export async function runApp(): Promise<void> {
   const writer = new ProtocolWriter((chunk, callback) => rawStdoutWrite(chunk, callback));
 
   const systemPrompt = { current: composeSystem() };
-  const { session, resumed } = await createLangySession({ config, home, systemPrompt });
+  const turnContext = createTurnContext();
+  const { session, resumed } = await createLangySession({
+    config,
+    home,
+    systemPrompt,
+    turnContext,
+  });
 
   const runner = new TurnRunner({
     session,
@@ -55,9 +90,11 @@ export async function runApp(): Promise<void> {
       systemPrompt.current = composed;
     },
     warn,
+    turnContext,
     // A resumed session already carries the conversation, so the handoff
     // digest a turn may still bring along would tell it its own story twice.
     sessionResumed: resumed,
+    loadSkill: (name) => readSkillBody({ skillsDir: config.skillsDir, name }),
   });
   session.subscribe(runner.onSessionEvent);
 
@@ -73,22 +110,7 @@ export async function runApp(): Promise<void> {
           warn(`ignoring unparseable stdin line of ${line.length} characters`);
           return;
         }
-        switch (command.type) {
-          case "ping":
-            void writer.emit({ type: "pong" });
-            break;
-          case "turn":
-            void runner.submitTurn(command).catch((error) => {
-              warn(`turn crashed: ${error instanceof Error ? error.message : String(error)}`);
-            });
-            break;
-          case "abort":
-            runner.abortTurn(command.turnId);
-            break;
-          case "shutdown_imminent":
-            runner.shutdownImminent();
-            break;
-        }
+        dispatchCommand({ command, writer, runner });
       },
       onEnd: () => {
         // Manager closed stdin: abort in-flight work (its aborted terminal

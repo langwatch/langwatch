@@ -1,0 +1,55 @@
+import type { NavigationProject, NavigationTeam } from "@langwatch/navigation-contract";
+import { findLandingProjects } from "@langwatch/project-contract";
+
+import { useNavigationHost } from "../model/navigation-host.ts";
+
+/** Which project the project products (LLM Ops, Dashboards) open; team access comes from host */
+export function resolveLlmOpsProjectSlug({
+  ambientProject,
+  rememberedProjectSlug,
+  openableTeams,
+}: {
+  ambientProject: { slug: string; isPersonal?: boolean | null } | undefined;
+  rememberedProjectSlug: string;
+  /** Teams the reader may open, in the host's ambient preference order. */
+  openableTeams: readonly NavigationTeam[];
+}): string | null {
+  if (ambientProject && !ambientProject.isPersonal) return ambientProject.slug;
+
+  const candidates = openableTeams.filter((team) => !team.isPersonal && team.projects.length > 0);
+
+  const remembered = candidates
+    .flatMap((team) => team.projects)
+    .find((project) => project.slug === rememberedProjectSlug);
+  if (remembered) return remembered.slug;
+
+  // Never an aggregate by default (ADR-177 block F).
+  return findLandingProjects(candidates[0]?.projects ?? [])[0]?.slug ?? null;
+}
+
+/** `resolveLlmOpsProjectSlug` against the live workspace and this device. */
+export function useLlmOpsProjectSlug(): string | null {
+  const host = useNavigationHost();
+
+  return resolveLlmOpsProjectSlug({
+    ambientProject: host.project(),
+    rememberedProjectSlug: host.rememberedProjectSlug(),
+    openableTeams: host.openableTeams(),
+  });
+}
+
+/** The project `useLlmOpsProjectSlug` names, for a page that shows what is in it. */
+export function useLlmOpsProject(): NavigationProject | null {
+  const host = useNavigationHost();
+  const slug = useLlmOpsProjectSlug();
+  if (!slug) return null;
+  const ambient = host.project();
+  if (ambient?.slug === slug) return ambient;
+  return (
+    host
+      .openableTeams()
+      .filter((team) => !team.isPersonal)
+      .flatMap((team) => team.projects)
+      .find((project) => project.slug === slug) ?? null
+  );
+}

@@ -548,3 +548,19 @@ func TestCodeBlock_InvocationsAreIsolated(t *testing.T) {
 		assert.InDelta(t, 1.0, res.Outputs["x"], 1e-9, "no global state leak between invocations")
 	}
 }
+
+// @scenario "ZeroDivisionError aborts the node and the workflow with the traceback intact"
+func TestCodeBlock_TracebackCarriesOnlyTheCustomersFrames(t *testing.T) {
+	requirePython(t)
+	res, err := newExec(t).Execute(context.Background(), codeblock.Request{
+		Code:            "def execute():\n    return {'x': 1 / 0}\n",
+		DeclaredOutputs: []string{"x"},
+	})
+	require.NoError(t, err)
+	require.NotNil(t, res.Error)
+
+	assert.Contains(t, res.Error.Traceback, "ZeroDivisionError: division by zero")
+	assert.Contains(t, res.Error.Traceback, `File "<code-block>", line 2, in execute`)
+	assert.NotContains(t, res.Error.Traceback, `File "<string>"`,
+		"the runner's own frames reached the customer")
+}

@@ -6,7 +6,11 @@ vi.mock("@/client-sdk/services/prompts", () => ({
 }));
 
 vi.mock("../../../utils/apiKey", () => ({
-  resolveCredentials: vi.fn(async () => ({ apiKey: "test-key", source: "env", endpoint: "https://app.langwatch.ai" })),
+  resolveCredentials: vi.fn(async () => ({
+    apiKey: "test-key",
+    source: "env",
+    endpoint: "https://app.langwatch.ai",
+  })),
 }));
 
 vi.mock("../../../utils/formatting", () => ({
@@ -14,9 +18,10 @@ vi.mock("../../../utils/formatting", () => ({
   formatRelativeTime: vi.fn().mockReturnValue("3d ago"),
 }));
 
-import { tagListCommand } from "../list";
 import { PromptsApiService } from "@/client-sdk/services/prompts";
+
 import { formatTable } from "../../../utils/formatting";
+import { tagListCommand } from "../list";
 
 describe("tagListCommand", () => {
   let mockListTags: ReturnType<typeof vi.fn>;
@@ -24,8 +29,9 @@ describe("tagListCommand", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockListTags = vi.fn();
-    vi.mocked(PromptsApiService).mockImplementation(
-      function () { return ({ listTags: mockListTags }) as unknown as InstanceType<typeof PromptsApiService>; });
+    vi.mocked(PromptsApiService).mockImplementation(function () {
+      return { listTags: mockListTags } as unknown as InstanceType<typeof PromptsApiService>;
+    });
   });
 
   describe("when tags exist", () => {
@@ -62,18 +68,17 @@ describe("tagListCommand", () => {
       const result = await tagListCommand();
       result?.table();
 
-      expect(consoleSpy).toHaveBeenCalledWith(
-        expect.stringContaining("No custom tags found"),
-      );
+      expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining("No custom tags found"));
       expect(formatTable).not.toHaveBeenCalled();
     });
   });
 
   describe("when the API returns an error", () => {
     it("propagates the error (exits 1 via caller)", async () => {
-      mockListTags.mockRejectedValue(new Error("list tags failed"));
+      const listFailure = new Error("list tags failed");
+      mockListTags.mockRejectedValue(listFailure);
 
-      await expect(tagListCommand()).rejects.toThrow();
+      await expect(tagListCommand()).rejects.toBe(listFailure);
     });
   });
 });

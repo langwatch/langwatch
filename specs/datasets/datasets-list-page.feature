@@ -71,12 +71,65 @@ Feature: Datasets list page
     When I open my datasets page
     Then every row shows that dataset's own entry count
 
+  # Entry counts are a second read, asked once the list has arrived, so a slow
+  # count never holds the list up.
+
+  @integration
+  Scenario: The list shows before entry counts arrive
+    Given my datasets have loaded
+    And their entry counts are still being counted
+    When I open my datasets page
+    Then I see one row per dataset
+    And each row's entry count shows a loading skeleton
+
+  @integration
+  Scenario: A failed entry count read shows the counts as unavailable
+    Given my datasets have loaded
+    And reading their entry counts failed
+    When I open my datasets page
+    Then I see one row per dataset
+    And each row's entry count shows as unavailable, not loading
+
+  @integration
+  Scenario: Entry counts arrive after the list
+    Given my datasets are listed
+    When their entry counts arrive
+    Then each row shows that dataset's own entry count
+
+  @unit
+  Scenario: Datasets kept in object storage never have their entries counted
+    Given my project mixes datasets stored in the entries table with datasets stored in object storage
+    When their entry counts are asked for
+    Then only the datasets stored in the entries table are counted, in one read
+    And the others answer from their stored count
+
+  @unit
+  Scenario: An entry count refreshes after records are added
+    Given a dataset's entries have been counted
+    When I add records to it
+    And its entry count is asked for again
+    Then I see the new count
+
   @integration
   Scenario: The list loads while I wait, and tells me it is loading
     Given my datasets are still being fetched
     When I open my datasets page
     Then I see that the list is loading
     And I am not shown an empty-project message
+
+  @integration
+  Scenario: The datasets list shows no error when the read succeeded
+    Given my datasets have loaded
+    When nothing has failed
+    Then I see my datasets
+    And no "Couldn't load the datasets" notice is shown
+
+  @integration
+  Scenario: A failed refresh keeps the datasets I already see
+    Given my datasets have loaded
+    When a later refresh of the list fails
+    Then I still see my datasets
+    And I am told the refresh failed, above them
 
   # ============================================================================
   # Creating
@@ -109,3 +162,9 @@ Feature: Datasets list page
     When I choose "Replicate to another project" from a dataset's row menu
     Then I can pick a target project
     And the dataset is copied there
+
+  @integration
+  Scenario: Replicating a dataset offers only the projects I may create datasets in
+    Given I may create datasets in one of my projects and not in another
+    When I open the dataset replicate dialog
+    Then only the project I may create datasets in is offered

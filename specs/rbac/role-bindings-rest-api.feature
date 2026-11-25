@@ -86,11 +86,11 @@ Feature: Role bindings REST API
     And no binding is created
 
   @integration
-  Scenario: A duplicate binding is reported as already existing
+  Scenario: An identical binding is written again
     Given a member is already bound as a member of a team
     When I create the same binding again
-    Then the request is refused with code role_binding_already_exists and status 409
-    And the member still has exactly one binding on that team
+    Then the request succeeds with a new binding id, because bindings are never unique
+    And the member holds two bindings on that team
 
   @integration
   Scenario: A binding into a personal workspace is refused
@@ -100,11 +100,11 @@ Feature: Role bindings REST API
     And no binding is created
 
   @integration
-  Scenario: The first explicit binding for a legacy user is reported in the response
+  Scenario: The first explicit binding for a legacy user is created normally
     Given a member whose access comes from team membership predating explicit bindings
     When I create their first explicit binding
     Then the response status is 201
-    And the response notes that their team-derived access no longer applies
+    And the response has the normal binding shape
     And the binding is created regardless
 
   # ============================================================================

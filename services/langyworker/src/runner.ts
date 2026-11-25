@@ -2,28 +2,32 @@
  * Per-turn orchestration over one pi AgentSession: system-prompt
  * recomposition, event fan-out, abort, preemption, and the terminal-last
  * invariant.
- *
- * Prior-art notes (agentic-pi, @ai-sdk/harness-pi):
- * - session event listeners run synchronously inside `session.prompt()`; a
- *   throw there would reject the prompt, so every listener body is contained.
- * - `session.abort()` from inside a listener or a command handler is
- *   fire-and-forget (`void ... .catch()`): awaiting its `waitForIdle` from a
- *   listener deadlocks.
- * - `prompt()` resolving is decoupled from a clean finish: the terminal
- *   outcome is derived from OUR abort/shutdown flags first, then the last
- *   assistant message's `stopReason`/`errorMessage` (the harness-pi rule:
- *   `stopReason === "error" | "aborted"` is terminal), so a provider error is
- *   never reported as ok.
  */
 
 import { buildHandoffDigest } from "./digest.js";
 import { TurnEventMapper, type SessionEventLike } from "./events.js";
 import {
+  GUIDED_ONBOARDING_SKILL_NAME,
+  isGuidedKickoffPrompt,
+  isGuidedTurn,
+  prependSkillBody,
+} from "./guided-kickoff.js";
+import {
+  GUIDED_TURN_BARE_END_LOG,
+  GUIDED_TURN_CONTINUED_LOG,
+  TurnCallLog,
+  continuationPrompt,
+  decideGuidedContinuation,
+  guidedSegment,
+} from "./guided-turn-end.js";
+import {
   boundText,
+  type GuidedTurnEvent,
   type TerminalEvent,
   type TurnCommand,
 } from "./protocol.js";
 import { prependResumeSeed } from "./system-prompt.js";
+import type { TurnContext } from "./tools/turn-context.js";
 import type { ProtocolWriter } from "./writer.js";
 
 /** The slice of pi's AgentSession the runner drives (injectable for tests). */
@@ -44,6 +48,20 @@ type TurnState = {
   shutdownRequested: boolean;
   terminalEmitted: boolean;
   mapper: TurnEventMapper;
+  /** The turn's settled calls, read by the guided turn end guard. */
+  calls: TurnCallLog;
+  /**
+   * The turn is on the guided path, read once from the composed prompt and
+   * the history before the prompt goes out; the skill tool and the guard
+   * read this one value.
+   */
+  guided: boolean;
+  /** The segment of the turn the guard last read: 1, plus one per card answered inside the turn. */
+  segment: number;
+  /** Continuation messages appended to that segment so far; one is the limit. */
+  continuations: number;
+  /** Continuation messages over all the turn's segments; MAX_TURN_CONTINUATIONS is the cap. */
+  turnContinuations: number;
 };
 
 export type TurnRunnerOptions = {
@@ -58,12 +76,23 @@ export type TurnRunnerOptions = {
   applySystemPrompt: (systemPrompt: string) => void;
   warn?: (message: string) => void;
   /**
-   * True when the session continued a persisted transcript at boot. A turn's
-   * `resumeToken` (the shutdown-handoff digest) is then skipped: the session's
-   * own history is the single copy of the conversation, and prepending a
-   * digest of it would re-tell the story and break the byte-stable prefix.
+   * The holder the local tools read to name the turn they belong to. It carries
+   * the turn in flight and goes back to null at the terminal, so a tool that
+   * somehow runs between turns names no turn instead of a stale one.
+   */
+  turnContext?: TurnContext;
+  /**
+   * True when the session continued a persisted transcript at boot: a
+   * turn's `resumeToken` is then skipped, since prepending a digest of the
+   * session's own history would re-tell the story and break the prefix.
    */
   sessionResumed?: boolean;
+  /**
+   * Reads an installed skill's SKILL.md by name. A guided onboarding kickoff
+   * turn gets the guided-onboarding skill placed ahead of its message, so the
+   * script is in context before the model chooses anything.
+   */
+  loadSkill?: (name: string) => string | undefined;
 };
 
 export class TurnRunner {
@@ -81,11 +110,14 @@ export class TurnRunner {
     const state = this.current;
     if (!state || state.terminalEmitted) return;
     try {
+      state.calls.record(event);
       for (const mapped of state.mapper.map(event)) {
         void this.options.writer.emit(mapped);
       }
     } catch (error) {
-      this.warn(`event mapping failed (${event.type}): ${error instanceof Error ? error.message : String(error)}`);
+      this.warn(
+        `event mapping failed (${event.type}): ${error instanceof Error ? error.message : String(error)}`,
+      );
     }
   };
 
@@ -116,7 +148,7 @@ export class TurnRunner {
         });
         return;
       }
-      await this.runTurn(command);
+      await this.runTurn(command, seq);
     })();
     return this.running;
   }
@@ -159,7 +191,7 @@ export class TurnRunner {
     return this.running.catch(() => undefined);
   }
 
-  private async runTurn(command: TurnCommand): Promise<void> {
+  private async runTurn(command: TurnCommand, seq: number): Promise<void> {
     const { session, writer, composeSystem } = this.options;
     const state: TurnState = {
       turnId: command.turnId,
@@ -167,8 +199,18 @@ export class TurnRunner {
       shutdownRequested: false,
       terminalEmitted: false,
       mapper: new TurnEventMapper(command.turnId),
+      calls: new TurnCallLog(),
+      guided: false,
+      segment: 1,
+      continuations: 0,
+      turnContinuations: 0,
     };
     this.current = state;
+    if (this.options.turnContext) {
+      this.options.turnContext.turnId = command.turnId;
+      this.options.turnContext.calls = state.calls.calls;
+      this.options.turnContext.continued = false;
+    }
 
     let terminal: TerminalEvent;
     try {
@@ -179,10 +221,9 @@ export class TurnRunner {
 
       await writer.emit({ type: "turn_started", turnId: command.turnId });
 
-      const prompt =
-        command.resumeToken && !this.options.sessionResumed
-          ? prependResumeSeed({ prompt: command.prompt, seed: command.resumeToken })
-          : command.prompt;
+      const prompt = this.composePrompt(command);
+      state.guided = isGuidedTurn({ prompt, history: session.agent.state.messages });
+      if (this.options.turnContext) this.options.turnContext.guided = state.guided;
 
       let thrown: unknown;
       try {
@@ -191,7 +232,12 @@ export class TurnRunner {
         thrown = error;
       }
 
-      terminal = this.deriveTerminal(state, thrown);
+      terminal = await this.continueGuidedTurn({
+        command,
+        state,
+        seq,
+        terminal: this.deriveTerminal(state, thrown),
+      });
     } catch (error) {
       // A failure in our own orchestration still terminates the turn.
       terminal = {
@@ -204,8 +250,112 @@ export class TurnRunner {
 
     state.terminalEmitted = true;
     this.current = null;
+    if (this.options.turnContext) {
+      this.options.turnContext.turnId = null;
+      this.options.turnContext.calls = [];
+      this.options.turnContext.guided = false;
+      this.options.turnContext.continued = false;
+    }
     // The terminal is flushed to the pipe before anything else can run.
     await writer.emit(terminal);
+  }
+
+  /**
+   * The message as the model reads it: a kickoff brief behind its skill, and
+   * a handoff digest ahead of everything when the turn resumes one.
+   */
+  private composePrompt(command: TurnCommand): string {
+    let prompt = command.prompt;
+    if (this.options.loadSkill && isGuidedKickoffPrompt(prompt)) {
+      const body = this.options.loadSkill(GUIDED_ONBOARDING_SKILL_NAME);
+      if (body) {
+        prompt = prependSkillBody({ prompt, name: GUIDED_ONBOARDING_SKILL_NAME, body });
+      } else {
+        this.warn(
+          `skill "${GUIDED_ONBOARDING_SKILL_NAME}" is not installed; the kickoff runs on the routing row alone`,
+        );
+      }
+    }
+    if (command.resumeToken && !this.options.sessionResumed) {
+      prompt = prependResumeSeed({ prompt, seed: command.resumeToken });
+    }
+    return prompt;
+  }
+
+  /**
+   * The guided turn end guard: a clean turn ending on none of the calls the
+   * skill allows gets one continuation naming what it still owes; a second
+   * bare end is reported and left. A newer turn submitted meanwhile wins.
+   */
+  private async continueGuidedTurn({
+    command,
+    state,
+    seq,
+    terminal,
+  }: {
+    command: TurnCommand;
+    state: TurnState;
+    seq: number;
+    terminal: TerminalEvent;
+  }): Promise<TerminalEvent> {
+    if (terminal.type !== "turn_done" || terminal.outcome !== "ok") return terminal;
+    const segment = guidedSegment(state.calls.calls).index;
+    if (segment !== state.segment) {
+      state.segment = segment;
+      state.continuations = 0;
+    }
+    const decision = decideGuidedContinuation({
+      calls: state.calls.calls,
+      guided: state.guided,
+      continuations: state.continuations,
+      turnContinuations: state.turnContinuations,
+      history: this.options.session.agent.state.messages,
+    });
+    if (decision.kind === "leave") return terminal;
+    if (decision.kind === "give_up") {
+      await this.reportGuidedTurn({ state, event: GUIDED_TURN_BARE_END_LOG, decision });
+      return terminal;
+    }
+    if (state.abortRequested || seq !== this.submitSeq) return terminal;
+    state.continuations += 1;
+    state.turnContinuations += 1;
+    await this.reportGuidedTurn({ state, event: GUIDED_TURN_CONTINUED_LOG, decision });
+    if (this.options.turnContext) this.options.turnContext.continued = true;
+    let thrown: unknown;
+    try {
+      await this.options.session.prompt(continuationPrompt(decision.message));
+    } catch (error) {
+      thrown = error;
+    }
+    return this.continueGuidedTurn({
+      command,
+      state,
+      seq,
+      terminal: this.deriveTerminal(state, thrown),
+    });
+  }
+
+  /**
+   * The guard's report goes to the manager as a protocol event, ahead of
+   * the turn's terminal — worker stderr is not read, so this is the sink.
+   */
+  private async reportGuidedTurn({
+    state,
+    event,
+    decision,
+  }: {
+    state: TurnState;
+    event: GuidedTurnEvent["event"];
+    decision: { segment: number; missing: string[] };
+  }): Promise<void> {
+    const report: GuidedTurnEvent = {
+      type: "guided_turn",
+      turnId: state.turnId,
+      event,
+      segment: decision.segment,
+      missing: decision.missing,
+    };
+    await this.options.writer.emit(report);
   }
 
   private deriveTerminal(state: TurnState, thrown: unknown): TerminalEvent {
@@ -215,7 +365,9 @@ export class TurnRunner {
       try {
         seed = buildHandoffDigest({ messages: session.agent.state.messages });
       } catch (error) {
-        this.warn(`handoff digest failed: ${error instanceof Error ? error.message : String(error)}`);
+        this.warn(
+          `handoff digest failed: ${error instanceof Error ? error.message : String(error)}`,
+        );
       }
       return { type: "handoff", turnId: state.turnId, seed };
     }
@@ -227,7 +379,7 @@ export class TurnRunner {
         type: "turn_done",
         turnId: state.turnId,
         outcome: "error",
-        errorMessage: boundText({ text: thrown instanceof Error ? thrown.message : String(thrown) }),
+        errorMessage: boundText({ text: describeThrown(thrown) }),
       };
     }
     const assistantError = lastAssistantError(session.agent.state.messages);
@@ -244,6 +396,12 @@ export class TurnRunner {
     }
     return { type: "turn_done", turnId: state.turnId, outcome: "ok" };
   }
+}
+
+/** A caught value's message, without risking an `[object Object]` stringification. */
+function describeThrown(thrown: unknown): string {
+  if (thrown instanceof Error) return thrown.message;
+  return typeof thrown === "string" ? thrown : "unknown error";
 }
 
 type AssistantError = { kind: "error" | "aborted"; message: string };

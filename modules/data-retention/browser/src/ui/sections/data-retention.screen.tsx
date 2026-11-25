@@ -1,0 +1,592 @@
+/**
+ * Retention policies configuration screen moved from platform/app. Scope filter
+ * reads the URL directly. See {@link specs/data-retention/retention-policy-configuration.feature}
+ */
+
+import { useUiDeployment } from "@langwatch/browser-host/capabilities";
+import { EnterpriseLock } from "@langwatch/browser-host/enterprise-lock";
+import { type ScopeAssignment, type StoredApplyStatus } from "@langwatch/data-retention-contract";
+import { Card } from "@langwatch/design-system/card";
+import { MoreVerticalIcon } from "@langwatch/design-system/icons";
+import { ListTable } from "@langwatch/design-system/list-table";
+import { Menu } from "@langwatch/design-system/menu";
+import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
+import { PageLayout } from "@langwatch/design-system/page-layout";
+import {
+  Alert,
+  Button,
+  HStack,
+  Spacer,
+  Skeleton,
+  SkeletonText,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
+import { ScopeChipPicker } from "@langwatch/design-system/scope-chip-picker";
+import {
+  ScopeFilter,
+  type ScopeFilterValue,
+  isScopeInFilter,
+  resolveScopeFilter,
+  scopeFilterAddressWrite,
+  scopeFilterFromAddress,
+  scopeHierarchyOf,
+} from "@langwatch/design-system/scope-filter";
+import { StatTileSkeleton } from "@langwatch/design-system/stat-tile";
+import { DatabaseBackup, Pencil, Plus, Trash2 } from "lucide-react";
+import { useState } from "react";
+
+import { dataRetentionApi } from "../../behavior/data-retention-api.ts";
+import {
+  removeRetentionScope,
+  retentionPolicySaver,
+} from "../../behavior/retention-policy-save.ts";
+import { useStoredRetentionApply } from "../../behavior/stored-retention-apply.ts";
+import {
+  RETENTION_SCOPE_QUERY_KEY,
+  useDataRetentionHost,
+  type DataRetentionHostApi,
+} from "../../model/data-retention-host.ts";
+import {
+  BINDING_SCOPE_TIERS,
+  retentionLengthBillsStorage,
+  SCOPE_ICON,
+} from "../../model/retention-constants.ts";
+import {
+  groupRulesByScope,
+  renderPolicyValue,
+  type RetentionScopeGroup,
+} from "../../model/retention-grouping.ts";
+import { retentionRemovalPreviewQuery } from "../../model/retention-removal-preview.ts";
+import { storedApplyLabel } from "../../model/stored-retention-copy.ts";
+import { AddOverrideDrawer, type RetentionEditTarget } from "../blocks/add-override-drawer.tsx";
+import { ApplyStoredRetentionDialog } from "../blocks/apply-stored-retention-dialog.tsx";
+import { RemoveScopeConfirmDialog } from "../blocks/remove-scope-confirm-dialog.tsx";
+import { RetentionAndUsageCard } from "../blocks/retention-and-usage-card.tsx";
+import { RetroactiveProgressCard } from "../blocks/retroactive-progress-card.tsx";
+import { StoredRetentionNote } from "../blocks/stored-retention-note.tsx";
+
+const RETENTION_DOCS_HREF = "https://langwatch.ai/docs/platform/data-retention";
+
+export default function DataRetentionScreen() {
+  const host = useDataRetentionHost();
+  const { projectId } = host.scope();
+  // Every retention row belongs to a project; without one in scope the page
+  // renders nothing, which is what the platform page did.
+  if (!projectId) return null;
+  return <DataRetentionPage host={host} projectId={projectId} />;
+}
+
+function storageDescriptionFor(scopeFilter: ReturnType<typeof resolveScopeFilter>): string {
+  if (scopeFilter.kind === "all") return "How much space everything you can see uses today.";
+  if (scopeFilter.scopeType === "ORGANIZATION") {
+    return "How much space this organization's data uses today.";
+  }
+  if (scopeFilter.scopeType === "TEAM") return "How much space this team's data uses today.";
+  return "How much space this project's data uses today.";
+}
+
+function storageScopeFor({
+  scopeFilter,
+  organizationId,
+  projectId,
+}: {
+  scopeFilter: ReturnType<typeof resolveScopeFilter>;
+  organizationId: string | undefined;
+  projectId: string;
+}): ScopeAssignment {
+  if (scopeFilter.kind === "specific") {
+    return { scopeType: scopeFilter.scopeType, scopeId: scopeFilter.scopeId };
+  }
+  if (organizationId) return { scopeType: "ORGANIZATION", scopeId: organizationId };
+  return { scopeType: "PROJECT", scopeId: projectId };
+}
+
+/**
+ * Configurable retention is a paid-plan feature: even an org admin on the free plan
+ * can't add overrides, so this gate and the plan's must both pass.
+ */
+function hasWritableScope(
+  available: { organization?: unknown; teams: unknown[]; projects: unknown[] } | undefined,
+): boolean {
+  if (!available) return false;
+  return !!available.organization || available.teams.length > 0 || available.projects.length > 0;
+}
+
+/** A scope write names its organization; a page outside one offers no scope to write. */
+function organizationOf(organizationId: string | undefined): string {
+  if (!organizationId) throw new Error("Retention overrides are set inside an organization.");
+  return organizationId;
+}
+
+function DataRetentionPage({ host, projectId }: { host: DataRetentionHostApi; projectId: string }) {
+  const { organizationId, teamId } = host.scope();
+  const utils = dataRetentionApi.useUtils();
+  const rulesQuery = dataRetentionApi.dataRetention.getRules.useQuery({ projectId });
+
+  const filterAvailable = host.availableScopes();
+  const scopeFilter = scopeFilterFromAddress({
+    raw: host.route().query[RETENTION_SCOPE_QUERY_KEY],
+    available: filterAvailable,
+  });
+  const setScopeFilter = (next: ScopeFilterValue) => {
+    const write = scopeFilterAddressWrite(next, { teamId, projectId });
+    if (write.kind === "keep") return;
+    host.setQuery(
+      {
+        ...host.route().query,
+        [RETENTION_SCOPE_QUERY_KEY]: write.kind === "set" ? write.value : void 0,
+      },
+      { replace: true },
+    );
+  };
+
+  // Resolve the active scope filter once; everything below derives from this
+  // single value so the storage scope, its description, and the row filter
+  // can't drift from one another.
+  const resolvedScopeFilter = resolveScopeFilter(scopeFilter, {
+    currentTeamId: teamId,
+    currentProjectId: projectId,
+  });
+
+  // Storage tracks the scope selector, not just the current project. Map the
+  // active filter to a concrete scope: a specific pick passes through; "all you
+  // can see" resolves to the whole org (or just this project for a personal
+  // account with no org).
+  const storageScope = storageScopeFor({
+    scopeFilter: resolvedScopeFilter,
+    organizationId,
+    projectId,
+  });
+
+  const storageDescription = storageDescriptionFor(resolvedScopeFilter);
+
+  const storageQuery = dataRetentionApi.dataRetention.getScopeStorageUsage.useQuery({
+    projectId,
+    scope: storageScope,
+  });
+  // Platform admin = a holder of the platform-operator grant, NOT an org admin. Only they may
+  // disable retention; the route enforces this independently. It decides
+  // nothing here but whether the drawer offers the "No retention" option.
+  const isPlatformAdmin = host.isPlatformAdmin();
+  // Enterprise (and self-hosted, which resolves to enterprise) gets the full
+  // retention menu + custom; paid non-enterprise gets the fixed short pair.
+  const isEnterprise = host.isEnterprise();
+  const { isSaaS } = useUiDeployment();
+
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  // When set, the Add drawer opens in edit mode locked to this scope's policy.
+  const [editTarget, setEditTarget] = useState<RetentionEditTarget | null>(null);
+  // The scope-group pending removal — drives the confirm dialog so deletion is
+  // a deliberate, explained action instead of a one-click trash button.
+  const [removeTarget, setRemoveTarget] = useState<RetentionScopeGroup | null>(null);
+
+  // Fallback preview for the remove-confirm dialog: owned here (transport is
+  // an application concern) and passed down as controlled data so the dialog
+  // itself stays presentation-only.
+  const removePreview = retentionRemovalPreviewQuery({
+    projectId,
+    organizationId,
+    target: removeTarget,
+  });
+  const removePreviewQuery = dataRetentionApi.dataRetention.previewScopeRemoval.useQuery(
+    removePreview.input,
+    removePreview.options,
+  );
+
+  const invalidate = () => utils.dataRetention.getRules.invalidate({ projectId });
+
+  // Per-call toasts are intentionally omitted — the Add-policy drawer fans
+  // out one setForScope per (scope × category) pair and stacks the toaster
+  // column with identical "saved" messages. The drawer's onSave emits a
+  // single aggregated notice after the batch resolves.
+  const setForScope = dataRetentionApi.dataRetention.setForScope.useMutation();
+  // A length that bills storage asks subscription:manage on the organization: its own write.
+  const setBilledForScope = dataRetentionApi.dataRetention.setBilledForScope.useMutation();
+
+  // Removing a scope's policy fans out one removeForScope call per category,
+  // so we mirror the save-flow pattern: aggregate the result and emit a
+  // single notice at the call site instead of one per mutation.
+  const removeForScope = dataRetentionApi.dataRetention.removeForScope.useMutation();
+
+  const storedApply = useStoredRetentionApply({
+    projectId,
+    organizationId: () => organizationOf(organizationId),
+    viewedScope: storageScope,
+    notices: host,
+    canApply:
+      !!rulesQuery.data?.canConfigureRetention && hasWritableScope(rulesQuery.data?.available),
+  });
+
+  const projectIsWritable =
+    rulesQuery.data?.available.projects.some((project) => project.id === projectId) ?? false;
+  const progressQuery = dataRetentionApi.dataRetention.getMutationProgress.useQuery(
+    { projectId },
+    {
+      enabled: projectIsWritable,
+      // needs a read hint: retroactive retention mutation finished (system.mutations)
+    },
+  );
+  const activeMutations = progressQuery.data ?? [];
+
+  const killMutation = dataRetentionApi.dataRetention.killMutation.useMutation({
+    onSuccess: () => {
+      void progressQuery.refetch();
+      host.succeeded({ title: "Retroactive update cancelled" });
+    },
+    onError: (error: unknown) =>
+      host.failed({ error, fallbackTitle: "Couldn't cancel the retroactive update" }),
+  });
+
+  if (rulesQuery.isLoading) return <DataRetentionLoading />;
+
+  const snapshot = rulesQuery.data;
+  const available = snapshot?.available;
+  const canConfigureRetention = !!snapshot?.canConfigureRetention;
+  const canWrite = canConfigureRetention && hasWritableScope(available);
+  const storageBilled = !!snapshot?.storageBilled;
+  const billedLocked = storageBilled && !host.hasPermission("subscription:manage");
+
+  // Open the Add drawer in edit mode for a scope group. The drawer edits one
+  // retention value applied to all categories, so we seed it with the group's
+  // traces value (or the first present category for a divergent legacy group).
+  const openEditForGroup = (group: RetentionScopeGroup) => {
+    // Deterministic prefill: prefer traces, then a fixed category order, so a
+    // divergent legacy group never depends on object key insertion order.
+    const retentionDays =
+      group.byCategory.traces ?? group.byCategory.scenarios ?? group.byCategory.experiments;
+    if (retentionDays === undefined) return;
+    setEditTarget({
+      scope: { scopeType: group.scopeType, scopeId: group.scopeId },
+      scopeName: group.name,
+      retentionDays,
+    });
+    setDrawerOpen(true);
+  };
+
+  const closeDrawer = () => {
+    setDrawerOpen(false);
+    setEditTarget(null);
+  };
+
+  const savePolicy = retentionPolicySaver({
+    notices: host,
+    write: ({ scope, category, retentionDays }) => {
+      const input = {
+        projectId,
+        organizationId: organizationOf(organizationId),
+        scope,
+        category,
+        retentionDays,
+      };
+      return retentionLengthBillsStorage({ storageBilled, retentionDays })
+        ? setBilledForScope.mutateAsync(input)
+        : setForScope.mutateAsync(input);
+    },
+    afterWrite: () => void invalidate(),
+    afterSave: (saved) => void storedApply.offer(saved.scopes),
+    close: closeDrawer,
+  });
+
+  const hierarchy = scopeHierarchyOf(filterAvailable);
+  const filteredRules = (snapshot?.rules ?? []).filter((rule) =>
+    isScopeInFilter(
+      { scopeType: rule.scopeType, scopeId: rule.scopeId },
+      resolvedScopeFilter,
+      hierarchy,
+    ),
+  );
+  const scopeGroups = groupRulesByScope(filteredRules).toSorted(
+    (left, right) =>
+      BINDING_SCOPE_TIERS[left.scopeType] - BINDING_SCOPE_TIERS[right.scopeType] ||
+      left.name.localeCompare(right.name),
+  );
+
+  return (
+    <>
+      <PageLayout.Header>
+        <PageLayout.Heading>Data Retention</PageLayout.Heading>
+        <Spacer />
+        <ScopeFilter
+          value={scopeFilter}
+          onChange={setScopeFilter}
+          available={filterAvailable}
+          currentTeamId={teamId}
+          currentProjectId={projectId}
+        />
+        {canWrite && (
+          <PageLayout.HeaderButton primary onClick={() => setDrawerOpen(true)}>
+            Add retention policy
+          </PageLayout.HeaderButton>
+        )}
+      </PageLayout.Header>
+      <VStack gap={6} width="full" align="start">
+        <Text color="fg.muted">
+          How long your traces, scenarios and experiments are kept before deletion.
+        </Text>
+        {!canConfigureRetention && snapshot && !isSaaS && (
+          <EnterpriseLock
+            compact
+            feature="Data retention"
+            description="Set how long traces, scenarios and experiments are kept, per organization, team or project."
+            canManage={host.hasPermission("organization:manage")}
+            data-testid="retention-enterprise-upsell"
+          />
+        )}
+        {!canConfigureRetention && snapshot && isSaaS && (
+          <Alert.Root status="info">
+            <Alert.Indicator />
+            <Alert.Content>
+              <Alert.Title>Configurable retention is a paid-plan feature</Alert.Title>
+              <Alert.Description>
+                Your plan applies the platform default to every project. Upgrade to configure
+                per-organization, per-team, or per-project retention overrides.
+              </Alert.Description>
+            </Alert.Content>
+          </Alert.Root>
+        )}
+
+        {snapshot && (
+          <RetentionAndUsageCard
+            effective={snapshot.effective}
+            isLoading={storageQuery.isLoading}
+            data={storageQuery.data}
+            storageDescription={storageDescription}
+          />
+        )}
+
+        {snapshot && storedApply.viewed && (
+          <StoredRetentionNote
+            counted={storedApply.viewed}
+            canApply={canWrite}
+            onApply={storedApply.offerViewed}
+          />
+        )}
+
+        {snapshot && (
+          <RetentionPolicyList
+            ruleCount={snapshot.rules.length}
+            defaultDays={snapshot.effective.traces}
+            scopeGroups={scopeGroups}
+            storedApply={snapshot.storedApply}
+            canWrite={canWrite}
+            onAdd={() => setDrawerOpen(true)}
+            onEdit={openEditForGroup}
+            onRemove={setRemoveTarget}
+          />
+        )}
+
+        <RetroactiveProgressCard
+          mutations={activeMutations}
+          onCancel={(mutationId) => killMutation.mutate({ projectId, mutationId })}
+          isCancelling={killMutation.isPending}
+        />
+
+        {available && (
+          <AddOverrideDrawer
+            open={drawerOpen}
+            onClose={closeDrawer}
+            editTarget={editTarget}
+            available={available}
+            currentProjectId={projectId}
+            isPlatformAdmin={isPlatformAdmin}
+            isEnterprise={isEnterprise}
+            billedLocked={billedLocked}
+            isSaving={setForScope.isPending || setBilledForScope.isPending}
+            scopePicker={({ value, onChange }) => (
+              <ScopeChipPicker
+                value={value}
+                onChange={onChange}
+                organizationId={available.organization?.id}
+                organizationName={available.organization?.name}
+                availableTeams={available.teams}
+                availableProjects={available.projects}
+                label=""
+                currentOrganizationId={available.organization ? organizationId : undefined}
+                currentTeamId={teamId}
+                currentProjectId={projectId}
+              />
+            )}
+            onSave={savePolicy}
+          />
+        )}
+
+        <RemoveScopeConfirmDialog
+          group={removeTarget}
+          isRemoving={removeForScope.isPending}
+          preview={{
+            data: removePreviewQuery.data,
+            isLoading: removePreviewQuery.isLoading,
+            isError: removePreviewQuery.isError,
+          }}
+          onCancel={() => setRemoveTarget(null)}
+          onConfirm={async () => {
+            if (!removeTarget) return;
+            await removeRetentionScope({
+              group: removeTarget,
+              remove: ({ scope, category }) =>
+                removeForScope.mutateAsync({
+                  projectId,
+                  organizationId: organizationOf(organizationId),
+                  scope,
+                  category,
+                }),
+              afterWrite: () => void invalidate(),
+              notices: host,
+            });
+            setRemoveTarget(null);
+          }}
+        />
+
+        <ApplyStoredRetentionDialog
+          pending={storedApply.pending}
+          isApplying={storedApply.isApplying}
+          onDismiss={storedApply.dismiss}
+          onApply={storedApply.apply}
+        />
+      </VStack>
+    </>
+  );
+}
+
+/** The page while its rules load: the header, the summary tiles and the table, unfilled. */
+function DataRetentionLoading() {
+  return (
+    <>
+      <PageLayout.Header>
+        <PageLayout.Heading>Data Retention</PageLayout.Heading>
+      </PageLayout.Header>
+      <VStack gap={6} width="full" align="start" aria-busy="true">
+        <SkeletonText noOfLines={1} width="sm" />
+        <StatTileSkeleton columns={2} />
+        <Card padding="lg">
+          <VStack gap={4} align="stretch">
+            {[0, 1, 2].map((row) => (
+              <Skeleton key={row} height="5" />
+            ))}
+          </VStack>
+        </Card>
+      </VStack>
+    </>
+  );
+}
+
+type RetentionPolicyListProps = {
+  ruleCount: number;
+  /** With no policies written, the effective value is the deployment's platform default. */
+  defaultDays: number;
+  scopeGroups: RetentionScopeGroup[];
+  /** Per scope with a recorded change, whether that change reached stored data. */
+  storedApply: readonly StoredApplyStatus[];
+  canWrite: boolean;
+  onAdd: () => void;
+  onEdit: (group: RetentionScopeGroup) => void;
+  onRemove: (group: RetentionScopeGroup) => void;
+};
+
+/** The policies in scope: an invitation when none exist, a note when the filter hides them. */
+function RetentionPolicyList({
+  ruleCount,
+  defaultDays,
+  scopeGroups,
+  storedApply,
+  canWrite,
+  onAdd,
+  onEdit,
+  onRemove,
+}: RetentionPolicyListProps) {
+  const applyByScope = new Map(
+    storedApply.map((status) => [`${status.scopeType}:${status.scopeId}`, status]),
+  );
+  if (ruleCount === 0) {
+    return (
+      <NoDataInfoBlock
+        title="No retention policies"
+        description={`Add a retention policy to override the platform default of ${defaultDays} days.`}
+        icon={<DatabaseBackup size={24} />}
+        primaryAction={
+          canWrite && (
+            <PageLayout.HeaderButton primary onClick={onAdd}>
+              <Plus /> Add retention policy
+            </PageLayout.HeaderButton>
+          )
+        }
+        next={[{ kind: "docs", label: "How retention scopes work", href: RETENTION_DOCS_HREF }]}
+      />
+    );
+  }
+  if (scopeGroups.length === 0) {
+    return (
+      <NoDataInfoBlock
+        title="No matching policies"
+        description="No retention policies match the current scope filter."
+        icon={<DatabaseBackup size={24} />}
+        next={[{ kind: "docs", label: "How retention scopes work", href: RETENTION_DOCS_HREF }]}
+      />
+    );
+  }
+  return (
+    <ListTable scroll="x" scrollLabel="Retention policies">
+      <ListTable.Header>
+        <ListTable.Row>
+          <ListTable.ColumnHeader>Scope</ListTable.ColumnHeader>
+          <ListTable.ColumnHeader>Policy</ListTable.ColumnHeader>
+          <ListTable.ColumnHeader>Stored data</ListTable.ColumnHeader>
+          <ListTable.ActionHeader />
+        </ListTable.Row>
+      </ListTable.Header>
+      <ListTable.Body>
+        {scopeGroups.map((group) => {
+          const Icon = SCOPE_ICON[group.scopeType];
+          const applied = applyByScope.get(`${group.scopeType}:${group.scopeId}`);
+          return (
+            <ListTable.Row key={`${group.scopeType}:${group.scopeId}`}>
+              <ListTable.Cell>
+                <HStack gap={3}>
+                  <Icon size={16} />
+                  <VStack align="start" gap={0}>
+                    <Text fontWeight="medium">{group.name}</Text>
+                    <Text fontSize="xs" color="fg.muted" textTransform="capitalize">
+                      {group.scopeType.toLowerCase()}
+                    </Text>
+                  </VStack>
+                </HStack>
+              </ListTable.Cell>
+              <ListTable.Cell>{renderPolicyValue(group.byCategory)}</ListTable.Cell>
+              <ListTable.Cell>
+                {applied && (
+                  <Text
+                    fontSize="sm"
+                    color={applied.status === "applied" ? "fg.muted" : "orange.fg"}
+                    data-testid="stored-apply-status"
+                  >
+                    {storedApplyLabel(applied)}
+                  </Text>
+                )}
+              </ListTable.Cell>
+              <ListTable.ActionCell>
+                {canWrite && (
+                  <Menu.Root>
+                    <Menu.Trigger asChild>
+                      <Button size="xs" variant="ghost" aria-label={`Actions for ${group.name}`}>
+                        <MoreVerticalIcon size={14} />
+                      </Button>
+                    </Menu.Trigger>
+                    <Menu.Content>
+                      <Menu.Item value="edit" onClick={() => onEdit(group)}>
+                        <Pencil size={14} /> Edit
+                      </Menu.Item>
+                      <Menu.Item value="remove" color="red.fg" onClick={() => onRemove(group)}>
+                        <Trash2 size={14} /> Remove
+                      </Menu.Item>
+                    </Menu.Content>
+                  </Menu.Root>
+                )}
+              </ListTable.ActionCell>
+            </ListTable.Row>
+          );
+        })}
+      </ListTable.Body>
+    </ListTable>
+  );
+}

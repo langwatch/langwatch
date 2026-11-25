@@ -42,3 +42,26 @@ func TestVoyageClientSharesTimeoutCeiling(t *testing.T) {
 	// pinned by the request-timeout tests above with independent literals.
 	assert.Equal(t, ProviderRequestTimeoutSeconds*time.Second, newVoyageClient().Timeout)
 }
+
+// @scenario "A provider on a private address is dispatched to only with the private-network guard off"
+func TestGetConfigForProviderFollowsEgressPolicyForPrivateNetwork(t *testing.T) {
+	cases := []struct {
+		name      string
+		opts      BifrostOptions
+		wantAllow bool
+	}{
+		{name: "guard off", opts: BifrostOptions{BlockLocalHTTPCalls: false}, wantAllow: true},
+		{name: "guard on with allowlist", opts: BifrostOptions{BlockLocalHTTPCalls: true, AllowedEndpointHosts: []string{"llm-proxy.internal"}}, wantAllow: false},
+		{name: "guard on without allowlist", opts: BifrostOptions{BlockLocalHTTPCalls: true}, wantAllow: false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			a := &account{allowPrivateNetwork: tc.opts.allowsPrivateNetwork()}
+			for _, provider := range []bfschemas.ModelProvider{bfschemas.VLLM, bfschemas.OpenAI, bfschemas.Anthropic} {
+				cfg, err := a.GetConfigForProvider(provider)
+				require.NoError(t, err)
+				assert.Equal(t, tc.wantAllow, cfg.NetworkConfig.AllowPrivateNetwork, "provider %s", provider)
+			}
+		})
+	}
+}

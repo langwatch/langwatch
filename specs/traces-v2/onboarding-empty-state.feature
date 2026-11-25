@@ -34,6 +34,19 @@ Rule: Onboarding empty state
     Then the empty-state journey is rendered in place of the trace results pane
     And the journey starts on the `welcome` stage
 
+  @integration
+  Scenario: The trace explorer learns from the project record that it has no trace yet
+    Given the organization graph lists the project with `firstMessage` false
+    When the trace explorer mounts for that project
+    Then the explorer knows the project has never received a trace
+    And it shows the setup panel instead of an empty table
+
+  @integration
+  Scenario: The trace explorer follows the presence switches on the project record
+    Given the organization turned presence off for its projects
+    When the trace explorer mounts for one of them
+    Then the explorer reads presence as turned off by the organization
+
   Scenario: Page chrome stays visible but inert while the journey is active
     When the Observe page loads with zero traces and the journey not dismissed
     Then the search bar is rendered with reduced opacity, `pointer-events: none`, and the `inert` attribute
@@ -50,6 +63,17 @@ Rule: Onboarding empty state
     When the user clicks "Skip for now" or presses "K"
     Then the journey is hidden for this project (persisted in localStorage)
     And the real trace table is shown
+
+  # The flag is read once when the page opens. The page already listens to the
+  # project's live trace stream; while the flag is false, a trace event on that stream
+  # is the first trace, ahead of the stored flag (WEB-17803, WEB-17707).
+  @integration
+  Scenario: The Trace Explorer leaves its empty state when the first trace arrives
+    Given the Observe page is open with the project's `firstMessage` flag false
+    When the project's live trace stream reports its first trace
+    Then the page leaves the empty state on its own, without a reload or a poll
+    And the trace list is read again so the trace replaces the empty state
+    And once the flag is true further trace events leave it alone
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -170,7 +194,7 @@ Rule: Integrate drawer hosts API key minting and setup paths
 # ─────────────────────────────────────────────────────────────────────────────
 
 Rule: Generate access token inside the Integrate drawer
-  `ApiKeyIntegrationInfoCard` mints a project-scoped API key and surfaces it
+  `ApiKeyIntegrationInfoCard` mints a project-scoped personal access token and surfaces it
   as a copyable env-var block. The token is lifted to the drawer so
   every setup tab can read it via `ActiveProjectProvider`.
 
@@ -178,13 +202,14 @@ Rule: Generate access token inside the Integrate drawer
     Given the Integrate drawer is open
 
   Scenario: Initial state shows the generate-token card
-    Then a card titled "Generate an access token" is visible
-    And a "Generate access token" button is enabled
+    Then the shared personal access token banner is visible
+    And a "Create a key" button is enabled
 
-  Scenario: Generating creates a project-scoped API key
-    When the user clicks "Generate access token"
-    Then an API key is created via `apiKey.create`
-    And the API key name is "Initial API key"
+  Scenario: Generating creates a project-scoped personal access token
+    When the user clicks "Create a key"
+    Then a token is created via `apiKey.create` with key type personal
+    And the token name is "Personal access token"
+    And the token expires 90 days from now
     And the binding is `{ role: MEMBER, scopeType: PROJECT, scopeId: projectId }`
     # TODO(traces-v2): Switch to a tracing-only custom role once one ships;
     # MEMBER is the closest preset that grants traces + prompts read/write.
@@ -199,13 +224,13 @@ Rule: Generate access token inside the Integrate drawer
 
   Scenario: A copy button sits next to the shown-once warning
     Given the user successfully generated a token
-    Then a copy button is rendered right after the "shown once" warning
+    Then a copy button is rendered right after the "Copy this token now." warning
     When the user clicks that copy button
     Then the raw token is copied to the clipboard
 
   Scenario: Token failure surfaces a toast
-    Given the `personalAccessToken.create` mutation fails
-    When the user clicks "Generate access token"
+    Given the `apiKey.create` mutation fails
+    When the user clicks "Create a key"
     Then a toast surfaces the error message
     And the generate button returns to its enabled state
 
@@ -240,7 +265,7 @@ Rule: Sample data preview overlays fixture rows on the trace list
   During the journey the trace list is overridden by `useSamplePreview`,
   which serves fixtures from `samplePreviewTraces.ts` (no real OTLP
   POST happens). A persistent `SampleDataBanner` reads
-  "Sample data — facets, filters, and the drawer all work, but
+  "Sample data: facets, filters, and the drawer all work, but
   nothing here is real." Pre-aurora stages see only
   `SAMPLE_PREVIEW_TRACES`; arrival-and-after stages also include
   `ARRIVAL_PREVIEW_TRACES` so the rich + simple "just arrived" rows
@@ -252,7 +277,7 @@ Rule: Sample data preview overlays fixture rows on the trace list
   Scenario: Banner appears whenever the preview is active
     When `usePreviewTracesActive()` returns true
     Then the `SampleDataBanner` is visible above the trace list
-    And the banner reads "Sample data — facets, filters, and the drawer all work, but nothing here is real."
+    And the banner reads "Sample data: facets, filters, and the drawer all work, but nothing here is real."
 
   Scenario: Arrival fixtures join the preview after the aurora chapter
     Given the journey has reached an arrival-and-after stage
@@ -293,3 +318,23 @@ Rule: First trace celebration
   # @planned — Auto-dismiss after 10s, confetti burst, and a once-per-
   # project gate are not yet implemented as of 2026-05-01. The current
   # banner stays until manually dismissed.
+
+# ─────────────────────────────────────────────────────────────────────────────
+# SHARED TRACE AND RETIRED SETUP ADDRESS
+# ─────────────────────────────────────────────────────────────────────────────
+
+Rule: The shared trace page and the old setup address
+  The public shared trace page holds no project key, and the retired
+  `/:project/setup` address leads to the Trace Explorer.
+
+  @integration
+  Scenario: The shared trace page asks for no key
+    Given nobody is signed in
+    When the trace explorer mounts for a shared trace
+    Then it asks the server for no project key
+
+  @integration
+  Scenario: The old setup page sends you to Traces
+    Given I have a saved link to a project's setup page
+    When I open the old setup page
+    Then I land on that project's Traces page

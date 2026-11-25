@@ -6,7 +6,9 @@ description: "Step-by-step guide to upgrade LangWatch from v1.x or v2.x to v3.0"
 LangWatch v3 replaces Elasticsearch/OpenSearch with **ClickHouse** as the primary data store. This guide walks you through the full migration. The process is the same whether you're coming from v1.x or v2.x.
 
 <Tip>
-This is a **zero-downtime migration**. Elasticsearch and ClickHouse run side-by-side during the transition. New data flows to ClickHouse immediately, and you migrate historical data at your own pace.
+  This is a **zero-downtime migration**. Elasticsearch and ClickHouse run side-by-side during the
+  transition. New data flows to ClickHouse immediately, and you migrate historical data at your own
+  pace.
 </Tip>
 
 ## What Changed
@@ -38,14 +40,20 @@ Add ClickHouse to your existing infrastructure. Your Elasticsearch instance stay
 
 ### Docker Compose
 
+Set a password for ClickHouse's `default` user in your `.env`. Keep it URL-safe, because the app carries it inside `CLICKHOUSE_URL`. Without one the file below falls back to the published `langwatch`, which ClickHouse warns about at every boot and the next major release removes:
+
+```bash
+echo "CLICKHOUSE_PASSWORD=$(openssl rand -hex 24)" >> .env
+```
+
 Add the ClickHouse service to your `compose.yml`:
 
 ```yaml
 services:
   clickhouse:
-    image: langwatch/clickhouse-serverless:0.2.0
+    image: langwatch/clickhouse-serverless:0.4.0
     environment:
-      CLICKHOUSE_PASSWORD: langwatch
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-langwatch}
     ports:
       - "8123:8123"
     volumes:
@@ -80,10 +88,10 @@ Add `CLICKHOUSE_URL` to your app and workers environment in `compose.yml`:
 services:
   app:
     environment:
-      CLICKHOUSE_URL: http://default:langwatch@clickhouse:8123/langwatch
+      CLICKHOUSE_URL: http://default:${CLICKHOUSE_PASSWORD:-langwatch}@clickhouse:8123/langwatch
   workers:
     environment:
-      CLICKHOUSE_URL: http://default:langwatch@clickhouse:8123/langwatch
+      CLICKHOUSE_URL: http://default:${CLICKHOUSE_PASSWORD:-langwatch}@clickhouse:8123/langwatch
 ```
 
 Then pull and restart:
@@ -100,13 +108,13 @@ helm repo update
 
 helm upgrade langwatch langwatch/langwatch \
   --namespace langwatch \
-  --version 3.16.0 \
   -f values-production.yaml \
   --wait --timeout 10m
 ```
 
 <Note>
-The Helm chart configures `CLICKHOUSE_URL` automatically from the ClickHouse values, no manual env var needed for either managed or external ClickHouse.
+  The Helm chart configures `CLICKHOUSE_URL` automatically from the ClickHouse values, no manual env
+  var needed for either managed or external ClickHouse.
 </Note>
 
 ### What Happens on Startup
@@ -117,7 +125,8 @@ The Helm chart configures `CLICKHOUSE_URL` automatically from the ClickHouse val
 - **Historical data** in Elasticsearch remains readable until you migrate it
 
 <Note>
-Keep your `ELASTICSEARCH_NODE_URL` configured during this phase. LangWatch v3 can still read from Elasticsearch for data that hasn't been migrated yet.
+  Keep your `ELASTICSEARCH_NODE_URL` configured during this phase. LangWatch v3 can still read from
+  Elasticsearch for data that hasn't been migrated yet.
 </Note>
 
 ## Step 3: Migrate Historical Data
@@ -144,14 +153,16 @@ Set the required environment variables:
 
 ```bash
 export ELASTICSEARCH_NODE_URL="http://localhost:9200"
-export CLICKHOUSE_URL="http://default:langwatch@localhost:8123/langwatch"
+# Your shell does not load .env: export CLICKHOUSE_PASSWORD first, or the published default applies.
+export CLICKHOUSE_URL="http://default:${CLICKHOUSE_PASSWORD:-langwatch}@localhost:8123/langwatch"
 
 # If your Elasticsearch requires authentication
 export ELASTICSEARCH_API_KEY="your-api-key"
 ```
 
 <Warning>
-Point these at your actual Elasticsearch and ClickHouse instances. If they're running in Docker or Kubernetes, you may need to set up port forwarding or use the internal network addresses.
+  Point these at your actual Elasticsearch and ClickHouse instances. If they're running in Docker or
+  Kubernetes, you may need to set up port forwarding or use the internal network addresses.
 </Warning>
 
 **Credential requirements:**
@@ -162,12 +173,17 @@ Point these at your actual Elasticsearch and ClickHouse instances. If they're ru
 ### Disable ClickHouse TTLs Before Migrating
 
 <Warning>
-**This step is critical.** If you skip it, ClickHouse may immediately expire or offload historical data as it arrives during migration.
+  **This step is critical.** If you skip it, ClickHouse may immediately expire or offload historical
+  data as it arrives during migration.
 </Warning>
 
-LangWatch uses TTL rules to manage data retention and tiered storage in ClickHouse. By default, data older than 49 days is moved to cold storage (or dropped if cold storage isn't configured). When you migrate historical data from Elasticsearch, much of it is older than 49 days, so ClickHouse tries to expire or offload it the moment it lands.
+LangWatch uses TTL rules to manage data retention and tiered storage in ClickHouse. With cold storage on, data older than 49 days moves to S3. Separately, [data retention](/platform/data-retention) deletes data past its retention period, which defaults to 49 days. When you migrate historical data from Elasticsearch, much of it is older than 49 days, so ClickHouse tries to offload or delete it the moment it lands.
 
-**Before starting the migration**, set the TTL to a very high value so all migrated data stays in hot storage:
+**To keep history older than 49 days**, set a longer retention policy before you import. That needs an Enterprise license: without one the deployment keeps the 49-day default, and older history is deleted as it lands.
+
+**With cold storage on**, also raise its TTL before starting the migration, so migrated data stays in hot storage:
+
+A per-table variable such as `CLICKHOUSE_COLD_STORAGE_SPANS_TTL_DAYS` takes precedence over the default. If you set any of them on the app or workers, raise or remove them too, then check the effective TTL with `SHOW CREATE TABLE` before you import history.
 
 #### Docker Compose
 
@@ -177,10 +193,10 @@ Add to your app and workers environment:
 services:
   app:
     environment:
-      TIERED_STORAGE_DEFAULT_HOT_DAYS: "9999"
+      CLICKHOUSE_COLD_STORAGE_DEFAULT_TTL_DAYS: "9999"
   workers:
     environment:
-      TIERED_STORAGE_DEFAULT_HOT_DAYS: "9999"
+      CLICKHOUSE_COLD_STORAGE_DEFAULT_TTL_DAYS: "9999"
 ```
 
 Then restart:
@@ -191,15 +207,12 @@ docker compose up -d
 
 #### Helm Chart
 
+The chart sets `CLICKHOUSE_COLD_STORAGE_DEFAULT_TTL_DAYS` on the app and workers from `clickhouse.cold.defaultTtlDays` when cold storage is on. Raise that value instead of adding the variable through `extraEnvs`:
+
 ```yaml
-app:
-  extraEnvs:
-    - name: TIERED_STORAGE_DEFAULT_HOT_DAYS
-      value: "9999"
-workers:
-  extraEnvs:
-    - name: TIERED_STORAGE_DEFAULT_HOT_DAYS
-      value: "9999"
+clickhouse:
+  cold:
+    defaultTtlDays: 9999
 ```
 
 Then upgrade:
@@ -215,23 +228,24 @@ The TTL reconciler runs on startup and updates the ClickHouse table metadata wit
 
 #### After Migration: Restore TTLs
 
-Once the migration is complete, set `TIERED_STORAGE_DEFAULT_HOT_DAYS` back to your desired retention value and restart LangWatch. ClickHouse handles the offloading gracefully in the background.
+Once the migration is complete, set `CLICKHOUSE_COLD_STORAGE_DEFAULT_TTL_DAYS` (Helm: `clickhouse.cold.defaultTtlDays`) back to your desired value and restart LangWatch. ClickHouse handles the offloading gracefully in the background.
 
 <Tip>
-We recommend setting TTL values to a **multiple of 7** (e.g., 7, 14, 28, 49) to align with ClickHouse partition boundaries for more efficient data management.
+  We recommend setting TTL values to a **multiple of 7** (e.g., 7, 14, 28, 49) to align with
+  ClickHouse partition boundaries for more efficient data management.
 </Tip>
 
 ### Migration Targets
 
 The tool migrates data in separate targets:
 
-| Target | Description |
-|--------|-------------|
-| `traces-combined` | Traces and their evaluations |
-| `simulations` | Simulation run events |
-| `batch-evaluations` | Batch experiment evaluation data |
-| `dspy-steps` | DSPy optimization steps |
-| `all` | Run all primary targets in sequence |
+| Target              | Description                         |
+| ------------------- | ----------------------------------- |
+| `traces-combined`   | Traces and their evaluations        |
+| `simulations`       | Simulation run events               |
+| `batch-evaluations` | Batch experiment evaluation data    |
+| `dspy-steps`        | DSPy optimization steps             |
+| `all`               | Run all primary targets in sequence |
 
 ### Testing Workflow
 
@@ -264,7 +278,8 @@ pnpm tsx src/index.ts all
 ```
 
 <Tip>
-For large history systems, we recommend running one target at a time instead of `all`, so you can apply the tuning profiles below for each target individually.
+  For large history systems, we recommend running one target at a time instead of `all`, so you can
+  apply the tuning profiles below for each target individually.
 </Tip>
 
 ### Recommended Tuning
@@ -349,11 +364,11 @@ helm upgrade langwatch langwatch/langwatch \
 
 ## Environment Variable Changes
 
-| Variable | v1.x, v2.x | v3.0 |
-|----------|-------------|------|
-| `ELASTICSEARCH_NODE_URL` | Required | Remove |
-| `ELASTICSEARCH_API_KEY` | Optional | Remove |
-| `CLICKHOUSE_URL` |, | Required |
+| Variable                 | v1.x, v2.x | v3.0     |
+| ------------------------ | ---------- | -------- |
+| `ELASTICSEARCH_NODE_URL` | Required   | Remove   |
+| `ELASTICSEARCH_API_KEY`  | Optional   | Remove   |
+| `CLICKHOUSE_URL`         | ,          | Required |
 
 All other environment variables remain the same. See [Environment Variables](/self-hosting/configuration/environment-variables) for the full reference.
 

@@ -1,0 +1,70 @@
+import { CodePreview } from "@langwatch/design-system/code-preview";
+import { Badge, Box, HStack, Text, VStack } from "@langwatch/design-system/primitives";
+
+import { httpBodyLanguage, prettyBody } from "../../model/http-body-language.ts";
+import { CollapsibleSection, CopyButton } from "../elements/http-test-components.tsx";
+
+function bodyPreview({
+  body,
+  headers,
+}: {
+  body: string;
+  headers?: { key: string; value: string }[];
+}) {
+  const pretty = prettyBody({ body });
+  if (pretty.language === "json") return pretty;
+  const language = httpBodyLanguage({ headers });
+  return { code: body, language: language === "xml" ? "xml" : "text" };
+}
+
+export function HttpTestRequestPreview({
+  url,
+  method,
+  headers,
+  body,
+}: {
+  url?: string;
+  method?: string;
+  headers?: { key: string; value: string }[];
+  body: string;
+}) {
+  return (
+    <CollapsibleSection title="Request Preview" defaultOpen>
+      <VStack align="stretch" gap={2} fontSize="sm">
+        <HStack>
+          <Badge colorPalette="blue">{method ?? "POST"}</Badge>
+          <Text fontFamily="mono" fontSize="xs" wordBreak="break-all">
+            {url ?? "No URL configured"}
+          </Text>
+        </HStack>
+        {headers && headers.length > 0 && (
+          <Box>
+            <Text fontWeight="medium" fontSize="xs" color="fg.muted">
+              Headers:
+            </Text>
+            <Box
+              as="pre"
+              fontSize="xs"
+              fontFamily="mono"
+              bg="bg.subtle"
+              padding={2}
+              borderRadius="md"
+              overflow="auto"
+            >
+              {headers.map((header) => `${header.key}: ${header.value}`).join("\n")}
+            </Box>
+          </Box>
+        )}
+        <Box>
+          <HStack justify="space-between">
+            <Text fontWeight="medium" fontSize="xs" color="fg.muted">
+              Body (rendered):
+            </Text>
+            <CopyButton text={body} label="Copy body" />
+          </HStack>
+          <CodePreview {...bodyPreview({ body, headers })} filename="body" maxHeight="200px" />
+        </Box>
+      </VStack>
+    </CollapsibleSection>
+  );
+}

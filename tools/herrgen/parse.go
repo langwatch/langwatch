@@ -31,9 +31,9 @@ import (
 	"strings"
 )
 
-// herrImportSuffix locates, relative to the module path, the package whose
-// Code/RegisterStatus calls are read. Joining it to the module read from go.mod
-// means a fork or a module rename needs no edit here.
+// herrImportSuffix locates, relative to the repository's import path, the
+// package whose Code/RegisterStatus calls are read. Joining it to the path read
+// from pkg/go.mod means a fork or a module rename needs no edit here.
 const herrImportSuffix = "pkg/herr"
 
 // Declaration is one `Name = herr.Code("code")` const in the tree.
@@ -200,23 +200,28 @@ func Parse(root string, warn io.Writer) ([]Entry, []NodeCode, error) {
 	return group(declarations, statuses), groupNodeCodes(resolvedNodeSites), nil
 }
 
-// snippetSegment marks the hand-written Go under platform/app/ that is
-// rendered into the onboarding UI rather than compiled.
+// snippetSegment marks the hand-written Go that is rendered into the
+// onboarding UI rather than compiled.
 const snippetSegment = "/codegen/snippets/"
+
+// snippetRoot is the package that owns those snippets. The tolerance is scoped
+// by tree as well as by segment, so a stray /codegen/snippets/ directory
+// anywhere else cannot silently drop a compiled file's codes.
+const snippetRoot = "modules/onboarding/browser/"
 
 // toleratesParseFailure reports whether a file failing to parse is expected.
 // Only the onboarding snippets are: everywhere else the file is real, compiled
 // Go, and dropping it would drop its codes.
 func toleratesParseFailure(rel string) bool {
-	return strings.HasPrefix(rel, "platform/app/") && strings.Contains(rel, snippetSegment)
+	return strings.HasPrefix(rel, snippetRoot) && strings.Contains(rel, snippetSegment)
 }
 
 // goFiles lists the repository-relative non-test Go files under root.
 //
 // testdata is skipped for the same reason the go tool skips it: the Go inside is
 // a fixture, and its codes are not the product's. Everything else is walked,
-// including platform/app/'s onboarding snippets — see toleratesParseFailure for
-// the one place that costs us something.
+// including the onboarding snippets — see toleratesParseFailure for the one
+// place that costs us something.
 func goFiles(root string) ([]string, error) {
 	var files []string
 	err := filepath.WalkDir(root, func(abs string, entry fs.DirEntry, err error) error {
@@ -312,14 +317,17 @@ func localNameFor(imports map[string]string, importPath string) (string, error) 
 
 var modulePattern = regexp.MustCompile(`(?m)^module\s+(\S+)\s*$`)
 
+// readModulePath returns the repository's import path. No module sits at the
+// root, so it is the pkg module's path without its /pkg.
 func readModulePath(root string) (string, error) {
-	raw, err := os.ReadFile(filepath.Join(root, "go.mod"))
+	goMod := filepath.Join(root, "pkg", "go.mod")
+	raw, err := os.ReadFile(goMod)
 	if err != nil {
-		return "", fmt.Errorf("read go.mod: %w", err)
+		return "", fmt.Errorf("read pkg/go.mod: %w", err)
 	}
 	match := modulePattern.FindSubmatch(raw)
-	if match == nil {
-		return "", fmt.Errorf("no module path in %s", filepath.Join(root, "go.mod"))
+	if len(match) < 2 || !strings.HasSuffix(string(match[1]), "/pkg") {
+		return "", fmt.Errorf("no module path ending in /pkg in %s", goMod)
 	}
-	return string(match[1]), nil
+	return strings.TrimSuffix(string(match[1]), "/pkg"), nil
 }

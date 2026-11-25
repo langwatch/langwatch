@@ -9,6 +9,10 @@ from attrs import field as _attrs_field
 from ..types import UNSET, Unset
 
 if TYPE_CHECKING:
+    from ..models.patch_api_suites_by_id_body_scope_type_0 import PatchApiSuitesByIdBodyScopeType0
+    from ..models.patch_api_suites_by_id_body_scope_type_1 import PatchApiSuitesByIdBodyScopeType1
+    from ..models.patch_api_suites_by_id_body_scope_type_2 import PatchApiSuitesByIdBodyScopeType2
+    from ..models.patch_api_suites_by_id_body_scope_type_3 import PatchApiSuitesByIdBodyScopeType3
     from ..models.patch_api_suites_by_id_body_targets_item import PatchApiSuitesByIdBodyTargetsItem
 
 
@@ -21,6 +25,11 @@ class PatchApiSuitesByIdBody:
     Attributes:
         name (str | Unset):
         description (None | str | Unset):
+        scope (PatchApiSuitesByIdBodyScopeType0 | PatchApiSuitesByIdBodyScopeType1 | PatchApiSuitesByIdBodyScopeType2 |
+            PatchApiSuitesByIdBodyScopeType3 | Unset): What the run plan covers: all (every active scenario), folders (the
+            scenarios filed in the named test suites), labels (the scenarios carrying any of the labels), or cases (the
+            scenarioIds below). A dynamic scope is resolved again at every run, so a scenario written later runs without
+            editing the plan.
         scenario_ids (list[str] | Unset):
         targets (list[PatchApiSuitesByIdBodyTargetsItem] | Unset):
         repeat_count (int | Unset):
@@ -29,6 +38,13 @@ class PatchApiSuitesByIdBody:
 
     name: str | Unset = UNSET
     description: None | str | Unset = UNSET
+    scope: (
+        PatchApiSuitesByIdBodyScopeType0
+        | PatchApiSuitesByIdBodyScopeType1
+        | PatchApiSuitesByIdBodyScopeType2
+        | PatchApiSuitesByIdBodyScopeType3
+        | Unset
+    ) = UNSET
     scenario_ids: list[str] | Unset = UNSET
     targets: list[PatchApiSuitesByIdBodyTargetsItem] | Unset = UNSET
     repeat_count: int | Unset = UNSET
@@ -36,6 +52,10 @@ class PatchApiSuitesByIdBody:
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
+        from ..models.patch_api_suites_by_id_body_scope_type_0 import PatchApiSuitesByIdBodyScopeType0
+        from ..models.patch_api_suites_by_id_body_scope_type_1 import PatchApiSuitesByIdBodyScopeType1
+        from ..models.patch_api_suites_by_id_body_scope_type_2 import PatchApiSuitesByIdBodyScopeType2
+
         name = self.name
 
         description: None | str | Unset
@@ -43,6 +63,18 @@ class PatchApiSuitesByIdBody:
             description = UNSET
         else:
             description = self.description
+
+        scope: dict[str, Any] | Unset
+        if isinstance(self.scope, Unset):
+            scope = UNSET
+        elif isinstance(self.scope, PatchApiSuitesByIdBodyScopeType0):
+            scope = self.scope.to_dict()
+        elif isinstance(self.scope, PatchApiSuitesByIdBodyScopeType1):
+            scope = self.scope.to_dict()
+        elif isinstance(self.scope, PatchApiSuitesByIdBodyScopeType2):
+            scope = self.scope.to_dict()
+        else:
+            scope = self.scope.to_dict()
 
         scenario_ids: list[str] | Unset = UNSET
         if not isinstance(self.scenario_ids, Unset):
@@ -68,6 +100,8 @@ class PatchApiSuitesByIdBody:
             field_dict["name"] = name
         if description is not UNSET:
             field_dict["description"] = description
+        if scope is not UNSET:
+            field_dict["scope"] = scope
         if scenario_ids is not UNSET:
             field_dict["scenarioIds"] = scenario_ids
         if targets is not UNSET:
@@ -81,6 +115,10 @@ class PatchApiSuitesByIdBody:
 
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
+        from ..models.patch_api_suites_by_id_body_scope_type_0 import PatchApiSuitesByIdBodyScopeType0
+        from ..models.patch_api_suites_by_id_body_scope_type_1 import PatchApiSuitesByIdBodyScopeType1
+        from ..models.patch_api_suites_by_id_body_scope_type_2 import PatchApiSuitesByIdBodyScopeType2
+        from ..models.patch_api_suites_by_id_body_scope_type_3 import PatchApiSuitesByIdBodyScopeType3
         from ..models.patch_api_suites_by_id_body_targets_item import PatchApiSuitesByIdBodyTargetsItem
 
         d = dict(src_dict)
@@ -94,6 +132,49 @@ class PatchApiSuitesByIdBody:
             return cast(None | str | Unset, data)
 
         description = _parse_description(d.pop("description", UNSET))
+
+        def _parse_scope(
+            data: object,
+        ) -> (
+            PatchApiSuitesByIdBodyScopeType0
+            | PatchApiSuitesByIdBodyScopeType1
+            | PatchApiSuitesByIdBodyScopeType2
+            | PatchApiSuitesByIdBodyScopeType3
+            | Unset
+        ):
+            if isinstance(data, Unset):
+                return data
+            try:
+                if not isinstance(data, dict):
+                    raise TypeError()
+                scope_type_0 = PatchApiSuitesByIdBodyScopeType0.from_dict(data)
+
+                return scope_type_0
+            except (TypeError, ValueError, AttributeError, KeyError):
+                pass
+            try:
+                if not isinstance(data, dict):
+                    raise TypeError()
+                scope_type_1 = PatchApiSuitesByIdBodyScopeType1.from_dict(data)
+
+                return scope_type_1
+            except (TypeError, ValueError, AttributeError, KeyError):
+                pass
+            try:
+                if not isinstance(data, dict):
+                    raise TypeError()
+                scope_type_2 = PatchApiSuitesByIdBodyScopeType2.from_dict(data)
+
+                return scope_type_2
+            except (TypeError, ValueError, AttributeError, KeyError):
+                pass
+            if not isinstance(data, dict):
+                raise TypeError()
+            scope_type_3 = PatchApiSuitesByIdBodyScopeType3.from_dict(data)
+
+            return scope_type_3
+
+        scope = _parse_scope(d.pop("scope", UNSET))
 
         scenario_ids = cast(list[str], d.pop("scenarioIds", UNSET))
 
@@ -113,6 +194,7 @@ class PatchApiSuitesByIdBody:
         patch_api_suites_by_id_body = cls(
             name=name,
             description=description,
+            scope=scope,
             scenario_ids=scenario_ids,
             targets=targets,
             repeat_count=repeat_count,

@@ -1,43 +1,14 @@
-Feature: Langy can run a conversation on the pi harness
-  Langy's worker runs on one of two coding-agent harnesses, selected per
-  project. The harness rides the same credential envelope as every other
-  worker-shaping input, so a change replaces the worker instead of quietly
-  reusing one built for the other harness, and a deploy that introduces
-  harness selection does not touch any worker that was running before it.
+Feature: Langy runs a conversation on the pi worker
+  Langy's worker is the langy-worker wrapper around the pi coding agent, driven
+  by the manager over a stdio protocol. This feature covers how the manager
+  configures that worker, drives a turn on it, and keeps the conversation's
+  session across respawns.
 
   # Companion specs:
   #   - specs/langy/langy-minimal-harness.feature  (what the worker's prompt and
-  #     tool surface look like, harness-independent)
+  #     tool surface look like)
   #   - specs/langy/langy-stop-and-resume.feature  (the user-facing stop this
   #     feature's cancel path completes)
-
-  @unit
-  Scenario: A conversation that names no harness keeps its running worker
-    Given a worker is running for a conversation that never named a harness
-    When the next turn arrives naming the default harness explicitly
-    Then the running worker is reused
-    And no worker is replaced just because harness selection was deployed
-
-  @unit
-  Scenario: Selecting the pi harness replaces the conversation's worker
-    Given a worker is running for a conversation on the default harness
-    When the next turn arrives selecting the pi harness
-    Then the running worker does not match and is replaced
-    And the conversation continues on a worker built for the pi harness
-
-  @unit
-  Scenario: An unrecognized harness value falls back to the default harness
-    Given a turn arrives naming a harness this manager does not know
-    When the manager resolves the harness
-    Then the turn runs on the default harness
-    And the unknown value never selects an unfinished or absent harness
-
-  @unit
-  Scenario: The pre-turn probe answers for the harness the turn will use
-    Given the control plane asks whether a matching worker is already running
-    When the probe names the harness the turn would run on
-    Then the answer compares the running worker's harness too
-    And a harness change is a miss, so the turn replaces the worker instead of reusing it
 
   # The wrapper generates pi's model registry from the manager's config. That
   # entry must not LOSE what pi's own catalog knows about the model: Claude 5
@@ -53,11 +24,49 @@ Feature: Langy can run a conversation on the pi harness
     And the manager's explicit settings win over the catalog where both name the same field
     And the entry still routes through the mediated gateway URL, never the catalog's own endpoint
 
+  # pi's catalog lags Anthropic releases (claude-*-5-5 shipped after it), and
+  # every Claude from 4.6 on rejects the legacy thinking shape with a 400.
+  @unit
+  Scenario: A Claude newer than pi's catalog still gets the adaptive thinking shape
+    Given the manager configures an Anthropic Messages model of Claude 4.6 or later that pi's catalog does not list
+    When the wrapper generates the model registry
+    Then the entry asks pi for adaptive thinking
+    And an older Claude pi's catalog does not list keeps the manager's config alone
+
+  # The manager marks every openai/* model as reasoning, and OpenAI answers a
+  # reasoning field on gpt-4o or gpt-4.1 with 400 "Unsupported parameter:
+  # 'reasoning.effort' is not supported with this model".
+  @unit
+  Scenario: A model that does not reason is never sent reasoning fields
+    Given the manager configures an OpenAI model pi's catalog lists as not reasoning
+    When the wrapper generates the model registry
+    Then the entry does not reason, whatever the lane's default says
+
+  # pi's catalog stops at gpt-5.6, and an unknown model gets pi's defaults: a
+  # 128k window and text-only input, a tenth of gpt-6's window.
+  @unit
+  Scenario: A GPT newer than pi's catalog gets its newest sibling's shape
+    Given the manager configures a GPT newer than every entry of its tier in pi's catalog
+    When the wrapper generates the model registry
+    Then the entry carries the newest same-tier sibling's window, input and thinking levels under its own id
+    And it carries neither the sibling's name nor its price
+    And an id with no catalog sibling of its tier keeps the manager's config alone
+
   @unit
   Scenario: A model pi's catalog does not know is written from config alone
     Given the manager configures a model id pi's catalog does not list for that API dialect
     When the wrapper generates the model registry
-    Then the entry is exactly the manager's config
+    Then the entry is exactly the manager's config, apart from the reasoning default
+
+  # A provider prefix cannot tell a reasoning model from one that refuses the
+  # parameter outright, so the manager stays silent and pi's catalog decides.
+  @unit
+  Scenario: A model that cannot reason is never asked to
+    Given the manager configures a model without saying whether it reasons
+    When the wrapper generates the model registry
+    Then a model pi's catalog lists keeps the catalog's reasoning flag
+    And a Responses or Messages model the catalog does not list reasons by default
+    And a chat-completions model the catalog does not list does not reason
 
   # The model config passes unknown keys through so a new compat flag needs no
   # wrapper change. Routing and credential keys must not travel that path: they
@@ -96,6 +105,18 @@ Feature: Langy can run a conversation on the pi harness
     When the next turn on that worker starts
     Then it reads its own events, not the abandoned turn's
     And the abandoned turn's events are released instead of waiting forever
+
+  # The relay carries ephemeral frames the durable log can survive without, so
+  # a broken push must degrade the live view, never end the turn: ending it
+  # releases the worker mid tool call and the idle reaper kills it while an
+  # LLM call is still in flight.
+  @unit
+  Scenario: A broken relay push never fails the turn
+    Given the relay stream to the control plane breaks mid-turn
+    When the next frame push fails
+    Then the sink reopens the stream and retries the frame once
+    And repeated reopen failures drop frames under a cooldown instead of erroring
+    And the turn keeps running to its real terminal
 
   @unit
   Scenario: A command to a worker that stopped reading gives up instead of blocking
@@ -162,12 +183,16 @@ Feature: Langy can run a conversation on the pi harness
   # Provider prompt caching is what makes a long conversation affordable, and
   # the default cache tier expires faster than the pauses between a user's
   # messages. The worker asks for the long tier: anthropic's hour-long
-  # cache_control, the Responses lane's day-long retention.
+  # cache_control, the Responses lane's day-long retention. The codex lane is
+  # the exception: the ChatGPT backend rejects the retention parameter with a
+  # 400 (the API-key endpoint accepts it), and in production that 400 killed
+  # every codex turn on its first LLM call. So the codex lane never asks.
   @unit
   Scenario: The worker asks the provider for long cache retention
     Given a pi worker provisioned for an anthropic or openai model
     When its config and environment are assembled
     Then the model allows long cache retention and the environment selects it
+    But a codex model never asks for it, because its backend refuses the request
 
   @unit
   Scenario: A corrupt persisted session degrades to a fresh one instead of failing the spawn
@@ -183,7 +208,7 @@ Feature: Langy can run a conversation on the pi harness
     Then the digest is not folded into the prompt
     And the session's own history remains the single copy of the conversation
 
-  # Telemetry: the pi harness exports no OTLP of its own, so the relay retells
+  # Telemetry: the worker exports no OTLP of its own, so the relay retells
   # each mediated LLM call as one gen_ai span. Provider prompt caching serves
   # most of a follow-up's prompt at a fraction of the input price, and a retold
   # span without the cache breakdown reads as a full-price call. See also
@@ -196,3 +221,26 @@ Feature: Langy can run a conversation on the pi harness
     Then the span carries the cache-read and cache-write token counts
     And the hour-long share of the writes when the provider states it
     And the counts use the same attribute names the gateway's own span uses
+
+  # A failed call's span once showed only an error status, so a spent balance
+  # retried five times looked like five identical unexplained failures.
+  @unit
+  Scenario: The retold span of a failed model call says why it failed
+    Given a pi worker's mediated LLM call the provider rejects, or fails with an error event inside its stream
+    When the relay retells the call as a gen_ai span
+    Then the span records the upstream HTTP status
+    And it records the provider's error type and the account cause the relay classified
+    And it records a message only when it is the gateway's own exhausted-access message
+    But every provider message, billing sentences included, is left off the span, because it can quote a key
+
+  # The gateway drops request options a provider cannot take and names them
+  # on the response (X-LangWatch-Params-Dropped). Two production outages were
+  # invisible until a live probe because nothing on the langy side recorded
+  # what the gateway removed: the next field pi starts sending should show up
+  # as a drop record on the first turn, not as a dead card in production.
+  @unit
+  Scenario: An option the gateway dropped from a model call is visible on the turn's telemetry
+    Given a pi worker's mediated LLM call whose response names dropped options
+    When the relay retells the call as a gen_ai span
+    Then the span records which options the gateway dropped
+    And the relay logs the drop once per distinct set, not once per call

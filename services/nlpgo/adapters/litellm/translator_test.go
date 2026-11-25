@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestSplitProviderModel(t *testing.T) {
@@ -88,6 +90,9 @@ func TestIsReasoningModel(t *testing.T) {
 	yes := []string{
 		"openai/o1-mini", "openai/o3", "openai/o4-preview",
 		"openai/gpt-5-mini", "gpt-5", "o1",
+		// Every generation after gpt-5 keeps the fixed temperature: the
+		// catalog's latest-mini resolves to these, and OpenAI refuses 0.2.
+		"openai/gpt-5.6-terra", "openai/gpt-6-luna", "gpt-7", "openai/gpt-10-mini",
 	}
 	// Pin Python parity: matching is anchored on the model BASENAME
 	// (anything after the last `/`, or the full string if no `/`),
@@ -97,11 +102,13 @@ func TestIsReasoningModel(t *testing.T) {
 	// non-reasoning models.
 	no := []string{
 		"openai/gpt-4o", "anthropic/claude-3-5-sonnet", "gemini/gemini-2.0-flash",
-		"openai/gpt-3.5-turbo",
+		"openai/gpt-3.5-turbo", "openai/gpt-4.1-mini",
 		// CodeRabbit-flagged false-positives that the basename-anchor fixes:
 		"openai/co3-thing",     // `co3` would substring-match o3 in the full id
 		"vertex_ai/pro1-model", // `pro1` would substring-match o1 in the full id
 		"custom/super-gpt-5x",  // gpt-5 anywhere but the start would substring-match
+		"openai/gpt-6x",        // a generation must end at the id's end, a `.` or a `-`
+		"openai/o1x-model",
 	}
 	for _, m := range yes {
 		if !IsReasoningModel(m) {
@@ -120,7 +127,7 @@ func TestApplyReasoningOverrides_PinsTemperatureAndFloorsMaxTokens(t *testing.T)
 		"temperature": 0.2,
 		"max_tokens":  1000,
 	}
-	mutated := ApplyReasoningOverrides("openai/gpt-5-mini", body)
+	mutated := ApplyReasoningOverrides("openai/gpt-5-mini", body, nil)
 	if !mutated {
 		t.Fatalf("expected mutation for reasoning model")
 	}
@@ -138,7 +145,7 @@ func TestApplyReasoningOverrides_PinsTemperatureAndFloorsMaxTokens(t *testing.T)
 
 func TestApplyReasoningOverrides_HighMaxTokensPreserved(t *testing.T) {
 	body := map[string]any{"max_tokens": 32000}
-	ApplyReasoningOverrides("openai/o3", body)
+	ApplyReasoningOverrides("openai/o3", body, nil)
 	if _, present := body["max_tokens"]; present {
 		t.Errorf("max_tokens must be removed for reasoning models, got %v", body["max_tokens"])
 	}
@@ -150,7 +157,7 @@ func TestApplyReasoningOverrides_HighMaxTokensPreserved(t *testing.T) {
 
 func TestApplyReasoningOverrides_NonReasoningUntouched(t *testing.T) {
 	body := map[string]any{"temperature": 0.2, "max_tokens": 100}
-	if ApplyReasoningOverrides("openai/gpt-4o", body) {
+	if ApplyReasoningOverrides("openai/gpt-4o", body, nil) {
 		t.Errorf("expected no mutation for non-reasoning model")
 	}
 	if body["temperature"] != 0.2 {
@@ -159,6 +166,73 @@ func TestApplyReasoningOverrides_NonReasoningUntouched(t *testing.T) {
 	if body["max_tokens"] != 100 {
 		t.Errorf("max_tokens must not change for gpt-4o")
 	}
+}
+
+// fakeCatalog answers for the models it lists and knows no other.
+type fakeCatalog map[string]string
+
+func (c fakeCatalog) OutputTokensParameter(modelID string) (string, bool) {
+	param, known := c[modelID]
+	return param, known
+}
+
+// @scenario "A workflow LLM call on a marked model sends max_completion_tokens"
+func TestApplyReasoningOverrides_CatalogMarkRenamesTheLimit(t *testing.T) {
+	// A model the name rule does not recognize: only the catalog can say.
+	catalog := fakeCatalog{"openai/acme-reasoner": "max_completion_tokens"}
+	body := map[string]any{"temperature": 0.2, "max_tokens": 900}
+
+	assert.True(t, NeedsReasoningOverrides("openai/acme-reasoner", catalog))
+	assert.True(t, ApplyReasoningOverrides("openai/acme-reasoner", body, catalog))
+
+	assert.NotContains(t, body, "max_tokens")
+	assert.Equal(t, 900, body["max_completion_tokens"])
+	assert.InDelta(t, 0.2, body["temperature"], 0, "only reasoning-class models pin temperature")
+}
+
+// @scenario "A workflow LLM call on a marked model sends max_completion_tokens"
+func TestApplyReasoningOverrides_CatalogMarkKeepsAnExplicitMaxCompletionTokens(t *testing.T) {
+	catalog := fakeCatalog{"openai/acme-reasoner": "max_completion_tokens"}
+	body := map[string]any{"max_tokens": 900, "max_completion_tokens": 300}
+
+	ApplyReasoningOverrides("openai/acme-reasoner", body, catalog)
+
+	assert.NotContains(t, body, "max_tokens")
+	assert.Equal(t, 300, body["max_completion_tokens"])
+}
+
+// @scenario "A workflow LLM call on a model that takes max_tokens keeps max_tokens"
+func TestApplyReasoningOverrides_CatalogDefaultKeepsMaxTokens(t *testing.T) {
+	catalog := fakeCatalog{"openai/gpt-4o": "max_tokens"}
+	body := map[string]any{"max_tokens": 100}
+
+	assert.False(t, NeedsReasoningOverrides("openai/gpt-4o", catalog))
+	assert.False(t, ApplyReasoningOverrides("openai/gpt-4o", body, catalog))
+	assert.Equal(t, 100, body["max_tokens"])
+}
+
+func TestApplyReasoningOverrides_CatalogDefaultLeavesTheNameRuleRename(t *testing.T) {
+	// An entry left at the default (the openai_codex/ ids) is not a claim
+	// that the model takes max_tokens, so the name rule's rename stands.
+	catalog := fakeCatalog{"openai_codex/gpt-5.6-sol": "max_tokens"}
+	body := map[string]any{"temperature": 0.2, "max_tokens": 1000}
+
+	ApplyReasoningOverrides("openai_codex/gpt-5.6-sol", body, catalog)
+
+	assert.NotContains(t, body, "max_tokens")
+	assert.Equal(t, reasoningMaxTokensFloor, body["max_completion_tokens"])
+	assert.InDelta(t, 1.0, body["temperature"], 0)
+}
+
+// @scenario "A model the catalog does not know keeps the request it gets today"
+func TestApplyReasoningOverrides_ModelOutsideTheCatalogKeepsTheNameRule(t *testing.T) {
+	catalog := fakeCatalog{}
+	body := map[string]any{"max_tokens": 32000}
+
+	ApplyReasoningOverrides("openai/o3", body, catalog)
+
+	assert.NotContains(t, body, "max_tokens")
+	assert.Equal(t, 32000, body["max_completion_tokens"])
 }
 
 func TestClampAnthropicTemperature(t *testing.T) {
@@ -330,7 +404,7 @@ func TestFromLiteLLMParams_OpenAI(t *testing.T) {
 }
 
 func TestFromLiteLLMParams_GenericAPIKeyProviders(t *testing.T) {
-	for _, provider := range []string{"xai", "groq", "cerebras", "deepseek"} {
+	for _, provider := range []string{"xai", "groq", "cerebras", "deepseek", "doubleword"} {
 		t.Run(provider, func(t *testing.T) {
 			ic, err := FromLiteLLMParams(provider, map[string]any{
 				"api_key": "gen-key",
@@ -508,5 +582,21 @@ func TestInlineCredentials_RequiresProvider(t *testing.T) {
 	ic := InlineCredentials{Provider: ""}
 	if _, err := ic.Encode(); err == nil {
 		t.Errorf("expected error when provider is empty")
+	}
+}
+
+// @scenario "A Gemini or Vertex provider with a base URL reaches that host instead of Google's"
+func TestFromLiteLLMParams_GeminiVertexAndBedrockCarryTheBaseURL(t *testing.T) {
+	gemini, err := FromLiteLLMParams("gemini", map[string]any{"api_key": "k", "api_base": "http://127.0.0.1:21651"})
+	if err != nil || gemini.Gemini["api_base"] != "http://127.0.0.1:21651" {
+		t.Fatalf("gemini api_base lost: %v %v", gemini.Gemini, err)
+	}
+	vertex, err := FromLiteLLMParams("vertex_ai", map[string]any{"vertex_project": "p", "vertex_location": "l", "api_base": "http://127.0.0.1:21651"})
+	if err != nil || vertex.VertexAI["api_base"] != "http://127.0.0.1:21651" {
+		t.Fatalf("vertex api_base lost: %v %v", vertex.VertexAI, err)
+	}
+	bedrock, err := FromLiteLLMParams("bedrock", map[string]any{"aws_region_name": "us-east-1", "api_base": "http://127.0.0.1:21651"})
+	if err != nil || bedrock.Bedrock["api_base"] != "http://127.0.0.1:21651" {
+		t.Fatalf("bedrock api_base lost: %v %v", bedrock.Bedrock, err)
 	}
 }

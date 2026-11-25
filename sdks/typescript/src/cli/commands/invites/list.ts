@@ -1,5 +1,7 @@
 import chalk from "chalk";
+
 import { OrganizationApiService } from "@/client-sdk/services/organization/organization-api.service";
+
 import { formatTable } from "../../utils/formatting";
 import type { CommandResult } from "../../utils/output";
 import { counted, printEmpty, runManagement } from "../management/_shared";
@@ -20,7 +22,7 @@ export const listInvitesCommand = async (): Promise<CommandResult | void> =>
       if (result.invites.length === 0) {
         printEmpty({
           what: "pending invites",
-          hint: 'langwatch invites create --email person@example.com --role MEMBER --team team_abc:MEMBER',
+          hint: "langwatch invites create --email person@example.com --role MEMBER --team team_abc:MEMBER",
         });
         return;
       }

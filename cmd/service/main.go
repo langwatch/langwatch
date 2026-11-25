@@ -43,10 +43,15 @@ func serviceTelemetryName(cmd string) string {
 // ServiceBoot is the entrypoint signature each service must implement.
 type ServiceBoot func(ctx context.Context, args []string) error
 
+// The simulators register only in a dev build: combined_dev.go.
 var services = map[string]ServiceBoot{
 	"aigateway":  aigateway.Root,
 	"langyagent": langyagent.Root,
 	"nlpgo":      nlpgo.Root,
+	// The development topology (ADR-004, 2026-09-07): the Go data-plane
+	// services in one process. Never a deployment — each service is still its
+	// own container in production.
+	combinedCommand: combinedRoot,
 }
 
 func main() {

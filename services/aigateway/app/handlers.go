@@ -60,11 +60,27 @@ func (a *App) HandleEmbeddings(ctx context.Context, bundle *domain.Bundle, body 
 	return a.pipeline.Sync(ctx, bundle, &domain.Request{Type: domain.RequestTypeEmbeddings, Model: model, BodyReader: body})
 }
 
-// HandleSpeech dispatches POST /v1/audio/speech (OpenAI-wire TTS). Same
-// pipeline as every sync call; the response body is binary audio with the
-// Content-Type attached by the dispatcher.
-func (a *App) HandleSpeech(ctx context.Context, bundle *domain.Bundle, body io.Reader, model string) (*CompletionResult, error) {
-	return a.pipeline.Sync(ctx, bundle, &domain.Request{Type: domain.RequestTypeSpeech, Model: model, BodyReader: body})
+// HandleDecisions dispatches POST /v1/decisions (OpenAI Decisions API). The
+// route pins OpenAI credentials through its surface, and the body reaches the
+// provider as the caller sent it apart from the resolved model.
+//
+//nolint:revive // argument-limit: the same four values every Handle method beside it takes.
+func (a *App) HandleDecisions(ctx context.Context, bundle *domain.Bundle, body []byte, model string) (*CompletionResult, error) {
+	return a.pipeline.Sync(ctx, bundle, &domain.Request{
+		Type:    domain.RequestTypeDecisions,
+		Model:   model,
+		Body:    body,
+		Surface: domain.DecisionsSurface(),
+	})
+}
+
+// HandleSpeechStream dispatches POST /v1/audio/speech (OpenAI-wire TTS). The
+// iterator yields the provider's body as it arrives: audio bytes, or the
+// provider's SSE when the caller asked for stream_format "sse".
+//
+//nolint:revive // argument-limit: the same four values every Handle method beside it takes.
+func (a *App) HandleSpeechStream(ctx context.Context, bundle *domain.Bundle, body []byte, model string) (*StreamResult, error) {
+	return a.pipeline.Stream(ctx, bundle, &domain.Request{Type: domain.RequestTypeSpeech, Model: model, Body: body})
 }
 
 // HandleTranscription dispatches POST /v1/audio/transcriptions (OpenAI-wire
@@ -81,13 +97,53 @@ func (a *App) HandleTranscription(ctx context.Context, bundle *domain.Bundle, up
 	})
 }
 
-// HandleElevenLabsSpeech dispatches POST /v1/text-to-speech/{voice_id},
-// ElevenLabs' own synthesis path. Same request type, pipeline and metering as
-// the OpenAI-wire TTS route: only the wire differs, and the vendor reads that
-// wire directly. The response body is binary audio.
-func (a *App) HandleElevenLabsSpeech(ctx context.Context, bundle *domain.Bundle, in ElevenLabsAudioDispatch) (*CompletionResult, error) {
-	route := in.Route
+// HandleTranscriptionStream dispatches POST /v1/audio/transcriptions with
+// stream=true. The iterator yields the provider's transcript events as they
+// arrive, unchanged.
+//
+//nolint:revive // argument-limit: the same four values HandleTranscription beside it takes.
+func (a *App) HandleTranscriptionStream(ctx context.Context, bundle *domain.Bundle, upload *domain.TranscriptionUpload, model string) (*StreamResult, error) {
+	return a.pipeline.Stream(ctx, bundle, &domain.Request{
+		Type:          domain.RequestTypeTranscription,
+		Model:         model,
+		Body:          modelOnlyBody("model", model),
+		Transcription: upload,
+	})
+}
+
+// HandleImageGeneration dispatches POST /v1/images/generations (OpenAI-wire
+// image generation). Same pipeline as every sync call; the response body is
+// the OpenAI images JSON, whose data[] entries carry the base64 images.
+//
+//nolint:revive // argument-limit: the same four values HandleSpeech beside it takes.
+func (a *App) HandleImageGeneration(ctx context.Context, bundle *domain.Bundle, body io.Reader, model string) (*CompletionResult, error) {
+	return a.pipeline.Sync(ctx, bundle, &domain.Request{Type: domain.RequestTypeImageGeneration, Model: model, BodyReader: body})
+}
+
+// HandleImageEdit dispatches POST /v1/images/edits (OpenAI-wire multipart
+// image edit). The router already parsed the form; the upload rides on
+// req.ImageEdit and Body carries a synthesized JSON summary so the
+// body-reading pipeline stages see well-formed bytes instead of multipart
+// framing. The prompt is in that summary because guardrails judge it, and the
+// end user because spend attribution reads it.
+//
+//nolint:revive // argument-limit: the same four values HandleTranscription beside it takes.
+func (a *App) HandleImageEdit(ctx context.Context, bundle *domain.Bundle, upload *domain.ImageEditUpload, model string) (*CompletionResult, error) {
 	return a.pipeline.Sync(ctx, bundle, &domain.Request{
+		Type:      domain.RequestTypeImageEdit,
+		Model:     model,
+		Body:      imageEditBody(model, upload.Params["prompt"], upload.Params["user"]),
+		ImageEdit: upload,
+	})
+}
+
+// HandleElevenLabsSpeechStream dispatches ElevenLabs' own synthesis paths:
+// POST /v1/text-to-speech/{voice_id} and its /stream variants. Same request
+// type, pipeline and metering as the OpenAI-wire TTS route: only the wire
+// differs, and the vendor reads that wire directly.
+func (a *App) HandleElevenLabsSpeechStream(ctx context.Context, bundle *domain.Bundle, in ElevenLabsAudioDispatch) (*StreamResult, error) {
+	route := in.Route
+	return a.pipeline.Stream(ctx, bundle, &domain.Request{
 		Type:       domain.RequestTypeSpeech,
 		Model:      in.Model,
 		Body:       in.Body,
@@ -127,6 +183,24 @@ func (a *App) HandleElevenLabsTranscription(ctx context.Context, bundle *domain.
 // missing model with its own message.
 func modelOnlyBody(field, model string) []byte {
 	body, err := sonic.Marshal(map[string]string{field: model})
+	if err != nil {
+		return []byte(`{}`)
+	}
+	return body
+}
+
+// imageEditBody is the synthesized JSON the multipart image edit route hands
+// the pipeline. It carries the model, the prompt every guardrail judges, and
+// the end user spend attribution reads. The image bytes stay off it: they are
+// megabytes of binary that no pipeline stage reads from the body.
+//
+// Marshaled rather than concatenated, for the reason modelOnlyBody states.
+func imageEditBody(model, prompt, user string) []byte {
+	fields := map[string]string{"model": model, "prompt": prompt}
+	if user != "" {
+		fields["user"] = user
+	}
+	body, err := sonic.Marshal(fields)
 	if err != nil {
 		return []byte(`{}`)
 	}
@@ -211,10 +285,28 @@ type RealtimeMintDispatch struct {
 	Surface domain.Surface
 }
 
-// RealtimeUsagePost is a usage report a client read off its own socket.
+// RealtimeUsagePost is what a client posts against its session: usage it
+// read off its own socket, a close, or both.
 type RealtimeUsagePost struct {
 	SessionID string
 	Body      []byte
+}
+
+// RealtimeSessionClose ends a session with no usage to add.
+type RealtimeSessionClose struct {
+	SessionID string
+	// DurationMS is how long the call ran, when the client knows.
+	DurationMS int64
+}
+
+// RealtimeUsageAnswer is what a usage post or a close did: the last report's
+// status, what this post added, and where the session and its budgets stand.
+type RealtimeUsageAnswer struct {
+	SessionID          string
+	Status             domain.RealtimeReportStatus
+	CostNanoUSD        int64
+	SessionCostNanoUSD int64
+	Budget             domain.RealtimeBudgetState
 }
 
 func PeekStream(body []byte) bool {

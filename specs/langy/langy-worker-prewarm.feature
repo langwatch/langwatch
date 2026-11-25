@@ -7,9 +7,8 @@ Feature: Langy worker pre-warm on panel open
   worker, and the first message finds it already running.
 
   The warm resolves the SAME credential surface a turn would, configured or
-  picked model, GitHub capability under the daily PR cap, egress allow-list,
-  mirror tier, harness, because the worker signature is made of exactly those
-  parts. A warm under a different signature boots a worker the first turn
+  picked model, GitHub capability under the daily PR cap, egress allow-list and
+  mirror tier, because the worker signature is made of exactly those parts. A warm under a different signature boots a worker the first turn
   cannot reuse, which is worse than no warm at all.
 
   A warm is an optimisation, never a promise. Every failure on the warm path
@@ -100,6 +99,25 @@ Feature: Langy worker pre-warm on panel open
       And the warm probe asks for a worker without GitHub capability
       # so the first turn, which strips the token the same way, still
       # matches the warmed worker's signature and reuses it
+
+    @unit
+    Scenario: The warm and the turn's probe carry the same disabled skills
+      Given a skill is gated off for the user by a feature flag
+      When the warm request is handled
+      Then the warmed worker carries that skill as disabled
+      And the warm probe asks for a worker with that skill disabled
+      When the user sends the first message
+      Then the turn's probe asks for a worker with that skill disabled
+      # so a probe hit means the dispatch reuses the warmed worker, instead of
+      # replacing it with a spawn that carries no session key
+
+    @unit
+    Scenario: A keyless dispatch that needs a spawn is logged as the fallback, not an error
+      Given the control plane dispatched a turn without a session key
+      And the conversation has no worker the turn can reuse
+      When the manager handles the dispatch
+      Then it answers credentials_required so the control plane mints a key and re-sends
+      And it logs that outcome at info level with no stacktrace
 
   Rule: Warm failures are invisible to the user
 

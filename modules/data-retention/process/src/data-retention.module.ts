@@ -1,0 +1,55 @@
+import type {
+  DataRetentionApi,
+  DataRetentionServerConfig,
+} from "@langwatch/data-retention-contract";
+import { defineProcessModule, type PublishedProcessModule } from "@langwatch/process";
+import { defineMigrationStep } from "@langwatch/upgrade/step";
+
+import { DataRetentionModule } from "./app/data-retention.app.ts";
+import { dataRetentionSeatPolicyEventing } from "./eventing/data-retention-seat-policy.pipeline.ts";
+import { retentionDriftEventing } from "./eventing/retention-drift.pipeline.ts";
+import { retentionExtensionEventing } from "./eventing/retention-extension.pipeline.ts";
+import { retentionStorageReportEventing } from "./eventing/retention-storage-report.pipeline.ts";
+import { dataRetentionRepositories } from "./repositories/data-retention-repositories.registry.ts";
+import { EventLogKeepForeverService } from "./services/event-log-keep-forever.service.ts";
+import { RetentionDriftCheckTask } from "./tasks/retention-drift-check.task.ts";
+import { RetentionStorageReportTask } from "./tasks/retention-storage-report.task.ts";
+import { dataRetentionTrpcTransport } from "./transport/data-retention.trpc.ts";
+
+export const dataRetentionProcessModule: PublishedProcessModule<
+  "data-retention",
+  DataRetentionApi,
+  DataRetentionServerConfig
+> = defineProcessModule("data-retention")
+  .withRepositories(dataRetentionRepositories)
+  .withApi(DataRetentionModule)
+  .withTransports(dataRetentionTrpcTransport)
+  .withEventing(dataRetentionSeatPolicyEventing)
+  .withEventing(retentionExtensionEventing)
+  .withEventing(retentionStorageReportEventing)
+  .withEventing(retentionDriftEventing)
+  .withTasks(({ app }) => [
+    RetentionStorageReportTask.create({ requests: app }),
+    RetentionDriftCheckTask.create({ requests: app }),
+  ])
+  .withMigrations(({ repositories }) => [
+    defineMigrationStep({
+      id: "data-retention:keep-control-plane-events-forever",
+      kind: "data",
+      mode: "background",
+      description:
+        "Keeps every event that is not customer telemetry forever, including those already stamped to expire.",
+      needsOldWritersGone: true,
+      run: ({ checkpoint, dryRun, signal }) => {
+        const resumed = checkpoint.resumeFrom?.done;
+        return EventLogKeepForeverService.create({
+          retroactive: repositories.retroactive,
+        }).keepIndefiniteEventsForever({
+          dryRun,
+          signal,
+          done: Array.isArray(resumed) ? resumed.filter((name) => typeof name === "string") : [],
+          onTargetDone: (progress) => checkpoint.save({ report: progress }),
+        });
+      },
+    }),
+  ]);

@@ -1,16 +1,18 @@
-import { createScenario as apiCreateScenario } from "../langwatch-api-scenarios.js";
+import { createScenario as apiCreateScenario } from "../langwatch-api-scenarios.ts";
+import type { ScenarioFieldValues } from "../schemas/suite-fields.ts";
+import { formatScenarioFields } from "./format-scenario.ts";
 
 /**
- * Handles the platform_create_scenario MCP tool invocation.
- *
- * Creates a new scenario in the LangWatch project and returns a
- * confirmation with the created scenario's details.
+ * Handles the platform_create_scenario MCP tool: creates a scenario and
+ * returns a confirmation with its details.
  */
 export async function handleCreateScenario(params: {
   name: string;
   situation: string;
   criteria?: string[];
   labels?: string[];
+  testSuiteId?: string | null;
+  fields?: ScenarioFieldValues;
 }): Promise<string> {
   const result = await apiCreateScenario(params);
 
@@ -25,6 +27,10 @@ export async function handleCreateScenario(params: {
   if (Array.isArray(result.labels) && result.labels.length > 0) {
     lines.push(`**Labels**: ${result.labels.join(", ")}`);
   }
+  if (result.testSuiteId) {
+    lines.push(`**Test suite**: ${result.testSuiteId}`);
+  }
+  lines.push(...formatScenarioFields(result.fields));
 
   return lines.join("\n");
 }

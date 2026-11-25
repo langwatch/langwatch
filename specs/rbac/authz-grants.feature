@@ -39,7 +39,7 @@ Feature: Authorization grants
   @unit
   Scenario: A role's aggregate is the role
     When a custom role is defined in "org_acme"
-    Then the appended event's aggregate type is "authz_role"
+    Then the appended event's aggregate type is "authz_grant"
     And the appended event's aggregate id is the role id
     And the appended event's tenant is "org_acme"
 
@@ -290,6 +290,40 @@ Feature: Authorization grants
     Then that grant is denied too
     And the member holds no access afterwards
 
+  @integration
+  Scenario: A delayed live attach is rejected after offboarding
+    Given a live USER attach captured before the member is offboarded
+    When its projection arrives after the member leaves and rejoins
+    Then the old attach is rejected by the membership lifetime fence
+    And the old legacy USER binding is gone
+
+  @unit
+  Scenario: A live USER attach carries the membership lifetime it locked
+    Given an attach naming a member of "org_acme"
+    When the attach is stated
+    Then the fact carries the lifetime read under that membership's row lock
+    And an attach naming a user with no live membership is refused
+
+  @unit
+  Scenario: A grant for a user with no live membership is refused as outside the organisation
+    Given a user who holds no live membership of "org_acme"
+    When an admin grants that user a role in "org_acme"
+    Then it is refused with grant_principal_not_found, a 422, never a server error
+    And no grant is stated
+
+  @unit
+  Scenario: The insert is fenced on the lifetime the fact was stamped against
+    Given a stamped USER fact arriving at the projection
+    When the row is written
+    Then the insert names the membership lifetime and takes its row lock
+
+  @unit
+  Scenario: Only a founder's own admin grants may state their own lifetime
+    Given a grant carrying the founder bootstrap marker
+    When the wire reads it
+    Then it is accepted only as a stamped USER admin organization or team grant
+    And an organization bootstrap naming another organization is refused
+
   @unit @unimplemented
   Scenario: Offboarding records one revocation per grant
     When a member holding 12 grants is offboarded
@@ -302,6 +336,106 @@ Feature: Authorization grants
     When the edit is saved
     Then the orphaned binding's revocation is issued before the edit commits
     And a failure to revoke fails the edit
+
+
+  # ═══ Read-your-writes ═════════════════════════════════════════════════
+
+  # An attach and a role definition hold, bounded, for the authoritative
+  # projection to make their rows readable. The default write contract confirms
+  # before returning; an explicitly asynchronous attach can return after the
+  # durable append without reading the projection. Compatibility rows, revoked
+  # grants and deleted roles never confirm a write.
+
+  @unit
+  Scenario: A default write fails when its projection lags
+    Given an attach using the default read-your-writes contract
+    When the read-your-writes window passes with the rows not readable
+    Then the write fails with "authz_grant_not_confirmed"
+
+  @unit
+  Scenario: An asynchronous write is accepted before its projection lands
+    Given an attach whose caller explicitly writes asynchronously
+    When the durable append succeeds before the rows are readable
+    Then the write is reported as done
+    And the projection is not read
+
+  @unit
+  Scenario: A write whose caller requires the projection fails when it lags
+    Given an attach whose caller requires the projection
+    When the read-your-writes window passes with the rows not readable
+    Then the write fails with "authz_grant_not_confirmed"
+
+  @unit
+  Scenario: A role definition whose caller requires the projection fails when it lags
+    Given a role definition whose caller requires the projection
+    When the read-your-writes window passes with the row not readable
+    Then the write fails with "authz_grant_not_confirmed"
+
+  @unit
+  Scenario: A required write that lands inside the window passes
+    Given an attach whose caller requires the projection
+    When the rows become readable inside the window
+    Then the write is reported as done
+
+  @unit
+  Scenario: A compatibility-only row cannot confirm an attach
+    Given the compatibility row exists but the Grant row does not
+    When the read-your-writes window passes
+    Then the write fails with "authz_grant_not_confirmed"
+
+  @unit
+  Scenario: A revoked Grant cannot confirm an attach
+    Given the Grant row is revoked
+    When the read-your-writes window passes
+    Then the write fails with "authz_grant_not_confirmed"
+
+  @unit
+  Scenario: A delayed Grant projection confirms an attach
+    Given the Grant row arrives inside the read-your-writes window
+    When the projection is checked again
+    Then the write is reported as done
+
+  @unit
+  Scenario: A role definition is confirmed by the canonical Role projection
+    Given a canonical Role row with the requested name and permissions
+    When the role definition is written
+    Then the write is reported as done
+
+  @unit
+  Scenario: A role definition that clears the description waits for the cleared Role row
+    Given a canonical Role row with the requested name and permissions but the old description
+    When the role definition is written without a description
+    Then the write is not confirmed
+
+  @unit
+  Scenario: Deleting a role binding twice answers not found the second time
+    Given a role binding whose grant was revoked but whose compatibility row has not been removed yet
+    When the binding is looked up for deletion
+    Then it reads as missing
+
+  @unit
+  Scenario: A restricted API key's private role permissions are read by id within its organization
+    Given a live role of the system API key kind in the organization
+    When its permissions are read by id
+    Then the role is returned with its permissions, whatever its kind
+
+  @unit
+  Scenario: A changed binding role is confirmed by the canonical Grant projection
+    Given a canonical Grant row with the requested role
+    When the binding role is changed
+    Then the write is reported as done
+
+  @unit
+  Scenario: A deleted role is confirmed when the canonical Role projection is gone
+    Given the canonical Role row disappears
+    When the role is deleted
+    Then the write is reported as done
+
+  @unit
+  Scenario: Requiring the projection waits for it even when the wait is switched off
+    Given an attach whose caller requires the projection and asks not to wait
+    When the read-your-writes window passes with the rows not readable
+    Then the write fails with "authz_grant_not_confirmed"
 
   # ═══ The projection ═══════════════════════════════════════════════════
 
@@ -364,15 +498,15 @@ Feature: Authorization grants
     Given a filtered revoke naming a principal
     And that principal holds a Grant-head row the compat head cannot express
     When the revoke runs on the ledger fork
-    Then the revoked set is the union of the compat ids and the Grant ids
+    Then the revoked set contains the matching live Grant ids
     And the row with no compat binding is revoked, not left resolving
 
   @unit
-  Scenario: A filter the vocabulary cannot translate falls back to the compat ids
-    Given a filtered revoke whose shape the Grant translation does not cover
-    When the revoke runs on the ledger fork
-    Then only the compat ids are revoked
-    And the Grant head is not queried with a guessed predicate
+  Scenario: A filtered revoke preserves excluded grant ids
+    Given an API key with multiple custom-role grants
+    When selected roles are revoked while naming grants to retain
+    Then only live grants for those roles and that key are revoked
+    And the retained grant ids are excluded
 
   # ═══ Share links and the compat heads ═════════════════════════════════
   # Share links live on both heads until every organization has moved:
@@ -519,6 +653,101 @@ Feature: Authorization grants
     Then the actor names the code path that decided to act
     And the platform is never an anonymous actor
 
+  # ═══ Braid grants, read before they are written ═══════════════════════
+  # ADR-201 (Braids) writes a braid as a shared project-reader grant on a
+  # span condition, with its compiled where and the braid a change replaces.
+  # The release before it reads those facts, so a worker still on it during a
+  # rolling upgrade folds a braid's attach rather than refusing and retrying
+  # it. Braids are honoured from the release that ships their fence
+  # (modules/authz/specs/braids.feature).
+
+  @unit
+  Scenario: A braid's attach is read before braids are written
+    Given a braid's attach with a span condition, its compiled where and the braid it replaces
+    When it arrives as an event or as a command
+    Then it is accepted with every one of those fields kept
+    And an empty id for the braid it replaces is refused
+
+  @unit
+  Scenario: A braid's where is refused without its compiled form
+    Given a braid's span condition carrying a where
+    When it arrives without the where's compiled form
+    Then it is refused
+    And a compiled form with no where beside it is refused too
+
+  @unit
+  Scenario: Only a braid writes a span condition
+    Given a shared read from any source other than a braid
+    When it carries a span condition, or a compiled where
+    Then it is refused
+    And the same read on a trace condition is still accepted
+
+  @unit
+  Scenario: The fold writes a braid's row as the release that writes braids does
+    Given a braid's attach made by a person, replacing an earlier braid
+    When the fold writes its row
+    Then the row names that person as its creator and the braid it replaces
+    And it keeps the compiled condition
+    And a braid no person made, or a shared read no braid made, names no creator
+
+  @integration
+  Scenario: A braid's row keeps the braid it replaces through a later write
+    Given a braid's row is written naming the braid it replaces
+    When it is read back
+    Then it names that braid
+    And a later write of the same row naming another braid replaces it
+
+  @integration
+  Scenario: The aggregate reconciler never revokes or reattaches a braid
+    Given a reader project holding an aggregate's shared read and a braid
+    When its shared reads are listed for the aggregate reconciler
+    Then only the aggregate's shared read is listed
+
+  # ═══ Provenance ═══════════════════════════════════════════════════════
+  # Two facts, not one. The SOURCE is which surface authored the grant, which
+  # the actor cannot say: a directory sync and an approved request to join
+  # both act as the platform. The ACTOR is who caused it, and for those same
+  # two surfaces that is nobody — a system principal, named from the closed
+  # registry. Both vocabularies are shared, so a surface states which entry
+  # it is rather than inventing a label.
+
+  @unit
+  Scenario: A grant states which surface authored it
+    Given a surface that grants access on a customer's behalf
+    When it states the grant
+    Then the fact carries that surface as its source
+
+  @unit
+  Scenario: A grant nobody attributed is the grants service's own
+    Given a grant made through the ordinary access surfaces
+    When no source is stated
+    Then the fact is attributed to the grants service
+
+  @unit
+  Scenario: The wire accepts every source the vocabulary names
+    Given a source is added to the shared vocabulary
+    When a grant arrives naming it
+    Then the wire accepts it with no second list to edit
+    And a source the vocabulary does not name is refused
+
+  @unit
+  Scenario: A write with no person behind it names the surface that made it
+    Given a grant write with no person or credential behind it
+    When the surface states the write
+    Then the fact names the surface from the closed registry
+    And a write made by a person still names that person
+
+  # A revocation carries no source of its own, and does not need one: the
+  # actor already names the surface and the reason carries the rest, so
+  # attributing an automated removal needs no new field on the fact.
+
+  @unit
+  Scenario: A revocation names the surface that made it without a source of its own
+    Given a surface removes access it granted earlier
+    When the revocation is stated
+    Then the fact names the surface as its actor
+    And the audit trail records it rather than treating it as backdated history
+
   # ═══ Audit ════════════════════════════════════════════════════════════
 
   @integration
@@ -532,13 +761,27 @@ Feature: Authorization grants
     Then no audit row is written for them
 
   @unit
-  Scenario: A write on the legacy path still records its audit row
-    Given "org_acme" has not completed the migration
-    When an authorization change is written on the legacy path
-    Then an audit row records it just the same
+  Scenario: A grant an automated surface made still reaches the audit trail
+    Given a surface grants access on a customer's behalf
+    When the grant is stated
+    Then an audit row records it and names the surface
+    And only backdated history is left out
+
+  @unit
+  Scenario: A grant write is recorded on the grants path
+    Given "org_acme" receives an authorization change through the grants path
+    When the change is recorded
+    Then an audit row records the grant change
 
   @unit
   Scenario: A fact delivered twice writes one audit row
     Given a fact delivered twice
     When it is handled
     Then exactly one audit row exists
+
+  @unit @regression
+  Scenario: Migrated custom bindings retain their permission restrictions
+    Given an organization, team or project binding retains ADMIN beside its customRoleId
+    When the custom role only grants traces:view
+    Then project:delete is denied
+    And a missing custom role fails closed

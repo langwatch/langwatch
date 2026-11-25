@@ -1,0 +1,249 @@
+{{/*
+  Asserts that every writer from before the serving roster has stopped, once the
+  rollout has finished (Round 47 E2; ADR-173, amendment 2026-10-08; runbook
+  dev/docs/runbooks/upgrade-on-deploy.md).
+
+  Why. Images before the roster (origin/main, 3.20.1) write no roster row, so the
+  roster cannot see them. On the first upgrade to a roster image, a background
+  step that needs every old writer gone waits until `pnpm task upgrade
+  old-writers-gone` records that they are, or until a grace after the upgrade
+  run. This hook records it as soon as it is true, so those steps need not wait
+  for the grace.
+
+  What this does. One post-upgrade Job. Its init container (kubectl) waits for
+  the app and workers Deployments to finish rolling out, then for the longer of
+  their termination grace periods, so an old pod still draining has stopped. Only
+  then does the main container, on the NEW image, run the assertion. A rollout
+  that does not finish in time records nothing: the grace still applies. The Job
+  never fails the release (a failed post-upgrade hook under --atomic would roll
+  back a good upgrade); a failure is a warning in its log.
+
+  Opt-in, off by default: `app.migrations.oldWritersGoneHook: true`. It needs a
+  Role that can read the two Deployments and its own ServiceAccount token, which
+  is projected into the kubectl container only; the global default
+  (`global.automountServiceAccountToken: false`) stays as it is for every other
+  pod, this one's main container included. Not post-rollback: a rollback to a
+  roster image is seen by the roster itself, and a rollback to an image before
+  it runs that revision's hooks, which do not include this one.
+*/}}
+{{- if dig "migrations" "oldWritersGoneHook" false .Values.app }}
+{{- $name := printf "%s-old-writers-gone" .Release.Name }}
+{{- $appDeployment := printf "%s-app" .Release.Name }}
+{{- $workersDeployment := printf "%s-workers" .Release.Name }}
+{{- $deployments := list $appDeployment }}
+{{- if .Values.workers.enabled }}
+{{- $deployments = append $deployments $workersDeployment }}
+{{- end }}
+{{- $rolloutWait := dig "migrations" "oldWritersGoneHookTimeoutSeconds" 1800 .Values.app | int }}
+{{- $appGrace := int (include "langwatch.terminationGracePeriod" (dict "component" .Values.app "name" "app")) }}
+{{- $workersGrace := int (include "langwatch.terminationGracePeriod" (dict "component" .Values.workers "name" "workers")) }}
+{{- $drainWait := add (max $appGrace $workersGrace) 30 }}
+{{- $kubectlImage := dig "migrations" "oldWritersGoneHookImage" "alpine/k8s:1.34.9" .Values.app }}
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ $name }}
+  labels:
+    {{- include "langwatch.labels" . | nindent 4 }}
+  annotations:
+    helm.sh/hook: post-upgrade
+    helm.sh/hook-weight: "-10"
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+automountServiceAccountToken: false
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ $name }}
+  labels:
+    {{- include "langwatch.labels" . | nindent 4 }}
+  annotations:
+    helm.sh/hook: post-upgrade
+    helm.sh/hook-weight: "-10"
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+rules:
+  # Read the rolled Deployments by name, and nothing else.
+  - apiGroups: ["apps"]
+    resources: ["deployments"]
+    resourceNames:
+      {{- range $deployments }}
+      - {{ . | quote }}
+      {{- end }}
+    verbs: ["get"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ $name }}
+  labels:
+    {{- include "langwatch.labels" . | nindent 4 }}
+  annotations:
+    helm.sh/hook: post-upgrade
+    helm.sh/hook-weight: "-10"
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+subjects:
+  - kind: ServiceAccount
+    name: {{ $name }}
+    namespace: {{ .Release.Namespace }}
+roleRef:
+  kind: Role
+  name: {{ $name }}
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ $name }}
+  labels:
+    {{- include "langwatch.labels" . | nindent 4 }}
+  annotations:
+    helm.sh/hook: post-upgrade
+    helm.sh/hook-weight: "10"
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+spec:
+  backoffLimit: 0
+  activeDeadlineSeconds: {{ add $rolloutWait $drainWait 300 }}
+  ttlSecondsAfterFinished: 600
+  template:
+    metadata:
+      labels:
+        {{- include "langwatch.labels" . | nindent 8 }}
+    spec:
+      restartPolicy: Never
+      serviceAccountName: {{ $name }}
+      automountServiceAccountToken: false
+      {{- with .Values.images.pullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        {{- include "langwatch.podSecurityContext" (dict "ctx" . "component" .Values.app) | nindent 8 }}
+      {{- with (coalesce .Values.app.nodeSelector .Values.global.scheduling.nodeSelector) }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with (coalesce .Values.app.tolerations .Values.global.scheduling.tolerations) }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      initContainers:
+        - name: wait-for-rollout
+          image: {{ $kubectlImage | quote }}
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 65534
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+          env:
+            # kubectl writes its discovery cache under $HOME.
+            - name: HOME
+              value: /tmp
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              set -u
+              ns={{ .Release.Namespace | quote }}
+              timeout={{ $rolloutWait }}
+              drain={{ $drainWait }}
+
+              {{ include "langwatch.storedObjects.upgradeHookAppRolloutHelper" . | nindent 14 | trim }}
+
+              deadline=$(( $(date +%s) + timeout ))
+              for deployment in {{ range $deployments }}{{ . | quote }} {{ end }}; do
+                until rollout_done "$deployment"; do
+                  if [ "$(date +%s)" -ge "$deadline" ]; then
+                    printf 'old-writers-gone: %s did not finish rolling out in %ss; nothing is asserted, and steps that wait for old writers run after the grace instead\n' "$deployment" "$timeout" >&2
+                    exit 0
+                  fi
+                  sleep 5
+                done
+                printf 'old-writers-gone: %s has finished rolling out\n' "$deployment"
+              done
+              printf 'old-writers-gone: waiting %ss for old pods to finish their termination grace\n' "$drain"
+              sleep "$drain"
+              touch /handoff/rolled-out
+          volumeMounts:
+            - name: handoff
+              mountPath: /handoff
+            - name: tmp-dir
+              mountPath: /tmp
+            - name: kube-api-access
+              mountPath: /var/run/secrets/kubernetes.io/serviceaccount
+              readOnly: true
+          resources:
+            requests:
+              cpu: 10m
+              memory: 32Mi
+            limits:
+              cpu: 100m
+              memory: 64Mi
+      containers:
+        - name: assert
+          securityContext:
+            {{- include "langwatch.containerSecurityContext" (dict "ctx" . "component" .Values.app) | nindent 12 }}
+          image: "{{ .Values.images.app.repository }}:{{ .Values.images.app.tag }}"
+          imagePullPolicy: "{{ .Values.images.app.pullPolicy }}"
+          workingDir: /app/apps/tasks
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              if [ ! -f /handoff/rolled-out ]; then
+                echo "old-writers-gone: the rollout did not finish; nothing asserted"
+                exit 0
+              fi
+              if ! pnpm -s task upgrade old-writers-gone; then
+                echo "old-writers-gone: the assertion failed; run \`pnpm task upgrade old-writers-gone\` from this image, or let the grace pass" >&2
+              fi
+              exit 0
+          env:
+            {{- include "langwatch.sharedEnv" . | nindent 12 }}
+            - name: OTEL_SERVICE_NAME
+              value: "langwatch-old-writers-gone"
+            {{- with .Values.app.extraEnvs }}
+            {{- include "langwatch.assertNoReservedTimeoutEnvs" (dict "envs" . "path" "app.extraEnvs") }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          {{- with .Values.app.extraEnvFrom }}
+          envFrom:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 1Gi
+          volumeMounts:
+            - name: handoff
+              mountPath: /handoff
+              readOnly: true
+            - name: tmp-dir
+              mountPath: /tmp
+      volumes:
+        - name: handoff
+          emptyDir:
+            sizeLimit: 1Mi
+        - name: tmp-dir
+          emptyDir:
+            sizeLimit: {{ .Values.app.scratchSizeLimit }}
+        - name: kube-api-access
+          projected:
+            sources:
+              - serviceAccountToken:
+                  path: token
+                  expirationSeconds: 3607
+              - configMap:
+                  name: kube-root-ca.crt
+                  items:
+                    - key: ca.crt
+                      path: ca.crt
+              - downwardAPI:
+                  items:
+                    - path: namespace
+                      fieldRef:
+                        fieldPath: metadata.namespace
+{{- end }}

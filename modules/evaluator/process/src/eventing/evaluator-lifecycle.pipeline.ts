@@ -1,0 +1,41 @@
+import {
+  EVALUATOR_AGGREGATE_TYPE,
+  EVALUATOR_LIFECYCLE_PIPELINE_NAME,
+} from "@langwatch/evaluator-contract";
+import {
+  defineAggregate,
+  defineEventingModule,
+  definePipeline,
+  type EventingSetup,
+} from "@langwatch/eventing";
+
+import type { EvaluatorModule } from "../app/evaluator.app.ts";
+import type { EvaluatorRepositories } from "../repositories/evaluator.repositories.ts";
+import {
+  evaluatorCreatedEventSchema,
+  evaluatorDeletedEventSchema,
+  RecordEvaluatorCreatedCommand,
+  RecordEvaluatorDeletedCommand,
+} from "./evaluator-lifecycle.commands.ts";
+
+/**
+ * evaluator_lifecycle: evaluator records its creation and its deletion; monitor removes the
+ * monitors that ran it from its own side (§9). Specs: evaluator-{created,deleted}-fact.feature
+ */
+function buildEvaluatorLifecyclePipeline() {
+  return definePipeline({
+    name: EVALUATOR_LIFECYCLE_PIPELINE_NAME,
+    aggregate: defineAggregate({ type: EVALUATOR_AGGREGATE_TYPE }),
+  })
+    .withEvents([evaluatorDeletedEventSchema, evaluatorCreatedEventSchema])
+    .withCommand("recordEvaluatorDeleted", RecordEvaluatorDeletedCommand)
+    .withCommand("recordEvaluatorCreated", RecordEvaluatorCreatedCommand)
+    .build();
+}
+
+export const evaluatorLifecycleEventing = defineEventingModule({
+  pipeline: EVALUATOR_LIFECYCLE_PIPELINE_NAME,
+  build: (_setup: EventingSetup<EvaluatorRepositories, EvaluatorModule>) =>
+    buildEvaluatorLifecyclePipeline(),
+  connect: ({ app, commands }) => app.connectLifecycle(commands),
+});

@@ -1,54 +1,86 @@
-Feature: Landing in the new navigation modes
-  As a returning user in a new navigation mode
+Feature: Landing
+  As a returning user
   I want "/" to open the product I last worked in
   So that the app starts where my work is
 
-  In the new modes the root address resolves in strict order: an explicit
+  The root address resolves in strict order: an explicit
   user pin wins; then the remembered product, when it is still reachable;
   then the server home resolver, which encodes the organization intent
   from ADR-038 and stays the cold-start default; then the safety nets.
   This deviates from ADR-038 deliberately: after the first product visit,
   what the user actually did outranks what the organization declared.
-  Legacy mode keeps the ADR-038 behavior unchanged.
 
   Settings is never a landing destination of its own. Leaving Settings
   goes back to the product the user came from.
+
+  # The chrome refuses to draw until a team and a project resolve, and "/" is
+  # the one address that names neither: the reader has not picked a project
+  # yet, and the screen that picks one for them renders INSIDE that chrome.
+  # Gating the resolver on its own output is a deadlock — a signed-in reader
+  # watches a spinner nothing will ever end, and the home resolver is never
+  # even asked. "/" needs the navigation host mounted, not the furniture.
+  @integration
+  Scenario: The front door draws before any project is chosen
+    Given a signed-in reader whose scope names no project yet
+    When they open "/"
+    Then the chrome draws the address rather than waiting on a project
+
+  # The page body refuses a reader it cannot place on a team, and offers them
+  # one way out: a link to "/". For a reader whose team has not resolved, that
+  # is the address they are already on — the refusal hands them a door back to
+  # itself. "/" resolves rather than displays, so membership is the
+  # DESTINATION's question, asked once they have been sent somewhere.
+  @integration
+  Scenario: The front door does not refuse a reader it has not placed yet
+    Given a reader on "/" whose team has not resolved
+    When the chrome draws the front door
+    Then it draws the resolver rather than refusing them for want of a team
+
+  # The chrome draws around an organization, and a reader who belongs to none
+  # has nothing for it to draw. "/" is where such a reader is sent after
+  # signing up or joining, so the resolver runs without the chrome for them.
+  @integration
+  Scenario: The front door sends a reader with no organization to onboarding
+    Given a signed-in reader who belongs to no organization
+    When they open "/"
+    Then the front door resolves without drawing the chrome
+    And they are sent to "/onboarding/welcome"
 
   @unit
   Scenario: An explicit pin outranks everything
     Given I pinned my home to "/governance"
     And the device remembers "gateway" for my organization
-    When "/" resolves in a new navigation mode
+    When "/" resolves
     Then I land on "/governance"
 
   @unit
   Scenario: The remembered product outranks the organization intent
     Given the device remembers "gateway" for my organization
     And the organization intent points at a project home
-    When "/" resolves in a new navigation mode
+    When "/" resolves
     Then I land on the Gateway home
 
   @unit
   Scenario: A remembered product I lost access to falls through
     Given the device remembers "governance" for my organization
     And Governance is not reachable for me anymore
-    And the organization intent points at "/me"
-    When "/" resolves in a new navigation mode
-    Then I land on "/me"
+    And the organization intent points at "/coding-agents"
+    When "/" resolves
+    Then I land on "/coding-agents"
 
   @unit
   Scenario: A remembered LLM Ops without any project falls through
     Given the device remembers "llm-ops" for my organization
     And no project is known on this device
     And the organization intent points at "/governance"
-    When "/" resolves in a new navigation mode
+    When "/" resolves
     Then I land on "/governance"
 
   @unit
   Scenario: A first visit follows the organization intent
     Given the device remembers nothing for my organization
     And the organization intent points at "/governance"
-    When "/" resolves in a new navigation mode
+    When "/" resolves
     Then I land on "/governance"
 
   @unit
@@ -56,7 +88,7 @@ Feature: Landing in the new navigation modes
     Given the device remembers nothing for my organization
     And the server home resolver has no answer
     And a project "demo" is known on this device
-    When "/" resolves in a new navigation mode
+    When "/" resolves
     Then I land on "/demo"
 
   @unit
@@ -73,17 +105,26 @@ Feature: Landing in the new navigation modes
     Then I land on the Governance home
 
   @integration
-  Scenario: The root address opens the remembered product in a new mode
-    Given I am in a new navigation mode
-    And the device remembers "gateway" for my organization
+  Scenario: The root address opens the remembered product
+    Given the device remembers "gateway" for my organization
     When I open "/"
     Then I am sent to the Gateway home
 
+  # The organization's Dashboards library (ADR-002 in modules/dashboard) is where Dashboards opens.
+  @unit
+  Scenario: A remembered Dashboards lands on the organization's library
+    Given the device remembers "dashboards" for my organization
+    And the organization's Dashboards library is on
+    When "/" resolves
+    Then I land on "/dashboards", not on my project's Dashboards area
+
   @integration
-  Scenario: The root address keeps its current behavior in legacy mode
-    Given I am in legacy mode
+  Scenario: The root address waits for the library's flags before landing on Dashboards
+    Given the device remembers "dashboards" for my organization
+    And the organization's Dashboards flags have not answered yet
     When I open "/"
-    Then the current home resolution applies unchanged
+    Then I am sent nowhere while they load
+    And once both answer on, I am sent to "/dashboards", once
 
   @integration
   Scenario: The landing redirect navigates once per destination
@@ -92,26 +133,11 @@ Feature: Landing in the new navigation modes
     Then no second navigation starts for the same destination
 
   @integration
-  Scenario: A member kept in an empty organization stays put in the new modes
+  Scenario: A member kept in an empty organization stays put
     Given my current organization has no project
     And another organization of mine has one
-    When the app resolves my context in a new navigation mode
+    When the app resolves my context
     Then I am not sent to the other organization's project
-
-  @integration
-  Scenario: Legacy mode keeps sending the member to the other organization's project
-    Given my current organization has no project
-    And another organization of mine has one
-    When the app resolves my context in legacy mode
-    Then I am sent to the other organization's project as today
-
-  @integration
-  Scenario: An organization with the new navigation off gets the teleport back
-    Given my current organization has no project
-    And another organization of mine has one
-    And my device painted a new navigation mode from the last flag answer
-    When the navigation flag answers off for my current organization
-    Then I am sent to the other organization's project
 
   @unit
   Scenario: Switching organization stays in the same product when possible
