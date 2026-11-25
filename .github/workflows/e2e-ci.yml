@@ -144,13 +144,13 @@ jobs:
           --health-timeout 5s
           --health-retries 5
 
-      # The image infra/compose.yml ships: its default user may create the
-      # LangWatchQL users and named collections the upgrade provisions.
       clickhouse:
-        image: langwatch/clickhouse-serverless:0.4.0
+        image: clickhouse/clickhouse-server:26.8.36.3
         ports:
           - 8123:8123
         env:
+          CLICKHOUSE_DB: default
+          CLICKHOUSE_USER: default
           CLICKHOUSE_PASSWORD: ci_password
         options: >-
           --health-cmd "wget --no-verbose --tries=1 --spider http://localhost:8123/ping || exit 1"
