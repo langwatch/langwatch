@@ -6,8 +6,9 @@
  * @see modules/dashboard/specs/dashboards-v2.feature
  */
 
+import { useInPlaceDrawerOpen } from "@langwatch/browser-host/drawer";
 import type { UiProcedureCall } from "@langwatch/browser/testing-transport";
-import { cleanup, screen, waitFor, within } from "@testing-library/react";
+import { cleanup, renderHook, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -151,10 +152,14 @@ describe("Ask Langy on a widget card", () => {
         expect(view).toHaveTextContent("Traces per bucket");
         expect(within(view).getByTestId("widget-langy-view-chart")).toBeInTheDocument();
         expect(within(view).getAllByTitle("Custom chart").length).toBeGreaterThan(0);
+        // Langy rides beside any open drawer, so the view counts as one while it shows.
+        const drawerOpen = renderHook(() => useInPlaceDrawerOpen());
+        expect(drawerOpen.result.current).toBe(true);
 
         await user.keyboard("{Escape}");
 
         await waitFor(() => expect(screen.queryByRole("dialog", { name: "Traffic" })).toBeNull());
+        expect(drawerOpen.result.current).toBe(false);
         expect(screen.getByRole("button", { name: ASK_TRAFFIC })).toBeInTheDocument();
       });
     });
