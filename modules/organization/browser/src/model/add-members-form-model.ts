@@ -1,4 +1,9 @@
-import type { InviteData, TeamAssignment } from "./member-invite-form.ts";
+import {
+  BILLING_ONLY_SEAT,
+  type InviteData,
+  type InviteSeat,
+  type TeamAssignment,
+} from "./member-invite-form.ts";
 import {
   getAutoCorrectedTeamRoleForOrganizationRole,
   type TeamRoleValue,
@@ -18,16 +23,24 @@ export type TeamOption = { label: string; value: string; description?: string };
  * the form used to offer Member with a Lite tick-box, and an Admin seat is
  * given from the members list to somebody already in.
  */
-export const INVITE_SEATS: readonly OrganizationUserRole[] = [
+export const INVITE_SEATS: readonly InviteSeat[] = [
   OrganizationUserRole.MEMBER,
   OrganizationUserRole.EXTERNAL,
   OrganizationUserRole.DEVELOPER,
+  BILLING_ONLY_SEAT,
 ];
+
+/** A choice that joins no team: a Developer (ADR-171) or Billing only (ADR-205). */
+export function seatJoinsNoTeam(
+  seat: InviteSeat,
+): seat is typeof OrganizationUserRole.DEVELOPER | typeof BILLING_ONLY_SEAT {
+  return seat === OrganizationUserRole.DEVELOPER || seat === BILLING_ONLY_SEAT;
+}
 
 // Internal form shape — flattened: one email input, shared role + teams
 export type InviteFormValues = {
   emailsRaw: string;
-  orgRole: OrganizationUserRole;
+  orgRole: InviteSeat;
   teams: TeamAssignment[];
 };
 
@@ -137,13 +150,22 @@ function teamForSeat(team: TeamAssignment, seat: OrganizationUserRole): TeamAssi
  * whatever the form still holds.
  */
 export function invitesFromForm(values: InviteFormValues): InviteData[] {
+  const seat = values.orgRole;
+  if (seat === BILLING_ONLY_SEAT) {
+    return splitInviteEmails(values.emailsRaw).map((email) => ({
+      email,
+      orgRole: OrganizationUserRole.EXTERNAL,
+      teams: [],
+      billingOnly: true,
+    }));
+  }
   const teams =
-    values.orgRole === OrganizationUserRole.DEVELOPER
+    seat === OrganizationUserRole.DEVELOPER
       ? []
-      : values.teams.map((team) => teamForSeat(team, values.orgRole));
+      : values.teams.map((team) => teamForSeat(team, seat));
   return splitInviteEmails(values.emailsRaw).map((email) => ({
     email,
-    orgRole: values.orgRole,
+    orgRole: seat,
     teams,
   }));
 }

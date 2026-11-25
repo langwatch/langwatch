@@ -41,6 +41,12 @@ Feature: The s3-client-region lint rule
     Then it reports nothing
 
   @unit
+  Scenario: A region from the shared rule for a known bucket is accepted
+    Given a module file that builds new S3Client({ region: s3RegionFor({ region, endpoint, bucket, askBucket }) })
+    When the s3-client-region rule runs over it
+    Then it reports nothing
+
+  @unit
   Scenario: The AWS client package may build its own clients
     Given packages/aws-client building new S3Client({ region })
     When the s3-client-region rule runs over it

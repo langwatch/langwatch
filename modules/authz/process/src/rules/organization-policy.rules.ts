@@ -9,6 +9,7 @@ export function defaultOrganizationPolicy({
   return {
     organizationId,
     braidsOrganizationAdminsOnly: false,
+    braidsEnabled: false,
     updatedByUserId: null,
     updatedAtMs: null,
   };

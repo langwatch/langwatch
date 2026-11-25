@@ -20,6 +20,7 @@ import {
   widgetCode,
 } from "../../templates/model/widget-code-parts.ts";
 import * as sql from "./agent-kind-queries.ts";
+import { PROMPT_VERSION_NAMES_SQL } from "./change-queries.ts";
 import type { CatalogueWidgetBuild } from "./index.ts";
 
 const UNIT_WORDS = Object.fromEntries(
@@ -41,8 +42,8 @@ function unitName(value, key) {
     return value;
   }
 }
-const NO_UNIT = "No trace in this period carries a customer id, labels or a grouping key " +
-  "such as document_type in its metadata.";`;
+const NO_UNIT = "LangWatch does not know who your customers are yet. Send a customer id " +
+  "with each request and this shows who uses your agent most.";`;
 
 /** A pass rate and whether it fell: enough judged on both sides, 2 points down, beyond chance. */
 const PASS_RATES = `const MIN_JUDGED = 30;
@@ -58,9 +59,11 @@ function worse(before, after) {
 
 /** Figure tiles: a label, the number, one line of context, red when it calls for action. */
 const FIGURES = `const TONES = { act: C.red, watch: C.orange, good: C.green };
-function Figure({ label, value, sub, tone }) {
+// subject, when set, makes the tile a button that asks Langy about it.
+function Figure({ label, value, sub, tone, subject }) {
   return (
-    <div style={{ minWidth: 0, borderRadius: 6, background: C.muted, padding: "6px 8px" }}>
+    <div {...(subject ? askable(subject) : {})} style={{ minWidth: 0, borderRadius: 6,
+      background: C.muted, padding: "6px 8px", ...(subject ? askCursor() : {}) }}>
       <div style={{ fontSize: 10, color: C.faint }}>{label}</div>
       <div style={{ fontSize: 15, fontWeight: 600, color: TONES[tone] || C.text,
         overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{value}</div>
@@ -92,7 +95,7 @@ const CHART = 6;
 
 const ATT_SHARE_CODE = widgetCode({
   summary: "Conversations per customer (or other grouping key) and each one's share of all.",
-  subtitle: "Who uses your agent most in this period",
+  subtitle: "Share of all conversations in this period, by customer.",
   source: "requests",
   parts: [NUMBERS, UNITS],
   components: `const SHARE_GRID = { display: "grid", gridTemplateColumns: "9rem 1fr 4rem 3.5rem", gap: 8,
@@ -108,7 +111,8 @@ function ShareRows({ rows, total, unit }) {
         <span style={{ textAlign: "right" }}>Share</span>
       </div>
       {rows.map((row) => (
-        <div key={row.label} style={{ ...SHARE_GRID, fontSize: 12 }}>
+        <div key={row.label} {...askable({ kind: "customer", label: row.label, value: row.key })}
+          style={{ ...SHARE_GRID, fontSize: 12, ...askCursor() }}>
           <span style={{ fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis",
             whiteSpace: "nowrap" }}>{row.label}</span>
           <span style={{ height: 6, borderRadius: 3, background: C.muted }}>
@@ -133,6 +137,7 @@ function ShareRows({ rows, total, unit }) {
   const more = num(totals.data[0]?.units) - Math.min(units.data.length, 6);
   const rows = units.data.slice(0, 6).map((row) => ({
     label: unitName(row.unit, key),
+    key: row.unit,
     value: num(row.conversations),
   }));
   return (
@@ -150,8 +155,8 @@ function ShareRows({ rows, total, unit }) {
 const ATT_TABLE_CODE = widgetCode({
   summary: "Per customer: conversations, judged pass rate against the period before, AI cost.",
   subtitle:
-    "One row per customer or group; a red earlier pass rate fell beyond chance. A pass rate " +
-    "needs 30 judged answers, else it reads as a dash",
+    "How your agent does for each customer in this period: red marks a drop too big to be " +
+    "chance, and a dash means fewer than 30 checked answers.",
   source: "requests",
   parts: [NUMBERS, TABLE, UNITS, PASS_RATES],
   queries: ["units", "passRates"],
@@ -173,7 +178,7 @@ const ATT_TABLE_CODE = widgetCode({
   const columns = [
     { header: cap(unit.one), cell: (row) => <b>{unitName(row.unit, key)}</b> },
     { header: cap(unit.things), align: "right", cell: (row) => count(num(row.conversations)) },
-    { header: "Pass rate", align: "right", cell: (row) => shown(sides(row).now) },
+    { header: "Checks passed", align: "right", cell: (row) => shown(sides(row).now) },
     {
       header: "Before",
       align: "right",
@@ -186,26 +191,31 @@ const ATT_TABLE_CODE = widgetCode({
     { header: "AI cost", align: "right", cell: (row) => usd(num(row.cost)) },
     { header: "Per " + unit.things.slice(0, -1), align: "right", cell: perConversation },
   ];
+  const ask = (row) => ({ kind: "customer", label: unitName(row.unit, key), value: row.unit });
+  signalProblem(units.data.some((row) => worse(sides(row).before, sides(row).now)));
   return (
     <Panel>
-      <Table columns={columns} rows={units.data} rowPadding={3} />
+      <Table columns={columns} rows={units.data} rowPadding={3} ask={ask} />
     </Panel>
   );`,
 });
 
 const ATT_CHANGE_CODE = widgetCode({
   summary: "Each customer's judged pass rate on the newest prompt version against the one before.",
-  subtitle: "Roll back or patch the ones the last change broke",
+  subtitle:
+    "Checks passed per customer, before and after your last prompt change. Roll back or fix the " +
+    "ones that got worse.",
   source: "evaluations",
   parts: [NUMBERS, DATES, UNITS, PASS_RATES],
-  components: `function ChangeRow({ label, before, after, fell, low }) {
+  components: `function ChangeRow({ label, unit, before, after, fell, low }) {
   const at = (value) => ((value - low) / (1 - low)) * 100 + "%";
   const dot = (value, size, colour) => ({ position: "absolute", top: "50%", left: at(value),
     width: size, height: size, borderRadius: size, background: colour,
     transform: "translate(-50%, -50%)" });
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 10rem) 1fr 7rem", gap: 12,
-      alignItems: "center", fontSize: 12, padding: "3px 0" }}>
+    <div {...askable({ kind: "customer", label, value: unit })} style={{ display: "grid",
+      gridTemplateColumns: "minmax(0, 10rem) 1fr 7rem", gap: 12, alignItems: "center",
+      fontSize: 12, padding: "3px 0", ...askCursor() }}>
       <span style={{ fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis",
         whiteSpace: "nowrap" }}>{label}</span>
       <span style={{ position: "relative", height: 12 }}>
@@ -216,15 +226,17 @@ const ATT_CHANGE_CODE = widgetCode({
       </span>
       <span style={{ textAlign: "right", whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums",
         color: fell ? C.red : C.subtle, fontWeight: fell ? 600 : 400 }}>
-        {pct(before, 0)} to {pct(after, 0)}
+        {pct(before, 0)} to {pct(after, 0)} checks passed
       </span>
     </div>
   );
 }`,
-  queries: ["change", "units"],
+  queries: ["change", "units", "versions"],
   body: `  const last = change.data[0];
+  const names = new Map(versions.data.map((row) => [row.id, row.name]));
+  const versionName = (version) => names.get(version) || version;
   if (!last) {
-    return <Panel><Note>No new prompt version started in this period.</Note></Panel>;
+    return <Panel><Note>No new prompt version in this period.</Note></Panel>;
   }
   if (units.data.length === 0) return <Panel><CallToAction /></Panel>;
   const key = units.data[0].unit_key;
@@ -241,6 +253,7 @@ const ATT_CHANGE_CODE = widgetCode({
     .filter(([, { before, after }]) => before.judged >= MIN_JUDGED && after.judged >= MIN_JUDGED)
     .map(([unit, { before, after }]) => ({
       label: unitName(unit, key),
+      unit,
       before: rate(before.passed, before.judged),
       after: rate(after.passed, after.judged),
       fell: worse(before, after),
@@ -250,10 +263,11 @@ const ATT_CHANGE_CODE = widgetCode({
   const low = Math.max(0, Math.min(...shown.flatMap((row) => [row.before, row.after]), 1) - 0.03);
   const day = utc(last.changed_at).toLocaleDateString("en-US", { month: "short", day: "numeric" });
   const unit = unitOf(key);
+  signalProblem(fell.length > 0);
   return (
     <Panel>
       <div style={{ display: "flex", gap: 8, alignItems: "baseline", marginBottom: 6, fontSize: 12 }}>
-        <b>{last.previous} to {last.version}, from {day}</b>
+        <b>Prompt {versionName(last.previous)} to {versionName(last.version)}, from {day}</b>
         {compared.length > 0 ? (
           <span style={{ color: fell.length > 0 ? C.red : C.subtle }}>
             {fell.length > 0
@@ -263,7 +277,7 @@ const ATT_CHANGE_CODE = widgetCode({
         ) : null}
       </div>
       {shown.length === 0 ? (
-        <Note>No {unit.one} has {MIN_JUDGED} judged answers on both versions yet.</Note>
+        <Note>Not enough checked answers yet: each {unit.one} needs {MIN_JUDGED} on both versions.</Note>
       ) : (
         shown.map((row) => <ChangeRow key={row.label} {...row} low={low} />)
       )}
@@ -274,7 +288,7 @@ const ATT_CHANGE_CODE = widgetCode({
 const COST_BY_SEGMENT_CODE = widgetCode({
   summary:
     "AI cost per customer (or other grouping key), top six, untagged traffic as its own row.",
-  subtitle: "Check the ones that cost more than they bring",
+  subtitle: "AI cost per customer in this period, highest first.",
   source: "models",
   parts: [NUMBERS, BARS, UNITS],
   queries: ["units", "totals"],
@@ -282,15 +296,16 @@ const COST_BY_SEGMENT_CODE = widgetCode({
   if (units.data.length === 0 || !total) return <Panel><CallToAction /></Panel>;
   const key = units.data[0].unit_key;
   if (!key) return <Panel><Note>{NO_UNIT}</Note></Panel>;
-  const ranked = units.data.map((row) => ({ label: unitName(row.unit, key), value: num(row.cost) }));
+  const ranked = units.data.map((row) => ({ label: unitName(row.unit, key), key: row.unit,
+    value: num(row.cost) }));
   const rest = Math.max(0, total - (add(...ranked.map((row) => row.value)) ?? 0));
   const more = num(totals.data[0]?.units) - ranked.length;
   return (
     <Panel>
-      <Bars rows={ranked} format={usd} />
+      <Bars rows={ranked} format={usd} kind="customer or team" />
       {more > 0 ? (
         <div style={{ marginTop: 6, fontSize: 10.5, color: C.faint }}>
-          and {more} more {unitOf(key).many}, {usd(rest)}
+          and {more} more, {usd(rest)}
         </div>
       ) : null}
     </Panel>
@@ -306,7 +321,9 @@ const STAGES = `const STAGES = [
 
 const VOICE_TURN_LATENCY_CODE = widgetCode({
   summary: "Slowest-5% reply time, split into speech to text, thinking and text to speech.",
-  subtitle: "Shorten the stage that grew; first half of the period against the second",
+  subtitle:
+    "How long each part of a voice reply takes at the slow end (1 in 20 took longer). Shorten " +
+    "the part that grew.",
   source: "spans",
   recharts: SERIES_CHART_IMPORTS,
   parts: [...SERIES_PARTS, STAGES],
@@ -322,19 +339,20 @@ const VOICE_TURN_LATENCY_CODE = widgetCode({
   const largest = stages.reduce((top, stage) => (stage.p95 > top.p95 ? stage : top));
   const grew = stages.reduce((top, stage) => (stage.change > top.change ? stage : top));
   const points = withBuckets(trend, STAGES.map((stage) => stage.key + "_p95")).map((row) => ({
-    x: bucketLabel(row.bucket),
+    x: bucketLabel(row.bucket), at: bucketStart(row.bucket),
     ...Object.fromEntries(STAGES.map((stage) => [stage.key, num(row[stage.key + "_p95"])])),
   }));
+  signalProblem(grew.change > 0.15);
   return (
     <Panel>
       <Figures columns={3}>
-        <Figure label="Reply time, slowest 5%" value={ms(reply)}
+        <Figure label="Slow replies take" value={ms(reply)}
           sub={"over " + count(num(totals.replies)) + " replies"} />
-        <Figure label="Largest stage" value={largest.label + " " + ms(largest.p95)}
+        <Figure label={"Biggest part: " + largest.label} value={ms(largest.p95)}
           sub={known(ratio(largest.p95, reply))
             ? pct(ratio(largest.p95, reply), 0) + " of the reply time"
             : undefined} />
-        <Figure label="Grew most, second half" value={grew.label + " " + signed(grew.change)}
+        <Figure label="Grew most lately" value={grew.label + " " + signed(grew.change)}
           tone={grew.change > 0.15 ? "act" : undefined} />
       </Figures>
       <SeriesChart points={points} format={ms} series={STAGES} />
@@ -344,12 +362,12 @@ const VOICE_TURN_LATENCY_CODE = widgetCode({
 
 const VOICE_CALL_HEALTH_CODE = widgetCode({
   summary: "Per 1,000 calls: calls whose last turn ended on an error, and calls that repeated.",
-  subtitle: "Open the calls behind a rise",
+  subtitle:
+    "Calls that ended on an error, and calls where your agent said the same sentence twice.",
   source: "spans",
   recharts: SERIES_CHART_IMPORTS,
   parts: SERIES_PARTS,
-  components: `const REPEAT_CHECK = "${sql.REPEAT_CHECK}";
-const perK = (part, whole) => (known(ratio(part, whole)) ? ratio(part, whole) * 1000 : null);
+  components: `const perK = (part, whole) => (known(ratio(part, whole)) ? ratio(part, whole) * 1000 : null);
 const perKLabel = (value) => (known(value) ? value.toFixed(1) : GAP);`,
   queries: ["trend", "summary"],
   body: `  const totals = summary.data[0] || {};
@@ -360,40 +378,51 @@ const perKLabel = (value) => (known(value) ? value.toFixed(1) : GAP);`,
   const second = perK(num(totals.dropped_second), num(totals.calls_second));
   const change = drift(first, second);
   const points = withBuckets(trend, ["dropped", "repeating", "calls"]).map((row) => ({
-    x: bucketLabel(row.bucket),
+    x: bucketLabel(row.bucket), at: bucketStart(row.bucket),
     dropped: perK(num(row.dropped), num(row.calls)),
     repeating: perK(num(row.repeating), num(row.calls)),
   }));
-  const series = [{ key: "dropped", label: "not ended", colour: C.red }];
-  if (checked) series.push({ key: "repeating", label: "repeated sentences", colour: C.orange });
+  const series = [{ key: "dropped", label: "Dropped calls", colour: C.red }];
+  if (checked) series.push({ key: "repeating", label: "Agent repeated itself", colour: C.orange });
+  const repeatsRose = checked && num(latest(points, "repeating")) >
+    num(earliest(points, "repeating")) * 1.25;
+  signalProblem(change > 0.25 || repeatsRose);
   return (
     <Panel>
       <Figures columns={3}>
-        <Figure label="Calls not ended" value={count(num(totals.dropped))}
-          sub={perKLabel(perK(num(totals.dropped), calls)) + " per 1k calls"} />
-        <Figure label="Calls with a repeated sentence"
+        <Figure label="Dropped calls" value={count(num(totals.dropped))}
+          sub={perKLabel(perK(num(totals.dropped), calls)) + " per 1,000 calls"} />
+        <Figure label="Agent repeated itself"
           value={checked ? count(num(totals.repeating)) : "-"}
           sub={checked
-            ? perKLabel(perK(num(totals.repeating), calls)) + " per 1k calls"
-            : "Add the " + REPEAT_CHECK} />
-        <Figure label="Not ended, second half" value={first > 0 ? signed(change) : "-"}
-          sub="against the first half" tone={change > 0.25 ? "act" : undefined} />
+            ? perKLabel(perK(num(totals.repeating), calls)) + " per 1,000 calls"
+            : "Not checked yet: add the repeat check"} />
+        <Figure label="Dropped calls lately" value={first > 0 ? signed(change) : "-"}
+          sub="against earlier in this period" tone={change > 0.25 ? "act" : undefined} />
       </Figures>
       <SeriesChart points={points} format={perKLabel} series={series} />
     </Panel>
   );`,
 });
 
-/** The accuracy under which a cell turns red; no stored minimum exists to read instead. */
+/** The accuracy under which a cell turns orange; no stored minimum exists to read instead. */
 const FIELD_FLOOR = 0.9;
+/** Three points under the floor, a cell turns red. */
+const FIELD_RED_FLOOR = 0.87;
+/** Fewer checks than this colour nothing: the share is too noisy to flag. */
+const FIELD_MIN_CHECKED = 30;
 
 const EXT_FIELD_ACCURACY_CODE = widgetCode({
   summary: "Share of checked documents with each field right, per document type and overall.",
-  subtitle: `Fields a check marked wrong at least once; red under ${FIELD_FLOOR * 100}%`,
+  subtitle:
+    `Share of checked documents where each field was right. Once a field has ` +
+    `${FIELD_MIN_CHECKED} checks, orange marks under ${FIELD_FLOOR * 100}% right and red under ` +
+    `${FIELD_RED_FLOOR * 100}%.`,
   source: "evaluations",
   parts: [NUMBERS, TABLE, UNITS],
   components: `const FLOOR = ${FIELD_FLOOR};
-const MIN_CHECKED = 30;
+const RED_FLOOR = ${FIELD_RED_FLOOR};
+const MIN_CHECKED = ${FIELD_MIN_CHECKED};
 const fieldName = (field) => cap(field.replace(/_/g, " ").replace(/\\b(vat|po)\\b/g, (word) =>
   word.toUpperCase()));
 function Accuracy({ wrong, checked }) {
@@ -401,7 +430,7 @@ function Accuracy({ wrong, checked }) {
   const accuracy = 1 - wrong / checked;
   let colour = C.subtle;
   if (checked < MIN_CHECKED) colour = C.faint;
-  else if (accuracy < FLOOR - 0.03) colour = C.red;
+  else if (accuracy < RED_FLOOR) colour = C.red;
   else if (accuracy < FLOOR) colour = C.orange;
   return <span style={{ color: colour, fontWeight: colour === C.red ? 600 : 400 }}>
     {pct(accuracy, 0)}
@@ -431,12 +460,21 @@ function Accuracy({ wrong, checked }) {
     .sort((a, b) => total(b[1]) - total(a[1]))
     .slice(0, 6)
     .map(([field, byUnit]) => ({ field, byUnit }));
+  const askField = (row, unit) => askable({ kind: "field", label: fieldName(row.field),
+    value: row.field, ...(unit === undefined ? {} : { series: unitName(unit, key) }) });
   const columns = [
-    { header: "Field", cell: (row) => <b>{fieldName(row.field)}</b> },
+    {
+      header: "Field",
+      cell: (row) => <b {...askField(row)} style={askCursor()}>{fieldName(row.field)}</b>,
+    },
     ...units.map((unit) => ({
       header: unitName(unit, key),
       align: "right",
-      cell: (row) => <Accuracy wrong={row.byUnit.get(unit) || 0} checked={checkedIn.get(unit) || 0} />,
+      cell: (row) => (
+        <span {...askField(row, unit)} style={askCursor()}>
+          <Accuracy wrong={row.byUnit.get(unit) || 0} checked={checkedIn.get(unit) || 0} />
+        </span>
+      ),
     })),
     {
       header: "All",
@@ -444,6 +482,9 @@ function Accuracy({ wrong, checked }) {
       cell: (row) => <Accuracy wrong={total(row.byUnit)} checked={allChecked} />,
     },
   ];
+  const under = (wrongCount, checked) => checked >= MIN_CHECKED && 1 - wrongCount / checked < FLOOR;
+  signalProblem(fields.some((row) => under(total(row.byUnit), allChecked) ||
+    units.some((unit) => under(row.byUnit.get(unit) || 0, checkedIn.get(unit) || 0))));
   return (
     <Panel>
       <Table columns={columns} rows={fields} rowPadding={3} />
@@ -453,7 +494,9 @@ function Accuracy({ wrong, checked }) {
 
 const EXT_HUMAN_REVIEW_CODE = widgetCode({
   summary: "Share of documents sent to a person per bucket, and the document type sent most.",
-  subtitle: "Lower it by fixing the type that fails the field check",
+  subtitle:
+    "Share of documents your agent hands to a person, so you can fix the document type sent most " +
+    "often.",
   source: "requests",
   recharts: SERIES_CHART_IMPORTS,
   parts: [...SERIES_PARTS, UNITS],
@@ -464,7 +507,10 @@ const EXT_HUMAN_REVIEW_CODE = widgetCode({
   if (!documents) {
     return (
       <Panel>
-        <Note>No trace in this period reports sent_to_review or an outcome in its metadata.</Note>
+        <Note>
+          Your app does not say yet which documents go to a person. Add it to each document's
+          request and this fills in.
+        </Note>
       </Panel>
     );
   }
@@ -473,14 +519,16 @@ const EXT_HUMAN_REVIEW_CODE = widgetCode({
   const top = byUnit.data[0];
   const unit = top ? unitOf(top.unit_key) : unitOf("");
   const points = withBuckets(trend, ["sent", "documents"]).map((row) => ({
-    x: bucketLabel(row.bucket),
+    x: bucketLabel(row.bucket), at: bucketStart(row.bucket),
     share: ratio(row.sent, row.documents),
   }));
+  const secondShare = ratio(sent - num(totals.sent_first), documents - num(totals.documents_first));
+  signalProblem(known(firstShare) && known(secondShare) && secondShare > firstShare);
   return (
     <Panel>
       <Figures columns={3}>
-        <Figure label="Sent to review" value={pct(sent / documents, 1)}
-          sub={"was " + pct(firstShare, 1) + " in the first half"} />
+        <Figure label="Sent to a person" value={pct(sent / documents, 1)}
+          sub={pct(firstShare, 1) + " earlier in this period"} />
         <Figure label={cap(unit.one) + " sent most"}
           value={top && num(top.sent) > 0 ? unitName(top.unit, top.unit_key) : "None"}
           sub={top && num(top.documents) > 0
@@ -489,20 +537,21 @@ const EXT_HUMAN_REVIEW_CODE = widgetCode({
           sub={"of " + count(documents) + " documents"} />
       </Figures>
       <SeriesChart points={points} format={(value) => pct(value, 0)} domain={[0, "auto"]}
-        series={[{ key: "share", label: "sent to review", colour: C.teal }]} />
+        series={[{ key: "share", label: "Sent to a person", colour: C.teal }]} />
     </Panel>
   );`,
 });
 
 const GEN_DROPOFF_CODE = widgetCode({
   summary: "Outputs generated, used and accepted as is; the biggest drop is the step to fix.",
-  subtitle: "Outputs whose use your app reported in output_action",
+  subtitle: "Where people stop using what your agent wrote, step by step.",
   source: "requests",
   parts: [NUMBERS, HEADLINE],
   components: `function Step({ label, value, of, drop }) {
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "8rem 1fr 4rem", gap: 8,
-      alignItems: "center", fontSize: 12 }}>
+    <div {...askable({ kind: "step", label })} style={{ display: "grid",
+      gridTemplateColumns: "8rem 1fr 4rem", gap: 8, alignItems: "center", fontSize: 12,
+      ...askCursor() }}>
       <span style={{ fontWeight: 500 }}>{label}</span>
       <span style={{ height: 14, borderRadius: 4, background: C.muted }}>
         <span style={{ display: "block", height: "100%", borderRadius: 4, background: C.teal,
@@ -524,7 +573,9 @@ const GEN_DROPOFF_CODE = widgetCode({
   if (!generated) {
     return (
       <Panel>
-        <Note>No trace in this period reports output_action in its metadata.</Note>
+        <Note>
+          Your app does not say yet what people did with each output. Add it and this fills in.
+        </Note>
       </Panel>
     );
   }
@@ -534,12 +585,15 @@ const GEN_DROPOFF_CODE = widgetCode({
     { label: "Accepted as is", value: num(totals.accepted) },
   ].map((step, index, all) => ({
     ...step,
+    from: index === 0 ? undefined : all[index - 1].label,
     drop: index === 0 ? undefined : 1 - step.value / Math.max(1, all[index - 1].value),
   }));
   const worst = steps.slice(1).reduce((top, step) => (step.drop > top.drop ? step : top));
   return (
     <Panel>
-      <Headline value={pct(worst.drop, 0)} label={"biggest drop, at " + worst.label.toLowerCase()} />
+      <Headline value={pct(worst.drop, 0)}
+        label={'of "' + worst.from.toLowerCase() + '" outputs are lost at "' +
+          worst.label.toLowerCase() + '"'} />
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
         {steps.map((step) => <Step key={step.label} {...step} of={generated} />)}
       </div>
@@ -550,8 +604,7 @@ const GEN_DROPOFF_CODE = widgetCode({
 const SO_VERDICT_CODE = widgetCode({
   summary: "Guardrail coverage, risky answers flagged but not blocked, and the review backlog.",
   subtitle:
-    "Sign off only when every figure is clear: a red figure blocks the release. This period " +
-    "against the one before",
+    "Clear to sign off when no figure is red, comparing this period with the previous period.",
   source: "evaluations",
   parts: [NUMBERS, FIGURES],
   queries: ["guardrails", "traffic", "backlog"],
@@ -567,24 +620,26 @@ const SO_VERDICT_CODE = widgetCode({
   const zone = (act, watch) => (act ? "act" : watch ? "watch" : undefined);
   const figures = [
     {
-      label: "Checked by guardrails",
+      label: "Lowest safety-check coverage",
       value: pct(lowest, 0),
-      sub: weakest.control + " checks the fewest of " + count(traces) + " traces",
+      sub: weakest.control + " checked the fewest requests",
       tone: traces >= 30 ? zone(lowest < 0.9, lowest < 0.99) : undefined,
+      subject: { kind: "control", label: weakest.control },
     },
     {
-      label: "Risky answers that got through",
+      label: "Risky answers users saw",
       value: count(flagged),
-      sub: "flagged, not blocked; " + count(flaggedBefore) + " the period before",
+      sub: "flagged but not blocked; " + count(flaggedBefore) + " in the previous period",
       tone: zone(flagged > flaggedBefore * 2 + 3, flagged > flaggedBefore * 1.25 + 1),
     },
     {
-      label: "Waiting for review",
+      label: "Waiting for a person",
       value: count(pending),
-      sub: count(pendingBefore) + " at the start of the period",
+      sub: count(pendingBefore) + " at the start of this period",
       tone: zone(pending > pendingBefore * 1.5 + 20, pending > pendingBefore * 1.1 + 5),
     },
   ];
+  signalProblem(figures.some((figure) => figure.tone === "act"));
   return (
     <Panel>
       <Figures columns={3}>
@@ -599,7 +654,9 @@ const POLICY_FLOOR = 0.9;
 
 const SO_RUBRIC_CODE = widgetCode({
   summary: "Pass rate per judge with its 95% margin, against a 90% minimum, lowest first.",
-  subtitle: `Hold the release on any check whose margin sits under ${POLICY_FLOOR * 100}%`,
+  subtitle:
+    `A check is clear at ${POLICY_FLOOR * 100}% or more passed, even at the low end of what the ` +
+    "sample allows. Hold the release on any check below that.",
   source: "evaluations",
   parts: [NUMBERS],
   components: `const FLOOR = ${POLICY_FLOOR};
@@ -619,15 +676,16 @@ function Criterion({ name, passed, judged }) {
   let colour = C.green;
   if (judged < MIN_JUDGED) colour = C.faint;
   else if (high < FLOOR) colour = C.red;
-  else if (share < FLOOR) colour = C.orange;
+  else if (low < FLOOR) colour = C.orange;
   return (
-    <div title={"Likely between " + pct(low, 0) + " and " + pct(high, 0) + ", from " +
-      count(judged) + " judged"}>
+    <div {...askable({ kind: "check", label: name || "Unnamed", value: name })}
+      style={askCursor()} title={"Passed " + pct(share, 0) + " of " + count(judged) +
+      " answers. With this many answers the true rate could be as low as " + pct(low, 0) + "."}>
       <div style={{ display: "flex", alignItems: "baseline", gap: 8, fontSize: 12 }}>
         <span style={{ flex: 1, minWidth: 0, fontWeight: 500, overflow: "hidden",
           textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{name || "Unnamed"}</span>
         <span style={{ fontSize: 10.5, color: C.faint }}>
-          {judged < MIN_JUDGED ? "only " + judged + " judged" : pct(low, 0) + " to " + pct(high, 0)}
+          {judged < MIN_JUDGED ? "only " + judged + " answers checked" : "as low as " + pct(low, 0)}
         </span>
         <b style={{ color: colour, fontVariantNumeric: "tabular-nums" }}>{pct(share, 0)}</b>
       </div>
@@ -645,6 +703,9 @@ function Criterion({ name, passed, judged }) {
 }`,
   queries: ["main"],
   body: `  if (main.data.length === 0) return <Panel><CallToAction /></Panel>;
+  const enoughJudged = (row) => num(row.judged) >= MIN_JUDGED;
+  signalProblem(main.data.some((row) => enoughJudged(row) &&
+    margin(num(row.passed), num(row.judged))[0] < FLOOR));
   return (
     <Panel>
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
@@ -659,7 +720,7 @@ function Criterion({ name, passed, judged }) {
 
 const SO_QUEUE_CODE = widgetCode({
   summary: "Annotation queue items that came in, were reviewed and wait, with the typical wait.",
-  subtitle: "Keep the pending count from growing",
+  subtitle: "Answers waiting for a person to review them, so you can keep the count from growing.",
   source: "feedback",
   recharts: SERIES_CHART_IMPORTS,
   parts: SERIES_PARTS,
@@ -674,37 +735,38 @@ const SO_QUEUE_CODE = widgetCode({
   const counts = ["came_in", "reviewed"].map((key) => ({ key, kind: "count" }));
   const points = withBuckets(flow, counts).map((row) => {
     backlog += num(row.came_in) - num(row.reviewed);
-    return { x: bucketLabel(row.bucket), pending: backlog };
+    return { x: bucketLabel(row.bucket), at: bucketStart(row.bucket), pending: backlog };
   });
   const wait = known(totals.wait_seconds) ? Math.round(num(totals.wait_seconds) / 3600) + "h" : GAP;
   let tone;
   if (grew > cameIn * 0.1) tone = "act";
   else if (grew > 0) tone = "watch";
+  signalProblem(grew > 0);
   return (
     <Panel>
       <Figures columns={4}>
         <Figure label="Came in" value={count(cameIn)} />
         <Figure label="Reviewed" value={count(num(totals.reviewed))} />
-        <Figure label="Pending now" value={count(pending)} tone={tone}
-          sub={(grew >= 0 ? "+" : "") + count(grew) + " in the period"} />
+        <Figure label="Waiting now" value={count(pending)} tone={tone}
+          sub={(grew >= 0 ? "+" : "") + count(grew) + " in this period"} />
         <Figure label="Typical wait" value={wait} />
       </Figures>
       <SeriesChart points={points} format={count}
-        series={[{ key: "pending", label: "pending", colour: C.red }]} />
+        series={[{ key: "pending", label: "Waiting", colour: C.red }]} />
     </Panel>
   );`,
 });
 
 const SO_CHANGES_CODE = widgetCode({
   summary: "Prompt versions, new evaluators and changed online evaluations, newest first.",
-  subtitle: "The audit trail for each release",
+  subtitle: "Every change to prompts and automatic checks, with who made it and when.",
   source: "evaluations",
   parts: [NUMBERS, DATES, TABLE],
   queries: ["main"],
   body: `  if (main.data.length === 0) {
     return (
       <Panel>
-        <Note>No prompt version, evaluator or online evaluation changed in this period.</Note>
+        <Note>No prompt or automatic check changed in this period.</Note>
       </Panel>
     );
   }
@@ -712,12 +774,14 @@ const SO_CHANGES_CODE = widgetCode({
     utc(value).toLocaleDateString("en-US", { month: "short", day: "numeric" });
   const columns = [
     { header: "When", cell: (row) => <span style={{ color: C.faint }}>{day(row.at)}</span> },
-    { header: "What", cell: (row) => row.kind },
+    { header: "What changed", cell: (row) => row.kind },
     { header: "Name", cell: (row) => <b>{row.name || "Unnamed"}</b> },
   ];
+  const ask = (row) => ({ kind: "change",
+    label: row.kind + " " + (row.name || "Unnamed") + " on " + day(row.at), value: row.name });
   return (
     <Panel>
-      <Table columns={columns} rows={main.data} rowPadding={3} />
+      <Table columns={columns} rows={main.data} rowPadding={3} ask={ask} />
     </Panel>
   );`,
 });
@@ -738,7 +802,11 @@ export const AGENT_KIND_WIDGET_BUILDS: Readonly<Record<string, CatalogueWidgetBu
   },
   "att-change": {
     code: ATT_CHANGE_CODE,
-    queries: { change: sql.LAST_CHANGE_SQL, units: sql.VERSION_PASS_RATES_SQL },
+    queries: {
+      change: sql.LAST_CHANGE_SQL,
+      units: sql.VERSION_PASS_RATES_SQL,
+      versions: PROMPT_VERSION_NAMES_SQL,
+    },
     width: "full",
     rows: 5,
   },

@@ -86,5 +86,14 @@ export const sendOrganizationMfaRequirementEmail = async ({
     organizationMfaRequirementEmailTemplate,
     props,
   );
-  await sendEmail({ mailer, content: { to: props.to, subject, html, idempotencyKey } });
+  await sendEmail({
+    mailer,
+    content: {
+      to: props.to,
+      subject,
+      html,
+      idempotencyKey,
+      template: organizationMfaRequirementEmailTemplate.id,
+    },
+  });
 };

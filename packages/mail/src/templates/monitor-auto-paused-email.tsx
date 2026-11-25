@@ -85,7 +85,7 @@ export const monitorAutoPausedEmailTemplate = defineTemplate({
 /** Rendered by the monitor module, which sends one copy to each admin. */
 export const renderMonitorAutoPausedEmail = async (
   props: MonitorAutoPausedEmailProps,
-): Promise<{ subject: string; html: string }> => {
+): Promise<{ subject: string; html: string; template: string }> => {
   const { subject, html } = await renderMailTemplate(monitorAutoPausedEmailTemplate, props);
-  return { subject, html };
+  return { subject, html, template: monitorAutoPausedEmailTemplate.id };
 };

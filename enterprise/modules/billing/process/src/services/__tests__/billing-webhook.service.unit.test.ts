@@ -27,6 +27,7 @@ const createMockHost = (): {
 } => ({
   sendSlackSubscriptionEvent: mockSendSlackSubscriptionEvent,
   sendSlackBillingThresholdFailureAlert: mockSendSlackBillingThresholdFailureAlert,
+  sendSlackAccountPaymentFailed: vi.fn().mockResolvedValue(undefined),
 });
 
 const createMockBillingSubscription = (): {
@@ -59,6 +60,7 @@ const ORGANIZATION_ROW_COMMANDS = [
   "recordPricingModelChanged",
   "recordSeatCheckoutPaid",
   "recordSeatCheckoutsAbandoned",
+  "recordOverPlanChanged",
 ] as const;
 type OrganizationRowCommand = (typeof ORGANIZATION_ROW_COMMANDS)[number];
 
@@ -82,7 +84,7 @@ function recordingAnnouncer(refuse?: OrganizationRowCommand) {
     ...unused,
   });
   const announcer = BillingLifecycleAnnouncerService.create({
-    subscriptions: { findLastNonCancelled: async () => null },
+    subscriptions: { findActive: async () => null },
     organizations: { findActiveMemberIds: async () => [] },
     resourceLimitAlerts: { notifyResourceLimitReached: async () => {} },
     planLimitAlerts: { notifyPlanLimitReached: async () => {} },
@@ -101,6 +103,7 @@ function recordingAnnouncer(refuse?: OrganizationRowCommand) {
     recordPricingModelChanged: rowSender("recordPricingModelChanged"),
     recordSeatCheckoutPaid: rowSender("recordSeatCheckoutPaid"),
     recordSeatCheckoutsAbandoned: rowSender("recordSeatCheckoutsAbandoned"),
+    recordOverPlanChanged: rowSender("recordOverPlanChanged"),
   });
   return { announcer, sent };
 }
@@ -1014,6 +1017,7 @@ describe("EEWebhookService", () => {
 
     describe("when subscription is ACTIVE", () => {
       /** @scenario "A failed invoice payment does not immediately remove the plan" */
+      /** @scenario "The day a renewal payment fails, the organization keeps its paid plan" */
       /** @scenario Payment failure on an active subscription records the failure */
       it("keeps status as ACTIVE with failed payment date", async () => {
         subRepo.findByStripeId.mockResolvedValue(
@@ -1637,7 +1641,7 @@ describe("EEWebhookService with the lifecycle announcer composed", () => {
       waitUntilReady: async () => {},
     };
     const announcer = BillingLifecycleAnnouncerService.create({
-      subscriptions: subRepo,
+      subscriptions: { findActive: async () => null },
       organizations: { findActiveMemberIds: async () => ["user-1"] },
       resourceLimitAlerts: { notifyResourceLimitReached: async () => {} },
       planLimitAlerts: { notifyPlanLimitReached: async () => {} },
@@ -1661,6 +1665,7 @@ describe("EEWebhookService with the lifecycle announcer composed", () => {
       recordPricingModelChanged: { send: async () => {}, ...unused },
       recordSeatCheckoutPaid: { send: async () => {}, ...unused },
       recordSeatCheckoutsAbandoned: { send: async () => {}, ...unused },
+      recordOverPlanChanged: { send: async () => {}, ...unused },
     });
     service = EEWebhookService.create({
       licenses,

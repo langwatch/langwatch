@@ -1,5 +1,5 @@
 import { formatCost, formatDuration } from "@langwatch/design-system/display-formatters";
-import { Box, Flex, HStack, Icon, Text } from "@langwatch/design-system/primitives";
+import { Badge, Box, Flex, HStack, Icon, Text } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import type { LangwatchSignalBucket } from "@langwatch/trace-contract";
 import { BookText, ScrollText } from "lucide-react";
@@ -41,6 +41,7 @@ export const TreeRow = memo(function TreeRow({
   rootDuration,
   isSelected,
   isPrompt,
+  isA2a = false,
   logCount,
   isCollapsed,
   hasChildren,
@@ -66,6 +67,8 @@ export const TreeRow = memo(function TreeRow({
   isSelected: boolean;
   /** Whether this span carries a managed prompt (shows a book icon). */
   isPrompt: boolean;
+  /** Whether this span is an A2A call (shows an A2A label). */
+  isA2a?: boolean;
   /**
    * Log records correlated to this span — a tool the user denied, an API
    * retry, a compaction — that never show up in the span's own input/output
@@ -273,6 +276,7 @@ export const TreeRow = memo(function TreeRow({
               </Text>
               <NameBadges
                 isPrompt={isPrompt}
+                isA2a={isA2a}
                 logCount={logCount}
                 isEdited={showsCorrectedTint}
                 isDeletedByCorrection={isDeletedByCorrection}
@@ -600,12 +604,14 @@ function CollapseChevron({
 /** What sits beside the span's name: prompt, logs, edit and delete marks, and the hidden count. */
 function NameBadges({
   isPrompt,
+  isA2a,
   logCount,
   isEdited,
   isDeletedByCorrection,
   hiddenCount,
 }: {
   isPrompt: boolean;
+  isA2a: boolean;
   logCount: number;
   isEdited: boolean;
   isDeletedByCorrection: boolean;
@@ -613,6 +619,11 @@ function NameBadges({
 }) {
   return (
     <>
+      {isA2a && (
+        <Badge size="xs" colorPalette="purple" variant="subtle" flexShrink={0}>
+          A2A
+        </Badge>
+      )}
       {/* Book icon (the Prompts nav glyph) flags spans that used a
                   managed prompt, so prompt-bearing spans are spottable in
                   the tree without opening each one. */}
