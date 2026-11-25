@@ -135,6 +135,8 @@ export function useSavedDashboards() {
     /** A held list being read again: a board just made elsewhere may not be in it yet. */
     isRefreshing: list.isFetching,
     loadError: list.error,
+    /** Asks the list again, after a read that failed. */
+    retry: () => void list.refetch(),
     isDeleting: remove.isPending,
     renameBoard,
     deleteBoard,

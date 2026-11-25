@@ -1,6 +1,6 @@
 /**
- * "Duplicate to edit" on a From LangWatch board, from its page or its sidebar row: makes the
- * member's own "<name> (copy)", opens it and drafts the template's report in Langy, unsent,
+ * "Make a copy" on a From LangWatch board's page, "Duplicate to edit" on its sidebar row: makes
+ * the member's own "<name> (copy)", opens it and drafts the template's report in Langy, unsent,
  * as adding a template does.
  */
 

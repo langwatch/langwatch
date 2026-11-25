@@ -5,7 +5,7 @@
  * @see modules/dashboard/specs/dashboards-v2.feature
  */
 
-import type { UiProcedureCall } from "@langwatch/browser/testing-transport";
+import { type UiProcedureCall, UiProcedureRefusal } from "@langwatch/browser/testing-transport";
 import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -56,6 +56,7 @@ function curatedServer({
   storedNames = [],
   boardsGate,
   flagsGate,
+  boardsFailsOnce = false,
   createFails = false,
   pinnedTemplateId,
 }: {
@@ -65,14 +66,20 @@ function curatedServer({
   boardsGate?: Promise<void>;
   /** Holds the organization's flags until it resolves. */
   flagsGate?: Promise<void>;
+  /** The first saved-boards read is refused; later reads answer. */
+  boardsFailsOnce?: boolean;
   createFails?: boolean;
   /** A From LangWatch board the member pinned. */
   pinnedTemplateId?: string;
 } = {}) {
   const calls: UiProcedureCall[] = [];
+  let boardsReads = 0;
   const answer = (call: UiProcedureCall): Promise<unknown> => {
     calls.push(call);
     if (call.path === "boards.getAll") {
+      if (boardsFailsOnce && boardsReads++ === 0) {
+        return Promise.reject(new UiProcedureRefusal("forbidden", 403));
+      }
       return (boardsGate ?? Promise.resolve()).then(() =>
         storedNames.map((name, index) => storedBoard({ name, index })),
       );
@@ -112,6 +119,7 @@ function openCurated({
   storedNames = [],
   boardsGate,
   flagsGate,
+  boardsFailsOnce,
   createFails,
   pinnedTemplateId,
   query = {},
@@ -124,6 +132,7 @@ function openCurated({
   storedNames?: readonly string[];
   boardsGate?: Promise<void>;
   flagsGate?: Promise<void>;
+  boardsFailsOnce?: boolean;
   createFails?: boolean;
   pinnedTemplateId?: string;
   /** The address's query, as when "Add a widget" is already open. */
@@ -134,6 +143,7 @@ function openCurated({
     storedNames,
     boardsGate,
     flagsGate,
+    boardsFailsOnce,
     createFails,
     pinnedTemplateId,
   });
@@ -212,9 +222,14 @@ describe("given a member opens a From LangWatch board", () => {
     await screen.findByRole("heading", { name: "Ready to ship?" });
     expect(screen.queryByRole("button", { name: "Make a copy" })).toBeNull();
     expect(screen.queryByText(/can create and edit dashboards can make/)).toBeNull();
+    // Past a later tick, so an early copy or hint would have shown by now.
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(screen.queryByRole("button", { name: "Make a copy" })).toBeNull();
+    expect(screen.queryByText(/can create and edit dashboards can make/)).toBeNull();
     answer();
     await screen.findByRole("button", { name: "Add a widget" });
     expect(screen.queryByRole("button", { name: "Make a copy" })).toBeNull();
+    expect(screen.queryByText(/can create and edit dashboards can make/)).toBeNull();
   });
 
   describe("when the member may not create dashboards", () => {
@@ -243,7 +258,7 @@ describe("given a member opens a From LangWatch board", () => {
   });
 
   describe("when the organization's Dashboards area is off", () => {
-    /** @scenario "With the flag off, a From LangWatch board is read-only, as on main" */
+    /** @scenario "With the flag off, a From LangWatch board is read-only until Make a copy" */
     it("offers no edit control, though the member may create dashboards", async () => {
       const { server } = openCurated({ templateId: "release", organizationArea: false });
 
@@ -269,6 +284,20 @@ describe("given a member opens a From LangWatch board", () => {
       ]);
       expect(inputsTo(server, "dashboardWidgets.create")).toHaveLength(RELEASE.widgets.length);
       expect(screen.queryByRole("dialog")).toBeNull();
+    });
+
+    it("shows why Make a copy is off when the boards fail, and Retry", async () => {
+      const user = userEvent.setup({ pointerEventsCheck: 0 });
+      openCurated({ templateId: "release", organizationArea: false, boardsFailsOnce: true });
+
+      await screen.findByText("Couldn't load your dashboards, so a copy can't be named yet.");
+      expect(screen.getByRole("button", { name: "Make a copy" })).toBeDisabled();
+      await user.click(screen.getByRole("button", { name: "Retry" }));
+
+      await waitFor(() =>
+        expect(screen.getByRole("button", { name: "Make a copy" })).toBeEnabled(),
+      );
+      expect(screen.queryByText(/Couldn't load your dashboards/)).toBeNull();
     });
 
     it("offers no Make a copy to a member who may create but not update, and says so", async () => {

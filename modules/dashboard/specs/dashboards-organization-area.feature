@@ -72,13 +72,14 @@ Feature: Organization-wide Dashboards area
     # Evidence: the label's aria-label in the rendered header
 
   @integration
-  Scenario: With the flag off, a From LangWatch board is read-only, as on main
+  Scenario: With the flag off, a From LangWatch board is read-only until Make a copy
     Given "the organization's Dashboards area" is off for "Acme"
-    And I may create dashboards in "Shop"
+    And I may create and update dashboards in "Shop"
     When I open "/shop/dashboards/curated/<id>"
     Then the board shows its widgets with no "Add a widget", no "Use this template", no title or description edit, and no widget edit, drag or delete
     And it offers "Make a copy" (dashboards-v2.feature), and no copy-on-change dialog can open
-    # Evidence: the quoted tRPC calls, with no dashboards or dashboardWidgets write
+    # Evidence: the quoted tRPC calls, with no dashboards or dashboardWidgets write unless
+    # the member presses Make a copy
 
   # ---- The Coding agents rename: page titles (draft AC4; S0) ----
   @integration @unimplemented

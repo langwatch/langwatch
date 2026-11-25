@@ -5,7 +5,7 @@
  */
 
 import { UiPageNotFound } from "@langwatch/browser/page-fallbacks";
-import { Button, Text, VStack } from "@langwatch/design-system/primitives";
+import { Button, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import { Copy, LayoutTemplate } from "lucide-react";
 import type { ReactNode } from "react";
 
@@ -171,11 +171,23 @@ function OpenCuratedBoard({
     );
   } else if (mayCopy) {
     headerAction = (
-      <MakeCopyButton
-        isCopying={copy.creatingId === board.templateId}
-        disabled={saved.isLoading || !!saved.loadError}
-        onClick={() => void copy.duplicate(board)}
-      />
+      <HStack gap={2}>
+        {saved.loadError && (
+          <>
+            <Text textStyle="bodySm" color="fg.muted">
+              Couldn't load your dashboards, so a copy can't be named yet.
+            </Text>
+            <Button size="xs" variant="outline" onClick={saved.retry}>
+              Retry
+            </Button>
+          </>
+        )}
+        <MakeCopyButton
+          isCopying={copy.creatingId === board.templateId}
+          disabled={saved.isLoading || !!saved.loadError}
+          onClick={() => void copy.duplicate(board)}
+        />
+      </HStack>
     );
   }
 
