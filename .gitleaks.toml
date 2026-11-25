@@ -176,31 +176,21 @@ paths = [
   '''docs/llms-full\.txt''',
 ]
 
-# Every curl example across the docs authenticates with a visible placeholder:
-# `Bearer sk-lw-...`, `Bearer vk-lw-<ULID>`, `Bearer $LANGWATCH_API_KEY`,
-# `X-Auth-Token: your_api_key`, `Bearer sk-your-litellm-key`. None
-# names a real credential. `llms-full.txt` is the generated concatenation of
-# those same pages, so a regeneration re-adds every example line at once and
-# the range-scoped scan sees all of them as new.
+# Placeholder bearer values in the docs' curl examples, as regenerated into
+# `llms-full.txt`: truncated keys (`vk-lw-01JXXX...`), `your_api_key` and
+# `sk-your-litellm-key`. None names a real credential.
 #
-# Scoped by VALUE as well as path, matched with AND, and matched against the
-# secret itself rather than the source line: this rule can match across several
-# physical lines of one example block, so a line-scoped pattern would let a
-# neighbouring placeholder line carry a real token through. Only a value that
-# is itself an environment-variable reference, holds an angle-bracket
-# placeholder or is visibly truncated is allowed; any other bearer value this
-# rule finds here is still reported, as every provider-specific rule is.
+# `condition = "AND"` because the default is OR, and under OR the path alone
+# would allowlist every curl-auth-header finding in this file. No
+# `regexTarget = "line"`: this rule can match across several lines of one
+# example, so a placeholder on a neighbouring line could carry a real token
+# through. The patterns apply to the matched secret itself.
 [[allowlists]]
 description = "Placeholder bearer keys in the docs' curl examples, not credentials"
 targetRules = ["curl-auth-header"]
-# `condition` has to say AND: the default is OR, and under OR the path alone
-# would allowlist every curl-auth-header finding in this file, placeholder
-# or not.
 condition = "AND"
 paths = ['''docs/llms-full\.txt''']
 regexes = [
-  '''^\$[A-Za-z][A-Za-z0-9_]*$''',
-  '''^.*<[^<>]*>.*$''',
   '''^(?:.*\.\.\.|.*…)$''',
   '''^your[-_]api[-_]key$''',
   '''^sk-your-litellm-key$''',
