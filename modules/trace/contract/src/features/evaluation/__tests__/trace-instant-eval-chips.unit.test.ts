@@ -5,9 +5,12 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  hasInstantEvalChipUnderOr,
+  isInstantEvalChipNegated,
   instantEvalChipsOf,
   instantEvalChipText,
   instantEvalRunKey,
+  queryWithInstantEvalChipRetargeted,
   queryWithoutInstantEvalChip,
   queryWithoutInstantEvalChips,
   resolveInstantEvalChips,
@@ -87,8 +90,8 @@ describe("instantEvalChipsOf", () => {
     });
 
     expect(chips).toEqual([
-      { question: "is it rude", field: "eval", target: "threads" },
-      { question: "is it wrong", field: "eval.llm", target: "llm_spans" },
+      { question: "is it rude", field: "eval", target: "threads", isUnjudgeable: false },
+      { question: "is it wrong", field: "eval.llm", target: "llm_spans", isUnjudgeable: false },
     ]);
   });
 
@@ -138,6 +141,100 @@ describe("queryWithoutInstantEvalChip", () => {
   });
 });
 
+describe("queryWithInstantEvalChipRetargeted", () => {
+  /** @scenario "A chip typed by hand starts its run on Enter" */
+  it("re-spells a bare chip for its target in place, NOT and other terms kept", () => {
+    expect(
+      queryWithInstantEvalChipRetargeted({
+        queryText: 'status:error AND NOT eval:"annoyed" AND eval:"other"',
+        question: "annoyed",
+        target: "traces",
+        lensId: "conversations",
+      }),
+    ).toBe('status:error AND NOT eval.trace:"annoyed" AND eval:"other"');
+  });
+
+  /** @scenario "A chip typed by hand starts its run on Enter" */
+  it("leaves a chip the lens already reads as its target as typed", () => {
+    const queryText = 'NOT eval:"annoyed"';
+    expect(
+      queryWithInstantEvalChipRetargeted({
+        queryText,
+        question: "annoyed",
+        target: "threads",
+        lensId: "conversations",
+      }),
+    ).toBe(queryText);
+  });
+});
+
+describe("hasInstantEvalChipUnderOr", () => {
+  /** @scenario "A chip typed by hand starts its run on Enter" */
+  it("finds the named chip below an OR, at any depth, and only there", () => {
+    const under = (queryText: string, field = "eval", question = "annoyed") =>
+      hasInstantEvalChipUnderOr({ queryText, field, question });
+    expect(under('status:error OR eval:"annoyed"')).toBe(true);
+    expect(under('a:1 OR (b:2 AND NOT eval.llm:"annoyed")', "eval.llm")).toBe(true);
+    expect(under('status:error AND NOT eval:"annoyed"')).toBe(false);
+    expect(under("status:error OR model:x")).toBe(false);
+  });
+
+  /** @scenario "A chip typed by hand starts its run on Enter" */
+  it("ignores another eval chip under an OR", () => {
+    const queryText = 'NOT eval:"b" AND (status:error OR eval:"a")';
+    expect(hasInstantEvalChipUnderOr({ queryText, field: "eval", question: "b" })).toBe(false);
+    expect(hasInstantEvalChipUnderOr({ queryText, field: "eval", question: "a" })).toBe(true);
+  });
+
+  /** @scenario "A chip typed by hand starts its run on Enter" */
+  it("counts a NOT over a group with other terms as an OR, but not a NOT on the chip alone", () => {
+    const under = (queryText: string) =>
+      hasInstantEvalChipUnderOr({ queryText, field: "eval", question: "the user" });
+    expect(under('NOT (eval:"the user" AND status:error)')).toBe(true);
+    expect(under('NOT (status:error AND (eval:"the  user"))')).toBe(true);
+    expect(under('status:error AND NOT (eval:"the user")')).toBe(false);
+  });
+});
+
+describe("instantEvalChipsOf isUnjudgeable", () => {
+  // Throws on a question the query lacks, so a `false` is never vacuous.
+  const refused = (queryText: string, question = "q") => {
+    const chips = instantEvalChipsOf({ queryText, lensId: undefined }).filter(
+      (chip) => chip.question === question,
+    );
+    if (chips.length === 0) throw new Error(`no chip "${question}" in ${queryText}`);
+    return chips.some((chip) => chip.isUnjudgeable);
+  };
+
+  /** @scenario "A NOT the run of a typed chip cannot answer is refused" */
+  it("refuses a NOT on the chip under an OR, and a NOT over a group holding it", () => {
+    expect(refused('NOT eval:"q" OR status:error')).toBe(true);
+    expect(refused('NOT (eval:"q" AND status:error)')).toBe(true);
+    expect(refused('NOT (eval:"q" OR status:error)')).toBe(true);
+  });
+
+  /** @scenario "A NOT the run of a typed chip cannot answer is refused" */
+  it("leaves a NOT on the chip beside AND, an OR without NOT, and another chip alone", () => {
+    expect(refused('status:error AND NOT eval:"q"')).toBe(false);
+    expect(refused('status:error OR eval:"q"')).toBe(false);
+    expect(refused('NOT eval:"b" AND (status:error OR eval:"q")')).toBe(false);
+    expect(refused('(NOT eval:"b" OR status:error) AND eval:"q"')).toBe(false);
+    expect(refused('(NOT eval:"b" OR status:error) AND eval:"q"', "b")).toBe(true);
+  });
+});
+
+describe("isInstantEvalChipNegated", () => {
+  /** @scenario "A pending chip under NOT is not judged yet" */
+  it("finds a NOT above the named chip at any depth, and only that chip", () => {
+    const negated = (queryText: string, question = "q") =>
+      isInstantEvalChipNegated({ queryText, field: "eval", question });
+    expect(negated('NOT eval:"q"')).toBe(true);
+    expect(negated('status:error AND NOT (eval:"q")')).toBe(true);
+    expect(negated('eval:"q" AND NOT status:error')).toBe(false);
+    expect(negated('NOT eval:"b" AND eval:"q"')).toBe(false);
+  });
+});
+
 describe("resolveInstantEvalChips", () => {
   it("sends only the chips a run is registered for, and none at all when there are none", () => {
     const queryText = 'status:error AND eval:"is it rude"';
@@ -152,7 +249,14 @@ describe("resolveInstantEvalChips", () => {
     });
     expect(pending.evalRuns).toBeUndefined();
     expect(pending.chips).toEqual([
-      { question: "is it rude", field: "eval", target: "traces", key, runId: null },
+      {
+        question: "is it rude",
+        field: "eval",
+        target: "traces",
+        isUnjudgeable: false,
+        key,
+        runId: null,
+      },
     ]);
 
     const registered = resolveInstantEvalChips({
@@ -162,6 +266,54 @@ describe("resolveInstantEvalChips", () => {
       runsByKey: { [key]: "run-1" },
     });
     expect(registered.evalRuns).toEqual({
+      [key]: { question: "is it rude", target: "traces", runId: "run-1" },
+    });
+  });
+
+  /** @scenario "A NOT the run of a typed chip cannot answer is refused" */
+  it("sends no run for a chip a NOT reaches across an OR, even when one is registered", () => {
+    const queryText = 'NOT eval:"is it rude" OR status:error';
+    const otherQuery = queryWithoutInstantEvalChips(queryText);
+    const key = instantEvalRunKey({ question: "is it rude", target: "traces", otherQuery, window });
+
+    const resolved = resolveInstantEvalChips({
+      queryText,
+      lensId: undefined,
+      window,
+      runsByKey: { [key]: "run-1" },
+    });
+
+    expect(resolved.evalRuns).toBeUndefined();
+    expect(resolved.chips).toEqual([
+      {
+        question: "is it rude",
+        field: "eval",
+        target: "traces",
+        isUnjudgeable: true,
+        key,
+        runId: null,
+      },
+    ]);
+  });
+
+  /** @scenario "A NOT the run of a typed chip cannot answer is refused" */
+  it("keeps the run for a sibling with the same question that no NOT reaches", () => {
+    const queryText = '(NOT eval:"is it rude" OR status:error) AND eval:"is it rude"';
+    const otherQuery = queryWithoutInstantEvalChips(queryText);
+    const key = instantEvalRunKey({ question: "is it rude", target: "traces", otherQuery, window });
+
+    const resolved = resolveInstantEvalChips({
+      queryText,
+      lensId: undefined,
+      window,
+      runsByKey: { [key]: "run-1" },
+    });
+
+    expect(resolved.chips.map((chip) => [chip.isUnjudgeable, chip.runId])).toEqual([
+      [true, null],
+      [false, "run-1"],
+    ]);
+    expect(resolved.evalRuns).toEqual({
       [key]: { question: "is it rude", target: "traces", runId: "run-1" },
     });
   });

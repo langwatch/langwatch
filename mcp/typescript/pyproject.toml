@@ -29,7 +29,8 @@ exclude-newer-package = { certifi = "2026-10-21T00:00:00Z" }
 constraint-dependencies = [
   "python-dotenv>=1.2.2", # security: python-dotenv advisory (#934)
   "python-liquid>=2.2.1", # security: python-liquid advisory (#1528)
-  "tornado>=6.5.9", # security: tornado advisories (#2159, #2173, #2233, #2665-#2667)
+  "tornado>=6.6.1", # security: tornado advisories (#2159, #2173, #2233, #2665-#2667, #3325-#3327), then the triple-slash open redirect covering <=6.6.0 (#3480)
+  "filelock>=4.2.1", # security: filelock lock-file advisories covering <=4.2.0 (#3281, #3282)
   "anyio>=4.14.2", # security: anyio advisories (#2430, #2431)
   "httpx2>=2.12.0", # security: httpx2 advisories (#2312, #2313, #2329)
   "pyjwt>=2.15.0", # security: PyJWT advisories covering <=2.14.0 (#2479, #2615)
@@ -37,6 +38,7 @@ constraint-dependencies = [
   "fsspec>=2026.6.0", # security: fsspec advisory covering <2026.6.0 (#2731)
   "aiohttp>=3.14.4", # security: aiohttp advisories covering <=3.14.3, two HIGH (#2842-#2844)
   "certifi>=2026.10.19", # security: certifi advisory covering <2026.10.19 (#2897)
+  "opentelemetry-api>=1.45.2", # security: quadratic-time traceparent parsing covering <=1.45.1 (#3460)
 ]
 
 [tool.uv.sources]

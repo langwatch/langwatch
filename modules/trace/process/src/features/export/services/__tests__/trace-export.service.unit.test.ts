@@ -139,6 +139,36 @@ describe("TraceExportService hides what the Explorer hides", () => {
   });
 });
 
+describe("TraceExportService hides what the over-plan state withholds", () => {
+  /** @scenario "A trace list answers only the count of traces recorded after the cutoff" */
+  it("ends the count and every batch just before the cutoff", async () => {
+    const inputs: { endDate?: number }[] = [];
+    const traceService = legacyReadAnswering(async (input: unknown) => {
+      inputs.push(input as { endDate?: number });
+      return { groups: [], totalHits: 1, traceChecks: {}, scrollId: undefined } as never;
+    });
+    const service = TraceExportService.create({
+      authorizeOwnRead: async () => authorization,
+      traceService,
+      compileFilter: hiddenOriginsOnly,
+    });
+    const cutoff = 1_700_000_050_000;
+    const withheld = { ...protections, withheldFromMs: cutoff } as Protections;
+    const request = buildExportRequest();
+
+    await service.getTotalCount({ request, protections: withheld, authorization });
+    for await (const _chunk of service.exportTraces({
+      request,
+      protections: withheld,
+      authorization,
+    })) {
+      // consume the generator
+    }
+
+    expect(inputs.map((input) => input.endDate)).toEqual([cutoff - 1, cutoff - 1]);
+  });
+});
+
 describe("TraceExportService — #4991 AC1 full export resolution", () => {
   describe("when TraceExportService.create() receives the process-owned reader", () => {
     it("wraps that reader without constructing another service", async () => {

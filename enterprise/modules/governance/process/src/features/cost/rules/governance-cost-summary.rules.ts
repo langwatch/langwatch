@@ -14,8 +14,8 @@ import {
 } from "@langwatch/gateway-contract";
 import type { Instant } from "@langwatch/time";
 
-import type { GovernanceSeatReportRow } from "../../../repositories/clickhouse/clickhouse.ocsf-events.repository.ts";
 import type { GovernanceCostDayLaneGroup } from "../../../repositories/governance-cost-rollup.repository.ts";
+import type { GovernanceSeatReportRow } from "../../../rules/ocsf-seat-report.rules.ts";
 import {
   GOVERNANCE_COST_CURRENCY_USD,
   GOVERNANCE_COST_SOURCE,

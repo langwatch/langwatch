@@ -24,7 +24,7 @@ Feature: AI Gateway Governance — CLI ↔ Dashboard deep-links
   # ---------------------------------------------------------------------------
 
   @bdd @cli @dashboard
-  Scenario: Default dashboard opens the user's /me page
+  Scenario: Default dashboard prints the /me link that the app redirects to /coding-agents
     When jane runs "langwatch dashboard"
     Then the CLI prints "Opening http://app.langwatch.example.com/me"
     And the CLI invokes the OS default browser launcher with that URL
@@ -44,9 +44,10 @@ Feature: AI Gateway Governance — CLI ↔ Dashboard deep-links
 
   @bdd @cli @dashboard @deep-link
   Scenario: --trace deep-links to the per-trace view
-    Given a trace with id "tr_01HZK9ABCD" exists in jane's personal project
+    Given jane's personal project slug is "personal-jane"
+    And a trace with id "tr_01HZK9ABCD" exists in jane's personal project
     When she runs "langwatch dashboard --trace tr_01HZK9ABCD"
-    Then the CLI prints "Opening http://app.langwatch.example.com/me/traces/tr_01HZK9ABCD"
+    Then the CLI prints "Opening http://app.langwatch.example.com/personal-jane/traces/tr_01HZK9ABCD"
     And the CLI invokes the OS default browser launcher with that URL
 
   @bdd @cli @dashboard @deep-link @encoding
@@ -89,8 +90,9 @@ Feature: AI Gateway Governance — CLI ↔ Dashboard deep-links
   @bdd @cli @dashboard @browser
   Scenario: LANGWATCH_BROWSER=none suppresses launcher (still prints URL)
     Given env var LANGWATCH_BROWSER="none"
+    And jane's personal project slug is "personal-jane"
     When jane runs "langwatch dashboard --trace tr_x"
-    Then the CLI prints "Opening http://app.langwatch.example.com/me/traces/tr_x"
+    Then the CLI prints "Opening http://app.langwatch.example.com/personal-jane/traces/tr_x"
     And NO browser process is spawned
     And exit status is 0
     # Useful for headless CI / SSH-without-X / programmatic shell wrappers

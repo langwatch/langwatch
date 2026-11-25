@@ -6,6 +6,50 @@ import {
   VERIFIED_ATTRIBUTE_PREFIX,
 } from "@langwatch/authorization";
 import { compileBraidCondition } from "@langwatch/authz-contract/braid-condition-compiler";
+import type { Protections } from "@langwatch/trace-contract";
+
+/** The audience a project's own redaction names; under a braid it reads as the reader's. */
+export const OWN_PROJECT_AUDIENCE = "members of this project";
+
+/**
+ * An owner's protections with "this project" naming the owner, so a braided span's redaction
+ * says whose members may see it rather than seeming to mean the reader's (ADR-201 §5).
+ */
+export function ownerAudienceNamed({
+  protections,
+  ownerName,
+}: {
+  protections: Protections;
+  ownerName: string;
+}): Protections {
+  const audience = `members of ${ownerName}`;
+  const named = <T extends { visibleTo: string }>(rule: T): T =>
+    rule.visibleTo === OWN_PROJECT_AUDIENCE ? { ...rule, visibleTo: audience } : rule;
+  const categories = protections.contentCategories;
+  return {
+    ...protections,
+    ...(protections.hiddenAttributes && {
+      hiddenAttributes: protections.hiddenAttributes.map(named),
+    }),
+    ...(protections.restrictedAttributes && {
+      restrictedAttributes: protections.restrictedAttributes.map(named),
+    }),
+    ...(protections.canSeeCapturedInput !== true &&
+      !protections.capturedInputVisibleTo && { capturedInputVisibleTo: audience }),
+    ...(protections.canSeeCapturedOutput !== true &&
+      !protections.capturedOutputVisibleTo && { capturedOutputVisibleTo: audience }),
+    ...(categories && {
+      contentCategories: Object.fromEntries(
+        Object.entries(categories).map(([category, visibility]) => [
+          category,
+          visibility.canSee || visibility.restrictVisibleTo
+            ? visibility
+            : { ...visibility, restrictVisibleTo: audience },
+        ]),
+      ) as typeof categories,
+    }),
+  };
+}
 
 /** Whether a proof reads any owner's spans through a braid (ADR-201 §5). */
 export function readsBraidedSpans(authorization: Authorization): boolean {

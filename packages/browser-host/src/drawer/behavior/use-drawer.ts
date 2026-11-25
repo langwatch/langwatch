@@ -25,6 +25,7 @@ import {
 } from "../model/drawer-stack.ts";
 import { URL_QS_PARSE_OPTIONS } from "../model/qs-parse-options.ts";
 import { drawerRouterRef, readDrawerLocation, useDrawerRouter } from "./drawer-router.ts";
+import { useInPlaceDrawerOpen } from "./in-place-drawer.ts";
 
 const logger = createLogger("useDrawer");
 
@@ -504,6 +505,7 @@ export const useDrawer = () => {
   const router = useDrawerRouter();
 
   const currentDrawer = router.query["drawer.open"];
+  const inPlaceDrawerOpen = useInPlaceDrawerOpen();
   const backStack = useMemo(
     () => (currentDrawer ? readDrawerAncestors(router.state) : []),
     [currentDrawer, router.state],
@@ -653,9 +655,21 @@ export const useDrawer = () => {
       canGoBack,
       backStack,
       currentDrawer,
+      /** A drawer opened from a feature's own state (`useInPlaceDrawer`) is showing. */
+      inPlaceDrawerOpen,
       setFlowCallbacks,
       getFlowCallbacks,
     }),
-    [openDrawer, closeDrawer, drawerOpen, goBack, goBackTo, canGoBack, backStack, currentDrawer],
+    [
+      openDrawer,
+      closeDrawer,
+      drawerOpen,
+      goBack,
+      goBackTo,
+      canGoBack,
+      backStack,
+      currentDrawer,
+      inPlaceDrawerOpen,
+    ],
   );
 };

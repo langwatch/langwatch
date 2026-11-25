@@ -3,6 +3,7 @@
  * @vitest-environment jsdom
  * @see specs/scenarios/suites-page-metrics-display.feature
  * @see specs/features/suites/suite-list-view-status.feature
+ * @see modules/scenario/specs/red-team-scenario.feature
  */
 import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import { ScenarioRunStatus, Verdict, type ScenarioRunData } from "@langwatch/scenario-contract";
@@ -126,6 +127,35 @@ describe("<ScenarioTargetRow/>", () => {
       );
 
       expect(within(row.parentElement!).getByText("Failed (2/5)")).toBeInTheDocument();
+    });
+  });
+
+  describe("given a red team run that broke", () => {
+    /** @scenario "A suite run row reads Held or Broke for a red team run" */
+    it("reads Broke instead of Failed", () => {
+      const row = renderRow(
+        runOf({
+          status: ScenarioRunStatus.FAILED,
+          metadata: {
+            langwatch: {
+              targetReferenceId: "agent_1",
+              redTeam: {
+                outcome: "broke",
+                brokeAtTurn: 2,
+                strategy: "crescendo",
+                owaspIds: ["LLM01"],
+                attackGoal: "Leak the refund policy override",
+                maxTurns: 30,
+                turnsUsed: 2,
+                turnScores: [{ turn: 2, score: 9 }],
+              },
+            },
+          },
+        }),
+      );
+
+      expect(row).toHaveTextContent("Broke");
+      expect(row).not.toHaveTextContent("Failed");
     });
   });
 });

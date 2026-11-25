@@ -5,6 +5,7 @@
  */
 import type { AuthzApi } from "@langwatch/authz-contract";
 import { ConfigParseError } from "@langwatch/config";
+import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import { LangevalsPiiDetectionError } from "@langwatch/evaluation-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { createRecordingMeterProvider } from "@langwatch/observability/metrics/testing";
@@ -59,6 +60,7 @@ function flagsOff() {
 const permissions = createApiFixture<AuthzApi>({
   checkScopeLineage: async () => ({ kind: "consistent" }),
 });
+const entitlements = createApiFixture<EntitlementApi>();
 
 /** Presidio answering one batch, as langevals would. */
 function presidioAnswering(): MemoryPresidioChannel {
@@ -98,7 +100,7 @@ describe("given the PII redaction model wired into the module", () => {
         const presidio = presidioAnswering();
         const { featureFlags, reads } = flagsOff();
         const app = await createDataPrivacyTestApp({
-          dependencies: { featureFlags, permissions },
+          dependencies: { featureFlags, permissions, entitlements },
           settings: { langevalsEndpoint: LANGEVALS, piiRedactionModelEndpoint: ALIAS_ARN },
           channels: async () => ({
             presidio,
@@ -124,7 +126,7 @@ describe("given the PII redaction model wired into the module", () => {
     /** @scenario "A deployment that calls the model and has no key pepper refuses to boot" */
     it("refuses to boot", async () => {
       const boot = createDataPrivacyTestApp({
-        dependencies: { featureFlags: flagsOff().featureFlags, permissions },
+        dependencies: { featureFlags: flagsOff().featureFlags, permissions, entitlements },
         settings: { langevalsEndpoint: LANGEVALS, piiRedactionModelEndpoint: ALIAS_ARN },
         keyPepper: null,
       });
@@ -138,7 +140,7 @@ describe("given the PII redaction model wired into the module", () => {
     it("boots, as no call is ever priced", async () => {
       await expect(
         createDataPrivacyTestApp({
-          dependencies: { featureFlags: flagsOff().featureFlags, permissions },
+          dependencies: { featureFlags: flagsOff().featureFlags, permissions, entitlements },
           settings: { langevalsEndpoint: LANGEVALS },
           keyPepper: null,
         }),
@@ -168,6 +170,7 @@ describe("given the PII redaction model wired into the module", () => {
             isEnabled: async (key) => key === PII_REDACTION_MODEL_FLAG,
           }),
           permissions,
+          entitlements,
         },
         settings: { langevalsEndpoint: LANGEVALS },
         channels: async () => ({
@@ -206,7 +209,7 @@ describe("given the PII redaction model wired into the module", () => {
       const presidio = presidioAnswering();
       const { featureFlags, reads } = flagsOff();
       const app = await createDataPrivacyTestApp({
-        dependencies: { featureFlags, permissions },
+        dependencies: { featureFlags, permissions, entitlements },
         settings: { langevalsEndpoint: LANGEVALS },
         channels: async (config) => ({
           // The model channel is composed from the settings exactly as in production.

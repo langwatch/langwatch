@@ -45,7 +45,7 @@ describe("given the Answer quality widgets", () => {
     }
     expect(sql.reasons).toContain("countIf(at < {dashboard_context_period_start:DateTime})");
     expect(sql.reasons).toContain("LIMIT 5");
-    expect(tsx).toContain("Top reasons");
+    expect(tsx).toContain("Why the others failed");
   });
 
   /** @scenario "AC41 Answer quality: Unanswered, by topic is the refused share of closed conversations per topic" */
@@ -54,7 +54,7 @@ describe("given the Answer quality widgets", () => {
     expect(sql.topics).toContain("countIf(outcome = 'refusal') AS refused");
     expect(sql.topics).toContain("ORDER BY refused / closed DESC");
     expect(sql.trend).toContain("AS bucket");
-    expect(tsx).toContain('<Stat label="All conversations"');
+    expect(tsx).toContain('<Stat label="Refused to answer"');
   });
 
   /** @scenario "AC42 Answer quality: Judges vs reviewers scores agreement per week from reviewer thumbs" */
@@ -78,7 +78,7 @@ describe("given the Answer quality widgets", () => {
     expect(sql.flagged).toContain("LIMIT 4");
     expect(sql.audit).toContain("HAVING min(Passed) = 1");
     expect(sql.audit).toContain("LIMIT 1");
-    expect(tsx).toContain("Picked at random to check the judges");
+    expect(tsx).toContain("Picked at random so you can confirm the checks are right.");
   });
 
   /** @scenario "AC44 Answer quality: Retrieval or generation splits failed searches by cause" */
@@ -125,7 +125,7 @@ describe("given the What users ask widgets", () => {
     );
     expect(sql.shares).toContain("subtractSeconds({dashboard_context_period_start:DateTime}");
     expect(tsx).toContain("num(row.in_previous) === 0 && num(row.in_period) > 0");
-    expect(tsx).toContain("No topics in the period before to compare with");
+    expect(tsx).toContain("Nothing to compare with yet: the previous period had no topics.");
   });
 
   /** @scenario "AC48 What users ask: Topics people ask about shows volume, success and cannot-do per topic" */
@@ -136,7 +136,7 @@ describe("given the What users ask widgets", () => {
     // Checks are counted per evaluation, topped by the trace's columns on the row.
     expect(sql.topics).toContain("FROM trace_evaluation_metrics AS e");
     expect(sql.topics).toContain("AND e.IsGuardrail = 0");
-    expect(tsx).toContain('byOutcome ? "Resolved" : "Checks passed"');
+    expect(tsx).toContain('header: "Went well"');
   });
 
   /** @scenario "AC49 What users ask: Asked again shows misread conversations and returning users" */

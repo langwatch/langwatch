@@ -9,6 +9,7 @@
 export { AgentCard } from "./agent-card";
 export { AgentFilterBar } from "./agent-filter-bar";
 export { AgentFleetSummaryStrip } from "./agent-fleet-summary-strip";
+export type { AgentRowExtras } from "./agent-row-extras";
 export {
   type AgentsLayout,
   AgentsLayoutControl,
@@ -18,24 +19,33 @@ export {
 } from "./agents-list";
 export { AGENT_TABLE_COLUMNS, AgentsTable } from "./agents-table";
 export {
+  AGENT_POSTURE_LABELS,
   AGENT_SORT_LABELS,
   AGENT_SORTS,
   type AgentFilters,
   type AgentSort,
+  ALL_POSTURES,
   ALL_SOURCES,
   applyAgentFilters,
   coerceOwnership,
+  coercePosture,
   coerceSort,
   coerceSource,
+  countShadowAgents,
   DEFAULT_AGENT_FILTERS,
   OWNERSHIP_FILTERS,
   OWNERSHIP_LABELS,
   type OwnershipFilter,
+  type PostureFilter,
+  postureLabel,
+  posturesPresentIn,
   type SourceFilter,
   sourceLabel,
   sourcesPresentIn,
   useAgentFilters,
 } from "./agent-filters";
+export { AgentPostureBadge } from "./agent-posture-badge";
+export { AgentRegistrySettingsControl } from "./agent-registry-settings-control";
 export {
   AGENT_HEALTH_LABELS,
   AGENT_SOURCE_LABELS,

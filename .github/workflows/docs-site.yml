@@ -415,9 +415,15 @@ jobs:
       # Hashed files go first and are never deleted, so a page still open in a
       # tab loads its scripts; pages go last, so none names a missing file.
       # The sitemap this deploy replaces, so IndexNow hears only what changed;
-      # absent on a first deploy.
+      # absent on a first deploy. Read from the public site: the deploy role gets
+      # 403 reading the bucket, which made every deploy resubmit every page.
+      # A failed read warns, since IndexNow then hears of every page.
       - name: Read the live sitemap
-        run: aws s3 cp "s3://$BUCKET/docs/sitemap.xml" "$RUNNER_TEMP/live-sitemap.xml" --only-show-errors || true
+        run: >-
+          curl -fsS --retry 2 --max-time 30 -o "$RUNNER_TEMP/live-sitemap.xml"
+          https://langwatch.ai/docs/sitemap.xml
+          || { echo "::warning::Could not read the live sitemap; IndexNow will hear of every page";
+          rm -f "$RUNNER_TEMP/live-sitemap.xml"; }
       - name: Upload the content-hashed files
         run: >-
           aws s3 sync "$SITE" "s3://$BUCKET/docs/" --only-show-errors

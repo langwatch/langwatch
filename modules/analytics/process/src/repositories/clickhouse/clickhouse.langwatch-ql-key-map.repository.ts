@@ -15,7 +15,7 @@ export const LWQL_KEY_MAP_INSERT_SETTINGS = {
 const LWQL_KEY_MAP_TABLE = "lwql_api_key_tenant_map";
 
 /**
- * The one place runtime code writes the LangWatchQL key-map table, qualified with the app's own
+ * The one place runtime code reads and writes the key-map table, qualified with the app's own
  * database (`sourceDatabase`). Through the LangWatchQL admin target, as the deploy backfill does:
  * never a tenant's routed client, which can be a server the customer controls (ADR-200).
  */
@@ -43,6 +43,24 @@ export class LwqlKeyMapClickHouseRepository extends LwqlKeyMapRepository {
       table: `${sourceDatabase}.${LWQL_KEY_MAP_TABLE}`,
       rows: [{ KeyHash: row.KeyHash, TenantId: row.TenantId }],
       settings: LWQL_KEY_MAP_INSERT_SETTINGS,
+    });
+  }
+
+  async findKeyHashes({
+    tenantId,
+    sourceDatabase,
+  }: {
+    tenantId: string;
+    sourceDatabase: string;
+  }): Promise<string[]> {
+    const table = `${sourceDatabase}.${LWQL_KEY_MAP_TABLE}`;
+    const rows = await this.statements.rows(
+      `SELECT DISTINCT KeyHash FROM ${table} WHERE TenantId = {tenantId:String}`,
+      { tenantId },
+    );
+    return rows.flatMap((row) => {
+      const hash = row.KeyHash;
+      return typeof hash === "string" ? [hash] : [];
     });
   }
 }

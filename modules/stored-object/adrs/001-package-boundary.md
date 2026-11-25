@@ -57,7 +57,7 @@ Stored Objects adds exactly one domain table, `StoredObject`:
 StoredObject
   tenantId
   id
-  status                       pending | available | deleted | failed
+  status                       pending | uploading | available | deleted | failed
   purpose
   ownerKind
   ownerId
@@ -86,9 +86,15 @@ adapter resolves them through trusted configuration.
 
 The row is primary operational state, not an event projection. Stored Objects
 defines no lifecycle event family, replay cursor, operation table, audience
-table, location table, idempotency table, process state, wake, claim, intent or
-outbox. The generic system-migration tenant state remains owned by
-`@langwatch/system-migrations`.
+table, location table or idempotency table. The generic system-migration
+tenant state remains owned by `@langwatch/system-migrations`.
+
+The one exception is the scheduled upload reaper (#9666), the
+`stored_object_maintenance` pipeline. It declares no events. Its global process
+manager holds a process state, a scheduled wake, one `reap` intent and an outbox
+whose lease is its claim, all in the generic `@langwatch/eventing` process store.
+That state records when the sweep last ran, not any object's lifecycle, so the
+row stays the only lifecycle state.
 
 ### Classes own behaviour
 
@@ -130,6 +136,11 @@ checks the target's length and checksum and changes the same row to `available`.
 A bounded cleanup pass finds expired `pending` rows, deletes their bytes and
 marks them `failed`. No direct-upload target is offered when the selected
 existing driver cannot support it.
+
+When uploads go through LangWatch, the signed upload route moves the row to
+`uploading` while the bytes stream, with a deadline past the api's body limit.
+Once they land it moves the row back to `pending` with the digest the write took.
+The cleanup pass also takes expired `uploading` rows.
 
 Deletion first changes the row to `deleted`, immediately denying delivery, and
 then attempts physical deletion. A bounded cleanup pass retries deleted rows

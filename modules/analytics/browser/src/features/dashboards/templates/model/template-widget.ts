@@ -4,14 +4,14 @@
  * source to set up, and the full-width and half-width places on the chart grid.
  */
 
-import type { TraceSource } from "@langwatch/analytics-contract";
+import { readsSourcesParameter, type TraceSource } from "@langwatch/analytics-contract";
 import {
   DASHBOARD_WIDGET_DEFINITION_VERSION,
   type DashboardWidgetDefinition,
 } from "@langwatch/analytics-contract/dashboard-widget-definition";
 
 import { CHART_GRID_COLUMNS } from "../../../../model/chart-grid.ts";
-import { PRESENCE_QUERY, readsSourcesParameter } from "../../model/sources-parameter.ts";
+import { PRESENCE_QUERY } from "../../model/sources-parameter.ts";
 import type { BoardTemplateWidget } from "./board-template.ts";
 import { PRESENCE_SQL } from "./source-presence-queries.ts";
 import { readSources } from "./stock-query-sources.ts";

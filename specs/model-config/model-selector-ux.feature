@@ -4,8 +4,8 @@ Feature: Model Selector UX Improvements
   I want a compact and intuitive model selector
   So that I can quickly choose and configure the right model for my task
 
-  # All scenarios describe model-selector UI rendering. Need a JSDOM
-  # render of the selector component — no test fixture exists yet.
+  # All scenarios describe model-selector UI rendering, bound to JSDOM
+  # renders of the selector component.
 
   Background:
     Given I am on a page with the model selector
@@ -45,6 +45,12 @@ Feature: Model Selector UX Improvements
     When I open the model selector dropdown
     And I type "claude" in the search box
     Then only models containing "claude" should be visible
+
+  Scenario: Says so when no model matches the search
+    When I open the model selector dropdown
+    And I type a name no model carries in the search box
+    Then the dropdown reads "No models match your search."
+    And the text is gone once the search matches a model again
 
   @unimplemented
   Scenario: Search is case-insensitive
