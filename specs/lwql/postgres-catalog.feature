@@ -26,7 +26,7 @@ Feature: Every catalogued Postgres model is queryable through LangWatchQL
       When the catalog builds its entry
       Then a view named after the model in snake_case exists in the catalog
       And its projectId column is exposed as TenantId
-      And every other column is exposed in PascalCase
+      And every other column is listed explicitly, PascalCase by convention
 
     @unit
     Scenario: A hand-written view is an override on the derived default, not a second definition
@@ -55,6 +55,53 @@ Feature: Every catalogued Postgres model is queryable through LangWatchQL
       Given two organizations, each with a project and a gateway virtual key
       When a caller in the first project queries the virtual_keys view
       Then they see only keys belonging to their own organization
+
+    # tasks#1212: the fan-out above emits the row once per project, so a query
+    # over two sibling projects would see an organization's budget twice.
+    @integration
+    Scenario: An organization-level row is counted once in a multi-project query
+      Given an organization with two projects and one gateway budget with a known limit
+      When a caller who can read both projects sums the budget limit and counts budgets in one query over both
+      Then the sum equals the budget's own limit
+      And the count is one
+
+    @integration
+    Scenario: A single project still reads its organization's row once
+      Given an organization with two projects and one gateway budget with a known limit
+      When a caller queries each project on its own, summing the budget limit and counting budgets
+      Then each read's sum equals the budget's own limit
+      And each read's count is one
+
+    # tasks#1212: the view keeps the copy under the lowest project id, so TenantId names that project.
+    @integration
+    Scenario: A multi-project read filters and groups an organization-level row under the lowest project only
+      Given an organization with two projects and one gateway budget with a known limit
+      When a caller who can read both projects filters and groups the budget by TenantId in queries over both
+      Then filtering on the lower project id reads the budget once
+      And filtering on the other project's id reads no budget
+      And grouping by TenantId puts the budget once under the lower project id and nowhere else
+
+    @unit
+    Scenario: A fanned-out view keeps one row per entity across the projects read
+      Given a model whose tenant column is organizationId or teamId
+      When its LangWatchQL view is rendered
+      Then the view keeps one row per primary key, the lowest in-scope project's, after the tenant predicate
+      And a project-scoped view is rendered without that step
+
+    @unit
+    Scenario: A fanned-out view keyed on its scope field keeps its fan-out
+      Given an organization-scoped model whose primary key holds organizationId
+      When its LangWatchQL view is derived
+      Then the view names no entity key, so no step collapses its rows
+      And the same model keyed by id alone names that id as its entity key
+
+    # tasks#1212: collapsing keeps one copy per key, so the key must name one row in its table.
+    @unit
+    Scenario: A fanned-out view collapses only on a key that names one row in its table
+      Given every view in the catalog that collapses its fan-out
+      When its entity key is compared with its model's primary key
+      Then the entity key is the whole primary key
+      And the primary key holds no organizationId, teamId or projectId
 
     @unit
     Scenario: A team-scoped model fans out to one row per project in the team
@@ -94,6 +141,12 @@ Feature: Every catalogued Postgres model is queryable through LangWatchQL
       And a caller with content access reads it
 
     @unit
+    Scenario: LWQL reads a template's OTTL rules only with aiTools:manage
+      Given the derived ingestion templates view
+      When a caller without aiTools:manage queries it
+      Then the OTTL rules column is not readable
+
+    @unit
     Scenario: Identity tables are skipped and person columns stay opaque
       Given the User, Team and Organization models
       When the Postgres catalog is derived
@@ -101,11 +154,10 @@ Feature: Every catalogued Postgres model is queryable through LangWatchQL
       And a userId column on any other model is exposed as an opaque id with no join to a person
 
     @unit
-    Scenario: An override that re-admits a stripped column carries a reason
-      Given an override that exposes a column the safe defaults would strip
-      When the override is validated
-      Then it carries a non-empty reason
-      And an override without one fails the build
+    Scenario: A catalogue entry exposing a stripped column fails the build
+      Given a catalogue entry that exposes a secret-, email- or binary-named column, even renamed
+      When the Postgres catalog is derived
+      Then the build is refused naming the column
 
     @unit @integration
     Scenario: Per-user visibility is enforced at the approved view
@@ -152,6 +204,47 @@ Feature: Every catalogued Postgres model is queryable through LangWatchQL
       Then the model's timeColumn is set to CreatedAt
       And queries can use CreatedAt to filter by time window
 
+  Rule: A Postgres date reads as the date Postgres holds
+
+    Postgres stores a Prisma DateTime as timestamp(3) or timestamptz(3).
+    ClickHouse's PostgreSQL engine reads either one at the wrong scale into a
+    DateTime64(3) column, as a date in the year 2299, and correctly into a
+    DateTime64(6) column. Issue: langwatch/tasks#958.
+
+    @unit
+    Scenario: The engine table reads a date at the scale Postgres stores it
+      Given a Postgres-backed view with a DateTime64(3) column, nullable or not
+      When its PostgreSQL-engine table statement is built
+      Then that column is declared DateTime64(6) on the engine table
+      And every other column keeps its catalogue type
+
+    @unit
+    Scenario: The view still shows millisecond dates
+      Given a Postgres-backed view with a DateTime64(3) column
+      When its LangWatchQL view statement is built
+      Then the view casts the engine column back to the catalogue type
+      And a column of any other type is projected unchanged
+
+    @integration
+    Scenario: Every date on every Postgres-backed view equals the Postgres value
+      Given every Postgres-backed view provisioned over seeded rows
+      When a project reads each of its date columns
+      Then every date equals the value Postgres holds, to the millisecond
+      And none reads as a date in the year 2299
+
+    @integration
+    Scenario: A date filter compares against the real date
+      Given a project created in March 2026
+      When the project counts its projects created from June 2026 against a date it reads from another table
+      Then it counts none
+
+    @integration
+    Scenario: Re-provisioning replaces an engine table declared at the old scale
+      Given a Postgres-backed view whose engine table still declares DateTime64(3)
+      When provisioning runs the current engine-table and view statements
+      Then the engine table declares DateTime64(6)
+      And the view reads the date Postgres holds
+
   Rule: Topics are the proving slice
 
     @integration
@@ -177,3 +270,27 @@ Feature: Every catalogued Postgres model is queryable through LangWatchQL
       Then no error occurs
       And the view's columns match the derived catalog's order
       And the reader role can still select from it
+
+  Rule: A read of a Postgres view takes no table modifier
+
+    # The view's PostgreSQL engine table refuses FINAL with ILLEGAL_FINAL, and the
+    # view already keeps one row per key, so neither modifier adds anything.
+    @unit
+    Scenario: FINAL or SAMPLE on a PostgreSQL-resident view is refused with a clear message
+      When ana runs a statement that reads a Postgres view with FINAL or SAMPLE
+      Then the run is refused saying FINAL and SAMPLE cannot be used on this read
+      And no statement reaches the store
+
+    @unit
+    Scenario: A pass over a PostgreSQL-resident view with FINAL is refused too
+      When an instant-eval pass runs a statement that reads a Postgres view with FINAL
+      Then the pass is refused saying FINAL and SAMPLE cannot be used on this read
+      And no statement reaches the store
+
+    # FINAL or SAMPLE on a subquery means nothing, whatever it reads; on a view as written,
+    # a ClickHouse-resident view still takes FINAL.
+    @unit
+    Scenario: FINAL or SAMPLE on a subquery is refused with a clear message
+      When ana runs a statement that writes FINAL or SAMPLE on a subquery, over any view or nested
+      Then the run is refused saying FINAL and SAMPLE cannot be used on this read
+      And FINAL written directly on a ClickHouse-resident view still runs

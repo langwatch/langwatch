@@ -21,6 +21,7 @@ import (
 	"github.com/langwatch/langwatch/services/langyagent/app"
 	"github.com/langwatch/langwatch/services/langyagent/domain"
 	"github.com/langwatch/langwatch/services/langyagent/internal/frames"
+	"github.com/langwatch/langwatch/services/langyagent/internal/toolmap"
 )
 
 // frameSink is a thread-safe app.ChatSink capturing emitted frame payloads
@@ -618,5 +619,138 @@ func TestStreamState_RetryEventsDrawTheStatusLine(t *testing.T) {
 		if got[i] != want[i] {
 			t.Errorf("frame %d = %s, want %s", i, got[i], want[i])
 		}
+	}
+}
+
+// A reasoning event is its own live frame: it carries the thinking text, is
+// never an answer delta, and does not count as answer text (so the paragraph
+// restore that follows a tool call is not triggered by thinking alone).
+// @scenario "The manager emits a reasoning frame for a reasoning delta"
+func TestStreamState_ReasoningEventIsAReasoningFrameNotAnAnswerToken(t *testing.T) {
+	var got []string
+	state := newStreamState(func(f frames.Frame) bool {
+		got = append(got, f.JSON())
+		return true
+	})
+	if !state.apply(wireEvent{Type: eventReasoning, TurnID: "t1", Text: "let me check the traces"}) {
+		t.Fatal("the reasoning frame did not reach the relay")
+	}
+	if !state.apply(wireEvent{Type: eventDelta, TurnID: "t1", Text: "Here is the answer"}) {
+		t.Fatal("the answer frame did not reach the relay")
+	}
+
+	want := []string{
+		`{"type":"reasoning","text":"let me check the traces"}`,
+		`{"type":"delta","text":"Here is the answer"}`,
+	}
+	if len(got) != len(want) {
+		t.Fatalf("frames = %v, want %v", got, want)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Errorf("frame %d = %s, want %s", i, got[i], want[i])
+		}
+	}
+	if strings.Contains(got[0], `"type":"delta"`) {
+		t.Error("a reasoning delta must not be treated as an answer token")
+	}
+}
+
+// The turn stream ends on the turn's own terminal event, and a sibling turn's
+// events (the wrapper tags every event with its turn id) never reach it: the
+// reader routes by turn id, the consumer settles on the terminal.
+// @scenario "Terminal detection and session routing are unchanged by the fast frame"
+func TestAgent_TerminalEndsTheTurnAndAnotherTurnsEventsAreNotForwarded(t *testing.T) {
+	r, w := startTestReader(t)
+	mine := r.register("mine")
+	defer r.unregister("mine", mine)
+	other := r.register("other")
+	defer r.unregister("other", other)
+
+	for _, line := range []string{
+		`{"type":"delta","turnId":"other","text":"not for you"}`,
+		`{"type":"delta","turnId":"mine","text":"for you"}`,
+		`{"type":"turn_done","turnId":"other","outcome":"ok"}`,
+		`{"type":"turn_done","turnId":"mine","outcome":"ok"}`,
+	} {
+		_, _ = w.Write([]byte(line + "\n"))
+	}
+
+	agent := &Agent{}
+	var forwarded []string
+	state := newStreamState(func(f frames.Frame) bool {
+		forwarded = append(forwarded, f.JSON())
+		return true
+	})
+	var settled bool
+	for !settled {
+		select {
+		case ev := <-mine.ch:
+			isDone, err := agent.consumeEvent(context.Background(), state, ev)
+			if err != nil {
+				t.Fatalf("a clean terminal must settle the turn without an error, got %v", err)
+			}
+			settled = isDone
+		case <-time.After(3 * time.Second):
+			t.Fatal("the turn's terminal event never ended its stream")
+		}
+	}
+
+	if len(forwarded) != 1 || !strings.Contains(forwarded[0], `"text":"for you"`) {
+		t.Errorf("forwarded frames = %v, want only this turn's delta", forwarded)
+	}
+	select {
+	case ev := <-mine.ch:
+		t.Errorf("a sibling turn's event leaked into this turn's stream: %+v", ev)
+	default:
+	}
+}
+
+// A plan far past the cap is trimmed, not dropped: the typed plan frame holds
+// MaxPlanItems items of bounded text, and the todo tool call that carried it
+// is still forwarded as a tool card pair for the audit trail.
+// @scenario "The manager caps a runaway plan"
+func TestStreamState_RunawayPlanIsCappedAndTheToolCallStillRecorded(t *testing.T) {
+	var got []string
+	state := newStreamState(func(f frames.Frame) bool {
+		got = append(got, f.JSON())
+		return true
+	})
+	items := make([]planItem, 0, toolmap.MaxPlanItems*2)
+	for i := 0; i < toolmap.MaxPlanItems*2; i++ {
+		items = append(items, planItem{Content: strings.Repeat("x", toolmap.MaxPlanContentChars*2), Status: "pending"})
+	}
+	input := json.RawMessage(`{"todos":[{"content":"step","status":"pending"}]}`)
+	state.apply(wireEvent{Type: eventToolStart, TurnID: "t1", ID: "todo-1", Name: "todowrite", Input: input})
+	state.apply(wireEvent{Type: eventPlan, TurnID: "t1", Items: items})
+	state.apply(wireEvent{Type: eventToolEnd, TurnID: "t1", ID: "todo-1", Name: "todowrite", Input: input, Output: "ok"})
+
+	var plan struct {
+		Type  string `json:"type"`
+		Items []struct {
+			Content string `json:"content"`
+		} `json:"items"`
+	}
+	var starts, ends int
+	for _, payload := range got {
+		switch {
+		case strings.Contains(payload, `"type":"plan"`):
+			if err := json.Unmarshal([]byte(payload), &plan); err != nil {
+				t.Fatalf("plan frame: %v", err)
+			}
+		case strings.Contains(payload, `"phase":"start"`):
+			starts++
+		case strings.Contains(payload, `"phase":"end"`):
+			ends++
+		}
+	}
+	if len(plan.Items) != toolmap.MaxPlanItems {
+		t.Fatalf("plan items = %d, want the cap of %d", len(plan.Items), toolmap.MaxPlanItems)
+	}
+	if got := len([]rune(plan.Items[0].Content)); got != toolmap.MaxPlanContentChars+1 {
+		t.Errorf("item text = %d runes, want %d truncated plus an ellipsis, not dropped", got, toolmap.MaxPlanContentChars)
+	}
+	if starts != 1 || ends != 1 {
+		t.Errorf("the todo tool call must stay recorded: start frames = %d, end frames = %d", starts, ends)
 	}
 }

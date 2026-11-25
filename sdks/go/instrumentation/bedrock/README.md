@@ -4,7 +4,7 @@ This package provides OpenTelemetry instrumentation for the AWS Bedrock Runtime
 client (`github.com/aws/aws-sdk-go-v2/service/bedrockruntime`).
 
 Unlike the HTTP-bytes instrumentations in this SDK, Bedrock is traced via the AWS
-**smithy-go middleware stack**. The middleware reads the *typed* operation input
+**smithy-go middleware stack**. The middleware reads the _typed_ operation input
 and output structs (`*bedrockruntime.ConverseInput` /
 `*bedrockruntime.ConverseOutput`, …) rather than parsing SigV4-signed HTTP
 bodies. This is cleaner and more robust: there is no body buffering, and the
@@ -16,11 +16,11 @@ metrics and usage attributes.
 
 ## Supported operations
 
-| Operation        | Support                                  | Notes |
-| ---------------- | ---------------------------------------- | ----- |
-| `Converse`       | Full (input + output + usage + metrics)  | The unified messages API. Priority surface. |
-| `ConverseStream` | Full (input + accumulated output + usage)| The event stream is wrapped, so output text and the final `metadata` usage are captured after the stream is consumed. |
-| `InvokeModel`    | Best-effort                              | Body is provider-specific JSON; usage is parsed for the common Anthropic / Amazon Titan shapes, otherwise the model id + raw body are recorded. |
+| Operation        | Support                                   | Notes                                                                                                                                           |
+| ---------------- | ----------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Converse`       | Full (input + output + usage + metrics)   | The unified messages API. Priority surface.                                                                                                     |
+| `ConverseStream` | Full (input + accumulated output + usage) | The event stream is wrapped, so output text and the final `metadata` usage are captured after the stream is consumed.                           |
+| `InvokeModel`    | Best-effort                               | Body is provider-specific JSON; usage is parsed for the common Anthropic / Amazon Titan shapes, otherwise the model id + raw body are recorded. |
 
 Other Bedrock Runtime operations pass through untouched (no span).
 
@@ -96,11 +96,11 @@ stack mutator shape, so it composes with any other API options you pass.
 
 Both `InstrumentConfig` and `WithTracing` accept the same options:
 
-| Option                          | Default                              | Effect |
-| ------------------------------- | ------------------------------------ | ------ |
-| `WithTracerProvider(tp)`        | global provider                      | Tracer provider used to create spans. |
-| `WithDataCapture(mode)`         | `langwatch.DataCaptureAll`           | Gates recording of input/output **content** at the source (`All` / `Input` / `Output` / `None`). Structure, models, usage and metrics are always recorded. |
-| `WithGenAIProvider(kv)`         | `semconv.GenAIProviderNameAWSBedrock`| Value recorded as `gen_ai.provider.name` and used as the span-name prefix. Override to attribute by the underlying foundation-model vendor. |
+| Option                   | Default                               | Effect                                                                                                                                                     |
+| ------------------------ | ------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `WithTracerProvider(tp)` | global provider                       | Tracer provider used to create spans.                                                                                                                      |
+| `WithDataCapture(mode)`  | `langwatch.DataCaptureAll`            | Gates recording of input/output **content** at the source (`All` / `Input` / `Output` / `None`). Structure, models, usage and metrics are always recorded. |
+| `WithGenAIProvider(kv)`  | `semconv.GenAIProviderNameAWSBedrock` | Value recorded as `gen_ai.provider.name` and used as the span-name prefix. Override to attribute by the underlying foundation-model vendor.                |
 
 `WithDataCapture` composes with the exporter-level
 `langwatch.WithDataCapture(...)`: the middleware gates at the source and the
@@ -120,16 +120,16 @@ Every span is a client span with:
 
 **Request** (`ConverseInput` / `ConverseStreamInput`):
 
-| Source field                       | Recorded as |
-| ---------------------------------- | ----------- |
-| `ModelId`                          | `gen_ai.request.model` + span name |
-| `InferenceConfig.MaxTokens`        | `gen_ai.request.max_tokens` |
-| `InferenceConfig.Temperature`      | `gen_ai.request.temperature` |
-| `InferenceConfig.TopP`             | `gen_ai.request.top_p` |
-| `InferenceConfig.StopSequences`    | `gen_ai.request.stop_sequences` |
-| `ToolConfig.Tools`                 | `gen_ai.request.tools` (JSON) |
-| `System` (text blocks)             | `gen_ai.system_instructions` (gated by capture) |
-| `Messages` (all content blocks)    | `gen_ai.input.messages` (gated by capture) |
+| Source field                    | Recorded as                                     |
+| ------------------------------- | ----------------------------------------------- |
+| `ModelId`                       | `gen_ai.request.model` + span name              |
+| `InferenceConfig.MaxTokens`     | `gen_ai.request.max_tokens`                     |
+| `InferenceConfig.Temperature`   | `gen_ai.request.temperature`                    |
+| `InferenceConfig.TopP`          | `gen_ai.request.top_p`                          |
+| `InferenceConfig.StopSequences` | `gen_ai.request.stop_sequences`                 |
+| `ToolConfig.Tools`              | `gen_ai.request.tools` (JSON)                   |
+| `System` (text blocks)          | `gen_ai.system_instructions` (gated by capture) |
+| `Messages` (all content blocks) | `gen_ai.input.messages` (gated by capture)      |
 
 Message content blocks are expanded into LangWatch chat content: `text` →
 plain text, `image`/`document` → binary parts (MIME type, filename), `toolUse` →
@@ -138,15 +138,15 @@ a tool-call part (name, id, JSON args), `toolResult` → a tool-result part,
 
 **Response** (`ConverseOutput` / accumulated `ConverseStream` events):
 
-| Source field                                            | Recorded as |
-| ------------------------------------------------------- | ----------- |
+| Source field                                               | Recorded as                                                                                                    |
+| ---------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
 | `Output` message (Converse) / accumulated message (stream) | `gen_ai.output.messages` (gated by capture) — carrying any `toolUse` blocks as `tool_call` parts, else as text |
-| `StopReason` / `messageStop.stopReason`                 | `gen_ai.response.finish_reasons` |
-| `Usage.InputTokens`                                     | `gen_ai.usage.input_tokens` |
-| `Usage.OutputTokens`                                    | `gen_ai.usage.output_tokens` |
-| `Usage.TotalTokens`                                     | `gen_ai.usage.total_tokens` |
-| `Usage.CacheReadInputTokens`                            | `gen_ai.usage.cached_input_tokens` |
-| `Usage.CacheWriteInputTokens`                           | `gen_ai.usage.cache_creation.input_tokens` |
+| `StopReason` / `messageStop.stopReason`                    | `gen_ai.response.finish_reasons`                                                                               |
+| `Usage.InputTokens`                                        | `gen_ai.usage.input_tokens`                                                                                    |
+| `Usage.OutputTokens`                                       | `gen_ai.usage.output_tokens`                                                                                   |
+| `Usage.TotalTokens`                                        | `gen_ai.usage.total_tokens`                                                                                    |
+| `Usage.CacheReadInputTokens`                               | `gen_ai.usage.cached_input_tokens`                                                                             |
+| `Usage.CacheWriteInputTokens`                              | `gen_ai.usage.cache_creation.input_tokens`                                                                     |
 
 Token usage is recorded via `SetGenAIUsage` (the OTel `gen_ai.usage.*`
 attributes, including the cache-read and cache-creation counts for cache-aware

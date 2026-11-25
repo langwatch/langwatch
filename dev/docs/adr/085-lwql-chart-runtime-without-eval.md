@@ -17,7 +17,7 @@ Both halves of the stack reach for `new Function` by default:
 - **Vega** compiles the expressions in a specification to JavaScript source and
   evaluates it.
 - **Ajv**, which validates a specification against the official Vega-Lite v6
-  JSON Schema, compiles the *schema* to a validate function at runtime — a
+  JSON Schema, compiles the _schema_ to a validate function at runtime — a
   ~1.6 second `new Function` call over a 1.9 MB document.
 
 The application's deployed policy still carries `unsafe-eval` for unrelated
@@ -73,12 +73,12 @@ keystroke; and it is the only version that works under the policy the feature is
 built for.
 
 Two smaller options were measured and rejected. Compiling with `allErrors: false`
-generates *more* code (8.2 MB), not less, and would reduce every refusal to a
+generates _more_ code (8.2 MB), not less, and would reduce every refusal to a
 root-level "must match a schema in `anyOf`" that names nothing a member could
 fix. Stripping annotation-only keywords (`description`, `$comment`) from the
 schema before compiling brings it to 5.5 MB / 492 KB gzipped, but requires a
-JSON-Schema-aware traversal that must never confuse a `description` *keyword*
-with a property *named* `description` — a correctness risk carried by the whole
+JSON-Schema-aware traversal that must never confuse a `description` _keyword_
+with a property _named_ `description` — a correctness risk carried by the whole
 schema in exchange for 300 KB inside a chunk that is already megabytes. It
 remains available if the checked-in size becomes the binding constraint.
 
@@ -100,7 +100,7 @@ remains available if the checked-in size becomes the binding constraint.
 
 Everything above runs in the browser of the member who wrote the specification,
 at the moment it is drawn. That is the whole of what it protects: this member,
-this render, this session. It is not a check on what may be *stored*.
+this render, this session. It is not a check on what may be _stored_.
 
 Nothing persists a specification today — it lives in memory for as long as the
 result is on screen — which is what makes rendering-time validation sufficient

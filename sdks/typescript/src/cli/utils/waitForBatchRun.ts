@@ -1,39 +1,24 @@
 /**
- * The `--wait` poll every run command shares.
- *
- * A run command schedules a batch and answers immediately. `--wait` turns that
- * into a verdict: it polls the run list until every run of the batch has
- * stopped, then reports the pass and fail counts and sets a failing exit code
- * when any run failed. Three commands need exactly that answer, and a batch
- * that reads as done in one and still running in another is worse than either.
- *
- * The poll RETURNS the verdict instead of printing it. The progress prose is
- * for a person and stays on the spinner (stderr); the command puts the same
- * numbers into the single final document a machine caller reads.
- *
- * @see specs/features/run-plan-cli.feature
+ * The `--wait` poll every run command shares: turns a scheduled batch into
+ * a verdict, reporting pass/fail counts and a failing exit code. RETURNS
+ * the verdict rather than printing it.
  */
 
 import chalk from "chalk";
-import { scopedApiKey } from "@/internal/credentialContext";
-import { buildAuthHeaders } from "@/internal/api/auth";
+
 import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
-import {
-  fetchBatchRuns,
-  tallyBatchRuns,
-  type BatchRun,
-} from "./batchRunProgress";
+import { buildRequestHeaders } from "@/internal/api/request-headers";
+import { scopedApiKey } from "@/internal/credentialContext";
+
+import { fetchBatchRuns, tallyBatchRuns, type BatchRun } from "./batchRunProgress";
 import { createSpinner } from "./spinner";
 
 /** How long the poll sleeps between reads. */
 const POLL_INTERVAL_MS = 3000;
 
 /**
- * How many reads in a row may fail before the wait ends.
- *
- * A status endpoint that is down used to be indistinguishable from a batch
- * that is merely slow: every poll error was swallowed and the wait ran the
- * full timeout before reporting one.
+ * How many reads in a row may fail before the wait ends, so a down status
+ * endpoint is distinguishable from a batch that is merely slow.
  */
 const MAX_CONSECUTIVE_POLL_FAILURES = 5;
 
@@ -95,13 +80,9 @@ const toRunResults = (runs: BatchRun[]): BatchRunResultRow[] =>
   }));
 
 /**
- * Polls until the batch is over.
- *
- * Sets `process.exitCode = 1` when a run of the batch failed, when the wait
- * times out, and when the status endpoint stays down: `--wait` exists to report
- * the verdict, and exiting 0 on a red batch hides it from every machine caller.
- * A timeout sets the exit code and RETURNS rather than ending the process, so
- * the command can still print its final document.
+ * Polls until the batch is over. Sets `process.exitCode = 1` on a failed
+ * run, a timeout, or a status endpoint that stays down. RETURNS on timeout
+ * rather than ending the process, so the command can still print its document.
  */
 export async function waitForBatchRun({
   batchRunId,
@@ -111,9 +92,7 @@ export async function waitForBatchRun({
   timeoutMs,
 }: WaitForBatchRunParams): Promise<WaitForBatchRunResult> {
   if (!machine) console.log();
-  const pollSpinner = createSpinner(
-    `Waiting for the ${subject} to complete...`,
-  ).start();
+  const pollSpinner = createSpinner(`Waiting for the ${subject} to complete...`).start();
 
   const apiKey = scopedApiKey() ?? process.env.LANGWATCH_API_KEY ?? "";
   const endpoint = resolveControlPlaneUrl();
@@ -137,19 +116,7 @@ export async function waitForBatchRun({
   while (!completed) {
     if (Date.now() - startTime > timeoutMs) {
       outcome = "timeout";
-      process.exitCode = 1;
-      pollSpinner.fail(
-        chalk.red(
-          `The ${subject} timed out after ${describeMinutes(timeoutMs)}`,
-        ),
-      );
-      if (!machine) {
-        console.log(
-          chalk.yellow(
-            `Check results in the dashboard. Batch ID: ${batchRunId}`,
-          ),
-        );
-      }
+      reportTimedOutBatch({ batchRunId, subject, machine, timeoutMs, pollSpinner });
       break;
     }
 
@@ -159,7 +126,7 @@ export async function waitForBatchRun({
       latestRuns = await fetchBatchRuns({
         endpoint,
         batchRunId,
-        headers: buildAuthHeaders({ apiKey }),
+        headers: buildRequestHeaders({ apiKey }),
       });
       const progress = tallyBatchRuns(latestRuns);
 
@@ -182,18 +149,7 @@ export async function waitForBatchRun({
 
       if (tallies.completed >= total && total > 0) {
         completed = true;
-        if (tallies.failed > 0) {
-          outcome = "failed";
-          pollSpinner.warn(
-            `The ${subject} completed: ${tallies.passed}/${total} passed, ${chalk.red(`${tallies.failed} failed`)}`,
-          );
-          process.exitCode = 1;
-        } else {
-          outcome = "passed";
-          pollSpinner.succeed(
-            `The ${subject} completed: ${chalk.green(`${tallies.passed}/${total} passed`)}`,
-          );
-        }
+        outcome = reportCompletedBatch({ tallies, subject, pollSpinner });
       }
     } catch {
       consecutivePollFailures++;
@@ -212,4 +168,44 @@ export async function waitForBatchRun({
   }
 
   return { outcome, tallies, results: toRunResults(latestRuns) };
+}
+
+type PollSpinner = ReturnType<typeof createSpinner>;
+
+function reportTimedOutBatch({
+  batchRunId,
+  subject,
+  machine,
+  timeoutMs,
+  pollSpinner,
+}: Pick<WaitForBatchRunParams, "batchRunId" | "subject" | "machine" | "timeoutMs"> & {
+  pollSpinner: PollSpinner;
+}): void {
+  process.exitCode = 1;
+  pollSpinner.fail(chalk.red(`The ${subject} timed out after ${describeMinutes(timeoutMs)}`));
+  if (!machine) {
+    console.log(chalk.yellow(`Check results in the dashboard. Batch ID: ${batchRunId}`));
+  }
+}
+
+function reportCompletedBatch({
+  tallies,
+  subject,
+  pollSpinner,
+}: {
+  tallies: BatchRunTallies;
+  subject: string;
+  pollSpinner: PollSpinner;
+}): BatchRunOutcome {
+  if (tallies.failed > 0) {
+    pollSpinner.warn(
+      `The ${subject} completed: ${tallies.passed}/${tallies.total} passed, ${chalk.red(`${tallies.failed} failed`)}`,
+    );
+    process.exitCode = 1;
+    return "failed";
+  }
+  pollSpinner.succeed(
+    `The ${subject} completed: ${chalk.green(`${tallies.passed}/${tallies.total} passed`)}`,
+  );
+  return "passed";
 }

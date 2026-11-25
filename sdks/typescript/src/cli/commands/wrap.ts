@@ -2,10 +2,9 @@ import { runWrapped } from "@/cli/utils/governance/wrapper";
 import { infoRunKind } from "@/cli/utils/governance/wrapper-info-run";
 
 /**
- * Tiny shim — each `langwatch <tool>` subcommand delegates to
- * `runWrapped(tool, args)` which loads the device-flow config,
- * pre-checks budget, and exec's the underlying binary with the
- * right env vars injected.
+ * Tiny shim: each `langwatch <tool>` subcommand delegates to
+ * `runWrapped(tool, args)`, which loads the device-flow config, pre-checks
+ * budget, and exec's the underlying binary with the right env injected.
  */
 export const wrapClaude = async (args: string[]): Promise<void> => {
   await runWrapped("claude", args);
@@ -41,4 +40,12 @@ export const wrapGemini = async (args: string[]): Promise<void> => {
 
 export const wrapOpencode = async (args: string[]): Promise<void> => {
   await runWrapped("opencode", args);
+};
+
+export const wrapGrok = async (args: string[]): Promise<void> => {
+  await runWrapped("grok", args);
+};
+
+export const wrapPi = async (args: string[]): Promise<void> => {
+  await runWrapped("pi", args);
 };

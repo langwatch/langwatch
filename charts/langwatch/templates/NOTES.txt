@@ -67,7 +67,7 @@ Then in any terminal:
   langwatch shell      # Subshell with ANTHROPIC_BASE_URL etc. preloaded
 
 Per-user identity comes from your SSO; spend / quota live under each
-dev's Personal Workspace at https://<your-host>/me .
+dev's Personal Workspace at https://<your-host>/coding-agents .
 
 ──────────────────────────────────────────────────────────────────────
 5. Helpful next steps
@@ -79,15 +79,21 @@ dev's Personal Workspace at https://<your-host>/me .
       curl http://{{ .Release.Name }}-gateway/healthz
 {{- $gwHost := ((.Values.ingress | default dict).gateway | default dict).host }}
 {{- if and .Values.ingress.enabled $gwHost }}
-  • AI Gateway public route: Ingress {{ .Release.Name }}-gateway-ingress for {{ $gwHost }}, paths /v1 and /health.
+  • AI Gateway public route: Ingress {{ .Release.Name }}-gateway-ingress for {{ $gwHost }}, paths /v1, /a2a and /health.
+{{- if not .Values.gateway.publicUrl }}
+{{- $gwScheme := "http" }}
+{{- if (((.Values.ingress).gateway).tls).secretName }}{{- $gwScheme = "https" }}{{- end }}
+  • A2A Agent Cards: the gateway refuses them (a2a_public_url_unset) until
+    gateway.publicUrl is set. Set it to {{ $gwScheme }}://{{ $gwHost }}.
+{{- end }}
 {{- else if .Values.gateway.publicUrl }}
   • AI Gateway public URL: {{ .Values.gateway.publicUrl }} (no Ingress
-    rendered; your own route must send /v1 and /health to Service
+    rendered; your own route must send /v1, /a2a and /health to Service
     {{ .Release.Name }}-gateway port 80).
 {{- else }}
   • The AI Gateway has no public route. LLM clients and the CLI need one.
     Either set ingress.gateway.host on the app Ingress, or route
-    /v1 and /health on your gateway hostname to Service
+    /v1, /a2a and /health on your gateway hostname to Service
     {{ .Release.Name }}-gateway port 80 (Gateway API HTTPRoute, a load
     balancer) and set gateway.publicUrl. Routes, timeouts and body size:
       https://docs.langwatch.ai/self-hosting/deployment/routing
@@ -242,6 +248,19 @@ backend for you:
         PostSync hook, which already waits for the rollout to be healthy;
         plain Helm should upgrade with --wait when crossing the ADR-032
         boundary (see the migration Job template header).
+      • GitOps: the pre-roll upgrade Job (rendered only with
+        serializeUpgrades) is a pre-upgrade hook, which ArgoCD/Flux map to PreSync and run on the
+        first sync too; `upgrade` is idempotent, so it is a no-op there.
+
+  • Upgrades: the new worker pods run `pnpm task upgrade`; the new app pods
+    report not ready until it is done, so the old pods keep serving (pass
+    --wait --timeout 45m). With serializeUpgrades on, a pre-roll Job runs it
+    first instead. To run it yourself from the new image:
+      kubectl run langwatch-upgrade --rm -it --restart=Never \
+        --image={{ .Values.images.app.repository }}:{{ .Values.images.app.tag }} \
+        -- sh -c 'cd /app/apps/api && pnpm --silent run start:prepare:db'
+    (with the app's environment). A first install needs nothing: the
+    worker's first boot runs it once on the empty database.
 
   • Production / multi-pod: enable app.dataplane (S3 / MinIO / Azure).
     Then configure these on the bucket and deployment, or uploads and
@@ -272,7 +291,6 @@ CreateContainerConfigError; `kubectl describe pod` names the missing key.
 
   {{ include "langwatch.appSecretName" . }} keys (always required):
     - credentialsEncryptionKey
-    - cronApiKey
     - nextAuthSecret
     - virtualKeyPepper
 {{- if and .Values.gateway .Values.gateway.chartManaged }}
@@ -323,7 +341,6 @@ CreateContainerConfigError; `kubectl describe pod` names the missing key.
 
     kubectl -n {{ .Release.Namespace }} create secret generic {{ include "langwatch.appSecretName" . }} \
       --from-literal=credentialsEncryptionKey="$(openssl rand -hex 32)" \
-      --from-literal=cronApiKey="$(openssl rand -hex 32)" \
       --from-literal=nextAuthSecret="$(openssl rand -hex 32)" \
       --from-literal=virtualKeyPepper="$(openssl rand -hex 32)" \
 {{- if and .Values.gateway .Values.gateway.chartManaged }}
@@ -376,9 +393,9 @@ CreateContainerConfigError; `kubectl describe pod` names the missing key.
 8. LangWatchQL (LWQL) — governed analytics SQL
 ──────────────────────────────────────────────────────────────────────
 {{- if .Values.lwql.enabled }}
-The `release_lwql_workbench` feature flag still gates the HTTP endpoint —
-until it is on for a project, queries are refused with `lwql_not_enabled`
-while the backend objects sit ready.
+The `release_lwql_workbench` feature flag gates the HTTP endpoint. It is on
+by default on a self-hosted install; where an operator switches it off for a
+project, queries are refused with `lwql_not_enabled`.
 
 The application owns the LangWatchQL access model in code. How it reaches
 ClickHouse depends on the posture:
@@ -392,8 +409,8 @@ ClickHouse depends on the posture:
   restricted identity, its profile, grants, row policies and the `lwql_postgres`
   named collection land on EVERY replica — not just the one behind the Service.
   No access SQL DDL runs, and the restricted langwatch_lwql identity holds no
-  ACCESS MANAGEMENT. (The image still grants the `default` admin user
-  access_management; rendered delivery never uses it — only `sql` mode does.)
+  ACCESS MANAGEMENT. Nor does the `default` admin user: in rendered mode it
+  may only use the `lwql_postgres*` collections; `sql` mode grants it more.
   On upgrade, the ClickHouse pods roll (carrying the LWQL catalog annotation) so
   each re-mounts the freshly rendered Secret.
 

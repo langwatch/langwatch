@@ -108,6 +108,43 @@ Feature: Activating a self-hosted install with a code
     When another attempt arrives
     Then it is refused as rate limited before the registry is read
 
+  @unit
+  Scenario: The connect host's door finds the code and the redemption claims it
+    Given a valid single-use code
+    When an install posts it to the connect host as its bearer
+    Then the licence token door looks the code up without claiming it
+    And the redemption is handed the code and the install the door found, never the bearer
+    And the redemption claims the code and answers with the minted license
+
+  @unit
+  Scenario: A revoked, expired or already redeemed code is refused at the connect host with its own code
+    Given a code that is revoked, past its expiry, or already redeemed
+    When an install posts it to the connect host
+    Then a revoked code is refused at the door as activation_code_not_found with status 401
+    And an expired code is refused at the door as activation_code_expired with status 403
+    And a code claimed first by another install is refused by the claim as activation_code_already_redeemed with status 403
+    And nothing is minted
+
+  @unit
+  Scenario: A code this install already redeemed is refused as used here
+    Given a single-use code this install redeemed before
+    When the same install redeems it again, for example after removing its license
+    Then it is refused as activation_code_already_redeemed with sameInstall true
+    And nothing is minted
+
+  @unit
+  Scenario: A code another install redeemed is refused as used elsewhere
+    Given a single-use code another install redeemed
+    When this install redeems it
+    Then it is refused as activation_code_already_redeemed with sameInstall false
+
+  @unit
+  Scenario: A used code is explained in words that match where it was used
+    Given a refusal as activation_code_already_redeemed
+    Then with sameInstall true it reads "This code was already used on this install. Ask LangWatch for a new one."
+    And with sameInstall false it reads "This code was already used on another install. Ask LangWatch for a new one."
+    And from a host that does not say which, it reads "This code was already used. Ask LangWatch for a new one."
+
   # ============================================================================
   # Exactly once
   # ============================================================================
@@ -151,7 +188,7 @@ Feature: Activating a self-hosted install with a code
     When LangWatch answers with a signed license
     Then the install validates and stores it the way it stores a pasted one
 
-  @unimplemented @unit
+  @unit
   Scenario: An install with connect switched off refuses to redeem
     Given an install with connect switched off
     When an operator enters a code

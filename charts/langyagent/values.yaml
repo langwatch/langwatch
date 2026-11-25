@@ -3,7 +3,7 @@ image:
   # .github/workflows/publish-docker-app.yml on every `langwatch@*` release.
   # Self-hosters who mirror to an internal registry override `repository`.
   repository: docker.io/langwatch/langyagent
-  tag: ""            # defaults to .Chart.AppVersion; releases also publish `latest` and `<short-sha>`
+  tag: "" # defaults to .Chart.AppVersion; releases also publish `latest` and `<short-sha>`
   pullPolicy: IfNotPresent
 
 # Lift this pod as part of the umbrella chart. Set false to run the agent
@@ -38,7 +38,11 @@ environment: ""
 manager:
   port: 8080
   maxWorkers: 20
-  workerIdleMs: 600000        # 10 min — idle workers are reaped
+  workerIdleMs: 600000 # 10 min — idle workers are reaped
+  # Workers older than this are retired between turns (never mid-turn) and the
+  # next turn spawns a fresh one with a fresh session key. Keep it below the
+  # 6h session key lifetime.
+  workerMaxAgeMs: 18000000 # 5h
   # How long to wait for a freshly-spawned worker to report ready before
   # aborting the spawn. Under gVisor (runsc), process/syscall startup is
   # materially slower than runc: a cold worker boot on the dev gVisor node
@@ -54,6 +58,8 @@ service:
   type: ClusterIP
   port: 80
   targetPort: 8080
+  ## @param service.annotations [object, default: {}] Annotations on the Service, e.g. service.kubernetes.io/topology-mode.
+  annotations: {}
 
 # Auth secret shared with the control plane: the app sends it as a Bearer
 # token, the agent verifies it, so BOTH pods must read the same value.
@@ -120,7 +126,7 @@ workspaceVolume:
   # emptyDir spec (e.g. medium: Memory).
   sizeLimit: 2Gi
 
-## @param scratchSizeLimit [string, default: 1Gi] Size cap for the writable /tmp emptyDir required under readOnlyRootFilesystem.
+## @param scratchSizeLimit [string, default: 1Gi] Size cap for the writable /tmp emptyDir required under readOnlyRootFilesystem. Empty renders an uncapped emptyDir, which removes the only bound on a path the agent's workers write to: a worker can then fill the node's ephemeral storage and get neighbouring pods evicted. Leave it set unless the node's own ephemeral-storage limits cover this.
 scratchSizeLimit: 1Gi
 
 ## SecurityContext.
@@ -302,14 +308,14 @@ networkPolicy:
   # Operators on a non-standard topology (a service CIDR outside RFC1918, extra
   # VPC CIDRs) APPEND their ranges here — the template iterates the list.
   privateExcept:
-    - 10.0.0.0/8          # RFC1918 (covers the EKS default service CIDR 10.100/16)
-    - 172.16.0.0/12       # RFC1918 (covers the EKS default service CIDR 172.20/16)
-    - 192.168.0.0/16      # RFC1918
-    - 169.254.0.0/16      # link-local + cloud metadata (169.254.169.254)
-    - 100.64.0.0/10       # RFC 6598 CGNAT — EKS "custom networking" / secondary
-                          # CIDR places PODS (and sometimes NODES + the apiserver
-                          # ENI) here; NOT covered by RFC1918, so it MUST be
-                          # excluded or a worker reaches neighbours on :443.
+    - 10.0.0.0/8 # RFC1918 (covers the EKS default service CIDR 10.100/16)
+    - 172.16.0.0/12 # RFC1918 (covers the EKS default service CIDR 172.20/16)
+    - 192.168.0.0/16 # RFC1918
+    - 169.254.0.0/16 # link-local + cloud metadata (169.254.169.254)
+    - 100.64.0.0/10 # RFC 6598 CGNAT — EKS "custom networking" / secondary
+      # CIDR places PODS (and sometimes NODES + the apiserver
+      # ENI) here; NOT covered by RFC1918, so it MUST be
+      # excluded or a worker reaches neighbours on :443.
   # IPv6 side of the external-HTTPS rule (`::/0` with the excepts below):
   # OPT-IN, and only for genuinely dual-stack clusters. On an IPv4-only EKS
   # cluster the v6 block is not just dead weight, it BREAKS enforcement: the
@@ -322,8 +328,8 @@ networkPolicy:
   # DENIES v6 (fail closed), it does not allow it.
   allowExternalHttpsIpv6: false
   privateExceptV6:
-    - fd00::/8            # unique-local (incl. IPv6 metadata fd00:ec2::254)
-    - fe80::/10           # link-local
+    - fd00::/8 # unique-local (incl. IPv6 metadata fd00:ec2::254)
+    - fe80::/10 # link-local
 
 # Egress enforcement (ADR-076) — the per-worker L7 egress adapter. Monitor
 # first, enforce last: the default posture is monitor-only. These map to the
@@ -362,6 +368,29 @@ egress:
 
 nameOverride: ""
 fullnameOverride: ""
+
+# ── Taking over objects created by another tool ─────────────────────────────
+# These values let an install hand an existing langyagent Deployment, Service
+# and ConfigMap over to this chart without deleting and recreating them. Leave
+# them at their defaults on a fresh install. Helm refuses an object it does not
+# own: run the install with --take-ownership (Helm 3.17 or later), or first
+# annotate each object meta.helm.sh/release-name and
+# meta.helm.sh/release-namespace and label it app.kubernetes.io/managed-by=Helm.
+
+## @param selectorLabels [object, default: {}] Replaces the default selector labels (app.kubernetes.io/name + instance) on the Deployment selector, the Service selector, the NetworkPolicy, the CiliumNetworkPolicy and the PDB. A Deployment's selector cannot be changed after creation, so set this only to keep an existing Deployment's selector when this chart takes it over.
+selectorLabels: {}
+
+## @param podLabels [object, default: {}] Extra labels on the pod template. The selector labels win on a shared key.
+podLabels: {}
+
+## @param extraEnvs [array, default: []] Extra container environment entries, appended after the chart's own (same shape as a container's env list, so valueFrom works).
+extraEnvs: []
+
+## @param extraConfig [object, default: {}] Extra keys for the agent ConfigMap. A key the chart already writes is refused at render time; set it through its own value.
+extraConfig: {}
+
+## @param progressDeadlineSeconds [int, default: unset] Deployment progressDeadlineSeconds. Unset keeps the Kubernetes default (600).
+progressDeadlineSeconds: null
 
 # Node placement for the agent pod. Rendered by deployment.yaml only when set;
 # empty (the default) keeps existing behaviour — the scheduler places the pod on

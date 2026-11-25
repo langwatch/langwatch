@@ -1,7 +1,9 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
+
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+
 import {
   configPath,
   defaultConfigPath,
@@ -12,6 +14,7 @@ import {
   clearConfig,
   isLoggedIn,
   isCanonicalVkSecret,
+  configWriteProblem,
 } from "../config";
 
 const tmpFile = (): string => {
@@ -41,7 +44,7 @@ describe("governance config persistence", () => {
     expect(isLoggedIn(cfg)).toBe(false);
   });
 
-  describe("self-hosted gateway-URL inference", () => {
+  describe("when inferring the self-hosted gateway URL", () => {
     let prevEndpoint: string | undefined;
     let prevGateway: string | undefined;
     beforeEach(() => {
@@ -139,9 +142,7 @@ describe("governance config persistence", () => {
       // Kept, the codex entry would hand `Bearer undefined` to every reader
       // that trusts the declared type.
       expect(loaded.tool_project_keys?.codex).toBeUndefined();
-      expect(loaded.tool_project_keys?.claude?.secret).toBe(
-        "ik-lw-pin0000000000000_secret",
-      );
+      expect(loaded.tool_project_keys?.claude?.secret).toBe("ik-lw-pin0000000000000_secret");
     });
   });
 
@@ -183,13 +184,11 @@ describe("governance config persistence", () => {
         }),
       );
       const loaded = loadConfig();
-      expect(loaded.default_personal_vk?.secret).toBe(
-        "vk-lw-01HZX9N4TESTULIDTESTULID00",
-      );
+      expect(loaded.default_personal_vk?.secret).toBe("vk-lw-01HZX9N4TESTULIDTESTULID00");
     });
   });
 
-  describe("isCanonicalVkSecret", () => {
+  describe("isCanonicalVkSecret()", () => {
     it("accepts vk-lw- prefixed secrets", () => {
       expect(isCanonicalVkSecret("vk-lw-01HZX9N4ABCDEF")).toBe(true);
     });
@@ -282,7 +281,13 @@ describe("governance config persistence", () => {
 
     /** @scenario "The login names the config file it writes" */
     it("is shown by its own path, not as the home's default", () => {
-      expect(displayConfigPath()).toBe(p);
+      // os.tmpdir() can sit under $HOME (agent shells), which would read as ~/…
+      vi.stubEnv("HOME", path.join(path.dirname(p), "home"));
+      try {
+        expect(displayConfigPath()).toBe(p);
+      } finally {
+        vi.unstubAllEnvs();
+      }
     });
   });
 
@@ -291,9 +296,7 @@ describe("governance config persistence", () => {
       process.env.LANGWATCH_CLI_CONFIG = defaultConfigPath();
 
       expect(isIsolatedConfig()).toBe(false);
-      expect(displayConfigPath()).toBe(
-        path.join("~", ".langwatch", "config.json"),
-      );
+      expect(displayConfigPath()).toBe(path.join("~", ".langwatch", "config.json"));
     });
   });
 
@@ -313,5 +316,45 @@ describe("governance config persistence", () => {
     expect(fs.existsSync(p)).toBe(false);
     // Second call must not throw
     expect(() => clearConfig()).not.toThrow();
+  });
+});
+
+describe("configWriteProblem", () => {
+  let prev: string | undefined;
+  let root: string;
+
+  beforeEach(() => {
+    prev = process.env.LANGWATCH_CLI_CONFIG;
+    root = fs.mkdtempSync(path.join(os.tmpdir(), "lw-cfg-probe-"));
+  });
+
+  afterEach(() => {
+    if (prev === undefined) delete process.env.LANGWATCH_CLI_CONFIG;
+    else process.env.LANGWATCH_CLI_CONFIG = prev;
+    fs.rmSync(root, { recursive: true, force: true });
+  });
+
+  describe("when the config folder is missing", () => {
+    /** @scenario "The check writes and removes a probe beside the config" */
+    it.skipIf(process.platform === "win32")(
+      "creates it owner-only and leaves no probe behind",
+      () => {
+        const dir = path.join(root, "missing");
+        process.env.LANGWATCH_CLI_CONFIG = path.join(dir, "config.json");
+
+        expect(configWriteProblem()).toBeUndefined();
+        expect(fs.statSync(dir).mode & 0o777).toBe(0o700);
+        expect(fs.readdirSync(dir)).toEqual([]);
+      },
+    );
+  });
+
+  describe("when a file sits where the config folder belongs", () => {
+    it("names the reason the config cannot be saved", () => {
+      fs.writeFileSync(path.join(root, "blocked"), "");
+      process.env.LANGWATCH_CLI_CONFIG = path.join(root, "blocked", "config.json");
+
+      expect(configWriteProblem()).toMatch(/^E(EXIST|NOTDIR): /);
+    });
   });
 });

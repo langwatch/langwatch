@@ -1,6 +1,6 @@
 @unit
 Feature: The Langy home
-  As a project member who has Langy
+  As a project member
   I want the home page to open with a place to ask
   So that the first thing I meet is a way into my own work, not a lobby
 
@@ -13,31 +13,29 @@ Feature: The Langy home
   The block only ever renders on the shared announcement canvas: it layers
   over it and never mounts a second one.
 
-  Which home renders is resolved in a strict order, specified in
-  specs/home/signal-focused-home-rollout.feature: the signal-focused home
-  first, then this one, then the classic home. This feature covers the second
-  branch and what the block contains. The send animation and its states are
-  specified in specs/home/langy-home-morph.feature.
+  Every reader gets this home. Without Langy the block keeps its shape and its
+  field is the command bar alone; Langy only decides what the block offers.
+  This feature covers what the block contains. The send animation and its
+  states are specified in specs/home/langy-home-morph.feature.
 
   Background:
     Given I am signed in on a project's home page
 
-  Scenario: The Langy home renders when the signal-focused home is off
+  Scenario: The Langy home renders for a reader with Langy
     Given I have Langy
-    But the signal-focused home is not enabled for me
     When the home page renders
     Then the lit block leads the page with a composer I can type into
     And recent work and the setup checklist still follow underneath
 
-  # Having Langy IS having the Langy home — there is no second rollout to
-  # forget. A project with the panel and a classic lobby was a state nobody
-  # could explain from the page, so it is no longer a state.
-  Scenario: Without Langy the classic home renders
+  # There is one home. A second layout for readers without Langy was a state
+  # nobody could explain from the page, so it is no longer a state.
+  Scenario: Without Langy the home shows the command bar and says Langy isn't enabled
     Given I do not have Langy
-    And the signal-focused home is not enabled for me
     When the home page renders
-    Then the classic home renders
-    And the lit block is not shown
+    Then the lit block still leads the page, with recent work and the setup checklist underneath
+    And its field is the command bar, for searching and jumping to anything
+    And no example asks or ways to hand work to Langy are offered
+    And one quiet line under the field says "Langy isn't enabled for this workspace."
 
   Scenario: The Langy home carries an announcement about Langy
     Given the Langy home renders
@@ -46,7 +44,8 @@ Feature: The Langy home
     And following it starts that conversation in place, without leaving the page
 
   Scenario: That announcement is not shown to readers without Langy
-    Given the classic home renders
+    Given I do not have Langy
+    When the home page renders
     Then no announcement about Langy is carried
     Because an announcement about something I cannot reach is only noise
 
@@ -169,10 +168,18 @@ Feature: The Langy home
     Then the docs and guides section is on the page
     And the footer's quiet resource links are still there too
 
-  Scenario: Developers can preview every state of this home
-    Given the app is running a development build
-    When I use the home state control in the page footer
-    Then I can pin the page to any state the block can be in
-    And I can compare the ways the figures can be presented, side by side over time
-    And I can return it to the project's real data
-    And the control is never rendered in production builds
+  # What the block offers is decided by Langy's gate, and a gate that has not
+  # answered yet is not the same as one that is off. Drawing the block on the
+  # assumption of "off" means swapping its field and its asks a beat later.
+  Scenario: The page waits rather than guessing which home it is
+    Given I am loading the home page
+    And Langy's gate has not answered yet
+    When the page renders
+    Then a single neutral placeholder renders in place of the home
+    And the placeholder is announced as loading
+
+  Scenario: The placeholder gives way to the home once Langy's gate answers
+    Given I am loading the home page
+    And the placeholder is showing
+    When Langy's gate has answered
+    Then the home renders in its place, offering what that answer allows

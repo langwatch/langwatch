@@ -53,17 +53,6 @@ Feature: Internal feature flag system for system-level kill switches
 
   Rule: SYSTEM flags never reach PostHog
 
-    Scenario: hot-path event-sourcing kill switch resolves without a PostHog call
-      Given the registry has a SYSTEM-scoped flag for the trace-processing
-            projection kill switch
-      And no environment variable forces the flag on or off
-      And no row exists for the flag in the postgres flag store
-      When the trace-processing pipeline checks the kill switch for ten
-           thousand events
-      Then the resolved value matches the registry default for every check
-      And no request is made to PostHog
-      And the per-pod cache absorbs the bulk of those checks
-
     Scenario: SYSTEM flag flipped on in postgres takes effect cluster-wide within seconds
       Given an operator opens the Ops Feature Flags page
       And the operator toggles a SYSTEM kill switch from disabled to enabled
@@ -311,9 +300,11 @@ Feature: Internal feature flag system for system-level kill switches
            rule the operator believes is live
 
   Rule: Operators manage flags from the Ops Feature Flags page
+  # The page shows only where ops's cloud-ops capability is on (Alex, 2026-10-09).
 
     Scenario: Ops Feature Flags page lists every registered flag with its current resolved value
-      Given an operator with ops:view permission opens /ops/feature-flags
+      Given an install where ops's cloud-ops capability is on
+      And an operator with ops:view permission opens /ops/feature-flags
       Then the page lists every flag declared in the registry
       And each row shows the flag's scope, description, registry default,
           postgres value, and effective resolved value
@@ -334,6 +325,27 @@ Feature: Internal feature flag system for system-level kill switches
       Then the System section names env, this postgres store, and the registry
            default as the places a value comes from, in that order
       And it names no external flag service either
+
+    @unit
+    Scenario: Self-hosted installs do not offer the Feature Flags page
+      Given an operator on a self-hosted production install where ops's cloud-ops capability is off
+      Then the Ops menu has no Feature Flags entry
+      And /ops/feature-flags answers as an unknown page
+      But an environment override still sets a flag
+      And the flag procedures still answer an operator with ops permissions
+
+    @unit
+    Scenario: A developer's local stack offers the Feature Flags page
+      Given an operator on a development build where ops's cloud-ops capability is off
+      Then the Ops menu has a Feature Flags entry
+      And /ops/feature-flags shows the flags
+
+    @unit
+    Scenario: Cloud, self-hosted and local development are told apart
+      Given a build's mode and deployment
+      Then a development build reads as local, even when it runs SaaS-shaped
+      And a production SaaS build reads as cloud
+      And any other production build reads as self-hosted
 
     Scenario: Operator without ops:manage permission cannot toggle flags
       Given an operator with only ops:view permission opens the page
@@ -463,6 +475,38 @@ Feature: Internal feature flag system for system-level kill switches
       Then the saved rule still carries both conditions, because dropping one
            would widen the rollout to that organization's whole history
 
+  Rule: A project rule may name several projects
+
+    # A per-project allowlist, such as the projects whose legacy keys keep
+    # full access, is one rule naming every project rather than one rule per
+    # project, so the writable rule cap stays at 50.
+
+    @unit
+    Scenario: a project rule naming several projects matches each of them
+      Given a rule naming the projects "project_a" and "project_b", with enabled true
+      When the flag is read for either project
+      Then the rule matches
+      And a read for a third project does not match
+
+    @unit
+    Scenario: an operator cannot save a project rule that names no project
+      Given an operator writes a project rule from the Ops UI
+      When its list of projects is empty, or an id in it is blank or padded
+      Then the write is rejected with a message naming the expected form
+
+    @unit
+    Scenario: a rules write still holds at most 50 rules
+      Given an operator writes the rules of one flag
+      When the write carries 51 rules
+      Then the write is rejected
+
+    @unit
+    Scenario: the ops page reads and writes a project rule naming several projects
+      Given a stored rule enabling the flag for three projects
+      When the rule is opened in the targeting rules dialog
+      Then it shows as a "Project" rule with every id, comma-separated
+      And saving it after removing one id stores the remaining two
+
   Rule: A rollout can name the email domain of the signed-in user
 
     # The team QAs a flag in production by signing up with fresh accounts at
@@ -550,11 +594,44 @@ Feature: Internal feature flag system for system-level kill switches
       Then the flag resolves enabled
       And a signed-in user at another domain reads it disabled
 
+  Rule: A rollout can name signed-in users by id
+
+    # An operator turns a flag on for one person, such as a teammate who
+    # asked to try it, without switching it on for their whole organization.
+
+    @unit
+    Scenario: a user rule enables the flag for a named user
+      Given a flag that is off by default
+      And a rule naming the users "user_a" and "user_b", with enabled true
+      When the flag is read for a signed-in user "user_a"
+      Then the flag resolves enabled from the rule
+      And a read for a third user does not match
+
+    @unit
+    Scenario: a read with no signed-in user matches no user rule
+      Given a flag whose only rule names a user
+      When the flag is read from a surface with no signed-in user, such as a
+           job or an anonymous visitor
+      Then the rule does not match
+
+    @unit
+    Scenario: an operator cannot save a user rule that names no user
+      Given an operator writes a user rule from the Ops UI
+      When its list of users is empty, or an id in it is blank or padded
+      Then the write is rejected with a message naming the expected form
+
+    @unit
+    Scenario: the ops page reads and writes a user rule
+      Given a stored rule enabling the flag for two users
+      When the rule is opened in the targeting rules dialog
+      Then it shows as a "User" rule with both users
+      And saving it back stores the same two user ids
+
   Rule: Self-hosted parity
 
     Scenario: Flipping a kill switch works the same self-hosted as on a shared install
       Given the installation is self-hosted
-      When an operator toggles a SYSTEM kill switch from the Ops UI
+      When an operator flips a SYSTEM kill switch through the flag procedures
       Then the change persists in postgres and every pod observes it, exactly
            as it would on a shared install
       And nothing in the chain reaches outside the install, because the

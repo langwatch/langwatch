@@ -1,0 +1,245 @@
+// Package entrypoint tests scripts/entrypoint-wrapper.sh with stubbed
+// ch-config and official entrypoint, so no ClickHouse binary is needed.
+package entrypoint
+
+import (
+	"os"
+	"os/exec"
+	"path/filepath"
+	"strings"
+	"testing"
+	"time"
+)
+
+// runWrapper runs the wrapper with args and env, returning the environment
+// and arguments the official entrypoint would have been handed.
+func runWrapper(t *testing.T, initdbFiles []string, env map[string]string, args ...string) (map[string]string, string) {
+	t.Helper()
+	got, argv, _ := runWrapperOut(t, initdbFiles, env, args...)
+	return got, argv
+}
+
+// runWrapperOut also returns the stem the stubs write their records under.
+func runWrapperOut(t *testing.T, initdbFiles []string, env map[string]string, args ...string) (map[string]string, string, string) {
+	t.Helper()
+	dir := t.TempDir()
+	initdb := filepath.Join(dir, "initdb")
+	if err := os.Mkdir(initdb, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	for _, f := range initdbFiles {
+		if err := os.WriteFile(filepath.Join(initdb, f), []byte("SELECT 1;\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	bin := filepath.Join(dir, "bin")
+	if err := os.Mkdir(bin, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	out := filepath.Join(dir, "out")
+	// As the embedded sidecar, record its env and stop the restart loop.
+	chConfig := "#!/usr/bin/env bash\nif [ \"$1\" = sidecar ]; then env > " + out + ".sidecar; kill $PPID; exit 0; fi\nexit 0\n"
+	if pw := env["TEST_BOOTSTRAP_PASSWORD"]; pw != "" {
+		// Stands in for `ch-config generate` in dynamic-only mode.
+		chConfig = "#!/usr/bin/env bash\nif [ \"$1\" = sidecar ]; then env > " + out + ".sidecar; kill $PPID; exit 0; fi\nmkdir -p " + filepath.Join(dir, "bootstrap") + " && echo " + pw + " > " + filepath.Join(dir, "bootstrap", "password") + "\n"
+	}
+	writeExec(t, filepath.Join(bin, "ch-config"), chConfig)
+	official := filepath.Join(dir, "entrypoint.sh")
+	writeExec(t, official, "#!/usr/bin/env bash\nenv > "+out+".env\necho \"$*\" > "+out+".args\n")
+
+	src, err := os.ReadFile("../../scripts/entrypoint-wrapper.sh")
+	if err != nil {
+		t.Fatal(err)
+	}
+	script := strings.NewReplacer(
+		"exec /entrypoint.sh", "exec "+official,
+		"/run/clickhouse-access", filepath.Join(dir, "bootstrap"),
+		"/docker-entrypoint-initdb.d", initdb,
+	).Replace(string(src))
+	wrapper := filepath.Join(dir, "wrapper.sh")
+	writeExec(t, wrapper, script)
+
+	cmd := exec.Command("bash", append([]string{wrapper}, args...)...)
+	cmd.Env = []string{"PATH=" + bin + ":/usr/bin:/bin"}
+	for k, v := range env {
+		cmd.Env = append(cmd.Env, k+"="+v)
+	}
+	if b, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("wrapper failed: %v\n%s", err, b)
+	}
+	got := map[string]string{}
+	raw, err := os.ReadFile(out + ".env")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, line := range strings.Split(string(raw), "\n") {
+		if k, v, ok := strings.Cut(line, "="); ok {
+			got[k] = v
+		}
+	}
+	argv, err := os.ReadFile(out + ".args")
+	if err != nil {
+		t.Fatal(err)
+	}
+	return got, strings.TrimSpace(string(argv)), out
+}
+
+// sidecarEnv waits for the embedded sidecar's environment, if it started.
+func sidecarEnv(t *testing.T, out string) (map[string]string, bool) {
+	t.Helper()
+	path := out + ".sidecar"
+	for i := 0; i < 50; i++ {
+		if raw, err := os.ReadFile(path); err == nil && len(raw) > 0 {
+			got := map[string]string{}
+			for _, line := range strings.Split(string(raw), "\n") {
+				if k, v, ok := strings.Cut(line, "="); ok {
+					got[k] = v
+				}
+			}
+			return got, true
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	return nil, false
+}
+
+func writeExec(t *testing.T, path, content string) {
+	t.Helper()
+	if err := os.WriteFile(path, []byte(content), 0o755); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func passwordFile(t *testing.T, content string) string {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), "password")
+	if err := os.WriteFile(path, []byte(content), 0o440); err != nil {
+		t.Fatal(err)
+	}
+	return path
+}
+
+// @scenario "Initialisation scripts and CLICKHOUSE_DB still log in as default"
+func TestWrapper_InitdbGetsThePassword(t *testing.T) {
+	plain := passwordFile(t, "file-pw\n")
+	for _, tc := range []struct {
+		name     string
+		initdb   []string
+		env      map[string]string
+		wantEnv  string // CLICKHOUSE_PASSWORD handed on, "" for unset
+		wantFile string // CLICKHOUSE_PASSWORD_FILE handed on, "" for unset
+	}{
+		{"CLICKHOUSE_DB with an env password", nil,
+			map[string]string{"CLICKHOUSE_DB": "db_under_test", "CLICKHOUSE_PASSWORD": "pw"}, "pw", ""},
+		{"a padded password file goes trimmed, as ch-config reads it", []string{"01-schema.sql"},
+			map[string]string{"CLICKHOUSE_PASSWORD_FILE": passwordFile(t, "  file-pw \n")}, "file-pw", ""},
+		{"a plain password file stays a file, and wins over env", []string{"01-schema.sql"},
+			map[string]string{"CLICKHOUSE_PASSWORD": "env-pw", "CLICKHOUSE_PASSWORD_FILE": plain}, "", plain},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			env, args := runWrapper(t, tc.initdb, tc.env, "--listen_host=0.0.0.0")
+			if env["CLICKHOUSE_PASSWORD"] != tc.wantEnv {
+				t.Errorf("CLICKHOUSE_PASSWORD = %q, want %q", env["CLICKHOUSE_PASSWORD"], tc.wantEnv)
+			}
+			if env["CLICKHOUSE_PASSWORD_FILE"] != tc.wantFile {
+				t.Errorf("CLICKHOUSE_PASSWORD_FILE = %q, want %q", env["CLICKHOUSE_PASSWORD_FILE"], tc.wantFile)
+			}
+			if env["CLICKHOUSE_SKIP_USER_SETUP"] != "1" {
+				t.Error("CLICKHOUSE_SKIP_USER_SETUP must be 1")
+			}
+			if !strings.HasSuffix(args, "--config-file=/etc/clickhouse-server/config.xml") {
+				t.Errorf("args = %q, want the config file appended", args)
+			}
+		})
+	}
+}
+
+// @scenario "An install that names its own CLICKHOUSE_USER keeps that login"
+func TestWrapper_CustomUserKeepsTheOfficialUserSetup(t *testing.T) {
+	pw := passwordFile(t, " padded-pw \n")
+	env, _ := runWrapper(t, nil, map[string]string{"CLICKHOUSE_USER": "app", "CLICKHOUSE_PASSWORD_FILE": pw})
+	if _, set := env["CLICKHOUSE_SKIP_USER_SETUP"]; set {
+		t.Error("the official user setup was skipped, so user app would never be created")
+	}
+	if env["CLICKHOUSE_USER"] != "app" || env["CLICKHOUSE_PASSWORD_FILE"] != pw {
+		t.Errorf("handed on user %q with file %q, want app with %q", env["CLICKHOUSE_USER"], env["CLICKHOUSE_PASSWORD_FILE"], pw)
+	}
+	if _, set := env["CLICKHOUSE_PASSWORD"]; set {
+		t.Error("the password reached the server's environment")
+	}
+}
+
+// @scenario "Initialisation scripts and CLICKHOUSE_DB still log in as default"
+func TestWrapper_NoPasswordWithoutInitdb(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		initdb []string
+		env    map[string]string
+		args   []string
+	}{
+		{"no initdb inputs", nil, map[string]string{"CLICKHOUSE_PASSWORD": "pw"}, nil},
+		{"default clickhouse-server command skips initdb", []string{"01-schema.sql"},
+			map[string]string{"CLICKHOUSE_PASSWORD": "pw", "CLICKHOUSE_DB": "db_under_test"}, []string{"clickhouse-server"}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			env, _ := runWrapper(t, tc.initdb, tc.env, tc.args...)
+			if _, set := env["CLICKHOUSE_PASSWORD"]; set {
+				t.Error("CLICKHOUSE_PASSWORD must be unset when the official entrypoint runs no initdb")
+			}
+			if env["CLICKHOUSE_SKIP_USER_SETUP"] != "1" {
+				t.Error("CLICKHOUSE_SKIP_USER_SETUP must be 1")
+			}
+		})
+	}
+}
+
+// @scenario "Initialisation scripts log in as the local admin in dynamic-only mode"
+func TestWrapper_DynamicOnlyInitdbUsesTheLocalAdmin(t *testing.T) {
+	pw := strings.Repeat("ab", 32)
+	env, _ := runWrapper(t, []string{"01-schema.sql"}, map[string]string{"TEST_BOOTSTRAP_PASSWORD": pw}, "--listen_host=0.0.0.0")
+	file := env["CLICKHOUSE_PASSWORD_FILE"]
+	got, _ := os.ReadFile(file)
+	if env["CLICKHOUSE_USER"] != "local_admin" || strings.TrimSpace(string(got)) != pw {
+		t.Errorf("initdb runs as %q with password file %q, want local_admin with this start's password", env["CLICKHOUSE_USER"], file)
+	}
+	if _, set := env["CLICKHOUSE_PASSWORD"]; set {
+		t.Error("the local admin password reached the server's environment")
+	}
+
+	t.Run("without initdb nothing is handed on", func(t *testing.T) {
+		env, _ := runWrapper(t, nil, map[string]string{"TEST_BOOTSTRAP_PASSWORD": pw})
+		if _, set := env["CLICKHOUSE_PASSWORD"]; set {
+			t.Error("the local admin password reached the server's environment")
+		}
+		if _, set := env["CLICKHOUSE_USER"]; set {
+			t.Error("CLICKHOUSE_USER set without initdb")
+		}
+	})
+}
+
+// @scenario "The image runs the backup sidecar in-process when asked, logging in from a file"
+func TestWrapper_EmbeddedBackupSidecar(t *testing.T) {
+	pw := passwordFile(t, "file-pw\n")
+	_, _, out := runWrapperOut(t, nil, map[string]string{
+		"BACKUP_SIDECAR": "run", "CLICKHOUSE_PASSWORD": "env-pw", "CLICKHOUSE_PASSWORD_FILE": pw,
+		"CLICKHOUSE_ACCESS_FILE": "/etc/access.yaml", "CLICKHOUSE_ACCESS_SIDECAR": "external",
+	})
+	env, ok := sidecarEnv(t, out)
+	if !ok {
+		t.Fatal("BACKUP_SIDECAR=run started no embedded sidecar")
+	}
+	if env["BACKUP_PASSWORD_FILE"] != pw {
+		t.Errorf("BACKUP_PASSWORD_FILE = %q, want the password file %q", env["BACKUP_PASSWORD_FILE"], pw)
+	}
+	if _, set := env["CLICKHOUSE_PASSWORD"]; set {
+		t.Error("the sidecar must never get a password from the environment")
+	}
+	if _, set := env["CLICKHOUSE_ACCESS_FILE"]; set {
+		t.Error("an external access sidecar must not run here as well")
+	}
+
+	_, _, out = runWrapperOut(t, nil, map[string]string{"CLICKHOUSE_PASSWORD": "pw"})
+	if _, ok := sidecarEnv(t, out); ok {
+		t.Error("a sidecar started without an access file or BACKUP_SIDECAR")
+	}
+}

@@ -64,7 +64,7 @@ for idx, entry in experiment.loop(enumerate(image_dataset)):
             "output": result,
         },
         settings={
-            "model": "openai/gpt-5-mini",
+            "model": "openai/gpt-6-luna",
             "prompt": "Does the agent correctly describe/classify this image?",
         },
     )

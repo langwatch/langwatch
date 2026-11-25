@@ -94,6 +94,18 @@ Rule: Search bar layout and behavior
     Then the trace table filters to show only error traces
     And no request went out before Enter
 
+  Scenario: The inline hint names Enter
+    Given the search bar is focused with text in it
+    Then the hint after the text reads "⏎ Enter to search"
+    And no other key submits the search
+
+  @unit
+  Scenario: The inline hint shows only while typed text is unsubmitted
+    Given the user typed "foo bar baz" in the search bar
+    When the user presses Enter and the bar shows the resulting chip
+    Then the "⏎ Enter to search" hint is gone
+    And it comes back only once the user types text that was not searched
+
   @integration
   Scenario: Typing does not trigger live search
     When the user types "@status:err" without pressing Enter
@@ -101,10 +113,6 @@ Rule: Search bar layout and behavior
     And the filter store does not change
     And only autocomplete suggestions and chip highlighting update live
 
-  Scenario: The inline hint names Enter
-    Given the search bar is focused with text in it
-    Then the hint after the text reads "⏎ Enter to search"
-    And no other key submits the search
 
   # Pasting a multi-line error message used to create one Paragraph node
   # per line, growing the editor vertically until it pushed the rest of
@@ -206,6 +214,30 @@ Rule: Query syntax
   Scenario: Negation with NOT
     When the user searches for "NOT @status:error"
     Then traces with status "error" are excluded from results
+
+  @unit
+  Scenario: NOT over a bracketed group negates the whole group
+    Given traces that are errors on "gpt-4o-mini", errors on another model, and not errors on "gpt-4o-mini"
+    When the user searches for "NOT (@status:error AND @model:gpt-4o-mini)"
+    Then only the errors on "gpt-4o-mini" are excluded
+    And "NOT (@status:error OR @model:gpt-4o-mini)" excludes every error and every "gpt-4o-mini" trace
+    And a NOT inside the group cancels only on its own term while the AND still becomes an OR, so "NOT (NOT @status:error AND @model:gpt-4o-mini)" keeps every error and every trace not on "gpt-4o-mini"
+    And the trace list and an automation's match on a single trace give the same answer
+
+  @unit
+  Scenario: NOT over an evaluator group keeps the evaluator's own results together
+    Given a trace where evaluator "x" scored 0.3 and evaluator "y" scored 0.9
+    When the user searches for "NOT (@evaluator:x AND @evaluatorScore:>0.5)"
+    Then the trace is shown, because x did not score above 0.5
+    And the compiled query passes the tenant guard instead of erroring
+    And the evaluator stays tied to its results only when they are written in one AND chain; a written-out form such as "NOT (NOT @evaluator:x OR NOT @evaluatorScore:>0.5)" reads them separately
+
+  @integration
+  Scenario: The table lists exactly the complement of a group under NOT
+    Given stored traces that are errors on a model, errors on another model, and not errors on that model
+    When the trace list reads "NOT (@status:error AND @model:<model>)" and "NOT (@status:error OR @model:<model>)"
+    Then each lists the traces its group leaves out, no more and no fewer
+    And the table total and the sidebar's counts agree with that list
 
   Scenario: CSV shorthand for OR within a field
     When the user searches for "@status:error,warning"
@@ -632,6 +664,32 @@ Rule: Categorical facet selection logic
     When the user checks "Error" and "Warning" under Status and "gpt-4o" under Model
     Then the query is "(@status:error OR @status:warning) AND @model:gpt-4o"
 
+  @unit
+  Scenario: A value a group in the search bar makes optional is marked as in group
+    When the user searches for "NOT (@status:error AND @model:gpt-5-mini)" or "@status:error OR @model:gpt-5-mini"
+    Then the "Error" row under Status and the "gpt-5-mini" row under Model are neither included nor excluded
+    And each says "in group", titled "Part of a group in the search bar" and then what a click does
+    And clicking such a row does what it did before
+
+  @unit
+  Scenario: Values every result must match keep their include or exclude mark
+    When the user searches for "@status:error AND @model:gpt-5-mini", "NOT (@status:error OR @model:gpt-5-mini)" or "@status:error OR @status:warning"
+    Then each named row shows include or exclude as before, with no "in group" label
+
+  @unit
+  Scenario: The exclude button on a row in a group says what a click does
+    When the user searches for "NOT (@status:error AND @model:gpt-5-mini)" and hovers the "Error" row
+    Then its exclude button reads "Remove Error from the group" and is not pressed, because a click removes "Error" from that group, which can widen or narrow what it hides
+    And the same holds for "NOT (@evaluator:abc AND @evaluatorVerdict:fail)" and the "gpt-5-mini" row of "@status:error AND NOT (@status:error AND @model:gpt-5-mini)"
+    And on a row in a group the query names plainly, as in "@status:error OR @model:gpt-5-mini", the button reads "Exclude <value>", because a click excludes it from every result
+
+  @unit
+  Scenario: Attribute, metadata and event rows a group makes optional also say in group
+    When a group in the search bar makes an attribute, metadata or event value optional, as "NOT (@status:error AND @attribute.metadata.customer:acme)" does for the "acme" row under Metadata
+    Then its row in the sidebar says "in group" and is neither included nor excluded
+    And its title and accessible name say what a click does: "remove from the group" for a negated term, "exclude" for a plain one
+    And clicking it does what it did before
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # RANGE FACETS
@@ -1037,13 +1095,6 @@ Rule: Facet count updates
     And an absolute window still carries both bounds
 
   @unit
-  Scenario: A facet term under a NOT is removed with the rest
-    Given the query reads "NOT (status:error OR service:api)"
-    When the Status facet is counted
-    Then the term it is counted under no longer names status
-    And the rest of the negated group still applies
-
-  @unit
   Scenario: Facet counts are fetched in a single batched query
     When the user applies a filter
     Then all facet counts are fetched in one query, not one per facet
@@ -1061,14 +1112,6 @@ Rule: Facet count updates
     Then the table shows no traces
     And no facet the query does not name shows a nonzero count
 
-  @integration
-  Scenario: Facet counts leave out the hidden origin and the traces outside the window
-    Given the project has a trace from Langy's own origin in the window
-    And a trace outside the selected window
-    Then neither trace is counted in any facet but Origin
-    And the Origin facet still offers Langy with its count
-    And the counts read the window the table reads, never a rounded one
-
   @unit
   Scenario: A facet on spans or evaluations reads the listed traces once any filter is active
     Given the query names only an evaluator facet
@@ -1081,12 +1124,66 @@ Rule: Facet count updates
     Then the span and evaluation facets count every row in the window
     And they are counted again through the listed traces as soon as a filter is applied
 
+  # The sidebar's numbers come from the same predicate the table runs, so the
+  # read is never served from the shared discover cache while a query is on.
+  @unit
   @integration
   Scenario: Facet counts are cached only per query and window
     When the user changes the query or the time window
     Then the counts are requested again for the new input
     And a count kept for a previous input is never shown as the current one
 
+  # One tenant's slow facet scan must not hold the statement slots every other
+  # tenant's reads queue for.
+  @unit
+  Scenario: A capped facet read gives its shared slot back
+    When a sidebar facet read runs past its time or memory cap
+    Then the server stops that scan and the sidebar omits that facet
+    And a facet that sets its own memory ceiling keeps it, with the time cap added
+
+  @unit
+  Scenario: A repeated facet request shares the count still running
+    Given the facet counts for a query, window and viewer are still running
+    When the same request arrives again
+    Then it is answered by the running count, not a second scan
+    And a request differing in query, eval runs or protections runs its own count
+    And a repeat after the count has answered counts afresh
+
+  # A live window's bounds roll forward on every request, so a repeat that
+  # differs only by that roll asks for the same counts.
+  @unit
+  Scenario: A live repeat in the same minute shares the count still running
+    Given the facet counts for a live window are still running
+    When the page asks again with its bounds rolled forward within the same minute
+    Then it is answered by the running count, not a second scan
+
+  @unit
+  Scenario: A facet read stopped at its time cap is not run again
+    When a sidebar facet read is stopped at its time cap
+    Then the client answers with the timeout instead of running the read again
+
+  @unit
+  Scenario: One facet discovery pass runs per tenant window at a time
+    Given a discovery pass for a tenant's window is still running in a process
+    When more viewers open the sidebar, or the live window rolls to its next bucket
+    Then that process starts no second pass for that window
+    And the pass runs a bounded number of ClickHouse statements at once
+    And a pass that failed is not started again until a short cooldown passes
+
+  # The `discover_updated` push is the fast path; a viewer answered pending
+  # must not depend on it arriving.
+  @unit
+  Scenario: A viewer answered pending asks again until the facets land
+    Given the sidebar's last discover answer was pending
+    Then it asks again every few seconds
+    And it stops asking once the facets have landed or a read fails
+
+  Scenario: Facet counts leave out the hidden origin and the traces outside the window
+    Given the project has a trace from Langy's own origin in the window
+    And a trace outside the selected window
+    Then neither trace is counted in any facet but Origin
+    And the Origin facet still offers Langy with its count
+    And the counts read the window the table reads, never a rounded one
 
 # ─────────────────────────────────────────────────────────────────────────────
 # NUMBERS THAT AGREE
@@ -1385,6 +1482,12 @@ Rule: Enter routes a sentence
     Given the user is authenticated with "traces:view" permission
     And the project has traces
 
+  @unit
+  Scenario: A sentence about what the agent did is offered to the classifier as a judgement
+    When the classifier's routing question is built
+    Then the instant_eval option names judging what the agent did, such as a tool called with a wrong value or tests not re-run
+    And the free_text option says a description of something that happened is not a literal string
+
   @integration
   Scenario: Enter on a sentence asks the router
     Given the search bar contains the applied query "model:gpt-4o"
@@ -1427,6 +1530,55 @@ Rule: Enter routes a sentence
     Then the sentence is empty
     And the explicit query is "status:error OR refund"
     And the query is applied as typed rather than routed
+
+  @unit
+  Scenario: An apostrophe inside a word is part of the word, not a quote
+    When the user types "where did a member ask about cover their plan doesn't include?"
+    Then the whole text is the sentence and nothing is a syntax error
+    And contractions, possessives and a trailing plural possessive stay words too
+    And a value in single quotes is still a quoted value
+
+  # A quoted value still missing its closing quote does not parse, so its chip
+  # is drawn without the parser. An open quote reads as it will once closed:
+  # everything after it is the value.
+  @unit
+  Scenario: A quoted value still being typed is drawn as one chip
+    When the user has typed `errorMessage:"rate limit exc` and not closed the quote
+    Then one chip covers the field, the quote and every word typed after it
+    And it is one chip after every character typed on the way there, a space included
+    And the U+00A0 the editor writes for a space is part of the chip like a space
+    And an escaped quote inside the value does not close it
+    And a value opened with a single quote is drawn the same way
+
+  @unit
+  Scenario: An apostrophe inside an open quoted value stays in the chip
+    When the user has typed `errorMessage:"the model didn't answ` and not closed the quote
+    Then one chip covers the text up to the last character typed
+
+  @unit
+  Scenario: A term after a closed quote is its own chip while its quote is open
+    When the user has typed `errorMessage:"rate limit" model:"gpt 5` and not closed the second quote
+    Then the closed term is one chip and the open term is a second chip
+    And an operator word inside the open value is not drawn as an operator
+
+  @integration
+  Scenario: The editor draws an open quoted value as one chip wherever the caret sits
+    Given the search bar editor holds `errorMessage:"rate limit exceeded` with the quote not closed
+    When the caret is moved back between two words of the value
+    Then the editor shows one chip holding the whole text
+
+  @unit
+  Scenario: A lowercase "not" inside a sentence is a word of the sentence
+    When the user types "where did a member ask about cover that is not in their plan?"
+    Then the whole text, "not" included, is the sentence
+    And an uppercase NOT is still the negation operator
+
+  @unit
+  Scenario: The editor uppercases an operator only where it joins filter terms
+    When the user types "not" after a bare word of a sentence
+    Then it stays lowercase
+    And "and", "or" and "not" typed after a field:value term, a quoted phrase or a group are uppercased
+    And "not" typed at the start, after an opening parenthesis or after an operator is uppercased
 
   @unit
   Scenario: Joining a query that holds a top-level OR groups it first
@@ -1521,6 +1673,36 @@ Rule: Enter routes a sentence
     When the router runs
     Then the query is `service:api AND "cannot connect to database"`
     And no model is called
+
+  # A question is never a literal string to look for: nobody types "Was the
+  # customer frustrated?" hoping a trace contains those words.
+  @unit
+  Scenario: A question the classifier or the model calls a phrase is judged instead
+    Given Instant Evals are available for the project
+    And the classifier, or the model without one, answers "free_text" for "Was the customer frustrated?"
+    When the router runs
+    Then the result is an Instant Eval on that question, rewritten by the FAST model like any judgement
+    And a sentence that is not a question, such as "cannot connect to database", is still searched as one phrase
+
+  @unit
+  Scenario: A question no model could route is judged as typed
+    Given Instant Evals are available for the project
+    And no classifier answered and the FAST model fails or is not configured
+    When the user submits "Was the customer frustrated?"
+    Then the result is an Instant Eval whose question is "Was the customer frustrated?"
+    And it says the model failed, as a judgement without a model does
+
+  @unit
+  Scenario: A question stays a phrase search while Instant Evals are unavailable
+    Given Instant Evals are not available for the project
+    And the classifier answers "free_text" for "Was the customer frustrated?"
+    When the router runs
+    Then the sentence is searched as one quoted phrase
+
+  @unit
+  Scenario: A sentence reads as a question when it asks one
+    Then "Was the customer frustrated?" and "did the agent call the refund tool" read as questions
+    And "cannot connect to database", "how", "is" and "?" do not
 
   @unit
   Scenario: A question for the assistant goes to Langy with the view attached
@@ -1687,6 +1869,9 @@ Rule: The search bar's ask affordance belongs to Langy when Langy is available
     When the user opens the Langy ask surface
     Then it says the active search goes with the question
 
+  # Regression: the trace host's ask once handed the question to nothing, so the
+  # surface dissolved and no panel opened.
+  @integration @regression
   Scenario: Enter hands the question and the search to the panel
     Given the Langy ask surface is open with "why are these failing?" typed
     And the search bar contains the applied query "status:error"
@@ -1695,6 +1880,7 @@ Rule: The search bar's ask affordance belongs to Langy when Langy is available
     And the Langy panel opens and asks "why are these failing?"
     And the active search rides along as attached context
 
+  @unit
   @integration
   Scenario: Ask Langy sends the whole view with the question
     Given the search bar contains the applied query "status:error"
@@ -2370,12 +2556,14 @@ Rule: Attribute sections list values from their own attribute store
     Given the user is authenticated with "traces:view" permission
     And the project has traces with trace, span, and event attributes
 
+  @unit
   Scenario: Expanding an event-attribute key lists values observed on events
     Given events carry the attribute "event.metrics.vote" with values "1" and "-1"
     And no trace-level attribute named "event.metrics.vote" exists
     When the user expands the "event.metrics.vote" key in the Event attributes section
     Then the value list shows "1" and "-1"
 
+  @unit
   Scenario: Expanding a span-attribute key lists values observed on spans
     Given spans carry the attribute "gen_ai.request.model" with value "gpt-5-mini"
     And no trace-level attribute named "gen_ai.request.model" exists
@@ -2399,11 +2587,13 @@ Rule: Event filtering is reachable on the default sidebar
     And the user has never changed density
     And the project has traces with events carrying attributes
 
+  @unit
   Scenario: Event name and Event attributes sections show on the comfortable default
     Given the user has never changed facet visibility
     Then the sidebar shows the "Event name" section
     And the sidebar shows the "Event attributes" section
 
+  @unit
   Scenario: Span attributes stays behind the facet picker on comfortable density
     Given the user has never changed facet visibility
     And the project has traces with span attributes
@@ -2426,6 +2616,7 @@ Rule: Event rows drill down into their metric values
     Given the user is authenticated with "traces:view" permission
     And the project has traces with "thumbs_up_down" events carrying "event.metrics.vote" values "1" and "-1"
 
+  @unit @integration
   Scenario: Expanding the thumbs_up_down row shows its vote values with counts
     When the user expands the "thumbs_up_down" row in the Event name section
     Then the drilldown lists "vote" values "thumbs up" and "thumbs down" with their counts
@@ -2437,11 +2628,13 @@ Rule: Event rows drill down into their metric values
   # named by whoever sent it, has no such mapping and shows as stored.
   # (Metric values are numbers everywhere — see `eventSchema.metrics`, a
   # record of string to number — so "as stored" always means a decimal.)
+  @integration
   Scenario: A metric with no human name shows its stored value
     Given "checkout_survey" events carry "event.metrics.stars" with value "4"
     When the user expands the "checkout_survey" row in the Event name section
     Then the drilldown lists that value as "4"
 
+  @integration
   Scenario: Clicking a vote value on an already-active event row applies a single event-attribute filter
     Given "event:thumbs_up_down" is already an active filter
     When the user clicks the vote value shown as "thumbs down" in the thumbs_up_down drilldown
@@ -2453,6 +2646,7 @@ Rule: Event rows drill down into their metric values
   # event type — a metric that never happened on "thumbs_up_down" would still
   # pass. Adding the anchor keeps the picked value scoped to the row the user
   # actually expanded.
+  @integration
   Scenario: Clicking a vote value on an inactive event row scopes the filter to that event first
     Given the "thumbs_up_down" row is not yet an active filter
     When the user expands the row and clicks the vote value shown as "thumbs down"
@@ -2494,6 +2688,7 @@ Rule: Event rows drill down into their metric values
     When the user clicks the vote value "-1" in the thumbs_up_down drilldown
     Then that trace still matches the resulting query
 
+  @integration
   Scenario: An event type with no metrics shows no drilldown affordance
     Given the project has "custom_marker" events carrying no event.metrics attributes
     Then the "custom_marker" row shows no expand affordance
@@ -2578,3 +2773,70 @@ Rule: Editing an existing token reopens the dropdown
     Given the search bar contains "@trace.attribute.langwatch.origin:application" with the dropdown open
     When the user presses the right arrow until the cursor sits past the token
     Then the dropdown closes
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# ENTER ROUTES A SENTENCE
+# ─────────────────────────────────────────────────────────────────────────────
+
+Rule: Enter routes a sentence
+  Enter is the only way a typed text leaves the search bar. A text made of
+  `field:value` terms is applied as typed, with no request. A text with bare
+  words is a sentence, and `tracesV2.routeSearch` decides what it is: a
+  filter the query language can express, a judgement each trace needs (an
+  Instant Eval), a literal phrase, or a question for Langy. The classifier
+  makes the call in one category question over the sentence and a line of
+  context (lens, window, the filter fields, the evaluators and events the
+  project has); a deployment without the classifier asks the FAST model to
+  decide and build in one call; a deployment with neither searches the
+  phrase and says why. Routing is counted on a metric and never metered.
+  A failure on the way is a phrase search, never an error state in the bar.
+  See dev/docs/adr/139-trace-search-routes-on-enter.md.
+
+  Background:
+    Given the user is authenticated with "traces:view" permission
+    And the project has traces
+
+  # The two halves are rejoined with AND, so a word the writer put under an OR
+  # would come back meaning something else than they typed.
+  # A rejected key makes the provider's own response body the credential, so
+  # the log line gets the same curation the customer-facing disclosure gets.
+
+  Rule: A facet is counted under the query with its own field left out
+
+    @unit
+    Scenario: The facet's own terms are dropped and the rest kept
+      Given a query naming the status facet and another field
+      When the query is rewritten for the status facet's count
+      Then the status terms are gone and every other term is kept
+      And a field that merely shares the prefix is left alone
+      And a query that named only that facet becomes empty
+
+    @unit
+    Scenario: A facet term under a NOT over an OR group is removed with the rest
+      Given a query negating an OR group that names the facet, which reads as an AND
+      When the query is rewritten for that facet's count
+      Then the negated group no longer carries the facet's term
+
+    @unit @integration
+    Scenario: A facet whose term an OR joins to other terms counts under the whole query
+      Given a query joining the facet's term to another field's by an OR, or by an AND under a NOT
+      When the facet's counts are computed
+      Then the facet is counted under the whole query, as the table is
+      And a facet joined to the rest by AND still drops its own terms
+
+  Rule: The Explorer leaves Langy's own turns out unless the query names an origin
+
+    @unit
+    Scenario: The list leaves out Langy's turns by default
+      Given a query that does not name the origin field
+      When the Explorer's filter is compiled
+      Then the Langy origin is excluded after the query's own terms
+      And a trace with no origin still counts as the application's
+
+    @unit
+    Scenario: Naming an origin turns the default off
+      Given a query naming the origin field, negated or not
+      When the Explorer's filter is compiled
+      Then nothing is hidden, so picking Langy shows Langy's turns
+      And free text or an attribute holding the word does not count as naming it

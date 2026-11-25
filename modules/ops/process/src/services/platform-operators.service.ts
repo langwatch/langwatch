@@ -1,0 +1,499 @@
+import type { LedgerActor } from "@langwatch/authorization";
+import type { AuthzApi, PlatformOperator } from "@langwatch/authz-contract";
+import type { MailRender, PlatformOperatorChangeEmailProps } from "@langwatch/mail";
+import {
+  isEmailUnconfigured,
+  type NotificationService as NotificationApi,
+} from "@langwatch/notification-contract";
+import { createLogger } from "@langwatch/observability";
+import {
+  OpsImpersonatedOperatorRefusedError,
+  OpsOperatorSessionRequiredError,
+  PlatformOperatorUserNotFoundError,
+  type OpsOperator,
+  type OpsPlatformOperator,
+} from "@langwatch/ops-contract";
+import type { OrganizationApi } from "@langwatch/organization-contract";
+import type { UserApi, UserProfile } from "@langwatch/user-contract";
+
+import { grantsAreStaffOnly, isStaffAccount } from "../rules/platform-operator-staff.rules.ts";
+
+const logger = createLogger("langwatch:ops:platform-operators");
+
+/** The ledger actor on the one-time seed's grants. */
+export const PLATFORM_OPERATOR_SEED_ACTOR: LedgerActor = {
+  type: "system",
+  id: "system:ops-platform-operator-seed",
+};
+
+/** The ledger actor on the recovery task's grants: shell access already implies full control. */
+export const PLATFORM_OPERATOR_TASK_ACTOR: LedgerActor = {
+  type: "system",
+  id: "system:grant-platform-operator-task",
+};
+
+const RECOVERY_HINT =
+  "run `pnpm --filter @langwatch/tasks task grant-platform-operator <email>` to grant one";
+
+/** What the seed reads: the address list, and whether this is the hosted service. */
+export type PlatformOperatorSeedSettings = Readonly<{
+  adminEmails: readonly string[];
+  cloud: boolean;
+}>;
+
+/** Who the one-time seed decides to grant, and why. `waiting`: nothing decided, nothing latched. */
+export type PlatformOperatorSeedOutcome = Readonly<{
+  via: "waiting" | "admin-emails" | "sole-organization-admin" | "first-user" | "none";
+  userIds: readonly string[];
+  reason: string;
+}>;
+
+/** Sends ops's own record-the-seed command; the event latches the seed process's marker. */
+type PlatformOperatorSeedRecorder = Readonly<{
+  record(outcome: {
+    via: Exclude<PlatformOperatorSeedOutcome["via"], "waiting">;
+    userIds: readonly string[];
+  }): Promise<void>;
+}>;
+
+/** Where every operator is told of a grant or a revoke, and what the mail calls this install. */
+export type PlatformOperatorChangeNotice = Readonly<{
+  mail: Pick<NotificationApi, "sendEmail">;
+  renderer: Pick<MailRender, "renderPlatformOperatorChange">;
+  installation: string;
+  /** Absolute; null when the install has no public address, and the mail then links nothing. */
+  operatorsUrl: string | null;
+}>;
+
+const TASK_ACTOR_NAME = "The grant-platform-operator task";
+
+type PlatformOperatorsServiceOptions = Readonly<{
+  authz: Pick<
+    AuthzApi,
+    "grantPlatformOperator" | "revokePlatformOperator" | "listPlatformOperators"
+  >;
+  users: Pick<UserApi, "findByEmail" | "findById" | "countUsage" | "isFirstCreatedAccount">;
+  organizations: Pick<OrganizationApi, "listProvisioningSummaries" | "findAdministrators">;
+  /** Whether the install has email at all: without it no account can verify its address. */
+  mail: Pick<NotificationApi, "getMailDelivery">;
+  /** `cloud` is the seed's own: a deployment LangWatch runs. */
+  deployment: Readonly<{ cloud: boolean; isLocalDevelopment: boolean }>;
+  notice: PlatformOperatorChangeNotice;
+}>;
+
+/** Who ADMIN_EMAILS names that the seed may take, and whether an unverified one was passed over. */
+type NamedSeedables = Readonly<{ userIds: string[]; isLaterUnverifiedSkipped: boolean }>;
+
+/**
+ * ops's side of the platform-operator grant (ARCHITECTURE.md, "Platform operators are a grant"
+ * and "Operator bootstrap"): the Operators page, the recovery task and the one-time seed. authz
+ * holds the rules (no self-grant, last holder); this resolves people and picks the seed.
+ */
+export class PlatformOperatorsService {
+  private constructor(private readonly options: PlatformOperatorsServiceOptions) {}
+
+  static create(options: PlatformOperatorsServiceOptions): PlatformOperatorsService {
+    return new PlatformOperatorsService(options);
+  }
+
+  #recorder: PlatformOperatorSeedRecorder | undefined;
+  #loggedWaitReason: string | undefined;
+
+  /** Bound once ops's pipeline registers, as the system-migration kick is. */
+  connectSeedRecorder(recorder: PlatformOperatorSeedRecorder): void {
+    this.#recorder = recorder;
+  }
+
+  async list(): Promise<OpsPlatformOperator[]> {
+    const holders = await this.options.authz.listPlatformOperators();
+    return Promise.all(
+      holders.map(async (holder) => {
+        const user = await this.options.users.findById({ id: holder.userId });
+        return { ...holder, name: user?.name ?? null, email: user?.email ?? null };
+      }),
+    );
+  }
+
+  /** A signed-in, non-impersonated operator grants; authz refuses granting yourself. */
+  async grant({
+    email,
+    operator,
+  }: {
+    email: string;
+    operator: OpsOperator | null;
+  }): Promise<OpsPlatformOperator> {
+    const granter = signedInOperator(operator);
+    const user = await this.#eligibleUserOf(email);
+    const holding = await this.#holdingBeforeChange(user.id);
+    const held = await this.options.authz.grantPlatformOperator({
+      principal: { type: "user", id: user.id },
+      caller: { type: "user", id: granter.id },
+      actor: { type: "user", id: granter.id },
+      source: "grants-service",
+    });
+    if (holding === "not-held") {
+      await this.#tellOperators({
+        change: "granted",
+        grantId: held.grantId,
+        subject: user,
+        actorName: nameOf(granter),
+      });
+    }
+    return { ...held, name: user.name, email: user.email };
+  }
+
+  async revoke({
+    grantId,
+    operator,
+  }: {
+    grantId: string;
+    operator: OpsOperator | null;
+  }): Promise<void> {
+    const revoker = signedInOperator(operator);
+    const holders = await this.#holdersBeforeChange();
+    await this.options.authz.revokePlatformOperator({
+      grantId,
+      caller: { type: "user", id: revoker.id },
+      actor: { type: "user", id: revoker.id },
+    });
+    if (holders === "unknown") return;
+    const target = holders.find((holder) => holder.grantId === grantId);
+    // The revoke already stands: a failed lookup only costs the notice, as a failed send does.
+    let subject: UserProfile | null = null;
+    try {
+      subject = target ? await this.options.users.findById({ id: target.userId }) : null;
+    } catch (error) {
+      logger.error({ error, grantId }, "the platform operators were not told of a revoke");
+      return;
+    }
+    if (!subject) {
+      logger.warn(
+        { grantId },
+        "the platform operators were not told of a revoke of an inactive holder",
+      );
+      return;
+    }
+    await this.#tellOperators({ change: "revoked", grantId, subject, actorName: nameOf(revoker) });
+  }
+
+  /**
+   * The recovery task: lockout on self-hosted, staff at the cloud cutover. With no email
+   * configured no address can verify, so shell access naming the account is the check.
+   */
+  async grantAsSystem({ email }: { email: string }): Promise<OpsPlatformOperator> {
+    const user = await this.#eligibleUserOf(email, {
+      canGrantUnverified: await this.#isEmailUnconfigured(),
+    });
+    const holding = await this.#holdingBeforeChange(user.id);
+    const held = await this.options.authz.grantPlatformOperator({
+      principal: { type: "user", id: user.id },
+      caller: { type: "system" },
+      actor: PLATFORM_OPERATOR_TASK_ACTOR,
+      source: "grants-service",
+    });
+    if (holding === "not-held") {
+      await this.#tellOperators({
+        change: "granted",
+        grantId: held.grantId,
+        subject: user,
+        actorName: TASK_ACTOR_NAME,
+      });
+    }
+    return { ...held, name: user.name, email: user.email };
+  }
+
+  /**
+   * One seed attempt: decide, then record the decision, which latches the marker. It grants
+   * nothing itself: the recorded event asks for the grants, so a failed record grants nobody
+   * and only the first recorded decision is ever granted (review L2). Waiting records nothing.
+   */
+  async seedOnce(settings: PlatformOperatorSeedSettings): Promise<PlatformOperatorSeedOutcome> {
+    const outcome = await this.#decide(settings);
+    if (outcome.via === "waiting") return outcome;
+    await this.#record({ via: outcome.via, userIds: outcome.userIds });
+    return outcome;
+  }
+
+  /**
+   * user's created fact: a self-hosted install's first user operates, whatever ADMIN_EMAILS says.
+   * Only the install's sole active user, while nobody holds the grant, is recorded as the seed's
+   * decision; that record's one fixed key and the process's latch grant only the first decision.
+   */
+  async grantFirstUser({
+    userId,
+    backfilled,
+    settings,
+  }: {
+    userId: string;
+    backfilled: boolean;
+    settings: PlatformOperatorSeedSettings;
+  }): Promise<boolean> {
+    if (settings.cloud || backfilled) return false; // a backfilled fact is never a sign-up
+    if ((await this.options.authz.listPlatformOperators()).length > 0) return false;
+    if ((await this.#userCount()) !== 1) return false;
+    const user = await this.options.users.findById({ id: userId });
+    if (!user || user.deactivatedAt !== null) return false;
+    await this.#record({ via: "first-user", userIds: [user.id] });
+    logger.info({ userId: user.id }, "recorded the install's first user as its platform operator");
+    return true;
+  }
+
+  async #record(decision: Parameters<PlatformOperatorSeedRecorder["record"]>[0]): Promise<void> {
+    if (!this.#recorder) {
+      throw new Error(
+        "the platform-operator seed ran in a process that never connected its command",
+      );
+    }
+    await this.#recorder.record(decision);
+  }
+
+  /** The recorded decision's grants, as the system; authz keeps a holder's existing grant. */
+  async grantSeeded({
+    via,
+    userIds,
+  }: Parameters<PlatformOperatorSeedRecorder["record"]>[0]): Promise<void> {
+    for (const id of userIds) {
+      await this.options.authz.grantPlatformOperator({
+        principal: { type: "user", id },
+        caller: { type: "system" },
+        actor: PLATFORM_OPERATOR_SEED_ACTOR,
+        source: "migration",
+      });
+    }
+    logger.info({ via, userIds }, "seeded the platform operators once");
+  }
+
+  /**
+   * The `ops:seed-platform-operators` upgrade step: while nobody holds the grant, grants the
+   * seedable active users a still-set ADMIN_EMAILS names (verified, or with no email configured
+   * the install's first-created account), and answers how many. The rest stays with the seed.
+   */
+  async seedFromAdminEmails({
+    settings,
+    dryRun,
+  }: {
+    settings: PlatformOperatorSeedSettings;
+    dryRun: boolean;
+  }): Promise<number> {
+    if (settings.cloud || settings.adminEmails.length === 0) return 0;
+    if ((await this.options.authz.listPlatformOperators()).length > 0) return 0;
+    const { userIds } = await this.#seedableUsersNamed(settings.adminEmails);
+    if (!dryRun && userIds.length > 0) await this.grantSeeded({ via: "admin-emails", userIds });
+    return userIds.length;
+  }
+
+  /**
+   * Cloud never seeds; no user waits; holders decide nobody. A set ADMIN_EMAILS takes its seedable
+   * active users (with no email configured, an unverified one only as the first-created account)
+   * or waits, never an org admin. An empty one takes the only organization's oldest active admin.
+   */
+  async #decide({
+    adminEmails,
+    cloud,
+  }: PlatformOperatorSeedSettings): Promise<PlatformOperatorSeedOutcome> {
+    if (cloud) return nobody("the hosted service never bootstraps; staff are granted by the task");
+    if (!(await this.#anyUserExists())) return waiting("no user exists yet");
+    if ((await this.options.authz.listPlatformOperators()).length > 0) {
+      return nobody("platform operators already hold the grant");
+    }
+
+    if (adminEmails.length > 0) {
+      const { userIds, isLaterUnverifiedSkipped } = await this.#seedableUsersNamed(adminEmails);
+      if (userIds.length > 0) {
+        return { via: "admin-emails", userIds, reason: "the users ADMIN_EMAILS names" };
+      }
+      return this.#waitForNamedUser({ isLaterUnverifiedSkipped });
+    }
+
+    const organizations = await this.options.organizations.listProvisioningSummaries();
+    if (organizations.length === 0) return waiting("users exist but no organization yet");
+    const [only, ...others] = organizations;
+    if (!only || others.length > 0) {
+      return nobody(`the install has ${organizations.length} organizations, not one`);
+    }
+    const admin = await this.#oldestActiveAdministrator({ organizationId: only.id });
+    if (!admin) return nobody("the only organization has no active administrator");
+    return {
+      via: "sole-organization-admin",
+      userIds: [admin],
+      reason: "the oldest active administrator of the only organization",
+    };
+  }
+
+  /** Waits for a named user; says each reason once per process, not on every wake. */
+  #waitForNamedUser({
+    isLaterUnverifiedSkipped,
+  }: {
+    isLaterUnverifiedSkipped: boolean;
+  }): PlatformOperatorSeedOutcome {
+    const reason = isLaterUnverifiedSkipped
+      ? "the unverified account ADMIN_EMAILS names is not the install's first-created account, " +
+        "and with no email configured only that first account is seeded unverified, never a later " +
+        `one, even once the first is deactivated or erased; ${RECOVERY_HINT}`
+      : "no user named by ADMIN_EMAILS has an active account yet, verified where email is configured";
+    if (this.#loggedWaitReason !== reason) {
+      this.#loggedWaitReason = reason;
+      logger.warn({ reason }, `the platform-operator seed is waiting: ${reason}`);
+    }
+    return waiting(reason);
+  }
+
+  async #anyUserExists(): Promise<boolean> {
+    return (await this.#userCount()) > 0;
+  }
+
+  async #userCount(): Promise<number> {
+    const { emailDomains } = await this.options.users.countUsage();
+    return Object.values(emailDomains).reduce((total, count) => total + count, 0);
+  }
+
+  /**
+   * The active users the list names whose address is verified. With no email configured an
+   * unverified one counts only as the install's first-created account, as the first user does: a
+   * later sign-up on a named address proves nothing, even once the first is deactivated or erased.
+   */
+  async #seedableUsersNamed(adminEmails: readonly string[]): Promise<NamedSeedables> {
+    const active: UserProfile[] = [];
+    for (const email of adminEmails) {
+      const user = await this.options.users.findByEmail({ email });
+      if (user && user.deactivatedAt === null) active.push(user);
+    }
+    const verifiedIds = active.filter((user) => user.emailVerified).map((user) => user.id);
+    const unverified = active.filter((user) => !user.emailVerified);
+    if (unverified.length === 0 || !(await this.#isEmailUnconfigured())) {
+      return { userIds: [...new Set(verifiedIds)], isLaterUnverifiedSkipped: false };
+    }
+    const seedable = [...verifiedIds];
+    let isLaterUnverifiedSkipped = false;
+    for (const user of unverified) {
+      if (await this.options.users.isFirstCreatedAccount({ userId: user.id }))
+        seedable.push(user.id);
+      else isLaterUnverifiedSkipped = true;
+    }
+    return { userIds: [...new Set(seedable)], isLaterUnverifiedSkipped };
+  }
+
+  async #isEmailUnconfigured(): Promise<boolean> {
+    return isEmailUnconfigured({ mail: await this.options.mail.getMailDelivery() });
+  }
+
+  async #oldestActiveAdministrator({
+    organizationId,
+  }: {
+    organizationId: string;
+  }): Promise<string | undefined> {
+    const administrators = await this.options.organizations.findAdministrators({ organizationId });
+    const profiles = await Promise.all(
+      administrators.map((admin) => this.options.users.findById({ id: admin.userId })),
+    );
+    return profiles
+      .filter((user): user is UserProfile => user !== null && user.deactivatedAt === null)
+      .toSorted((a, b) => a.createdAt.getTime() - b.createdAt.getTime())[0]?.id;
+  }
+
+  /** Read only for the notice, so a failed read skips the notice and never the change itself. */
+  async #holdersBeforeChange(): Promise<PlatformOperator[] | "unknown"> {
+    try {
+      return await this.options.authz.listPlatformOperators();
+    } catch (error) {
+      logger.error({ error }, "the platform operators will not be told of this role change");
+      return "unknown";
+    }
+  }
+
+  async #holdingBeforeChange(userId: string): Promise<"held" | "not-held" | "unknown"> {
+    const holders = await this.#holdersBeforeChange();
+    if (holders === "unknown") return "unknown";
+    return holders.some((holder) => holder.userId === userId) ? "held" : "not-held";
+  }
+
+  /**
+   * Tells every holder, and the person whose role changed, so a grant nobody expected is seen
+   * by someone who can revoke it. The change already stands: a failed send is logged, not thrown.
+   */
+  async #tellOperators({
+    change,
+    grantId,
+    subject,
+    actorName,
+  }: {
+    change: PlatformOperatorChangeEmailProps["change"];
+    grantId: string;
+    subject: UserProfile;
+    actorName: string;
+  }): Promise<void> {
+    const { mail, renderer, installation, operatorsUrl } = this.options.notice;
+    try {
+      const { subject: title, html } = await renderer.renderPlatformOperatorChange({
+        installation,
+        change,
+        subjectName: subject.name ?? subject.email ?? subject.id,
+        subjectEmail: subject.email,
+        actorName,
+        operatorsUrl,
+      });
+      const holders = await this.list();
+      const recipients = new Set(
+        [...holders.map((holder) => holder.email), subject.email].flatMap((email) =>
+          email ? [email.toLowerCase()] : [],
+        ),
+      );
+      await Promise.all(
+        [...recipients].map((to) =>
+          mail.sendEmail({
+            to,
+            subject: title,
+            html,
+            idempotencyKey: `platform-operator-${change}:${grantId}:${to}`,
+          }),
+        ),
+      );
+    } catch (error) {
+      logger.error(
+        { error, change, userId: subject.id },
+        "the platform operators were not told of a role change",
+      );
+    }
+  }
+
+  /**
+   * Who the page and the task may grant: an active account with a verified address, since
+   * whoever registered an unclaimed one first would operate; where grants are staff-only, staff.
+   * `canGrantUnverified` lifts only the verified rule, for the task on an install with no email.
+   */
+  async #eligibleUserOf(
+    email: string,
+    { canGrantUnverified = false }: { canGrantUnverified?: boolean } = {},
+  ): Promise<UserProfile> {
+    const user = await this.options.users.findByEmail({ email });
+    if (!user) throw new PlatformOperatorUserNotFoundError();
+    if (user.deactivatedAt !== null || (!user.emailVerified && !canGrantUnverified)) {
+      throw new PlatformOperatorUserNotFoundError({ userId: user.id });
+    }
+    if (grantsAreStaffOnly(this.options.deployment) && !isStaffAccount(user)) {
+      throw new PlatformOperatorUserNotFoundError({ userId: user.id });
+    }
+    return user;
+  }
+}
+
+function waiting(reason: string): PlatformOperatorSeedOutcome {
+  return { via: "waiting", userIds: [], reason };
+}
+
+function nobody(reason: string): PlatformOperatorSeedOutcome {
+  logger.warn({ reason }, `no platform operator was seeded; ${RECOVERY_HINT}`);
+  return { via: "none", userIds: [], reason };
+}
+
+/** How the mail names whoever changed the role: their name, else their address. */
+function nameOf(operator: OpsOperator): string {
+  return operator.name ?? operator.email ?? "Another platform operator";
+}
+
+/** Grant and revoke need a real signed-in session: an impersonation never changes who operates. */
+function signedInOperator(operator: OpsOperator | null): OpsOperator {
+  if (!operator) throw new OpsOperatorSessionRequiredError();
+  if (operator.impersonator) throw new OpsImpersonatedOperatorRefusedError();
+  return operator;
+}

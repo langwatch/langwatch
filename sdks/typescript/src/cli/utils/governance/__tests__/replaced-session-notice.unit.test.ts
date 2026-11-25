@@ -28,9 +28,7 @@ describe("replacedSessionNotice()", () => {
     });
 
     it("says the previous login is signed out, not merely changed", () => {
-      expect(replacedSessionNotice({ previous: ACME, next: OTHER })).toContain(
-        "signed out",
-      );
+      expect(replacedSessionNotice({ previous: ACME, next: OTHER })).toContain("signed out");
     });
   });
 
@@ -63,9 +61,7 @@ describe("replacedSessionNotice()", () => {
 
   describe("when the machine holds no login yet", () => {
     it("says nothing, because nothing is being replaced", () => {
-      expect(
-        replacedSessionNotice({ previous: {}, next: OTHER }),
-      ).toBeUndefined();
+      expect(replacedSessionNotice({ previous: {}, next: OTHER })).toBeUndefined();
     });
   });
 

@@ -99,3 +99,10 @@ Feature: Editing an existing SSO connection's identity provider settings
     Then the form shows the current issuer and client id
     And the client secret is blank, with a note that blank keeps the current secret
     And saving sends the changed settings for the same connection
+
+  @integration
+  Scenario: A SAML connection registered from metadata alone still offers the edit
+    Given a live SAML connection whose issuer was never recorded
+    When an administrator views the connection's card
+    Then the issuer reads as not recorded
+    And the identity provider settings, including sign-in from the identity provider, can still be edited

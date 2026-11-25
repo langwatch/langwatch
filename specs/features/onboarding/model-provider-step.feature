@@ -11,15 +11,15 @@ Feature: Model provider step in product onboarding
   # through it at all.
   #
   # Tests:
-  #   platform/app/src/features/onboarding/hooks/__tests__/use-product-flow.unit.test.tsx
-  #   platform/app/src/features/onboarding/components/sections/__tests__/ModelProviderStepScreen.integration.test.tsx
+  #   modules/onboarding/browser/src/behavior/__tests__/use-product-flow.unit.test.tsx
+  #   modules/onboarding/browser/src/ui/sections/__tests__/model-provider-step-screen.integration.test.tsx
 
   Background:
     Given I finished the welcome questions and reached the flavour selection
 
   @unit
   Scenario: Only the platform flavour passes through the step
-    When I pick "Via the Platform"
+    When I pick "In the platform"
     Then I see the "Set up a model provider" step before the platform overview
     And picking a coding-agent flavour instead goes straight to its setup screen with no model provider step
 

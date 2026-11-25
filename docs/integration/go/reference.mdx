@@ -52,7 +52,9 @@ func setupLangWatch(ctx context.Context) func(context.Context) {
 ```
 
 <Warning>
-**Always call shutdown!** Traces are buffered in memory before being sent. Without `defer shutdown(ctx)`, your traces will be lost when the application exits. This is critical for CLI tools, serverless functions, and any short-lived process.
+  **Always call shutdown!** Traces are buffered in memory before being sent. Without `defer
+  shutdown(ctx)`, your traces will be lost when the application exits. This is critical for CLI
+  tools, serverless functions, and any short-lived process.
 </Warning>
 
 For custom configuration, pass options to `NewExporter`:
@@ -66,9 +68,9 @@ exporter, err := langwatch.NewExporter(ctx,
 )
 ```
 
-| Option | Description |
-| --- | --- |
-| `WithAPIKey(key)` | Set API key (defaults to `LANGWATCH_API_KEY` env var) |
+| Option              | Description                                           |
+| ------------------- | ----------------------------------------------------- |
+| `WithAPIKey(key)`   | Set API key (defaults to `LANGWATCH_API_KEY` env var) |
 | `WithEndpoint(url)` | Set endpoint (defaults to `https://app.langwatch.ai`) |
 | `WithFilters(...)` | Apply span filters (see [Filtering](#filtering)) |
 | `WithDataCapture(mode)` | Strip input/output content at export time (see [Data Capture](#data-capture)) |
@@ -91,12 +93,13 @@ There are two exporter constructors:
 func Tracer(instrumentationName string, opts ...trace.TracerOption) LangWatchTracer
 ```
 
-| Parameter | Type | Description |
-| --- | --- | --- |
-| `instrumentationName` | `string` | Name of the library or application being instrumented. |
-| `opts` | `...trace.TracerOption`| Optional OpenTelemetry tracer options (e.g., `trace.WithInstrumentationVersion`). |
+| Parameter             | Type                    | Description                                                                       |
+| --------------------- | ----------------------- | --------------------------------------------------------------------------------- |
+| `instrumentationName` | `string`                | Name of the library or application being instrumented.                            |
+| `opts`                | `...trace.TracerOption` | Optional OpenTelemetry tracer options (e.g., `trace.WithInstrumentationVersion`). |
 
 **Example:**
+
 ```go
 // Basic usage
 tracer := langwatch.Tracer("my-app")
@@ -117,6 +120,7 @@ func (t *LangWatchTracer) WithActiveSpan(ctx context.Context, name string, fn fu
 ```
 
 **Example:**
+
 ```go
 tracer := langwatch.Tracer("my-app")
 ctx, span := tracer.Start(ctx, "HandleUserRequest")
@@ -146,7 +150,7 @@ span.
     SetType(langwatch.SpanTypeLLM).
     SetInput("What is the capital of France?").
     SetOutput("The capital of France is Paris.").
-    SetRequestModel("gpt-5-mini").
+    SetRequestModel("gpt-6-luna").
     SetThreadID("conversation-123")
 ```
 
@@ -280,8 +284,8 @@ Handy when instrumenting manually. These map directly to OpenTelemetry GenAI sem
 
   **Example:**
   ```go
-  span.SetRequestModel("gpt-5-mini")
-  span.SetResponseModel("gpt-5-mini-2025-08-07")
+  span.SetRequestModel("gpt-6-luna")
+  span.SetResponseModel("gpt-6-luna")
   ```
 </ParamField>
 
@@ -498,10 +502,10 @@ exporter, err := langwatch.NewExporter(ctx,
 )
 ```
 
-| Filter | Description |
-| --- | --- |
-| `ExcludeHTTPRequests()` | Removes HTTP verb spans (GET, POST, etc.) |
-| `LangWatchOnly()` | Keeps only spans from LangWatch instrumentation |
+| Filter                  | Description                                     |
+| ----------------------- | ----------------------------------------------- |
+| `ExcludeHTTPRequests()` | Removes HTTP verb spans (GET, POST, etc.)       |
+| `LangWatchOnly()`       | Keeps only spans from LangWatch instrumentation |
 
 ### Custom Filters
 
@@ -531,11 +535,11 @@ A `Criteria` matches on `ScopeName` (the `InstrumentationScope.Name`) and/or `Sp
 
 ### Matchers
 
-| Matcher | Description |
-| --- | --- |
-| `Equals(s)` | Exact match |
-| `EqualsIgnoreCase(s)` | Case-insensitive exact match |
-| `StartsWith(prefix)` | Prefix match |
+| Matcher                        | Description                   |
+| ------------------------------ | ----------------------------- |
+| `Equals(s)`                    | Exact match                   |
+| `EqualsIgnoreCase(s)`          | Case-insensitive exact match  |
+| `StartsWith(prefix)`           | Prefix match                  |
 | `StartsWithIgnoreCase(prefix)` | Case-insensitive prefix match |
 | `MatchRegex(re)` | Regex match (compiled `*regexp.Regexp`) |
 | `MustMatchRegex(pattern)` | Regex match from a pattern string (panics on invalid pattern) |
@@ -543,6 +547,13 @@ A `Criteria` matches on `ScopeName` (the `InstrumentationScope.Name`) and/or `Sp
 <Note>
 Multiple filters use AND semantics (a span must pass all). Within a `Criteria`, matchers use OR semantics (a span matches if any matcher matches); multiple fields in a `Criteria` use AND.
 </Note>
+
+## Braids: signed calls
+
+`langwatch.SignBaggage` signs the baggage entries a braid names; `langwatch.NewBraidBaggageSpanProcessor`
+copies them onto the called service's spans. Setup is on the [Braids](/features/braids#signed-calls)
+page. Signing returns a `*langwatch.BraidSigningError` whose `Code` is `malformed_signing_key`,
+`empty_entries`, `invalid_entry_key`, `invalid_entry_value` or `no_active_trace`.
 
 ## LangWatch Span Types
 
@@ -563,7 +574,8 @@ Multiple filters use AND semantics (a span must pass all). Within a `Criteria`, 
 | `SpanTypeSpan` | Generic span (the default) |
 
 <Note>
-Using these span types is optional but highly recommended, as it enables LangWatch to provide more tailored insights and visualizations for your traces.
+  Using these span types is optional but highly recommended, as it enables LangWatch to provide more
+  tailored insights and visualizations for your traces.
 </Note>
 
 ## API Client
@@ -627,7 +639,7 @@ prod, err := lw.Prompts.Get(ctx, "support-greeting", &client.GetPromptOptions{Ta
 // Create a prompt (Update creates a new version).
 p, err := lw.Prompts.Create(ctx, client.CreatePromptParams{
 	Handle: "support-greeting",
-	Model:  "openai/gpt-5-mini",
+	Model:  "openai/gpt-6-luna",
 	Messages: []client.Message{
 		{Role: client.RoleSystem, Content: "You are a friendly support agent."},
 	},
@@ -722,6 +734,7 @@ func setupLangWatch(ctx context.Context, apiKey string) func() {
 ## Support
 
 For additional help:
+
 - [GitHub Issues](https://github.com/langwatch/langwatch/issues)
 - [Documentation](https://docs.langwatch.ai)
 - [Community Support](https://docs.langwatch.ai/support)

@@ -78,6 +78,12 @@ spec:
         {{- with (coalesce .Values.workers.pod.annotations .Values.global.podAnnotations) }}
         {{- toYaml . | nindent 8 }}
         {{- end }}
+        {{- if .Values.app.telemetry.metrics.enabled }}
+        {{- /* What the langwatch-workers scrape job keeps on. The port is the
+               worker's own scrape listener, not the probes' health port. */}}
+        prometheus.io/scrape: "true"
+        prometheus.io/port: {{ include "langwatch.metricsPort" . | quote }}
+        {{- end }}
     spec:
       # Workers do not call the Kubernetes API, so don't mount the SA token.
       {{- with (include "langwatch.serviceAccountName" .) }}
@@ -133,110 +139,7 @@ spec:
         {{- with .Values.workers.extraContainers}}
         {{- toYaml . | nindent 8 }}
         {{- end }}
-        - name: {{ .Release.Name }}-workers
-          securityContext:
-            {{- include "langwatch.containerSecurityContext" (dict "ctx" . "component" .Values.workers) | nindent 12 }}
-          image: "{{ .Values.images.app.repository }}:{{ .Values.images.app.tag }}"
-          imagePullPolicy: "{{ .Values.images.app.pullPolicy }}"
-          workingDir: /app/platform/app
-          command: ['pnpm']
-          args: ['run', 'start:workers']
-          env:
-            {{- include "langwatch.sharedEnv" . | nindent 12 }}
-            {{- include "langwatch.shutdownEnv" (dict "component" .Values.workers "name" "workers") | nindent 12 }}
-
-            # See the app deployment — named per role so worker telemetry is
-            # separable from the app's.
-            - name: OTEL_SERVICE_NAME
-              value: {{ .Values.workers.otel.serviceName | default "langwatch-workers" | quote }}
-
-            - name: LANGWATCH_ENDPOINT
-              value: {{ .Values.workers.upstreams.langwatch.scheme | default "http" }}://{{ .Values.workers.upstreams.langwatch.name | default (printf "%s-app" .Release.Name) }}:{{ .Values.workers.upstreams.langwatch.port | default 5560 }}
-
-            {{- /* Langy turns are dispatched from HERE, not from the app: the
-                   process outbox in the event-sourcing runtime POSTs the turn to
-                   the Go manager and the liveness subscriber re-drives a stalled
-                   one (see startWorkers.ts, "Langy turns self-drive"). Both run
-                   in the worker stack, so a workers pod without this pair builds
-                   its Langy port with an empty URL and every turn dies where no
-                   one is looking — the app pod, which HAS the pair, never makes
-                   that call. Same Secret and same Service as the app block. */}}
-            {{- if (index .Values "langyagent").chartManaged }}
-            - name: LANGY_AGENT_URL
-              value: {{ (index .Values "langyagent").controlPlane.agentUrl | default (printf "http://%s-langyagent:80" .Release.Name) | quote }}
-            - name: LANGY_INTERNAL_SECRET
-              valueFrom:
-                secretKeyRef:
-                  name: {{ (index .Values "langyagent").secrets.existingSecretName | default (include "langwatch.appSecretName" .) }}
-                  key: {{ (index .Values "langyagent").secrets.internalSecretKey | default "LANGY_INTERNAL_SECRET" }}
-            {{- include "langwatch.langyCallbackUrlEnv" . | nindent 12 }}
-            {{- /* Re-dispatching a stalled turn re-resolves the worker's
-                   credentials, which needs the gateway the same way the app does. */}}
-            {{- include "langwatch.gatewayBaseUrlEnv" . | nindent 12 }}
-            {{- end }}
-
-            {{- with .Values.workers.extraEnvs}}
-            {{- include "langwatch.assertNoReservedTimeoutEnvs" (dict "envs" . "path" "workers.extraEnvs") }}
-            {{- toYaml . | nindent 12 }}
-            {{- end }}
-
-          {{- include "langwatch.envFromWithOfflineDefaults" (dict "root" $ "extraEnvFrom" .Values.workers.extraEnvFrom) | nindent 10 }}
-
-          # Probe the worker's HTTP listener (the metrics server port, 2999)
-          # rather than just PID 1 liveness — an answered request proves the
-          # event loop is turning, which `kill -0 1` cannot tell us.
-          #
-          # The probe targets /healthz, NOT /metrics. /metrics is fail-closed in
-          # production: with no METRICS_API_KEY (the default —
-          # app.telemetry.metrics.enabled is false, so the env var is never
-          # emitted) it answers 500 to every caller, which would crash-loop the
-          # workers on a stock install. And an httpGet probe cannot read a
-          # Secret, so a key delivered via secretKeyRef could never be put in a
-          # rendered Authorization header anyway — that install would 401.
-          # /healthz is unauthenticated by design and carries no telemetry, so
-          # no bearer token is copied into this podspec.
-          # See specs/server/worker-liveness-probe.feature.
-          #
-          # 40 minutes (15s x 160), matching the app: this lane runs the same
-          # `start:prepare:db` + system-migration preflight before it listens,
-          # and that preflight is designed to take up to ~27 minutes. See the
-          # app deployment for why a shorter budget hides the real error.
-          startupProbe:
-            httpGet:
-              path: /healthz
-              port: 2999
-            failureThreshold: 160
-            periodSeconds: 15
-            timeoutSeconds: 5
-          livenessProbe:
-            httpGet:
-              path: /healthz
-              port: 2999
-            periodSeconds: 30
-            timeoutSeconds: 5
-            failureThreshold: 3
-          resources:
-            {{- toYaml .Values.workers.resources | nindent 12 }}
-          volumeMounts:
-            {{- with .Values.workers.extraVolumeMounts}}
-            {{- toYaml . | nindent 12 }}
-            {{- end }}
-            - name: tmp-dir
-              mountPath: /tmp
-            {{- if eq (include "langwatch.storedObjects.localFilesystemIsActive" .) "true" }}
-            # Stored-objects local-FS mount. The off-request normalize job runs
-            # HERE (on the worker), so it must read the app's staged upload and
-            # write dataset chunks to the SAME PVC the app mounts — not the
-            # worker's own ephemeral FS (where `LANGWATCH_LOCAL_STORAGE_PATH`
-            # from sharedEnv would otherwise point, and normalize would fail to
-            # find the staged file / lose its chunk writes). Renders only when
-            # local-FS is the active backend; app + workers share this one RWO
-            # PVC, which requires them co-located on a single node — the
-            # documented single-replica/hobby topology. Use app.dataplane (S3)
-            # for any multi-node deployment.
-            - name: stored-objects-data
-              mountPath: {{ .Values.app.storedObjects.localFilesystem.path }}
-            {{- end }}
+        {{- include "langwatch.workersContainer" . | nindent 8 }}
 
       volumes:
         {{- with .Values.workers.extraVolumes}}

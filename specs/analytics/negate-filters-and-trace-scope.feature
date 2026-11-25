@@ -18,6 +18,15 @@ Feature: Negate filters and trace scoping affect analytics results
     When the query is executed
     Then the executed query carries the negation
 
+  # A span filter reads its own tenant-scoped subquery, so the negation is written
+  # as NOT IN; a NOT around the subquery is refused by the tenant guard (WEB-17801).
+  @unit
+  Scenario: Negating a span filter inverts the selection and passes the tenant guard
+    Given a timeseries request with a span model filter and the negate toggle enabled
+    When the query is built
+    Then the span filter reads as "not in" its tenant-scoped subquery
+    And the tenant guard admits the query
+
   @unit
   Scenario: A graph scoped to specific traces reads only those traces
     Given a timeseries request scoped to specific trace ids

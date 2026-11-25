@@ -15,20 +15,23 @@ Feature: Complete notification coverage for all limit enforcement paths
   # Projects, teams, and experimentation resources are OSS/uncapped and have no
   # limit-notification path.
 
-  # KEPT @unimplemented: the member-invite notification end-to-end flow is not
-  # yet wired to a test harness.
-  @unimplemented
+  # A refusal records organization's seat-limit event; the worker's subscriber
+  # tells billing, which sends the Slack alert (resource-limit-notifications).
   Scenario: Member invite triggers notification when limit reached
     Given the organization has reached the maximum number of full members
     When a user sends an invite for a full member
     Then the invite is rejected
     And a Slack notification is sent to the ops team
 
-  # KEPT @unimplemented: same blocker as preceding scenario.
-  @unimplemented
   Scenario: Lite member invite triggers notification when limit reached
     Given the organization has reached the maximum number of lite members
     When a user sends an invite for a lite member
     Then the invite is rejected
     And a Slack notification is sent to the ops team
 
+  @integration
+  Scenario: Role change refused at a seat limit triggers notification
+    Given the organization has reached the maximum number of full members
+    When an admin promotes a lite member to a full member
+    Then the role change is rejected
+    And a Slack notification is sent to the ops team

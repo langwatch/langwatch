@@ -5,7 +5,7 @@ description: "Project the text of a conversation, a trace or an LLM call straigh
 
 ## What They Are
 
-The analytics datasets hold metrics and dimensions: counts, latencies, models, identifiers. Extraction functions add the text those rows point at. `conversation(ConversationId)` returns the whole thread as markdown, `llm_readable_trace(TraceId, 8000)` returns a trace as the evaluators read it, and `llm_messages(TraceId)` returns the chat messages of the trace's model call.
+The analytics datasets hold metrics and dimensions: counts, latencies, models, identifiers. Extraction functions add the text those rows point at. `conversation(ConversationId)` returns the thread as the chat view shows it, `llm_readable_thread(ConversationId, 16000)` returns the thread with the agent's work on each turn, `llm_readable_trace(TraceId, 8000)` returns one trace as the evaluators read it, and `llm_messages(TraceId)` returns the chat messages of the trace's model call.
 
 LangWatch computes these values after the query runs, then puts them in the column you aliased. `GET /api/v1/query/schema` lists every function in its `functions` section, with the value it returns, the permissions it needs, and whether your key holds them.
 
@@ -29,19 +29,30 @@ The first argument is the key and can be any expression the query already allows
 
 ## The Functions
 
-| Function | Returns | Reads |
-|---|---|---|
-| `conversation(thread_key)` | The whole thread as markdown, the way the trace view renders it. | 200 conversations per run |
-| `conversation_bounded(thread_key, max_tokens, until_trace_id)` | The same transcript under a token budget, with a marker naming the turns it dropped. Pass an empty string for `until_trace_id` to read the whole thread. | 200 conversations per run |
-| `thread_traces(thread_key)` | The thread's trace identifiers, oldest first. | 200 conversations per run |
-| `llm_readable_trace(trace_id, max_tokens)` | The trace as a span digest under a token budget, the rendering the evaluators and the scenario judge read. | 1,000 traces per run |
-| `llm_messages(trace_id)` | JSON `{input, output}` holding the chat messages of the trace's model call. | 1,000 traces per run |
-| `llm_input_messages(trace_id)` | A JSON array holding the request side of `llm_messages`. | 1,000 traces per run |
-| `llm_output_messages(trace_id)` | A JSON array holding the response side of `llm_messages`. | 1,000 traces per run |
-| `llm_messages_span(trace_id, span_id)` | JSON `{input, output}` for one named span rather than the chosen one. | 1,000 spans per run |
-| `trace_json(trace_id)` | The whole trace as one JSON object, spans included. | 1,000 traces per run |
+| Function                                                       | Returns                                                                                                                                                                                                                                                           | Reads                     |
+| -------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------- |
+| `conversation(thread_key)`                                     | The thread as the chat view shows it: the system prompt once, then each turn's user message and reply, with one italic line per turn naming the tools it used, such as `_Used 3 tools: search_units (2x), get_price_`. No tool arguments, results or model calls. | 200 conversations per run |
+| `conversation_bounded(thread_key, max_tokens, until_trace_id)` | The same transcript under a token budget. Every turn is shortened before any is dropped, and a marker names the turns dropped from the middle. Pass an empty string for `until_trace_id` to read the whole thread.                                                | 200 conversations per run |
+| `llm_readable_thread(thread_key, max_tokens)`                  | The thread as the thread evaluators read it: each turn once, with the agent's work between the user message and the reply (model calls with token counts, tool calls with arguments and results, retrievals), under a token budget.                               | 200 conversations per run |
+| `thread_traces(thread_key)`                                    | The thread's trace identifiers, oldest first.                                                                                                                                                                                                                     | 200 conversations per run |
+| `llm_readable_trace(trace_id, max_tokens)`                     | The trace as a span digest under a token budget, the rendering the evaluators and the scenario judge read.                                                                                                                                                        | 1,000 traces per run      |
+| `llm_messages(trace_id)`                                       | JSON `{input, output}` holding the chat messages of the trace's model call.                                                                                                                                                                                       | 1,000 traces per run      |
+| `llm_input_messages(trace_id)`                                 | A JSON array holding the request side of `llm_messages`.                                                                                                                                                                                                          | 1,000 traces per run      |
+| `llm_output_messages(trace_id)`                                | A JSON array holding the response side of `llm_messages`.                                                                                                                                                                                                         | 1,000 traces per run      |
+| `llm_messages_span(trace_id, span_id)`                         | JSON `{input, output}` for one named span rather than the chosen one.                                                                                                                                                                                             | 1,000 spans per run       |
+| `trace_json(trace_id)`                                         | The whole trace as one JSON object, spans included.                                                                                                                                                                                                               | 1,000 traces per run      |
 
 The schema endpoint publishes each function's `encoding`. A function marked `json` returns a string whose contents are JSON, so parse it back rather than treating it as prose.
+
+## Which thread function to use
+
+Both read a whole thread. They differ in what they show of each turn.
+
+Use `conversation` for questions about what was said: tone, language, whether the user got an answer, a handoff, an apology. Use `llm_readable_thread` for questions about what the agent did: the tools it called, their arguments and results, the documents it retrieved, the tests it ran, its token usage.
+
+When unsure, use `llm_readable_thread`. On our judge benchmark it answers questions about the conversation within 2.5 points of `conversation`, while `conversation` loses 14 to 22 points on questions about tools. The cost is tokens: `llm_readable_thread` is about 1.8 times the size on short threads and 3 to 10 times on long agent sessions.
+
+For one trace rather than a whole thread, use `llm_readable_trace`.
 
 ## Permissions
 
@@ -71,7 +82,7 @@ Three things can shorten a result, and each one leaves a diagnostic behind:
 }
 ```
 
-Each row carries a conversation identifier and its transcript, cut to roughly eight thousand tokens with both ends kept.
+Each row carries a conversation identifier and its transcript under roughly eight thousand tokens. Every turn is shortened first, and turns are dropped from the middle only when that is not enough.
 
 ## Example: Read The Model Calls Of Failed Traces
 
@@ -97,14 +108,26 @@ GROUP BY ConversationId
 LIMIT 100
 ```
 
-| Function | Returns |
-|---|---|
-| `eval(text, instructions)` | How likely the statement is true, between 0 and 1. |
-| `eval_criteria(text, instructions, criteria)` | The same, with two entries saying what counts as yes and what does not. |
-| `eval_passed(text, instructions, threshold)` | 1 when the probability is at or above the threshold, 0 below it. |
-| `eval_score(text, instructions, min, max)` | A rating on the whole-numbered scale you name, as the probability-weighted mean of its levels. A scale holds at most 10 levels, so the two ends may be at most 9 apart. |
-| `eval_category(text, instructions, options)` | The most likely option, as its name. Each option is written `name: what it means`, 2 to 255 of them. |
-| `eval_category_probs(text, instructions, options)` | The same judgement as a JSON object of option name to probability. |
+A question about what the agent did reads the agent's work, so it takes `llm_readable_thread`:
+
+```sql
+SELECT
+  ConversationId,
+  eval(llm_readable_thread(ConversationId, 16000), 'The agent quoted a price without calling get_price') AS unchecked_price
+FROM analytics.trace_metrics
+WHERE OccurredAt >= subtractDays(now(), 7) AND ConversationId != ''
+GROUP BY ConversationId
+LIMIT 100
+```
+
+| Function                                           | Returns                                                                                                                                                                 |
+| -------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `eval(text, instructions)`                         | How likely the statement is true, between 0 and 1.                                                                                                                      |
+| `eval_criteria(text, instructions, criteria)`      | The same, with two entries saying what counts as yes and what does not.                                                                                                 |
+| `eval_passed(text, instructions, threshold)`       | 1 when the probability is at or above the threshold, 0 below it.                                                                                                        |
+| `eval_score(text, instructions, min, max)`         | A rating on the whole-numbered scale you name, as the probability-weighted mean of its levels. A scale holds at most 10 levels, so the two ends may be at most 9 apart. |
+| `eval_category(text, instructions, options)`       | The most likely option, as its name. Each option is written `name: what it means`, 2 to 255 of them.                                                                    |
+| `eval_category_probs(text, instructions, options)` | The same judgement as a JSON object of option name to probability.                                                                                                      |
 
 `eval` takes two arguments and `eval_criteria` takes three. They are separate names because a function in the database has one fixed argument count, so the criteria form cannot be an optional third argument on `eval`.
 

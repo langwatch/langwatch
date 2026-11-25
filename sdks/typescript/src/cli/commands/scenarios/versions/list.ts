@@ -1,17 +1,16 @@
 import chalk from "chalk";
-import { createSpinner } from "../../../utils/spinner";
+
 import { resolveCredentials } from "../../../utils/apiKey";
 import { formatTable } from "../../../utils/formatting";
-import { failSpinner } from "../../../utils/spinnerError";
 import type { CommandResult } from "../../../utils/output";
+import { createSpinner } from "../../../utils/spinner";
+import { failSpinner } from "../../../utils/spinnerError";
 import { createCliScenariosService } from "../cli-scenarios-service";
 
 /**
- * The saved versions of a scenario, newest first.
- *
- * A scenario saved before versions were recorded closes its history with a
- * Created entry that has no snapshot to read back.
- *
+ * The saved versions of a scenario, newest first. A scenario saved before
+ * versions were recorded closes its history with a Created entry that has
+ * no snapshot to read back.
  * @see specs/scenarios/scenario-versioning.feature
  */
 export const listScenarioVersionsCommand = async (
@@ -21,9 +20,7 @@ export const listScenarioVersionsCommand = async (
   await resolveCredentials();
 
   const service = createCliScenariosService();
-  const spinner = createSpinner(
-    `Fetching versions of scenario "${scenarioId}"...`,
-  ).start();
+  const spinner = createSpinner(`Fetching versions of scenario "${scenarioId}"...`).start();
 
   try {
     const limit = options?.limit ? parseInt(options.limit, 10) : undefined;

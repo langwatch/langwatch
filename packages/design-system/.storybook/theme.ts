@@ -1,0 +1,50 @@
+import { tokens, type ThemeName } from "@langwatch/design-system-internal/tokens";
+import { create } from "storybook/theming";
+
+/**
+ * The manager and the docs pages wear the internal consoles' paper look (ADR-160)
+ * in the OS scheme, so a docs page is never light around stories drawn dark.
+ */
+export const pickScheme = (): ThemeName =>
+  window.matchMedia?.("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+
+/** The toolbar's colour mode as a scheme: "System" (or nothing yet) follows the OS. */
+export const schemeFor = (mode: unknown): ThemeName =>
+  mode === "light" || mode === "dark" ? mode : pickScheme();
+
+const pixels = ({ value }: { value: string }): number => Number.parseInt(value, 10);
+
+export const paperTheme = ({ scheme }: { scheme: ThemeName }) => {
+  const colour = tokens[scheme];
+  return create({
+    base: scheme,
+    brandTitle: "LangWatch design system",
+    brandUrl: "./",
+    brandImage: `./images/logo-full-${scheme}theme.svg`,
+    colorPrimary: colour.brand,
+    colorSecondary: colour.brand,
+    appBg: colour["paper-soft"],
+    appContentBg: colour.paper,
+    appHoverBg: colour["paper-deep"],
+    appPreviewBg: colour.paper,
+    appBorderColor: colour.line,
+    appBorderRadius: pixels({ value: tokens.radius.md }),
+    fontBase: tokens.font.sans,
+    fontCode: tokens.font.mono,
+    textColor: colour["ink-900"],
+    textInverseColor: colour.paper,
+    textMutedColor: colour["ink-500"],
+    barTextColor: colour["ink-600"],
+    barHoverColor: colour.brand,
+    barSelectedColor: colour.brand,
+    barBg: colour.paper,
+    buttonBg: colour.paper,
+    buttonBorder: colour["line-strong"],
+    booleanBg: colour["paper-deep"],
+    booleanSelectedBg: colour.paper,
+    inputBg: colour.paper,
+    inputBorder: colour["line-strong"],
+    inputTextColor: colour["ink-900"],
+    inputBorderRadius: pixels({ value: tokens.radius.sm }),
+  });
+};

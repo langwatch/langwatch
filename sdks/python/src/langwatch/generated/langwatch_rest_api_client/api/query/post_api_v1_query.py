@@ -9,6 +9,7 @@ from ...models.post_api_v1_query_response_200 import PostApiV1QueryResponse200
 from ...models.post_api_v1_query_response_400 import PostApiV1QueryResponse400
 from ...models.post_api_v1_query_response_401 import PostApiV1QueryResponse401
 from ...models.post_api_v1_query_response_403 import PostApiV1QueryResponse403
+from ...models.post_api_v1_query_response_404 import PostApiV1QueryResponse404
 from ...models.post_api_v1_query_response_422 import PostApiV1QueryResponse422
 from ...models.post_api_v1_query_response_500 import PostApiV1QueryResponse500
 from ...types import Response, safe_http_status
@@ -40,6 +41,7 @@ def _parse_response(
     | PostApiV1QueryResponse400
     | PostApiV1QueryResponse401
     | PostApiV1QueryResponse403
+    | PostApiV1QueryResponse404
     | PostApiV1QueryResponse422
     | PostApiV1QueryResponse500
     | None
@@ -64,6 +66,11 @@ def _parse_response(
 
         return response_403
 
+    if response.status_code == 404:
+        response_404 = PostApiV1QueryResponse404.from_dict(response.json())
+
+        return response_404
+
     if response.status_code == 422:
         response_422 = PostApiV1QueryResponse422.from_dict(response.json())
 
@@ -87,6 +94,7 @@ def _build_response(
     | PostApiV1QueryResponse400
     | PostApiV1QueryResponse401
     | PostApiV1QueryResponse403
+    | PostApiV1QueryResponse404
     | PostApiV1QueryResponse422
     | PostApiV1QueryResponse500
 ]:
@@ -110,10 +118,11 @@ def sync_detailed(
     | PostApiV1QueryResponse400
     | PostApiV1QueryResponse401
     | PostApiV1QueryResponse403
+    | PostApiV1QueryResponse404
     | PostApiV1QueryResponse422
     | PostApiV1QueryResponse500
 ]:
-    """Run a LangWatchQL query
+    r"""Run a LangWatchQL query
 
      Executes one read-only LangWatchQL SELECT over the analytics views and returns typed columns, rows,
     execution statistics and diagnostics. The query runs as a restricted database identity scoped to the
@@ -132,10 +141,22 @@ def sync_detailed(
     answers 422 rather than a partial result, and a run whose texts would exceed the per-query token
     budget answers 422 before anything is sent.
 
-    Any LangWatch API key — project, organization or personal — reaches every project it can read
-    `analytics:view` on: an organization or personal key spans its projects, a project key its one. Rows
-    from more than one project come back flagged with the `MULTI_PROJECT_RESULT` diagnostic — to read a
-    single project, filter inside the statement with `WHERE TenantId = '<project id>'`.
+    A project API key, or any key that can read exactly one project, reads that project and needs none.
+    A key that reaches several must name the projects to read in `projects`, each one it can read
+    `analytics:view` on; without them the run is refused with `projects_required` (422). A key that
+    reads no project is refused with `projects_unreadable` (422) when it names no project or sends
+    \"all\"; a project it names and cannot read is `project_not_found` (404). Rows from more than one
+    project come back flagged with the `MULTI_PROJECT_RESULT` diagnostic.
+
+    Send `projects`, a list of project ids, to name the projects to read; `projectId` (one id) still
+    works, and sending both is a 422. A project the key cannot read `analytics:view` on, a project of
+    another organization and a project that does not exist are all refused with `project_not_found`
+    (404), with one body that names no id. Send `sources` to bind
+    `{dashboard_context_sources:Array(String)}` (application when absent); only a statement that reads
+    that placeholder is kept to those origins. `{dashboard_context_projects:Array(String)}` is bound to
+    the projects read. The answer's `params` lists every placeholder the statement declares by its SQL
+    name with the value it ran with, plus the `period` it followed. A `SOURCES_IGNORED` diagnostic says
+    `sources` changed nothing; `GRANULARITY_COARSENED` says the step ran coarser than asked.
 
     A statement that names no `LIMIT` is capped at 10,000 rows: that `LIMIT` is appended before the
     query runs. A statement whose own `LIMIT` asks for more is refused with `LIMIT_TOO_HIGH` — lower it
@@ -155,7 +176,7 @@ def sync_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[PostApiV1QueryResponse200 | PostApiV1QueryResponse400 | PostApiV1QueryResponse401 | PostApiV1QueryResponse403 | PostApiV1QueryResponse422 | PostApiV1QueryResponse500]
+        Response[PostApiV1QueryResponse200 | PostApiV1QueryResponse400 | PostApiV1QueryResponse401 | PostApiV1QueryResponse403 | PostApiV1QueryResponse404 | PostApiV1QueryResponse422 | PostApiV1QueryResponse500]
     """
 
     kwargs = _get_kwargs(
@@ -178,11 +199,12 @@ def sync(
     | PostApiV1QueryResponse400
     | PostApiV1QueryResponse401
     | PostApiV1QueryResponse403
+    | PostApiV1QueryResponse404
     | PostApiV1QueryResponse422
     | PostApiV1QueryResponse500
     | None
 ):
-    """Run a LangWatchQL query
+    r"""Run a LangWatchQL query
 
      Executes one read-only LangWatchQL SELECT over the analytics views and returns typed columns, rows,
     execution statistics and diagnostics. The query runs as a restricted database identity scoped to the
@@ -201,10 +223,22 @@ def sync(
     answers 422 rather than a partial result, and a run whose texts would exceed the per-query token
     budget answers 422 before anything is sent.
 
-    Any LangWatch API key — project, organization or personal — reaches every project it can read
-    `analytics:view` on: an organization or personal key spans its projects, a project key its one. Rows
-    from more than one project come back flagged with the `MULTI_PROJECT_RESULT` diagnostic — to read a
-    single project, filter inside the statement with `WHERE TenantId = '<project id>'`.
+    A project API key, or any key that can read exactly one project, reads that project and needs none.
+    A key that reaches several must name the projects to read in `projects`, each one it can read
+    `analytics:view` on; without them the run is refused with `projects_required` (422). A key that
+    reads no project is refused with `projects_unreadable` (422) when it names no project or sends
+    \"all\"; a project it names and cannot read is `project_not_found` (404). Rows from more than one
+    project come back flagged with the `MULTI_PROJECT_RESULT` diagnostic.
+
+    Send `projects`, a list of project ids, to name the projects to read; `projectId` (one id) still
+    works, and sending both is a 422. A project the key cannot read `analytics:view` on, a project of
+    another organization and a project that does not exist are all refused with `project_not_found`
+    (404), with one body that names no id. Send `sources` to bind
+    `{dashboard_context_sources:Array(String)}` (application when absent); only a statement that reads
+    that placeholder is kept to those origins. `{dashboard_context_projects:Array(String)}` is bound to
+    the projects read. The answer's `params` lists every placeholder the statement declares by its SQL
+    name with the value it ran with, plus the `period` it followed. A `SOURCES_IGNORED` diagnostic says
+    `sources` changed nothing; `GRANULARITY_COARSENED` says the step ran coarser than asked.
 
     A statement that names no `LIMIT` is capped at 10,000 rows: that `LIMIT` is appended before the
     query runs. A statement whose own `LIMIT` asks for more is refused with `LIMIT_TOO_HIGH` — lower it
@@ -224,7 +258,7 @@ def sync(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        PostApiV1QueryResponse200 | PostApiV1QueryResponse400 | PostApiV1QueryResponse401 | PostApiV1QueryResponse403 | PostApiV1QueryResponse422 | PostApiV1QueryResponse500
+        PostApiV1QueryResponse200 | PostApiV1QueryResponse400 | PostApiV1QueryResponse401 | PostApiV1QueryResponse403 | PostApiV1QueryResponse404 | PostApiV1QueryResponse422 | PostApiV1QueryResponse500
     """
 
     return sync_detailed(
@@ -242,10 +276,11 @@ async def asyncio_detailed(
     | PostApiV1QueryResponse400
     | PostApiV1QueryResponse401
     | PostApiV1QueryResponse403
+    | PostApiV1QueryResponse404
     | PostApiV1QueryResponse422
     | PostApiV1QueryResponse500
 ]:
-    """Run a LangWatchQL query
+    r"""Run a LangWatchQL query
 
      Executes one read-only LangWatchQL SELECT over the analytics views and returns typed columns, rows,
     execution statistics and diagnostics. The query runs as a restricted database identity scoped to the
@@ -264,10 +299,22 @@ async def asyncio_detailed(
     answers 422 rather than a partial result, and a run whose texts would exceed the per-query token
     budget answers 422 before anything is sent.
 
-    Any LangWatch API key — project, organization or personal — reaches every project it can read
-    `analytics:view` on: an organization or personal key spans its projects, a project key its one. Rows
-    from more than one project come back flagged with the `MULTI_PROJECT_RESULT` diagnostic — to read a
-    single project, filter inside the statement with `WHERE TenantId = '<project id>'`.
+    A project API key, or any key that can read exactly one project, reads that project and needs none.
+    A key that reaches several must name the projects to read in `projects`, each one it can read
+    `analytics:view` on; without them the run is refused with `projects_required` (422). A key that
+    reads no project is refused with `projects_unreadable` (422) when it names no project or sends
+    \"all\"; a project it names and cannot read is `project_not_found` (404). Rows from more than one
+    project come back flagged with the `MULTI_PROJECT_RESULT` diagnostic.
+
+    Send `projects`, a list of project ids, to name the projects to read; `projectId` (one id) still
+    works, and sending both is a 422. A project the key cannot read `analytics:view` on, a project of
+    another organization and a project that does not exist are all refused with `project_not_found`
+    (404), with one body that names no id. Send `sources` to bind
+    `{dashboard_context_sources:Array(String)}` (application when absent); only a statement that reads
+    that placeholder is kept to those origins. `{dashboard_context_projects:Array(String)}` is bound to
+    the projects read. The answer's `params` lists every placeholder the statement declares by its SQL
+    name with the value it ran with, plus the `period` it followed. A `SOURCES_IGNORED` diagnostic says
+    `sources` changed nothing; `GRANULARITY_COARSENED` says the step ran coarser than asked.
 
     A statement that names no `LIMIT` is capped at 10,000 rows: that `LIMIT` is appended before the
     query runs. A statement whose own `LIMIT` asks for more is refused with `LIMIT_TOO_HIGH` — lower it
@@ -287,7 +334,7 @@ async def asyncio_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[PostApiV1QueryResponse200 | PostApiV1QueryResponse400 | PostApiV1QueryResponse401 | PostApiV1QueryResponse403 | PostApiV1QueryResponse422 | PostApiV1QueryResponse500]
+        Response[PostApiV1QueryResponse200 | PostApiV1QueryResponse400 | PostApiV1QueryResponse401 | PostApiV1QueryResponse403 | PostApiV1QueryResponse404 | PostApiV1QueryResponse422 | PostApiV1QueryResponse500]
     """
 
     kwargs = _get_kwargs(
@@ -308,11 +355,12 @@ async def asyncio(
     | PostApiV1QueryResponse400
     | PostApiV1QueryResponse401
     | PostApiV1QueryResponse403
+    | PostApiV1QueryResponse404
     | PostApiV1QueryResponse422
     | PostApiV1QueryResponse500
     | None
 ):
-    """Run a LangWatchQL query
+    r"""Run a LangWatchQL query
 
      Executes one read-only LangWatchQL SELECT over the analytics views and returns typed columns, rows,
     execution statistics and diagnostics. The query runs as a restricted database identity scoped to the
@@ -331,10 +379,22 @@ async def asyncio(
     answers 422 rather than a partial result, and a run whose texts would exceed the per-query token
     budget answers 422 before anything is sent.
 
-    Any LangWatch API key — project, organization or personal — reaches every project it can read
-    `analytics:view` on: an organization or personal key spans its projects, a project key its one. Rows
-    from more than one project come back flagged with the `MULTI_PROJECT_RESULT` diagnostic — to read a
-    single project, filter inside the statement with `WHERE TenantId = '<project id>'`.
+    A project API key, or any key that can read exactly one project, reads that project and needs none.
+    A key that reaches several must name the projects to read in `projects`, each one it can read
+    `analytics:view` on; without them the run is refused with `projects_required` (422). A key that
+    reads no project is refused with `projects_unreadable` (422) when it names no project or sends
+    \"all\"; a project it names and cannot read is `project_not_found` (404). Rows from more than one
+    project come back flagged with the `MULTI_PROJECT_RESULT` diagnostic.
+
+    Send `projects`, a list of project ids, to name the projects to read; `projectId` (one id) still
+    works, and sending both is a 422. A project the key cannot read `analytics:view` on, a project of
+    another organization and a project that does not exist are all refused with `project_not_found`
+    (404), with one body that names no id. Send `sources` to bind
+    `{dashboard_context_sources:Array(String)}` (application when absent); only a statement that reads
+    that placeholder is kept to those origins. `{dashboard_context_projects:Array(String)}` is bound to
+    the projects read. The answer's `params` lists every placeholder the statement declares by its SQL
+    name with the value it ran with, plus the `period` it followed. A `SOURCES_IGNORED` diagnostic says
+    `sources` changed nothing; `GRANULARITY_COARSENED` says the step ran coarser than asked.
 
     A statement that names no `LIMIT` is capped at 10,000 rows: that `LIMIT` is appended before the
     query runs. A statement whose own `LIMIT` asks for more is refused with `LIMIT_TOO_HIGH` — lower it
@@ -354,7 +414,7 @@ async def asyncio(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        PostApiV1QueryResponse200 | PostApiV1QueryResponse400 | PostApiV1QueryResponse401 | PostApiV1QueryResponse403 | PostApiV1QueryResponse422 | PostApiV1QueryResponse500
+        PostApiV1QueryResponse200 | PostApiV1QueryResponse400 | PostApiV1QueryResponse401 | PostApiV1QueryResponse403 | PostApiV1QueryResponse404 | PostApiV1QueryResponse422 | PostApiV1QueryResponse500
     """
 
     return (

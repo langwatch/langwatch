@@ -13,12 +13,12 @@ a Prometheus that scrapes it.
 
 ## The four alerts
 
-| Alert | Severity | Means |
-|---|---|---|
-| `ClickHouseBackupStale` | critical | No successful run inside the backup's window, or no successful run ever |
-| `ClickHouseBackupJobFailed` | warning | A Job created inside the window ended with a `Failed` condition |
-| `ClickHouseBackupCronJobSuspended` | warning | `spec.suspend` is set, so nothing is being scheduled |
-| `ClickHouseBackupCronJobMissing` | critical | No `kube_cronjob_info` series: the CronJob is gone, or kube-state-metrics is |
+| Alert                              | Severity | Means                                                                        |
+| ---------------------------------- | -------- | ---------------------------------------------------------------------------- |
+| `ClickHouseBackupStale`            | critical | No successful run inside the backup's window, or no successful run ever      |
+| `ClickHouseBackupJobFailed`        | warning  | A Job created inside the window ended with a `Failed` condition              |
+| `ClickHouseBackupCronJobSuspended` | warning  | `spec.suspend` is set, so nothing is being scheduled                         |
+| `ClickHouseBackupCronJobMissing`   | critical | No `kube_cronjob_info` series: the CronJob is gone, or kube-state-metrics is |
 
 `ClickHouseBackupStale` is the one that matters. The other three are there to
 name a cause faster than the staleness window elapses, or, in the case of
@@ -125,6 +125,35 @@ If the CronJob is genuinely gone, either the release was deployed with
 `backup.enabled=false`, or the target is stale: a backup that was deliberately
 retired should be removed from `backup.monitoring.targets` in the same change
 that removes the CronJob, not left to alert.
+
+## Sidecar mode
+
+With `backup.mode=sidecar` or `cronjob-observe` the rules read the sidecar's own
+metrics (`clickhouse_backup_*`, scraped from `/metrics` on port 8125; enable
+`backup.sidecar.podMonitor`). In `cronjob-observe` both sets render. The design
+is [ADR-199](../adr/199-clickhouse-serverless-backups-run-in-the-ch-config-sidecar.md).
+
+| Alert                             | Severity | Means                                                                                       |
+| --------------------------------- | -------- | ------------------------------------------------------------------------------------------- |
+| `ClickHouseBackupStale`           | critical | No completed backup of a mode inside its window, or none ever                               |
+| `ClickHouseBackupFailing`         | warning  | The runner's last attempt of a mode failed                                                  |
+| `ClickHouseBackupNoRunner`        | critical | No sidecar reports itself as runner, or no sidecar is scraped at all                        |
+| `ClickHouseBackupMultipleRunners` | warning  | Two sidecars both elected themselves; each writes its own backups until the partition heals |
+| `ClickHouseBackupConfigError`     | critical | A sidecar's backup env is invalid, so it schedules nothing                                  |
+| `ClickHouseBackupOverrunning`     | warning  | A backup of a mode has run longer than `backup.staleHours`; no new one starts until it ends |
+
+To see what a sidecar thinks, read its status and logs:
+
+```bash
+kubectl exec <pod> -c backup -- curl -s http://127.0.0.1:8125/status
+kubectl logs <pod> -c backup
+```
+
+Use `-c access` when ClickHouse access is enabled. `/status` names the runner,
+the last success, attempt and failure per mode, and the reason for the last
+decision. A config error names the variable in the log. `NoRunner` with every
+sidecar up usually means the replicas cannot reach each other over the cluster;
+the preferred ordinal (`backup.sidecar.runnerOrdinal`) still runs when it is up.
 
 ## Tuning
 

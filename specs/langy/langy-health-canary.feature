@@ -148,6 +148,12 @@ Feature: A Langy health check that sends a real greeting and says what broke
   # ---------------------------------------------------------------------------
 
   @unit
+  Scenario: A held turn settles from the turn-state projection
+    Given a turn the api process is holding a request open for
+    When the worker folds the turn's reply into the turn-state projection
+    Then the hold settles with that reply, read from the projection rather than the event log
+
+  @unit
   Scenario: A user wait settles the wait only when the caller opts in
     Given a turn whose fold records a question wait and no reply
     When the settlement wait opted in to settling on a user wait
@@ -272,11 +278,11 @@ Feature: A Langy health check that sends a real greeting and says what broke
     Then the response carries "Cache-Control: no-store"
 
   @unit
-  Scenario: The Langy probe is declared public like its sibling health probes
-    Given the health-checks app is loaded
-    When the route registry is read for GET /api/health/langy
-    Then its policy is public, the key being authenticated in-handler
-    And it matches the policy of GET /api/health/scenarios
+  Scenario: The Langy probe is declared behind the project key door, unlike its public sibling probes
+    Given the Langy probe is declared
+    When its route declaration is read for GET /api/health/langy
+    Then its credential is the project key and the permission it asks is langy:create
+    And the probes of the other subsystems are declared as public routes
 
   # ---------------------------------------------------------------------------
   # Live proof — against a running stack, before the monitor is trusted

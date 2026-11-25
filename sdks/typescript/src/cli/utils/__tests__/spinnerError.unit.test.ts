@@ -1,5 +1,6 @@
-import { describe, it, expect, vi } from "vitest";
 import type { Ora } from "ora";
+import { describe, it, expect, vi } from "vitest";
+
 import { failSpinner } from "../spinnerError";
 
 const makeSpinner = () => {
@@ -28,9 +29,7 @@ describe("failSpinner", () => {
           this.name = "AgentsApiError";
         }
       }
-      const err = new AgentsApiError(
-        "Failed to list agents: Unauthorized: Invalid API key",
-      );
+      const err = new AgentsApiError("Failed to list agents: Unauthorized: Invalid API key");
       const { spinner, calls } = makeSpinner();
       failSpinner({ spinner, error: err, action: "fetch agents" });
       expect(stripAnsi(String(calls[0]))).toBe(
@@ -50,9 +49,7 @@ describe("failSpinner", () => {
       const err = new SomeApiError("boom");
       const { spinner, calls } = makeSpinner();
       failSpinner({ spinner, error: err, action: "reticulate splines" });
-      expect(stripAnsi(String(calls[0]))).toBe(
-        "Failed to reticulate splines: boom",
-      );
+      expect(stripAnsi(String(calls[0]))).toBe("Failed to reticulate splines: boom");
     });
   });
 
@@ -61,19 +58,14 @@ describe("failSpinner", () => {
       const err = new Error("fetch failed");
       const { spinner, calls } = makeSpinner();
       failSpinner({ spinner, error: err, action: "list monitors" });
-      expect(stripAnsi(String(calls[0]))).toBe(
-        "Failed to list monitors: fetch failed",
-      );
+      expect(stripAnsi(String(calls[0]))).toBe("Failed to list monitors: fetch failed");
     });
   });
 
   describe("when error carries the platform's error shape", () => {
-    // `{ error: <code>, message }` is exactly what the shared Hono error handler
-    // puts on the wire for a `HandledError`. It used to be flattened back
-    // into the sentence "NotFoundError: Record missing", which reads as though
-    // the class name were part of the prose. Now the sentence is the sentence and
-    // the code is named as a code — which is the whole point: a caller can act on
-    // `not_found`, and could only ever have read the string.
+    // `{ error: <code>, message }` is what the Hono error handler puts on the
+    // wire for a `HandledError`. It used to flatten to "NotFoundError: Record
+    // missing"; now the sentence is the sentence and the code is a code a caller can act on.
     it("leads with the platform's sentence and names the code beneath it", () => {
       const err = { error: "NotFoundError", message: "Record missing" };
       const { spinner, calls } = makeSpinner();
@@ -97,9 +89,7 @@ describe("failSpinner", () => {
       const err = new PromptsError("Failed to sync prompt: Internal server error");
       const { spinner, calls } = makeSpinner();
       failSpinner({ spinner, error: err, action: "sync prompt" });
-      expect(stripAnsi(String(calls[0]))).toBe(
-        "Failed to sync prompt: Internal server error",
-      );
+      expect(stripAnsi(String(calls[0]))).toBe("Failed to sync prompt: Internal server error");
     });
   });
 });

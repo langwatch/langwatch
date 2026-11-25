@@ -5,7 +5,7 @@ Feature: The Agent Testing page
 
   Background: the shape of the page.
     Agent Testing is one page behind a release flag. Its header holds the page
-    title on the left and the tabs in the middle, on one line. The content of
+    title on the far left and the tabs in the middle, on one line. The content of
     the selected tab starts directly under that line. With a run plan open the
     title reads the name of that plan instead.
 
@@ -31,6 +31,12 @@ Feature: The Agent Testing page
     Then the page is shown with its header and its tabs
 
   @integration
+  Scenario: While the flag is still being read the page shows it is loading
+    Given the Agent Testing release flag has not been read yet
+    When the Agent Testing address is opened
+    Then a loading screen is shown, never an empty page
+
+  @integration
   Scenario: With the flag on the main menu shows one Agent Testing item
     Given the Agent Testing release flag is on
     When the main menu is read
@@ -44,13 +50,13 @@ Feature: The Agent Testing page
     Then the current Simulations group is shown, unchanged
     And no Agent Testing item is shown
 
-  @integration
+  @unit
   Scenario: A rule that names the organization lights up the main menu
     Given the Agent Testing release flag is off by default
     And the flag carries one targeting rule that names the organization of
         the person who reads the menu
-    When the main menu is read
-    Then one item named "Agent Testing" is shown
+    When the flag is read for that person
+    Then it is on, which is what shows the one "Agent Testing" item in the main menu
     And the Simulations group is not shown
 
   @integration
@@ -112,6 +118,12 @@ Feature: The Agent Testing page
     And "Results" carries the number of run plans
 
   @unit
+  Scenario: The number beside the Scenarios tab counts what the suite rail can reach
+    Given a project with two scenarios filed in a listed suite and one filed in no listed suite
+    When the number beside "Scenarios" is worked out
+    Then only the two filed scenarios are counted
+
+  @unit
   Scenario: The number beside the Results tab counts what the Test Runs list holds
     Given a project with one test suite, one run plan and one throwaway suite of the command line
     When the number beside "Results" is worked out
@@ -138,14 +150,14 @@ Feature: The Agent Testing page
     Given the Agent Testing page is open on a wide window
     When the scenarios and the results are read one after the other
     Then the content of each is held to one readable column
-    And the column is centred on the whole page, not on the space beside the rail
-    And the column does not move when the tab changes
+    And the column is centred in the space beside the rail
+    And no blank strip is reserved on the right
 
   @integration
   Scenario: A surface with no rail takes the width the rail would have used
     Given the Agent Testing page is open on the Results tab
     Then the list of run plans reserves no space for a rail
-    And it is centred on the whole page
+    And it is centred on the page
     And it is held to a wider column than a surface that has a rail beside it
 
   # --- Addresses ---

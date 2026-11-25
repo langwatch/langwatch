@@ -4,7 +4,7 @@ Feature: BetterAuth config (unmounted)
   I want a fully-configured BetterAuth instance ready to use
   So that I can swap NextAuth for it in a single cutover without gaps
 
-  # The file `platform/app/src/server/better-auth/index.ts` exports a `betterAuth`
+  # The file `modules/auth/process/src/transport/better-auth/better-auth.api.ts` exports a `betterAuth`
   # instance with every provider we care about and every custom hook ported
   # from the NextAuth callbacks. BetterAuth is now the live auth handler,
   # mounted at `/api/auth/[...all]`.
@@ -113,7 +113,7 @@ Feature: BetterAuth config (unmounted)
   # @unimplemented: the BetterAuth OAuth-callback hook chain is wired but the
   # guard logic for the "active-session-with-different-email" path lives across
   # Bound at config-layer: `accountLinking.allowDifferentEmails` defaults to
-  # false, which causes BetterAuth to fire LINKING_DIFFERENT_EMAILS_NOT_ALLOWED
+  # false, so the link callback redirects with email_does_not_match (1.7.x)
   # (surfaced as DIFFERENT_EMAIL_NOT_ALLOWED in the UI). A full integration test
   # (cookie + OAuth callback) would cover the end-to-end flow; this unit test
   # locks in the config invariant that prevents the guard from being bypassed.

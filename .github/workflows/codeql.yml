@@ -1,30 +1,29 @@
 # Always-run workflow with internal path gating + aggregator. See #3223.
 # Branch protection requires `codeql-complete`. Draft PRs are excluded
-# at the event level AND at the `changes` gate, so the analyze matrix
-# never starts on drafts.
+# at the `changes` gate, so the analyze matrix never starts on drafts,
+# unless the PR carries the `ci:full` label.
 name: codeql
 
 on:
+  # Pull requests and the merge queue reach this through pr.yml.
+  workflow_call:
   push:
     branches: ["main"]
-  pull_request:
-    branches: ["main"]
-    # Draft PRs are excluded by specifying only these types
-    types: [opened, synchronize, reopened, ready_for_review]
-  merge_group:
   schedule:
     - cron: "00 08 * * *"
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  # Supersede an outdated run on a PR branch, never on main: every commit
-  # that lands on main has to keep its own validation, and cancelling here
-  # would let a merge silently void the run for the commit before it.
-  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+  group: codeql-${{ github.ref }}
+  # A newer commit supersedes an older run, on main too: the newest verdict
+  # covers the commits before it. Image and release builds keep their own rule.
+  cancel-in-progress: true
 
 jobs:
   changes:
-    if: github.event_name != 'pull_request' || github.event.pull_request.draft != true
+    # A draft or release-please PR is skipped unless labelled `ci:full`.
+    if: >-
+      (github.event_name != 'pull_request' || (github.event.pull_request.draft != true && !(startsWith(github.head_ref, 'release-please--') && github.event.pull_request.user.login == 'langwatch-agent'))
+       || contains(github.event.pull_request.labels.*.name, 'ci:full'))
     runs-on: ubuntu-latest
     outputs:
       relevant: ${{ steps.detect.outputs.relevant }}
@@ -38,10 +37,10 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
         with:
-          # The gate reads no working-tree content: on pull_request events
-          # dorny/paths-filter takes the changed-file list from the API, and
-          # every file this job needs on disk lives under .github/. Checking
-          # out the rest of the tree is pure runner time.
+          # The gate reads no working-tree content: the changed paths come
+          # from git trees (.github/actions/detect-changes),
+          # and every file this job needs on disk lives under .github/.
+          # Checking out the rest of the tree is pure runner time.
           sparse-checkout: .github
       - uses: ./.github/actions/detect-changes
         id: detect
@@ -60,18 +59,22 @@ jobs:
             # gets analysed at all is a separate question — see the note about
             # the default code-scanning setup in the PR that added this.)
             relevant:
-              - 'platform/app/**'
+              - 'apps/**'
               - 'sdks/python/**'
               - 'sdks/typescript/**'
               - 'mcp/typescript/**'
               - 'services/langevals/**'
               - 'packages/**'
+              - 'modules/**'
+              - 'enterprise/**'
               - '.github/workflows/codeql.yml'
             codeql-javascript:
-              - 'platform/app/**'
+              - 'apps/**'
               - 'sdks/typescript/**'
               - 'mcp/typescript/**'
               - 'packages/**'
+              - 'modules/**'
+              - 'enterprise/**'
               - '.github/workflows/codeql.yml'
             codeql-python:
               - 'sdks/python/**'

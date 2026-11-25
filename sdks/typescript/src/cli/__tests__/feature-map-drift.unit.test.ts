@@ -1,22 +1,12 @@
 /**
- * Drift guard between the CLI's real command surface and `feature-map.json`.
- *
- * The CLI's `program.ts` is the ground truth for which command groups exist;
- * the feature map (embedded at codegen time as
- * `internal/generated/cli/feature-map.generated.ts`) is the canonical
- * information architecture every surface derives from. This test fails — with
- * a readable list, not a count — when a top-level CLI group has no feature-map
- * CLI coverage, or the map lists a group the CLI no longer registers.
- *
- * It lives in typescript-sdk (not next to the app-side capabilityCatalog
- * coverage test it mirrors) because this is where the dependencies to parse
- * and run exist; the parsing approach is the same regex over program.ts.
- *
+ * Keeps CLI's program.ts and feature-map.generated.ts in sync.
  * @see .claude/skills/feature-map/SKILL.md
  */
 import { readFileSync } from "fs";
 import { join } from "path";
+
 import { describe, expect, it } from "vitest";
+
 import {
   FEATURE_MAP,
   type GeneratedFeature,
@@ -26,10 +16,9 @@ import { PLUMBING_COMMANDS } from "../utils/commandCatalog";
 const CLI_PROGRAM_PATH = join(__dirname, "../program.ts");
 
 /**
- * The top-level resource words the CLI registers: every
- * `program.command("<word> …")`, whether registered inline or via
- * `const xCmd = program\n  .command(…)`. Sub-commands are registered on the
- * sub-command objects and deliberately not matched.
+ * The top-level resource words the CLI registers -- every
+ * `program.command("<word> …")`, inline or via `const xCmd = program.command(…)`.
+ * Sub-command registrations are deliberately not matched.
  */
 function cliTopLevelCommands(): Set<string> {
   const source = readFileSync(CLI_PROGRAM_PATH, "utf-8");
@@ -42,10 +31,7 @@ function cliTopLevelCommands(): Set<string> {
 }
 
 const flattenFeatures = (features: GeneratedFeature[]): GeneratedFeature[] =>
-  features.flatMap((feature) => [
-    feature,
-    ...flattenFeatures(feature.children ?? []),
-  ]);
+  features.flatMap((feature) => [feature, ...flattenFeatures(feature.children ?? [])]);
 
 /** The top-level group words of every CLI command the feature map claims. */
 function featureMapCliGroups(): Set<string> {
@@ -61,9 +47,7 @@ function featureMapCliGroups(): Set<string> {
 
 describe("the feature map, given the CLI's real command tree", () => {
   const cliCommands = cliTopLevelCommands();
-  const cliGroups = [...cliCommands].filter(
-    (command) => !PLUMBING_COMMANDS.has(command),
-  );
+  const cliGroups = [...cliCommands].filter((command) => !PLUMBING_COMMANDS.has(command));
   const mapGroups = featureMapCliGroups();
 
   describe("when the CLI source is parsed", () => {
@@ -77,9 +61,7 @@ describe("the feature map, given the CLI's real command tree", () => {
     });
 
     it("excludes only commands the CLI actually has", () => {
-      const staleExclusions = [...PLUMBING_COMMANDS].filter(
-        (command) => !cliCommands.has(command),
-      );
+      const staleExclusions = [...PLUMBING_COMMANDS].filter((command) => !cliCommands.has(command));
       expect(
         staleExclusions,
         `Excluded commands the CLI no longer registers — remove them from PLUMBING_COMMANDS:\n  ${staleExclusions.join("\n  ")}`,

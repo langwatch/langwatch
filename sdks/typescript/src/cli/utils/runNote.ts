@@ -1,10 +1,6 @@
 /**
- * The `--note` flag every run command reads.
- *
- * A note is one short line saying why a batch was run: a hypothesis, a commit
- * message, what changed. It travels with the batch and every run in it carries
- * the same note.
- *
+ * The `--note` flag every run command reads: a short line — hypothesis,
+ * commit message, what changed — shared by every run in the batch.
  * @see specs/suites/run-notes.feature
  */
 
@@ -17,18 +13,11 @@ export const MAX_RUN_NOTE_LENGTH = 200;
 export const NOTE_FLAG_HELP = `Why this run is being started: its hypothesis or commit message. Up to ${MAX_RUN_NOTE_LENGTH} characters.`;
 
 /**
- * The note a run records, or nothing.
- *
- * A note of only spaces is no note: sending an empty string would store a
- * value every reader then has to filter out. A note that is too long ends the
- * command before anything is scheduled, so the caller can shorten it and run
- * once, rather than finding the refusal after a batch already started.
+ * The note a run records, or nothing. Spaces-only is no note -- an empty
+ * string would store a value every reader must filter. Too long ends the
+ * command before anything is scheduled, not after a batch already started.
  */
-export const parseRunNoteFlag = ({
-  note,
-}: {
-  note: string | undefined;
-}): string | undefined => {
+export const parseRunNoteFlag = ({ note }: { note: string | undefined }): string | undefined => {
   const trimmed = note?.trim();
   if (!trimmed) return undefined;
   if (trimmed.length > MAX_RUN_NOTE_LENGTH) {

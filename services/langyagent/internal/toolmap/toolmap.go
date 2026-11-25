@@ -128,22 +128,25 @@ func BoundPlanItems(items []frames.PlanItem) ([]frames.PlanItem, bool) {
 
 // The tools whose work happens outside the sandbox: the seven local mirrors run
 // on the developer's own machine through the shared folder (ADR-129), and
-// `code_access`, `question`, `say` and `secret_snippet` speak to the person,
+// `code_access`, `question`, `say`, `secret_snippet`, `notify` and
+// `offer_notifications` speak to the person,
 // not to the model. pi sends no title of its own, so the manager supplies one
 // here and the panel's activity row can say where the call runs instead of
 // showing a bare tool name.
 var toolTitles = map[string]string{
-	"code_access":    "Code access",
-	"question":       "Question",
-	"say":            "Say",
-	"secret_snippet": "Secret snippet",
-	"local_read":     "Read on your machine",
-	"local_write":    "Write on your machine",
-	"local_edit":     "Edit on your machine",
-	"local_bash":     "Run on your machine",
-	"local_grep":     "Search on your machine",
-	"local_find":     "Find on your machine",
-	"local_ls":       "List on your machine",
+	"code_access":         "Code access",
+	"question":            "Question",
+	"say":                 "Say",
+	"secret_snippet":      "Secret snippet",
+	"notify":              "Notify",
+	"offer_notifications": "Offer notifications",
+	"local_read":          "Read on your machine",
+	"local_write":         "Write on your machine",
+	"local_edit":          "Edit on your machine",
+	"local_bash":          "Run on your machine",
+	"local_grep":          "Search on your machine",
+	"local_find":          "Find on your machine",
+	"local_ls":            "List on your machine",
 }
 
 // ToolTitle returns the activity row label for a tool name, or "" when the tool

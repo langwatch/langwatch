@@ -1,20 +1,14 @@
 /**
- * The `skill` tool: a thin loader over `<skillsDir>/<name>/SKILL.md`.
- *
- * Langy's AGENTS.md names a callable tool: "The `skill` tool lists every skill
- * installed, including ones with no row here, so check it when a request
- * matches none of them." pi's native skill loading (skills injected into the
- * system prompt) cannot satisfy that sentence because the wrapper owns the
- * system prompt outright (persona + AGENTS.md + turn system), so this compat
- * tool exists: its description carries the installed inventory, calling it
- * with a name returns that skill's SKILL.md, and calling it with an unknown
- * or missing name returns the inventory.
+ * The `skill` tool: a thin loader over `<skillsDir>/<name>/SKILL.md`, since
+ * the wrapper owns the system prompt outright and cannot use pi's native
+ * skill injection.
  */
 
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
-import { Type } from "typebox";
+
 import type { ExtensionAPI, InlineExtension } from "@earendil-works/pi-coding-agent";
+import { Type } from "typebox";
 
 export const SKILL_TOOL_NAME = "skill";
 
@@ -50,7 +44,7 @@ export function listSkills(skillsDir: string | undefined): SkillEntry[] {
     return [];
   }
   const skills: SkillEntry[] = [];
-  for (const dirName of dirNames.sort()) {
+  for (const dirName of dirNames.toSorted()) {
     const baseDir = join(skillsDir, dirName);
     const filePath = join(baseDir, "SKILL.md");
     try {
@@ -68,7 +62,8 @@ export function listSkills(skillsDir: string | undefined): SkillEntry[] {
         baseDir,
       });
     } catch {
-      // A directory without a readable SKILL.md is not a skill.
+      // A directory without a readable SKILL.md is not a skill: skip it.
+      continue;
     }
   }
   return skills;
@@ -104,6 +99,16 @@ const skillParams = Type.Object({
 
 /** A rule a load is checked against: the refusal to answer with, or nothing. */
 export type SkillRefusal = (name: string) => string | undefined;
+
+/** A skill's SKILL.md text, or a thrown message naming the read failure. */
+function readSkillMarkdown(skill: SkillEntry): string {
+  try {
+    return readFileSync(skill.filePath, "utf8");
+  } catch (error) {
+    const cause = error instanceof Error ? error.message : "unreadable";
+    throw new Error(`Could not read skill "${skill.name}": ${cause}`);
+  }
+}
 
 export function createSkillExtension({
   skillsDir,
@@ -159,14 +164,7 @@ export function createSkillExtension({
           }
           const refused = refuse?.(skill.name);
           if (refused !== undefined) throw new Error(refused);
-          let markdown: string;
-          try {
-            markdown = readFileSync(skill.filePath, "utf8");
-          } catch (error) {
-            throw new Error(
-              `Could not read skill "${name}": ${error instanceof Error ? error.message : String(error)}`,
-            );
-          }
+          const markdown = readSkillMarkdown(skill);
           return {
             content: [
               {

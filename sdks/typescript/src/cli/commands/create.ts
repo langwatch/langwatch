@@ -1,19 +1,16 @@
 import * as fs from "fs";
 import * as path from "path";
+
 import chalk from "chalk";
-import { FileManager } from "../utils/fileManager";
-import { resolveCredentials } from "../utils/apiKey";
-import {
-  commandValidationError,
-  reportCommandError,
-} from "../utils/errorOutput";
-import { ensureProjectInitialized } from "../utils/init";
+
 import { DEFAULT_PROMPT_MODEL } from "../constants";
+import { resolveCredentials } from "../utils/apiKey";
+import { commandValidationError, reportCommandError } from "../utils/errorOutput";
+import { FileManager } from "../utils/fileManager";
+import { ensureProjectInitialized } from "../utils/init";
 import type { CommandResult } from "../utils/output";
 
-export const createCommand = async (
-  name: string,
-): Promise<CommandResult | void> => {
+export const createCommand = async (name: string): Promise<CommandResult | void> => {
   try {
     // Validate prompt name
     if (!name || name.trim() === "") {
@@ -30,17 +27,11 @@ export const createCommand = async (
     await ensureProjectInitialized();
 
     // Check if file already exists
-    const promptPath = path.join(
-      process.cwd(),
-      "prompts",
-      `${name}.prompt.yaml`,
-    );
+    const promptPath = path.join(process.cwd(), "prompts", `${name}.prompt.yaml`);
 
     if (fs.existsSync(promptPath)) {
       reportCommandError({
-        error: commandValidationError(
-          `Prompt file already exists at ${promptPath}`,
-        ),
+        error: commandValidationError(`Prompt file already exists at ${promptPath}`),
       });
       process.exit(1);
     }
@@ -51,12 +42,9 @@ export const createCommand = async (
       fs.mkdirSync(promptsDir, { recursive: true });
     }
 
-    // Default prompt content.
-    //
-    // No `modelParameters.temperature`: the latest model families (gpt-5+)
-    // reject a custom temperature, so injecting one by default breaks the
-    // very models a new prompt should be using. Add it back only for a model
-    // that supports it.
+    // Default prompt content. No `modelParameters.temperature`: gpt-5+
+    // rejects a custom temperature, so a default would break the very
+    // models a new prompt should target.
     const defaultContent = `model: ${DEFAULT_PROMPT_MODEL}
 messages:
   - role: system
@@ -88,9 +76,7 @@ messages:
     return {
       data: { name, path: relativePath, dependency: `file:${relativePath}` },
       table: () => {
-        console.log(
-          chalk.green(`✓ Created prompt file: ${chalk.cyan(displayPath)}`),
-        );
+        console.log(chalk.green(`✓ Created prompt file: ${chalk.cyan(displayPath)}`));
         console.log(chalk.gray(`  Edit this file and then run:`));
         console.log(chalk.cyan(`  langwatch prompt sync`));
       },

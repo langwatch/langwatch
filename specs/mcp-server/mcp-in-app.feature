@@ -210,67 +210,22 @@ Feature: MCP HTTP Server In-App Integration (Phase 1)
     Then the response status is 400 with error "invalid_grant"
     And no access token is issued
 
-  # --- SSE transport across replicas ---
+  # --- /sse, the retired SSE transport's URL ---
   #
-  # The SSE stream is connection-bound: it lives on the one replica that
-  # answered GET /sse. Every follow-up message is a separate POST that the
-  # load balancer may send to any replica, so a replica that does not hold
-  # the stream has to hand the message to the one that does.
+  # The SSE transport (GET /sse plus POST /messages) is deprecated in the MCP
+  # spec and removed here. Clients configured with the /sse URL are served the
+  # Streamable HTTP transport there, so their configuration keeps working.
 
   @integration
-  Scenario: A message posted to a replica that does not hold the stream still reaches the session
-    Given a client opened an SSE connection against one replica
-    When the client posts a tools/list message to a different replica
-    Then the response is accepted
-    And the tools/list reply arrives on the open SSE stream
-    And the reply lists at least one tool
+  Scenario: A client configured with the retired /sse URL is served Streamable HTTP
+    Given a client configured with the /sse URL
+    When it initializes, lists tools and closes the session at /sse
+    Then each request is answered by the Streamable HTTP transport
 
   @integration
-  Scenario: A message posted to the replica holding the stream is answered directly
-    Given a client opened an SSE connection to a replica
-    When the client posts a message to that same replica
-    Then the response is accepted
-    And the reply arrives on the open SSE stream
-
-  @integration
-  Scenario: Clients that append the message path to the connect path are still routed
-    Given a client opened an SSE connection
-    When the client posts its message to the /sse/messages path instead of /messages
-    Then the response is accepted
-
-  @integration
-  Scenario: A message for an unknown session is rejected as a missing session
-    Given no SSE session exists for the session id a client presents
-    When the client posts a message for that session id
+  Scenario: The retired SSE message endpoint is no longer served
+    When a client posts to /messages
     Then the response status is 404
-    And the response says the session was not found
-
-  @integration
-  Scenario: A message carrying credentials for a different project is rejected
-    Given a client opened an SSE connection with one project's credentials
-    When a message for that session presents another project's credentials
-    Then the response status is 401
-    And the message is never delivered to the session
-
-  @integration
-  Scenario: A message with no credentials is rejected as unauthorized rather than as a bad session
-    Given an SSE session exists
-    When a message for that session arrives with no credentials
-    Then the response status is 401
-
-  @integration
-  Scenario: A message for a session whose replica is gone tells the client to reconnect
-    Given an SSE session that no replica still holds
-    When a client posts a message for that session
-    Then the response status is 404
-    And the response says the session was not found
-    And the session stops counting against the project's concurrent sessions
-
-  @integration
-  Scenario: SSE sessions count towards the per-project concurrent session limit
-    Given a project already holds the maximum number of concurrent sessions
-    When a client opens another SSE connection for that project
-    Then the connection is refused as over the session limit
 
   @integration
   Scenario: Reconnecting the streaming transport to another replica resumes the session
@@ -289,7 +244,7 @@ Feature: MCP HTTP Server In-App Integration (Phase 1)
   Scenario: Reconnecting with another project's credentials is refused and rebuilds nothing
     Given a streamable session was created on one replica
     When a caller reconnects that session through a different replica with another project's credentials
-    Then the response status is 401
+    Then the response status is 404, as for a session that does not exist
     And the other replica serves no session for that session id
 
   # --- OAuth discovery documents ---

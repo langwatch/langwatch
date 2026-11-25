@@ -1,18 +1,11 @@
 /**
- * The `secret_snippet` tool: Langy shows a secret once, without holding it.
- *
- * A virtual key minted with `--reveal-once` answers with a reveal id and never
- * the secret. This tool takes that id and a snippet template, and the panel
- * renders the secret snippet card off the call: the card reads the secret
- * once from the app, straight into the reader's screen. Nothing here talks to
- * the app, because the worker has nothing to fetch. The value never enters
- * the tool result, the model's text, the events or the projection.
- *
+ * The `secret_snippet` tool: Langy shows a secret once, without holding
+ * it. The panel's card reads it once from the app off a reveal id.
  * Spec: specs/langy/langy-secret-snippet.feature
  */
 
-import { Type } from "typebox";
 import type { ExtensionAPI, InlineExtension } from "@earendil-works/pi-coding-agent";
+import { Type } from "typebox";
 
 export const SECRET_SNIPPET_TOOL_NAME = "secret_snippet";
 

@@ -1,0 +1,146 @@
+/**
+ * What this package's screen suites mount a screen inside. A test
+ * constructs the abstract host port rather than mocking a module: the
+ * fake RECORDS what a screen asked and reported. Not exported.
+ */
+
+import {
+  UiHostServiceProvider,
+  UiHostServicesContextProvider,
+} from "@langwatch/browser-host/capabilities";
+import { uiDeclarations, type UiDrawerToken } from "@langwatch/browser-host/declarations";
+import { UiFlagsService } from "@langwatch/browser-host/feature-flag";
+import { createUiHostServicesFromHost } from "@langwatch/browser-host/testing";
+import { DesignSystemTestProvider } from "@langwatch/design-system/testing";
+import { ContactSalesToken } from "@langwatch/enterprise-billing-client";
+import { render } from "@testing-library/react";
+import type { ReactElement, ReactNode } from "react";
+
+import {
+  AuthzHostApi,
+  AuthzHostProvider,
+  type AuthzFailureNotice,
+  type AuthzHostScope,
+  type AuthzOrganizationStructure,
+  type AuthzPlanReading,
+  type AuthzRouteReading,
+  type AuthzSuccessNotice,
+} from "./model/authz-host.ts";
+
+export class FakeAuthzHost extends AuthzHostApi {
+  readonly successes: AuthzSuccessNotice[] = [];
+  readonly failures: AuthzFailureNotice[] = [];
+  readonly queries: Record<string, string | undefined>[] = [];
+  readonly overlays: { drawer: string; props: unknown }[] = [];
+  closedOverlays = 0;
+
+  constructor(
+    private readonly options: {
+      scope?: AuthzHostScope;
+      grants?: ReadonlySet<string>;
+      plan?: AuthzPlanReading;
+      query?: Readonly<Record<string, string | undefined>>;
+      structure?: AuthzOrganizationStructure;
+      projectSwitcher?: ReactNode;
+    } = {},
+  ) {
+    super();
+  }
+
+  scope(): AuthzHostScope {
+    return this.options.scope ?? { organizationId: "org-1" };
+  }
+
+  hasPermission(permission: string): boolean {
+    return (this.options.grants ?? new Set(["organization:manage"])).has(permission);
+  }
+
+  plan(): AuthzPlanReading {
+    return this.options.plan ?? { isEnterprise: true, isLoading: false };
+  }
+
+  route(): AuthzRouteReading {
+    return { query: this.options.query ?? {} };
+  }
+
+  organizationStructure(): AuthzOrganizationStructure {
+    return this.options.structure ?? { organizationName: "Acme", teams: [], projects: [] };
+  }
+
+  setQuery(next: Readonly<Record<string, string | undefined>>): void {
+    this.queries.push({ ...next });
+  }
+
+  openOverlay<Props>(drawer: UiDrawerToken<Props>, props?: Partial<Props>): void {
+    this.overlays.push({ drawer: drawer.key, props });
+  }
+
+  closeOverlay(): void {
+    this.closedOverlays += 1;
+  }
+
+  succeeded(notice: AuthzSuccessNotice): void {
+    this.successes.push(notice);
+  }
+
+  failed(failure: AuthzFailureNotice): void {
+    this.failures.push(failure);
+  }
+
+  projectSwitcher(): ReactNode | null {
+    return this.options.projectSwitcher ?? null;
+  }
+}
+
+/** Renders a screen inside the Design System's provider and a host. */
+/** Billing lends the sales card by token, as its declaration does in the browser app. */
+const billingLendsContactSales = {
+  ...createUiHostServicesFromHost({ route: () => ({ params: {}, query: {} }), navigate: () => {} }),
+  declarations: uiDeclarations([
+    {
+      name: "billing",
+      installation: {
+        capabilities: {},
+        lends: [
+          {
+            token: ContactSalesToken,
+            load: async () => ({
+              default: () => <div data-testid="contact-sales-block">Need more?</div>,
+            }),
+          },
+        ],
+      },
+    },
+  ]),
+};
+
+/** `release_braids` as the screen reads it: on unless a suite says otherwise. */
+function braidsFlag(braidsReleased: boolean) {
+  return new Map([
+    [
+      UiFlagsService.name,
+      {
+        flag: ({ name }: { name: string }) => (name === "release_braids" ? braidsReleased : false),
+      },
+    ],
+  ]);
+}
+
+export function renderWithAuthzHost(
+  element: ReactElement,
+  host: FakeAuthzHost = new FakeAuthzHost(),
+  { braidsReleased = true }: { braidsReleased?: boolean } = {},
+) {
+  return {
+    host,
+    ...render(
+      <DesignSystemTestProvider>
+        <UiHostServicesContextProvider value={billingLendsContactSales}>
+          <UiHostServiceProvider value={braidsFlag(braidsReleased)}>
+            <AuthzHostProvider value={host}>{element}</AuthzHostProvider>
+          </UiHostServiceProvider>
+        </UiHostServicesContextProvider>
+      </DesignSystemTestProvider>,
+    ),
+  };
+}

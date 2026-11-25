@@ -1,7 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 vi.mock("../../../utils/apiKey", () => ({
-  resolveCredentials: vi.fn(async () => ({ apiKey: "test-key", source: "env", endpoint: "https://app.langwatch.ai" })),
+  resolveCredentials: vi.fn(async () => ({
+    apiKey: "test-key",
+    source: "env",
+    endpoint: "https://app.langwatch.ai",
+  })),
 }));
 
 vi.mock("ora", () => ({
@@ -12,14 +16,14 @@ vi.mock("ora", () => ({
   }),
 }));
 
-import { listTriggersCommand } from "../list";
-import { getTriggerCommand } from "../get";
 import { createTriggerCommand } from "../create";
-import { updateTriggerCommand } from "../update";
 import { deleteTriggerCommand } from "../delete";
+import { triggerFiresCommand } from "../fires";
+import { getTriggerCommand } from "../get";
+import { listTriggersCommand } from "../list";
 import { setTriggerActiveCommand } from "../setActive";
 import { testFireTriggerCommand } from "../testFire";
-import { triggerFiresCommand } from "../fires";
+import { updateTriggerCommand } from "../update";
 
 class ProcessExitError extends Error {
   constructor(public code: number) {
@@ -75,7 +79,7 @@ describe("listTriggersCommand()", () => {
       await listTriggersCommand();
 
       expect(mockFetch).toHaveBeenCalledWith(
-        expect.stringContaining("/api/triggers"),
+        expect.stringContaining("/api/v1/triggers"),
         expect.objectContaining({
           headers: expect.objectContaining({
             authorization: "Bearer test-key",
@@ -156,7 +160,7 @@ describe("getTriggerCommand()", () => {
       await getTriggerCommand("trigger_abc");
 
       expect(mockFetch).toHaveBeenCalledWith(
-        "http://localhost:5560/api/triggers/trigger_abc",
+        "http://localhost:5560/api/v1/triggers/trigger_abc",
         expect.anything(),
       );
     });
@@ -280,7 +284,7 @@ describe("createTriggerCommand()", () => {
       await createTriggerCommand("Error Alert", { action: "SEND_EMAIL" });
 
       expect(mockFetch).toHaveBeenCalledWith(
-        "http://localhost:5560/api/triggers",
+        "http://localhost:5560/api/v1/triggers",
         expect.objectContaining({
           method: "POST",
           body: expect.stringContaining("SEND_EMAIL"),
@@ -291,9 +295,9 @@ describe("createTriggerCommand()", () => {
 
   describe("when invalid action is provided", () => {
     it("exits with code 1", async () => {
-      await expect(
-        createTriggerCommand("Bad", { action: "INVALID" }),
-      ).rejects.toThrow(ProcessExitError);
+      await expect(createTriggerCommand("Bad", { action: "INVALID" })).rejects.toThrow(
+        ProcessExitError,
+      );
     });
   });
   describe("when an alert on a graph is created", () => {
@@ -407,7 +411,7 @@ describe("updateTriggerCommand()", () => {
       await updateTriggerCommand("trigger_abc", { active: "false" });
 
       expect(mockFetch).toHaveBeenCalledWith(
-        "http://localhost:5560/api/triggers/trigger_abc",
+        "http://localhost:5560/api/v1/triggers/trigger_abc",
         expect.objectContaining({
           method: "PATCH",
           body: expect.stringContaining("false"),
@@ -474,7 +478,7 @@ describe("setTriggerActiveCommand()", () => {
       await setTriggerActiveCommand({ id: "trigger_abc", active: false });
 
       expect(mockFetch).toHaveBeenCalledWith(
-        "http://localhost:5560/api/triggers/trigger_abc/disable",
+        "http://localhost:5560/api/v1/triggers/trigger_abc/disable",
         expect.objectContaining({ method: "POST" }),
       );
     });
@@ -490,7 +494,7 @@ describe("setTriggerActiveCommand()", () => {
       await setTriggerActiveCommand({ id: "trigger_abc", active: true });
 
       expect(mockFetch).toHaveBeenCalledWith(
-        "http://localhost:5560/api/triggers/trigger_abc/enable",
+        "http://localhost:5560/api/v1/triggers/trigger_abc/enable",
         expect.objectContaining({ method: "POST" }),
       );
     });
@@ -525,7 +529,7 @@ describe("testFireTriggerCommand()", () => {
       const command = await testFireTriggerCommand("trigger_abc");
 
       expect(mockFetch).toHaveBeenCalledWith(
-        "http://localhost:5560/api/triggers/trigger_abc/test-fire",
+        "http://localhost:5560/api/v1/triggers/trigger_abc/test-fire",
         expect.objectContaining({ method: "POST" }),
       );
       expect(command?.data).toEqual(result);
@@ -554,7 +558,7 @@ describe("triggerFiresCommand()", () => {
       await triggerFiresCommand({ id: "trigger_abc", options: { limit: "5" } });
 
       expect(mockFetch).toHaveBeenCalledWith(
-        "http://localhost:5560/api/triggers/trigger_abc/fires?limit=5",
+        "http://localhost:5560/api/v1/triggers/trigger_abc/fires?limit=5",
         expect.anything(),
       );
     });
@@ -577,7 +581,7 @@ describe("triggerFiresCommand()", () => {
       result?.table?.();
 
       expect(mockFetch).toHaveBeenCalledWith(
-        "http://localhost:5560/api/triggers/trigger_abc/fires?limit=1&cursor=cursor_2",
+        "http://localhost:5560/api/v1/triggers/trigger_abc/fires?limit=1&cursor=cursor_2",
         expect.anything(),
       );
       expect(result?.data).toMatchObject({ nextCursor: "cursor_3" });
@@ -621,7 +625,7 @@ describe("deleteTriggerCommand()", () => {
       await deleteTriggerCommand("trigger_abc");
 
       expect(mockFetch).toHaveBeenCalledWith(
-        "http://localhost:5560/api/triggers/trigger_abc",
+        "http://localhost:5560/api/v1/triggers/trigger_abc",
         expect.objectContaining({ method: "DELETE" }),
       );
     });

@@ -251,7 +251,8 @@ async def on_chat_start():
     # )
 
     tools = [retriever_tool]
-    model = ChatOpenAI(streaming=True)
+    # gpt-6-luna takes function tools on Chat Completions only with reasoning off.
+    model = ChatOpenAI(model="gpt-6-luna", reasoning_effort="none", streaming=True)
     
     agent = create_agent(
         model=model,

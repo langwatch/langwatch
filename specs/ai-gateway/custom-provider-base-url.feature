@@ -121,6 +121,35 @@ Feature: Custom (OpenAI-compatible) provider routing to customer endpoints
     Then the dispatch does not fail credential validation
     And the upstream request carries no x-api-key header
 
+  @unit
+  Scenario: A Gemini or Vertex provider with a base URL reaches that host instead of Google's
+    Given a Gemini credential, or a Vertex credential with a project and location, whose base_url names another host
+    When a chat completion is dispatched through the gateway
+    Then the generateContent call reaches that host, on the Gemini models path or the Vertex publishers path
+    And a credential without a base_url keeps Google's endpoints
+
+  @unit
+  Scenario: A Bedrock provider whose runtime host is on the customer-endpoint allowlist reaches that host
+    Given a Bedrock credential whose runtime endpoint or base_url names a host on ALLOWED_PROXY_HOSTS
+    When a chat completion is dispatched through the gateway
+    Then the Converse call is signed for and sent to that host
+    But a runtime host that is neither amazonaws.com nor on the allowlist is still refused
+
+  @unit
+  Scenario Outline: A provider on a private address is dispatched to only with the private-network guard off
+    The allowlist does not lift the refusal at dispatch: every custom endpoint
+    shares one Bifrost provider, so it would lift it for every host.
+
+    Given BLOCK_LOCAL_HTTP_CALLS is <block> and ALLOWED_PROXY_HOSTS is <allowlist>
+    When the gateway configures a provider for dispatch
+    Then its connections to private addresses are <outcome>
+
+    Examples:
+      | block   | allowlist                 | outcome |
+      | "false" | empty                     | allowed |
+      | "true"  | "llm-proxy.internal"      | refused |
+      | "true"  | empty                     | refused |
+
   Scenario: An endpoint that fell out of recent use still works when dispatched to again
     Given an "anthropic" model provider with a base URL that has not been used recently
     And many other Anthropic-compatible endpoints have served traffic since

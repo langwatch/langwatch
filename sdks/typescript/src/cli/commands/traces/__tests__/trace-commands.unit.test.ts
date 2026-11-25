@@ -1,5 +1,7 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { TracesApiError } from "@/client-sdk/services/traces/traces-api.service";
+import { afterEach, beforeEach, describe, expect, it, type MockInstance, vi } from "vitest";
+
+import { TracesApiError, TracesApiService } from "@/client-sdk/services/traces/traces-api.service";
+
 import { AGENT_MODE_ENV_VARS } from "../../../utils/output";
 
 // Agent-mode detection reads the ambient environment (Claude Code sets
@@ -8,770 +10,1122 @@ import { AGENT_MODE_ENV_VARS } from "../../../utils/output";
 // suite asserts the human default regardless of what launched vitest.
 let savedAgentEnv: Record<string, string | undefined> = {};
 beforeEach(() => {
-	savedAgentEnv = Object.fromEntries(
-		AGENT_MODE_ENV_VARS.map((name) => [name, process.env[name]]),
-	);
-	for (const name of AGENT_MODE_ENV_VARS) delete process.env[name];
+  savedAgentEnv = Object.fromEntries(AGENT_MODE_ENV_VARS.map((name) => [name, process.env[name]]));
+  for (const name of AGENT_MODE_ENV_VARS) delete process.env[name];
 });
 afterEach(() => {
-	for (const name of AGENT_MODE_ENV_VARS) {
-		const value = savedAgentEnv[name];
-		if (value === undefined) delete process.env[name];
-		else process.env[name] = value;
-	}
+  for (const name of AGENT_MODE_ENV_VARS) {
+    const value = savedAgentEnv[name];
+    if (value === undefined) delete process.env[name];
+    else process.env[name] = value;
+  }
 });
 
-vi.mock(
-	"@/client-sdk/services/traces/traces-api.service",
-	async (importOriginal) => {
-		// eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
-		const actual = (await importOriginal()) as Record<string, unknown>;
-		return {
-			...actual,
-			TracesApiService: vi.fn(),
-		};
-	},
-);
+vi.mock("@/client-sdk/services/traces/traces-api.service", async (importOriginal) => {
+  const actual = await importOriginal<Record<string, unknown>>();
+  return {
+    ...actual,
+    TracesApiService: vi.fn(),
+  };
+});
+
+const recordedCounts = vi.hoisted(() => [] as { count: number; message: string }[]);
+
+vi.mock("../../../telemetry/events", async (importOriginal) => {
+  const actual = await importOriginal<Record<string, unknown>>();
+  return {
+    ...actual,
+    createCommandEvents: () => ({
+      started: () => undefined,
+      count: (args: { count: number; message: string }) => recordedCounts.push(args),
+      progress: () => undefined,
+      completed: () => undefined,
+      failed: () => undefined,
+      flush: () => Promise.resolve(),
+    }),
+  };
+});
 
 vi.mock("../../../utils/apiKey", () => ({
-	resolveCredentials: vi.fn(async () => ({ apiKey: "test-key", source: "env", endpoint: "https://app.langwatch.ai" })),
+  resolveCredentials: vi.fn(async () => ({
+    apiKey: "test-key",
+    source: "env",
+    endpoint: "https://app.langwatch.ai",
+  })),
 }));
 
 vi.mock("ora", () => ({
-	default: () => ({
-		start: vi.fn().mockReturnThis(),
-		succeed: vi.fn(),
-		fail: vi.fn(),
-	}),
+  default: () => ({
+    start: vi.fn().mockReturnThis(),
+    succeed: vi.fn(),
+    fail: vi.fn(),
+  }),
+}));
+
+vi.mock("../../../utils/searchedProject", () => ({
+  searchedProjectSlug: vi.fn(async ({ project }: { project?: string }) => project ?? "acme-app"),
 }));
 
 vi.mock("@/cli/utils/governance/resolveEndpoint", () => ({
-	resolveControlPlaneUrl: () => "https://langwatch.test",
+  resolveControlPlaneUrl: () => "https://langwatch.test",
 }));
 
-import { TracesApiService } from "@/client-sdk/services/traces/traces-api.service";
 import { exportTracesCommand } from "../export";
 import { getTraceCommand } from "../get";
 import { searchTracesCommand } from "../search";
 import { transcriptTraceCommand } from "../transcript";
 
 class ProcessExitError extends Error {
-	constructor(public code: number) {
-		super(`process.exit(${code})`);
-	}
+  constructor(public code: number) {
+    super(`process.exit(${code})`);
+  }
 }
 
 const noop = () => {
-	// intentionally empty — suppresses output during tests
+  // intentionally empty — suppresses output during tests
 };
 
+let exitSpy: MockInstance<typeof process.exit>;
+
 const mockProcessExit = () => {
-	vi.spyOn(process, "exit").mockImplementation((code) => {
-		throw new ProcessExitError(code as number);
-	});
+  exitSpy = vi.spyOn(process, "exit").mockImplementation((code) => {
+    throw new ProcessExitError(code as number);
+  });
 };
 
 describe("searchTracesCommand()", () => {
-	let mockSearch: ReturnType<typeof vi.fn>;
+  let mockSearch: ReturnType<typeof vi.fn>;
 
-	beforeEach(() => {
-		vi.clearAllMocks();
-		mockSearch = vi.fn();
-		// biome-ignore lint/complexity/useArrowFunction: the command news up TracesApiService, and an arrow function is not constructible.
-		vi.mocked(TracesApiService).mockImplementation(function () {
-			return {
-				search: mockSearch,
-				get: vi.fn(),
-			} as unknown as TracesApiService;
-		});
-		vi.spyOn(console, "log").mockImplementation(noop);
-		vi.spyOn(console, "error").mockImplementation(noop);
-		mockProcessExit();
-	});
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockSearch = vi.fn();
+    // The command news up TracesApiService, and an arrow function is not constructible.
+    // biome-ignore lint/complexity/useArrowFunction: needs a constructible function.
+    vi.mocked(TracesApiService).mockImplementation(function () {
+      return {
+        search: mockSearch,
+        get: vi.fn(),
+      } as unknown as TracesApiService;
+    });
+    vi.spyOn(console, "log").mockImplementation(noop);
+    vi.spyOn(console, "error").mockImplementation(noop);
+    mockProcessExit();
+  });
 
-	describe("when a filter is given", () => {
-		/** @scenario "The CLI sends a filter and keeps free text separate" */
-		it("sends the filter and the text query as two different things", async () => {
-			mockSearch.mockResolvedValue({
-				traces: [],
-				pagination: { totalHits: 0 },
-			});
+  describe("when the window is given", () => {
+    it("reads epoch milliseconds as the instant they are", async () => {
+      mockSearch.mockResolvedValue({
+        traces: [],
+        pagination: { totalHits: 0 },
+      });
 
-			await searchTracesCommand({
-				filter: "status:error",
-				query: "refund",
-			});
+      await searchTracesCommand({
+        startDate: "1789000000000",
+        endDate: "2026-09-20T06:00:00.000Z",
+      });
 
-			const body = mockSearch.mock.calls[0]?.[0] as {
-				filter?: string;
-				query?: string;
-			};
-			expect(body.filter).toBe("status:error");
-			expect(body.query).toBe("refund");
-		});
+      const body = mockSearch.mock.calls[0]?.[0] as {
+        startDate?: number;
+        endDate?: number;
+      };
+      expect(body.startDate).toBe(1789000000000);
+      expect(body.endDate).toBe(Date.parse("2026-09-20T06:00:00.000Z"));
+    });
 
-		it("sends no filter key when none was given", async () => {
-			mockSearch.mockResolvedValue({
-				traces: [],
-				pagination: { totalHits: 0 },
-			});
+    it("refuses a value that is neither an instant nor epoch milliseconds", async () => {
+      await expect(searchTracesCommand({ startDate: "last tuesday" })).rejects.toThrow(
+        ProcessExitError,
+      );
+      expect(mockSearch).not.toHaveBeenCalled();
+    });
+  });
 
-			await searchTracesCommand({ query: "refund" });
+  describe("when traces are found", () => {
+    it("calls search and prints results", async () => {
+      mockSearch.mockResolvedValue({
+        traces: [{ traceId: "trace_1", input: "hello", output: "world" }],
+        pagination: { totalHits: 1 },
+      });
 
-			const body = mockSearch.mock.calls[0]?.[0] as { filter?: string };
-			expect(body.filter).toBeUndefined();
-		});
+      await searchTracesCommand({});
 
-		/**
-		 * A filter that parses and matches nothing is almost always a value
-		 * spelled the way a person would spell it, which is the one question the
-		 * facets command answers.
-		 *
-		 */
-		/** @scenario "An empty filtered result points at the facets command" */
-		it("points an empty result at the facets command", async () => {
-			mockSearch.mockResolvedValue({
-				traces: [],
-				pagination: { totalHits: 0 },
-			});
+      expect(mockSearch).toHaveBeenCalledOnce();
+    });
+  });
 
-			await searchTracesCommand({ filter: "model:gpt5" });
+  describe("when no traces are found", () => {
+    it("prints empty-state message", async () => {
+      mockSearch.mockResolvedValue({
+        traces: [],
+        pagination: { totalHits: 0 },
+      });
 
-			const printed = vi
-				.mocked(console.log)
-				.mock.calls.map((call) => String(call[0] ?? ""))
-				.join("\n");
-			expect(printed).toContain("langwatch trace facets");
-		});
-	});
+      await searchTracesCommand({});
 
-	describe("when the window is given", () => {
-		it("reads epoch milliseconds as the instant they are", async () => {
-			mockSearch.mockResolvedValue({
-				traces: [],
-				pagination: { totalHits: 0 },
-			});
+      expect(exitSpy).not.toHaveBeenCalled();
+    });
+  });
 
-			await searchTracesCommand({
-				startDate: "1789000000000",
-				endDate: "2026-09-20T06:00:00.000Z",
-			});
+  // The query is matched as a phrase, so a Lucene-style query returns zero
+  // rows rather than an error, and zero rows reads like "you have none of
+  // those". An agent asked to find failing traces reports that as the answer.
+  describe("when a query with boolean operators finds nothing", () => {
+    let log: ReturnType<typeof vi.spyOn>;
 
-			const body = mockSearch.mock.calls[0]?.[0] as {
-				startDate?: number;
-				endDate?: number;
-			};
-			expect(body.startDate).toBe(1789000000000);
-			expect(body.endDate).toBe(Date.parse("2026-09-20T06:00:00.000Z"));
-		});
+    beforeEach(() => {
+      log = vi.spyOn(console, "log").mockImplementation(() => undefined);
+      mockSearch.mockResolvedValue({
+        traces: [],
+        pagination: { totalHits: 0 },
+      });
+    });
 
-		it("refuses a value that is neither an instant nor epoch milliseconds", async () => {
-			await expect(
-				searchTracesCommand({ startDate: "last tuesday" }),
-			).rejects.toThrow(ProcessExitError);
-			expect(mockSearch).not.toHaveBeenCalled();
-		});
-	});
+    // Restored here rather than after each assertion: a rejected command
+    // would skip an inline mockRestore and leave every later test in this
+    // file writing into a mocked logger.
+    afterEach(() => {
+      log.mockRestore();
+    });
 
-	describe("when traces are found", () => {
-		it("calls search and prints results", async () => {
-			mockSearch.mockResolvedValue({
-				traces: [{ traceId: "trace_1", input: "hello", output: "world" }],
-				pagination: { totalHits: 1 },
-			});
+    /** @scenario A boolean query that finds nothing says why */
+    it("says the operators were searched for as words", async () => {
+      await searchTracesCommand({ query: "error OR exception" });
 
-			await searchTracesCommand({});
+      expect(log.mock.calls.flat().join("\n")).toContain("searched for as words");
+    });
 
-			expect(mockSearch).toHaveBeenCalledOnce();
-		});
-	});
+    /** @scenario A plain query that finds nothing does not blame the operators */
+    it("stays quiet about them when the query is one phrase", async () => {
+      await searchTracesCommand({ query: "validation failed" });
 
-	describe("when no traces are found", () => {
-		it("prints empty-state message", async () => {
-			mockSearch.mockResolvedValue({
-				traces: [],
-				pagination: { totalHits: 0 },
-			});
+      expect(log.mock.calls.flat().join("\n")).not.toContain("searched for as words");
+      expect(log.mock.calls.flat().join("\n")).not.toContain("redacted");
+    });
+  });
 
-			await searchTracesCommand({});
+  // An email address never survives ingestion under the default privacy
+  // settings, so a search for one reads like the customer never wrote in.
+  describe("when a query carrying an email address finds nothing", () => {
+    let log: ReturnType<typeof vi.spyOn>;
 
-			// eslint-disable-next-line @typescript-eslint/unbound-method
-			expect(process.exit).not.toHaveBeenCalled();
-		});
-	});
+    beforeEach(() => {
+      log = vi.spyOn(console, "log").mockImplementation(() => undefined);
+      mockSearch.mockResolvedValue({
+        traces: [],
+        pagination: { totalHits: 0 },
+      });
+    });
 
-	// The query is matched as a phrase, so a Lucene-style query returns zero
-	// rows rather than an error, and zero rows reads like "you have none of
-	// those". An agent asked to find failing traces reports that as the answer.
-	describe("when a query with boolean operators finds nothing", () => {
-		let log: ReturnType<typeof vi.spyOn>;
+    afterEach(() => {
+      log.mockRestore();
+    });
 
-		beforeEach(() => {
-			log = vi.spyOn(console, "log").mockImplementation(() => undefined);
-			mockSearch.mockResolvedValue({
-				traces: [],
-				pagination: { totalHits: 0 },
-			});
-		});
+    /** @scenario An email-shaped query that finds nothing explains redaction */
+    it("says email addresses are redacted and what to search by instead", async () => {
+      await searchTracesCommand({ query: "priya.raman@northwind.example" });
 
-		// Restored here rather than after each assertion: a rejected command
-		// would skip an inline mockRestore and leave every later test in this
-		// file writing into a mocked logger.
-		afterEach(() => {
-			log.mockRestore();
-		});
+      const printed = log.mock.calls.flat().join("\n");
+      expect(printed).toContain("redacted");
+      expect(printed).toContain("data privacy");
+    });
 
-		/** @scenario A boolean query that finds nothing says why */
-		it("says the operators were searched for as words", async () => {
-			await searchTracesCommand({ query: "error OR exception" });
+    /** @scenario The machine document carries the hint */
+    it("puts the same hint on the machine document", async () => {
+      await searchTracesCommand({
+        query: "priya.raman@northwind.example",
+        format: "json",
+      });
 
-			expect(log.mock.calls.flat().join("\n")).toContain(
-				"searched for as words",
-			);
-		});
+      const printed = log.mock.calls.flat().join("\n");
+      const document = JSON.parse(printed) as { hint?: string; traces: unknown[] };
+      expect(document.traces).toEqual([]);
+      expect(document.hint).toContain("redacted");
+    });
 
-		/** @scenario A plain query that finds nothing does not blame the operators */
-		it("stays quiet about them when the query is one phrase", async () => {
-			await searchTracesCommand({ query: "validation failed" });
+    /** @scenario The machine document carries the hint */
+    it("adds no hint to a document that holds traces", async () => {
+      mockSearch.mockResolvedValue({
+        traces: [{ traceId: "t1" }],
+        pagination: { totalHits: 1 },
+      });
 
-			expect(log.mock.calls.flat().join("\n")).not.toContain(
-				"searched for as words",
-			);
-			expect(log.mock.calls.flat().join("\n")).not.toContain("redacted");
-		});
-	});
+      await searchTracesCommand({
+        query: "priya.raman@northwind.example",
+        format: "json",
+      });
 
-	// An email address never survives ingestion under the default privacy
-	// settings, so a search for one reads like the customer never wrote in.
-	describe("when a query carrying an email address finds nothing", () => {
-		let log: ReturnType<typeof vi.spyOn>;
+      const document = JSON.parse(log.mock.calls.flat().join("\n")) as {
+        hint?: string;
+      };
+      expect(document.hint).toBeUndefined();
+    });
+  });
 
-		beforeEach(() => {
-			log = vi.spyOn(console, "log").mockImplementation(() => undefined);
-			mockSearch.mockResolvedValue({
-				traces: [],
-				pagination: { totalHits: 0 },
-			});
-		});
+  describe("when format is json", () => {
+    /** @scenario "A search-backed list also carries the total under the common name" */
+    it("outputs the document it was given, with the total under the common name", async () => {
+      const result = {
+        traces: [{ traceId: "t1" }],
+        pagination: { totalHits: 1 },
+      };
+      mockSearch.mockResolvedValue(result);
 
-		afterEach(() => {
-			log.mockRestore();
-		});
+      await searchTracesCommand({ format: "json" });
 
-		/** @scenario An email-shaped query that finds nothing explains redaction */
-		it("says email addresses are redacted and what to search by instead", async () => {
-			await searchTracesCommand({ query: "priya.raman@northwind.example" });
+      // A trace search says how many it matched as `totalHits`, and every
+      // resource list says it as `total`. Both are printed, so a caller has
+      // one name to read on any list.
+      const printed = JSON.parse(vi.mocked(console.log).mock.calls.at(-1)![0] as string) as Record<
+        string,
+        unknown
+      >;
+      expect(printed.traces).toEqual([{ traceId: "t1" }]);
+      expect(printed.pagination).toEqual({ totalHits: 1, total: 1 });
+      expect(printed.window).toMatchObject({ lookback: "7d", widened: false });
+    });
+  });
 
-			const printed = log.mock.calls.flat().join("\n");
-			expect(printed).toContain("redacted");
-			expect(printed).toContain("data privacy");
-		});
+  describe("when no window is given", () => {
+    const DAY = 24 * 60 * 60 * 1000;
+    const sentWindow = (call: number) => {
+      const body = mockSearch.mock.calls[call]?.[0] as { startDate: number; endDate: number };
+      return body.endDate - body.startDate;
+    };
 
-		/** @scenario The machine document carries the hint */
-		it("puts the same hint on the machine document", async () => {
-			await searchTracesCommand({
-				query: "priya.raman@northwind.example",
-				format: "json",
-			});
+    /** @scenario A trace read with no window reads the last 7 days */
+    it("reads the last 7 days", async () => {
+      mockSearch.mockResolvedValue({ traces: [{ traceId: "t1" }], pagination: { totalHits: 1 } });
 
-			const printed = log.mock.calls.flat().join("\n");
-			const document = JSON.parse(printed) as { hint?: string; traces: unknown[] };
-			expect(document.traces).toEqual([]);
-			expect(document.hint).toContain("redacted");
-		});
+      await searchTracesCommand({});
 
-		/** @scenario The machine document carries the hint */
-		it("adds no hint to a document that holds traces", async () => {
-			mockSearch.mockResolvedValue({
-				traces: [{ traceId: "t1" }],
-				pagination: { totalHits: 1 },
-			});
+      expect(mockSearch).toHaveBeenCalledOnce();
+      expect(sentWindow(0)).toBe(7 * DAY);
+    });
 
-			await searchTracesCommand({
-				query: "priya.raman@northwind.example",
-				format: "json",
-			});
+    /** @scenario An empty default search widens once to 30 days and says so */
+    it("widens once to 30 days when the default week is empty, and says so", async () => {
+      mockSearch
+        .mockResolvedValueOnce({ traces: [], pagination: { totalHits: 0 } })
+        .mockResolvedValueOnce({ traces: [{ traceId: "t1" }], pagination: { totalHits: 1 } });
 
-			const document = JSON.parse(log.mock.calls.flat().join("\n")) as {
-				hint?: string;
-			};
-			expect(document.hint).toBeUndefined();
-		});
-	});
+      await searchTracesCommand({ query: "refund", format: "json" });
 
-	describe("when format is json", () => {
-		/** @scenario "A search-backed list also carries the total under the common name" */
-		it("outputs the document it was given, with the total under the common name", async () => {
-			const result = {
-				traces: [{ traceId: "t1" }],
-				pagination: { totalHits: 1 },
-			};
-			mockSearch.mockResolvedValue(result);
+      expect(mockSearch).toHaveBeenCalledTimes(2);
+      expect(sentWindow(1)).toBe(30 * DAY);
+      const printed = JSON.parse(vi.mocked(console.log).mock.calls.at(-1)![0] as string) as {
+        window: Record<string, unknown>;
+      };
+      expect(printed.window).toMatchObject({ lookback: "30d", widened: true });
+    });
 
-			await searchTracesCommand({ format: "json" });
+    it("says in the table that it widened", async () => {
+      mockSearch
+        .mockResolvedValueOnce({ traces: [], pagination: { totalHits: 0 } })
+        .mockResolvedValueOnce({ traces: [{ traceId: "t1" }], pagination: { totalHits: 1 } });
 
-			// A trace search says how many it matched as `totalHits`, and every
-			// resource list says it as `total`. Both are printed, so a caller has
-			// one name to read on any list.
-			expect(console.log).toHaveBeenCalledWith(
-				JSON.stringify(
-					{
-						traces: [{ traceId: "t1" }],
-						pagination: { totalHits: 1, total: 1 },
-					},
-					null,
-					2,
-				),
-			);
-		});
-	});
+      await searchTracesCommand({});
 
-	describe("when the API call fails", () => {
-		it("exits with code 1", async () => {
-			mockSearch.mockRejectedValue(
-				new TracesApiError("Network error", "search traces"),
-			);
+      const printed = vi
+        .mocked(console.log)
+        .mock.calls.map((c) => String(c[0]))
+        .join("\n");
+      expect(printed).toContain("searched the last 30d");
+    });
+  });
 
-			await expect(searchTracesCommand({})).rejects.toThrow(ProcessExitError);
-		});
-	});
+  describe("when the caller names the window", () => {
+    it("accepts --since as a lookback and never widens it", async () => {
+      mockSearch.mockResolvedValue({ traces: [], pagination: { totalHits: 0 } });
 
-	describe("when --origin is provided", () => {
-		/** @scenario Search traces filtered by origin */
-		it("passes the origin as a traces.origin filter to the search API", async () => {
-			mockSearch.mockResolvedValue({
-				traces: [],
-				pagination: { totalHits: 0 },
-			});
+      await searchTracesCommand({ since: "2d" });
 
-			await searchTracesCommand({ origin: "application" });
+      expect(mockSearch).toHaveBeenCalledOnce();
+      const body = mockSearch.mock.calls[0]?.[0] as { startDate: number; endDate: number };
+      expect(body.endDate - body.startDate).toBe(2 * 24 * 60 * 60 * 1000);
+    });
 
-			expect(mockSearch).toHaveBeenCalledWith(
-				expect.objectContaining({
-					filters: { "traces.origin": ["application"] },
-				}),
-			);
-		});
+    it("refuses --since together with --start-date before searching", async () => {
+      await expect(searchTracesCommand({ since: "2d", startDate: "yesterday" })).rejects.toThrow(
+        ProcessExitError,
+      );
+      expect(mockSearch).not.toHaveBeenCalled();
+    });
+  });
 
-		/** @scenario Search traces filtered by multiple origins */
-		it("splits comma-separated origins into one filter value each", async () => {
-			mockSearch.mockResolvedValue({
-				traces: [],
-				pagination: { totalHits: 0 },
-			});
+  describe("when the widened search is empty too", () => {
+    beforeEach(() => {
+      mockSearch.mockResolvedValue({ traces: [], pagination: { totalHits: 0 } });
+    });
 
-			await searchTracesCommand({ origin: "application, evaluation" });
+    /** @scenario An empty search names what was searched and the command to widen it */
+    it("describes what was searched and the command that reads further back, as JSON", async () => {
+      await searchTracesCommand({
+        query: "refund",
+        origin: "application",
+        errorsOnly: true,
+        format: "json",
+      });
 
-			expect(mockSearch).toHaveBeenCalledWith(
-				expect.objectContaining({
-					filters: { "traces.origin": ["application", "evaluation"] },
-				}),
-			);
-		});
-	});
+      const printed = JSON.parse(vi.mocked(console.log).mock.calls.at(-1)![0] as string) as Record<
+        string,
+        unknown
+      >;
+      expect(printed.traces).toEqual([]);
+      expect(printed.window).toMatchObject({ widened: true, lookback: "30d" });
+      expect(printed.searched).toMatchObject({
+        project: "acme-app",
+        query: "refund",
+        filter: null,
+        origin: ["application"],
+        errorsOnly: true,
+      });
+      expect(printed.widen).toBe(
+        "langwatch trace search -q refund --origin application --errors-only --since 90d",
+      );
+    });
 
-	// An error is recorded on the span, not in the trace's searchable text, so
-	// before this flag existed the only way to answer "show me my failed
-	// traces" was to pull every trace and filter locally. An agent that instead
-	// searched for the word "error" got zero rows and reported a clean project.
-	describe("when --errors-only is provided", () => {
-		/** @scenario Search only traces that contain an error */
-		it("passes a traces.error filter to the search API", async () => {
-			mockSearch.mockResolvedValue({
-				traces: [],
-				pagination: { totalHits: 0 },
-			});
+    describe("when the search had a free-text query", () => {
+      /** @scenario An empty text search says which fields it matched and how to look inside spans */
+      it("names the matched fields and the way into spans, as JSON", async () => {
+        await searchTracesCommand({ query: "54 soldiers", format: "json" });
 
-			await searchTracesCommand({ errorsOnly: true });
+        const printed = JSON.parse(vi.mocked(console.log).mock.calls.at(-1)![0] as string) as {
+          searched: { queryFields: string[] };
+          inSpans: string;
+        };
+        expect(printed.searched.queryFields).toEqual(["input", "output", "name", "span names"]);
+        expect(printed.inSpans).toContain("langwatch trace get <traceId>");
+        expect(printed.inSpans).toContain('grep its spans for "54 soldiers"');
+      });
 
-			expect(mockSearch).toHaveBeenCalledWith(
-				expect.objectContaining({
-					filters: { "traces.error": ["true"] },
-				}),
-			);
-		});
+      it("names the matched fields and the way into spans in the table", async () => {
+        await searchTracesCommand({ query: "cease-fire" });
 
-		/** @scenario Combine the error filter with an origin filter */
-		it("combines with --origin instead of replacing it", async () => {
-			mockSearch.mockResolvedValue({
-				traces: [],
-				pagination: { totalHits: 0 },
-			});
+        const printed = vi
+          .mocked(console.log)
+          .mock.calls.map((c) => String(c[0]))
+          .join("\n");
+        expect(printed).toContain(
+          "Query:   cease-fire (matched against input, output, name, span names)",
+        );
+        expect(printed).toContain("not span content");
+        expect(printed).toContain("langwatch trace get <traceId>");
+      });
+    });
 
-			await searchTracesCommand({ errorsOnly: true, origin: "application" });
+    describe("when the query is blank", () => {
+      it("reads as no query, with no span suggestion", async () => {
+        await searchTracesCommand({ query: "", format: "json" });
 
-			expect(mockSearch).toHaveBeenCalledWith(
-				expect.objectContaining({
-					filters: {
-						"traces.origin": ["application"],
-						"traces.error": ["true"],
-					},
-				}),
-			);
-		});
-	});
+        const printed = JSON.parse(vi.mocked(console.log).mock.calls.at(-1)![0] as string) as {
+          searched: { query: unknown; queryFields: unknown };
+          inSpans?: unknown;
+        };
+        expect(printed.searched.query).toBeNull();
+        expect(printed.searched.queryFields).toBeNull();
+        expect(printed.inSpans).toBeUndefined();
+      });
+    });
 
-	describe("when --origin is not provided", () => {
-		it("sends no filters field so the search body stays unchanged", async () => {
-			mockSearch.mockResolvedValue({
-				traces: [],
-				pagination: { totalHits: 0 },
-			});
+    describe("when the search had no query", () => {
+      it("carries no span suggestion", async () => {
+        await searchTracesCommand({ errorsOnly: true, format: "json" });
 
-			await searchTracesCommand({});
+        const printed = JSON.parse(
+          vi.mocked(console.log).mock.calls.at(-1)![0] as string,
+        ) as Record<string, unknown>;
+        expect(printed.inSpans).toBeUndefined();
+        expect((printed.searched as { queryFields: unknown }).queryFields).toBeNull();
+      });
+    });
 
-			expect(mockSearch.mock.calls[0]![0]).not.toHaveProperty("filters");
-		});
-	});
+    it("names the project, window and widen command in the table", async () => {
+      await searchTracesCommand({ query: "late refund", project: "acme-app" });
+
+      const printed = vi
+        .mocked(console.log)
+        .mock.calls.map((c) => String(c[0]))
+        .join("\n");
+      expect(printed).toContain("Project: acme-app");
+      expect(printed).toMatch(/Window: {2}\d{4}-\d{2}-\d{2}T.* to \d{4}-/);
+      expect(printed).toContain("Query:   late refund");
+      expect(printed).toContain(
+        "langwatch trace search -q 'late refund' --project acme-app --since 90d",
+      );
+    });
+  });
+
+  describe("when the API call fails", () => {
+    it("exits with code 1", async () => {
+      mockSearch.mockRejectedValue(new TracesApiError("Network error", "search traces"));
+
+      await expect(searchTracesCommand({})).rejects.toThrow(ProcessExitError);
+    });
+  });
+
+  describe("when --origin is provided", () => {
+    /** @scenario Search traces filtered by origin */
+    it("passes the origin as a traces.origin filter to the search API", async () => {
+      mockSearch.mockResolvedValue({
+        traces: [],
+        pagination: { totalHits: 0 },
+      });
+
+      await searchTracesCommand({ origin: "application" });
+
+      expect(mockSearch).toHaveBeenCalledWith(
+        expect.objectContaining({
+          filters: { "traces.origin": ["application"] },
+        }),
+      );
+    });
+
+    /** @scenario Search traces filtered by multiple origins */
+    it("splits comma-separated origins into one filter value each", async () => {
+      mockSearch.mockResolvedValue({
+        traces: [],
+        pagination: { totalHits: 0 },
+      });
+
+      await searchTracesCommand({ origin: "application, evaluation" });
+
+      expect(mockSearch).toHaveBeenCalledWith(
+        expect.objectContaining({
+          filters: { "traces.origin": ["application", "evaluation"] },
+        }),
+      );
+    });
+  });
+
+  describe("when a filter and a text query are given together", () => {
+    /** @scenario The CLI sends a filter and keeps free text separate */
+    it("sends the filter and the text as separate request fields", async () => {
+      mockSearch.mockResolvedValue({
+        traces: [],
+        pagination: { totalHits: 0 },
+      });
+
+      await searchTracesCommand({ filter: "status:error", query: "refund" });
+
+      const body = mockSearch.mock.calls[0]?.[0] as { filter?: string; query?: string };
+      expect(body.filter).toBe("status:error");
+      expect(body.query).toBe("refund");
+    });
+  });
+
+  describe("when a filtered search returns no rows", () => {
+    let log: ReturnType<typeof vi.spyOn>;
+
+    beforeEach(() => {
+      log = vi.spyOn(console, "log").mockImplementation(() => undefined);
+      mockSearch.mockResolvedValue({
+        traces: [],
+        pagination: { totalHits: 0 },
+      });
+    });
+
+    afterEach(() => {
+      log.mockRestore();
+    });
+
+    /** @scenario An empty filtered result points at the facets command */
+    it("points at the facets command", async () => {
+      await searchTracesCommand({ filter: "status:error" });
+
+      expect(log.mock.calls.flat().join("\n")).toContain("langwatch trace facets <field>");
+    });
+
+    it("stays quiet about facets when no filter was given", async () => {
+      await searchTracesCommand({ query: "refund" });
+
+      expect(log.mock.calls.flat().join("\n")).not.toContain("langwatch trace facets");
+    });
+  });
+
+  // An error is recorded on the span, not in the trace's searchable text, so
+  // before this flag existed the only way to answer "show me my failed
+  // traces" was to pull every trace and filter locally. An agent that instead
+  // searched for the word "error" got zero rows and reported a clean project.
+  describe("when --errors-only is provided", () => {
+    /** @scenario Search only traces that contain an error */
+    it("passes a traces.error filter to the search API", async () => {
+      mockSearch.mockResolvedValue({
+        traces: [],
+        pagination: { totalHits: 0 },
+      });
+
+      await searchTracesCommand({ errorsOnly: true });
+
+      expect(mockSearch).toHaveBeenCalledWith(
+        expect.objectContaining({
+          filters: { "traces.error": ["true"] },
+        }),
+      );
+    });
+
+    /** @scenario Combine the error filter with an origin filter */
+    it("combines with --origin instead of replacing it", async () => {
+      mockSearch.mockResolvedValue({
+        traces: [],
+        pagination: { totalHits: 0 },
+      });
+
+      await searchTracesCommand({ errorsOnly: true, origin: "application" });
+
+      expect(mockSearch).toHaveBeenCalledWith(
+        expect.objectContaining({
+          filters: {
+            "traces.origin": ["application"],
+            "traces.error": ["true"],
+          },
+        }),
+      );
+    });
+  });
+
+  describe("when --origin is not provided", () => {
+    it("sends no filters field so the search body stays unchanged", async () => {
+      mockSearch.mockResolvedValue({
+        traces: [],
+        pagination: { totalHits: 0 },
+      });
+
+      await searchTracesCommand({});
+
+      expect(mockSearch.mock.calls[0]![0]).not.toHaveProperty("filters");
+    });
+  });
 });
 
 describe("exportTracesCommand()", () => {
-	let fetchMock: ReturnType<typeof vi.fn>;
+  let fetchMock: ReturnType<typeof vi.fn>;
 
-	beforeEach(() => {
-		vi.clearAllMocks();
-		fetchMock = vi
-			.fn()
-			.mockResolvedValue(
-				new Response(
-					JSON.stringify({ traces: [], pagination: { totalHits: 0 } }),
-					{ status: 200 },
-				),
-			);
-		vi.stubGlobal("fetch", fetchMock);
-		vi.spyOn(console, "log").mockImplementation(noop);
-		vi.spyOn(console, "error").mockImplementation(noop);
-		vi.spyOn(process.stdout, "write").mockImplementation(() => true);
-		mockProcessExit();
-	});
+  beforeEach(() => {
+    vi.clearAllMocks();
+    fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ traces: [], pagination: { totalHits: 0 } }), {
+        status: 200,
+      }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    vi.spyOn(console, "log").mockImplementation(noop);
+    vi.spyOn(console, "error").mockImplementation(noop);
+    vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+    mockProcessExit();
+  });
 
-	describe("when --origin is provided", () => {
-		/** @scenario Export traces filtered by origin */
-		it("passes the origin as a traces.origin filter to the search API", async () => {
-			await exportTracesCommand({ origin: "application,evaluation" });
+  describe("when --origin is provided", () => {
+    /** @scenario Export traces filtered by origin */
+    it("passes the origin as a traces.origin filter to the search API", async () => {
+      await exportTracesCommand({ origin: "application,evaluation" });
 
-			const body = JSON.parse(
-				(fetchMock.mock.calls[0]![1] as { body: string }).body,
-			) as Record<string, unknown>;
-			expect(body.filters).toEqual({
-				"traces.origin": ["application", "evaluation"],
-			});
-		});
-	});
+      const body = JSON.parse((fetchMock.mock.calls[0]![1] as { body: string }).body) as Record<
+        string,
+        unknown
+      >;
+      expect(body.filters).toEqual({
+        "traces.origin": ["application", "evaluation"],
+      });
+    });
+  });
 
-	describe("when --origin is not provided", () => {
-		it("sends no filters field so the export body stays unchanged", async () => {
-			await exportTracesCommand({});
+  describe("when the window is given as a lookback", () => {
+    it("sends that many days before now", async () => {
+      await exportTracesCommand({ since: "30d" });
 
-			const body = JSON.parse(
-				(fetchMock.mock.calls[0]![1] as { body: string }).body,
-			) as Record<string, unknown>;
-			expect(body).not.toHaveProperty("filters");
-		});
-	});
+      const body = JSON.parse((fetchMock.mock.calls[0]![1] as { body: string }).body) as {
+        startDate: number;
+        endDate: number;
+      };
+      expect(body.endDate - body.startDate).toBe(30 * 24 * 60 * 60 * 1000);
+    });
 
-	const pageResponse = (args: {
-		count: number;
-		from: number;
-		scrollId?: string;
-		totalHits: number;
-		skipped?: number;
-		trace?: (i: number) => Record<string, unknown>;
-	}) =>
-		new Response(
-			JSON.stringify({
-				traces: Array.from({ length: args.count }, (_, i) =>
-					args.trace
-						? args.trace(args.from + i)
-						: { trace_id: `trace_${args.from + i}` },
-				),
-				pagination: {
-					totalHits: args.totalHits,
-					...(args.scrollId ? { scrollId: args.scrollId } : {}),
-					...(args.skipped ? { skipped: args.skipped } : {}),
-				},
-			}),
-			{ status: 200 },
-		);
+    it("refuses a date it cannot read instead of sending NaN", async () => {
+      await expect(exportTracesCommand({ startDate: "last tuesday" })).rejects.toThrow(
+        ProcessExitError,
+      );
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
+  });
 
-	const writtenOutput = () =>
-		(process.stdout.write as unknown as ReturnType<typeof vi.fn>).mock.calls
-			.map((c) => String(c[0]))
-			.join("");
+  describe("when nothing matches", () => {
+    /** @scenario An empty export says what it read on stderr and keeps stdout the file */
+    it("says on stderr what it read and how to export further back, leaving stdout the file", async () => {
+      await exportTracesCommand({ query: "refund", format: "json" });
 
-	const requestBodies = () =>
-		fetchMock.mock.calls.map(
-			(c) => JSON.parse((c[1] as { body: string }).body) as Record<string, unknown>,
-		);
+      const stderr = vi
+        .mocked(console.error)
+        .mock.calls.map((c) => String(c[0]))
+        .join("\n");
+      expect(stderr).toContain("No traces to export");
+      expect(stderr).toContain("Project: acme-app");
+      expect(stderr).toContain("langwatch trace export -q refund --since 30d");
+      expect(writtenOutput()).toBe("[]");
+    });
+  });
 
-	describe("when the limit spans multiple pages", () => {
-		/** @scenario export pages with the server cursor until the requested limit is reached */
-		it("passes each response's scrollId into the next request until the limit is reached", async () => {
-			fetchMock
-				.mockResolvedValueOnce(
-					pageResponse({ count: 1000, from: 0, scrollId: "s1", totalHits: 2500 }),
-				)
-				.mockResolvedValueOnce(
-					pageResponse({ count: 1000, from: 1000, scrollId: "s2", totalHits: 2500 }),
-				)
-				.mockResolvedValueOnce(
-					pageResponse({ count: 500, from: 2000, scrollId: "s3", totalHits: 2500 }),
-				);
+  describe("when --origin is not provided", () => {
+    it("sends no filters field so the export body stays unchanged", async () => {
+      await exportTracesCommand({});
 
-			await exportTracesCommand({ limit: "2500" });
+      const body = JSON.parse((fetchMock.mock.calls[0]![1] as { body: string }).body) as Record<
+        string,
+        unknown
+      >;
+      expect(body).not.toHaveProperty("filters");
+    });
+  });
 
-			expect(fetchMock).toHaveBeenCalledTimes(3);
-			const bodies = requestBodies();
-			expect(bodies[0]).not.toHaveProperty("scrollId");
-			expect(bodies[0]!.pageSize).toBe(1000);
-			expect(bodies[1]!.scrollId).toBe("s1");
-			expect(bodies[2]!.scrollId).toBe("s2");
-			expect(bodies[2]!.pageSize).toBe(500);
-			expect(writtenOutput().trim().split("\n")).toHaveLength(2500);
-		});
+  const pageResponse = (args: {
+    count: number;
+    from: number;
+    scrollId?: string;
+    totalHits: number;
+    skipped?: number;
+    trace?: (i: number) => Record<string, unknown>;
+  }) =>
+    new Response(
+      JSON.stringify({
+        traces: Array.from({ length: args.count }, (_, i) =>
+          args.trace ? args.trace(args.from + i) : { trace_id: `trace_${args.from + i}` },
+        ),
+        pagination: {
+          totalHits: args.totalHits,
+          ...(args.scrollId ? { scrollId: args.scrollId } : {}),
+          ...(args.skipped ? { skipped: args.skipped } : {}),
+        },
+      }),
+      { status: 200 },
+    );
 
-		/** @scenario export stops paging when the server returns no further cursor */
-		it("stops after the page that returns no scrollId", async () => {
-			fetchMock.mockResolvedValueOnce(
-				pageResponse({ count: 40, from: 0, totalHits: 40 }),
-			);
+  const writtenOutput = () =>
+    (process.stdout.write as unknown as ReturnType<typeof vi.fn>).mock.calls
+      .map((c) => String(c[0]))
+      .join("");
 
-			await exportTracesCommand({ limit: "1000" });
+  const requestBodies = () =>
+    fetchMock.mock.calls.map(
+      (c) => JSON.parse((c[1] as { body: string }).body) as Record<string, unknown>,
+    );
 
-			expect(fetchMock).toHaveBeenCalledTimes(1);
-			expect(writtenOutput().trim().split("\n")).toHaveLength(40);
-		});
+  describe("when the limit spans multiple pages", () => {
+    /** @scenario export pages with the server cursor until the requested limit is reached */
+    it("passes each response's scrollId into the next request until the limit is reached", async () => {
+      fetchMock
+        .mockResolvedValueOnce(
+          pageResponse({ count: 1000, from: 0, scrollId: "s1", totalHits: 2500 }),
+        )
+        .mockResolvedValueOnce(
+          pageResponse({ count: 1000, from: 1000, scrollId: "s2", totalHits: 2500 }),
+        )
+        .mockResolvedValueOnce(
+          pageResponse({ count: 500, from: 2000, scrollId: "s3", totalHits: 2500 }),
+        );
 
-		/** @scenario export keeps paging through a short page whose shortfall is skipped rows */
-		it("continues past a short page whose shortfall is reported as skipped", async () => {
-			fetchMock
-				.mockResolvedValueOnce(
-					pageResponse({
-						count: 990,
-						from: 0,
-						scrollId: "s1",
-						totalHits: 1100,
-						skipped: 10,
-					}),
-				)
-				.mockResolvedValueOnce(
-					pageResponse({ count: 100, from: 990, scrollId: "s2", totalHits: 1100 }),
-				);
+      await exportTracesCommand({ limit: "2500" });
 
-			await exportTracesCommand({ limit: "1090" });
+      expect(fetchMock).toHaveBeenCalledTimes(3);
+      const bodies = requestBodies();
+      expect(bodies[0]).not.toHaveProperty("scrollId");
+      expect(bodies[0]!.pageSize).toBe(1000);
+      expect(bodies[1]!.scrollId).toBe("s1");
+      expect(bodies[2]!.scrollId).toBe("s2");
+      expect(bodies[2]!.pageSize).toBe(1000);
+      expect(writtenOutput().trim().split("\n")).toHaveLength(2500);
+    });
 
-			expect(fetchMock).toHaveBeenCalledTimes(2);
-			expect(writtenOutput().trim().split("\n")).toHaveLength(1090);
-		});
+    /** @scenario export stops paging when the server returns no further cursor */
+    it("stops after the page that returns no scrollId", async () => {
+      fetchMock.mockResolvedValueOnce(pageResponse({ count: 40, from: 0, totalHits: 40 }));
 
-		/** @scenario export requests one page when the limit fits in a single page */
-		it("makes exactly one request with pageSize matching the limit", async () => {
-			fetchMock.mockResolvedValueOnce(
-				pageResponse({ count: 50, from: 0, scrollId: "s1", totalHits: 500 }),
-			);
+      await exportTracesCommand({ limit: "1000" });
 
-			await exportTracesCommand({ limit: "50" });
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      expect(writtenOutput().trim().split("\n")).toHaveLength(40);
+    });
 
-			expect(fetchMock).toHaveBeenCalledTimes(1);
-			expect(requestBodies()[0]!.pageSize).toBe(50);
-		});
+    /** @scenario export keeps paging through a short page whose shortfall is skipped rows */
+    it("continues past a short page whose shortfall is reported as skipped", async () => {
+      fetchMock
+        .mockResolvedValueOnce(
+          pageResponse({
+            count: 990,
+            from: 0,
+            scrollId: "s1",
+            totalHits: 1100,
+            skipped: 10,
+          }),
+        )
+        .mockResolvedValueOnce(
+          pageResponse({ count: 100, from: 990, scrollId: "s2", totalHits: 1100 }),
+        );
 
-		/** @scenario export ends the walk on a short page without skipped rows */
-		it("stops on a short page whose shortfall is not accounted for by skipped", async () => {
-			fetchMock.mockResolvedValueOnce(
-				pageResponse({ count: 990, from: 0, scrollId: "s1", totalHits: 5000 }),
-			);
+      await exportTracesCommand({ limit: "1090" });
 
-			await exportTracesCommand({ limit: "3000" });
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+      expect(writtenOutput().trim().split("\n")).toHaveLength(1090);
+    });
 
-			expect(fetchMock).toHaveBeenCalledTimes(1);
-			expect(writtenOutput().trim().split("\n")).toHaveLength(990);
-		});
+    /** @scenario export requests one page when the limit fits in a single page */
+    it("makes exactly one request asking for the limit", async () => {
+      fetchMock.mockResolvedValueOnce(
+        pageResponse({ count: 50, from: 0, scrollId: "s1", totalHits: 500 }),
+      );
 
-		/** @scenario export rejects a non-numeric limit */
-		it("exits with an error for a non-numeric --limit instead of paging unbounded", async () => {
-			fetchMock.mockResolvedValue(
-				pageResponse({ count: 100, from: 0, scrollId: "s", totalHits: 1000 }),
-			);
+      await exportTracesCommand({ limit: "50" });
 
-			await expect(exportTracesCommand({ limit: "abc" })).rejects.toThrow(
-				ProcessExitError,
-			);
-			expect(fetchMock).not.toHaveBeenCalled();
-		});
-	});
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      expect(requestBodies()[0]!.pageSize).toBe(50);
+      expect(writtenOutput().trim().split("\n")).toHaveLength(50);
+    });
 
-	describe("when --include-spans is provided", () => {
-		/** @scenario export with --include-spans requests span data and preserves it in the output */
-		it("sends includeSpans and preserves each trace's spans in the JSONL output", async () => {
-			fetchMock.mockResolvedValueOnce(
-				pageResponse({
-					count: 2,
-					from: 0,
-					totalHits: 2,
-					trace: (i) => ({
-						trace_id: `trace_${i}`,
-						spans: [{ span_id: `span_${i}` }],
-					}),
-				}),
-			);
+    /** @scenario export reports the match count once, from the first page */
+    it("reports the match count once when the first page held only skipped rows", async () => {
+      recordedCounts.length = 0;
+      fetchMock
+        .mockResolvedValueOnce(
+          pageResponse({ count: 0, from: 0, scrollId: "s1", totalHits: 5000, skipped: 10 }),
+        )
+        .mockResolvedValueOnce(
+          pageResponse({ count: 1000, from: 0, scrollId: "s2", totalHits: 5000 }),
+        );
 
-			await exportTracesCommand({ includeSpans: true });
+      await exportTracesCommand({ limit: "1000" });
 
-			expect(requestBodies()[0]!.includeSpans).toBe(true);
-			const lines = writtenOutput().trim().split("\n");
-			const first = JSON.parse(lines[0]!) as { spans?: unknown[] };
-			expect(first.spans).toEqual([{ span_id: "span_0" }]);
-		});
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+      expect(recordedCounts.map(({ count }) => count)).toEqual([5000]);
+    });
 
-		/** @scenario export with --include-spans requests smaller pages */
-		it("caps each page at 200 so per-trace span joining stays bounded", async () => {
-			fetchMock.mockResolvedValueOnce(
-				pageResponse({ count: 200, from: 0, totalHits: 200 }),
-			);
+    /** @scenario export keeps paging through a page the server answered short */
+    it("follows the cursor past a short page and stops on an empty one", async () => {
+      fetchMock
+        .mockResolvedValueOnce(
+          pageResponse({ count: 990, from: 0, scrollId: "s1", totalHits: 5000 }),
+        )
+        .mockResolvedValueOnce(
+          pageResponse({ count: 10, from: 990, scrollId: "s2", totalHits: 5000 }),
+        )
+        .mockResolvedValueOnce(
+          pageResponse({ count: 0, from: 1000, scrollId: "s3", totalHits: 5000 }),
+        );
 
-			await exportTracesCommand({ includeSpans: true });
+      await exportTracesCommand({ limit: "3000" });
 
-			expect(requestBodies()[0]!.pageSize).toBe(200);
-		});
+      expect(fetchMock).toHaveBeenCalledTimes(3);
+      expect(writtenOutput().trim().split("\n")).toHaveLength(1000);
+    });
 
-		/** @scenario export without --include-spans keeps the legacy request shape */
-		it("sends no includeSpans field when the flag is absent", async () => {
-			await exportTracesCommand({});
+    /** @scenario export rejects a non-numeric limit */
+    it("exits with an error for a non-numeric --limit instead of paging unbounded", async () => {
+      fetchMock.mockResolvedValue(
+        pageResponse({ count: 100, from: 0, scrollId: "s", totalHits: 1000 }),
+      );
 
-			expect(requestBodies()[0]).not.toHaveProperty("includeSpans");
-		});
-	});
+      await expect(exportTracesCommand({ limit: "abc" })).rejects.toThrow(ProcessExitError);
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
+  });
 
-	describe("when exporting as CSV", () => {
-		/** @scenario CSV export appends token and context columns after the existing ones */
-		it("keeps the legacy columns first and appends the token metric columns", async () => {
-			fetchMock.mockResolvedValueOnce(
-				pageResponse({
-					count: 1,
-					from: 0,
-					totalHits: 1,
-					trace: (i) => ({
-						trace_id: `trace_${i}`,
-						input: { value: "hi" },
-						output: { value: "yo" },
-						timestamps: { started_at: 1720000000000 },
-						metrics: {
-							prompt_tokens: 10,
-							completion_tokens: 5,
-							total_cost: 0.5,
-							context_size_tokens: 123456,
-							cache_read_input_tokens: 120000,
-							cache_creation_input_tokens: 3456,
-							reasoning_tokens: 7,
-						},
-					}),
-				}),
-			);
+  describe("when --include-spans is provided", () => {
+    /** @scenario export with --include-spans requests span data and preserves it in the output */
+    it("sends includeSpans and preserves each trace's spans in the JSONL output", async () => {
+      fetchMock.mockResolvedValueOnce(
+        pageResponse({
+          count: 2,
+          from: 0,
+          totalHits: 2,
+          trace: (i) => ({
+            trace_id: `trace_${i}`,
+            spans: [{ span_id: `span_${i}` }],
+          }),
+        }),
+      );
 
-			await exportTracesCommand({ format: "csv" });
+      await exportTracesCommand({ includeSpans: true });
 
-			const lines = writtenOutput().trim().split("\n");
-			expect(lines[0]).toBe(
-				"trace_id,input,output,started_at,error,prompt_tokens,completion_tokens,total_cost,context_size_tokens,cache_read_input_tokens,cache_creation_input_tokens,reasoning_tokens",
-			);
-			expect(lines[1]).toContain("trace_0,hi,yo,");
-			expect(lines[1]).toContain(",10,5,0.5,123456,120000,3456,7");
-		});
-	});
+      expect(requestBodies()[0]!.includeSpans).toBe(true);
+      const lines = writtenOutput().trim().split("\n");
+      const first = JSON.parse(lines[0]!) as { spans?: unknown[] };
+      expect(first.spans).toEqual([{ span_id: "span_0" }]);
+    });
+
+    /** @scenario export with --include-spans requests smaller pages */
+    it("asks for at most the server's 100-trace cap per page", async () => {
+      fetchMock.mockResolvedValueOnce(pageResponse({ count: 100, from: 0, totalHits: 100 }));
+
+      await exportTracesCommand({ includeSpans: true });
+
+      expect(requestBodies()[0]!.pageSize).toBe(100);
+    });
+
+    /** @scenario export with --include-spans walks past the server's page cap */
+    it("follows the cursor past the server's page cap until the limit is met", async () => {
+      fetchMock
+        .mockResolvedValueOnce(
+          pageResponse({ count: 100, from: 0, scrollId: "s1", totalHits: 400 }),
+        )
+        .mockResolvedValueOnce(
+          pageResponse({ count: 100, from: 100, scrollId: "s2", totalHits: 400 }),
+        )
+        .mockResolvedValueOnce(
+          pageResponse({ count: 100, from: 200, scrollId: "s3", totalHits: 400 }),
+        );
+
+      await exportTracesCommand({ includeSpans: true, limit: "250" });
+
+      expect(fetchMock).toHaveBeenCalledTimes(3);
+      expect(requestBodies()[2]!.scrollId).toBe("s2");
+      // A limit that is not a multiple of the cap still asks the cap, so the cursor holds.
+      expect(requestBodies().map((body) => body.pageSize)).toEqual([100, 100, 100]);
+      expect(writtenOutput().trim().split("\n")).toHaveLength(250);
+    });
+
+    /** @scenario export without --include-spans keeps the legacy request shape */
+    it("sends no includeSpans field when the flag is absent", async () => {
+      await exportTracesCommand({});
+
+      expect(requestBodies()[0]).not.toHaveProperty("includeSpans");
+    });
+  });
+
+  describe("when exporting as CSV", () => {
+    /** @scenario CSV export appends token and context columns after the existing ones */
+    it("keeps the legacy columns first and appends the token metric columns", async () => {
+      fetchMock.mockResolvedValueOnce(
+        pageResponse({
+          count: 1,
+          from: 0,
+          totalHits: 1,
+          trace: (i) => ({
+            trace_id: `trace_${i}`,
+            input: { value: "hi" },
+            output: { value: "yo" },
+            timestamps: { started_at: 1720000000000 },
+            metrics: {
+              prompt_tokens: 10,
+              completion_tokens: 5,
+              total_cost: 0.5,
+              context_size_tokens: 123456,
+              cache_read_input_tokens: 120000,
+              cache_creation_input_tokens: 3456,
+              reasoning_tokens: 7,
+            },
+          }),
+        }),
+      );
+
+      await exportTracesCommand({ format: "csv" });
+
+      const lines = writtenOutput().trim().split("\n");
+      expect(lines[0]).toBe(
+        "trace_id,input,output,started_at,error,prompt_tokens,completion_tokens,total_cost,context_size_tokens,cache_read_input_tokens,cache_creation_input_tokens,reasoning_tokens",
+      );
+      expect(lines[1]).toContain("trace_0,hi,yo,");
+      expect(lines[1]).toContain(",10,5,0.5,123456,120000,3456,7");
+    });
+  });
 });
 
 describe("transcriptTraceCommand()", () => {
-	let fetchMock: ReturnType<typeof vi.fn>;
-	let logSpy: ReturnType<typeof vi.spyOn>;
+  let fetchMock: ReturnType<typeof vi.fn>;
+  let logSpy: ReturnType<typeof vi.spyOn>;
 
-	const transcriptDoc = {
-		agent: "claude_code",
-		sessionId: "session-123",
-		entries: [
-			{ kind: "user_prompt", atMs: 1720000000000, text: "summarise the repo", chars: 18 },
-			{ kind: "assistant_message", atMs: 1720000002000, text: "Here is the summary.", model: "claude-opus-5" },
-		],
-		totals: { modelCalls: 1, toolCalls: 0, tokens: 128, costUsd: 0.04 },
-		subAgents: [],
-	};
+  const transcriptDoc = {
+    agent: "claude_code",
+    sessionId: "session-123",
+    entries: [
+      { kind: "user_prompt", atMs: 1720000000000, text: "summarise the repo", chars: 18 },
+      {
+        kind: "assistant_message",
+        atMs: 1720000002000,
+        text: "Here is the summary.",
+        model: "claude-opus-5",
+      },
+    ],
+    totals: { modelCalls: 1, toolCalls: 0, tokens: 128, costUsd: 0.04 },
+    subAgents: [],
+  };
 
-	beforeEach(() => {
-		vi.clearAllMocks();
-		fetchMock = vi
-			.fn()
-			.mockResolvedValue(
-				new Response(JSON.stringify(transcriptDoc), { status: 200 }),
-			);
-		vi.stubGlobal("fetch", fetchMock);
-		logSpy = vi.spyOn(console, "log").mockImplementation(noop);
-		vi.spyOn(console, "error").mockImplementation(noop);
-		mockProcessExit();
-	});
+  beforeEach(() => {
+    vi.clearAllMocks();
+    fetchMock = vi
+      .fn()
+      .mockResolvedValue(new Response(JSON.stringify(transcriptDoc), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+    logSpy = vi.spyOn(console, "log").mockImplementation(noop);
+    vi.spyOn(console, "error").mockImplementation(noop);
+    mockProcessExit();
+  });
 
-	/** @scenario the CLI prints a trace transcript */
-	it("fetches the transcript endpoint and prints the entries", async () => {
-		await transcriptTraceCommand("trace_abc", {});
+  /** @scenario the CLI prints a trace transcript */
+  it("fetches the transcript endpoint and prints the entries", async () => {
+    await transcriptTraceCommand("trace_abc", {});
 
-		expect(String(fetchMock.mock.calls[0]![0])).toContain(
-			"/api/traces/trace_abc/transcript",
-		);
-		const printed = logSpy.mock.calls
-			.map((c: unknown[]) => c.join(" "))
-			.join("\n");
-		expect(printed).toContain("summarise the repo");
-		expect(printed).toContain("Here is the summary.");
-		expect(printed).toContain("1 model call ·");
-	});
+    expect(String(fetchMock.mock.calls[0]![0])).toContain("/api/v1/traces/trace_abc/transcript");
+    const printed = logSpy.mock.calls.map((c: unknown[]) => c.join(" ")).join("\n");
+    expect(printed).toContain("summarise the repo");
+    expect(printed).toContain("Here is the summary.");
+    expect(printed).toContain("1 model call ·");
+  });
 
-	it("exits with code 1 when the endpoint answers an error", async () => {
-		fetchMock.mockResolvedValue(
-			new Response(JSON.stringify({ message: "Trace not found." }), {
-				status: 404,
-			}),
-		);
+  it("exits with code 1 when the endpoint answers an error", async () => {
+    fetchMock.mockResolvedValue(
+      new Response(JSON.stringify({ message: "Trace not found." }), {
+        status: 404,
+      }),
+    );
 
-		await expect(transcriptTraceCommand("nope", {})).rejects.toThrow(
-			ProcessExitError,
-		);
-	});
+    await expect(transcriptTraceCommand("nope", {})).rejects.toThrow(ProcessExitError);
+  });
 });
 
 describe("getTraceCommand()", () => {
-	let mockGet: ReturnType<typeof vi.fn>;
+  let mockGet: ReturnType<typeof vi.fn>;
 
-	beforeEach(() => {
-		vi.clearAllMocks();
-		mockGet = vi.fn();
-		// biome-ignore lint/complexity/useArrowFunction: the command news up TracesApiService, and an arrow function is not constructible.
-		vi.mocked(TracesApiService).mockImplementation(function () {
-			return {
-				search: vi.fn(),
-				get: mockGet,
-			} as unknown as TracesApiService;
-		});
-		vi.spyOn(console, "log").mockImplementation(noop);
-		vi.spyOn(console, "error").mockImplementation(noop);
-		mockProcessExit();
-	});
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockGet = vi.fn();
+    // The command news up TracesApiService, and an arrow function is not constructible.
+    // biome-ignore lint/complexity/useArrowFunction: needs a constructible function.
+    vi.mocked(TracesApiService).mockImplementation(function () {
+      return {
+        search: vi.fn(),
+        get: mockGet,
+      } as unknown as TracesApiService;
+    });
+    vi.spyOn(console, "log").mockImplementation(noop);
+    vi.spyOn(console, "error").mockImplementation(noop);
+    mockProcessExit();
+  });
 
-	describe("when trace is found", () => {
-		it("calls get with the provided trace ID", async () => {
-			mockGet.mockResolvedValue({ traceId: "trace_abc", input: "test" });
+  describe("when trace is found", () => {
+    it("calls get with the provided trace ID", async () => {
+      mockGet.mockResolvedValue({ traceId: "trace_abc", input: "test" });
 
-			await getTraceCommand("trace_abc", {});
+      await getTraceCommand("trace_abc", {});
 
-			expect(mockGet).toHaveBeenCalledWith("trace_abc", { format: "digest" });
-		});
-	});
+      expect(mockGet).toHaveBeenCalledWith("trace_abc", { format: "digest" });
+    });
+  });
 
-	describe("when trace is not found", () => {
-		it("exits with code 1", async () => {
-			mockGet.mockRejectedValue(new TracesApiError("Not found", "get trace"));
+  describe("when trace is not found", () => {
+    it("exits with code 1", async () => {
+      mockGet.mockRejectedValue(new TracesApiError("Not found", "get trace"));
 
-			await expect(getTraceCommand("nonexistent", {})).rejects.toThrow(
-				ProcessExitError,
-			);
-		});
-	});
+      await expect(getTraceCommand("nonexistent", {})).rejects.toThrow(ProcessExitError);
+    });
+  });
+
+  describe("when the trace is still arriving", () => {
+    const stillArriving = Object.assign(new Error("Trace not found"), {
+      code: "trace_not_found",
+      retryable: true,
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    /** @scenario The CLI retries a trace that is still arriving */
+    it("retries briefly and prints the trace once it lands", async () => {
+      vi.useFakeTimers();
+      mockGet
+        .mockRejectedValueOnce(stillArriving)
+        .mockRejectedValueOnce(stillArriving)
+        .mockResolvedValue({ trace_id: "trace_abc", spans: [] });
+
+      const run = getTraceCommand("trace_abc", { format: "json" });
+      await vi.advanceTimersByTimeAsync(10_000);
+      await run;
+
+      expect(mockGet).toHaveBeenCalledTimes(3);
+      expect(vi.mocked(console.log).mock.calls.flat().join("\n")).toContain("trace_abc");
+    });
+
+    it("gives up after the last retry and exits with code 1", async () => {
+      vi.useFakeTimers();
+      mockGet.mockRejectedValue(stillArriving);
+
+      const run = getTraceCommand("trace_abc", {}).catch((error: unknown) => error);
+      await vi.advanceTimersByTimeAsync(10_000);
+
+      expect(await run).toBeInstanceOf(ProcessExitError);
+      expect(mockGet).toHaveBeenCalledTimes(4);
+    });
+
+    it("does not retry a failure the platform did not mark retryable", async () => {
+      mockGet.mockRejectedValue(
+        Object.assign(new Error("That is a scenario run id"), {
+          code: "scenario_run_has_many_traces",
+          retryable: false,
+        }),
+      );
+
+      await expect(getTraceCommand("trace_abc", {})).rejects.toThrow(ProcessExitError);
+      expect(mockGet).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("when --format json is given", () => {
+    /** @scenario The CLI and the REST route answer the same for one id */
+    it("prints the REST route's document for that id unchanged", async () => {
+      const document = {
+        trace_id: "0123456789abcdef0123456789abcdef",
+        requested_id: "8f1c2d3e4a5b6c7d",
+        resolved_from: "span_id",
+        spans: [],
+        evaluations: [],
+      };
+      mockGet.mockResolvedValue(document);
+
+      await getTraceCommand("8f1c2d3e4a5b6c7d", { format: "json" });
+
+      expect(mockGet).toHaveBeenCalledWith("8f1c2d3e4a5b6c7d", { format: "json" });
+      const printed = JSON.parse(vi.mocked(console.log).mock.calls.at(-1)![0] as string);
+      expect(printed).toEqual(document);
+    });
+  });
+});
+
+describe("given a trace ID copied from the `trace search` table", () => {
+  const fullTraceId = "0123456789abcdef0123456789abcdef";
+  let mockSearch: ReturnType<typeof vi.fn>;
+  let mockGet: ReturnType<typeof vi.fn>;
+  let logSpy: MockInstance<typeof console.log>;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockSearch = vi.fn();
+    mockGet = vi.fn();
+    // biome-ignore lint/complexity/useArrowFunction: needs a constructible function.
+    vi.mocked(TracesApiService).mockImplementation(function () {
+      return { search: mockSearch, get: mockGet } as unknown as TracesApiService;
+    });
+    logSpy = vi.spyOn(console, "log").mockImplementation(noop);
+    vi.spyOn(console, "error").mockImplementation(noop);
+    mockProcessExit();
+  });
+
+  describe("when `trace get` is run with that truncated ID", () => {
+    /** @scenario "CLI `trace get` with truncated ID from `trace search` succeeds" */
+    it("asks the backend for the 20-character prefix and prints the full trace it resolves to", async () => {
+      mockSearch.mockResolvedValue({
+        traces: [{ traceId: fullTraceId, input: "hello", output: "world" }],
+        pagination: { totalHits: 1 },
+      });
+      await searchTracesCommand({ limit: "1" });
+      const searchOutput = logSpy.mock.calls.flat().join("\n");
+      const displayedId = fullTraceId.substring(0, 20);
+      expect(searchOutput).toContain(displayedId);
+      expect(searchOutput).not.toContain(fullTraceId);
+
+      logSpy.mockClear();
+      const digest = `Trace ${fullTraceId}\nInput: hello\nOutput: world`;
+      mockGet.mockResolvedValue(digest);
+      await getTraceCommand(displayedId, {});
+
+      expect(mockGet).toHaveBeenCalledWith(displayedId, { format: "digest" });
+      expect(logSpy.mock.calls.flat().join("\n")).toContain(digest);
+    });
+  });
 });

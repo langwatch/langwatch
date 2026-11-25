@@ -91,17 +91,10 @@ spec:
                 {{- include "langwatch.containerSecurityContext" (dict "ctx" $root "component" $root.Values.cronjobs) | nindent 16 }}
               image: "{{ $root.Values.cronjobs.image.repository }}:{{ $root.Values.cronjobs.image.tag }}"
               imagePullPolicy: {{ $root.Values.cronjobs.image.pullPolicy }}
-              env:
-                - name: CRON_API_KEY
-                  valueFrom:
-                    secretKeyRef:
-                      name: {{ include "langwatch.appSecretName" $root }}
-                      key: {{ $root.Values.secrets.secretKeys.cronApiKey | default "cronApiKey" }}
               command: ["/bin/sh", "-c"]
               args:
                 - |
                   curl --retry 5 --retry-delay 10 --retry-connrefused -i \
-                    -H "Authorization: Bearer ${CRON_API_KEY}" \
                     -X GET \
                     http://{{ $root.Release.Name }}-app:{{ $root.Values.app.service.port }}{{ $jobConfig.endpoint }}
 

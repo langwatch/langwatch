@@ -79,23 +79,39 @@ langwatch instant-eval run \
   --target threads --last 7d
 ```
 
-You can ask up to ten questions per run, all of the same text. Put each `--criteria`, `--threshold`, `--score`, `--category` and `--id` after the `--ask` it belongs to. You pay for the text plus the questions, in one judge request per row, so ten questions cost about the same as one.
+You can ask up to ten questions per run, all of the same text. Put each `--criteria`, `--threshold`, `--score`, `--category` and `--id` after the `--ask` it belongs to. You pay for the text, the questions and a small fixed part of every request, in one judge request per row, so ten questions cost about the same as one.
 
 ## Questions from a file
 
 ```json
 [
-  { "id": "annoyed", "kind": "boolean", "instructions": "the customer sounds annoyed",
-    "criteria": ["sarcasm, repetition or a raised voice count", "a calm complaint does not count"] },
-  { "id": "apologised", "kind": "boolean", "instructions": "the agent apologised", "threshold": 0.8 },
-  { "id": "satisfaction", "kind": "score",
+  {
+    "id": "annoyed",
+    "kind": "boolean",
+    "instructions": "the customer sounds annoyed",
+    "criteria": ["sarcasm, repetition or a raised voice count", "a calm complaint does not count"]
+  },
+  {
+    "id": "apologised",
+    "kind": "boolean",
+    "instructions": "the agent apologised",
+    "threshold": 0.8
+  },
+  {
+    "id": "satisfaction",
+    "kind": "score",
     "instructions": "How satisfied is the customer, from 1 for angry to 5 for delighted",
-    "range": { "min": 1, "max": 5 } },
-  { "id": "intent", "kind": "category", "instructions": "what is the customer asking for",
+    "range": { "min": 1, "max": 5 }
+  },
+  {
+    "id": "intent",
+    "kind": "category",
+    "instructions": "what is the customer asking for",
     "options": [
       { "name": "refund", "description": "wants money back" },
       { "name": "bug", "description": "reports something broken" }
-    ] }
+    ]
+  }
 ]
 ```
 

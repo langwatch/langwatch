@@ -4,13 +4,10 @@ Feature: Claude Code telemetry turn bounding
   So that one pathological agentic turn cannot serialize all of its work
   behind one queue group and stall every tenant's processing.
 
-  # RETIRED MECHANISM (ADR-055, canonical log ingestion): the `recordLog` command
-  # and the per-turn ingest-lane sharding described below were removed — canonical
-  # `log_records` is now the only log write path, and the coding-agent session
-  # fold consumes each log event incrementally (no whole-turn re-read to bound).
-  # These scenarios are NOT deleted: they are preserved as the behavioural
-  # contract to port to the canonical pipeline, tracked in
-  # dev/docs/coding-agent-pipeline-plan.md.
+  # The old `recordLog` sharding mechanism is retired (ADR-055). Canonical
+  # `log_records` is the only write path and the coding-agent session fold
+  # consumes bounded contributions incrementally. These scenarios retain the
+  # queue-bounding behaviour that replacement must preserve.
 
   # Incident 2026-07-10: Claude Code logs arrive with no trace context; the
   # receiver already synthesizes one trace per TURN (session.id:prompt.id) and

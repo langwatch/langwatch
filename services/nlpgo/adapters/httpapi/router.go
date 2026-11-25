@@ -16,6 +16,8 @@ import (
 	"github.com/langwatch/langwatch/pkg/herr"
 	"github.com/langwatch/langwatch/pkg/httpmiddleware"
 	"github.com/langwatch/langwatch/pkg/otelsetup"
+	gatewaydomain "github.com/langwatch/langwatch/services/aigateway/domain"
+	"github.com/langwatch/langwatch/services/nlpgo/adapters/litellm"
 	"github.com/langwatch/langwatch/services/nlpgo/app"
 	"github.com/langwatch/langwatch/services/nlpgo/domain"
 )
@@ -33,6 +35,9 @@ type RouterDeps struct {
 	// in-process aigateway dispatcher. nil → /go/proxy/v1/* returns the
 	// 501 stub (used by tests that don't exercise the playground path).
 	PlaygroundProxy PlaygroundProxy
+	// ModelCatalog names the output token limit each model takes on
+	// /go/proxy/v1/*. nil keeps the engine's name rule for every model.
+	ModelCatalog litellm.OutputTokensLookup
 	// StreamHeartbeat is the is_alive_response cadence for
 	// /go/studio/execute, from the operator's
 	// NLPGO_ENGINE_STREAM_HEARTBEAT_SECONDS. Zero → DefaultStreamHeartbeat.
@@ -91,8 +96,8 @@ func NewRouter(deps RouterDeps) http.Handler {
 			s.Post("/execute_sync", executeSyncHandler(deps.App))
 			s.Post("/execute", executeStreamHandler(deps.App, deps.StreamHeartbeat, deps.StreamIdleTimeout))
 		})
-		g.HandleFunc("/proxy/v1/*", proxyPassthroughHandler(deps.PlaygroundProxy))
-		g.HandleFunc("/proxy/v1beta/*", proxyPassthroughHandler(deps.PlaygroundProxy))
+		g.HandleFunc("/proxy/v1/*", proxyPassthroughHandler(deps.PlaygroundProxy, deps.ModelCatalog))
+		g.HandleFunc("/proxy/v1beta/*", proxyPassthroughHandler(deps.PlaygroundProxy, deps.ModelCatalog))
 	})
 
 	// Anything outside /go/* and the health routes gets a typed 502 with
@@ -165,4 +170,11 @@ func registerErrorStatuses() {
 	herr.RegisterStatus(domain.ErrUpstreamHTTP, http.StatusBadGateway)
 	herr.RegisterStatus(domain.ErrChildUnavailable, http.StatusServiceUnavailable)
 	herr.RegisterStatus(domain.ErrGatewayUnavailable, http.StatusBadGateway)
+	// Refusals the in-process dispatcher makes of a caller; the playground
+	// proxy forwards them as the 4xx they are rather than as a 502.
+	herr.RegisterStatus(gatewaydomain.ErrRateLimited, http.StatusTooManyRequests)
+	herr.RegisterStatus(gatewaydomain.ErrBudgetExceeded, http.StatusPaymentRequired)
+	herr.RegisterStatus(gatewaydomain.ErrModelNotAllowed, http.StatusBadRequest)
+	herr.RegisterStatus(gatewaydomain.ErrProviderNotBound, http.StatusBadRequest)
+	herr.RegisterStatus(gatewaydomain.ErrModelNotRecognized, http.StatusBadRequest)
 }

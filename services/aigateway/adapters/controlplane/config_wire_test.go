@@ -459,15 +459,23 @@ func TestConfigWire_KeyExpiry(t *testing.T) {
 // design and therefore silent: the cap would quietly stop following a changed
 // date. Pin both the field and its unit.
 func TestControlPlaneMaterialiserEmitsTheKeyExpiry(t *testing.T) {
-	src := readControlPlaneSource(t, "src", "server", "gateway", "config.materialiser.ts")
+	src := readControlPlaneSource(t,
+		"modules", "gateway", "process", "src", "services",
+		"gateway-config-materialisation.service.ts")
 
 	// Whitespace-tolerant: a formatter may break the expression across lines
 	// without breaking the contract it expresses.
-	if !regexp.MustCompile(`expires_at:\s*expiresAtWire\(\s*vk\.expiresAt\s*\)`).MatchString(src) {
-		t.Error("config.materialiser.ts no longer emits expires_at from the key's own date")
+	if !regexp.MustCompile(`expires_at:\s*toExpiresAtWire\(\s*vk\.expiresAt\s*\)`).MatchString(src) {
+		t.Error("gateway-config-materialisation.service.ts no longer emits expires_at from the key's own date")
 	}
-	if !regexp.MustCompile(`Math\.floor\(\s*expiresAt\.getTime\(\)\s*/\s*1000\s*\)`).MatchString(src) {
-		t.Error("config.materialiser.ts no longer emits expires_at in unix SECONDS; milliseconds would push the date out of reach")
+
+	// toExpiresAtWire's own seconds conversion now lives in the shared
+	// wire-rules module the materialiser calls through to.
+	rulesSrc := readControlPlaneSource(t,
+		"modules", "gateway", "process", "src", "rules",
+		"gateway-config-wire.rules.ts")
+	if !regexp.MustCompile(`Math\.floor\(\s*expiresAt\.epochMilliseconds\s*/\s*1000\s*\)`).MatchString(rulesSrc) {
+		t.Error("gateway-config-wire.rules.ts no longer emits expires_at in unix SECONDS; milliseconds would push the date out of reach")
 	}
 }
 
@@ -523,4 +531,37 @@ func TestConfigWire_BudgetsValidUntil(t *testing.T) {
 	t.Run("is zero when the key has no budgets at all", func(t *testing.T) {
 		assert.True(t, (&configWire{}).toDomain().Budget.ValidUntil.IsZero())
 	})
+}
+
+// A null or absent allow list admits any key of the project; an empty list
+// admits none. Decoding the two the same way would open a restricted target.
+func TestConfigWire_A2ATargetAllowList(t *testing.T) {
+	cases := []struct {
+		name       string
+		field      string
+		wantPolicy bool
+		wantIDs    []string
+	}{
+		{"null admits any key", `,"allowed_virtual_key_ids":null`, false, nil},
+		{"absent admits any key", ``, false, nil},
+		{"empty list denies every key", `,"allowed_virtual_key_ids":[]`, true, []string{}},
+		{"listed keys are kept", `,"allowed_virtual_key_ids":["vk_a"]`, true, []string{"vk_a"}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			var wire configWire
+			require.NoError(t, json.Unmarshal(
+				[]byte(`{"a2a_targets":[{"name":"billing","upstream_url":"https://billing.acme.test"`+tc.field+`}]}`),
+				&wire,
+			))
+			targets := wire.toDomain().A2ATargets
+			require.Len(t, targets, 1)
+			if !tc.wantPolicy {
+				assert.Nil(t, targets[0].Policy)
+				return
+			}
+			require.NotNil(t, targets[0].Policy)
+			assert.Equal(t, tc.wantIDs, targets[0].Policy.AllowedVirtualKeyIDs)
+		})
+	}
 }

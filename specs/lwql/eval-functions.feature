@@ -4,27 +4,38 @@ Feature: LangWatchQL eval functions — a judged column, computed by the classif
   I want to ask a question of every conversation a statement selects and get a calibrated answer per row
   So that I can search production history by meaning instead of by keyword, in one statement
 
-  Issue: Instant Evals, PR 2b. ADR-136 (amended).
+  Issue: Instant Evals, PR 2b. ADR-136 (amended), ADR-153.
 
-  What this adds to the extraction functions of PR 2:
-  - `eval`, `eval_passed`, `eval_score`, `eval_category` and `eval_category_probs` are app
-    functions like the extraction ones: a projection UDF in ClickHouse, projection-only,
-    alias required, value computed by the application after the query runs.
+  What the eval functions are:
+  - `eval`, `eval_criteria`, `eval_passed`, `eval_score`, `eval_category` and
+    `eval_category_probs` are app functions like the extraction ones: a projection UDF in
+    ClickHouse, projection-only, alias required, value computed by the application after
+    the query runs.
   - Their key is the text to judge. It is normally another app function, so an eval
-    function may nest an extraction function one level deep — the only nesting the
+    function may nest an extraction function one level deep, the only nesting the
     validator allows anywhere. Hydration then runs extraction first and the eval second.
-  - Several eval calls over the same nested expression are one classifier request per row,
-    carrying every question. Rows are never packed together: the bench measured 98%
-    agreement on single conversations against 87% with eight packed into one request.
+  - A synchronous query judges its own rows, as main did (Alex, 2026-10-06, "Inline eval":
+    restore synchronous judging). Several eval calls over the same nested expression are one
+    classifier request per row, carrying every question. Rows are never packed together: the
+    bench measured 98% agreement on single conversations against 87% with eight packed into
+    one request.
+  - An Instant Eval run (ADR-153) judges the same statement as a job instead: it pages the
+    statement, reads the text through the extraction functions and asks the classifier.
+    Its judging is specified in modules/instant-eval/specs/instant-eval-pipeline.feature,
+    classifier.feature and instant-eval-cost.feature.
+  - Analytics reaches the judge through InstantEvalApi.judgeQuery, which holds the budget,
+    judges and records the spend once (Alex, 2026-10-08, round 34: through a channel bound to InstantEvalApi, no peer).
+    Cutting a conversation to the judge's budget is @unimplemented: hydration does not yet
+    know the judge's limits.
 
   Background:
     Given a project whose credential holds analytics:view
     And the caller holds the captured-input and captured-output permissions
-    And the Instant Evals flag is on for the project
+    And Instant Evals are enabled for the project
     And a classifier is configured for the deployment
 
   # ---------------------------------------------------------------------------
-  # The golden path
+  # What a statement may say
   # ---------------------------------------------------------------------------
 
   @unit
@@ -50,6 +61,36 @@ Feature: LangWatchQL eval functions — a judged column, computed by the classif
     And the hydration plan names the column "annoyed", the function "eval" and the nested function "conversation"
 
   @unit
+  Scenario: An eval over a plain column needs no extraction read
+    Given a statement selecting eval(CapturedOutput, 'The answer is an apology') AS apology
+    When the statement is validated
+    Then it is accepted
+    And the plan records no nested function, because the column already holds the text
+
+  # ---------------------------------------------------------------------------
+  # What a query hands back
+  # ---------------------------------------------------------------------------
+
+  @unit
+  Scenario: An eval written over an extraction is read as that extraction
+    Given a hydration plan holding eval over conversation in the column "transcript"
+    When the extraction half of the plan is taken
+    Then the column holds the conversation call
+
+  @unit
+  Scenario: An eval written over a plain expression is left to the column
+    Given a hydration plan holding eval over a plain column
+    When the extraction half of the plan is taken
+    Then the call is dropped, because the column already holds the text
+
+  @unit
+  Scenario: A page read for a run holds the text that would be judged, not a verdict
+    Given a statement projecting eval over conversation, and one trace id
+    When the page is read for judging
+    Then the judged column holds the conversation text
+    And no classifier was called
+
+  @unit
   Scenario: The judged column carries the probability, not the conversation key
     Given a conversation the classifier answers with a probability of 0.9
     When a statement projecting eval(conversation(ConversationId), 'The customer sounds annoyed') AS annoyed is hydrated
@@ -71,7 +112,7 @@ Feature: LangWatchQL eval functions — a judged column, computed by the classif
     Then the classifier received two requests
 
   @unit
-  Scenario: An eval over a plain column needs no extraction read
+  Scenario: An eval over a plain column is judged on the column's own text and reads no trace
     Given a statement selecting eval(CapturedOutput, 'The answer is an apology') AS apology
     When the statement is hydrated
     Then the classifier was asked about the column's own text
@@ -113,6 +154,20 @@ Feature: LangWatchQL eval functions — a judged column, computed by the classif
   Scenario: An eval in WHERE is refused rather than silently comparing the text
     Given a statement filtering on eval(CapturedOutput, 'anything') > 0.5
     When the statement is validated
+    Then it is refused with APP_FUNCTION_POSITION
+
+  @unit
+  Scenario: Sorting by an eval's alias is refused rather than sorting by the text it judges
+    Given a statement projecting eval_score(CapturedOutput, 'How polite', 1, 5) AS s
+    When it orders by s, or by the eval's position in the SELECT list
+    Then it is refused with APP_FUNCTION_POSITION
+    And the message says to run the eval first and sort over analytics.judgments
+    And ordering the same statement by TraceId is accepted
+
+  @unit
+  Scenario: Grouping or filtering on an eval's alias is refused
+    Given a statement projecting eval_score(CapturedOutput, 'How polite', 1, 5) AS s
+    When it names s in GROUP BY, HAVING or WHERE
     Then it is refused with APP_FUNCTION_POSITION
 
   # ---------------------------------------------------------------------------
@@ -174,8 +229,8 @@ Feature: LangWatchQL eval functions — a judged column, computed by the classif
   # ---------------------------------------------------------------------------
 
   @unit
-  Scenario: An eval function is refused while the flag is off for the project
-    Given the Instant Evals flag is off for the project
+  Scenario: An eval function is refused while Instant Evals are not enabled for the project
+    Given Instant Evals are not enabled for the project
     When a statement calling eval is validated
     Then it is refused with APP_FUNCTION_GATED
     And the message says the feature is not open to this project
@@ -192,20 +247,30 @@ Feature: LangWatchQL eval functions — a judged column, computed by the classif
   @unit
   Scenario: An eval function is refused for a key that reads more than one project
     Given a key that can read two projects
-    And the Instant Evals flag is on for both of them
+    And Instant Evals are enabled for both of them
     When the caller asks whether Instant Evals are open to it
     Then the answer is no
 
   @unit
-  Scenario: A key that reads one project is judged on that project's own flag
+  Scenario: A key that reads one project is judged on that project's own Instant Evals access
     Given a key that can read one project
-    And the Instant Evals flag is on for it
+    And Instant Evals are enabled for it
     When the caller asks whether Instant Evals are open to it
     Then the answer is yes
 
+  # The release flag governs LangWatch's own model only (ADR-182): a project on its own decision
+  # model, or an organization that switched Instant Evals on, calls eval functions without it.
+  @unit
+  Scenario: Eval functions open on Instant Evals' own answer, not on the release flag
+    Given the Instant Evals release flag is off for the project
+    And Instant Evals are enabled for the project because it runs on its own decision model
+    When a statement calling eval is run
+    Then the eval gate is open
+    And Analytics never reads the release flag for it
+
   @unit
   Scenario: The schema publishes eval functions as unavailable while they are gated
-    Given the Instant Evals flag is off for the project
+    Given Instant Evals are not enabled for the project
     When the schema endpoint is asked for the functions section
     Then every eval function is listed with available false
     And the extraction functions keep the availability their permissions give them
@@ -281,6 +346,22 @@ Feature: LangWatchQL eval functions — a judged column, computed by the classif
     And its cost is the classifier's own cost
     And the customer price carries the platform markup
 
+  @unit
+  Scenario: A conversation past the judge's budget is cut through the bounded renderer, keeping both ends
+    Given an eval over a conversation far longer than the judge's budget
+    When the statement is hydrated
+    Then the text sent keeps the close of the conversation
+    And it keeps the opening of the conversation
+    And it names how many turns were dropped from the middle
+    And the cell reports itself truncated
+
+  @unit
+  Scenario: A conversation inside the judge's budget is sent whole and not marked truncated
+    Given an eval over a conversation smaller than the judge's budget
+    When the statement is hydrated
+    Then the whole conversation is sent
+    And the cell does not report itself truncated
+
   # ---------------------------------------------------------------------------
   # Against a real server
   # ---------------------------------------------------------------------------
@@ -298,18 +379,15 @@ Feature: LangWatchQL eval functions — a judged column, computed by the classif
     Then the server's query log holds the submitted text byte for byte, comment included
     And the column carries the text the call was given, which is what the application judges
 
-  @unit
-  Scenario: A conversation past the judge's budget is cut through the bounded renderer, keeping both ends
-    Given an eval over a conversation far longer than the judge's budget
-    When the statement is hydrated
-    Then the text sent keeps the close of the conversation
-    And it keeps the opening of the conversation
-    And it names how many turns were dropped from the middle
-    And the cell reports itself truncated
+  # ---------------------------------------------------------------------------
+  # What the published examples teach
+  # ---------------------------------------------------------------------------
 
+  # Agents copy the published example. A question about what the agent did is
+  # decided by a tool result, which `conversation` names but does not hold.
   @unit
-  Scenario: A conversation inside the judge's budget is sent whole and not marked truncated
-    Given an eval over a conversation smaller than the judge's budget
-    When the statement is hydrated
-    Then the whole conversation is sent
-    And the cell does not report itself truncated
+  Scenario: The eval function examples judge the thread's steps view
+    Given the published eval function catalog
+    When each eval function's example is read
+    Then its text is llm_readable_thread over the conversation
+    And no example judges the chat-only conversation view

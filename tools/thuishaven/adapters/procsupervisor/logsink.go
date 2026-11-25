@@ -42,16 +42,31 @@ type logSink struct {
 	// means "now".
 	retryAt time.Time
 	now     func() time.Time
+	// since is when this up started. A capture last written before it belongs
+	// to an earlier up and is rotated out on the first open, so a tab and
+	// `haven logs` read this up alone; a restart within the up keeps appending.
+	since time.Time
 }
 
-func newLogSink(path string) *logSink {
+func newLogSink(path string) *logSink { return newLogSinkSince(path, time.Time{}) }
+
+// newLogSinkSince is newLogSink for a supervisor that started at since.
+func newLogSinkSince(path string, since time.Time) *logSink {
 	if path == "" {
 		return nil
 	}
-	return &logSink{path: path, rotateAt: logSinkMaxBytes, now: time.Now}
+	return &logSink{path: path, rotateAt: logSinkMaxBytes, now: time.Now, since: since}
 }
 
 func (s *logSink) writeLine(line string) {
+	if s != nil {
+		s.writeLineAt(s.now(), line)
+	}
+}
+
+// writeLineAt is writeLine stamped at, so a line split across captures keeps
+// one instant and a reader of several can fold it back to one.
+func (s *logSink) writeLineAt(at time.Time, line string) {
 	if s == nil {
 		return
 	}
@@ -66,7 +81,7 @@ func (s *logSink) writeLine(line string) {
 			return
 		}
 	}
-	n, err := fmt.Fprintf(s.file, "%s %s\n", s.now().UTC().Format(time.RFC3339Nano), line)
+	n, err := fmt.Fprintf(s.file, "%s %s\n", at.UTC().Format(time.RFC3339Nano), line)
 	s.written += int64(n)
 	if err != nil {
 		// The descriptor is unusable (the disk filled, the file was replaced).
@@ -100,18 +115,20 @@ func (s *logSink) open() error { return s.openFile(true) }
 // into unbounded recursion and a stack overflow that took the launcher — and
 // with it the whole stack — down.
 func (s *logSink) openFile(mayRotate bool) error {
-	if err := os.MkdirAll(filepath.Dir(s.path), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(s.path), 0o700); err != nil {
 		return err
 	}
 	f, err := os.OpenFile(s.path, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o600)
 	if err != nil {
 		return err
 	}
+	stale := false
 	if info, err := f.Stat(); err == nil {
 		s.written = info.Size()
+		stale = s.written > 0 && !s.since.IsZero() && info.ModTime().Before(s.since)
 	}
 	s.file = f
-	if mayRotate && s.written >= s.rotateAt {
+	if mayRotate && (stale || s.written >= s.rotateAt) {
 		s.rotate()
 	}
 	return nil

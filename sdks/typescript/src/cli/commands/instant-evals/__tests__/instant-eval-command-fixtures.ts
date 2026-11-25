@@ -1,13 +1,7 @@
 /**
- * What the `instant-eval` command suites share: the mocked service, the runs
- * and judgements it answers with, and the console and exit capture around
- * each test.
- *
- * Not a suite itself: the file has no `.test.ts` suffix so vitest never
- * collects it. Each suite still declares its own `vi.mock` calls, because
- * those are hoisted per test file, and points the service mock at
+ * What the `instant-eval` suites share: the mocked service, its runs and judgements, and
+ * console/exit capture. Not a suite; each suite declares its own hoisted `vi.mock` pointing at
  * {@link serviceSpies}.
- *
  * @see specs/features/instant-eval-cli.feature
  */
 
@@ -119,10 +113,7 @@ export function installCommandHarness(): { printed: () => string } {
     vi.clearAllMocks();
     // Agent mode is detected from the environment, and these suites run inside
     // a coding agent, so the table renderings would never be reached.
-    savedAgentMode = AGENT_MODE_ENV_VARS.map((name) => [
-      name,
-      process.env[name],
-    ]);
+    savedAgentMode = AGENT_MODE_ENV_VARS.map((name) => [name, process.env[name]]);
     for (const name of AGENT_MODE_ENV_VARS) delete process.env[name];
     process.exitCode = undefined;
     exitSpy = vi.spyOn(process, "exit").mockImplementation(((code?: number) => {
@@ -146,8 +137,6 @@ export function installCommandHarness(): { printed: () => string } {
 
   return {
     printed: () =>
-      logSpy.mock.calls
-        .map((call: unknown[]) => call.map(String).join(" "))
-        .join("\n"),
+      logSpy.mock.calls.map((call: unknown[]) => call.map(String).join(" ")).join("\n"),
   };
 }

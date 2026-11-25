@@ -1,4 +1,4 @@
-import { listWorkflows as apiListWorkflows } from "../langwatch-api-workflows.js";
+import { listWorkflows as apiListWorkflows } from "../langwatch-api-workflows.ts";
 
 export async function handleListWorkflows(): Promise<string> {
   const workflows = await apiListWorkflows();
@@ -23,9 +23,7 @@ export async function handleListWorkflows(): Promise<string> {
     lines.push("");
   }
 
-  lines.push(
-    "> Use `platform_get_workflow` with the ID to see full workflow details.",
-  );
+  lines.push("> Use `platform_get_workflow` with the ID to see full workflow details.");
 
   return lines.join("\n");
 }

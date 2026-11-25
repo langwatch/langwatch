@@ -275,7 +275,7 @@ Feature: Onboarding Flow
   # would complete the step before the credentials are stored, leaving Langy
   # calling a provider with no API key.
   #
-  # Bindings: platform/app/src/features/onboarding/components/sections/model-provider/__tests__/ModelProviderSetup.single-save.integration.test.tsx
+  # Bindings: modules/model-provider/browser/src/ui/sections/__tests__/model-provider-form.single-save.integration.test.tsx
 
   @integration
   Scenario: The first save stores the credentials that were entered
@@ -283,6 +283,16 @@ Feature: Onboarding Flow
     When I enter an API key and a base URL and click "Save"
     Then exactly one provider write is sent
     And it carries the API key, the base URL and the scope the form chose
+
+  # The step's model select carries full model ids, so the save's check that the
+  # default model belongs to the provider being saved passes.
+  @integration
+  Scenario: A default chat model picked in the setup card saves with the provider
+    Given a new organization with no "openai" provider
+    When I pick a default chat model from the list, enter an API key and click "Save"
+    Then the provider is saved in one write
+    And that model becomes the default chat model
+
 
   @integration
   Scenario: No enabled provider is ever stored without its credentials

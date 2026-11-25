@@ -27,9 +27,9 @@ Feature: Everything about a coding-agent session is queryable
   Rule: Read what a tool call printed
 
     # coding_tool_results joins the tool call to the next turn's request body,
-    # so this reads as one query. Bound by the integration test in
-    # catalog/__tests__/codingToolResults.integration.test.ts.
-    @e2e
+    # so this reads as one query. Bound by the integration test in the analytics
+    # process package, langwatch-ql/__tests__/coding-tool-results.integration.test.ts.
+    @integration
     Scenario: Read what a tool call printed
       Given a user with an API key with access to a project with coding-agent sessions
       When they ask for the output of a tool call

@@ -1,0 +1,2602 @@
+/**
+ * The tRPC transport: the typed root, the process handler binding, the server
+ * half of a contract (`defineTrpcRouter`), the one execution path a mounted
+ * procedure runs, and the wire shape a failed call arrives in.
+ */
+import {
+  actorSchema,
+  toLedgerActor,
+  type Actor,
+  declaredScopeIdSchema,
+  type AuthzDeclaredScopeId,
+  type AuthzHandlerScope,
+  type AuthzPermission,
+  type PlatformTierPermission,
+  type ScopeTierField,
+  type Authorization,
+  type ProofBearingPermission,
+  SCOPE_TIER_FIELDS,
+} from "@langwatch/authorization";
+import { HandledError, isZodLikeError, ValidationError } from "@langwatch/handled-error";
+import {
+  defineMiddlewareContext,
+  type MiddlewareContext,
+  type ModuleApiToken,
+  type TrpcContract,
+  type TrpcContractMember,
+} from "@langwatch/module";
+import { createLogger, validationMeta, type RequestContext } from "@langwatch/observability";
+import { runWithContext } from "@langwatch/observability/context";
+import { nowInstant } from "@langwatch/time";
+import {
+  context as otelContext,
+  trace as otelTrace,
+  type Span,
+  SpanKind,
+  SpanStatusCode,
+} from "@opentelemetry/api";
+import {
+  initTRPC,
+  TRPCError,
+  type AnyTRPCRootTypes,
+  type TRPCBuiltRouter,
+  type TRPCDecorateCreateRouterOptions,
+  type TRPCDefaultErrorShape,
+  type TRPCMutationProcedure,
+  type TRPCQueryProcedure,
+  type TRPCRootObject,
+  type TRPCRouterRecord,
+  type TRPCRuntimeConfigOptions,
+  type TRPCSubscriptionProcedure,
+} from "@trpc/server";
+import type {
+  GetRawInputFn,
+  MiddlewareResult,
+  ProcedureType,
+} from "@trpc/server/unstable-core-do-not-import";
+import { z } from "zod";
+
+import {
+  AuthenticationRequiredError,
+  decide,
+  declaredPermissions,
+  mintAuthorization,
+  refuseWriteUnderAggregate,
+  scopeWithOrganization,
+  decideEntitlement,
+  declareAccessMiddleware,
+  SCOPE_INPUT_FIELDS,
+  assertNotPlatformPermission,
+  permissionsTogether,
+  platformPermissionOf,
+  refuseImpersonatedMint,
+  type AccessDeclaration,
+  type AccessDecision,
+  type AccessDenial,
+  type ApiEntitlement,
+  type Authorize,
+  type Caller,
+  type EntitlementGate,
+  type EntitlementOptions,
+  type Entitlements,
+  type PlatformPermissionTarget,
+  type PublicRouteAccess,
+} from "../access/access.ts";
+import type { AuthzDeclaration, EnforcedScopeFields } from "../access/declared-middleware.ts";
+import {
+  assertInputPermission,
+  type ExactInputPermission,
+  type InputPermission,
+} from "../access/input-permission.ts";
+import { promoteStoreFailure } from "../errors.ts";
+import type { ApiHandlerArguments } from "../handler-arguments.ts";
+import { declaredPath } from "../output-issue-path.ts";
+import { withoutUndeclaredKeys } from "../output-salvage.ts";
+import {
+  auditScopeId,
+  auditScopeIds,
+  callerTraceContext,
+  deriveAuditTarget,
+  isSilencedCall,
+  markFailureAnswered,
+  recordTrpcCall,
+  trpcFailureTraceIds,
+  type TrpcFailureTraceIds,
+} from "./audit.ts";
+import { refuseOutdatedClient } from "./client-outdated.ts";
+import { doorInputSchema } from "./infinite-input.ts";
+import { trpcThrottle, type TrpcThrottle } from "./throttle.ts";
+
+const logger = createLogger("langwatch:trpc");
+const outputLogger = createLogger("langwatch:api:output-validation");
+
+// ─────────────────────────────────────────────────────────────────────────────
+// The typed root.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Defines one typed tRPC root without choosing authentication, authorization, audit,
+ * tracing, or error policy. A process builds the policy spine on top, supplying the
+ * concrete identity, authorization, audit, error-reporting and cause-translation members.
+ */
+export type TrpcRoot<
+  TContext extends object,
+  TOptions extends TRPCRuntimeConfigOptions<TContext, object> = TRPCRuntimeConfigOptions<
+    TContext,
+    object
+  >,
+> = Pick<
+  TRPCRootObject<TContext, object, TOptions, AnyTRPCRootTypes>,
+  "procedure" | "router" | "middleware"
+>;
+
+/** The one place `initTRPC` is called; feature packages ask for a root here for discipline */
+export class TrpcRootDefinition {
+  private constructor() {}
+
+  static forContext<TContext extends object>() {
+    return initTRPC.context<TContext>();
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// The process handler binding: how a mount resolves the application slice, the
+// actor and the scope a governed handler is trusted with.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * An authenticated tRPC actor, normalized with a stable identifier for every kind.
+ * `impersonatorId` is the session's real principal when a user actor is impersonated.
+ */
+export type TrpcHandlerActor = Actor & Readonly<{ id: string; impersonatorId?: string }>;
+
+export type ApiHandlerAdapter<TContext, App> = <Input>(input: {
+  readonly ctx: TContext;
+  readonly input: Input;
+  readonly signal: AbortSignal | undefined;
+}) => Promise<Readonly<{ app: App; actor: unknown; scope: unknown }>>;
+
+/** Opaque process binding installed by the API mount. */
+export class TrpcHandlerBinding<TContext, App> {
+  private constructor(private readonly resolver: ApiHandlerAdapter<TContext, App>) {}
+
+  static create<TContext, App>(resolve: ApiHandlerAdapter<TContext, App>) {
+    return new TrpcHandlerBinding(resolve);
+  }
+
+  static resolve<TContext, App, Input>(
+    binding: TrpcHandlerBinding<TContext, App>,
+    request: {
+      readonly ctx: TContext;
+      readonly input: Input;
+      readonly signal: AbortSignal | undefined;
+    },
+  ) {
+    return binding.resolver(request);
+  }
+}
+
+export function createTrpcHandlerBinding<TContext, App>(
+  resolve: ApiHandlerAdapter<TContext, App>,
+): TrpcHandlerBinding<TContext, App> {
+  return TrpcHandlerBinding.create(resolve);
+}
+
+export async function resolveTrustedHandlerArguments<TContext, App, Input>(
+  binding: TrpcHandlerBinding<TContext, App>,
+  request: {
+    readonly ctx: TContext;
+    readonly input: Input;
+    readonly signal: AbortSignal | undefined;
+  },
+): Promise<Readonly<{ app: App; actor: TrpcHandlerActor; scope: AuthzDeclaredScopeId | null }>> {
+  const resolved = await TrpcHandlerBinding.resolve(binding, request);
+
+  if (resolved.actor === null) {
+    throw new TRPCError({ code: "UNAUTHORIZED", message: "Authentication is required" });
+  }
+
+  const parsedActor = actorSchema.parse(resolved.actor);
+  const ledgerActor = toLedgerActor(parsedActor);
+
+  if (ledgerActor.id === null) {
+    throw new TRPCError({ code: "UNAUTHORIZED", message: "Authentication is required" });
+  }
+
+  const actor: TrpcHandlerActor =
+    parsedActor.type === "user" || parsedActor.type === "api_key"
+      ? parsedActor
+      : { ...parsedActor, id: ledgerActor.id };
+
+  const scope = resolved.scope === null ? null : declaredScopeIdSchema.parse(resolved.scope);
+
+  return {
+    app: resolved.app,
+    actor,
+    scope,
+  };
+}
+
+/** Process-owned adapter that resolves trusted values after policy has run. */
+export async function parseGovernedOutput<TSchema extends z.ZodType>(
+  schema: TSchema,
+  value: unknown,
+): Promise<z.output<TSchema>> {
+  return schema.parseAsync(value);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Declared middleware context: what a procedure asks the PROCESS for beyond its own input,
+// bound once at the mount — the same split REST makes, so nothing a caller sends can stand in
+// for it and no handler reaches for the request itself.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Where one middleware context's value comes from, as this process's mount reads it. */
+export interface TrpcMiddlewareContextBinding<
+  TContext = never,
+  Name extends string = string,
+  Value = unknown,
+> {
+  readonly trpcMiddlewareContext: MiddlewareContext<Name>;
+  resolve(ctx: TContext): Value | Promise<Value>;
+}
+
+/** A mount binds request access; handlers receive only the parsed result. */
+export function bindTrpcMiddlewareContext<
+  const Name extends string,
+  Schema extends z.ZodType,
+  TContext,
+>(
+  context: MiddlewareContext<Name, Schema>,
+  resolve: (ctx: TContext) => z.input<Schema> | Promise<z.input<Schema>>,
+): TrpcMiddlewareContextBinding<TContext, Name, z.input<Schema>> {
+  return { trpcMiddlewareContext: context, resolve };
+}
+
+/**
+ * The twin of REST's `bindMiddlewareContext`: the mount names the header, so which
+ * proxy header this deployment trusts is the process's answer and not a
+ * feature's. A header the request did not carry resolves to null.
+ */
+export function bindTrpcHeader<const Name extends string, Schema extends z.ZodType>(
+  context: MiddlewareContext<Name, Schema>,
+  header: string,
+): TrpcMiddlewareContextBinding<TrpcRuntimeContext, Name, string | null> {
+  return {
+    trpcMiddlewareContext: context,
+    resolve: (ctx) => headerValue(ctx.req?.headers[header]),
+  };
+}
+
+function headerValue(value: string | readonly string[] | undefined): string | null {
+  if (Array.isArray(value)) return value[0] ?? null;
+
+  return typeof value === "string" ? value : null;
+}
+
+/**
+ * The browser session row this request arrived on. Middleware context, not part of the
+ * actor: one person on two tabs is one actor and two sessions, so "end every
+ * session but this one" is a question about the request, not about who asked.
+ */
+export const browserSessionContext = defineMiddlewareContext(
+  "browserSession",
+  z.string().nullable(),
+);
+
+/**
+ * The same browser session with its window: when it began and when it ends, as ISO instants.
+ * A credential minted for the session reads it to end no later than the session does.
+ */
+export const browserSessionWindowContext = defineMiddlewareContext(
+  "browserSessionWindow",
+  z
+    .object({
+      id: z.string(),
+      startedAt: z.iso.datetime().nullable(),
+      expiresAt: z.iso.datetime().nullable(),
+    })
+    .nullable(),
+);
+
+/** Where the request came from, as the process's own mount reads the address. */
+export const callerAddressContext = defineMiddlewareContext("callerAddress", z.string().nullable());
+
+// The server half of a tRPC contract: `.procedure(name)` selects a declared member and
+// inherits its kind, parser, and answer (see transport-declaration-split.feature)
+
+/** A feature API token is the runtime identity a router binds to. */
+export type TrpcFeatureApiWitness<Api> = ModuleApiToken<Api>;
+
+/**
+ * What a governed handler is handed. There is no `ctx`, request or response. Its scope carries
+ * the organization holding it (Alex, 2026-10-06, lineage D1).
+ */
+export type TrpcContractHandlerArguments<Input, App> = Omit<
+  ApiHandlerArguments<Input, App>,
+  "actor" | "scope"
+> &
+  Readonly<{ actor: TrpcHandlerActor; scope: AuthzHandlerScope | null }>;
+
+/**
+ * What a procedure that runs with no caller is handed. Both halves are null
+ * together, so a handler cannot read one and assume the other, and the runtime
+ * builds no actor to hand it.
+ */
+export type TrpcAnonymousHandlerArguments<Input, App> = Omit<
+  ApiHandlerArguments<Input, App>,
+  "actor" | "scope"
+> &
+  Readonly<{ actor: null; scope: null }>;
+
+/** Whether the procedure's declaration opens a door at all. */
+type TrpcCallerKind = "authenticated" | "anonymous" | "proven";
+
+type HandlerArgumentsFor<Caller extends TrpcCallerKind, Input, App> = Caller extends "anonymous"
+  ? TrpcAnonymousHandlerArguments<Input, App>
+  : Caller extends "proven"
+    ? TrpcContractHandlerArguments<Input, App> & Readonly<{ authorization: Authorization }>
+    : TrpcContractHandlerArguments<Input, App>;
+
+/** A procedure asking at several targets is handed each proof-bearing target's proof by field. */
+type TargetProofArguments<Composed extends boolean, Fields extends string> = Composed extends true
+  ? [Fields] extends [never]
+    ? unknown
+    : Readonly<{ authorizations: Readonly<Record<Fields, Authorization>> }>
+  : unknown;
+
+/** A permission asked at a further project, named by an input field of its own (ADR-201 §2). */
+export type TrpcFurtherPermission = Readonly<{
+  permission: AuthzPermission;
+  via: ScopeTierField;
+  field: string;
+}>;
+
+/** A further target: the tier `via` names, at the id the input's `field` holds. */
+export type TrpcFurtherTarget<Field extends string = string> = Readonly<{
+  via: ScopeTierField;
+  field: Field;
+}>;
+
+/** An input field a further target may name: never a scope field, which name the first target. */
+type FurtherField<
+  Contract extends BuiltTrpcContract,
+  Name extends keyof Contract["members"],
+> = Exclude<keyof z.output<Contract["members"][Name]["input"]> & string, ScopeTierField>;
+
+/** The middleware context a handler is handed beside its input, in declaration order. */
+type TrpcMiddlewareContextValues<Contexts extends readonly MiddlewareContext[]> = {
+  [Index in keyof Contexts]: z.output<Contexts[Index]["schema"]>;
+};
+
+type ValueResult<Output> = z.input<Output> | Promise<z.input<Output>>;
+type StreamResult<Output> =
+  | AsyncIterable<z.input<Output>>
+  | Promise<AsyncIterable<z.input<Output>>>;
+
+/**
+ * Any contract `build()` returned, accepted by its stamp: constraining on `TrpcContract` would
+ * compare every member's schemas to `z.ZodType` again, for each router declared.
+ */
+// oxlint-disable-next-line typescript/no-explicit-any -- the stamp, not the members, is the check
+export type BuiltTrpcContract<Namespace extends string = string> = TrpcContract<Namespace, any>;
+
+/** The answer a declared output asks for, read without relating its schema to `z.ZodType`. */
+type AnswerOf<Kind, Output> = Output extends undefined
+  ? void | Promise<void>
+  : Kind extends "subscription"
+    ? StreamResult<Output>
+    : ValueResult<Output>;
+
+/** What a handler may answer: the declared output, one stream value, or nothing. */
+type DeclaredResult<Member extends TrpcContractMember> = AnswerOf<Member["kind"], Member["output"]>;
+
+/** Names the procedures `build()` is still waiting for. */
+export type TrpcProceduresNotImplemented<Names extends string> = Readonly<{
+  readonly procedureNotImplemented: Names;
+}>;
+
+/** What the CLIENT sends, and what it receives — the declaration's own two sides. */
+type MemberOutput<Member extends TrpcContractMember> = OutputOf<Member["kind"], Member["output"]>;
+
+type OutputOf<Kind, Output> = Output extends undefined
+  ? void
+  : Kind extends "subscription"
+    ? AsyncIterable<z.output<Output>>
+    : z.output<Output>;
+
+type MemberDefinition<Member extends TrpcContractMember> = {
+  input: z.input<Member["input"]>;
+  output: MemberOutput<Member>;
+  meta: object;
+};
+
+type MemberProcedure<Member extends TrpcContractMember> = Member["kind"] extends "query"
+  ? TRPCQueryProcedure<MemberDefinition<Member>>
+  : Member["kind"] extends "mutation"
+    ? TRPCMutationProcedure<MemberDefinition<Member>>
+    : TRPCSubscriptionProcedure<MemberDefinition<Member>>;
+
+/** The record the mounted router publishes, derived from the declaration alone. */
+export type TrpcContractProcedures<Contract extends BuiltTrpcContract> = {
+  [Name in keyof Contract["members"]]: MemberProcedure<Contract["members"][Name]>;
+};
+
+/**
+ * One member as the runtime is asked to build it: the contract's parser and
+ * answer, the server's access decision, its handler, and where the
+ * application slice comes from.
+ */
+export type TrpcProcedureRequest<TContext extends object> = Readonly<{
+  /** The dotted name an output refusal and an audit row are written with. */
+  procedure: string;
+  member: TrpcContractMember;
+  access: TrpcAccess;
+  /** Present exactly when the procedure asks at several targets: each after the first, in order. */
+  furtherPermissions?: readonly TrpcFurtherPermission[];
+  /** Present exactly when the procedure asks the tenant to hold an entitlement. */
+  entitlement?: EntitlementGate;
+  /** Present exactly when the procedure mints a credential. */
+  mintsCredential?: true;
+  /** Present exactly when a mutation is refused on an aggregate though its permission is exempt. */
+  refusedOnAggregate?: true;
+  /** Present exactly when the procedure's audit row names a target its input does not. */
+  audit?: TrpcAuditTarget;
+  /** Present exactly when the mutation leaves no generic audit row: the reason it gave. */
+  auditExempt?: string;
+  /** Present exactly when an exempt mutation's refusals still take the generic row. */
+  auditRefusals?: "generic";
+  /** Present exactly when the module hears of a caller its door refused (Q51). */
+  onRefused?: TrpcRefusalHook<unknown, unknown>;
+  /** What the procedure asks the process for; the mount binds each one. */
+  contexts: readonly MiddlewareContext[];
+  handle(args: never, ...contexts: never[]): unknown;
+  app(ctx: TContext): unknown;
+}>;
+
+/**
+ * The scope a mutation's audit row is recorded against when its input names a narrower one:
+ * `{ target: "organization", via: "projectId" }` records the organization holding the project
+ * (Alex, 2026-10-05, E10). The host resolves it; the handler writes nothing.
+ */
+export type TrpcAuditTarget = Readonly<{ target: "organization"; via: "projectId" | "teamId" }>;
+
+/** What a module is handed when its procedure's door refuses a caller (Alex, 2026-10-06, Q51). */
+export type TrpcRefusalHook<Api, Input> = (
+  args: Readonly<{ app: Api; input: Input; actor: Caller["actor"] }>,
+) => void | Promise<void>;
+
+/** The tier each audited input field names, as the host is asked about it. */
+const AUDITED_TIER = { projectId: "project", teamId: "team" } as const;
+
+/**
+ * What a procedure declares instead of a permission. `publicRoute` is REST's
+ * own word for it, and means the same here: no credential is resolved, no
+ * actor is built, and the handler is told so.
+ */
+export type TrpcAccess = AccessDeclaration | PublicRouteAccess;
+
+/**
+ * What a runtime offers a declaration: one built procedure per member, and the
+ * root's own router factory to collect them. Named structurally so the
+ * declaration stays inert — it imports no runtime and names no tRPC generic.
+ */
+export interface TrpcProcedureFactory<TContext extends object> {
+  procedure(request: TrpcProcedureRequest<TContext>): unknown;
+  router(record: Readonly<Record<string, unknown>>): unknown;
+}
+
+/** A host invokes this with its own runtime and the application slice to bind. */
+export type TrpcRouterMount<Api, Contract extends BuiltTrpcContract> = <TContext extends object>(
+  runtime: TrpcProcedureFactory<TContext>,
+  app: (ctx: TContext) => Api,
+) => TRPCBuiltRouter<
+  AnyTRPCRootTypes,
+  TRPCDecorateCreateRouterOptions<TrpcContractProcedures<Contract>>
+>;
+
+/**
+ * The inert declaration a feature installer retains and a process mounts. It carries the
+ * contract it was built from, so composition and the sweeps can both ask what it declares
+ * without importing the contract a second time.
+ */
+export type TrpcRouterDeclaration<Api, Contract extends BuiltTrpcContract> = Readonly<{
+  readonly protocol: "trpc";
+  readonly api: TrpcFeatureApiWitness<Api>;
+  readonly namespace: Contract["namespace"];
+  readonly contract: Contract;
+  readonly router: TrpcRouterMount<Api, Contract>;
+}>;
+
+type Undeclared<Contract extends BuiltTrpcContract, Implemented extends string> = Exclude<
+  keyof Contract["members"] & string,
+  Implemented
+>;
+
+/** Select the next declared procedure, or build once every one is implemented. */
+export interface TrpcRouterBuilder<
+  Api,
+  Contract extends BuiltTrpcContract,
+  Implemented extends string,
+> {
+  procedure<Name extends Undeclared<Contract, Implemented>>(
+    name: Name,
+  ): TrpcRouterAccess<Api, Contract, Implemented, Name, []>;
+  build(
+    this: [Undeclared<Contract, Implemented>] extends [never]
+      ? TrpcRouterBuilder<Api, Contract, Implemented>
+      : TrpcProceduresNotImplemented<Undeclared<Contract, Implemented>>,
+  ): TrpcRouterDeclaration<Api, Contract>;
+}
+
+/**
+ * A selected procedure with no access decision yet, so it has no `handle` to
+ * call. The three members are the AuthZ vocabulary; no role enum reaches here.
+ */
+export interface TrpcRouterAccess<
+  Api,
+  Contract extends BuiltTrpcContract,
+  Implemented extends string,
+  Name extends keyof Contract["members"] & string,
+  Contexts extends readonly MiddlewareContext[],
+> {
+  /**
+   * What this procedure needs the process to resolve, beside its own input:
+   * the address the caller reached us at, the session row it arrived on. Each
+   * one is bound at the mount, and reaches the handler after its arguments.
+   */
+  withMiddlewareContext<const Added extends readonly MiddlewareContext[]>(
+    ...contexts: Added
+  ): TrpcRouterAccess<Api, Contract, Implemented, Name, [...Contexts, ...Added]>;
+  /**
+   * What the tenant must hold beside the permission, asked after access at the scope it
+   * resolved (refused access never reaches the plan). `feature` is named on the refusal;
+   * `when` asks only for an input it holds for. The plan-first order is REST's alone (Q31).
+   */
+  withEntitlement(
+    entitlement: ApiEntitlement,
+    options?: Omit<EntitlementOptions, "before">,
+  ): TrpcRouterAccess<Api, Contract, Implemented, Name, Contexts>;
+  /**
+   * The procedure mints a credential (a key, token or secret). The runtime refuses it with
+   * ImpersonationCannotMintCredentialError whenever the actor carries an impersonatorId,
+   * after access and before the handler.
+   */
+  mintsCredential(): TrpcRouterAccess<Api, Contract, Implemented, Name, Contexts>;
+  /**
+   * The mutation writes under its project although its permission is exempt from the aggregate
+   * write guard, so the door refuses it on an aggregate (ADR-177 decision 8). Refused on a query.
+   */
+  refusedOnAggregate(): TrpcRouterAccess<Api, Contract, Implemented, Name, Contexts>;
+  /**
+   * The mutation's audit row names the organization holding the scope its `via` input field
+   * names, as its organization and its target. Refused on a query, twice, for a field the input
+   * does not carry, and on a procedure that runs with no caller.
+   */
+  withAudit(target: TrpcAuditTarget): TrpcRouterAccess<Api, Contract, Implemented, Name, Contexts>;
+  /**
+   * No generic audit row, the reason saying why (as REST's `withoutAudit`): its service records
+   * its own rows, refusals included; `refusals: "generic"` keeps the row for a refusal. Refused on
+   * a query, with an empty reason, beside `withAudit` and twice.
+   */
+  withoutAudit(
+    reason: string,
+    options?: TrpcAuditExemption,
+  ): TrpcRouterAccess<Api, Contract, Implemented, Name, Contexts>;
+  /**
+   * What the module does when the door refuses a caller: handed the parsed input and the caller,
+   * awaited before the refusal is answered unchanged; a hook that throws fails the call.
+   */
+  onRefused(
+    hook: TrpcRefusalHook<Api, z.output<Contract["members"][Name]["input"]>>,
+  ): TrpcRouterAccess<Api, Contract, Implemented, Name, Contexts>;
+  /**
+   * The permission the parsed input chooses (`permissionBy`): its map names every value the
+   * field holds. A bare entry is asked at `via`'s scope, an entry with a tier at its own field.
+   */
+  /** A proof-bearing permission: the door mints the proof and the handler is handed it. */
+  withPermission(
+    permission: ProofBearingPermission,
+    options?: { via: ScopeTierField },
+  ): TrpcComposableImplementation<
+    Api,
+    Contract,
+    Implemented,
+    Name,
+    Contexts,
+    "proven",
+    "projectId"
+  >;
+  withPermission<const Choice extends InputPermission>(
+    choice: Choice & ExactInputPermission<z.output<Contract["members"][Name]["input"]>, Choice>,
+    options?: { via: ScopeTierField },
+  ): TrpcRouterImplementation<Api, Contract, Implemented, Name, Contexts, "authenticated">;
+  withPermission(
+    access: AuthzPermission | AuthzDeclaration,
+  ): TrpcRouterImplementation<Api, Contract, Implemented, Name, Contexts, "authenticated">;
+  /** One permission, asked at the scope the named input field holds. */
+  withPermission(
+    permission: AuthzPermission,
+    options: { via: ScopeTierField },
+  ): TrpcComposableImplementation<Api, Contract, Implemented, Name, Contexts, "authenticated">;
+  /**
+   * A platform-tier permission, asked of the operator's PLATFORM grant before the handler (E4);
+   * `hidden` answers NOT_FOUND to every caller it refuses, an anonymous one included.
+   */
+  withPermission<P extends PlatformTierPermission>(
+    permission: P,
+    options: PlatformPermissionTarget,
+  ): TrpcRouterImplementation<Api, Contract, Implemented, Name, Contexts, "authenticated">;
+  /**
+   * Every one of them, asked before the handler at the one scope the input
+   * names. Naming an array is what says AND; a single permission is declared
+   * on its own.
+   */
+  withPermission(
+    permissions: readonly [AuthzPermission, AuthzPermission, ...AuthzPermission[]],
+    options?: { via: ScopeTierField },
+  ): TrpcRouterImplementation<Api, Contract, Implemented, Name, Contexts, "authenticated">;
+  /**
+   * Runs with no caller at all: the sign-up that predates the account it
+   * creates. `publicRoute({ reason })` is the same declaration REST writes,
+   * and the reason is what a reviewer reads.
+   */
+  withAccess(
+    access: PublicRouteAccess,
+  ): TrpcRouterImplementation<Api, Contract, Implemented, Name, Contexts, "anonymous">;
+  /** Authenticated and deliberately unchecked, with the reason it needs none. */
+  noPermission(declaration: {
+    reason: string;
+    allow?: Record<string, string>;
+    /** Exempt from the second-factor gate: the read a held member recovers through. */
+    mfaRecovery?: Readonly<{ reason: string }>;
+  }): TrpcRouterImplementation<Api, Contract, Implemented, Name, Contexts, "authenticated">;
+  /** The handler proves standing itself; `enforces` records which fields it covers. */
+  serviceAuthorized(declaration: {
+    reason: string;
+    permissions: readonly AuthzPermission[];
+    enforces?: EnforcedScopeFields;
+  }): TrpcRouterImplementation<Api, Contract, Implemented, Name, Contexts, "authenticated">;
+}
+
+/** The handler, over the contract's parsed input and declared answer. */
+export interface TrpcRouterImplementation<
+  Api,
+  Contract extends BuiltTrpcContract,
+  Implemented extends string,
+  Name extends keyof Contract["members"] & string,
+  Contexts extends readonly MiddlewareContext[] = [],
+  Caller extends TrpcCallerKind = "authenticated",
+  Proofs extends string = never,
+  Composed extends boolean = false,
+> {
+  handle(
+    handler: (
+      args: HandlerArgumentsFor<Caller, z.output<Contract["members"][Name]["input"]>, Api> &
+        TargetProofArguments<Composed, Proofs>,
+      ...contexts: TrpcMiddlewareContextValues<Contexts>
+    ) => DeclaredResult<Contract["members"][Name]>,
+  ): TrpcRouterBuilder<Api, Contract, Implemented | Name>;
+}
+
+/**
+ * A procedure asking one permission, which may ask one more at a further project its input names
+ * by a field of its own (ADR-201 §2): both asked before the handler, one proof per target.
+ */
+export interface TrpcComposableImplementation<
+  Api,
+  Contract extends BuiltTrpcContract,
+  Implemented extends string,
+  Name extends keyof Contract["members"] & string,
+  Contexts extends readonly MiddlewareContext[] = [],
+  Caller extends TrpcCallerKind = "authenticated",
+  Proofs extends string = never,
+  Composed extends boolean = false,
+> extends TrpcRouterImplementation<
+  Api,
+  Contract,
+  Implemented,
+  Name,
+  Contexts,
+  Caller,
+  Proofs,
+  Composed
+> {
+  /** A proof-bearing permission at the further project: the handler is handed its proof. */
+  withPermission<const Field extends FurtherField<Contract, Name>>(
+    permission: ProofBearingPermission,
+    target: TrpcFurtherTarget<Field>,
+  ): TrpcComposableImplementation<
+    Api,
+    Contract,
+    Implemented,
+    Name,
+    Contexts,
+    Caller,
+    Proofs | Field,
+    true
+  >;
+  /** One more permission, asked before the handler at the scope `field` names. */
+  withPermission<const Field extends FurtherField<Contract, Name>>(
+    permission: AuthzPermission,
+    target: TrpcFurtherTarget<Field>,
+  ): TrpcComposableImplementation<Api, Contract, Implemented, Name, Contexts, Caller, Proofs, true>;
+}
+
+type Implementation = Readonly<{
+  access: TrpcAccess;
+  furtherPermissions?: readonly TrpcFurtherPermission[];
+  entitlement?: EntitlementGate;
+  mintsCredential?: true;
+  refusedOnAggregate?: true;
+  audit?: TrpcAuditTarget;
+  auditExempt?: string;
+  auditRefusals?: "generic";
+  onRefused?: TrpcRefusalHook<unknown, unknown>;
+  contexts: readonly MiddlewareContext[];
+  handle(args: never, ...contexts: never[]): unknown;
+}>;
+
+function mountRouter<Api, Contract extends BuiltTrpcContract>(
+  contract: Contract,
+  implementations: ReadonlyMap<string, Implementation>,
+): TrpcRouterMount<Api, Contract> {
+  return <TContext extends object>(
+    runtime: TrpcProcedureFactory<TContext>,
+    app: (ctx: TContext) => Api,
+  ) => {
+    const record: Record<string, unknown> = {};
+    const declared: TrpcContract = contract;
+
+    for (const [name, member] of Object.entries(declared.members)) {
+      const implementation = implementations.get(name);
+
+      if (!implementation) {
+        throw new Error(
+          `tRPC router "${contract.namespace}" has no implementation for procedure "${name}"`,
+        );
+      }
+
+      const procedure = `${contract.namespace}.${name}`;
+      // An implementation carries only the marks its procedure declared, so it spreads as is.
+      record[name] = runtime.procedure({ procedure, member, ...implementation, app });
+    }
+
+    return runtime.router(record) as TRPCBuiltRouter<
+      AnyTRPCRootTypes,
+      TRPCDecorateCreateRouterOptions<TrpcContractProcedures<Contract>>
+    >;
+  };
+}
+
+type PermissionArgument =
+  | AuthzPermission
+  | AuthzDeclaration
+  | InputPermission
+  | readonly AuthzPermission[];
+
+/** What a selected procedure has declared beside its middleware context, before its access. */
+/** What an exempt mutation's service leaves to the generic trail: by default, nothing. */
+export type TrpcAuditExemption = Readonly<{ refusals?: "generic" }>;
+
+type ProcedureMarks = Readonly<{
+  entitlement?: EntitlementGate;
+  mintsCredential?: true;
+  refusedOnAggregate?: true;
+  audit?: TrpcAuditTarget;
+  auditExempt?: string;
+  auditRefusals?: "generic";
+  onRefused?: TrpcRefusalHook<unknown, unknown>;
+}>;
+
+type EntitlementQuestion = {
+  contract: TrpcContract;
+  name: string;
+  entitlement: EntitlementGate | undefined;
+};
+
+/** A procedure asks one entitlement question at most. */
+function assertSingleEntitlement({ contract, name, entitlement }: EntitlementQuestion): void {
+  if (!entitlement) return;
+  throw new Error(
+    `tRPC ${contract.namespace}.${name} already asks whether its tenant holds ` +
+      `"${entitlement.entitlement}"`,
+  );
+}
+
+/** Only a mutation writes, and it declares the refusal once. */
+function assertRefusableOnAggregate({
+  contract,
+  name,
+  declared,
+}: {
+  contract: TrpcContract;
+  name: string;
+  declared: true | undefined;
+}): void {
+  if (contract.members[name]?.kind === "mutation" && !declared) return;
+  throw new Error(
+    `tRPC ${contract.namespace}.${name} declares refusedOnAggregate on a query or twice`,
+  );
+}
+
+/** Both ask a question about a tenant, and a public procedure has none. */
+function assertNoTenantQuestion({ contract, name, entitlement }: EntitlementQuestion): void {
+  if (!entitlement) return;
+  throw new Error(
+    `tRPC ${contract.namespace}.${name} runs with no caller, so there is no tenant to ` +
+      `ask whether it holds "${entitlement.entitlement}"`,
+  );
+}
+
+/** The declared second-factor recovery exemption, copied so the declaration cannot change it. */
+function copiedRecovery(mfaRecovery: Readonly<{ reason: string }> | undefined): {
+  mfaRecovery?: Readonly<{ reason: string }>;
+} {
+  return mfaRecovery ? { mfaRecovery: { reason: mfaRecovery.reason } } : {};
+}
+
+function copiedAllowance(
+  allow: Record<string, string> | undefined,
+): Record<string, string> | undefined {
+  return allow ? { ...allow } : undefined;
+}
+
+function enforcedFields(enforces: EnforcedScopeFields | undefined): {
+  enforces?: EnforcedScopeFields;
+} {
+  return enforces === undefined ? {} : { enforces };
+}
+
+function routerBuilder<Api, Contract extends BuiltTrpcContract, Implemented extends string>(
+  api: TrpcFeatureApiWitness<Api>,
+  contract: Contract,
+  implementations: ReadonlyMap<string, Implementation>,
+): TrpcRouterBuilder<Api, Contract, Implemented> {
+  /** One selected procedure, with the middleware context it has named so far. */
+  const selected = (
+    name: string,
+    contexts: readonly MiddlewareContext[],
+    marks: ProcedureMarks = {},
+  ) => {
+    const { entitlement } = marks;
+    const implement = (access: TrpcAccess, further: readonly TrpcFurtherPermission[] = []) => {
+      assertRefusable({ contract, name, access, onRefused: marks.onRefused });
+      const composed = further.length > 0 ? { furtherPermissions: further } : {};
+
+      return {
+        handle: (handle: (args: never, ...values: never[]) => unknown) =>
+          routerBuilder(
+            api,
+            contract,
+            new Map(implementations).set(name, { access, contexts, handle, ...marks, ...composed }),
+          ),
+      };
+    };
+    /** A declared access, and each further permission asked after it (ADR-201 §2). */
+    const composable = (
+      access: AccessDeclaration,
+      further: readonly TrpcFurtherPermission[],
+    ): ReturnType<typeof implement> & Readonly<{ withPermission: unknown }> => ({
+      ...implement(access, further),
+      withPermission: (permission: PermissionArgument, target?: TrpcFurtherTarget) =>
+        composable(access, [
+          ...further,
+          furtherPermissionOf({ contract, name, first: access, further, permission, target }),
+        ]),
+    });
+
+    return {
+      withMiddlewareContext: (...added: readonly MiddlewareContext[]) => {
+        assertContextsDistinct({ contract, name, contexts: [...contexts, ...added] });
+
+        return selected(name, [...contexts, ...added], marks);
+      },
+      withEntitlement: (named: ApiEntitlement, options: EntitlementOptions = {}) => {
+        assertSingleEntitlement({ contract, name, entitlement });
+
+        assertNoPlanFirst({ address: `tRPC ${contract.namespace}.${name}`, options });
+
+        return selected(name, contexts, {
+          ...marks,
+          entitlement: { entitlement: named, ...options },
+        });
+      },
+      mintsCredential: () => selected(name, contexts, { ...marks, mintsCredential: true }),
+      refusedOnAggregate: () => {
+        assertRefusableOnAggregate({ contract, name, declared: marks.refusedOnAggregate });
+
+        return selected(name, contexts, { ...marks, refusedOnAggregate: true });
+      },
+      onRefused: (hook: TrpcRefusalHook<unknown, unknown>) => {
+        if (marks.onRefused) {
+          throw new Error(`tRPC ${contract.namespace}.${name} declares onRefused twice`);
+        }
+
+        return selected(name, contexts, { ...marks, onRefused: hook });
+      },
+      withAudit: (target: TrpcAuditTarget) => {
+        assertAuditUndeclared({ contract, name, marks });
+        assertAuditTarget({ contract, name, target, declared: marks.audit });
+
+        return selected(name, contexts, {
+          ...marks,
+          audit: { target: target.target, via: target.via },
+        });
+      },
+      withoutAudit: (reason: string, options?: TrpcAuditExemption) => {
+        assertAuditExemption({ contract, name, reason, marks });
+
+        return selected(name, contexts, {
+          ...marks,
+          auditExempt: reason,
+          ...(options?.refusals === "generic" ? { auditRefusals: "generic" as const } : {}),
+        });
+      },
+      withPermission: (
+        access: PermissionArgument,
+        options?: { via: ScopeTierField } | PlatformPermissionTarget,
+      ) => composable(accessDeclarationOf({ contract, name, access, options }), []),
+      withAccess: (access: PublicRouteAccess) => {
+        assertNoTenantQuestion({ contract, name, entitlement });
+
+        if (marks.mintsCredential) {
+          throw new Error(
+            `tRPC ${contract.namespace}.${name} mints a credential, so it cannot run with no caller`,
+          );
+        }
+
+        if (marks.audit) {
+          throw new Error(
+            `tRPC ${contract.namespace}.${name} declares an audit target, and a procedure with ` +
+              "no caller writes no audit row",
+          );
+        }
+
+        assertAnonymousProcedure({ contract, name });
+
+        return implement(access);
+      },
+      noPermission: (declaration: {
+        reason: string;
+        allow?: Record<string, string>;
+        mfaRecovery?: Readonly<{ reason: string }>;
+      }) =>
+        implement({
+          kind: "no-permission",
+          reason: declaration.reason,
+          allow: copiedAllowance(declaration.allow),
+          ...copiedRecovery(declaration.mfaRecovery),
+        }),
+      serviceAuthorized: (declaration: {
+        reason: string;
+        permissions: readonly AuthzPermission[];
+        enforces?: EnforcedScopeFields;
+      }) =>
+        implement({
+          kind: "service-authorized",
+          reason: declaration.reason,
+          permissions: declaration.permissions,
+          ...enforcedFields(declaration.enforces),
+        }),
+    };
+  };
+
+  return {
+    procedure: (name: string) => {
+      assertDeclared(contract, name);
+      assertUnimplemented(contract, name, implementations);
+
+      return selected(name, []);
+    },
+    build: () => ({
+      protocol: "trpc",
+      api,
+      namespace: contract.namespace,
+      contract,
+      router: mountRouter<Api, Contract>(contract, implementations),
+    }),
+  } as TrpcRouterBuilder<Api, Contract, Implemented>;
+}
+
+/** A hook needs a door that refuses: a public, unchecked or self-checked procedure has none. */
+function assertRefusable({
+  contract,
+  name,
+  access,
+  onRefused,
+}: {
+  contract: TrpcContract;
+  name: string;
+  access: TrpcAccess;
+  onRefused: TrpcRefusalHook<unknown, unknown> | undefined;
+}): void {
+  const refuses = !["public", "no-permission", "service-authorized"].includes(access.kind);
+
+  if (!onRefused || refuses) return;
+
+  throw new Error(
+    `tRPC ${contract.namespace}.${name} declares onRefused, and its door refuses nobody`,
+  );
+}
+
+function isPermissionList(access: PermissionArgument): access is readonly AuthzPermission[] {
+  return Array.isArray(access);
+}
+
+/**
+ * A bare permission is the one-permission declaration spelled short, an array
+ * is the AND. `custom` is refused: a custom check IS its own middleware, and
+ * the one execution path has no seam for one.
+ */
+function permissionDeclarationOf({
+  contract,
+  name,
+  access,
+  via,
+}: {
+  contract: TrpcContract;
+  name: string;
+  access: PermissionArgument;
+  via?: ScopeTierField;
+}): AccessDeclaration {
+  if (typeof access === "string") {
+    assertNotPlatformPermission({
+      address: `tRPC ${contract.namespace}.${name}`,
+      permissions: [access],
+    });
+
+    return via === undefined
+      ? { kind: "permission", permission: access }
+      : { kind: "permission", permission: access, via };
+  }
+
+  if (isPermissionList(access)) {
+    return permissionAllOf({ contract, name, permissions: access, via });
+  }
+
+  if (access.kind === "permission-by-input") {
+    const input = contract.members[name]?.input;
+
+    assertInputPermission({
+      address: `tRPC ${contract.namespace}.${name}`,
+      declared: access,
+      schemas: input ? [input] : [],
+    });
+
+    return {
+      kind: "permission-by-input",
+      field: access.field,
+      map: access.map,
+      ...(via ? { via } : {}),
+    };
+  }
+
+  if (access.kind === "custom") {
+    throw new Error("a tRPC router cannot declare a custom access check");
+  }
+
+  if (access.kind === "public") {
+    throw new Error("a tRPC router declares a public procedure with withAccess(publicRoute(…))");
+  }
+
+  // An AND written as a declaration object earns the same refusals as one
+  // written as a list, so the two spellings cannot disagree.
+  if (access.kind === "permission-all") {
+    const target = access.via ?? via;
+
+    return permissionAllOf({
+      contract,
+      name,
+      permissions: access.permissions,
+      ...(target ? { via: target } : {}),
+    });
+  }
+
+  return access;
+}
+
+/** A permission at the platform when the options name it, else at the scope the input names. */
+function accessDeclarationOf({
+  contract,
+  name,
+  access,
+  options,
+}: {
+  contract: TrpcContract;
+  name: string;
+  access: PermissionArgument;
+  options: { via: ScopeTierField } | PlatformPermissionTarget | undefined;
+}): AccessDeclaration {
+  if (options && "at" in options) {
+    return platformDeclarationOf({ contract, name, access, target: options });
+  }
+
+  return permissionDeclarationOf({ contract, name, access, via: options?.via });
+}
+
+/**
+ * A further permission composes only as one permission beside a first that asks one, at a field
+ * of the input's own that no scope field and no earlier target already names (ADR-201 §2).
+ */
+function furtherPermissionOf({
+  contract,
+  name,
+  first,
+  further,
+  permission,
+  target,
+}: {
+  contract: TrpcContract;
+  name: string;
+  first: AccessDeclaration;
+  further: readonly TrpcFurtherPermission[];
+  permission: PermissionArgument;
+  target: TrpcFurtherTarget | undefined;
+}): TrpcFurtherPermission {
+  const address = `tRPC ${contract.namespace}.${name}`;
+  const input = contract.members[name]?.input;
+  const shape = input instanceof z.ZodObject ? Object.keys(input.shape) : [];
+
+  const composes = first.kind === "permission" && typeof permission === "string";
+  const targeted =
+    target !== undefined &&
+    SCOPE_INPUT_FIELDS.includes(target.via) &&
+    typeof target.field === "string";
+  if (!composes || !targeted) {
+    throw new Error(
+      `${address} declares withPermission() twice; a further permission is one permission at ` +
+        "{ via, field }, beside a first that asks one",
+    );
+  }
+
+  assertNotPlatformPermission({ address, permissions: [permission] });
+
+  const named = [...SCOPE_INPUT_FIELDS, ...further.map((asked) => asked.field)];
+  if (named.includes(target.field)) {
+    throw new Error(`${address} asks a permission at "${target.field}" twice`);
+  }
+
+  if (!shape.includes(target.field)) {
+    throw new Error(`${address} asks at "${target.field}", a field its input does not carry`);
+  }
+
+  return { permission, via: target.via, field: target.field };
+}
+
+/** One platform-tier permission at the platform (E4); anything else is refused where written. */
+function platformDeclarationOf({
+  contract,
+  name,
+  access,
+  target,
+}: {
+  contract: TrpcContract;
+  name: string;
+  access: PermissionArgument;
+  target: PlatformPermissionTarget;
+}): AccessDeclaration {
+  const address = `tRPC ${contract.namespace}.${name}`;
+
+  if (typeof access !== "string") {
+    throw new Error(`${address} asks one permission at the platform, and only one`);
+  }
+
+  return platformPermissionOf({ address, permission: access, target });
+}
+
+/**
+ * Every one of them, at one scope. A set that names fewer than two, repeats
+ * one, or shares no tier it could all be asked at is refused where it is
+ * written rather than at the request that first fails on it.
+ */
+function permissionAllOf({
+  contract,
+  name,
+  permissions,
+  via,
+}: {
+  contract: TrpcContract;
+  name: string;
+  permissions: readonly AuthzPermission[];
+  via?: ScopeTierField;
+}): AccessDeclaration {
+  const together = permissionsTogether({
+    address: `tRPC ${contract.namespace}.${name}`,
+    permissions,
+  });
+
+  return { kind: "permission-all", permissions: together, ...(via ? { via } : {}) };
+}
+
+/** A procedure says once whether it leaves a generic row: a target and an exemption contradict. */
+function assertAuditUndeclared({
+  contract,
+  name,
+  marks,
+}: {
+  contract: TrpcContract;
+  name: string;
+  marks: ProcedureMarks;
+}): void {
+  if (marks.auditExempt === undefined) return;
+  throw new Error(`tRPC ${contract.namespace}.${name} already declares withoutAudit()`);
+}
+
+/** Only a mutation writes a row to stand down, once, with a reason a reader can check. */
+function assertAuditExemption({
+  contract,
+  name,
+  reason,
+  marks,
+}: {
+  contract: TrpcContract;
+  name: string;
+  reason: string;
+  marks: ProcedureMarks;
+}): void {
+  const address = `tRPC ${contract.namespace}.${name}`;
+
+  if (reason.trim().length === 0) throw new Error(`${address} withoutAudit needs a reason`);
+  if (marks.audit) throw new Error(`${address} already declares withAudit()`);
+  assertAuditUndeclared({ contract, name, marks });
+  if (contract.members[name]?.kind !== "mutation") {
+    throw new Error(`${address} is not a mutation, so it writes no audit row to leave out`);
+  }
+}
+
+/**
+ * One audit target per mutation, over a field its input carries: a query writes no row, and a
+ * field the parser drops would name no scope to resolve.
+ */
+function assertAuditTarget({
+  contract,
+  name,
+  target,
+  declared,
+}: {
+  contract: TrpcContract;
+  name: string;
+  target: TrpcAuditTarget;
+  declared: TrpcAuditTarget | undefined;
+}): void {
+  const address = `tRPC ${contract.namespace}.${name}`;
+  const member = contract.members[name];
+
+  if (declared) throw new Error(`${address} already declares the target its audit row names`);
+
+  if (member?.kind !== "mutation") {
+    throw new Error(`${address} is not a mutation, so it writes no audit row to name a target on`);
+  }
+
+  const input = member.input;
+  const shape = input instanceof z.ZodObject ? Object.keys(input.shape) : [];
+
+  if (!(target.via in AUDITED_TIER) || !shape.includes(target.via)) {
+    throw new Error(`${address} audits via "${target.via}", a field its input does not carry`);
+  }
+}
+
+/**
+ * A procedure with no caller may not ask about a tenant: nothing resolved a scope for it, so
+ * a scope id in its input would be a claim the runtime can't check. The same refusal REST
+ * makes of a public route, made here against the contract's declared parser.
+ */
+function assertAnonymousProcedure({
+  contract,
+  name,
+}: {
+  contract: TrpcContract;
+  name: string;
+}): void {
+  const input = contract.members[name]?.input;
+  const shape = input instanceof z.ZodObject ? Object.keys(input.shape) : [];
+  const scoped = SCOPE_INPUT_FIELDS.filter((field) => shape.includes(field));
+
+  if (scoped.length > 0) {
+    throw new Error(
+      `tRPC ${contract.namespace}.${name} runs with no caller and its input names ${scoped.join(", ")}`,
+    );
+  }
+}
+
+/** Two contexts of one name would reach the handler as one argument twice. */
+function assertContextsDistinct({
+  contract,
+  name,
+  contexts,
+}: {
+  contract: TrpcContract;
+  name: string;
+  contexts: readonly MiddlewareContext[];
+}): void {
+  const names = contexts.map((declared) => declared.name);
+
+  if (new Set(names).size !== names.length) {
+    throw new Error(`tRPC ${contract.namespace}.${name} declares one middleware context twice`);
+  }
+}
+
+function assertDeclared(contract: TrpcContract, name: string): void {
+  if (!(name in contract.members)) {
+    throw new Error(`tRPC contract "${contract.namespace}" declares no procedure "${name}"`);
+  }
+}
+
+function assertUnimplemented(
+  contract: TrpcContract,
+  name: string,
+  implementations: ReadonlyMap<string, Implementation>,
+): void {
+  if (implementations.has(name)) {
+    throw new Error(`tRPC router "${contract.namespace}" implements procedure "${name}" twice`);
+  }
+}
+
+/**
+ * Opens the server side of one declared namespace. Every procedure the
+ * contract names must be implemented exactly once before `build()` compiles.
+ */
+export function defineTrpcRouter<Api, Contract extends BuiltTrpcContract>(
+  api: TrpcFeatureApiWitness<Api>,
+  contract: Contract,
+): TrpcRouterBuilder<Api, Contract, never> {
+  return routerBuilder(api, contract, new Map());
+}
+
+// The one tRPC execution path; ORDER IS BEHAVIOUR: everything reads the VALIDATED input
+// (installed after parser, never before)
+
+/**
+ * The transport, as the path reads it: headers for the caller's trace context and the user
+ * agent, and the status the log line records. Deliberately not a Node request type — callers
+ * range from an HTTP request to a WebSocket handshake to nothing at all.
+ */
+export type TrpcRuntimeRequest = Readonly<{
+  headers: Record<string, string | string[] | undefined> & { "user-agent"?: string };
+  socket?: { remoteAddress?: string };
+}>;
+
+/** The request context this path reads directly, and nothing more. */
+export interface TrpcRuntimeContext {
+  readonly req?: TrpcRuntimeRequest | undefined;
+  readonly res?: { statusCode?: number } | undefined;
+}
+
+/** The scope a declared audit target is resolved from. */
+export type TrpcAuditedScope = Readonly<{ tier: "project" | "team"; id: string }>;
+
+/** One audit row, as the path describes it. */
+export type TrpcRuntimeAuditEntry = Readonly<{
+  userId: string;
+  organizationId?: string;
+  projectId?: string;
+  /** The tRPC path, which is also what the redaction rules are keyed by. */
+  action: string;
+  args?: unknown;
+  error?: Error;
+  req?: TrpcRuntimeRequest;
+  metadata?: Record<string, string>;
+  targetKind?: string;
+  targetId?: string;
+}>;
+
+/** Everything the process supplies for the path to run. */
+export type TrpcRuntimeMembers<TContext> = Readonly<{
+  /** Who is calling, and the scope their credential resolved. */
+  identity: Readonly<{ caller(ctx: TContext): Caller }>;
+  /** Resolves the authorization decisions for one request. */
+  authorization: Readonly<{ forRequest(ctx: TContext): Authorize }>;
+  /** The two refusals whose concrete error class is the process's to choose. */
+  denials: AccessDenial;
+  /** What the process reads a tenant's entitlements from, for a procedure that asks. */
+  entitlements?: Entitlements;
+  /**
+   * The per-procedure window a caller is counted inside, where the process
+   * throttles at all. Absent, every procedure passes through uncounted.
+   */
+  throttle?: TrpcThrottle<TContext>;
+  audit: Readonly<{
+    record(entry: TrpcRuntimeAuditEntry): Promise<void>;
+    /** The owner says WHAT is sensitive; the path only redacts. */
+    redact(input: { procedure: string; args: unknown }): unknown;
+    /** The process decides which procedures it does not record. */
+    exempt(procedure: string): boolean;
+    /** The organization holding a scope, for a declared target; absent, one is refused at mount. */
+    organizationOf?(scope: TrpcAuditedScope): Promise<string | null>;
+  }>;
+  errors: Readonly<{
+    report(failure: unknown): void;
+    asError(failure: unknown): Error;
+    /** Application classes a client interceptor acts on, by their own code. */
+    translate(cause: unknown): Readonly<{ code: TRPCError["code"]; message: string }> | undefined;
+  }>;
+}>;
+
+/** What one mount supplies beyond the application slice. */
+export type TrpcMountOptions<TContext> = Readonly<{
+  /** One binding per middleware context the mounted declaration's procedures name. */
+  middlewareContext?: readonly TrpcMiddlewareContextBinding<TContext>[];
+}>;
+
+/** Mounts declared namespaces on one process's root. */
+export interface TrpcRuntime<TContext extends object> extends TrpcProcedureFactory<TContext> {
+  mount<Api, Contract extends BuiltTrpcContract>(
+    declaration: TrpcRouterDeclaration<Api, Contract>,
+    app: (ctx: TContext) => Api,
+    options?: TrpcMountOptions<TContext>,
+  ): TRPCBuiltRouter<
+    AnyTRPCRootTypes,
+    TRPCDecorateCreateRouterOptions<TrpcContractProcedures<Contract>>
+  >;
+}
+
+/**
+ * Builds one process's tRPC path. Called ONCE per root: every middleware it
+ * installs belongs to the root that produced it.
+ */
+export function createTrpcRuntime<
+  TContext extends TrpcRuntimeContext & object,
+  TOptions extends TRPCRuntimeConfigOptions<TContext, object> = TRPCRuntimeConfigOptions<
+    TContext,
+    object
+  >,
+  TRoot extends AnyTRPCRootTypes = AnyTRPCRootTypes,
+>({
+  root,
+  procedure,
+  anonymousProcedure,
+  members,
+}: {
+  root: TRPCRootObject<TContext, object, TOptions, TRoot>;
+  /**
+   * The process's AUTHENTICATED procedure. The path builds on it rather than the bare one, so
+   * a signed-out caller is refused by the process's own definition, and the public-surface
+   * sweep can still tell an authenticated procedure from an anonymous one.
+   */
+  procedure: TrpcBuildableProcedure;
+  /**
+   * The process's PUBLIC procedure, for a declaration that runs with no
+   * caller. A runtime given none refuses such a declaration at mount, naming
+   * the procedure, rather than answering it behind the authenticated door.
+   */
+  anonymousProcedure?: TrpcBuildableProcedure;
+  members: TrpcRuntimeMembers<TContext>;
+}): TrpcRuntime<TContext> {
+  const trace = tracer(members);
+  const handledError = handledErrors(members);
+  const throttle = members.throttle ? trpcThrottle(members.throttle) : undefined;
+
+  const build = (
+    request: TrpcProcedureRequest<TContext>,
+    bound: ReadonlyMap<string, TrpcMiddlewareContextBinding<TContext>>,
+  ): unknown => {
+    const anonymous = request.access.kind === "public";
+    const contexts = boundContexts({ request, bound });
+
+    // The parser FIRST, then the check: a check installed ahead of `.input()`
+    // reads `undefined` and silently authorizes nothing.
+    const checked = doorOf({ anonymous, procedure, anonymousProcedure, request })
+      .use(refuseOutdatedClient)
+      .input(doorInputSchema(request.member))
+      .use(trace)
+      .use(requestLog(members, { anonymous }))
+      .use(handledError)
+      .use(
+        access({
+          members,
+          declaration: request.access,
+          further: request.furtherPermissions ?? [],
+          procedure: request.procedure,
+          kind: request.member.kind,
+          app: request.app,
+          contexts,
+          ...(request.entitlement ? { entitlement: request.entitlement } : {}),
+          ...(request.mintsCredential ? { mintsCredential: request.mintsCredential } : {}),
+          refusedOnAggregate: request.refusedOnAggregate === true,
+          ...(request.onRefused ? { onRefused: request.onRefused } : {}),
+        }),
+      );
+
+    // The throttle runs AFTER the check, so the caller it counts is the one
+    // the door resolved, and BEFORE the trail, so a refused call writes no
+    // audit row.
+    const built = (throttle ? checked.use(throttle) : checked).use(
+      auditTrail(members, {
+        anonymous,
+        exempt: request.auditExempt !== undefined,
+        refusalsToGeneric: request.auditRefusals === "generic",
+        ...(request.audit ? { target: auditTargetPort({ members, request }) } : {}),
+      }),
+    );
+
+    const handle = guardOutput({
+      procedure: request.procedure,
+      kind: request.member.kind,
+      output: request.member.output,
+      handler: request.handle,
+    });
+
+    if (request.member.kind === "query") return built.query(handle);
+
+    if (request.member.kind === "mutation") return built.mutation(handle);
+
+    return built.subscription(handle);
+  };
+
+  const router = (record: Readonly<Record<string, unknown>>) =>
+    root.router(record as TRPCRouterRecord);
+
+  return {
+    procedure: (request) => build(request, new Map()),
+    router,
+    mount: (declaration, app, options) =>
+      declaration.router(
+        {
+          procedure: (request: TrpcProcedureRequest<TContext>) =>
+            build(request, contextBindings(declaration.namespace, options)),
+          router,
+        },
+        app,
+      ),
+  };
+}
+
+/** The bindings this mount supplied, by the context name each one answers for. */
+function contextBindings<TContext>(
+  namespace: unknown,
+  options: TrpcMountOptions<TContext> | undefined,
+): ReadonlyMap<string, TrpcMiddlewareContextBinding<TContext>> {
+  const contexts = options?.middlewareContext ?? [];
+
+  contexts.forEach((binding, index) => {
+    if (!binding?.trpcMiddlewareContext?.name) {
+      throw new Error(
+        `Namespace "${String(namespace)}" binds a middleware context that is undefined at index ${index} of ${contexts.length} - a circular import in the module that declares it usually explains this.`,
+      );
+    }
+  });
+
+  return new Map(contexts.map((binding) => [binding.trpcMiddlewareContext.name, binding] as const));
+}
+
+/**
+ * Every middleware context the procedure declared, paired with the binding that answers
+ * it. One the mount bound no value for is refused here, naming the context and the
+ * procedure, rather than reaching a handler as an unset argument.
+ */
+function boundContexts<TContext extends object>({
+  request,
+  bound,
+}: {
+  request: TrpcProcedureRequest<TContext>;
+  bound: ReadonlyMap<string, TrpcMiddlewareContextBinding<TContext>>;
+}): readonly Readonly<{
+  declared: MiddlewareContext;
+  binding: TrpcMiddlewareContextBinding<TContext>;
+}>[] {
+  return request.contexts.map((declared) => {
+    const binding = bound.get(declared.name);
+
+    if (!binding) {
+      throw new Error(
+        `tRPC ${request.procedure} declares the middleware context "${declared.name}", and this mount bound no value for it`,
+      );
+    }
+
+    return { declared, binding };
+  });
+}
+
+/**
+ * Which of the process's procedures this declaration is built on. A procedure
+ * that runs with no caller cannot be built on the authenticated one — the door
+ * would refuse the very caller it exists to serve.
+ */
+function doorOf<TContext extends object>({
+  anonymous,
+  procedure,
+  anonymousProcedure,
+  request,
+}: {
+  anonymous: boolean;
+  procedure: TrpcBuildableProcedure;
+  anonymousProcedure: TrpcBuildableProcedure | undefined;
+  request: TrpcProcedureRequest<TContext>;
+}): TrpcBuildableProcedure {
+  if (!anonymous) return procedure;
+
+  if (anonymousProcedure) return anonymousProcedure;
+
+  throw new Error(
+    `tRPC ${request.procedure} answers with no caller, and this runtime was given no anonymous procedure to build it on`,
+  );
+}
+
+/**
+ * The parser-and-resolver surface a built procedure exposes, named
+ * structurally at the one seam where a feature's declaration meets a builder
+ * whose generics belong to the process.
+ */
+export type TrpcBuildableProcedure = Readonly<{
+  use(middleware: unknown): TrpcBuildableProcedure;
+  input(schema: z.ZodType): TrpcParsedProcedure;
+}>;
+
+/** The same builder once its parser is applied: middlewares, then a resolver. */
+type TrpcParsedProcedure = Readonly<{
+  use(middleware: unknown): TrpcParsedProcedure;
+  query(resolver: (opts: ResolverOptions) => unknown): unknown;
+  mutation(resolver: (opts: ResolverOptions) => unknown): unknown;
+  subscription(resolver: (opts: ResolverOptions) => unknown): unknown;
+}>;
+
+/** What the handler is handed: no `ctx`, no request, no response. */
+type HandlerArguments = Readonly<{
+  app: unknown;
+  input: unknown;
+  actor: (Actor & { id: string }) | null;
+  scope: unknown;
+  authorization: unknown;
+  /** Each proof-bearing target's proof by its field; present only on a procedure asking several. */
+  authorizations?: Readonly<Record<string, Authorization>>;
+  signal: AbortSignal | undefined;
+}>;
+
+/**
+ * What the access step establishes: the handler's own arguments, and the middleware
+ * context it declared, resolved after the decision so a refused request never asks the
+ * process for anything.
+ */
+type ResolvedAccess = Omit<HandlerArguments, "input" | "signal"> &
+  Readonly<{ contexts: readonly unknown[] }>;
+
+/**
+ * The resolver's own options. `handlerArguments` is written onto the context by
+ * the access step through `next({ ctx })`, which tRPC merges onto a COPY —
+ * nothing the caller passed in is mutated.
+ */
+type ResolverOptions = Readonly<{
+  ctx: object;
+  input: unknown;
+  signal: AbortSignal | undefined;
+}>;
+
+/**
+ * The access step: the one check, run on the validated input, writing the middleware context
+ * the handler is handed. A procedure that ran no check cannot exist — every mounted procedure
+ * carries this middleware, and the machine-readable declaration the router sweep reads back off it.
+ */
+function access<TContext extends object>({
+  members,
+  declaration,
+  further,
+  procedure,
+  kind,
+  entitlement,
+  mintsCredential,
+  refusedOnAggregate,
+  onRefused,
+  app,
+  contexts,
+}: {
+  members: TrpcRuntimeMembers<TContext>;
+  declaration: TrpcAccess;
+  further: readonly TrpcFurtherPermission[];
+  procedure: string;
+  kind: TrpcContractMember["kind"];
+  entitlement?: EntitlementGate;
+  mintsCredential?: true;
+  refusedOnAggregate: boolean;
+  onRefused?: TrpcRefusalHook<unknown, unknown>;
+  app: (ctx: TContext) => unknown;
+  contexts: readonly BoundContext<TContext>[];
+}) {
+  if (entitlement && !members.entitlements) {
+    throw new Error(
+      `tRPC ${procedure} asks whether its tenant holds "${entitlement.entitlement}", and ` +
+        "this runtime supplied no entitlements port to ask",
+    );
+  }
+
+  return declareAccessMiddleware(
+    declaration,
+    check({
+      members,
+      declaration,
+      further,
+      procedure,
+      kind,
+      app,
+      contexts,
+      ...(entitlement ? { entitlement } : {}),
+      ...(mintsCredential ? { mintsCredential } : {}),
+      refusedOnAggregate,
+      ...(onRefused ? { onRefused } : {}),
+    }),
+  );
+}
+
+type BoundContext<TContext> = Readonly<{
+  declared: MiddlewareContext;
+  binding: TrpcMiddlewareContextBinding<TContext>;
+}>;
+
+function check<TContext extends object>({
+  members,
+  declaration,
+  further,
+  procedure,
+  kind,
+  entitlement,
+  mintsCredential,
+  refusedOnAggregate,
+  onRefused,
+  app,
+  contexts,
+}: {
+  members: TrpcRuntimeMembers<TContext>;
+  declaration: TrpcAccess;
+  further: readonly TrpcFurtherPermission[];
+  procedure: string;
+  kind: TrpcContractMember["kind"];
+  entitlement?: EntitlementGate;
+  mintsCredential?: true;
+  refusedOnAggregate: boolean;
+  onRefused?: TrpcRefusalHook<unknown, unknown>;
+  app: (ctx: TContext) => unknown;
+  contexts: readonly BoundContext<TContext>[];
+}) {
+  return async ({
+    ctx,
+    input,
+    next,
+  }: {
+    ctx: TContext;
+    input: unknown;
+    next: (options: {
+      ctx: { handlerArguments: ResolvedAccess };
+    }) => Promise<MiddlewareResult<object>>;
+  }): Promise<MiddlewareResult<object>> => {
+    // Nothing is authenticated for a public procedure and no actor is built
+    // for it: the handler is told there is no one behind the request rather
+    // than handed a guess.
+    if (declaration.kind === "public") {
+      const anonymous: ResolvedAccess = {
+        app: app(ctx),
+        actor: null,
+        scope: null,
+        authorization: null,
+        contexts: await resolveContexts({ contexts, ctx }),
+      };
+
+      return next({ ctx: { handlerArguments: anonymous } });
+    }
+
+    const decision = await authorized({ members, declaration, further, ctx, input }).catch(
+      async (failure: unknown) => {
+        if (onRefused && isRefusal(failure)) {
+          await onRefused({ app: app(ctx), input, actor: members.identity.caller(ctx).actor });
+        }
+
+        throw failure;
+      },
+    );
+
+    if (!decision.actor) {
+      throw new TRPCError({ code: "UNAUTHORIZED", message: "Authentication is required" });
+    }
+
+    if (mintsCredential) {
+      refuseImpersonatedMint({ actor: decision.actor });
+    }
+
+    // After access, never before it: a caller who may not do this at all is
+    // told that rather than told to buy something.
+    if (entitlement && members.entitlements) {
+      await decideEntitlement({
+        gate: entitlement,
+        scope: decision.scope,
+        input,
+        entitlements: members.entitlements,
+        address: `tRPC ${procedure}`,
+      });
+    }
+
+    const authorize = members.authorization.forRequest(ctx);
+    const admitted = await admittedScope({
+      declaration,
+      decision,
+      kind,
+      refusedOnAggregate,
+      procedure,
+      authorize,
+    });
+    const handlerArguments: ResolvedAccess = {
+      app: app(ctx),
+      actor: decision.actor,
+      ...admitted,
+      ...(await targetProofs({ decision, first: admitted.authorization, authorize, procedure })),
+      contexts: await resolveContexts({ contexts, ctx }),
+    };
+
+    return next({ ctx: { handlerArguments } });
+  };
+}
+
+/**
+ * The admitted call's scope with its organisation and kind, refused as read only when a mutation
+ * writes under an aggregate (ADR-177 decision 8), and the proof a proof-bearing read carries.
+ */
+async function admittedScope({
+  declaration,
+  decision,
+  kind,
+  refusedOnAggregate,
+  procedure,
+  authorize,
+}: {
+  declaration: AccessDeclaration;
+  decision: Awaited<ReturnType<typeof decide>>;
+  kind: TrpcContractMember["kind"];
+  refusedOnAggregate: boolean;
+  procedure: string;
+  authorize: Authorize;
+}): Promise<Pick<ResolvedAccess, "scope"> & Readonly<{ authorization: Authorization | null }>> {
+  const scope = await scopeWithOrganization({ scope: decision.scope, authorize });
+  if (kind === "mutation") {
+    refuseWriteUnderAggregate({
+      permissions: declaredPermissions(declaration),
+      scope,
+      refusedOnAggregate,
+    });
+  }
+
+  return {
+    scope,
+    authorization: await mintAuthorization({
+      permission: declaration.kind === "permission" ? declaration.permission : undefined,
+      actor: decision.actor,
+      scope: decision.scope,
+      authorize,
+      route: procedure,
+    }),
+  };
+}
+
+/** A target after the first, with the scope its own input field named (ADR-201 §2). */
+type FurtherTarget = Readonly<{
+  permission: AuthzPermission;
+  field: string;
+  scope: AuthzDeclaredScopeId;
+}>;
+
+/** The first target's decision, and each further target the door admitted after it. */
+type TargetedDecision = AccessDecision & Readonly<{ targets: readonly FurtherTarget[] }>;
+
+/** One proof per proof-bearing target, by the field naming it; the first's is reused. */
+async function targetProofs({
+  decision,
+  first,
+  authorize,
+  procedure,
+}: {
+  decision: TargetedDecision;
+  first: Authorization | null;
+  authorize: Authorize;
+  procedure: string;
+}): Promise<Pick<ResolvedAccess, "authorizations">> {
+  if (decision.targets.length === 0) return {};
+
+  const proofs: Record<string, Authorization> = {};
+  if (first && decision.scope) {
+    proofs[SCOPE_TIER_FIELDS[decision.scope.tier]] = first;
+  }
+
+  for (const { permission, field, scope } of decision.targets) {
+    const { actor } = decision;
+    const proof = await mintAuthorization({
+      permission,
+      actor,
+      scope,
+      authorize,
+      route: procedure,
+    });
+    if (proof) proofs[field] = proof;
+  }
+
+  return { authorizations: proofs };
+}
+
+/**
+ * The declared middleware context, in declaration order, each parsed by the schema that
+ * declared it. A value the schema refuses is the mount's fault, and it is
+ * raised here rather than reaching a handler that trusted the type.
+ */
+async function resolveContexts<TContext extends object>({
+  contexts,
+  ctx,
+}: {
+  contexts: readonly BoundContext<TContext>[];
+  ctx: TContext;
+}): Promise<readonly unknown[]> {
+  const resolved: unknown[] = [];
+
+  for (const { declared, binding } of contexts) {
+    resolved.push(declared.schema.parse(await binding.resolve(ctx)));
+  }
+
+  return resolved;
+}
+
+/** A caller the door turned away, as opposed to a door that could not answer. */
+function isRefusal(failure: unknown): boolean {
+  if (failure instanceof TRPCError) return failure.code === "UNAUTHORIZED";
+
+  return failure instanceof HandledError && (failure.httpStatus ?? 500) < 500;
+}
+
+/**
+ * The one check, with the anonymous refusal spelled the way the transport
+ * spells it: an authentication failure is a 401 on the wire, not a fault.
+ */
+async function authorized<TContext extends object>({
+  members,
+  declaration,
+  further,
+  ctx,
+  input,
+}: {
+  members: TrpcRuntimeMembers<TContext>;
+  declaration: AccessDeclaration;
+  further: readonly TrpcFurtherPermission[];
+  ctx: TContext;
+  input: unknown;
+}): Promise<TargetedDecision> {
+  const { denials } = members;
+
+  try {
+    const caller = members.identity.caller(ctx);
+    const authorize = members.authorization.forRequest(ctx);
+    const decision = await decide({ declaration, caller, input, authorize, denials });
+    const targets: FurtherTarget[] = [];
+
+    // Each further target is the question the first is, at the scope its own field names.
+    for (const { permission, via, field } of further) {
+      const named =
+        typeof input === "object" && input !== null ? Reflect.get(input, field) : void 0;
+      const { scope } = await decide({
+        declaration: { kind: "permission", permission, via },
+        caller,
+        input: { [via]: named },
+        authorize,
+        denials,
+      });
+      if (!scope) throw new Error(`a further target at "${field}" was admitted with no scope`);
+      targets.push({ permission, field, scope });
+    }
+
+    return { ...decision, targets };
+  } catch (failure) {
+    if (failure instanceof AuthenticationRequiredError) {
+      throw new TRPCError({ code: "UNAUTHORIZED", message: failure.message });
+    }
+
+    throw failure;
+  }
+}
+
+/**
+ * Parses an answer with its declared schema. One the schema refuses is logged
+ * and still answered, with every key the schema does not name dropped: a shape
+ * drift is not worth a 500, and the raw value is never sent.
+ */
+function validateDeclaredOutput({
+  procedure,
+  schema,
+  value,
+}: {
+  procedure: string;
+  schema: z.ZodType;
+  value: unknown;
+}): unknown {
+  const parsed = schema.safeParse(value);
+
+  if (parsed.success) return parsed.data;
+
+  outputLogger.error(
+    {
+      endpoint: procedure,
+      protocol: "trpc",
+      validation: validationMeta(parsed.error, {
+        privacy: "schema-only",
+        schemaPath: (path) => declaredPath(schema, path),
+      }),
+    },
+    "tRPC handler response did not match its declared output schema",
+  );
+
+  return withoutUndeclaredKeys(schema, value);
+}
+
+/**
+ * The handler, with its answer checked against the declaration. A stream is checked one value at
+ * a time, because a single wrong yield is what a client crashes on.
+ */
+function guardOutput({
+  procedure,
+  kind,
+  output,
+  handler,
+}: {
+  procedure: string;
+  kind: TrpcContractMember["kind"];
+  output: z.ZodType | undefined;
+  handler: (args: never, ...contexts: never[]) => unknown;
+}): (opts: ResolverOptions) => unknown {
+  const invoke = (opts: ResolverOptions, input: unknown = opts.input): unknown => {
+    const { args, contexts } = invocation(opts, input);
+
+    return (handler as (args: HandlerArguments, ...values: unknown[]) => unknown)(
+      args,
+      ...contexts,
+    );
+  };
+
+  if (!output) {
+    return async (opts: ResolverOptions) =>
+      voidOutput({ procedure, kind, value: await invoke(opts) });
+  }
+
+  if (kind === "subscription") {
+    return (opts: ResolverOptions) => ({
+      async *[Symbol.asyncIterator]() {
+        const stream = (await invoke(opts)) as AsyncIterable<unknown>;
+
+        for await (const value of stream) {
+          yield validateDeclaredOutput({ procedure, schema: output, value });
+        }
+      },
+    });
+  }
+
+  return async (opts: ResolverOptions) =>
+    validateDeclaredOutput({ procedure, schema: output, value: await invoke(opts) });
+}
+
+/**
+ * A procedure that declared no output answers nothing; a value is logged, then dropped. A
+ * subscription has no nothing to answer, so one without an output stays a 500.
+ */
+function voidOutput({
+  procedure,
+  kind,
+  value,
+}: {
+  procedure: string;
+  kind: TrpcContractMember["kind"];
+  value: unknown;
+}): unknown {
+  if (value === undefined) return value;
+
+  outputLogger.error(
+    {
+      endpoint: procedure,
+      protocol: "trpc",
+      validation: { expected: "void", received: typeof value },
+    },
+    "tRPC handler response did not match its declared output schema",
+  );
+
+  if (kind === "subscription") {
+    throw new Error(`tRPC ${procedure} streams values but declares no output schema`);
+  }
+
+  return undefined;
+}
+
+/** The handler's own arguments, and the middleware context that follows them. */
+function invocation(
+  request: ResolverOptions,
+  input: unknown = request.input,
+): {
+  args: HandlerArguments;
+  contexts: readonly unknown[];
+} {
+  const resolved = resolvedAccessOf(request.ctx);
+
+  if (!resolved) throw new Error("tRPC procedure reached its handler with no access decision");
+
+  const { contexts, ...access } = resolved;
+
+  return { args: { ...access, input, signal: request.signal }, contexts };
+}
+
+/** Reads back what the access step wrote, and nothing it did not write. */
+function resolvedAccessOf(ctx: object): ResolvedAccess | undefined {
+  if (!("handlerArguments" in ctx)) return undefined;
+
+  const resolved = ctx.handlerArguments;
+
+  return isResolvedAccess(resolved) ? resolved : undefined;
+}
+
+function isResolvedAccess(value: unknown): value is ResolvedAccess {
+  const named = typeof value === "object" && value !== null;
+
+  return named && "app" in value && "actor" in value && "scope" in value && "contexts" in value;
+}
+
+/** Puts a failed call on its span the way the log line already puts it in Loki. */
+function recordSpanError({
+  span,
+  error,
+  asError,
+}: {
+  span: Span;
+  error: unknown;
+  asError: (failure: unknown) => Error;
+}): void {
+  const failure = asError(error);
+  span.recordException(failure);
+
+  // A middleware may hand us the TRPCError wrapper or the domain error itself,
+  // depending on where in the chain the failure was caught.
+  const candidate = error instanceof TRPCError ? error.cause : error;
+  const handled = HandledError.isHandled(candidate) ? candidate : undefined;
+
+  if (handled) {
+    span.setAttributes({
+      "langwatch.error.code": handled.code,
+      "langwatch.error.fault": handled.fault,
+    });
+
+    // A 404 for a row someone deleted is the system working; marking it ERROR
+    // counts routine refusals against every SLO built on span status.
+    if (handled.fault === "customer") return;
+  }
+
+  span.setStatus({ code: SpanStatusCode.ERROR, message: failure.message });
+}
+
+function tracer<TContext extends TrpcRuntimeContext & object>(
+  members: TrpcRuntimeMembers<TContext>,
+) {
+  const asError = (failure: unknown): Error => members.errors.asError(failure);
+
+  return async ({
+    ctx,
+    path,
+    type,
+    next,
+  }: {
+    ctx: TContext;
+    path: string;
+    type: ProcedureType;
+    next: () => Promise<MiddlewareResult<object>>;
+  }): Promise<MiddlewareResult<object>> => {
+    const otel = otelTrace.getTracer("langwatch:trpc");
+    const spanName = `trpc.${path}`;
+    const parentContext = callerTraceContext({ req: ctx.req, type });
+
+    // For silenced routes we want zero spans on the happy path — they
+    // otherwise drown out the trace surface — but failures still need a span.
+    if (isSilencedCall({ path, type })) {
+      const startTime = nowInstant().epochMilliseconds;
+      const result = await next();
+
+      if (result.ok) return result;
+
+      const span = otel.startSpan(
+        spanName,
+        { kind: SpanKind.SERVER, startTime, attributes: spanAttributes({ path, type }) },
+        parentContext,
+      );
+
+      trpcFailureTraceIds.remember(result.error, span);
+      recordSpanError({ span, error: result.error, asError });
+      span.end();
+
+      return result;
+    }
+
+    return otelContext.with(parentContext, () =>
+      otel.startActiveSpan(
+        spanName,
+        { kind: SpanKind.SERVER, attributes: spanAttributes({ path, type }) },
+        async (span) => {
+          // In tRPC v11 next() never throws. Downstream errors are returned as
+          // { ok: false, error } result objects — NOT thrown.
+          const result = await next();
+
+          if (!result.ok) {
+            trpcFailureTraceIds.remember(result.error, span);
+            recordSpanError({ span, error: result.error, asError });
+          }
+
+          span.end();
+
+          return result;
+        },
+      ),
+    );
+  };
+}
+
+function spanAttributes({ path, type }: { path: string; type: string }) {
+  return { "rpc.system": "trpc", "rpc.method": path, "rpc.type": type } as const;
+}
+
+function requestLog<TContext extends TrpcRuntimeContext & object>(
+  members: TrpcRuntimeMembers<TContext>,
+  { anonymous }: { anonymous: boolean },
+) {
+  return async ({
+    ctx,
+    path,
+    type,
+    input,
+    next,
+  }: {
+    ctx: TContext;
+    path: string;
+    type: ProcedureType;
+    input: unknown;
+    next: () => Promise<MiddlewareResult<object>>;
+  }): Promise<MiddlewareResult<object>> => {
+    const scopeIds = auditScopeIds(input);
+
+    // A procedure that runs with no caller asks the process nothing about who
+    // is calling — not even to leave the field blank in the log line.
+    const requestContext: RequestContext = {
+      organizationId: scopeIds.organizationId,
+      projectId: scopeIds.projectId,
+      userId: anonymous ? undefined : members.identity.caller(ctx).actor?.id,
+    };
+
+    return runWithContext(requestContext, async () => {
+      const start = nowInstant().epochMilliseconds;
+      const result = await next();
+      const duration = nowInstant().epochMilliseconds - start;
+
+      recordTrpcCall({
+        result,
+        path,
+        type,
+        duration,
+        userAgent: ctx.req?.headers["user-agent"] ?? null,
+        statusCode: ctx.res?.statusCode ?? null,
+        log: logger,
+        capture: (failure: unknown) => members.errors.report(failure),
+      });
+
+      return result;
+    });
+  };
+}
+
+/**
+ * Converts handled errors thrown in handlers to coded TRPCErrors, else INTERNAL_SERVER_ERROR.
+ * A bare Zod failure and a busy database are promoted as the REST door promotes them, so one
+ * throw isn't a 422 or 503 through Hono and a 500 through tRPC.
+ */
+function handledErrors<TContext extends object>(members: TrpcRuntimeMembers<TContext>) {
+  return async ({
+    next,
+  }: {
+    next: () => Promise<MiddlewareResult<object>>;
+  }): Promise<MiddlewareResult<object>> => {
+    const result = await next();
+
+    if (result.ok) return result;
+
+    const cause = promoteStoreFailure(result.error.cause);
+
+    if (HandledError.isHandled(cause)) {
+      throw new TRPCError({ code: trpcCodeOf(cause), message: cause.message, cause });
+    }
+
+    if (isZodLikeError(cause)) {
+      const validation = ValidationError.fromZodError(cause);
+
+      // The code, not the message: zod's message is the whole issue array as
+      // JSON, and the wire message is the code either way (#5984).
+      throw new TRPCError({
+        code: trpcCodeOf(validation),
+        message: validation.code,
+        cause: validation,
+      });
+    }
+
+    const translated = members.errors.translate(cause);
+
+    if (translated) {
+      throw new TRPCError({ code: translated.code, message: translated.message, cause });
+    }
+
+    return result;
+  };
+}
+
+/**
+ * Every 4xx a handled error raises needs a line here — the fallback is INTERNAL_SERVER_ERROR,
+ * so a missing entry books a customer-side refusal as a server fault. 5xx are deliberately
+ * left to the fallback: they are ours either way, and the client keys its copy off `code`.
+ */
+const TRPC_CODE_BY_STATUS: Partial<Record<number, TRPCError["code"]>> = {
+  400: "BAD_REQUEST",
+  401: "UNAUTHORIZED",
+  // tRPC has no PAYMENT_REQUIRED; FORBIDDEN is what the enterprise guard
+  // already answers for the same refusal.
+  402: "FORBIDDEN",
+  403: "FORBIDDEN",
+  404: "NOT_FOUND",
+  409: "CONFLICT",
+  // tRPC has no GONE. NOT_FOUND is the closest reading of an expired link.
+  410: "NOT_FOUND",
+  412: "PRECONDITION_FAILED",
+  413: "PAYLOAD_TOO_LARGE",
+  422: "UNPROCESSABLE_CONTENT",
+  // tRPC has no 425 Too Early; PRECONDITION_FAILED is what the dataset routers
+  // already used for a still-preparing dataset.
+  425: "PRECONDITION_FAILED",
+  429: "TOO_MANY_REQUESTS",
+  503: "SERVICE_UNAVAILABLE",
+};
+
+function trpcCodeOf(error: HandledError): TRPCError["code"] {
+  return TRPC_CODE_BY_STATUS[error.httpStatus] ?? "INTERNAL_SERVER_ERROR";
+}
+
+/** A declared audit target, with the port that resolves it; a runtime with none refuses it. */
+type ResolvableAuditTarget = Readonly<{
+  declared: TrpcAuditTarget;
+  organizationOf(scope: TrpcAuditedScope): Promise<string | null>;
+}>;
+
+function auditTargetPort<TContext extends object>({
+  members,
+  request,
+}: {
+  members: TrpcRuntimeMembers<TContext>;
+  request: TrpcProcedureRequest<TContext>;
+}): ResolvableAuditTarget {
+  const declared = request.audit;
+  const organizationOf = members.audit.organizationOf;
+
+  if (!declared || !organizationOf) {
+    throw new Error(
+      `tRPC ${request.procedure} records its audit row against the organization holding its ` +
+        `${declared?.via ?? "input"}, and this runtime supplied no port to ask which one`,
+    );
+  }
+
+  return { declared, organizationOf: (scope) => organizationOf(scope) };
+}
+
+/** The organization a declared target names for this input; none when the field is empty. */
+async function declaredOrganization({
+  target,
+  input,
+}: {
+  target: ResolvableAuditTarget;
+  input: unknown;
+}): Promise<string | undefined> {
+  const { via } = target.declared;
+  const id = auditScopeId(input, via);
+
+  if (id === undefined) return undefined;
+
+  return (await target.organizationOf({ tier: AUDITED_TIER[via], id })) ?? undefined;
+}
+
+/** The resource a row is about: the declared organization, else what the answer named. */
+function rowTarget({
+  organization,
+  path,
+  result,
+}: {
+  organization: string | undefined;
+  path: string;
+  result: MiddlewareResult<object>;
+}): { targetKind?: string; targetId?: string } {
+  if (organization) return { targetKind: "organization", targetId: organization };
+
+  return result.ok ? deriveAuditTarget(path, result.data) : {};
+}
+
+/**
+ * An exempt mutation's service records its own rows, refusals included, so the generic
+ * failed-call row stands down too, unless the declaration kept it for refusals.
+ */
+async function serviceAudited({
+  next,
+  refusalsToGeneric,
+}: {
+  next: () => Promise<MiddlewareResult<object>>;
+  refusalsToGeneric: boolean;
+}): Promise<MiddlewareResult<object>> {
+  const result = await next();
+  if (!result.ok && !refusalsToGeneric) markFailureAnswered(result.error);
+  return result;
+}
+
+/** Writes the audit row for a mutation, with the arguments the owner redacted. */
+function auditTrail<TContext extends TrpcRuntimeContext & object>(
+  members: TrpcRuntimeMembers<TContext>,
+  {
+    anonymous,
+    exempt,
+    refusalsToGeneric,
+    target: declared,
+  }: {
+    anonymous: boolean;
+    exempt: boolean;
+    refusalsToGeneric: boolean;
+    target?: ResolvableAuditTarget;
+  },
+) {
+  return async ({
+    ctx,
+    next,
+    type,
+    path,
+    input,
+    getRawInput,
+  }: {
+    ctx: TContext;
+    next: () => Promise<MiddlewareResult<object>>;
+    type: ProcedureType;
+    path: string;
+    input: unknown;
+    getRawInput: GetRawInputFn;
+  }): Promise<MiddlewareResult<object>> => {
+    // There is nobody to attribute a public procedure's write to.
+    if (anonymous) return next();
+    if (exempt) return serviceAudited({ next, refusalsToGeneric });
+
+    const actor = members.identity.caller(ctx).actor;
+
+    if (type !== "mutation" || !actor || members.audit.exempt(path)) return next();
+
+    // Asked before the handler runs, so a handler that removes the scope cannot hide its owner.
+    const organization = declared
+      ? await declaredOrganization({ target: declared, input: input ?? (await getRawInput()) })
+      : undefined;
+    const result = await next();
+    const audited = input ?? (await getRawInput());
+    const target = rowTarget({ organization, path, result });
+    const scopeIds = auditScopeIds(audited);
+    const impersonatorId = impersonatorOf(actor);
+
+    await members.audit.record({
+      userId: actor.id,
+      organizationId: organization ?? scopeIds.organizationId,
+      projectId: scopeIds.projectId,
+      action: path,
+      args: members.audit.redact({ procedure: path, args: audited }),
+      error: result.ok ? undefined : result.error,
+      req: ctx.req,
+      targetKind: target.targetKind,
+      targetId: target.targetId,
+      // `userId` above is the impersonated target, which is who the
+      // authorization decision was about; the metadata names the human.
+      metadata: impersonatorId ? { impersonatorId } : undefined,
+    });
+    // This row carries the refusal, so the generic failed-call row is not written beside it.
+    if (!result.ok) markFailureAnswered(result.error);
+
+    return result;
+  };
+}
+
+function impersonatorOf(actor: Actor & { id: string }): string | undefined {
+  return actor.type === "user" ? actor.impersonatorId : undefined;
+}
+
+// The wire shape for failed tRPC calls: code replaces message, stack stripped,
+// trace id attached; application half comes through a port
+
+const MAX_CAUSE_DEPTH = 3;
+
+/**
+ * The application payload a client interceptor reads off `data.cause`, for the
+ * causes this package does not own. Answers null when the cause is not one of
+ * them — which is what the legacy formatter already put on the wire.
+ */
+export interface TrpcErrorCausePayload {
+  payloadFor(cause: unknown): unknown;
+}
+
+function donatedMessage(cause: unknown): string | undefined {
+  if (typeof cause !== "object" || cause === null) return undefined;
+
+  const message = (cause as { message?: unknown }).message;
+
+  return typeof message === "string" && message.length > 0 ? message : undefined;
+}
+
+function isInheritedFromCause(message: string, cause: unknown): boolean {
+  let current = cause;
+
+  for (let depth = 0; depth < MAX_CAUSE_DEPTH; depth++) {
+    if (current === null || current === undefined) return false;
+
+    const donated = donatedMessage(current);
+    if (donated !== undefined && message.includes(donated)) return true;
+
+    if (typeof current !== "object") return true;
+
+    current = (current as { cause?: unknown }).cause;
+  }
+
+  return current !== null && current !== undefined;
+}
+
+/** A handled error that renders its own `data.cause` body (`toResponseBody`), read by shape. */
+function ownCauseBody(handled: HandledError | null): unknown {
+  if (!handled || !("toResponseBody" in handled)) return null;
+  const render: unknown = handled.toResponseBody;
+
+  return typeof render === "function" ? render.call(handled) : null;
+}
+
+export function createTrpcErrorFormatter(
+  members: Readonly<{
+    causePayload: TrpcErrorCausePayload;
+    traceIds: TrpcFailureTraceIds;
+  }>,
+) {
+  return function errorFormatter({
+    shape,
+    error,
+  }: {
+    shape: TRPCDefaultErrorShape;
+    error: { cause?: unknown; message?: string; code?: string };
+  }) {
+    let handled: HandledError | null = null;
+    if (HandledError.isHandled(error.cause)) handled = error.cause;
+    else if (isZodLikeError(error.cause)) handled = ValidationError.fromZodError(error.cause);
+
+    const isInternalServerError =
+      error.code === "INTERNAL_SERVER_ERROR" || shape?.data?.code === "INTERNAL_SERVER_ERROR";
+
+    let message = shape.message;
+    if (handled) message = handled.code;
+    else if (isInternalServerError) message = HandledError.toUserMessage(error.cause);
+
+    const isAuthoredMessage =
+      !handled &&
+      !isInternalServerError &&
+      typeof shape.message === "string" &&
+      shape.message.length > 0 &&
+      shape.message !== error.code &&
+      !isInheritedFromCause(shape.message, error.cause);
+
+    const shapeData = { ...shape.data };
+    delete shapeData.stack;
+
+    return {
+      ...shape,
+      message,
+      data: {
+        ...shapeData,
+        cause: ownCauseBody(handled) ?? members.causePayload.payloadFor(error.cause),
+        error: handled?.serialize() ?? null,
+        authored: isAuthoredMessage,
+        traceId: members.traceIds.find(error),
+      },
+    };
+  };
+}
+
+/** The plan-first order (Q31) is a REST door's; a procedure asks its plan after access. */
+function assertNoPlanFirst({
+  address,
+  options,
+}: {
+  address: string;
+  options: EntitlementOptions;
+}): void {
+  if (options.before) throw new Error(`${address} asks its plan first, which REST alone does`);
+}

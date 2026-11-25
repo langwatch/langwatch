@@ -39,7 +39,7 @@ Feature: Authorization grants
   @unit
   Scenario: A role's aggregate is the role
     When a custom role is defined in "org_acme"
-    Then the appended event's aggregate type is "authz_role"
+    Then the appended event's aggregate type is "authz_grant"
     And the appended event's aggregate id is the role id
     And the appended event's tenant is "org_acme"
 
@@ -297,6 +297,33 @@ Feature: Authorization grants
     Then the old attach is rejected by the membership lifetime fence
     And the old legacy USER binding is gone
 
+  @unit
+  Scenario: A live USER attach carries the membership lifetime it locked
+    Given an attach naming a member of "org_acme"
+    When the attach is stated
+    Then the fact carries the lifetime read under that membership's row lock
+    And an attach naming a user with no live membership is refused
+
+  @unit
+  Scenario: A grant for a user with no live membership is refused as outside the organisation
+    Given a user who holds no live membership of "org_acme"
+    When an admin grants that user a role in "org_acme"
+    Then it is refused with grant_principal_not_found, a 422, never a server error
+    And no grant is stated
+
+  @unit
+  Scenario: The insert is fenced on the lifetime the fact was stamped against
+    Given a stamped USER fact arriving at the projection
+    When the row is written
+    Then the insert names the membership lifetime and takes its row lock
+
+  @unit
+  Scenario: Only a founder's own admin grants may state their own lifetime
+    Given a grant carrying the founder bootstrap marker
+    When the wire reads it
+    Then it is accepted only as a stamped USER admin organization or team grant
+    And an organization bootstrap naming another organization is refused
+
   @unit @unimplemented
   Scenario: Offboarding records one revocation per grant
     When a member holding 12 grants is offboarded
@@ -373,6 +400,24 @@ Feature: Authorization grants
     Given a canonical Role row with the requested name and permissions
     When the role definition is written
     Then the write is reported as done
+
+  @unit
+  Scenario: A role definition that clears the description waits for the cleared Role row
+    Given a canonical Role row with the requested name and permissions but the old description
+    When the role definition is written without a description
+    Then the write is not confirmed
+
+  @unit
+  Scenario: Deleting a role binding twice answers not found the second time
+    Given a role binding whose grant was revoked but whose compatibility row has not been removed yet
+    When the binding is looked up for deletion
+    Then it reads as missing
+
+  @unit
+  Scenario: A restricted API key's private role permissions are read by id within its organization
+    Given a live role of the system API key kind in the organization
+    When its permissions are read by id
+    Then the role is returned with its permissions, whatever its kind
 
   @unit
   Scenario: A changed binding role is confirmed by the canonical Grant projection
@@ -607,6 +652,56 @@ Feature: Authorization grants
     When the fact is stamped
     Then the actor names the code path that decided to act
     And the platform is never an anonymous actor
+
+  # ═══ Braid grants, read before they are written ═══════════════════════
+  # ADR-201 (Braids) writes a braid as a shared project-reader grant on a
+  # span condition, with its compiled where and the braid a change replaces.
+  # The release before it reads those facts, so a worker still on it during a
+  # rolling upgrade folds a braid's attach rather than refusing and retrying
+  # it. Braids are honoured from the release that ships their fence
+  # (modules/authz/specs/braids.feature).
+
+  @unit
+  Scenario: A braid's attach is read before braids are written
+    Given a braid's attach with a span condition, its compiled where and the braid it replaces
+    When it arrives as an event or as a command
+    Then it is accepted with every one of those fields kept
+    And an empty id for the braid it replaces is refused
+
+  @unit
+  Scenario: A braid's where is refused without its compiled form
+    Given a braid's span condition carrying a where
+    When it arrives without the where's compiled form
+    Then it is refused
+    And a compiled form with no where beside it is refused too
+
+  @unit
+  Scenario: Only a braid writes a span condition
+    Given a shared read from any source other than a braid
+    When it carries a span condition, or a compiled where
+    Then it is refused
+    And the same read on a trace condition is still accepted
+
+  @unit
+  Scenario: The fold writes a braid's row as the release that writes braids does
+    Given a braid's attach made by a person, replacing an earlier braid
+    When the fold writes its row
+    Then the row names that person as its creator and the braid it replaces
+    And it keeps the compiled condition
+    And a braid no person made, or a shared read no braid made, names no creator
+
+  @integration
+  Scenario: A braid's row keeps the braid it replaces through a later write
+    Given a braid's row is written naming the braid it replaces
+    When it is read back
+    Then it names that braid
+    And a later write of the same row naming another braid replaces it
+
+  @integration
+  Scenario: The aggregate reconciler never revokes or reattaches a braid
+    Given a reader project holding an aggregate's shared read and a braid
+    When its shared reads are listed for the aggregate reconciler
+    Then only the aggregate's shared read is listed
 
   # ═══ Provenance ═══════════════════════════════════════════════════════
   # Two facts, not one. The SOURCE is which surface authored the grant, which

@@ -6,69 +6,34 @@ Feature: Dashboard widgets placed on a dashboard
   precedent this mirrors). Placement was previously refused everywhere: the
   card-level procedures never admitted the kind, so a widget with a
   `dashboardId` still never appeared on the grid. This feature opens that
-  gate behind `release_custom_chart_playground`, the same flag that gates the
-  widget REST/CLI surface, gives the grid a renderer for the kind, and lets a
-  member edit the widget in place from the card's menu.
+  gate, gives the grid a renderer for the kind, and lets a member edit the
+  widget in place from the card's menu.
 
-  Unlike the mutual exclusion between `chart`/`graph` WRITES and
-  `dashboard-widget` WRITES (release_custom_chart_playground turns the
-  former off), placement is not mutually exclusive: a project can carry
-  `workbench_sql` rows placed before the playground shipped and
-  `dashboard_srcdoc` rows side by side, and both must keep rendering
-  regardless of which flags are on, because deleting neither is this
-  feature's job.
+  Dashboard widgets open with exactly two flags, everywhere: `release_dashboards`
+  and `release_lwql_workbench`. That covers boards and the REST/CLI surface.
+  Since the boards split (owner, 2026-10-15) a widget lives on a Dashboards board
+  alone: the legacy Analytics reports page neither shows nor adds one.
+
+  Placement is not mutually exclusive: a project can carry `workbench_sql`
+  rows placed before widgets shipped and `dashboard_srcdoc` rows side by
+  side, and both must keep rendering regardless of which flags are on,
+  because deleting neither is this feature's job.
 
   Background:
     Given a dashboard grid
 
   @unit
-  Scenario: The dashboard's card procedures admit dashboard-widget rows only when the flag is on
-    Given a dashboard holding a dashboard widget
+  Scenario: The dashboard's card procedures admit workbench rows only when the workbench flag is on
+    Given a dashboard holding a saved workbench chart
     When the card procedures run with the flag on and again with it off
-    Then with the flag on the `kind` clause includes dashboard_srcdoc
-    And with the flag off the `kind` clause is exactly the same as before the feature existed
-
-  @unit
-  Scenario: Workbench and dashboard-widget rows are both admitted when both flags are on
-    Given a dashboard holding a saved workbench chart and a dashboard widget
-    When the card procedures run with both flags on
-    Then the `kind` clause admits builder, workbench_sql and dashboard_srcdoc together
-
-  @unit
-  Scenario: The dashboard-widget flag does not change workbench visibility, or the reverse
-    Given a dashboard holding a saved workbench chart placed before the playground shipped
-    When the dashboard-widget flag is on and the workbench flag is off
-    Then the `kind` clause admits dashboard_srcdoc but not workbench_sql, because each kind is gated on its own flag alone
-
-  @integration
-  Scenario: A dashboard widget card draws the sandboxed widget, not the builder
-    Given a dashboard grid holding a dashboard widget
-    When the card is rendered
-    Then the sandboxed dashboard widget frame draws it, with the row's own code and queries, and the builder renderer is not mounted
-
-  @integration
-  Scenario: A dashboard widget card is not offered an alert it cannot evaluate
-    Given a dashboard grid holding a dashboard widget
-    When the card is rendered
-    Then no add-alert control is offered, because sandboxed author code has no series to threshold
-
-  @integration
-  Scenario: Edit opens the widget editor in place
-    Given a dashboard grid holding a dashboard widget
-    When the card's menu is opened and Edit is chosen
-    Then the item is labelled "Edit" and the widget's edit drawer opens over the grid, without navigating to the builder or any other page
+    Then with the flag on the `kind` clause admits builder and workbench_sql
+    And with the flag off the `kind` clause admits builder alone
 
   @integration
   Scenario: A placed dashboard widget follows the dashboard's period control
     Given a dashboard grid holding a dashboard widget
     When the dashboard's period selector changes
     Then the widget's queries re-run against the new period, the same one control every other card on the grid reads
-
-  @integration
-  Scenario: A new widget previews against the dashboard's period
-    Given a dashboard whose period selector shows the last 30 days
-    When a member opens "Add chart" to draft a widget
-    Then the draft's preview is asked for that same period, not a fixed last 24 hours
 
   # Persistence invariants for the write path (dashboardWidget.service):
   # placement scoped to the target, dashboard ownership enforced, and partial
@@ -91,3 +56,34 @@ Feature: Dashboard widgets placed on a dashboard
     Given a saved widget with both author code and named queries
     When only the code is updated, or only the queries
     Then the side that was not sent is kept, not blanked, and the update is not silently dropped
+
+  @unit
+  Scenario: The create drawer places a new widget on the dashboard it names through dashboardWidgets.create
+    Given a dashboard in a project with dashboard widgets open
+    When a widget is created through dashboardWidgets.create naming that dashboard
+    Then the widget is placed on that dashboard and answered in main's widget shape
+
+  @unit
+  Scenario: Every dashboard widget procedure is refused while dashboard widgets are closed
+    Given a project with dashboard widgets closed
+    When any dashboardWidgets procedure is called
+    Then it is refused with the widget surface's own error code
+
+  @unit
+  Scenario: Dashboard widgets open with the Dashboards and LangWatchQL flags alone
+    Given a project with `release_dashboards` and `release_lwql_workbench` on
+    When the widget surface asks whether the project may use it
+    Then the project is admitted
+
+  @unit
+  Scenario: Dashboard widgets stay closed while the Dashboards or the LangWatchQL flag is off
+    Given a project with `release_dashboards` or `release_lwql_workbench` off
+    When the widget surface asks whether the project may use it
+    Then it is refused with the widget surface's own error code
+
+  @integration
+  Scenario: The legacy reports page neither shows nor adds dashboard widgets
+    Given the legacy Analytics reports page, with `release_dashboards` and `release_lwql_workbench` on
+    When a board is opened there
+    Then only the charts made in Reports are drawn on its grid
+    And "Add chart" links to the chart builder

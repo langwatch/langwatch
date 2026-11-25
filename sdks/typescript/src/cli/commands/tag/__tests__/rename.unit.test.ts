@@ -6,11 +6,16 @@ vi.mock("@/client-sdk/services/prompts", () => ({
 }));
 
 vi.mock("../../../utils/apiKey", () => ({
-  resolveCredentials: vi.fn(async () => ({ apiKey: "test-key", source: "env", endpoint: "https://app.langwatch.ai" })),
+  resolveCredentials: vi.fn(async () => ({
+    apiKey: "test-key",
+    source: "env",
+    endpoint: "https://app.langwatch.ai",
+  })),
 }));
 
-import { tagRenameCommand } from "../rename";
 import { PromptsApiService } from "@/client-sdk/services/prompts";
+
+import { tagRenameCommand } from "../rename";
 
 class ProcessExitError extends Error {
   constructor(public code: number) {
@@ -24,8 +29,9 @@ describe("tagRenameCommand", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockRenameTag = vi.fn();
-    vi.mocked(PromptsApiService).mockImplementation(
-      function () { return ({ renameTag: mockRenameTag }) as unknown as InstanceType<typeof PromptsApiService>; });
+    vi.mocked(PromptsApiService).mockImplementation(function () {
+      return { renameTag: mockRenameTag } as unknown as InstanceType<typeof PromptsApiService>;
+    });
     vi.spyOn(process, "exit").mockImplementation((code) => {
       throw new ProcessExitError(code as number);
     });
@@ -48,7 +54,9 @@ describe("tagRenameCommand", () => {
       const result = await tagRenameCommand("canary", "beta");
       result?.table();
 
-      expect(console.log).toHaveBeenCalledWith(expect.stringContaining("Renamed tag: canary -> beta"));
+      expect(console.log).toHaveBeenCalledWith(
+        expect.stringContaining("Renamed tag: canary -> beta"),
+      );
     });
   });
 

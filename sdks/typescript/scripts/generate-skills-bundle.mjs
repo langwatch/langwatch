@@ -1,50 +1,39 @@
 #!/usr/bin/env node
 /**
- * Embed the published LangWatch agent skills into the CLI as a generated TS
- * module — `langwatch skills list/get/install/…` reads no files at runtime,
- * so the bundle survives both the tsup build and the bun single-binary build.
- *
- * The bodies come from the COMMITTED `skills/_compiled/native/<slug>/SKILL.md`
- * files — not from re-inlining the MDX sources here. Those files are rendered
- * by `skills/_compiler/native.ts` with the very same `inlineMdx` the public
- * publisher (`skills/_publish/sync.ts`) uses, and `skills/_tests/
- * native-skills.test.ts` pins them to the sources. Reading them means this
- * script needs zero workspace dependencies (copy-types.sh runs on every SDK
- * `pnpm install`/`pnpm build`, where the skills workspace may not be
- * installed) AND the bundle can never drift from what Langy ships or what
- * `npx skills add langwatch/skills` installs: one rendered artifact, three
- * consumers. The native set flattens recipes to top-level dirs; the bundle
- * re-nests them via `isRecipe` from the published-set listing.
- *
- * The published set + frontmatter metadata (name/description/user-prompt)
- * still come from the canonical sources, exactly as the publisher reads
- * them. NATIVE_ONLY skills (github) are excluded — they ship with Langy only.
- *
- * Usage: node scripts/generate-skills-bundle.mjs   (from copy-types.sh)
+ * Embeds the published LangWatch agent skills into the CLI as a generated TS
+ * module -- `langwatch skills list/get/install/...` reads no files at
+ * runtime, so the bundle survives both the tsup and bun single-binary builds.
+ */
+
+/**
+ * Bodies: committed skills/_compiled/<mode>/<slug>/SKILL.md, mode = LANGWATCH_SKILLS_RENDER
+ * (default `cli`, pinned by `native-skills.test.ts`). `native` drops the login steps.
+ * Only langyagent (Dockerfile.langyagent) and haven's host-tier Langy (plan_langy.go) set it.
+ */
+
+/**
+ * The published set + frontmatter metadata come from the canonical sources.
+ * NATIVE_ONLY skills (github) are excluded -- they ship with Langy only.
+ * Usage: node scripts/generate-skills-bundle.mjs (from copy-types.sh)
  */
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { renderModeDir } from "./skills-render-mode.mjs";
+
 const sdkRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const skillsRoot = path.resolve(sdkRoot, "..", "..", "skills");
-const nativeRoot = path.join(skillsRoot, "_compiled", "native");
-const outPath = path.join(
-  sdkRoot,
-  "src/internal/generated/cli/skills.generated.ts",
-);
+const renderMode = renderModeDir(process.env.LANGWATCH_SKILLS_RENDER);
+const compiledRoot = path.join(skillsRoot, "_compiled", renderMode);
+const outPath = path.join(sdkRoot, "src/internal/generated/cli/skills.generated.ts");
 
-// --- The published set -------------------------------------------------------
-// Read FEATURE_SKILLS from skills/_lib/feature-skills.ts rather than
-// duplicating the list: it is the single source of truth for what is public.
-// The file is TypeScript but the declaration is a plain string array, which a
-// regex reads fine — a failure here means the file changed shape, and that
-// SHOULD break the build rather than silently ship a stale skill set.
+// --- The published set ---
+// Reads FEATURE_SKILLS from skills/_lib/feature-skills.ts via regex rather
+// than duplicating the list (it's the single source of truth); a shape
+// change here should break the build, not silently ship a stale skill set.
 function listFeatureSkills() {
-  const src = fs.readFileSync(
-    path.join(skillsRoot, "_lib/feature-skills.ts"),
-    "utf8",
-  );
+  const src = fs.readFileSync(path.join(skillsRoot, "_lib/feature-skills.ts"), "utf8");
   const match = src.match(/export const FEATURE_SKILLS = \[([\s\S]*?)\] as const;/);
   if (!match) {
     throw new Error(
@@ -66,7 +55,7 @@ function listPublishedSkills() {
       .readdirSync(recipesDir, { withFileTypes: true })
       .filter((e) => e.isDirectory())
       .map((e) => e.name)
-      .sort(); // deterministic output across machines
+      .toSorted(); // deterministic output across machines
     for (const name of names) {
       const src = path.join(recipesDir, name, "SKILL.mdx");
       if (fs.existsSync(src)) out.push({ slug: name, src, isRecipe: true });
@@ -78,6 +67,10 @@ function listPublishedSkills() {
 // --- Frontmatter -------------------------------------------------------------
 // Same minimal reader as skills/_lib/frontmatter.ts: top-level single-line
 // `key: value` pairs between the `---` fences.
+/**
+ * @param {string} raw full SKILL.mdx source
+ * @returns {{ frontmatter: Record<string, string>, body: string }}
+ */
 function splitFrontmatter(raw) {
   const m = raw.match(/^---\n([\s\S]*?)\n---\n([\s\S]*)$/);
   if (!m) return { frontmatter: {}, body: raw };
@@ -86,12 +79,10 @@ function splitFrontmatter(raw) {
     const kv = line.match(/^(\w[\w-]*?):\s*(.+)$/);
     if (!kv) continue;
     const value = kv[2].trim();
-    // A YAML block/folded scalar (`description: >-`, `: |`, `: >2`) puts the
-    // real value on the following INDENTED lines, which this single-line
-    // reader never sees — it would capture the literal ">-" instead. The
-    // `if (!description) throw` guard downstream cannot catch that, because
-    // ">-" is perfectly truthy: the bundle would ship, with every agent
-    // reading ">-" as the skill's description. Fail here, loudly, instead.
+    // A YAML block/folded scalar (`description: >-`, `: |`) puts the real
+    // value on following INDENTED lines this single-line reader never sees,
+    // capturing the literal ">-" instead -- truthy enough to ship silently.
+    // Fail here, loudly, instead.
     if (/^[>|][-+0-9]*$/.test(value)) {
       throw new Error(
         `Frontmatter key "${kv[1]}" uses a YAML block scalar ("${value}"), which this minimal reader cannot parse.\n` +
@@ -104,22 +95,21 @@ function splitFrontmatter(raw) {
 }
 
 // --- Bundle ------------------------------------------------------------------
-const version = fs
-  .readFileSync(path.join(skillsRoot, "version.txt"), "utf8")
-  .trim();
+const version = fs.readFileSync(path.join(skillsRoot, "version.txt"), "utf8").trim();
 
 const skills = listPublishedSkills()
   .map(({ slug, src, isRecipe }) => {
     if (!fs.existsSync(src)) {
       throw new Error(`Published skill ${slug} has no SKILL.mdx at ${src}`);
     }
-    // The body is the committed native render (recipes are flattened there).
+    // The body is the committed render `renderMode` names, cli or native
+    // (recipes are flattened there).
     // Missing means the sources changed without regenerating — say so loudly,
     // with the fix, rather than shipping a stale or half-empty bundle.
-    const nativePath = path.join(nativeRoot, slug, "SKILL.md");
-    if (!fs.existsSync(nativePath)) {
+    const compiledPath = path.join(compiledRoot, slug, "SKILL.md");
+    if (!fs.existsSync(compiledPath)) {
       throw new Error(
-        `No compiled native skill for ${slug} at ${path.relative(process.cwd(), nativePath)}.\n` +
+        `No compiled ${renderMode} skill for ${slug} at ${path.relative(process.cwd(), compiledPath)}.\n` +
           `Regenerate from the repo root: bash skills/_compiled/generate.sh`,
       );
     }
@@ -135,7 +125,7 @@ const skills = listPublishedSkills()
       description,
       ...(userPrompt ? { userPrompt } : {}),
       isRecipe,
-      body: fs.readFileSync(nativePath, "utf8"),
+      body: fs.readFileSync(compiledPath, "utf8"),
       featureFlag: frontmatter["feature-flag"],
     };
   })
@@ -146,9 +136,7 @@ const skills = listPublishedSkills()
   // skills/_publish/sync.ts's filter, applied to the CLI's own public output.
   .filter((skill) => {
     if (skill.featureFlag) {
-      console.log(
-        `  ⊘ ${skill.slug} (gated by ${skill.featureFlag}, excluded from CLI bundle)`,
-      );
+      console.log(`  ⊘ ${skill.slug} (gated by ${skill.featureFlag}, excluded from CLI bundle)`);
     }
     return !skill.featureFlag;
   })
@@ -156,7 +144,7 @@ const skills = listPublishedSkills()
 
 const header = [
   "// Generated by copy-types.sh (scripts/generate-skills-bundle.mjs) from",
-  "// skills/_compiled/native/ (committed, rendered by skills/_compiler/native.ts).",
+  `// skills/_compiled/${renderMode}/ (committed, rendered by skills/_compiler/native.ts --target ${renderMode}).`,
   "// Do not edit by hand — re-runs on every SDK install/build.",
   "",
   "/** One published skill, fully inlined (MDX partials resolved) and ready to write as SKILL.md. */",

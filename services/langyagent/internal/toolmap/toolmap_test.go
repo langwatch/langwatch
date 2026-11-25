@@ -218,6 +218,8 @@ func TestToolTitle(t *testing.T) {
 		{"question", "Question"},
 		{"say", "Say"},
 		{"secret_snippet", "Secret snippet"},
+		{"notify", "Notify"},
+		{"offer_notifications", "Offer notifications"},
 		{"local_read", "Read on your machine"},
 		{"local_write", "Write on your machine"},
 		{"local_edit", "Edit on your machine"},

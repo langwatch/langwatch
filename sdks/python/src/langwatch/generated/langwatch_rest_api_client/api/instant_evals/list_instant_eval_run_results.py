@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, cast
 from urllib.parse import quote
 
 import httpx
@@ -56,11 +56,15 @@ def _get_kwargs(
 
 def _parse_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> ListInstantEvalRunResultsResponse200 | None:
+) -> Any | ListInstantEvalRunResultsResponse200 | None:
     if response.status_code == 200:
         response_200 = ListInstantEvalRunResultsResponse200.from_dict(response.json())
 
         return response_200
+
+    if response.status_code == 404:
+        response_404 = cast(Any, None)
+        return response_404
 
     if client.raise_on_unexpected_status:
         raise errors.UnexpectedStatus(response.status_code, response.content)
@@ -70,7 +74,7 @@ def _parse_response(
 
 def _build_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> Response[ListInstantEvalRunResultsResponse200]:
+) -> Response[Any | ListInstantEvalRunResultsResponse200]:
     # LangWatch override: use safe_http_status to tolerate non-IANA status codes
     # (Cloudflare 520-527, AWS WAF 561, etc). Upstream still crashes here.
     # Tracked upstream: https://github.com/openapi-generators/openapi-python-client/pull/1407
@@ -91,7 +95,7 @@ def sync_detailed(
     status: ListInstantEvalRunResultsStatus | Unset = UNSET,
     limit: int | Unset = 100,
     cursor: str | Unset = UNSET,
-) -> Response[ListInstantEvalRunResultsResponse200]:
+) -> Response[Any | ListInstantEvalRunResultsResponse200]:
     """Read a run's results
 
      Read the run's judgements, one page at a time. Pass the cursor a page answers with to read the page
@@ -111,7 +115,7 @@ def sync_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[ListInstantEvalRunResultsResponse200]
+        Response[Any | ListInstantEvalRunResultsResponse200]
     """
 
     kwargs = _get_kwargs(
@@ -139,7 +143,7 @@ def sync(
     status: ListInstantEvalRunResultsStatus | Unset = UNSET,
     limit: int | Unset = 100,
     cursor: str | Unset = UNSET,
-) -> ListInstantEvalRunResultsResponse200 | None:
+) -> Any | ListInstantEvalRunResultsResponse200 | None:
     """Read a run's results
 
      Read the run's judgements, one page at a time. Pass the cursor a page answers with to read the page
@@ -159,7 +163,7 @@ def sync(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        ListInstantEvalRunResultsResponse200
+        Any | ListInstantEvalRunResultsResponse200
     """
 
     return sync_detailed(
@@ -182,7 +186,7 @@ async def asyncio_detailed(
     status: ListInstantEvalRunResultsStatus | Unset = UNSET,
     limit: int | Unset = 100,
     cursor: str | Unset = UNSET,
-) -> Response[ListInstantEvalRunResultsResponse200]:
+) -> Response[Any | ListInstantEvalRunResultsResponse200]:
     """Read a run's results
 
      Read the run's judgements, one page at a time. Pass the cursor a page answers with to read the page
@@ -202,7 +206,7 @@ async def asyncio_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[ListInstantEvalRunResultsResponse200]
+        Response[Any | ListInstantEvalRunResultsResponse200]
     """
 
     kwargs = _get_kwargs(
@@ -228,7 +232,7 @@ async def asyncio(
     status: ListInstantEvalRunResultsStatus | Unset = UNSET,
     limit: int | Unset = 100,
     cursor: str | Unset = UNSET,
-) -> ListInstantEvalRunResultsResponse200 | None:
+) -> Any | ListInstantEvalRunResultsResponse200 | None:
     """Read a run's results
 
      Read the run's judgements, one page at a time. Pass the cursor a page answers with to read the page
@@ -248,7 +252,7 @@ async def asyncio(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        ListInstantEvalRunResultsResponse200
+        Any | ListInstantEvalRunResultsResponse200
     """
 
     return (

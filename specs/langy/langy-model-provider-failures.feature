@@ -61,6 +61,7 @@ Feature: A turn that the model provider refused says so
       Given a turn the provider refused with a 401 or 403 and its own code for it
       When the customer reads the card
       Then it is the provider card saying the provider refused this key or its access to the model
+      And its headline says the provider rejected the API key
       And it offers to open the model settings
       And it does not offer to try again
 
@@ -70,6 +71,15 @@ Feature: A turn that the model provider refused says so
       When the customer reads the card
       Then it is the provider card saying the provider does not serve that model
       And it offers to open the model settings
+
+    # The gateway writes its generic "provider_error" envelope when it has no
+    # parsed provider body, which names no cause; the status still does.
+    @unit
+    Scenario: A missing model behind the gateway's generic provider error still reads as a missing model
+      Given the provider answers 404 and the gateway forwards its generic "provider_error" envelope
+      When the proxy records the failure
+      Then it carries "provider_error" and "upstream_not_found" as reasons
+      And the customer reads the card saying the provider does not serve that model, with the model settings offered
 
     @unit
     Scenario: Any failure filed under the proxy's upstream code reads as the provider's
@@ -90,6 +100,61 @@ Feature: A turn that the model provider refused says so
       Then it is the provider card saying the provider refused the request as invalid
       And it offers to open the model settings
       And it does not offer to try again
+
+    # Anthropic refuses a request shape a model does not take (Claude 5.5 and
+    # the legacy thinking shape) with a 400 invalid_request_error. The same
+    # request fails the same way every time, and people retried 3 to 5 times.
+    @unit
+    Scenario: A request the provider refuses with a plain 400 offers no retry
+      Given a turn that failed with the proxy's upstream code carrying "invalid_request_error" or a bare 400 status reason
+      When the customer reads the card
+      Then it offers to open the model settings
+      And it does not offer to try again
+
+    # Anthropic files a spent balance under the same 400 invalid_request_error,
+    # with only its sentence telling the two apart. The proxy reads that sentence
+    # where it stands and files a reason of its own, so the sentence never travels.
+    @unit
+    Scenario: A spent balance or a refused key a provider names only in prose rides as a typed reason
+      Given the provider answers with a spent balance, a quota error, or a 400 naming an invalid key
+      When the proxy records the failure
+      Then it carries "llm_provider_out_of_credit" or "llm_provider_key_rejected" as a reason
+      And a 400 that names neither carries no such reason
+      And the provider's sentence is not recorded
+
+    # The AI gateway replaces a spent balance's message with its own
+    # exhausted-access message, so the proxy's sentence check never matched
+    # and the card fell back to the invalid-request copy.
+    @unit
+    Scenario: A spent balance behind the AI gateway still rides as out of credit
+      Given the provider answers a streaming call with its 400 credit balance error
+      And the AI gateway forwards it with its own exhausted-access message
+      When the proxy records the failure
+      Then it carries "llm_provider_out_of_credit" as a reason
+      And the agent's SDK gets a 400 it does not retry
+
+    @unit
+    Scenario: A spent provider balance reads as the account to top up, with no retry
+      Given a turn that failed with the proxy's "llm_provider_out_of_credit" reason
+      When the customer reads the card
+      Then its headline says the provider account is out of credit
+      And it says to check the provider's billing, or pick a model from a different provider
+      And it offers to open the model settings
+      And it does not offer to try again
+
+    @unit
+    Scenario: A plan or quota limit that resets reads as no allowance left
+      Given a turn that failed with a provider's quota, usage limit or plan limit code
+      When the customer reads the card
+      Then its headline says the provider account has no allowance left
+      And it does not say the account is out of credit
+
+    @unit
+    Scenario: A key the provider refuses on a 400 reads as a credential to check
+      Given a turn that failed with the proxy's "llm_provider_key_rejected" reason
+      When the customer reads the card
+      Then its headline says the provider rejected the API key
+      And it offers to open the model settings
 
     # A failure the gateway names in its own envelope rather than forwarding
     # the provider's body: "provider_error" when the provider answered with
@@ -133,6 +198,36 @@ Feature: A turn that the model provider refused says so
       Given a turn that failed because the provider for the chosen model is off
       When the customer reads the card
       Then it says the model has no provider connected in this project
+
+  Rule: A turn an AI gateway spending limit refused says whose limit it is
+
+    When an AI gateway budget blocks the call, the gateway answers 402 with
+    the code "budget_exceeded" and names the budget's scope and window. The
+    turn reaches the panel as a failed agent turn with that reason beneath it.
+    The block holds until the window resets or an admin raises the limit, so
+    another try fails the same way.
+
+    @unit
+    Scenario: A spending limit reads as the limit, not as a failed reply
+      Given a turn that failed because the team's monthly AI gateway budget is spent
+      When the customer reads the card
+      Then the title says the team's monthly AI spending limit is reached
+      And it says when the limit resets and that an admin can raise it
+      And it offers to open the AI gateway budgets
+      And it does not offer to try again
+
+    @unit
+    Scenario: A spending limit with no named scope still reads as a spending limit
+      Given a turn that failed on an AI gateway budget that named no scope or window
+      When the customer reads the card
+      Then the title says the AI spending limit is reached
+      And it does not offer to try again
+
+    @unit
+    Scenario: A spending limit on the live stream reads the same as after a refresh
+      Given a turn whose live stream error carries the gateway's budget reason
+      When the customer reads the card before refreshing
+      Then the card is the spending limit card
 
   Rule: A provider that is not set up says which setting is missing
 

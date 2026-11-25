@@ -234,7 +234,7 @@ Feature: The platform operator identity lookup - the end of database surgery
     Then a fresh invitation goes out and the previous one stops working
     And the resend is recorded with "olive" on it
 
-  @unit
+  @integration
   Scenario: Extending an invitation moves its expiry and says by how much
     Given an invitation expires tomorrow
     When "olive" extends it
@@ -304,3 +304,25 @@ Feature: The platform operator identity lookup - the end of database surgery
     When a repair is refused for a reason we can name
     Then the answer carries a stable code and the words registered for it
     And an operator reading it knows what to try next
+
+  @integration
+  Scenario: A person drawer remains informative while its read is pending or failed
+    When an operator opens a person whose details are loading
+    Then the drawer shows loading feedback
+    And loaded details replace the loading feedback
+    And a failed read shows an error alert with an action to retry
+
+  @integration
+  Scenario: Recent operator activity uses plain words and groups repeated reads
+    When an operator reads recent activity
+    Then operation names read as plain words with relative time
+    And repeated reads by the same operator for the same address within a minute show a count
+    And duplicate audit records appear once
+    And distinct repair records remain separate
+
+  @integration
+  Scenario: Removed sign-in methods remain visible without repair actions
+    Given a person's sign-in method has been removed
+    When an operator opens that person's details
+    Then the method has a Removed badge and its removal time
+    And no repair actions are offered for that method

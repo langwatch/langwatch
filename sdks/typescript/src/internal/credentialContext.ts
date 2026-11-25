@@ -1,29 +1,7 @@
 /**
- * Request-scoped resolved credentials.
- *
- * The CLI daemon is one long-lived process that admits multiple requests
- * concurrently when they share a `(cwd, env, colorLevel)` execution window
- * (see cli/daemon/execution.ts). Device-mode requests do exactly that: the
- * caller environment carries NO API key, so the window fingerprint is
- * identical across two different logged-in users and they run at the same
- * time. Writing the resolved per-user key into the single shared
- * `process.env.LANGWATCH_API_KEY` would let one in-flight request build a
- * service with another request's key the instant a concurrent resolution (or
- * a login/logout) overwrote the global: the cross-identity leak the daemon
- * design says must be structurally impossible.
- *
- * The fix keeps the resolved key out of the global entirely. Each request runs
- * inside a credential HOLDER scope established at the request boundary
- * (`runWithCredentialHolder`, wrapped around the in-process command dispatch
- * and around every daemon request in cli/daemon/execution.ts). The resolver,
- * running later inside that scope, mutates the holder; the API-client factory
- * reads it. Because the holder object identity is fixed per request by
- * `AsyncLocalStorage.run` at the top, and `run` (unlike `enterWith`)
- * propagates the store to every continuation of the wrapped callback, a
- * mutation made mid-command is visible to the service constructed afterward,
- * while a concurrent request in its own holder never observes it. Outside any
- * scope (a plain SDK embed, or a direct unit call) a process-local fallback
- * holder is used, which is safe because those paths are single-request.
+ * Request-scoped resolved credentials: the CLI daemon serves concurrent
+ * requests from one process, so a resolved key in `process.env` would leak
+ * across requests -- this holder makes that structurally impossible.
  */
 
 import { AsyncLocalStorage } from "node:async_hooks";
@@ -32,7 +10,14 @@ interface CredentialHolder {
   apiKey?: string;
   projectId?: string;
   requestedProject?: string;
+  runsOutsideProject?: boolean;
   warnedProjectEnvIgnored?: boolean;
+  /**
+   * Set to "cli" at the CLI's request boundaries (runWithCliCredentialHolder,
+   * below). A plain SDK embed never sets this, so its holder — scoped or
+   * fallback — always reads undefined here.
+   */
+  surface?: "cli";
 }
 
 const storage = new AsyncLocalStorage<CredentialHolder>();
@@ -40,8 +25,7 @@ const storage = new AsyncLocalStorage<CredentialHolder>();
 /**
  * Process-local fallback for callers not wrapped in a holder scope: a plain
  * SDK embed, or a cold-CLI path that skipped the wrapper. Never used inside
- * the daemon, where every request runs inside its own `run`-established
- * holder, so it can never carry one request's key into another.
+ * the daemon, where every request runs in its own holder.
  */
 const fallbackHolder: CredentialHolder = {};
 
@@ -56,6 +40,18 @@ function currentHolder(): CredentialHolder {
  */
 export function runWithCredentialHolder<T>(fn: () => T): T {
   return storage.run({}, fn);
+}
+
+/**
+ * `runWithCredentialHolder` that marks the holder as a CLI request, so the shared
+ * request-header builders attach `x-langwatch-surface: cli` (cli/daemon/dispatch.ts,
+ * cli/daemon/execution.ts). Spec: specs/observability/traffic-attribution.feature
+ */
+export function runWithCliCredentialHolder<T>({ fn }: { fn: () => T }): T {
+  return runWithCredentialHolder(() => {
+    setScopedSurface({ surface: "cli" });
+    return fn();
+  });
 }
 
 /**
@@ -76,13 +72,9 @@ export function scopedApiKey(): string | undefined {
 }
 
 /**
- * Publish the project the current request targets. A user-scoped API key
- * (`sk-lw-{lookupId}_{secret}`) carries no project identity of its own, so the
- * server resolves the role binding from the project the request names: the
- * resolver decides which project that is (the personal one by default,
- * `--project <id|slug>` otherwise) and every client built afterwards reads it
- * from here. Same request scoping as the key, for the same reason — two
- * concurrent daemon requests can target different projects.
+ * Publishes the project the current request targets. A user-scoped API key
+ * carries no project identity, so the resolver decides which project the
+ * request names, and every client built afterwards reads it from here.
  */
 export function setResolvedProjectId(projectId: string | undefined): void {
   currentHolder().projectId = projectId;
@@ -98,13 +90,8 @@ export function scopedProjectId(): string | undefined {
 }
 
 /**
- * Publish the project the command line pointed this request at, BEFORE any
- * credential resolves: the id or slug as the user typed it, not a resolved id.
- *
- * Set from the `preAction` hook rather than passed down through the commands,
- * so a command inherits `--project` without its action having to accept the
- * value and hand it on (cli/utils/projectOption.ts). The resolver reads it
- * with `requestedProject()` and turns it into the project the request names.
+ * Publish the project the command line named (as typed) before any credential resolves. Set from
+ * `preAction` so commands inherit `--project`; the resolver reads it with `requestedProject()`.
  */
 export function setRequestedProject(selector: string | undefined): void {
   currentHolder().requestedProject = selector;
@@ -120,19 +107,45 @@ export function requestedProject(): string | undefined {
 }
 
 /**
- * Take the right to warn that `LANGWATCH_PROJECT_ID` was ignored, once per
- * request. True the first time it is asked in this holder, false afterwards.
- *
- * Request-scoped rather than process-scoped because the daemon serves many
- * requests from one process: a module-level flag would warn the first caller
- * and leave every later one running against the key's own project with
- * nothing on screen saying so, which is the silence the warning exists to end.
+ * Publish whether the command about to run answers outside any project (machine-local or
+ * organization-scoped), so nothing tells its user which project it reads.
+ */
+export function setRunsOutsideProject(outsideProject: boolean): void {
+  currentHolder().runsOutsideProject = outsideProject;
+}
+
+/** Whether the current request's command answers outside any project; false when nothing said. */
+export function runsOutsideProject(): boolean {
+  return currentHolder().runsOutsideProject === true;
+}
+
+/**
+ * Take the once-per-request right to warn that `LANGWATCH_PROJECT_ID` was ignored. Request-scoped
+ * because the daemon serves many requests from one process; a module flag would warn only the
+ * first.
  */
 export function claimProjectEnvIgnoredWarning(): boolean {
   const holder = currentHolder();
   if (holder.warnedProjectEnvIgnored) return false;
   holder.warnedProjectEnvIgnored = true;
   return true;
+}
+
+/**
+ * Mark the current request's holder as a CLI request. Read by
+ * the shared request-header builders when attaching the surface header.
+ */
+export function setScopedSurface({ surface }: { surface: "cli" }): void {
+  currentHolder().surface = surface;
+}
+
+/**
+ * The surface recorded for the current request, or undefined outside a CLI
+ * request boundary (a plain SDK embed, or a request scope that never called
+ * `runWithCliCredentialHolder`).
+ */
+export function scopedSurface(): "cli" | undefined {
+  return currentHolder().surface;
 }
 
 /**
@@ -144,4 +157,5 @@ export function resetFallbackCredentialHolder(): void {
   fallbackHolder.projectId = undefined;
   fallbackHolder.requestedProject = undefined;
   fallbackHolder.warnedProjectEnvIgnored = undefined;
+  fallbackHolder.surface = undefined;
 }

@@ -2,6 +2,7 @@ package langyagent
 
 import (
 	"context"
+	"strings"
 	"testing"
 	"time"
 )
@@ -13,7 +14,7 @@ func clearLangyEnv(t *testing.T) {
 	t.Helper()
 	for _, k := range []string{
 		"ENVIRONMENT", "PORT", "LANGY_INTERNAL_SECRET", "LANGY_MAX_WORKERS",
-		"LANGY_WORKER_IDLE_MS", "LANGY_REAPER_INTERVAL_MS", "LANGY_READINESS_TIMEOUT_MS", "SESSIONS_ROOT",
+		"LANGY_WORKER_IDLE_MS", "LANGY_WORKER_MAX_AGE_MS", "LANGY_REAPER_INTERVAL_MS", "LANGY_READINESS_TIMEOUT_MS", "SESSIONS_ROOT",
 		"LANGY_WORKSPACE_ROOT", "LANGY_UNSAFE_DEV_DISABLE_ISOLATION",
 		"LOG_LEVEL", "LOG_FORMAT",
 		"OTEL_OTLP_ENDPOINT", "OTEL_OTLP_HEADERS", "OTEL_SAMPLE_RATIO",
@@ -49,6 +50,9 @@ func TestLoadConfig_DefaultsWhenOnlySecretSet(t *testing.T) {
 	if cfg.WorkerIdle() != 10*time.Minute {
 		t.Errorf("WorkerIdle default = %s, want 10m", cfg.WorkerIdle())
 	}
+	if cfg.WorkerMaxAge() != 5*time.Hour {
+		t.Errorf("WorkerMaxAge default = %s, want 5h", cfg.WorkerMaxAge())
+	}
 	if cfg.ReaperInterval() != 30*time.Second {
 		t.Errorf("ReaperInterval default = %s, want 30s", cfg.ReaperInterval())
 	}
@@ -75,6 +79,7 @@ func TestLoadConfig_EnvOverrides(t *testing.T) {
 	t.Setenv("PORT", "9000")
 	t.Setenv("LANGY_MAX_WORKERS", "5")
 	t.Setenv("LANGY_WORKER_IDLE_MS", "1000")
+	t.Setenv("LANGY_WORKER_MAX_AGE_MS", "3000")
 	t.Setenv("LANGY_REAPER_INTERVAL_MS", "250")
 	t.Setenv("LANGY_READINESS_TIMEOUT_MS", "2000")
 	t.Setenv("SESSIONS_ROOT", "/tmp/langy-sessions")
@@ -92,6 +97,9 @@ func TestLoadConfig_EnvOverrides(t *testing.T) {
 	}
 	if cfg.WorkerIdle() != time.Second {
 		t.Errorf("WorkerIdle override = %s, want 1s", cfg.WorkerIdle())
+	}
+	if cfg.WorkerMaxAge() != 3*time.Second {
+		t.Errorf("WorkerMaxAge override = %s, want 3s", cfg.WorkerMaxAge())
 	}
 	if cfg.ReaperInterval() != 250*time.Millisecond {
 		t.Errorf("ReaperInterval override = %s, want 250ms", cfg.ReaperInterval())
@@ -205,6 +213,7 @@ func TestLoadConfig_UnsafeDevDisableIsolationAllowedInLocalEnvs(t *testing.T) {
 	}
 }
 
+// @scenario "The manager refuses the isolation bypass outside a local environment"
 func TestLoadConfig_UnsafeDevDisableIsolationRefusedInNonLocalEnvs(t *testing.T) {
 	// Allowlist fail-closed: production, staging, and any unknown/prod-like value
 	// must reject the bypass, so it can never be armed off a dev box.
@@ -215,8 +224,12 @@ func TestLoadConfig_UnsafeDevDisableIsolationRefusedInNonLocalEnvs(t *testing.T)
 			t.Setenv("ENVIRONMENT", env)
 			t.Setenv("LANGY_UNSAFE_DEV_DISABLE_ISOLATION", "true")
 
-			if _, err := LoadConfig(context.Background()); err == nil {
+			_, err := LoadConfig(context.Background())
+			if err == nil {
 				t.Fatalf("expected LoadConfig to refuse LANGY_UNSAFE_DEV_DISABLE_ISOLATION when ENVIRONMENT=%q", env)
+			}
+			if !strings.Contains(err.Error(), "LANGY_UNSAFE_DEV_DISABLE_ISOLATION") || !strings.Contains(err.Error(), env) {
+				t.Fatalf("refusal %q names neither the bypass nor the environment", err)
 			}
 		})
 	}

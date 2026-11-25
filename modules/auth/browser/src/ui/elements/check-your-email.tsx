@@ -1,0 +1,87 @@
+import { Box, Button, Text, VStack } from "@langwatch/design-system/primitives";
+import { Mail } from "lucide-react";
+import type { ReactNode } from "react";
+
+import { findInboxProvider, type InboxProviderId } from "../../model/inbox-providers.ts";
+import { AuthCard } from "./auth-card.tsx";
+import { Google } from "./google-icon.tsx";
+import { BRAND_MARK_SIZE, Microsoft } from "./sign-in-method-icon.tsx";
+
+/** The mark on the inbox door; a provider we hold no mark for wears a plain envelope. */
+const INBOX_MARKS: Record<InboxProviderId, ReactNode> = {
+  gmail: <Google size={BRAND_MARK_SIZE} />,
+  outlook: <Microsoft size={BRAND_MARK_SIZE} />,
+  yahoo: <Mail size={18} />,
+  icloud: <Mail size={18} />,
+  proton: <Mail size={18} />,
+  aol: <Mail size={18} />,
+};
+
+/** Verification link confirmation screen; includes back option for wrong address. */
+export function CheckYourEmail({
+  email,
+  what,
+  onUseDifferentEmail,
+}: {
+  email: string;
+  /** What the link does when they open it, in their words. */
+  what: string;
+  /** Back to the address step, for the address that was typed wrong. */
+  onUseDifferentEmail?: () => void;
+}) {
+  const [inbox] = findInboxProvider({ email });
+
+  return (
+    <AuthCard title="Check your email" solid>
+      <VStack width="full" align="stretch" gap="3.5">
+        {/* Centred under a centred title, because there is nothing to do on
+            this card. Every other screen left-aligns its words against a form
+            the eye has to return to; here the sentence IS the screen, so it
+            sits on the same axis as the heading over it. */}
+        <Text
+          data-testid="verification-sent"
+          textAlign="center"
+          textWrap="balance"
+          lineHeight="1.65"
+        >
+          We sent a link to <b>{email}</b>. {what} The link expires in 1 hour.
+        </Text>
+        {/* Only for the mailboxes everyone recognizes: a wrong guess is a
+            login page for a mailbox the person does not have. */}
+        {inbox ? (
+          <Button variant="outline" asChild data-testid="go-to-inbox">
+            <a href={inbox.url} target="_blank" rel="noreferrer">
+              <Box
+                as="span"
+                display="inline-flex"
+                alignItems="center"
+                boxSize={`${BRAND_MARK_SIZE}px`}
+                css={{ "& svg": { width: "100%", height: "100%" } }}
+                aria-hidden="true"
+                data-testid="inbox-mark"
+                data-provider={inbox.id}
+              >
+                {INBOX_MARKS[inbox.id]}
+              </Box>
+              Go to inbox
+            </a>
+          </Button>
+        ) : null}
+        {onUseDifferentEmail ? (
+          <Button
+            textStyle="bodySm"
+            variant="plain"
+            size="sm"
+            alignSelf="center"
+            textDecoration="underline"
+            textUnderlineOffset="3px"
+            onClick={onUseDifferentEmail}
+            data-testid="check-email-back"
+          >
+            Wrong address? Use a different email
+          </Button>
+        ) : null}
+      </VStack>
+    </AuthCard>
+  );
+}

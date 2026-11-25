@@ -103,6 +103,14 @@ export const goErrorCodes = {
    */
   config_invalid: { service: "config" },
   /**
+   * ErrConnectCredentialPending — means the license authenticated but its
+   * managed key is still being provisioned. It is not a refusal: a retry a few
+   * seconds later succeeds, so the gateway never remembers it.
+   *
+   * @source services/aigateway/domain/errors.go
+   */
+  connect_credential_pending: { service: "aigateway", httpStatus: 503 },
+  /**
    * ErrConnectInstanceRequired — means a license token arrived without the
    * X-LangWatch-Instance header. A license is bound to one install, so the
    * token alone identifies nothing.
@@ -270,9 +278,28 @@ export const goErrorCodes = {
    * ErrJSONPathNoMatch — signals an HTTP block's output_path matched no
    * element of the upstream response.
    *
+   * Also produced as a workflow NodeError type, so this one entry is the copy
+   * for both the HTTP failure and the node error event. Its node sites are
+   * among the @source files below.
+   *
+   * @source services/nlpgo/app/engine/engine.go
    * @source services/nlpgo/domain/errors.go
    */
   jsonpath_no_match: { service: "nlpgo", httpStatus: 422 },
+  /**
+   * ErrProviderKeyRejected — marks a key the provider refused on a status
+   * other than 401 or 403.
+   *
+   * @source services/langyagent/adapters/otelrelay/llmproxy.go
+   */
+  llm_provider_key_rejected: { service: "langyagent" },
+  /**
+   * ErrProviderOutOfCredit — marks a provider account with no credit or quota
+   * left.
+   *
+   * @source services/langyagent/adapters/otelrelay/llmproxy.go
+   */
+  llm_provider_out_of_credit: { service: "langyagent" },
   /**
    * llmUpstreamErrorCode — marks a failed mediated LLM call whose response
    * body was NOT the gateway's typed herr envelope — a provider-native error
@@ -564,6 +591,15 @@ export const goErrorCodes = {
    * @source services/aigateway/domain/errors.go
    */
   virtual_key_revoked: { service: "aigateway", httpStatus: 403 },
+  /**
+   * ErrVoiceBrokerUnavailable — means this gateway cannot take another
+   * brokered call right now: it is draining, or it already supervises as many
+   * calls as it is configured to hold. Nothing was booked and nothing was
+   * created.
+   *
+   * @source services/aigateway/domain/voice_broker.go
+   */
+  voice_broker_unavailable: { service: "aigateway", httpStatus: 503 },
   /**
    * ErrWorkerNotReady — signals a freshly spawned worker did not become ready
    * within LANGY_READINESS_TIMEOUT_MS.

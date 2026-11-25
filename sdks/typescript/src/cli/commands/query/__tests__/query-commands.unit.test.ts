@@ -1,16 +1,13 @@
 /**
- * The `langwatch query` family, with the API mocked.
- *
- * What these pin is the CONTRACT between the flags and the request: a statement
- * sent as written, parameters bound as given, a keyset walk that rebinds the
- * cursor instead of rewriting the statement, and a refusal before any request
- * for every flag combination that cannot mean anything.
- *
- * @see specs/analytics/lwql-cli-query.feature
+ * The `langwatch query` family: a statement sent as written, parameters bound
+ * as given, a keyset walk that rebinds the cursor, and a refusal before any
+ * request. @see specs/analytics/lwql-cli-query.feature
+ * @see specs/typescript-sdk/cli-cross-project-access.feature
  */
 import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+
 import type { MockInstance } from "vitest";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -20,8 +17,7 @@ const mockQuery = vi.fn();
 let stdoutWrite: MockInstance<(chunk: unknown) => boolean>;
 
 vi.mock("@/client-sdk/services/query/query-api.service", async (importOriginal) => {
-  // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
-  const actual = (await importOriginal()) as Record<string, unknown>;
+  const actual: Record<string, unknown> = await importOriginal();
   return { ...actual, QueryApiService: vi.fn() };
 });
 
@@ -34,11 +30,13 @@ vi.mock("../../../utils/apiKey", () => ({
   })),
 }));
 
+const spinnerFail = vi.hoisted(() => vi.fn());
+
 vi.mock("ora", () => ({
   default: () => ({
     start: vi.fn().mockReturnThis(),
     succeed: vi.fn(),
-    fail: vi.fn(),
+    fail: spinnerFail,
   }),
 }));
 
@@ -49,6 +47,8 @@ class ProcessExitError extends Error {
 }
 
 import { QueryApiService } from "@/client-sdk/services/query/query-api.service";
+
+import { resolveCredentials } from "../../../utils/apiKey";
 import { runQueryCommand } from "../run";
 
 const RESULT = {
@@ -88,9 +88,7 @@ let savedAgentEnv: Record<string, string | undefined> = {};
 
 beforeEach(async () => {
   vi.clearAllMocks();
-  savedAgentEnv = Object.fromEntries(
-    AGENT_MODE_ENV_VARS.map((name) => [name, process.env[name]]),
-  );
+  savedAgentEnv = Object.fromEntries(AGENT_MODE_ENV_VARS.map((name) => [name, process.env[name]]));
   for (const name of AGENT_MODE_ENV_VARS) delete process.env[name];
 
   mockQuery.mockResolvedValue(RESULT);
@@ -104,9 +102,9 @@ beforeEach(async () => {
 
   vi.spyOn(console, "log").mockImplementation(() => undefined);
   vi.spyOn(console, "error").mockImplementation(() => undefined);
-  stdoutWrite = vi.spyOn(process.stdout, "write").mockImplementation(
-    () => true,
-  ) as unknown as MockInstance<(chunk: unknown) => boolean>;
+  stdoutWrite = vi
+    .spyOn(process.stdout, "write")
+    .mockImplementation(() => true) as unknown as MockInstance<(chunk: unknown) => boolean>;
   vi.spyOn(process, "exit").mockImplementation((code) => {
     throw new ProcessExitError(code as number);
   });
@@ -143,9 +141,9 @@ describe("runQueryCommand", () => {
   describe("when both a statement and a file are given", () => {
     /** @scenario "A statement and a statement file together are refused" */
     it("refuses before making a request", async () => {
-      await expect(
-        runQueryCommand("SELECT 1", { sqlFile: "/nowhere.sql" }),
-      ).rejects.toThrow(ProcessExitError);
+      await expect(runQueryCommand("SELECT 1", { sqlFile: "/nowhere.sql" })).rejects.toThrow(
+        ProcessExitError,
+      );
       expect(mockQuery).not.toHaveBeenCalled();
     });
   });
@@ -199,28 +197,25 @@ describe("runQueryCommand", () => {
     /** @scenario "The row limit is applied to what is printed" */
     it("keeps only that many rows", async () => {
       const result = await runQueryCommand("SELECT 1", { limit: "1" });
-      expect((result as { data: unknown[] }).data).toHaveLength(1);
+      expect((result as { data: { rows: unknown[] } }).data.rows).toHaveLength(1);
     });
 
     it("refuses a limit that is not a whole number", async () => {
-      await expect(runQueryCommand("SELECT 1", { limit: "0" })).rejects.toThrow(
-        ProcessExitError,
-      );
+      await expect(runQueryCommand("SELECT 1", { limit: "0" })).rejects.toThrow(ProcessExitError);
     });
   });
 
   describe("when the format is the default", () => {
-    // The payload is the rows array, so `-o json` prints exactly one JSON
-    // array. The columns reach a reader through the table renderer, which the
-    // command hands back alongside it.
+    // The payload is the rows with the run's params and diagnostics beside them (owner: "they
+    // get the params back as part of the success or final state object in the response").
     /** @scenario "The table format prints the result's own columns" */
     it("returns the rows for the table renderer to print", async () => {
       const result = await runQueryCommand("SELECT 1", {});
       const { data, table } = result as {
-        data: Record<string, unknown>[];
+        data: { rows: Record<string, unknown>[] };
         table: () => void;
       };
-      expect(Object.keys(data[0] ?? {})).toEqual(["TraceId", "OccurredAt"]);
+      expect(Object.keys(data.rows[0] ?? {})).toEqual(["TraceId", "OccurredAt"]);
       expect(typeof table).toBe("function");
     });
   });
@@ -296,20 +291,16 @@ describe("runQueryCommand", () => {
 
       await runQueryCommand(KEYSET_SQL, { pageBy: "keyset", format: "jsonl" });
 
-      const statements = new Set(
-        mockQuery.mock.calls.map((call) => call[0].sql as string),
-      );
+      const statements = new Set(mockQuery.mock.calls.map((call) => call[0].sql as string));
       expect([...statements]).toEqual([KEYSET_SQL]);
     });
 
     /** @scenario "Keyset paging stops when a page comes back short" */
     it("stops after a page shorter than the one before it", async () => {
-      mockQuery
-        .mockResolvedValueOnce(KEYSET_RESULT)
-        .mockResolvedValueOnce({
-          ...KEYSET_RESULT,
-          rows: [KEYSET_RESULT.rows[0]],
-        });
+      mockQuery.mockResolvedValueOnce(KEYSET_RESULT).mockResolvedValueOnce({
+        ...KEYSET_RESULT,
+        rows: [KEYSET_RESULT.rows[0]],
+      });
 
       await runQueryCommand(KEYSET_SQL, { pageBy: "keyset", format: "jsonl" });
 
@@ -331,12 +322,8 @@ describe("runQueryCommand", () => {
         limit: "3",
       });
 
-      const written = stdoutWrite.mock.calls
-        .map((call) => String(call[0]))
-        .join("");
-      const lines = written
-        .split("\n")
-        .filter((line) => line.trim().length > 0);
+      const written = stdoutWrite.mock.calls.map((call) => String(call[0])).join("");
+      const lines = written.split("\n").filter((line) => line.trim().length > 0);
       expect(lines).toHaveLength(3);
     });
 
@@ -353,5 +340,218 @@ describe("runQueryCommand", () => {
         runQueryCommand(KEYSET_SQL, { pageBy: "keyset", format: "jsonl" }),
       ).rejects.toThrow(ProcessExitError);
     });
+  });
+});
+
+describe("runQueryCommand across projects", () => {
+  const PAGED_SQL =
+    "SELECT TraceId AS after_id, OccurredAt AS after_ts FROM analytics.traces WHERE (OccurredAt, TraceId) > ({after_ts:DateTime64(3)}, {after_id:String}) ORDER BY OccurredAt, TraceId LIMIT 2";
+
+  describe("when no --project is given", () => {
+    /** @scenario "query run reads every project the login reaches unless --project narrows it" */
+    it("sends no projectId, although the credential resolved a project", async () => {
+      await runQueryCommand("SELECT 1", {});
+
+      expect(mockQuery).toHaveBeenCalledWith({ sql: "SELECT 1" });
+      expect(mockQuery.mock.calls[0]?.[0]).not.toHaveProperty("projectId");
+    });
+  });
+
+  describe("when --project names a project", () => {
+    beforeEach(() => {
+      vi.mocked(resolveCredentials).mockResolvedValueOnce({
+        apiKey: "test-key",
+        source: "session",
+        endpoint: "https://app.langwatch.ai",
+        projectId: "project_b",
+      });
+    });
+
+    /** @scenario "query run follows --project" */
+    it("sends the resolved project id, not the slug, as projectId", async () => {
+      await runQueryCommand("SELECT 1", { project: "proj-b" });
+
+      expect(resolveCredentials).toHaveBeenCalledWith({ project: "proj-b" });
+      expect(mockQuery).toHaveBeenCalledWith({ sql: "SELECT 1", projectId: "project_b" });
+    });
+
+    it("sends it on every page of a keyset walk", async () => {
+      mockQuery
+        .mockResolvedValueOnce(KEYSET_RESULT)
+        .mockResolvedValueOnce({ ...KEYSET_RESULT, rows: [KEYSET_RESULT.rows[0]] })
+        .mockResolvedValue({ ...KEYSET_RESULT, rows: [] });
+
+      await runQueryCommand(PAGED_SQL, { pageBy: "keyset", format: "jsonl", project: "proj-b" });
+
+      expect(mockQuery.mock.calls.length).toBeGreaterThan(1);
+      expect(mockQuery.mock.calls.map((call) => call[0].projectId)).toEqual(
+        mockQuery.mock.calls.map(() => "project_b"),
+      );
+    });
+  });
+});
+
+describe("runQueryCommand with --projects and --sources", () => {
+  /** @scenario "QP19 The CLI sends the parameters and returns the params in the result" */
+  it("sends the named projects and sources as lists", async () => {
+    await runQueryCommand("SELECT 1", { projects: "A, B", sources: "application,langy" });
+
+    expect(mockQuery).toHaveBeenCalledWith({
+      sql: "SELECT 1",
+      projects: ["A", "B"],
+      sources: ["application", "langy"],
+    });
+  });
+
+  /** @scenario "QP19 The CLI sends the parameters and returns the params in the result" */
+  it("prints what the run was bound to under the table", async () => {
+    mockQuery.mockResolvedValue({
+      ...RESULT,
+      params: { dashboard_context_projects: ["A"] },
+    });
+
+    const result = await runQueryCommand("SELECT 1", { projects: "A" });
+    (result as { table: () => void }).table();
+
+    const printed = vi.mocked(console.log).mock.calls.flat().join("\n");
+    expect(printed).toContain('Ran with {"dashboard_context_projects":["A"]}');
+  });
+
+  /** @scenario "QP03f projects accepts the word all for every project the caller can read" */
+  it('sends "all" as the string when --projects is all', async () => {
+    await runQueryCommand("SELECT 1", { projects: "all" });
+
+    expect(mockQuery).toHaveBeenCalledWith({ sql: "SELECT 1", projects: "all" });
+  });
+
+  /** @scenario "QP03f projects accepts the word all for every project the caller can read" */
+  it("refuses all mixed with ids, before anything is sent", async () => {
+    await expect(runQueryCommand("SELECT 1", { projects: "all,proj_x" })).rejects.toThrow(
+      ProcessExitError,
+    );
+    expect(mockQuery).not.toHaveBeenCalled();
+  });
+
+  /** @scenario "QP03e The CLI and the MCP tool tell the user to pass the projects" */
+  it("refuses --project beside --projects before it reads any credential", async () => {
+    await expect(
+      runQueryCommand("SELECT 1", { project: "my-slug", projects: "proj_x" }),
+    ).rejects.toThrow(ProcessExitError);
+
+    expect(vi.mocked(console.error).mock.calls.flat().join("\n")).toContain("pass one of them");
+    expect(mockQuery).not.toHaveBeenCalled();
+    expect(resolveCredentials).not.toHaveBeenCalled();
+  });
+
+  /** @scenario "QP03e The CLI and the MCP tool tell the user to pass the projects" */
+  it("refuses a bad --sources list before it reads any credential", async () => {
+    await expect(runQueryCommand("SELECT 1", { sources: " , " })).rejects.toThrow(ProcessExitError);
+
+    expect(resolveCredentials).not.toHaveBeenCalled();
+  });
+
+  /** @scenario "QP03f projects accepts the word all for every project the caller can read" */
+  it("reads All and ALL as the word all", async () => {
+    await runQueryCommand("SELECT 1", { projects: "ALL" });
+
+    expect(mockQuery).toHaveBeenCalledWith(expect.objectContaining({ projects: "all" }));
+  });
+
+  /** @scenario "QP19 The CLI sends the parameters and returns the params in the result" */
+  it("prints nothing about params when the statement declared no placeholder", async () => {
+    mockQuery.mockResolvedValue({ ...RESULT, params: {} });
+
+    const result = await runQueryCommand("SELECT 1", { projects: "A" });
+    (result as { table: () => void }).table();
+
+    expect(vi.mocked(console.log).mock.calls.flat().join("\n")).not.toContain("Ran with");
+  });
+
+  /** @scenario "QP03e The CLI and the MCP tool tell the user to pass the projects" */
+  it("tells the user to pass --projects when the platform asks for them", async () => {
+    mockQuery.mockRejectedValue(
+      Object.assign(
+        new Error('Name the projects to query: send `projects`, a list of project ids, or "all"'),
+        {
+          code: "projects_required",
+          kind: "projects_required",
+          httpStatus: 422,
+          meta: {},
+          isHandled: true,
+        },
+      ),
+    );
+
+    await expect(runQueryCommand("SELECT 1", {})).rejects.toThrow(ProcessExitError);
+
+    const printed = vi.mocked(console.error).mock.calls.flat().join("\n");
+    expect(printed).toContain(
+      "Name the projects to query: pass --projects <id,id>, or --projects all",
+    );
+    expect(printed).not.toMatch(/project_[a-z0-9]+/);
+  });
+});
+
+describe("runQueryCommand when the key reads no project", () => {
+  /** @scenario "QP03j A key that reads no project is told so, not asked to name one" */
+  it("shows the platform's message, not a request to pass --projects", async () => {
+    mockQuery.mockRejectedValue(
+      Object.assign(new Error("This key reads no project. Ask an admin to grant one"), {
+        code: "projects_unreadable",
+        kind: "projects_unreadable",
+        httpStatus: 422,
+        meta: {},
+        isHandled: true,
+      }),
+    );
+
+    await expect(runQueryCommand("SELECT 1", {})).rejects.toThrow(ProcessExitError);
+
+    const printed = [
+      ...vi.mocked(console.error).mock.calls.flat(),
+      ...spinnerFail.mock.calls.flat(),
+    ].join("\n");
+    expect(printed).toContain("reads no project");
+    expect(printed).not.toContain("pass --projects");
+  });
+});
+
+describe("runQueryCommand with machine output", () => {
+  const PARAMS = { dashboard_context_sources: ["application"], dashboard_context_projects: ["A"] };
+
+  /** @scenario "QP19 The CLI sends the parameters and returns the params in the result" */
+  it("returns params and diagnostics beside the rows in the success object", async () => {
+    mockQuery.mockResolvedValue({ ...RESULT, params: PARAMS });
+
+    const result = await runQueryCommand("SELECT 1", { projects: "A" });
+
+    expect((result as { data: unknown }).data).toEqual({
+      rows: RESULT.rows,
+      params: PARAMS,
+      diagnostics: RESULT.diagnostics,
+    });
+  });
+
+  it("prints one JSON object with the rows and params for --format json", async () => {
+    mockQuery.mockResolvedValue({ ...RESULT, params: PARAMS });
+
+    await runQueryCommand("SELECT 1", { projects: "A", format: "json" });
+
+    const printed = stdoutWrite.mock.calls.map(([chunk]) => String(chunk)).join("");
+    expect(JSON.parse(printed)).toMatchObject({ rows: RESULT.rows, params: PARAMS });
+  });
+
+  it("keeps CSV and JSON lines to the rows and puts params on stderr", async () => {
+    mockQuery.mockResolvedValue({ ...RESULT, params: PARAMS });
+    const stderr = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+
+    await runQueryCommand("SELECT 1", { projects: "A", format: "jsonl" });
+
+    expect(stderr).toHaveBeenCalledWith(`${JSON.stringify({ params: PARAMS })}\n`);
+  });
+
+  it("refuses a blank --projects or --sources rather than reading the default", async () => {
+    await expect(runQueryCommand("SELECT 1", { projects: "," })).rejects.toThrow(ProcessExitError);
+    await expect(runQueryCommand("SELECT 1", { sources: "" })).rejects.toThrow(ProcessExitError);
   });
 });

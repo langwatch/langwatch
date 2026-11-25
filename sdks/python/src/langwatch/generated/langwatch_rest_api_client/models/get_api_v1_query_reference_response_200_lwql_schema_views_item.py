@@ -4,7 +4,6 @@ from collections.abc import Mapping
 from typing import TYPE_CHECKING, Any, TypeVar, cast
 
 from attrs import define as _attrs_define
-from attrs import field as _attrs_field
 
 if TYPE_CHECKING:
     from ..models.get_api_v1_query_reference_response_200_lwql_schema_views_item_columns_item import (
@@ -23,7 +22,7 @@ class GetApiV1QueryReferenceResponse200LwqlSchemaViewsItem:
         description (str):
         grain (str):
         join_keys (list[str]):
-        time_column (str):
+        time_column (None | str):
         freshness (str):
         columns (list[GetApiV1QueryReferenceResponse200LwqlSchemaViewsItemColumnsItem]):
         example_sql (str):
@@ -33,11 +32,10 @@ class GetApiV1QueryReferenceResponse200LwqlSchemaViewsItem:
     description: str
     grain: str
     join_keys: list[str]
-    time_column: str
+    time_column: None | str
     freshness: str
     columns: list[GetApiV1QueryReferenceResponse200LwqlSchemaViewsItemColumnsItem]
     example_sql: str
-    additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         name = self.name
@@ -48,6 +46,7 @@ class GetApiV1QueryReferenceResponse200LwqlSchemaViewsItem:
 
         join_keys = self.join_keys
 
+        time_column: None | str
         time_column = self.time_column
 
         freshness = self.freshness
@@ -60,7 +59,7 @@ class GetApiV1QueryReferenceResponse200LwqlSchemaViewsItem:
         example_sql = self.example_sql
 
         field_dict: dict[str, Any] = {}
-        field_dict.update(self.additional_properties)
+
         field_dict.update(
             {
                 "name": name,
@@ -91,7 +90,12 @@ class GetApiV1QueryReferenceResponse200LwqlSchemaViewsItem:
 
         join_keys = cast(list[str], d.pop("joinKeys"))
 
-        time_column = d.pop("timeColumn")
+        def _parse_time_column(data: object) -> None | str:
+            if data is None:
+                return data
+            return cast(None | str, data)
+
+        time_column = _parse_time_column(d.pop("timeColumn"))
 
         freshness = d.pop("freshness")
 
@@ -115,21 +119,4 @@ class GetApiV1QueryReferenceResponse200LwqlSchemaViewsItem:
             example_sql=example_sql,
         )
 
-        get_api_v1_query_reference_response_200_lwql_schema_views_item.additional_properties = d
         return get_api_v1_query_reference_response_200_lwql_schema_views_item
-
-    @property
-    def additional_keys(self) -> list[str]:
-        return list(self.additional_properties.keys())
-
-    def __getitem__(self, key: str) -> Any:
-        return self.additional_properties[key]
-
-    def __setitem__(self, key: str, value: Any) -> None:
-        self.additional_properties[key] = value
-
-    def __delitem__(self, key: str) -> None:
-        del self.additional_properties[key]
-
-    def __contains__(self, key: str) -> bool:
-        return key in self.additional_properties

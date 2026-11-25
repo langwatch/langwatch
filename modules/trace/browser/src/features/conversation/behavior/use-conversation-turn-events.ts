@@ -1,0 +1,70 @@
+import { keepPreviousData } from "@tanstack/react-query";
+import { useMemo } from "react";
+
+import { useIsReadOnlyTrace } from "../../../behavior/explorer/context/trace-viewer-context.tsx";
+import type { TraceListItem } from "../../../behavior/explorer/types/trace.ts";
+import { api } from "../../../behavior/trace-api.ts";
+import { mergeTraceEvents } from "../../explorer/behavior/use-trace-list-events.ts";
+import { useDrawerProjectId } from "../../trace-drawer/behavior/use-drawer-project-id.ts";
+
+/** Padding on the read window, so an event stamped after its turn's start is still inside it. */
+const WINDOW_PAD_MS = 60 * 60 * 1000;
+
+/**
+ * Attaches each conversation turn's events, read once per thread.
+ */
+export function useConversationTurnEvents(turns: TraceListItem[]): TraceListItem[] {
+  const projectId = useDrawerProjectId();
+  const isReadOnly = useIsReadOnlyTrace();
+
+  // Deduplicated and sorted so two renders of the same thread ask for the same
+  // ids in the same order, which is what lets them share a query key: the key
+  // is compared structurally, not by identity.
+  const traceIds = useMemo(
+    () => [...new Set(turns.map((turn) => turn.traceId))].toSorted(),
+    [turns],
+  );
+
+  const timeRange = useMemo(() => {
+    if (turns.length === 0) return { from: 0, to: 0 };
+    let from = Number.POSITIVE_INFINITY;
+    let to = Number.NEGATIVE_INFINITY;
+    for (const turn of turns) {
+      from = Math.min(from, turn.timestamp);
+      to = Math.max(to, turn.timestamp + turn.durationMs);
+    }
+    return { from: from - WINDOW_PAD_MS, to: to + WINDOW_PAD_MS };
+  }, [turns]);
+
+  const enabled = !!projectId && !isReadOnly && traceIds.length > 0;
+  const query = api.traces.listEvents.useQuery(
+    {
+      projectId,
+      traceIds,
+      timeRange,
+    },
+    {
+      // Backed by the same project-protected read as the turns themselves, so
+      // a share grant never opens it.
+      enabled,
+      placeholderData: keepPreviousData,
+    },
+  );
+
+  // `placeholderData: keepPreviousData` hands back the previous thread's
+  // rollups with `isLoading` already false, so a turn of the new thread would
+  // find no entry of its own and read as eventless while it is still waiting.
+  const isLoading = enabled && (query.isLoading || query.isPlaceholderData);
+
+  return useMemo(
+    () =>
+      mergeTraceEvents({
+        rows: turns,
+        rollups: query.data,
+        projectId,
+        isLoading,
+        isUnavailable: enabled && query.isError,
+      }),
+    [turns, query.data, projectId, query.isError, isLoading, enabled],
+  );
+}

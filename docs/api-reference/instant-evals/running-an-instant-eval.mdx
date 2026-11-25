@@ -25,7 +25,7 @@ Add an `ORDER BY` when your statement carries a `LIMIT`. The run reads your stat
 ```sql
 SELECT
   TraceId,
-  eval_passed(conversation(ConversationId), 'Did the agent refuse the request?') AS refused
+  eval_passed(llm_readable_thread(ConversationId, 16000), 'Did the agent refuse the request?') AS refused
 FROM analytics.trace_metrics
 WHERE OccurredAt >= subtractDays(now(), 30) AND ConversationId != ''
 GROUP BY TraceId, ConversationId
@@ -51,6 +51,10 @@ GROUP BY TraceId, ConversationId
 
 An organization without a paid plan also gets `freeBudgetRemainingUsd`, what is left of its $1 free budget. Once that is spent, a new run and a judged query answer `402` with `instant_eval_free_budget_exhausted`, carrying `spentUsd` and `budgetUsd` in `meta`, until the organization upgrades. The rate is on [Pricing](/pricing#instant-evals).
 
+On any plan, a [gateway budget](/ai-gateway/budgets) set to block on the project, its team or the organization also applies. Once it is reached, a new run and a judged query answer `402` with `instant_eval_gateway_budget_exceeded`, carrying `budgetId`, `scope`, `window`, `limitUsd` and `spentUsd` in `meta`. A run under way stops before its next page and keeps the verdicts it wrote.
+
+A budget set to warn never refuses. A run on your own decision model is checked too, as its provider usage counts against these budgets.
+
 ## Row Limits
 
 A run judges at most 10,000 rows by default. Pass `limit` to ask for fewer, or for up to 100,000 on a plan that lifts the cap. A `limit` above what your plan allows answers `instant_eval_row_cap_exceeded` with the cap and the plan in `meta`.
@@ -61,17 +65,17 @@ When the statement matches more rows than the limit, the run judges the first pa
 
 `POST /api/v1/instant-evals` accepts the statement and answers `202` with the run, whose `status` is `QUEUED`. Poll `GET /api/v1/instant-evals/{id}` for progress:
 
-| Field | What it says |
-|---|---|
-| `status` | `QUEUED`, `PLANNING`, `RUNNING`, `FINISHED`, `FAILED` or `CANCELLED` |
-| `total` | Rows the statement matched, once the run has counted them |
-| `progress` | Rows judged so far |
-| `matched` | Judgements that matched, across the boolean questions. Null when the run asked none |
-| `matchedByQuestion` | Matches for a boolean question, judged rows for a score or a category one |
-| `failed` | Rows the judge could not answer |
-| `skipped` | Rows the judge declined, for instance because the text was too large |
-| `tokens` | Input tokens billed so far |
-| `priceUsd` | What the run has cost you, written when it finishes |
+| Field               | What it says                                                                        |
+| ------------------- | ----------------------------------------------------------------------------------- |
+| `status`            | `QUEUED`, `PLANNING`, `RUNNING`, `FINISHED`, `FAILED` or `CANCELLED`                |
+| `total`             | Rows the statement matched, once the run has counted them                           |
+| `progress`          | Rows judged so far                                                                  |
+| `matched`           | Judgements that matched, across the boolean questions. Null when the run asked none |
+| `matchedByQuestion` | Matches for a boolean question, judged rows for a score or a category one           |
+| `failed`            | Rows the judge could not answer                                                     |
+| `skipped`           | Rows the judge declined, for instance because the text was too large                |
+| `tokens`            | Input tokens billed so far                                                          |
+| `priceUsd`          | What the run has cost you, written when it finishes                                 |
 
 `GET /api/v1/instant-evals` lists the project's runs newest first, paged with `before` as an ISO 8601 cursor.
 
@@ -79,7 +83,7 @@ When the statement matches more rows than the limit, the run judges the first pa
 
 `GET /api/v1/instant-evals/{id}/results` pages through what the run wrote, keyset-paged with a `cursor`. Filter with `questionId`, `matched` and `status`:
 
-```
+```http
 GET /api/v1/instant-evals/run_123/results?questionId=refused&matched=true&limit=200
 ```
 

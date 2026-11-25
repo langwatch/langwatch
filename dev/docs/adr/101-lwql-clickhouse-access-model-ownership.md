@@ -2,9 +2,9 @@
 
 **Date:** 2026-09-01
 
-**Status:** Superseded by [ADR-142](./142-the-app-owns-the-lwql-access-model.md)
+**Status:** Superseded by [ADR-159](./159-the-app-owns-the-lwql-access-model.md)
 
-> **Superseded (2026-09-22).** ADR-142: the app owns the LangWatchQL access model on every distribution; no rendered copy exists. The two-owner table below is historical.
+> **Superseded (2026-09-22).** ADR-159: the app owns the LangWatchQL access model on every distribution; no rendered copy exists. The two-owner table below is historical.
 
 ## Context
 
@@ -48,10 +48,10 @@ only stable state.
 **One owner per entity name, always.** Whoever owns the ClickHouse server owns
 the access model for that server:
 
-| ClickHouse is... | Access model owner | Mechanism |
-| --- | --- | --- |
+| ClickHouse is...                                                             | Access model owner  | Mechanism                                                                                                                                                                                                                                                                             |
+| ---------------------------------------------------------------------------- | ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Chart-managed (`clickhouse.chartManaged: true`, the default) or SaaS-managed | The rendered config | `charts/clickhouse-serverless` (chart path) / `render-config.sh` (SaaS path) writes `langwatch_lwql`, `lwql_restricted`, the row policies, and the `lwql_postgres` named collection as XML/YAML config at pod boot. Re-read on every restart; no SQL DDL for these objects ever runs. |
-| External / BYO (`clickhouse.chartManaged: false`) | The application | The app cannot render config into a server it does not run, so it self-provisions the same objects via SQL DDL on every boot, and degrades to a logged, fail-closed refusal if the server rejects a statement. |
+| External / BYO (`clickhouse.chartManaged: false`)                            | The application     | The app cannot render config into a server it does not run, so it self-provisions the same objects via SQL DDL on every boot, and degrades to a logged, fail-closed refusal if the server rejects a statement.                                                                        |
 
 This is enforced structurally, not just by convention: `charts/langwatch`'s
 `langwatch.lwql.selfProvisionActive` helper (`templates/_helpers.tpl`) gates
@@ -96,7 +96,7 @@ thing that can create these objects when it does not own the server."
 
 ## Update — #8085: the tenant predicate is a set, single-sourced
 
-As of #8085 the tenant capability carries a *set* of the caller's per-project
+As of #8085 the tenant capability carries a _set_ of the caller's per-project
 key hashes (comma-joined), and the row-policy predicate is set membership
 (`has(splitByChar(',', getSetting(...)), KeyHash)`) rather than a single-hash
 equality — so one key reaches every project it can read.

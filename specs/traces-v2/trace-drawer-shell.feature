@@ -1,9 +1,10 @@
 # Trace Drawer Shell — Gherkin Spec
 # Implementation:
-#   platform/app/src/features/traces-v2/components/TraceDrawer/**
-#   platform/app/src/features/traces-v2/stores/drawerStore.ts
-#   platform/app/src/features/traces-v2/hooks/{useDrawerUrlSync,useTraceDrawerShortcuts,useTraceDrawerNavigation}.ts
-#   platform/app/src/features/traces-v2/hooks/traceDrawerShortcutTable.ts
+#   [gone] src/features/traces-v2/components/TraceDrawer/**
+#   modules/trace/browser/src/behavior/trace-drawer.ts  (the drawer's state, read from the address)
+#   modules/trace/browser/src/behavior/drawer-chrome.store.ts  (layout)
+#   [gone] src/features/traces-v2/hooks/{useTraceDrawerShortcuts,useTraceDrawerNavigation}.ts
+#   modules/trace/browser/src/ui/sections/explorer/hooks/trace-drawer-shortcut-table.ts
 #
 # Audited 2026-05-01: drift between spec and code was significant.
 #   - Drawer tabs are SUMMARY / LLM-OPTIMIZED / PROMPTS (the latter only when
@@ -113,19 +114,53 @@ Rule: Drawer maximise and restore
 
   Scenario: Maximise drawer by double-clicking the edge grip
     When the user double-clicks the left-edge grip
-    Then `drawerStore.widthPx` is set to `viewport - 10px`
+    Then `drawerChrome.widthPx` is set to `viewport - 10px`
     And the previous width is remembered for the next double-click
 
   Scenario: Maximise drawer with the M shortcut
     When the user presses M
-    Then `drawerStore.toggleSnapMaximize(window.innerWidth)` runs
+    Then `drawerChrome.toggleSnapMaximize(window.innerWidth)` runs
     And the same width snap as the edge-grip double-click is applied
 
   Scenario: Restore drawer to its prior width
     Given the drawer is at the maximize snap width
     When the user double-clicks the edge grip (or presses M again)
-    Then `drawerStore.toggleSnapMaximize(window.innerWidth)` runs
-    And `drawerStore.widthPx` returns to the previously remembered width
+    Then `drawerChrome.toggleSnapMaximize(window.innerWidth)` runs
+    And `drawerChrome.widthPx` returns to the previously remembered width
+
+
+Rule: The drawer never covers Ask Langy
+  The dragged width is a preference. The drawer renders narrower when that width
+  would reach over the search bar's Ask Langy button, and narrows again (instead
+  of sliding left at the same width) while the docked Langy panel holds the right edge.
+
+  @unit @integration @regression
+  Scenario: A wide trace drawer leaves the Ask Langy button visible
+    Given the reader dragged the trace drawer wider than the space beside Ask Langy
+    When the drawer is open on Trace Explorer
+    Then the drawer's left edge stops a gap to the right of the Ask Langy button
+    And the button can still be clicked
+
+  @integration
+  Scenario: Narrowing the window keeps the drawer clear of Ask Langy
+    Given a wide trace drawer is open on Trace Explorer
+    When the reader makes the window narrower
+    Then the drawer narrows with it and the Ask Langy button stays uncovered
+
+  @unit
+  Scenario: With less room than the minimum width the drawer still leaves Ask Langy clear
+    Given the room right of Ask Langy is narrower than the drawer's minimum width
+    When the trace drawer is open
+    Then the drawer takes only the room there is and the button stays uncovered
+
+  @unit @integration @regression
+  Scenario: Opening Langy beside a wide trace drawer narrows the drawer
+    Given a wide trace drawer is open on Trace Explorer and the Langy panel is closed
+    When the reader clicks Ask Langy
+    Then the Langy panel opens, not the floating ask bar that would sit under the drawer
+    And with the panel docked the drawer gets narrower and sits left of it
+    And the Ask Langy button stays uncovered
+    And closing Langy brings back the width the reader dragged
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -177,7 +212,7 @@ Rule: Unified drawer model
 
 Rule: Drawer tab bar
   The SpanTabBar sits below the visualisation and is the active-tab control
-  for `drawerStore.activeTab` (one of "summary" | "llm" | "prompts" | "span").
+  for the drawer's `activeTab` (one of "summary" | "llm" | "prompts" | "span").
   Spans can be opened ephemerally (one selected-but-not-pinned span tab) or
   pinned, with a "+N more" overflow menu when more than 4 are pinned.
 
@@ -896,7 +931,7 @@ Rule: Keyboard shortcuts
 # ─────────────────────────────────────────────────────────────────────────────
 
 Rule: Deep linking
-  Drawer state is mirrored to the URL via `useDrawerUrlSync`. The URL
+  The drawer reads its state from the address and writes changes back to it. The URL
   parameters are namespaced under `drawer.X` (the `useDrawer`/Drawer system
   prefixes drawer state with `drawer.`). The drawer key is
   `traceV2Details`, so the activation flag is `drawer.open=traceV2Details`.
@@ -910,7 +945,7 @@ Rule: Deep linking
 
   Scenario: Opening a trace with the partition-pruning hint
     When the URL also contains `drawer.t=1714476000000`
-    Then `drawerStore.occurredAtMs` is hydrated with that timestamp
+    Then the drawer's `occurredAtMs` is read with that timestamp
     And per-trace queries forward it as the partition hint
 
   Scenario: Opening a trace in conversation mode via URL
@@ -933,7 +968,7 @@ Rule: Deep linking
   Scenario: URL updates as drawer state changes
     Given the drawer is open
     When the user changes mode, viz tab, active tab, or selected span
-    Then `useDrawerUrlSync` pushes a diff into the URL via `updateDrawerParams`
+    Then the drawer writes the change back to the address via `updateDrawerParams`
 
   # Not yet implemented as of 2026-05-01 — there is no `?thread=` (or
   # `drawer.threadId`) deep link. Conversation mode is opened by passing
@@ -946,15 +981,46 @@ Rule: Deep linking
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# THE DRAWER READS THE ADDRESS
+# ─────────────────────────────────────────────────────────────────────────────
+
+Rule: The drawer's state is the address
+  The open trace, its span, view, tab, pins and edit mode are `drawer.*` in
+  the address. What the reader chose last (layout, view, tab) lives in the
+  drawer-chrome store and only fills in what a link leaves out.
+
+  @integration
+  Scenario: The trace drawer's trace, span and view come from the address
+    When the address names the trace drawer with a trace, project, hint, span, view, tab, pins and edit mode
+    Then the drawer reads each of them from the address
+
+  @integration
+  Scenario: A link that names no view opens on the view the reader last chose
+    Given the reader last chose a view and a visualisation tab
+    When a link names the trace and neither of those
+    Then the drawer opens on the view and tab the reader last chose
+
+  @integration
+  Scenario: What the drawer changes is written back to the address
+    Given the drawer is open on a trace
+    When the reader selects a span
+    Then the address gains the span and keeps the rest of its parameters
+
+  @integration
+  Scenario: The traces walked through in the drawer are the stack beneath it
+    Given the reader walked from one trace into another through the drawer
+    Then the traces beneath the open one are the unbroken run of trace drawers in the drawer stack
+    And each keeps its view and partition hint, oldest first
+
+# ─────────────────────────────────────────────────────────────────────────────
 # DEEP LINKS AND THE PARTITION HINT
 # ─────────────────────────────────────────────────────────────────────────────
 
 Rule: Deep links carry the partition hint
   A row click writes `drawer.t` with the trace's start time, and every
   per-trace read prunes ClickHouse partitions by it. A link from an API
-  response, a Slack message or an email used to carry the id alone, so the
-  drawer opened with every read scanning by id across every partition,
-  cold storage included, and sat on a skeleton for seconds.
+  response, a Slack message or an email may carry the id alone: the drawer then
+  reads by id, and the id index bounds each read server-side.
 
   @unit
   Scenario: A trace link built by the platform carries the trace timestamp
@@ -980,11 +1046,18 @@ Rule: Deep links carry the partition hint
     And a t that is not a positive whole number is dropped
 
   @unit
-  Scenario: Sibling reads wait for the partition hint on a deep link
+  Scenario: The browser opens a trace by id alone
     Given the drawer opened from a link with no t
-    Then the header read runs without the hint and backfills it from its result
-    And the span tree, events, signals, full spans and span detail reads wait for the hint
-    And they run once the hint is known
+    Then the header, span tree, events, signals, full spans and span detail reads run at once
+    And they name the trace and send no occurredAtMs, so the id index bounds them server-side
+    And a drawer that already knows t, from the URL or a list row, sends it as occurredAtMs
+
+  @unit
+  Scenario: The evaluations read does not wait for the partition hint
+    Given the drawer opened from a link with no t
+    Then the evaluations read runs at once, naming the trace and its member
+    And it sends no hint, because the evaluations store is not partitioned by trace time
+    And the header's backfill of the hint neither re-keys nor refetches it
 
 # ─────────────────────────────────────────────────────────────────────────────
 # RESPONSIVE BEHAVIOR

@@ -1,10 +1,12 @@
 import chalk from "chalk";
-import { createSpinner } from "../../utils/spinner";
+
 import { AgentsApiService } from "@/client-sdk/services/agents/agents-api.service";
+
 import { resolveCredentials } from "../../utils/apiKey";
-import { failSpinner } from "../../utils/spinnerError";
 import { commandValidationError } from "../../utils/errorOutput";
 import type { CommandResult } from "../../utils/output";
+import { createSpinner } from "../../utils/spinner";
+import { failSpinner } from "../../utils/spinnerError";
 
 /**
  * Returns the updated agent rather than printing it: the output port renders it
@@ -12,7 +14,7 @@ import type { CommandResult } from "../../utils/output";
  */
 export const updateAgentCommand = async (
   id: string,
-  options: { name?: string; type?: string; config?: string },
+  options: { name?: string; type?: string; config?: string; commitMessage?: string },
 ): Promise<CommandResult | void> => {
   await resolveCredentials();
 
@@ -20,18 +22,22 @@ export const updateAgentCommand = async (
   const spinner = createSpinner(`Updating agent "${id}"...`).start();
 
   try {
-    const params: { name?: string; type?: string; config?: Record<string, unknown> } = {};
+    const params: {
+      name?: string;
+      type?: string;
+      config?: Record<string, unknown>;
+      commitMessage?: string;
+    } = {};
     if (options.name !== undefined) params.name = options.name;
     if (options.type !== undefined) params.type = options.type;
+    if (options.commitMessage !== undefined) params.commitMessage = options.commitMessage;
     if (options.config !== undefined) {
       params.config = JSON.parse(options.config) as Record<string, unknown>;
     }
 
     const agent = await service.update(id, params);
 
-    spinner.succeed(
-      `Updated agent "${chalk.cyan(agent.name)}" ${chalk.gray(`(id: ${agent.id})`)}`,
-    );
+    spinner.succeed(`Updated agent "${chalk.cyan(agent.name)}" ${chalk.gray(`(id: ${agent.id})`)}`);
 
     return {
       data: agent,

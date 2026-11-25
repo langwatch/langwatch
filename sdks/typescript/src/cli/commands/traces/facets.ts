@@ -1,28 +1,35 @@
 /**
- * `langwatch trace facets [field]` — what the filter fields actually hold.
- *
- * The other half of `langwatch trace fields`. That one says a field exists;
- * this says what is in it, in this project, right now. The pair is what turns
- * "I think the origin is called `app`" into `origin:application` without a
- * round trip through a failed search.
- *
+ * `langwatch trace facets [field]`: what the filter fields hold in this project now; with `trace
+ * fields`, it turns a guessed value into a working filter without a failed search.
  * @see specs/traces/trace-filter-api.feature
  */
 
 import chalk from "chalk";
 
 import { TracesApiService } from "@/client-sdk/services/traces/traces-api.service";
+
 import { resolveCredentials } from "../../utils/apiKey";
 import { formatTable } from "../../utils/formatting";
 import type { CommandResult } from "../../utils/output";
+import { searchedProjectSlug } from "../../utils/searchedProject";
 import { createSpinner } from "../../utils/spinner";
 import { failSpinner } from "../../utils/spinnerError";
+import {
+  DEFAULT_LOOKBACK,
+  resolveTimeWindowOrExit,
+  shellQuote,
+  type TimeWindow,
+  type WindowDocument,
+  windowDocument,
+} from "../../utils/timeWindow";
+import { type SearchedDocument, searchedDocument, searchedLines, widenCommand } from "./searched";
 
 export interface TraceFacetsOptions {
   prefix?: string;
   limit?: string;
   startDate?: string;
   endDate?: string;
+  since?: string;
   project?: string;
 }
 
@@ -68,12 +75,19 @@ function summarise(facet: DiscoverPayload["facets"][number]): string {
 function valuesResult({
   payload,
   field,
+  read,
 }: {
   payload: FacetValuesPayload;
   field: string | undefined;
+  read: FacetsRead;
 }): CommandResult {
+  const empty = payload.values.length === 0 ? read.empty : undefined;
   return {
-    data: payload,
+    data: {
+      ...payload,
+      window: read.window,
+      ...(empty ? { searched: empty.searched, widen: empty.widen } : {}),
+    },
     table: () => {
       console.log();
       formatTable({
@@ -82,8 +96,9 @@ function valuesResult({
           Traces: String(entry.count),
         })),
         headers: ["Value", "Traces"],
-        emptyMessage: `Nothing recorded for ${field ?? "that field"} in this window.`,
+        emptyMessage: `Nothing recorded for ${field ?? "that field"} between ${read.window.from} and ${read.window.to}.`,
       });
+      if (empty) printEmptyFacets(empty);
       if (payload.hasMore) {
         console.log();
         console.log(
@@ -98,9 +113,20 @@ function valuesResult({
 }
 
 /** The discovery answer: every facet this project has, with a taste of each. */
-function discoverResult(discover: DiscoverPayload): CommandResult {
+function discoverResult({
+  discover,
+  read,
+}: {
+  discover: DiscoverPayload;
+  read: FacetsRead;
+}): CommandResult {
+  const empty = discover.facets.length === 0 ? read.empty : undefined;
   return {
-    data: discover,
+    data: {
+      ...discover,
+      window: read.window,
+      ...(empty ? { searched: empty.searched, widen: empty.widen } : {}),
+    },
     table: () => {
       console.log();
       formatTable({
@@ -110,9 +136,9 @@ function discoverResult(discover: DiscoverPayload): CommandResult {
           "Top values": summarise(facet),
         })),
         headers: ["Field", "Kind", "Top values"],
-        emptyMessage:
-          "No facets yet: this project has no traces in the window.",
+        emptyMessage: `No facets: this project has no traces between ${read.window.from} and ${read.window.to}.`,
       });
+      if (empty) printEmptyFacets(empty);
       if (discover.pending) {
         console.log();
         console.log(
@@ -132,14 +158,51 @@ function discoverResult(discover: DiscoverPayload): CommandResult {
   };
 }
 
+/** The window a facets read covered, and what to say if it came back empty. */
+interface FacetsRead {
+  window: WindowDocument;
+  empty: { searched: SearchedDocument; widen: string | null };
+}
+
+const printEmptyFacets = (empty: FacetsRead["empty"]): void => {
+  console.log();
+  for (const line of searchedLines(empty.searched)) console.log(chalk.gray(`  ${line}`));
+  if (empty.widen) console.log(chalk.gray(`Read further back: ${chalk.cyan(empty.widen)}`));
+};
+
+/** The read's window, plus the empty-answer description, looked up only when it is needed. */
+const describeRead = async ({
+  field,
+  options,
+  window,
+  isEmpty,
+}: {
+  field: string | undefined;
+  options: TraceFacetsOptions;
+  window: TimeWindow;
+  isEmpty: boolean;
+}): Promise<FacetsRead> => {
+  const searched = {
+    project: isEmpty ? await searchedProjectSlug({ project: options.project }) : null,
+    window,
+  };
+  const base =
+    field === undefined ? "langwatch trace facets" : `langwatch trace facets ${shellQuote(field)}`;
+  return {
+    window: windowDocument({ window, lookback: DEFAULT_LOOKBACK }),
+    empty: {
+      searched: searchedDocument(searched),
+      widen: widenCommand({ base, searched, project: options.project }) ?? null,
+    },
+  };
+};
+
 /** `--limit` as a number, or a refusal. */
 function resolveLimit(raw: string | undefined): number | undefined {
   if (raw === undefined) return undefined;
   const limit = Number(raw);
   if (!Number.isInteger(limit) || limit < 1) {
-    console.error(
-      chalk.red("Error: --limit must be a whole number of at least 1"),
-    );
+    console.error(chalk.red("Error: --limit must be a whole number of at least 1"));
     process.exit(1);
   }
   return limit;
@@ -153,13 +216,17 @@ export const traceFacetsCommand = async (
   // fix whether or not a key is configured, and reading the credential first
   // answers a question they did not ask.
   const limit = resolveLimit(options.limit);
+  const window = resolveTimeWindowOrExit({
+    startDate: options.startDate,
+    endDate: options.endDate,
+    since: options.since,
+    now: Date.now(),
+  });
 
   await resolveCredentials({ project: options.project });
   const service = new TracesApiService();
   const spinner = createSpinner(
-    field === undefined
-      ? "Reading the project's facets..."
-      : `Reading the values of ${field}...`,
+    field === undefined ? "Reading the project's facets..." : `Reading the values of ${field}...`,
   ).start();
 
   try {
@@ -167,24 +234,35 @@ export const traceFacetsCommand = async (
       ...(field === undefined ? {} : { field }),
       ...(options.prefix === undefined ? {} : { prefix: options.prefix }),
       ...(limit === undefined ? {} : { limit }),
-      ...(options.startDate === undefined
-        ? {}
-        : { startDate: options.startDate }),
-      ...(options.endDate === undefined ? {} : { endDate: options.endDate }),
+      // Sent as epoch ms: the CLI owns the default window and the relative forms.
+      startDate: String(window.from),
+      endDate: String(window.to),
     });
 
     if (isValues(payload)) {
       spinner.succeed(
         `${payload.values.length} of ${payload.total} value${payload.total !== 1 ? "s" : ""}${payload.hasMore ? ", more remain" : ""}`,
       );
-      return valuesResult({ payload, field });
+      const read = await describeRead({
+        field,
+        options,
+        window,
+        isEmpty: payload.values.length === 0,
+      });
+      return valuesResult({ payload, field, read });
     }
 
     const discover = payload as unknown as DiscoverPayload;
     spinner.succeed(
       `${discover.facets.length} facet${discover.facets.length !== 1 ? "s" : ""}${discover.pending ? ", still being computed" : ""}`,
     );
-    return discoverResult(discover);
+    const read = await describeRead({
+      field,
+      options,
+      window,
+      isEmpty: discover.facets.length === 0,
+    });
+    return discoverResult({ discover, read });
   } catch (error) {
     failSpinner({ spinner, error, action: "read trace facets" });
     process.exit(1);

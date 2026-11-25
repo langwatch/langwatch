@@ -52,6 +52,13 @@ Feature: LangWatchQL app-side extraction functions — projection UDFs plus a po
     Then the column holds the conversation markdown, with the system prompt once and one section per turn
     And the column type is reported as the hydrated type rather than the key's type
 
+  @unit
+  Scenario: conversation reads like the chat view and llm_readable_thread holds the agent's steps
+    Given a thread whose turns called tools
+    When conversation(ConversationId) and llm_readable_thread(ConversationId, 8000) are hydrated
+    Then conversation is rendered in the conversation view, with no budget
+    And llm_readable_thread is rendered in the steps view under its own budget, over the whole thread
+
   @integration
   Scenario: Submitted SQL using an app function is still recorded verbatim
     Given a statement projecting llm_readable_trace(TraceId, 8000) AS text with a trailing comment
@@ -390,10 +397,29 @@ Feature: LangWatchQL app-side extraction functions — projection UDFs plus a po
 
   @unit
   Scenario: A multi-replica server without a shared function store is provisioned without the functions
-    Given a self-hosted ClickHouse with three replicas and no user_defined_zookeeper_path
+    Given a self-hosted ClickHouse with three replicas and no node at /clickhouse/user_defined in Keeper
     When self-provisioning runs
     Then the app functions are left out and the log names the setting to declare
     And the rest of the access model is provisioned
+
+  @unit
+  Scenario: A multi-replica server whose function store is in Keeper is provisioned with the functions
+    Given a ClickHouse with three replicas whose user_defined_zookeeper_path is /clickhouse/user_defined
+    When self-provisioning runs
+    Then the app functions are created once and every replica sees them
+
+  @unit
+  Scenario: The store probe reads the shared function store from Keeper
+    Given a ClickHouse with three replicas
+    When the app asks where a CREATE FUNCTION would land
+    Then it looks for the node /clickhouse/user_defined in system.zookeeper
+    And it never asks system.server_settings, which does not list user_defined_zookeeper_path
+
+  @unit
+  Scenario: The store probe never asks Keeper on a server with no replicated table
+    Given a ClickHouse with no replicated table, which may have no Keeper at all
+    When the app asks where a CREATE FUNCTION would land
+    Then it answers from system.replicas alone
 
   @unit
   Scenario: A single-node server is provisioned with the functions

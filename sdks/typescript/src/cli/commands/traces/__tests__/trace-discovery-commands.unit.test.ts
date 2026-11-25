@@ -1,12 +1,6 @@
 /**
- * `langwatch trace facets` and `langwatch trace fields`, with the API mocked.
- *
- * The pair is the discovery loop: fields says what exists, facets says what is
- * in it. What matters here is that each sends what the flags asked for and
- * renders the shape the endpoint answered with — the facets door answers two
- * different shapes from one path, and telling them apart by the wrong key is
- * how a caller ends up with an empty table over a full payload.
- *
+ * `trace facets` and `trace fields` with the API mocked: each sends what the flags asked and
+ * renders the answered shape. The facets door answers two shapes from one path.
  * @see specs/traces/trace-filter-api.feature
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -18,14 +12,12 @@ const mockSearch = vi.fn();
 const mockReference = vi.fn();
 
 vi.mock("@/client-sdk/services/traces/traces-api.service", async (importOriginal) => {
-  // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
-  const actual = (await importOriginal()) as Record<string, unknown>;
+  const actual = await importOriginal<Record<string, unknown>>();
   return { ...actual, TracesApiService: vi.fn() };
 });
 
 vi.mock("@/client-sdk/services/query/query-api.service", async (importOriginal) => {
-  // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
-  const actual = (await importOriginal()) as Record<string, unknown>;
+  const actual = await importOriginal<Record<string, unknown>>();
   return { ...actual, QueryApiService: vi.fn() };
 });
 
@@ -36,6 +28,10 @@ vi.mock("../../../utils/apiKey", () => ({
     endpoint: "https://app.langwatch.ai",
     projectId: "project-1",
   })),
+}));
+
+vi.mock("../../../utils/searchedProject", () => ({
+  searchedProjectSlug: vi.fn(async ({ project }: { project?: string }) => project ?? "acme-app"),
 }));
 
 vi.mock("ora", () => ({
@@ -54,6 +50,7 @@ class ProcessExitError extends Error {
 
 import { QueryApiService } from "@/client-sdk/services/query/query-api.service";
 import { TracesApiService } from "@/client-sdk/services/traces/traces-api.service";
+
 import { traceFacetsCommand } from "../facets";
 import { traceFieldsCommand } from "../fields";
 
@@ -132,9 +129,7 @@ let savedAgentEnv: Record<string, string | undefined> = {};
 
 beforeEach(async () => {
   vi.clearAllMocks();
-  savedAgentEnv = Object.fromEntries(
-    AGENT_MODE_ENV_VARS.map((name) => [name, process.env[name]]),
-  );
+  savedAgentEnv = Object.fromEntries(AGENT_MODE_ENV_VARS.map((name) => [name, process.env[name]]));
   for (const name of AGENT_MODE_ENV_VARS) delete process.env[name];
 
   mockReference.mockResolvedValue(REFERENCE);
@@ -144,9 +139,7 @@ beforeEach(async () => {
     >;
   } as unknown as typeof TracesApiService);
   vi.mocked(QueryApiService).mockImplementation(function () {
-    return { reference: mockReference } as unknown as InstanceType<
-      typeof QueryApiService
-    >;
+    return { reference: mockReference } as unknown as InstanceType<typeof QueryApiService>;
   } as unknown as typeof QueryApiService);
 
   vi.spyOn(console, "log").mockImplementation(() => undefined);
@@ -175,25 +168,22 @@ describe("traceFacetsCommand", () => {
       });
       const result = await traceFacetsCommand("model", {});
       expect(
-        (result as { data: { values: { value: string; count: number }[] } }).data
-          .values,
+        (result as { data: { values: { value: string; count: number }[] } }).data.values,
       ).toEqual([{ value: "gpt-5-mini", count: 7 }]);
     });
 
     it("sends the field, prefix and limit as given", async () => {
       mockFacets.mockResolvedValue({ values: [], total: 0, hasMore: false });
       await traceFacetsCommand("model", { prefix: "gpt", limit: "5" });
-      expect(mockFacets).toHaveBeenCalledWith({
-        field: "model",
-        prefix: "gpt",
-        limit: 5,
-      });
+      expect(mockFacets).toHaveBeenCalledWith(
+        expect.objectContaining({ field: "model", prefix: "gpt", limit: 5 }),
+      );
     });
 
     it("refuses a limit that is not a whole number", async () => {
-      await expect(
-        traceFacetsCommand("model", { limit: "many" }),
-      ).rejects.toThrow(ProcessExitError);
+      await expect(traceFacetsCommand("model", { limit: "many" })).rejects.toThrow(
+        ProcessExitError,
+      );
       expect(mockFacets).not.toHaveBeenCalled();
     });
   });
@@ -213,10 +203,57 @@ describe("traceFacetsCommand", () => {
         pending: false,
       });
       const result = await traceFacetsCommand(undefined, {});
-      expect(
-        (result as { data: { facets: { key: string }[] } }).data.facets[0]?.key,
-      ).toBe("model");
-      expect(mockFacets).toHaveBeenCalledWith({});
+      expect((result as { data: { facets: { key: string }[] } }).data.facets[0]?.key).toBe("model");
+      expect(mockFacets).toHaveBeenCalledWith({
+        startDate: expect.stringMatching(/^\d+$/),
+        endDate: expect.stringMatching(/^\d+$/),
+      });
+    });
+  });
+
+  describe("when no window is given", () => {
+    it("reads the last 7 days, sent as epoch milliseconds", async () => {
+      mockFacets.mockResolvedValue({ values: [], total: 0, hasMore: false });
+      await traceFacetsCommand("model", {});
+      const query = mockFacets.mock.calls[0]![0] as { startDate: string; endDate: string };
+      expect(Number(query.endDate) - Number(query.startDate)).toBe(7 * 24 * 60 * 60 * 1000);
+    });
+  });
+
+  describe("when the window is a relative value", () => {
+    it("resolves --since before sending", async () => {
+      mockFacets.mockResolvedValue({ values: [], total: 0, hasMore: false });
+      await traceFacetsCommand("model", { since: "12h" });
+      const query = mockFacets.mock.calls[0]![0] as { startDate: string; endDate: string };
+      expect(Number(query.endDate) - Number(query.startDate)).toBe(12 * 60 * 60 * 1000);
+    });
+
+    it("refuses a value it cannot read before calling the API", async () => {
+      await expect(traceFacetsCommand("model", { startDate: "soonish" })).rejects.toThrow(
+        ProcessExitError,
+      );
+      expect(mockFacets).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when a field holds nothing in the window", () => {
+    it("says which project and window it read and how to read further back", async () => {
+      mockFacets.mockResolvedValue({ values: [], total: 0, hasMore: false });
+      const result = (await traceFacetsCommand("model", {})) as {
+        data: Record<string, unknown>;
+        table: () => void;
+      };
+      expect(result.data.window).toMatchObject({ lookback: "7d", widened: false });
+      expect(result.data.searched).toMatchObject({ project: "acme-app" });
+      expect(result.data.widen).toBe("langwatch trace facets model --since 30d");
+
+      result.table();
+      const printed = vi
+        .mocked(console.log)
+        .mock.calls.map((c) => String(c[0]))
+        .join("\n");
+      expect(printed).toContain("Project: acme-app");
+      expect(printed).toContain("langwatch trace facets model --since 30d");
     });
   });
 });
@@ -238,9 +275,7 @@ describe("traceFieldsCommand", () => {
   /** @scenario "The CLI prints the filter fields and the syntax" */
   it("returns the syntax document when asked for it", async () => {
     const result = await traceFieldsCommand({ syntax: true });
-    expect((result as { data: { syntax: string } }).data.syntax).toContain(
-      "trace.attribute.",
-    );
+    expect((result as { data: { syntax: string } }).data.syntax).toContain("trace.attribute.");
   });
 
   /** @scenario "The CLI prints the filter fields and the syntax" */

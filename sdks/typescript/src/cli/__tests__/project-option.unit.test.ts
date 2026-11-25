@@ -1,11 +1,7 @@
 /**
- * `--project` is declared over the finished command tree, so this suite is
- * what makes "a new command cannot forget it" true rather than aspirational.
- *
- * The whole `instant-eval` family shipped with no `--project` because the flag
- * had been added a family at a time and that family was written later. Nothing
- * failed when it was left out. Now a leaf that is neither marked as running
- * inside a project nor listed as one that does not fails here, by name.
+ * `--project` is declared over the finished tree; this suite makes that stick. A leaf neither
+ * marked as in-project nor listed as not fails here by name (`instant-eval` once shipped without
+ * it).
  */
 import type { Command } from "commander";
 import { describe, expect, it } from "vitest";
@@ -13,11 +9,13 @@ import { describe, expect, it } from "vitest";
 import { buildProgram } from "../program";
 import {
   COMMANDS_WITH_OWN_PROJECT_FLAG,
+  COMMANDS_ACROSS_PROJECTS,
   COMMANDS_WITHOUT_PROJECT,
   commandPath,
   isProjectScoped,
   leafCommands,
   projectSelectorOf,
+  QUERY_PROJECT_FLAG_HELP,
 } from "../utils/projectOption";
 
 // buildProgram() reads the tsup-injected __CLI_VERSION__ build constant,
@@ -27,9 +25,7 @@ import {
 const tree = () => buildProgram({ bin: "langwatch" });
 
 const leafAt = (program: Command, path: string): Command => {
-  const found = leafCommands(program).find(
-    (leaf) => commandPath(leaf) === path,
-  );
+  const found = leafCommands(program).find((leaf) => commandPath(leaf) === path);
   expect(found, `no leaf command "${path}" in the tree`).toBeDefined();
   return found!;
 };
@@ -43,9 +39,7 @@ describe("given the command tree the CLI runs", () => {
     const missing = leafCommands(tree())
       .map(commandPath)
       .filter(
-        (path) =>
-          !(path in COMMANDS_WITHOUT_PROJECT) &&
-          !(path in COMMANDS_WITH_OWN_PROJECT_FLAG),
+        (path) => !(path in COMMANDS_WITHOUT_PROJECT) && !(path in COMMANDS_WITH_OWN_PROJECT_FLAG),
       )
       .filter((path) => !declaresProject(leafAt(tree(), path)));
 
@@ -90,8 +84,29 @@ describe("given the command tree the CLI runs", () => {
     }
   });
 
+  /** @scenario "virtual key commands answer for everything the login key reaches" */
+  it("keeps --project on the commands that answer across projects, where it narrows", () => {
+    const program = tree();
+    for (const path of Object.keys(COMMANDS_ACROSS_PROJECTS)) {
+      expect(declaresProject(leafAt(program, path)), path).toBe(true);
+      expect(isProjectScoped(leafAt(program, path)), path).toBe(true);
+    }
+    expect(COMMANDS_ACROSS_PROJECTS).not.toHaveProperty("virtual-keys create");
+  });
+
+  it("tells query run's user that the flag narrows a run over every readable project", () => {
+    const run = leafAt(tree(), "query run");
+    const flag = run.options.find((option) => option.long === "--project");
+
+    expect(COMMANDS_ACROSS_PROJECTS).toHaveProperty("query run");
+    expect(isProjectScoped(run)).toBe(true);
+    expect(flag?.description).toBe(QUERY_PROJECT_FLAG_HELP);
+    expect(flag?.description).not.toContain("personal project");
+  });
+
   it("records a reason for every command it exempts", () => {
     const entries = [
+      ...Object.entries(COMMANDS_ACROSS_PROJECTS),
       ...Object.entries(COMMANDS_WITHOUT_PROJECT),
       ...Object.entries(COMMANDS_WITH_OWN_PROJECT_FLAG),
     ];
@@ -103,6 +118,7 @@ describe("given the command tree the CLI runs", () => {
   it("names only commands that exist, so a rename cannot leave a stale exemption", () => {
     const paths = new Set(leafCommands(tree()).map(commandPath));
     const stale = [
+      ...Object.keys(COMMANDS_ACROSS_PROJECTS),
       ...Object.keys(COMMANDS_WITHOUT_PROJECT),
       ...Object.keys(COMMANDS_WITH_OWN_PROJECT_FLAG),
     ].filter((path) => !paths.has(path));

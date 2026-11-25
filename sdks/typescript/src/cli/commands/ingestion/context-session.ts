@@ -1,21 +1,6 @@
 /**
- * Which coding-agent session a declaration is for.
- *
- * Resolution is ordered by how sure each answer is:
- *
- *   1. `--agent` plus `--session-id`, when the caller knows better.
- *   2. The claude session this process runs inside: claude exports
- *      `CLAUDECODE` and `CLAUDE_CODE_SESSION_ID` into every shell it spawns.
- *      Checked before codex so a codex started inside a claude session
- *      declares for the claude session actually doing the work.
- *   3. The codex session this process runs UNDER, read from the process tree.
- *      Exact, see `codex-ancestor-session.ts`.
- *   4. The codex session active on this machine, inferred from the rollout
- *      transcripts, for when the process tree cannot be read.
- *
- * Every refusal says one line to whoever ran the command: "nothing was
- * declared" must never be silent to the agent.
- *
+ * Resolve coding-agent session: explicit flags, claude env, codex tree,
+ * or codex rollout. Refusals always report one line.
  * Spec: specs/ai-governance/cli-wrappers/session-context-declare.feature
  */
 
@@ -25,15 +10,13 @@ import {
   type AncestorProbe,
   resolveCodexSessionFromAncestors,
 } from "@/cli/utils/governance/codex-ancestor-session";
-import {
-  type CodexRolloutMeta,
-  parseCodexRollout,
-} from "@/cli/utils/governance/codex-rollout";
-import { findRolloutForThread } from "@/cli/utils/governance/codex-rollout-otlp";
 import { resolveLiveCodexSession } from "@/cli/utils/governance/codex-live-session";
-
-/** The agents a declaration can name, keyed by their normalized spelling. */
-const AGENTS = new Set(["claude_code", "codex", "opencode"]);
+import { type CodexRolloutMeta, parseCodexRollout } from "@/cli/utils/governance/codex-rollout";
+import { findRolloutForThread } from "@/cli/utils/governance/codex-rollout-otlp";
+import {
+  isSessionContextAgentId,
+  sessionContextHookArguments,
+} from "@/cli/utils/governance/session-context-agents";
 
 /** Which session the declaration is for, and what titles its seams carry. */
 export interface ResolvedSession {
@@ -42,7 +25,6 @@ export interface ResolvedSession {
   /** The codex rollout identity, when the session resolved to codex. */
   codexMeta: CodexRolloutMeta | null;
 }
-
 /** What every resolution tier needs to answer. */
 interface ResolutionInputs {
   sessionId?: string;
@@ -64,9 +46,9 @@ async function resolveExplicitSession({
 }: ResolutionInputs): Promise<ResolvedSession | null> {
   const normalized = agent?.trim().toLowerCase().replace(/-/g, "_") ?? "";
   const trimmedSessionId = sessionId?.trim() ?? "";
-  if (!trimmedSessionId || !AGENTS.has(normalized)) {
+  if (!trimmedSessionId || !isSessionContextAgentId(normalized)) {
     writeLine(
-      "Pass both --agent (claude-code, codex or opencode) and --session-id to declare for an explicit session.",
+      `Pass both --agent (${listOfAgents()}) and --session-id to declare for an explicit session.`,
     );
     return null;
   }
@@ -78,6 +60,12 @@ async function resolveExplicitSession({
         ? await readCodexMeta({ sessionId: trimmedSessionId, codexSessionsRoot })
         : null,
   };
+}
+
+/** The agents a declaration can name, as their hooks spell them: "a, b or c". */
+function listOfAgents(): string {
+  const names = sessionContextHookArguments();
+  return `${names.slice(0, -1).join(", ")} or ${names.at(-1)}`;
 }
 
 /**
@@ -139,9 +127,7 @@ async function resolveCodexSession({
  * Which session is asking, in the order above. Each tier announces its own
  * failure, because "nothing was declared" must never be silent to the agent.
  */
-export async function resolveSession(
-  inputs: ResolutionInputs,
-): Promise<ResolvedSession | null> {
+export async function resolveSession(inputs: ResolutionInputs): Promise<ResolvedSession | null> {
   if (inputs.sessionId || inputs.agent) {
     return resolveExplicitSession(inputs);
   }
@@ -153,9 +139,7 @@ export async function resolveSession(
 }
 
 /** The rollout identity at a known transcript path, best-effort. */
-async function readRolloutMeta(
-  rolloutPath: string,
-): Promise<CodexRolloutMeta | null> {
+async function readRolloutMeta(rolloutPath: string): Promise<CodexRolloutMeta | null> {
   try {
     return parseCodexRollout(await readFile(rolloutPath, "utf8")).meta;
   } catch {
@@ -179,4 +163,3 @@ async function readCodexMeta({
     return null;
   }
 }
-

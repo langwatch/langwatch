@@ -13,6 +13,39 @@ Feature: Landing
   Settings is never a landing destination of its own. Leaving Settings
   goes back to the product the user came from.
 
+  # The chrome refuses to draw until a team and a project resolve, and "/" is
+  # the one address that names neither: the reader has not picked a project
+  # yet, and the screen that picks one for them renders INSIDE that chrome.
+  # Gating the resolver on its own output is a deadlock — a signed-in reader
+  # watches a spinner nothing will ever end, and the home resolver is never
+  # even asked. "/" needs the navigation host mounted, not the furniture.
+  @integration
+  Scenario: The front door draws before any project is chosen
+    Given a signed-in reader whose scope names no project yet
+    When they open "/"
+    Then the chrome draws the address rather than waiting on a project
+
+  # The page body refuses a reader it cannot place on a team, and offers them
+  # one way out: a link to "/". For a reader whose team has not resolved, that
+  # is the address they are already on — the refusal hands them a door back to
+  # itself. "/" resolves rather than displays, so membership is the
+  # DESTINATION's question, asked once they have been sent somewhere.
+  @integration
+  Scenario: The front door does not refuse a reader it has not placed yet
+    Given a reader on "/" whose team has not resolved
+    When the chrome draws the front door
+    Then it draws the resolver rather than refusing them for want of a team
+
+  # The chrome draws around an organization, and a reader who belongs to none
+  # has nothing for it to draw. "/" is where such a reader is sent after
+  # signing up or joining, so the resolver runs without the chrome for them.
+  @integration
+  Scenario: The front door sends a reader with no organization to onboarding
+    Given a signed-in reader who belongs to no organization
+    When they open "/"
+    Then the front door resolves without drawing the chrome
+    And they are sent to "/onboarding/welcome"
+
   @unit
   Scenario: An explicit pin outranks everything
     Given I pinned my home to "/governance"
@@ -31,9 +64,9 @@ Feature: Landing
   Scenario: A remembered product I lost access to falls through
     Given the device remembers "governance" for my organization
     And Governance is not reachable for me anymore
-    And the organization intent points at "/me"
+    And the organization intent points at "/coding-agents"
     When "/" resolves
-    Then I land on "/me"
+    Then I land on "/coding-agents"
 
   @unit
   Scenario: A remembered LLM Ops without any project falls through
@@ -76,6 +109,22 @@ Feature: Landing
     Given the device remembers "gateway" for my organization
     When I open "/"
     Then I am sent to the Gateway home
+
+  # The organization's Dashboards library (ADR-002 in modules/dashboard) is where Dashboards opens.
+  @unit
+  Scenario: A remembered Dashboards lands on the organization's library
+    Given the device remembers "dashboards" for my organization
+    And the organization's Dashboards library is on
+    When "/" resolves
+    Then I land on "/dashboards", not on my project's Dashboards area
+
+  @integration
+  Scenario: The root address waits for the library's flags before landing on Dashboards
+    Given the device remembers "dashboards" for my organization
+    And the organization's Dashboards flags have not answered yet
+    When I open "/"
+    Then I am sent nowhere while they load
+    And once both answer on, I am sent to "/dashboards", once
 
   @integration
   Scenario: The landing redirect navigates once per destination

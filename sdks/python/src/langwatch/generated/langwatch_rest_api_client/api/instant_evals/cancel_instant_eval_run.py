@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, cast
 from urllib.parse import quote
 
 import httpx
@@ -6,7 +6,6 @@ import httpx
 from ... import errors
 from ...client import AuthenticatedClient, Client
 from ...models.cancel_instant_eval_run_response_200 import CancelInstantEvalRunResponse200
-from ...models.cancel_instant_eval_run_response_404 import CancelInstantEvalRunResponse404
 from ...models.cancel_instant_eval_run_response_409 import CancelInstantEvalRunResponse409
 from ...types import Response, safe_http_status
 
@@ -27,15 +26,14 @@ def _get_kwargs(
 
 def _parse_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> CancelInstantEvalRunResponse200 | CancelInstantEvalRunResponse404 | CancelInstantEvalRunResponse409 | None:
+) -> Any | CancelInstantEvalRunResponse200 | CancelInstantEvalRunResponse409 | None:
     if response.status_code == 200:
         response_200 = CancelInstantEvalRunResponse200.from_dict(response.json())
 
         return response_200
 
     if response.status_code == 404:
-        response_404 = CancelInstantEvalRunResponse404.from_dict(response.json())
-
+        response_404 = cast(Any, None)
         return response_404
 
     if response.status_code == 409:
@@ -51,7 +49,7 @@ def _parse_response(
 
 def _build_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> Response[CancelInstantEvalRunResponse200 | CancelInstantEvalRunResponse404 | CancelInstantEvalRunResponse409]:
+) -> Response[Any | CancelInstantEvalRunResponse200 | CancelInstantEvalRunResponse409]:
     # LangWatch override: use safe_http_status to tolerate non-IANA status codes
     # (Cloudflare 520-527, AWS WAF 561, etc). Upstream still crashes here.
     # Tracked upstream: https://github.com/openapi-generators/openapi-python-client/pull/1407
@@ -67,7 +65,7 @@ def sync_detailed(
     id: str,
     *,
     client: AuthenticatedClient,
-) -> Response[CancelInstantEvalRunResponse200 | CancelInstantEvalRunResponse404 | CancelInstantEvalRunResponse409]:
+) -> Response[Any | CancelInstantEvalRunResponse200 | CancelInstantEvalRunResponse409]:
     """Cancel a run
 
      Ask a run to stop. The run stops before its next page, so the pages it already judged keep their
@@ -82,7 +80,7 @@ def sync_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[CancelInstantEvalRunResponse200 | CancelInstantEvalRunResponse404 | CancelInstantEvalRunResponse409]
+        Response[Any | CancelInstantEvalRunResponse200 | CancelInstantEvalRunResponse409]
     """
 
     kwargs = _get_kwargs(
@@ -100,7 +98,7 @@ def sync(
     id: str,
     *,
     client: AuthenticatedClient,
-) -> CancelInstantEvalRunResponse200 | CancelInstantEvalRunResponse404 | CancelInstantEvalRunResponse409 | None:
+) -> Any | CancelInstantEvalRunResponse200 | CancelInstantEvalRunResponse409 | None:
     """Cancel a run
 
      Ask a run to stop. The run stops before its next page, so the pages it already judged keep their
@@ -115,7 +113,7 @@ def sync(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        CancelInstantEvalRunResponse200 | CancelInstantEvalRunResponse404 | CancelInstantEvalRunResponse409
+        Any | CancelInstantEvalRunResponse200 | CancelInstantEvalRunResponse409
     """
 
     return sync_detailed(
@@ -128,7 +126,7 @@ async def asyncio_detailed(
     id: str,
     *,
     client: AuthenticatedClient,
-) -> Response[CancelInstantEvalRunResponse200 | CancelInstantEvalRunResponse404 | CancelInstantEvalRunResponse409]:
+) -> Response[Any | CancelInstantEvalRunResponse200 | CancelInstantEvalRunResponse409]:
     """Cancel a run
 
      Ask a run to stop. The run stops before its next page, so the pages it already judged keep their
@@ -143,7 +141,7 @@ async def asyncio_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[CancelInstantEvalRunResponse200 | CancelInstantEvalRunResponse404 | CancelInstantEvalRunResponse409]
+        Response[Any | CancelInstantEvalRunResponse200 | CancelInstantEvalRunResponse409]
     """
 
     kwargs = _get_kwargs(
@@ -159,7 +157,7 @@ async def asyncio(
     id: str,
     *,
     client: AuthenticatedClient,
-) -> CancelInstantEvalRunResponse200 | CancelInstantEvalRunResponse404 | CancelInstantEvalRunResponse409 | None:
+) -> Any | CancelInstantEvalRunResponse200 | CancelInstantEvalRunResponse409 | None:
     """Cancel a run
 
      Ask a run to stop. The run stops before its next page, so the pages it already judged keep their
@@ -174,7 +172,7 @@ async def asyncio(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        CancelInstantEvalRunResponse200 | CancelInstantEvalRunResponse404 | CancelInstantEvalRunResponse409
+        Any | CancelInstantEvalRunResponse200 | CancelInstantEvalRunResponse409
     """
 
     return (

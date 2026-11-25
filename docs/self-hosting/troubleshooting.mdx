@@ -42,6 +42,7 @@ docker compose logs postgres --tail=50
 ```
 
 Common causes:
+
 - PostgreSQL not ready before app starts (health checks should handle this)
 - Missing or invalid `.env` file
 - Insufficient Docker memory (increase to 8+ GB in Docker Desktop settings)
@@ -49,8 +50,9 @@ Common causes:
 ### Slow startup
 
 First startup is slower because:
+
 - Docker pulls all images
-- PostgreSQL runs initial migrations
+- The workers run the upgrade (PostgreSQL and ClickHouse migrations), and the app is not ready until it is done
 - OpenSearch initializes its cluster
 
 Subsequent starts are faster. If it remains slow, check Docker resource allocation.
@@ -99,7 +101,7 @@ If not, set one in your values:
 ```yaml
 clickhouse:
   storage:
-    storageClass: "gp3"  # or your available StorageClass
+    storageClass: "gp3" # or your available StorageClass
 ```
 
 ### Ingress not routing traffic
@@ -136,7 +138,7 @@ Increase ClickHouse memory:
 
 ```yaml
 clickhouse:
-  memory: "16Gi"  # Up from default 4Gi
+  memory: "16Gi" # Up from default 4Gi
 ```
 
 The subchart auto-tunes internal memory limits based on this value.
@@ -155,7 +157,7 @@ Give one worker room for every local model it may load:
 langevals:
   resources:
     requests: { cpu: 100m, memory: 768Mi }
-    limits:   { cpu: 500m, memory: 4Gi }
+    limits: { cpu: 500m, memory: 4Gi }
 ```
 
 The limit is a ceiling, not a reservation, so a generous one uses no extra
@@ -200,28 +202,81 @@ kubectl -n langwatch logs sts/langwatch-clickhouse --tail=50 | grep -i s3
 
 Ensure the service account has S3 access (IRSA) or static credentials are configured correctly.
 
-## PostgreSQL Issues
+### ClickHouse restarts with `NAMED_COLLECTION_ALREADY_EXISTS`
 
-### Migration failures on startup
+With chart-managed ClickHouse, the chart delivers the LangWatchQL named collections `lwql_postgres` and `lwql_postgres_<database>` as server config. A collection of the same name created by hand with `CREATE NAMED COLLECTION` clashes with it, and the server stops at startup. Remove the hand-made one before you upgrade. If the server already stops, roll back to the previous release (`helm rollback`) so ClickHouse starts, follow these steps, then upgrade again:
 
-If Prisma migrations fail, the app pod crashes. Check logs:
+Named collections created by hand live on one replica only, so run every step on each ClickHouse pod. Set your release and namespace, and a helper that runs a query on one pod with the chart's password:
 
 ```bash
-kubectl -n langwatch logs deploy/langwatch-app --tail=100 | grep -i prisma
+RELEASE=langwatch NS=langwatch
+PODS=$(kubectl -n "$NS" get pods -l "app.kubernetes.io/name=$RELEASE-clickhouse" -o name)
+ch() { kubectl -n "$NS" exec -i "$1" -c clickhouse -- sh -c \
+  'clickhouse-client --password "$(cat /mnt/secrets/password)" "$@"' ch "${@:2}"; }
 ```
 
-To skip migrations temporarily (for debugging):
+1. On each pod, list the collections, and the tables that read PostgreSQL through each one:
 
-```yaml
-app:
-  extraEnvs:
-    - name: SKIP_PRISMA_MIGRATE
-      value: "true"
+   ```bash
+   for pod in $PODS; do echo "== $pod"; ch "$pod" <<'SQL'
+   SELECT c.name AS collection, c.source, t.database, t.name AS engine_table
+   FROM system.named_collections AS c
+   LEFT JOIN (
+     SELECT database, name,
+       extract(engine_full, '^PostgreSQL\\(\\s*`?([A-Za-z0-9_]+)') AS collection
+     FROM system.tables
+     WHERE engine = 'PostgreSQL'
+   ) AS t ON t.collection = c.name
+   WHERE c.name LIKE 'lwql_postgres%'
+   ORDER BY collection, engine_table
+   SQL
+   done
+   ```
+
+2. On each pod, for each collection whose `source` is `SQL`, drop the tables listed beside it. They hold no data: each one reads PostgreSQL when it is queried. The next deploy recreates the LangWatchQL tables only. Save the definition of any table you created yourself first (`SHOW CREATE TABLE`) and recreate it after the upgrade. Until the deploy, LangWatchQL's PostgreSQL-backed views are unavailable.
+
+   ```bash
+   pod=pod/$RELEASE-clickhouse-0 # the pod that listed the table
+   ch "$pod" -q "SHOW CREATE TABLE <database>.<engine_table>"
+   ch "$pod" -q "DROP TABLE <database>.<engine_table>"
+   ```
+
+3. On each pod, drop each collection whose `source` is `SQL`. ClickHouse refuses while any table still uses it (`NAMED_COLLECTION_IS_USED`):
+
+   ```bash
+   pod=pod/$RELEASE-clickhouse-0 # the pod that listed the collection
+   ch "$pod" -q "DROP NAMED COLLECTION <collection>"
+   ```
+
+Upgrades need no collection created by hand: the upgrade binds the LangWatchQL tables to a collection the server already holds.
+
+## PostgreSQL Issues
+
+### The app refuses to start: the installation is behind
+
+The api never migrates; the workers run the upgrade when they start. The api logs `refuses to serve: the installation is behind this image` with the outstanding steps and is not ready while the upgrade has not run for its version. Check the workers' log for why the upgrade did not finish, or run it from the new image (see [Run the upgrade](/self-hosting/upgrade#run-the-upgrade)).
+
+The refusal names the cause: outstanding steps, or no ClickHouse configured (set `CLICKHOUSE_URL`, run the upgrade, start again). **Ops > Upgrades** and `pnpm task upgrade status` show the state.
+
+On Helm, read the workers' log. When upgrades are serialised (`serializeUpgrades` on and no `app.dataplane`), the pre-upgrade Job runs it instead:
+
+```bash
+kubectl -n langwatch logs deploy/<release>-workers --tail=100
+kubectl -n langwatch get jobs | grep migrate-pre-roll
+kubectl -n langwatch logs job/<release>-migrate-pre-roll --tail=100
 ```
 
-<Warning>
-Only skip migrations for debugging. Running with pending migrations can cause application errors.
-</Warning>
+On Docker Compose, read the `workers` service:
+
+```bash
+docker compose -f infra/compose.yml --project-directory . logs workers
+```
+
+### The upgrade failed
+
+A failed upgrade in the pre-upgrade Job fails the `helm upgrade` before any pod rolls, so the previous version keeps serving. When the new workers run it instead, the new api pods never become ready and the previous version keeps serving. On Docker Compose, the failure is in the `workers` log and the app does not become ready.
+
+The exit code and outcome code, and what to do for each, are in [Exit codes and what to do](/self-hosting/upgrade#exit-codes-and-what-to-do). The Job's or the workers' log and **Ops > Upgrades** name the failed step. A failed PostgreSQL migration is named with the command that clears it: check what it left behind, then run `prisma migrate resolve --rolled-back <migration>` if none of it remains, and run the upgrade again. It resumes where it stopped.
 
 ### Connection refused
 
@@ -243,7 +298,7 @@ kubectl -n langwatch exec deploy/langwatch-app -- \
 
 The redirect URI registered in your identity provider must exactly match the one shown on the connection's setup page:
 
-```
+```text
 https://<your LangWatch host>/api/auth/sso/callback/<connection id>
 ```
 
@@ -279,7 +334,7 @@ Roughly 1 KB per span (compressed). See [Sizing & Scaling](/self-hosting/configu
 
 ### Can I use an existing PostgreSQL, Redis?
 
-Yes. Use the external database overlays:
+Yes. Redis must be 7.0 or later (or Valkey 7.2 or later); LangWatch refuses to start when the server reports an older version (a server that does not report its version starts with a warning). Use the external database overlays:
 
 ```bash
 helm install langwatch langwatch/langwatch \

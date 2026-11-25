@@ -25,10 +25,62 @@ Feature: Request log level and where the cause is attached
   # The level
   # ---------------------------------------------------------------------------
 
+  # ---------------------------------------------------------------------------
+  # The logger name
+  #
+  # The request-failure alerts ("CLI / SDK Request Failures", "Dashboard Request
+  # Failures") filter on logger_name="langwatch:api:hono". Naming the logger per
+  # family made every one of them blind. The family is a field, not the name.
+  # ---------------------------------------------------------------------------
+
+  @unit @regression
+  Scenario: Every API family's request record is written under one logger name
+    Given a request answered by a REST family with its own namespace
+    When its request record is written
+    Then the record's logger is "langwatch:api:hono"
+    And the family is carried as a field on the record
+
+  # The tRPC and SSE lanes wrote no access record at all, so a dashboard 5xx was
+  # invisible to the request-failure alerts.
+
+  @unit @regression
+  Scenario: A dashboard tRPC request writes the same access record as a REST request
+    Given a tRPC procedure that answers successfully
+    When the dashboard calls it
+    Then one access record is written under "langwatch:api:hono" with the method, path, status and duration
+    And the record's family is "trpc"
+
+  @unit @regression
+  Scenario: A tRPC failure with a handled cause is logged by its fault
+    Given a tRPC procedure that fails with a handled platform error
+    When the dashboard calls it
+    Then the access record carries the handled code and fault
+    And it does not say the request failed without a cause attached
+
+  # The host also wrote "tRPC call failed" for every failure the "trpc call"
+  # record already carried at error: the same failure twice.
+  @unit @regression
+  Scenario: A failed tRPC call writes its failure once
+    Given a tRPC procedure that fails with an unhandled error
+    When the dashboard calls it
+    Then one "trpc call" record at error carries the cause
+    And no second "tRPC call failed" record is written
+
+  # A client that gave up mid-upload made the body read throw, which answered
+  # 500 and logged "error handling request" at error: hundreds a day, none ours.
+
+  @unit @regression
+  Scenario: A request whose body stopped arriving is the sender's 400, not a 500
+    Given a route that reads the whole request body
+    When the client's upload breaks off before the body is complete
+    Then the answer is 400 request_body_unreadable, attributed to the customer
+    And the same holds for a body measured against the ingestion size cap
+
   @unit @regression
   Scenario: A handled customer failure is logged below error
     When the failure is attributed to the customer
-    Then the record is logged at warning level
+    Then the first record for its family, code and status in a minute is logged at warning level
+    And the repeats in that minute are logged at debug
     And the handled code and fault are carried on the record
 
   @unit @regression
@@ -156,3 +208,10 @@ Feature: Request log level and where the cause is attached
   Scenario: Credentials in a failed Redis command never reach the summary
     When a failed AUTH command error is logged
     Then the emitted line does not contain the password
+
+  @unit
+  Scenario: A forwarded server failure names its status as the cause, never its body
+    Given a route that passes another service's 5xx answer through
+    When the request is logged
+    Then the record's cause names the forwarded status
+    And the forwarded body is neither read nor quoted

@@ -1,0 +1,124 @@
+/**
+ * Every run entry of the Scenarios tab. Each one opens the run dialog; the dialog owns
+ * the target choice, the note, the overrides, and the run itself.
+ * @see specs/features/agent-testing/cases-table.feature
+ */
+
+import { useCallback, useState } from "react";
+
+import { useOpenLiveRun } from "../../../../behavior/agent-testing/cases/use-open-live-run.ts";
+import { useAgentTestingStore } from "../../../../behavior/agent-testing/use-agent-testing-store.ts";
+import type { TestCase, TestSuiteEntry } from "../../../../model/agent-testing/cases/test-cases.ts";
+import { readScenarioTarget } from "../../use-scenario-target.ts";
+import type { RunDialogSubject, RunStartedInfo } from "../run/run-dialog.tsx";
+import { useOpenPlanRun } from "./use-open-plan-run.ts";
+
+/**
+ * The run dialog subject of a whole suite, with the scenarios it holds.
+ */
+function runSubjectForSuite({
+  suite,
+  cases,
+}: {
+  suite: TestSuiteEntry;
+  cases: TestCase[];
+}): RunDialogSubject {
+  return {
+    kind: "suite",
+    suiteId: suite.id,
+    name: suite.name,
+    scenarioIds: cases
+      .filter((testCase) => testCase.testSuiteId === suite.id)
+      .map((testCase) => testCase.id),
+    initialTarget: null,
+    persistedTarget: null,
+  };
+}
+
+/**
+ * What happens when a run is queued, shared by the table, scenario editor
+ * and Results tab. Opens under the run's own plan; a multi-scenario run
+ * opens the Results tab, a single-scenario run opens in the drawer instead.
+ */
+export function useRunStartedHandler(): (info: RunStartedInfo) => void {
+  const { openLiveRun } = useOpenLiveRun();
+  const openPlanRun = useOpenPlanRun();
+  const setPendingRun = useAgentTestingStore((state) => state.setPendingRun);
+
+  return useCallback(
+    ({ batchRunId, scenarioSetId, planSlug, scenarioId, targetId }: RunStartedInfo) => {
+      setPendingRun({ batchRunId, scenarioSetId });
+      if (!scenarioId) {
+        openPlanRun({ planSlug, batchRunId });
+        return;
+      }
+      // A run of one scenario opens in the drawer right away and streams into
+      // it, so the person watches the conversation without leaving the table.
+      openLiveRun({ batchRunId, scenarioSetId, scenarioId, targetId });
+    },
+    [setPendingRun, openLiveRun, openPlanRun],
+  );
+}
+
+export type CaseRunActions = {
+  /** The suite or scenario the run dialog is open on, if any. */
+  runSubject: RunDialogSubject | null;
+  closeRunDialog: () => void;
+  onRunStarted: (info: RunStartedInfo) => void;
+  runCase: (testCase: TestCase) => void;
+  /** Runs the suite that is open. */
+  runSelectedSuite: () => void;
+  runSuiteById: (suiteId: string) => void;
+};
+
+export function useCaseRunActions({
+  projectId,
+  cases,
+  suites,
+  selectedSuite,
+}: {
+  projectId: string;
+  cases: TestCase[];
+  suites: TestSuiteEntry[];
+  selectedSuite: TestSuiteEntry | null;
+}): CaseRunActions {
+  const [runSubject, setRunSubject] = useState<RunDialogSubject | null>(null);
+  const onRunStarted = useRunStartedHandler();
+
+  const runCase = useCallback(
+    (testCase: TestCase) => {
+      setRunSubject({
+        kind: "case",
+        scenarioId: testCase.id,
+        name: testCase.name,
+        initialTarget: readScenarioTarget({
+          projectId,
+          scenarioId: testCase.id,
+        }),
+      });
+    },
+    [projectId],
+  );
+
+  const runSelectedSuite = useCallback(() => {
+    if (!selectedSuite) return;
+    setRunSubject(runSubjectForSuite({ suite: selectedSuite, cases }));
+  }, [selectedSuite, cases]);
+
+  const runSuiteById = useCallback(
+    (suiteId: string) => {
+      const suite = suites.find((entry) => entry.id === suiteId);
+      if (suite) setRunSubject(runSubjectForSuite({ suite, cases }));
+    },
+    [suites, cases],
+  );
+
+  return {
+    runSubject,
+    closeRunDialog: () => setRunSubject(null),
+    onRunStarted,
+    runCase,
+    runSelectedSuite,
+    runSuiteById,
+  };
+}

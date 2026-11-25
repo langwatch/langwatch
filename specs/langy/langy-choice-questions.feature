@@ -248,6 +248,17 @@ Feature: Langy asks a real question with selectable options
       Then my choice appears as my own message in the conversation
       And a new turn starts with Langy acting on it
 
+    # A film showed an answered card still taking clicks: the second answer was
+    # refused as settled, and the refusal was read as a late answer and sent as
+    # a new message. The refusal names how the wait ended, so only an
+    # unanswered wait falls back to a message.
+    @unit
+    Scenario: A second answer to an already answered question starts no turn
+      Given a question card whose wait was already answered, here or in the terminal
+      When I select an option on it again
+      Then the card settles as answered
+      And no message is sent and no new turn starts
+
     @integration
     Scenario: Stopping the turn closes the open question
       Given an open question card asked by the tool

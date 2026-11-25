@@ -149,9 +149,9 @@ def sync_detailed(
 ]:
     """Update a dashboard widget
 
-     Replaces a dashboard widget's name, its { code, queries } definition, or both. code and queries are
-    rewritten together — the graph blob holds them as one — so a request that offers one without the
-    other, or neither field at all, is refused.
+     Changes a dashboard widget's name, code, queries, description or source. A field the body leaves out
+    keeps its stored value, so code alone keeps the queries and the source is kept unless the body names
+    one. A body with none of these fields is refused.
 
     Args:
         project_id (str):
@@ -196,9 +196,9 @@ def sync(
 ):
     """Update a dashboard widget
 
-     Replaces a dashboard widget's name, its { code, queries } definition, or both. code and queries are
-    rewritten together — the graph blob holds them as one — so a request that offers one without the
-    other, or neither field at all, is refused.
+     Changes a dashboard widget's name, code, queries, description or source. A field the body leaves out
+    keeps its stored value, so code alone keeps the queries and the source is kept unless the body names
+    one. A body with none of these fields is refused.
 
     Args:
         project_id (str):
@@ -237,9 +237,9 @@ async def asyncio_detailed(
 ]:
     """Update a dashboard widget
 
-     Replaces a dashboard widget's name, its { code, queries } definition, or both. code and queries are
-    rewritten together — the graph blob holds them as one — so a request that offers one without the
-    other, or neither field at all, is refused.
+     Changes a dashboard widget's name, code, queries, description or source. A field the body leaves out
+    keeps its stored value, so code alone keeps the queries and the source is kept unless the body names
+    one. A body with none of these fields is refused.
 
     Args:
         project_id (str):
@@ -282,9 +282,9 @@ async def asyncio(
 ):
     """Update a dashboard widget
 
-     Replaces a dashboard widget's name, its { code, queries } definition, or both. code and queries are
-    rewritten together — the graph blob holds them as one — so a request that offers one without the
-    other, or neither field at all, is refused.
+     Changes a dashboard widget's name, code, queries, description or source. A field the body leaves out
+    keeps its stored value, so code alone keeps the queries and the source is kept unless the body names
+    one. A body with none of these fields is refused.
 
     Args:
         project_id (str):

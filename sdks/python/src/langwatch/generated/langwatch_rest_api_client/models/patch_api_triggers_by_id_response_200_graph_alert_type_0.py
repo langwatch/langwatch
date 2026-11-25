@@ -4,7 +4,6 @@ from collections.abc import Mapping
 from typing import Any, Literal, TypeVar, cast
 
 from attrs import define as _attrs_define
-from attrs import field as _attrs_field
 
 from ..models.patch_api_triggers_by_id_response_200_graph_alert_type_0_operator import (
     PatchApiTriggersByIdResponse200GraphAlertType0Operator,
@@ -15,8 +14,7 @@ T = TypeVar("T", bound="PatchApiTriggersByIdResponse200GraphAlertType0")
 
 @_attrs_define
 class PatchApiTriggersByIdResponse200GraphAlertType0:
-    """The rule an alert fires by. Null for anything that is not one.
-
+    """
     Attributes:
         threshold (float):
         operator (PatchApiTriggersByIdResponse200GraphAlertType0Operator):
@@ -28,7 +26,6 @@ class PatchApiTriggersByIdResponse200GraphAlertType0:
     operator: PatchApiTriggersByIdResponse200GraphAlertType0Operator
     time_period: Literal[1440] | Literal[15] | Literal[1] | Literal[30] | Literal[5] | Literal[60]
     series_name: str
-    additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         threshold = self.threshold
@@ -41,7 +38,7 @@ class PatchApiTriggersByIdResponse200GraphAlertType0:
         series_name = self.series_name
 
         field_dict: dict[str, Any] = {}
-        field_dict.update(self.additional_properties)
+
         field_dict.update(
             {
                 "threshold": threshold,
@@ -99,21 +96,4 @@ class PatchApiTriggersByIdResponse200GraphAlertType0:
             series_name=series_name,
         )
 
-        patch_api_triggers_by_id_response_200_graph_alert_type_0.additional_properties = d
         return patch_api_triggers_by_id_response_200_graph_alert_type_0
-
-    @property
-    def additional_keys(self) -> list[str]:
-        return list(self.additional_properties.keys())
-
-    def __getitem__(self, key: str) -> Any:
-        return self.additional_properties[key]
-
-    def __setitem__(self, key: str, value: Any) -> None:
-        self.additional_properties[key] = value
-
-    def __delitem__(self, key: str) -> None:
-        del self.additional_properties[key]
-
-    def __contains__(self, key: str) -> bool:
-        return key in self.additional_properties

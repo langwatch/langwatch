@@ -1,26 +1,31 @@
 # Directory paths
 DOCS_DIR = api-reference
 API_SPEC_FILE = openapiLangWatch.json
-CANONICAL_SPEC = ../platform/app/src/app/api/$(API_SPEC_FILE)
+# The OpenAPI document is generated from the api's route declarations and never
+# committed. Mintlify builds the site from the repository alone and cannot run
+# the generator, so the site keeps a committed copy under its historical name;
+# docs CI regenerates it and fails when it is stale.
+GENERATED_SPEC = ../specs/api-reference/openapi-document.json
 
 
 .PHONY: sync-api-spec
 sync-api-spec:
-	@echo "Copying the canonical OpenAPI specification into the docs site..."
+	@echo "Generating the OpenAPI document and copying it into the docs site..."
+	@cd .. && pnpm --filter @langwatch/platform-api run openapi:generate
 	@mkdir -p $(DOCS_DIR)
-	@cp $(CANONICAL_SPEC) $(DOCS_DIR)/$(API_SPEC_FILE)
+	@cp $(GENERATED_SPEC) $(DOCS_DIR)/$(API_SPEC_FILE)
 	@echo "✅ API specification synced to $(DOCS_DIR)/$(API_SPEC_FILE)"
 
 .PHONY: generate-openapi-evals
 generate-openapi-evals:
 	@echo "Generating OpenAPI spec for evaluators from langevals..."
-	@npx tsx scripts/generate-openapi-evals.ts
+	@node scripts/generate-openapi-evals.ts
 	@echo "✅ Evaluators OpenAPI spec generated successfully"
 
 .PHONY: generate-api-reference
 generate-api-reference:
 	@echo "Generating API reference pages from OpenAPI spec..."
-	@../platform/app/node_modules/.bin/tsx scripts/generate-api-reference-pages.ts
+	@node --experimental-transform-types --no-warnings scripts/generate-api-reference-pages.ts
 	@echo "✅ API reference pages generated and docs.json updated"
 
 .PHONY: view-docs

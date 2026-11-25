@@ -1,0 +1,276 @@
+import type { Protections } from "@langwatch/trace-contract";
+/** ADR-087: The joined span read must never emit an empty time predicate. A
+ * page of log-only traces (epoch sentinel) left nothing, scanning every weekly
+ * part and dying with MEMORY_LIMIT_EXCEEDED. These assert on the SQL. */
+import { beforeAll, describe, expect, it, vi } from "vitest";
+
+import { TraceCanonicalisationService } from "#features/derivation/services/trace-canonicalisation.service";
+
+import { ownProof } from "../../../../../__tests__/support/authorization-proofs.fixture.ts";
+import { traceSummaryRow } from "../../../../../repositories/clickhouse/__tests__/support/trace-summary-row.support.ts";
+import { mappedLegacyRead } from "./support/legacy-trace-mapping.support.ts";
+
+const OWN_READ = ownProof({ projectId: "proj-1" });
+
+const { mockClickHouseQuery } = vi.hoisted(() => ({
+  mockClickHouseQuery: vi.fn(),
+}));
+const traceCanonicalisation = TraceCanonicalisationService.create();
+
+/** The process's tenant-keyed connection as this suite supplies it. The
+ * repository takes the resolver, so the fake sits with every other dependency. */
+const testResolveClickHouseClient = () => Promise.resolve({ query: mockClickHouseQuery } as never);
+
+vi.mock("~/server/filters/clickhouse", () => ({
+  generateClickHouseFilterConditions: () => ({
+    conditions: [],
+    params: {},
+    hasUnsupportedFilters: false,
+  }),
+}));
+
+vi.mock("langwatch", () => ({
+  getLangWatchTracer: () => ({
+    withActiveSpan: (_name: string, ...args: unknown[]) => {
+      const fn = args.length === 1 ? args[0] : args[1];
+      return (fn as (s: unknown) => Promise<unknown>)({
+        setAttribute: () => {},
+        setAttributes: () => {},
+      });
+    },
+  }),
+}));
+
+/** The repository's first import transforms a large graph; pay it once, outside any test. */
+beforeAll(async () => {
+  await import("../trace-legacy-read.repository.ts");
+}, 60_000);
+
+const protections = {
+  canSeeCosts: true,
+  canSeePiiData: true,
+  canSeeTopics: true,
+} as Protections;
+
+const NOW = Date.now();
+const RECENT_MS = NOW - 60 * 60 * 1000;
+
+function summaryRow(traceId: string, occurredAtMs: number) {
+  return traceSummaryRow({
+    ts_TraceId: traceId,
+    ts_SpanCount: 1,
+    ts_TotalDurationMs: 100,
+    ts_ComputedIOSchemaVersion: "1",
+    ts_ComputedInput: null,
+    ts_ComputedOutput: null,
+    ts_TimeToFirstTokenMs: null,
+    ts_TimeToLastTokenMs: null,
+    ts_TokensPerSecond: null,
+    ts_ContainsErrorStatus: false,
+    ts_ContainsOKStatus: true,
+    ts_ErrorMessage: "",
+    ts_Models: [],
+    ts_TotalCost: 0,
+    ts_TokensEstimated: false,
+    ts_TotalPromptTokenCount: 0,
+    ts_TotalCompletionTokenCount: 0,
+    ts_TopicId: null,
+    ts_SubTopicId: null,
+    ts_HasAnnotation: null,
+    ts_AnnotationIds: [],
+    ts_Attributes: {},
+    ts_TraceName: null,
+    ts_OccurredAt: occurredAtMs,
+    ts_CreatedAt: occurredAtMs,
+    ts_UpdatedAt: occurredAtMs,
+  });
+}
+
+/** The three reads fetchTracesWithSpansJoined fires with no time range are
+ * routed by query shape, not call order. Every shape is matched explicitly. */
+function mockReads({
+  resolved,
+  summaries,
+}: {
+  resolved: { fromMs: number | null; toMs: number | null };
+  summaries: ReturnType<typeof summaryRow>[];
+}) {
+  mockClickHouseQuery.mockReset();
+  mockClickHouseQuery.mockImplementation(({ query }: { query: string }) => {
+    const rows = matchRows({ query, resolved, summaries });
+    return Promise.resolve({ json: () => Promise.resolve(rows) });
+  });
+}
+
+function matchRows({
+  query,
+  resolved,
+  summaries,
+}: {
+  query: string;
+  resolved: { fromMs: number | null; toMs: number | null };
+  summaries: ReturnType<typeof summaryRow>[];
+}) {
+  if (query.includes("AS fromMs")) return [resolved];
+  if (query.includes("FROM trace_summaries AS t")) return summaries;
+  if (query.includes("FROM stored_spans AS t")) return [];
+  throw new Error(
+    `fixture: fetchTracesWithSpansJoined issued a read this fixture does not know: ${query}`,
+  );
+}
+
+/** Drives the read; a page with no summaries issues no span read at all. */
+function findTraces(traceIds: string[]) {
+  const service = mappedLegacyRead({
+    resolveClickHouseClient: testResolveClickHouseClient,
+    traceCanonicalisation,
+  });
+  return service.findTracesWithSpans({
+    authorization: OWN_READ,
+    projectId: "proj-1",
+    traceIds,
+    protections,
+  });
+}
+
+/** Drives the read and hands back the span query it issued. Missing span
+ * read is a broken fixture, not a failed expectation. Throws to report setup
+ * break as a setup break, keeping assertions in the it blocks. */
+async function readTraces(traceIds: string[]) {
+  await findTraces(traceIds);
+  const spanCall = mockClickHouseQuery.mock.calls.find(([args]) =>
+    String(args.query).includes("FROM stored_spans AS t"),
+  );
+  if (!spanCall) {
+    throw new Error(
+      "fixture: the service issued no stored_spans read, so there is no span query to inspect",
+    );
+  }
+  return spanCall[0] as {
+    query: string;
+    query_params: Record<string, unknown>;
+  };
+}
+
+describe("given a page of traces whose spans are read together", () => {
+  describe("when every summary carries a real filing time", () => {
+    /** @scenario "Spans are read from the weeks the page's traces were filed under" */
+    it("bounds the span read to those traces' own weeks", async () => {
+      mockReads({
+        resolved: { fromMs: RECENT_MS, toMs: RECENT_MS },
+        summaries: [summaryRow("t1", RECENT_MS), summaryRow("t2", RECENT_MS)],
+      });
+
+      const spanRead = await readTraces(["t1", "t2"]);
+
+      expect(spanRead.query).toContain("t.StartTime >=");
+      expect(spanRead.query).toContain("StartTime <=");
+      const twoDaysMs = 2 * 24 * 60 * 60 * 1000;
+      expect(spanRead.query_params.fromMs).toBe(RECENT_MS - twoDaysMs);
+      expect(spanRead.query_params.toMs).toBe(RECENT_MS + twoDaysMs);
+    });
+  });
+
+  describe("when no summary on the page carries a usable filing time", () => {
+    /** @scenario "A page whose summaries carry no usable filing time still reads spans within a bounded window" */
+    it("falls back to a retention floor rather than dropping the time predicate", async () => {
+      // Pre-anchor sentinel rows: OccurredAt is the epoch, and the light resolve
+      // (which now excludes sentinels in SQL) finds nothing to bound with.
+      mockReads({
+        resolved: { fromMs: null, toMs: null },
+        summaries: [summaryRow("t1", 0), summaryRow("t2", 0)],
+      });
+
+      const spanRead = await readTraces(["t1", "t2"]);
+
+      expect(spanRead.query).toContain("t.StartTime >=");
+      expect(spanRead.query).toContain("StartTime <=");
+      const fromMs = Number(spanRead.query_params.fromMs);
+      const ninetyDaysMs = 90 * 24 * 60 * 60 * 1000;
+      expect(fromMs).toBeGreaterThan(0);
+      // The floor is `now - 90d`, and `now` is read when the query runs rather
+      // than when this module loaded, so compare with a minute of slack.
+      expect(Math.abs(NOW - ninetyDaysMs - fromMs)).toBeLessThan(60_000);
+      expect(Number(spanRead.query_params.toMs)).toBeGreaterThanOrEqual(NOW);
+    });
+  });
+
+  describe("when one summary on the page carries no usable filing time", () => {
+    /** @scenario "One trace with no usable filing time does not unbound the whole page" */
+    it("bounds the span read by the times the other traces supply", async () => {
+      mockReads({
+        resolved: { fromMs: RECENT_MS, toMs: RECENT_MS },
+        summaries: [summaryRow("t1", 0), summaryRow("t2", RECENT_MS)],
+      });
+
+      const spanRead = await readTraces(["t1", "t2"]);
+
+      const twoDaysMs = 2 * 24 * 60 * 60 * 1000;
+      expect(spanRead.query_params.fromMs).toBe(RECENT_MS - twoDaysMs);
+      expect(spanRead.query_params.toMs).toBe(RECENT_MS + twoDaysMs);
+    });
+  });
+});
+
+describe("given the light resolve that bounds a hint-less batch read", () => {
+  it("excludes the epoch sentinel so one such row cannot collapse the range", async () => {
+    mockReads({
+      resolved: { fromMs: RECENT_MS, toMs: RECENT_MS },
+      summaries: [summaryRow("t1", RECENT_MS)],
+    });
+
+    await readTraces(["t1"]);
+
+    const resolveCall = mockClickHouseQuery.mock.calls.find(([args]) =>
+      String(args.query).includes("AS fromMs"),
+    );
+    expect(resolveCall).toBeDefined();
+    expect(String(resolveCall![0].query)).toContain("OccurredAt > fromUnixTimestamp64Milli(0)");
+  });
+});
+
+/** The summary read the service issued, located by its shape. */
+function summaryReadIssued() {
+  const call = mockClickHouseQuery.mock.calls.find(([args]) =>
+    String(args.query).includes("FROM trace_summaries AS t"),
+  );
+  if (!call) {
+    throw new Error("fixture: the service issued no trace_summaries read");
+  }
+  return call[0] as { query: string; query_params: Record<string, unknown> };
+}
+
+describe("given trace ids read by id alone", () => {
+  describe("when the resolve finds no summary filed under a real time", () => {
+    /** @scenario "Traces the resolve finds no filed summary for read only the epoch partition" */
+    it("bounds the summary read to the epoch partition", async () => {
+      mockReads({ resolved: { fromMs: null, toMs: null }, summaries: [] });
+
+      await expect(findTraces(["missing-1"])).resolves.toBeDefined();
+
+      const summaryRead = summaryReadIssued();
+      expect(summaryRead.query).toContain(
+        "t.OccurredAt >= fromUnixTimestamp64Milli({fromMs:Int64})",
+      );
+      expect(summaryRead.query_params).toMatchObject({ fromMs: 0, toMs: 0 });
+    });
+  });
+
+  describe("when the resolve fails", () => {
+    /** @scenario "A resolve that fails still reads the summaries" */
+    it("reads the summaries without a time bound, as before", async () => {
+      mockClickHouseQuery.mockReset();
+      mockClickHouseQuery.mockImplementation(({ query }: { query: string }) => {
+        if (query.includes("AS fromMs")) return Promise.reject(new Error("resolve failed"));
+        const rows = matchRows({ query, resolved: { fromMs: null, toMs: null }, summaries: [] });
+        return Promise.resolve({ json: () => Promise.resolve(rows) });
+      });
+
+      await expect(findTraces(["t1"])).resolves.toBeDefined();
+
+      const summaryRead = summaryReadIssued();
+      expect(summaryRead.query).not.toContain("t.OccurredAt >=");
+      expect(summaryRead.query_params).not.toHaveProperty("fromMs");
+    });
+  });
+});

@@ -22,7 +22,7 @@ npx langwatch claude
 
 The first run opens a browser to sign you in, then asks one question:
 
-```
+```text
 How should `langwatch claude` run?
 ❯ Using a Claude subscription   keep your own plan, send only telemetry to LangWatch
   Using an API key              route calls through LangWatch with a virtual key
@@ -36,7 +36,7 @@ If you read local usage with `ccusage`, this is the same accounting with the con
 
 ## Read your sessions
 
-Open **Sessions** at [/me/sessions](https://app.langwatch.ai/me/sessions). One row per session, with the context it carried, how often it compacted, how long it worked against how long it waited on you, and what it cost.
+Open **Sessions** at [/coding-agents/sessions](https://app.langwatch.ai/coding-agents/sessions). One row per session, with the context it carried, how often it compacted, how long it worked against how long it waited on you, and what it cost.
 
 <Frame caption="One row per session. Context and Compactions show which sessions ran heavy, and Pull requests shows what each one shipped.">
   ![Claude Code sessions list](/images/coding-agents/sessions-list.png)
@@ -46,12 +46,12 @@ Open **Sessions** at [/me/sessions](https://app.langwatch.ai/me/sessions). One r
 
 Open a session and the **Usage** tab prices it. Read the **Cache health** block first: cache reads and cache writes decide a large share of a coding agent's bill.
 
-| Stat | Why it costs you |
-| --- | --- |
-| **Peak context** | The most tokens the session carried into one call. Every later call pays to keep that context alive. |
-| **Cache misses** | Calls that rebuilt the context instead of reading it. A cache write costs more per token than a read, so a miss pays twice for the same tokens. |
-| **Context reused** | Tokens served from cache, billed at a fraction of fresh input. |
-| **Context rebuilt** | Tokens spent writing the cache again. |
+| Stat                | Why it costs you                                                                                                                                                                                                                                                                                        |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Peak context**    | The most tokens the session carried into one call. Every later call pays to keep that context alive.                                                                                                                                                                                                    |
+| **Cache misses**    | Model calls that wrote 1,000 tokens or more to the cache, and at least half as many as the call before them held in it (that call's cache read plus its cache write). A session's first call is never a miss. A cache write costs more per token than a read, so a miss pays twice for the same tokens. |
+| **Context reused**  | Tokens served from cache, billed at a fraction of fresh input.                                                                                                                                                                                                                                          |
+| **Context rebuilt** | Tokens spent writing the cache again.                                                                                                                                                                                                                                                                   |
 
 <Frame caption="Session detail with the Cache health section. This session compacted twice, missed its cache three times, and re-sent 393k tokens on its biggest rebuild.">
   ![Claude Code session cost detail](/images/coding-agents/session-detail.png)
@@ -73,7 +73,7 @@ A tool call the agent was denied stays in the replay, marked as denied, so a ses
 
 ## Cost per pull request
 
-**Pull requests** at [/me/pull-requests](https://app.langwatch.ai/me/pull-requests) sums every session that drove a branch, over the pull request's whole life and across everyone who worked on it. That is the number to compare against what the change was worth.
+**Pull requests** at [/coding-agents/pull-requests](https://app.langwatch.ai/coding-agents/pull-requests) sums every session that drove a branch, over the pull request's whole life and across everyone who worked on it. That is the number to compare against what the change was worth.
 
 <Frame caption="Cost per pull request, summed across every session and contributor that touched the branch.">
   ![Cost per pull request](/images/coding-agents/pull-requests-list.png)
@@ -103,7 +103,7 @@ You can point it at its own history too, through the [skills directory](https://
 
 Answer **Using an API key** at the first-run question instead. Paste your `sk-ant-` key at **Settings → Model providers**, and `langwatch claude` routes every call through the LangWatch AI Gateway with a virtual key.
 
-This path adds no extra cost and gives you two things the subscription path cannot. Cost comes from Anthropic's own response rather than from Claude Code's estimate, and a personal budget at **/me → Settings** is enforced rather than advisory: requests fail with `budget_exceeded` once you cross it. On a subscription you get alerts at 80% and 100%, because a proxy cannot gate subscription calls.
+This path adds no extra cost and gives you two things the subscription path cannot. Cost comes from Anthropic's own response rather than from Claude Code's estimate, and a personal budget at **/coding-agents → Settings** is enforced rather than advisory: requests fail with `budget_exceeded` once you cross it. On a subscription you get alerts at 80% and 100%, because a proxy cannot gate subscription calls.
 
 Everything above this section looks the same on either path.
 

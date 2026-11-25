@@ -8,20 +8,23 @@ vi.mock("../../../utils/apiKey", () => ({
   })),
 }));
 
-const { getGuidedState, completePath } = vi.hoisted(() => ({
+const { getGuidedState, completePath, recordLangyStart } = vi.hoisted(() => ({
   getGuidedState: vi.fn(),
   completePath: vi.fn(),
+  recordLangyStart: vi.fn(),
 }));
 
 vi.mock("@/client-sdk/services/onboarding/onboarding-api.service", () => ({
   OnboardingApiService: class {
     getGuidedState = getGuidedState;
     completePath = completePath;
+    recordLangyStart = recordLangyStart;
   },
 }));
 
 import { resolveCredentials } from "../../../utils/apiKey";
 import { onboardingCompletePathCommand } from "../complete-path";
+import { onboardingStartCommand } from "../start";
 import { onboardingStateCommand } from "../state";
 
 const STATE = {
@@ -67,9 +70,9 @@ describe("langwatch onboarding", () => {
       const result = await onboardingStateCommand();
 
       expect(resolveCredentials).toHaveBeenCalledTimes(1);
-      expect(
-        vi.mocked(resolveCredentials).mock.invocationCallOrder[0]!,
-      ).toBeLessThan(getGuidedState.mock.invocationCallOrder[0]!);
+      expect(vi.mocked(resolveCredentials).mock.invocationCallOrder[0]!).toBeLessThan(
+        getGuidedState.mock.invocationCallOrder[0]!,
+      );
       expect(result?.data).toEqual(CARD);
 
       result?.table();
@@ -114,11 +117,12 @@ describe("langwatch onboarding", () => {
         provider: "vertex_ai",
         providerModel: undefined,
       });
-      expect(((await onboardingStateCommand())?.data as { provider: string }).provider).toBe(
-        "Vertex AI",
-      );
+      const withProvider = (await onboardingStateCommand())?.data as { provider: string };
+      expect(withProvider.provider).toBe("Vertex AI");
+
       getGuidedState.mockResolvedValueOnce({ ...STATE, provider: undefined });
-      expect("provider" in ((await onboardingStateCommand())?.data as object)).toBe(false);
+      const withoutProvider = (await onboardingStateCommand())?.data as object;
+      expect("provider" in withoutProvider).toBe(false);
     });
 
     it("reads a skipped tour as Skipped and leaves the row out when there was no tour", async () => {
@@ -126,9 +130,9 @@ describe("langwatch onboarding", () => {
         ...STATE,
         tourSkippedAt: "2026-09-06T10:00:00.000Z",
       });
-      expect(((await onboardingStateCommand())?.data as { tour?: string }).tour).toBe(
-        "Skipped",
-      );
+      const skipped = (await onboardingStateCommand())?.data as { tour?: string };
+      expect(skipped.tour).toBe("Skipped");
+
       getGuidedState.mockResolvedValueOnce(STATE);
       const card = (await onboardingStateCommand())?.data as object;
       expect("tour" in card).toBe(false);
@@ -173,10 +177,46 @@ describe("langwatch onboarding", () => {
       completePath.mockRejectedValue(new Error("guided_path_unknown"));
       const log = vi.spyOn(console, "log").mockImplementation(noop);
 
-      await expect(onboardingCompletePathCommand("nope")).rejects.toThrow(
-        "guided_path_unknown",
-      );
+      await expect(onboardingCompletePathCommand("nope")).rejects.toThrow("guided_path_unknown");
       expect(log).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("given `langwatch onboarding start call` runs", () => {
+    /** @scenario "the CLI records Langy's start by name" */
+    it("asks the platform to record the call start and prints the choice, never a booking", async () => {
+      recordLangyStart.mockResolvedValue({ ...ANSWERED, langyStart: "call" });
+      const log = vi.spyOn(console, "log").mockImplementation(noop);
+
+      const result = await onboardingStartCommand("call");
+
+      expect(resolveCredentials).toHaveBeenCalledTimes(1);
+      expect(recordLangyStart).toHaveBeenCalledWith("call");
+      expect(result?.data).toEqual({ text: "You chose a call for the company setup" });
+      expect(JSON.stringify(result?.data)).not.toMatch(/book|schedul/i);
+
+      result?.table();
+      expect(log.mock.calls[0]![0]).toBe("You chose a call for the company setup");
+    });
+
+    it("prints the coding choice in the person's words", async () => {
+      recordLangyStart.mockResolvedValue({ ...ANSWERED, langyStart: "coding" });
+
+      const result = await onboardingStartCommand("coding");
+
+      expect(recordLangyStart).toHaveBeenCalledWith("coding");
+      expect(result?.data).toEqual({ text: "You chose to track your coding agent" });
+    });
+  });
+
+  describe("given `langwatch onboarding start meeting` runs", () => {
+    /** @scenario "the CLI refuses a start other than coding or call before any request" */
+    it("fails as langy_start_unknown, and never asks the platform", async () => {
+      await expect(onboardingStartCommand("meeting")).rejects.toMatchObject({
+        code: "langy_start_unknown",
+      });
+      expect(resolveCredentials).not.toHaveBeenCalled();
+      expect(recordLangyStart).not.toHaveBeenCalled();
     });
   });
 });

@@ -1,23 +1,18 @@
 /**
  * `connectAgent`: the function that runs an agent becomes a simulation target.
- *
- * The wrapper resolves the environment and the parameter schema at definition,
- * registers the agent with the process-wide client, and returns a function
- * that is directly callable (for unit tests and local runs) and exposes
- * `disconnect()`.
- *
  * @see specs/typescript-sdk/agent-wrapper.feature
  */
 
 import { ConsoleLogger, type Logger } from "../logger";
 import { getSharedClient, warnOnce, type AgentRuntime } from "./client";
-import {
-  resolveEnabled,
-  resolveEnvironment,
-  resolveInstanceLabel,
-} from "./identity";
-import type { AgentMessage, AgentParameterValue, JsonSchemaObject } from "./protocol";
-import type { AgentTransport } from "./transport";
+import { resolveEnabled, resolveEnvironment, resolveInstanceLabel } from "./identity";
+import type {
+  AgentMessage,
+  AgentParameterValue,
+  CallRun,
+  JsonSchemaObject,
+  ScenarioState,
+} from "./protocol";
 import {
   AgentParameterError,
   createParameterReader,
@@ -29,19 +24,27 @@ import {
   type ParameterInput,
   type StandardJsonSchema,
 } from "./schema";
+import type { AgentTransport } from "./transport";
 
 /** The default call timeout, and the cap the platform enforces. */
 export const DEFAULT_TIMEOUT_MS = 120_000;
 export const MAX_TIMEOUT_MS = 300_000;
 export const DEFAULT_CONCURRENCY = 10;
 
-/** What a handler may return: a string, one message, a list of messages, or an output with a session. */
+/**
+ * What a handler may return: a string, one message, a list of messages, or an
+ * output with a session.
+ */
 export type AgentOutput = string | AgentMessage | AgentMessage[];
 
-/** The output of one turn plus the session the agent keeps for the next turn of the same thread. */
+/**
+ * The output of one turn, the session the agent keeps for the next turn of the
+ * same thread, and an update to the scenario's state.
+ */
 export interface AgentResult {
   output: AgentOutput;
   session?: unknown;
+  state?: ScenarioState;
 }
 
 export type AgentReply = AgentOutput | AgentResult;
@@ -54,15 +57,44 @@ export interface AgentCall<P = Record<string, AgentParameterValue>> {
   newMessages: AgentMessage[];
   /** The platform's conversation id. */
   threadId: string;
-  /** The value the handler returned as `session` on the previous turn of this thread, null on the first. */
+  /**
+   * The value the handler returned as `session` on the previous turn of this
+   * thread, null on the first.
+   */
   session: unknown;
+  /** The scenario's state: what setup returned, as the latest turn updated it; null without one. */
+  state: ScenarioState | null;
   /** The run parameters, validated and with defaults filled. */
   params: P;
-  /** The trace id of the turn, so the agent's own spans join it. Empty when the call carries none. */
+  /**
+   * The trace id of the turn, so the agent's own spans join it. Empty when the
+   * call carries none.
+   */
   traceId: string;
 }
 
 export type AgentHandler<P> = (call: AgentCall<P>) => AgentReply | Promise<AgentReply>;
+
+/** The scenario run a hook is called for. */
+export type ScenarioRun = CallRun;
+
+type HookAnswer = ScenarioState | undefined | void;
+
+/** Makes the test data before the first turn and returns it as the state. */
+export type SetupHook<P> = (run: ScenarioRun, params: P) => HookAnswer | Promise<HookAnswer>;
+
+/** Removes the test data after the last turn; what it returns is shown on the run. */
+export type TeardownHook<P> = (
+  run: ScenarioRun,
+  state: ScenarioState | null,
+  params: P,
+) => HookAnswer | Promise<HookAnswer>;
+
+/** `agent.scenario`: declares the hooks the platform runs around a scenario's turns (ADR-180). */
+export interface ScenarioHooks<P> {
+  setup: (hook: SetupHook<P>) => void;
+  teardown: (hook: TeardownHook<P>) => void;
+}
 
 /** What a direct call of the wrapped function takes: messages, and anything else is optional. */
 export interface DirectAgentCall<P> {
@@ -70,6 +102,7 @@ export interface DirectAgentCall<P> {
   newMessages?: AgentMessage[];
   threadId?: string;
   session?: unknown;
+  state?: ScenarioState | null;
   params?: Partial<P>;
   traceId?: string;
 }
@@ -77,16 +110,16 @@ export interface DirectAgentCall<P> {
 export interface ConnectAgentOptions<P extends ParameterInput = ParameterDefinitions> {
   /** The agent name. One row per name and environment on the platform. */
   name: string;
-  /** Resolved from LANGWATCH_AGENT_ENVIRONMENT, APP_ENV, ENVIRONMENT, NODE_ENV, else development. */
+  /**
+   * Resolved from LANGWATCH_AGENT_ENVIRONMENT, APP_ENV, ENVIRONMENT, NODE_ENV,
+   * else development.
+   */
   environment?: string;
   /** A definition map, a Standard JSON Schema object, or a JSON Schema object. */
   parameters?: P;
   /**
-   * Whether this process connects. Takes any boolean, so one expression can
-   * gate the deployments that connect. Without it the default is true, except
-   * when CI is truthy; a value given here replaces that rule rather than adding
-   * to it, so keep the CI half: `process.env.APP_ENV !== "production" && !process.env.CI`.
-   * LANGWATCH_AGENT_CONNECT=0 always disables.
+   * Whether this process connects. Takes any boolean, so one expression can gate the
+   * deployments that connect.
    */
   enabled?: boolean;
   /** Names this instance in the platform. Also LANGWATCH_AGENT_INSTANCE_LABEL. */
@@ -104,37 +137,61 @@ export interface ConnectAgentOptions<P extends ParameterInput = ParameterDefinit
   apiKey?: string;
   endpoint?: string;
   projectId?: string;
-  /** `websocket` (default, falls back to HTTP when the upgrade is refused) or `http`. Also LANGWATCH_AGENT_TRANSPORT. */
+  /**
+   * `websocket` (default, falls back to HTTP when the upgrade is refused) or
+   * `http`. Also LANGWATCH_AGENT_TRANSPORT.
+   */
   transport?: AgentTransport;
   logger?: Logger;
 }
 
-/** The wrapped function: callable, and connected until `disconnect()`. */
-export interface ConnectedAgent<P> {
+/**
+ * The wrapped function: callable, and connected until `disconnect()`. `HookP`
+ * is `P` for every caller; only the implementation signature widens it, since
+ * the hook params are covariant and the call params are not.
+ */
+export interface ConnectedAgent<P, HookP = P> {
   (call: DirectAgentCall<P>): Promise<AgentResult>;
   readonly name: string;
   readonly environment: string;
   /** The parameter schema as registered. */
   readonly parameters: JsonSchemaObject;
+  /**
+   * Declares setup and teardown. Declared before the process yields, they ride
+   * on the first register; declared later, the agents register again.
+   */
+  readonly scenario: ScenarioHooks<HookP>;
   /** Send deregister and close the socket when this was the last agent of the process. */
   disconnect: () => Promise<void>;
 }
 
-type Widen<V> = V extends string ? string : V extends number ? number : V extends boolean ? boolean : V;
+type Widen<V> = V extends string
+  ? string
+  : V extends number
+    ? number
+    : V extends boolean
+      ? boolean
+      : V;
+
+/** The value type when neither `options` nor `type` pin one down: widened from `default`. */
+type ParameterValueFallback<D extends ParameterDefinition> = D extends { default: infer V }
+  ? Widen<V>
+  : string;
+
+/** The value type driven by the declared `type`, falling back to `default`'s widened type. */
+type ParameterValueByType<D extends ParameterDefinition> = D extends { type: "number" }
+  ? number
+  : D extends { type: "boolean" }
+    ? boolean
+    : D extends { type: "string" }
+      ? string
+      : ParameterValueFallback<D>;
 
 type ParameterValueOf<D extends ParameterDefinition> = D extends {
   options: readonly (infer O extends string)[];
 }
   ? O
-  : D extends { type: "number" }
-    ? number
-    : D extends { type: "boolean" }
-      ? boolean
-      : D extends { type: "string" }
-        ? string
-        : D extends { default: infer V }
-          ? Widen<V>
-          : string;
+  : ParameterValueByType<D>;
 
 /** The `params` type a definition map gives the handler. */
 export type InferParameters<P extends ParameterDefinitions> = {
@@ -142,28 +199,50 @@ export type InferParameters<P extends ParameterDefinitions> = {
 };
 
 const isMessage = (value: unknown): value is AgentMessage =>
-  typeof value === "object" && value !== null && !Array.isArray(value) && typeof (value as AgentMessage).role === "string";
+  typeof value === "object" &&
+  value !== null &&
+  !Array.isArray(value) &&
+  typeof (value as AgentMessage).role === "string";
 
-/** One of the four reply shapes as the `{ output, session }` the result frame carries. */
+/** One of the four reply shapes as the `{ output, session, state }` the result frame carries. */
 export function normalizeReply(reply: unknown): AgentResult {
   if (typeof reply === "string") return { output: reply };
-  if (Array.isArray(reply) && reply.every(isMessage)) return { output: reply };
+  if (Array.isArray(reply)) {
+    if (reply.every(isMessage)) return { output: reply };
+  }
   if (isMessage(reply)) return { output: reply };
   if (typeof reply === "object" && reply !== null && "output" in reply) {
-    const { output, session } = reply as { output: unknown; session?: unknown };
-    const normalized = normalizeReply(output);
-    return session === undefined ? normalized : { output: normalized.output, session };
+    const { output, session, state } = reply as {
+      output: unknown;
+      session?: unknown;
+      state?: ScenarioState;
+    };
+    return {
+      output: normalizeReply(output).output,
+      ...(session === undefined ? {} : { session }),
+      ...(state === undefined ? {} : { state }),
+    };
   }
   throw new Error(
-    "the agent handler must return a string, a message, a list of messages, or { output, session }",
+    "the agent handler must return a string, a message, a list of messages, or { output, session, state }",
   );
 }
 
-const clampTimeout = ({ timeoutMs, logger, name }: { timeoutMs: number | undefined; logger: Logger; name: string }): number => {
+const clampTimeout = ({
+  timeoutMs,
+  logger,
+  name,
+}: {
+  timeoutMs: number | undefined;
+  logger: Logger;
+  name: string;
+}): number => {
   if (timeoutMs === undefined) return DEFAULT_TIMEOUT_MS;
   if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) return DEFAULT_TIMEOUT_MS;
   if (timeoutMs > MAX_TIMEOUT_MS) {
-    logger.warn(`agent "${name}": timeoutMs ${timeoutMs} is above the ${MAX_TIMEOUT_MS} cap, using the cap`);
+    logger.warn(
+      `agent "${name}": timeoutMs ${timeoutMs} is above the ${MAX_TIMEOUT_MS} cap, using the cap`,
+    );
     return MAX_TIMEOUT_MS;
   }
   return Math.floor(timeoutMs);
@@ -199,7 +278,7 @@ export function connectAgent(
 export function connectAgent(
   options: ConnectAgentOptions<ParameterInput>,
   handler: AgentHandler<Record<string, AgentParameterValue>>,
-): ConnectedAgent<Record<string, AgentParameterValue>> {
+): ConnectedAgent<Record<string, AgentParameterValue>, Record<string, unknown>> {
   const logger = options.logger ?? new ConsoleLogger({ level: "info", prefix: "LangWatch" });
   const name = options.name?.trim();
   if (!name) throw new Error("connectAgent needs a name");
@@ -210,22 +289,28 @@ export function connectAgent(
   const timeoutMs = clampTimeout({ timeoutMs: options.timeoutMs, logger, name });
   const concurrency = Math.max(1, Math.floor(options.concurrency ?? DEFAULT_CONCURRENCY));
 
-  const runHandler = async (call: AgentCall<Record<string, AgentParameterValue>>): Promise<AgentResult> =>
-    normalizeReply(await handler(call));
+  const runHandler = async (
+    call: AgentCall<Record<string, AgentParameterValue>>,
+  ): Promise<AgentResult> => normalizeReply(await handler(call));
 
   const readParams = createParameterReader({ input: options.parameters, specs });
 
-  const invoke = async (call: DirectAgentCall<Record<string, AgentParameterValue>>): Promise<AgentResult> => {
+  const invoke = async (
+    call: DirectAgentCall<Record<string, AgentParameterValue>>,
+  ): Promise<AgentResult> => {
     const params = await readParams(call.params as Record<string, AgentParameterValue> | undefined);
     return runHandler({
       messages: call.messages,
       newMessages: call.newMessages ?? call.messages,
       threadId: call.threadId ?? `local_${Date.now().toString(36)}`,
       session: call.session ?? null,
+      state: call.state ?? null,
       params,
       traceId: call.traceId ?? "",
     });
   };
+
+  const hooks: AgentRuntime["hooks"] = {};
 
   const runtime: AgentRuntime = {
     name,
@@ -237,14 +322,32 @@ export function connectAgent(
       concurrency,
       timeoutMs,
       ...(options.sticky ? { sticky: true } : {}),
+      hooks: { setup: false, teardown: false },
     },
     readParams,
     concurrency,
     timeoutMs,
     run: runHandler,
+    hooks,
   };
 
   let detach: (() => Promise<void>) | undefined;
+  let refresh: (() => void) | undefined;
+
+  // The register frame is built when the socket opens, so a hook declared
+  // before the process yields rides on the first register; a later one registers again.
+  const scenario: ScenarioHooks<Record<string, AgentParameterValue>> = {
+    setup: (hook) => {
+      hooks.setup = async ({ run, params }) => hook(run, params);
+      runtime.register.hooks = { setup: true, teardown: Boolean(hooks.teardown) };
+      refresh?.();
+    },
+    teardown: (hook) => {
+      hooks.teardown = async ({ run, state, params }) => hook(run, state, params);
+      runtime.register.hooks = { setup: Boolean(hooks.setup), teardown: true };
+      refresh?.();
+    },
+  };
 
   if (!resolveEnabled({ explicit: options.enabled })) {
     logger.debug(`agent "${name}" not connected to LangWatch: the connection is disabled`);
@@ -267,23 +370,26 @@ export function connectAgent(
       });
       client.addAgent(runtime);
       detach = () => client.removeAgent(runtime);
+      refresh = () => client.refreshAgents();
     }
   }
 
   const connected = Object.assign(invoke, {
     environment,
     parameters,
+    scenario,
     disconnect: async (): Promise<void> => {
       if (!detach) return;
       const release = detach;
       detach = undefined;
+      refresh = undefined;
       await release();
     },
   });
   // A function's own `name` is read-only but configurable, so it is defined rather than assigned.
   Object.defineProperty(connected, "name", { value: name, configurable: true });
 
-  return connected as ConnectedAgent<Record<string, AgentParameterValue>>;
+  return connected as ConnectedAgent<Record<string, AgentParameterValue>, Record<string, unknown>>;
 }
 
 export { AgentParameterError };

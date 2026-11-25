@@ -1,12 +1,6 @@
 /**
- * `langwatch instant-eval estimate`: what a run would read and what it would
- * cost, with nothing judged and nothing charged.
- *
- * Takes the same inputs `run` does, so a line that prices a run is the same
- * line that starts it with the word changed. That is the whole reason it is its
- * own subcommand as well as a flag on `run`: an agent about to spend money
- * reads better asking for an estimate than remembering a flag.
- *
+ * `langwatch instant-eval estimate`: what a run would read and cost, judging and charging nothing.
+ * Same inputs as `run`, so pricing and starting differ by one word.
  * @see specs/features/instant-eval-cli.feature
  */
 

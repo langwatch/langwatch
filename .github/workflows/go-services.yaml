@@ -32,9 +32,9 @@ on:
       - "services/aigateway/**"
       - "pkg/**"
       - "cmd/**"
-      - "go.mod"
-      - "go.sum"
-      - "infra/docker/Dockerfile.go_service"
+      - "*/go.mod"
+      - "*/go.sum"
+      - "infra/docker/Dockerfile.go-services"
       - ".github/workflows/go-services.yaml"
       # from `chart`
       - "charts/gateway/**"
@@ -44,21 +44,18 @@ on:
       - "sdks/go/**"
       - "infra/docker/Dockerfile.langyagent"
       - "sdks/typescript/**"
-      - "packages/langy/**"
+      - "modules/langy/contract/**"
       - "skills/**"
       - "feature-map.json"
-      - "platform/app/src/server/tracer/types.ts"
-      - "platform/app/src/server/filters/types.ts"
-      - "platform/app/src/server/evaluations/types.ts"
-      - "platform/app/src/server/modelProviders/llmModels.json"
-      - "platform/app/src/app/api/openapiLangWatch.json"
+      - "modules/trace/contract/src/trace-format.schemas.ts"
+      - "modules/evaluator/contract/src/evaluators.native.ts"
+      - "modules/model-provider/contract/src/catalog/model-catalog.json"
       - "services/langevals/ts-integration/evaluators.generated.ts"
   workflow_dispatch:
 
 permissions:
   contents: read
   pull-requests: read
-  packages: write
 
 concurrency:
   group: go-services-${{ github.ref_name }}
@@ -77,23 +74,34 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          # The gate reads no working-tree content: on pull_request events
-          # dorny/paths-filter takes the changed-file list from the API, and
-          # every file this job needs on disk lives under .github/. Checking
-          # out the rest of the tree is pure runner time.
+          # The gate reads no working-tree content: dorny/paths-filter lists
+          # changed paths from git trees, and every file this job needs on disk
+          # lives under .github/. Checking out the rest of the tree is pure
+          # runner time.
           sparse-checkout: .github
+      # dorny diffs a pull request from the event's base commit, which can be
+      # older than the main this merge commit is built on, and so counts main's
+      # newer commits as changed. Diff from the merge commit's first parent.
+      - name: Diff from the main the merge commit is built on
+        if: github.event_name == 'pull_request'
+        id: diff-base
+        run: bash "$GITHUB_WORKSPACE/.github/scripts/pull-request-diff-base.sh" >> "$GITHUB_OUTPUT"
       - uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
         if: github.event_name != 'workflow_dispatch'
         id: filter
         with:
+          # Empty: diff with git, never the files API, which stops at 3,000
+          # files (specs/ci/path-filters.feature).
+          token: ""
+          base: ${{ steps.diff-base.outputs.sha }}
           filters: |
             service:
               - 'services/aigateway/**'
               - 'pkg/**'
               - 'cmd/**'
-              - 'go.mod'
-              - 'go.sum'
-              - 'infra/docker/Dockerfile.go_service'
+              - '*/go.mod'
+              - '*/go.sum'
+              - 'infra/docker/Dockerfile.go-services'
               - '.github/workflows/go-services.yaml'
             chart:
               - 'charts/gateway/**'
@@ -108,7 +116,7 @@ jobs:
               # The langyagent image bakes in the langwatch CLI, and that CLI is
               # generated AT IMAGE-BUILD TIME from inputs OUTSIDE the Go tree:
               # sdks/typescript/ + skills/ + feature-map.json + a handful of
-              # platform/app + services/langevals source files (sdks/typescript/copy-types.sh +
+              # packages + apps/api + services/langevals source files (sdks/typescript/copy-types.sh +
               # generate-skills-bundle.mjs). A change to any of those can break
               # `docker build -f infra/docker/Dockerfile.langyagent` with no Go source
               # touched — exactly the gap that shipped a broken build once
@@ -119,18 +127,16 @@ jobs:
               - 'pkg/**'
               - 'cmd/**'
               - 'sdks/go/**'
-              - 'go.mod'
-              - 'go.sum'
+              - '*/go.mod'
+              - '*/go.sum'
               - 'infra/docker/Dockerfile.langyagent'
               - 'sdks/typescript/**'
-              - 'packages/langy/**'
+              - 'modules/langy/contract/**'
               - 'skills/**'
               - 'feature-map.json'
-              - 'platform/app/src/server/tracer/types.ts'
-              - 'platform/app/src/server/filters/types.ts'
-              - 'platform/app/src/server/evaluations/types.ts'
-              - 'platform/app/src/server/modelProviders/llmModels.json'
-              - 'platform/app/src/app/api/openapiLangWatch.json'
+              - 'modules/trace/contract/src/trace-format.schemas.ts'
+              - 'modules/evaluator/contract/src/evaluators.native.ts'
+              - 'modules/model-provider/contract/src/catalog/model-catalog.json'
               - 'services/langevals/ts-integration/evaluators.generated.ts'
               - '.github/workflows/go-services.yaml'
 
@@ -142,45 +148,32 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@96fe6ef7f33517b61c61be40b68a1882f3264fb8 # v3
-        with:
-          platforms: arm64
-
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
         with:
           driver-opts: image=moby/buildkit:buildx-stable-1
 
-      - name: Login to GHCR
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Compute image tags
+      - name: Compute version
         id: meta
-        run: |
-          repo_lower=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
-          echo "image=ghcr.io/${repo_lower}/ai-gateway" >> "$GITHUB_OUTPUT"
-          echo "sha_tag=${GITHUB_SHA::12}" >> "$GITHUB_OUTPUT"
+        run: echo "sha_tag=${GITHUB_SHA::12}" >> "$GITHUB_OUTPUT"
 
-      - name: Build and push
+      # Build-only guard: this image is never pushed from here, main included.
+      # Only released versions go to a public registry: publish-docker-app.yml
+      # publishes ai-gateway, multi-arch, from the release commit. amd64 only,
+      # as the langyagent job below: the failures this catches (a broken Go
+      # compile, a missing COPY input) are arch-independent.
+      - name: Build gateway image (no push)
         uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v6
         with:
           context: .
-          file: infra/docker/Dockerfile.go_service
-          push: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
-          platforms: ${{ (github.event_name == 'push' && github.ref == 'refs/heads/main') && 'linux/amd64,linux/arm64' || 'linux/amd64' }}
+          file: infra/docker/Dockerfile.go-services
+          target: gateway
+          push: false
+          platforms: linux/amd64
           build-args: |
             VERSION=${{ steps.meta.outputs.sha_tag }}
-          tags: |
-            ${{ steps.meta.outputs.image }}:${{ steps.meta.outputs.sha_tag }}
-            ${{ steps.meta.outputs.image }}:latest
           cache-from: type=gha,scope=gateway
-          cache-to: type=gha,scope=gateway,mode=max
+          cache-to: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && 'type=gha,scope=gateway,mode=max' || '' }}
 
   langyagent:
     needs: changes
@@ -213,7 +206,7 @@ jobs:
           build-args: |
             SERVICE_VERSION=${{ github.sha }}
           cache-from: type=gha,scope=langyagent-amd64
-          cache-to: type=gha,scope=langyagent-amd64,mode=max
+          cache-to: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && 'type=gha,scope=langyagent-amd64,mode=max' || '' }}
 
   helm:
     needs: changes

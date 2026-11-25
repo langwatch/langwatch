@@ -1,5 +1,5 @@
 ---
-title: "LLM-as-a-Judge: score outputs on criteria without expected answers"
+title: "LLM-as-a-Judge: score outputs without expected answers"
 sidebarTitle: LLM-as-a-Judge
 description: Score outputs against written criteria with an LLM-as-a-Judge evaluator when your dataset has inputs but no expected answers, and read the reason behind each verdict.
 ---
@@ -17,11 +17,11 @@ This guide builds an experiment for a business coaching assistant, where the dat
 
 LangWatch ships three LLM-as-a-Judge evaluators. All three read the same inputs (`input`, `output` and, when you map it, `contexts`) and apply the criteria you write in the evaluator's prompt.
 
-| Evaluator | Returns | Use it when |
-|-----------|---------|-------------|
-| **LLM-as-a-Judge Boolean Evaluator** | Pass or fail | The output either meets the criteria or it does not. |
-| **LLM-as-a-Judge Score Evaluator** | A number on the scale your prompt defines. The default prompt asks for 0.0 to 1.0. | You want a graded verdict, for example how satisfied the user is likely to be. |
-| **LLM-as-a-Judge Category Evaluator** | One of the categories you define, each with a name and a description | You want to sort outputs into buckets, for example `on_topic`, `off_topic`, `refusal`. |
+| Evaluator                             | Returns                                                                            | Use it when                                                                            |
+| ------------------------------------- | ---------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| **LLM-as-a-Judge Boolean Evaluator**  | Pass or fail                                                                       | The output either meets the criteria or it does not.                                   |
+| **LLM-as-a-Judge Score Evaluator**    | A number on the scale your prompt defines. The default prompt asks for 0.0 to 1.0. | You want a graded verdict, for example how satisfied the user is likely to be.         |
+| **LLM-as-a-Judge Category Evaluator** | One of the categories you define, each with a name and a description               | You want to sort outputs into buckets, for example `on_topic`, `off_topic`, `refusal`. |
 
 ## Steps
 
@@ -31,15 +31,21 @@ Open [Experiments](https://app.langwatch.ai/@project/experiments), click **New E
 </Step>
 
 <Step title="Add a prompt column">
-Under **Prompts or Agents**, click **Add**, pick **Prompt**, then **New Prompt**. Pick the model, write the coaching assistant's system prompt, check that `input` maps to the dataset's `input` column under **Variables**, and click **Apply**.
+  Under **Prompts or Agents**, click **Add**, pick **Prompt**, then **New Prompt**. Pick the model,
+  write the coaching assistant's system prompt, check that `input` maps to the dataset's `input`
+  column under **Variables**, and click **Apply**.
 </Step>
 
 <Step title="Create the judge">
 On the prompt column, click **Add evaluator**, then **New Evaluator**. Pick the **LLM as Judge** category and **LLM-as-a-Judge Boolean Evaluator**.
 
-Name it, pick the judge model, and replace the default prompt with your criteria. Write the criteria as a checklist the judge can apply to one answer at a time. For example:
+Name it, pick the judge model, and replace the default prompt with your criteria. The model picker also lists **Decision models**, such as OpenAI Decisions API, TypeSafe Jev, Cloudflare Clef or Gemini Decision 1, which answer yes or no, score and category questions on your own provider key. [Your own model](/features/instant-evals/own-model) lists each one and the key it needs.
 
-```
+On LangWatch Cloud the picker can also list **Instant Evals**, a judge that needs no key of your own; see [Judge with Instant Evals](#judge-with-instant-evals).
+
+Write the criteria as a checklist the judge can apply to one answer at a time. For example:
+
+```text
 You are evaluating a business coaching assistant.
 The output passes only if all of these are true:
 1. It answers the question the user asked, not a different one.
@@ -50,14 +56,18 @@ Fail the output if any criterion is not met, and name the criterion that failed.
 ```
 
 <Frame>
-<img src="/images/evaluations/workbench-llm-judge-editor.png" alt="The LLM-as-a-Judge Boolean evaluator editor with the criteria prompt" />
+  <img
+    src="/images/evaluations/workbench-llm-judge-editor.png"
+    alt="The LLM-as-a-Judge Boolean evaluator editor with the criteria prompt"
+  />
 </Frame>
 
 In **Variables**, map `input` to the dataset's `input` column and `output` to the prompt column's output. Click **Create Evaluator**. If a required field stays unmapped, the workbench opens the mapping editor. Map the field there and click **Apply**.
+
 </Step>
 
 <Step title="Run">
-Click **Run** in the header. Each row fills with the assistant's answer and the judge's verdict.
+  Click **Run** in the header. Each row fills with the assistant's answer and the judge's verdict.
 </Step>
 
 <Step title="Read the reasons">
@@ -68,6 +78,14 @@ Click an evaluator chip to open its **Result** block. **Status** is the verdict 
 </Frame>
 </Step>
 </Steps>
+
+## Judge with Instant Evals
+
+On LangWatch Cloud, once Instant Evals is switched on for your organization, the judge model picker lists **Instant Evals** first. It runs on LangWatch's key, so it needs no model provider or key of your own. A self-hosted install cannot judge with it yet. How Instant Evals is switched on, and who processes the text, is in [Where the judged text goes](/features/instant-evals/limits-and-cost#where-the-judged-text-goes).
+
+- **What it reads.** Your prompt, plus the input, output and contexts you mapped, each as its own section. Your input, output and contexts share the room the judge has. A short one stays whole; a long one keeps its beginning and its end, so a long input never pushes out a short output.
+- **What it returns.** The Boolean, Score and Category judges keep their usual result. A Score judge on Instant Evals shows a minimum and a maximum: a whole-number range of at most ten values, such as 1 to 5 (but not 0 to 1), is asked as it is, and any other range is asked on 1 to 10 and mapped back onto yours. With no range set, the score is between 0 and 1.
+- **What it costs.** Each judged call is one Instant Evals row on the [billing events](/ai-gateway/billing-events) ledger, and the result's cost is its price. A call that judged no text records no row and no cost. An organization that is not billed per use can spend 1 USD on Instant Evals in total, shared with Instant Evals runs and judged queries; past it, the judge returns an error with `instant_eval_free_budget_exhausted` instead of a verdict.
 
 ## Calibrate the judge
 

@@ -1,44 +1,32 @@
+import { nowInstant } from "@langwatch/time";
 /**
- * The RUM session: the window of activity a visit represents.
- *
- * Trace ids answer "what happened in this one call"; a session id answers
- * "what else was this person doing around it", which is the question worth
- * asking when a report arrives as "it broke when I was editing the prompt".
- * The web SDK has no session concept, so this supplies one.
- *
- * Kept in `sessionStorage` rather than `localStorage` so it dies with the tab
- * rather than following someone across days, and rotated after a gap in
- * activity so an abandoned tab reopened tomorrow is a new visit rather than a
- * twenty-hour one.
- *
- * See ADR-058 and the OpenTelemetry session semantic conventions.
+ * The RUM session: the window of activity a visit represents (ADR-058).
+ * Kept in `sessionStorage` so it dies with the tab, and rotated after an
+ * inactivity gap so a reopened tab starts a new visit rather than one long one.
  */
 
-const SESSION_ID_KEY = "langwatch.rum.session.id";
-const SESSION_LAST_SEEN_KEY = "langwatch.rum.session.lastSeen";
+import {
+  RUM_SESSION_ID_KEY as SESSION_ID_KEY,
+  RUM_SESSION_LAST_SEEN_KEY as SESSION_LAST_SEEN_KEY,
+  SESSION_INACTIVITY_MS,
+} from "./constants.ts";
 
-/** A gap longer than this ends the session; the next span starts a new one. */
-export const SESSION_INACTIVITY_MS = 30 * 60 * 1000;
+export { SESSION_INACTIVITY_MS };
 
 const newSessionId = (): string => {
   // Matches the OTel session.id shape (16 bytes, hex). `randomUUID` is not used
   // because its dashes are not part of that shape.
   const bytes = new Uint8Array(16);
   crypto.getRandomValues(bytes);
-  return Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join(
-    "",
-  );
+  return Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
 };
 
 /**
- * The current session id, rotating it when the visit has gone quiet for longer
- * than {@link SESSION_INACTIVITY_MS}.
- *
- * Returns undefined when there is nowhere to keep it — Safari's private mode
- * throws on `sessionStorage`, and telemetry must never be the reason a page
- * fails to load.
+ * The current session id, rotating when the visit has gone quiet longer than
+ * {@link SESSION_INACTIVITY_MS}. Returns undefined when there's nowhere to
+ * keep it — Safari's private mode throws, and telemetry must never block a page.
  */
-export function currentSessionId(now = Date.now()): string | undefined {
+export function currentSessionId(now = nowInstant().epochMilliseconds): string | undefined {
   let storage: Storage;
   try {
     storage = window.sessionStorage;

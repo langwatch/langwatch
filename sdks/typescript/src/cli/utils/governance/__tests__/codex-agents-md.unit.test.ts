@@ -1,7 +1,6 @@
 /**
  * The LangWatch guidance block in codex's global AGENTS.md: installed
- * idempotently, removed exactly, and never touching a byte the user wrote.
- *
+ * idempotently, removed exactly, never touching a byte the user wrote.
  * Feature: specs/ai-governance/cli-wrappers/session-context-declare.feature
  */
 
@@ -115,10 +114,7 @@ describe("the codex AGENTS.md guidance block", () => {
 
   describe("when only half a marker pair is in the file", () => {
     it("reports no guidance, the same region removal accepts", () => {
-      fs.writeFileSync(
-        file,
-        `${USER_CONTENT}\n<!-- >>> langwatch agent guidance begin >>> -->\n`,
-      );
+      fs.writeFileSync(file, `${USER_CONTENT}\n<!-- >>> langwatch agent guidance begin >>> -->\n`);
 
       expect(hasCodexAgentGuidance(file)).toBe(false);
       expect(removeCodexAgentGuidance(file)).toBe(false);
@@ -129,7 +125,9 @@ describe("the codex AGENTS.md guidance block", () => {
     it("fails instead of replacing it with the block alone", () => {
       fs.mkdirSync(file);
 
-      expect(() => installCodexAgentGuidance(file)).toThrow();
+      expect(() => installCodexAgentGuidance(file)).toThrow(
+        expect.objectContaining({ code: "EISDIR" }),
+      );
       expect(fs.statSync(file).isDirectory()).toBe(true);
     });
   });
@@ -147,7 +145,7 @@ describe("the codex AGENTS.md guidance block", () => {
     });
   });
 
-  describe("the block itself", () => {
+  describe("when checking the guidance block itself", () => {
     it("renders nothing of its own as markdown structure", () => {
       const block = buildCodexAgentGuidanceBlock();
       for (const line of block.split("\n")) {

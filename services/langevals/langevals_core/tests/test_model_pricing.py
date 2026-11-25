@@ -80,12 +80,12 @@ class TestRegisterLangwatchModelPricing:
     def test_overlay_wins_and_litellm_prices_from_it(self, tmp_path, monkeypatch):
         write_catalog(
             tmp_path,
-            "llmModels.json",
+            "model-catalog.json",
             {"acme/acme-model-1": model("acme/acme-model-1", 0.5, 0.5)},
         )
         write_catalog(
             tmp_path,
-            "llmModels.overlay.json",
+            "model-catalog.overlay.json",
             {"acme/acme-model-1": model("acme/acme-model-1", 0.001, 0.002)},
         )
         monkeypatch.setenv(PRICING_DIR_ENV, str(tmp_path))

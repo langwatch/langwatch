@@ -21,6 +21,8 @@ import (
 //	$.items[0]            — numeric index
 //	$.items[*]            — every element
 //	$.items[*].id         — every element's "id" key
+//	$.items[-1]           — negative index, from the end
+//	$.items[-1:]          — slice [start:end], Python semantics
 //
 // Anything outside this subset returns an error.
 func ExtractJSONPath(data any, path string) (any, error) {
@@ -103,6 +105,18 @@ func walk(cur []any, path string) ([]any, error) {
 					next = append(next, arr...)
 					continue
 				}
+				if colon := strings.IndexByte(seg, ':'); colon >= 0 {
+					arr, ok := v.([]any)
+					if !ok {
+						continue
+					}
+					lo, hi, err := sliceBounds(seg[:colon], seg[colon+1:], len(arr))
+					if err != nil {
+						return nil, err
+					}
+					next = append(next, arr[lo:hi]...)
+					continue
+				}
 				idx, err := strconv.Atoi(seg)
 				if err != nil {
 					return nil, fmt.Errorf("jsonpath: invalid index %q", seg)
@@ -110,6 +124,9 @@ func walk(cur []any, path string) ([]any, error) {
 				arr, ok := v.([]any)
 				if !ok {
 					continue
+				}
+				if idx < 0 {
+					idx += len(arr)
 				}
 				if idx >= 0 && idx < len(arr) {
 					next = append(next, arr[idx])
@@ -119,6 +136,33 @@ func walk(cur []any, path string) ([]any, error) {
 		cur = next
 	}
 	return cur, nil
+}
+
+// sliceBounds resolves `[start:end]` like Python: blanks mean the ends,
+// negatives count from the end, and both clamp to the array.
+func sliceBounds(start, end string, n int) (int, int, error) {
+	bound := func(raw string, def int) (int, error) {
+		if raw == "" {
+			return def, nil
+		}
+		i, err := strconv.Atoi(raw)
+		if err != nil {
+			return 0, fmt.Errorf("jsonpath: invalid slice bound %q", raw)
+		}
+		if i < 0 {
+			i += n
+		}
+		return min(max(i, 0), n), nil
+	}
+	lo, err := bound(start, 0)
+	if err != nil {
+		return 0, 0, err
+	}
+	hi, err := bound(end, n)
+	if err != nil {
+		return 0, 0, err
+	}
+	return lo, max(lo, hi), nil
 }
 
 func indexAny(s, chars string) int {

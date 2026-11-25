@@ -11,7 +11,8 @@ member of the group receives those roles. The API calls these assignments role
 bindings.
 
 <Info>
-  Groups are an **Enterprise** feature, whether they come from SCIM or are created by hand. Set up [SCIM Provisioning](/platform/scim) for users first.
+  Groups are an **Enterprise** feature, whether they come from SCIM or are created by hand. Set up
+  [SCIM Provisioning](/platform/scim) for users first.
 </Info>
 
 ---
@@ -19,7 +20,7 @@ bindings.
 ## How it works
 
 1. Your identity provider pushes groups to the SCIM `/Groups` endpoint
-2. The groups appear at **Settings > Directory > Groups**
+2. The groups appear at **Settings > Users > Groups**
 3. You bind roles to each group, for example Member on the Engineering team
 4. A user added to the group in the identity provider holds every binding of the group
 5. A user removed from the group, or deprovisioned, loses them
@@ -34,14 +35,14 @@ bindings.
 </Frame>
 
 
-**Settings > Directory > Groups** lists every group. Each row shows:
+**Settings > Users > Groups** lists every group. Each row shows:
 
-| Column | Description |
-|--------|-------------|
-| **Group** | The group name from the identity provider |
-| **Source** | `SCIM` for a pushed group, `Manual` for a group created in LangWatch |
-| **Access** | The role bindings of the group |
-| **Members** | The number of users in the group |
+| Column      | Description                                                          |
+| ----------- | -------------------------------------------------------------------- |
+| **Group**   | The group name from the identity provider                            |
+| **Source**  | `SCIM` for a pushed group, `Manual` for a group created in LangWatch |
+| **Access**  | The role bindings of the group                                       |
+| **Members** | The number of users in the group                                     |
 
 Click a row to open the group dialog, where you manage the bindings and, for manual groups, the members.
 
@@ -60,17 +61,17 @@ A group can hold several bindings, for example Member on the organization plus A
 
 ### Binding scopes
 
-| Scope | What it grants |
-|-------|---------------|
+| Scope            | What it grants                                         |
+| ---------------- | ------------------------------------------------------ |
 | **Organization** | The role on every team and project in the organization |
-| **Team** | The role on one team and all its projects |
-| **Project** | The role on one project |
+| **Team**         | The role on one team and all its projects              |
+| **Project**      | The role on one project                                |
 
 ---
 
 ## How bindings add up
 
-A user in several groups holds every binding of every group, plus the bindings set on the user directly at **Settings > Directory > People**. Permissions add up: a request is allowed when any binding on the project, its team or the organization grants it, and no binding removes what another one grants.
+A user in several groups holds every binding of every group, plus the bindings set on the user directly at **Settings > Users > People**. Permissions add up: a request is allowed when any binding on the project, its team or the organization grants it, and no binding removes what another one grants.
 
 For example, a user in Group A (Member on the Engineering team) and Group B (Admin on the Engineering team) holds both, and can do everything an Admin can on that team.
 
@@ -102,7 +103,7 @@ Both `DELETE` and `PATCH active: false` remove the person's organization members
 
 You can also create groups manually without an identity provider:
 
-1. At **Settings > Directory > Groups**, click **Add a group** below the list
+1. At **Settings > Users > Groups**, click **Add a group** below the list
 2. Enter a group name
 3. Add role bindings and members in the dialog if you want
 4. Click **Create group**
@@ -113,21 +114,21 @@ Bindings work the same way on manual and SCIM groups. Members must already be in
 
 ## SCIM group endpoints
 
-| Endpoint | Methods |
-|----------|---------|
-| `/api/scim/v2/Groups` | `GET`, `POST` |
+| Endpoint                   | Methods                         |
+| -------------------------- | ------------------------------- |
+| `/api/scim/v2/Groups`      | `GET`, `POST`                   |
 | `/api/scim/v2/Groups/{id}` | `GET`, `PUT`, `PATCH`, `DELETE` |
 
 `POST` with the `displayName` of an existing group returns `409 Conflict`. `GET /Groups` returns SCIM groups only, at most 100 per page.
 
 ### Supported PATCH operations
 
-| Operation | Example | Effect |
-|-----------|---------|--------|
-| `add members` | Add users to the group | The users hold the group's bindings |
-| `remove members` | Remove users from the group | The group's bindings no longer apply to them |
-| `replace displayName` | Rename the group | The name changes in LangWatch |
-| `replace members` | Replace the member list | Adds the new members and removes the old ones |
+| Operation             | Example                     | Effect                                        |
+| --------------------- | --------------------------- | --------------------------------------------- |
+| `add members`         | Add users to the group      | The users hold the group's bindings           |
+| `remove members`      | Remove users from the group | The group's bindings no longer apply to them  |
+| `replace displayName` | Rename the group            | The name changes in LangWatch                 |
+| `replace members`     | Replace the member list     | Adds the new members and removes the old ones |
 
 A `replace` clears the membership only when `members` is an empty list or an explicit `null`. A `replace` with no `members` value, a `members` value that is not a list, or a list with entries that have no usable string `value` leaves the membership unchanged, so a malformed payload cannot revoke access. The other attributes in the same operation, such as `displayName`, still apply, and the unapplied part is written to the server log.
 
@@ -135,7 +136,7 @@ A `replace` clears the membership only when `members` is an empty list or an exp
 
 `GET /Groups` filters by `displayName` with a case-insensitive `eq`:
 
-```
+```http
 GET /api/scim/v2/Groups?filter=displayName eq "Engineering"
 ```
 
@@ -151,13 +152,13 @@ GET /api/scim/v2/Groups?filter=displayName eq "Engineering"
 
 **Users in a group have no access**
 
-- Open the group at **Settings > Directory > Groups**. The **Access granted** section needs at least one binding
+- Open the group at **Settings > Users > Groups**. The **Access granted** section needs at least one binding
 - The user is in the group's **Members** list. A user who was not in the organization when the identity provider pushed the group was skipped; push the group again after the user is provisioned
 
 **A user has more access than expected**
 
 - The user is in several groups. Bindings add up across groups
-- Bindings set on the user at **Settings > Directory > People** add up with the group bindings
+- Bindings set on the user at **Settings > Users > People** add up with the group bindings
 
 **Removing a user from a group in the identity provider has no effect**
 
@@ -171,7 +172,8 @@ GET /api/scim/v2/Groups?filter=displayName eq "Engineering"
 The [Groups REST API](/api-reference/groups/overview) creates groups, sets their bindings and members, and deletes them, so you can script provisioning outside SCIM.
 
 <Info>
-  The name and the members of a SCIM group belong to the identity provider. The REST API and the settings page refuse to change them.
+  The name and the members of a SCIM group belong to the identity provider. The REST API and the
+  settings page refuse to change them.
 </Info>
 
 ---

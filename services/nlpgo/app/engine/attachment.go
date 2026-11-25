@@ -1,6 +1,7 @@
 package engine
 
 import (
+	"bytes"
 	"context"
 	"encoding/base64"
 	"errors"
@@ -32,13 +33,8 @@ import (
 // referencing a link, not attaching a file. A URL that cannot be fetched fails
 // the run with a clear, user-facing error rather than a broken request.
 
-const (
-	// defaultMaxAttachmentBytes caps a single fetched attachment. Large enough
-	// for real photos/audio/PDFs, small enough to refuse a runaway download.
-	defaultMaxAttachmentBytes int64 = 20 * 1024 * 1024
-	// defaultAttachmentTimeout bounds the whole fetch (connect + read).
-	defaultAttachmentTimeout = 30 * time.Second
-)
+// defaultAttachmentTimeout bounds the whole fetch (connect + read).
+const defaultAttachmentTimeout = 30 * time.Second
 
 // httpURLRe matches an http(s) URL token: the scheme followed by a run of
 // non-space characters that are not URL-hostile delimiters. Trailing
@@ -50,6 +46,10 @@ var httpURLRe = regexp.MustCompile("https?://[^\\s<>\"'`]+")
 // content parts. It applies the same SSRF policy as the HTTP block (private,
 // loopback, and cloud-metadata addresses are refused, with DNS-rebinding
 // protection via SafeDialer), a wall-clock timeout, and a size cap.
+//
+// The engine holds one fetcher for every request it serves, so the fetcher is
+// never mutated after construction: a request that runs under its own size cap
+// takes a copy from withMaxBytes.
 type attachmentFetcher struct {
 	client   *http.Client
 	ssrf     httpblock.SSRFOptions
@@ -70,8 +70,17 @@ func newAttachmentFetcher(ssrf httpblock.SSRFOptions) *attachmentFetcher {
 			Transport: transport,
 		},
 		ssrf:     ssrf,
-		maxBytes: defaultMaxAttachmentBytes,
+		maxBytes: app.DefaultMaxAttachmentBytes,
 	}
+}
+
+// withMaxBytes returns a fetcher that applies the per-request size cap. The
+// copy shares the HTTP client (and so its connection pool) with the receiver,
+// which stays untouched for the requests running beside this one.
+func (f *attachmentFetcher) withMaxBytes(requested int64) *attachmentFetcher {
+	scoped := *f
+	scoped.maxBytes = app.ResolveMaxAttachmentBytes(requested)
+	return &scoped
 }
 
 // fetchedAttachment is the validated result of fetching a URL.
@@ -102,13 +111,9 @@ func (f *attachmentFetcher) fetch(ctx context.Context, rawURL string) (*fetchedA
 	if resp.StatusCode >= 400 {
 		return nil, attachmentError(rawURL, fmt.Sprintf("returned an error status (%d)", resp.StatusCode), resp.StatusCode)
 	}
-	// Read one byte past the cap so an oversized body is detectable.
-	body, err := io.ReadAll(io.LimitReader(resp.Body, f.maxBytes+1))
-	if err != nil {
-		return nil, attachmentError(rawURL, "could not be read ("+err.Error()+")", 0)
-	}
-	if int64(len(body)) > f.maxBytes {
-		return nil, attachmentError(rawURL, fmt.Sprintf("is larger than the %d MB attachment limit", f.maxBytes/(1024*1024)), 0)
+	body, ne := f.readBody(resp, rawURL)
+	if ne != nil {
+		return nil, ne
 	}
 	mt := normalizeMediaType(resp.Header.Get("Content-Type"))
 	// Sniff from the bytes when the server omits or generalizes the type, so
@@ -117,6 +122,52 @@ func (f *attachmentFetcher) fetch(ctx context.Context, rawURL string) (*fetchedA
 		mt = normalizeMediaType(http.DetectContentType(body))
 	}
 	return &fetchedAttachment{mediaType: mt, data: body, sourceURL: rawURL}, nil
+}
+
+// readBody reads the response body under the size cap. A server that declares
+// an oversized body is refused before any of it is read; one that declares
+// nothing is read one byte past the cap, so an oversized body is detectable.
+func (f *attachmentFetcher) readBody(resp *http.Response, rawURL string) ([]byte, *NodeError) {
+	if resp.ContentLength > f.maxBytes {
+		return nil, attachmentTooLargeError(rawURL, f.maxBytes)
+	}
+	body, err := readAllSized(io.LimitReader(resp.Body, f.maxBytes+1), resp.ContentLength)
+	if err != nil {
+		return nil, attachmentError(rawURL, "could not be read ("+err.Error()+")", 0)
+	}
+	if int64(len(body)) > f.maxBytes {
+		return nil, attachmentTooLargeError(rawURL, f.maxBytes)
+	}
+	return body, nil
+}
+
+// readAllSized reads r to the end. When the server declared the body length the
+// buffer is allocated once at that size, so a large attachment is not copied
+// through a series of growing buffers on the way in. The caller bounds r, and a
+// declared length past that bound never reaches here.
+func readAllSized(r io.Reader, declared int64) ([]byte, error) {
+	if declared <= 0 {
+		return io.ReadAll(r)
+	}
+	buf := bytes.NewBuffer(make([]byte, 0, declared+bytes.MinRead))
+	_, err := buf.ReadFrom(r)
+	return buf.Bytes(), err
+}
+
+// attachmentTooLargeError names the limit the request ran under, so the author
+// reads the figure their organization actually holds.
+func attachmentTooLargeError(rawURL string, maxBytes int64) *NodeError {
+	return attachmentError(rawURL, "is larger than the "+formatAttachmentLimit(maxBytes)+" attachment limit", 0)
+}
+
+// formatAttachmentLimit renders a byte limit in MB (1 MB = 1024 * 1024 bytes),
+// whole when the limit is a whole number of them.
+func formatAttachmentLimit(maxBytes int64) string {
+	const mb = 1024 * 1024
+	if maxBytes%mb == 0 {
+		return fmt.Sprintf("%d MB", maxBytes/mb)
+	}
+	return fmt.Sprintf("%.2f MB", float64(maxBytes)/mb)
 }
 
 // rewrite fetches remote attachment URLs in every message and re-homes them
@@ -367,7 +418,20 @@ func contentPartForAttachment(att *fetchedAttachment) (map[string]any, bool) {
 }
 
 func dataURL(att *fetchedAttachment) string {
-	return "data:" + att.mediaType + ";base64," + base64.StdEncoding.EncodeToString(att.data)
+	return encodeDataURL("data:"+att.mediaType+";base64,", att.data)
+}
+
+// encodeDataURL appends the base64 of data to prefix in one allocation. A
+// separate encode followed by a concatenation holds the encoded attachment
+// twice, which matters once an attachment is hundreds of megabytes.
+func encodeDataURL(prefix string, data []byte) string {
+	var b strings.Builder
+	b.Grow(len(prefix) + base64.StdEncoding.EncodedLen(len(data)))
+	b.WriteString(prefix)
+	enc := base64.NewEncoder(base64.StdEncoding, &b)
+	_, _ = enc.Write(data)
+	_ = enc.Close()
+	return b.String()
 }
 
 // dataURLWithName builds a data URL that carries the file name as an RFC 2397
@@ -377,7 +441,7 @@ func dataURLWithName(att *fetchedAttachment, name string) string {
 	if name == "" {
 		return dataURL(att)
 	}
-	return "data:" + att.mediaType + ";name=" + escapeAttachmentName(name) + ";base64," + base64.StdEncoding.EncodeToString(att.data)
+	return encodeDataURL("data:"+att.mediaType+";name="+escapeAttachmentName(name)+";base64,", att.data)
 }
 
 // escapeAttachmentName percent-encodes a file name for the ";name=" parameter,
@@ -392,8 +456,10 @@ func escapeAttachmentName(name string) string {
 // short "[media-type, N bytes]" summary when it does not.
 //
 // The ceiling is the collector's OTLP body limit, not the fetch limit: an
-// attachment fetch may return up to defaultMaxAttachmentBytes (20 MB) while the
-// collector refuses a body over 10 MB, and a rejected body loses the whole
+// attachment fetch may return up to the request's per-file limit (20 MB by
+// default, up to app.MaxAttachmentBytesCeiling for an organization that holds a
+// raised one) while the collector refuses a body over 10 MB, and a rejected
+// body loses the whole
 // trace, which is far worse than a summarized picture. The budget is shared
 // across the message set so several medium attachments cannot add up past the
 // same limit. Both figures count DECODED bytes; base64 inflates a payload by a

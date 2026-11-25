@@ -1,13 +1,7 @@
 /**
- * The `--field` flag, on two command families.
- *
- * On `test-suite create|update` a value declares a field: `identifier:type`,
- * where the type is text, number or boolean. On `scenario create|update` a
- * value gives the scenario's value for a field: `identifier=value`, coerced
- * by the type the suite declares when the suite is known.
- *
- * Both are read before anything is sent, so a malformed flag never leaves a
- * half-written suite or scenario behind.
+ * The `--field` flag: `test-suite create|update` declares a field
+ * (`identifier:type`); `scenario create|update` sets its value
+ * (`identifier=value`) — both validated before sending, so a bad flag leaves nothing half-written.
  */
 
 import {
@@ -18,6 +12,7 @@ import {
   fieldValueIsBlank,
   suiteFieldDefinitionsSchema,
 } from "@/internal/generated/types/suite-fields";
+
 import { commandValidationError, reportCommandError } from "./errorOutput";
 import { coerceParameterValue } from "./keyValueFlags";
 
@@ -65,13 +60,9 @@ export const parseSuiteFieldDefinitionFlags = ({
 };
 
 /**
- * `--field golden_sql=SELECT ...`, repeated, collected into the values a
- * scenario carries for the fields its suite declares.
- *
- * With the suite's definitions at hand, a value is coerced by its declared
- * type and a name the suite does not declare is refused with the list it
- * does. Without them, `true`, `false` and a plain number are read as what
- * they look like, and the platform settles the rest by name.
+ * `--field golden_sql=SELECT ...`, collected into a scenario's field values,
+ * coerced by the suite's declared type when known (an undeclared name is
+ * refused); otherwise true/false/numbers read as they look; the platform settles the rest.
  */
 export const parseScenarioFieldFlags = ({
   pairs,
@@ -85,9 +76,7 @@ export const parseScenarioFieldFlags = ({
   for (const pair of pairs) {
     const separator = pair.indexOf("=");
     if (separator <= 0) {
-      return rejectFlag(
-        `Invalid ${FIELD_FLAG} value: ${pair} (expected identifier=value)`,
-      );
+      return rejectFlag(`Invalid ${FIELD_FLAG} value: ${pair} (expected identifier=value)`);
     }
     const identifier = pair.slice(0, separator).trim();
     const raw = pair.slice(separator + 1);
@@ -95,9 +84,7 @@ export const parseScenarioFieldFlags = ({
       values.set(identifier, coerceParameterValue({ value: raw }));
       continue;
     }
-    const definition = definitions.find(
-      (candidate) => candidate.identifier === identifier,
-    );
+    const definition = definitions.find((candidate) => candidate.identifier === identifier);
     if (!definition) {
       const declared = definitions.map((field) => field.identifier);
       return rejectFlag(

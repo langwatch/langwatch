@@ -370,7 +370,29 @@ Feature: Langy works in a folder shared from the developer's machine
       And Langy is running a command that takes several minutes
       When the command runs for longer than the turn stall window
       Then the turn is still in flight and its answer is not lost
-      And the panel says what is running and on which machine
+      And the panel says a command is running and on whose machine
+
+    # The line once repeated the raw uv or Python command beside the card that
+    # already shows it. It names the person who shared the folder, and falls
+    # back to the machine's own name when no name is on record.
+    @unit
+    Scenario: The activity line says whose machine, never the command
+      Given a folder shared by Ada Lovelace from the machine "ada-mbp"
+      When Langy runs a command there for longer than one heartbeat
+      Then the panel says "Running on Ada's machine"
+      And the line never repeats the command, which stays on the card
+      And with no name on record the line says "Running on ada-mbp"
+
+    # A failed command hid its one readable line: a Python warning read as a
+    # stack trace, and uv's progress escapes stayed in the text.
+    @unit
+    Scenario: A failed command says its exit code and its last error line
+      Given a connected folder
+      When a command exits non-zero after printing warnings, progress bars and an error
+      Then the card says the exit code the command stopped with
+      And it shows the last error line the command printed as its detail
+      And a warning line is never taken for a stack trace
+      And the details hold the output with every terminal escape removed
 
     @integration
     Scenario: The live stream stays alive during a long wait
@@ -416,6 +438,14 @@ Feature: Langy works in a folder shared from the developer's machine
       When the command line applies it
       Then the text is added as the last line of the file, which is created when absent
       And a replacement in a file that is not there is still refused
+
+    @unit
+    Scenario: A search pattern that is not a valid regular expression is searched as plain text
+      Given a file on the developer's machine holding the line "prompt = create_prompt(name)"
+      When Langy searches the folder for "create_prompt(" without asking for plain text
+      Then the search finds the line instead of failing on the bare parenthesis
+      And the result says the pattern was searched as plain text because it is not a valid regular expression
+      And a pattern that is a valid regular expression is still read as one
 
   Rule: The app gets its LangWatch key from the developer's login, never from Langy
 
@@ -464,12 +494,58 @@ Feature: Langy works in a folder shared from the developer's machine
 
   Rule: The session key is the only credential and it ends with the conversation
 
+    # The worker calls the local surface with its conversation's session key,
+    # which never holds `langy:create` (Langy may not start Langy). The door
+    # asks no permission; the service bridges the key to its owner, checks the
+    # owner's Langy access and refuses any conversation that is not theirs.
+
+    @unit
+    Scenario: Langy's own session key reaches the local surface
+      Given the worker's Langy session key, carrying no "langy:create"
+      When the worker calls the local surface with it
+      Then the call is served to the key's owner in the key's project
+      And no permission is asked of the key
+
+    @unit
+    Scenario: A call without a key the door accepts is refused
+      Given a request carrying no key the door accepts
+      When it calls the local surface
+      Then the call is refused before any conversation is read
+
     @integration
     Scenario: The CLI connects with the session key alone
       Given an approved control request
       When the CLI connects with an API key that is not the minted session key
       Then the connection is refused
       And the refusal names the reason
+
+    @unit
+    Scenario: The CLI may send the session key as a bearer token or as Basic credentials
+      Given an approved control request
+      When the CLI registers over long-poll with the session key as a bearer token or as Basic credentials
+      Then the folder is registered
+      And a key sent only as X-Auth-Token is refused with the frame that asks for a bearer token
+
+    @unit
+    Scenario: A long-poll register with a key that is not a Langy session key answers a refused frame
+      Given an approved control request
+      When the CLI registers over long-poll with a key that is not the minted session key
+      Then register answers 403 with a refused frame
+      And the frame names the reason: an invalid key, the wrong kind of key, or a key that controls no conversation
+
+    @unit
+    Scenario: A long-poll poll or post for an unknown instance token answers 410
+      Given a long-poll share registered on another pod, or one that has ended
+      When the CLI polls or posts frames with its instance token
+      Then the platform answers 410 with no frames and nothing accepted
+      And the CLI registers again, as it does after a dropped socket
+
+    @unit
+    Scenario: A pod that shuts down retires its long-poll shares before closing the session store
+      Given a folder shared over long-poll on a pod
+      When the pod shuts down
+      Then the pod retires every long-poll share it holds
+      And only then closes its session-state store
 
     @integration
     Scenario: Disconnecting from the panel revokes the key
@@ -510,6 +586,12 @@ Feature: Langy works in a folder shared from the developer's machine
       And the address bar no longer carries the conversation parameter
 
     @unit
+    Scenario: Every project page reads the follow-along link
+      Given the project layout that mounts Langy
+      When any project page renders
+      Then the follow-along link in its address is read, so opening it lands on the conversation
+
+    @unit
     Scenario: A link to a conversation I cannot see is refused silently
       Given a follow-along link for a conversation I have no access to
       When I open that link
@@ -521,3 +603,15 @@ Feature: Langy works in a folder shared from the developer's machine
       Given a follow-along link, whose path is the site root
       When the root resolves my home page
       Then the conversation parameter travels to the page it lands on
+
+  @unit
+  Scenario: A poll for a lapsed call or question answers a handled not found
+    Given the call or question the worker polls has lapsed
+    When the worker reads its answer
+    Then the platform answers not found with the code langy_local_record_not_found
+
+  @unit
+  Scenario: The control family answers at main's dated and latest addresses
+    Given a command line that pinned the control family at 2026-08-27 or at latest
+    When it lists, approves or cancels a request, or registers, polls or posts frames
+    Then the platform answers as it does at the undated address

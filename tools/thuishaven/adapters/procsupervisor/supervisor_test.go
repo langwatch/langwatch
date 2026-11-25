@@ -34,3 +34,27 @@ func TestRunOnceBoundedLetsFastCommandsFinish(t *testing.T) {
 		t.Fatalf("a fast, well-behaved command should not be reaped: %v", err)
 	}
 }
+
+func TestSuperviseKillsALaneOverItsMemoryCeilingAndRestartsIt(t *testing.T) {
+	s := New(true)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	reaps := make(chan string, 4)
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		s.superviseChild(ctx, app.Child{
+			Name: "capped", Dir: t.TempDir(), Shell: "sleep 30", MaxRSSBytes: 1,
+			OnReap: func(reason string) { reaps <- reason },
+		})
+	}()
+	for range 2 { // killed, restarted, killed again
+		select {
+		case <-reaps:
+		case <-time.After(10 * time.Second):
+			t.Fatal("the lane over its ceiling was not killed and restarted")
+		}
+	}
+	cancel()
+	<-done
+}

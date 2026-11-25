@@ -13,9 +13,11 @@ import (
 // TEST_VK_AZURE's bound ModelProvider must carry:
 //   - azure_openai credential with api_key + endpoint (e.g.
 //     https://langwatchopenaisweden.openai.azure.com/)
-//   - a deployment_map entry mapping "gpt-5-mini" → the Azure deployment name
-//     (Azure routes on deployment, not on the bare model id; the gateway's
-//     bifrost adapter substitutes via pc.DeploymentMap).
+//   - a deployment for the model: with no deployment_map entry the gateway
+//     maps the model id to a deployment of the same name, so either the
+//     resource has a "gpt-5-mini" deployment or AZURE_MODEL names the one it
+//     has. cmd/matrixseed stores no deployment_map: the public REST route
+//     it writes through does not take one.
 func azureCell(t *testing.T, scenario string, body func(string) []byte, streaming bool) resolvedCell {
 	t.Helper()
 	vk := requireEnv(t, "TEST_VK_AZURE")

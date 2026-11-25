@@ -79,6 +79,9 @@ func buildMessagesResponsesRequest(
 	if len(anthReq.Messages) == 0 {
 		return nil, fmt.Errorf("anthropic messages body has no messages")
 	}
+	if provider == bfschemas.Bedrock {
+		anthReq.Messages = inlineMidConversationSystem(anthReq.Messages)
+	}
 
 	bfReq := anthReq.ToBifrostResponsesRequest(bfCtx)
 	if bfReq == nil {
@@ -89,6 +92,7 @@ func buildMessagesResponsesRequest(
 	bfReq.Model = model
 	bfReq.Fallbacks = nil
 	normalizeReasoningBudget(bfReq)
+	restoreReasoningItemIDs(bfReq)
 
 	return bfReq, nil
 }
@@ -153,10 +157,14 @@ func (r *BifrostRouter) dispatchMessagesTranslated(
 	// dispatch goes through the pinned aws-sdk client instead. OpenAI models
 	// on Bedrock take the same lane over the public runtime host (see
 	// bedrockConverseEndpoint).
-	if endpoint, epErr := resolveBedrockConverseEndpoint(cred, model); epErr != nil {
+	if endpoint, epErr := resolveBedrockConverseEndpoint(cred, model, r.endpointPolicy); epErr != nil {
 		return nil, epErr
 	} else if endpoint != "" {
 		return r.dispatchMessagesTranslatedBedrockVPCE(ctx, bfCtx, bfReq, model, cred, endpoint)
+	}
+
+	if err := carryBedrockCacheTTL(bfCtx, bfReq, req.Body); err != nil {
+		return nil, anthropicUpstreamError(http.StatusBadRequest, err.Error())
 	}
 
 	resp, berr := r.bf.ResponsesRequest(bfCtx, bfReq)
@@ -188,6 +196,7 @@ func assembleAnthropicMessageBody(
 	resp *bfschemas.BifrostResponsesResponse,
 	model string,
 ) ([]byte, error) {
+	exposeEncryptedReasoning(resp)
 	anthResp := bfanthropic.ToAnthropicResponsesResponse(bfCtx, resp)
 	if anthResp == nil {
 		return nil, anthropicUpstreamError(http.StatusBadGateway, "provider response could not be translated")
@@ -201,6 +210,7 @@ func assembleAnthropicMessageBody(
 	if anthResp.Content == nil {
 		anthResp.Content = []bfanthropic.AnthropicContentBlock{}
 	}
+	sealResponseReasoningData(resp, anthResp.Content)
 	// A reply carrying a tool call ends in tool_use, whatever the provider
 	// reported. Providers that translate through their own chat shape lose the
 	// distinction and answer end_turn, which tells the client the turn is over
@@ -235,10 +245,14 @@ func (r *BifrostRouter) dispatchMessagesTranslatedStream(
 	}
 
 	// Same endpoint pinning as the non-streaming lane above.
-	if endpoint, epErr := resolveBedrockConverseEndpoint(cred, model); epErr != nil {
+	if endpoint, epErr := resolveBedrockConverseEndpoint(cred, model, r.endpointPolicy); epErr != nil {
 		return nil, epErr
 	} else if endpoint != "" {
 		return r.dispatchMessagesTranslatedBedrockVPCEStream(ctx, bfCtx, bfReq, req, model, cred, endpoint)
+	}
+
+	if err := carryBedrockCacheTTL(bfCtx, bfReq, req.Body); err != nil {
+		return nil, anthropicUpstreamError(http.StatusBadRequest, err.Error())
 	}
 
 	ch, berr := r.bf.ResponsesStreamRequest(bfCtx, bfReq)
@@ -259,8 +273,8 @@ func (r *BifrostRouter) dispatchMessagesTranslatedStream(
 // streaming and non-streaming translated lanes. An invalid endpoint comes back as the Anthropic-shaped 400 both lanes owe
 // their clients; keeping the check in one place means the error contract and
 // any future bypass condition cannot drift between the two.
-func resolveBedrockConverseEndpoint(cred domain.Credential, model string) (string, error) {
-	endpoint, err := bedrockConverseEndpoint(cred, model)
+func resolveBedrockConverseEndpoint(cred domain.Credential, model string, policy customerEndpointPolicy) (string, error) {
+	endpoint, err := bedrockConverseEndpoint(cred, model, policy)
 	if err != nil {
 		return "", anthropicUpstreamError(http.StatusBadRequest, err.Error())
 	}

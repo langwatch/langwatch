@@ -7,7 +7,7 @@ Feature: Gateway list pages for a viewer without the grant
   # the view grant only on a team or project can open the page and is refused
   # the list.
   #
-  # Bindings: platform/app/src/components/gateway/__tests__/GatewayErrorPanel.integration.test.tsx
+  # Bindings: modules/gateway/browser/src/ui/elements/__tests__/gateway-error-panel.integration.test.tsx
 
   @integration
   Scenario: A refused gateway list reads as no access, not as a failed load

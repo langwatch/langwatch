@@ -1,38 +1,18 @@
 // @vitest-environment node
 
+import { spawn } from "node:child_process";
+import * as fs from "node:fs";
+import * as http from "node:http";
+import * as os from "node:os";
+import * as path from "node:path";
+import { clearTimeout, setTimeout } from "node:timers";
+
 /**
- * CLI wrapper e2e suite.
- *
- * Pure-Node harness — no Docker, no live LLM, no langwatch-server.
- * Spins up a fake control-plane + fake gateway in-process, drops
- * shell-script "tool stubs" (claude/codex/opencode/cursor/gemini)
- * on a tmp PATH, spawns the compiled langwatch CLI as a child, and
- * asserts on:
- *
- *   1. Login config write — `langwatch login` ceremony lands a
- *      GovernanceConfig the wrapper can read on next invocation.
- *   2. Env injection — `langwatch <tool>` spawns the underlying tool
- *      with the right per-provider env vars set to gateway-base-url
- *      + personal-VK secret.
- *   3. Routing — when a tool stub actually issues an HTTP request
- *      using its injected env vars, the request lands at the fake
- *      gateway with the expected path + Authorization header.
- *   4. Budget pre-check — if the control-plane returns 402 on the
- *      pre-flight check, the wrapper exits 2 BEFORE spawning the
- *      tool; under-limit case spawns normally.
- *   5. Tool-not-found — clear error + exit 127 when the binary
- *      isn't on PATH.
- *   6. Exit-code propagation — wrapper transparently returns the
- *      child's exit code.
- *
+ * CLI wrapper e2e suite: pure-Node harness (no Docker, no live LLM), a fake
+ * control-plane + gateway in-process, and tool stubs on a tmp PATH.
  * Spec: specs/ai-governance/cli-wrappers/wrap-login-routing.feature
  */
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import * as fs from "node:fs";
-import * as os from "node:os";
-import * as path from "node:path";
-import * as http from "node:http";
-import { spawn } from "node:child_process";
 
 // ─────────────────────────────────────────────────────────────────
 // Harness state
@@ -41,12 +21,12 @@ let cpServer: http.Server;
 let gwServer: http.Server;
 let cpUrl: string;
 let gwUrl: string;
-let recordedGwRequests: Array<{
+let recordedGwRequests: {
   path: string;
   method: string;
   authorization: string;
   body: string;
-}> = [];
+}[] = [];
 let cpBudgetResponse: { status: number; body: unknown } = {
   status: 200,
   body: { ok: true },
@@ -54,13 +34,10 @@ let cpBudgetResponse: { status: number; body: unknown } = {
 let tmpRoot: string;
 let toolStubsDir: string;
 let configPath: string;
-// Hermetic HOME for the spawned CLI. The wrapper resolves the tool through the
-// user's interactive login shell (`$SHELL -i -c`) so aliases are honored. That
-// re-sources the shell rc, which on a real machine restores the real PATH and
-// finds the REAL claude/codex/etc. installed on the box — defeating our stub.
-// Pointing HOME at a tmp dir whose seeded `.zshrc`/`.bashrc` prepend the stub
-// dir keeps resolution deterministic (and keeps any settings-file writes off
-// the developer's real ~/.claude).
+// Hermetic HOME for the spawned CLI: the wrapper resolves the tool via the
+// login shell (`$SHELL -i -c`), which re-sources the real rc and would find
+// the real claude/codex on the box. A seeded tmp `.zshrc`/`.bashrc` prepends
+// the stub dir instead, keeping resolution deterministic.
 let fakeHome: string;
 const cliPath = path.resolve(__dirname, "../../../dist/cli/index.js");
 
@@ -157,14 +134,10 @@ async function startFakeControlPlane(): Promise<{
     }
     if (req.url === "/api/auth/cli/bootstrap" && req.method === "GET") {
       res.writeHead(200, { "content-type": "application/json" });
-      // Wrapper preflight checks that the org has at least one provider
-      // from the tool's TOOL_PROVIDER_FAMILIES table (claude → anthropic,
-      // codex → openai, gemini → google|gemini, cursor + opencode → any
-      // of anthropic|openai). The fake CP advertises the full union so
-      // every wrapped-tool test sees its required family available and
-      // the preflight returns ok; tests that need to exercise the
-      // "no provider configured" branch should mount a narrower
-      // bootstrap from inside the test body.
+      // Wrapper preflight requires the org to have one provider from the
+      // tool's TOOL_PROVIDER_FAMILIES table. The fake CP advertises the full
+      // union so every wrapped-tool test passes preflight; a test needing "no
+      // provider configured" should mount a narrower bootstrap itself.
       res.end(
         JSON.stringify({
           providers: [
@@ -191,28 +164,18 @@ async function startFakeControlPlane(): Promise<{
 // ─────────────────────────────────────────────────────────────────
 
 /**
- * Writes a shell-script "stub" for a wrapped tool. Modes:
- *   - "echo-env": prints every governance-relevant env var the
- *     wrapper might inject, one per line, then exits 0.
- *   - "post-anthropic": POSTs to ${ANTHROPIC_BASE_URL}/v1/messages
- *     with header `Authorization: Bearer ${ANTHROPIC_AUTH_TOKEN}`.
- *   - "post-openai": POSTs to ${OPENAI_BASE_URL}/v1/chat/completions
- *     with header `Authorization: Bearer ${OPENAI_API_KEY}`.
- *   - "post-openai-no-v1": POSTs to ${OPENAI_BASE_URL}/chat/completions
- *     (no `/v1` prepended). Mimics the Vercel AI SDK used by opencode,
- *     which expects the base URL to already include `/v1`. The wrapper
- *     supplies `OPENAI_BASE_URL=${gw}/v1` for opencode so the gateway
- *     still sees the request at `/v1/chat/completions`.
- *   - "exit-code:<n>": exits with code n (transparency check).
+ * Writes a shell-script "stub" for a wrapped tool; mode selects the
+ * behavior: echo-env, post-anthropic, post-openai, post-openai-no-v1, or
+ * exit-code:<n>.
  */
 function writeToolStub(name: string, mode: string): void {
   const scriptPath = path.join(toolStubsDir, name);
   let body = "#!/bin/bash\nset -e\n";
   if (mode === "echo-env") {
     body +=
-      'for var in ANTHROPIC_BASE_URL ANTHROPIC_AUTH_TOKEN ANTHROPIC_API_KEY OPENAI_BASE_URL OPENAI_API_KEY GOOGLE_GEMINI_BASE_URL GOOGLE_API_KEY GEMINI_API_KEY; do\n' +
+      "for var in ANTHROPIC_BASE_URL ANTHROPIC_AUTH_TOKEN ANTHROPIC_API_KEY OPENAI_BASE_URL OPENAI_API_KEY GOOGLE_GEMINI_BASE_URL GOOGLE_API_KEY GEMINI_API_KEY; do\n" +
       '  printf "%s=%s\\n" "$var" "${!var:-}"\n' +
-      'done\n';
+      "done\n";
   } else if (mode === "post-anthropic") {
     body +=
       'curl -s -X POST -H "Authorization: Bearer ${ANTHROPIC_AUTH_TOKEN}" ' +
@@ -238,11 +201,11 @@ function writeToolStub(name: string, mode: string): void {
     // One arg per line so we can split on newlines and assert exact
     // count + ordering. Exits 0.
     body +=
-      'idx=0\n' +
+      "idx=0\n" +
       'for arg in "$@"; do\n' +
       '  printf "ARG[%d]=%s\\n" "$idx" "$arg"\n' +
-      '  idx=$((idx + 1))\n' +
-      'done\n' +
+      "  idx=$((idx + 1))\n" +
+      "done\n" +
       'printf "ARGC=%d\\n" "$#"\n';
   } else {
     throw new Error(`unknown stub mode: ${mode}`);
@@ -279,31 +242,18 @@ interface RunResult {
 }
 
 /**
- * Spawn the CLI as an ASYNC child process. This is critical: when the
- * test harness hosts the fake control-plane / fake gateway in the same
- * vitest worker, a synchronous `spawnSync` blocks the worker's event
- * loop, so the in-process HTTP server never responds to the child's
- * fetch — the child waits forever, spawnSync times out. Using async
- * `spawn` keeps the worker's event loop free to serve the fake
- * servers while the child runs.
+ * Spawns the CLI as an ASYNC child process: a sync `spawnSync` would block
+ * this worker's event loop, so the in-process fake control-plane/gateway
+ * could never answer the child's fetch, and it would wait forever.
  */
 function runCli(args: string[], opts: RunOpts = {}): Promise<RunResult> {
   const includeStubs = opts.includeToolStubs ?? true;
-  // PATH composition is delicate:
-  //  - When stubs are included, prepend toolStubsDir so our shell-script
-  //    stubs win over any real binaries on the dev machine (the wrapper
-  //    routes through `claude`/`codex`/etc., and the developer running
-  //    these tests likely has the real binaries installed).
-  //  - When stubs are EXCLUDED (the "tool-not-found" scenario), we need
-  //    a PATH that does NOT contain the real binaries at all — otherwise
-  //    spawn() finds the real `claude` and exec's it, and the test
-  //    asserts the wrong outcome. We strip user-installed-tool paths
-  //    (~/.nvm/.../bin, ~/.local/bin, /usr/local/bin) and keep only
-  //    the bash/curl essentials at /usr/bin:/bin.
+  // PATH composition: with stubs, prepend toolStubsDir so our stubs win over
+  // any real binaries on the dev machine. Without stubs (the "tool-not-found"
+  // case), strip user-installed-tool paths entirely so spawn() cannot fall
+  // back to a real `claude`/`codex` and mask the missing-binary assertion.
   const inheritedPath = process.env.PATH ?? "/usr/bin:/bin";
-  const pathValue = includeStubs
-    ? `${toolStubsDir}:${inheritedPath}`
-    : "/usr/bin:/bin";
+  const pathValue = includeStubs ? `${toolStubsDir}:${inheritedPath}` : "/usr/bin:/bin";
   // Build a minimal env: keep PATH + HOME + a small allowlist; drop
   // every VITEST_*/NODE_* variable that vitest's worker injects (some
   // of them — e.g. NODE_V8_COVERAGE — cause the spawned child to
@@ -339,13 +289,9 @@ function runCli(args: string[], opts: RunOpts = {}): Promise<RunResult> {
   // Always suppress the OS browser open() side-effect from the device-flow
   // login so tests don't pop a real browser tab on the dev machine.
   env.LANGWATCH_BROWSER = "none";
-  // This suite's subject is the gateway path: provider base-URL injection,
-  // VK auth, the budget pre-check, codex's `--profile`. The gateway bills
-  // model usage to the organization, so the wrapper only ever takes it when
-  // asked, and a non-TTY child like this one is never asked. Pin it here so
-  // each scenario states the path it exercises instead of leaning on a
-  // default. The "implicit path choice" describe below covers the unpinned
-  // case, and drops this var to do it.
+  // This suite's subject is the gateway path. A non-TTY child is never asked,
+  // and the wrapper would default elsewhere, so pin it here rather than lean
+  // on a default; "implicit path choice" below covers the unpinned case.
   env.LANGWATCH_TOOL_MODE = "gateway";
   if (opts.extraEnv) {
     for (const [k, v] of Object.entries(opts.extraEnv)) env[k] = v;
@@ -407,10 +353,7 @@ function writeLoggedOutConfig(): void {
 }
 
 function readConfig(): Record<string, unknown> {
-  return JSON.parse(fs.readFileSync(configPath, "utf8")) as Record<
-    string,
-    unknown
-  >;
+  return JSON.parse(fs.readFileSync(configPath, "utf8")) as Record<string, unknown>;
 }
 
 // ─────────────────────────────────────────────────────────────────
@@ -483,7 +426,7 @@ function envFromStub(stdout: string): Record<string, string> {
 // Tests
 // ─────────────────────────────────────────────────────────────────
 describe("governance CLI wrappers — e2e", () => {
-  describe("login state gating", () => {
+  describe("given login state gating", () => {
     describe("when not logged in and auto-login is disabled (non-TTY default)", () => {
       it("exits 1 with `Not logged in` on `langwatch claude` and never spawns the tool", async () => {
         writeLoggedOutConfig();
@@ -513,27 +456,16 @@ describe("governance CLI wrappers — e2e", () => {
         // Config got persisted by the auto-login path
         const cfg = readConfig();
         expect(cfg.access_token).toBe(TEST_ACCESS_TOKEN);
-        expect((cfg.default_personal_vk as { secret?: string })?.secret).toBe(
-          TEST_VK,
-        );
+        expect((cfg.default_personal_vk as { secret?: string })?.secret).toBe(TEST_VK);
       });
     });
   });
 
-  describe("env injection — per-tool standard env vars", () => {
-    // Provider base-URLs are set to the bare gateway URL. The Go aigateway
-    // routes OpenAI- and Anthropic-shaped requests at root (`/v1/chat/completions`,
-    // `/v1/messages`); per-provider sub-paths like `/api/v1/anthropic`
-    // were the Phase 11 design and were folded away when the Go dispatcher
-    // landed (see services/aigateway/adapters/httpapi/router*). Each SDK
-    // appends its own canonical suffix to the base URL.
-    //   "url" → expect bare gateway URL (no suffix)
-    //   string literal → expect that exact value (used for VK auth tokens)
-    // `"url"` is a sentinel meaning "expect bare gateway URL (no suffix)";
-    // any other string is a literal expected value. The `& {}` brand keeps
-    // TypeScript from collapsing the union into plain `string`.
-    // "url" = exact match against `gwUrl`.
-    // "url+v1" = `${gwUrl}/v1` (opencode's Vercel AI SDK doesn't prepend /v1 itself).
+  describe("given env injection of per-tool standard env vars", () => {
+    // Provider base-URLs are the bare gateway URL; each SDK appends its own
+    // canonical suffix. "url" means exact match against `gwUrl`; "url+v1"
+    // means `${gwUrl}/v1` (opencode's Vercel AI SDK doesn't prepend `/v1`
+    // itself). The `& {}` brand keeps TypeScript from collapsing to `string`.
     type ExpectedValue = "url" | "url+v1" | (string & {});
     describe.each([
       {
@@ -585,33 +517,29 @@ describe("governance CLI wrappers — e2e", () => {
         },
         mustNotInject: ["ANTHROPIC_BASE_URL", "OPENAI_BASE_URL"],
       },
-    ])(
-      "when running `langwatch $tool`",
-      ({ tool, expected, mustNotInject }) => {
-        it(`spawns ${tool} with the documented provider env vars and no unrelated ones`, async () => {
-          writeLoggedInConfig();
-          writeToolStub(tool, "echo-env");
-          const res = await runCli([tool]);
-          expect(res.status).toBe(0);
-          const env = envFromStub(res.stdout ?? "");
-          for (const [k, want] of Object.entries(expected)) {
-            if (want === "url") {
-              expect(env[k]).toBe(gwUrl);
-            } else if (want === "url+v1") {
-              expect(env[k]).toBe(`${gwUrl}/v1`);
-            } else {
-              expect(env[k]).toBe(want);
-            }
-          }
-          for (const k of mustNotInject) {
-            expect(env[k] ?? "").toBe("");
-          }
-        });
-      },
-    );
+    ])("when running `langwatch $tool`", ({ tool, expected, mustNotInject }) => {
+      it(`spawns ${tool} with the documented provider env vars and no unrelated ones`, async () => {
+        writeLoggedInConfig();
+        writeToolStub(tool, "echo-env");
+        const res = await runCli([tool]);
+        expect(res.status).toBe(0);
+        const env = envFromStub(res.stdout ?? "");
+        const valueFor = (want: ExpectedValue): string => {
+          if (want === "url") return gwUrl;
+          if (want === "url+v1") return `${gwUrl}/v1`;
+          return want;
+        };
+        for (const [k, want] of Object.entries(expected)) {
+          expect(env[k]).toBe(valueFor(want));
+        }
+        for (const k of mustNotInject) {
+          expect(env[k] ?? "").toBe("");
+        }
+      });
+    });
   });
 
-  describe("routing — wrapped tool's HTTP traffic lands at the gateway with the VK", async () => {
+  describe("given the wrapped tool's HTTP traffic lands at the gateway with the VK", async () => {
     describe("when wrapped claude POSTs to ${ANTHROPIC_BASE_URL}/v1/messages", () => {
       it("the fake gateway records the request at /v1/messages with Bearer VK", async () => {
         writeLoggedInConfig();
@@ -658,7 +586,7 @@ describe("governance CLI wrappers — e2e", () => {
     });
   });
 
-  describe("budget pre-check", () => {
+  describe("given a budget pre-check", () => {
     describe("when the control-plane returns 402 budget_exceeded", () => {
       it("exits 2 BEFORE spawning the tool and prints the request URL", async () => {
         writeLoggedInConfig();
@@ -719,7 +647,7 @@ describe("governance CLI wrappers — e2e", () => {
     });
   });
 
-  describe("tool-not-found handling", () => {
+  describe("given tool-not-found handling", () => {
     describe("when the underlying binary is not on PATH", () => {
       it("exits 127 with a clear actionable error", async () => {
         writeLoggedInConfig();
@@ -733,7 +661,7 @@ describe("governance CLI wrappers — e2e", () => {
     });
   });
 
-  describe("arg forwarding — wrapper passes every CLI arg verbatim to the tool", () => {
+  describe("given the wrapper passes every CLI arg verbatim to the tool", () => {
     function parseArgv(stdout: string): { argc: number; argv: string[] } {
       const argv: string[] = [];
       let argc = 0;
@@ -807,19 +735,15 @@ describe("governance CLI wrappers — e2e", () => {
           // langwatch-gateway` prepend so codex 0.134+ honors the
           // [model_providers.langwatch] block we wrote to
           // ~/.codex/config.toml. Other tools forward args verbatim.
-          if (tool === "codex") {
-            expect(parsed.argv.slice(-2)).toEqual(["--foo", "bar baz"]);
-            expect(parsed.argv).toContain("--profile");
-            expect(parsed.argv).toContain("langwatch-gateway");
-          } else {
-            expect(parsed.argv).toEqual(["--foo", "bar baz"]);
-          }
+          const expectedPrefix = tool === "codex" ? ["--profile", "langwatch-gateway"] : [];
+          expect(parsed.argv.slice(-2)).toEqual(["--foo", "bar baz"]);
+          expect(parsed.argv.slice(0, -2)).toEqual(expectedPrefix);
         });
       },
     );
   });
 
-  describe("exit-code propagation", () => {
+  describe("given exit-code propagation", () => {
     describe.each([
       { tool: "claude", code: 0 },
       { tool: "codex", code: 1 },

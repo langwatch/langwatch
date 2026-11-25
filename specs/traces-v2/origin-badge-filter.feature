@@ -1,9 +1,9 @@
 # Origin badge — click to filter
 #
 # Implementation:
-#   platform/app/src/features/traces-v2/components/TraceTable/registry/cells/trace/SimpleCells.tsx (OriginCell)
-#   platform/app/src/features/traces-v2/components/TraceTable/registry/cells/FilterChip.tsx
-#   platform/app/src/features/traces-v2/stores/filterStore.ts (toggleFacet)
+#   modules/trace/browser/src/ui/sections/explorer/trace-table/registry/cells/trace/simple-cells.tsx (OriginCell)
+#   modules/trace/browser/src/ui/blocks/explorer/trace-table/registry/cells/filter-chip.tsx
+#   modules/trace/browser/src/filter.store.ts (toggleFacet)
 #
 # Motivation (round 5): the Origin column rendered a static badge while the
 # Model and Label cells were already click-to-filter chips. Make Origin
@@ -64,6 +64,14 @@ Rule: Langy's own turns stay out of the explorer until the origin is asked for
     When the facet counts are read with no origin term in the query
     Then the origin facet counts the "langy" origin
     And its row reads "Langy"
+
+  # A personal ("Me") project is its owner's own workspace, where Langy's turns
+  # are their own traffic, so nothing is hidden there.
+  @unit
+  Scenario: A personal project shows Langy's turns
+    Given the person's own personal project with Langy's turns in it
+    When the explorer reads the list or the facet counts with no origin term
+    Then no origin is hidden
 
   @unit
   Scenario: Naming an origin turns the default off

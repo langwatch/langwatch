@@ -47,6 +47,25 @@ Feature: License sync
     When two processes mint one at the same time
     Then the one that loses the write takes the identity the winner minted
 
+  @unit @integration
+  Scenario: The usage report switches persist on an install with no identity row yet
+    Given an install that has never presented an identity
+    When a manager turns the optional metrics and the hostname off on the Checkup
+    Then the identity row is created holding both switches off
+    And the Checkup shows them off after a reload
+
+  @integration
+  Scenario: Two first writes of the usage report switches end with one identity row
+    Given an install that has never presented an identity
+    When two processes write the usage report switches at the same time
+    Then the install holds one identity row
+
+  @unit @integration
+  Scenario: A usage report sent before any identity row existed is still recorded
+    Given an install whose operator named the instance id, so no row was minted
+    When a usage report is accepted
+    Then the identity row is created with the named id and the time the report landed
+
   @unit
   Scenario: An operator can name the identity this install presents
     Given a deployment configuration that names an instance id
@@ -93,6 +112,13 @@ Feature: License sync
     Then the post is accepted as before
 
   @unit
+  Scenario: An install whose managed key is pending syncs that organisation again 30 seconds later
+    Given the connect host answers an organisation's sync with connect_credential_pending
+    When the daily sync pass runs
+    Then the pass waits 30 seconds and syncs that organisation once more
+    And it records how that second sync ended, retrying no further
+
+  @unit
   Scenario: An install without a license sends no sync
     Given an organization with no license
     When the daily jobs run
@@ -126,6 +152,18 @@ Feature: License sync
     And no seats are recorded
 
   @unit
+  Scenario: The connect host's door refuses a malformed licence token before the body
+    When a sync arrives with no bearer, or a bearer that is not a licence token
+    Then the licence token door refuses it as connect_license_token_malformed with status 401
+    And the body is not read and no seats are recorded
+
+  @unit
+  Scenario: The connect host's door refuses a licence token presented without an instance id
+    When a sync arrives with a well-formed licence token and no instance id
+    Then the licence token door refuses it as connect_instance_required with status 400
+    And no seats are recorded
+
+  @unit
   Scenario: A sync with a malformed payload is refused
     When a sync arrives with seat counts that are not whole non-negative numbers
     Then it is refused as invalid
@@ -152,6 +190,33 @@ Feature: License sync
     Given sync has been failing for 1 day
     When an admin opens Settings, Connect
     Then the page shows when sync last succeeded and why it is failing
+
+  @integration
+  Scenario: The sync line uses the same words on the Connect and License pages
+    Given a license that names a hosted service
+    When the last sync succeeded, the Connect page reads "Last synced" and how long ago
+    And when no sync has run yet, it reads "Not synced yet"
+    And the License page shows the same line from the same reading
+
+  @unit
+  Scenario: A sync time that cannot be read reads as not synced
+    Given the last sync time is missing or cannot be parsed
+    When the sync line is written
+    Then it reads "Not synced yet"
+    And a failed last sync still leads with "Last sync failed."
+
+  @integration
+  Scenario: The sync line follows a refresh once its outcome is recorded
+    Given a license that names a hosted service
+    When an admin refreshes the license on the License page
+    Then the page re-reads the sync line until the refresh's outcome is recorded
+    And it stops re-reading once the line changed
+
+  @integration
+  Scenario: A failure that is already the page's refusal is not shown twice
+    Given the last sync was refused for the same reason the hosted services refuse the license
+    When an admin opens Settings, Connect
+    Then the reason is shown once
 
   # ============================================================================
   # Refresh on demand

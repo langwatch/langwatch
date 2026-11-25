@@ -6,7 +6,7 @@ keywords: manual instrumentation, context managers, span, trace, async, synchron
 
 While decorators offer a concise way to instrument functions, you might prefer or need to manually manage trace and span lifecycles. This is useful in asynchronous contexts, for finer control, or when decorators are inconvenient. The LangWatch Python SDK provides two primary ways to do this manually:
 
-### Using Context Managers (`with`/`async with`)
+## Using Context Managers (`with`/`async with`)
 
 The `langwatch.trace()` and `langwatch.span()` functions can be used directly as asynchronous (`async with`) or synchronous (`with`) context managers. This is the recommended approach for manual instrumentation as it automatically handles ending the trace/span, even if errors occur.
 
@@ -52,7 +52,7 @@ async def handle_user_query_manual(query: str):
         llm_response = ""
         async with langwatch.span(type="llm", name="Manual LLM Generation") as llm_span:
             llm_input = {"role": "user", "content": f"Context: {retrieved_docs}\nQuery: {query}"}
-            llm_metadata = {"model_name": "gpt-5"}
+            llm_metadata = {"model_name": "gpt-6-luna"}
 
             # ... your async LLM call logic ...
             await asyncio.sleep(0.1)
@@ -62,7 +62,7 @@ async def handle_user_query_manual(query: str):
             # Set input, metadata and output via update
             llm_span.update(
                 input=llm_input,
-                output=llm_output
+                output=llm_output,
                 llm_metadata=llm_metadata,
             )
 
@@ -85,7 +85,7 @@ Key points for manual instrumentation with context managers:
 - Use methods like `span.add_event()`, and primarily `span.update(...)`, `trace.update(...)` to add details. The `update()` method is flexible for adding structured data like `input`, `output`, `metadata`, and `contexts`.
 - This approach gives explicit control over the start and end of each instrumented block, as the context manager handles ending the span automatically.
 
-### Direct Span Creation (`span.end()`)
+## Direct Span Creation (`span.end()`)
 
 Alternatively, you can manage span and trace lifecycles completely manually. Call `langwatch.span()` or `langwatch.trace()` directly to start them, and then explicitly call the `end()` method on the returned object (`span.end()` or `trace.end()`) when the operation finishes. **This requires careful handling to ensure `end()` is always called, even if errors occur (e.g., using `try...finally`).** Context managers are generally preferred as they handle this automatically.
 

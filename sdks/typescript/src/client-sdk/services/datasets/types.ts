@@ -53,10 +53,11 @@ export type DatasetEntry<T extends Record<string, unknown> = Record<string, unkn
 /**
  * A dataset containing metadata and entries.
  */
-export type Dataset<T extends Record<string, unknown> = Record<string, unknown>> = DatasetMetadata & {
-  /** Array of dataset entries */
-  entries: DatasetEntry<T>[];
-};
+export type Dataset<T extends Record<string, unknown> = Record<string, unknown>> =
+  DatasetMetadata & {
+    /** Array of dataset entries */
+    entries: DatasetEntry<T>[];
+  };
 
 /**
  * Options for getting a dataset.
@@ -87,14 +88,14 @@ export type GetDatasetApiResponse = {
   createdAt?: string;
   updatedAt?: string;
   platformUrl?: string;
-  data: Array<{
+  data: {
     id: string;
     datasetId: string;
     projectId: string;
     entry: Record<string, unknown>;
     createdAt: string;
     updatedAt: string;
-  }>;
+  }[];
 };
 
 /**
@@ -140,6 +141,25 @@ export type CreateDatasetOptions = {
   name: string;
   /** Column type definitions (defaults to empty array) */
   columnTypes?: DatasetColumnType[];
+  /** First rows, written with the dataset in one request. Each key must be a column. */
+  entries?: Record<string, unknown>[];
+};
+
+/**
+ * Options for upserting records by a key column.
+ */
+export type UpsertRecordsOptions = {
+  /** The column that identifies a row, such as "case_id". */
+  key: string;
+};
+
+/**
+ * Result of upserting records: what was created, what was updated, how many were left alone.
+ */
+export type UpsertRecordsResult = {
+  created: DatasetRecordResponse[];
+  updated: DatasetRecordResponse[];
+  unchanged: number;
 };
 
 /**
@@ -179,8 +199,8 @@ export type DeleteRecordsResponse = {
 };
 
 /**
- * API response for uploading a file.
- * Covers both upload-to-existing (records) and create-from-file (recordsCreated, datasetId) responses.
+ * API response for uploading a file. Covers both upload-to-existing
+ * (records) and create-from-file (recordsCreated, datasetId) responses.
  */
 export type UploadResponse = {
   dataset?: DatasetMetadata;
@@ -202,7 +222,10 @@ export type ListRecordsOptions = {
 /**
  * API response for listing records in a dataset.
  */
-export type ListRecordsApiResponse = PaginatedResponse<DatasetRecordResponse>;
+export type ListRecordsApiResponse = PaginatedResponse<DatasetRecordResponse> & {
+  /** The dataset the page belongs to. Absent on servers that do not send it. */
+  dataset?: DatasetMetadata;
+};
 
 /**
  * Options for creating a dataset from a file upload.

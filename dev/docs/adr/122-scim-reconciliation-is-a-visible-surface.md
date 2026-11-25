@@ -81,5 +81,5 @@ reactivation-is-re-entry rule doing its job, not a missing feature.
 - The re-drive command is new authority and is treated like the other guarded
   operator acts: named permission, recorded actor, and a spec scenario per
   refusal path.
-- Spec: `specs/identity/scim-reconciliation-surfaces.feature` (carried inert
+- Spec: `enterprise/modules/scim/specs/scim-reconciliation-surfaces.feature` (carried inert
   until D08's remainder binds it). No protocol change, no new SCIM routes.

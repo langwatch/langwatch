@@ -1,0 +1,180 @@
+/**
+ * Only a visible tab speaks to the server; its landed fetch broadcasts `{ key, version }`,
+ * never data, and a tab whose version differs marks the key stale. When shown, a tab reads
+ * IndexedDB first. specs/ui/browser-query-caching.feature.
+ */
+
+import {
+  focusManager,
+  hashKey,
+  type Query,
+  type QueryCacheNotifyEvent,
+  type QueryClient,
+} from "@tanstack/react-query";
+
+import { procedurePathOf, type UiCachePlan, type UiQueryVersions } from "./cache-tiers.ts";
+import { readStoredQuery, storedQueryKey, type UiQueryStore } from "./query-persistence.ts";
+
+export const UI_QUERY_SYNC_CHANNEL = "langwatch:query-versions";
+
+/** One channel per signed-in user, so a tab of another login never hears this one. */
+export const uiQuerySyncChannelName = ({ userId }: { userId: string }) =>
+  `${UI_QUERY_SYNC_CHANNEL}:${userId}`;
+
+/**
+ * A short opaque digest of a read's data; the data itself never leaves the tab.
+ * ponytail: 53-bit non-cryptographic mix, enough to tell versions apart across tabs.
+ */
+export function digestOf({ text }: { text: string }): string {
+  let h1 = 0xdeadbeef;
+  let h2 = 0x41c6ce57;
+  for (let index = 0; index < text.length; index += 1) {
+    const code = text.charCodeAt(index);
+    h1 = Math.imul(h1 ^ code, 2654435761);
+    h2 = Math.imul(h2 ^ code, 1597334677);
+  }
+  h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909);
+  h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909);
+  return (4294967296 * (2097151 & h2) + (h1 >>> 0)).toString(36);
+}
+
+type UiQuerySyncMessage = { key: string; version: string };
+
+function isSyncMessage(value: unknown): value is UiQuerySyncMessage {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "key" in value &&
+    typeof value.key === "string" &&
+    "version" in value &&
+    typeof value.version === "string"
+  );
+}
+
+/** Some browsers refuse a channel (opaque origins, privacy modes); the tab then syncs on focus. */
+function openChannel({ userId }: { userId: string }): BroadcastChannel | undefined {
+  if (typeof BroadcastChannel === "undefined") return;
+  try {
+    return new BroadcastChannel(uiQuerySyncChannelName({ userId }));
+  } catch {
+    return;
+  }
+}
+
+type SyncChannel = Pick<BroadcastChannel, "postMessage" | "close" | "onmessage">;
+
+/** What every stage of one tab's sync reads; `announced` holds versions heard but not yet held. */
+type SyncContext = {
+  queryClient: QueryClient;
+  plan: UiCachePlan;
+  store: UiQueryStore;
+  userId: string;
+  versions: UiQueryVersions;
+  announced: Map<string, string>;
+};
+
+const pathOf = (query: Query) => procedurePathOf(query.queryKey) ?? "";
+
+/** The persisted reads: the ones another tab's copy or the disk can stand in for. */
+function isTracked({ plan, query }: { plan: UiCachePlan; query: Query }): boolean {
+  return plan.persisted.has(pathOf(query));
+}
+
+function versionOf({ versions, query }: { versions: UiQueryVersions; query: Query }): string {
+  return versions.get(query.queryHash) ?? digestOf({ text: hashKey([query.state.data]) });
+}
+
+function markStale({ queryClient, query }: { queryClient: QueryClient; query: Query }) {
+  return queryClient.invalidateQueries({
+    queryKey: query.queryKey,
+    exact: true,
+    refetchType: "none",
+  });
+}
+
+/** A landed fetch in a visible tab tells the others which version it holds. */
+function announce({
+  event,
+  channel,
+  plan,
+  versions,
+}: {
+  event: QueryCacheNotifyEvent;
+  channel: SyncChannel | undefined;
+  plan: UiCachePlan;
+  versions: UiQueryVersions;
+}): void {
+  if (event.type !== "updated" || event.action.type !== "success" || event.action.manual) return;
+  if (!focusManager.isFocused() || !isTracked({ plan, query: event.query })) return;
+  channel?.postMessage({
+    key: event.query.queryHash,
+    version: versionOf({ versions, query: event.query }),
+  });
+}
+
+/** A version this tab does not hold marks the read stale; nothing is fetched. */
+function receive({ data, context }: { data: unknown; context: SyncContext }): void {
+  if (!isSyncMessage(data)) return;
+  const query = context.queryClient.getQueryCache().get(data.key);
+  if (!query || !isTracked({ plan: context.plan, query })) return;
+  if (versionOf({ versions: context.versions, query }) === data.version) return;
+  context.announced.set(data.key, data.version);
+  void markStale({ queryClient: context.queryClient, query });
+}
+
+/** Draws the stored copy when newer than this tab's; stale again if behind the announcement. */
+async function adoptFromDisk({ context, query }: { context: SyncContext; query: Query }) {
+  const { queryClient, versions, announced } = context;
+  const entry = await readStoredQuery({
+    store: context.store,
+    key: storedQueryKey({ userId: context.userId, queryHash: query.queryHash }),
+    plan: context.plan,
+  });
+  if (!entry || entry.updatedAt <= query.state.dataUpdatedAt) return;
+  if (entry.version === undefined) versions.delete(query.queryHash);
+  else versions.set(query.queryHash, entry.version);
+  queryClient.setQueryData(query.queryKey, entry.data, { updatedAt: entry.updatedAt });
+  if (versionOf({ versions, query }) === announced.get(query.queryHash)) return;
+  await markStale({ queryClient, query });
+}
+
+/**
+ * The tab's one focus pass (ARCHITECTURE.md §10.2): disk first, then the network for the mounted
+ * reads still stale, whether past the safety bound or marked by a hint. The library's is off.
+ * A fetch already in flight is left to finish: a second refetch would abort and resend it.
+ */
+async function refreshOnFocus(context: SyncContext): Promise<void> {
+  const { queryClient, plan } = context;
+  const isBehind = (query: Query) => isTracked({ plan, query }) && query.isStale();
+  const behind = queryClient.getQueryCache().findAll({ predicate: isBehind });
+  await Promise.all(behind.map((query) => adoptFromDisk({ context, query })));
+  context.announced.clear();
+  await queryClient.refetchQueries({ type: "active", stale: true }, { cancelRefetch: false });
+}
+
+/**
+ * Starts this tab's half of the sync; returns the stop. A read without a server
+ * version is compared by an opaque digest of its data.
+ */
+export function startUiQuerySync({
+  channel,
+  ...options
+}: Omit<SyncContext, "announced"> & { channel?: SyncChannel | undefined }): () => void {
+  channel ??= openChannel({ userId: options.userId });
+  const context: SyncContext = { ...options, announced: new Map() };
+  const stopAnnouncing = options.queryClient
+    .getQueryCache()
+    .subscribe((event) =>
+      announce({ event, channel, plan: options.plan, versions: options.versions }),
+    );
+  if (channel) channel.onmessage = ({ data }: MessageEvent) => receive({ data, context });
+  const stopFocus = focusManager.subscribe((focused) => {
+    if (focused) void refreshOnFocus(context);
+  });
+
+  return () => {
+    stopAnnouncing();
+    stopFocus();
+    channel?.close();
+  };
+}

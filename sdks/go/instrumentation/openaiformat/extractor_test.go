@@ -425,3 +425,38 @@ func requireSingleSpan(t *testing.T, exporter *tracetest.InMemoryExporter) trace
 	require.Len(t, spans, 1, "expected exactly one exported span")
 	return spans[0]
 }
+
+// TestGenericExtractorCachedUsage pins the exclusive cached split through the
+// fallback extractor, for both usage spellings and both paths: cached tokens
+// leave the input count, so they are not billed twice.
+func TestGenericExtractorCachedUsage(t *testing.T) {
+	const cachedKey = attribute.Key("gen_ai.usage.cached_input_tokens")
+	usages := map[string]string{
+		"chat spelling":      `{"prompt_tokens":100,"completion_tokens":20,"total_tokens":120,"prompt_tokens_details":{"cached_tokens":40},"completion_tokens_details":{"reasoning_tokens":5}}`,
+		"responses spelling": `{"input_tokens":100,"output_tokens":20,"total_tokens":120,"input_tokens_details":{"cached_tokens":40},"output_tokens_details":{"reasoning_tokens":5}}`,
+	}
+	assertSplit := func(t *testing.T, attrs map[attribute.Key]attribute.Value) {
+		t.Helper()
+		assert.Equal(t, int64(60), attrs[semconvGenAIUsageInputTokens].AsInt64())
+		assert.Equal(t, int64(40), attrs[cachedKey].AsInt64())
+		assert.Equal(t, int64(20), attrs[semconvGenAIUsageOutputTokens].AsInt64())
+		assert.Equal(t, int64(5), attrs[semconv.GenAIUsageReasoningOutputTokensKey].AsInt64())
+	}
+	for name, usage := range usages {
+		t.Run(name+" non-streaming", func(t *testing.T) {
+			attrs := recordExtractor(t, func(span *langwatch.Span) {
+				GenericExtractor{}.ExtractNonStreaming(span, []byte(`{"model":"m","usage":`+usage+`}`), langwatch.DataCaptureNone)
+			})
+			assertSplit(t, attrs)
+		})
+		t.Run(name+" streaming", func(t *testing.T) {
+			span, exporter := newSpan(t)
+			acc := GenericExtractor{}.NewStreamAccumulator()
+			acc.Consume(`{"model":"m","choices":[{"delta":{"content":"a"}}]}`)
+			acc.Consume(`{"usage":` + usage + `}`)
+			acc.Finish(span, langwatch.DataCaptureNone)
+			span.End()
+			assertSplit(t, requireSingleSpanAttrs(t, exporter))
+		})
+	}
+}

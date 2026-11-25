@@ -1,17 +1,15 @@
-import { createSpinner } from "../../utils/spinner";
-import { resolveCredentials } from "../../utils/apiKey";
-import { failSpinnerFromResponse } from "../../utils/failFromResponse";
-import { failSpinner } from "../../utils/spinnerError";
-import type { CommandResult } from "../../utils/output";
-import { triggerRequest } from "./triggerRequest";
+import { resolveCredentials } from "../../utils/apiKey.ts";
+import { failSpinnerFromResponse } from "../../utils/failFromResponse.ts";
+import type { CommandResult } from "../../utils/output.ts";
+import { createSpinner } from "../../utils/spinner.ts";
+import { failSpinner } from "../../utils/spinnerError.ts";
+import { triggerRequest } from "./triggerRequest.ts";
 
 /**
  * Returns the deletion result rather than printing it: the output port renders
  * it in whatever format the caller asked for (utils/output.ts).
  */
-export const deleteTriggerCommand = async (
-  id: string,
-): Promise<CommandResult | void> => {
+export const deleteTriggerCommand = async (id: string): Promise<CommandResult | void> => {
   await resolveCredentials();
 
   const spinner = createSpinner(`Deleting trigger "${id}"...`).start();

@@ -1,7 +1,9 @@
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { initConfig } from "../config.js";
-import type { ApiKeyVerifier } from "../http-security.js";
 import type { Server } from "http";
+
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+
+import { initConfig } from "../config.ts";
+import type { ApiKeyVerifier } from "../http-security.ts";
 
 /** Standard headers required by the MCP Streamable HTTP protocol for POST requests */
 const MCP_POST_HEADERS = {
@@ -24,10 +26,7 @@ function stubVerifier(validKeys: string[]): ApiKeyVerifier {
 }
 
 /** Helper to create auth + MCP headers */
-function mcpHeaders({
-  sessionId,
-  apiKey,
-}: { sessionId?: string; apiKey?: string } = {}) {
+function mcpHeaders({ sessionId, apiKey }: { sessionId?: string; apiKey?: string } = {}) {
   const headers: Record<string, string> = {
     ...MCP_POST_HEADERS,
     Authorization: `Bearer ${apiKey ?? BEARER_TOKEN}`,
@@ -62,7 +61,7 @@ describe("HTTP transport", () => {
       endpoint: "https://app.langwatch.ai",
     });
 
-    const { startHttpServer } = await import("../http-server.js");
+    const { startHttpServer } = await import("../http-server.ts");
     const result = await startHttpServer({
       port: 0,
       apiKeyVerifier: stubVerifier([BEARER_TOKEN, "my-langwatch-api-key"]),
@@ -78,7 +77,7 @@ describe("HTTP transport", () => {
     });
   });
 
-  describe("/health endpoint", () => {
+  describe("when calling GET /health", () => {
     it("returns ok status without authentication", async () => {
       const response = await fetch(`${baseUrl}/health`);
       const body = await response.json();
@@ -88,7 +87,7 @@ describe("HTTP transport", () => {
     });
   });
 
-  describe("CORS headers", () => {
+  describe("when checking CORS headers", () => {
     it("sends no Access-Control-Allow-Origin when the request has no Origin", async () => {
       const response = await fetch(`${baseUrl}/health`);
 
@@ -101,9 +100,7 @@ describe("HTTP transport", () => {
         headers: { Origin: "http://localhost:5173" },
       });
 
-      expect(response.headers.get("access-control-allow-origin")).toBe(
-        "http://localhost:5173"
-      );
+      expect(response.headers.get("access-control-allow-origin")).toBe("http://localhost:5173");
       expect(response.headers.get("vary")).toContain("Origin");
     });
 
@@ -113,12 +110,8 @@ describe("HTTP transport", () => {
       });
 
       expect(response.status).toBe(204);
-      expect(response.headers.get("access-control-allow-methods")).toContain(
-        "POST"
-      );
-      expect(response.headers.get("access-control-allow-headers")).toContain(
-        "mcp-session-id"
-      );
+      expect(response.headers.get("access-control-allow-methods")).toContain("POST");
+      expect(response.headers.get("access-control-allow-headers")).toContain("mcp-session-id");
     });
 
     it("includes Authorization in allowed headers for CORS", async () => {
@@ -126,13 +119,11 @@ describe("HTTP transport", () => {
         method: "OPTIONS",
       });
 
-      expect(response.headers.get("access-control-allow-headers")).toContain(
-        "Authorization"
-      );
+      expect(response.headers.get("access-control-allow-headers")).toContain("Authorization");
     });
   });
 
-  describe("/mcp endpoint (Streamable HTTP)", () => {
+  describe("when calling POST /mcp (Streamable HTTP)", () => {
     describe("when no Bearer token is provided", () => {
       it("returns 401 on initialize request", async () => {
         const response = await fetch(`${baseUrl}/mcp`, {
@@ -215,7 +206,7 @@ describe("HTTP transport", () => {
     });
   });
 
-  describe("DELETE /mcp", () => {
+  describe("when calling DELETE /mcp", () => {
     it("closes an existing session", async () => {
       const initResponse = await fetch(`${baseUrl}/mcp`, {
         method: "POST",
@@ -249,12 +240,10 @@ describe("HTTP transport", () => {
     });
   });
 
-  describe("OAuth 2.0 endpoints", () => {
-    describe("/.well-known/oauth-authorization-server", () => {
+  describe("when using OAuth 2.0 endpoints", () => {
+    describe("when calling GET /.well-known/oauth-authorization-server", () => {
       it("returns OAuth metadata with token endpoint", async () => {
-        const response = await fetch(
-          `${baseUrl}/.well-known/oauth-authorization-server`
-        );
+        const response = await fetch(`${baseUrl}/.well-known/oauth-authorization-server`);
         const body = await response.json();
 
         expect(response.status).toBe(200);
@@ -263,7 +252,7 @@ describe("HTTP transport", () => {
       });
     });
 
-    describe("/oauth/token", () => {
+    describe("when calling POST /oauth/token", () => {
       it("returns 400 for unsupported grant type", async () => {
         const response = await fetch(`${baseUrl}/oauth/token`, {
           method: "POST",
@@ -347,16 +336,14 @@ describe("HTTP transport", () => {
         });
 
         expect(response.status).toBe(200);
-        expect(response.headers.get("content-type")).toContain(
-          "text/event-stream"
-        );
+        expect(response.headers.get("content-type")).toContain("text/event-stream");
 
         controller.abort();
       });
     });
   });
 
-  describe("/sse endpoint (legacy SSE)", () => {
+  describe("when calling GET /sse (legacy SSE)", () => {
     it("returns 401 without authorization", async () => {
       const controller = new AbortController();
 
@@ -377,9 +364,7 @@ describe("HTTP transport", () => {
       });
 
       expect(response.status).toBe(200);
-      expect(response.headers.get("content-type")).toContain(
-        "text/event-stream"
-      );
+      expect(response.headers.get("content-type")).toContain("text/event-stream");
 
       const reader = response.body!.getReader();
       const decoder = new TextDecoder();

@@ -17,24 +17,24 @@ The [LangWatch MCP Server](https://www.npmjs.com/package/@langwatch/mcp-server) 
 
 Instead of manually reading docs and writing boilerplate code, just ask your AI assistant to instrument your codebase with LangWatch, and it will do it for you.
 
+<Note>
+**The server URL is `https://app.langwatch.ai/mcp`.** If you added LangWatch to your AI client before October 2026, update the connector's URL to this one. Self-hosted deployments use their own host followed by `/mcp`.
+</Note>
+
 ## Setup
 
-<Steps>
+Connect to the hosted server at `https://app.langwatch.ai/mcp`. Sign in with **OAuth** (recommended): your client opens a browser window, you sign in to LangWatch and approve a project, and the client refreshes its access on its own, with no key to manage. Clients that cannot sign in can send a [personal API key](/platform/api-keys#create-a-personal-key) as an `Authorization: Bearer <key>` header instead.
 
-<Step title="Get your API key">
-Go to [**Settings → API Keys**](https://app.langwatch.ai/settings/api-keys) and create a **personal API key**. This key connects your coding assistant to your LangWatch account for observability, prompts, and analytics tools. Documentation tools work without a key.
-
-See the [API Keys guide](/platform/api-keys#create-a-personal-key) for step-by-step instructions.
-</Step>
-
-<Step title="Configure your MCP">
+<Frame caption="The approval page your client opens after you sign in: pick the project it may use, then Allow.">
+  <img src="/images/mcp/mcp-authorize-light.png" alt="The Authorize MCP Connection page, asking to allow a client to use a LangWatch project" className="block dark:hidden" />
+  <img src="/images/mcp/mcp-authorize-dark.png" alt="The Authorize MCP Connection page, asking to allow a client to use a LangWatch project" className="hidden dark:block" />
+</Frame>
 
 <Tabs>
 <Tab title="Claude Desktop">
-1. Go to **Settings → Connectors**
-2. Click **Add custom connector**
-3. Enter the server URL: `https://app.langwatch.ai/sse`
-4. Click **Connect**: you'll be redirected to sign in and authorize access to your project
+1. Go to **Customize → Connectors**, click **+ Add**, then **Add custom connector**. On Team and Enterprise plans, an owner adds it under **Organization settings → Connectors → Add → Custom → Web**.
+2. Enter the server URL: `https://app.langwatch.ai/mcp`
+3. Click **Connect**: you'll be redirected to sign in and approve access to a project
 
 The same steps work in Claude Cowork and in Claude chat on the web.
 
@@ -42,96 +42,95 @@ The same steps work in Claude Cowork and in Claude chat on the web.
 </Tab>
 
 <Tab title="Claude Code">
-Run this command to add the MCP server:
+Add the server, then sign in:
 
 ```bash
-claude mcp add langwatch --env LANGWATCH_API_KEY=your-api-key-here -- npx -y @langwatch/mcp-server
+claude mcp add --transport http langwatch https://app.langwatch.ai/mcp
 ```
 
-Or add it manually to your `~/.claude.json`. Under the `mcpServers` object, add an entry named `langwatch` with these fields:
+In Claude Code, run `/mcp`, pick `langwatch` and choose **Authenticate**. Sign in to LangWatch in the browser window that opens and approve a project.
 
-- `command`: `npx`
-- `args`: `-y`, then the package name `@langwatch/mcp-server` on a separate token
-- `env.LANGWATCH_API_KEY`: your LangWatch API key
+To use an API key instead of signing in, add the header when you add the server:
 
-See the [Claude Code MCP documentation](https://code.claude.com/docs/en/mcp#plugin-provided-mcp-servers) for more details.
+```bash
+claude mcp add --transport http langwatch https://app.langwatch.ai/mcp --header "Authorization: Bearer your-api-key"
+```
 
-<Info>
-This page intentionally describes the config in prose rather than as a JSON snippet. Some CLI agents (notably Gemini CLI 0.36.0 and earlier) parse `@`-prefixed runs as file paths and can crash with `ENAMETOOLONG` when a multi-line JSON snippet wraps the scoped package name in double quotes. See [#3104](https://github.com/langwatch/langwatch/issues/3104) for details. The bash `claude mcp add` form above is safe: the package name is followed by a whitespace terminator.
-</Info>
+See the [Claude Code MCP documentation](https://code.claude.com/docs/en/mcp) for more details.
 </Tab>
 
 <Tab title="Copilot">
-Add to `.vscode/mcp.json` in your project (or use **MCP: Add Server** from the Command Palette).
+Add to `.vscode/mcp.json` in your project (or use **MCP: Add Server** from the Command Palette). Under the `servers` object, add an entry named `langwatch` with these fields:
 
-Under the `servers` object, add an entry named `langwatch` with these fields:
+- `type`: `http`
+- `url`: `https://app.langwatch.ai/mcp`
 
-- `type`: `stdio`
-- `command`: `npx`
-- `args`: `-y`, then the package name `@langwatch/mcp-server` on a separate token
-- `env.LANGWATCH_API_KEY`: your LangWatch API key
+VS Code opens a browser window to sign in the first time it connects. To use an API key instead, add `headers.Authorization` set to `Bearer ` followed by your key.
 </Tab>
 
 <Tab title="Cursor">
 1. Open Cursor Settings
 2. Navigate to the **Tools and MCP** section in the sidebar
-3. Add the LangWatch MCP server. Under the `mcpServers` object, add an entry named `langwatch` with these fields:
-   - `command`: `npx`
-   - `args`: `-y`, then the package name `@langwatch/mcp-server` on a separate token
-   - `env.LANGWATCH_API_KEY`: your LangWatch API key
+3. Add the LangWatch MCP server. Under the `mcpServers` object, add an entry named `langwatch` with the field `url` set to `https://app.langwatch.ai/mcp`
+
+Cursor signs you in through your browser when it first connects. To use an API key instead, add `headers.Authorization` set to `Bearer ` followed by your key.
 </Tab>
 
 <Tab title="ChatGPT">
-1. Go to **Settings → Connectors**
-2. Click **Add connector**
-3. Enter the server URL: `https://app.langwatch.ai/sse`
-4. Click **Connect**: you'll be redirected to sign in and authorize access to your project
+1. Turn on developer mode, then add a custom MCP server in ChatGPT's apps settings
+2. Enter the server URL: `https://app.langwatch.ai/mcp`
+3. Choose **OAuth** as the authentication
+4. Click **Connect**: you'll be redirected to sign in and approve access to a project
 
-*Requires a Plus or Team plan.*
-</Tab>
-
-<Tab title="BoltAI, Other MCP Clients">
-For any MCP client that supports remote servers with OAuth:
-
-1. Add a new remote MCP server
-2. Enter the endpoint URL: `https://app.langwatch.ai/sse`
-3. Select **OAuth (browser)** authentication
-4. Click **Connect**: you'll be redirected to sign in and authorize access to your project
-
-The server supports OAuth Authorization Code + PKCE with Dynamic Client Registration, so any standards-compliant MCP client should work automatically. Clients that speak the Streamable HTTP transport can point at `https://app.langwatch.ai/mcp` instead.
+ChatGPT supports OAuth only, not API keys.
 </Tab>
 
 <Tab title="Other">
-For other MCP-compatible editors, add an entry named `langwatch` under the `mcpServers` object of your editor's MCP settings file with these fields:
+For any MCP client that supports remote servers:
+
+1. Add a new remote MCP server with the URL `https://app.langwatch.ai/mcp`
+2. Select **OAuth** authentication, or send a personal API key as an `Authorization: Bearer <key>` header
+3. Connect, then sign in and approve a project in the browser window that opens
+
+The server speaks the Streamable HTTP transport and supports OAuth Authorization Code + PKCE with Dynamic Client Registration, so any standards-compliant MCP client should work automatically.
+</Tab>
+</Tabs>
+
+### Run it locally instead
+
+Coding assistants can also run the MCP server on your machine with your API key and the project to work in. For Claude Code:
+
+```bash
+claude mcp add langwatch --env LANGWATCH_API_KEY=your-api-key-here --env LANGWATCH_PROJECT_ID=your-project-id -- npx -y @langwatch/mcp-server
+```
+
+For other editors, add an entry named `langwatch` under your editor's MCP servers with these fields:
 
 - `command`: `npx`
 - `args`: `-y`, then the package name `@langwatch/mcp-server` on a separate token
 - `env.LANGWATCH_API_KEY`: your LangWatch API key
+- `env.LANGWATCH_PROJECT_ID`: your LangWatch project ID
 
-Refer to your editor's MCP documentation for the specific configuration file location.
-</Tab>
-</Tabs>
+<Info>
+This page intentionally describes the config in prose rather than as a JSON snippet. Some CLI agents (notably Gemini CLI 0.36.0 and earlier) parse `@`-prefixed runs as file paths and can crash with `ENAMETOOLONG` when a multi-line JSON snippet wraps the scoped package name in double quotes. See [#3104](https://github.com/langwatch/langwatch/issues/3104) for details. The bash `claude mcp add` form above is safe: the package name is followed by a whitespace terminator.
+</Info>
 
-</Step>
+Once connected, open your AI assistant's chat and ask it to help with LangWatch tasks.
 
-<Step title="Start using it">
-Open your AI assistant chat (e.g., `Cmd/Ctrl + I` in Cursor, or `Cmd/Ctrl + Shift + P` > "Claude Code: Open Chat" in Claude Code) and ask it to help with LangWatch tasks.
-</Step>
-</Steps>
-
-### Configuration
+### Local server configuration
 
 | Environment Variable | CLI Argument | Description |
 |---------------------|-------------|-------------|
 | `LANGWATCH_API_KEY` | `--apiKey` | API key for authentication |
+| `LANGWATCH_PROJECT_ID` | `--projectId` | The project to work in; needed for a personal API key, which can reach several projects |
 | `LANGWATCH_ENDPOINT` | `--endpoint` | API endpoint (default: `https://app.langwatch.ai`) |
 
 ### Two Modes
 
 The MCP server runs in two modes:
 
-- **Local (stdio)**: Default. Runs as a subprocess of your coding assistant (Claude Code, Copilot, Cursor). API key set via `--apiKey` flag or `LANGWATCH_API_KEY` env var.
-- **Remote (HTTP/SSE)**: For chat assistants (Claude Desktop, ChatGPT, BoltAI, etc.). Hosted at `https://app.langwatch.ai`. Uses OAuth Authorization Code + PKCE, click Connect and sign in via your browser to authorize access to your project. Supports both SSE (`/sse`) and Streamable HTTP (`/mcp`) transports.
+- **Remote (Streamable HTTP)**: Recommended, for every client. Hosted at `https://app.langwatch.ai/mcp`. Sign in with OAuth (Authorization Code + PKCE) in your browser and approve a project, or send a personal API key as a Bearer token.
+- **Local (stdio)**: Runs as a subprocess of your coding assistant. API key set via `--apiKey` flag or `LANGWATCH_API_KEY` env var.
 
 ## Usage Examples
 
@@ -233,21 +232,38 @@ The AI assistant will:
 **Example transformation:**
 
 Before:
-```python
+<CodeGroup>
+```python title="chat.py"
 from openai import OpenAI
 
 client = OpenAI()
 
 def chat(message: str):
     response = client.chat.completions.create(
-        model="gpt-5-mini",
+        model="gpt-6-luna",
         messages=[{"role": "user", "content": message}]
     )
     return response.choices[0].message.content
 ```
 
+```typescript title="chat.ts"
+import { OpenAI } from "openai";
+
+const client = new OpenAI();
+
+async function chat(message: string) {
+  const response = await client.chat.completions.create({
+    model: "gpt-5-mini",
+    messages: [{ role: "user", content: message }],
+  });
+  return response.choices[0].message.content;
+}
+```
+</CodeGroup>
+
 After (automatically added by AI assistant):
-```python
+<CodeGroup>
+```python title="chat.py" {2,5,7-12}
 from openai import OpenAI
 import langwatch
 
@@ -262,11 +278,36 @@ def chat(message: str):
     )
 
     response = client.chat.completions.create(
-        model="gpt-5-mini",
+        model="gpt-6-luna",
         messages=[{"role": "user", "content": message}]
     )
     return response.choices[0].message.content
 ```
+
+```typescript title="chat.ts" {2-3,5-6,10-12}
+import { OpenAI } from "openai";
+import { setupObservability } from "langwatch/observability/node";
+import { getLangWatchTracer } from "langwatch/observability";
+
+setupObservability({ serviceName: "chatbot" });
+const tracer = getLangWatchTracer("chatbot");
+const client = new OpenAI();
+
+async function chat(message: string) {
+  return tracer.withActiveSpan("chat", async (span) => {
+    span.setInput(message);
+    span.setAttribute("langwatch.labels", ["document_parsing"]);
+    const response = await client.chat.completions.create({
+      model: "gpt-5-mini",
+      messages: [{ role: "user", content: message }],
+    });
+    const text = response.choices[0].message.content;
+    span.setOutput(text);
+    return text;
+  });
+}
+```
+</CodeGroup>
 
 ### Set Up Evaluations
 
@@ -403,7 +444,7 @@ The MCP server provides tools organized into categories. Your AI assistant autom
 | `platform_update_monitor` | Update, enable or disable an online evaluation |
 | `platform_delete_monitor` | Delete an online evaluation |
 | `platform_experiment_list` | List the experiments in the project |
-| `platform_run_experiment` | Start an experiment run |
+| `platform_run_experiment` | Start an experiment run, optionally with a `concurrency` from 1 to 24: the cells that run at once, for that run only |
 | `platform_experiment_status` | Get the progress of a run |
 | `platform_experiment_list_runs` | List the runs of an experiment |
 | `platform_experiment_results` | Get the per-row results of a run |
@@ -489,7 +530,7 @@ Create a new prompt in the LangWatch project.
 **Parameters:**
 - `name` (required): Prompt name
 - `messages` (required): Array of `{role, content}` messages
-- `model` (required): Model name (e.g., `"gpt-5-mini"`, `"claude-sonnet-4-5-20250929"`)
+- `model` (required): Model name (e.g., `"gpt-6-luna"`, `"claude-sonnet-4-5-20250929"`)
 - `modelProvider` (required): Provider name (e.g., `"openai"`, `"anthropic"`)
 - `handle` (optional): URL-friendly handle
 - `description` (optional): Prompt description

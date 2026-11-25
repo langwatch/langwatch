@@ -24,13 +24,18 @@ class PostApiSuitesByIdRunBody:
         name (str | Unset): The run plan this run joins or creates. Used only when the id names a test suite; derived
             from the suite name and the targets when absent.
         targets (list[PostApiSuitesByIdRunBodyTargetsItem] | Unset): The prompts, agents or workflows the run goes
-            against. Used only when the id names a test suite, which stores no target of its own.
+            against. Read only when the id names a test suite, which stores no target of its own; a run plan already holds
+            its own and refuses these.
         repeat_count (int | Unset): How many times each scenario and target pairing runs, between 1 and 5. Used only
             when the id names a test suite.
         simulator_model (None | str | Unset): The model that plays the user for every scenario in the run. Used only
             when the id names a test suite.
         judge_model (None | str | Unset): The model that judges every scenario in the run. Used only when the id names a
             test suite.
+        trace_quiet_period_ms (int | None | Unset): Milliseconds (0 to 60000) the agent's trace must stay unchanged
+            before the judge reads it, for every scenario in the run. Used only when the id names a test suite.
+        trace_wait_timeout_ms (int | None | Unset): Milliseconds (1000 to 300000) the judge waits for the agent's trace
+            before a verdict, for every scenario in the run. Used only when the id names a test suite.
         parameters (PostApiSuitesByIdRunBodyParameters | Unset): Constant values applied to every scenario in the run,
             e.g. a fixture id or a tenant. A value supplied here overrides the scenario's own default for that name.
         note (str | Unset): One short line describing why this batch was run, e.g. a commit hash or what you changed. It
@@ -43,6 +48,8 @@ class PostApiSuitesByIdRunBody:
     repeat_count: int | Unset = UNSET
     simulator_model: None | str | Unset = UNSET
     judge_model: None | str | Unset = UNSET
+    trace_quiet_period_ms: int | None | Unset = UNSET
+    trace_wait_timeout_ms: int | None | Unset = UNSET
     parameters: PostApiSuitesByIdRunBodyParameters | Unset = UNSET
     note: str | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
@@ -73,6 +80,18 @@ class PostApiSuitesByIdRunBody:
         else:
             judge_model = self.judge_model
 
+        trace_quiet_period_ms: int | None | Unset
+        if isinstance(self.trace_quiet_period_ms, Unset):
+            trace_quiet_period_ms = UNSET
+        else:
+            trace_quiet_period_ms = self.trace_quiet_period_ms
+
+        trace_wait_timeout_ms: int | None | Unset
+        if isinstance(self.trace_wait_timeout_ms, Unset):
+            trace_wait_timeout_ms = UNSET
+        else:
+            trace_wait_timeout_ms = self.trace_wait_timeout_ms
+
         parameters: dict[str, Any] | Unset = UNSET
         if not isinstance(self.parameters, Unset):
             parameters = self.parameters.to_dict()
@@ -94,6 +113,10 @@ class PostApiSuitesByIdRunBody:
             field_dict["simulatorModel"] = simulator_model
         if judge_model is not UNSET:
             field_dict["judgeModel"] = judge_model
+        if trace_quiet_period_ms is not UNSET:
+            field_dict["traceQuietPeriodMs"] = trace_quiet_period_ms
+        if trace_wait_timeout_ms is not UNSET:
+            field_dict["traceWaitTimeoutMs"] = trace_wait_timeout_ms
         if parameters is not UNSET:
             field_dict["parameters"] = parameters
         if note is not UNSET:
@@ -140,6 +163,24 @@ class PostApiSuitesByIdRunBody:
 
         judge_model = _parse_judge_model(d.pop("judgeModel", UNSET))
 
+        def _parse_trace_quiet_period_ms(data: object) -> int | None | Unset:
+            if data is None:
+                return data
+            if isinstance(data, Unset):
+                return data
+            return cast(int | None | Unset, data)
+
+        trace_quiet_period_ms = _parse_trace_quiet_period_ms(d.pop("traceQuietPeriodMs", UNSET))
+
+        def _parse_trace_wait_timeout_ms(data: object) -> int | None | Unset:
+            if data is None:
+                return data
+            if isinstance(data, Unset):
+                return data
+            return cast(int | None | Unset, data)
+
+        trace_wait_timeout_ms = _parse_trace_wait_timeout_ms(d.pop("traceWaitTimeoutMs", UNSET))
+
         _parameters = d.pop("parameters", UNSET)
         parameters: PostApiSuitesByIdRunBodyParameters | Unset
         if isinstance(_parameters, Unset):
@@ -156,6 +197,8 @@ class PostApiSuitesByIdRunBody:
             repeat_count=repeat_count,
             simulator_model=simulator_model,
             judge_model=judge_model,
+            trace_quiet_period_ms=trace_quiet_period_ms,
+            trace_wait_timeout_ms=trace_wait_timeout_ms,
             parameters=parameters,
             note=note,
         )

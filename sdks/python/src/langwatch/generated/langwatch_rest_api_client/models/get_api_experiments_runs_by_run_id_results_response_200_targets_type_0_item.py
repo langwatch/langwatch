@@ -4,7 +4,6 @@ from collections.abc import Mapping
 from typing import TYPE_CHECKING, Any, TypeVar, cast
 
 from attrs import define as _attrs_define
-from attrs import field as _attrs_field
 
 from ..types import UNSET, Unset
 
@@ -27,6 +26,8 @@ class GetApiExperimentsRunsByRunIdResultsResponse200TargetsType0Item:
         prompt_id (None | str | Unset):
         prompt_version (float | None | Unset):
         agent_id (None | str | Unset):
+        agent_label (None | str | Unset): The deploy label an agent target ran at, such as production
+        agent_version (int | None | Unset): The agent version the label pointed at when the run started
         evaluator_id (None | str | Unset):
         model (None | str | Unset):
         metadata (GetApiExperimentsRunsByRunIdResultsResponse200TargetsType0ItemMetadataType0 | None | Unset):
@@ -38,10 +39,11 @@ class GetApiExperimentsRunsByRunIdResultsResponse200TargetsType0Item:
     prompt_id: None | str | Unset = UNSET
     prompt_version: float | None | Unset = UNSET
     agent_id: None | str | Unset = UNSET
+    agent_label: None | str | Unset = UNSET
+    agent_version: int | None | Unset = UNSET
     evaluator_id: None | str | Unset = UNSET
     model: None | str | Unset = UNSET
     metadata: GetApiExperimentsRunsByRunIdResultsResponse200TargetsType0ItemMetadataType0 | None | Unset = UNSET
-    additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         from ..models.get_api_experiments_runs_by_run_id_results_response_200_targets_type_0_item_metadata_type_0 import (
@@ -72,6 +74,18 @@ class GetApiExperimentsRunsByRunIdResultsResponse200TargetsType0Item:
         else:
             agent_id = self.agent_id
 
+        agent_label: None | str | Unset
+        if isinstance(self.agent_label, Unset):
+            agent_label = UNSET
+        else:
+            agent_label = self.agent_label
+
+        agent_version: int | None | Unset
+        if isinstance(self.agent_version, Unset):
+            agent_version = UNSET
+        else:
+            agent_version = self.agent_version
+
         evaluator_id: None | str | Unset
         if isinstance(self.evaluator_id, Unset):
             evaluator_id = UNSET
@@ -93,7 +107,7 @@ class GetApiExperimentsRunsByRunIdResultsResponse200TargetsType0Item:
             metadata = self.metadata
 
         field_dict: dict[str, Any] = {}
-        field_dict.update(self.additional_properties)
+
         field_dict.update(
             {
                 "id": id,
@@ -107,6 +121,10 @@ class GetApiExperimentsRunsByRunIdResultsResponse200TargetsType0Item:
             field_dict["promptVersion"] = prompt_version
         if agent_id is not UNSET:
             field_dict["agentId"] = agent_id
+        if agent_label is not UNSET:
+            field_dict["agentLabel"] = agent_label
+        if agent_version is not UNSET:
+            field_dict["agentVersion"] = agent_version
         if evaluator_id is not UNSET:
             field_dict["evaluatorId"] = evaluator_id
         if model is not UNSET:
@@ -156,6 +174,24 @@ class GetApiExperimentsRunsByRunIdResultsResponse200TargetsType0Item:
 
         agent_id = _parse_agent_id(d.pop("agentId", UNSET))
 
+        def _parse_agent_label(data: object) -> None | str | Unset:
+            if data is None:
+                return data
+            if isinstance(data, Unset):
+                return data
+            return cast(None | str | Unset, data)
+
+        agent_label = _parse_agent_label(d.pop("agentLabel", UNSET))
+
+        def _parse_agent_version(data: object) -> int | None | Unset:
+            if data is None:
+                return data
+            if isinstance(data, Unset):
+                return data
+            return cast(int | None | Unset, data)
+
+        agent_version = _parse_agent_version(d.pop("agentVersion", UNSET))
+
         def _parse_evaluator_id(data: object) -> None | str | Unset:
             if data is None:
                 return data
@@ -204,26 +240,11 @@ class GetApiExperimentsRunsByRunIdResultsResponse200TargetsType0Item:
             prompt_id=prompt_id,
             prompt_version=prompt_version,
             agent_id=agent_id,
+            agent_label=agent_label,
+            agent_version=agent_version,
             evaluator_id=evaluator_id,
             model=model,
             metadata=metadata,
         )
 
-        get_api_experiments_runs_by_run_id_results_response_200_targets_type_0_item.additional_properties = d
         return get_api_experiments_runs_by_run_id_results_response_200_targets_type_0_item
-
-    @property
-    def additional_keys(self) -> list[str]:
-        return list(self.additional_properties.keys())
-
-    def __getitem__(self, key: str) -> Any:
-        return self.additional_properties[key]
-
-    def __setitem__(self, key: str, value: Any) -> None:
-        self.additional_properties[key] = value
-
-    def __delitem__(self, key: str) -> None:
-        del self.additional_properties[key]
-
-    def __contains__(self, key: str) -> bool:
-        return key in self.additional_properties

@@ -1,21 +1,16 @@
 /**
- * Filing a scenario into a test suite from the command line.
- *
- * The test suite is named by id or by name, and it is resolved through the
- * test suites API before the scenario is written, so a name that matches
- * nothing leaves no half-filed scenario behind.
- *
+ * File scenario into test suite by id or name; resolve before write.
  * Spec: specs/features/scenario-cli.feature
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
+
 import type { ScenarioResponse } from "@/client-sdk/services/scenarios";
 
 const mockSuitesList = vi.hoisted(() => vi.fn());
 const mockSuiteGet = vi.hoisted(() => vi.fn());
 
 vi.mock("@/client-sdk/services/scenarios", async (importOriginal) => {
-  // eslint-disable-next-line @typescript-eslint/consistent-type-imports
-  const actual = await importOriginal<typeof import("@/client-sdk/services/scenarios")>();
+  const actual = await importOriginal<typeof scenariosModule>();
   return {
     ...actual,
     ScenariosApiService: vi.fn(),
@@ -48,9 +43,11 @@ vi.mock("ora", () => ({
 }));
 
 import { ScenariosApiService } from "@/client-sdk/services/scenarios";
+import type * as scenariosModule from "@/client-sdk/services/scenarios";
+
 import { createScenarioCommand } from "../create";
-import { updateScenarioCommand } from "../update";
 import { listScenariosCommand } from "../list";
+import { updateScenarioCommand } from "../update";
 
 class ProcessExitError extends Error {
   constructor(public code: number) {
@@ -62,9 +59,7 @@ const noop = () => {
   // intentionally empty, suppresses output during tests
 };
 
-const makeScenario = (
-  overrides: Partial<ScenarioResponse> = {},
-): ScenarioResponse => ({
+const makeScenario = (overrides: Partial<ScenarioResponse> = {}): ScenarioResponse => ({
   id: "scenario_abc123",
   name: "Login Flow",
   situation: "User attempts to log in",
@@ -165,9 +160,7 @@ describe("filing a scenario into a test suite from the command line", () => {
   describe("when updating a scenario with --field", () => {
     /** @scenario "Update the field values of a scenario in place" */
     it("reads the suite the scenario is in for its field types", async () => {
-      const mockScenarioGet = vi
-        .fn()
-        .mockResolvedValue(makeScenario({ testSuiteId: "suite_abc" }));
+      const mockScenarioGet = vi.fn().mockResolvedValue(makeScenario({ testSuiteId: "suite_abc" }));
       vi.mocked(ScenariosApiService).mockImplementation(function () {
         return {
           getAll: mockScenarioGetAll,
@@ -192,13 +185,11 @@ describe("filing a scenario into a test suite from the command line", () => {
     });
   });
 
-  describe("createScenarioCommand() with --test-suite", () => {
+  describe("when createScenarioCommand is called with --test-suite", () => {
     /** @scenario "Create a scenario inside a test suite" */
     it("creates the scenario inside that test suite", async () => {
       mockSuitesList.mockResolvedValue([makeTestSuite()]);
-      mockScenarioCreate.mockResolvedValue(
-        makeScenario({ testSuiteId: "suite_abc" }),
-      );
+      mockScenarioCreate.mockResolvedValue(makeScenario({ testSuiteId: "suite_abc" }));
 
       const result = await createScenarioCommand("Login Flow", {
         situation: "User logs in",
@@ -215,9 +206,7 @@ describe("filing a scenario into a test suite from the command line", () => {
     /** @scenario "Create a scenario inside a test suite" */
     it("names the test suite in the confirmation", async () => {
       mockSuitesList.mockResolvedValue([makeTestSuite()]);
-      mockScenarioCreate.mockResolvedValue(
-        makeScenario({ testSuiteId: "suite_abc" }),
-      );
+      mockScenarioCreate.mockResolvedValue(makeScenario({ testSuiteId: "suite_abc" }));
 
       await createScenarioCommand("Login Flow", {
         situation: "User logs in",
@@ -247,15 +236,11 @@ describe("filing a scenario into a test suite from the command line", () => {
     });
   });
 
-  describe("updateScenarioCommand() with --test-suite", () => {
+  describe("when updateScenarioCommand is called with --test-suite", () => {
     /** @scenario "Move a scenario to another test suite" */
     it("moves the scenario into the named test suite", async () => {
-      mockSuitesList.mockResolvedValue([
-        makeTestSuite({ id: "suite_xyz", name: "Chargebacks" }),
-      ]);
-      mockScenarioUpdate.mockResolvedValue(
-        makeScenario({ testSuiteId: "suite_xyz" }),
-      );
+      mockSuitesList.mockResolvedValue([makeTestSuite({ id: "suite_xyz", name: "Chargebacks" })]);
+      mockScenarioUpdate.mockResolvedValue(makeScenario({ testSuiteId: "suite_xyz" }));
 
       const result = await updateScenarioCommand("scenario_abc123", {
         testSuite: "suite_xyz",
@@ -272,9 +257,7 @@ describe("filing a scenario into a test suite from the command line", () => {
     it("clears the test suite, and reads back the Default the platform files it into", async () => {
       // The platform keeps every scenario in exactly one suite, so a cleared
       // test suite comes back as the project's Default rather than as none.
-      mockScenarioUpdate.mockResolvedValue(
-        makeScenario({ testSuiteId: "suite_default" }),
-      );
+      mockScenarioUpdate.mockResolvedValue(makeScenario({ testSuiteId: "suite_default" }));
 
       const result = await updateScenarioCommand("scenario_abc123", {
         noTestSuite: true,
@@ -321,9 +304,7 @@ describe("filing a scenario into a test suite from the command line", () => {
 
     /** @scenario "List scenarios shows the test suite each one belongs to" */
     it("reads a scenario with no test suite as unfiled", async () => {
-      mockScenarioGetAll.mockResolvedValue([
-        makeScenario({ id: "scenario_2", testSuiteId: null }),
-      ]);
+      mockScenarioGetAll.mockResolvedValue([makeScenario({ id: "scenario_2", testSuiteId: null })]);
 
       const result = await listScenariosCommand();
       result!.table();

@@ -6,8 +6,6 @@ from typing import Any, TypeVar
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
 
-from ..types import UNSET, Unset
-
 T = TypeVar("T", bound="GetApiScenariosByIdVersionsByVersionResponse404")
 
 
@@ -16,17 +14,13 @@ class GetApiScenariosByIdVersionsByVersionResponse404:
     """
     Attributes:
         error (str):
-        message (str | Unset):
     """
 
     error: str
-    message: str | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         error = self.error
-
-        message = self.message
 
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
@@ -35,8 +29,6 @@ class GetApiScenariosByIdVersionsByVersionResponse404:
                 "error": error,
             }
         )
-        if message is not UNSET:
-            field_dict["message"] = message
 
         return field_dict
 
@@ -45,11 +37,8 @@ class GetApiScenariosByIdVersionsByVersionResponse404:
         d = dict(src_dict)
         error = d.pop("error")
 
-        message = d.pop("message", UNSET)
-
         get_api_scenarios_by_id_versions_by_version_response_404 = cls(
             error=error,
-            message=message,
         )
 
         get_api_scenarios_by_id_versions_by_version_response_404.additional_properties = d

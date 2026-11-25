@@ -113,6 +113,13 @@ Feature: Automations list pages, providers, and shared copy
       When its conditions render in the list or the drawer
       Then the chip reads "Metadata · plan" with the value "true"
 
+    @integration
+    Scenario: A long key wraps inside its filter chip
+      Given an automation whose filter is keyed by one long unbreakable monitor id
+      When its conditions render in the list or the drawer
+      Then the chip's label wraps inside the chip's border
+      And the value takes its own line when it cannot fit beside the label
+
     @unit @integration
     Scenario: A keyed filter stored without its key is flagged as never matching
       Given an automation whose filter is {"metadata.value": ["true"]}

@@ -2,7 +2,7 @@ Feature: License Activation UI
 
   # Page-level UX of the License activation flow. The @integration scenarios
   # under "Either form in any field" are bound by
-  # src/components/license/__tests__/NoLicenseCard.integration.test.tsx, which
+  # enterprise/modules/licensing/browser/src/ui/sections/__tests__/license-input-forms.integration.test.tsx, which
   # renders the page with the license API mocked. The @unimplemented ones
   # still need a page-level harness or a Playwright E2E.
 
@@ -27,7 +27,7 @@ Feature: License Activation UI
     Given the platform is deployed in SaaS mode (IS_SAAS=true)
     When I navigate to the settings page
     Then I do not see "License" in the settings sidebar menu
-    And I see "Subscription" in the settings sidebar menu instead
+    And I see "Plan & billing" in the settings sidebar menu instead
 
   # License activation - dual input method UI
   @e2e @unimplemented

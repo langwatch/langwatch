@@ -1,0 +1,18 @@
+{
+  "name": "D3: missing metric, says so and offers the nearest",
+  "situation": "You are a LangWatch user talking to Langy, the in-product assistant. The test state is the test's own bookkeeping: take only the names it gives you (board.name, trace_name), never mention ids, facts or anything else from it. Write short, plain messages. In your first message, ask exactly (with the real values): 'Add a chart of revenue per checkout per day for my traces named <trace_name> to my \"<board.name>\" dashboard.' If Langy says revenue is not available and offers something else, reply 'No thanks, leave it.'",
+  "criteria": [
+    "Langy says plainly that revenue per checkout is not recorded in this project's data, instead of inventing a revenue chart.",
+    "Langy offers the nearest metric it does have (for example trace count, cost, or duration).",
+    "Code check: facts_now.items_created_this_run is 0: no widget or chart was created."
+  ],
+  "labels": ["confidence"],
+  "parameters": [
+    {
+      "name": "world",
+      "description": "Which matrix world the setup hook builds",
+      "defaultValue": "D3"
+    }
+  ],
+  "maxTurns": 2
+}

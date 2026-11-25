@@ -23,17 +23,61 @@ Feature: API Key Scope and Fine-Grained Permissions
 
   # ── Scope selector (ScopeChipPicker with quick-pick pills) ──
 
-  @integration @unimplemented
+  @integration
   Scenario: Scope defaults to current project via quick-pick pill
     When I open the create API key drawer
-    Then the "This project" pill is selected by default
+    Then the "Project" pill, with the current project's name in a badge, is selected by default
     And the key will be scoped to the current project context
 
-  @integration @unimplemented
-  Scenario: Scope quick-picks show Organization, This team, This project, Multiple
+  @integration
+  Scenario: Scope quick-picks show Organization, Team, Project, Multiple
     When I open the create API key drawer
-    Then I see pill buttons: Organization, This team, This project, Multiple
+    Then I see pill buttons: Organization, "Team" with the current team's name in a badge, "Project" with the current project's name in a badge, Multiple
     And each pill has an icon: building for organization, users for team, folder for project
+
+  # The shared scope picker names the current team and project, so a reader in
+  # an organization with many of each can tell what a key will be bound to
+  # without opening Advanced (issue #9707). The name is the platform's green
+  # badge, the one the key list uses for "Active".
+  @integration @regression
+  Scenario: The quick picks name the current team and project
+    Given the current team is "Platform" and the current project is "Checkout"
+    When the scope picker shows its quick picks
+    Then the team pill reads "Team" followed by "Platform" in a green badge
+    And the project pill reads "Project" followed by "Checkout" in a green badge
+    And a screen reader names the pills "Team Platform" and "Project Checkout"
+
+  @integration @regression
+  Scenario: A long quick-pick name is truncated with the full label on hover
+    Given the current project has a name too long for its pill
+    When the scope picker shows its quick picks
+    Then the name truncates inside its badge
+    And hovering the badge shows the full name
+
+  @integration @regression
+  Scenario: A quick pick whose name is unknown keeps its plain label
+    Given a current team and project are in context
+    But neither is among the teams and projects the picker was given
+    When the scope picker shows its quick picks
+    Then the pills read "This team" and "This project", with no badge
+
+  @integration @regression
+  Scenario: The helper under the picker names the scope it binds to
+    When the picked scope is the project "Checkout"
+    Then the helper reads "Only Checkout can use this configuration." with "Checkout" in a badge
+    When the picked scope is the team "Platform"
+    Then the helper reads "Every project in Platform inherits this configuration." with "Platform" in a badge
+
+  @integration @regression
+  Scenario: The Advanced summary names the key's scope in a badge
+    When I open the create API key drawer in the project "Web App"
+    Then the closed Advanced section reads "Personal key with all permissions on Web App."
+    And "Web App" is in a badge
+
+  @integration @regression
+  Scenario: The helper keeps its plain wording when the scope's name is unknown
+    When the picked scope is a project the picker has no name for
+    Then the helper reads "Only this project can use this configuration."
 
   @integration @unimplemented
   Scenario: Selecting Organization pill scopes key to the organization
@@ -102,6 +146,7 @@ Feature: API Key Scope and Fine-Grained Permissions
       | Organization           | read, write   |
       | Gateway                | read, write   |
       | Governance             | read, write   |
+      | Feature Flags          | write         |
 
   @unit
   Scenario: Project write carries creation and deletion, because manage implies them
@@ -193,7 +238,7 @@ Feature: API Key Scope and Fine-Grained Permissions
     Given a personal API key has project access
     When its stored owner loses that access
     Then the key loses that access on its next permission check
-    And supplying a different or absent owner does not bypass the stored owner's ceiling
+    And the owner is read from storage by the key's id, never supplied by the caller
 
   @integration @unimplemented
   Scenario: Changing scope recalculates ceiling and resets out-of-bounds selections
@@ -203,10 +248,10 @@ Feature: API Key Scope and Fine-Grained Permissions
     Then Traces resets to "None" because Write exceeds my Viewer ceiling on Team Beta
 
   @integration @unimplemented
-  Scenario: Service key bypasses creator ceiling
+  Scenario: A service key is offered every permission its creator's organization role holds
     Given I am an organization admin
     When I create a service key with "Restricted" permissions
-    Then all resource menus offer None, Read, and Write regardless of my personal role
+    Then each resource menu offers the levels my organization role holds, and no more
 
   # ── Create flow ─────────────────────────────────────────────
 
@@ -234,11 +279,11 @@ Feature: API Key Scope and Fine-Grained Permissions
 
   # ── Edit flow ───────────────────────────────────────────────
 
-  @integration @unimplemented
+  @integration
   Scenario: Edit drawer pre-populates scope from existing binding
     Given I have an API key scoped to a team
     When I open the edit drawer
-    Then the "This team" pill is selected in the scope picker
+    Then the "Team" pill, with the team's name in a badge, is selected in the scope picker
 
   @integration @unimplemented
   Scenario: Edit drawer pre-populates fine-grained permissions from CustomRole
@@ -375,6 +420,13 @@ Feature: API Key Scope and Fine-Grained Permissions
     And the bindings are recreated with the CustomRole id
 
   @unit
+  Scenario: Editing a key without changing its scopes keeps them
+    Given an API key already bound to a project
+    When I save an edit that resubmits the same scope unchanged
+    Then the key keeps that binding
+    And the key still works afterwards
+
+  @unit
   Scenario: Restricted key with camelCase permissions saves without error
     When I create a restricted key with permissions including "auditLog:view"
     Then the CustomRole is created successfully
@@ -385,3 +437,45 @@ Feature: API Key Scope and Fine-Grained Permissions
     Given every permission category at its maximum access level
     When I compute the backend permissions for each category
     Then every permission string matches the CustomRole schema regex
+
+  # ── Cost visibility on the REST read doors ──────────────────
+
+  # A key's grants decide what its reads may see, and cost is one of them. The
+  # governed-SQL door and the trace doors both used to answer "yes" to
+  # cost:view for every key alike, on the reasoning that project keys predate
+  # RBAC — true of a legacy project key, and false of every key minted since.
+
+  @unit
+  Scenario: A key without the cost grant reads the query surface with costs redacted
+    Given a key that may run governed queries but does not carry "cost:view"
+    When the query surface resolves what that key may see
+    Then costs are hidden from it
+
+  @unit
+  Scenario: A key carrying the cost grant reads the query surface with costs
+    Given a key that carries "cost:view" for its project
+    When the query surface resolves what that key may see
+    Then costs are visible to it
+
+  @unit
+  Scenario: A key without the cost grant reads traces with costs redacted
+    Given a key that may view traces but does not carry "cost:view"
+    When the trace read resolves what that key may see
+    Then costs are hidden from it
+
+  @unit
+  Scenario: A legacy project key still reads costs without a grant lookup
+    Given a legacy project key, which predates fine-grained permissions
+    When either read door resolves what that key may see
+    Then costs are visible to it
+    And no per-key permission is looked up
+
+  # A misconfigured client retries its refused request many times a second.
+  # Each retry is the same customer fault, so the API door logs one warning
+  # per key per window, like trace ingestion does.
+  @unit
+  Scenario: Repeated ceiling refusals for one key log one warning per window
+    Given an API key whose permissions do not include the route's permission
+    When it is refused three times inside one sampling window
+    Then one warning is logged and no error
+    And the next refusal after the window carries the two refusals held back

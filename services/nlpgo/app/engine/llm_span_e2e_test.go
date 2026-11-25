@@ -128,23 +128,39 @@ func TestEngineExecute_SignatureNodeEmitsLLMChildSpan(t *testing.T) {
 // counts; without them the evaluations-v3 cell showed no cost even though the
 // trace did (rchaves dogfood 2026-06-19).
 func TestEngineExecute_SignatureNodeSurfacesTokenMetrics(t *testing.T) {
+	ns := runSignatureNodeForMetrics(t, app.Usage{
+		PromptTokens:     30,
+		CompletionTokens: 5,
+		TotalTokens:      35,
+		ReasoningTokens:  2,
+	})
+	assert.Equal(t, 30, ns.Metrics.PromptTokens)
+	assert.Equal(t, 5, ns.Metrics.CompletionTokens)
+	assert.Equal(t, 35, ns.Metrics.TotalTokens)
+	assert.Equal(t, 2, ns.Metrics.ReasoningTokens)
+	assert.Equal(t, "openai/gpt-5-mini", ns.Metrics.Model)
+}
+
+// @scenario "A signature node reports its cache counts in its node metrics"
+func TestEngineExecute_SignatureNodeSurfacesCacheOnlyMetrics(t *testing.T) {
+	ns := runSignatureNodeForMetrics(t, app.Usage{
+		CacheReadInputTokens:     20,
+		CacheCreationInputTokens: 4,
+	})
+	assert.Equal(t, 20, ns.Metrics.CacheReadInputTokens)
+	assert.Equal(t, 4, ns.Metrics.CacheCreationInputTokens)
+	assert.Equal(t, "openai/gpt-5-mini", ns.Metrics.Model)
+}
+
+// runSignatureNodeForMetrics runs entry -> signature -> end with the LLM
+// answering under usage, and returns the signature node's state.
+func runSignatureNodeForMetrics(t *testing.T, usage app.Usage) *NodeState {
+	t.Helper()
 	_ = withRecorder(t)
 
-	model := "openai/gpt-5-mini"
-	llm := &fakeLLMClient{
-		resp: &app.LLMResponse{
-			Content: "4",
-			Usage: app.Usage{
-				PromptTokens:     30,
-				CompletionTokens: 5,
-				TotalTokens:      35,
-				ReasoningTokens:  2,
-			},
-		},
-	}
-
+	llm := &fakeLLMClient{resp: &app.LLMResponse{Content: "4", Usage: usage}}
 	eng := New(Options{LLM: llm})
-	llmConfigJSON, err := json.Marshal(map[string]any{"model": model})
+	llmConfigJSON, err := json.Marshal(map[string]any{"model": "openai/gpt-5-mini"})
 	require.NoError(t, err)
 
 	wf := &dsl.Workflow{
@@ -180,9 +196,5 @@ func TestEngineExecute_SignatureNodeSurfacesTokenMetrics(t *testing.T) {
 	ns := res.Nodes["answer"]
 	require.NotNil(t, ns, "answer node state must be present")
 	require.NotNil(t, ns.Metrics, "signature node must surface token metrics for pricing")
-	assert.Equal(t, 30, ns.Metrics.PromptTokens)
-	assert.Equal(t, 5, ns.Metrics.CompletionTokens)
-	assert.Equal(t, 35, ns.Metrics.TotalTokens)
-	assert.Equal(t, 2, ns.Metrics.ReasoningTokens)
-	assert.Equal(t, model, ns.Metrics.Model)
+	return ns
 }

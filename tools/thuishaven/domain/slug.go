@@ -119,6 +119,33 @@ func AllocateRedisDB(slug string, taken map[int]bool) (db int, exclusive bool) {
 	return preferred, false
 }
 
+// LLMPortBase and LLMPortSpan bound the ports a stack's llmsim may hold. The
+// range sits below every OS's ephemeral range, so a random FreePorts pick
+// never lands in it.
+const (
+	LLMPortBase = 21000
+	LLMPortSpan = 1000
+)
+
+// AllocateLLMPort picks the port a stack's llmsim listens on. Seeded model
+// providers store it, so it must not move: the slug's hash is the starting
+// point and the same slug lands on it every time, probing past ports that
+// isInUse reports taken (another stack's, or a stranger's listener).
+// With the whole range taken it returns 0 and the caller falls back to a random one.
+func AllocateLLMPort(slug string, isInUse func(port int) bool) int {
+	var h uint32
+	for _, c := range slug {
+		h = h*31 + uint32(c)
+	}
+	for offset := range LLMPortSpan {
+		candidate := LLMPortBase + int((h+uint32(offset))%LLMPortSpan)
+		if !isInUse(candidate) {
+			return candidate
+		}
+	}
+	return 0
+}
+
 // ErrInvalidSlug is returned when an explicit LANGWATCH_SLUG is malformed.
 func ErrInvalidSlug(s string) error {
 	return fmt.Errorf("%q is not a valid slug (want lowercase words joined by -)", s)

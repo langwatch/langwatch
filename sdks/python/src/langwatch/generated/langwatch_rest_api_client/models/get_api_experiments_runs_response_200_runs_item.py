@@ -4,7 +4,6 @@ from collections.abc import Mapping
 from typing import TYPE_CHECKING, Any, TypeVar, cast
 
 from attrs import define as _attrs_define
-from attrs import field as _attrs_field
 
 from ..types import UNSET, Unset
 
@@ -34,6 +33,9 @@ class GetApiExperimentsRunsResponse200RunsItem:
         summary (GetApiExperimentsRunsResponse200RunsItemSummary):
         progress (float | None | Unset):
         total (float | None | Unset):
+        concurrency (int | None | Unset): Cells the run executed at once. Null for a run that recorded none.
+        repeat (int | None | Unset): How many times the run repeated every dataset row. Run row `r * repeat + k` is
+            repetition `k` of dataset row `r`. Null for a run that ran each row once.
     """
 
     experiment_id: str
@@ -43,7 +45,8 @@ class GetApiExperimentsRunsResponse200RunsItem:
     summary: GetApiExperimentsRunsResponse200RunsItemSummary
     progress: float | None | Unset = UNSET
     total: float | None | Unset = UNSET
-    additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
+    concurrency: int | None | Unset = UNSET
+    repeat: int | None | Unset = UNSET
 
     def to_dict(self) -> dict[str, Any]:
         from ..models.get_api_experiments_runs_response_200_runs_item_workflow_version_type_0 import (
@@ -76,8 +79,20 @@ class GetApiExperimentsRunsResponse200RunsItem:
         else:
             total = self.total
 
+        concurrency: int | None | Unset
+        if isinstance(self.concurrency, Unset):
+            concurrency = UNSET
+        else:
+            concurrency = self.concurrency
+
+        repeat: int | None | Unset
+        if isinstance(self.repeat, Unset):
+            repeat = UNSET
+        else:
+            repeat = self.repeat
+
         field_dict: dict[str, Any] = {}
-        field_dict.update(self.additional_properties)
+
         field_dict.update(
             {
                 "experimentId": experiment_id,
@@ -91,6 +106,10 @@ class GetApiExperimentsRunsResponse200RunsItem:
             field_dict["progress"] = progress
         if total is not UNSET:
             field_dict["total"] = total
+        if concurrency is not UNSET:
+            field_dict["concurrency"] = concurrency
+        if repeat is not UNSET:
+            field_dict["repeat"] = repeat
 
         return field_dict
 
@@ -150,6 +169,24 @@ class GetApiExperimentsRunsResponse200RunsItem:
 
         total = _parse_total(d.pop("total", UNSET))
 
+        def _parse_concurrency(data: object) -> int | None | Unset:
+            if data is None:
+                return data
+            if isinstance(data, Unset):
+                return data
+            return cast(int | None | Unset, data)
+
+        concurrency = _parse_concurrency(d.pop("concurrency", UNSET))
+
+        def _parse_repeat(data: object) -> int | None | Unset:
+            if data is None:
+                return data
+            if isinstance(data, Unset):
+                return data
+            return cast(int | None | Unset, data)
+
+        repeat = _parse_repeat(d.pop("repeat", UNSET))
+
         get_api_experiments_runs_response_200_runs_item = cls(
             experiment_id=experiment_id,
             run_id=run_id,
@@ -158,23 +195,8 @@ class GetApiExperimentsRunsResponse200RunsItem:
             summary=summary,
             progress=progress,
             total=total,
+            concurrency=concurrency,
+            repeat=repeat,
         )
 
-        get_api_experiments_runs_response_200_runs_item.additional_properties = d
         return get_api_experiments_runs_response_200_runs_item
-
-    @property
-    def additional_keys(self) -> list[str]:
-        return list(self.additional_properties.keys())
-
-    def __getitem__(self, key: str) -> Any:
-        return self.additional_properties[key]
-
-    def __setitem__(self, key: str, value: Any) -> None:
-        self.additional_properties[key] = value
-
-    def __delitem__(self, key: str) -> None:
-        del self.additional_properties[key]
-
-    def __contains__(self, key: str) -> bool:
-        return key in self.additional_properties

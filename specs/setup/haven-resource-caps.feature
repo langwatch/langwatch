@@ -23,6 +23,21 @@ Feature: Resource caps — shared services can't take the machine
     Then a maxmemory ceiling is applied to it
     And the ceiling is tunable (and can be disabled) via the environment
 
+  @unit
+  Scenario: Starting the shared Redis adopts the brew-started formula, else the installed one, valkey first
+    Given nothing answers on the Redis port
+    When haven up starts the Redis it manages
+    Then a formula brew already reports as started is used
+    And otherwise an installed valkey is used before an installed redis
+    And a machine with neither gets valkey to install
+
+  @unit
+  Scenario: The Redis health line names the server that answered
+    Given a Valkey or a Redis answers on the Redis port
+    When I run "haven status"
+    Then the Redis line says "valkey" or "redis" with the version that answered
+    And a Valkey is never reported as Redis for its compatibility version field
+
   @integration @unimplemented
   Scenario: The doctor shows each service's memory footprint
     When I run "haven status"

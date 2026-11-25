@@ -11,7 +11,7 @@ T = TypeVar("T", bound="SampleInstantEvalRunResponse200JudgmentsItemProbabilitie
 
 @_attrs_define
 class SampleInstantEvalRunResponse200JudgmentsItemProbabilitiesType0:
-    """The full distribution behind a category answer."""
+    """ """
 
     additional_properties: dict[str, float] = _attrs_field(init=False, factory=dict)
 

@@ -1,11 +1,11 @@
 /**
- * The options a caller passes to Experiment.compare(), and the judge settings
- * each one maps onto.
- *
+ * The options a caller passes to Experiment.compare(), and the judge
+ * settings each one maps onto.
  * Spec: specs/experiments/comparison-sdk.feature
  */
 
 import { describe, it, expect } from "vitest";
+
 import {
   type ComparisonHarness,
   THREE_OUTPUTS,
@@ -53,13 +53,13 @@ describe("Experiment.compare", () => {
           include_metrics: ["duration"],
           temperature: 0.2,
         });
-        expect(Object.keys(request.data).sort()).toEqual([
+        expect(Object.keys(request.data).toSorted()).toEqual([
           "candidates",
           "golden",
           "input",
           "row_index",
         ]);
-        expect(Object.keys(verdict!).sort()).toEqual([
+        expect(Object.keys(verdict!).toSorted()).toEqual([
           "candidates",
           "reasoning",
           "status",
@@ -113,9 +113,10 @@ describe("Experiment.compare", () => {
           options: { targets: ["gpt-5-mini", "claude-sonnet-5"] },
         });
 
-        expect(
-          harness.judgeRequests[0]!.data.candidates.map((candidate) => candidate.id)
-        ).toEqual(["gpt-5-mini", "claude-sonnet-5"]);
+        expect(harness.judgeRequests[0]!.data.candidates.map((candidate) => candidate.id)).toEqual([
+          "gpt-5-mini",
+          "claude-sonnet-5",
+        ]);
         expect(verdict?.candidates).toEqual(["gpt-5-mini", "claude-sonnet-5"]);
       });
     });
@@ -130,20 +131,20 @@ describe("Experiment.compare", () => {
           async ({ index }) => {
             await Promise.all(
               Object.entries(THREE_OUTPUTS).map(([target, output]) =>
-                experiment.withTarget(target, () => output)
-              )
+                experiment.withTarget(target, () => output),
+              ),
             );
             await experiment.compare({ index });
             if (index === 0) await experiment.compare({ index });
           },
-          { concurrency: 1 }
+          { concurrency: 1 },
         );
 
         const [first, second, other] = harness.judgeRequests;
         expect(first!.data.row_index).toBe(0);
         expect(second!.data.row_index).toBe(0);
         expect(first!.data.candidates.map((candidate) => candidate.id)).toEqual(
-          second!.data.candidates.map((candidate) => candidate.id)
+          second!.data.candidates.map((candidate) => candidate.id),
         );
         expect(other!.data.row_index).toBe(1);
       });

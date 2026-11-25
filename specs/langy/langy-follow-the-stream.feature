@@ -116,3 +116,29 @@ Feature: The Langy conversation follows the stream
       Given the Langy panel is open and scrolled to the bottom
       When the column is part way through following the answer
       Then it keeps following to the end
+
+  Rule: The follow outlives the column being rebuilt
+
+    # The recents view takes the whole panel body, so coming back builds a new
+    # column. The follow kept listening to the old one: scrolling up stopped
+    # nothing, and a reader who had scrolled up before was never followed again.
+    @integration
+    Scenario: A column shown again after the recent chats still answers the reader
+      Given I opened the recent chats and came back to the conversation
+      When I scroll up to read while an answer streams
+      Then the column stops following, and offers to jump to the latest
+
+    @integration
+    Scenario: A conversation shown again starts at its live edge and follows
+      Given I scrolled up to read, then opened the recent chats and came back
+      When the answer grows
+      Then the column follows it and the newest line stays in view
+
+    # Reading a long conversation from the very top and starting a new chat
+    # leaves the column at the top with nothing to scroll, so no scroll ever
+    # says the reader is back at the live edge.
+    @integration
+    Scenario: A new chat follows its first answer
+      Given I scrolled to the top of a long conversation and started a new chat
+      When the new answer grows past the bottom of the column
+      Then the column follows it, and offers nothing to jump to

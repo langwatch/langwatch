@@ -4,7 +4,6 @@ from collections.abc import Mapping
 from typing import Any, TypeVar
 
 from attrs import define as _attrs_define
-from attrs import field as _attrs_field
 
 from ..types import UNSET, Unset
 
@@ -19,7 +18,8 @@ class GetApiExperimentsRunsByRunIdResponse200SummaryEvaluatorsItem:
         name (str):
         passed (float):
         failed (float):
-        pass_rate (float):
+        pass_rate (float): Percentage of verdicts that passed; 0 when passed and failed are both 0
+        errored (float | Unset): Cells where the evaluator crashed and gave no verdict
         avg_score (float | Unset):
     """
 
@@ -28,8 +28,8 @@ class GetApiExperimentsRunsByRunIdResponse200SummaryEvaluatorsItem:
     passed: float
     failed: float
     pass_rate: float
+    errored: float | Unset = UNSET
     avg_score: float | Unset = UNSET
-    additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         evaluator_id = self.evaluator_id
@@ -42,10 +42,12 @@ class GetApiExperimentsRunsByRunIdResponse200SummaryEvaluatorsItem:
 
         pass_rate = self.pass_rate
 
+        errored = self.errored
+
         avg_score = self.avg_score
 
         field_dict: dict[str, Any] = {}
-        field_dict.update(self.additional_properties)
+
         field_dict.update(
             {
                 "evaluatorId": evaluator_id,
@@ -55,6 +57,8 @@ class GetApiExperimentsRunsByRunIdResponse200SummaryEvaluatorsItem:
                 "passRate": pass_rate,
             }
         )
+        if errored is not UNSET:
+            field_dict["errored"] = errored
         if avg_score is not UNSET:
             field_dict["avgScore"] = avg_score
 
@@ -73,6 +77,8 @@ class GetApiExperimentsRunsByRunIdResponse200SummaryEvaluatorsItem:
 
         pass_rate = d.pop("passRate")
 
+        errored = d.pop("errored", UNSET)
+
         avg_score = d.pop("avgScore", UNSET)
 
         get_api_experiments_runs_by_run_id_response_200_summary_evaluators_item = cls(
@@ -81,24 +87,8 @@ class GetApiExperimentsRunsByRunIdResponse200SummaryEvaluatorsItem:
             passed=passed,
             failed=failed,
             pass_rate=pass_rate,
+            errored=errored,
             avg_score=avg_score,
         )
 
-        get_api_experiments_runs_by_run_id_response_200_summary_evaluators_item.additional_properties = d
         return get_api_experiments_runs_by_run_id_response_200_summary_evaluators_item
-
-    @property
-    def additional_keys(self) -> list[str]:
-        return list(self.additional_properties.keys())
-
-    def __getitem__(self, key: str) -> Any:
-        return self.additional_properties[key]
-
-    def __setitem__(self, key: str, value: Any) -> None:
-        self.additional_properties[key] = value
-
-    def __delitem__(self, key: str) -> None:
-        del self.additional_properties[key]
-
-    def __contains__(self, key: str) -> bool:
-        return key in self.additional_properties

@@ -1,18 +1,11 @@
 /**
- * The query family: the analytics SQL door and the reference that describes
- * both query languages.
- *
- * The reference is what replaced `schemas/filter-fields.ts`, a hand-copied list
- * of 24 filter field names that lived in this package and drifted: it named
- * fields the platform had renamed and missed the ones the Trace Explorer had
- * gained, and nothing could catch that because there was nothing to compare it
- * against. Fetching it means this server cannot describe a field the platform
- * does not have.
- *
+ * The query family: the analytics SQL door and the reference describing both query languages.
+ * Fetched, replacing a hand-copied field list that drifted, so this server cannot describe a
+ * missing field.
  * @see specs/mcp-server/schema-discovery.feature
  */
 
-import { makeRequest } from "./langwatch-api.js";
+import { makeRequest } from "./langwatch-api.ts";
 
 /** One column of a query result. */
 export interface QueryResultColumn {
@@ -32,6 +25,8 @@ export interface QueryRunResponse {
   };
   truncated: boolean;
   diagnostics: { code: string; message: string }[];
+  /** Each placeholder the SQL declares by its name, plus `period`; absent on an older platform. */
+  params?: Record<string, unknown>;
 }
 
 /** One published dataset. */
@@ -108,17 +103,18 @@ export interface QueryReferenceResponse {
 export async function runQuery(params: {
   sql: string;
   parameters?: Record<string, string | number | boolean | null>;
+  projects?: string[] | string;
+  sources?: string[];
 }): Promise<QueryRunResponse> {
   return makeRequest("POST", "/api/v1/query", {
     sql: params.sql,
     ...(params.parameters ? { parameters: params.parameters } : {}),
+    ...(params.projects ? { projects: params.projects } : {}),
+    ...(params.sources ? { sources: params.sources } : {}),
   }) as Promise<QueryRunResponse>;
 }
 
 /** Reads the query reference: both languages, their fields and worked examples. */
 export async function getQueryReference(): Promise<QueryReferenceResponse> {
-  return makeRequest(
-    "GET",
-    "/api/v1/query/reference",
-  ) as Promise<QueryReferenceResponse>;
+  return makeRequest("GET", "/api/v1/query/reference") as Promise<QueryReferenceResponse>;
 }

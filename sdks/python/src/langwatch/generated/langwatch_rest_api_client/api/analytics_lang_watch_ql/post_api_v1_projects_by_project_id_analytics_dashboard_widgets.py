@@ -123,9 +123,11 @@ def sync_detailed(
 ]:
     """Create a dashboard widget
 
-     Saves a React source file and the named LangWatchQL queries it runs as one dashboard widget. The
-    queries' shape is validated against the widget schema; their SQL is governed at run time by LW.query
-    inside the sandbox, not at save.
+     Saves a React source file and the named LangWatchQL queries it runs as one dashboard widget, with an
+    optional description the card shows behind its info icon and an optional prompt Langy is drafted
+    with when asked about it. `source` records where the widget came from; without it, the widget is
+    recorded as made through the API. The queries' shape is validated against the widget schema; their
+    SQL is governed at run time by LW.query inside the sandbox, not at save.
 
     Args:
         project_id (str):
@@ -166,9 +168,11 @@ def sync(
 ):
     """Create a dashboard widget
 
-     Saves a React source file and the named LangWatchQL queries it runs as one dashboard widget. The
-    queries' shape is validated against the widget schema; their SQL is governed at run time by LW.query
-    inside the sandbox, not at save.
+     Saves a React source file and the named LangWatchQL queries it runs as one dashboard widget, with an
+    optional description the card shows behind its info icon and an optional prompt Langy is drafted
+    with when asked about it. `source` records where the widget came from; without it, the widget is
+    recorded as made through the API. The queries' shape is validated against the widget schema; their
+    SQL is governed at run time by LW.query inside the sandbox, not at save.
 
     Args:
         project_id (str):
@@ -203,9 +207,11 @@ async def asyncio_detailed(
 ]:
     """Create a dashboard widget
 
-     Saves a React source file and the named LangWatchQL queries it runs as one dashboard widget. The
-    queries' shape is validated against the widget schema; their SQL is governed at run time by LW.query
-    inside the sandbox, not at save.
+     Saves a React source file and the named LangWatchQL queries it runs as one dashboard widget, with an
+    optional description the card shows behind its info icon and an optional prompt Langy is drafted
+    with when asked about it. `source` records where the widget came from; without it, the widget is
+    recorded as made through the API. The queries' shape is validated against the widget schema; their
+    SQL is governed at run time by LW.query inside the sandbox, not at save.
 
     Args:
         project_id (str):
@@ -244,9 +250,11 @@ async def asyncio(
 ):
     """Create a dashboard widget
 
-     Saves a React source file and the named LangWatchQL queries it runs as one dashboard widget. The
-    queries' shape is validated against the widget schema; their SQL is governed at run time by LW.query
-    inside the sandbox, not at save.
+     Saves a React source file and the named LangWatchQL queries it runs as one dashboard widget, with an
+    optional description the card shows behind its info icon and an optional prompt Langy is drafted
+    with when asked about it. `source` records where the widget came from; without it, the widget is
+    recorded as made through the API. The queries' shape is validated against the widget schema; their
+    SQL is governed at run time by LW.query inside the sandbox, not at save.
 
     Args:
         project_id (str):

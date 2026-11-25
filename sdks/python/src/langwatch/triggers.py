@@ -87,7 +87,7 @@ class TriggersFacade:
         Returns:
             Dictionary with trigger data.
         """
-        response = self._http().get("/api/triggers")
+        response = self._http().get("/api/v1/triggers")
         _raise_for_status(response, operation="list")
         return response.json()
 
@@ -97,7 +97,7 @@ class TriggersFacade:
         and its organization's. Name one by ``id`` as ``slackIntegrationId``
         in ``actionParams``. Tokens and webhook URLs are never returned.
         """
-        response = self._http().get("/api/slack-connections")
+        response = self._http().get("/api/v1/slack-connections")
         _raise_for_status(response, operation="list_slack_connections")
         return response.json()
 
@@ -111,7 +111,7 @@ class TriggersFacade:
         Returns:
             Dictionary containing the trigger data.
         """
-        response = self._http().get(f"/api/triggers/{_quote(trigger_id)}")
+        response = self._http().get(f"/api/v1/triggers/{_quote(trigger_id)}")
         _raise_for_status(response, operation="get")
         return response.json()
 
@@ -134,7 +134,7 @@ class TriggersFacade:
             Dictionary containing the created trigger data.
         """
         body = params or {}
-        response = self._http().post("/api/triggers", json=body)
+        response = self._http().post("/api/v1/triggers", json=body)
         _raise_for_status(response, operation="create")
         return response.json()
 
@@ -157,7 +157,9 @@ class TriggersFacade:
             Dictionary containing the updated trigger data.
         """
         body = params or {}
-        response = self._http().patch(f"/api/triggers/{_quote(trigger_id)}", json=body)
+        response = self._http().patch(
+            f"/api/v1/triggers/{_quote(trigger_id)}", json=body
+        )
         _raise_for_status(response, operation="update")
         return response.json()
 
@@ -171,7 +173,7 @@ class TriggersFacade:
         Returns:
             Dictionary with deletion result.
         """
-        response = self._http().delete(f"/api/triggers/{_quote(trigger_id)}")
+        response = self._http().delete(f"/api/v1/triggers/{_quote(trigger_id)}")
         _raise_for_status(response, operation="delete")
         return response.json()
 
@@ -199,7 +201,7 @@ class TriggersFacade:
         if limit is not None:
             query["limit"] = limit
         response = self._http().get(
-            f"/api/triggers/{_quote(trigger_id)}/fires", params=query
+            f"/api/v1/triggers/{_quote(trigger_id)}/fires", params=query
         )
         _raise_for_status(response, operation="fires")
         return response.json()
@@ -214,7 +216,7 @@ class TriggersFacade:
         Returns:
             Dictionary containing the updated trigger data.
         """
-        response = self._http().post(f"/api/triggers/{_quote(trigger_id)}/enable")
+        response = self._http().post(f"/api/v1/triggers/{_quote(trigger_id)}/enable")
         _raise_for_status(response, operation="enable")
         return response.json()
 
@@ -228,7 +230,7 @@ class TriggersFacade:
         Returns:
             Dictionary containing the updated trigger data.
         """
-        response = self._http().post(f"/api/triggers/{_quote(trigger_id)}/disable")
+        response = self._http().post(f"/api/v1/triggers/{_quote(trigger_id)}/disable")
         _raise_for_status(response, operation="disable")
         return response.json()
 
@@ -243,6 +245,6 @@ class TriggersFacade:
             Dictionary with ``channel``, ``recipientCount``, ``usedDefault``,
             ``missingVariables``, ``errors`` and, for webhooks, ``httpStatus``.
         """
-        response = self._http().post(f"/api/triggers/{_quote(trigger_id)}/test-fire")
+        response = self._http().post(f"/api/v1/triggers/{_quote(trigger_id)}/test-fire")
         _raise_for_status(response, operation="test_fire")
         return response.json()

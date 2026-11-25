@@ -1,47 +1,7 @@
 /**
- * The LangWatch Claude Code plugin: what Claude Code knows about it, how it
- * gets installed, and how it gets taken off again.
- *
- * The plugin carries the session context hooks (SessionStart and Stop) that
- * report which repository, branch and worktree a session ran in. The CLI used
- * to write those two entries straight into `~/.claude/settings.json`, and that
- * has two costs a plugin does not have:
- *
- *   - Invisibility. Nothing presents a raw hook entry as a LangWatch feature,
- *     so it reads as an unexplained command wired into every session. A plugin
- *     is listed by name, with everything it does inside it.
- *   - PATH coupling. The entry names `langwatch` and resolves it against the
- *     PATH of whatever started Claude Code, which for a desktop app has no
- *     version manager on it. The plugin's launcher runs the CLI through the
- *     location the CLI recorded about itself first (cli-location.ts).
- *
- * The plugin carries no hook logic: its launcher runs `langwatch ingest hook`
- * and `langwatch ingest guidance` from whatever CLI is installed, so a hook fix
- * ships with the CLI and the plugin only changes when a plugin-shaped file
- * does. The two commands accept arguments they do not know and always exit
- * zero, which is what lets a plugin from any version run with a CLI from any
- * version.
- *
- * What does NOT move here is the telemetry env block. Claude Code reads its
- * OTLP exporter configuration from `~/.claude/settings.json` and from nowhere
- * else, and a plugin cannot set a session's environment, so the env block stays
- * CLI-managed (see app-settings.ts) whichever seam carries the hooks.
- *
- * The installed plugin still has to keep up with what we publish for the
- * plugin-shaped changes (a new skill, a new hook event), and Claude Code will
- * not see to that: it auto-updates its own marketplaces and leaves third-party
- * ones like ours switched off by default. So the plugin is also updated from
- * here, once a day, from whichever wrapped run comes first.
- *
- * Everything in this file is best-effort by construction. A `claude` too old to
- * take a plugin, a network that is down, a marketplace that will not clone: none
- * of them may fail the coding session the user actually asked for. Every entry
- * point reports what happened and leaves the caller free to fall back to the raw
- * hook entries in session-context-hooks.ts.
- *
- * Specs:
- *   specs/ai-governance/cli-wrappers/claude-plugin-install.feature
- *   specs/ai-governance/cli-wrappers/claude-plugin-update.feature
+ * LangWatch's Claude Code plugin: install, update, and hook wiring for the CLI.
+ * Every operation here is best-effort — a missing `claude`, a dead network, or
+ * a marketplace that won't clone must never fail the coding session it runs in.
  */
 
 import { spawnSync } from "node:child_process";
@@ -89,29 +49,23 @@ const PROBE_TIMEOUT_MS = 10_000;
 const INSTALL_TIMEOUT_MS = 120_000;
 
 /**
- * How long a failed install suppresses the next attempt. A `claude` that could
- * not install the plugin today is overwhelmingly likely to fail the same way in
- * the next hour, and retrying on every single wrapped session would spend a
- * subprocess and a clone each time to learn it again.
+ * How long a failed install suppresses the next attempt. A `claude` that failed today
+ * is overwhelmingly likely to fail the same way within the hour, and retrying every
+ * wrapped session would spend a subprocess and a clone each time to learn it again.
  */
 const RETRY_AFTER_MS = 24 * 60 * 60 * 1000;
 
 /**
- * How long a completed update check suppresses the next one. The plugin moves
- * when we cut a release, which is nowhere near often enough to be worth a
- * repository fetch per wrapped launch, and a day is short enough that a fix
- * reaches a machine the day after it ships.
+ * How long a completed update check suppresses the next one. The plugin only moves on
+ * a release — far too rarely to justify a repository fetch per wrapped launch — and a
+ * day is short enough that a fix still reaches a machine the day after it ships.
  */
 const UPDATE_CHECK_INTERVAL_MS = 24 * 60 * 60 * 1000;
 
 /**
- * Refreshing the listing and applying an update are each a fetch of a small
- * repository, so this is generous for the work and deliberately far below the
- * install timeout. Both can run on the way into a launch the user never asked
- * to involve Claude Code in, and they run back to back, so the number that
- * matters is the two of them plus the probe: a wrapped run waits at most a
- * bit over a minute on a network that has stopped answering, having said so
- * first, rather than the two minutes a matching install timeout would cost.
+ * Generous for a small-repo fetch but far below the install timeout: refresh
+ * and apply run back to back on a launch the user never asked for, so this caps
+ * the worst case at a bit over a minute rather than two.
  */
 const UPDATE_TIMEOUT_MS = 30_000;
 
@@ -128,16 +82,15 @@ const VERSION_PATTERN = /^\d+\.\d+\.\d+/;
  * worked is not something a coding session should narrate.
  */
 function debugLog(message: string): void {
-  if (!process.env.DEBUG?.includes("langwatch")) return;
+  const debugFlag = process.env.DEBUG;
+  if (!debugFlag?.includes("langwatch")) return;
   process.stderr.write(`langwatch:claude-plugin ${message}\n`);
 }
 
 /**
- * What Claude Code currently records about the plugin, read off disk.
- *
- * Every field answers "no" for state we cannot read: a missing file, JSON that
- * will not parse, or a shape we do not recognise all mean the same thing to
- * every caller, which is that there is nothing here to reuse or remove.
+ * What Claude Code currently records about the plugin, read off disk. Every field
+ * answers "no" for unreadable state — a missing file, unparsable JSON, or an
+ * unrecognised shape all mean the same thing: nothing here to reuse or remove.
  */
 export interface ClaudePluginState {
   /** An install record exists for the plugin, at any scope. */
@@ -153,13 +106,9 @@ export interface ClaudePluginState {
 let pluginCliAvailable: boolean | undefined;
 
 /**
- * Whether this `claude` understands `claude plugin` at all. Old releases have no
- * such subcommand, and asking them to install one exits non-zero with a usage
- * error, so probe once and fall back to the raw hook entries for the rest of the
- * process.
- *
- * Memoized per process: the binary cannot grow a subcommand mid-run, and the
- * wrapper may ask more than once.
+ * Old `claude` releases have no `claude plugin` subcommand and exit non-zero on
+ * probe, so this checks once and falls back to raw hook entries for the rest of
+ * the process. Memoized: the binary cannot grow a subcommand mid-run.
  */
 export function claudePluginCliAvailable(): boolean {
   if (pluginCliAvailable !== undefined) return pluginCliAvailable;
@@ -176,10 +125,9 @@ function probePluginCli(): boolean {
 }
 
 /**
- * The Claude Code settings file. app-settings owns the location, keyed by the
- * wrapped tool's slug, and always has one for claude. Note the slug is `claude`
- * while the plugin's own name is `langwatch`: they are different names for
- * different things and must not be crossed.
+ * The Claude Code settings file. app-settings owns the location, keyed by the wrapped
+ * tool's slug (`claude`) — always present, and distinct from the plugin's own name
+ * (`langwatch`): different names for different things, not to be crossed.
  */
 function claudeSettingsPath(): string {
   return appSettingsTargetFor("claude")!.path;
@@ -191,10 +139,9 @@ function claudePluginsDir(): string {
 }
 
 /**
- * Read the three files Claude Code keeps the plugin's state in. Tolerant by
- * design: these are somebody else's files in somebody else's format, and a shape
- * we do not recognise must degrade to "not installed" rather than throw into a
- * coding session.
+ * Read the three files Claude Code keeps the plugin's state in. Tolerant by design:
+ * these are somebody else's files in somebody else's format, so an unrecognised shape
+ * degrades to "not installed" rather than throwing into a coding session.
  */
 export function readClaudePluginState(): ClaudePluginState {
   const pluginsDir = claudePluginsDir();
@@ -203,12 +150,8 @@ export function readClaudePluginState(): ClaudePluginState {
   const settings = readJsonObject(claudeSettingsPath());
 
   const marketplaceCandidate = marketplaces[CLAUDE_PLUGIN_MARKETPLACE];
-  const marketplaceEntry = isPlainObject(marketplaceCandidate)
-    ? marketplaceCandidate
-    : null;
-  const enabledPlugins = isPlainObject(settings.enabledPlugins)
-    ? settings.enabledPlugins
-    : {};
+  const marketplaceEntry = isPlainObject(marketplaceCandidate) ? marketplaceCandidate : null;
+  const enabledPlugins = isPlainObject(settings.enabledPlugins) ? settings.enabledPlugins : {};
 
   return {
     pluginInstalled: hasInstallRecord(installed),
@@ -221,9 +164,8 @@ export function readClaudePluginState(): ClaudePluginState {
 
 /**
  * `installed_plugins.json` holds `{ version, plugins: { "<name>@<marketplace>":
- * [ { scope, ... } ] } }`. An entry present with anything in it counts: which
- * scope it was installed at is the user's business, and a record we half
- * recognise still means removing rather than installing is the right move.
+ * [ { scope, ... } ] } }`. Any entry present counts, whatever scope — a half-recognised
+ * record still means removing rather than installing is the right move.
  */
 function hasInstallRecord(document: Record<string, unknown>): boolean {
   const plugins = isPlainObject(document.plugins) ? document.plugins : document;
@@ -234,22 +176,8 @@ function hasInstallRecord(document: Record<string, unknown>): boolean {
 }
 
 /**
- * Whether a known-marketplace entry's source is the repository we publish from.
- * The name alone proves nothing: anyone may register a marketplace called
- * `langwatch`, and removing theirs on our logout would be taking something that
- * is not ours.
- *
- * Claude Code records a source several ways: github shorthand
- * (`{ source: "github", repo: "langwatch/agent-plugin" }`), a git URL, or a
- * local path. Only an exact, canonical GitHub identity counts. Everything else
- * belongs to whoever registered it, including the near misses built to read
- * like us: `evil-langwatch/agent-plugin`, `langwatch/agent-plugin-fork`,
- * `github.com/langwatch/agent-plugin.evil`, and any host that is not GitHub.
- */
-/**
- * The hosts a canonical registration can name. Nothing else qualifies: the
- * plugin is published to GitHub and only to GitHub, so a source anywhere else
- * is by definition not the one we publish, whatever it is called.
+ * The hosts a canonical registration can name — GitHub only, since that is the
+ * only place the plugin is published, so a source anywhere else is not us.
  */
 const OWNED_HOSTS = new Set(["github.com", "www.github.com"]);
 
@@ -261,25 +189,16 @@ const OWNED_HOSTS = new Set(["github.com", "www.github.com"]);
 const OWNED_PROTOCOLS = new Set(["https:", "http:", "ssh:", "git:"]);
 
 /**
- * The fields that say WHERE a marketplace comes from, across the shapes Claude
- * Code writes. Only these decide ownership: a description, a commit message or
- * any other metadata that happens to mention the repository says nothing about
- * who published the marketplace, and reading the whole entry would hand
- * somebody else's registration to our logout.
+ * The fields that say WHERE a marketplace comes from, across the shapes Claude Code
+ * writes. Only these decide ownership — other metadata that merely mentions the
+ * repository could otherwise hand somebody else's registration to our logout.
  */
 const SOURCE_IDENTITY_KEYS = ["source", "repo", "url", "path"] as const;
 
 /**
- * Whether one source field names the repository we publish from, and names it
- * exactly. Parsed rather than pattern-matched, because the interesting inputs
- * are the ones built to look right: `github.com/langwatch/agent-plugin.evil`,
- * `evil.example/?repo=langwatch/agent-plugin` and a local directory that
- * happens to sit at that path all contain our repository name and none of them
- * are us.
- *
- * The stakes are what make exactness worth the parser. This gate decides both
- * what logout may deregister and, now, what a wrapped run may pull new code
- * into the user's agent from without asking.
+ * Parsed rather than pattern-matched: the interesting inputs are near misses built
+ * to look right, like `github.com/langwatch/agent-plugin.evil`. This gate decides both
+ * what logout may deregister and what a wrapped run may pull new code from unasked.
  */
 function pointsAtOwnedRepo(value: unknown): boolean {
   if (typeof value !== "string") return false;
@@ -293,15 +212,14 @@ function pointsAtOwnedRepo(value: unknown): boolean {
 
   const scp = /^git@([^:]+):(.+)$/.exec(lowered);
   if (scp) {
-    return (
-      OWNED_HOSTS.has(scp[1]!) && stripRepoPath(scp[2]!) === CLAUDE_PLUGIN_MARKETPLACE_REPO
-    );
+    return OWNED_HOSTS.has(scp[1]!) && stripRepoPath(scp[2]!) === CLAUDE_PLUGIN_MARKETPLACE_REPO;
   }
 
   try {
     const url = new URL(raw);
     if (!OWNED_PROTOCOLS.has(url.protocol)) return false;
-    if (!OWNED_HOSTS.has(url.hostname.toLowerCase())) return false;
+    const hostname = url.hostname.toLowerCase();
+    if (!OWNED_HOSTS.has(hostname)) return false;
     // A query or a fragment means the path is not the whole address, and we do
     // not know what the rest of it does.
     if (url.search !== "" || url.hash !== "") return false;
@@ -314,7 +232,10 @@ function pointsAtOwnedRepo(value: unknown): boolean {
 
 /** `/langwatch/agent-plugin.git/` and friends down to `langwatch/agent-plugin`. */
 function stripRepoPath(value: string): string {
-  return value.replace(/^\/+/, "").replace(/\/+$/, "").replace(/\.git$/, "");
+  return value
+    .replace(/^\/+/, "")
+    .replace(/\/+$/, "")
+    .replace(/\.git$/, "");
 }
 
 function sourcePointsAtLangwatch(source: unknown): boolean {
@@ -337,17 +258,9 @@ export interface ClaudePluginEnsureResult {
 }
 
 /**
- * Put the plugin on this machine, or report why it could not be. Never throws:
- * every caller is in the middle of setting up a coding session, and the raw hook
- * entries are a working fallback for every failure here.
- *
- * `interactive` decides who sees the subprocess. Installing a plugin can ask the
- * user to trust the marketplace, and a prompt written to a pipe nobody reads is
- * a hang, so an install the user just consented to inherits stdio. An install
- * nobody is watching captures its output instead.
- *
- * On success the raw hook entries are removed: they and the plugin declare the
- * same two hooks, and leaving both wired runs each of them twice per session.
+ * Installs the plugin, or reports why not, and never throws — raw hook entries
+ * remain a working fallback. `interactive` inherits stdio only for a
+ * user-consented install, since a marketplace trust prompt to an unread pipe hangs.
  */
 export function ensureLangwatchClaudePlugin({
   interactive,
@@ -431,29 +344,17 @@ export interface ClaudePluginUpdateResult {
 }
 
 /**
- * Bring the installed plugin up to the version the marketplace publishes, at
- * most once a day. Never throws: this runs on the way into a coding session
- * that has nothing to do with plugin housekeeping, so every failure here is a
- * warning the caller prints and then gets on with the launch.
- *
- * Ordered so the cheap answers come first. A machine without the plugin and a
- * machine already checked today both return without spawning anything, which is
- * what the overwhelming majority of wrapped runs do.
- *
- * The check is stamped BEFORE the work rather than after it, so a fetch that
- * hangs until the timeout, or a process killed in the middle of one, costs the
- * next launch nothing. The price is that a transient failure waits a day for
- * its retry, which is the right trade for housekeeping: the plugin that is
- * installed keeps working, it is only a version behind.
+ * Updates the plugin at most once a day; never throws, since this runs on the way
+ * into a session unrelated to plugin housekeeping. Stamped BEFORE the fetch, so a
+ * hang or kill mid-run costs nothing next launch — the trade is a day's retry wait.
  */
 export function updateLangwatchClaudePlugin({
   onCheckStart,
 }: {
   /**
-   * Called once, immediately before the first subprocess, and not at all on
-   * the runs that answer from disk. The work behind it is a network fetch on
-   * somebody's way into a coding session, so the caller gets the chance to say
-   * what the pause is for rather than leaving a silent terminal.
+   * Called once, immediately before the first subprocess, never on runs that answer
+   * from disk. The work behind it is a network fetch on the way into a coding
+   * session, so the caller can say what the pause is for instead of a silent terminal.
    */
   onCheckStart?: () => void;
 } = {}): ClaudePluginUpdateResult {
@@ -472,7 +373,9 @@ export function updateLangwatchClaudePlugin({
       timeoutMs: UPDATE_TIMEOUT_MS,
     });
     const refreshFailure =
-      refresh.status === 0 ? null : `the marketplace listing could not be refreshed: ${refresh.detail}`;
+      refresh.status === 0
+        ? null
+        : `the marketplace listing could not be refreshed: ${refresh.detail}`;
     if (refreshFailure) debugLog(refreshFailure);
 
     const installed = readInstalledPluginVersion();
@@ -511,14 +414,9 @@ export function updateLangwatchClaudePlugin({
 }
 
 /**
- * Why this run should not go looking, or null when it should. Everything here
- * answers from disk, which is what keeps the runs that have nothing to do from
- * costing a subprocess.
- *
- * The paths that DID reach a conclusion about this machine stamp the check on
- * their way out. A `claude` that cannot manage plugins will not learn to before
- * tomorrow, and asking it again on every launch spends a subprocess to be told
- * the same thing.
+ * Why this run should not go looking, or null when it should — answered from disk
+ * alone, so the common no-op case costs no subprocess. A conclusion reached here
+ * gets stamped, so an unmanageable `claude` isn't asked again until tomorrow.
  */
 function updateEligibility(): ClaudePluginUpdateResult | null {
   // The user scope is the one this CLI installs into and the only one it may
@@ -527,7 +425,8 @@ function updateEligibility(): ClaudePluginUpdateResult | null {
   // from spending a probe and a fetch every day to reach the same conclusion.
   if (!readUserScopeInstall()) return { action: "absent" };
 
-  if (checkedRecently(lastCheckedAt())) return { action: "checked_recently" };
+  const lastChecked = lastCheckedAt();
+  if (checkedRecently(lastChecked)) return { action: "checked_recently" };
 
   // Record the check BEFORE running it, and give up when that cannot be done.
   // A stamp that does not land is a check with no memory, and a check with no
@@ -553,13 +452,9 @@ function updateEligibility(): ClaudePluginUpdateResult | null {
 }
 
 /**
- * Move the installed copy to what the listing publishes, and report on what is
- * on disk afterwards rather than on the exit status: a non-zero exit that still
- * moved the version did the job, and a zero exit that moved nothing did not.
- *
- * A failure carries no `to`, because nothing was installed. The version it was
- * reaching for is in the reason, where it reads as an intention rather than as
- * a version the machine has.
+ * Reports on what is on disk afterwards, not on the exit status: a non-zero
+ * exit that still moved the version did the job, and a zero exit that moved
+ * nothing did not. A failure carries no `to`, since nothing was installed.
  */
 function applyUpdate({
   installed,
@@ -584,21 +479,16 @@ function applyUpdate({
 }
 
 /**
- * The install record this CLI put there, or null when the machine has none.
- * Only the user scope qualifies: a project or local record belongs to a
- * checkout somebody else pinned, and moving it would be taking that decision
- * off them.
+ * The install record this CLI put there, or null when the machine has none. Only the
+ * user scope qualifies — a project or local record belongs to a checkout somebody
+ * else pinned, and moving it would be taking that decision away from them.
  */
 function readUserScopeInstall(): Record<string, unknown> | null {
-  const document = readJsonObject(
-    path.join(claudePluginsDir(), "installed_plugins.json"),
-  );
+  const document = readJsonObject(path.join(claudePluginsDir(), "installed_plugins.json"));
   const plugins = isPlainObject(document.plugins) ? document.plugins : document;
   const records = plugins[CLAUDE_PLUGIN_REF];
   if (!Array.isArray(records)) return null;
-  const userScoped = records.find(
-    (record) => isPlainObject(record) && record.scope === "user",
-  );
+  const userScoped = records.find((record) => isPlainObject(record) && record.scope === "user");
   return isPlainObject(userScoped) ? userScoped : null;
 }
 
@@ -631,9 +521,7 @@ function readPublishedPluginVersion(): string | null {
  * one, and a wrong guess only costs an unreadable manifest.
  */
 function marketplaceListingDir(): string {
-  const marketplaces = readJsonObject(
-    path.join(claudePluginsDir(), "known_marketplaces.json"),
-  );
+  const marketplaces = readJsonObject(path.join(claudePluginsDir(), "known_marketplaces.json"));
   const entry = marketplaces[CLAUDE_PLUGIN_MARKETPLACE];
   if (isPlainObject(entry) && typeof entry.installLocation === "string" && entry.installLocation) {
     return entry.installLocation;
@@ -661,10 +549,9 @@ function lastCheckedAt(): number | undefined {
 }
 
 /**
- * Whether a check inside the last day already answered this. Bounded at both
- * ends for the same reason the install suppression is: a stamp in the future is
- * a clock that went backwards or a config copied from another machine, and
- * reading it as recent would suppress every check until time caught up.
+ * Whether a check inside the last day already answered this. Bounded at both ends,
+ * same as the install suppression: a future stamp is a backwards clock or a copied
+ * config, and reading it as recent would suppress every check until time caught up.
  */
 function checkedRecently(checkedAt: number | undefined): boolean {
   if (checkedAt === undefined) return false;
@@ -689,11 +576,7 @@ function stampUpdateCheck(): boolean {
   }
 }
 
-export type ClaudePluginRemovalAction =
-  | "uninstalled"
-  | "disabled"
-  | "absent"
-  | "failed";
+export type ClaudePluginRemovalAction = "uninstalled" | "disabled" | "absent" | "failed";
 
 export interface ClaudePluginRemovalResult {
   action: ClaudePluginRemovalAction;
@@ -702,13 +585,9 @@ export interface ClaudePluginRemovalResult {
 }
 
 /**
- * Take the plugin off this machine. Reads state first so a machine that never
- * had it spends no subprocess finding that out, which is what keeps the logout
- * scan cheap for the users who only ever wrapped codex.
- *
- * When the subcommand cannot remove it, switching it off in `enabledPlugins` is
- * the fallback that matters: logout revokes the token, and a plugin left enabled
- * keeps firing hooks at a collector that will reject every one of them.
+ * Reads state first so a machine that never had the plugin spends no subprocess
+ * finding that out. If the subcommand can't remove it, disabling `enabledPlugins`
+ * still matters — left enabled, hooks keep firing at a collector that rejects them.
  */
 export function uninstallLangwatchClaudePlugin(): ClaudePluginRemovalResult {
   try {
@@ -735,11 +614,9 @@ export function uninstallLangwatchClaudePlugin(): ClaudePluginRemovalResult {
 }
 
 /**
- * Deregister the marketplace, but only the one we registered. A marketplace of
- * the same name pointing somewhere else belongs to whoever added it, and logout
- * removing it would cost them every plugin they installed from it.
- *
- * Returns true when the registration is gone.
+ * Deregister the marketplace, but only the one we registered — a same-named
+ * marketplace pointing elsewhere belongs to whoever added it, and removing it would
+ * cost them every plugin they installed from it. Returns true once it's gone.
  */
 export function removeLangwatchClaudeMarketplace(): boolean {
   try {
@@ -773,19 +650,15 @@ function migrateAwayFromRawHooks(): void {
 }
 
 /**
- * Switch the plugin off in the settings file, preserving everything else.
- *
- * Reports the END STATE, not whether a write happened: a plugin that is already
- * switched off is the outcome the caller wanted, and a second logout finding it
- * that way is a success. Only a state we could not reach is false.
+ * Switch the plugin off in the settings file, preserving everything else. Reports the
+ * END STATE, not whether a write happened: an already-off plugin is the outcome the
+ * caller wanted, so a second logout finding it that way is still a success.
  */
 function disableInSettings(): boolean {
   const filePath = claudeSettingsPath();
   try {
     const settings = readAppSettingsFileForUpdate(filePath);
-    const enabled = isPlainObject(settings.enabledPlugins)
-      ? { ...settings.enabledPlugins }
-      : {};
+    const enabled = isPlainObject(settings.enabledPlugins) ? { ...settings.enabledPlugins } : {};
     if (enabled[CLAUDE_PLUGIN_REF] === false) return true;
     enabled[CLAUDE_PLUGIN_REF] = false;
     settings.enabledPlugins = enabled;
@@ -809,6 +682,7 @@ function recordFailure(reason: string): ClaudePluginEnsureResult {
     saveConfig(cfg);
   } catch {
     // The fallback still runs; only the suppression window went unwritten.
+    void 0;
   }
   return { action: "failed", reason };
 }
@@ -822,6 +696,7 @@ function clearRecordedFailure(): void {
     saveConfig(cfg);
   } catch {
     // A stale stamp only suppresses an install that already happened.
+    void 0;
   }
 }
 

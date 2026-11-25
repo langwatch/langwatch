@@ -7,15 +7,18 @@ Feature: LangWatchQL access-model delivery to every chart-managed ClickHouse rep
 
   A deploy-time Job runs the application image, renders the two files
   (`renderLwqlAccessConfig`), and writes them into the Secret
-  `<release>-lwql-clickhouse-access`. Every ClickHouse pod mounts that Secret at
+  `<release>-lwql-clickhouse-access`. Every ClickHouse pod mounts that Secret as
+  the directory `/etc/clickhouse-server/lwql`, and the image links its files to
   `/etc/clickhouse-server/users.d/lwql-access.yaml` and
-  `/etc/clickhouse-server/config.d/lwql-named-collection.yaml`, so the restricted
+  `/etc/clickhouse-server/config.d/lwql-named-collection.yaml` (`LWQL_ACCESS_DIR`).
+  Kubelet updates a directory mount in place, so a patched Secret reaches the
+  running server with no restart. So the restricted
   identity, its profile, grants, both row policies and the PostgreSQL named
   collection land in the `users_xml` store of every replica — install, upgrade,
   scale-up or disk rebuild alike, with no per-pod app action.
 
   SQL DDL is kept only for bring-your-own ClickHouse (`LWQL_ACCESS_MODEL_MODE=sql`),
-  where the chart cannot write the server's config files. See ADR-142.
+  where the chart cannot write the server's config files. See ADR-159.
 
   # ── AC7: existing patterns, no new machinery ──────────────────────────────
 
@@ -24,7 +27,7 @@ Feature: LangWatchQL access-model delivery to every chart-managed ClickHouse rep
     Given the chart is rendered with chart-managed ClickHouse and lwql.enabled
     Then a deploy-time Job runs the application image and renders the access files
     And the Job's ServiceAccount may only create the access Secret and get, update or patch it by name
-    And every ClickHouse pod mounts the access Secret at the users.d and config.d paths
+    And every ClickHouse pod mounts the access Secret as a directory and links its files into users.d and config.d
     And no chart template renders any part of the access model itself
 
   # ── AC3: every replica carries the whole access set ───────────────────────
@@ -70,12 +73,12 @@ Feature: LangWatchQL access-model delivery to every chart-managed ClickHouse rep
   # ── AC9: sql mode is fail-closed on clusters, permitted on one node ─────────
   # The chart never selects sql mode for chart-managed ClickHouse, but an
   # operator can, so both branches of the AC9 cluster guard are exercised live
-  # against a chart-managed deployment. See ADR-142 and
-  # platform/app/src/server/analytics/lwql/provisioning/sqlModeClusterGuard.ts.
+  # against a chart-managed deployment. See ADR-159 and
+  # modules/analytics/process/src/services/langwatch-ql-sql-mode-cluster-guard.service.ts.
 
   # This asserts permit + DDL-path-ran + config-store yield, not a SQL-store
   # user: rendered delivery owns langwatch_lwql in users_xml, so sql mode yields
-  # (495). See ADR-142, the AC8 deviation "The AC9 'one node provisions' e2e half".
+  # (495). See ADR-159, the AC8 deviation "The AC9 'one node provisions' e2e half".
   @e2e
   Scenario: On a single node, sql mode is permitted and provisions the access model
     Given the single-replica chart-managed release is upgraded to LWQL_ACCESS_MODEL_MODE=sql

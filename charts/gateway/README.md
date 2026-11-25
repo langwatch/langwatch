@@ -45,12 +45,16 @@ JWT pre-rotation has expired (default ~15 min).
 ## Install
 
 The gateway sub-chart is shipped as a dependency of the umbrella
-`langwatch` chart, not as a standalone published OCI artifact. Installing
-the umbrella chart installs the gateway too (`gateway.chartManaged`
-defaults to `true`):
+`langwatch` chart, not as a standalone published chart. Released
+`langwatch` charts are published to the project's GitHub Pages Helm
+repository. Installing the umbrella chart installs the gateway too
+(`gateway.chartManaged` defaults to `true`):
 
 ```bash
-helm install langwatch oci://ghcr.io/langwatch/charts/langwatch \
+helm repo add langwatch https://langwatch.github.io/langwatch
+helm repo update
+
+helm install langwatch langwatch/langwatch \
   -n langwatch -f values.prod.yaml
 ```
 
@@ -66,16 +70,17 @@ helm install gateway ./charts/gateway -n langwatch -f values.prod.yaml
 The defaults in `values.yaml` are tuned for typical production
 self-hosting. The values you most often override:
 
-| Path                          | Purpose                                                              |
-|-------------------------------|----------------------------------------------------------------------|
-| `image.tag`                   | Image tag override (defaults to `Chart.AppVersion`)                  |
-| `controlPlane.baseUrl`        | URL of your LangWatch app. Empty resolves to `<release>-app:5560`     |
-| `secrets.existingSecretName`  | Name of the Secret created above (default `gateway-runtime-secrets`) |
-| `replicaCount`                | Static replicas if `autoscaling.enabled: false`                      |
-| `autoscaling.minReplicas` / `maxReplicas` | HPA bounds                                              |
-| `resources`                   | Pod CPU/memory requests + limits                                     |
-| `otel.endpoint`               | Optional OTLP HTTP exporter URL (gateway emits its own spans)        |
-| `spend.enabled`               | Kill switch for spend emission (default `true`). Off means no budget debits are ever written |
+| Path                                      | Purpose                                                                                                         |
+| ----------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| `image.tag`                               | Image tag override (defaults to `Chart.AppVersion`)                                                             |
+| `controlPlane.baseUrl`                    | URL of your LangWatch app. Empty resolves to `<release>-app:5560`                                               |
+| `secrets.existingSecretName`              | Name of the Secret created above (default `gateway-runtime-secrets`)                                            |
+| `replicaCount`                            | Static replicas if `autoscaling.enabled: false`                                                                 |
+| `autoscaling.minReplicas` / `maxReplicas` | HPA bounds                                                                                                      |
+| `resources`                               | Pod CPU/memory requests + limits                                                                                |
+| `otel.endpoint`                           | Optional OTLP HTTP exporter URL (gateway emits its own spans)                                                   |
+| `metrics.enabled`                         | Serves Prometheus `/metrics` on `metrics.port` (default `9464`), bearer `METRICS_API_KEY` from `metrics.apiKey` |
+| `spend.enabled`                           | Kill switch for spend emission (default `true`). Off means no budget debits are ever written                    |
 
 The pod ships hardened (`podSecurityContext` / `containerSecurityContext` in
 `values.yaml`): non-root at both pod and container level, read-only root,
@@ -100,11 +105,11 @@ today survive v1.1 without re-pinning. See
 The chart wires three Kubernetes probes against the gateway's HTTP
 listener (port `5563`, named `http`):
 
-| Probe        | Endpoint    | Validates                                                  |
-|--------------|-------------|------------------------------------------------------------|
-| `livenessProbe` | `/healthz`  | Process is responsive (cheap; never does network I/O)      |
-| `readinessProbe`| `/readyz`   | Pod is not draining; OK to receive new traffic             |
-| `startupProbe`  | `/startupz` | Auth-cache bootstrap completed; gives ~60 s of boot room   |
+| Probe            | Endpoint    | Validates                                                |
+| ---------------- | ----------- | -------------------------------------------------------- |
+| `livenessProbe`  | `/healthz`  | Process is responsive (cheap; never does network I/O)    |
+| `readinessProbe` | `/readyz`   | Pod is not draining; OK to receive new traffic           |
+| `startupProbe`   | `/startupz` | Auth-cache bootstrap completed; gives ~60 s of boot room |
 
 Response shape and tuning are documented in
 [Health Checks](https://docs.langwatch.ai/ai-gateway/self-hosting/health-checks).
@@ -132,7 +137,7 @@ SSE chunks reach clients promptly, and a 32m body size to match
 the render rather than being dropped.
 
 For Envoy Gateway, other Gateway API implementations, or this chart
-installed on its own, route `/v1` and `/health` to the Service yourself and
+installed on its own, route `/v1`, `/a2a` and `/health` to the Service yourself and
 follow
 [Routing and ingress controllers](https://docs.langwatch.ai/self-hosting/deployment/routing).
 

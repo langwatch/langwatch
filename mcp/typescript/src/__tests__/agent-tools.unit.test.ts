@@ -6,20 +6,20 @@
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("../langwatch-api.js", async (importOriginal) => {
+vi.mock("../langwatch-api.ts", async (importOriginal) => {
   const actual = (await importOriginal()) as Record<string, unknown>;
   return { ...actual, makeRequest: vi.fn() };
 });
-vi.mock("../public-http-request.js", () => ({ requestPublicJson: vi.fn() }));
+vi.mock("../public-http-request.ts", () => ({ requestPublicJson: vi.fn() }));
 
-import { makeRequest } from "../langwatch-api.js";
-import { runAgent, type AgentSummary } from "../langwatch-api-agents.js";
-import { requestPublicJson } from "../public-http-request.js";
-import { runPlanTargetSchema, toWireTargets } from "../schemas/run-plan.js";
-import { handleGetAgent } from "../tools/get-agent.js";
-import { handleListAgents } from "../tools/list-agents.js";
-import { handleRunAgent } from "../tools/run-agent.js";
-import { handleTestAgent } from "../tools/test-agent.js";
+import { runAgent, type AgentSummary } from "../langwatch-api-agents.ts";
+import { makeRequest } from "../langwatch-api.ts";
+import { requestPublicJson } from "../public-http-request.ts";
+import { runPlanTargetSchema, toWireTargets } from "../schemas/run-plan.ts";
+import { handleGetAgent } from "../tools/get-agent.ts";
+import { handleListAgents } from "../tools/list-agents.ts";
+import { handleRunAgent } from "../tools/run-agent.ts";
+import { handleTestAgent } from "../tools/test-agent.ts";
 
 const mockRequest = vi.mocked(makeRequest);
 const mockPublic = vi.mocked(requestPublicJson);
@@ -39,7 +39,13 @@ const connectedAgent = (overrides: Partial<AgentSummary> = {}): AgentSummary => 
   ],
   owner: { userId: "u1", name: "Ada" },
   parameters: [
-    { name: "model", type: "string", options: ["gpt-5", "gpt-5-mini"], default: "gpt-5-mini", required: false },
+    {
+      name: "model",
+      type: "string",
+      options: ["gpt-5", "gpt-5-mini"],
+      default: "gpt-5-mini",
+      required: false,
+    },
     { name: "plan", type: "string", required: true, description: "Customer plan" },
   ],
   ...overrides,
@@ -85,7 +91,9 @@ describe("handleListAgents()", () => {
     /** @scenario "A listed agent the key cannot choose says so" */
     it("lists it with its owner and says only its owner can run it", async () => {
       mockRequest.mockResolvedValueOnce({
-        data: [connectedAgent({ selectable: false, notSelectableReason: "owned_by_another_person" })],
+        data: [
+          connectedAgent({ selectable: false, notSelectableReason: "owned_by_another_person" }),
+        ],
         pagination: { page: 1, limit: 100, total: 1, totalPages: 1 },
       });
 
@@ -106,7 +114,9 @@ describe("handleGetAgent()", () => {
       const output = await handleGetAgent({ id: "agent_conn" });
 
       expect(output).toContain("## Parameters");
-      expect(output).toContain('- **model** (string, one of gpt-5, gpt-5-mini, default "gpt-5-mini")');
+      expect(output).toContain(
+        '- **model** (string, one of gpt-5, gpt-5-mini, default "gpt-5-mini")',
+      );
       expect(output).toContain("- **plan** (string, required): Customer plan");
       expect(output).toContain("## Instances (2)");
       expect(output).toContain("- pod-a (blue), connected 2026-01-02T00:00:00Z");
@@ -114,7 +124,6 @@ describe("handleGetAgent()", () => {
       expect(output).toContain("**Owner**: Ada");
     });
   });
-
 });
 
 describe("handleTestAgent()", () => {
@@ -149,7 +158,11 @@ describe("handleRunAgent()", () => {
         durationMs: 321,
       });
 
-      const output = await handleRunAgent({ id: "agent_conn", message: "hi", parameters: { model: "gpt-5" } });
+      const output = await handleRunAgent({
+        id: "agent_conn",
+        message: "hi",
+        parameters: { model: "gpt-5" },
+      });
 
       expect(mockRequest).toHaveBeenNthCalledWith(2, "POST", "/api/v1/agents/agent_conn/call", {
         messages: [{ role: "user", content: "hi" }],
@@ -164,7 +177,11 @@ describe("handleRunAgent()", () => {
     /** @scenario "An input with messages is sent as the relay body" */
     it("sends an input with messages, thread id and session as the body", async () => {
       mockRequest.mockResolvedValueOnce(connectedAgent());
-      mockRequest.mockResolvedValueOnce({ output: "ok", instance: { hostname: "pod-a" }, durationMs: 1 });
+      mockRequest.mockResolvedValueOnce({
+        output: "ok",
+        instance: { hostname: "pod-a" },
+        durationMs: 1,
+      });
       const input = JSON.stringify({
         messages: [{ role: "user", content: "again" }],
         threadId: "t1",
@@ -184,7 +201,9 @@ describe("handleRunAgent()", () => {
     it("refuses an input with no messages and no message", async () => {
       mockRequest.mockResolvedValueOnce(connectedAgent());
 
-      await expect(runAgent({ id: "agent_conn", input: { question: "hi" } })).rejects.toThrow(/give `message`, or `input` with a `messages` list/);
+      await expect(runAgent({ id: "agent_conn", input: { question: "hi" } })).rejects.toThrow(
+        /give `message`, or `input` with a `messages` list/,
+      );
       expect(mockRequest).toHaveBeenCalledTimes(1);
     });
 
@@ -202,7 +221,10 @@ describe("handleRunAgent()", () => {
       await expect(
         runAgent({
           id: "agent_conn",
-          input: { messages: [{ role: "user", content: "hi" }], params: { model: { name: "gpt-5" } } },
+          input: {
+            messages: [{ role: "user", content: "hi" }],
+            params: { model: { name: "gpt-5" } },
+          },
         }),
       ).rejects.toThrow(/flat object of string, number or boolean values/);
       expect(mockRequest).toHaveBeenCalledTimes(1);
@@ -229,7 +251,10 @@ describe("handleRunAgent()", () => {
 
       const output = await handleRunAgent({ id: "agent_http", input: '{"question":"hi"}' });
 
-      expect(mockPublic).toHaveBeenCalledWith("https://api.example.com/agent", expect.objectContaining({ method: "POST" }));
+      expect(mockPublic).toHaveBeenCalledWith(
+        "https://api.example.com/agent",
+        expect.objectContaining({ method: "POST" }),
+      );
       expect(mockRequest).toHaveBeenCalledTimes(1);
       expect(output).toContain("type: http");
     });
@@ -248,10 +273,18 @@ describe("runPlanTargetSchema", () => {
   /** @scenario "A connected target names an agent by name and environment" */
   it("passes name@environment through as the reference id", () => {
     const targets = toWireTargets([
-      runPlanTargetSchema.parse({ type: "connected", referenceId: "support-agent@production", parameters: { model: "gpt-5" } }),
+      runPlanTargetSchema.parse({
+        type: "connected",
+        referenceId: "support-agent@production",
+        parameters: { model: "gpt-5" },
+      }),
     ]);
     expect(targets).toEqual([
-      { type: "connected", referenceId: "support-agent@production", runParameters: { model: "gpt-5" } },
+      {
+        type: "connected",
+        referenceId: "support-agent@production",
+        runParameters: { model: "gpt-5" },
+      },
     ]);
   });
 });

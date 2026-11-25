@@ -149,6 +149,15 @@ Feature: Guided onboarding variant
     When the user skips the provider step
     Then the guided state carries the time the provider was skipped
 
+  # "Later" on Langy's model prompt after the tour. Recorded on the organization
+  # so the prompt and the forced panel stay away across reloads and devices.
+  @integration
+  Scenario: putting off the model prompt is recorded
+    Given an organization in the guided variant that skipped the provider
+    When the user presses "Later" on Langy's model prompt
+    Then the guided state carries the time the prompt was put off
+    And the provider skip and the tour are left as they were
+
   @integration
   Scenario: completing, skipping and replaying the tour are recorded
     Given an organization in the guided variant
@@ -204,6 +213,27 @@ Feature: Guided onboarding variant
     When the user records paths
     Then the guided onboarding event hook receives a "paths_selected" event for that organization and user
 
+  # Langy's governance opener asks how the person wants to start. "call" is the
+  # choice they made: nothing books the call, so nothing records one as booked.
+  @unit
+  Scenario: recording Langy's start stores the choice and announces it
+    Given an organization in the guided variant that picked governance
+    When the start call is recorded
+    Then the guided state carries the start call
+    And a "start_chosen" event is announced with the start call
+    When the start coding is recorded after it
+    Then the guided state carries the start coding
+    And a "start_chosen" event is announced with the start coding
+
+  # A retried CLI call repeats the start it already recorded: announcing it again
+  # would count the choice twice in Customer.io and PostHog.
+  @unit
+  Scenario: recording the same Langy start again changes and announces nothing
+    Given an organization in the guided variant whose recorded start is call
+    When the start call is recorded again
+    Then the guided state is not written
+    And no event is announced
+
   # ============================================================================
   # The CLI reaches the same state through the project's credential
   # ============================================================================
@@ -221,10 +251,24 @@ Feature: Guided onboarding variant
     Then the organization's done paths list llmops
 
   @unit
+  Scenario: the REST route records Langy's start for the project's organization
+    When the start call is recorded with that project's credential
+    Then the start is recorded on the project's organization
+    And a start other than coding or call is refused before the application is called
+
+  @unit
   Scenario: the REST routes are guarded by a permission Langy's own key can hold
     Given Langy reports a path as done from inside its own session, with the conversation's key
     When the guided state route and the completion route declare their guards
     Then each guard is a permission the platform delegates to a Langy session key
+
+  @unit
+  Scenario: completing a path asks a write permission, so a read-only key cannot
+    Given a key that holds only the project's read permissions, such as a read-only docs session key
+    When it reads the guided state
+    Then the state is answered
+    When it completes a path
+    Then it is refused with status 403 and nothing is written
 
   @unit
   Scenario: the CLI prints the guided state as JSON
@@ -244,6 +288,18 @@ Feature: Guided onboarding variant
     Then the card carries that one line and none of the state the platform answered
 
   @unit
+  Scenario: the CLI records Langy's start by name
+    When "langwatch onboarding start call" runs
+    Then it asks the platform to record the start call
+    And it prints one line saying the person chose a call, never that a call is booked
+
+  @unit
+  Scenario: the CLI refuses a start other than coding or call before any request
+    When "langwatch onboarding start meeting" runs
+    Then it fails naming coding and call
+    And the platform is never asked
+
+  @unit
   Scenario: the onboarding card carries what the person reads and nothing else
     Given Langy runs "langwatch onboarding state" inside the panel, where the output is a card
     When the command prints
@@ -256,3 +312,19 @@ Feature: Guided onboarding variant
   Scenario: the CLI boot graph does not change for the onboarding commands
     When the CLI starts
     Then the onboarding command modules are not loaded until the command runs
+
+  # ============================================================================
+  # Persisting the guided state
+  #
+  # The record lives in Organization.signupData, a column the organization
+  # module owns; onboarding reaches it only through
+  # OrganizationApi.readGuidedOnboardingState/writeGuidedOnboardingState, so
+  # its storage round-trip is organization's own test surface, not this one.
+  # ============================================================================
+
+  @unit
+  Scenario: an unknown path is refused before any organization call
+    Given a guided onboarding service over an organization capability that refuses every call
+    When a path named "billing" is completed, begun or recorded
+    Then the request fails with the code "guided_onboarding_path_unknown"
+    And the organization capability is never called

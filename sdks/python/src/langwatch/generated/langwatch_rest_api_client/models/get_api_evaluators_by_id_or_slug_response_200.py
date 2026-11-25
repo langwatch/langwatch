@@ -1,10 +1,11 @@
 from __future__ import annotations
 
+import datetime
 from collections.abc import Mapping
 from typing import TYPE_CHECKING, Any, TypeVar, cast
 
 from attrs import define as _attrs_define
-from attrs import field as _attrs_field
+from dateutil.parser import isoparse
 
 from ..types import UNSET, Unset
 
@@ -12,11 +13,20 @@ if TYPE_CHECKING:
     from ..models.get_api_evaluators_by_id_or_slug_response_200_config_type_0 import (
         GetApiEvaluatorsByIdOrSlugResponse200ConfigType0,
     )
+    from ..models.get_api_evaluators_by_id_or_slug_response_200_created_by_type_0 import (
+        GetApiEvaluatorsByIdOrSlugResponse200CreatedByType0,
+    )
     from ..models.get_api_evaluators_by_id_or_slug_response_200_fields_item import (
         GetApiEvaluatorsByIdOrSlugResponse200FieldsItem,
     )
+    from ..models.get_api_evaluators_by_id_or_slug_response_200_labels_item import (
+        GetApiEvaluatorsByIdOrSlugResponse200LabelsItem,
+    )
     from ..models.get_api_evaluators_by_id_or_slug_response_200_output_fields_item import (
         GetApiEvaluatorsByIdOrSlugResponse200OutputFieldsItem,
+    )
+    from ..models.get_api_evaluators_by_id_or_slug_response_200_updated_by_type_0 import (
+        GetApiEvaluatorsByIdOrSlugResponse200UpdatedByType0,
     )
 
 
@@ -35,10 +45,17 @@ class GetApiEvaluatorsByIdOrSlugResponse200:
         config (GetApiEvaluatorsByIdOrSlugResponse200ConfigType0 | None):
         workflow_id (None | str):
         copied_from_evaluator_id (None | str):
-        created_at (str):
-        updated_at (str):
+        created_at (datetime.datetime):
+        updated_at (datetime.datetime):
         fields (list[GetApiEvaluatorsByIdOrSlugResponse200FieldsItem]):
         output_fields (list[GetApiEvaluatorsByIdOrSlugResponse200OutputFieldsItem]):
+        version (int | None): The version this response shows: the latest, unless a label or a version was asked for.
+        labels (list[GetApiEvaluatorsByIdOrSlugResponse200LabelsItem]): The deploy labels the evaluator carries, such as
+            production, and the version each points at.
+        created_by (GetApiEvaluatorsByIdOrSlugResponse200CreatedByType0 | None): The user who created the evaluator.
+            Null when an API key created it, or it predates creators being recorded.
+        updated_by (GetApiEvaluatorsByIdOrSlugResponse200UpdatedByType0 | None): The user who changed the evaluator
+            last. Null when an API key changed it.
         platform_url (str):
         workflow_name (str | Unset):
         workflow_icon (str | Unset):
@@ -52,18 +69,27 @@ class GetApiEvaluatorsByIdOrSlugResponse200:
     config: GetApiEvaluatorsByIdOrSlugResponse200ConfigType0 | None
     workflow_id: None | str
     copied_from_evaluator_id: None | str
-    created_at: str
-    updated_at: str
+    created_at: datetime.datetime
+    updated_at: datetime.datetime
     fields: list[GetApiEvaluatorsByIdOrSlugResponse200FieldsItem]
     output_fields: list[GetApiEvaluatorsByIdOrSlugResponse200OutputFieldsItem]
+    version: int | None
+    labels: list[GetApiEvaluatorsByIdOrSlugResponse200LabelsItem]
+    created_by: GetApiEvaluatorsByIdOrSlugResponse200CreatedByType0 | None
+    updated_by: GetApiEvaluatorsByIdOrSlugResponse200UpdatedByType0 | None
     platform_url: str
     workflow_name: str | Unset = UNSET
     workflow_icon: str | Unset = UNSET
-    additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         from ..models.get_api_evaluators_by_id_or_slug_response_200_config_type_0 import (
             GetApiEvaluatorsByIdOrSlugResponse200ConfigType0,
+        )
+        from ..models.get_api_evaluators_by_id_or_slug_response_200_created_by_type_0 import (
+            GetApiEvaluatorsByIdOrSlugResponse200CreatedByType0,
+        )
+        from ..models.get_api_evaluators_by_id_or_slug_response_200_updated_by_type_0 import (
+            GetApiEvaluatorsByIdOrSlugResponse200UpdatedByType0,
         )
 
         id = self.id
@@ -89,9 +115,9 @@ class GetApiEvaluatorsByIdOrSlugResponse200:
         copied_from_evaluator_id: None | str
         copied_from_evaluator_id = self.copied_from_evaluator_id
 
-        created_at = self.created_at
+        created_at = self.created_at.isoformat()
 
-        updated_at = self.updated_at
+        updated_at = self.updated_at.isoformat()
 
         fields = []
         for fields_item_data in self.fields:
@@ -103,6 +129,26 @@ class GetApiEvaluatorsByIdOrSlugResponse200:
             output_fields_item = output_fields_item_data.to_dict()
             output_fields.append(output_fields_item)
 
+        version: int | None
+        version = self.version
+
+        labels = []
+        for labels_item_data in self.labels:
+            labels_item = labels_item_data.to_dict()
+            labels.append(labels_item)
+
+        created_by: dict[str, Any] | None
+        if isinstance(self.created_by, GetApiEvaluatorsByIdOrSlugResponse200CreatedByType0):
+            created_by = self.created_by.to_dict()
+        else:
+            created_by = self.created_by
+
+        updated_by: dict[str, Any] | None
+        if isinstance(self.updated_by, GetApiEvaluatorsByIdOrSlugResponse200UpdatedByType0):
+            updated_by = self.updated_by.to_dict()
+        else:
+            updated_by = self.updated_by
+
         platform_url = self.platform_url
 
         workflow_name = self.workflow_name
@@ -110,7 +156,7 @@ class GetApiEvaluatorsByIdOrSlugResponse200:
         workflow_icon = self.workflow_icon
 
         field_dict: dict[str, Any] = {}
-        field_dict.update(self.additional_properties)
+
         field_dict.update(
             {
                 "id": id,
@@ -125,6 +171,10 @@ class GetApiEvaluatorsByIdOrSlugResponse200:
                 "updatedAt": updated_at,
                 "fields": fields,
                 "outputFields": output_fields,
+                "version": version,
+                "labels": labels,
+                "createdBy": created_by,
+                "updatedBy": updated_by,
                 "platformUrl": platform_url,
             }
         )
@@ -140,11 +190,20 @@ class GetApiEvaluatorsByIdOrSlugResponse200:
         from ..models.get_api_evaluators_by_id_or_slug_response_200_config_type_0 import (
             GetApiEvaluatorsByIdOrSlugResponse200ConfigType0,
         )
+        from ..models.get_api_evaluators_by_id_or_slug_response_200_created_by_type_0 import (
+            GetApiEvaluatorsByIdOrSlugResponse200CreatedByType0,
+        )
         from ..models.get_api_evaluators_by_id_or_slug_response_200_fields_item import (
             GetApiEvaluatorsByIdOrSlugResponse200FieldsItem,
         )
+        from ..models.get_api_evaluators_by_id_or_slug_response_200_labels_item import (
+            GetApiEvaluatorsByIdOrSlugResponse200LabelsItem,
+        )
         from ..models.get_api_evaluators_by_id_or_slug_response_200_output_fields_item import (
             GetApiEvaluatorsByIdOrSlugResponse200OutputFieldsItem,
+        )
+        from ..models.get_api_evaluators_by_id_or_slug_response_200_updated_by_type_0 import (
+            GetApiEvaluatorsByIdOrSlugResponse200UpdatedByType0,
         )
 
         d = dict(src_dict)
@@ -192,9 +251,9 @@ class GetApiEvaluatorsByIdOrSlugResponse200:
 
         copied_from_evaluator_id = _parse_copied_from_evaluator_id(d.pop("copiedFromEvaluatorId"))
 
-        created_at = d.pop("createdAt")
+        created_at = isoparse(d.pop("createdAt"))
 
-        updated_at = d.pop("updatedAt")
+        updated_at = isoparse(d.pop("updatedAt"))
 
         fields = []
         _fields = d.pop("fields")
@@ -211,6 +270,50 @@ class GetApiEvaluatorsByIdOrSlugResponse200:
             )
 
             output_fields.append(output_fields_item)
+
+        def _parse_version(data: object) -> int | None:
+            if data is None:
+                return data
+            return cast(int | None, data)
+
+        version = _parse_version(d.pop("version"))
+
+        labels = []
+        _labels = d.pop("labels")
+        for labels_item_data in _labels:
+            labels_item = GetApiEvaluatorsByIdOrSlugResponse200LabelsItem.from_dict(labels_item_data)
+
+            labels.append(labels_item)
+
+        def _parse_created_by(data: object) -> GetApiEvaluatorsByIdOrSlugResponse200CreatedByType0 | None:
+            if data is None:
+                return data
+            try:
+                if not isinstance(data, dict):
+                    raise TypeError()
+                created_by_type_0 = GetApiEvaluatorsByIdOrSlugResponse200CreatedByType0.from_dict(data)
+
+                return created_by_type_0
+            except (TypeError, ValueError, AttributeError, KeyError):
+                pass
+            return cast(GetApiEvaluatorsByIdOrSlugResponse200CreatedByType0 | None, data)
+
+        created_by = _parse_created_by(d.pop("createdBy"))
+
+        def _parse_updated_by(data: object) -> GetApiEvaluatorsByIdOrSlugResponse200UpdatedByType0 | None:
+            if data is None:
+                return data
+            try:
+                if not isinstance(data, dict):
+                    raise TypeError()
+                updated_by_type_0 = GetApiEvaluatorsByIdOrSlugResponse200UpdatedByType0.from_dict(data)
+
+                return updated_by_type_0
+            except (TypeError, ValueError, AttributeError, KeyError):
+                pass
+            return cast(GetApiEvaluatorsByIdOrSlugResponse200UpdatedByType0 | None, data)
+
+        updated_by = _parse_updated_by(d.pop("updatedBy"))
 
         platform_url = d.pop("platformUrl")
 
@@ -231,26 +334,13 @@ class GetApiEvaluatorsByIdOrSlugResponse200:
             updated_at=updated_at,
             fields=fields,
             output_fields=output_fields,
+            version=version,
+            labels=labels,
+            created_by=created_by,
+            updated_by=updated_by,
             platform_url=platform_url,
             workflow_name=workflow_name,
             workflow_icon=workflow_icon,
         )
 
-        get_api_evaluators_by_id_or_slug_response_200.additional_properties = d
         return get_api_evaluators_by_id_or_slug_response_200
-
-    @property
-    def additional_keys(self) -> list[str]:
-        return list(self.additional_properties.keys())
-
-    def __getitem__(self, key: str) -> Any:
-        return self.additional_properties[key]
-
-    def __setitem__(self, key: str, value: Any) -> None:
-        self.additional_properties[key] = value
-
-    def __delitem__(self, key: str) -> None:
-        del self.additional_properties[key]
-
-    def __contains__(self, key: str) -> bool:
-        return key in self.additional_properties

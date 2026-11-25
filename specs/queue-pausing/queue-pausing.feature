@@ -89,6 +89,30 @@ Feature: Queue pipeline pausing
     When the dispatcher reconcile runs while tenant A is still paused
     Then tenant A's groups remain held out of the scan
 
+  # A paused lane (a replay pausing one projection, or an operator pausing a
+  # pipeline) holds its groups out of the dispatch scan the same way, under the
+  # pause entry that matched, and restores them at their scores once it is gone.
+
+  @integration @v1
+  Scenario: A paused lane's backlog does not block other work
+    Given a lane is paused with more pending groups than one dispatch scan examines
+    And a group of another lane is pending behind them
+    When the dispatcher runs
+    Then the paused lane's groups are held out of the dispatch scan
+    And the other lane's group is dispatched
+
+  @integration @v1
+  Scenario: Unpausing a lane restores its parked groups at their scores
+    Given a paused lane's groups are held out of the dispatch scan
+    When the lane's pause entry is removed
+    Then the next dispatch puts every held group back in the queue with its original score
+
+  @integration @v1
+  Scenario: A still-paused lane is not restored
+    Given a paused lane's groups are held out of the dispatch scan
+    When the dispatcher runs again while the lane is still paused
+    Then the lane's groups remain held out of the scan
+
   # Note: scenarios "active jobs at pause-time complete normally" and
   # "Ops UI controls" are covered by integration tests + manual QA below
   # and are not added as separate @scenario-bound unit tests because the

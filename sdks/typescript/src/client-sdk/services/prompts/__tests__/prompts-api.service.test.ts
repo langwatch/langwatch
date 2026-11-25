@@ -1,10 +1,12 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { PromptsApiService } from "../prompts-api.service";
-import { PromptsApiError } from "../errors";
 import { mock } from "vitest-mock-extended";
+
 import type { InternalConfig } from "@/client-sdk/types";
-import { promptResponseFactory } from "../../../../../__tests__/factories/prompt.factory";
 import type { LangwatchApiClient } from "@/internal/api/client";
+
+import { promptResponseFactory } from "../../../../../__tests__/factories/prompt.factory";
+import { PromptsApiError } from "../errors";
+import { PromptsApiService } from "../prompts-api.service";
 
 describe("PromptsApiService.renameTag", () => {
   let service: PromptsApiService;
@@ -21,12 +23,12 @@ describe("PromptsApiService.renameTag", () => {
     } as InternalConfig);
   });
 
-  /** @scenario renameTag calls PUT /api/prompts/tags/{tag} with new name */
-  it("calls PUT /api/prompts/tags/{tag} with new name", async () => {
+  /** @scenario renameTag calls PUT /api/v1/prompts/tags/{tag} with new name */
+  it("calls PUT /api/v1/prompts/tags/{tag} with new name", async () => {
     mockPut.mockResolvedValue({ data: undefined, error: undefined });
     await service.renameTag({ tag: "old-name", name: "new-name" });
     expect(mockPut).toHaveBeenCalledWith(
-      "/api/prompts/tags/{tag}",
+      "/api/v1/prompts/tags/{tag}",
       expect.objectContaining({
         params: expect.objectContaining({ path: { tag: "old-name" } }),
         body: { name: "new-name" },
@@ -37,7 +39,9 @@ describe("PromptsApiService.renameTag", () => {
   describe("when the API returns an error", () => {
     it("throws PromptsApiError", async () => {
       mockPut.mockResolvedValue({ data: undefined, error: "tag not found" });
-      await expect(service.renameTag({ tag: "old-name", name: "new-name" })).rejects.toThrow(PromptsApiError);
+      await expect(service.renameTag({ tag: "old-name", name: "new-name" })).rejects.toThrow(
+        PromptsApiError,
+      );
     });
   });
 });
@@ -66,7 +70,7 @@ describe("PromptsApiService.get", () => {
       await service.get("pizza-prompt", { tag: "production" });
 
       expect(mockGet).toHaveBeenCalledWith(
-        "/api/prompts/{id}",
+        "/api/v1/prompts/{id}",
         expect.objectContaining({
           params: expect.objectContaining({
             path: { id: "pizza-prompt" },
@@ -83,7 +87,7 @@ describe("PromptsApiService.get", () => {
       await service.get("pizza-prompt", { tag: "production", version: "3" });
 
       expect(mockGet).toHaveBeenCalledWith(
-        "/api/prompts/{id}",
+        "/api/v1/prompts/{id}",
         expect.objectContaining({
           params: expect.objectContaining({
             path: { id: "pizza-prompt" },
@@ -138,9 +142,7 @@ describe("PromptsApiService.sync", () => {
       });
 
       await expect(service.sync(syncArgs)).rejects.toThrow(PromptsApiError);
-      await expect(service.sync(syncArgs)).rejects.toThrow(
-        /invalid response body/,
-      );
+      await expect(service.sync(syncArgs)).rejects.toThrow(/invalid response body/);
     });
 
     it("throws PromptsApiError when data is missing entirely", async () => {
@@ -162,7 +164,7 @@ describe("PromptsApiService.sync", () => {
 
 describe("PromptsApiService.handleApiError", () => {
   let service: PromptsApiService;
-  let handleApiError: typeof PromptsApiService.prototype["handleApiError"];
+  let handleApiError: (typeof PromptsApiService.prototype)["handleApiError"];
 
   beforeEach(() => {
     service = new PromptsApiService({
@@ -174,85 +176,105 @@ describe("PromptsApiService.handleApiError", () => {
   });
 
   it("extracts string error", () => {
-    expect(() =>
-      handleApiError("test operation", "simple error")
-    ).toThrow(PromptsApiError);
+    expect(() => handleApiError("test operation", "simple error")).toThrow(PromptsApiError);
 
+    let caught: unknown;
     try {
       handleApiError("test operation", "simple error");
     } catch (error) {
-      expect(error).toBeInstanceOf(PromptsApiError);
-      expect((error as PromptsApiError).message).toBe("Failed to test operation: simple error");
-      expect((error as PromptsApiError).operation).toBe("test operation");
+      caught = error;
     }
+    expect(caught).toBeInstanceOf(PromptsApiError);
+    expect((caught as PromptsApiError).message).toBe("Failed to test operation: simple error");
+    expect((caught as PromptsApiError).operation).toBe("test operation");
   });
 
   it("extracts nested error.error as string", () => {
     const error = { error: "nested error string" };
 
+    let caught: unknown;
     try {
       handleApiError("test operation", error);
     } catch (e) {
-      expect(e).toBeInstanceOf(PromptsApiError);
-      expect((e as PromptsApiError).message).toBe("Failed to test operation: nested error string");
+      caught = e;
     }
+    expect(caught).toBeInstanceOf(PromptsApiError);
+    expect((caught as PromptsApiError).message).toBe(
+      "Failed to test operation: nested error string",
+    );
   });
 
   it("extracts error.error.message", () => {
     const error = { error: { message: "nested error message" } };
 
+    let caught: unknown;
     try {
       handleApiError("test operation", error);
     } catch (e) {
-      expect(e).toBeInstanceOf(PromptsApiError);
-      expect((e as PromptsApiError).message).toBe("Failed to test operation: nested error message");
+      caught = e;
     }
+    expect(caught).toBeInstanceOf(PromptsApiError);
+    expect((caught as PromptsApiError).message).toBe(
+      "Failed to test operation: nested error message",
+    );
   });
 
   it("serializes error.error object when no message", () => {
     const error = { error: { code: 404, detail: "not found" } };
 
+    let caught: unknown;
     try {
       handleApiError("test operation", error);
     } catch (e) {
-      expect(e).toBeInstanceOf(PromptsApiError);
-      expect((e as PromptsApiError).message).toContain("404");
-      expect((e as PromptsApiError).message).toContain("not found");
+      caught = e;
     }
+    expect(caught).toBeInstanceOf(PromptsApiError);
+    expect((caught as PromptsApiError).message).toContain("404");
+    expect((caught as PromptsApiError).message).toContain("not found");
   });
 
   it("extracts error.message when no error.error", () => {
     const error = { message: "direct error message" };
 
+    let caught: unknown;
     try {
       handleApiError("test operation", error);
     } catch (e) {
-      expect(e).toBeInstanceOf(PromptsApiError);
-      expect((e as PromptsApiError).message).toBe("Failed to test operation: direct error message");
+      caught = e;
     }
+    expect(caught).toBeInstanceOf(PromptsApiError);
+    expect((caught as PromptsApiError).message).toBe(
+      "Failed to test operation: direct error message",
+    );
   });
 
   it("uses unknown error when no extractable message", () => {
     const error = {};
 
+    let caught: unknown;
     try {
       handleApiError("test operation", error);
     } catch (e) {
-      expect(e).toBeInstanceOf(PromptsApiError);
-      expect((e as PromptsApiError).message).toBe("Failed to test operation: Unknown error occurred");
+      caught = e;
     }
+    expect(caught).toBeInstanceOf(PromptsApiError);
+    expect((caught as PromptsApiError).message).toBe(
+      "Failed to test operation: Unknown error occurred",
+    );
   });
 
   it("serializes Error objects properly (not [object Object])", () => {
     const error = { error: new Error("native error") };
 
+    let caught: unknown;
     try {
       handleApiError("test operation", error);
     } catch (e) {
-      expect(e).toBeInstanceOf(PromptsApiError);
-      expect((e as PromptsApiError).message).not.toContain("[object Object]");
-      expect((e as PromptsApiError).message).toContain("native error");
+      caught = e;
     }
+    expect(caught).toBeInstanceOf(PromptsApiError);
+    expect((caught as PromptsApiError).message).not.toContain("[object Object]");
+    expect((caught as PromptsApiError).message).toContain("native error");
   });
 
   it("serializes objects with non-enumerable properties", () => {
@@ -267,15 +289,17 @@ describe("PromptsApiService.handleApiError", () => {
     });
     const error = { error: errorObj };
 
+    let caught: unknown;
     try {
       handleApiError("test operation", error);
     } catch (e) {
-      expect(e).toBeInstanceOf(PromptsApiError);
-      expect((e as PromptsApiError).message).not.toContain("[object Object]");
-      // Should contain the properties thanks to Object.getOwnPropertyNames
-      expect((e as PromptsApiError).message).toContain("ERR_BAD_REQUEST");
-      expect((e as PromptsApiError).message).toContain("400");
+      caught = e;
     }
+    expect(caught).toBeInstanceOf(PromptsApiError);
+    expect((caught as PromptsApiError).message).not.toContain("[object Object]");
+    // Should contain the properties thanks to Object.getOwnPropertyNames
+    expect((caught as PromptsApiError).message).toContain("ERR_BAD_REQUEST");
+    expect((caught as PromptsApiError).message).toContain("400");
   });
 
   it("handles complex nested objects without [object Object]", () => {
@@ -286,13 +310,14 @@ describe("PromptsApiService.handleApiError", () => {
       },
     };
 
+    let caught: unknown;
     try {
       handleApiError("test operation", error);
     } catch (e) {
-      expect(e).toBeInstanceOf(PromptsApiError);
-      expect((e as PromptsApiError).message).not.toContain("[object Object]");
-      expect((e as PromptsApiError).message).toContain("500");
+      caught = e;
     }
+    expect(caught).toBeInstanceOf(PromptsApiError);
+    expect((caught as PromptsApiError).message).not.toContain("[object Object]");
+    expect((caught as PromptsApiError).message).toContain("500");
   });
 });
-

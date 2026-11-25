@@ -1,17 +1,13 @@
 /**
- * Device login persists the personal project delivered by /exchange, so data
- * commands authenticate with zero env vars from the very first post-login
- * command, no lazy exchange needed. Older servers omit the field and the
- * config simply carries none.
- *
+ * Device login persists the personal project from /exchange, so data
+ * commands authenticate with zero env vars from the first post-login command.
  * Feature: specs/ai-governance/cli-onboarding/me-credentials.feature
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const pollUntilDone = vi.fn();
 vi.mock("../device-flow", async () => {
-  const actual =
-    await vi.importActual<typeof import("../device-flow")>("../device-flow");
+  const actual = await vi.importActual<typeof deviceFlowModule>("../device-flow");
   return {
     ...actual,
     startDeviceCode: vi.fn(async () => ({
@@ -58,13 +54,16 @@ vi.mock("../config", () => ({
   })),
   saveConfig: (...args: unknown[]) => saveConfig(...args),
   displayConfigPath: () => "~/.langwatch/config.json",
+  assertConfigWritable: vi.fn(),
 }));
 
 vi.mock("../../identityNotice", () => ({
   rememberProjectName: vi.fn(),
 }));
 
-import { loadConfig } from "../config";
+import { assertConfigWritable, loadConfig } from "../config";
+import type * as deviceFlowModule from "../device-flow";
+import { startDeviceCode } from "../device-flow";
 import { runUnifiedLoginFlow } from "../login-flow";
 import { refreshTelemetryWiringForLogin } from "../telemetry-refresh";
 
@@ -76,6 +75,20 @@ const exchangeResult = (extra: Record<string, unknown> = {}) => ({
   user: { id: "u1", email: "dev@example.com", name: "Dev" },
   organization: { id: "o1", name: "Acme", slug: "acme" },
   ...extra,
+});
+
+describe("runUnifiedLoginFlow (device session) when the config cannot be saved", () => {
+  /** @scenario "A device login does not start when the config cannot be saved" */
+  it("refuses before asking the server for a device code", async () => {
+    vi.mocked(assertConfigWritable).mockImplementationOnce(() => {
+      throw Object.assign(new Error("cannot save"), { code: "config_not_writable" });
+    });
+
+    await expect(runUnifiedLoginFlow({ kind: "device_session" })).rejects.toMatchObject({
+      code: "config_not_writable",
+    });
+    expect(startDeviceCode).not.toHaveBeenCalled();
+  });
 });
 
 describe("runUnifiedLoginFlow (device session) personal-project persistence", () => {
@@ -94,7 +107,9 @@ describe("runUnifiedLoginFlow (device session) personal-project persistence", ()
     pollUntilDone.mockResolvedValue(exchangeResult());
     const notice = "Restart `langwatch code` to apply the updated telemetry settings.";
     vi.mocked(refreshTelemetryWiringForLogin).mockResolvedValueOnce({
-      mintedAny: false, labels: ["code shell function (~/.zshrc)"], warnings: [notice],
+      mintedAny: false,
+      labels: ["code shell function (~/.zshrc)"],
+      warnings: [notice],
     });
     const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
 

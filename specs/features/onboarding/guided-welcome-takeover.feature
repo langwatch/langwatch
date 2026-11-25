@@ -8,16 +8,8 @@ Feature: Guided welcome flow and takeover screens
   # organization and the project exist before the takeover starts, and every
   # answer is written to the organization so a reload continues where it was.
   #
-  # Tests:
-  #   platform/app/src/features/onboarding/constants/onboarding-flow.unit.test.ts
-  #   platform/app/src/features/guided-onboarding/__tests__/paths.unit.test.ts
-  #   platform/app/src/features/onboarding/screens/__tests__/WelcomeScreen.guided.integration.test.tsx
-  #   platform/app/src/features/guided-onboarding/takeover/__tests__/GuidedTakeover.integration.test.tsx
-  #   platform/app/src/features/guided-onboarding/takeover/__tests__/HelloScreen.integration.test.tsx
-  #   platform/app/src/features/guided-onboarding/takeover/__tests__/ValueScreen.integration.test.tsx
-  #   platform/app/src/features/guided-onboarding/takeover/__tests__/ProviderScreen.integration.test.tsx
-  #   platform/app/src/features/guided-onboarding/takeover/__tests__/useGuidedProviderConnect.integration.test.tsx
-  #   platform/app/src/features/guided-onboarding/takeover/__tests__/takeover.analytics.integration.test.tsx
+  # Tests live beside their subject under
+  # modules/onboarding/browser/src/features/guided-onboarding/{model,ui/takeover}/__tests__/.
 
   Background:
     Given I signed up and the "experiment_onboarding_langy_guided" flag resolves enabled for me
@@ -98,10 +90,11 @@ Feature: Guided welcome flow and takeover screens
     Then Next fades in shortly after
 
   @integration
-  Scenario: A user without a first name is greeted as "there"
-    Given my account has no name
+  Scenario: A user without a name is greeted without a placeholder
+    Given my account has no name, or only spaces, or only my email address
     When the hello screen opens
-    Then the greeting starts with "Hello there"
+    Then the greeting types out "Hello, I'm Langy 👋"
+    And it does not call me "there" or by my email address
 
   # ============================================================================
   # Value
@@ -112,6 +105,12 @@ Feature: Guided welcome flow and takeover screens
     Given I said I use LangWatch for my company "ACME"
     When the value screen opens
     Then Langy asks "So tell me, Rogerio, what are the most valuable things we can set up for ACME today?"
+
+  @integration
+  Scenario: The value question leaves the name out when the account has none
+    Given my account has no name
+    When the value screen opens
+    Then Langy asks "So tell me, what are the most valuable things we can set up for ACME today?"
 
   @integration
   Scenario: The value question says "you" when the user is on their own
@@ -192,6 +191,14 @@ Feature: Guided welcome flow and takeover screens
     And the default chat model pills show the recommended model first, marked "recommended"
     And Connect is disabled until a key is typed
 
+  @integration
+  Scenario: The picked chat model pill is the model the connection uses
+    When I select OpenAI
+    Then the default chat model pills show the recommended model first, marked "recommended"
+    When I pick another pill and connect with a key
+    Then the connection saves the model I picked and Langy runs on it
+    And the pills can no longer be changed once connected
+
   @unit
   Scenario: The recommended model is the newest main-tier model in the catalog
     Given the committed model catalog
@@ -202,14 +209,62 @@ Feature: Guided welcome flow and takeover screens
     # The catalog is synced weekly; a typed default went stale next to it.
 
   @integration
-  Scenario: Azure, Bedrock and Custom take credentials and a typed model name
-    When I select Azure
-    Then the connect panel asks for the credentials and a chat model
-    And the hint reads "Type it exactly as deployed: Azure has no model list we can read for you."
+  Scenario: Bedrock and Custom take credentials and a typed model name
     When I select Bedrock
-    Then the hint names Bedrock
+    Then the connect panel asks for the credentials and a chat model
+    And the hint reads "Type it exactly as deployed: Bedrock has no model list we can read for you."
     When I select Custom
     Then the hint names Custom
+    When I type a model and connect
+    Then the connection saves the typed model as the provider's model and Langy runs on it
+
+  # Azure OpenAI hosts OpenAI's models, so its card borrows OpenAI's pills.
+  # No deployment mapping is written: the deployment name is the model id.
+  @integration
+  Scenario: Azure offers OpenAI's chat models and an optional deployment name
+    When I select Azure
+    Then the connect panel asks for the endpoint and the key
+    And the default chat model pills show OpenAI's recommended model first, picked
+    And a "Deployment name" field is empty
+    And the hint reads "Pick the model you deployed. If your deployment has a different name, type it instead."
+
+  @integration
+  Scenario: Azure connects with the picked model as the deployment
+    Given I selected Azure and typed an endpoint and a key
+    When I pick a model pill and connect
+    Then the key is checked against a deployment of that name
+    And the connection saves that model as the provider's model and Langy runs on it
+
+  @integration
+  Scenario: Connecting a stored Azure row keeps its own models
+    Given an Azure row is already stored with models of its own
+    And the recommended model pill is picked
+    When I pick another model pill and connect
+    Then the saved models are the stored ones plus that pick
+    And the recommended model is not saved
+
+  @integration
+  Scenario: A stored Azure deployment mapping names the deployment checked
+    Given an Azure row is already stored with a deployment mapping for the picked model
+    When I type a new key and connect
+    Then the key is checked against the mapped deployment, the one the model runs on
+
+  @integration
+  Scenario: A typed Azure deployment name wins over the picked model
+    Given I selected Azure and typed an endpoint and a key
+    When I type a deployment name
+    Then no model pill is picked
+    And connecting checks and saves the typed deployment name as the model
+
+  @integration
+  Scenario: A missing Azure deployment is named and checked again once corrected
+    Given I selected Azure and typed a deployment name the resource does not have
+    When I click Connect
+    Then I read that there is no deployment by that name
+    And the message sits under the deployment name, not under the endpoint it says works
+    And nothing is saved
+    When I correct the deployment name and click Connect
+    Then the key is checked again against the corrected deployment
 
   @integration
   Scenario: Connecting with a key checks it and then reports Connected
@@ -299,11 +354,15 @@ Feature: Guided welcome flow and takeover screens
     Then the organization records that the provider was skipped
     And I land on the first pick's page
 
+  # Skip anyway skips the provider step only. The tour is app UI and needs no
+  # model, so the landing still shows the product; Langy asks for a model after
+  # it, inline in the panel (specs/langy/langy-inline-model-setup.feature).
   @integration
-  Scenario: Skip anyway skips the tour as well
+  Scenario: Skip anyway leaves the tour to run
     When the provider skip is recorded
-    Then the organization records the tour as skipped in the same call
-    And the provider skipped and tour skipped events both reach the onboarding event hook
+    Then the organization records the provider skip and nothing else
+    And the tour is not recorded as skipped, so the landing still runs it
+    And only the provider skipped event reaches the onboarding event hook
 
   # ============================================================================
   # Self-hosted
@@ -372,7 +431,7 @@ Feature: Guided welcome flow and takeover screens
     And no event carries the API key
 
   # ============================================================================
-  # End to end, in a real browser (platform/app/e2e/guided-onboarding.e2e.test.ts)
+  # End to end, in a real browser (apps/ui/e2e/langy/guided-onboarding.e2e.test.ts)
   # ============================================================================
 
   @e2e
@@ -393,9 +452,9 @@ Feature: Guided welcome flow and takeover screens
     Then I am asked "Are you sure sure?"
     When I confirm with "Skip anyway"
     Then I land on my personal home with the Langy panel open
-    And the panel asks for the model the provider step would have connected
+    And below the tour card Langy asks for the model the provider step would have connected
     And no offer is shown there, because the coding path is the one being guided
-    And the skip is recorded on my organization
+    And the skip is recorded on my organization, with the tour not skipped
 
   @e2e
   Scenario: With the flag off the classic wizard is unchanged

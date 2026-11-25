@@ -4,19 +4,12 @@ from collections.abc import Mapping
 from typing import Any, TypeVar, cast
 
 from attrs import define as _attrs_define
-from attrs import field as _attrs_field
 
-from ..models.get_api_v1_query_reference_response_200_lwql_schema_views_item_columns_item_gates_item import (
-    GetApiV1QueryReferenceResponse200LwqlSchemaViewsItemColumnsItemGatesItem,
+from ..models.get_api_v1_query_reference_response_200_lwql_schema_views_item_columns_item_gates_item_type_0 import (
+    GetApiV1QueryReferenceResponse200LwqlSchemaViewsItemColumnsItemGatesItemType0,
 )
-from ..models.get_api_v1_query_reference_response_200_lwql_schema_views_item_columns_item_unit_type_1 import (
-    GetApiV1QueryReferenceResponse200LwqlSchemaViewsItemColumnsItemUnitType1,
-)
-from ..models.get_api_v1_query_reference_response_200_lwql_schema_views_item_columns_item_unit_type_2_type_1 import (
-    GetApiV1QueryReferenceResponse200LwqlSchemaViewsItemColumnsItemUnitType2Type1,
-)
-from ..models.get_api_v1_query_reference_response_200_lwql_schema_views_item_columns_item_unit_type_3_type_1 import (
-    GetApiV1QueryReferenceResponse200LwqlSchemaViewsItemColumnsItemUnitType3Type1,
+from ..models.get_api_v1_query_reference_response_200_lwql_schema_views_item_columns_item_gates_item_type_1 import (
+    GetApiV1QueryReferenceResponse200LwqlSchemaViewsItemColumnsItemGatesItemType1,
 )
 
 T = TypeVar("T", bound="GetApiV1QueryReferenceResponse200LwqlSchemaViewsItemColumnsItem")
@@ -29,25 +22,21 @@ class GetApiV1QueryReferenceResponse200LwqlSchemaViewsItemColumnsItem:
         name (str):
         type_ (str):
         description (str):
-        unit (GetApiV1QueryReferenceResponse200LwqlSchemaViewsItemColumnsItemUnitType1 |
-            GetApiV1QueryReferenceResponse200LwqlSchemaViewsItemColumnsItemUnitType2Type1 |
-            GetApiV1QueryReferenceResponse200LwqlSchemaViewsItemColumnsItemUnitType3Type1 | None):
-        gates (list[GetApiV1QueryReferenceResponse200LwqlSchemaViewsItemColumnsItemGatesItem]):
+        unit (None | str):
+        gates (list[GetApiV1QueryReferenceResponse200LwqlSchemaViewsItemColumnsItemGatesItemType0 |
+            GetApiV1QueryReferenceResponse200LwqlSchemaViewsItemColumnsItemGatesItemType1]):
         available (bool):
     """
 
     name: str
     type_: str
     description: str
-    unit: (
-        GetApiV1QueryReferenceResponse200LwqlSchemaViewsItemColumnsItemUnitType1
-        | GetApiV1QueryReferenceResponse200LwqlSchemaViewsItemColumnsItemUnitType2Type1
-        | GetApiV1QueryReferenceResponse200LwqlSchemaViewsItemColumnsItemUnitType3Type1
-        | None
-    )
-    gates: list[GetApiV1QueryReferenceResponse200LwqlSchemaViewsItemColumnsItemGatesItem]
+    unit: None | str
+    gates: list[
+        GetApiV1QueryReferenceResponse200LwqlSchemaViewsItemColumnsItemGatesItemType0
+        | GetApiV1QueryReferenceResponse200LwqlSchemaViewsItemColumnsItemGatesItemType1
+    ]
     available: bool
-    additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         name = self.name
@@ -57,24 +46,24 @@ class GetApiV1QueryReferenceResponse200LwqlSchemaViewsItemColumnsItem:
         description = self.description
 
         unit: None | str
-        if isinstance(self.unit, GetApiV1QueryReferenceResponse200LwqlSchemaViewsItemColumnsItemUnitType1):
-            unit = self.unit.value
-        elif isinstance(self.unit, GetApiV1QueryReferenceResponse200LwqlSchemaViewsItemColumnsItemUnitType2Type1):
-            unit = self.unit.value
-        elif isinstance(self.unit, GetApiV1QueryReferenceResponse200LwqlSchemaViewsItemColumnsItemUnitType3Type1):
-            unit = self.unit.value
-        else:
-            unit = self.unit
+        unit = self.unit
 
         gates = []
         for gates_item_data in self.gates:
-            gates_item = gates_item_data.value
+            gates_item: str
+            if isinstance(
+                gates_item_data, GetApiV1QueryReferenceResponse200LwqlSchemaViewsItemColumnsItemGatesItemType0
+            ):
+                gates_item = gates_item_data.value
+            else:
+                gates_item = gates_item_data.value
+
             gates.append(gates_item)
 
         available = self.available
 
         field_dict: dict[str, Any] = {}
-        field_dict.update(self.additional_properties)
+
         field_dict.update(
             {
                 "name": name,
@@ -97,54 +86,40 @@ class GetApiV1QueryReferenceResponse200LwqlSchemaViewsItemColumnsItem:
 
         description = d.pop("description")
 
-        def _parse_unit(
-            data: object,
-        ) -> (
-            GetApiV1QueryReferenceResponse200LwqlSchemaViewsItemColumnsItemUnitType1
-            | GetApiV1QueryReferenceResponse200LwqlSchemaViewsItemColumnsItemUnitType2Type1
-            | GetApiV1QueryReferenceResponse200LwqlSchemaViewsItemColumnsItemUnitType3Type1
-            | None
-        ):
+        def _parse_unit(data: object) -> None | str:
             if data is None:
                 return data
-            try:
-                if not isinstance(data, str):
-                    raise TypeError()
-                unit_type_1 = GetApiV1QueryReferenceResponse200LwqlSchemaViewsItemColumnsItemUnitType1(data)
-
-                return unit_type_1
-            except (TypeError, ValueError, AttributeError, KeyError):
-                pass
-            try:
-                if not isinstance(data, str):
-                    raise TypeError()
-                unit_type_2_type_1 = GetApiV1QueryReferenceResponse200LwqlSchemaViewsItemColumnsItemUnitType2Type1(data)
-
-                return unit_type_2_type_1
-            except (TypeError, ValueError, AttributeError, KeyError):
-                pass
-            try:
-                if not isinstance(data, str):
-                    raise TypeError()
-                unit_type_3_type_1 = GetApiV1QueryReferenceResponse200LwqlSchemaViewsItemColumnsItemUnitType3Type1(data)
-
-                return unit_type_3_type_1
-            except (TypeError, ValueError, AttributeError, KeyError):
-                pass
-            return cast(
-                GetApiV1QueryReferenceResponse200LwqlSchemaViewsItemColumnsItemUnitType1
-                | GetApiV1QueryReferenceResponse200LwqlSchemaViewsItemColumnsItemUnitType2Type1
-                | GetApiV1QueryReferenceResponse200LwqlSchemaViewsItemColumnsItemUnitType3Type1
-                | None,
-                data,
-            )
+            return cast(None | str, data)
 
         unit = _parse_unit(d.pop("unit"))
 
         gates = []
         _gates = d.pop("gates")
         for gates_item_data in _gates:
-            gates_item = GetApiV1QueryReferenceResponse200LwqlSchemaViewsItemColumnsItemGatesItem(gates_item_data)
+
+            def _parse_gates_item(
+                data: object,
+            ) -> (
+                GetApiV1QueryReferenceResponse200LwqlSchemaViewsItemColumnsItemGatesItemType0
+                | GetApiV1QueryReferenceResponse200LwqlSchemaViewsItemColumnsItemGatesItemType1
+            ):
+                try:
+                    if not isinstance(data, str):
+                        raise TypeError()
+                    gates_item_type_0 = GetApiV1QueryReferenceResponse200LwqlSchemaViewsItemColumnsItemGatesItemType0(
+                        data
+                    )
+
+                    return gates_item_type_0
+                except (TypeError, ValueError, AttributeError, KeyError):
+                    pass
+                if not isinstance(data, str):
+                    raise TypeError()
+                gates_item_type_1 = GetApiV1QueryReferenceResponse200LwqlSchemaViewsItemColumnsItemGatesItemType1(data)
+
+                return gates_item_type_1
+
+            gates_item = _parse_gates_item(gates_item_data)
 
             gates.append(gates_item)
 
@@ -159,21 +134,4 @@ class GetApiV1QueryReferenceResponse200LwqlSchemaViewsItemColumnsItem:
             available=available,
         )
 
-        get_api_v1_query_reference_response_200_lwql_schema_views_item_columns_item.additional_properties = d
         return get_api_v1_query_reference_response_200_lwql_schema_views_item_columns_item
-
-    @property
-    def additional_keys(self) -> list[str]:
-        return list(self.additional_properties.keys())
-
-    def __getitem__(self, key: str) -> Any:
-        return self.additional_properties[key]
-
-    def __setitem__(self, key: str, value: Any) -> None:
-        self.additional_properties[key] = value
-
-    def __delitem__(self, key: str) -> None:
-        del self.additional_properties[key]
-
-    def __contains__(self, key: str) -> bool:
-        return key in self.additional_properties

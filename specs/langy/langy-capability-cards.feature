@@ -18,7 +18,7 @@ Feature: Langy renders domain-capability cards for tool calls
     When Langy runs the trace-search capability and it returns matching traces
     Then Langy shows a traces card listing the matched traces
     And each trace row links to that trace
-    And the card offers an "Open in Traces" link
+    And the card offers a "View in Trace Explorer" link
     And the card shows no Apply or Discard action
 
   @integration
@@ -32,7 +32,7 @@ Feature: Langy renders domain-capability cards for tool calls
     When Langy runs the analytics capability and it returns numbers
     Then Langy shows a metrics card with the reported figures
     And each figure rolls up from zero as a rolling number
-    And the card offers an "Open in Analytics" link
+    And the card offers no deep link, since a link that did not carry the query would mislead
 
   @integration
   Scenario: A trace count split by model reads as a count of traces
@@ -171,8 +171,9 @@ Feature: Langy renders domain-capability cards for tool calls
 
   @integration
   Scenario: An unmapped tool falls through to the raw view
+    Given developer mode is on
     When Langy runs a tool that is not a LangWatch action and has no capability card
-    Then Langy shows the tool's raw name, state, input, and output
+    Then I can show the tool's raw name, state, input, and output
     And it does not fabricate a card it has no mapping for
 
   @integration
@@ -391,6 +392,7 @@ Feature: Langy renders domain-capability cards for tool calls
     Scenario: A turn that failed immediately still leads with the failure
       Given the first thing Langy did in a turn failed
       Then the failure is the first thing in the transcript
+      And once the turn answered, it is the first row of the folded record of the work
 
     # Ordering held inside the activity block and nowhere else. The block itself
     # sat above the reply and the whole reply below it, so a turn that wrote a

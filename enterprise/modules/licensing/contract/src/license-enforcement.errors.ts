@@ -1,0 +1,52 @@
+import type { LimitType } from "@langwatch/enterprise-licensing-contract";
+import { HandledError } from "@langwatch/handled-error";
+
+import { LIMIT_TYPE_LABELS } from "./license-limit-labels.ts";
+
+/**
+ * Domain error thrown when an organization has reached its limit for a resource type.
+ * This error is framework-agnostic and should be caught and mapped to
+ * HTTP/tRPC errors by the router layer.
+ */
+export class LimitExceededError extends HandledError {
+  declare readonly code: "resource_limit_exceeded";
+
+  constructor(
+    public readonly limitType: LimitType,
+    public readonly current: number,
+    public readonly max: number,
+  ) {
+    super(
+      "resource_limit_exceeded",
+      `You have reached the maximum number of ${LIMIT_TYPE_LABELS[limitType]}`,
+      {
+        meta: { limitType, current, max },
+        httpStatus: 403,
+      },
+    );
+    this.name = "LimitExceededError";
+  }
+}
+
+/** The suite cap refused a template apply: the `scenarioSets` limit, counted as suites. */
+export class TestSuiteLimitExceededError extends LimitExceededError {
+  constructor(current: number, max: number) {
+    super("scenarioSets", current, max);
+    this.name = "TestSuiteLimitExceededError";
+    this.meta.countedAs = "testSuites";
+    this.message = "You have reached the maximum number of suites";
+  }
+}
+
+/**
+ * Domain error thrown when a project is not found or has no organization.
+ * This error is framework-agnostic and should be caught and mapped to
+ * HTTP/tRPC errors by the router layer.
+ */
+export class ProjectNotFoundError extends Error {
+  public readonly name = "ProjectNotFoundError";
+
+  constructor(public readonly projectId: string) {
+    super(`Project not found: ${projectId}`);
+  }
+}

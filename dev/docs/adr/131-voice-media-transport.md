@@ -14,7 +14,7 @@ accept inbound connections, read this instead of re-deriving it.
 ## Context
 
 Testing a phone agent means placing a real call and exchanging real audio with
-it. The open question was the *direction* of the media path: must something dial
+it. The open question was the _direction_ of the media path: must something dial
 in to us, or can we get away with dialling out only?
 
 One constraint settles it:
@@ -41,8 +41,7 @@ is not re-asked.
 
 Twilio's Media Streams overview defines the product as "streaming it over
 WebSockets to a destination you specify", and its only infrastructure
-requirement is a firewall rule to "allow secure WebSocket connections (TCP port
-443) from Twilio to your WebSocket servers from any public IP address". Their
+requirement is a firewall rule to "allow secure WebSocket connections (TCP port 443) from Twilio to your WebSocket servers from any public IP address". Their
 Media Streams tutorial then says, verbatim: "We recommend that you make use of
 an ssh tunnel service like ngrok, which supports the wss scheme." A public
 `wss://` endpoint, provided by a tunnel when the host has none, is therefore
@@ -119,7 +118,7 @@ scenario child, and the per-call nonce travels in the URL path.
 - An unreachable or unresolvable stream URL fails almost silently. Twilio
   reports error 31920, the call lasts about a second, and the adapter then burns
   its full connect timeout before giving up. Any new endpoint mechanism must be
-  proven globally resolvable *before* a call is placed.
+  proven globally resolvable _before_ a call is placed.
 - Because the endpoint faces the internet, the nonce check is load-bearing
   rather than defence in depth.
 
@@ -135,7 +134,7 @@ every 20 ms for the whole call, silence included, and the protocol carries no
 speech, silence or VAD event of any kind (`mark` is only a playback-completion
 echo; the speech-endpointing knobs — `speechTimeout`, `eotThreshold` — belong
 to ConversationRelay, which we do not use). Every turn boundary on a phone call
-is therefore something *we* decide from the audio.
+is therefore something _we_ decide from the audio.
 
 The scenario SDK's runtime decides it by silence: after the first inbound chunk
 it keeps reading until `responseTailSilence` (0.6 s by default) passes with no
@@ -178,7 +177,7 @@ Current approach is a free `cloudflared` quick tunnel. The worker shells out to
 its public base URL. No account, no load balancer, no certificate to manage.
 This is explicitly temporary.
 
-Its real advantage is not avoiding infrastructure work. A tunnel lets *every*
+Its real advantage is not avoiding infrastructure work. A tunnel lets _every_
 worker publish its own address, which dissolves the single-replica constraint
 that a fixed hostname otherwise forces.
 
@@ -190,7 +189,7 @@ wrong nonce. The DNS wait is mandatory — the hostname is not resolvable the
 moment `cloudflared` prints it, which is exactly the error 31920 trap above.
 
 The durable fallback is a single-replica deployment behind a public NLB with its
-own certificate and an *unproxied* DNS record. Unproxied matters: proxied records
+own certificate and an _unproxied_ DNS record. Unproxied matters: proxied records
 apply bot rules that return Cloudflare error 1010 to machine clients like Twilio.
 
 Quick tunnels are ephemeral and rate-limited, and Cloudflare does not intend them

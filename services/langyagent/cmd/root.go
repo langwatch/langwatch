@@ -65,6 +65,7 @@ func Root(ctx context.Context, _ []string) error {
 	pool, err := workerpool.New(ctx, workerpool.Options{
 		MaxWorkers:       cfg.MaxWorkers,
 		WorkerIdle:       cfg.WorkerIdle(),
+		WorkerMaxAge:     cfg.WorkerMaxAge(),
 		ReadinessTimeout: cfg.ReadinessTimeout(),
 		ReaperInterval:   cfg.ReaperInterval(),
 		SessionsRoot:     cfg.SessionsRoot,
@@ -81,7 +82,8 @@ func Root(ctx context.Context, _ []string) error {
 		// Host-mediated worker telemetry + LLM traffic: workers export OTLP to
 		// this loopback relay keyless and route LLM calls through it; the manager
 		// injects the session key / virtual key on the forwards.
-		OTelRelay: deps.OTelRelay,
+		OTelRelay:  deps.OTelRelay,
+		GithubHost: cfg.GithubHost,
 	})
 	if err != nil {
 		return err

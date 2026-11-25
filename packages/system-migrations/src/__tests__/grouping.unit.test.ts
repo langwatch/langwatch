@@ -1,8 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { groupByTenantSource } from "../grouping";
-import type { SystemMigration } from "../system-migration";
-import type { TenantSource } from "../tenant-source";
-import type { TenantMigrationOutcome } from "../types";
+
+import { groupByTenantSource } from "../grouping.ts";
+import type { SystemMigration } from "../system-migration.ts";
+import type { TenantSource } from "../tenant-source.ts";
+import type { TenantMigrationOutcome } from "../types.ts";
 
 function source(ids: string[]): TenantSource {
   return {
@@ -34,9 +35,7 @@ function migration({
 }
 
 function driveOrder(buckets: ReturnType<typeof groupByTenantSource>): string[] {
-  return buckets.flatMap((bucket) =>
-    bucket.migrations.map((migration) => migration.name),
-  );
+  return buckets.flatMap((bucket) => bucket.migrations.map((migration) => migration.name));
 }
 
 describe("groupByTenantSource", () => {
@@ -93,9 +92,7 @@ describe("groupByTenantSource", () => {
         everyTenant,
       });
 
-      expect(grouped).toEqual([
-        { tenants: everyTenant, migrations: [first, second] },
-      ]);
+      expect(grouped).toEqual([{ tenants: everyTenant, migrations: [first, second] }]);
     });
   });
 
@@ -139,11 +136,7 @@ describe("groupByTenantSource", () => {
         everyTenant,
       });
 
-      expect(grouped.map((bucket) => bucket.tenants)).toEqual([
-        shared,
-        everyTenant,
-        shared,
-      ]);
+      expect(grouped.map((bucket) => bucket.tenants)).toEqual([shared, everyTenant, shared]);
     });
   });
 });

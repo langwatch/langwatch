@@ -21,12 +21,13 @@ pip install langwatch litellm
 ```bash uv
 uv add langwatch litellm
 ```
+
 </CodeGroup>
 
 ## Usage
 
 <Info>
-The LangWatch API key is configured by default via the `LANGWATCH_API_KEY` environment variable.
+  The LangWatch API key is configured by default via the `LANGWATCH_API_KEY` environment variable.
 </Info>
 
 Use `autotrack_litellm_calls()` to automatically capture all LiteLLM calls within a trace.
@@ -64,6 +65,12 @@ if __name__ == "__main__":
 ```
 
 The `@langwatch.trace()` decorator creates a parent trace, and `autotrack_litellm_calls()` enables automatic tracking of all LiteLLM calls for the duration of that trace.
+
+## Check it worked
+
+Run the example. Then open your project in LangWatch: a new trace named "LiteLLM Autotrack Example" appears in the traces list within a few seconds. Open it to see the LiteLLM completion call nested inside it, with its input and output.
+
+If no trace appears, check that `LANGWATCH_API_KEY` is set in the environment the script runs in.
 
 ## Related
 

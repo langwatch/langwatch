@@ -1,5 +1,5 @@
 Feature: AI Tools Portal - Admin catalog editor at /governance/inventory?tab=catalog
-  As an org admin curating which AI tools my team can see on /me
+  As an org admin curating which AI tools my team can see on /coding-agents
   I want a catalog editor with sections per tile type, drag-to-reorder,
   add/edit drawer, and per-team scoping
   So that I can publish, retire, scope, and order the tile set without
@@ -46,19 +46,10 @@ Feature: AI Tools Portal - Admin catalog editor at /governance/inventory?tab=cat
     And user "carol@acme.com" unchecks every starter tool
     Then the import action is disabled
 
-  # Auto-provisioning means real catalogs are never empty, so the import
-  # affordance cannot hide behind the empty state: it stays reachable from
-  # a populated catalog behind a compact toggle. Import only ever adds
-  # starter tiles the catalog never had: tiles already present are skipped,
-  # and archived tiles count as present, so a re-import never undoes
-  # curation (+ Add tile recreates an archived tile deliberately).
-  @bdd @admin-catalog @starter-pack @integration
-  Scenario: a populated catalog still offers the starter pack import behind a toggle
-    Given the org-scoped catalog already has entries
-    When user "carol@acme.com" loads "/governance/inventory?tab=catalog"
-    Then an "Import starter pack" button is shown instead of the empty-state callout
-    And clicking it reveals the starter tool checklist
-
+  # Import only ever adds starter tiles the catalog never had: tiles
+  # already present are skipped, and archived tiles count as present, so a
+  # re-import never undoes curation (+ Add tile recreates an archived tile
+  # deliberately).
   @bdd @admin-catalog @starter-pack @integration
   Scenario: re-importing the starter pack adds only tiles the catalog never had
     Given the catalog has most starter tiles but lacks one entirely
@@ -92,24 +83,18 @@ Feature: AI Tools Portal - Admin catalog editor at /governance/inventory?tab=cat
       | element           | function                                          |
       | grip-vertical    | drag handle (cursor: grab)                        |
       | display name     | non-interactive label                             |
-      | tile icon        | the same icon the /me portal renders for the tile |
+      | tile icon        | the same icon the /coding-agents portal renders for the tile |
       | type badge       | "Coding assistant", "Model provider" or "Internal tool" |
       | scope badge      | "Org-wide" or "Team: <name>"                      |
       | actions menu     | Edit / Disable-Enable / Delete                    |
 
   @bdd @admin-catalog @cards @integration
-  Scenario: the catalog renders cards with only the fields a tile has
-    Given the catalog has a coding assistant "Claude Code" allowing the
-      gateway path but not direct ingestion, a model provider "Anthropic",
-      and an internal tool "Wiki" linking to "https://wiki.example.test"
+  Scenario: the catalog renders cards with only the rows a tool has
+    Given the catalog has a coding assistant "Claude Code", a model provider "OpenAI" and an internal tool "Support Desk Assistant"
     When user "carol@acme.com" loads "/governance/inventory?tab=catalog"
-    Then each section lays its tiles out as a grid of cards, one to three
-      across depending on the viewport
-    And the "Claude Code" card carries its type badge, its scope chip and
-      the line "CLI paths: gateway only"
-    And the "Wiki" card carries its link
-    And no card shows a seat count, a licence, or a cost — nothing the tile
-      does not actually store
+    Then each registered tool is a card carrying its name
+    And the "Claude Code" card carries its vendor "Anthropic" and a "Subscriptions" row, and no seats, licence or tokens row
+    And the "OpenAI" card carries a "Tokens · 30 days" row, and no subscriptions or seats row
 
   Scenario: + Add tile opens drawer with section's type pre-selected
     Given the editor is loaded
@@ -179,7 +164,7 @@ Feature: AI Tools Portal - Admin catalog editor at /governance/inventory?tab=cat
     Then `api.aiTools.setEnabled` is called with `enabled=false`
     And the row dims (opacity 0.5)
     And the button label flips to "Enable"
-    And on /me the Anthropic tile is no longer visible to MEMBER users
+    And on /coding-agents the Anthropic tile is no longer visible to MEMBER users
 
   Scenario: UI-preview banner renders while backend router is unwired
     Given Sergey's `aiToolsCatalogRouter` is not yet shipped

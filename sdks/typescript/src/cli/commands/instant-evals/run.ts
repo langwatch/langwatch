@@ -1,25 +1,7 @@
 /**
- * `langwatch instant-eval run`: ask one question of a whole history.
- *
- * The command runs the eval and answers with the result, the way any other
- * command does. It creates the run, shows the statement, the price and the
- * progress while the judging happens, and replaces all of it with the matches
- * when the run is done. `--detach` is the other shape: create it and return
- * the id, for a caller that will read it back later.
- *
- * It renders its own resolved format rather than returning a `CommandResult`,
- * because two things follow the answer: the estimate printed BEFORE a large
- * run is created, and the rows read after it finishes. A machine caller still
- * reads exactly one document, and the estimate goes to stderr so it never
- * lands inside it.
- *
- * ## Why a large run is priced first
- *
- * A run is charged for what it judges, and the difference between a hundred
- * rows and a hundred thousand is three orders of magnitude of spend for the
- * same command line. So above a thousand rows the command asks what it would
- * cost, says so, and then creates the run. `--estimate` stops after the price.
- *
+ * `langwatch instant-eval run`: creates the run, shows statement, price and progress, then the
+ * matches; `--detach` returns the id. Above a thousand rows it prices first (stderr); `--estimate`
+ * stops there.
  * @see specs/features/instant-eval-cli.feature
  */
 
@@ -34,11 +16,7 @@ import type {
 } from "@/client-sdk/services/instant-evals";
 
 import { resolveCredentials } from "../../utils/apiKey";
-import {
-  printResult,
-  type RawOutputFlags,
-  resolveOutputOptions,
-} from "../../utils/output";
+import { printResult, type RawOutputFlags, resolveOutputOptions } from "../../utils/output";
 import { createSpinner } from "../../utils/spinner";
 import { failSpinner } from "../../utils/spinnerError";
 import { createCliInstantEvalsService } from "./cli-instant-evals-service";
@@ -58,9 +36,7 @@ import {
   type InstantEvalRunFlags,
 } from "./runInput";
 
-export interface InstantEvalRunOptions
-  extends InstantEvalRunFlags,
-    RawOutputFlags {
+export interface InstantEvalRunOptions extends InstantEvalRunFlags, RawOutputFlags {
   estimate?: boolean;
   detach?: boolean;
   show?: string;
@@ -151,9 +127,7 @@ async function reportDetached({
         printRun(run);
         console.log();
         console.log(
-          chalk.gray(
-            `Follow it with ${chalk.cyan(`langwatch instant-eval status ${run.id}`)}`,
-          ),
+          chalk.gray(`Follow it with ${chalk.cyan(`langwatch instant-eval status ${run.id}`)}`),
         );
       },
     },
@@ -161,11 +135,9 @@ async function reportDetached({
 }
 
 /**
- * Follow the run to its end and print what it found.
- *
- * Ctrl-C leaves the run judging: it is already created and already being paid
- * for, so stopping the terminal is not a reason to throw the work away. The
- * command that reads it back is printed instead.
+ * Follow the run to its end and print what it found. Ctrl-C leaves the run judging: it is already
+ * created and already being paid for, so stopping the terminal is not a reason to throw the work
+ * away. The command that reads it back is printed instead.
  */
 async function followAndReport({
   service,
@@ -251,11 +223,9 @@ function readShow(raw: string | undefined): number {
 }
 
 /**
- * The first rows of the finished run, matched ones first.
- *
- * A sample rather than a results page, because the table shows the text each
- * row was judged on beside its verdict, and only the sample re-reads that text
- * through the statement's own extraction functions. It judges nothing again.
+ * The first rows of the finished run, matched ones first. A sample rather than a results page,
+ * because the table shows the text each row was judged on beside its verdict, and only the sample
+ * re-reads that text through the statement's own extraction functions. It judges nothing again.
  */
 async function readRows({
   service,
@@ -307,13 +277,8 @@ async function reportEstimate({
 }
 
 /**
- * The estimate a plain run prints before it creates anything, or nothing.
- *
- * Only asked for above the row threshold: a small run is not worth a second
- * round trip, and the whole point of the threshold is that the caller sees a
- * price before a spend that is worth seeing. A failed estimate does not stop
- * the run, because the caller asked for a run and not for a price, so it is
- * reported on stderr and the run goes ahead.
+ * The estimate a plain run prints before creating anything, only above the row threshold. A failed
+ * estimate is reported on stderr and the run goes ahead: the caller asked for a run, not a price.
  */
 async function priceIfLarge({
   service,
@@ -334,11 +299,7 @@ async function priceIfLarge({
     const estimate = await service.estimate(body);
     spinner.succeed(`This run will judge ${estimateLine(estimate)}`);
     if (!machine) {
-      console.log(
-        chalk.gray(
-          "  Run it with --estimate to see the price without starting it.",
-        ),
-      );
+      console.log(chalk.gray("  Run it with --estimate to see the price without starting it."));
     }
     return estimate;
   } catch {

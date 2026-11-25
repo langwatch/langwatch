@@ -170,6 +170,10 @@ const (
 	// Either the token leaked, or the install was rebuilt and an operator has
 	// to reset the binding.
 	ErrConnectWrongInstance = herr.Code("connect_wrong_instance")
+	// ErrConnectCredentialPending means the license authenticated but its
+	// managed key is still being provisioned. It is not a refusal: a retry a
+	// few seconds later succeeds, so the gateway never remembers it.
+	ErrConnectCredentialPending = herr.Code("connect_credential_pending")
 	// ErrConnectServiceNotEntitled means the license authenticated but does
 	// not include the hosted service the call needs. Distinct from every
 	// refusal above: the license is live and its other services keep working,
@@ -212,6 +216,13 @@ const (
 // cache's own check are the same answer to the same person, and two copies of
 // it drift.
 const KeyExpiredMessage = "This key has expired. Extend its expiration date, or create a new key."
+
+// KeyDisabledMessage and KeyRevokedMessage are what a tenant reads for a key
+// refused by the control plane or by the gateway's revocation list.
+const (
+	KeyDisabledMessage = "This key is disabled. An administrator can re-enable it; the key material is unchanged."
+	KeyRevokedMessage  = "This key was revoked."
+)
 
 // noFallbackError marks a dispatch error the engine has already declared
 // terminal for the whole credential chain, carrying that verdict to the

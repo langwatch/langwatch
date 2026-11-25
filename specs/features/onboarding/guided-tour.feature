@@ -2,7 +2,7 @@
 # sign-up lands, and again on request from the "Guided tour" card in the panel.
 #
 # The tour is deterministic app UI, not agent output: a collaborator cursor
-# tagged "(langy)", a spotlight around the current target, and a caption card
+# tagged "Langy", a spotlight around the current target, and a caption card
 # with the step text. Each step reads for `(2800 + words * 330) * 3` ms and
 # then advances on its own. Targets are `data-tour` attributes on the real
 # navigation and pages; steps that need the page to do something (fold a
@@ -99,13 +99,19 @@ Feature: Guided onboarding tour
     And the path is reported as having no tour
 
   # A tour step or a Langy page name pointing at an address the router does
-  # not know lands the demo on the 404 page. The route table is the check.
+  # not know lands the demo on the 404 page. The shell's route-pattern list is
+  # the check; each module binds the clause for the addresses it owns.
   @unit
   Scenario: every address the guided onboarding navigates to is a registered route
-    Given the application's route table
+    Given the shell's list of route patterns
     Then each path's landing after the sign-up and the page Langy starts from match a route of their own
     And every address a tour step navigates to matches a route of its own
-    And every page name Langy's navigate command opens matches a route of its own, under the project slug for a project page and at the top level for an organization page
+    And none of them falls through to the 404 catch-all
+
+  @unit
+  Scenario: every page name Langy's navigate command opens is a registered route
+    Given the shell's list of route patterns
+    Then every page name Langy's navigate command opens matches a route of its own, under the project slug for a project page and at the top level for an organization page
     And none of them falls through to the 404 catch-all
 
   @unit
@@ -249,6 +255,13 @@ Feature: Guided onboarding tour
     Then the action is no longer registered
 
   @unit
+  Scenario: a page outside onboarding registers its tour actions through the guided tour lend
+    Given onboarding lends the guided tour and the virtual keys page reads it
+    When the page registers "openVirtualKeyCreate" through the lend
+    Then the tour can call it while the page is mounted
+    And a composition without onboarding gives the page a lend that registers nothing
+
+  @unit
   Scenario: the gateway tour opens the real create drawer, types the name and submits it
     Given the gateway tour is running on the virtual keys page
     When the cursor lands on the New key button
@@ -360,12 +373,23 @@ Feature: Guided onboarding tour
     When the host mounts
     Then nothing is queued
 
-  @unit
-  Scenario: a skipped provider means no tour
+  # Skipping the provider skips only the provider. The tour needs no model, so
+  # it still shows the product; Langy asks for a model once it ends, inline in
+  # the panel (specs/langy/langy-inline-model-setup.feature).
+  @unit @integration
+  Scenario: a skipped provider still runs the tour
     Given the user clicked "Skip anyway" on the provider screen
     When the host mounts on the landing
+    Then the tour runs as it does with a provider connected
+    When the tour ends
+    Then the kickoff is queued with the tour's own status
+
+  @unit @integration
+  Scenario: a landing after the model prompt was put off does nothing
+    Given the user skipped the provider and pressed "Later" on Langy's model prompt
+    When the host mounts on a later landing
     Then no tour runs
-    And the kickoff is queued with the tour status "skipped", so Langy opens with the no-worries line
+    And the panel is not opened and nothing is queued
 
   @unit
   Scenario: a kickoff owed right away waits for Langy to announce the page's scope
@@ -438,7 +462,7 @@ Feature: Guided onboarding tour
     And a replay emits "replayed tour"
 
   # ============================================================================
-  # End to end, in a real browser (platform/app/e2e/guided-onboarding.e2e.test.ts)
+  # End to end, in a real browser (apps/ui/e2e/langy/guided-onboarding.e2e.test.ts)
   # ============================================================================
 
   @e2e

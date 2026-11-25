@@ -1,0 +1,765 @@
+import { createTestLogger } from "@langwatch/test-harness";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { z } from "zod";
+
+import type { Command, CommandHandler } from "../../../commands/command.ts";
+import type { CommandHandlerClass } from "../../../commands/commandHandlerClass.ts";
+import { defineCommandSchema } from "../../../commands/commandSchema.ts";
+import { sealCommandClass } from "../../../commands/sealedCommand.ts";
+import type { CommandType } from "../../../domain/commandType.ts";
+import type { Event } from "../../../domain/types.ts";
+import type { EventSourcedQueueProcessor } from "../../../queues/index.ts";
+import {
+  createTestAggregateType,
+  createTestTenantId,
+  TEST_CONSTANTS,
+  parseTestEvent,
+  createTestEvent,
+} from "../../__tests__/testHelpers.ts";
+import type { JobRegistryEntry } from "../queueManager.ts";
+import { QueueManager } from "../queueManager.ts";
+
+const payloadSchema = z.object({
+  tenantId: z.string(),
+  aggregateId: z.string(),
+  experimentId: z.string().optional(),
+  runId: z.string().optional(),
+  index: z.number().optional(),
+  occurredAt: z.number(),
+});
+
+function createMockCommandHandlerClass(name: string): CommandHandlerClass<any, CommandType, Event> {
+  class MockCommandHandler implements CommandHandler<Command<any, any>, Event> {
+    static readonly schema = defineCommandSchema(
+      `test.command.${name}` as CommandType,
+      payloadSchema,
+    );
+
+    static getAggregateId(payload: any): string {
+      return payload.aggregateId;
+    }
+
+    async handle(_command: Command<any, any>): Promise<Event[]> {
+      return [];
+    }
+  }
+
+  return MockCommandHandler as any;
+}
+
+function createMockCommandHandlerClassWithGroupKey(
+  name: string,
+): CommandHandlerClass<any, CommandType, Event> {
+  class MockCommandHandlerWithGroupKey implements CommandHandler<Command<any, any>, Event> {
+    static readonly schema = defineCommandSchema(
+      `test.command.${name}` as CommandType,
+      payloadSchema,
+    );
+
+    static getAggregateId(payload: any): string {
+      return payload.aggregateId;
+    }
+
+    static getGroupKey(payload: any): string {
+      return `${payload.experimentId}:${payload.runId}:item:${payload.index}`;
+    }
+
+    async handle(_command: Command<any, any>): Promise<Event[]> {
+      return [];
+    }
+  }
+
+  return MockCommandHandlerWithGroupKey as any;
+}
+
+function createMockSharedQueue(): EventSourcedQueueProcessor<any> {
+  return {
+    send: vi.fn().mockResolvedValue(void 0),
+    sendBatch: vi.fn().mockResolvedValue(void 0),
+    close: vi.fn().mockResolvedValue(void 0),
+    waitUntilReady: vi.fn().mockResolvedValue(void 0),
+  };
+}
+
+describe("QueueManager.initializeCommandQueues with getGroupKey", () => {
+  const aggregateType = createTestAggregateType();
+  const tenantId = createTestTenantId();
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(TEST_CONSTANTS.BASE_TIMESTAMP);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+  });
+
+  describe("when getGroupKey is defined on the command class", () => {
+    it("uses the class-level getGroupKey for queue routing", () => {
+      const mockQueueProcessor = createMockSharedQueue();
+      const globalJobRegistry = new Map<string, JobRegistryEntry>();
+
+      const manager = new QueueManager({
+        parseEvent: parseTestEvent,
+        aggregateType,
+        pipelineName: "test-pipeline",
+        globalQueue: mockQueueProcessor,
+        globalJobRegistry,
+      });
+
+      manager.initializeCommandQueues(
+        [
+          sealCommandClass({
+            name: "recordResult",
+            handlerClass: createMockCommandHandlerClassWithGroupKey("recordResult"),
+          }),
+        ],
+        vi.fn(),
+        "test-pipeline",
+      );
+
+      const entry = globalJobRegistry.get("test-pipeline:command:recordResult");
+      expect(entry?.route).toBeDefined();
+
+      const payload = {
+        tenantId: String(tenantId),
+        aggregateId: "exp1:run1",
+        experimentId: "exp1",
+        runId: "run1",
+        index: 42,
+        occurredAt: 1000,
+      };
+
+      const groupKey = entry?.route(payload).groupKey;
+      expect(groupKey).toBe(`${tenantId}/command/recordResult/${aggregateType}:exp1:run1:item:42`);
+    });
+  });
+
+  describe("when getGroupKey is not defined", () => {
+    it("falls back to getAggregateId for queue routing", () => {
+      const mockQueueProcessor = createMockSharedQueue();
+      const globalJobRegistry = new Map<string, JobRegistryEntry>();
+
+      const manager = new QueueManager({
+        parseEvent: parseTestEvent,
+        aggregateType,
+        pipelineName: "test-pipeline",
+        globalQueue: mockQueueProcessor,
+        globalJobRegistry,
+      });
+
+      manager.initializeCommandQueues(
+        [
+          sealCommandClass({
+            name: "startRun",
+            handlerClass: createMockCommandHandlerClass("startRun"),
+          }),
+        ],
+        vi.fn(),
+        "test-pipeline",
+      );
+
+      const entry = globalJobRegistry.get("test-pipeline:command:startRun");
+      expect(entry?.route).toBeDefined();
+
+      const payload = {
+        tenantId: String(tenantId),
+        aggregateId: "exp1:run1",
+        occurredAt: 1000,
+      };
+
+      const groupKey = entry?.route(payload).groupKey;
+      expect(groupKey).toBe(`${tenantId}/command/startRun/${aggregateType}:exp1:run1`);
+    });
+  });
+
+  describe("when getGroupKey is provided via options", () => {
+    it("prefers options getGroupKey over class-level getGroupKey", () => {
+      const mockQueueProcessor = createMockSharedQueue();
+      const globalJobRegistry = new Map<string, JobRegistryEntry>();
+
+      const manager = new QueueManager({
+        parseEvent: parseTestEvent,
+        aggregateType,
+        pipelineName: "test-pipeline",
+        globalQueue: mockQueueProcessor,
+        globalJobRegistry,
+      });
+
+      const optionsGroupKey = (payload: any) => `custom:${payload.aggregateId}`;
+
+      manager.initializeCommandQueues(
+        [
+          sealCommandClass({
+            name: "recordResult",
+            handlerClass: createMockCommandHandlerClassWithGroupKey("recordResult"),
+            options: { getGroupKey: optionsGroupKey },
+          }),
+        ],
+        vi.fn(),
+        "test-pipeline",
+      );
+
+      const entry = globalJobRegistry.get("test-pipeline:command:recordResult");
+
+      const payload = {
+        tenantId: String(tenantId),
+        aggregateId: "exp1:run1",
+        experimentId: "exp1",
+        runId: "run1",
+        index: 42,
+        occurredAt: 1000,
+      };
+
+      const groupKey = entry?.route(payload).groupKey;
+      expect(groupKey).toBe(`${tenantId}/command/recordResult/${aggregateType}:custom:exp1:run1`);
+    });
+  });
+});
+
+describe("QueueManager migration preflight targets", () => {
+  const aggregateType = createTestAggregateType();
+  const tenantId = createTestTenantId();
+
+  it("registers the complete default-routed pipeline before staging a command", async () => {
+    const queue = createMockSharedQueue();
+    queue.registerPreflightGroups = vi.fn().mockResolvedValue(void 0);
+    const registry = new Map<string, JobRegistryEntry>();
+    const manager = new QueueManager({
+      parseEvent: parseTestEvent,
+      aggregateType,
+      pipelineName: "test-pipeline",
+      globalQueue: queue,
+      globalJobRegistry: registry,
+    });
+    manager.initializeHandlerQueues(
+      {
+        writer: {
+          name: "writer",
+          handler: { handle: vi.fn() },
+          options: {},
+        },
+      },
+      vi.fn(),
+    );
+    manager.initializeProjectionQueues({
+      projections: { state: { name: "state" } },
+      onEvent: vi.fn(),
+      lane: {
+        queueType: "projection",
+        jobPath: "fold",
+      },
+    });
+    manager.initializeProjectionSubscriberQueues(
+      {
+        effect: {
+          name: "effect",
+          parentProjection: "state",
+          parentType: "fold",
+          handler: { handle: vi.fn() },
+        },
+      },
+      vi.fn(),
+    );
+    manager.initializeCommandQueues(
+      [
+        sealCommandClass({
+          name: "start",
+          handlerClass: createMockCommandHandlerClass("start"),
+        }),
+      ],
+      vi.fn(),
+      "test-pipeline",
+    );
+
+    const command = manager.getCommandQueue("start")!;
+    await command.send({
+      tenantId: String(tenantId),
+      aggregateId: "aggregate-1",
+      occurredAt: TEST_CONSTANTS.BASE_TIMESTAMP,
+    });
+
+    expect(queue.registerPreflightGroups).toHaveBeenCalledOnce();
+    const registered = vi.mocked(queue.registerPreflightGroups!).mock.calls[0]![0]();
+    expect(new Set(registered)).toEqual(
+      new Set([
+        `${tenantId}/map/writer/${aggregateType}:aggregate-1`,
+        `${tenantId}/fold/state/${aggregateType}:aggregate-1`,
+        `${tenantId}/fold/state/reactor/effect/${aggregateType}:aggregate-1`,
+        `${tenantId}/command/start/${aggregateType}:aggregate-1`,
+      ]),
+    );
+    expect(vi.mocked(queue.registerPreflightGroups!).mock.invocationCallOrder[0]).toBeLessThan(
+      vi.mocked(queue.send).mock.invocationCallOrder[0]!,
+    );
+  });
+
+  it("fails closed before staging when a pipeline has custom group routing", async () => {
+    const queue = createMockSharedQueue();
+    queue.registerPreflightGroups = vi.fn(async (resolveGroups) => {
+      const groups = resolveGroups();
+      if (groups.some((groupId: string | undefined) => !groupId)) {
+        throw new Error("custom routing cannot be pre-registered");
+      }
+    });
+    const manager = new QueueManager({
+      parseEvent: parseTestEvent,
+      aggregateType,
+      pipelineName: "test-pipeline",
+      globalQueue: queue,
+      globalJobRegistry: new Map(),
+    });
+    manager.initializeHandlerQueues(
+      {
+        custom: {
+          name: "custom",
+          handler: { handle: vi.fn() },
+          options: { groupKeyFn: () => "custom" },
+        },
+      },
+      vi.fn(),
+    );
+    manager.initializeCommandQueues(
+      [
+        sealCommandClass({
+          name: "start",
+          handlerClass: createMockCommandHandlerClass("start"),
+        }),
+      ],
+      vi.fn(),
+      "test-pipeline",
+    );
+
+    await expect(
+      manager.getCommandQueue("start")!.send({
+        tenantId: String(tenantId),
+        aggregateId: "aggregate-1",
+        occurredAt: TEST_CONSTANTS.BASE_TIMESTAMP,
+      }),
+    ).rejects.toThrow("custom routing cannot be pre-registered");
+    expect(queue.send).not.toHaveBeenCalled();
+  });
+});
+
+const UNCOALESCED_PRODUCER_MESSAGE =
+  "grouped command producer registered without append coalescing";
+
+// ADR-066 pillar 2 — append coalescing wiring + the un-coalesced-producer
+// visibility record. See packages/eventing/specs/producer-append-coalescing.feature.
+describe("QueueManager.initializeCommandQueues append coalescing", () => {
+  const aggregateType = createTestAggregateType();
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(TEST_CONSTANTS.BASE_TIMESTAMP);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+  });
+
+  function buildManager() {
+    const globalJobRegistry = new Map<string, JobRegistryEntry>();
+    const { logger, lines } = createTestLogger();
+    const manager = new QueueManager({
+      parseEvent: parseTestEvent,
+      aggregateType,
+      pipelineName: "test-pipeline",
+      globalQueue: createMockSharedQueue(),
+      globalJobRegistry,
+      logger,
+    });
+    return { manager, globalJobRegistry, lines };
+  }
+
+  describe("given a command that opts into coalescing", () => {
+    describe("when the command queue is initialized", () => {
+      it("wires coalesceMaxBatch, coalesceMaxBytes, and processBatch onto the registry entry", () => {
+        const { manager, globalJobRegistry } = buildManager();
+
+        manager.initializeCommandQueues(
+          [
+            sealCommandClass({
+              name: "hot",
+              handlerClass: createMockCommandHandlerClass("hot"),
+              options: {
+                serializeByAggregate: true,
+                coalesceMaxBatch: 200,
+                coalesceMaxBytes: 1024,
+              },
+            }),
+          ],
+          vi.fn(),
+          "test-pipeline",
+        );
+
+        const entry = globalJobRegistry.get("test-pipeline:command:hot");
+        expect(
+          entry?.route({ tenantId: "tenant-1", aggregateId: "aggregate-1", occurredAt: 1 })
+            .coalesceMaxBatch,
+        ).toBe(200);
+        expect(entry?.coalesceMaxBytes).toBe(1024);
+        expect(entry?.readBatch).toBeDefined();
+      });
+    });
+  });
+
+  describe("given a command that does not coalesce", () => {
+    describe("when the command queue is initialized", () => {
+      it("leaves processBatch and the coalesce bounds unset", () => {
+        const { manager, globalJobRegistry } = buildManager();
+
+        manager.initializeCommandQueues(
+          [
+            sealCommandClass({
+              name: "cold",
+              handlerClass: createMockCommandHandlerClass("cold"),
+              options: { serializeByAggregate: true },
+            }),
+          ],
+          vi.fn(),
+          "test-pipeline",
+        );
+
+        const entry = globalJobRegistry.get("test-pipeline:command:cold");
+        expect(entry?.readBatch).toBeUndefined();
+        expect(
+          entry?.route({ tenantId: "tenant-1", aggregateId: "aggregate-1", occurredAt: 1 })
+            .coalesceMaxBatch,
+        ).toBe(1);
+      });
+    });
+  });
+
+  describe("given a serialized producer registered without coalescing", () => {
+    describe("when the command queue is initialized", () => {
+      /** @scenario 'an un-coalesced producer that declares its grouping is visible, not silent' */
+      it("emits a record naming the producer and its pipeline", () => {
+        const { manager, lines } = buildManager();
+
+        manager.initializeCommandQueues(
+          [
+            sealCommandClass({
+              name: "cold",
+              handlerClass: createMockCommandHandlerClass("cold"),
+              options: { serializeByAggregate: true },
+            }),
+          ],
+          vi.fn(),
+          "test-pipeline",
+        );
+
+        expect(lines.findLine("info", UNCOALESCED_PRODUCER_MESSAGE)).toMatchObject({
+          pipeline: "test-pipeline",
+          command: "cold",
+        });
+      });
+    });
+  });
+
+  describe("given a serialized producer that DOES coalesce", () => {
+    describe("when the command queue is initialized", () => {
+      it("does not emit the un-coalesced visibility record", () => {
+        const { manager, lines } = buildManager();
+
+        manager.initializeCommandQueues(
+          [
+            sealCommandClass({
+              name: "hot",
+              handlerClass: createMockCommandHandlerClass("hot"),
+              options: { serializeByAggregate: true, coalesceMaxBatch: 200 },
+            }),
+          ],
+          vi.fn(),
+          "test-pipeline",
+        );
+
+        expect(lines.findLine("info", UNCOALESCED_PRODUCER_MESSAGE)).toBeUndefined();
+      });
+    });
+  });
+
+  // A shard/bucket group key funnels many aggregates into one consumer just as
+  // serializeByAggregate funnels many commands into one aggregate — the same
+  // producer shape, so the same gap has to be visible.
+  describe("given a group-keyed producer registered without coalescing", () => {
+    describe("when the group key comes from the command class", () => {
+      /** @scenario 'an un-coalesced producer that declares its grouping is visible, not silent' */
+      it("emits a record naming the producer and its pipeline", () => {
+        const { manager, lines } = buildManager();
+
+        manager.initializeCommandQueues(
+          [
+            sealCommandClass({
+              name: "sharded",
+              handlerClass: createMockCommandHandlerClassWithGroupKey("sharded"),
+            }),
+          ],
+          vi.fn(),
+          "test-pipeline",
+        );
+
+        expect(lines.findLine("info", UNCOALESCED_PRODUCER_MESSAGE)).toMatchObject({
+          pipeline: "test-pipeline",
+          command: "sharded",
+        });
+      });
+    });
+
+    describe("when the group key comes from the registration options", () => {
+      /** @scenario 'an un-coalesced producer that declares its grouping is visible, not silent' */
+      it("emits a record naming the producer and its pipeline", () => {
+        const { manager, lines } = buildManager();
+
+        manager.initializeCommandQueues(
+          [
+            sealCommandClass({
+              name: "sharded",
+              handlerClass: createMockCommandHandlerClass("sharded"),
+              options: {
+                getGroupKey: (payload: any) => `shard:${payload.index}`,
+              },
+            }),
+          ],
+          vi.fn(),
+          "test-pipeline",
+        );
+
+        expect(lines.findLine("info", UNCOALESCED_PRODUCER_MESSAGE)).toMatchObject({
+          pipeline: "test-pipeline",
+          command: "sharded",
+        });
+      });
+    });
+  });
+
+  describe("given a group-keyed producer that DOES coalesce", () => {
+    describe("when the command queue is initialized", () => {
+      it("does not emit the un-coalesced visibility record", () => {
+        const { manager, lines } = buildManager();
+
+        manager.initializeCommandQueues(
+          [
+            sealCommandClass({
+              name: "sharded",
+              handlerClass: createMockCommandHandlerClassWithGroupKey("sharded"),
+              options: { coalesceMaxBatch: 256 },
+            }),
+          ],
+          vi.fn(),
+          "test-pipeline",
+        );
+
+        expect(lines.findLine("info", UNCOALESCED_PRODUCER_MESSAGE)).toBeUndefined();
+      });
+    });
+  });
+
+  describe("given a producer keyed only by its own aggregate", () => {
+    describe("when the command queue is initialized", () => {
+      it("stays silent — one aggregate per job is not a funnel", () => {
+        const { manager, lines } = buildManager();
+
+        manager.initializeCommandQueues(
+          [
+            sealCommandClass({
+              name: "perAggregate",
+              handlerClass: createMockCommandHandlerClass("perAggregate"),
+            }),
+          ],
+          vi.fn(),
+          "test-pipeline",
+        );
+
+        expect(lines.findLine("info", UNCOALESCED_PRODUCER_MESSAGE)).toBeUndefined();
+      });
+    });
+  });
+
+  // A producer whose foldability depends on the individual job supplies a
+  // resolver instead of a constant. Its presence is the opt-in — the value is
+  // only known at dispatch, so registration cannot compare it against 1.
+  describe("given a command whose coalescing bound is resolved per payload", () => {
+    describe("when the command queue is initialized", () => {
+      it("wires processBatch and carries the resolver onto the registry entry", () => {
+        const { manager, globalJobRegistry } = buildManager();
+        const bound = (payload: any) => (payload.oversized ? 1 : 64);
+
+        manager.initializeCommandQueues(
+          [
+            sealCommandClass({
+              name: "hot",
+              handlerClass: createMockCommandHandlerClass("hot"),
+              options: { serializeByAggregate: true, coalesceMaxBatch: bound },
+            }),
+          ],
+          vi.fn(),
+          "test-pipeline",
+        );
+
+        const entry = globalJobRegistry.get("test-pipeline:command:hot");
+        expect(entry?.readBatch).toBeDefined();
+        expect(
+          entry?.route({ tenantId: "tenant-1", aggregateId: "aggregate-1", occurredAt: 1 })
+            .coalesceMaxBatch,
+        ).toBe(64);
+      });
+
+      it("does not emit the un-coalesced visibility record", () => {
+        const { manager, lines } = buildManager();
+
+        manager.initializeCommandQueues(
+          [
+            sealCommandClass({
+              name: "hot",
+              handlerClass: createMockCommandHandlerClass("hot"),
+              options: {
+                serializeByAggregate: true,
+                coalesceMaxBatch: () => 64,
+              },
+            }),
+          ],
+          vi.fn(),
+          "test-pipeline",
+        );
+
+        expect(lines.findLine("info", UNCOALESCED_PRODUCER_MESSAGE)).toBeUndefined();
+      });
+
+      // recordSpan's own shape: sharded onto a group key, and folding only the
+      // payloads it can weigh honestly.
+      it("stays silent for a group-keyed producer too", () => {
+        const { manager, lines } = buildManager();
+
+        manager.initializeCommandQueues(
+          [
+            sealCommandClass({
+              name: "sharded",
+              handlerClass: createMockCommandHandlerClassWithGroupKey("sharded"),
+              options: { coalesceMaxBatch: (p: any) => (p.oversized ? 1 : 64) },
+            }),
+          ],
+          vi.fn(),
+          "test-pipeline",
+        );
+
+        expect(lines.findLine("info", UNCOALESCED_PRODUCER_MESSAGE)).toBeUndefined();
+      });
+    });
+  });
+
+  describe("given a command whose coalescing bound is exactly one", () => {
+    describe("when the command queue is initialized", () => {
+      it("leaves processBatch unset so the per-job path is unchanged", () => {
+        const { manager, globalJobRegistry } = buildManager();
+
+        manager.initializeCommandQueues(
+          [
+            sealCommandClass({
+              name: "cold",
+              handlerClass: createMockCommandHandlerClass("cold"),
+              options: { serializeByAggregate: true, coalesceMaxBatch: 1 },
+            }),
+          ],
+          vi.fn(),
+          "test-pipeline",
+        );
+
+        expect(globalJobRegistry.get("test-pipeline:command:cold")?.readBatch).toBeUndefined();
+      });
+    });
+  });
+});
+
+describe("QueueManager.initializeHandlerQueues with groupKeyFn", () => {
+  const aggregateType = createTestAggregateType();
+  const tenantId = createTestTenantId();
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(TEST_CONSTANTS.BASE_TIMESTAMP);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+  });
+
+  describe("when groupKeyFn is provided in handler options", () => {
+    it("uses the custom groupKeyFn with tenantId prefix", () => {
+      const mockQueueProcessor = createMockSharedQueue();
+      const globalJobRegistry = new Map<string, JobRegistryEntry>();
+
+      const manager = new QueueManager({
+        parseEvent: parseTestEvent,
+        aggregateType,
+        pipelineName: "test-pipeline",
+        globalQueue: mockQueueProcessor,
+        globalJobRegistry,
+      });
+
+      const customGroupKeyFn = (event: Event) =>
+        `result:${(event.data as any).runId}:item:${(event.data as any).index}`;
+
+      const handlers = {
+        resultStorage: {
+          name: "resultStorage",
+          handler: { handle: vi.fn().mockResolvedValue(void 0) },
+          options: {
+            eventTypes: ["target_result"] as readonly string[],
+            groupKeyFn: customGroupKeyFn,
+          },
+        },
+      };
+
+      manager.initializeHandlerQueues(handlers, vi.fn());
+
+      const entry = globalJobRegistry.get("test-pipeline:handler:resultStorage");
+      expect(entry?.route).toBeDefined();
+
+      const event = {
+        ...createTestEvent("exp1:run1", aggregateType, tenantId),
+        data: { runId: "run1", index: 5 },
+      };
+
+      const groupKey = entry?.route(event).groupKey;
+      expect(groupKey).toBe(`${tenantId}/map/resultStorage/result:run1:item:5`);
+    });
+  });
+
+  describe("when groupKeyFn is not provided in handler options", () => {
+    it("uses default aggregate-based group key", () => {
+      const mockQueueProcessor = createMockSharedQueue();
+      const globalJobRegistry = new Map<string, JobRegistryEntry>();
+
+      const manager = new QueueManager({
+        parseEvent: parseTestEvent,
+        aggregateType,
+        pipelineName: "test-pipeline",
+        globalQueue: mockQueueProcessor,
+        globalJobRegistry,
+      });
+
+      const handlers = {
+        resultStorage: {
+          name: "resultStorage",
+          handler: { handle: vi.fn().mockResolvedValue(void 0) },
+          options: {
+            eventTypes: ["target_result"] as readonly string[],
+          },
+        },
+      };
+
+      manager.initializeHandlerQueues(handlers, vi.fn());
+
+      const entry = globalJobRegistry.get("test-pipeline:handler:resultStorage");
+
+      const event = createTestEvent("exp1:run1", aggregateType, tenantId);
+
+      const groupKey = entry?.route(event).groupKey;
+      expect(groupKey).toBe(`${tenantId}/map/resultStorage/${aggregateType}:exp1:run1`);
+    });
+  });
+});

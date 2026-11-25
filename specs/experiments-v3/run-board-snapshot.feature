@@ -48,6 +48,28 @@ Feature: A run carries a snapshot of the board
     When I run one row
     Then the run carries the other row's cells
 
+  # The board's cells answer the saved dataset's rows. A run over rows sent in
+  # the request, another dataset or other parameters is answering different
+  # questions, so a board cell copied into it would sit on the wrong row.
+
+  @unit
+  Scenario: A run of rows sent in the request carries nothing from the board
+    Given a board with two rows that both have results
+    When the run API runs one row of rows sent in the request
+    Then the run carries no cells from the board
+
+  @unit
+  Scenario: A run of another dataset carries nothing from the board
+    Given a board with two rows that both have results
+    When the run API runs one row of a dataset other than the saved one
+    Then the run carries no cells from the board
+
+  @unit
+  Scenario: A run with its own parameters carries nothing from the board
+    Given a board with two rows that both have results
+    When the run API runs one row with parameters of its own
+    Then the run carries no cells from the board
+
   @unit
   Scenario: A cell with nothing on the board is not carried
     Given a board with a column that has results for the first row only
@@ -59,6 +81,42 @@ Feature: A run carries a snapshot of the board
     Given a board with no results at all
     When I run one column
     Then the run carries no cells from the board
+
+  # An evaluator rerun reuses the cell's output instead of producing it, so the
+  # run carries that output and drops only the verdict it is about to replace.
+
+  @unit
+  Scenario: Rerunning one cell's evaluator carries that cell's output
+    Given a board with two columns that both have results
+    When I rerun one evaluator on the first row of one column
+    Then the run carries that cell's output, cost and trace
+    And it carries no verdict of the evaluator being rerun for that cell
+
+  @unit
+  Scenario: Rerunning an evaluator without a saved output leaves that cell to the run
+    Given a board with two columns that both have results
+    When I rerun one evaluator on a cell whose output is not reused
+    Then the run does not carry that cell, because the target answers it again
+    And it still carries the other rows of that column
+
+  @unit
+  Scenario: Running an evaluator on all rows carries every row's output
+    Given a board with two columns that both have results
+    When I run one evaluator on all rows of one column
+    Then the run carries every row's output of that column
+    And it carries no verdict of that evaluator for that column
+
+  @unit
+  Scenario: A verdict of an evaluator no longer on the workbench is not carried
+    Given a board holding a verdict of an evaluator that was removed from the workbench
+    When I run one column
+    Then the removed evaluator's verdict is not carried
+
+  @unit
+  Scenario: A carried cell keeps its carried mark when it is recorded
+    Given a run that carries a board cell with a verdict
+    When the carried target result and verdict are recorded
+    Then both are recorded as carried over, so neither is streamed to the page
 
   # ==========================================================================
   # A carried cell cost nothing and took no time in this run
@@ -160,13 +218,13 @@ Feature: A run carries a snapshot of the board
   # What the run reports it spent
   # ==========================================================================
 
-  @unit
+  @integration
   Scenario: The run's cost summary leaves carried rows out
     Given a run whose items include carried rows and rows it produced
     When the run's cost and duration summary is read
     Then only the rows the run produced are counted
 
-  @unit
+  @integration
   Scenario: The run's evaluator breakdown keeps carried rows
     Given a run whose items include carried verdicts
     When the run's per-evaluator breakdown is read

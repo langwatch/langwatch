@@ -1,14 +1,12 @@
 /**
- * The `question` tool: Langy asks the user mid-turn and keeps the turn.
- *
- * The tool posts the question as a user wait, then long-polls it. The app
- * writes the durable event and the live entry the panel renders as a choices
- * card (ADR-060 §6). The answer comes back as the tool result, so Langy
- * continues the same turn with the plan it had.
+ * The `question` tool: Langy asks the user mid-turn and keeps the turn. It
+ * posts the question as a user wait, then long-polls it; the answer comes
+ * back as the tool result (ADR-060 §6).
  */
 
-import { Type } from "typebox";
 import type { ExtensionAPI, InlineExtension } from "@earendil-works/pi-coding-agent";
+import { Type } from "typebox";
+
 import {
   AppUnreachableError,
   callApp,
@@ -32,13 +30,9 @@ const POLL_RETRY_DELAY_MS = 1_000;
 const MAX_POLL_FAILURES = 3;
 
 /**
- * The longest the tool waits for an answer.
- *
- * It is the app's own question budget (`QUESTION_WAIT_BUDGET_MS` in
- * `platform/app/src/server/langy-local-control/constants.ts`). The app expires
- * the card and answers `expired` first; this is the net under it, so a worker
- * that cannot reach the app still ends its turn at the same minute the card
- * on screen stops waiting.
+ * The longest the tool waits for an answer: the app's own question budget.
+ * The app expires the card first; this is the net under it, so a worker
+ * that cannot reach the app still ends its turn on the same minute.
  */
 export const WAIT_MAX_MS = 10 * 60 * 1000;
 
@@ -64,12 +58,18 @@ type PollWaitResponse = {
 
 function sleep(ms: number, signal: AbortSignal | undefined): Promise<void> {
   return new Promise((resolve) => {
-    const timer = setTimeout(resolve, ms);
+    let settled = false;
+    const settle = () => {
+      if (settled) return;
+      settled = true;
+      resolve();
+    };
+    const timer = setTimeout(settle, ms);
     signal?.addEventListener(
       "abort",
       () => {
         clearTimeout(timer);
-        resolve();
+        settle();
       },
       { once: true },
     );
@@ -99,12 +99,9 @@ function foldLabel(text: string): string {
 }
 
 /**
- * The question text without the option labels written out at its end. The
- * card draws the options as buttons under the text, so a text that ends with
- * the same labels as a numbered, bulleted or bare list reads them twice; the
- * line that introduced the list ("Options, in this order:") goes with them.
- * Labels mid-text are left alone, and so is a text that is nothing but the
- * labels.
+ * The question text without the option labels written out at its end,
+ * since the card already draws them as buttons. Labels mid-text are left
+ * alone, and so is a text that is nothing but the labels.
  */
 export function dropRepeatedOptions(question: string, labels: readonly string[]): string {
   const folded = new Set(labels.map(foldLabel).filter((label) => label.length > 0));
@@ -140,7 +137,9 @@ export function withoutRepeatedOptions(questions: unknown): unknown {
     if (typeof question !== "string" || !Array.isArray(options)) return entry;
     const labels = options
       .map((option) =>
-        typeof option === "object" && option !== null ? (option as { label?: unknown }).label : undefined,
+        typeof option === "object" && option !== null
+          ? (option as { label?: unknown }).label
+          : undefined,
       )
       .filter((label): label is string => typeof label === "string");
     return { ...entry, question: dropRepeatedOptions(question, labels) };
@@ -187,33 +186,62 @@ export async function askQuestions({
     timeoutMs: REQUEST_TIMEOUT_MS,
   });
 
+  return waitForAnswer({ waitId: started.waitId, startedAt, signal, now });
+}
+
+/** One poll of a wait, retried on failure up to MAX_POLL_FAILURES, until it settles. */
+async function pollOnce({
+  waitId,
+  signal,
+  failures,
+}: {
+  waitId: string;
+  signal: AbortSignal | undefined;
+  failures: number;
+}): Promise<{ poll?: PollWaitResponse; failures: number }> {
+  try {
+    const poll = await callApp<PollWaitResponse>({
+      path: `/api/langy/waits/${encodeURIComponent(waitId)}`,
+      method: "GET",
+      signal,
+      timeoutMs: POLL_REQUEST_TIMEOUT_MS,
+    });
+    return { poll, failures: 0 };
+  } catch (error) {
+    if (error instanceof CallCancelledError || signal?.aborted) {
+      throw new CallCancelledError(CANCELLED_PUSHBACK);
+    }
+    const nextFailures = failures + 1;
+    if (nextFailures >= MAX_POLL_FAILURES) throw error;
+    await sleep(POLL_RETRY_DELAY_MS, signal);
+    return { failures: nextFailures };
+  }
+}
+
+/** Polls a wait until it answers, expires, is cancelled, or the tool's own budget runs out. */
+async function waitForAnswer({
+  waitId,
+  startedAt,
+  signal,
+  now,
+}: {
+  waitId: string;
+  startedAt: number;
+  signal: AbortSignal | undefined;
+  now: () => number;
+}): Promise<string> {
   let failures = 0;
   for (;;) {
     if (signal?.aborted) throw new CallCancelledError(CANCELLED_PUSHBACK);
     if (now() - startedAt > WAIT_MAX_MS) return NO_ANSWER_PUSHBACK;
 
-    let poll: PollWaitResponse;
-    try {
-      poll = await callApp<PollWaitResponse>({
-        path: `/api/langy/waits/${encodeURIComponent(started.waitId)}`,
-        method: "GET",
-        signal,
-        timeoutMs: POLL_REQUEST_TIMEOUT_MS,
-      });
-    } catch (error) {
-      if (error instanceof CallCancelledError || signal?.aborted) {
-        throw new CallCancelledError(CANCELLED_PUSHBACK);
-      }
-      failures += 1;
-      if (failures >= MAX_POLL_FAILURES) throw error;
-      await sleep(POLL_RETRY_DELAY_MS, signal);
-      continue;
-    }
-    failures = 0;
+    const result = await pollOnce({ waitId, signal, failures });
+    failures = result.failures;
+    if (!result.poll) continue;
 
-    if (poll.state === "pending") continue;
-    if (poll.state === "answered") return renderAnswers(poll.answers ?? []);
-    if (poll.state === "cancelled") throw new CallCancelledError(CANCELLED_PUSHBACK);
+    if (result.poll.state === "pending") continue;
+    if (result.poll.state === "answered") return renderAnswers(result.poll.answers ?? []);
+    if (result.poll.state === "cancelled") throw new CallCancelledError(CANCELLED_PUSHBACK);
     return NO_ANSWER_PUSHBACK;
   }
 }
@@ -283,9 +311,7 @@ export function createQuestionExtension({
           } catch (error) {
             if (error instanceof AppUnreachableError) {
               return {
-                content: [
-                  { type: "text" as const, text: QUESTION_UNAVAILABLE_PUSHBACK },
-                ],
+                content: [{ type: "text" as const, text: QUESTION_UNAVAILABLE_PUSHBACK }],
                 details: {},
               };
             }

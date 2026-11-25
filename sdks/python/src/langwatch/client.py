@@ -13,6 +13,7 @@ from opentelemetry import trace
 from opentelemetry.instrumentation.instrumentor import BaseInstrumentor
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.resources import Resource
+from opentelemetry.exporter.otlp.proto.http import Compression
 from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
 from opentelemetry.sdk.trace.sampling import TraceIdRatioBased, ALWAYS_OFF
 from opentelemetry.sdk.trace.export import SpanExporter, SpanExportResult
@@ -21,7 +22,7 @@ from opentelemetry.sdk.trace import ReadableSpan
 
 from .exporters.filterable_batch_span_exporter import FilterableBatchSpanProcessor
 from .types import LangWatchClientProtocol
-from .utils.auth import build_auth_headers
+from .utils.auth import build_request_headers
 
 from .generated.langwatch_rest_api_client import Client as LangWatchApiClient
 
@@ -29,6 +30,21 @@ import opentelemetry.trace
 from opentelemetry.util._once import Once
 
 logger: logging.Logger = logging.getLogger(__name__)
+
+
+def _default_otlp_compression() -> Compression | None:
+    """Gzip, unless an OTEL_EXPORTER_OTLP_*COMPRESSION variable is set.
+
+    An explicit argument beats the environment in the OTel exporter, so gzip
+    is passed only when neither variable is set; None defers to them.
+    """
+    for name in (
+        "OTEL_EXPORTER_OTLP_COMPRESSION",
+        "OTEL_EXPORTER_OTLP_TRACES_COMPRESSION",
+    ):
+        if os.getenv(name, "").strip():
+            return None
+    return Compression.Gzip
 
 
 def _skip_open_telemetry_setup_from_env() -> bool:
@@ -728,13 +744,10 @@ class Client(LangWatchClientProtocol):
         if not Client._api_key:
             raise ValueError("LangWatch API key is required but not provided")
 
-        headers = {
-            **build_auth_headers(
-                api_key=Client._api_key,
-                project_id=Client._project_id,
-            ),
-            "X-LangWatch-SDK-Version": str(__version__),
-        }
+        headers = build_request_headers(
+            api_key=Client._api_key,
+            project_id=Client._project_id,
+        )
 
         if Client._debug:
             # Nothing taken from the endpoint reaches this line. A URL can carry
@@ -750,6 +763,7 @@ class Client(LangWatchClientProtocol):
             endpoint=f"{Client._endpoint_url}/api/otel/v1/traces",
             headers=headers,
             timeout=int(os.getenv("OTEL_EXPORTER_OTLP_TRACES_TIMEOUT", 30)),
+            compression=_default_otlp_compression(),
         )
 
         # Wrap the exporter with conditional logic
@@ -773,7 +787,7 @@ class Client(LangWatchClientProtocol):
         """
         Sets up the REST API client for the client.
         """
-        headers = build_auth_headers(
+        headers = build_request_headers(
             api_key=Client._api_key,
             project_id=Client._project_id,
         )

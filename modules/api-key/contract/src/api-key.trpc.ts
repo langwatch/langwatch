@@ -1,0 +1,99 @@
+/**
+ * Every `apiKey.*` procedure, declared once: name, kind, input, output.
+ * The server binds a permission and handler to a name here; the browser
+ * reads the same names as types — the mounted namespace, never respelled.
+ */
+
+// `create`, `rotate` and `mintDocsSessionKey` are the only procedures that return a plaintext
+// token — once, at minting; every read hands back a five-character `lookupIdPrefix` and
+// nothing more. `nameById` answers null identically for an unknown id and one
+// in another organization, so it cannot enumerate. `orgProjects` / `orgTeams`
+// / `orgMembers` feed the pickers the drawers render.
+
+import { defineTrpcContract } from "@langwatch/module";
+import { z } from "zod";
+
+import {
+  apiKeyTrpcCreateInputSchema,
+  apiKeyTrpcGrantableInputSchema,
+  apiKeyTrpcNameByIdInputSchema,
+  apiKeyTrpcOrganizationScopeSchema,
+  apiKeyTrpcRevokeInputSchema,
+  apiKeyTrpcRotateInputSchema,
+  apiKeyTrpcUpdateInputSchema,
+} from "./api-key-trpc.schemas.ts";
+import {
+  apiKeyTrpcDocsSessionAvailabilityInputSchema,
+  apiKeyTrpcMintDocsSessionKeyInputSchema,
+  docsSessionAvailabilitySchema,
+  docsSessionKeyMintedSchema,
+} from "./api-key.docs-session.ts";
+import { apiKeyListEntrySchema, namedApiKeyBindingSchema } from "./api-key.list.ts";
+import {
+  apiKeyMintedSchema,
+  apiKeyNameSchema,
+  apiKeyProjectSchema,
+  apiKeyRevokedSchema,
+  apiKeyTeamSchema,
+  apiKeyUpdatedSchema,
+  apiKeyUserSchema,
+} from "./api-key.responses.ts";
+
+export const apiKeyTrpc = defineTrpcContract("apiKey")
+  .query("myBindings")
+  .withInput(apiKeyTrpcOrganizationScopeSchema)
+  .withOutput(namedApiKeyBindingSchema.array())
+
+  // What a restricted key's rows may offer: read off the same resolver the mint checks with.
+  .query("grantablePermissions")
+  .withInput(apiKeyTrpcGrantableInputSchema)
+  .withOutput(z.string().array())
+
+  .query("nameById")
+  .withInput(apiKeyTrpcNameByIdInputSchema)
+  .withOutput(apiKeyNameSchema.nullable())
+
+  .query("list")
+  .withInput(apiKeyTrpcOrganizationScopeSchema)
+  .withOutput(apiKeyListEntrySchema.array())
+
+  .mutation("create")
+  .withInput(apiKeyTrpcCreateInputSchema)
+  .withOutput(apiKeyMintedSchema)
+
+  .mutation("update")
+  .withInput(apiKeyTrpcUpdateInputSchema)
+  .withOutput(apiKeyUpdatedSchema)
+
+  .mutation("revoke")
+  .withInput(apiKeyTrpcRevokeInputSchema)
+  .withOutput(apiKeyRevokedSchema)
+
+  // Swaps the key's secret and answers the new token once; the old secret stops at once.
+  .mutation("rotate")
+  .withInput(apiKeyTrpcRotateInputSchema)
+  .withOutput(apiKeyMintedSchema)
+
+  .query("orgProjects")
+  .withInput(apiKeyTrpcOrganizationScopeSchema)
+  .withOutput(apiKeyProjectSchema.array())
+
+  .query("orgTeams")
+  .withInput(apiKeyTrpcOrganizationScopeSchema)
+  .withOutput(apiKeyTeamSchema.array())
+
+  .query("orgMembers")
+  .withInput(apiKeyTrpcOrganizationScopeSchema)
+  .withOutput(apiKeyUserSchema.array())
+
+  // The docs consent page's Allow (ADR-185): the second place a plaintext token is answered.
+  .mutation("mintDocsSessionKey")
+  .withInput(apiKeyTrpcMintDocsSessionKeyInputSchema)
+  .withOutput(docsSessionKeyMintedSchema)
+
+  // Whether the project's organization lets the docs playground connect (ADR-185, 2026-11-13).
+  .query("docsSessionAvailability")
+  .withInput(apiKeyTrpcDocsSessionAvailabilityInputSchema)
+  .withOutput(docsSessionAvailabilitySchema)
+
+  .build();
