@@ -68,7 +68,6 @@ function isSameFirstSend(a: InstantEvalJudgeRoutePlan, b: InstantEvalJudgeRouteP
     [plan.primary, plan.pairWith].map((backend) => plan.fallbacks[backend ?? ""] ?? []);
   return (
     !a.gate &&
-    !b.gate &&
     a.primary === b.primary &&
     a.pairWith === b.pairWith &&
     a.inputView === b.inputView &&

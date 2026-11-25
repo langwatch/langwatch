@@ -92,7 +92,7 @@ function viewOf(text: string): string {
 }
 
 /** Which way the gate sends a question, and whether it had a score to go by. */
-export type InstantEvalJudgeGateBranch = Readonly<{ branch: "easy" | "hard"; hasScore: boolean }>;
+type InstantEvalJudgeGateBranch = Readonly<{ branch: "easy" | "hard"; hasScore: boolean }>;
 
 /**
  * Easy only on a score under the threshold. No readable score (the gate failed, timed out or
