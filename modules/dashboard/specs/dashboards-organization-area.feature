@@ -77,7 +77,7 @@ Feature: Organization-wide Dashboards area
     And I may create dashboards in "Shop"
     When I open "/shop/dashboards/curated/<id>"
     Then the board shows its widgets with no "Add a widget", no "Use this template", no title or description edit, and no widget edit, drag or delete
-    And no copy-on-change dialog can open
+    And it offers "Make a copy" (dashboards-v2.feature), and no copy-on-change dialog can open
     # Evidence: the quoted tRPC calls, with no dashboards or dashboardWidgets write
 
   # ---- The Coding agents rename: page titles (draft AC4; S0) ----

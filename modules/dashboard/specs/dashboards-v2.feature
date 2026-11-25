@@ -1560,7 +1560,7 @@ Feature: Dashboards v2 polish and bring-your-own-AI
     When the member opens /[project]/dashboards/curated/<template id>
     Then the template's widgets run over the project's data, badged "From LangWatch", and nothing is stored
     And it offers what an own board does: "Add a widget", the title and description to click, and on each widget a drag handle, "Edit code" and "Delete"
-    And its header offers "Use this template" and no "Duplicate to edit" button
+    And its header offers "Use this template" and no "Duplicate to edit" or "Make a copy" button
     And an unknown template id shows the not-found page
 
   @integration
@@ -1569,6 +1569,16 @@ Feature: Dashboards v2 polish and bring-your-own-AI
     When the member opens a From LangWatch board
     Then it has no "Add a widget" and no "Use this template", its title and description are plain text
     And each widget's menu holds only Export CSV, with no drag handle
+    And no "Make a copy" is offered; a quiet line says who can make their own copy
+
+  @integration
+  Scenario: From LangWatch: Make a copy, with the organization's Dashboards area off
+    Given "the organization's Dashboards area" is off and a member who may create dashboards
+    When the member opens a From LangWatch board
+    Then its header offers "Make a copy" and no "Add a widget" or "Use this template"
+    When the member presses "Make a copy"
+    Then a board named "<name> (copy)" is made for the project with the template's built widgets
+    And it opens, and nothing on the From LangWatch board is changed
 
   @unit @integration
   Scenario: From LangWatch: the first change asks before it makes the member's own copy

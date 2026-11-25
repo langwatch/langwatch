@@ -179,6 +179,7 @@ describe("given a member opens a From LangWatch board", () => {
       expect(screen.getByText("From LangWatch")).toBeInTheDocument();
       expect(screen.getByRole("button", { name: "Use this template" })).toBeInTheDocument();
       expect(screen.queryByRole("button", { name: "Duplicate to edit" })).toBeNull();
+      expect(screen.queryByRole("button", { name: "Make a copy" })).toBeNull();
       expect(screen.getByTitle("Edit name")).toBeInTheDocument();
       expect(screen.getByTitle("Edit description")).toBeInTheDocument();
       expect(screen.getAllByTitle("Drag to move")).toHaveLength(RELEASE.widgets.length);
@@ -202,6 +203,10 @@ describe("given a member opens a From LangWatch board", () => {
       expect(await screen.findByRole("heading", { name: "Ready to ship?" })).toBeInTheDocument();
       expect(screen.queryByRole("button", { name: "Add a widget" })).toBeNull();
       expect(screen.queryByRole("button", { name: "Use this template" })).toBeNull();
+      expect(screen.queryByRole("button", { name: "Make a copy" })).toBeNull();
+      expect(
+        screen.getByText("Members who can create dashboards can make their own copy to edit it."),
+      ).toBeInTheDocument();
       expect(screen.queryByTitle("Edit name")).toBeNull();
       expect(screen.queryByTitle("Edit description")).toBeNull();
       expect(screen.queryByTitle("Drag to move")).toBeNull();
@@ -224,6 +229,21 @@ describe("given a member opens a From LangWatch board", () => {
       expect(screen.queryByTitle("Edit description")).toBeNull();
       expect(screen.queryByTitle("Drag to move")).toBeNull();
       expect(server.calls.filter(({ path }) => WRITES.test(path))).toEqual([]);
+    });
+
+    /** @scenario "From LangWatch: Make a copy, with the organization's Dashboards area off" */
+    it("offers Make a copy, which makes the member's own copy and opens it", async () => {
+      const user = userEvent.setup({ pointerEventsCheck: 0 });
+      const { host, server } = openCurated({ templateId: "release", organizationArea: false });
+
+      await user.click(await screen.findByRole("button", { name: "Make a copy" }));
+
+      await waitFor(() => expect(host.navigations).toEqual(["/test-project/dashboards/board-1"]));
+      expect(inputsTo(server, "boards.create")).toEqual([
+        { projectId: "proj-1", name: "Ready to ship? (copy)" },
+      ]);
+      expect(inputsTo(server, "dashboardWidgets.create")).toHaveLength(RELEASE.widgets.length);
+      expect(screen.queryByRole("dialog")).toBeNull();
     });
   });
 
