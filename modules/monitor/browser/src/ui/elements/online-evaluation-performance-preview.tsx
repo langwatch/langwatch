@@ -3,7 +3,14 @@
  * evaluators, a label strip and the leading label for category evaluators.
  */
 
-import { Box, HStack, Skeleton, Text, VStack } from "@langwatch/design-system/primitives";
+import {
+  Box,
+  HStack,
+  Skeleton,
+  Text,
+  VisuallyHidden,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import type { LabelShare, OnlineEvaluationPerformance } from "@langwatch/evaluation-contract";
 
 type PerformanceRow = {
@@ -139,12 +146,13 @@ const LabelPreview = ({
   );
 };
 
-/** One strip, a segment per label sized by share; each names itself, as the column has no room for a legend. */
 const segmentName = (entry: LabelShare) => (entry.grouped ? "Other labels" : entry.label);
 
+/** One strip, a segment per label sized by share; the hidden list names them for screen readers. */
 const LabelDistribution = ({ labels, name }: { labels: LabelShare[]; name: string }) => (
   <HStack
-    role="group"
+    as="figure"
+    margin={0}
     aria-label={`Label distribution for ${name}`}
     width={`${CHART_WIDTH}px`}
     height={`${CHART_HEIGHT}px`}
@@ -155,8 +163,7 @@ const LabelDistribution = ({ labels, name }: { labels: LabelShare[]; name: strin
     {labels.map((entry, index) => (
       <Box
         key={`${entry.grouped ? "grouped" : "label"}:${entry.label}`}
-        role="img"
-        aria-label={`${segmentName(entry)}, ${percent(entry.share)}`}
+        aria-hidden="true"
         title={`${segmentName(entry)}: ${percent(entry.share)} (${entry.count})`}
         flexGrow={entry.share}
         flexBasis={0}
@@ -166,6 +173,13 @@ const LabelDistribution = ({ labels, name }: { labels: LabelShare[]; name: strin
         background={entry.grouped ? GROUPED_LABEL_COLOR : LABEL_COLORS[index % LABEL_COLORS.length]}
       />
     ))}
+    <VisuallyHidden as="ul">
+      {labels.map((entry) => (
+        <li key={`${entry.grouped ? "grouped" : "label"}:${entry.label}`}>
+          {`${segmentName(entry)}, ${percent(entry.share)}`}
+        </li>
+      ))}
+    </VisuallyHidden>
   </HStack>
 );
 

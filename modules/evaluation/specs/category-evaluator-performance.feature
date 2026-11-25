@@ -90,7 +90,7 @@ Feature: Category evaluators show their label distribution in the list
       Then every label in the distribution is named with its share
 
     @integration
-    Scenario: The row says how much of the period the leading label held when there is nothing to compare
+    Scenario: With nothing to compare, the row gives the leading label's share
       Given a row whose label distribution has no previous share
       When the online evaluations list is rendered
       Then the row says the leading label's share of the results

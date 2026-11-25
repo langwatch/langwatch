@@ -256,7 +256,7 @@ describe("<OnlineEvaluationsTable />", () => {
       renderTable(<OnlineEvaluationsTable {...defaultProps} rows={[categoryRow]} />);
 
       expect(
-        screen.getByRole("group", { name: "Label distribution for Conversation outcome" }),
+        screen.getByRole("figure", { name: "Label distribution for Conversation outcome" }),
       ).toBeInTheDocument();
       expect(screen.getByText("resolved")).toBeInTheDocument();
       expect(screen.getByText("60%, ↑ 12 pp")).toHaveAttribute("data-trend", "up");
@@ -267,9 +267,9 @@ describe("<OnlineEvaluationsTable />", () => {
     it("names every label with its share", () => {
       renderTable(<OnlineEvaluationsTable {...defaultProps} rows={[categoryRow]} />);
 
-      expect(screen.getByRole("img", { name: "resolved, 60%" })).toBeInTheDocument();
-      expect(screen.getByRole("img", { name: "escalated, 25%" })).toBeInTheDocument();
-      expect(screen.getByRole("img", { name: "abandoned, 15%" })).toBeInTheDocument();
+      expect(screen.getByText("resolved, 60%")).toBeInTheDocument();
+      expect(screen.getByText("escalated, 25%")).toBeInTheDocument();
+      expect(screen.getByText("abandoned, 15%")).toBeInTheDocument();
     });
 
     it("names the grouped tail apart from a label called Other", () => {
@@ -295,11 +295,11 @@ describe("<OnlineEvaluationsTable />", () => {
         />,
       );
 
-      expect(screen.getByRole("img", { name: "Other, 50%" })).toBeInTheDocument();
-      expect(screen.getByRole("img", { name: "Other labels, 50%" })).toBeInTheDocument();
+      expect(screen.getByText("Other, 50%")).toBeInTheDocument();
+      expect(screen.getByText("Other labels, 50%")).toBeInTheDocument();
     });
 
-    /** @scenario "The row says how much of the period the leading label held when there is nothing to compare" */
+    /** @scenario "With nothing to compare, the row gives the leading label's share" */
     it("says how much of the period the leading label held when there is nothing to compare", () => {
       renderTable(
         <OnlineEvaluationsTable
@@ -358,7 +358,7 @@ describe("<OnlineEvaluationsTable />", () => {
     expect(screen.getByText("0.86")).toBeInTheDocument();
     expect(screen.getByText("↑ 0.12")).toHaveAttribute("data-trend", "up");
     expect(
-      screen.queryByRole("group", { name: "Label distribution for Answer quality" }),
+      screen.queryByRole("figure", { name: "Label distribution for Answer quality" }),
     ).not.toBeInTheDocument();
   });
 });

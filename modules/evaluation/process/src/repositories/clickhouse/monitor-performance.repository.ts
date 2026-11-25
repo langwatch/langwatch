@@ -101,7 +101,7 @@ type ClickHouseMonitorPerformanceRow = {
   PassSum: string;
   PassCount: string;
   /** sumMap's answer: the labels seen and, in step, how often each was seen. */
-  LabelCounts: [string[], Array<number | string>];
+  LabelCounts: [string[], (number | string)[]];
 };
 
 /** Unlabelled results land under the empty key; that key is not a label. */

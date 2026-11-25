@@ -31,7 +31,7 @@ const toLabelShares = (counts: Map<string, number>): LabelShare[] => {
   const total = totalOf(counts);
   if (total === 0) return [];
 
-  const ordered = [...counts.entries()].sort(
+  const ordered = [...counts.entries()].toSorted(
     ([leftLabel, leftCount], [rightLabel, rightCount]) =>
       rightCount - leftCount || leftLabel.localeCompare(rightLabel),
   );
