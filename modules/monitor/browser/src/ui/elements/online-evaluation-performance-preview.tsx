@@ -140,6 +140,8 @@ const LabelPreview = ({
 };
 
 /** One strip, a segment per label sized by share; each names itself, as the column has no room for a legend. */
+const segmentName = (entry: LabelShare) => (entry.grouped ? "Other labels" : entry.label);
+
 const LabelDistribution = ({ labels, name }: { labels: LabelShare[]; name: string }) => (
   <HStack
     role="group"
@@ -154,8 +156,8 @@ const LabelDistribution = ({ labels, name }: { labels: LabelShare[]; name: strin
       <Box
         key={`${entry.grouped ? "grouped" : "label"}:${entry.label}`}
         role="img"
-        aria-label={`${entry.label}, ${percent(entry.share)}`}
-        title={`${entry.label}: ${percent(entry.share)} (${entry.count})`}
+        aria-label={`${segmentName(entry)}, ${percent(entry.share)}`}
+        title={`${segmentName(entry)}: ${percent(entry.share)} (${entry.count})`}
         flexGrow={entry.share}
         flexBasis={0}
         minWidth={0}

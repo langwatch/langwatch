@@ -109,12 +109,11 @@ const toLabelCounts = (
   counts: ClickHouseMonitorPerformanceRow["LabelCounts"] | undefined,
 ): Record<string, number> => {
   const [labels, occurrences] = counts ?? [[], []];
-  const byLabel: Record<string, number> = {};
-  labels.forEach((label, index) => {
-    if (label === "") return;
-    byLabel[label] = Number(occurrences[index] ?? 0);
-  });
-  return byLabel;
+  return Object.fromEntries(
+    labels.flatMap((label, index) =>
+      label === "" ? [] : [[label, Number(occurrences[index] ?? 0)] as const],
+    ),
+  );
 };
 
 /** Private parity query for the online-evaluation performance chart. */

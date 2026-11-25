@@ -6,46 +6,18 @@
  * @see modules/monitor/specs/monitor-created-by.feature
  * @see modules/evaluation/specs/category-evaluator-performance.feature
  */
-import { DesignSystemProvider } from "@langwatch/design-system/provider";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import type { ReactNode } from "react";
+import type { ReactElement } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { MonitorHostApi, MonitorHostProvider } from "../../../model/monitor-host.ts";
+import { FakeMonitorHost, renderWithMonitorHost } from "../../../testing.tsx";
 import { type OnlineEvaluationRow, OnlineEvaluationsTable } from "../online-evaluations-table.tsx";
 
-const navigate = vi.fn();
+const HOST_OPTIONS = { scope: { projectId: "proj_1", projectSlug: "demo" }, timeZone: "UTC" };
 
-class TestMonitorHost extends MonitorHostApi {
-  scope() {
-    return { projectId: "proj_1", projectSlug: "demo" };
-  }
-  hasPermission() {
-    return true;
-  }
-  copyTargets() {
-    return [];
-  }
-  timeZone() {
-    return "UTC";
-  }
-  route() {
-    return { params: {}, query: {} };
-  }
-  navigate(to: string) {
-    navigate(to);
-  }
-  openOverlay() {}
-  succeeded() {}
-  failed() {}
-}
-
-const Wrapper = ({ children }: { children: ReactNode }) => (
-  <MonitorHostProvider value={new TestMonitorHost()}>
-    <DesignSystemProvider forcedTheme="light">{children}</DesignSystemProvider>
-  </MonitorHostProvider>
-);
+const renderTable = (element: ReactElement) =>
+  renderWithMonitorHost(element, new FakeMonitorHost(HOST_OPTIONS));
 
 const rows: OnlineEvaluationRow[] = [
   {
@@ -131,7 +103,7 @@ describe("<OnlineEvaluationsTable />", () => {
 
   /** @scenario Scan online evaluation performance in the configuration table */
   it("shows real score trends and an explicit no-data state", () => {
-    render(<OnlineEvaluationsTable {...defaultProps} />, { wrapper: Wrapper });
+    renderTable(<OnlineEvaluationsTable {...defaultProps} />);
 
     expect(screen.getByText("Answer quality")).toBeInTheDocument();
     expect(screen.getByText("Safety policy")).toBeInTheDocument();
@@ -149,7 +121,7 @@ describe("<OnlineEvaluationsTable />", () => {
   /** @scenario Open analytics for one online evaluation */
   it("links both the performance preview and row menu to filtered analytics", async () => {
     const user = userEvent.setup();
-    render(<OnlineEvaluationsTable {...defaultProps} />, { wrapper: Wrapper });
+    renderTable(<OnlineEvaluationsTable {...defaultProps} />);
 
     const analyticsHref = "/demo/analytics/evaluations?evaluationId=monitor-up";
     expect(
@@ -168,7 +140,7 @@ describe("<OnlineEvaluationsTable />", () => {
 
   it("navigates to analytics through the host, without a full page reload", async () => {
     const user = userEvent.setup();
-    render(<OnlineEvaluationsTable {...defaultProps} />, { wrapper: Wrapper });
+    const { host } = renderTable(<OnlineEvaluationsTable {...defaultProps} />);
 
     await user.click(
       screen.getByRole("link", {
@@ -176,15 +148,13 @@ describe("<OnlineEvaluationsTable />", () => {
       }),
     );
 
-    expect(navigate).toHaveBeenCalledWith("/demo/analytics/evaluations?evaluationId=monitor-up");
+    expect(host.navigations).toEqual(["/demo/analytics/evaluations?evaluationId=monitor-up"]);
   });
 
   it("keeps configuration actions available from the row menu", async () => {
     const user = userEvent.setup();
     const onEdit = vi.fn();
-    render(<OnlineEvaluationsTable {...defaultProps} onEdit={onEdit} />, {
-      wrapper: Wrapper,
-    });
+    renderTable(<OnlineEvaluationsTable {...defaultProps} onEdit={onEdit} />);
 
     await user.click(screen.getByRole("button", { name: "Actions for Safety policy" }));
     await user.click(await screen.findByRole("menuitem", { name: "Edit" }));
@@ -194,9 +164,8 @@ describe("<OnlineEvaluationsTable />", () => {
 
   /** @scenario A viewer without analytics access does not wait forever */
   it("shows a stable permission state without an empty action menu", () => {
-    render(
+    renderTable(
       <OnlineEvaluationsTable {...defaultProps} canManage={false} canViewAnalytics={false} />,
-      { wrapper: Wrapper },
     );
 
     expect(screen.getAllByText("Analytics access required")).toHaveLength(3);
@@ -209,12 +178,11 @@ describe("<OnlineEvaluationsTable />", () => {
   it("badges a monitor that paused itself, with the reason in its tooltip", async () => {
     const user = userEvent.setup();
     const reason = "95% of evaluations failed in the last hour (114 of 120)";
-    render(
+    renderTable(
       <OnlineEvaluationsTable
         {...defaultProps}
         rows={[{ ...rows[2]!, autoPausedReason: reason }, rows[1]!]}
       />,
-      { wrapper: Wrapper },
     );
 
     const badge = screen.getByTestId("monitor-auto-paused");
@@ -229,12 +197,11 @@ describe("<OnlineEvaluationsTable />", () => {
   });
 
   it("shows an explicit state when performance analytics cannot load", () => {
-    render(
+    renderTable(
       <OnlineEvaluationsTable
         {...defaultProps}
         rows={[{ ...rows[0]!, performance: undefined, hasPerformanceError: true }]}
       />,
-      { wrapper: Wrapper },
     );
 
     expect(screen.getByText("Performance unavailable")).toBeInTheDocument();
@@ -242,7 +209,7 @@ describe("<OnlineEvaluationsTable />", () => {
   });
 
   it("centers a flat performance trend", () => {
-    render(
+    renderTable(
       <OnlineEvaluationsTable
         {...defaultProps}
         rows={[
@@ -258,7 +225,6 @@ describe("<OnlineEvaluationsTable />", () => {
           },
         ]}
       />,
-      { wrapper: Wrapper },
     );
 
     expect(
@@ -270,7 +236,7 @@ describe("<OnlineEvaluationsTable />", () => {
 
   /** @scenario "The online evaluations list shows who created each monitor" */
   it("names the creator beside the check type when one was recorded", () => {
-    render(
+    renderTable(
       <OnlineEvaluationsTable
         {...defaultProps}
         rows={[
@@ -278,7 +244,6 @@ describe("<OnlineEvaluationsTable />", () => {
           { ...rows[1]!, createdByName: null },
         ]}
       />,
-      { wrapper: Wrapper },
     );
 
     expect(screen.getByTestId("monitor-row-monitor-up")).toHaveTextContent("Created by Ada");
@@ -288,9 +253,7 @@ describe("<OnlineEvaluationsTable />", () => {
   describe("when a monitor classifies instead of scoring", () => {
     /** @scenario "The row shows the labels instead of an empty state" */
     it("shows the label distribution and the leading label", () => {
-      render(<OnlineEvaluationsTable {...defaultProps} rows={[categoryRow]} />, {
-        wrapper: Wrapper,
-      });
+      renderTable(<OnlineEvaluationsTable {...defaultProps} rows={[categoryRow]} />);
 
       expect(
         screen.getByRole("group", { name: "Label distribution for Conversation outcome" }),
@@ -302,18 +265,43 @@ describe("<OnlineEvaluationsTable />", () => {
 
     /** @scenario "The distribution names every label it drew" */
     it("names every label with its share", () => {
-      render(<OnlineEvaluationsTable {...defaultProps} rows={[categoryRow]} />, {
-        wrapper: Wrapper,
-      });
+      renderTable(<OnlineEvaluationsTable {...defaultProps} rows={[categoryRow]} />);
 
       expect(screen.getByRole("img", { name: "resolved, 60%" })).toBeInTheDocument();
       expect(screen.getByRole("img", { name: "escalated, 25%" })).toBeInTheDocument();
       expect(screen.getByRole("img", { name: "abandoned, 15%" })).toBeInTheDocument();
     });
 
+    it("names the grouped tail apart from a label called Other", () => {
+      renderTable(
+        <OnlineEvaluationsTable
+          {...defaultProps}
+          rows={[
+            {
+              ...categoryRow,
+              performance: {
+                monitorId: "monitor-category",
+                metric: "label",
+                points: [],
+                labels: [
+                  { label: "Other", count: 5, share: 0.5, grouped: false },
+                  { label: "Other", count: 5, share: 0.5, grouped: true },
+                ],
+                current: 0.5,
+                previous: null,
+              },
+            },
+          ]}
+        />,
+      );
+
+      expect(screen.getByRole("img", { name: "Other, 50%" })).toBeInTheDocument();
+      expect(screen.getByRole("img", { name: "Other labels, 50%" })).toBeInTheDocument();
+    });
+
     /** @scenario "The row says how much of the period the leading label held when there is nothing to compare" */
     it("says how much of the period the leading label held when there is nothing to compare", () => {
-      render(
+      renderTable(
         <OnlineEvaluationsTable
           {...defaultProps}
           rows={[
@@ -330,7 +318,6 @@ describe("<OnlineEvaluationsTable />", () => {
             },
           ]}
         />,
-        { wrapper: Wrapper },
       );
 
       expect(screen.getByText("100% of results")).toBeInTheDocument();
@@ -338,7 +325,7 @@ describe("<OnlineEvaluationsTable />", () => {
 
     /** @scenario "A row with no results still says there is no data" */
     it("still says there is no data when the classifier produced none", () => {
-      render(
+      renderTable(
         <OnlineEvaluationsTable
           {...defaultProps}
           rows={[
@@ -355,7 +342,6 @@ describe("<OnlineEvaluationsTable />", () => {
             },
           ]}
         />,
-        { wrapper: Wrapper },
       );
 
       expect(screen.getByText("No data yet")).toHaveAttribute("data-trend", "neutral");
@@ -364,7 +350,7 @@ describe("<OnlineEvaluationsTable />", () => {
 
   /** @scenario "A scoring row is unchanged" */
   it("keeps showing a scoring monitor as a sparkline and a score", () => {
-    render(<OnlineEvaluationsTable {...defaultProps} rows={[rows[0]!]} />, { wrapper: Wrapper });
+    renderTable(<OnlineEvaluationsTable {...defaultProps} rows={[rows[0]!]} />);
 
     expect(
       screen.getByRole("figure", { name: "Performance trend for Answer quality" }),
