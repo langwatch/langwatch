@@ -69,7 +69,7 @@ Feature: Billing-only invite
     And they count in the member seats
 
   Scenario: Using a spent invitation link again writes nothing
-    Given a Billing-only invite already accepted, whose Billing an admin turned off
+    Given a Billing-only invite already accepted, whose Billing grant has since gone
     When the person uses the link again
     Then it is refused with invite_already_accepted
     And Billing stays off

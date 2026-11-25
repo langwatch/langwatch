@@ -241,4 +241,20 @@ describe("AuthzBillingRoleService", () => {
     ).rejects.toMatchObject({ code: "billing_only_keeps_billing" });
     expect(await service.listMembers({ organizationId: ORG })).toEqual([{ userId: MEMBER }]);
   });
+
+  /** @scenario "Billing cannot be taken from a Billing-only member" */
+  it("lets a revoke through for a Billing-only member whose grant is already gone", async () => {
+    addMember({ memory, userId: MEMBER, billingOnly: true });
+
+    await expect(
+      service.setRole({
+        organizationId: ORG,
+        userId: MEMBER,
+        holds: false,
+        caller: ADMIN,
+        actor: ADMIN,
+      }),
+    ).resolves.toBeUndefined();
+    expect(await service.listMembers({ organizationId: ORG })).toEqual([]);
+  });
 });
