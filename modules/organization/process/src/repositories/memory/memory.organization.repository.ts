@@ -33,6 +33,7 @@ import {
   type StoredOrganizationSettings,
   type OrganizationTeamProject,
   type OrganizationPresenceSettingRow,
+  type OrganizationActiveMemberPage,
   type OrganizationOperatorQuery,
   type OrganizationOperatorRow,
 } from "../organization.repository.ts";
@@ -111,6 +112,38 @@ export class MemoryOrganizationRepository extends OrganizationRepository {
       .toSorted((a, b) => (a.id < b.id ? -1 : 1))
       .slice(0, limit)
       .map((row) => ({ id: row.id, presenceEnabled: row.presenceEnabled }));
+  }
+
+  async findActiveMemberPage({
+    afterId,
+    limit,
+  }: {
+    afterId: string | null;
+    limit: number;
+  }): Promise<OrganizationActiveMemberPage> {
+    const ids = [...this.memory.organizations.keys()]
+      .filter((id) => afterId === null || id > afterId)
+      .toSorted()
+      .slice(0, limit);
+    // As the Postgres join: a membership with no user row is not listed.
+    const members = this.memory.organizationUsers
+      .filter((row) => ids.includes(row.organizationId) && row.disabledAt === null)
+      .filter((row) => {
+        const user = this.memory.users.get(row.userId);
+        return user !== undefined && user.deactivatedAt === null;
+      })
+      .toSorted((left, right) => {
+        if (left.organizationId !== right.organizationId) {
+          return left.organizationId < right.organizationId ? -1 : 1;
+        }
+        return left.userId < right.userId ? -1 : 1;
+      })
+      .map((row) => ({
+        organizationId: row.organizationId,
+        userId: row.userId,
+        joinedAt: row.createdAt,
+      }));
+    return { lastOrganizationId: ids.at(-1) ?? null, organizations: ids.length, members };
   }
 
   /** The memory rows carry no legacy single sign-on column, so no provider is named here. */

@@ -901,6 +901,44 @@ Feature: IngestionSource — admin configuration of cross-platform feeds
     When a batch is stamped as received
     Then the source is active and its last event time is now
 
+  # Governance records two lifecycle facts of a source, which nurturing tells Customer.io of
+  # without reading governance's tables: lw.governance.ingestion_source_created and
+  # lw.governance.ingestion_source_went_live. Each is recorded after its write commits and
+  # never fails that write. A pulled source goes active through its run's mirror, not the
+  # received-batch stamp, so it records no went-live fact.
+  @unit
+  Scenario: Creating a source records that it was created
+    Given an admin of an organization
+    When they create an ingestion source
+    Then governance records ingestion_source_created naming the organization, source, type and admin
+
+  @unit
+  Scenario: A source's first data records that it went live, once
+    Given a source still awaiting its first event
+    When two batches are stamped as received
+    Then governance records ingestion_source_went_live once, naming the source's creator
+
+  @unit
+  Scenario: A batch on a source already live records no lifecycle fact
+    Given a source that has taken data
+    When another batch is stamped as received
+    Then governance records no lifecycle fact
+    And the source's last event time still moves to now
+
+  @unit
+  Scenario: A batch on a disabled source records no lifecycle fact
+    Given a source the admin disabled before its first data
+    When a batch let in before the disable is stamped as received
+    Then governance records no lifecycle fact
+    And the source stays disabled
+
+  @unit
+  Scenario: A lifecycle fact that is not recorded never fails the create or the batch
+    Given governance's ingestion-source pipeline refuses every record
+    When a source is created and takes its first data
+    Then the source is created and active
+    And each refusal is reported
+
   @unit
   Scenario: Re-enabling a disabled source resumes ingestion
     Given a push source the admin disabled and then set back to active

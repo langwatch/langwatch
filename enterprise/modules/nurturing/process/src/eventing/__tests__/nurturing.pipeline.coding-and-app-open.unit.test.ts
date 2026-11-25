@@ -23,15 +23,18 @@ function nurturing() {
   const codingBatches: CodingAgentSessionStoredEventData[][] = [];
   const pipeline = buildNurturingPipeline({
     deliver: async ({ signal }) => void delivered.push(signal),
-    projectCreated: async () => undefined,
     guidedTurnFailed: async () => undefined,
     usageReportReceived: async () => undefined,
     evaluationsCompleted: async () => undefined,
     simulationRunsFinished: async () => undefined,
     codingSessionsStored: async ({ sessions }) => void codingBatches.push([...sessions]),
-    recordPersonalOwner: async () => undefined,
-    recordTracedProject: async () => undefined,
     forgetErasedUser: async () => undefined,
+    virtualKeyCreated: async () => undefined,
+    keyBudgetCrossed: async () => undefined,
+    keyFirstRequested: async () => undefined,
+    unbudgetedSpendRecorded: async () => undefined,
+    governanceSourceConnected: async () => undefined,
+    governanceSourceLive: async () => undefined,
   });
   const subscribers: EventSubscriberDefinition<Event>[] = [];
   const registry = createApiFixture<

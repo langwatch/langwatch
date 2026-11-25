@@ -14,9 +14,7 @@ import {
   type NurturingProjectUsageFact,
   organizationUsageTraits,
   PROJECT_USAGE_TRIAL_WINDOW_MS,
-  retriesUncopiedProject,
   TRACE_COUNTING_WINDOW_MS,
-  UNCOPIED_PROJECT_RETRY_WINDOW_MS,
 } from "../nurturing-project-usage.rules.ts";
 import type { NurturingTraceCounts } from "../nurturing-trace-day.rules.ts";
 
@@ -246,8 +244,8 @@ describe("organizationUsageTraits() has_habit", () => {
 });
 
 describe("isTraceCounted()", () => {
-  /** @scenario "An organization past its counting window writes no counts" */
-  it("counts a trace inside its organization's window, the free window and a week", () => {
+  /** @scenario "An organization past its counting window gets no trace trait" */
+  it("reads traces inside its organization's window, the free window and a week", () => {
     expect(TRACE_COUNTING_WINDOW_MS).toBe(PROJECT_USAGE_TRIAL_WINDOW_MS + 7 * DAY_MS);
     const organizationCreatedAt = NOW;
 
@@ -262,7 +260,7 @@ describe("isTraceCounted()", () => {
 });
 
 describe("organizationUsageTraits() past the counting window", () => {
-  /** @scenario "An organization past its counting window writes no counts" */
+  /** @scenario "An organization past its counting window gets no trace trait" */
   it("sends no trace trait, so Customer.io keeps the last ones sent", () => {
     const traits = organizationUsageTraits({
       projects: [],
@@ -313,20 +311,5 @@ describe("createdRangeOfEndedWindows()", () => {
       after: NOW - 3_600_000 - TRACE_COUNTING_WINDOW_MS,
       upTo: NOW - TRACE_COUNTING_WINDOW_MS,
     });
-  });
-});
-
-describe("retriesUncopiedProject()", () => {
-  /** @scenario "The retry window is real time from first seen, shared by every worker and kept across a restart" */
-  it("retries while less than the window has passed since the project was first seen", () => {
-    const firstSeenAt = NOW;
-
-    expect(retriesUncopiedProject({ firstSeenAt, now: NOW })).toBe(true);
-    expect(
-      retriesUncopiedProject({ firstSeenAt, now: NOW + UNCOPIED_PROJECT_RETRY_WINDOW_MS - 1 }),
-    ).toBe(true);
-    expect(
-      retriesUncopiedProject({ firstSeenAt, now: NOW + UNCOPIED_PROJECT_RETRY_WINDOW_MS }),
-    ).toBe(false);
   });
 });
