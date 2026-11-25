@@ -1,7 +1,7 @@
 /**
- * @vitest-environment node
- * No LangWatchQL password still yields a restricted identity; the PostgreSQL reader DDL is server-wide so it is skipped here.
+ * An install that sets no LangWatchQL password gets both derived from the key pepper, in `sql` mode.
  * @see modules/analytics/specs/analytics-lwql-default-credentials.feature
+ * @vitest-environment node
  */
 import { randomUUID } from "node:crypto";
 
