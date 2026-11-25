@@ -22,6 +22,10 @@ export function useRereadMissingBoard({
     latestReread.current = reread;
   });
   const isPending = isMissing && dashboardId !== void 0 && rereadFor !== dashboardId;
+  // Leaving the address ends the visit, so a later visit to a board still missing re-reads again.
+  useEffect(() => {
+    if (rereadFor !== void 0 && (rereadFor !== dashboardId || !isMissing)) setRereadFor(void 0);
+  }, [rereadFor, dashboardId, isMissing]);
   useEffect(() => {
     if (!isPending) return;
     let isCurrent = true;

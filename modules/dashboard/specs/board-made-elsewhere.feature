@@ -20,3 +20,10 @@ Feature: A board made elsewhere opens from its link
     When I open the link to that board
     Then the screen shows the unavailable page
     And the list is read again only once for that address
+
+  @integration
+  Scenario: Coming back to a board still missing reads the list again
+    Given I opened a missing board and the list was read again
+    And I went on to a board the list holds
+    When I come back to the missing board
+    Then the list is read again before the screen shows the unavailable page
