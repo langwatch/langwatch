@@ -1,6 +1,7 @@
 import { appendFileSync, mkdirSync, renameSync, writeFileSync } from "node:fs";
 import { createServer } from "node:http";
 import { dirname } from "node:path";
+import { Readable } from "node:stream";
 import { pathToFileURL } from "node:url";
 
 import { credentialSource } from "./credentials.mjs";
@@ -35,11 +36,36 @@ const answerAfterBody = (req, res) => {
 const uploadable = ({ prefix, length, maxUploadBytes }) =>
   Boolean(prefix) && Number.isFinite(length) && length > 0 && length <= maxUploadBytes;
 
+// A pull request's later jobs restore their GitHub Actions caches, which can hold laptop
+// output this server never served. So the taint is a marker object in the branch's own
+// namespace: once one job used a laptop entry, every later job of that branch is tainted.
+const taintKeyFor = (scope) =>
+  scope.taintedWrite && scope.taintedWrite !== scope.write ? `${scope.taintedWrite}tainted` : null;
+
+const writeMarker = ({ store, key }) =>
+  store.put(key, Readable.from([Buffer.from("1")]), 1, { overwrite: true }).catch(() => 0);
+
+const loadTaint = (ctx) => {
+  const { scope, state, store } = ctx;
+  state.loaded ??= (async () => {
+    const key = taintKeyFor(scope);
+    if (!key) return;
+    const hit = await store.get(key).catch(() => null);
+    if (!hit) return;
+    hit.body.resume();
+    state.tainted = true;
+    await writeMarker({ store, key });
+  })();
+  return state.loaded;
+};
+
 const markTainted = (ctx, found) => {
-  const { scope, state, log } = ctx;
-  if (!found.read.laptop || state.tainted || scope.taintedWrite === scope.write) return;
+  const { scope, state, store, log } = ctx;
+  const key = taintKeyFor(scope);
+  if (!found.read.laptop || state.tainted || !key) return;
   state.tainted = true;
-  log(`used a laptop entry (${found.key}); this job no longer writes ${scope.write}`);
+  log(`used a laptop entry (${found.key}); this branch no longer writes ${scope.write}`);
+  void writeMarker({ store, key });
 };
 
 const serveGet = async (ctx, hash, res) => {
@@ -57,6 +83,7 @@ const serveGet = async (ctx, hash, res) => {
 
 const servePut = async (ctx, hash, req, res) => {
   const { scope, state, store, maxUploadBytes, log } = ctx;
+  await loadTaint(ctx);
   const prefix = writePrefixFor({ scope, tainted: state.tainted });
   const length = Number(req.headers["content-length"]);
   if (!uploadable({ prefix, length, maxUploadBytes })) return answerAfterBody(req, res);
@@ -93,10 +120,10 @@ export const s3Store = ({ bucket, region, credentials }) => ({
     }
     return { body: res, length: res.headers["content-length"] };
   },
-  put: async (key, body, length) => {
+  put: async (key, body, length, { overwrite = false } = {}) => {
     const creds = await credentials();
     if (!creds) return 0;
-    return putObject({ bucket, region, credentials: creds, key, body, length });
+    return putObject({ bucket, region, credentials: creds, key, body, length, overwrite });
   },
 });
 

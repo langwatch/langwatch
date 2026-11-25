@@ -22,6 +22,7 @@ Feature: Nx remote cache shared by CI and laptops
     Given a pull request job has been served an entry from branch/feat_x/
     When it stores a new task result
     Then the result goes to branch/feat_x/, not pr/
+    And every later job of that branch writes branch/feat_x/ too, since its restored caches can hold laptop output
 
   Scenario: A laptop writes only its own branch
     Given a laptop on branch feat/x with the lw-dev-sso AWS profile

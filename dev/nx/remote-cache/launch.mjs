@@ -40,9 +40,11 @@ const stop = (pid) => {
 
 export const ensureServer = async ({ workspaceRoot, scope, profile, env, serverEnv = env }) => {
   const dir = join(workspaceRoot, ".nx", "remote-cache");
-  const stateFile = join(dir, "server.json");
   const bucket = env.LANGWATCH_NX_REMOTE_CACHE_BUCKET || BUCKET;
   const key = createHash("sha256").update(JSON.stringify({ scope, bucket, profile })).digest("hex");
+  // One server per configuration: a run on another branch starts its own and never stops
+  // a server an earlier run still uses. Idle servers exit on their own.
+  const stateFile = join(dir, `server-${key.slice(0, 16)}.json`);
   let state = readState(stateFile);
   if (state?.key === key && (await healthy(state))) return state;
   if (state?.pid) stop(state.pid);

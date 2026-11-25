@@ -83,7 +83,8 @@ export const getObject = ({ bucket, region, credentials, key, timeoutMs = 30_000
     req.end();
   });
 
-// First write wins (If-None-Match: *): an entry is never replaced once stored.
+// First write wins (If-None-Match: *): an entry is never replaced once stored. Only the
+// taint marker overwrites, to restart its expiry.
 export const putObject = ({
   bucket,
   region,
@@ -91,6 +92,7 @@ export const putObject = ({
   key,
   body,
   length,
+  overwrite = false,
   timeoutMs = 120_000,
 }) =>
   new Promise((resolve, reject) => {
@@ -102,7 +104,7 @@ export const putObject = ({
       key,
       headers: {
         "content-length": length,
-        "if-none-match": "*",
+        ...(overwrite ? {} : { "if-none-match": "*" }),
         "content-type": "application/octet-stream",
       },
       timeoutMs,

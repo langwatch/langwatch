@@ -24,10 +24,10 @@ const memoryStore = () => {
       const { Readable } = await import("node:stream");
       return { body: Readable.from([value]), length: value.length };
     },
-    put: async (key, body) => {
+    put: async (key, body, _length, { overwrite = false } = {}) => {
       const chunks = [];
       for await (const chunk of body) chunks.push(chunk);
-      if (objects.has(key)) return 412;
+      if (objects.has(key) && !overwrite) return 412;
       objects.set(key, Buffer.concat(chunks));
       return 200;
     },
@@ -112,6 +112,12 @@ describe("Nx remote cache", () => {
     assert.ok(store.objects.has("pr/222"));
     assert.ok(store.objects.has("branch/feat_x/333"));
     assert.ok(!store.objects.has("pr/333"));
+    // A later job of the same branch restores caches this server never saw.
+    await withServer({ scope, store }, async (port) => {
+      await call({ port, method: "PUT", path: "/v1/cache/444", body: Buffer.from("later") });
+    });
+    assert.ok(store.objects.has("branch/feat_x/444"));
+    assert.ok(!store.objects.has("pr/444"));
   });
 
   /** @scenario "A laptop writes only its own branch" */
