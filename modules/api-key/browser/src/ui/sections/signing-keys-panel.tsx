@@ -60,9 +60,11 @@ function StatusBadge({ signingKey }: { signingKey: SigningKeyRow }) {
 
 function SigningKeyTableRow({
   signingKey,
+  canIssue,
   onAction,
 }: {
   signingKey: SigningKeyRow;
+  canIssue: boolean;
   onAction: (action: PendingAction) => void;
 }) {
   return (
@@ -107,12 +109,14 @@ function SigningKeyTableRow({
               </Button>
             </Menu.Trigger>
             <Menu.Content>
-              <Menu.Item
-                value="rotate"
-                onClick={() => onAction({ kind: "rotate", key: signingKey })}
-              >
-                Rotate
-              </Menu.Item>
+              {canIssue ? (
+                <Menu.Item
+                  value="rotate"
+                  onClick={() => onAction({ kind: "rotate", key: signingKey })}
+                >
+                  Rotate
+                </Menu.Item>
+              ) : null}
               <Menu.Item
                 value="revoke"
                 color="fg.error"
@@ -131,10 +135,12 @@ function SigningKeyTableRow({
 function SigningKeysTable({
   rows,
   isLoading,
+  canIssue,
   onAction,
 }: {
   rows: readonly SigningKeyRow[];
   isLoading: boolean;
+  canIssue: boolean;
   onAction: (action: PendingAction) => void;
 }) {
   if (!isLoading && rows.length === 0) {
@@ -163,14 +169,19 @@ function SigningKeysTable({
       <ListTable.Body>
         {isLoading && <ListTable.LoadingRows rows={2} columns={COLUMNS} />}
         {rows.map((signingKey) => (
-          <SigningKeyTableRow key={signingKey.id} signingKey={signingKey} onAction={onAction} />
+          <SigningKeyTableRow
+            key={signingKey.id}
+            signingKey={signingKey}
+            canIssue={canIssue}
+            onAction={onAction}
+          />
         ))}
       </ListTable.Body>
     </ListTable>
   );
 }
 
-export function SigningKeysPanel({ projectId }: SigningKeysPanelProps) {
+export function SigningKeysPanel({ projectId, canIssue = true }: SigningKeysPanelProps) {
   const host = useApiKeyHost();
   const utils = apiKeyApi.useUtils();
   const canManage = host.hasPermission(MANAGE_PERMISSION);
@@ -180,7 +191,7 @@ export function SigningKeysPanel({ projectId }: SigningKeysPanelProps) {
   const revoke = apiKeyApi.signingKeys.revoke.useMutation();
 
   const { query } = host.route();
-  const asked = canManage && query[SIGNING_KEY_QUERY_KEY] === "new";
+  const asked = canManage && canIssue && query[SIGNING_KEY_QUERY_KEY] === "new";
   const [creating, setCreating] = useState(false);
   // The ask opens the dialog once, adjusted during render; the effect clears it from the address.
   const [taken, setTaken] = useState(false);
@@ -251,7 +262,12 @@ export function SigningKeysPanel({ projectId }: SigningKeysPanelProps) {
   };
 
   let body = (
-    <SigningKeysTable rows={keys.data ?? []} isLoading={keys.isLoading} onAction={setPending} />
+    <SigningKeysTable
+      rows={keys.data ?? []}
+      isLoading={keys.isLoading}
+      canIssue={canIssue}
+      onAction={setPending}
+    />
   );
   if (!canManage) {
     body = (

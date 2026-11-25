@@ -131,6 +131,25 @@ export interface LwqlSpanDataFloorSchema extends Named<typeof lwqlSpanDataFloorS
 export const lwqlSpanDataFloorSchema: LwqlSpanDataFloorSchema = lwqlSpanDataFloorSchemaDefinition;
 export type LangWatchQLSpanDataFloor = z.infer<typeof lwqlSpanDataFloorSchema>;
 
+/**
+ * Where `LastUsedPromptVersionId` is known from: the managed prompt version replay's recorded
+ * since, or null when whole. `rebuilding` until the replay is done; `unknown` when it failed or
+ * its ledger could not be read. A widget reading the column shows no rows in either (ADR-006).
+ */
+const lwqlManagedPromptVersionFloorSchemaDefinition = z.object({
+  from: z.string().nullable(),
+  rebuilding: z.boolean(),
+  unknown: z.boolean(),
+});
+export interface LwqlManagedPromptVersionFloorSchema extends Named<
+  typeof lwqlManagedPromptVersionFloorSchemaDefinition
+> {}
+export const lwqlManagedPromptVersionFloorSchema: LwqlManagedPromptVersionFloorSchema =
+  lwqlManagedPromptVersionFloorSchemaDefinition;
+export type LangWatchQLManagedPromptVersionFloor = z.infer<
+  typeof lwqlManagedPromptVersionFloorSchema
+>;
+
 export const analyticsLwqlTrpc = defineTrpcContract("analytics.lwql")
   // Separate from `schema` because the catalog is answerable without an
   // executor, so a deployment with no LangWatchQL identity would describe a
@@ -153,6 +172,11 @@ export const analyticsLwqlTrpc = defineTrpcContract("analytics.lwql")
   .query("spanDataFloor")
   .withInput(lwqlProjectScopeSchema)
   .withOutput(lwqlSpanDataFloorSchema)
+
+  /** Where LastUsedPromptVersionId is known from, so a widget reading it can hold its rows back. */
+  .query("managedPromptVersionFloor")
+  .withInput(lwqlProjectScopeSchema)
+  .withOutput(lwqlManagedPromptVersionFloorSchema)
 
   /** The projects of the organization this member may read, for the editor's project picker. */
   .query("readableProjects")

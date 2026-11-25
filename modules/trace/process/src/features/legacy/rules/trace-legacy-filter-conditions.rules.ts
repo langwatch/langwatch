@@ -7,6 +7,10 @@ import { tenantSet } from "@langwatch/clickhouse-markers";
 import {
   customMetadataKeyCondition,
   customMetadataValueCondition,
+  type SpanAnalyticsFloor,
+  type SpanAnalyticsSource,
+  spanAnalyticsSourceOf,
+  STORED_SPANS_SOURCE,
 } from "@langwatch/trace-contract";
 import { z } from "zod";
 
@@ -20,6 +24,10 @@ type FilterConditionResult = {
 type FilterConditionOptions = {
   /** Bounds `sp.StartTime` to the window in `stored_spans` EXISTS subqueries; empty without one. */
   spanTimeBound?: string;
+  /** The same bound on `sa.StartTime`, for `span_analytics` EXISTS subqueries. */
+  lightSpanTimeBound?: string;
+  /** Where a span type is read; `stored_spans` unless a floor was given. */
+  spanAnalytics?: SpanAnalyticsSource;
   /** Whether the statement reads through a proof's fence instead of naming its own tenant. */
   fenced?: boolean;
 };
@@ -72,6 +80,37 @@ function buildEvaluatorExistsCondition(additionalWhere: string): FilterCondition
     params: { [`${paramId}_values`]: values },
   });
 }
+
+/**
+ * A trace with a span of one of these types. The type comes from span_analytics' plain
+ * `SpanType` where it is complete, and from the stored_spans map (which a read decompresses
+ * whole) before its floor. See specs/analytics/span-type-light-reads.feature.
+ */
+const spanTypeCondition: FilterConditionBuilder = ({ values, paramId, options }) => {
+  const source = options?.spanAnalytics ?? STORED_SPANS_SOURCE;
+  const valuesParam = `{${paramId}_values:Array(String)}`;
+  const stored = (bound: string) => `EXISTS (
+      SELECT 1 FROM stored_spans sp
+      WHERE ${sideTenantPredicate("sp", options)}
+        AND sp.TraceId = ts.TraceId${options?.spanTimeBound ?? ""}${bound}
+        AND sp.SpanAttributes['langwatch.span.type'] IN (${valuesParam})
+    )`;
+  const light = (bound: string) => `EXISTS (
+      SELECT 1 FROM span_analytics sa
+      WHERE ${sideTenantPredicate("sa", options)}
+        AND sa.TraceId = ts.TraceId${options?.lightSpanTimeBound ?? ""}${bound}
+        AND sa.SpanType IN (${valuesParam})
+    )`;
+  const params: Record<string, unknown> = { [`${paramId}_values`]: values };
+  if (source.kind === "stored_spans") return { sql: stored(""), params };
+  if (source.kind === "span_analytics") return { sql: light(""), params };
+  params[`${paramId}_from`] = source.fromMs;
+  const from = `fromUnixTimestamp64Milli({${paramId}_from:Int64})`;
+  return {
+    sql: `(${light(` AND sa.StartTime >= ${from}`)} OR ${stored(` AND sp.StartTime < ${from}`)})`,
+    params,
+  };
+};
 
 /** Absent, an empty list, or an empty object: none of them narrow anything. */
 function isEmptyFilterParams(filterParams: unknown): boolean {
@@ -152,15 +191,7 @@ export const clickHouseFilterConditions: Record<FilterField, FilterConditionBuil
   }),
 
   // Spans
-  "spans.type": ({ values, paramId, options }) => ({
-    sql: `EXISTS (
-      SELECT 1 FROM stored_spans sp
-      WHERE ${sideTenantPredicate("sp", options)}
-        AND sp.TraceId = ts.TraceId${options?.spanTimeBound ?? ""}
-        AND sp.SpanAttributes['langwatch.span.type'] IN ({${paramId}_values:Array(String)})
-    )`,
-    params: { [`${paramId}_values`]: values },
-  }),
+  "spans.type": spanTypeCondition,
   "spans.model": ({ values, paramId }) => ({
     sql: `hasAny(ts.Models, {${paramId}_values:Array(String)})`,
     params: { [`${paramId}_values`]: values },
@@ -461,6 +492,8 @@ const SPAN_WINDOW_BUFFER_MS = 2 * 24 * 60 * 60 * 1000;
  */
 function buildSpanTimeBound(timeWindow?: { startDate?: number; endDate?: number }): {
   sql: string;
+  lightSql: string;
+  startMs: number | undefined;
   params: Record<string, unknown>;
 } {
   if (
@@ -468,12 +501,17 @@ function buildSpanTimeBound(timeWindow?: { startDate?: number; endDate?: number 
     typeof timeWindow.startDate !== "number" ||
     typeof timeWindow.endDate !== "number"
   ) {
-    return { sql: "", params: {} };
+    return { sql: "", lightSql: "", startMs: undefined, params: {} };
   }
+  const bound = (alias: string) =>
+    ` AND ${alias}.StartTime >= fromUnixTimestamp64Milli({spanWindowStart:UInt64}) AND ${alias}.StartTime <= fromUnixTimestamp64Milli({spanWindowEnd:UInt64})`;
+  const startMs = Math.max(0, timeWindow.startDate - SPAN_WINDOW_BUFFER_MS);
   return {
-    sql: " AND sp.StartTime >= fromUnixTimestamp64Milli({spanWindowStart:UInt64}) AND sp.StartTime <= fromUnixTimestamp64Milli({spanWindowEnd:UInt64})",
+    sql: bound("sp"),
+    lightSql: bound("sa"),
+    startMs,
     params: {
-      spanWindowStart: Math.max(0, timeWindow.startDate - SPAN_WINDOW_BUFFER_MS),
+      spanWindowStart: startMs,
       spanWindowEnd: timeWindow.endDate + SPAN_WINDOW_BUFFER_MS,
     },
   };
@@ -487,7 +525,10 @@ function buildSpanTimeBound(timeWindow?: { startDate?: number; endDate?: number 
 export function generateClickHouseFilterConditions(
   filters: Partial<Record<FilterField, FilterParam>>,
   timeWindow?: { startDate?: number; endDate?: number },
-  { fenced = false }: { fenced?: boolean } = {},
+  {
+    fenced = false,
+    spanAnalyticsFloor = null,
+  }: { fenced?: boolean; spanAnalyticsFloor?: SpanAnalyticsFloor | null } = {},
 ): GenerateFilterConditionsResult {
   const conditions: string[] = [];
   const allParams: Record<string, unknown> = {};
@@ -495,7 +536,15 @@ export function generateClickHouseFilterConditions(
   let hasUnsupportedFilters = false;
 
   const spanBound = buildSpanTimeBound(timeWindow);
-  const options: FilterConditionOptions = { spanTimeBound: spanBound.sql, fenced };
+  const options: FilterConditionOptions = {
+    spanTimeBound: spanBound.sql,
+    lightSpanTimeBound: spanBound.lightSql,
+    spanAnalytics: spanAnalyticsSourceOf({
+      floor: spanAnalyticsFloor,
+      windowStartMs: spanBound.startMs,
+    }),
+    fenced,
+  };
   Object.assign(allParams, spanBound.params);
 
   for (const [field, filterParams] of Object.entries(filters)) {
@@ -537,12 +586,16 @@ export function translateLegacyFilters({
   filters,
   window,
   fenced,
+  spanAnalyticsFloor,
 }: {
   filters: Readonly<Record<string, unknown>>;
   window?: { startDate?: number; endDate?: number };
   fenced?: boolean;
+  /** Where span_analytics is complete; absent or null, span types come from stored_spans. */
+  spanAnalyticsFloor?: SpanAnalyticsFloor | null;
 }): GenerateFilterConditionsResult {
   return generateClickHouseFilterConditions(legacyFiltersSchema.parse(filters), window, {
     fenced,
+    spanAnalyticsFloor,
   });
 }

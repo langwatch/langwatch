@@ -9,6 +9,7 @@ import * as os from "node:os";
 import * as path from "node:path";
 
 import { normalizeEndpoint } from "../../internal/endpoint";
+import { writeSecretFile } from "./secret-file";
 
 const BEGIN = "# >>> langwatch otel begin >>>";
 const END = "# <<< langwatch otel end <<<";
@@ -233,7 +234,7 @@ export function writeCodexOtelBlock(
 
   if (!fs.existsSync(filePath)) {
     fs.mkdirSync(path.dirname(filePath), { recursive: true });
-    writeFile0600(filePath, block);
+    writeSecretFile(filePath, block);
     return { action: "created", path: filePath };
   }
 
@@ -242,12 +243,12 @@ export function writeCodexOtelBlock(
   if (re.test(prior)) {
     const next = replaceVerbatim(prior, re, block);
     if (next === prior) return { action: "unchanged", path: filePath };
-    writeFile0600(filePath, next);
+    writeSecretFile(filePath, next);
     return { action: "updated", path: filePath };
   }
 
   const sep = prior.endsWith("\n") ? "\n" : "\n\n";
-  writeFile0600(filePath, prior + sep + block);
+  writeSecretFile(filePath, prior + sep + block);
   return { action: "updated", path: filePath };
 }
 
@@ -262,19 +263,6 @@ function escapeRe(s: string): string {
  */
 function replaceVerbatim(content: string, re: RegExp, replacement: string): string {
   return content.replace(re, () => replacement);
-}
-
-/**
- * Write `content` and enforce `0600`. `writeFileSync`'s `mode` only applies
- * when creating a file, not an existing one — and these blocks can carry a
- * bearer token, so chmod BEFORE writing closes the world-readable window.
- */
-function writeFile0600(filePath: string, content: string): void {
-  if (fs.existsSync(filePath)) {
-    fs.chmodSync(filePath, 0o600);
-  }
-  fs.writeFileSync(filePath, content, { mode: 0o600 });
-  fs.chmodSync(filePath, 0o600);
 }
 
 const NOTIFY_BEGIN = "# >>> langwatch codex notify begin >>>";
@@ -683,10 +671,10 @@ export function writeCodexNotifyBlock(
 
   if (!fs.existsSync(filePath)) {
     fs.mkdirSync(path.dirname(filePath), { recursive: true });
-    writeFile0600(filePath, next);
+    writeSecretFile(filePath, next);
     return { action: "created", path: filePath, chained };
   }
-  writeFile0600(filePath, next);
+  writeSecretFile(filePath, next);
   return { action: "updated", path: filePath, chained };
 }
 
@@ -831,14 +819,14 @@ export function writeCodexGatewayBlock(
   let profileAction: CodexOtelWriteAction;
   if (!fs.existsSync(profilePath)) {
     fs.mkdirSync(path.dirname(profilePath), { recursive: true });
-    writeFile0600(profilePath, profileBody);
+    writeSecretFile(profilePath, profileBody);
     profileAction = "created";
   } else {
     const priorProfile = fs.readFileSync(profilePath, "utf8");
     if (priorProfile === profileBody) {
       profileAction = "unchanged";
     } else {
-      writeFile0600(profilePath, profileBody);
+      writeSecretFile(profilePath, profileBody);
       profileAction = "updated";
     }
   }
@@ -970,7 +958,7 @@ function writeGatewayConfigBlock(filePath: string, block: string): CodexOtelWrit
   let action: CodexOtelWriteAction;
   if (!fs.existsSync(filePath)) {
     fs.mkdirSync(path.dirname(filePath), { recursive: true });
-    writeFile0600(filePath, block);
+    writeSecretFile(filePath, block);
     action = "created";
   } else {
     const prior = fs.readFileSync(filePath, "utf8");
@@ -980,12 +968,12 @@ function writeGatewayConfigBlock(filePath: string, block: string): CodexOtelWrit
       if (next === prior) {
         action = "unchanged";
       } else {
-        writeFile0600(filePath, next);
+        writeSecretFile(filePath, next);
         action = "updated";
       }
     } else {
       const sep = prior.endsWith("\n") ? "\n" : "\n\n";
-      writeFile0600(filePath, prior + sep + block);
+      writeSecretFile(filePath, prior + sep + block);
       action = "updated";
     }
   }

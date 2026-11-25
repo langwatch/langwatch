@@ -66,17 +66,26 @@ function bucketLabel(value) {
   const daily = LW.dashboardContext.granularitySeconds >= 86400;
   const parts = daily ? { month: "short", day: "numeric" } : { day: "numeric", hour: "numeric" };
   return utc(value).toLocaleString("en-US", parts);
+}
+// The bucket's start as an ISO instant, which a click hands Langy beside the label.
+const bucketStart = (value) => utc(value).toISOString();
+// The span one point of a chart covers, in words: "hour", "day" or "week".
+function bucketUnit() {
+  const seconds = LW.dashboardContext.granularitySeconds;
+  return seconds >= 604800 ? "week" : seconds >= 86400 ? "day" : "hour";
 }`;
 
 export const CHART_STYLE = `const AXIS = { fontSize: 14, fill: dark ? C.faint : "#666666" };
 const TIP = { background: C.panel, border: "1px solid " + C.border, borderRadius: 8, fontSize: 12 };
 const dot = (color) => ({ width: 8, height: 8, borderRadius: 4, background: color });
 
-function Legend({ items }) {
+// kind names what an entry is ("series", "model"): Langy reads the click by it.
+function Legend({ items, kind = "series" }) {
   return (
     <div style={{ display: "flex", gap: 12, marginBottom: 4, fontSize: 10.5, color: C.subtle }}>
       {items.map(([color, label, dashed]) => (
-        <span key={label} style={{ display: "flex", alignItems: "center", gap: 6 }}>
+        <span key={label} {...askable({ kind, label })}
+          style={{ display: "flex", alignItems: "center", gap: 6, ...askCursor() }}>
           <span style={dashed ? { width: 12, borderTop: "2px dashed " + color } : dot(color)} />
           {label}
         </span>
@@ -106,8 +115,9 @@ const bar = (colour) => ({
 });
 
 // height fixes the list's box, else it fills what the panel leaves. A row with no value (a model
-// with no price) shows its note where the bar goes and a dash, never a $0.00 bar.
-function Bars({ rows, format, height }) {
+// with no price) shows its note where the bar goes and a dash, never a $0.00 bar, and asks nothing.
+// kind names what a row is ("model", "tool"); a row's key is its raw value when the label is not.
+function Bars({ rows, format, height, kind }) {
   const max = Math.max(...rows.filter((row) => known(row.value)).map((row) => row.value),
     Number.MIN_VALUE);
   const box = height ? { height } : { flex: 1 };
@@ -115,8 +125,13 @@ function Bars({ rows, format, height }) {
     <div style={{ ...box, display: "flex", flexDirection: "column", justifyContent: "center",
       gap: 6 }}>
       {rows.map((row, index) => (
-        <div key={row.label} title={row.title}
-          style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 11.5 }}>
+        <div key={row.key ?? row.label}
+          {...(known(row.value)
+            ? askable({ kind, label: row.label || "Unknown", value: row.key ?? row.label })
+            : {})}
+          {...(row.title ? { title: row.title } : {})}
+          style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 11.5,
+            ...(known(row.value) ? askCursor() : {}) }}>
           <span style={{ width: 128, flexShrink: 0, color: C.subtle, ...ELLIPSIS }}>
             {row.label || "Unknown"}
           </span>
@@ -136,8 +151,9 @@ function Bars({ rows, format, height }) {
   );
 }`;
 
-export const TABLE = `// rowPadding is the space above and below each cell, in px.
-function Table({ columns, rows, rowPadding = 4 }) {
+export const TABLE = `// rowPadding is the space above and below each cell, in px. ask(row) names what a row is,
+// { kind, label, value }, to make it a button that asks Langy about it; null leaves it plain.
+function Table({ columns, rows, rowPadding = 4, ask }) {
   const cell = (column, index) => ({
     textAlign: column.align || "left",
     padding: rowPadding + "px 0",
@@ -157,7 +173,8 @@ function Table({ columns, rows, rowPadding = 4 }) {
         </thead>
         <tbody>
           {rows.map((row, rowIndex) => (
-            <tr key={rowIndex} style={{ borderTop: "1px solid " + C.border }}>
+            <tr key={rowIndex} {...askableRow(ask, row)}
+              style={{ borderTop: "1px solid " + C.border, ...(ask ? askCursor() : {}) }}>
               {columns.map((column, index) => (
                 <td key={column.header} style={{ ...cell(column, index), fontWeight: 400 }}>
                   {column.cell(row)}
@@ -169,6 +186,10 @@ function Table({ columns, rows, rowPadding = 4 }) {
       </table>
     </div>
   );
+}
+function askableRow(ask, row) {
+  const subject = ask ? ask(row) : null;
+  return subject && subject.label ? askable(subject) : {};
 }
 const mono = (text, color = C.subtle) => (
   <span style={{ fontFamily: "ui-monospace, monospace", fontSize: 10.5, color }}>{text}</span>
@@ -198,7 +219,11 @@ export const STAT = `function Stat({ label, value }) {
 
 /** A trace id that opens the trace; reads `mono` from `TABLE`. */
 export const TRACE_LINK = `function TraceLink({ id }) {
-  const open = () => LW.navigate("trace", { traceId: id });
+  // Opens the request, never also the row's ask under it.
+  const open = (event) => {
+    event.stopPropagation();
+    LW.navigate("trace", { traceId: id });
+  };
   return (
     <span onClick={open} title={id} style={{ cursor: "pointer", display: "block", maxWidth: 240,
       overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
@@ -240,7 +265,7 @@ function pricedShare(query) {
 // The models the report found with no price, as rows a cost list shows with a dash.
 const unpricedRows = (query, listed = []) => (query.completeness?.unpriced?.models || [])
   .filter((model) => !listed.includes(model))
-  .map((model) => ({ label: model, value: null, note: "no price",
+  .map((model) => ({ label: model, value: null, note: "price unknown",
     title: model + " has no price, so its cost is unknown." }));`;
 
 /** The Recharts components `SERIES_CHART` draws with. */
@@ -271,14 +296,31 @@ const tipValue = (format) => (value, name) => [known(value) ? format(value) : "N
 
 /** A time series of bars and lines on one axis; reads `CHART_STYLE` and `GAP_BRIDGE`. */
 export const SERIES_CHART = `// series: { key, label, colour, dashed?, bars? }; format labels the axis and the tooltip.
-function SeriesChart({ points, series, format, domain }) {
+// A point's at is its bucket's start (bucketStart), which a click hands Langy.
+// legendKind names what a legend entry is ("check", "model") when it is not a plain series.
+function SeriesChart({ points, series, format, domain, legendKind }) {
   const legend = series.map((item) => [item.colour, item.label, item.dashed]);
+  // A click asks about the bucket under the pointer, and the series of the bar or point hit;
+  // off any, the one series drawn when there is one. The legend asks about a series.
+  const drawn = series.filter((item) => !item.dashed);
+  let pointed = null;
+  const point = (item) => () => { pointed = item.label; };
+  const onClick = (state) => {
+    const index = state?.activeTooltipIndex;
+    const at = index == null ? undefined : points[Number(index)];
+    const hit = pointed ?? (drawn.length === 1 ? drawn[0].label : null);
+    pointed = null;
+    if (!at) return;
+    askLangy({ kind: "day", label: String(at.x), ...(at.at ? { at: at.at } : {}),
+      ...(hit ? { series: hit } : {}) });
+  };
   return (
     <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
-      <Legend items={legend} />
+      <Legend items={legend} kind={legendKind} />
       <div style={{ flex: 1, minHeight: 0 }}>
         <ResponsiveContainer width="100%" height="100%">
-          <ComposedChart data={points} margin={{ top: 6, right: 4, bottom: 0, left: 0 }}>
+          <ComposedChart data={points} margin={{ top: 6, right: 4, bottom: 0, left: 0 }}
+            onClick={canAskLangy() && points.length > 0 ? onClick : undefined} style={askCursor()}>
             <CartesianGrid vertical={false} stroke={C.border} />
             <XAxis dataKey="x" tick={AXIS} tickLine={false} axisLine={false} minTickGap={28}
               dy={4} />
@@ -288,10 +330,11 @@ function SeriesChart({ points, series, format, domain }) {
             {series.filter((item) => !item.bars).map(bridge)}
             {series.map((item) => item.bars ? (
               <Bar key={item.key} dataKey={item.key} name={item.label} fill={item.colour}
-                radius={[2, 2, 0, 0]} isAnimationActive={false} />
+                radius={[2, 2, 0, 0]} isAnimationActive={false} onClick={point(item)} />
             ) : (
               <Line key={item.key} type="monotone" dataKey={item.key} name={item.label}
                 stroke={item.colour} strokeWidth={2} dot={false} isAnimationActive={false}
+                activeDot={{ r: 4, onClick: point(item) }}
                 strokeDasharray={item.dashed ? "4 3" : undefined} />
             ))}
           </ComposedChart>
@@ -341,6 +384,8 @@ export const FACE_FULL_MIN_HEIGHT_PX = 180;
  * the full face is 208px with a two-line line, 164px without its icon; the row is 75px.
  */
 const FIT_CSS = `.lw-row { display: none; }
+[data-lw-ask]:hover { background: rgba(127, 127, 127, 0.1); border-radius: 4px; }
+[data-lw-ask]:focus-visible { outline: 2px solid #0d9488; outline-offset: 1px; border-radius: 4px; }
 @media (max-height: ${FACE_ICON_MIN_HEIGHT_PX - 1}px) { .lw-icon { display: none !important; } }
 @media (max-height: ${FACE_FULL_MIN_HEIGHT_PX - 1}px) {
   .lw-full { display: none !important; }
@@ -475,6 +520,32 @@ export interface WidgetCodeSpec {
   readonly compactCallToAction?: boolean;
 }
 
+/**
+ * Asking Langy about a mark (dashboards-v2 AC124, AC245): a bar, row, point or legend entry the
+ * reader clicks, and the problem signal (AC244). Only while the host takes asks is a mark a
+ * named, focusable button with a pointer.
+ */
+export const ASK_CODE = `const canAskLangy = () => LW.dashboardContext?.canAskLangy === true;
+const askLangy = (subject) => { if (canAskLangy()) LW.askLangy(subject); };
+// Whether the problem this widget watches for is on the card now; only a change is sent.
+let problemSignalled = false;
+const signalProblem = (problem) => {
+  problemSignalled = true;
+  LW.signal?.({ problem: problem === true });
+};
+const askCursor = () => (canAskLangy() ? { cursor: "pointer" } : {});
+function askable(subject) {
+  if (!canAskLangy()) return {};
+  const name = "Ask Langy about " + subject.label;
+  return { role: "button", tabIndex: 0, "aria-label": name, title: name, "data-lw-ask": "",
+    onClick: () => askLangy(subject),
+    onKeyDown: (event) => {
+      if (event.key !== "Enter" && event.key !== " ") return;
+      event.preventDefault();
+      askLangy(subject);
+    } };
+}`;
+
 /** The chart kit helpers a widget may call; each is imported only by the code that calls it. */
 const CHART_KIT_HELPERS = ["isLowerBound", "mergeBuckets"] as const;
 
@@ -486,6 +557,26 @@ function importsOf({ recharts, code }: { recharts?: readonly string[]; code: str
   ]
     .map((line) => `${line}\n`)
     .join("");
+}
+
+/**
+ * `Widget()` itself. A body that signals a problem runs as one call, so a draw that returns
+ * before its own `signalProblem` (an empty period, say) clears the problem the last draw showed.
+ */
+function widgetFunction({ queries, body }: { queries: readonly string[]; body: string }): string {
+  const states = queryStatesCode(queries);
+  if (!/\bsignalProblem\(/.test(body)) {
+    return `export default function Widget() {\n${states}\n${body}\n}`;
+  }
+  return `export default function Widget() {
+${states}
+  problemSignalled = false;
+  const drawn = (() => {
+${body}
+  })();
+  if (!problemSignalled) signalProblem(false);
+  return drawn;
+}`;
 }
 
 /** One widget's stored TSX, put together from its spec. */
@@ -500,13 +591,17 @@ export function widgetCode({
   body,
   compactCallToAction = false,
 }: WidgetCodeSpec): WidgetCode {
+  const asks = [...parts, components ?? "", body].some((text) =>
+    /\b(ask(able|Cursor|Langy)|signalProblem)\(/.test(text),
+  );
   const sections = [
     PALETTE,
+    ...(asks ? [ASK_CODE] : []),
     ...parts,
     panelCode(),
     ...(source ? [callToActionCode({ source, compact: compactCallToAction })] : []),
     ...(components ? [components] : []),
-    `export default function Widget() {\n${queryStatesCode(queries)}\n${body}\n}`,
+    widgetFunction({ queries, body }),
   ];
   const code = sections.join("\n\n");
   const imports = importsOf({ recharts, code });

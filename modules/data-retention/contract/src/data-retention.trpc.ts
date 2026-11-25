@@ -8,8 +8,11 @@ import { defineTrpcContract, type Named } from "@langwatch/module";
 import { z } from "zod";
 
 import {
+  organizationRetentionSchema,
+  organizationStorageEstimateSchema,
   retentionPolicySnapshotSchema,
   retentionStorageUsageSchema,
+  storedPastRetentionSchema,
 } from "./data-retention.snapshot.ts";
 import {
   killRetroactiveMutationInputSchema,
@@ -102,6 +105,21 @@ export const dataRetentionTrpc = defineTrpcContract("dataRetention")
   .withOutput(retentionPolicySchema)
 
   /**
+   * Set a length that bills storage on this plan (above 90 days, or forever). The door asks
+   * `subscription:manage` on `organizationId`, which is required here; the scope must sit there.
+   */
+  .mutation("setBilledForScope")
+  .withInput(
+    z.object({
+      ...retentionScopeTargetInputSchema.shape,
+      organizationId: z.string().min(1),
+      category: retentionCategorySchema,
+      retentionDays: retentionDaysInputSchema,
+    }),
+  )
+  .withOutput(retentionPolicySchema)
+
+  /**
    * What each category would fall back to if the scope's override were removed
    * — the cascade value the data would land on, so the remove-confirmation
    * dialog names the real number rather than a guessed one.
@@ -136,4 +154,23 @@ export const dataRetentionTrpc = defineTrpcContract("dataRetention")
   .query("getScopeStorageUsage")
   .withInput(retentionScopeTargetInputSchema)
   .withOutput(retentionStorageUsageSchema)
+
+  /** Stored items every project under the scope keeps past its period, per category, aggregated. */
+  .query("getStoredPastRetention")
+  .withInput(retentionScopeTargetInputSchema)
+  .withOutput(storedPastRetentionSchema)
+
+  /** Rewrite every project's stored rows under the scope to its resolved period, in the worker. */
+  .mutation("applyScopeRetentionToStoredData")
+  .withInput(retentionScopeWriteInputSchema)
+
+  /** The organization's stored bytes and the days they cover, for the upgrade dialog's price. */
+  .query("getOrganizationStorageEstimate")
+  .withInput(z.object({ organizationId: z.string().min(1) }))
+  .withOutput(organizationStorageEstimateSchema)
+
+  /** The organization's traces retention, for the plan card. */
+  .query("getOrganizationRetention")
+  .withInput(z.object({ organizationId: z.string().min(1) }))
+  .withOutput(organizationRetentionSchema)
   .build();

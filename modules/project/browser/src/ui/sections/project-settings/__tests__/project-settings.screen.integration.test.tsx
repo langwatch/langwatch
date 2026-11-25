@@ -4,7 +4,7 @@
  * Settings → General: role-based access control for workspace, project, and storage credentials.
  */
 
-import { cleanup, fireEvent, screen } from "@testing-library/react";
+import { cleanup, fireEvent, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const { calls } = vi.hoisted(() => ({
@@ -94,6 +94,44 @@ describe("when the project settings page opens", () => {
       language: "python",
       framework: "openai",
     });
+  });
+});
+
+describe("when the project settings page shows the project's identifiers", () => {
+  const writeText = vi.fn<(text: string) => Promise<void>>(() => Promise.resolve());
+  beforeEach(() => {
+    Object.defineProperty(navigator, "clipboard", { value: { writeText }, configurable: true });
+  });
+
+  /** @scenario "The project settings page shows the project ID and the slug apart" */
+  it("shows the ID and, right under it, the slug, each with its own copy button", async () => {
+    renderWithProjectHost(
+      <ProjectGeneralScreen />,
+      new FakeProjectHost({ project: aProject({ id: "checkout-1", slug: "checkout-assistant" }) }),
+    );
+
+    const idRow = screen.getByTestId("project-id-field");
+    const slugRow = screen.getByTestId("project-slug-field");
+    expect(idRow.nextElementSibling).toBe(slugRow);
+
+    expect(within(idRow).getByText("Project ID")).toBeTruthy();
+    expect(within(idRow).getByText("Use this ID when authenticating with API keys.")).toBeTruthy();
+    expect(within(idRow).getByTitle("checkout-1")).toBeTruthy();
+    expect(within(slugRow).getByText("Project slug")).toBeTruthy();
+    expect(
+      within(slugRow).getByText("Appears in the project's web address. Not used to authenticate."),
+    ).toBeTruthy();
+    expect(within(slugRow).getByTitle("checkout-assistant")).toBeTruthy();
+
+    fireEvent.click(within(idRow).getByRole("button", { name: "Copy project ID" }));
+    fireEvent.click(within(slugRow).getByRole("button", { name: "Copy project slug" }));
+
+    await vi.waitFor(() => expect(writeText).toHaveBeenCalledTimes(2));
+    expect(writeText.mock.calls.map(([text]) => text)).toEqual([
+      "checkout-1",
+      "checkout-assistant",
+    ]);
+    expect(calls.updateProject).not.toHaveBeenCalled();
   });
 });
 

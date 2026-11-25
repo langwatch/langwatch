@@ -33,6 +33,25 @@ Feature: Langy runs a conversation on the pi worker
     Then the entry asks pi for adaptive thinking
     And an older Claude pi's catalog does not list keeps the manager's config alone
 
+  # The manager marks every openai/* model as reasoning, and OpenAI answers a
+  # reasoning field on gpt-4o or gpt-4.1 with 400 "Unsupported parameter:
+  # 'reasoning.effort' is not supported with this model".
+  @unit
+  Scenario: A model that does not reason is never sent reasoning fields
+    Given the manager configures an OpenAI model pi's catalog lists as not reasoning
+    When the wrapper generates the model registry
+    Then the entry does not reason, whatever the lane's default says
+
+  # pi's catalog stops at gpt-5.6, and an unknown model gets pi's defaults: a
+  # 128k window and text-only input, a tenth of gpt-6's window.
+  @unit
+  Scenario: A GPT newer than pi's catalog gets its newest sibling's shape
+    Given the manager configures a GPT newer than every entry of its tier in pi's catalog
+    When the wrapper generates the model registry
+    Then the entry carries the newest same-tier sibling's window, input and thinking levels under its own id
+    And it carries neither the sibling's name nor its price
+    And an id with no catalog sibling of its tier keeps the manager's config alone
+
   @unit
   Scenario: A model pi's catalog does not know is written from config alone
     Given the manager configures a model id pi's catalog does not list for that API dialect

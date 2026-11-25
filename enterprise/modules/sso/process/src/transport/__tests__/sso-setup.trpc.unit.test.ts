@@ -117,6 +117,7 @@ async function harness(
     listEntityHistory: vi.fn(),
     hasRecordedSince: vi.fn(async () => false),
     findByTargetKind: vi.fn(async () => []),
+    findForOrganization: vi.fn(async () => []),
   };
   const app = await createSsoTestApp({
     connections,

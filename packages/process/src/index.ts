@@ -147,6 +147,7 @@ export {
   type UpgradeDoor,
   hostedRuntime,
 } from "./server.ts";
+export { type LongRequestBody } from "./lifecycle/request-body-deadline.ts";
 export { processOwner } from "./owner.ts";
 export { observabilityOwner } from "./observability-owner.ts";
 export {

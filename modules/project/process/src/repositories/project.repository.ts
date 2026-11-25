@@ -30,6 +30,12 @@ import type {
 } from "@langwatch/project-contract";
 import type { Instant } from "@langwatch/time";
 
+/** A project as a slug change reads it: who it is, what it is called and its address. */
+export type ProjectSlugHolder = Readonly<{ id: string; name: string; slug: string }>;
+
+/** How a slug move ended: moved, the project no longer held `from`, or another holds `to`. */
+export type ProjectSlugMove = "moved" | "gone" | "taken";
+
 /** A live project whose legacy `apiKey` still authenticates; never the key itself. */
 export type LiveLegacyKey = Readonly<{
   projectId: string;
@@ -100,6 +106,10 @@ export interface ProjectRepository {
     kind: InternalProjectKind;
   }): Promise<InternalProject | null>;
   findInternalBySlug(slug: string): Promise<InternalProject | null>;
+  /** The project holding exactly this slug, archived ones included; empty when none does. */
+  findSlugHolders(input: { slug: string }): Promise<ProjectSlugHolder[]>;
+  /** Moves a project from one slug to another, only while it still holds `from`. */
+  replaceSlug(input: { projectId: string; from: string; to: string }): Promise<ProjectSlugMove>;
   findLiveInternalIds(input: { kind: InternalProjectKind }): Promise<string[]>;
   createInternalOrFindWinner(input: {
     id: string;

@@ -89,3 +89,29 @@ Feature: The subscription lane streams subscriptions and nothing else
       Given a request that carries neither a fetch-site signal nor an origin
       When it opens the live update channel
       Then the request is refused, because there is no positive same-site signal
+
+  Rule: A deployment served over plain HTTP still opens its own live streams
+
+    Over plain HTTP a browser sends no fetch-site header, and a same-origin
+    EventSource sends no Origin. A cross-origin EventSource or fetch always sends
+    an Origin, and a navigation cannot ask for an event stream, so an
+    unsignalled request asking for text/event-stream comes from the app's pages.
+
+    @unit
+    Scenario: A same-origin live stream on a plain-HTTP install opens
+      Given the deployment's public address is an http URL on a host other than localhost
+      When the application's own page opens the live update channel
+      And the request carries neither a fetch-site signal nor an origin, asking for an event stream
+      Then the channel opens
+
+    @unit
+    Scenario: A navigation to the live update channel on a plain-HTTP install is refused
+      Given the deployment's public address is an http URL
+      When another site navigates the browser to the live update channel
+      Then the request is refused as cross-site
+
+    @unit
+    Scenario: An HTTPS install keeps refusing an unsignalled live stream
+      Given the deployment's public address is an https URL
+      When a request asking for an event stream carries neither a fetch-site signal nor an origin
+      Then the request is refused, because there is no positive same-site signal

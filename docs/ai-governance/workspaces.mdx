@@ -6,7 +6,7 @@ sidebarTitle: Workspaces
 
 LangWatch organizes everything around three workspace scopes. Every Virtual Key, every Routing Policy, every Budget, every Audit Log row, every spend chart attaches to one of:
 
-- **Personal**: _you_. One Personal Workspace per user per org. Your Personal Virtual Keys, your `/me` dashboard, your spend ledger.
+- **Personal**: _you_. One Personal Workspace per user per org. Your Personal Virtual Keys, your `/coding-agents` dashboard, your spend ledger.
 - **Team**: a _group of people_ in the same org. Shared budget envelope, shared routing policy override, shared Audit Log scope.
 - **Project**: a _shared application_. The right home for a virtual key bundled into an app's config (a chatbot, an internal RAG, a workflow). One project, many apps if useful, governed centrally.
 
@@ -36,13 +36,13 @@ A Personal Workspace is created automatically the first time you visit a project
 - Owned by you (`isPersonal=true`, `ownerUserId=<your user>`).
 - Scoped to **one** team, your private team, also flagged `isPersonal`.
 - Only ever has **one** project, your Personal Workspace project.
-- The home for every [Personal Virtual Key](/ai-gateway/governance/personal-keys) you mint via `langwatch login` or the `/me` portal.
+- The home for every [Personal Virtual Key](/ai-gateway/governance/personal-keys) you mint via `langwatch login` or the `/coding-agents` portal.
 
 What you do here:
 
 - Use the CLI (`langwatch claude`, `langwatch codex`, `langwatch gemini`, etc.), every request flows through your Personal VK and lands in your personal ledger.
-- Issue Personal Virtual Keys for inline app development (the model-provider tiles on `/me`).
-- Read your own spend, budget, request count, and Recent activity at `/me`.
+- Issue Personal Virtual Keys for inline app development (the model-provider tiles on `/coding-agents`).
+- Read your own spend, budget, request count, and Recent activity at `/coding-agents`.
 
 What you can't do:
 
@@ -72,7 +72,7 @@ Teams are groups of people. They:
 
 Create a team at `/settings/teams` (admin-only). Add members from the existing org member list, invites you make from within the team flow have a `Team Assignment` block in the same drawer documented at [Members & invites](/platform/members-and-teams#invite-people).
 
-Teams scope down what an `aiTools:view` permission shows on `/me`. A team-scoped tile catalog entry appears only for members of that team; an org-scoped tile catalog entry appears for everyone. When a team-scoped entry shares a slug with an org-scoped entry, the team override wins for members of that team, the recommended pattern for "engineering gets Cursor, everyone else gets Copilot."
+Teams scope down what an `aiTools:view` permission shows on `/coding-agents`. A team-scoped tile catalog entry appears only for members of that team; an org-scoped tile catalog entry appears for everyone. When a team-scoped entry shares a slug with an org-scoped entry, the team override wins for members of that team, the recommended pattern for "engineering gets Cursor, everyone else gets Copilot."
 
 ## Project
 
@@ -89,9 +89,9 @@ When the AI Tools Portal's model-provider tiles offer to mint a virtual key, the
 
 ## Workspace switcher
 
-The header of every authenticated page hosts a single **Workspace Switcher** dropdown. Across the entire `/me` chrome and the project chrome, it's the same component, the only thing that changes is what's currently selected:
+The header of every authenticated page hosts a single **Workspace Switcher** dropdown. Across the entire `/coding-agents` chrome and the project chrome, it's the same component, the only thing that changes is what's currently selected:
 
-- On `/me` and `/me/*`, the switcher shows **My Workspace** (your Personal scope).
+- On `/coding-agents` and `/coding-agents/*`, the switcher shows **My Workspace** (your Personal scope).
 - On `/[project]/*`, it shows the current project name.
 - On `/settings/*` and `/governance`, it shows the current admin scope (org or "Choose workspace" if not bound).
 
