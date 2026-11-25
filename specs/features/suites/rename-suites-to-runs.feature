@@ -50,15 +50,15 @@ Feature: Rename Suites to Run Plans and Simulation Runs to Runs in UI
   # --- Create / Edit Forms ---
 
   @integration
-  Scenario: Form drawer title reads "New Run Plan" for creation
+  Scenario: Form drawer title reads "New run plan" for creation
     When the user opens the form to create a new run plan
-    Then the drawer title reads "New Run Plan"
+    Then the drawer title reads "New run plan"
 
   @integration
-  Scenario: Form drawer title reads "Edit Run Plan" for editing
+  Scenario: Form drawer title reads "Edit run plan" for editing
     Given a run plan already exists
     When the user opens the form to edit that run plan
-    Then the drawer title reads "Edit Run Plan"
+    Then the drawer title reads "Edit run plan"
 
   @integration
   Scenario: Form placeholder uses "Run Plan" terminology

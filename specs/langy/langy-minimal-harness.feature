@@ -1,4 +1,4 @@
-Feature: Langy minimal harness
+Feature: Langy minimal worker
   Langy's worker runs with Langy's own system prompt and a tool surface scoped
   to its role. A constraint that can live in configuration lives in
   configuration, not in prompt prose, and the prompt has an enforced size
@@ -8,37 +8,70 @@ Feature: Langy minimal harness
   Scenario: The system prompt is Langy's own, not a coding agent's
     When a worker is provisioned
     Then the agent configuration carries Langy's own prompt
-    And the harness's built-in coding-agent prompt is not used
+    And the agent's own built-in coding-agent prompt is not used
 
   @unit
   Scenario: The worker does not expose tools the panel cannot show
-    When a worker is provisioned
-    Then subagent spawning and interactive questions are denied, because the
-      panel has no way to show either one yet
-    And the shell, file, skill, todo, and web fetching tools stay available,
-      since Langy answers questions whose answers are not in LangWatch's docs
+    When a worker session is opened
+    Then only the tools Langy's role needs are enabled
+    And subagent spawning is not among them, because the panel has no way to
+      show it
+    And no built-in interactive prompt is among them, because Langy asks
+      through its own question tool, which the panel renders as a choices card
+    And the shell, file, skill and todo tools stay available, since Langy
+      answers questions whose answers are not in LangWatch's docs
+
+  # A cloud replay passed "$HOME/work/<repo>/file" to read and edit. The file
+  # tools took the text literally, failed with ENOENT, and the model fell back
+  # to sed. A shell spelling of the home folder now means the sandbox home.
+  @unit
+  Scenario: The sandbox file tools read a home folder spelled the way a shell spells it
+    Given a file at "work/agent/main.py" under the worker's home
+    When the model reads, edits or writes it as "$HOME/work/agent/main.py", "${HOME}/work/agent/main.py" or "~/work/agent/main.py"
+    Then the tool works on the file under the worker's home
+    And a "$HOME" that is not at the start of the path is left as written
+    And the tools on the user's machine get the path unchanged
 
   @unit
   Scenario: The worker runs only the skills we ship it
     Given the host account has its own agent skills installed
     When a worker is provisioned
-    Then the worker does not load them
+    Then the worker is pointed at the skills tree we shipped it, and no other
     And the operator's skills stay out of Langy's system prompt and out of the
       capabilities it offers the user
-
-  @unit
-  Scenario: The harness's own built-in skill is denied by name
-    Given the harness ships a built-in skill for editing its own configuration,
-      which is work Langy does not do for a customer
-    When a worker is provisioned
-    Then that skill is denied by name
-    And every skill we ship stays available, because a rule that denied all of
-      them would also switch the skill tool off
 
   @unit
   Scenario: The prompt fits its size budget
     When the prompt asset is checked
     Then its size is under the enforced byte ceiling
+
+  # Asked how many of something there are, the agent had no documented way to
+  # ask. The prompt told it to count first and never said with what, so it
+  # guessed: a filter the output did not answer, a flag the command did not
+  # take, then a Python one-liner whose traceback reached the user. The prompt
+  # names the two flags instead.
+  @unit
+  Scenario: The prompt says how to count
+    When the prompt asset is checked
+    Then the rule about counting a whole population names the flags that count
+
+  # The prompt used to name the worker's own endpoint as an EXAMPLE of an
+  # address never to give the user, and the manager filled that placeholder in
+  # per worker at spawn. So the one paragraph forbidding internal addresses
+  # arrived carrying a real one, in the reply the user reads. The rule stays,
+  # the example goes, and so does the substitution that delivered it.
+  @unit
+  Scenario: The system prompt names no address the user cannot reach
+    When the prompt asset is checked
+    Then it names no host that only the worker can reach
+    And it names no environment variable standing in for one
+
+  @unit
+  Scenario: The prompt reaches the worker exactly as it was written
+    When a worker is provisioned
+    Then the prompt file in its home matches the shipped prompt byte for byte
+    And no per-worker value is put into it, so no run can put an address back
+      into the paragraph that forbids them
 
   @unit
   Scenario: Every skill the prompt routes to is one the worker has
@@ -53,3 +86,18 @@ Feature: Langy minimal harness
     When they are compared with the origins the platform stamps
     Then the prompt names all of them and invents none
     And an origin the prompt never learned cannot silently return zero rows
+
+  # Langy's CLI runs in its own sandbox on a provisioned key, yet when a call
+  # failed it told the user to sign in, which they cannot do (issue #8770). A
+  # credential failure is Langy's internal error; a permission refusal is the
+  # user's missing access, and the two stay apart.
+  @unit
+  Scenario: The prompt reports a sandbox credential failure as an internal error
+    When the prompt asset is checked
+    Then on missing_api_key, unauthorized, not_authenticated or "Not logged in" it tells Langy to
+      report an internal error naming the read or write that failed
+    And it forbids telling the user to sign in or claiming Langy has no CLI
+    And it names a forbidden or permission_denied refusal as a permission
+      refusal, not an internal error
+    And on a denial reason of owner-ceiling, no-membership or membership-disabled it tells
+      Langy the access was removed or reduced, with no retry

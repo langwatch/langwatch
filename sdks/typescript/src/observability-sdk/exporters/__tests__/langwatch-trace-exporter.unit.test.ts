@@ -1,5 +1,7 @@
+import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-proto";
+import { CompressionAlgorithm } from "@opentelemetry/otlp-exporter-base";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { LangWatchTraceExporter, type LangWatchTraceExporterOptions } from "../langwatch-trace-exporter";
+
 import {
   LANGWATCH_SDK_NAME_OBSERVABILITY,
   LANGWATCH_SDK_LANGUAGE,
@@ -7,13 +9,16 @@ import {
   LANGWATCH_SDK_RUNTIME,
   TRACES_PATH,
 } from "../../../internal/constants.js";
-import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-http";
+import {
+  LangWatchTraceExporter,
+  type LangWatchTraceExporterOptions,
+} from "../langwatch-trace-exporter";
 
 const DEFAULT_ENDPOINT = process.env.LANGWATCH_ENDPOINT ?? "https://app.langwatch.ai";
 const DEFAULT_URL = `${DEFAULT_ENDPOINT}${TRACES_PATH}`;
 
 // Mock the OTLP exporter
-vi.mock("@opentelemetry/exporter-trace-otlp-http", () => {
+vi.mock("@opentelemetry/exporter-trace-otlp-proto", () => {
   const Ctor: any = vi.fn(function (this: any, config: any) {
     this.config = config;
     this.url = config.url;
@@ -39,7 +44,7 @@ describe("LangWatchExporter", () => {
     consoleSpy = vi.spyOn(console, "warn").mockImplementation(() => undefined);
   });
 
-    afterEach(() => {
+  afterEach(() => {
     // Restore original environment
     process.env = originalEnv;
 
@@ -50,7 +55,7 @@ describe("LangWatchExporter", () => {
     vi.clearAllMocks();
   });
 
-  describe("constructor", () => {
+  describe("constructor()", () => {
     it("creates exporter with default values when no options provided", () => {
       const exporter = new LangWatchTraceExporter();
 
@@ -92,7 +97,7 @@ describe("LangWatchExporter", () => {
     });
   });
 
-  describe("environment variable fallbacks", () => {
+  describe("when falling back to environment variables", () => {
     it("fallbacks to LANGWATCH_API_KEY environment variable", () => {
       const apiKey = "env-api-key";
       process.env.LANGWATCH_API_KEY = apiKey;
@@ -148,7 +153,7 @@ describe("LangWatchExporter", () => {
     });
   });
 
-  describe("header configuration", () => {
+  describe("when configuring headers", () => {
     it("includes all required SDK headers", () => {
       const exporter = new LangWatchTraceExporter();
 
@@ -180,7 +185,7 @@ describe("LangWatchExporter", () => {
 
   // deprecated options removed
 
-  describe("URL construction", () => {
+  describe("when constructing the URL", () => {
     it("constructs URL correctly with default endpoint", () => {
       const exporter = new LangWatchTraceExporter();
 
@@ -217,7 +222,34 @@ describe("LangWatchExporter", () => {
     });
   });
 
-  describe("inheritance from OTLPTraceExporter", () => {
+  describe("when choosing compression", () => {
+    const lastConfig = () => vi.mocked(OTLPTraceExporter).mock.calls.at(-1)?.[0];
+
+    /** @scenario "The TypeScript SDK sends gzipped protobuf by default" */
+    it("defaults to gzip", () => {
+      vi.stubEnv("OTEL_EXPORTER_OTLP_COMPRESSION", "");
+      vi.stubEnv("OTEL_EXPORTER_OTLP_TRACES_COMPRESSION", "");
+      new LangWatchTraceExporter();
+      expect(lastConfig()?.compression).toBe("gzip");
+      vi.unstubAllEnvs();
+    });
+
+    it("leaves the choice to the OTel env var when it is set", () => {
+      vi.stubEnv("OTEL_EXPORTER_OTLP_TRACES_COMPRESSION", "none");
+      new LangWatchTraceExporter();
+      expect(lastConfig()?.compression).toBeUndefined();
+      vi.unstubAllEnvs();
+    });
+
+    it("lets an explicit option win", () => {
+      vi.stubEnv("OTEL_EXPORTER_OTLP_COMPRESSION", "gzip");
+      new LangWatchTraceExporter({ compression: CompressionAlgorithm.NONE });
+      expect(lastConfig()?.compression).toBe("none");
+      vi.unstubAllEnvs();
+    });
+  });
+
+  describe("when inheriting from OTLPTraceExporter", () => {
     it("extends OTLPTraceExporter", () => {
       new LangWatchTraceExporter();
 
@@ -231,12 +263,12 @@ describe("LangWatchExporter", () => {
             "x-langwatch-sdk-runtime": LANGWATCH_SDK_RUNTIME(),
           }),
           url: expect.stringContaining("/api/otel/v1/traces"),
-        })
+        }),
       );
     });
   });
 
-  describe("edge cases", () => {
+  describe("when given edge case inputs", () => {
     it("handles empty string API key", () => {
       const exporter = new LangWatchTraceExporter({ apiKey: "" });
 
@@ -247,7 +279,7 @@ describe("LangWatchExporter", () => {
     it("handles empty string endpoint", () => {
       expect(() => {
         new LangWatchTraceExporter({ endpoint: "" });
-      }).toThrow(); // URL constructor should throw for empty string
+      }).toThrow(TypeError); // URL constructor should throw for empty string
     });
 
     it("handles null values in options", () => {
@@ -264,13 +296,13 @@ describe("LangWatchExporter", () => {
       const endpoint = "https://subdomain.example.com:8080/path";
       const exporter = new LangWatchTraceExporter({ endpoint });
 
-      // URL constructor behavior: new URL("/api/otel/v1/traces", "https://subdomain.example.com:8080/path")
-      // results in "https://subdomain.example.com:8080/api/otel/v1/traces" (path gets replaced, not appended)
+      // `new URL(path, base)` replaces the base's path rather than appending —
+      // the base's `/path` segment is dropped, not kept as a prefix.
       expect((exporter as any).url).toBe("https://subdomain.example.com:8080/api/otel/v1/traces");
     });
   });
 
-  describe("type safety", () => {
+  describe("when checking type safety", () => {
     it("accepts valid LangWatchExporterOptions", () => {
       const options: LangWatchTraceExporterOptions = {
         apiKey: "test-key",
@@ -300,12 +332,27 @@ describe("LangWatchExporter", () => {
     });
   });
 
-  describe("filters pipeline", () => {
+  describe("when running the filters pipeline", () => {
     function makeSpans() {
       return [
-        { name: "GET /users", instrumentationScope: { name: "http" }, attributes: { "http.method": "GET" }, resource: { attributes: { "service.name": "api" } } },
-        { name: "chat.completion", instrumentationScope: { name: "ai" }, attributes: { "app.env": "prod" }, resource: { attributes: { region: "us" } } },
-        { name: "custom op", instrumentationScope: { name: "custom" }, attributes: { foo: "bar" }, resource: { attributes: { "service.name": "worker" } } },
+        {
+          name: "GET /users",
+          instrumentationScope: { name: "http" },
+          attributes: { "http.method": "GET" },
+          resource: { attributes: { "service.name": "api" } },
+        },
+        {
+          name: "chat.completion",
+          instrumentationScope: { name: "ai" },
+          attributes: { "app.env": "prod" },
+          resource: { attributes: { region: "us" } },
+        },
+        {
+          name: "custom op",
+          instrumentationScope: { name: "custom" },
+          attributes: { foo: "bar" },
+          resource: { attributes: { "service.name": "worker" } },
+        },
       ];
     }
 
@@ -324,11 +371,9 @@ describe("LangWatchExporter", () => {
       (exporter as any).export(spans, () => undefined);
       const result = (exporter as any).__lastExportedSpans;
       expect(result).toHaveLength(3);
-      expect(result.map((s: any) => s.name)).toEqual(expect.arrayContaining([
-        "GET /users",
-        "chat.completion",
-        "custom op"
-      ]));
+      expect(result.map((s: any) => s.name)).toEqual(
+        expect.arrayContaining(["GET /users", "chat.completion", "custom op"]),
+      );
     });
 
     it("accepts empty array to disable filtering", () => {
@@ -337,25 +382,29 @@ describe("LangWatchExporter", () => {
       (exporter as any).export(spans, () => undefined);
       const result = (exporter as any).__lastExportedSpans;
       expect(result).toHaveLength(3);
-      expect(result.map((s: any) => s.name)).toEqual(expect.arrayContaining([
-        "GET /users",
-        "chat.completion",
-        "custom op"
-      ]));
+      expect(result.map((s: any) => s.name)).toEqual(
+        expect.arrayContaining(["GET /users", "chat.completion", "custom op"]),
+      );
     });
 
     it("preset vercelAIOnly keeps only AI spans", () => {
-      const exporter = new LangWatchTraceExporter({ filters: [{ preset: "vercelAIOnly" }] });
+      const exporter = new LangWatchTraceExporter({
+        filters: [{ preset: "vercelAIOnly" }],
+      });
       const spans = makeSpans();
       (exporter as any).export(spans, () => undefined);
       const result = (exporter as any).__lastExportedSpans;
       expect(result).toEqual([
-        expect.objectContaining({ instrumentationScope: expect.objectContaining({ name: "ai" }) }),
+        expect.objectContaining({
+          instrumentationScope: expect.objectContaining({ name: "ai" }),
+        }),
       ]);
     });
 
     it("preset excludeHttpRequests removes HTTP request spans", () => {
-      const exporter = new LangWatchTraceExporter({ filters: [{ preset: "excludeHttpRequests" }] });
+      const exporter = new LangWatchTraceExporter({
+        filters: [{ preset: "excludeHttpRequests" }],
+      });
       const spans = makeSpans();
       (exporter as any).export(spans, () => undefined);
       const names = (exporter as any).__lastExportedSpans.map((s: any) => s.name);
@@ -364,10 +413,12 @@ describe("LangWatchExporter", () => {
     });
 
     it("pipeline include instrumentation ai then exclude http requests", () => {
-      const exporter = new LangWatchTraceExporter({ filters: [
-        { include: { instrumentationScopeName: [{ equals: "ai" }] } },
-        { preset: "excludeHttpRequests" },
-      ] });
+      const exporter = new LangWatchTraceExporter({
+        filters: [
+          { include: { instrumentationScopeName: [{ equals: "ai" }] } },
+          { preset: "excludeHttpRequests" },
+        ],
+      });
       const spans = makeSpans();
       (exporter as any).export(spans, () => undefined);
       const result = (exporter as any).__lastExportedSpans;
@@ -376,9 +427,9 @@ describe("LangWatchExporter", () => {
     });
 
     it("criteria by name startsWith only", () => {
-      const exporter = new LangWatchTraceExporter({ filters: [
-        { include: { name: [{ startsWith: "chat." }] } },
-      ] });
+      const exporter = new LangWatchTraceExporter({
+        filters: [{ include: { name: [{ startsWith: "chat." }] } }],
+      });
       const spans = makeSpans();
       (exporter as any).export(spans, () => undefined);
       const result = (exporter as any).__lastExportedSpans;
@@ -387,9 +438,9 @@ describe("LangWatchExporter", () => {
     });
 
     it("include instrumentationScopeName equals (case-sensitive by default)", () => {
-      const exporter = new LangWatchTraceExporter({ filters: [
-        { include: { instrumentationScopeName: [{ equals: "ai" }] } },
-      ] });
+      const exporter = new LangWatchTraceExporter({
+        filters: [{ include: { instrumentationScopeName: [{ equals: "ai" }] } }],
+      });
       const spans = makeSpans();
       (exporter as any).export(spans, () => undefined);
       const result = (exporter as any).__lastExportedSpans;
@@ -398,9 +449,9 @@ describe("LangWatchExporter", () => {
     });
 
     it("include name equals (case-sensitive by default)", () => {
-      const exporter = new LangWatchTraceExporter({ filters: [
-        { include: { name: [{ equals: "chat.completion" }] } },
-      ] });
+      const exporter = new LangWatchTraceExporter({
+        filters: [{ include: { name: [{ equals: "chat.completion" }] } }],
+      });
       const spans = makeSpans();
       (exporter as any).export(spans, () => undefined);
       const names = (exporter as any).__lastExportedSpans.map((s: any) => s.name);
@@ -408,9 +459,9 @@ describe("LangWatchExporter", () => {
     });
 
     it("include name equals with ignoreCase true", () => {
-      const exporter = new LangWatchTraceExporter({ filters: [
-        { include: { name: [{ equals: "CHAT.completion", ignoreCase: true }] } },
-      ] });
+      const exporter = new LangWatchTraceExporter({
+        filters: [{ include: { name: [{ equals: "CHAT.completion", ignoreCase: true }] } }],
+      });
       const spans = makeSpans();
       (exporter as any).export(spans, () => undefined);
       const names = (exporter as any).__lastExportedSpans.map((s: any) => s.name);
@@ -418,9 +469,9 @@ describe("LangWatchExporter", () => {
     });
 
     it("include name with OR semantics across array of Match", () => {
-      const exporter = new LangWatchTraceExporter({ filters: [
-        { include: { name: [{ startsWith: "chat." }, { equals: "custom op" }] } },
-      ] });
+      const exporter = new LangWatchTraceExporter({
+        filters: [{ include: { name: [{ startsWith: "chat." }, { equals: "custom op" }] } }],
+      });
       const spans = makeSpans();
       (exporter as any).export(spans, () => undefined);
       const names = (exporter as any).__lastExportedSpans.map((s: any) => s.name);
@@ -429,21 +480,31 @@ describe("LangWatchExporter", () => {
     });
 
     it("include instrumentationScopeName with OR array", () => {
-      const exporter = new LangWatchTraceExporter({ filters: [
-        { include: { instrumentationScopeName: [{ equals: "ai" }, { equals: "custom" }] } },
-      ] });
+      const exporter = new LangWatchTraceExporter({
+        filters: [
+          {
+            include: {
+              instrumentationScopeName: [{ equals: "ai" }, { equals: "custom" }],
+            },
+          },
+        ],
+      });
       const spans = makeSpans();
       (exporter as any).export(spans, () => undefined);
-      const scopes = (exporter as any).__lastExportedSpans.map((s: any) => s.instrumentationScope.name);
+      const scopes = (exporter as any).__lastExportedSpans.map(
+        (s: any) => s.instrumentationScope.name,
+      );
       expect(scopes).toEqual(expect.arrayContaining(["ai", "custom"]));
       expect(scopes).not.toContain("http");
     });
 
     it("include then exclude applies sequentially (AND pipeline)", () => {
-      const exporter = new LangWatchTraceExporter({ filters: [
-        { include: { instrumentationScopeName: [{ equals: "ai" }] } },
-        { exclude: { name: [{ equals: "chat.completion" }] } },
-      ] });
+      const exporter = new LangWatchTraceExporter({
+        filters: [
+          { include: { instrumentationScopeName: [{ equals: "ai" }] } },
+          { exclude: { name: [{ equals: "chat.completion" }] } },
+        ],
+      });
       const spans = makeSpans();
       (exporter as any).export(spans, () => undefined);
       const result = (exporter as any).__lastExportedSpans;
@@ -451,10 +512,12 @@ describe("LangWatchExporter", () => {
     });
 
     it("exclude then include can restore only matching subset (results zero here)", () => {
-      const exporter = new LangWatchTraceExporter({ filters: [
-        { exclude: { name: [{ startsWith: "chat." }] } },
-        { include: { instrumentationScopeName: [{ equals: "ai" }] } },
-      ] });
+      const exporter = new LangWatchTraceExporter({
+        filters: [
+          { exclude: { name: [{ startsWith: "chat." }] } },
+          { include: { instrumentationScopeName: [{ equals: "ai" }] } },
+        ],
+      });
       const spans = makeSpans();
       (exporter as any).export(spans, () => undefined);
       expect((exporter as any).__lastExportedSpans).toHaveLength(0);

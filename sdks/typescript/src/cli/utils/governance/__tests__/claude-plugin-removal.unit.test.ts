@@ -1,24 +1,18 @@
 /**
- * Taking the LangWatch Claude Code plugin back off a machine, and deregistering
- * the marketplace it came from, which is what `langwatch logout` does.
- *
- * `node:child_process` is the only thing mocked. The settings file and the
- * plugin state files are real files under a temp HOME.
- *
- * Feature: specs/ai-governance/cli-wrappers/claude-plugin-install.feature
+ * Tests removing the LangWatch Claude Code plugin and deregistering its marketplace.
+ * Only child_process is mocked; settings and plugin state files are real temp files.
  */
 
-import { describe, expect, it, vi } from "vitest";
-
 import type * as ChildProcessModule from "node:child_process";
+
+import { describe, expect, it, vi } from "vitest";
 
 import { installClaudePluginHarness } from "./claude-plugin-test-helpers";
 
 const { spawnSyncMock } = vi.hoisted(() => ({ spawnSyncMock: vi.fn() }));
 
 vi.mock("node:child_process", async () => {
-  const actual =
-    await vi.importActual<typeof ChildProcessModule>("node:child_process");
+  const actual = await vi.importActual<typeof ChildProcessModule>("node:child_process");
   return { ...actual, spawnSync: spawnSyncMock };
 });
 
@@ -53,9 +47,7 @@ describe("uninstallLangwatchClaudePlugin", () => {
       expect(uninstallLangwatchClaudePlugin()).toEqual({
         action: "uninstalled",
       });
-      expect(commandsRun()).toContain(
-        "plugin uninstall langwatch@langwatch --scope user",
-      );
+      expect(commandsRun()).toContain("plugin uninstall langwatch@langwatch --scope user");
     });
   });
 

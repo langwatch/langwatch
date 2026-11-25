@@ -140,45 +140,6 @@ Feature: The gate prices an action before it silently invalidates a prompt cache
     Then the developer is told the next request may silently miss its cache
     And is told how to confirm it from the cache-read token count
 
-  # --- Fan-out has a cache price as well as a memory price ---
-
-  @unit @unimplemented
-  Scenario: Sub-agents launched together are priced for the cache they cannot share
-    Given several sub-agents are launched in one turn on a shared prefix
-    When the spawn is priced
-    Then the report notes each one pays the cache write rather than the read
-    Because an entry is readable only once the first response using it begins streaming
-
-  # --- Unambiguous waste is denied, not warned about ---
-
-  @unit @unimplemented
-  Scenario: A tool call repeating identically with no intervening change is stopped
-    Given the same tool called with identical input, consecutively, past the repeat threshold
-    And no file was edited and no other tool was called in between
-    When it is called again
-    Then it is denied
-    And the reason says the call is repeating and asks for a different approach
-
-  @unit @unimplemented
-  Scenario: A test rerun after an edit is not a repeat
-    Given the same test command run twice with a file edit in between
-    When it is called the second time
-    Then it is not denied
-    Because that is the ordinary red-green loop and denying it would break the main way work gets done
-
-  @unit @unimplemented
-  Scenario: An interleaved call resets the repeat count
-    Given the same tool called twice with a different tool called in between
-    When it is called again
-    Then it is not denied
-
-  @unit @unimplemented
-  Scenario: The repeat count is scoped to one session and does not outlive it
-    Given repeat state recorded for a session
-    When that session ends
-    Then the state is discarded
-    Because a count that leaks across sessions eventually denies a first attempt
-
   # --- Model tier ---
 
   @unit @unimplemented

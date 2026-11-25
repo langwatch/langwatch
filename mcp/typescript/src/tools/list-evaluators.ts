@@ -1,13 +1,11 @@
 import {
   listEvaluators as apiListEvaluators,
   getEvaluatorType,
-} from "../langwatch-api-evaluators.js";
+} from "../langwatch-api-evaluators.ts";
 
 /**
- * Handles the platform_list_evaluators MCP tool invocation.
- *
- * Lists all evaluators in the LangWatch project, formatted as an
- * AI-readable digest.
+ * Handles the platform_list_evaluators MCP tool: lists evaluators in
+ * the project as an AI-readable digest.
  */
 export async function handleListEvaluators(): Promise<string> {
   const evaluators = await apiListEvaluators();
@@ -29,9 +27,7 @@ export async function handleListEvaluators(): Promise<string> {
     lines.push("");
   }
 
-  lines.push(
-    "> Use `platform_get_evaluator` with the ID or slug to see full evaluator details.",
-  );
+  lines.push("> Use `platform_get_evaluator` with the ID or slug to see full evaluator details.");
 
   return lines.join("\n");
 }

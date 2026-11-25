@@ -3,6 +3,7 @@ export {
   SimulationRunsApiError,
   type SimulationRunsListResponse,
   type SimulationRunResponse,
+  type SimulationRunEvaluation,
   type SimulationRunsBatchesListResponse,
   type SimulationRunsListParams,
   type SimulationRunsBatchesListParams,

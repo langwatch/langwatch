@@ -13,7 +13,7 @@ Feature: Heavy runs are admitted, queued, or refused
   # mid-session on an 11-core / 18 GiB machine: 17 node processes, 550-712 MB
   # each, PIDs inside a 250-PID range — one simultaneous burst of about 10.5 GB,
   # alongside an 8 GB colima VM. Those are vitest workers under `pool:
-  # "vmForks"`, which platform/app/vitest.config.ts picks deliberately and
+  # "vmForks"`, which the repository's vitest configs pick deliberately and
   # measures at 573 MB per fork — which is what the observed range is.
   # `maxWorkers: "50%"` is 5 workers PER RUN on 11 cores, so three or four
   # agents testing at once is 15-20 workers.
@@ -54,7 +54,7 @@ Feature: Heavy runs are admitted, queued, or refused
   #
   # NEIGHBOURS, so this file's boundary is explicit rather than discovered
   # later. specs/setup/memory-footprint.feature is about what a single process
-  # LOADS; specs/setup/in-process-workers-dev.feature is about HOW MANY
+  # LOADS; specs/setup/dev-process-topology.feature is about HOW MANY
   # processes a stack runs; specs/setup/haven-resource-caps.feature caps the
   # shared services. This file is about how many heavy runs may start at once,
   # and touches none of those levers.
@@ -82,11 +82,11 @@ Feature: Heavy runs are admitted, queued, or refused
 
   # --- Admitted exactly once ---
 
-  # ADR-091's gate rewraps an agent's command under `haven run --class heavy`,
+  # ADR-091's gate rewraps an agent's command under `haven machine run --class heavy`,
   # which holds a slot of its own. The wrapped command is still a package script
   # that routes through this counter, so without a handoff the outer run waits
   # for the inner one and at a limit of 1 it waits for itself. #6598 already
-  # established the rule for `haven typecheck`, which passes CHECK_SLOTS=0.
+  # established the rule for `haven machine typecheck`, which passes CHECK_SLOTS=0.
   @unit @unimplemented
   Scenario: A run already admitted by haven is not admitted a second time
     Given a run that haven has already taken a slot for
@@ -260,6 +260,59 @@ Feature: Heavy runs are admitted, queued, or refused
     When a heavy run starts
     Then it runs
     Because red throttles admission, it does not stop the machine working
+
+  # --- Compile and test runs belong to their launchers ---
+
+  # The tsc and vitest launchers take their own slot per run (plan
+  # dev/docs/plans/haven-exec-policy.md, D4), so a gate prediction for them
+  # would count one Nx run of many tasks as one slot. oxlint has its launcher
+  # too (phase 8); the vite and build:types builds take a build slot in their
+  # scripts and were never gated. Every other lint, format or build stays gated.
+  @unit
+  Scenario: The gate leaves compile and test runs to their launchers
+    Given pressure is not red, or a slot is free
+    When an agent runs tsc, vitest, pnpm typecheck, pnpm typecheck:src, pnpm test:affected, a filtered package typecheck or test, or nx run-many -t typecheck
+    Then the gate answers with no decision and no message
+    And the command runs as asked, taking its slot in the launcher
+
+  @unit
+  Scenario: At critical pressure a compile or test run with no slot is still refused
+    Given pressure is red and no slot is free
+    When an agent runs pnpm test:unit or tsc
+    Then the gate refuses it with the pressure and the queue depth, as for any heavy run
+
+  @unit
+  Scenario: The gate leaves oxlint runs to their launcher
+    Given pressure is not red, or a slot is free
+    When an agent runs oxlint directly, through pnpm exec or node_modules/.bin, or pnpm lint:fix
+    Then the gate answers with no decision and no message
+    And the command runs as asked, taking a lint slot in the oxlint launcher
+
+  @unit
+  Scenario: Lint and builds keep the gate until they have launchers
+    Given the machine is full
+    When an agent runs pnpm lint, a filtered package lint, oxfmt, eslint, golangci-lint, go build, docker build or next build, alone or chained after an oxlint run
+    Then the gate still describes the queue it expects
+    Because one segment without a launcher keeps the whole command gated
+
+  # --- Rush's gate, when it owns the program ---
+
+  # Ruling 2026-10-11: rush's gate and haven's slots never both queue one run.
+  # Rush owns a program while its gate keeps a shim for it in rush's gate/bin
+  # folder (none while the gate is off) and a rush binary is runnable.
+  @unit
+  Scenario: Haven steps aside for programs rush's gate owns
+    Given rush's gate holds shims for tsc, vitest and oxlint and rush is runnable
+    And pressure is red and no slot is free
+    When an agent runs tsc, pnpm typecheck, pnpm test:unit, vitest or oxlint
+    Then the gate answers with no decision and no message
+    Because rush's own hook and the launchers queue the run in rush
+
+  @unit
+  Scenario: Haven keeps its gate for programs rush's gate does not own
+    Given rush's gate holds shims for tsc and vitest only, or rush is not runnable
+    When an agent runs pnpm lint, oxfmt, tsc chained with oxfmt, or tsc with no runnable rush
+    Then the gate decides as it did before rush's gate existed
 
   # --- A tightened ceiling, only where it is earned ---
 

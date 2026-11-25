@@ -5,19 +5,23 @@ package otelrelay
 // gen_ai span synthesis that replaces the OTLP a pi worker never exports.
 
 import (
-	"fmt"
+	"context"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
 	"go.opentelemetry.io/collector/pdata/pcommon"
 	"go.opentelemetry.io/collector/pdata/ptrace"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
+	"go.uber.org/zap/zaptest/observer"
 
-	"github.com/langwatch/langwatch/services/langyagent/domain"
+	"github.com/langwatch/langwatch/pkg/clog"
 )
 
 // The version-rooted anthropic-messages dialect appends /v1/messages to its
@@ -89,8 +93,8 @@ func TestLLMProxy_MessagesLaneInjectsXAPIKey(t *testing.T) {
 	}
 }
 
-// piWorkerInfo registers a pi-harness worker whose customer ingest is the
-// signaling fake, and arms the turn context.
+// registerPiWorker registers a worker whose customer ingest is the signaling
+// fake, and arms the turn context.
 func registerPiWorker(t *testing.T, relay *Relay, gatewayURL, ingestURL string) string {
 	t.Helper()
 	token, err := relay.Register(WorkerInfo{
@@ -101,13 +105,35 @@ func registerPiWorker(t *testing.T, relay *Relay, gatewayURL, ingestURL string) 
 		Model:             "openai/gpt-5-mini",
 		GatewayBaseURL:    gatewayURL,
 		LLMVirtualKey:     "vk-real",
-		Harness:           domain.HarnessPi,
 	})
 	if err != nil {
 		t.Fatalf("Register: %v", err)
 	}
 	relay.SetTurnContext(token, turnContext())
 	return token
+}
+
+// awaitSpans reads exported bodies until it holds n spans, so a test that made
+// several calls does not depend on how the exporter batched them.
+func awaitSpans(t *testing.T, ingest *signallingIngest, n int) []ptrace.Span {
+	t.Helper()
+	var spans []ptrace.Span
+	for len(spans) < n {
+		td, err := (&ptrace.ProtoUnmarshaler{}).UnmarshalTraces(ingest.await(t))
+		if err != nil {
+			t.Fatalf("forwarded payload is not OTLP protobuf: %v", err)
+		}
+		for i := range td.ResourceSpans().Len() {
+			scopes := td.ResourceSpans().At(i).ScopeSpans()
+			for j := range scopes.Len() {
+				sp := scopes.At(j).Spans()
+				for k := range sp.Len() {
+					spans = append(spans, sp.At(k))
+				}
+			}
+		}
+	}
+	return spans
 }
 
 func firstSpan(t *testing.T, payload []byte) (ptrace.ResourceSpans, ptrace.Span) {
@@ -292,6 +318,68 @@ func TestLLMProxy_PiHarnessReadsAnthropicStreamUsage(t *testing.T) {
 // a bare usage on the non-stream body) with the hour-long write share nested
 // under cache_creation; the OpenAI Responses API reports reads as
 // input_tokens_details.cached_tokens.
+// @scenario "An option the gateway dropped from a model call is visible on the turn's telemetry"
+func TestLLMProxy_PiHarnessRecordsGatewayDroppedParams(t *testing.T) {
+	// A, B, A: the first set must stay deduped after a different set arrives
+	// in between, so a turn that alternates bodies does not log A twice.
+	sets := []string{"max_output_tokens,temperature", "top_p", "max_output_tokens,temperature"}
+	var calls atomic.Int32
+	gateway := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		n := calls.Add(1)
+		w.Header().Set("X-LangWatch-Params-Dropped", sets[(int(n)-1)%len(sets)])
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"id":"cmpl_1","usage":{"prompt_tokens":1,"completion_tokens":1}}`))
+	}))
+	defer gateway.Close()
+
+	core, logs := observer.New(zapcore.DebugLevel)
+	relay, err := New(clog.Set(context.Background(), zap.New(core)), Options{})
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+	t.Cleanup(func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		defer cancel()
+		_ = relay.Shutdown(ctx)
+	})
+	ingest := startSignallingIngest(t)
+	token := registerPiWorker(t, relay, gateway.URL, ingest.srv.URL)
+
+	for range len(sets) {
+		resp, err := http.Post(relay.LLMBaseURLFor(token)+"/chat/completions", "application/json", strings.NewReader(`{}`))
+		if err != nil {
+			t.Fatalf("proxied LLM call: %v", err)
+		}
+		_, _ = io.ReadAll(resp.Body)
+		resp.Body.Close()
+	}
+
+	// One span per call, and the exporter batches them as it likes: the bodies
+	// carry the spans of several calls, or one call each, in whatever order the
+	// flushes happen. What the span must carry is its own call's drop set, so
+	// the whole set of spans is read and counted.
+	dropped := map[string]int{}
+	for _, span := range awaitSpans(t, ingest, len(sets)) {
+		v, ok := span.Attributes().Get("langwatch.langy.params_dropped")
+		if !ok {
+			t.Errorf("a retold span records nothing about what the gateway dropped")
+			continue
+		}
+		dropped[v.Str()]++
+	}
+	if dropped["max_output_tokens,temperature"] != 2 || dropped["top_p"] != 1 {
+		t.Errorf("the retold spans must record what the gateway dropped, got %v", dropped)
+	}
+	if int(calls.Load()) != len(sets) {
+		t.Fatalf("expected every call to reach the gateway, got %d", calls.Load())
+	}
+	// A busy turn makes many LLM calls; each distinct drop set is logged once.
+	logged := logs.FilterMessage("gateway dropped params from a langy model call")
+	if logged.Len() != 2 {
+		t.Errorf("the two distinct drop sets must be logged once each, got %d lines", logged.Len())
+	}
+}
+
 // @scenario "The retold LLM span carries the provider's cached-token usage"
 func TestLLMProxy_PiHarnessReadsCachedTokenUsage(t *testing.T) {
 	for _, tc := range []struct {
@@ -378,43 +466,5 @@ func TestLLMProxy_PiHarnessReadsCachedTokenUsage(t *testing.T) {
 			assertIntAttr("gen_ai.usage.cache_creation.input_tokens", tc.wantCreate)
 			assertIntAttr("gen_ai.usage.cache_creation_1h.input_tokens", tc.wantCreate1h)
 		})
-	}
-}
-
-// Synthesis is GATED on the pi harness: an opencode worker exports its own
-// spans, and the relay must not add a duplicate retelling.
-func TestLLMProxy_OpencodeHarnessSynthesizesNothing(t *testing.T) {
-	gateway := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		_, _ = fmt.Fprint(w, `{"usage":{"prompt_tokens":5,"completion_tokens":2}}`)
-	}))
-	defer gateway.Close()
-
-	relay := startRelay(t)
-	ingest := startIngest(t)
-	// The error is checked: an empty token would make the POST below miss every
-	// registered worker, so the negative assertion would pass for the wrong reason.
-	token, err := relay.Register(WorkerInfo{
-		ConversationID:    "conv-oc",
-		LangwatchEndpoint: ingest.srv.URL,
-		LangwatchAPIKey:   "sk-session",
-		GatewayBaseURL:    gateway.URL,
-		LLMVirtualKey:     "vk",
-		Harness:           domain.HarnessOpenCode,
-	})
-	if err != nil {
-		t.Fatalf("Register: %v", err)
-	}
-	relay.SetTurnContext(token, turnContext())
-
-	resp, err := http.Post(relay.LLMBaseURLFor(token)+"/chat/completions", "application/json", strings.NewReader(`{}`))
-	if err != nil {
-		t.Fatalf("proxied LLM call: %v", err)
-	}
-	_, _ = io.ReadAll(resp.Body)
-	resp.Body.Close()
-
-	time.Sleep(300 * time.Millisecond)
-	if len(ingest.lastBody()) != 0 {
-		t.Fatalf("an opencode worker's LLM call must synthesize no span; ingest got %d bytes", len(ingest.lastBody()))
 	}
 }

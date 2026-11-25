@@ -18,15 +18,36 @@ import (
 	"github.com/langwatch/langwatch/services/langyagent/transport/rpc"
 )
 
+// startupFields is what the manager is running with, said once at boot.
+//
+// Which harness runs a turn, where the per-conversation worker comes from and
+// whether the ADR-033 per-worker UID sandbox is active were previously only
+// answerable by reading this package: a local manager with the sandbox off and
+// one with it on log the same line, and a manager whose worker binary does not
+// exist logs nothing at all until a turn dies inside the pool. The harness is a
+// constant because pi is the only one the manager can spawn.
+func startupFields(cfg Config) []zap.Field {
+	isolation := "uid-sandbox"
+	if cfg.UnsafeDevDisableIsolation {
+		isolation = "disabled"
+	}
+	return []zap.Field{
+		zap.String("addr", cfg.Server.Addr),
+		zap.Int("max_workers", cfg.MaxWorkers),
+		zap.String("environment", cfg.Environment),
+		zap.String("harness", "pi"),
+		zap.String("isolation", isolation),
+		zap.String("worker_binary", cfg.PiWorkerBinaryPath),
+		zap.String("sessions_root", cfg.SessionsRoot),
+	}
+}
+
 // Serve wires the app into HTTP transport and pkg/lifecycle management,
 // blocking until shutdown. Services stop in reverse registration order, so the
 // HTTP listener stops accepting first, then the worker pool drains (killing
-// each opencode subprocess), then OTel flushes.
+// each worker subprocess), then OTel flushes.
 func Serve(ctx context.Context, application *app.App, deps *Deps, cfg Config) error {
-	deps.Logger.Info("langyagent_starting",
-		zap.String("addr", cfg.Server.Addr),
-		zap.Int("max_workers", cfg.MaxWorkers),
-	)
+	deps.Logger.Info("langyagent_starting", startupFields(cfg)...)
 
 	info := contexts.MustGetServiceInfo(ctx)
 	handler := rpc.NewRouter(rpc.RouterDeps{
@@ -67,7 +88,7 @@ func Serve(ctx context.Context, application *app.App, deps *Deps, cfg Config) er
 		// so it stops just before it (reverse order): AFTER the worker pool has
 		// killed every worker, when nothing exports to it any more.
 		lifecycle.Closer("otel-relay", deps.OTelRelay.Shutdown),
-		// The PID-1 orphan reaper: opencode's children (gh/git/npm) reparent to
+		// The PID-1 orphan reaper: a worker's children (gh/git/npm) reparent to
 		// the manager on worker kill; only PID 1 may reap them. Fire-and-forget,
 		// stops when the group context cancels.
 		//
@@ -110,7 +131,7 @@ func Serve(ctx context.Context, application *app.App, deps *Deps, cfg Config) er
 		// ADR-048 shutdown-handoff. Registered LAST so it stops FIRST on SIGTERM
 		// (reverse-order): before the http listener drains and well before the
 		// worker-pool process-group kill, notify each live worker that shutdown is
-		// imminent so opencode checkpoints the in-flight turn and emits a terminal
+		// imminent so the worker checkpoints the in-flight turn and emits a terminal
 		// `handoff` frame. The frame flows out over the still-open /chat response
 		// (ListenServer keeps in-flight requests alive via WithoutCancel) to the
 		// control plane, which persists the resume token.

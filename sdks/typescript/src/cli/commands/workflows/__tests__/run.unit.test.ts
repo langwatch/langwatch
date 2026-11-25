@@ -1,17 +1,17 @@
 /**
- * `workflow run` has two things that can throw a `SyntaxError`, and they belong
- * to opposite parties: `JSON.parse(options.input)` is the CALLER's mistake, and
- * `await response.json()` is the SERVER's. They used to share one `try`, whose
- * catch mapped every `SyntaxError` to `--input must be valid JSON` — so a
- * malformed 200-body told the caller to fix an input that was already valid.
- *
- * That is worse than an unhelpful message: it sends the caller (or the agent
- * driving them) to debug the wrong side of the wire, and it is invisible unless
- * the two paths are exercised separately. So they are, here.
+ * `workflow run` has two `SyntaxError` sources: `JSON.parse(options.input)`
+ * is the CALLER's mistake, `response.json()` is the SERVER's. They used to
+ * share one message, sending a caller to debug the wrong side of the wire.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
-vi.mock("../../../utils/apiKey", () => ({ resolveCredentials: vi.fn(async () => ({ apiKey: "test-key", source: "env", endpoint: "https://app.langwatch.ai" })) }));
+vi.mock("../../../utils/apiKey", () => ({
+  resolveCredentials: vi.fn(async () => ({
+    apiKey: "test-key",
+    source: "env",
+    endpoint: "https://app.langwatch.ai",
+  })),
+}));
 
 vi.mock("ora", () => ({
   default: () => ({
@@ -101,16 +101,12 @@ describe("runWorkflowCommand()", () => {
     });
 
   const sentBody = (fetchSpy: ReturnType<typeof vi.spyOn>): unknown =>
-    JSON.parse(
-      (fetchSpy.mock.calls[0]![1] as { body: string }).body,
-    ) as unknown;
+    JSON.parse((fetchSpy.mock.calls[0]![1] as { body: string }).body) as unknown;
 
   describe("when --param pairs are given", () => {
     /** @scenario "The workflow run command merges param flags into its entry inputs" */
     it("sends each name as an entry input holding the flag's value", async () => {
-      const fetchSpy = vi
-        .spyOn(globalThis, "fetch")
-        .mockResolvedValue(okResponse());
+      const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(okResponse());
 
       await runWorkflowCommand({
         id: "wf_1",
@@ -127,9 +123,7 @@ describe("runWorkflowCommand()", () => {
     });
 
     it("wins over the same key in --input, and leaves the rest of it alone", async () => {
-      const fetchSpy = vi
-        .spyOn(globalThis, "fetch")
-        .mockResolvedValue(okResponse());
+      const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(okResponse());
 
       await runWorkflowCommand({
         id: "wf_1",
@@ -148,9 +142,7 @@ describe("runWorkflowCommand()", () => {
 
   describe("when only --input is given", () => {
     it("sends exactly the record it parsed, as it always did", async () => {
-      const fetchSpy = vi
-        .spyOn(globalThis, "fetch")
-        .mockResolvedValue(okResponse());
+      const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(okResponse());
 
       await runWorkflowCommand({
         id: "wf_1",

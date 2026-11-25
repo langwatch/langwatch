@@ -242,6 +242,7 @@ func TestLoadConfig_AuthCacheSecondsFields(t *testing.T) {
 	t.Setenv("LW_GATEWAY_AUTH_CACHE_SOFT_BUMP_SECONDS", "300")
 	t.Setenv("LW_GATEWAY_AUTH_CACHE_HARD_GRACE_SECONDS", "21600")
 	t.Setenv("LW_GATEWAY_AUTH_CACHE_CONFIG_TTL_SECONDS", "90")
+	t.Setenv("LW_GATEWAY_AUTH_CACHE_FAIL_CLOSED_AFTER_SECONDS", "60")
 
 	cfg, err := LoadConfig(context.Background())
 	if err != nil {
@@ -255,6 +256,23 @@ func TestLoadConfig_AuthCacheSecondsFields(t *testing.T) {
 	}
 	if cfg.AuthCache.ConfigTTLSeconds != 90 {
 		t.Errorf("AuthCache.ConfigTTLSeconds = %d, want 90", cfg.AuthCache.ConfigTTLSeconds)
+	}
+	if cfg.AuthCache.FailClosedAfterSeconds != 60 {
+		t.Errorf("AuthCache.FailClosedAfterSeconds = %d, want 60", cfg.AuthCache.FailClosedAfterSeconds)
+	}
+}
+
+// @scenario "a fail-closed limit out of range or under the long-poll hold is refused"
+func TestLoadConfig_RefusesBadFailClosedLimit(t *testing.T) {
+	for _, v := range []string{"-1", "10", "9000000000000"} {
+		clearGatewayEnv(t)
+		t.Setenv("LW_GATEWAY_INTERNAL_SECRET", "internal-1")
+		t.Setenv("LW_GATEWAY_JWT_SECRET", "jwt-1")
+		t.Setenv("LW_GATEWAY_AUTH_CACHE_FAIL_CLOSED_AFTER_SECONDS", v)
+		_, err := LoadConfig(context.Background())
+		if err == nil || !strings.Contains(err.Error(), "LW_GATEWAY_AUTH_CACHE_FAIL_CLOSED_AFTER_SECONDS") {
+			t.Errorf("value %s: want a startup error naming the variable, got %v", v, err)
+		}
 	}
 }
 
@@ -488,16 +506,19 @@ func clearGatewayEnv(t *testing.T) {
 		"LW_GATEWAY_CIRCUIT_COOLDOWN_S",
 		"LOG_LEVEL",
 		"LW_GATEWAY_BASE_URL",
+		"CODEX_API_BASE",
 		"LW_GATEWAY_INTERNAL_SECRET",
 		"LW_GATEWAY_JWT_SECRET",
 		"LW_GATEWAY_JWT_SECRET_PREVIOUS",
 		"LW_GATEWAY_AUTH_CACHE_SOFT_BUMP_SECONDS",
 		"LW_GATEWAY_AUTH_CACHE_HARD_GRACE_SECONDS",
 		"LW_GATEWAY_AUTH_CACHE_CONFIG_TTL_SECONDS",
+		"LW_GATEWAY_AUTH_CACHE_FAIL_CLOSED_AFTER_SECONDS",
 		"LW_GATEWAY_AUTH_CACHE_SOFT_BUMP",
 		"LW_GATEWAY_AUTH_CACHE_HARD_GRACE",
 		"LW_GATEWAY_AUTH_CACHE_CONFIG_TTL",
 		"CUSTOMER_TRACE_BRIDGE_BASE_URL",
+		"LW_GATEWAY_CORS_ALLOWED_ORIGINS",
 		"LW_GATEWAY_SPEND_ENABLED",
 		"LW_GATEWAY_SPEND_SPOOL_DIR",
 		"LW_GATEWAY_SPEND_SPOOL_MAX_BYTES",
@@ -530,4 +551,141 @@ func clearGatewayEnv(t *testing.T) {
 	} {
 		t.Setenv(k, "")
 	}
+}
+
+func TestLoadConfig_VoiceDefaultsAndOverrides(t *testing.T) {
+	clearGatewayEnv(t)
+	t.Setenv("LW_GATEWAY_INTERNAL_SECRET", "internal-1")
+	t.Setenv("LW_GATEWAY_JWT_SECRET", "jwt-1")
+
+	cfg, err := LoadConfig(context.Background())
+	if err != nil {
+		t.Fatalf("LoadConfig: %v", err)
+	}
+	if cfg.Voice.DrainSeconds != 570 || cfg.Voice.MaxSupervisedSessions != 2000 {
+		t.Fatalf("voice defaults = %+v, want a 570s drain and 2000 calls", cfg.Voice)
+	}
+
+	t.Setenv("LW_GATEWAY_VOICE_DRAIN_SECONDS", "40")
+	t.Setenv("LW_GATEWAY_VOICE_MAX_SUPERVISED_SESSIONS", "50")
+	cfg, err = LoadConfig(context.Background())
+	if err != nil {
+		t.Fatalf("LoadConfig: %v", err)
+	}
+	if cfg.Voice.DrainSeconds != 40 || cfg.Voice.MaxSupervisedSessions != 50 {
+		t.Fatalf("voice overrides = %+v, want a 40s drain and 50 calls", cfg.Voice)
+	}
+
+	t.Setenv("LW_GATEWAY_VOICE_DRAIN_SECONDS", "-1")
+	if _, err = LoadConfig(context.Background()); err == nil {
+		t.Fatal("a negative voice drain was accepted")
+	}
+}
+
+// CORS is opt-in: unset sends no headers, and a malformed origin stops boot.
+//
+// @scenario "A malformed allowed origin stops the gateway at boot"
+func TestLoadConfig_CORSAllowedOrigins(t *testing.T) {
+	load := func(t *testing.T, value string) (Config, error) {
+		t.Helper()
+		clearGatewayEnv(t)
+		t.Setenv("LW_GATEWAY_INTERNAL_SECRET", "internal-1")
+		t.Setenv("LW_GATEWAY_JWT_SECRET", "jwt-1")
+		if value != "" {
+			t.Setenv("LW_GATEWAY_CORS_ALLOWED_ORIGINS", value)
+		}
+		return LoadConfig(context.Background())
+	}
+
+	t.Run("off by default", func(t *testing.T) {
+		cfg, err := load(t, "")
+		if err != nil {
+			t.Fatalf("LoadConfig: %v", err)
+		}
+		if got := cfg.CORS.AllowedOriginList(); len(got) != 0 {
+			t.Errorf("AllowedOriginList = %v, want none", got)
+		}
+	})
+
+	t.Run("a list of exact origins", func(t *testing.T) {
+		cfg, err := load(t, "https://app.example.com, http://localhost:5173")
+		if err != nil {
+			t.Fatalf("LoadConfig: %v", err)
+		}
+		got := strings.Join(cfg.CORS.AllowedOriginList(), "|")
+		if got != "https://app.example.com|http://localhost:5173" {
+			t.Errorf("AllowedOriginList = %q", got)
+		}
+	})
+
+	t.Run("any origin", func(t *testing.T) {
+		cfg, err := load(t, "*")
+		if err != nil {
+			t.Fatalf("LoadConfig: %v", err)
+		}
+		if got := cfg.CORS.AllowedOriginList(); len(got) != 1 || got[0] != "*" {
+			t.Errorf("AllowedOriginList = %v, want [*]", got)
+		}
+	})
+
+	for _, bad := range []string{
+		"app.example.com",
+		"https://app.example.com/",
+		"https://app.example.com/path",
+		"https://*.example.com",
+		"https://user:pw@app.example.com",
+		"null",
+		"*,https://app.example.com",
+	} {
+		t.Run("refuses "+bad, func(t *testing.T) {
+			_, err := load(t, bad)
+			if err == nil {
+				t.Fatalf("LoadConfig accepted %q", bad)
+			}
+			if !strings.Contains(err.Error(), "LW_GATEWAY_CORS_ALLOWED_ORIGINS") {
+				t.Errorf("error does not name the variable: %v", err)
+			}
+		})
+	}
+}
+
+// Spec: specs/model-providers/codex-account-provider.feature
+// "A Codex base that is unset or blank reaches OpenAI" and
+// "Codex is reached at the bases the deployment configures".
+func TestLoadConfig_CodexAPIBase(t *testing.T) {
+	t.Run("unset leaves the router on OpenAI's own backend", func(t *testing.T) {
+		clearGatewayEnv(t)
+		t.Setenv("LW_GATEWAY_INTERNAL_SECRET", "internal-1")
+		t.Setenv("LW_GATEWAY_JWT_SECRET", "jwt-1")
+		cfg, err := LoadConfig(context.Background())
+		if err != nil {
+			t.Fatalf("LoadConfig: %v", err)
+		}
+		if got := codexBackendURL(cfg.CodexAPIBase); got != "" {
+			t.Errorf("codexBackendURL = %q, want empty (the router's default)", got)
+		}
+	})
+	t.Run("a configured base carries the Responses endpoint", func(t *testing.T) {
+		clearGatewayEnv(t)
+		t.Setenv("LW_GATEWAY_INTERNAL_SECRET", "internal-1")
+		t.Setenv("LW_GATEWAY_JWT_SECRET", "jwt-1")
+		t.Setenv("CODEX_API_BASE", "http://127.0.0.1:6970/backend-api/codex/")
+		cfg, err := LoadConfig(context.Background())
+		if err != nil {
+			t.Fatalf("LoadConfig: %v", err)
+		}
+		want := "http://127.0.0.1:6970/backend-api/codex/responses"
+		if got := codexBackendURL(cfg.CodexAPIBase); got != want {
+			t.Errorf("codexBackendURL = %q, want %q", got, want)
+		}
+	})
+	t.Run("a value that is not a URL is refused at boot", func(t *testing.T) {
+		clearGatewayEnv(t)
+		t.Setenv("LW_GATEWAY_INTERNAL_SECRET", "internal-1")
+		t.Setenv("LW_GATEWAY_JWT_SECRET", "jwt-1")
+		t.Setenv("CODEX_API_BASE", "not a url")
+		if _, err := LoadConfig(context.Background()); err == nil || !strings.Contains(err.Error(), "CODEX_API_BASE") {
+			t.Fatalf("LoadConfig error = %v, want a CODEX_API_BASE refusal", err)
+		}
+	})
 }

@@ -1,0 +1,154 @@
+/**
+ * @vitest-environment jsdom
+ * The fire-once redirect guard, and the routing target per experiment type.
+ * See specs/experiments-v3/evaluation-creation-entrypoints.feature and
+ * modules/experiment/specs/experiment-entry-redirects.feature.
+ */
+
+import { cleanup, render } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+import { ExperimentType } from "../../../../model/prisma-types.ts";
+
+const { replaceMock, routerState, experimentState } = vi.hoisted(() => ({
+  replaceMock: vi.fn(),
+  routerState: { query: {} as Record<string, unknown> },
+  experimentState: {
+    data: undefined as { type?: string; workbenchState?: unknown; workflowId?: string } | undefined,
+    isFetched: false,
+  },
+}));
+
+// A new object each call, mirroring the real compat shim, so the redirect
+// effect sees an unstable `router` dependency every render.
+vi.mock("@langwatch/browser-host/use-router", () => ({
+  useRouter: () => ({ query: routerState.query, replace: replaceMock }),
+}));
+
+vi.mock("@langwatch/browser-host/use-organization-team-project", () => ({
+  useOrganizationTeamProject: () => ({
+    project: { id: "p1", slug: "test-project" },
+  }),
+}));
+
+vi.mock("@langwatch/design-system/loading-screen", () => ({
+  LoadingScreen: () => <div data-testid="loading" />,
+}));
+
+// The page reads the experiment to decide where a slugged URL can open, so the
+// tRPC hook is mocked and the branch under test is driven by `experimentState`.
+vi.mock("../../../../behavior/experiment-api.ts", () => ({
+  experimentApi: {
+    experiments: {
+      getExperimentBySlugOrId: {
+        useQuery: () => ({
+          data: experimentState.data,
+          isFetched: experimentState.isFetched,
+        }),
+      },
+    },
+  },
+}));
+
+const { default: EvaluationWizardRedirect } =
+  await import("../evaluation-wizard-redirect.screen.tsx");
+
+const renderRepeatedly = () => {
+  const { rerender } = render(<EvaluationWizardRedirect />);
+  // Each re-render hands the effect a fresh router object; the guard must keep
+  // the redirect from firing again.
+  for (let i = 0; i < 4; i++) rerender(<EvaluationWizardRedirect />);
+};
+
+describe("Evaluation wizard redirect", () => {
+  afterEach(() => cleanup());
+  beforeEach(() => {
+    vi.clearAllMocks();
+    routerState.query = {};
+    experimentState.data = undefined;
+    experimentState.isFetched = false;
+  });
+
+  describe("when there is no slug", () => {
+    /** @scenario A bare legacy wizard URL redirects to a fresh workbench */
+    it("redirects to a fresh workbench exactly once", () => {
+      routerState.query = {};
+
+      renderRepeatedly();
+
+      expect(replaceMock).toHaveBeenCalledTimes(1);
+      expect(replaceMock).toHaveBeenCalledWith("/test-project/experiments/workbench");
+    });
+  });
+
+  describe("when the experiment is workbench-native", () => {
+    /** @scenario Legacy wizard URLs for workbench-native experiments redirect to the workbench */
+    it("redirects to the slugged workbench exactly once", () => {
+      routerState.query = { slug: "saved-1" };
+      experimentState.data = { type: ExperimentType.EVALUATIONS_V3 };
+      experimentState.isFetched = true;
+
+      renderRepeatedly();
+
+      expect(replaceMock).toHaveBeenCalledTimes(1);
+      expect(replaceMock).toHaveBeenCalledWith("/test-project/experiments/workbench/saved-1");
+    });
+  });
+
+  describe("when the experiment predates the workbench", () => {
+    /** @scenario Legacy wizard URLs for experiments that predate the workbench redirect to their workflow */
+    it("redirects to the experiment's workflow exactly once", () => {
+      routerState.query = { slug: "saved-2" };
+      experimentState.data = {
+        type: ExperimentType.BATCH_EVALUATION_V2,
+        workflowId: "wf-9",
+      };
+      experimentState.isFetched = true;
+
+      renderRepeatedly();
+
+      expect(replaceMock).toHaveBeenCalledTimes(1);
+      expect(replaceMock).toHaveBeenCalledWith("/test-project/studio/wf-9");
+    });
+  });
+
+  describe("when the experiment has neither a workbench nor a workflow", () => {
+    /** @scenario A wizard link to an experiment with no workbench and no workflow opens its read-only view */
+    it("redirects to the read-only experiment view exactly once", () => {
+      routerState.query = { slug: "sdk-run" };
+      experimentState.data = { type: ExperimentType.BATCH_EVALUATION_V2 };
+      experimentState.isFetched = true;
+
+      renderRepeatedly();
+
+      expect(replaceMock).toHaveBeenCalledTimes(1);
+      expect(replaceMock).toHaveBeenCalledWith("/test-project/experiments/sdk-run");
+    });
+  });
+
+  describe("when reading the experiment fails", () => {
+    /** @scenario A wizard link whose experiment cannot be read opens the read-only view */
+    it("redirects to the read-only experiment view exactly once", () => {
+      routerState.query = { slug: "gone-1" };
+      experimentState.data = undefined;
+      experimentState.isFetched = true;
+
+      renderRepeatedly();
+
+      expect(replaceMock).toHaveBeenCalledTimes(1);
+      expect(replaceMock).toHaveBeenCalledWith("/test-project/experiments/gone-1");
+    });
+  });
+
+  describe("when a slugged experiment is still loading", () => {
+    /** @scenario A wizard link waits for its experiment before choosing where it opens */
+    it("waits for the experiment before redirecting", () => {
+      routerState.query = { slug: "saved-3" };
+      experimentState.isFetched = false;
+
+      renderRepeatedly();
+
+      expect(replaceMock).not.toHaveBeenCalled();
+    });
+  });
+});

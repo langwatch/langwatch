@@ -34,6 +34,7 @@ npm start
 ```
 
 This example:
+
 - Iterates over a Q&A dataset
 - Calls a simulated LLM for each question
 - Logs accuracy (pass/fail) and confidence score metrics
@@ -47,6 +48,7 @@ npm run start:with-evaluator
 ```
 
 This example:
+
 - Uses the `langevals/exact_match` evaluator
 - Combines built-in evaluators with custom metrics
 
@@ -59,6 +61,7 @@ npm run start:multi-target
 ```
 
 This example:
+
 - Uses `setupObservability()` to enable trace capture (required for trace links)
 - Uses `withTarget()` for target-scoped tracing
 - Each target gets its own unique trace ID (clickable in evaluation results)
@@ -112,7 +115,7 @@ await evaluation.run(
       passed: response === item.expected,
     });
   },
-  { concurrency: 4 } // Run 4 items in parallel
+  { concurrency: 4 }, // Run 4 items in parallel
 );
 ```
 
@@ -129,8 +132,8 @@ evaluation.log("latency", { index, score: 150.5 });
 evaluation.log("accuracy", {
   index,
   passed: true,
-  target: "gpt-4",
-  metadata: { model: "openai/gpt-4" },
+  target: "gpt-6-luna",
+  metadata: { model: "openai/gpt-6-luna" },
 });
 
 // With additional data
@@ -148,8 +151,8 @@ The `withTarget()` method creates a target-scoped span with automatic latency ca
 ```typescript
 await evaluation.run(dataset, async ({ item, index }) => {
   // Run multiple targets in parallel
-  const [gpt4, claude] = await Promise.all([
-    evaluation.withTarget("gpt-4", { model: "openai/gpt-4" }, async () => {
+  const [gptLuna, claude] = await Promise.all([
+    evaluation.withTarget("gpt-6-luna", { model: "openai/gpt-6-luna" }, async () => {
       const response = await openai.chat(item.question);
 
       // Target and index are auto-inferred inside withTarget()!
@@ -166,11 +169,12 @@ await evaluation.run(dataset, async ({ item, index }) => {
   ]);
 
   // Latency is automatically captured from span duration
-  console.log(`GPT-4: ${gpt4.duration}ms, Claude: ${claude.duration}ms`);
+  console.log(`GPT-6 Luna: ${gptLuna.duration}ms, Claude: ${claude.duration}ms`);
 });
 ```
 
 Benefits of `withTarget()`:
+
 - **Automatic latency capture** - Duration stored in dataset entry per target (like Evaluations V3)
 - **Context inference** - `log()` calls inside automatically use the target
 - **Parallel execution** - Use `Promise.all` for concurrent target testing

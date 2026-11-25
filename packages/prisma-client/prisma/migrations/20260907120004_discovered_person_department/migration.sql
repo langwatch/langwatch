@@ -1,0 +1,47 @@
+-- The department the directory pull already reads, kept on the person it is
+-- about (ADR-128 sections 10-11).
+--
+-- The Microsoft Graph directory read has carried `department` in every event's
+-- `extra` since it shipped, and two consumers used it: the OCSF row kept it,
+-- and directoryDepartmentSync assigned it to the LangWatch member a row
+-- PROVES. Everyone else - which on a fresh tenant is everyone, because nobody
+-- is linked yet - had their department read and then dropped. The People
+-- screen could only ever show a department through a link, so a directory that
+-- named four of them showed none.
+--
+-- NOT a "Department" foreign key, and that is the point of the column rather
+-- than an oversight:
+--
+--   * "Department" is the organization's own accounting entity - created,
+--     renamed, archived by an administrator, and the thing spend rolls up by.
+--     Every row in it is a decision somebody made.
+--   * This is free text a provider asserted about somebody who, in the common
+--     case, holds no LangWatch account at all. Minting a "Department" row for
+--     each distinct string a directory happens to contain would fill an
+--     administrator's spend-attribution list with entries they never chose and
+--     cannot meaningfully archive.
+--
+-- The two meet where they already met: when the match engine proves a person
+-- IS a member, directoryDepartmentSync resolves the same text onto a real
+-- "Department" and assigns the membership. This column is what the screen can
+-- show in the meantime, and it is why "the providers say Engineering" and "we
+-- attribute spend to Engineering" stay separately answerable.
+--
+-- NULLABLE, with null meaning "no directory has named one". A blank field in
+-- the tenant's directory and a person no directory lists are the same null:
+-- both are an absence of information, and neither is a claim that the person
+-- has no department. That is also why the write path only ever widens - a
+-- sighting carrying a blank department leaves a recorded one alone rather than
+-- clearing it (governanceIdentity.repository, recordDirectorySighting).
+--
+-- No backfill. The directory read runs daily and re-reads the whole tenant, so
+-- the column fills itself on the next pass; a backfill would have nothing to
+-- read from anyway, since the ClickHouse event rows are the only other copy and
+-- re-deriving people from them is exactly what the daily pull already does.
+ALTER TABLE "DiscoveredPerson" ADD COLUMN "department" TEXT;
+
+-- Reversible: the column holds a copy of what the directory says, and the next
+-- directory read rewrites every value in it. Dropping it loses nothing that a
+-- pull does not recover within a day.
+-- To roll back, uncomment and run manually:
+--   ALTER TABLE "DiscoveredPerson" DROP COLUMN "department";

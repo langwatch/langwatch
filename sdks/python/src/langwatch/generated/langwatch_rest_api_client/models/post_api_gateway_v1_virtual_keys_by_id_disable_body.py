@@ -15,7 +15,7 @@ T = TypeVar("T", bound="PostApiGatewayV1VirtualKeysByIdDisableBody")
 class PostApiGatewayV1VirtualKeysByIdDisableBody:
     """
     Attributes:
-        reason (str | Unset): Operator note, audit-logged and shown in the key's detail view.
+        reason (str | Unset):
     """
 
     reason: str | Unset = UNSET

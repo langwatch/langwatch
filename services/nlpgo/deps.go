@@ -3,10 +3,8 @@ package nlpgo
 import (
 	"context"
 	"fmt"
-	"os"
 	"strings"
 
-	"github.com/oklog/ulid/v2"
 	"go.uber.org/zap"
 
 	"github.com/langwatch/langwatch/pkg/clog"
@@ -28,8 +26,6 @@ import (
 // OTEL_EXPORTER_OTLP_* namespace: in a dev shell that namespace points
 // every service's OWN telemetry at the local observability stack, and
 // reading it here would silently divert customer studio traces into it.
-// The deprecated `OTEL_OTLP_ENDPOINT` fallback is kept for environments
-// that predate LANGWATCH_ENDPOINT wiring.
 func configureNLPGoOTel(ctx context.Context, cfg Config, nodeID string) (*otelsetup.Provider, error) {
 	// LANGWATCH_ENDPOINT is the ONLY source for the customer router. The
 	// pre-unification fallback to OTEL_OTLP_ENDPOINT was removed when that
@@ -40,22 +36,12 @@ func configureNLPGoOTel(ctx context.Context, cfg Config, nodeID string) (*otelse
 	// content there instead. Losing telemetry is recoverable; misrouting it
 	// is not, so an unset LANGWATCH_ENDPOINT fails toward exporting nothing,
 	// loudly.
-	endpoint := strings.TrimSpace(os.Getenv("LANGWATCH_ENDPOINT"))
+	endpoint := strings.TrimSpace(cfg.LangWatchEndpoint)
 	if endpoint != "" {
 		endpoint = strings.TrimRight(endpoint, "/") + "/api/otel/v1/traces"
 	} else if cfg.OTel.OTLPEndpoint != "" || cfg.OTel.ExporterEndpoint != "" || cfg.OTel.ExporterTracesEndpoint != "" {
 		clog.Get(ctx).Warn("nlpgo customer trace export is OFF: set LANGWATCH_ENDPOINT — the OTEL_* endpoints carry LangWatch's own operational spans and never route customer traces (the debug collector still applies for local development)")
 	}
-	// NLPGO_SPAN_SYNC=1 swaps the per-tenant BatchSpanProcessor for a
-	// SimpleSpanProcessor — every span.End() blocks on the OTLP
-	// roundtrip. The integration test
-	// platform/app/src/server/nlpgo/__tests__/traceparent-roundtrip.integration.test.ts
-	// flips this on so it can assert on persisted spans without
-	// chasing async BSP-flush windows under saturated-CI scheduler
-	// contention. Production deployments must leave this off — async
-	// batching is what keeps the request hot path independent of
-	// collector RTT.
-	syncExport := strings.TrimSpace(os.Getenv("NLPGO_SPAN_SYNC")) == "1"
 	debugEndpoint, debugHeaders := cfg.OTel.DebugCollector()
 	// The service's OWN spans (startup, health, background work — anything
 	// that never acquires a tenant api_key) go to the internal collector the
@@ -67,11 +53,16 @@ func configureNLPGoOTel(ctx context.Context, cfg Config, nodeID string) (*otelse
 		OTLPEndpoint:           endpoint,
 		Sampler:                cfg.OTel.SamplerChoice(),
 		MultiTenant:            true,
-		SyncExport:             syncExport,
+		SyncExport:             cfg.SpanSync,
 		OpsEndpoint:            opsEndpoint,
 		OpsHeaders:             opsHeaders,
 		DebugCollectorEndpoint: debugEndpoint,
 		DebugCollectorHeaders:  debugHeaders,
+		// The same switch every service built through OTel.Configure honors.
+		// nlpgo builds its Options by hand (its spans route per tenant), and
+		// without this line it was the one Go lane still posting metrics to a
+		// debug collector a developer had not started.
+		MetricsDisabled: cfg.OTel.MetricsExportDisabled(),
 	})
 }
 
@@ -94,7 +85,7 @@ func NewDeps(ctx context.Context, cfg Config) (context.Context, *Deps, error) {
 	}
 	logger := clog.New(ctx, cfg.Log)
 	ctx = clog.Set(ctx, logger)
-	nodeID := resolveNodeID(ctx, logger)
+	nodeID := otelsetup.ResolveNodeID(logger)
 
 	otelProvider, err := configureNLPGoOTel(ctx, cfg, nodeID)
 	if err != nil {
@@ -122,15 +113,4 @@ func NewDeps(ctx context.Context, cfg Config) (context.Context, *Deps, error) {
 		Health:   probes,
 		Profiler: profiler,
 	}, nil
-}
-
-func resolveNodeID(ctx context.Context, logger *zap.Logger) string {
-	hostname, err := os.Hostname()
-	if err != nil {
-		id := ulid.Make().String()
-		logger.Warn("hostname_unavailable", zap.Error(err), zap.String("fallback_node_id", id))
-		_ = ctx
-		return id
-	}
-	return hostname
 }

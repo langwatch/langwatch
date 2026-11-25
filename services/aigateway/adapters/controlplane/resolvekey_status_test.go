@@ -77,7 +77,7 @@ func TestResolveKey_ForbiddenBodyDecidesTheCode(t *testing.T) {
 				HTTPClient: srv.Client(),
 			})
 
-			_, err := cp.ResolveKey(context.Background(), "vk-lw-whatever")
+			_, err := cp.ResolveKey(context.Background(), domain.PresentedKey{Token: "vk-lw-whatever"})
 			require.Error(t, err)
 			assert.ErrorIs(t, err, tc.want)
 		})
@@ -143,6 +143,18 @@ func TestExtractClaims_VirtualKeyExpiresAt(t *testing.T) {
 	}
 }
 
+// The secret_valid_until claim is the previous secret's grace end; any other
+// credential sends none and decodes to the zero time.
+func TestExtractClaims_SecretValidUntil(t *testing.T) {
+	graceEnd := time.Now().Add(time.Minute).Truncate(time.Second)
+	m := map[string]any{"vk_id": "vk_01HZX", "exp": float64(time.Now().Add(15 * time.Minute).Unix())}
+
+	assert.True(t, claimsToBundle(extractClaims(m)).SecretValidUntil.IsZero())
+
+	m["secret_valid_until"] = float64(graceEnd.Unix())
+	assert.True(t, claimsToBundle(extractClaims(m)).SecretValidUntil.Equal(graceEnd))
+}
+
 // An unknown key and a bad credential are the same answer, and neither is a
 // stop on a key that exists: 401 must not be read as one of the 403 codes.
 func TestResolveKey_UnauthorizedIsAnInvalidKey(t *testing.T) {
@@ -158,7 +170,7 @@ func TestResolveKey_UnauthorizedIsAnInvalidKey(t *testing.T) {
 		HTTPClient: srv.Client(),
 	})
 
-	_, err := cp.ResolveKey(context.Background(), "vk-lw-whatever")
+	_, err := cp.ResolveKey(context.Background(), domain.PresentedKey{Token: "vk-lw-whatever"})
 	require.Error(t, err)
 	require.NotErrorIs(t, err, domain.ErrKeyExpired)
 	require.ErrorIs(t, err, domain.ErrInvalidAPIKey)

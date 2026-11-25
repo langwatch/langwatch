@@ -1,5 +1,7 @@
 import chalk from "chalk";
+
 import { PromptsApiService } from "@/client-sdk/services/prompts";
+
 import { resolveCredentials } from "../../utils/apiKey";
 import type { CommandResult } from "../../utils/output";
 
@@ -16,9 +18,7 @@ export const tagAssignCommand = async (
   options?: { version?: string },
 ): Promise<CommandResult | void> => {
   if (options?.version !== undefined && !/^[1-9]\d*$/.test(options.version)) {
-    console.error(
-      chalk.red("Error: --version must be a positive integer"),
-    );
+    console.error(chalk.red("Error: --version must be a positive integer"));
     process.exit(1);
   }
 

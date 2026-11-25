@@ -42,8 +42,8 @@ ALTER TABLE "Trigger"
 ```ts
 const engine = new Liquid({
   strictFilters: true,
-  strictVariables: false,   // missing vars render as empty string, no throw
-  cache: true,              // LRU of compiled templates, default 1k entries
+  strictVariables: false, // missing vars render as empty string, no throw
+  cache: true, // LRU of compiled templates, default 1k entries
 });
 ```
 
@@ -128,7 +128,7 @@ Letting templates branch on `{% if digest %}` would double the surface area cust
 
 ### Why fall-back-to-default on render failure
 
-Silent failure of customer-authored content (with operator visibility) is strictly better than blocking dispatch entirely. The customer gets *something* useful (the default message) and operators see the rendering error in the activity tab; the alternative is the customer getting nothing and having to debug from logs.
+Silent failure of customer-authored content (with operator visibility) is strictly better than blocking dispatch entirely. The customer gets _something_ useful (the default message) and operators see the rendering error in the activity tab; the alternative is the customer getting nothing and having to debug from logs.
 
 ### Why a shared module under `src/shared/templating/`
 
@@ -137,7 +137,7 @@ Both server-side dispatch (renders the actual notification) and the UI (renders 
 ## Consequences
 
 - **Four new nullable `Trigger` columns.** Single `ALTER TABLE`; trivial migration.
-- **New module at `src/shared/templating/`** wrapping engine setup, render, validation, and the Block Kit allowlist. The rendering surface — sandboxed user templates with a digest `matches[]` shape — is reusable by any future outbox reactor that needs customer-customizable output.
+- **Shared templating module** wrapping engine setup, render, validation, and the Block Kit allowlist. The rendering surface — sandboxed user templates with a digest `matches[]` shape — is reusable by any subscriber or intent executor that needs customer-customizable output.
 - **Default templates extracted from current hardcoded output.** Existing customers see no change.
 - **Operator-facing surfaces** (ADR-037):
   - Split-pane editor with live preview (Monaco + Liquid mode).
@@ -150,7 +150,7 @@ Both server-side dispatch (renders the actual notification) and the UI (renders 
 
 ## References
 
-- [ADR-030](./030-transactional-outbox-for-stake-sensitive-dispatch.md) — outbox dispatch is the renderer's caller
+- [ADR-052](./052-automations-on-process-manager-substrate.md) — outbox dispatch is the renderer's caller
 - [ADR-026](./026-per-trigger-dispatch-timing.md) — cadence model that produces `matches[]` of varying length
 - [ADR-037](./037-automation-operator-surfaces.md) — drawer that surfaces the live preview and template-health warnings
 - `liquidjs` — https://liquidjs.com (engine choice)

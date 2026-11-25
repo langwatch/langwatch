@@ -1,13 +1,14 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-vi.mock("../langwatch-api-evaluators.js", async (importOriginal) => {
-  const actual = await importOriginal() as Record<string, unknown>;
+vi.mock("../langwatch-api-evaluators.ts", async (importOriginal) => {
+  const actual = (await importOriginal()) as Record<string, unknown>;
   return {
     ...actual,
     listEvaluators: vi.fn(),
     getEvaluator: vi.fn(),
     createEvaluator: vi.fn(),
     updateEvaluator: vi.fn(),
+    deleteEvaluator: vi.fn(),
   };
 });
 
@@ -16,17 +17,19 @@ import {
   getEvaluator,
   createEvaluator,
   updateEvaluator,
-} from "../langwatch-api-evaluators.js";
-
-import { handleListEvaluators } from "../tools/list-evaluators.js";
-import { handleGetEvaluator } from "../tools/get-evaluator.js";
-import { handleCreateEvaluator } from "../tools/create-evaluator.js";
-import { handleUpdateEvaluator } from "../tools/update-evaluator.js";
+  deleteEvaluator,
+} from "../langwatch-api-evaluators.ts";
+import { handleCreateEvaluator } from "../tools/create-evaluator.ts";
+import { handleDeleteEvaluator } from "../tools/delete-evaluator.ts";
+import { handleGetEvaluator } from "../tools/get-evaluator.ts";
+import { handleListEvaluators } from "../tools/list-evaluators.ts";
+import { handleUpdateEvaluator } from "../tools/update-evaluator.ts";
 
 const mockListEvaluators = vi.mocked(listEvaluators);
 const mockGetEvaluator = vi.mocked(getEvaluator);
 const mockCreateEvaluator = vi.mocked(createEvaluator);
 const mockUpdateEvaluator = vi.mocked(updateEvaluator);
+const mockDeleteEvaluator = vi.mocked(deleteEvaluator);
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -220,6 +223,36 @@ describe("handleCreateEvaluator()", () => {
       expect(result).toContain("langevals/llm_boolean");
     });
   });
+
+  describe("when the tool creates a custom code evaluator", () => {
+    const config = {
+      code: "class Code:\n    def __call__(self, output: str):\n        return {}\n",
+      inputs: [{ identifier: "output", type: "str" }],
+    };
+
+    /** @scenario The MCP tool creates a code evaluator */
+    it("sends the kind and the program unchanged", async () => {
+      mockCreateEvaluator.mockResolvedValue({
+        id: "evaluator_code1",
+        projectId: "proj_1",
+        name: "Exact",
+        slug: "exact",
+        type: "code",
+        config,
+        workflowId: null,
+        copiedFromEvaluatorId: null,
+        createdAt: "2024-01-01T00:00:00.000Z",
+        updatedAt: "2024-01-01T00:00:00.000Z",
+        fields: [{ identifier: "output", type: "str" }],
+        outputFields: [{ identifier: "passed", type: "bool" }],
+      });
+
+      const result = await handleCreateEvaluator({ name: "Exact", type: "code", config });
+
+      expect(mockCreateEvaluator).toHaveBeenCalledWith({ name: "Exact", type: "code", config });
+      expect(result).toContain("**Kind**: code");
+    });
+  });
 });
 
 describe("handleUpdateEvaluator()", () => {
@@ -257,6 +290,21 @@ describe("handleUpdateEvaluator()", () => {
 
     it("includes the updated name", () => {
       expect(result).toContain("Updated Name");
+    });
+  });
+});
+
+describe("handleDeleteEvaluator()", () => {
+  describe("when the API answers success without an id", () => {
+    let result: string;
+
+    beforeEach(async () => {
+      mockDeleteEvaluator.mockResolvedValue({ success: true });
+      result = await handleDeleteEvaluator({ idOrSlug: "toxicity-check" });
+    });
+
+    it("names the id the tool was given", () => {
+      expect(result).toBe("Evaluator toxicity-check has been archived (soft-deleted).");
     });
   });
 });

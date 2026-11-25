@@ -21,6 +21,12 @@ if [ "$1" = "--headed" ]; then
   shift
 fi
 
+# A hard-killed session cannot signal this MCP, and the Chrome it launches
+# outlives even the MCP. The hook makes the MCP notice it was orphaned and
+# shut its browser down (specs/setup/mcp-browser-lifecycle.feature).
+ORPHAN_HOOK="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/die-with-parent.cjs"
+export NODE_OPTIONS="${NODE_OPTIONS:+$NODE_OPTIONS }--require \"$ORPHAN_HOOK\""
+
 # `npx @playwright/mcp@latest` does a registry lookup on every cold start (~55s
 # observed on this machine — well over Claude Code's 30s MCP-connect timeout).
 # Resolve to the already-installed CLI directly. Fall back to npx only if the
@@ -29,6 +35,9 @@ CACHED_CLI=$(find ~/.npm/_npx -path "*/node_modules/@playwright/mcp/cli.js" 2>/d
 if [ -n "$CACHED_CLI" ] && [ -f "$CACHED_CLI" ]; then
   exec node "$CACHED_CLI" $HEADLESS_FLAG "${EXTRA_ARGS[@]}" "$@"
 else
-  exec npx --offline @playwright/mcp $HEADLESS_FLAG "${EXTRA_ARGS[@]}" "$@" 2>/dev/null \
-    || exec npx @playwright/mcp@latest $HEADLESS_FLAG "${EXTRA_ARGS[@]}" "$@"
+  # No `exec` on the probe: an exec'd npx that fails takes the fallback with it.
+  if npx --offline @playwright/mcp --version >/dev/null 2>&1; then
+    exec npx --offline @playwright/mcp $HEADLESS_FLAG "${EXTRA_ARGS[@]}" "$@"
+  fi
+  exec npx -y @playwright/mcp@latest $HEADLESS_FLAG "${EXTRA_ARGS[@]}" "$@"
 fi

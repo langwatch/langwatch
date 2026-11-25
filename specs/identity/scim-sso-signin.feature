@@ -1,0 +1,33 @@
+Feature: First sign-in for a provisioned directory member
+  A connection may attach its verified assertion to the user it provisioned.
+  This does not change the local account's email verification or profile.
+
+  @integration @regression
+  Scenario: A provisioned member signs in without creating another account
+    Given the connection provisioned an active member with no sign-in account
+    And their pending email identifier proves no existing sign-in method
+    When its verified identity provider signs that member in
+    Then the session belongs to the existing member
+    And their local profile and email verification remain unchanged
+    And repeating sign-in reuses the same account binding
+
+  @integration @regression
+  Scenario: SCIM ownership cannot override conflicting sign-in evidence
+    Given a provisioned member whose assertion, ownership, membership or credential evidence is unsuitable
+    When the identity provider attempts to sign them in
+    Then no account is attached and no session is issued
+    And the refusal is OAuthAccountNotLinked, sso_existing_account_unconfirmed or the domain gate's existing refusal
+
+  @integration
+  Scenario: A signed SAML email does not require an OIDC verification claim
+    Given the domain gate accepted a signed SAML assertion for a provisioned member
+    When the assertion has no OIDC email verification claim
+    Then the same connection's active provisioned member may be selected
+
+  @integration
+  Scenario: A member disabled before sign-in is refused and nothing is provisioned
+    Given the connection provisioned a member whose membership was disabled and committed
+    When its verified identity provider signs that member in
+    Then identity reads the committed membership and refuses the account link
+    And no account is attached and no session is issued
+    And a membership that does not exist is refused the same way

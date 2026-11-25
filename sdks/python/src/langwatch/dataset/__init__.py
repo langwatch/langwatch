@@ -40,6 +40,7 @@ from .types import (
     PaginatedResult,
     Pagination,
     UploadResult,
+    UpsertResult,
 )
 
 # Re-export custom error classes for convenient import.
@@ -48,6 +49,7 @@ from .errors import (
     DatasetError,
     DatasetNotFoundError,
     DatasetPlanLimitError,
+    DatasetUpsertKeyError,
 )
 
 __all__ = [
@@ -59,11 +61,13 @@ __all__ = [
     "DatasetApiError",
     "DatasetNotFoundError",
     "DatasetPlanLimitError",
+    "DatasetUpsertKeyError",
     "DatasetInfo",
     "DatasetRecord",
     "PaginatedResult",
     "Pagination",
     "UploadResult",
+    "UpsertResult",
     "GetDatasetOptions",
     "get_dataset",
 ]

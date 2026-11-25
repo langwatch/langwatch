@@ -38,12 +38,13 @@ from tenacity import (
 )
 import langwatch
 from langwatch.domain import SpanTimestamps
-from pksuid import PKSUID
+from langwatch.http_client import create_async_client, create_client
+from langwatch_ksuid import generate as generate_ksuid
 from langwatch.telemetry.span import LangWatchSpan
 from langwatch.telemetry.context import get_current_span
 from langwatch.state import get_api_key, get_endpoint, get_instance
 from langwatch.attributes import AttributeKey
-from langwatch.utils.auth import build_auth_headers
+from langwatch.utils.auth import build_request_headers
 from langwatch.utils.exceptions import better_raise_for_status
 from pydantic import BaseModel
 
@@ -190,7 +191,7 @@ def evaluate(
         )
         @_retry_evaluator_call
         def _post() -> httpx.Response:
-            with httpx.Client(timeout=900) as client:
+            with create_client(timeout=900) as client:
                 response = client.post(**request_params)
                 better_raise_for_status(response)
                 return response
@@ -255,7 +256,7 @@ async def async_evaluate(
         )
         @_retry_evaluator_call
         async def _post() -> httpx.Response:
-            async with httpx.AsyncClient(timeout=900) as client:
+            async with create_async_client(timeout=900) as client:
                 response = await client.post(**request_params)
                 better_raise_for_status(response)
                 return response
@@ -268,6 +269,20 @@ async def async_evaluate(
         return _handle_response(response.json(), span, as_guardrail)
 
     raise ValueError("Async evaluate failed due to issue creating span")
+
+
+def _merge_keyword_data(
+    data: Optional[Union[BasicEvaluateData, Dict[str, Any]]] = None,
+    **fields: Any,
+) -> Dict[str, Any]:
+    """Fold keyword fields (input=, output=, ...) into one data dict; None fields are skipped."""
+    merged: Dict[str, Any] = (
+        data.model_dump(exclude_unset=True, exclude_none=True)
+        if isinstance(data, BasicEvaluateData)
+        else dict(data or {})
+    )
+    merged.update({key: value for key, value in fields.items() if value is not None})
+    return merged
 
 
 def _prepare_data(
@@ -304,7 +319,7 @@ def _prepare_data(
     client = get_instance()
 
     return {
-        "url": get_endpoint() + f"/api/evaluations/{slug}/evaluate",
+        "url": get_endpoint() + f"/api/v1/evaluations/{slug}/evaluate",
         "json": {
             "trace_id": (
                 None
@@ -329,7 +344,7 @@ def _prepare_data(
             "settings": settings,
             "as_guardrail": as_guardrail,
         },
-        "headers": build_auth_headers(get_api_key()),
+        "headers": build_request_headers(get_api_key()),
     }
 
 
@@ -472,7 +487,7 @@ def _add_evaluation(  # type: ignore
             span_id = format(span_ctx.span_id, "x")
 
         evaluation = _EvaluationTypedDict(
-            evaluation_id=evaluation_id or str(PKSUID("eval")),
+            evaluation_id=evaluation_id or str(generate_ksuid("eval")),
             span_id=span_id,
             name=name,
             type=type,

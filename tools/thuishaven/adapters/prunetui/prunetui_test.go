@@ -9,6 +9,8 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+
+	"github.com/langwatch/langwatch/tools/thuishaven/domain"
 )
 
 const day = 24 * time.Hour
@@ -60,6 +62,7 @@ func typeWord(m model, word string) model {
 
 func testActions(deleted *[]string) Actions {
 	return Actions{
+		Kind: domain.WorktreeKind,
 		Rows: []Row{
 			{Dir: "/wt/a", Slug: "a", Deletable: true},
 			{Dir: "/wt/b", Slug: "b", Deletable: true},
@@ -244,6 +247,7 @@ func TestPruneModelNothingSelected(t *testing.T) {
 	t.Run("given only protected worktrees", func(t *testing.T) {
 		t.Run("when rendered, the footer says there is nothing to prune", func(t *testing.T) {
 			m := newModel(context.Background(), Actions{
+				Kind: domain.WorktreeKind,
 				Rows: []Row{{Dir: "/wt/primary", Slug: "main", IsPrimary: true}},
 			})
 			if !strings.Contains(m.View(), "no other worktrees") {
@@ -313,7 +317,7 @@ func TestPruneViewportNeverOverflows(t *testing.T) {
 		// zero-padded so the default name-order tiebreak is also numeric
 		rows[i] = Row{Dir: fmt.Sprintf("/wt/wt-%02d", i), Slug: fmt.Sprintf("wt-%02d", i), Deletable: true}
 	}
-	m := newModel(context.Background(), Actions{Rows: rows, Threshold: 5 * day, SharedNote: "shared note"})
+	m := newModel(context.Background(), Actions{Kind: domain.WorktreeKind, Rows: rows, Threshold: 5 * day, SharedNote: "shared note"})
 	m = update(m, tea.WindowSizeMsg{Width: 80, Height: 20})
 
 	t.Run("given 50 worktrees in a 20-row terminal", func(t *testing.T) {
@@ -355,6 +359,7 @@ func TestPruneViewportNeverOverflows(t *testing.T) {
 }
 
 // @scenario "The list can be re-sorted"
+// @scenario "The newest work is at the top of the list, not buried below the old"
 func TestPruneSort(t *testing.T) {
 	rows := []Row{
 		{Dir: "/wt/big-fresh", Slug: "big-fresh", Deletable: true, MetaKnown: true, StaleKnown: true, StaleFor: 1 * day, SizeKnown: true, DiskBytes: 9000},
@@ -365,10 +370,15 @@ func TestPruneSort(t *testing.T) {
 	top := func(m model) string { return m.rows[m.order[0]].Slug }
 
 	t.Run("given a mix of worktrees", func(t *testing.T) {
-		m := newModel(context.Background(), Actions{Rows: rows, Threshold: 5 * day})
+		m := newModel(context.Background(), Actions{Kind: domain.WorktreeKind, Rows: rows, Threshold: 5 * day})
 
+		t.Run("the default puts the newest on top, where recent work is seen", func(t *testing.T) {
+			if got := top(m); got != "big-fresh" {
+				t.Errorf("default sort top = %q, want big-fresh — recent work must not be buried", got)
+			}
+		})
 		t.Run("when sorted by most idle, the stalest is on top", func(t *testing.T) {
-			// default is sortStale
+			m = update(m, key("s")) // newest -> most idle
 			if got := top(m); got != "small-stale" {
 				t.Errorf("stale sort top = %q, want small-stale", got)
 			}

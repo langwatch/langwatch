@@ -64,7 +64,7 @@ build_and_load_images() {
     # NLP
     if ! docker image inspect "$NLP_IMAGE" &>/dev/null; then
       info "Building NLP image..."
-      docker build -t "$NLP_IMAGE" -f "$REPO_ROOT/infra/docker/Dockerfile.langwatch_nlp" "$REPO_ROOT"
+      docker build -t "$NLP_IMAGE" -f "$REPO_ROOT/infra/docker/Dockerfile.go-services" --target nlp "$REPO_ROOT"
     fi
 
     # Langevals
@@ -267,7 +267,7 @@ test_api() {
   local api_key="e2e-full-stack-test-key"
   info "Seeding database..."
   kc exec "$app_pod" -- \
-    sh -c "cd /app/platform/app && HOME=/tmp LANGWATCH_API_KEY=$api_key pnpm prisma:seed"
+    sh -c "cd /app/packages/prisma-client && HOME=/tmp LANGWATCH_API_KEY=$api_key pnpm run db:seed"
   pass "Database seeded (org + project)"
 
   # Send a trace to the collector API

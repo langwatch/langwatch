@@ -38,7 +38,13 @@ AFFECTED_MODELS = [
     "openai/gpt-5.6-luna",
     "openai/gpt-5.6-sol",
     "openai/gpt-5.6-terra",
+    "openai/gpt-6-astra",
+    "openai/gpt-6-luna",
+    "openai/gpt-6-sol",
+    "openai/gpt-6.1-sol",
+    "openai/gpt-6.1-terra",
 ]
+
 
 # Models nobody has observed to need the compatibility. The first three are
 # near-misses a pattern match would have swept up; the last two are models
@@ -81,6 +87,7 @@ class _Provider:
     def __init__(self):
         self.requests: list[dict] = []
         self.refusal: Optional[BaseException] = None
+        self.refusals: list[BaseException] = []
 
     def __call__(self, *args, **kwargs):
         return self._respond(kwargs)
@@ -92,6 +99,8 @@ class _Provider:
         self.requests.append(kwargs)
         if self.refusal is not None:
             raise self.refusal
+        if self.refusals:
+            raise self.refusals.pop(0)
         return PROVIDER_ANSWER
 
     @property
@@ -120,6 +129,9 @@ def provider(monkeypatch):
     stub = _Provider()
     monkeypatch.setitem(litellm_patch.originals, "completion", stub)
     monkeypatch.setitem(litellm_patch.originals, "acompletion", stub.acall)
+    monkeypatch.setattr(litellm_patch, "tool_reasoning_off_models", set())
+    monkeypatch.setattr(litellm_patch, "temperature_pinned_models", set())
+    monkeypatch.setattr(litellm_patch, "forced_tool_choice_refusers", set())
     return stub
 
 
@@ -142,6 +154,68 @@ def test_affected_model_disables_reasoning_by_default(provider, model):
     litellm.completion(**judge_request(model))
 
     assert provider.last_request["reasoning_effort"] == "none"
+
+
+# @scenario "A judge reaches a verdict on a model that would otherwise refuse it"
+def test_reasoning_off_is_sent_even_when_litellm_does_not_know_the_model(provider):
+    """litellm 1.96 does not list reasoning_effort for openai/gpt-6-luna, and
+    with drop_params on it would strip the setting before the request left."""
+    litellm.completion(
+        **judge_request("openai/gpt-6-luna", allowed_openai_params=["seed"])
+    )
+
+    assert provider.last_request["allowed_openai_params"] == [
+        "seed",
+        "reasoning_effort",
+    ]
+
+
+# @scenario "A model that starts refusing is asked again with its reasoning off"
+def test_unseen_model_that_refuses_is_asked_again_with_reasoning_off(provider):
+    provider.refusals = [Exception(PROVIDER_TOOL_REASONING_REFUSAL)]
+
+    answer = litellm.completion(**judge_request("openai/gpt-7-new"))
+
+    first, second = provider.requests
+    assert "reasoning_effort" not in first
+    assert second["reasoning_effort"] == "none"
+    assert "reasoning_effort" in second["allowed_openai_params"]
+    assert second["tool_choice"] == FORCED_TOOL_CHOICE
+    assert answer == PROVIDER_ANSWER
+
+
+# @scenario "A model that starts refusing is asked again with its reasoning off"
+def test_model_seen_refusing_is_asked_with_reasoning_off_from_then_on(provider):
+    provider.refusals = [Exception(PROVIDER_TOOL_REASONING_REFUSAL)]
+    litellm.completion(**judge_request("openai/gpt-7-new"))
+
+    litellm.completion(**judge_request("openai/gpt-7-new"))
+
+    assert len(provider.requests) == 3
+    assert provider.last_request["reasoning_effort"] == "none"
+
+
+# @scenario "A model that starts refusing is asked again with its reasoning off"
+@pytest.mark.anyio
+async def test_awaited_unseen_model_that_refuses_is_asked_again(provider):
+    provider.refusals = [Exception(PROVIDER_TOOL_REASONING_REFUSAL)]
+
+    answer = await litellm.acompletion(**judge_request("openai/gpt-7-new"))
+
+    assert provider.last_request["reasoning_effort"] == "none"
+    assert answer == PROVIDER_ANSWER
+
+
+# @scenario "A reasoning effort the caller chose is the one that is used"
+def test_refusal_of_a_chosen_reasoning_effort_is_not_retried(provider):
+    provider.refusals = [Exception(PROVIDER_TOOL_REASONING_REFUSAL)]
+
+    with pytest.raises(ToolReasoningConflictError):
+        litellm.completion(
+            **judge_request("openai/gpt-7-new", reasoning_effort="high")
+        )
+
+    assert len(provider.requests) == 1
 
 
 # @scenario "A reasoning effort the caller chose is the one that is used"

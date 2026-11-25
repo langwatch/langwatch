@@ -168,12 +168,12 @@ jobs:
 
       - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
         with:
-          version: 10.24.0
+          version: 12.6.0
 
       - name: Setup Node
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v6
         with:
-          node-version: 24
+          node-version: "24.22.1"
           # No dependency cache on purpose. These legs build the binaries that
           # the publish job uploads to the release, so a poisoned cache entry
           # would become a shipped artifact. Restoring a shared store into a
@@ -205,7 +205,7 @@ jobs:
         run: pnpm install --frozen-lockfile --filter "langwatch..."
 
       - name: Generate the SDK's derived sources
-        # src/internal/generated/* is gitignored and derived from platform/app/
+        # src/internal/generated/* is gitignored and derived from packages/
         # + services/langevals/ sources and skills/, so the Bun compile cannot
         # resolve it until the generators have run. Invoked explicitly rather
         # than left to an install hook: the app depends on the SDK with

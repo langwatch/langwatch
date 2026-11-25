@@ -17,8 +17,6 @@ result.results  # per-row DataFrame, same shape as experiment.run(...).results
 from typing import Any, Callable, Dict, List, Optional, Union
 from urllib.parse import urlparse
 
-import httpx
-
 import langwatch
 from langwatch.experiment.platform_run import (
     ExperimentRunResult,
@@ -27,8 +25,9 @@ from langwatch.experiment.platform_run import (
     _poll_until_complete,
     _replace_url_domain,
 )
+from langwatch.http_client import create_client
 from langwatch.state import get_api_key, get_endpoint
-from langwatch.utils.auth import build_auth_headers
+from langwatch.utils.auth import build_request_headers
 
 
 def _experiment_slug_from_run_url(run_url: str) -> str:
@@ -53,6 +52,7 @@ def run(
     *,
     data: Optional[Union[List[dict], "pd.DataFrame"]] = None,
     dataset_id: Optional[str] = None,
+    dataset_version: Optional[int] = None,
     parameters: Optional[Dict[str, Any]] = None,
     version_id: Optional[str] = None,
     row_indices: Optional[List[int]] = None,
@@ -71,6 +71,9 @@ def run(
             Mutually exclusive with ``dataset_id``.
         dataset_id: Optional id of a platform dataset to evaluate. Mutually
             exclusive with ``data``.
+        dataset_version: Optional version number of the saved dataset to
+            evaluate (``dataset_id``, else the workflow's attached dataset).
+            Defaults to its current content. Cannot go with ``data``.
         parameters: Optional constants applied to every row.
         version_id: Optional specific workflow version to run (defaults to the
             latest committed version).
@@ -85,8 +88,10 @@ def run(
         ``result.results`` for a per-row pandas DataFrame.
 
     Raises:
-        ValueError: If both ``data`` and ``dataset_id`` are provided, if the
-            workflow is unknown, or if it has no committed version / invalid inputs.
+        ValueError: If both ``data`` and ``dataset_id`` are provided, if
+            ``dataset_version`` is combined with ``data`` or is not a whole
+            number from 1, if the workflow is unknown, or if it has no committed
+            version / invalid inputs.
         ExperimentsApiError: For other API errors.
 
     Example:
@@ -103,6 +108,18 @@ def run(
             "Pass either `data` or `dataset_id`, not both — they are mutually exclusive."
         )
 
+    if dataset_version is not None:
+        if data is not None:
+            raise ValueError(
+                "`dataset_version` names a version of a saved dataset; it cannot go with `data`."
+            )
+        if (
+            isinstance(dataset_version, bool)
+            or not isinstance(dataset_version, int)
+            or dataset_version < 1
+        ):
+            raise ValueError("`dataset_version` must be a whole number from 1.")
+
     langwatch.ensure_setup()
 
     effective_api_key = api_key or get_api_key()
@@ -116,6 +133,7 @@ def run(
     body = _build_run_body(
         data=data,
         dataset_id=dataset_id,
+        dataset_version=dataset_version,
         parameters=parameters,
         row_indices=row_indices,
     )
@@ -152,10 +170,10 @@ def _evaluate_workflow(
     workflow_id: str, endpoint: str, api_key: str, body: Dict[str, Any]
 ) -> dict:
     """Kick off a workflow evaluation run."""
-    with httpx.Client(timeout=60) as client:
+    with create_client(timeout=60) as client:
         response = client.post(
-            f"{endpoint}/api/workflows/{workflow_id}/evaluate",
-            headers=build_auth_headers(api_key),
+            f"{endpoint}/api/v1/workflows/{workflow_id}/evaluate",
+            headers=build_request_headers(api_key),
             json=body or None,
         )
 

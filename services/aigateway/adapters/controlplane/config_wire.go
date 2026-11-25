@@ -2,6 +2,7 @@ package controlplane
 
 import (
 	"encoding/json"
+	"net/url"
 	"strings"
 	"time"
 
@@ -43,6 +44,7 @@ type configWire struct {
 	PolicyRules          policyRulesWire           `json:"policy_rules"`
 	Budgets              []budgetWire              `json:"budgets"`
 	CacheRules           []cacheRuleWire           `json:"cache_rules"`
+	A2ATargets           []a2aTargetWire           `json:"a2a_targets"`
 	// VKTags are the VK's operator-assigned tags (config.metadata.tags on
 	// the control plane). Stamped on customer spans as langwatch.labels and
 	// matched by cache-rule vk_tags matchers.
@@ -57,6 +59,9 @@ type configWire struct {
 	// field a control plane older than it never sent, which are different
 	// answers: see keyExpiry.
 	ExpiresAt json.RawMessage `json:"expires_at"`
+	// Status is "active" or "revoked". Empty from a control plane older than
+	// the field, which reads as active.
+	Status string `json:"status"`
 }
 
 // keyExpiry reads the key's own expiration date off the wire as the tri-state
@@ -198,7 +203,7 @@ type cacheRuleWire struct {
 }
 
 // cacheMatchersWire mirrors the matchers shape emitted by the control-plane
-// materialiser (platform/app/src/server/gateway/config.materialiser.ts:121-128).
+// materialiser (modules/gateway/process/src/services/gateway-config-materialisation.service.ts:121-128).
 // Every recognized matcher must have an explicit field — silently dropping a
 // matcher at unmarshal collapses the rule's effective scope to "match all",
 // which has caused stripped `cache_control` on system blocks in matrix tests.
@@ -264,8 +269,10 @@ func (w *configWire) toDomain() domain.BundleConfig {
 	}
 
 	cfg.Budget.Scopes = toBudgetScopes(w.Budgets)
+	cfg.Budget.ValidUntil = budgetsValidUntil(w.Budgets)
 	cfg.PolicyRules = buildPolicyRules(w.PolicyRules)
 	cfg.CacheRules = buildCacheRules(w.CacheRules)
+	cfg.A2ATargets = buildA2ATargets(w.A2ATargets)
 
 	return cfg
 }
@@ -448,6 +455,32 @@ func toBudgetScopes(ws []budgetWire) []domain.BudgetScope {
 	return scopes
 }
 
+// budgetsValidUntil is the earliest boundary any enforceable budget on this
+// bundle is heading for: the instant its spend figures stop describing the
+// current period. See domain.BudgetConfig.ValidUntil for what the cache does
+// with it.
+//
+// Scopes without a limit are skipped because the checker skips them too, so
+// their boundary would shorten the config's life for a budget that can never
+// block. A non-positive resets_at is skipped as no answer rather than read as
+// 1970: TOTAL and MANUAL windows ship a far-future sentinel, and a control
+// plane older than the field ships nothing at all, neither of which is a
+// period that has ended.
+func budgetsValidUntil(ws []budgetWire) time.Time {
+	var earliest time.Time
+	for i := range ws {
+		b := &ws[i]
+		if b.LimitMicroUSD <= 0 || b.ResetsAt <= 0 {
+			continue
+		}
+		at := time.Unix(b.ResetsAt, 0)
+		if earliest.IsZero() || at.Before(earliest) {
+			earliest = at
+		}
+	}
+	return earliest
+}
+
 // toExcludedProviders maps the {id, type} exclusion wire entries onto domain
 // rows, normalizing the provider type the same way credentials are so the
 // gateway matches a resolved request's provider kind consistently.
@@ -521,6 +554,12 @@ func providerSlotToCredential(p providerSlotWire) domain.Credential {
 			"account_id":      getString("account_id"),
 			"provider_row_id": getString("provider_row_id"),
 		}
+	case domain.ProviderLangWatch:
+		// The license token is the bearer and the instance id rides a header,
+		// because the registry binds a license to one install and refuses the
+		// token presented from anywhere else (ADR-139 section 4).
+		cred.APIKey = getString("api_key")
+		cred.Extra = map[string]string{"instance_id": getString("instance_id")}
 	case domain.ProviderGemini:
 		// Gemini's second door: a credential carrying project_id + region
 		// is an Agent Platform key, and mapProvider routes it to
@@ -547,4 +586,62 @@ func providerSlotToCredential(p providerSlotWire) domain.Credential {
 	}
 
 	return cred
+}
+
+// a2aTargetWire is one registered A2A agent. A null allowed_virtual_key_ids
+// admits every key of the project; an empty list admits none.
+type a2aTargetWire struct {
+	Name                 string            `json:"name"`
+	AgentName            string            `json:"agent_name"`
+	CardURL              string            `json:"card_url"`
+	UpstreamURL          string            `json:"upstream_url"`
+	UpstreamHeaders      map[string]string `json:"upstream_headers"`
+	Blocked              bool              `json:"blocked"`
+	BlockReason          string            `json:"block_reason"`
+	AllowedVirtualKeyIDs *[]string         `json:"allowed_virtual_key_ids"`
+}
+
+func buildA2ATargets(wires []a2aTargetWire) []domain.A2ATarget {
+	if len(wires) == 0 {
+		return nil
+	}
+	targets := make([]domain.A2ATarget, 0, len(wires))
+	for _, w := range wires {
+		if !validA2ATargetWire(w) {
+			continue
+		}
+		targets = append(targets, domain.A2ATarget{
+			Name:            w.Name,
+			AgentName:       w.AgentName,
+			UpstreamURL:     w.UpstreamURL,
+			CardURL:         w.CardURL,
+			UpstreamHeaders: w.UpstreamHeaders,
+			Blocked:         w.Blocked,
+			BlockReason:     w.BlockReason,
+		})
+		if w.AllowedVirtualKeyIDs != nil {
+			targets[len(targets)-1].Policy = &domain.A2APolicy{AllowedVirtualKeyIDs: *w.AllowedVirtualKeyIDs}
+		}
+	}
+	return targets
+}
+
+// validA2ATargetWire re-checks what the control plane checked at save time:
+// http(s) URLs without credentials, and header names and values without line breaks. A target
+// that fails is left out, so the gateway never calls it.
+func validA2ATargetWire(w a2aTargetWire) bool {
+	if !httpURL(w.UpstreamURL) || (w.CardURL != "" && !httpURL(w.CardURL)) {
+		return false
+	}
+	for name, value := range w.UpstreamHeaders {
+		if name == "" || strings.ContainsAny(name+value, "\r\n\x00") {
+			return false
+		}
+	}
+	return true
+}
+
+func httpURL(raw string) bool {
+	u, err := url.Parse(raw)
+	return err == nil && (u.Scheme == "http" || u.Scheme == "https") && u.Host != "" && u.User == nil
 }

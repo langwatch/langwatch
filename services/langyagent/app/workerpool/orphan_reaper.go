@@ -16,10 +16,10 @@ import (
 // ENTRYPOINT, exec form — no shell wrapper), and only PID 1 may reap orphans
 // whose parent died.
 //
-// Why this matters: opencode forks children (`gh`, `git`, `npm`) that inherit
+// Why this matters: a worker forks children (`gh`, `git`, `npm`) that inherit
 // the worker pgroup (Setpgid: true). When the manager kills the worker via
 // syscall.Kill(-pgid, ...), every member of the pgroup gets the signal —
-// including opencode's children. Once they exit, those children's zombie
+// including the worker's children. Once they exit, those children's zombie
 // entries accumulate under PID 1 until reaped. Without this loop, long-running
 // pods leak process-table entries one per turn that recycles a worker,
 // eventually hitting the kernel pid_max limit or the container's nproc rlimit.

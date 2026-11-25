@@ -1,7 +1,7 @@
 Feature: Scenario Editor
   As a LangWatch user
   I want to create and edit scenario specifications
-  So that I can define behavioral test cases for my agents
+  So that I can define behavioral scenarios for my agents
 
   Background:
     Given I am logged into project "my-project"
@@ -121,3 +121,9 @@ Feature: Scenario Editor
   # Target Configuration
   # ============================================================================
 
+
+  @integration
+  Scenario: An edited scenario's typed fields are the ones the form reads
+    Given the scenario form opened on an existing scenario
+    When its name is edited
+    Then the form reads the typed name, not the one it opened with

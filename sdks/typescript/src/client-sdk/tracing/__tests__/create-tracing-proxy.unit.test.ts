@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { createTracingProxy } from "../create-tracing-proxy";
+
 import { getLangWatchTracerFromProvider, type LangWatchTracer } from "../../../observability-sdk";
 import {
   type MockTracer,
@@ -7,6 +7,7 @@ import {
   setupTestEnvironment,
   createDelayedPromise,
 } from "../../../observability-sdk/__tests__/test-utils";
+import { createTracingProxy } from "../create-tracing-proxy";
 
 describe("createTracingProxy", () => {
   let testEnv: ReturnType<typeof setupTestEnvironment>;
@@ -76,7 +77,7 @@ describe("createTracingProxy", () => {
     }
   }
 
-  describe("basic functionality", () => {
+  describe("when using basic functionality", () => {
     it("creates a proxy that traces public methods", () => {
       const testInstance = new TestClass();
       const proxy = createTracingProxy(testInstance, langwatchTracer);
@@ -132,25 +133,22 @@ describe("createTracingProxy", () => {
     });
   });
 
-  describe("span creation and attributes", () => {
-    it("creates spans with correct name format", () => {
+  describe("when creating spans and setting attributes", () => {
+    let span: ReturnType<MockTracer["getSpan"]>;
+
+    beforeEach(() => {
       const testInstance = new TestClass();
       const proxy = createTracingProxy(testInstance, langwatchTracer);
-
       proxy.publicMethod();
+      span = mockTracer.getSpan("TestClass.publicMethod");
+    });
 
-      const span = mockTracer.getSpan("TestClass.publicMethod");
+    it("creates spans with correct name format", () => {
       expect(span).toBeDefined();
       expect(span?.name).toBe("TestClass.publicMethod");
     });
 
     it("sets correct span attributes", () => {
-      const testInstance = new TestClass();
-      const proxy = createTracingProxy(testInstance, langwatchTracer);
-
-      proxy.publicMethod();
-
-      const span = mockTracer.getSpan("TestClass.publicMethod");
       expect(span).toBeDefined();
       // The attributes are set in the span options, verify the span was created with correct name
       expect(span?.name).toBe("TestClass.publicMethod");
@@ -158,19 +156,13 @@ describe("createTracingProxy", () => {
     });
 
     it("sets correct span kind", () => {
-      const testInstance = new TestClass();
-      const proxy = createTracingProxy(testInstance, langwatchTracer);
-
-      proxy.publicMethod();
-
-      const span = mockTracer.getSpan("TestClass.publicMethod");
       expect(span).toBeDefined();
       // The span kind is set in the options, verify it's used correctly
       expect(span?.ended).toBe(true);
     });
   });
 
-  describe("method execution", () => {
+  describe("when executing methods", () => {
     it("executes methods with arguments correctly", () => {
       const testInstance = new TestClass();
       const proxy = createTracingProxy(testInstance, langwatchTracer);
@@ -207,7 +199,7 @@ describe("createTracingProxy", () => {
     });
   });
 
-  describe("error handling", () => {
+  describe("when handling errors", () => {
     it("handles synchronous errors", () => {
       const testInstance = new TestClass();
       const proxy = createTracingProxy(testInstance, langwatchTracer);
@@ -265,11 +257,11 @@ describe("createTracingProxy", () => {
       expect(mockTracer.getSpan("ErrorTestClass.stringError")?.ended).toBe(true);
 
       // Test null errors
-      await expect(proxy.nullError()).rejects.toThrow();
+      await expect(proxy.nullError()).rejects.toThrow(Error);
       expect(mockTracer.getSpan("ErrorTestClass.nullError")?.ended).toBe(true);
 
       // Test undefined errors
-      await expect(proxy.undefinedError()).rejects.toThrow();
+      await expect(proxy.undefinedError()).rejects.toThrow(Error);
       expect(mockTracer.getSpan("ErrorTestClass.undefinedError")?.ended).toBe(true);
 
       // Test complex errors
@@ -349,7 +341,7 @@ describe("createTracingProxy", () => {
 
       // Start multiple concurrent operations that will fail
       const promises = Array.from({ length: 3 }, (_, i) =>
-        proxy.delayedError(i * 10).catch(error => error.message)
+        proxy.delayedError(i * 10).catch((error) => error.message),
       );
 
       const results = await Promise.all(promises);
@@ -371,8 +363,8 @@ describe("createTracingProxy", () => {
       class PromiseChainClass {
         public async promiseChain() {
           return Promise.resolve("step1")
-            .then(_result => Promise.resolve(_result + " -> step2"))
-            .then(_result => Promise.resolve(_result + " -> step3"))
+            .then((_result) => _result + " -> step2")
+            .then((_result) => _result + " -> step3")
             .then(() => {
               throw new Error("Error in promise chain");
             });
@@ -414,7 +406,7 @@ describe("createTracingProxy", () => {
     });
   });
 
-  describe("decorator functionality", () => {
+  describe("when using decorator functionality", () => {
     // Decorator class for testing
     class TestDecorator {
       private target: TestClass;
@@ -501,7 +493,7 @@ describe("createTracingProxy", () => {
     });
   });
 
-  describe("proxy behavior", () => {
+  describe("when checking proxy behaviour", () => {
     it("returns non-function properties as-is", () => {
       const testInstance = new TestClass();
       const proxy = createTracingProxy(testInstance, langwatchTracer);
@@ -530,7 +522,7 @@ describe("createTracingProxy", () => {
     });
   });
 
-  describe("edge cases", () => {
+  describe("when given edge case inputs", () => {
     it("handles class with no public methods", () => {
       class EmptyClass {
         private _privateMethod() {
@@ -592,19 +584,17 @@ describe("createTracingProxy", () => {
     });
   });
 
-  describe("concurrent execution", () => {
+  describe("when executing concurrently", () => {
     it("handles concurrent method calls", async () => {
       const testInstance = new TestClass();
       const proxy = createTracingProxy(testInstance, langwatchTracer);
 
-      const promises = Array.from({ length: 5 }, () =>
-        proxy.publicAsyncMethod()
-      );
+      const promises = Array.from({ length: 5 }, () => proxy.publicAsyncMethod());
 
       const results = await Promise.all(promises);
 
       expect(results).toHaveLength(5);
-      results.forEach(result => {
+      results.forEach((result) => {
         expect(result).toBe("async-result");
       });
 
@@ -635,7 +625,7 @@ describe("createTracingProxy", () => {
     });
   });
 
-  describe("decorator error handling", () => {
+  describe("when the decorator handles errors", () => {
     class ErrorDecorator {
       private target: TestClass;
 
@@ -684,7 +674,7 @@ describe("createTracingProxy", () => {
     });
   });
 
-  describe("type safety", () => {
+  describe("when checking type safety", () => {
     it("maintains type safety for the proxy", () => {
       const testInstance = new TestClass();
       const proxy = createTracingProxy(testInstance, langwatchTracer);

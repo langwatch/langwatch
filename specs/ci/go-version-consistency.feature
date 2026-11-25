@@ -23,7 +23,7 @@ Feature: One Go version, stated once
   # which is what this guard is for.
 
   Background:
-    Given the root go.mod declares the repository's Go version
+    Given go.work declares the repository's Go version
 
   @unit
   Scenario: Every non-exempt Go toolchain reference in the repo agrees
@@ -32,7 +32,7 @@ Feature: One Go version, stated once
 
   @unit
   Scenario: A child module on a different version fails the check
-    Given a non-root go.mod declaring a different version
+    Given a go.mod declaring a different version
     Then the guard names the module and both versions
     # The guard first read only the root module, which meant
     # infra/clickhouse-serverless could drift straight back and the exemption
@@ -53,8 +53,8 @@ Feature: One Go version, stated once
     # column-zero pattern let a valid spelling drift unchecked.
 
   @unit
-  Scenario: The workspace and the root module must agree
-    Given go.work declares a different version from go.mod
+  Scenario: Every workspace module agrees with go.work
+    Given a workspace module declares a different version from go.work
     Then the guard reports the disagreement
 
   @unit

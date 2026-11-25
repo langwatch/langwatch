@@ -5,10 +5,10 @@ description: Add guardrails to your LLM application to block harmful content in 
 ---
 
 <Tip>
-  **Let your agent set this up.** [Copy the evaluations prompt](/skills/code-prompts#set-up-evaluations) into your coding agent to get started automatically.
+  **Let your agent set this up.** [Copy the evaluations prompt](/skills/directory) into your coding agent to get started automatically.
 </Tip>
 
-This guide shows how to integrate guardrails into your application using the LangWatch SDK. Guardrails run evaluators synchronously and return results you can act on immediately.
+Guardrails run LangWatch evaluators synchronously from your code, through the LangWatch SDK, and return a result you can act on immediately.
 
 ## Basic Usage
 
@@ -62,6 +62,7 @@ async function myLLMApp(userInput: string): Promise<string> {
   return response;
 }
 ```
+
   </Tab>
 </Tabs>
 
@@ -69,12 +70,12 @@ async function myLLMApp(userInput: string): Promise<string> {
 
 When you run a guardrail, you get back a result object with these fields:
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `passed` | boolean | Whether the guardrail passed (true = safe, false = blocked) |
-| `score` | number | Numeric score from 0-1 (if applicable) |
-| `label` | string | Category label (if applicable) |
-| `details` | string | Explanation of the result |
+| Field     | Type    | Description                                                 |
+| --------- | ------- | ----------------------------------------------------------- |
+| `passed`  | boolean | Whether the guardrail passed (true = safe, false = blocked) |
+| `score`   | number  | Numeric score from 0-1 (if applicable)                      |
+| `label`   | string  | Category label (if applicable)                              |
+| `details` | string  | Explanation of the result                                   |
 
 ```python
 import langwatch
@@ -225,6 +226,7 @@ const guardrail = await langwatch.evaluations.evaluate("azure/jailbreak", {
   data: { input: userInput },
 });
 ```
+
   </Tab>
 </Tabs>
 
@@ -315,6 +317,7 @@ async function chatbotWithParallelGuards(userInput: string): Promise<string> {
   return await callLLM(userInput);
 }
 ```
+
   </Tab>
 </Tabs>
 
@@ -344,7 +347,7 @@ Policy rules:
 User message: {input}
 
 Does this message violate our policy? Answer only 'true' or 'false'.""",
-            "model": "openai/gpt-4o-mini",
+            "model": "openai/gpt-6-luna",
         },
     )
     
@@ -439,7 +442,7 @@ competitor_check = langwatch.evaluation.evaluate(
   <Card
     title="TypeScript SDK Reference"
     description="Full API documentation for the TypeScript SDK."
-    icon="square-js"
+    icon="typescript"
     href="/integration/typescript/reference"
   />
 </CardGroup>

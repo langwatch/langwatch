@@ -1,4 +1,5 @@
 import chalk from "chalk";
+
 import { formatTable } from "../../utils/formatting";
 import type { CommandResult } from "../../utils/output";
 import { asDate, counted, printEmpty, runManagement } from "../management/_shared";

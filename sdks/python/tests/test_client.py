@@ -347,6 +347,31 @@ def test_skip_open_telemetry_setup_property() -> None:
     assert client3.skip_open_telemetry_setup is False
 
 
+def test_skip_open_telemetry_setup_reads_the_environment(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A host that already reports the work sets LANGWATCH_SKIP_OTEL_SETUP.
+
+    The code agent sandbox is one: nothing in the row calls setup(), so the
+    environment is the only place the answer can come from.
+    """
+    Client.reset_for_testing()
+    monkeypatch.setenv("LANGWATCH_SKIP_OTEL_SETUP", "true")
+
+    client = Client(api_key="test-key")
+    assert client.skip_open_telemetry_setup is True
+
+
+def test_skip_open_telemetry_setup_argument_beats_the_environment(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    Client.reset_for_testing()
+    monkeypatch.setenv("LANGWATCH_SKIP_OTEL_SETUP", "true")
+
+    client = Client(api_key="test-key", skip_open_telemetry_setup=False)
+    assert client.skip_open_telemetry_setup is False
+
+
 def test_skip_open_telemetry_setup_api_key_setter() -> None:
     """Test that skip_open_telemetry_setup prevents OpenTelemetry reinitialization when API key changes."""
     client = make_client(api_key="first-key", skip_open_telemetry_setup=True)

@@ -1,7 +1,12 @@
-import { defineConfig } from "vitest/config";
+import { defineModuleVitestConfig } from "@langwatch/vitest-config";
 
-export default defineConfig({
+// Unit lane. The scenarios drive live Claude Code sessions and run only
+// through `pnpm test:suite`, on vitest.scenario.config.ts.
+export default defineModuleVitestConfig({
+  kind: "node",
+  isolate: false,
+  exclude: ["**/node_modules/**", "**/dist/**", "**/*.scenario.test.ts"],
   test: {
-    testTimeout: 60 * 60 * 1000, // 1 hour
+    globalSetup: ["./_tests/helpers/temp-workdir-teardown.ts"],
   },
 });

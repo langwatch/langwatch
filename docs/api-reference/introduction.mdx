@@ -1,6 +1,6 @@
 ---
-title: 'Introduction'
-description: 'The LangWatch REST API: authentication, the OpenAPI document, and where each surface lives.'
+title: "Introduction"
+description: "The LangWatch REST API: authentication, the OpenAPI document, and where each surface lives."
 ---
 
 Every page in this section is generated from LangWatch's OpenAPI 3.1 document, so what you read here is what the API accepts.
@@ -9,7 +9,7 @@ Every page in this section is generated from LangWatch's OpenAPI 3.1 document, s
 
 Fetch the whole thing, unauthenticated:
 
-```
+```http
 GET https://app.langwatch.ai/api/gateway/v1/openapi.json
 ```
 
@@ -19,11 +19,11 @@ One document covers every surface below, which is what you point a client genera
 
 Most endpoints take a project API key:
 
-```
+```http
 X-Auth-Token: sk-lw-...
 ```
 
-`Authorization: Bearer sk-lw-...` works too. Some families need an **organization** API key instead, because they carry signing secrets and organization-wide data: [webhook endpoints](/features/webhooks), [gateway spend](/ai-gateway/billing-events), and everything that provisions the organization itself, from the [organization profile](/api-reference/organization/overview) and its [members](/api-reference/members/overview) through [roles](/api-reference/roles/overview) and [role bindings](/api-reference/role-bindings/overview). Create either kind under **Settings > API Keys**.
+`Authorization: Bearer sk-lw-...` works too. Some families need an **organization** API key instead, because they carry signing secrets and organization-wide data: [webhook endpoints](/features/webhooks), [gateway spend](/ai-gateway/billing-events), and everything that provisions the organization itself, from the [organization profile](/api-reference/organization/overview) and its [members](/api-reference/members/overview) through [roles](/api-reference/roles/overview) and [grants](/api-reference/grants/overview). Create either kind under **Settings > API Keys**.
 
 Two surfaces authenticate differently again. The [SCIM 2.0 endpoints](/api-reference/scim/overview) take a SCIM bearer token, because the caller is your identity provider. [Creating organizations on a self-hosted instance](/api-reference/organizations/overview) takes the instance administrator credential, because it runs before any organization exists.
 

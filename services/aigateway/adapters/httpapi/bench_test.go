@@ -18,7 +18,7 @@ import (
 // stubAuth is a no-op auth resolver that returns a minimal bundle.
 type stubAuth struct{ bundle *domain.Bundle }
 
-func (s *stubAuth) Resolve(_ context.Context, _ string) (*domain.Bundle, error) {
+func (s *stubAuth) Resolve(_ context.Context, _ domain.PresentedKey) (*domain.Bundle, error) {
 	return s.bundle, nil
 }
 

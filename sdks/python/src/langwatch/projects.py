@@ -1,7 +1,7 @@
 """
 API facade for projects, the tenant everything else is written under.
 
-``/api/projects`` is an organization-class route: an organization API key
+``/api/v1/projects`` is an organization-class route: an organization API key
 (``sk-lw-...``) authorizes it and the project is named in the path or the
 body, which is why this facade sends no project header. Uses httpx via the
 generated REST API client for HTTP transport.
@@ -22,7 +22,7 @@ from langwatch.utils.gateway_http import (
 )
 from langwatch.utils.initialization import ensure_setup
 
-PROJECTS_PATH = "/api/projects"
+PROJECTS_PATH = "/api/v1/projects"
 
 
 class ProjectsFacade:

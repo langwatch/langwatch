@@ -1,6 +1,8 @@
 import { describe, it, expect } from "vitest";
-import { escapeCsvField, toCsv, toJsonl } from "../download";
+
 import type { DatasetRecordResponse } from "@/client-sdk/services/datasets/types";
+
+import { escapeCsvField, toCsv, toJsonl } from "../download";
 
 describe("escapeCsvField()", () => {
   describe("when given a plain string", () => {
@@ -76,10 +78,7 @@ describe("toCsv()", () => {
 
   describe("when records have different keys", () => {
     it("produces union of all keys as headers", () => {
-      const records = [
-        makeRecord({ input: "a" }),
-        makeRecord({ input: "b", extra: "c" }),
-      ];
+      const records = [makeRecord({ input: "a" }), makeRecord({ input: "b", extra: "c" })];
 
       const result = toCsv(records);
       const lines = result.split("\n");

@@ -14,7 +14,7 @@ langwatch.setup(
     instrumentors=[DSPyInstrumentor()],
 )
 
-llm = dspy.LM("openai/gpt-4o-mini", api_key=os.environ["OPENAI_API_KEY"])
+llm = dspy.LM("openai/gpt-6-luna", api_key=os.environ["OPENAI_API_KEY"])
 
 colbertv2_wiki17_abstracts = dspy.ColBERTv2(
     url="http://20.102.90.50:2017/wiki17_abstracts"

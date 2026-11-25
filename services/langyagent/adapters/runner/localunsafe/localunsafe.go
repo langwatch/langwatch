@@ -62,7 +62,7 @@ func (Runner) Chown(path string, uid uint32) error { return nil }
 // Lchown is a no-op, for the same reason as Chown.
 func (Runner) Lchown(path string, uid uint32) error { return nil }
 
-// SysProcAttr sets ONLY Setpgid: opencode runs as the manager's own user (no
+// SysProcAttr sets ONLY Setpgid: the worker runs as the manager's own user (no
 // setuid Credential — a non-root manager cannot setuid), still in its own process
 // group so the manager can group-kill it and its shelled children on shutdown.
 func (Runner) SysProcAttr(uid uint32) *syscall.SysProcAttr {

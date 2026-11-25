@@ -1,0 +1,39 @@
+Feature: Consistent upgrade and access states
+  @integration
+  Scenario: An Enterprise gate names the missing plan and offers a next step
+    Given a feature requires Enterprise
+    When its gate is shown
+    Then the feature and required plan are named with one primary action
+
+  @integration
+  Scenario: A reader can copy a permission request for their admin
+    Given a reader lacks a permission
+    When they copy an access request
+    Then the request includes the permission and current page address
+    And they are told to send it to an organization admin
+
+  @integration
+  Scenario: A failed copy still explains how to ask for access
+    Given clipboard access is unavailable
+    When the reader copies an access request
+    Then the page explains how to send the address and permission manually
+
+  @integration
+  Scenario: A Lite member asks for access without a plan purchase
+    Given a Lite member is refused an action
+    When the access dialog opens
+    Then it offers an access request and a way back without a purchase action
+
+  @integration
+  Scenario: A gate inside a card draws no box of its own
+    Given a card that already draws its own surface
+    When an access gate is shown inside it
+    Then the lock sits beside the title on the card's content edge
+    And the gate still names what is missing and offers its actions
+
+  @integration
+  Scenario: A gate that is a page's only content sits on the centre axis
+    Given a page whose only content is an access gate with an illustration
+    When the gate is shown centred
+    Then the lock, the title, the description, the illustration and the actions are centred
+    And an illustration that fills the width still fills it

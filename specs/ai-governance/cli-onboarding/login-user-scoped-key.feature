@@ -29,6 +29,42 @@ Feature: CLI login mints a user-scoped API key that inherits the user's permissi
   # Authorize screen defaults
   # ─────────────────────────────────────────────────────────────────────
 
+  Rule: the code is confirmed before anything else is shown
+
+    @integration
+    Scenario: the screen asks for the code check first
+      Given the user opened the authorize screen for the device code
+      Then the screen shows only the code, the confirmation question and the
+        confirm action
+      And the organization picker, the access selection and the approve
+        action are not shown yet
+
+    @integration
+    Scenario: the primary action and Deny are the same height on a phone
+      Given the user opened the authorize screen on a phone-width window
+      When the confirm and deny actions stack one above the other
+      Then the confirm action is drawn as tall as the deny action
+      And the same holds for the approve action after the code is confirmed
+
+    @integration
+    Scenario: a freshly minted code reads as 15 minutes
+      Given the CLI minted a code that expires in 15 minutes
+      When the user opens the authorize screen
+      Then the screen says the code expires in about 15 minutes
+
+    @integration
+    Scenario: confirming the code reveals the access selection
+      When the user confirms the code matches the one in their terminal
+      Then the code section goes away
+      And the organization picker, the access selection and the approve
+        action are shown
+
+    @integration
+    Scenario: a new device code starts the confirmation over
+      Given the user confirmed one device code
+      When the screen is opened for a different device code
+      Then the confirmation is asked again before anything else is shown
+
   Rule: the authorize screen preselects the widest scope the user holds
 
     @integration
@@ -70,6 +106,25 @@ Feature: CLI login mints a user-scoped API key that inherits the user's permissi
 
   Rule: the user can customize scopes and permissions before approving
 
+    @unit
+    Scenario: a CLI login key never carries organization:delete
+      Given an organization admin approves a CLI login, with or without --management
+      When they open Customize, or set Organization to Write
+      Then the key's permission list keeps "organization:manage" when picked
+        but never "organization:delete"
+      And the approval and the exchange both drop "organization:delete" if a
+        client sends it anyway, so an older screen cannot put it on a key
+
+    @unit
+    Scenario: on the approval screen, Organization at Write means managing it, not deleting it
+      Given a CLI login key never carries "organization:delete"
+      When the approver opens Customize on a --management login and changes nothing
+      Then Organization shows at Write and the key keeps "organization:manage"
+      And a caller who may manage the organization but not delete it can still
+        pick Organization at Write
+      But a regular API key's Organization at Write still requires
+        "organization:delete" held directly
+
     @integration
     Scenario: narrowing the selection narrows the minted key
       Given the user deselects everything except one shared project
@@ -101,6 +156,12 @@ Feature: CLI login mints a user-scoped API key that inherits the user's permissi
       And an approve request carrying zero bindings is refused with a handled
         error naming the bindings field
 
+    @integration
+    Scenario: approval is blocked when the user's own access cannot be read
+      Given the user's role bindings fail to load on the authorize screen
+      Then the approve action is unavailable
+      And the screen says the access could not be read and asks the user to reload
+
   # ─────────────────────────────────────────────────────────────────────
   # Minting mechanics
   # ─────────────────────────────────────────────────────────────────────
@@ -114,8 +175,15 @@ Feature: CLI login mints a user-scoped API key that inherits the user's permissi
       Then the response carries a `cli_api_key` in the `sk-lw-{lookupId}_{secret}` format
       And the ApiKey row records the approving user as owner
       And its permissionMode is "restricted" with the selected permission list
-      And the response still carries the personal project and its API key,
-        so older CLI versions keep working unchanged
+      And the response still carries the personal project's id, slug and name,
+        never its project API key
+
+    @integration
+    Scenario: the exchange reports the permissions the key was minted with
+      Given the user approved the device code with the default selection
+      When the CLI polls the exchange endpoint
+      Then `cli_api_key_scope` carries the permission slugs of the minted key
+      And `langwatch whoami` can print them beside the key's reach
 
     @integration
     Scenario: an approval that is never exchanged mints nothing
@@ -173,11 +241,36 @@ Feature: CLI login mints a user-scoped API key that inherits the user's permissi
       Then each mint revokes only the keys created before its own
       And the key the last exchange handed to the CLI is still active
 
+    @unit
+    Scenario: a previous key a racing login already revoked does not fail the re-login
+      Given two logins from the same device label are exchanged at the same time
+      And the other login revokes the previous key first
+      When this login's mint reaches the same previous key
+      Then the exchange still answers with its new key
+
     @integration
     Scenario: logout revokes the CLI key
       Given the user holds an active CLI key from this login
       When the CLI calls the logout endpoint
       Then that CLI key is revoked along with the device session tokens
+
+  # The key lives as long as the session that minted it: its expiry is set
+  # from the session start and the organization's session ceiling, and slides
+  # with every refresh, so a CLI that stops refreshing leaves no live key.
+  Rule: the CLI key expires with its session
+
+    @integration
+    Scenario: the CLI key is minted with the session's expiry
+      Given the organization caps sessions at thirty days
+      When the CLI exchanges an approved device code
+      Then the key is minted anchored at the moment the session started
+      And under the organization's ceiling and the refresh window
+
+    @integration
+    Scenario: refreshing the session extends the CLI key's expiry
+      Given the CLI holds a session and its CLI key
+      When the CLI refreshes the session
+      Then the key's expiry is extended from the same session start
 
   # ─────────────────────────────────────────────────────────────────────
   # Project listing honours the key's reach

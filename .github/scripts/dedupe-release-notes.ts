@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { readFileSync, writeFileSync } from "node:fs";
-import { pathToFileURL } from "node:url";
 import { resolve } from "node:path";
+import { pathToFileURL } from "node:url";
 
 // Squash merges here carry COMMIT_MESSAGES, so a pull request whose commit
 // body opens with its own conventional-commit line parses as TWO release-note
@@ -17,16 +17,18 @@ import { resolve } from "node:path";
 /** A trailing commit link, as Release Please renders it: `([abc1234](…/commit/<sha>))`. */
 const shaPattern = /\]\((https:\/\/[^)\s]*\/commit\/([0-9a-f]{7,40}))\)/;
 
+/** A top-level release-note bullet: Release Please writes `* `, a formatted changelog `- `. */
+const bulletPattern = /^[*-] /;
+
 /** A linked pull request number, as Release Please renders issue redirects: `([#123](…/issues/123))`. */
 const prLinkPattern = /https:\/\/[^)\s]*\/issues\/(\d+)/;
 
+/** The commit sha of a release-note bullet; null for any other line, even one linking a commit. */
 export const extractSha = (line: string): string | null =>
-  shaPattern.exec(line)?.[2] ?? null;
+  bulletPattern.test(line) ? (shaPattern.exec(line)?.[2] ?? null) : null;
 
 export const extractPrNumbers = (line: string): number[] =>
-  [...line.matchAll(new RegExp(prLinkPattern.source, "g"))].map(
-    (match) => Number(match[1]),
-  );
+  [...line.matchAll(new RegExp(prLinkPattern.source, "g"))].map((match) => Number(match[1]));
 
 export type DedupeOptions = {
   /**
@@ -97,9 +99,7 @@ const markSurplus = async (
     bullets.set(sha, seen);
   }
 
-  for (const [sha, at] of [...bullets.entries()].filter(
-    ([, seen]) => seen.length > 1,
-  )) {
+  for (const [sha, at] of [...bullets.entries()].filter(([, seen]) => seen.length > 1)) {
     const entries = at.map((i) => ({
       index: i,
       prNumbers: extractPrNumbers(lines[i] ?? ""),
@@ -130,20 +130,26 @@ export const githubMergedPrs = (): ((sha: string) => Promise<number[]>) | undefi
   if (!token || !repository) return undefined;
 
   return async (sha: string): Promise<number[]> => {
-    const response = await fetch(
-      `https://api.github.com/repos/${repository}/commits/${sha}/pulls`,
-      {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          Accept: "application/vnd.github+json",
+    try {
+      const response = await fetch(
+        `https://api.github.com/repos/${repository}/commits/${sha}/pulls`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            Accept: "application/vnd.github+json",
+          },
         },
-      },
-    );
-    if (!response.ok) return [];
-    const pulls = (await response.json()) as { number?: number }[];
-    return pulls.flatMap((pull) =>
-      typeof pull.number === "number" ? [pull.number] : [],
-    );
+      );
+      if (!response.ok) return [];
+      const pulls = (await response.json()) as { number?: number }[];
+      return Array.isArray(pulls)
+        ? pulls.flatMap((pull) => (typeof pull.number === "number" ? [pull.number] : []))
+        : [];
+    } catch (error) {
+      // A lookup that fails degrades to link preference instead of failing the pass.
+      console.warn(`could not resolve the pull request for ${sha}: ${String(error)}`);
+      return [];
+    }
   };
 };
 
@@ -169,8 +175,7 @@ const main = async (): Promise<number> => {
 };
 
 const isEntrypoint = (): boolean =>
-  process.argv[1] !== undefined &&
-  import.meta.url === pathToFileURL(resolve(process.argv[1])).href;
+  process.argv[1] !== undefined && import.meta.url === pathToFileURL(resolve(process.argv[1])).href;
 
 if (isEntrypoint()) {
   await main().then((code) => {

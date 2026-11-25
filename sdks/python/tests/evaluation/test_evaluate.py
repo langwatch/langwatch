@@ -85,7 +85,7 @@ class TestEvaluationResultModel:
 class TestEvaluate:
     """Tests for evaluate() function."""
 
-    @patch("langwatch.evaluation.httpx.Client")
+    @patch("langwatch.evaluation.create_client")
     @patch("langwatch.evaluation.langwatch.span")
     @patch("langwatch.evaluation.get_current_span")
     @patch("langwatch.evaluation.get_endpoint")
@@ -146,11 +146,11 @@ class TestEvaluate:
 
         # Verify API was called with correct URL
         call_args = mock_client.post.call_args
-        assert "https://api.langwatch.ai/api/evaluations/test-evaluator/evaluate" in str(
+        assert "https://api.langwatch.ai/api/v1/evaluations/test-evaluator/evaluate" in str(
             call_args
         )
 
-    @patch("langwatch.evaluation.httpx.Client")
+    @patch("langwatch.evaluation.create_client")
     @patch("langwatch.evaluation.langwatch.span")
     @patch("langwatch.evaluation.get_current_span")
     @patch("langwatch.evaluation.get_endpoint")
@@ -208,7 +208,7 @@ class TestEvaluate:
             name="presidio/pii_detection", type="guardrail"
         )
 
-    @patch("langwatch.evaluation.httpx.Client")
+    @patch("langwatch.evaluation.create_client")
     @patch("langwatch.evaluation.langwatch.span")
     @patch("langwatch.evaluation.get_current_span")
     @patch("langwatch.evaluation.get_endpoint")
@@ -257,7 +257,7 @@ class TestEvaluate:
         assert result.passed is True
         assert "Network error" in result.details
 
-    @patch("langwatch.evaluation.httpx.Client")
+    @patch("langwatch.evaluation.create_client")
     @patch("langwatch.evaluation.langwatch.span")
     @patch("langwatch.evaluation.get_current_span")
     @patch("langwatch.evaluation.get_endpoint")
@@ -312,7 +312,7 @@ class TestAsyncEvaluate:
     """Tests for async_evaluate() function."""
 
     @pytest.mark.asyncio
-    @patch("langwatch.evaluation.httpx.AsyncClient")
+    @patch("langwatch.evaluation.create_async_client")
     @patch("langwatch.evaluation.langwatch.span")
     @patch("langwatch.evaluation.get_current_span")
     @patch("langwatch.evaluation.get_endpoint")

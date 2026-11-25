@@ -1,24 +1,18 @@
 /**
- * Keeps a device-login session alive without the user noticing.
- *
- * `POST /api/auth/cli/exchange` hands out a short-lived access token
- * plus a long-lived rotating refresh token. Every authenticated CLI
- * call carries the access token; when the control plane rejects it the
- * CLI trades the refresh token for a fresh pair and retries, so an
- * actively used session keeps working and only a genuinely idle (or
- * revoked) session ends up back at `langwatch login --device`.
- *
- * Rotation is single-use server-side: the refresh call invalidates the
- * token it consumed. Two `langwatch <tool>` sessions running side by
- * side can therefore race, one of them presenting a token the other
- * already spent. That loses a race, not a session: on rejection this
- * module re-reads ~/.langwatch/config.json and retries once with
- * whatever the winner persisted.
+ * Keeps a device-login session alive: on rejection the CLI trades the
+ * refresh token for a fresh pair. Rotation is single-use server-side, so a
+ * race between two sessions re-reads config and retries with the winner's pair.
  */
 
+import {
+  assertConfigWritable,
+  type configWriteProblem,
+  displayConfigPath,
+  type GovernanceConfig,
+  loadConfig,
+  saveConfig,
+} from "./config";
 import * as deviceFlow from "./device-flow";
-import type { GovernanceConfig } from "./config";
-import { loadConfig, saveConfig } from "./config";
 
 /**
  * Treat an access token as spent this many seconds before its stated
@@ -34,14 +28,15 @@ export interface SessionRefreshDeps {
   loadImpl?: typeof loadConfig;
   /** Seam for tests; defaults to writing ~/.langwatch/config.json. */
   saveImpl?: typeof saveConfig;
+  /** Seam for tests; defaults to a real write next to ~/.langwatch/config.json. */
+  writeProblemImpl?: typeof configWriteProblem;
   fetchImpl?: typeof fetch;
 }
 
 /**
- * Whether `cfg.access_token` is at or past its recorded expiry. Returns
- * false when there is no recorded expiry: pre-`expires_at` configs and
- * `langwatch login --api-key` sessions have nothing to reason about, so
- * they keep the old behaviour of trying the call and handling the 401.
+ * Whether `cfg.access_token` is at or past its recorded expiry. False when
+ * there's no recorded expiry: pre-`expires_at` and `--api-key` sessions keep
+ * the old behaviour of trying the call and handling the 401.
  */
 export function isAccessTokenExpired(
   cfg: GovernanceConfig,
@@ -68,11 +63,9 @@ export type SessionRefreshOutcome =
   | { status: "failed"; message: string };
 
 /**
- * The reason a refresh failed, as a string worth showing someone. Rejections
- * do not always arrive as `Error`: a polyfilled fetch can reject with a bare
- * string or an `AbortError`-shaped object, and `(err as Error).message` on
- * those is `undefined`, which is what the wrapper would otherwise print as
- * the reason the session died.
+ * The reason a refresh failed, as a string worth showing someone. A
+ * polyfilled fetch can reject with a bare string or an `AbortError`-shaped
+ * object, where `(err as Error).message` is `undefined`.
  */
 function messageOf(err: unknown): string {
   return err instanceof Error ? err.message : String(err);
@@ -88,19 +81,66 @@ function applyRefreshResult(
   cfg.expires_at = Math.floor(Date.now() / 1000) + result.expires_in;
   try {
     saveImpl(cfg);
+  } catch (err) {
+    // The write check passed a moment ago, so this is rare; the old refresh token is spent now,
+    // so say so rather than let the next run log the person out with no explanation.
+    process.stderr.write(
+      `langwatch: the refreshed session could not be saved to ${displayConfigPath()} ` +
+        `(${messageOf(err)}); the next run may ask you to log in again.\n`,
+    );
+  }
+}
+
+async function recoverRejectedRefresh({
+  cfg,
+  err,
+  attempted,
+  opts,
+  refreshImpl,
+  loadImpl,
+  saveImpl,
+}: {
+  cfg: GovernanceConfig;
+  err: unknown;
+  attempted: string;
+  opts: deviceFlow.DeviceFlowOptions;
+  refreshImpl: typeof deviceFlow.refresh;
+  loadImpl: typeof loadConfig;
+  saveImpl: typeof saveConfig;
+}): Promise<SessionRefreshOutcome> {
+  const rejected = err instanceof deviceFlow.DeviceFlowError && err.kind === "unauthorized";
+  if (!rejected) {
+    return { status: "failed", message: messageOf(err) };
+  }
+
+  let onDisk: GovernanceConfig | null = null;
+  try {
+    onDisk = loadImpl();
   } catch {
-    // A read-only home directory still gets a working token for this
-    // run; the next run just refreshes again.
+    onDisk = null;
+  }
+  const rotated = onDisk?.refresh_token;
+  if (!rotated || rotated === attempted) {
+    return { status: "rejected", message: messageOf(err) };
+  }
+
+  try {
+    applyRefreshResult(cfg, await refreshImpl(opts, rotated), saveImpl);
+    return { status: "refreshed" };
+  } catch (retryError) {
+    const retryRejected =
+      retryError instanceof deviceFlow.DeviceFlowError && retryError.kind === "unauthorized";
+    return {
+      status: retryRejected ? "rejected" : "failed",
+      message: messageOf(retryError),
+    };
   }
 }
 
 /**
- * Trade `cfg.refresh_token` for a fresh access + refresh pair, mutating
- * `cfg` and persisting it on success.
- *
- * On a server rejection the config on disk is re-read once: a sibling
- * CLI process may have rotated the pair in the meantime, in which case
- * its newer refresh token is tried before giving up.
+ * Trades `cfg.refresh_token` for a fresh pair, mutating and persisting
+ * `cfg`. On a server rejection, the config is re-read once in case a
+ * sibling CLI process rotated it first, trying its newer token before giving up.
  */
 export async function refreshSession(
   cfg: GovernanceConfig,
@@ -116,40 +156,22 @@ export async function refreshSession(
 
   const attempted = cfg.refresh_token;
   if (!attempted) return { status: "unavailable" };
+  // Rotation spends the refresh token: never rotate one the CLI cannot save.
+  assertConfigWritable(deps.writeProblemImpl);
 
   try {
     applyRefreshResult(cfg, await refreshImpl(opts, attempted), saveImpl);
     return { status: "refreshed" };
   } catch (err) {
-    const rejected =
-      err instanceof deviceFlow.DeviceFlowError && err.kind === "unauthorized";
-    if (!rejected) {
-      return { status: "failed", message: messageOf(err) };
-    }
-
-    let onDisk: GovernanceConfig | null = null;
-    try {
-      onDisk = loadImpl();
-    } catch {
-      onDisk = null;
-    }
-    const rotated = onDisk?.refresh_token;
-    if (!rotated || rotated === attempted) {
-      return { status: "rejected", message: messageOf(err) };
-    }
-
-    try {
-      applyRefreshResult(cfg, await refreshImpl(opts, rotated), saveImpl);
-      return { status: "refreshed" };
-    } catch (err2) {
-      const rejected2 =
-        err2 instanceof deviceFlow.DeviceFlowError &&
-        err2.kind === "unauthorized";
-      return {
-        status: rejected2 ? "rejected" : "failed",
-        message: messageOf(err2),
-      };
-    }
+    return recoverRejectedRefresh({
+      cfg,
+      err,
+      attempted,
+      opts,
+      refreshImpl,
+      loadImpl,
+      saveImpl,
+    });
   }
 }
 

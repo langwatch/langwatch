@@ -4,7 +4,6 @@ from collections.abc import Mapping
 from typing import TYPE_CHECKING, Any, TypeVar, cast
 
 from attrs import define as _attrs_define
-from attrs import field as _attrs_field
 
 from ..types import UNSET, Unset
 
@@ -33,8 +32,8 @@ class PutApiModelProvidersByProviderResponse200AdditionalProperty:
         provider (str):
         enabled (bool):
         custom_keys (None | PutApiModelProvidersByProviderResponse200AdditionalPropertyCustomKeysType0):
+        deployment_mapping (Any | None):
         id (str | Unset):
-        deployment_mapping (None | Unset):
         models (list[str] | None | Unset):
         embeddings_models (list[str] | None | Unset):
         custom_models (list[PutApiModelProvidersByProviderResponse200AdditionalPropertyCustomModelsType0Item] | None |
@@ -50,8 +49,8 @@ class PutApiModelProvidersByProviderResponse200AdditionalProperty:
     provider: str
     enabled: bool
     custom_keys: None | PutApiModelProvidersByProviderResponse200AdditionalPropertyCustomKeysType0
+    deployment_mapping: Any | None
     id: str | Unset = UNSET
-    deployment_mapping: None | Unset = UNSET
     models: list[str] | None | Unset = UNSET
     embeddings_models: list[str] | None | Unset = UNSET
     custom_models: (
@@ -64,7 +63,6 @@ class PutApiModelProvidersByProviderResponse200AdditionalProperty:
     extra_headers: (
         list[PutApiModelProvidersByProviderResponse200AdditionalPropertyExtraHeadersType0Item] | None | Unset
     ) = UNSET
-    additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         from ..models.put_api_model_providers_by_provider_response_200_additional_property_custom_keys_type_0 import (
@@ -81,9 +79,10 @@ class PutApiModelProvidersByProviderResponse200AdditionalProperty:
         else:
             custom_keys = self.custom_keys
 
-        id = self.id
-
+        deployment_mapping: Any | None
         deployment_mapping = self.deployment_mapping
+
+        id = self.id
 
         models: list[str] | None | Unset
         if isinstance(self.models, Unset):
@@ -142,18 +141,17 @@ class PutApiModelProvidersByProviderResponse200AdditionalProperty:
             extra_headers = self.extra_headers
 
         field_dict: dict[str, Any] = {}
-        field_dict.update(self.additional_properties)
+
         field_dict.update(
             {
                 "provider": provider,
                 "enabled": enabled,
                 "customKeys": custom_keys,
+                "deploymentMapping": deployment_mapping,
             }
         )
         if id is not UNSET:
             field_dict["id"] = id
-        if deployment_mapping is not UNSET:
-            field_dict["deploymentMapping"] = deployment_mapping
         if models is not UNSET:
             field_dict["models"] = models
         if embeddings_models is not UNSET:
@@ -208,9 +206,14 @@ class PutApiModelProvidersByProviderResponse200AdditionalProperty:
 
         custom_keys = _parse_custom_keys(d.pop("customKeys"))
 
-        id = d.pop("id", UNSET)
+        def _parse_deployment_mapping(data: object) -> Any | None:
+            if data is None:
+                return data
+            return cast(Any | None, data)
 
-        deployment_mapping = d.pop("deploymentMapping", UNSET)
+        deployment_mapping = _parse_deployment_mapping(d.pop("deploymentMapping"))
+
+        id = d.pop("id", UNSET)
 
         def _parse_models(data: object) -> list[str] | None | Unset:
             if data is None:
@@ -349,8 +352,8 @@ class PutApiModelProvidersByProviderResponse200AdditionalProperty:
             provider=provider,
             enabled=enabled,
             custom_keys=custom_keys,
-            id=id,
             deployment_mapping=deployment_mapping,
+            id=id,
             models=models,
             embeddings_models=embeddings_models,
             custom_models=custom_models,
@@ -359,21 +362,4 @@ class PutApiModelProvidersByProviderResponse200AdditionalProperty:
             extra_headers=extra_headers,
         )
 
-        put_api_model_providers_by_provider_response_200_additional_property.additional_properties = d
         return put_api_model_providers_by_provider_response_200_additional_property
-
-    @property
-    def additional_keys(self) -> list[str]:
-        return list(self.additional_properties.keys())
-
-    def __getitem__(self, key: str) -> Any:
-        return self.additional_properties[key]
-
-    def __setitem__(self, key: str, value: Any) -> None:
-        self.additional_properties[key] = value
-
-    def __delitem__(self, key: str) -> None:
-        del self.additional_properties[key]
-
-    def __contains__(self, key: str) -> bool:
-        return key in self.additional_properties

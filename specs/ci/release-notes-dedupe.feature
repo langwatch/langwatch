@@ -39,3 +39,23 @@ Feature: One release-note entry per commit
     When the dedupe pass runs over the file
     Then every duplicated sha appears once per section afterwards
     And every other line survives byte for byte
+
+  @unit
+  Scenario: Lines that are not release-note bullets are never removed
+    Given a section holds a prose line and a bullet that link the same commit
+    And two prose lines in the section link one commit
+    When the dedupe pass runs
+    Then no line changes
+
+  @unit
+  Scenario: A failed pull-request lookup falls back to the linked entry
+    Given two entries in one section carry the same commit sha
+    And asking GitHub which pull request merged the commit fails
+    When the dedupe pass runs over the file
+    Then the run succeeds and keeps the entry carrying the pull-request link
+
+  @unit
+  Scenario: The release workflow checks out the repository before deduplicating
+    Given the release workflow's dedupe job
+    Then it checks out the repository with the release token before running the pass
+    And it runs after the release manifest stamp so the two never push to one branch at once

@@ -29,8 +29,8 @@ if [ -z "$branches" ]; then
   exit 0
 fi
 
-git config user.name "langwatch-ci"
-git config user.email "ci@langwatch.langwatch.ai"
+git config user.name "github-actions[bot]"
+git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
 worktree_root="$(mktemp -d)"
 trap 'git worktree list --porcelain | sed -n "s/^worktree //p" | grep "^$worktree_root" | xargs -r git worktree remove --force; rm -rf "$worktree_root"' EXIT

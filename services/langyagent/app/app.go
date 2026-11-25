@@ -68,6 +68,7 @@ type App struct {
 	telemetry  *telemetry.Telemetry
 	finalizer  TurnFinalizer
 	frameRelay FrameRelay
+	stopped    *stoppedTurns
 }
 
 // finalizeTimeout bounds the durable final POST (across its internal retries).
@@ -78,7 +79,7 @@ type Option func(*App)
 
 // New constructs an App with the given options.
 func New(opts ...Option) *App {
-	a := &App{}
+	a := &App{stopped: newStoppedTurns()}
 	for _, o := range opts {
 		o(a)
 	}
@@ -120,7 +121,7 @@ type ChatRequest struct {
 	HistorySeed string
 	Credentials domain.Credentials
 	// ResumeToken (ADR-048) is an opaque, worker-authored checkpoint from a prior
-	// turn that handed off on shutdown. Threaded into PostMessage so opencode
+	// turn that handed off on shutdown. Threaded into PostMessage so the agent
 	// resumes from it; empty on a normal cold start.
 	ResumeToken string
 	// TurnID is the control plane's idempotency key for this turn. It rides the
@@ -147,7 +148,7 @@ type ChatRequest struct {
 
 // Warm spawns the conversation's worker WITHOUT running a turn.
 //
-// Acquiring a worker is the expensive half of a cold turn: it forks opencode,
+// Acquiring a worker is the expensive half of a cold turn: it forks the worker,
 // lays out the worker home, installs the skills and waits for the session to
 // come up. The control plane knows a turn is coming the moment the browser POSTs
 // — long before the event-sourced dispatch actually reaches us — so it calls this
@@ -190,13 +191,17 @@ func (a *App) Warm(ctx context.Context, conversationID string, creds domain.Cred
 // turn (ADR-078: the token-burn half of the user's Stop). Deliberately returns
 // nothing: the control plane treats a cancel as fire-and-forget. The stopped
 // terminal is already on the durable record before the cancel is sent, so a
-// cancel that finds nothing to halt (worker gone, turn finished, harness
+// cancel that finds nothing to halt (worker gone, turn finished, an agent
 // without abort support) has succeeded at its only job, which is best-effort.
 func (a *App) CancelTurn(ctx context.Context, conversationID, turnID string) {
 	clog.Get(ctx).Info("canceling in-flight turn",
 		zap.String("conversation_id", conversationID),
 		zap.String("turn_id", turnID),
 	)
+	// Remembered first, because the abort below can only reach a worker that is
+	// already running the turn. A stop during the cold start finds no worker at
+	// all, and StartTurn is where it is honored instead.
+	a.stopped.record(turnID)
 	a.pool.CancelTurn(conversationID, turnID)
 }
 
@@ -227,17 +232,39 @@ func (a *App) HasLiveWorker(conversationID string, sig domain.CredentialSignatur
 // detached, panic-guarded goroutine — the client is not held open for the turn,
 // whose output flows out-of-band as signed frames to the relay.
 func (a *App) StartTurn(ctx context.Context, req ChatRequest) (func(context.Context), error) {
-	worker, err := a.pool.Acquire(ctx, req.ConversationID, req.Credentials)
+	// The user stopped this turn before it ever started running. Its terminal is
+	// already on the durable record, so there is nothing for the answer to land
+	// on: acquire no worker, claim nothing, and answer 202 so the caller retires
+	// the dispatch instead of re-driving it.
+	if a.stopped.has(req.TurnID) {
+		clog.Get(ctx).Info("turn was stopped before it started; not running it",
+			zap.String("conversation_id", req.ConversationID),
+			zap.String("turn_id", req.TurnID),
+		)
+		return func(context.Context) {}, nil
+	}
+	worker, err := a.pool.Acquire(ctx, req.ConversationID, req.TurnID, req.Credentials)
 	if err != nil {
 		if errors.Is(err, domain.ErrMaxWorkers) {
 			a.atCapacity(ctx)
 			return nil, herr.NewLight(ctx, domain.ErrMaxWorkers, nil)
 		}
+		// A keyless dispatch that needs a spawn is the designed fallback of the
+		// probe-then-mint flow: the control plane mints a key on the 428 and
+		// re-sends, and the turn runs. It is logged as that outcome, without a
+		// stacktrace; any other acquire failure is a real error.
+		if errors.Is(err, domain.ErrCredentialsRequired) {
+			clog.Get(ctx).Info("worker needs a spawn but the dispatch carried no session key; the control plane mints one and re-sends",
+				zap.String("conversation_id", req.ConversationID),
+				zap.String("turn_id", req.TurnID),
+			)
+			return nil, err
+		}
 		clog.Get(ctx).Error("acquire worker failed", zap.Error(err))
-		return nil, err // already a herr from the pool (e.g. ErrCredentialsRequired)
+		return nil, err // already a herr from the pool
 	}
 	// Per-conversation in-flight guard, turnId-idempotent (review "F"). The
-	// worker's OpenCode session is single-stream — two concurrent DIFFERENT turns
+	// worker's agent session is single-stream — two concurrent DIFFERENT turns
 	// would splice replies (busy → 409). But a redundant dispatch of the SAME
 	// turnId — exactly what the self-retry re-drive of a merely-slow worker
 	// produces — must be a benign no-op, never a second run.
@@ -290,12 +317,13 @@ func (a *App) driveTurn(ctx context.Context, req ChatRequest, worker Worker) {
 	defer func() { worker.ForwardTurnSpan(sc, start, time.Now(), failure) }()
 
 	// The per-turn relay push. Disabled (no runToken/endpoint/secret) ⇒ nil stream:
-	// the turn still runs + finalizes, it just has no live edge.
-	stream := a.openRelay(ctx, req)
-	if stream != nil {
-		defer func() { _ = stream.Close() }()
-	}
-	sink := newFrameSink(stream)
+	// the turn still runs + finalizes, it just has no live edge. The sink owns the
+	// stream from here (including any replacement it reopens after a push failure),
+	// so the deferred Close goes through it.
+	sink := newFrameSink(a.openRelay(ctx, req), func() FrameStream {
+		return a.openRelay(ctx, req)
+	})
+	defer sink.Close()
 	// A true status for the cold window: between the prompt POST and the first
 	// LLM request the worker prepares its tools (measured at 10s+ on a cold
 	// home) and produces NO frames — without a status the panel would sit on
@@ -384,7 +412,7 @@ func (a *App) driveTurn(ctx context.Context, req ChatRequest, worker Worker) {
 		a.finalizeCompletedTurn(ctx, req, sink)
 		a.turnObserved(ctx, start, "handoff", req.Intent)
 	case herr.IsCode(streamErr, domain.ErrAgentError):
-		// The agent itself reported the turn failed (an opencode error event —
+		// The agent itself reported the turn failed (an error terminal —
 		// e.g. its LLM call was rejected). Deterministic and terminal: emit the
 		// vetted `agent_error` herr NOW so the control plane fails the turn in
 		// milliseconds instead of the liveness sweep misreading it as a stall.
@@ -416,8 +444,7 @@ func (a *App) driveTurn(ctx context.Context, req ChatRequest, worker Worker) {
 		}
 		failure = &domain.TurnFailure{Code: "agent_error", Message: failureMessage}
 		turnSpan.RecordError(streamErr)
-		he := herr.NewLight(ctx, domain.ErrAgentError,
-			herr.M{"message": "the agent hit an error before finishing"}, reasons...)
+		he := agentErrorHerr(ctx, reasons)
 		f, mErr := frames.ErrorFromHerr(he)
 		if mErr != nil {
 			clog.Get(ctx).Warn("build error frame failed", zap.Error(mErr))
@@ -426,7 +453,7 @@ func (a *App) driveTurn(ctx context.Context, req ChatRequest, worker Worker) {
 		}
 		a.turnObserved(ctx, start, "agent-error", req.Intent)
 	case streamErr != nil:
-		// The worker's event stream died before the turn finished — the opencode
+		// The worker's event stream died before the turn finished — the worker
 		// subprocess crashed, was OOM-killed, or the connection dropped. The raw
 		// error is for the log only; the control plane classifies the vetted
 		// `worker_stopped` code into a final "Langy's worker stopped" state (never
@@ -550,4 +577,23 @@ func (a *App) atCapacity(ctx context.Context) {
 		return
 	}
 	a.telemetry.AtCapacity(ctx)
+}
+
+// agentErrorHerr is the wire herr for a turn the agent reported failed. With
+// no captured cause nothing says the provider refused the call, and a resend
+// often works, so the error is retryable; with causes, any retryable one decides.
+func agentErrorHerr(ctx context.Context, reasons []error) herr.E {
+	he := herr.NewLight(ctx, domain.ErrAgentError,
+		herr.M{"message": "the agent hit an error before finishing"}, reasons...)
+	return he.WithRetryable(len(reasons) == 0 || anyRetryable(reasons))
+}
+
+func anyRetryable(reasons []error) bool {
+	for _, reason := range reasons {
+		var he herr.E
+		if errors.As(reason, &he) && he.Retryable {
+			return true
+		}
+	}
+	return false
 }

@@ -31,6 +31,7 @@ Reference mockups for issue #1397. Based on design screenshots (Feb 2026).
 ## 2. Suites Page — Suite Selected
 
 When a suite is selected in the sidebar, the main area shows:
+
 1. Suite header (name, labels, description, Edit + Run buttons)
 2. Stats chips row
 3. Last activity timestamp
@@ -170,6 +171,7 @@ Opened via "+ New Suite" button. Slides in from right.
 ## 4. Edit Suite Drawer
 
 Same as New Suite but pre-populated. Title says "Edit Suite". Opened via:
+
 - Edit button in suite header
 - "Edit" in context menu
 
@@ -243,6 +245,7 @@ summary preview. Clicking a run navigates to the existing run detail page.
 ```
 
 Where:
+
 - `status_icon`: ✓ (green) for all pass, ✗ (red) for any fail
 - `pass%`: percentage of repeat trials that passed
 - `(pass/total)`: e.g. (3/3) when repeatCount=3

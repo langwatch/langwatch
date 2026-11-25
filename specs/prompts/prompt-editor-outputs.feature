@@ -61,3 +61,16 @@ Feature: Structured outputs section in the prompt editor
     When I add an input "query" of type str via the Add button
     Then "{{query}}" is a valid variable in the prompt template
     And it is no longer flagged as missing
+
+  @integration
+  Scenario: The last output cannot be removed
+    Given a prompt with exactly one output
+    Then its remove button is disabled and explains "At least one output is required"
+    And clicking it does not change the outputs
+
+  @integration
+  Scenario: Output names use the same keyboard editing as variable names
+    Given an output name is being edited
+    When I press Enter the new name is committed once
+    And when I press Escape the old name is kept and focus returns to the name
+

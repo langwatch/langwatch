@@ -1,0 +1,67 @@
+import { Card } from "@langwatch/design-system/card";
+import { Badge, Box, Button, HStack, Text } from "@langwatch/design-system/primitives";
+import { Skull } from "lucide-react";
+
+import { formatTimeAgo } from "../../../../model/ops-formatters.ts";
+import type { DeadLetterProcessCount } from "../../model/dead-letter-types.ts";
+
+/**
+ * Which processes are dead and how stale, doubling as the filter. One
+ * button per process rather than a dropdown: the breakdown is the
+ * diagnosis, and an operator mid-incident should not have to open a control.
+ */
+export function DeadLetterSummary({
+  byProcess,
+  selected,
+  now,
+  onSelect,
+}: {
+  byProcess: DeadLetterProcessCount[];
+  selected: string | undefined;
+  now: number;
+  onSelect: (processName: string | undefined) => void;
+}) {
+  const fleetTotal = byProcess.reduce((sum, row) => sum + row.count, 0);
+  return (
+    <Card bodyLayout="spaced">
+      <HStack gap={2}>
+        <Box color="red.fg">
+          <Skull size={16} />
+        </Box>
+        <Text textStyle="sm" fontWeight="medium" data-testid="dead-total">
+          {fleetTotal} dead {fleetTotal === 1 ? "message" : "messages"} across {byProcess.length}{" "}
+          {byProcess.length === 1 ? "process" : "processes"}
+        </Text>
+      </HStack>
+      <HStack gap={2} flexWrap="wrap">
+        <Button
+          size="sm"
+          variant={selected === undefined ? "solid" : "outline"}
+          onClick={() => onSelect(undefined)}
+        >
+          All
+        </Button>
+        {byProcess.map((row) => (
+          <Button
+            key={row.processName}
+            size="sm"
+            data-testid={`dead-filter-${row.processName}`}
+            variant={selected === row.processName ? "solid" : "outline"}
+            onClick={() => onSelect(row.processName)}
+          >
+            {row.processName}
+            <Badge size="xs" colorPalette="red" marginLeft={1}>
+              {row.count}
+            </Badge>
+            {/* `as="span"`: Chakra's Text renders a <p>, which a <button>
+                  may not contain — the browser closes the button early and
+                  the chip stops being one control. */}
+            <Text as="span" textStyle="xs" color="fg.muted" marginLeft={1}>
+              oldest {formatTimeAgo(row.oldestUpdatedAt, now)}
+            </Text>
+          </Button>
+        ))}
+      </HStack>
+    </Card>
+  );
+}

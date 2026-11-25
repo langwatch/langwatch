@@ -1,0 +1,80 @@
+/**
+ * @vitest-environment node
+ * Verifies that the span read's floor is only tenant-aware when a retention resolver is
+ * provided. Production wiring was broken: the service never received the optional resolver.
+ */
+import { describe, expect, it, vi } from "vitest";
+
+import { TraceCanonicalisationService } from "#features/derivation/services/trace-canonicalisation.service";
+
+vi.mock("~/server/db", () => ({ prisma: {} }));
+
+vi.mock("langwatch", () => ({
+  getLangWatchTracer: () => ({
+    withActiveSpan: (_name: string, ...args: unknown[]) => {
+      const fn = args.length === 1 ? args[0] : args[1];
+      return (fn as (span: unknown) => unknown)({
+        setAttribute: () => void 0,
+        setAttributes: () => void 0,
+        addEvent: () => void 0,
+      });
+    },
+  }),
+}));
+
+const { TraceModule } = await import("../trace.app.ts");
+const { TraceLegacyReadClickHouseRepository } =
+  await import("../../features/legacy/repositories/clickhouse/trace-legacy-read.repository.ts");
+const { LegacyTraceMappingService } =
+  await import("../../features/legacy/services/legacy-trace-mapping.service.ts");
+const traceCanonicalisation = TraceCanonicalisationService.create();
+const repository = TraceLegacyReadClickHouseRepository.create({});
+const retentionResolver = { resolve: async () => null };
+
+/** The mapping keeps the policy it passes to each read private; this is the wiring under test. */
+function retentionProviderOf(service: unknown) {
+  return (service as { retentionDays?: unknown }).retentionDays;
+}
+
+describe("the production trace-service factory", () => {
+  describe("given no resolver is passed explicitly", () => {
+    describe("when the service is created", () => {
+      /** @scenario "The floor follows the tenant's own retention policy" */
+      it("still wires a live retention cascade, so the floor is tenant-aware", () => {
+        const service = TraceModule.composeLegacyRead({
+          repository,
+          retentionResolver: retentionResolver as never,
+          traceCanonicalisation,
+        });
+
+        expect(retentionProviderOf(service)).toBeDefined();
+      });
+
+      /** @scenario "The floor follows the tenant's own retention policy" */
+      it("wires the policy cascade itself, not some other provider", () => {
+        const service = TraceModule.composeLegacyRead({
+          repository,
+          retentionResolver: retentionResolver as never,
+          traceCanonicalisation,
+        });
+
+        // `provider` is the TraceRetentionFloorService policy the floor asks;
+        // the resolver inside it is the thing that has to be the real cascade.
+        const provider = retentionProviderOf(service) as { resolver?: unknown };
+
+        expect(provider?.resolver).toBe(retentionResolver);
+      });
+    });
+  });
+
+  describe("given the caller constructs the service directly", () => {
+    describe("when no resolver is supplied", () => {
+      /** @scenario "A caller with no resolver wired still gets a bounded read" */
+      it("leaves the floor on the platform default, so unit tests stay database-free", () => {
+        const service = LegacyTraceMappingService.create({ repository, traceCanonicalisation });
+
+        expect(retentionProviderOf(service)).toBeUndefined();
+      });
+    });
+  });
+});

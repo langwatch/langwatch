@@ -1,8 +1,6 @@
 /**
- * The session context hook entries in the hook file of each agent that takes
- * command hooks: the merge, the ownership rule that keeps a user's own hooks
- * out of it, and the removal logout drives.
- *
+ * The session context hook entries in each agent's hook file: the merge,
+ * ownership rule, and the removal logout drives.
  * Feature: specs/ai-governance/cli-wrappers/session-context-hook.feature
  */
 
@@ -26,14 +24,30 @@ let settingsPath: string;
 const origHome = process.env.HOME;
 const origUserprofile = process.env.USERPROFILE;
 const origCodexHome = process.env.CODEX_HOME;
+const origCopilotHome = process.env.COPILOT_HOME;
 
 const entryFor = (tool: HookedTool) => ({
-  hooks: [
-    { type: "command", command: sessionContextHookCommand(tool), timeout: 10 },
-  ],
+  hooks: [{ type: "command", command: sessionContextHookCommand(tool), timeout: 10 }],
 });
 
 const ourEntry = entryFor("claude_code");
+
+// Claude's SessionStart entry additionally carries the guidance hook, in the
+// same entry, so it stays one langwatch entry per event.
+const ourSessionStartEntry = {
+  hooks: [
+    {
+      type: "command",
+      command: sessionContextHookCommand("claude_code"),
+      timeout: 10,
+    },
+    {
+      type: "command",
+      command: "langwatch ingest guidance claude-code",
+      timeout: 10,
+    },
+  ],
+};
 
 const userEntry = {
   matcher: "startup",
@@ -46,11 +60,9 @@ const install = ({
 }: { tool?: HookedTool; filePath?: string } = {}) =>
   installSessionContextHooks({ tool, ...(filePath ? { filePath } : {}) });
 
-const has = (tool: HookedTool = "claude_code") =>
-  hasSessionContextHooks({ tool });
+const has = (tool: HookedTool = "claude_code") => hasSessionContextHooks({ tool });
 
-const remove = (tool: HookedTool = "claude_code") =>
-  removeSessionContextHooks({ tool });
+const remove = (tool: HookedTool = "claude_code") => removeSessionContextHooks({ tool });
 
 const readSettings = (file = settingsPath): Record<string, any> =>
   JSON.parse(fs.readFileSync(file, "utf8")) as Record<string, any>;
@@ -65,6 +77,7 @@ beforeEach(() => {
   process.env.HOME = tmpHome;
   process.env.USERPROFILE = tmpHome;
   delete process.env.CODEX_HOME;
+  delete process.env.COPILOT_HOME;
   settingsPath = path.join(tmpHome, ".claude", "settings.json");
 });
 
@@ -77,6 +90,8 @@ afterEach(() => {
   else process.env.USERPROFILE = origUserprofile;
   if (origCodexHome === undefined) delete process.env.CODEX_HOME;
   else process.env.CODEX_HOME = origCodexHome;
+  if (origCopilotHome === undefined) delete process.env.COPILOT_HOME;
+  else process.env.COPILOT_HOME = origCopilotHome;
   fs.rmSync(tmpHome, { recursive: true, force: true });
 });
 
@@ -89,7 +104,7 @@ describe("installSessionContextHooks", () => {
       expect(result.path).toBe(settingsPath);
       expect(result.displayPath).toBe("~/.claude/settings.json");
       expect(readSettings()).toEqual({
-        hooks: { SessionStart: [ourEntry], Stop: [ourEntry] },
+        hooks: { SessionStart: [ourSessionStartEntry], Stop: [ourEntry] },
       });
     });
 
@@ -119,9 +134,7 @@ describe("installSessionContextHooks", () => {
         env: { MY_OWN: "keep" },
         hooks: {
           SessionStart: [userEntry],
-          PreToolUse: [
-            { matcher: "Bash", hooks: [{ type: "command", command: "audit" }] },
-          ],
+          PreToolUse: [{ matcher: "Bash", hooks: [{ type: "command", command: "audit" }] }],
         },
       });
     });
@@ -140,7 +153,7 @@ describe("installSessionContextHooks", () => {
     it("leaves the user's own entry first and adds ours beside it", () => {
       install();
 
-      expect(readSettings().hooks.SessionStart).toEqual([userEntry, ourEntry]);
+      expect(readSettings().hooks.SessionStart).toEqual([userEntry, ourSessionStartEntry]);
       expect(readSettings().hooks.Stop).toEqual([ourEntry]);
     });
   });
@@ -152,16 +165,14 @@ describe("installSessionContextHooks", () => {
           SessionStart: [
             userEntry,
             {
-              hooks: [
-                { type: "command", command: "langwatch ingest hook claude" },
-              ],
+              hooks: [{ type: "command", command: "langwatch ingest hook claude" }],
             },
           ],
         },
       });
 
       expect(install().action).toBe("updated");
-      expect(readSettings().hooks.SessionStart).toEqual([userEntry, ourEntry]);
+      expect(readSettings().hooks.SessionStart).toEqual([userEntry, ourSessionStartEntry]);
     });
   });
 
@@ -208,9 +219,7 @@ describe("installSessionContextHooks", () => {
       expect(sessionContextHooksTarget("codex").path).toBe(
         path.join(tmpHome, "elsewhere", "hooks.json"),
       );
-      expect(install({ tool: "codex" }).path).toBe(
-        path.join(tmpHome, "elsewhere", "hooks.json"),
-      );
+      expect(install({ tool: "codex" }).path).toBe(path.join(tmpHome, "elsewhere", "hooks.json"));
     });
 
     it("keeps hooks the user already declared in the same file", () => {
@@ -228,10 +237,7 @@ describe("installSessionContextHooks", () => {
 
       const document = readSettings(codexHooks);
       expect(document.description).toBe("mine");
-      expect(document.hooks.SessionStart).toEqual([
-        userEntry,
-        entryFor("codex"),
-      ]);
+      expect(document.hooks.SessionStart).toEqual([userEntry, entryFor("codex")]);
     });
 
     it("leaves the claude settings file alone", () => {
@@ -298,9 +304,7 @@ describe("removeSessionContextHooks", () => {
       install({ tool: "codex" });
 
       expect(remove("codex")).toBe(true);
-      expect(readSettings(path.join(tmpHome, ".codex", "hooks.json"))).toEqual(
-        {},
-      );
+      expect(readSettings(path.join(tmpHome, ".codex", "hooks.json"))).toEqual({});
     });
   });
 
@@ -321,9 +325,213 @@ describe("removeSessionContextHooks", () => {
       fs.writeFileSync(settingsPath, '{ "hooks": { "Stop": [ , ] }');
 
       expect(remove()).toBe(false);
-      expect(fs.readFileSync(settingsPath, "utf8")).toBe(
-        '{ "hooks": { "Stop": [ , ] }',
+      expect(fs.readFileSync(settingsPath, "utf8")).toBe('{ "hooks": { "Stop": [ , ] }');
+    });
+  });
+});
+
+describe("the Copilot hook file LangWatch owns", () => {
+  const copilotFile = () => path.join(tmpHome, ".copilot", "hooks", "langwatch.json");
+
+  describe("given no file of ours yet", () => {
+    it("creates it, then reports it unchanged and present", () => {
+      expect(install({ tool: "copilot" }).action).toBe("created");
+      expect(install({ tool: "copilot" }).action).toBe("unchanged");
+      expect(has("copilot")).toBe(true);
+      expect(sessionContextHooksTarget("copilot").displayPath).toBe(
+        "~/.copilot/hooks/langwatch.json",
       );
+    });
+
+    /** @scenario "A Copilot hook file holding only LangWatch's entries is brought up to date" */
+    it("rewrites a file of ours an older CLI left in another shape", () => {
+      fs.mkdirSync(path.dirname(copilotFile()), { recursive: true });
+      fs.writeFileSync(
+        copilotFile(),
+        JSON.stringify({
+          version: 1,
+          hooks: { sessionStart: [{ type: "command", bash: "langwatch ingest hook copilot" }] },
+        }),
+      );
+
+      expect(install({ tool: "copilot" }).action).toBe("updated");
+      expect(readSettings(copilotFile()).hooks.agentStop).toHaveLength(1);
+    });
+  });
+
+  describe("given a file of ours an older CLI wrote with a bash command only", () => {
+    const bashOnly = { type: "command", bash: "langwatch ingest hook copilot", timeoutSec: 10 };
+
+    /** @scenario "A Copilot hook file holding only LangWatch's entries is brought up to date" */
+    it("rewrites it so every entry carries the PowerShell command too", () => {
+      fs.mkdirSync(path.dirname(copilotFile()), { recursive: true });
+      fs.writeFileSync(
+        copilotFile(),
+        JSON.stringify({ version: 1, hooks: { sessionStart: [bashOnly], agentStop: [bashOnly] } }),
+      );
+
+      expect(install({ tool: "copilot" }).action).toBe("updated");
+      const powershellOf = (entries: unknown) =>
+        Array.isArray(entries) ? entries.map((entry) => entry.powershell) : [];
+      const hooks = readSettings(copilotFile()).hooks;
+      expect(powershellOf(hooks.sessionStart)).toEqual(["langwatch ingest hook copilot"]);
+      expect(powershellOf(hooks.agentStop)).toEqual(["langwatch ingest hook copilot"]);
+    });
+  });
+
+  describe("given a file at our path whose PowerShell command is the user's", () => {
+    it("treats it as the user's file that runs our hook, never rewritten", () => {
+      const theirs = JSON.stringify({
+        version: 1,
+        hooks: {
+          sessionStart: [
+            {
+              type: "command",
+              bash: "langwatch ingest hook copilot",
+              powershell: "./scripts/theirs.ps1",
+            },
+          ],
+        },
+      });
+      fs.mkdirSync(path.dirname(copilotFile()), { recursive: true });
+      fs.writeFileSync(copilotFile(), theirs);
+
+      expect(install({ tool: "copilot" }).action).toBe("user_file_runs_hook");
+      expect(fs.readFileSync(copilotFile(), "utf8")).toBe(theirs);
+    });
+  });
+
+  describe("given a file at our path the CLI cannot read", () => {
+    const theirs = '{"hooks":{"sessionStart":[{"bash":"./scripts/theirs.sh"}]}}';
+    const isRoot = process.getuid?.() === 0;
+
+    afterEach(() => {
+      if (fs.existsSync(copilotFile())) fs.chmodSync(copilotFile(), 0o600);
+    });
+
+    /** @scenario "A langwatch.json the CLI cannot read is never written over" */
+    it.skipIf(isRoot)("fails naming the file and leaves it exactly as it was", () => {
+      fs.mkdirSync(path.dirname(copilotFile()), { recursive: true });
+      fs.writeFileSync(copilotFile(), theirs);
+      fs.chmodSync(copilotFile(), 0o200);
+
+      expect(() => install({ tool: "copilot" })).toThrow(copilotFile());
+      fs.chmodSync(copilotFile(), 0o600);
+      expect(fs.readFileSync(copilotFile(), "utf8")).toBe(theirs);
+    });
+  });
+
+  describe("given a file at our path that runs none of our commands", () => {
+    const theirs = JSON.stringify({
+      version: 1,
+      hooks: { sessionStart: [{ type: "command", bash: "./scripts/theirs.sh" }] },
+    });
+
+    beforeEach(() => {
+      fs.mkdirSync(path.dirname(copilotFile()), { recursive: true });
+      fs.writeFileSync(copilotFile(), theirs);
+    });
+
+    it("neither overwrites, lists nor removes it", () => {
+      expect(install({ tool: "copilot" }).action).toBe("not_ours");
+      expect(has("copilot")).toBe(false);
+      expect(remove("copilot")).toBe(false);
+      expect(fs.readFileSync(copilotFile(), "utf8")).toBe(theirs);
+    });
+  });
+
+  describe("given a file at our path that runs our command and anything else", () => {
+    const cases = {
+      "a user hook beside ours in the same event": {
+        hooks: {
+          sessionStart: [{ bash: "langwatch ingest hook copilot" }, { bash: "echo mine" }],
+        },
+      },
+      "a user hook in an event of its own": {
+        hooks: {
+          sessionStart: [{ type: "command", bash: "langwatch ingest hook copilot" }],
+          preToolUse: [{ type: "command", bash: "echo guard" }],
+        },
+      },
+      "our command chained to the user's": {
+        hooks: { sessionStart: [{ bash: "langwatch ingest hook copilot && echo mine" }] },
+      },
+      "a setting of the user's on our entry": {
+        hooks: { sessionStart: [{ bash: "langwatch ingest hook copilot", cwd: "/work" }] },
+      },
+      "a key of the user's beside the hooks": {
+        version: 1,
+        disableAllHooks: false,
+        hooks: { sessionStart: [{ bash: "langwatch ingest hook copilot" }] },
+      },
+    };
+
+    for (const [shape, document] of Object.entries(cases)) {
+      it(`treats ${shape} as the user's: never rewritten, listed or removed`, () => {
+        const theirs = JSON.stringify(document);
+        fs.mkdirSync(path.dirname(copilotFile()), { recursive: true });
+        fs.writeFileSync(copilotFile(), theirs);
+
+        expect(install({ tool: "copilot" }).action).toBe("user_file_runs_hook");
+        expect(has("copilot")).toBe(false);
+        expect(remove("copilot")).toBe(false);
+        expect(fs.readFileSync(copilotFile(), "utf8")).toBe(theirs);
+      });
+    }
+  });
+
+  describe("given a user's file that runs our hook through another launcher", () => {
+    const assertFor = (command: string) => {
+      const theirs = JSON.stringify({
+        hooks: { sessionStart: [{ bash: command }], preToolUse: [{ bash: "echo guard" }] },
+      });
+      fs.mkdirSync(path.dirname(copilotFile()), { recursive: true });
+      fs.writeFileSync(copilotFile(), theirs);
+      const action = install({ tool: "copilot" }).action;
+      expect(fs.readFileSync(copilotFile(), "utf8")).toBe(theirs);
+      return action;
+    };
+
+    /** @scenario "A user's langwatch.json running the hook by path or npx is not reported as turning linking off" */
+    it.each([
+      "/opt/homebrew/bin/langwatch ingest hook copilot",
+      '"/Users/me/My Tools/langwatch" ingest hook copilot',
+      "npx langwatch ingest hook copilot",
+      "npx -y langwatch@1.19.0 ingest hook copilot",
+      "/usr/local/bin/node /usr/local/lib/node_modules/langwatch/dist/cli/index.js ingest hook copilot",
+    ])("reports %s as the user's file that runs our hook", (command) => {
+      expect(assertFor(command)).toBe("user_file_runs_hook");
+    });
+
+    /** @scenario "A user's langwatch.json running another program named like langwatch still gets the notice" */
+    it.each([
+      "/opt/homebrew/bin/langwatch-foo ingest hook copilot",
+      "npx langwatch-foo ingest hook copilot",
+      "npx @acme/langwatch ingest hook copilot",
+      "langwatch ingest hook claude-code",
+    ])("reports %s as not ours", (command) => {
+      expect(assertFor(command)).toBe("not_ours");
+    });
+  });
+
+  describe("given a file at our path that is not JSON", () => {
+    it("leaves it exactly as it was", () => {
+      fs.mkdirSync(path.dirname(copilotFile()), { recursive: true });
+      fs.writeFileSync(copilotFile(), "{ not json");
+
+      expect(install({ tool: "copilot" }).action).toBe("not_ours");
+      expect(remove("copilot")).toBe(false);
+      expect(fs.readFileSync(copilotFile(), "utf8")).toBe("{ not json");
+    });
+  });
+
+  describe("given the file is installed", () => {
+    it("deletes the whole file on removal, and reports nothing left after", () => {
+      install({ tool: "copilot" });
+
+      expect(remove("copilot")).toBe(true);
+      expect(fs.existsSync(copilotFile())).toBe(false);
+      expect(remove("copilot")).toBe(false);
     });
   });
 });

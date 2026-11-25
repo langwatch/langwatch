@@ -1,10 +1,39 @@
 import chalk from "chalk";
-import { createSpinner } from "../../utils/spinner";
+
 import { EvaluatorsApiService } from "@/client-sdk/services/evaluators";
 import type { EvaluatorResponse } from "@/client-sdk/services/evaluators";
+
 import { resolveCredentials } from "../../utils/apiKey";
-import { failSpinner } from "../../utils/spinnerError";
 import type { CommandResult } from "../../utils/output";
+import { createSpinner } from "../../utils/spinner";
+import { failSpinner } from "../../utils/spinnerError";
+import { versionSelectorOf } from "../../utils/versionCommands";
+import { refusalFromReference, findEvaluator } from "./findEvaluator";
+
+const printEvaluatorSettings = (settings: Record<string, unknown> | undefined): void => {
+  if (!settings || Object.keys(settings).length === 0) return;
+  console.log();
+  console.log(chalk.bold("  Settings:"));
+  for (const [key, value] of Object.entries(settings)) {
+    const displayValue =
+      typeof value === "object" ? JSON.stringify(value) : `${value as string | number | boolean}`;
+    console.log(`    ${chalk.gray(key + ":")} ${displayValue}`);
+  }
+};
+
+/** The version this read shows, where its deploy labels point, and who created it. */
+function printVersioning(
+  evaluator: Pick<EvaluatorResponse, "version" | "labels" | "createdBy">,
+): void {
+  if (evaluator.version) console.log(`  ${chalk.gray("Version:")}     v${evaluator.version}`);
+  if (evaluator.labels && evaluator.labels.length > 0) {
+    const labels = evaluator.labels.map(({ label, version }) => `${label} → v${version}`);
+    console.log(`  ${chalk.gray("Labels:")}      ${labels.join(", ")}`);
+  }
+  if (evaluator.createdBy?.name) {
+    console.log(`  ${chalk.gray("Created by:")}  ${evaluator.createdBy.name}`);
+  }
+}
 
 const formatEvaluatorDetails = (evaluator: EvaluatorResponse): void => {
   const config = evaluator.config as
@@ -20,6 +49,7 @@ const formatEvaluatorDetails = (evaluator: EvaluatorResponse): void => {
   console.log(`  ${chalk.gray("ID:")}          ${evaluator.id}`);
   console.log(`  ${chalk.gray("Slug:")}        ${evaluator.slug ?? chalk.gray("—")}`);
   console.log(`  ${chalk.gray("Type:")}        ${chalk.yellow(evaluatorType)}`);
+  printVersioning(evaluator);
   console.log(`  ${chalk.gray("Created:")}     ${new Date(evaluator.createdAt).toLocaleString()}`);
   console.log(`  ${chalk.gray("Updated:")}     ${new Date(evaluator.updatedAt).toLocaleString()}`);
 
@@ -32,7 +62,9 @@ const formatEvaluatorDetails = (evaluator: EvaluatorResponse): void => {
     console.log(chalk.bold("  Input Fields:"));
     evaluator.fields.forEach((field) => {
       const optional = field.optional ? chalk.gray(" (optional)") : "";
-      console.log(`    ${chalk.green("•")} ${field.identifier}: ${chalk.gray(field.type)}${optional}`);
+      console.log(
+        `    ${chalk.green("•")} ${field.identifier}: ${chalk.gray(field.type)}${optional}`,
+      );
     });
   }
 
@@ -41,21 +73,13 @@ const formatEvaluatorDetails = (evaluator: EvaluatorResponse): void => {
     console.log(chalk.bold("  Output Fields:"));
     evaluator.outputFields.forEach((field) => {
       const optional = field.optional ? chalk.gray(" (optional)") : "";
-      console.log(`    ${chalk.green("•")} ${field.identifier}: ${chalk.gray(field.type)}${optional}`);
+      console.log(
+        `    ${chalk.green("•")} ${field.identifier}: ${chalk.gray(field.type)}${optional}`,
+      );
     });
   }
 
-  if (config?.settings && Object.keys(config.settings).length > 0) {
-    console.log();
-    console.log(chalk.bold("  Settings:"));
-    for (const [key, value] of Object.entries(config.settings)) {
-      const displayValue =
-        typeof value === "object"
-          ? JSON.stringify(value)
-          : `${value as string | number | boolean}`;
-      console.log(`    ${chalk.gray(key + ":")} ${displayValue}`);
-    }
-  }
+  printEvaluatorSettings(config?.settings);
 
   if (evaluator.platformUrl) {
     console.log(`  ${chalk.bold("View:")}  ${chalk.underline(evaluator.platformUrl)}`);
@@ -68,7 +92,11 @@ const formatEvaluatorDetails = (evaluator: EvaluatorResponse): void => {
  * Returns the evaluator rather than printing it: the output port renders it in
  * whatever format the caller asked for (utils/output.ts).
  */
-export const getEvaluatorCommand = async (idOrSlug: string): Promise<CommandResult | void> => {
+export const getEvaluatorCommand = async (
+  idOrSlug: string,
+  options: { label?: string; version?: string } = {},
+): Promise<CommandResult | void> => {
+  const selector = versionSelectorOf(options);
   await resolveCredentials();
 
   const service = new EvaluatorsApiService();
@@ -76,12 +104,15 @@ export const getEvaluatorCommand = async (idOrSlug: string): Promise<CommandResu
 
   let evaluator: EvaluatorResponse;
   try {
-    evaluator = await service.get(idOrSlug);
+    evaluator = await findEvaluator({ service, reference: idOrSlug });
+    if (selector.label !== undefined || selector.version !== undefined) {
+      evaluator = await service.get(evaluator.id, selector);
+    }
     spinner.succeed(`Found evaluator "${evaluator.name}"`);
   } catch (error) {
     // No explicit `format`: see traces/search.ts — the preAction hook covers
     // every spelling; the `-f` commander default must not override it.
-    failSpinner({ spinner, error, action: "fetch evaluator" });
+    failSpinner({ spinner, error: refusalFromReference(error), action: "fetch evaluator" });
     process.exit(1);
   }
 

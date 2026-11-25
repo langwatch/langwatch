@@ -1,18 +1,14 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-vi.mock("../langwatch-api-scenarios.js", () => ({
+vi.mock("../langwatch-api-scenarios.ts", () => ({
   listScenarios: vi.fn(),
   getScenario: vi.fn(),
 }));
 
-import {
-  listScenarios,
-  getScenario,
-} from "../langwatch-api-scenarios.js";
-
-import { handleListScenarios } from "../tools/list-scenarios.js";
-import { handleGetScenario } from "../tools/get-scenario.js";
-import { formatScenarioSchema } from "../tools/discover-scenario-schema.js";
+import { listScenarios, getScenario } from "../langwatch-api-scenarios.ts";
+import { formatScenarioSchema } from "../tools/discover-scenario-schema.ts";
+import { handleGetScenario } from "../tools/get-scenario.ts";
+import { handleListScenarios } from "../tools/list-scenarios.ts";
 
 const mockListScenarios = vi.mocked(listScenarios);
 const mockGetScenario = vi.mocked(getScenario);
@@ -63,7 +59,7 @@ describe("handleListScenarios()", () => {
     it("includes truncated situation preview", () => {
       expect(result).toContain("User attempts to log in");
       expect(result).not.toContain(
-        "User attempts to log in with valid credentials and expects a welcome message back from the system"
+        "User attempts to log in with valid credentials and expects a welcome message back from the system",
       );
     });
 
@@ -117,10 +113,7 @@ describe("handleGetScenario()", () => {
     id: "scen_abc123",
     name: "Login Flow Happy Path",
     situation: "User attempts to log in with valid credentials",
-    criteria: [
-      "Responds with a welcome message",
-      "Includes user name in greeting",
-    ],
+    criteria: ["Responds with a welcome message", "Includes user name in greeting"],
     labels: ["auth", "happy-path"],
   };
 
@@ -184,5 +177,24 @@ describe("formatScenarioSchema()", () => {
     expect(result).toContain("## Writing a Good Situation");
     expect(result).toContain("## Writing Good Criteria");
     expect(result).toContain("Specific and testable");
+  });
+});
+
+describe("formatScenarioSchema()", () => {
+  describe("when documenting the fields and evaluators sections", () => {
+    /** @scenario "Agent discovers the suite fields and the evaluator attachments" */
+    it("documents the field rules and every mapping path", () => {
+      const result = formatScenarioSchema();
+
+      expect(result).toContain("## Test Suite Fields");
+      expect(result).toContain("text, number or boolean");
+      expect(result).toContain("## Evaluator Attachments");
+      expect(result).toContain("first_user_message");
+      expect(result).toContain("last_agent_message");
+      expect(result).toContain('["fields", "<identifier>"]');
+      expect(result).toContain('["tool_calls", "<toolName>", "input" | "output"]');
+      expect(result).toContain('["contexts"]');
+      expect(result).toContain("platform_get_simulation_run");
+    });
   });
 });

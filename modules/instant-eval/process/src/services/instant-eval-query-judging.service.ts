@@ -1,0 +1,173 @@
+/**
+ * One synchronous LangWatchQL query's judging (Alex, 2026-10-06, "Judge cycle"): the price of
+ * the whole query token budget held first, the rows judged, the spend recorded once, the hold
+ * dropped. A spend that never reached the ledger keeps its hold until the hold lapses.
+ * @see specs/lwql/eval-functions.feature
+ */
+
+import type {
+  InstantEvalQueryJudging,
+  InstantEvalQueryJudgingInput,
+} from "@langwatch/instant-eval-contract";
+import type { InstantEvalPricing } from "@langwatch/instant-eval-judge-contract";
+import {
+  instantEvalCostUsd,
+  instantEvalPriceUsd,
+  isInstantEvalSpendBillable,
+  pickInstantEvalRoutedSpend,
+} from "@langwatch/instant-eval-judge-contract";
+import { createLogger } from "@langwatch/observability";
+import { nowInstant, type Instant } from "@langwatch/time";
+
+import { instantEvalRunQuestions } from "../rules/instant-eval-run-questions.rules.ts";
+import { instantEvalQueryReservationId } from "../rules/instant-eval-spend-outcome.rules.ts";
+import type { InstantEvalFreeBudgetService } from "./instant-eval-free-budget.service.ts";
+import type { InstantEvalGatewayBudgetService } from "./instant-eval-gateway-budget.service.ts";
+import type {
+  InstantEvalJudgeRowsService,
+  InstantEvalJudgeUsage,
+} from "./instant-eval-judge-rows.service.ts";
+import type { InstantEvalJudgedSpendService } from "./instant-eval-judged-spend.service.ts";
+
+const logger = createLogger("langwatch:instant-eval:query-judging");
+
+export class InstantEvalQueryJudgingService {
+  private constructor(
+    private readonly options: {
+      rows: Pick<InstantEvalJudgeRowsService, "judgeRows">;
+      budget: Pick<InstantEvalFreeBudgetService, "reserve" | "release">;
+      gatewayBudget: Pick<InstantEvalGatewayBudgetService, "assertWithinGatewayBudget">;
+      spend: Pick<InstantEvalJudgedSpendService, "recordSpend">;
+      holdPricing: () => Promise<InstantEvalPricing>;
+      queryTokenBudget: number;
+      now: () => Instant;
+    },
+  ) {}
+
+  static create({
+    rows,
+    budget,
+    gatewayBudget,
+    spend,
+    holdPricing,
+    queryTokenBudget,
+    now = nowInstant,
+  }: {
+    rows: Pick<InstantEvalJudgeRowsService, "judgeRows">;
+    budget: Pick<InstantEvalFreeBudgetService, "reserve" | "release">;
+    gatewayBudget: Pick<InstantEvalGatewayBudgetService, "assertWithinGatewayBudget">;
+    spend: Pick<InstantEvalJudgedSpendService, "recordSpend">;
+    /** The judge's hold rates: the dearest input rate a routed call could reach. */
+    holdPricing: () => Promise<InstantEvalPricing>;
+    /** Input tokens one query may send: the ceiling it is held at and refused past. */
+    queryTokenBudget: number;
+    now?: () => Instant;
+  }): InstantEvalQueryJudgingService {
+    return new InstantEvalQueryJudgingService({
+      rows,
+      budget,
+      gatewayBudget,
+      spend,
+      holdPricing,
+      queryTokenBudget,
+      now,
+    });
+  }
+
+  /** Holds, judges, records once, releases; a statement asking nothing touches none of it. */
+  async judgeQuery({
+    projectId,
+    judgements,
+    rows,
+    signal,
+  }: InstantEvalQueryJudgingInput): Promise<InstantEvalQueryJudging> {
+    const questions = instantEvalRunQuestions(judgements);
+    if (questions.length === 0) return { rows, skipped: {} };
+
+    const { budget, gatewayBudget, queryTokenBudget } = this.options;
+    await gatewayBudget.assertWithinGatewayBudget({ projectId });
+    const reservationId = instantEvalQueryReservationId();
+    const priceUsd = await this.#holdPriceOf(queryTokenBudget);
+    await budget.reserve({ projectId, reservationId, priceUsd });
+    let isRecorded = true;
+    try {
+      const judged = await this.options.rows.judgeRows({
+        projectId,
+        rows,
+        questions,
+        tokenBudget: queryTokenBudget,
+        signal: signal ?? null,
+      });
+      // Recorded before a cancel is answered: what was judged was paid for.
+      isRecorded = await this.#recordSpend({ projectId, usage: judged.usage });
+
+      return {
+        rows: judged.rows,
+        skipped: judged.usage.skipped,
+        ...(judged.cancellation ? { cancellation: judged.cancellation } : {}),
+      };
+    } finally {
+      await this.#settle({ projectId, reservationId, isRecorded });
+    }
+  }
+
+  /**
+   * The token budget at the dearest base input rate a routed call could reach: a best-effort hold,
+   * not a hard cap on a routed query's spend (ADR-190 decision 7).
+   */
+  async #holdPriceOf(inputTokens: number): Promise<number> {
+    const pricing = await this.options.holdPricing();
+
+    return instantEvalPriceUsd({ costUsd: instantEvalCostUsd({ inputTokens, pricing }), pricing });
+  }
+
+  /**
+   * Nothing for a query that judged no text: a zero row is one a customer has to dismiss. Never
+   * fails the query: the answer is correct and paid for, so a lost row is a log line.
+   */
+  async #recordSpend({
+    projectId,
+    usage,
+  }: {
+    projectId: string;
+    usage: InstantEvalJudgeUsage;
+  }): Promise<boolean> {
+    if (!isInstantEvalSpendBillable(usage)) return true;
+    try {
+      await this.options.spend.recordSpend({
+        projectId,
+        inputTokens: usage.inputTokens,
+        requests: usage.requests,
+        ...pickInstantEvalRoutedSpend(usage),
+        occurredAt: this.options.now(),
+      });
+
+      return true;
+    } catch (error) {
+      logger.error({ projectId, error }, "Instant Evals query spend could not be recorded");
+
+      return false;
+    }
+  }
+
+  /** The hold goes once the spend it stood for is on the ledger; otherwise it stands in for it. */
+  async #settle({
+    projectId,
+    reservationId,
+    isRecorded,
+  }: {
+    projectId: string;
+    reservationId: string;
+    isRecorded: boolean;
+  }): Promise<void> {
+    if (isRecorded) {
+      await this.options.budget.release({ projectId, reservationId });
+
+      return;
+    }
+    logger.warn(
+      { projectId, reservationId },
+      "Instant Evals spend was not recorded; its hold on the free budget stays until it lapses",
+    );
+  }
+}

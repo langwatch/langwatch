@@ -263,12 +263,15 @@ func TestAudioTranscriptions_OversizedUploadIs413BeforeDispatch(t *testing.T) {
 	assert.False(t, dispatched, "provider must not be contacted for an oversized upload")
 }
 
-func TestAudioTranscriptions_UnknownFormFieldsAreDropped(t *testing.T) {
+// The gateway owns the model and the file. Every other part is the caller's
+// request to the provider, so a parameter the gateway has never heard of is
+// carried through rather than dropped.
+func TestAudioTranscriptions_UnknownFormFieldsAreCarried(t *testing.T) {
 	var captured domain.Request
 	router := audioRouter(&captured)
 
 	buf, contentType := multipartBody(t,
-		map[string]string{"model": "openai/gpt-4o-transcribe", "evil_field": "1; DROP TABLE"},
+		map[string]string{"model": "openai/gpt-4o-transcribe", "an_option_added_next_year": "kept"},
 		"file", "turn.wav", []byte("bytes"))
 	req := httptest.NewRequest(http.MethodPost, "/v1/audio/transcriptions", buf)
 	req.Header.Set("Authorization", "Bearer vk-lw-test")
@@ -277,8 +280,8 @@ func TestAudioTranscriptions_UnknownFormFieldsAreDropped(t *testing.T) {
 	router.ServeHTTP(rec, req)
 
 	require.Equal(t, http.StatusOK, rec.Code)
-	_, present := captured.Transcription.Params["evil_field"]
-	assert.False(t, present, "unknown form fields must not be forwarded")
+	assert.Equal(t, []domain.FormField{{Name: "an_option_added_next_year", Value: "kept"}},
+		captured.Transcription.Fields, "the model is the gateway's own part and is not repeated here")
 }
 
 // Guard: the speech success path must never be wrapped in a JSON envelope by

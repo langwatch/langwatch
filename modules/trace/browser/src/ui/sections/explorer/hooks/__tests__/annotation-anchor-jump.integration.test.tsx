@@ -1,0 +1,105 @@
+/**
+ * Jumping to what a comment is about: the span selected, and the section of the detail
+ * holding a field opened and briefly highlighted.
+ * @vitest-environment jsdom
+ */
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { useRef, useState } from "react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import "@testing-library/jest-dom/vitest";
+
+import { setWindowAddress } from "../../../../../__tests__/window-location-router.ts";
+import { getTraceDrawer } from "../../../../../behavior/trace-drawer.ts";
+import { useJumpToAnnotationAnchor } from "../../../../../features/annotation/behavior/use-jump-to-annotation-anchor.ts";
+import { useFocusSectionStore } from "../../../../../features/trace-drawer/behavior/focus-section.store.ts";
+import { useSpanPulseStore } from "../../../../../features/trace-drawer/behavior/span-pulse.store.ts";
+import { useSectionFocusGlow } from "../../trace-drawer/trace-accordions/use-section-focus-glow.ts";
+
+vi.mock("react-router", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  ...(await import("../../../../../__tests__/window-location-router.ts")).windowLocationRouter,
+}));
+
+const TRACE_ID = "trace-1";
+const SPAN_ID = "span-7";
+
+/**
+ * The two halves of a jump wired the way the drawer wires them: something that
+ * asks to be taken to a part of the trace, and an accordion stack watching for
+ * the request.
+ */
+function JumpHarness({ anchorPath }: { anchorPath: string | null }) {
+  const [openSections, setOpenSections] = useState<string[]>([]);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const { glow } = useSectionFocusGlow({
+    traceId: TRACE_ID,
+    sections: ["io", "attributes"],
+    openSections,
+    setOpenSections,
+    containerRef,
+  });
+  const jump = useJumpToAnnotationAnchor();
+  return (
+    <div ref={containerRef}>
+      <button
+        type="button"
+        onClick={() =>
+          jump({
+            traceId: TRACE_ID,
+            anchorKind: "field",
+            anchorId: SPAN_ID,
+            anchorPath,
+          })
+        }
+      >
+        Go to the comment
+      </button>
+      <div data-section="io" data-testid="io-section">
+        {openSections.includes("io") ? "open" : "closed"}
+      </div>
+      {glow ? <span data-testid="section-glow" /> : null}
+    </div>
+  );
+}
+
+beforeEach(() => {
+  setWindowAddress({
+    url: `/my-project/traces?drawer.open=traceV2Details&drawer.traceId=${TRACE_ID}&drawer.mode=conversation`,
+  });
+  useFocusSectionStore.getState().clear();
+  Element.prototype.scrollIntoView = vi.fn();
+});
+
+afterEach(cleanup);
+
+describe("given a span carries a comment about its output", () => {
+  describe("when the reader jumps to that comment's field", () => {
+    /** @scenario "Jumping to a comment on a field opens the part of the detail holding it" */
+    it("opens the section holding the output", async () => {
+      render(<JumpHarness anchorPath="output" />);
+
+      fireEvent.click(screen.getByText("Go to the comment"));
+
+      await waitFor(() => expect(screen.getByTestId("io-section")).toHaveTextContent("open"));
+    });
+
+    /** @scenario "Jumping to a comment on a field opens the part of the detail holding it" */
+    it("highlights it briefly so the reader sees where they landed", async () => {
+      render(<JumpHarness anchorPath="output" />);
+
+      fireEvent.click(screen.getByText("Go to the comment"));
+
+      await waitFor(() => expect(screen.getByTestId("section-glow")).toBeInTheDocument());
+    });
+
+    it("selects the span the field belongs to and shows the trace view", () => {
+      render(<JumpHarness anchorPath="output" />);
+
+      fireEvent.click(screen.getByText("Go to the comment"));
+
+      expect(getTraceDrawer().selectedSpanId).toBe(SPAN_ID);
+      expect(getTraceDrawer().viewMode).toBe("trace");
+      expect(useSpanPulseStore.getState().pulsingIds.has(SPAN_ID)).toBe(true);
+    });
+  });
+});

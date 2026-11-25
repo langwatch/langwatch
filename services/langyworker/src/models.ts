@@ -1,23 +1,15 @@
 /**
- * Turns the manager-written model config into a generated pi `models.json`
- * under the wrapper's private agent dir. Two rules keep secrets off disk:
- * the base URL (a loopback gateway URL, not secret) is resolved from the env
- * at boot and written literally; the API key is written as pi's env REFERENCE
- * syntax (`"$OPENAI_API_KEY"`), resolved by pi at request time.
- *
- * The entry starts from pi's OWN catalog when the model is known there for the
- * same API dialect: the catalog carries per-model request-shape knowledge the
- * manager's config does not (Claude 5's `compat.forceAdaptiveThinking`, the
- * thinking-level map, the real context window), and losing it broke every
- * turn on those models. The manager's explicit fields win over the catalog;
- * the id keeps its provider prefix (the gateway routes on it), and the
- * catalog's own endpoint and provider identity never ride along.
+ * Turns manager-written model config into pi's `models.json`. The API key
+ * uses pi's env REFERENCE syntax, never touching disk. Starts from pi's OWN
+ * catalog when known, for request-shape knowledge the manager lacks.
  */
+
+import { mkdirSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
 
 import { ANTHROPIC_MODELS } from "@earendil-works/pi-ai/providers/anthropic.models";
 import { OPENAI_MODELS } from "@earendil-works/pi-ai/providers/openai.models";
-import { mkdirSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+
 import type { LangyWorkerModelConfig } from "./config.js";
 
 export const PROVIDER_ID = "langwatch-gateway";
@@ -34,17 +26,23 @@ type CatalogModelEntry = Record<string, unknown> & {
 };
 
 /**
- * pi catalogs by the gateway's provider prefix. Only the prefixes whose API
- * lane can actually match are mapped: `openai_codex/*` runs our
- * openai-responses lane while pi catalogs those models under its own
- * codex-specific dialect, so its entries never apply (the api guard below
- * would skip them anyway), and the chat-completions prefixes have no
- * per-model compat worth inheriting.
+ * pi catalogs by the gateway's provider prefix. Only prefixes whose API lane
+ * can match are mapped - `openai_codex/*` runs openai-responses while pi
+ * catalogs those under its own codex dialect, so those entries never apply.
  */
 const CATALOG_BY_PREFIX: Record<string, Record<string, CatalogModelEntry | undefined>> = {
   anthropic: ANTHROPIC_MODELS as unknown as Record<string, CatalogModelEntry>,
   openai: OPENAI_MODELS as unknown as Record<string, CatalogModelEntry>,
 };
+
+/**
+ * Dialects whose models pi's catalog does not list are assumed to reason, as new
+ * frontier releases do. A catalog entry's own `reasoning` always wins over this.
+ */
+const REASONING_BY_DEFAULT: ReadonlySet<LangyWorkerModelConfig["api"]> = new Set([
+  "anthropic-messages",
+  "openai-responses",
+]);
 
 function catalogEntryFor(model: LangyWorkerModelConfig): CatalogModelEntry | undefined {
   const slash = model.id.indexOf("/");
@@ -56,17 +54,74 @@ function catalogEntryFor(model: LangyWorkerModelConfig): CatalogModelEntry | und
   return entry;
 }
 
+const CLAUDE_VERSION_PATTERN = /^claude-(?:opus|sonnet|haiku|fable)-(\d+)(?:-(\d{1,2}))?(?:-|$)/;
+
+/** Claude 4.6 and later answer the legacy `thinking.type: "enabled"` shape with a 400. */
+function isAdaptiveThinkingClaude(modelId: string): boolean {
+  const match = CLAUDE_VERSION_PATTERN.exec(modelId.slice(modelId.indexOf("/") + 1));
+  if (!match) return false;
+  const major = Number(match[1]);
+  const minor = match[2] === undefined ? 0 : Number(match[2]);
+  return major > 4 || (major === 4 && minor >= 6);
+}
+
+/** A Claude newer than pi's catalog gets the request shape its catalog siblings carry. */
+function uncataloguedCompat(model: LangyWorkerModelConfig): Record<string, unknown> | undefined {
+  if (model.api !== "anthropic-messages" || !isAdaptiveThinkingClaude(model.id)) return undefined;
+  return { forceAdaptiveThinking: true, ...model.compat };
+}
+
+const GPT_VERSION_PATTERN = /^gpt-(\d+)(?:\.(\d+))?(?:-([a-z]+))?$/;
+
+type GptVersion = { major: number; minor: number; tier: string | undefined };
+
+function parseGptVersion(id: string): GptVersion | undefined {
+  const match = GPT_VERSION_PATTERN.exec(id);
+  if (!match) return undefined;
+  return { major: Number(match[1]), minor: Number(match[2] ?? 0), tier: match[3] };
+}
+
+const isNewer = (a: GptVersion, b: GptVersion) =>
+  a.major !== b.major ? a.major > b.major : a.minor > b.minor;
+
+/**
+ * pi's newest catalog GPT of the same tier (`luna`, `sol`, ...), or of no tier, for a GPT newer
+ * than every entry pi lists. pi's defaults for an unknown model are a 128k window and text-only
+ * input, so a gpt-6 written from config alone compacted at a tenth of its window.
+ */
+function newerGptSibling(model: LangyWorkerModelConfig): CatalogModelEntry | undefined {
+  if (model.api !== "openai-responses" || !model.id.startsWith("openai/")) return undefined;
+  const wanted = parseGptVersion(model.id.slice("openai/".length));
+  if (!wanted) return undefined;
+  let best: { version: GptVersion; entry: CatalogModelEntry } | undefined;
+  for (const [id, entry] of Object.entries(CATALOG_BY_PREFIX.openai ?? {})) {
+    const version = parseGptVersion(id);
+    if (!entry || !version || version.tier !== wanted.tier || entry.api !== model.api) continue;
+    if (!best || isNewer(version, best.version)) best = { version, entry };
+  }
+  if (!best || !isNewer(wanted, best.version)) return undefined;
+  // The sibling lends its request shape and limits, never its name or price.
+  const { name: _name, cost: _cost, ...shape } = best.entry;
+  return shape;
+}
+
+/**
+ * Whether the model reasons is a fact about the model, not about the lane: the manager marks every
+ * model of a reasoning-capable lane, and OpenAI answers a reasoning field on gpt-4o or gpt-4.1
+ * with a 400.
+ */
+function catalogReasoning(catalog: CatalogModelEntry, entry: Record<string, unknown>) {
+  if (typeof catalog.reasoning === "boolean") entry.reasoning = catalog.reasoning;
+}
+
 function buildModelEntry(model: LangyWorkerModelConfig): Record<string, unknown> {
   const {
     baseUrlEnv: _baseUrlEnv,
     apiKeyEnv: _apiKeyEnv,
-    // The model config passes unknown keys through (config.ts) so a new compat
-    // finding needs no wrapper change. Routing and credential keys are the
-    // exception and are dropped: a model-level baseUrl or provider would send
-    // pi straight at the provider instead of through the mediated gateway, and
-    // a literal apiKey would put the secret in models.json when the provider
-    // block references it by env name. The catalog is already stripped of the
-    // same three below; the config gets the same treatment.
+    // Unknown keys pass through (config.ts) so a new compat finding needs no
+    // wrapper change. Routing/credential keys are the exception and are dropped:
+    // a model-level baseUrl/provider would bypass the mediated gateway, and a
+    // literal apiKey would put the secret in models.json instead of by env name.
     baseUrl: _configBaseUrl,
     provider: _configProvider,
     apiKey: _configApiKey,
@@ -76,8 +131,15 @@ function buildModelEntry(model: LangyWorkerModelConfig): Record<string, unknown>
     provider?: unknown;
     apiKey?: unknown;
   };
-  const catalog = catalogEntryFor(model);
-  if (!catalog) return configEntry;
+  const catalog = catalogEntryFor(model) ?? newerGptSibling(model);
+  if (!catalog) {
+    const entry: Record<string, unknown> = { ...configEntry };
+    if (entry.reasoning === undefined && REASONING_BY_DEFAULT.has(model.api)) {
+      entry.reasoning = true;
+    }
+    const compat = uncataloguedCompat(model);
+    return compat ? { ...entry, compat } : entry;
+  }
   const {
     // Ours stay authoritative: the provider-prefixed id is what the gateway
     // routes on, and the catalog's endpoint/provider identity would point pi
@@ -90,6 +152,7 @@ function buildModelEntry(model: LangyWorkerModelConfig): Record<string, unknown>
     ...catalogBase
   } = catalog;
   const entry: Record<string, unknown> = { ...catalogBase, ...configEntry };
+  catalogReasoning(catalog, entry);
   const compat = { ...catalogCompat, ...model.compat };
   if (Object.keys(compat).length > 0) entry.compat = compat;
   return entry;

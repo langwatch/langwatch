@@ -98,3 +98,15 @@ Feature: Custom roles REST API
     Then the response status is 200
     And every permission is grouped by the resource it acts on
     And permissions that only make sense at organization scope are marked as such
+
+  # ============================================================================
+  # Plans
+  # ============================================================================
+
+  @integration
+  Scenario: The roles family answers 402 below Enterprise, naming RBAC
+    Given the organization is on a plan below Enterprise
+    When I list roles or create a role through /api/roles
+    Then each request is refused with code enterprise_plan_required and status 402
+    And meta.feature is "RBAC"
+    And no role is defined

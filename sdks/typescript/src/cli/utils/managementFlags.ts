@@ -1,21 +1,7 @@
 /**
- * The flag grammar the management commands share.
- *
- * The management APIs take structured values a single `--flag value` cannot
- * carry: a permission is a resource and an action, a binding is a role and a
- * scope. Rather than invent a per-command spelling for each, the CLI uses one
- * colon-separated shape per concept and repeats the flag, which is the
- * convention the rest of the CLI already uses for lists (`--project-id` on
- * `api-keys create`).
- *
- * Every parser refuses a malformed value by NAMING the expected shape: a
- * message that says only "invalid" leaves the caller guessing at a grammar the
- * help text describes in one line.
- *
- * Parsing is pure and separate from the commands so it can be tested directly,
- * and so a command's failure is a validation error rather than a request the
- * platform has to reject. The invite grammar, the one shape with a JSON
- * spelling as well as a flag one, lives in `managementInvites`.
+ * The flag grammar the management commands share: one colon-separated shape per concept,
+ * repeated per flag, since a single `--flag value` can't carry a resource+action permission
+ * or a role+scope binding. Every parser refuses a malformed value by naming the expected shape.
  */
 import {
   MANAGEMENT_ROLES,
@@ -26,6 +12,14 @@ import {
   type ManagementScopeType,
   type OrganizationRole,
 } from "@/client-sdk/services/_shared/management-types";
+import {
+  GRANT_SCOPE_TYPES,
+  GRANT_STATUSES,
+  type GrantPrincipalType,
+  type GrantScopeType,
+  type GrantStatus,
+  type ListGrantsOptions,
+} from "@/client-sdk/services/grants/grants-api.service";
 import type { ListRoleBindingsOptions } from "@/client-sdk/services/role-bindings/role-bindings-api.service";
 
 /** A flag value the CLI refuses before it ever reaches the platform. */
@@ -41,26 +35,17 @@ export const oneOf = (values: readonly string[]): string => values.join(", ");
 
 /**
  * A non-negative integer flag, refused by name rather than sent as NaN.
- *
- * Matched as plain decimal digits rather than run through `Number`, which
- * reads "" as 0, "0x10" as 16 and "1e3" as 1000: a page size nobody typed.
- * Digits alone are not enough either, because past 2^53 a decimal string
- * rounds to a different integer and long enough becomes Infinity, so the
- * request would carry a number the caller never asked for.
+ * Matched as plain decimal digits, not `Number` (reads "" as 0, "0x10" as
+ * 16). Past 2^53 a decimal string can round wrong, so `isSafeInteger` guards too.
  */
-export const parseCount = ({
-  value,
-  flag,
-}: {
-  value: string;
-  flag: string;
-}): number => {
+export const parseCount = ({ value, flag }: { value: string; flag: string }): number => {
   const trimmed = value.trim();
   const count = Number(trimmed);
-  if (!/^\d+$/.test(trimmed) || !Number.isSafeInteger(count)) {
-    throw new ManagementFlagError(
-      `Invalid ${flag} "${value}". Expected a whole number.`,
-    );
+  if (!/^\d+$/.test(trimmed)) {
+    throw new ManagementFlagError(`Invalid ${flag} "${value}". Expected a whole number.`);
+  }
+  if (!Number.isSafeInteger(count)) {
+    throw new ManagementFlagError(`Invalid ${flag} "${value}". Expected a whole number.`);
   }
   return count;
 };
@@ -74,7 +59,17 @@ export const parsePermissionFlags = (values: string[] = []): string[] => {
   const permissions: string[] = [];
   for (const value of values) {
     const parts = value.split(":");
-    if (parts.length !== 2 || !parts[0]?.trim() || !parts[1]?.trim()) {
+    if (parts.length !== 2) {
+      throw new ManagementFlagError(
+        `Invalid permission "${value}". Expected resource:action, for example project:view.`,
+      );
+    }
+    if (!parts[0]?.trim()) {
+      throw new ManagementFlagError(
+        `Invalid permission "${value}". Expected resource:action, for example project:view.`,
+      );
+    }
+    if (!parts[1]?.trim()) {
       throw new ManagementFlagError(
         `Invalid permission "${value}". Expected resource:action, for example project:view.`,
       );
@@ -144,12 +139,22 @@ export const parseScopeType = (value: string): ManagementScopeType =>
  * `role:scopeType:scopeId`, repeated: what an API key may do, and where.
  * Scope ids never contain a colon, so the three parts are unambiguous.
  */
-export const parseBindingFlags = (
-  values: string[] = [],
-): ManagementBindingInput[] =>
+export const parseBindingFlags = (values: string[] = []): ManagementBindingInput[] =>
   values.map((value) => {
     const parts = value.split(":");
-    if (parts.length !== 3 || parts.some((part) => !part.trim())) {
+    if (parts.length !== 3) {
+      throw new ManagementFlagError(
+        `Invalid binding "${value}". Expected role:scopeType:scopeId, for example ADMIN:PROJECT:project_abc.`,
+      );
+    }
+    let hasEmptyPart = false;
+    for (const part of parts) {
+      if (!part.trim()) {
+        hasEmptyPart = true;
+        break;
+      }
+    }
+    if (hasEmptyPart) {
       throw new ManagementFlagError(
         `Invalid binding "${value}". Expected role:scopeType:scopeId, for example ADMIN:PROJECT:project_abc.`,
       );
@@ -174,14 +179,9 @@ export interface RoleBindingFilterFlags {
 }
 
 /** The principal kinds `role-bindings list` and `create` accept. */
-export const ROLE_BINDING_PRINCIPAL_FLAGS = [
-  "user",
-  "group",
-  "api-key",
-] as const;
+export const ROLE_BINDING_PRINCIPAL_FLAGS = ["user", "group", "api-key"] as const;
 
-export type RoleBindingPrincipalFlag =
-  (typeof ROLE_BINDING_PRINCIPAL_FLAGS)[number];
+export type RoleBindingPrincipalFlag = (typeof ROLE_BINDING_PRINCIPAL_FLAGS)[number];
 
 /** The request field a principal type names. */
 const PRINCIPAL_FIELD = {
@@ -192,9 +192,7 @@ const PRINCIPAL_FIELD = {
 
 export const parsePrincipalType = (value: string): RoleBindingPrincipalFlag => {
   const principalType = value.trim().toLowerCase();
-  if (
-    !(ROLE_BINDING_PRINCIPAL_FLAGS as readonly string[]).includes(principalType)
-  ) {
+  if (!(ROLE_BINDING_PRINCIPAL_FLAGS as readonly string[]).includes(principalType)) {
     throw new ManagementFlagError(
       `Invalid principal type "${value}". Expected one of ${oneOf(ROLE_BINDING_PRINCIPAL_FLAGS)}.`,
     );
@@ -203,11 +201,9 @@ export const parsePrincipalType = (value: string): RoleBindingPrincipalFlag => {
 };
 
 /**
- * The filters a role-bindings listing sends.
- *
- * A filter the caller did not give is ABSENT from the result, never present
- * and empty: an empty string is a filter that matches nothing, which would
- * turn "no filter" into "no results".
+ * The filters a role-bindings listing sends. A filter the caller did not
+ * give is ABSENT, never present and empty: an empty string filter matches
+ * nothing, turning "no filter" into "no results".
  */
 export const composeRoleBindingFilters = (
   flags: RoleBindingFilterFlags,
@@ -220,8 +216,7 @@ export const composeRoleBindingFilters = (
         `--principal-id needs --principal-type to say what it names. Expected one of ${oneOf(ROLE_BINDING_PRINCIPAL_FLAGS)}.`,
       );
     }
-    filters[PRINCIPAL_FIELD[parsePrincipalType(flags.principalType)]] =
-      flags.principalId;
+    filters[PRINCIPAL_FIELD[parsePrincipalType(flags.principalType)]] = flags.principalId;
   } else if (flags.principalType !== undefined) {
     throw new ManagementFlagError(
       "--principal-type needs --principal-id to say which principal it names.",
@@ -253,18 +248,11 @@ export const composeRoleBindingPrincipal = ({
 });
 
 /** The permission modes `api-keys create` and `update` accept on the wire. */
-export const API_KEY_PERMISSION_MODE_FLAGS = [
-  "all",
-  "readonly",
-  "restricted",
-] as const;
+export const API_KEY_PERMISSION_MODE_FLAGS = ["all", "readonly", "restricted"] as const;
 
-export type ApiKeyPermissionModeFlag =
-  (typeof API_KEY_PERMISSION_MODE_FLAGS)[number];
+export type ApiKeyPermissionModeFlag = (typeof API_KEY_PERMISSION_MODE_FLAGS)[number];
 
-export const parsePermissionMode = (
-  value: string,
-): ApiKeyPermissionModeFlag => {
+export const parsePermissionMode = (value: string): ApiKeyPermissionModeFlag => {
   const mode = value.trim().toLowerCase();
   if (!(API_KEY_PERMISSION_MODE_FLAGS as readonly string[]).includes(mode)) {
     throw new ManagementFlagError(
@@ -272,4 +260,64 @@ export const parsePermissionMode = (
     );
   }
   return mode as ApiKeyPermissionModeFlag;
+};
+
+/** The wire word each `--principal-type` spelling names on `/api/v1/grants`. */
+const GRANT_PRINCIPAL_BY_FLAG = {
+  user: "user",
+  group: "group",
+  "api-key": "apiKey",
+} as const satisfies Record<RoleBindingPrincipalFlag, GrantPrincipalType>;
+
+export const parseGrantPrincipalType = (value: string): GrantPrincipalType =>
+  GRANT_PRINCIPAL_BY_FLAG[parsePrincipalType(value)];
+
+/** Case-insensitive, sent lowercase as the grants family spells it. */
+export const parseGrantScopeType = (value: string): GrantScopeType => {
+  const scopeType = GRANT_SCOPE_TYPES.find((type) => type === value.trim().toLowerCase());
+  if (!scopeType) {
+    throw new ManagementFlagError(
+      `Invalid scope type "${value}" in --scope-type. Expected one of ${oneOf(GRANT_SCOPE_TYPES)}.`,
+    );
+  }
+  return scopeType;
+};
+
+const parseGrantStatus = (value: string): GrantStatus => {
+  const status = GRANT_STATUSES.find((candidate) => candidate === value.trim().toLowerCase());
+  if (!status) {
+    throw new ManagementFlagError(
+      `Invalid status "${value}". Expected one of ${oneOf(GRANT_STATUSES)}.`,
+    );
+  }
+  return status;
+};
+
+export interface GrantFilterFlags {
+  principalType?: string;
+  principalId?: string;
+  role?: string;
+  scopeType?: string;
+  scopeId?: string;
+  status?: string;
+  limit?: string;
+  cursor?: string;
+}
+
+/** The filters a grants listing sends; a filter not given is absent, never empty. */
+export const composeGrantFilters = (flags: GrantFilterFlags): ListGrantsOptions => {
+  const filters: ListGrantsOptions = {};
+  if (flags.principalType !== undefined) {
+    filters.principalType = parseGrantPrincipalType(flags.principalType);
+  }
+  if (flags.principalId !== undefined) filters.principalId = flags.principalId;
+  if (flags.role !== undefined) filters.roleId = flags.role;
+  if (flags.scopeType !== undefined) filters.scopeType = parseGrantScopeType(flags.scopeType);
+  if (flags.scopeId !== undefined) filters.scopeId = flags.scopeId;
+  if (flags.status !== undefined) filters.status = parseGrantStatus(flags.status);
+  if (flags.limit !== undefined) {
+    filters.limit = parseCount({ value: flags.limit, flag: "--limit" });
+  }
+  if (flags.cursor !== undefined) filters.cursor = flags.cursor;
+  return filters;
 };

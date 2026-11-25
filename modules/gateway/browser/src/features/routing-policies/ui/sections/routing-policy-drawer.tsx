@@ -1,0 +1,316 @@
+import { Checkbox } from "@langwatch/design-system/checkbox";
+import { Drawer } from "@langwatch/design-system/drawer";
+import { FieldInfoTooltip } from "@langwatch/design-system/field-info-tooltip";
+import {
+  Alert,
+  Button,
+  Field,
+  HStack,
+  Input,
+  Separator,
+  Spinner,
+  Text,
+  Textarea,
+  VStack,
+} from "@langwatch/design-system/primitives";
+import { ProviderScopeChips } from "@langwatch/design-system/provider-scope-chips";
+import { ScopeChipPicker, type ScopeTriadEntry } from "@langwatch/design-system/scope-chip-picker";
+import { X } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import type { UseFormReturn } from "react-hook-form";
+
+import { useOrganizationTeamProject } from "../../../../behavior/gateway-session.ts";
+import { useCloseGatewayDrawer } from "../../../../behavior/use-close-gateway-drawer.ts";
+import { useRoutingPolicyDrawerForm } from "../../behavior/use-routing-policy-drawer-form.ts";
+import { useRoutingPolicyMutations } from "../../behavior/use-routing-policy-mutations.ts";
+import type { ModelTier } from "../../model/model-tier-presets.ts";
+import type { ProviderCredentialOption } from "../../model/provider-credential-option.ts";
+import type { RoutingPolicyFormValues } from "../../model/routing-policy-form.ts";
+import { ModelNameMappingSection } from "../blocks/model-name-mapping-section.tsx";
+import { RestrictionsSection } from "../blocks/restrictions-section.tsx";
+import { ProviderCredentialPicker } from "../elements/provider-credential-picker.tsx";
+import { ModelTiersSection } from "./model-tiers-section.tsx";
+
+/**
+ * URL-routed routing-policy editor shell (see dev/docs/best_practices/drawers.md).
+ * Props are address-bar-safe; policy is fetched to enable link reuse.
+ * Does not close itself; closing is a callback per the drawers pattern.
+ */
+export function RoutingPolicyDrawer({
+  policyId,
+  seedScopeType,
+  seedScopeId,
+  seedIsDefault,
+  onClose,
+}: {
+  policyId?: string;
+  seedScopeType?: string;
+  seedScopeId?: string;
+  seedIsDefault?: string;
+  /** Puts the address back where it was before the drawer opened; absent when a link opened it. */
+  onClose?: () => void;
+}) {
+  const close = useCloseGatewayDrawer(onClose);
+  const { organization } = useOrganizationTeamProject();
+  const organizationId = organization?.id ?? "";
+  const isEditing = !!policyId;
+
+  const seedScopes: ScopeTriadEntry[] = useMemo(() => {
+    if (!seedScopeType) return [];
+    const scopeType = seedScopeType.toUpperCase() as ScopeTriadEntry["scopeType"];
+    const scopeId = scopeType === "ORGANIZATION" ? organizationId : seedScopeId;
+    return scopeId ? [{ scopeType, scopeId }] : [];
+  }, [seedScopeType, seedScopeId, organizationId]);
+
+  const drawer = useRoutingPolicyDrawerForm({
+    policyId: policyId ?? null,
+    organizationId,
+    organization,
+    seedScopes,
+    seedIsDefault: seedIsDefault === "true",
+  });
+
+  const { save, isSaving, saveError, clearSaveError } = useRoutingPolicyMutations({
+    organizationId,
+    onSaved: close,
+  });
+
+  const { values, problems, form } = drawer;
+  const [refusals, setRefusals] = useState(0);
+  const onSubmit = drawer.form.handleSubmit(
+    (formValues) => {
+      if (isSaving || problems.length > 0) return;
+      save({ policyId: policyId ?? null, values: formValues });
+    },
+    () => setRefusals((count) => count + 1),
+  );
+
+  useEffect(() => {
+    if (refusals === 0) return;
+    if (form.getFieldState("name").invalid) {
+      form.setFocus("name");
+      return;
+    }
+    const id = form.getFieldState("scopes").invalid
+      ? "gateway-routing-policy-scopes-error"
+      : "gateway-routing-policy-providers-error";
+    document.getElementById(id)?.focus();
+  }, [refusals, form]);
+
+  return (
+    <Drawer
+      onClose={close}
+      title={isEditing ? "Edit routing policy" : "New routing policy"}
+      size="md"
+      busy={isSaving}
+      footer={{
+        summary: (
+          <VStack align="stretch" gap={3} width="full">
+            <Problems problems={problems} />
+            {saveError && (
+              <SaveError isEditing={isEditing} message={saveError} onDismiss={clearSaveError} />
+            )}
+          </VStack>
+        ),
+        primaryAction: {
+          label: isEditing ? "Save changes" : "Create policy",
+          loading: isSaving,
+          onClick: () => void onSubmit(),
+          "data-testid": "gateway-routing-policy-submit",
+        },
+      }}
+    >
+      {isEditing && drawer.policyLoading ? (
+        <HStack gap={2}>
+          <Spinner size="sm" />
+          <Text fontSize="sm" color="fg.muted">
+            Loading the policy
+          </Text>
+        </HStack>
+      ) : (
+        <DrawerBody
+          form={drawer.form}
+          values={values}
+          isEditing={isEditing}
+          organizationId={organizationId}
+          organizationName={organization?.name}
+          availableTeams={drawer.availableTeams}
+          availableProjects={drawer.availableProjects}
+          scopesWithNames={drawer.scopesWithNames}
+          providerOptions={drawer.providerOptions}
+          providersLoading={drawer.providersLoading}
+          boundProviderTypes={drawer.boundProviderTypes}
+        />
+      )}
+    </Drawer>
+  );
+}
+
+function DrawerBody({
+  form,
+  values,
+  isEditing,
+  organizationId,
+  organizationName,
+  availableTeams,
+  availableProjects,
+  scopesWithNames,
+  providerOptions,
+  providersLoading,
+  boundProviderTypes,
+}: {
+  form: UseFormReturn<RoutingPolicyFormValues>;
+  values: RoutingPolicyFormValues;
+  isEditing: boolean;
+  organizationId: string;
+  organizationName?: string;
+  availableTeams: { id: string; name: string }[];
+  availableProjects: { id: string; name: string; teamId?: string }[];
+  scopesWithNames: ScopeTriadEntry[];
+  providerOptions: ProviderCredentialOption[];
+  providersLoading: boolean;
+  boundProviderTypes: string[];
+}) {
+  const { control, register, setValue } = form;
+  const { errors } = form.formState;
+
+  return (
+    <VStack align="stretch" gap={5}>
+      <Field.Root required invalid={!!errors.name}>
+        <Field.Label>Name</Field.Label>
+        <Input
+          placeholder="Developer default"
+          data-testid="gateway-routing-policy-name"
+          {...register("name")}
+        />
+        <Field.ErrorText>{errors.name?.message}</Field.ErrorText>
+      </Field.Root>
+
+      <Field.Root>
+        <Field.Label>Description</Field.Label>
+        <Textarea rows={2} placeholder="What this policy is for" {...register("description")} />
+      </Field.Root>
+
+      {!isEditing && (
+        <Checkbox
+          checked={values.isDefault}
+          onChange={(event) => setValue("isDefault", event.target.checked)}
+        >
+          <Text fontSize="sm">Make this the default where it applies</Text>
+        </Checkbox>
+      )}
+
+      <Separator />
+
+      <Field.Root required invalid={!!errors.scopes}>
+        <Field.Label>Where it applies</Field.Label>
+        {isEditing ? (
+          <>
+            <ProviderScopeChips scopes={scopesWithNames} />
+            <Field.HelperText>
+              Fixed once the policy exists. Create another policy to cover a different organization,
+              team or project.
+            </Field.HelperText>
+          </>
+        ) : (
+          <ScopeChipPicker
+            label=""
+            value={values.scopes}
+            onChange={(next) => setValue("scopes", next)}
+            organizationId={organizationId}
+            organizationName={organizationName}
+            availableTeams={availableTeams}
+            availableProjects={availableProjects}
+            currentOrganizationId={organizationId}
+          />
+        )}
+        <Field.ErrorText id="gateway-routing-policy-scopes-error" tabIndex={-1}>
+          {errors.scopes?.message}
+        </Field.ErrorText>
+      </Field.Root>
+
+      <Field.Root required invalid={!!errors.modelProviderIds}>
+        <Field.Label>
+          Model providers, in order
+          <FieldInfoTooltip
+            description="The providers this policy routes through. The gateway tries the first one, and moves to the next when a request fails in a way another provider could answer. Reorder with the arrows on each row."
+            docHref="/ai-gateway/governance/routing-policies"
+          />
+        </Field.Label>
+        <ProviderCredentialPicker
+          selectedIds={values.modelProviderIds}
+          onChange={(next) => setValue("modelProviderIds", next)}
+          available={providerOptions}
+          loading={providersLoading}
+          modelProvidersAdminPath="/settings/model-providers"
+        />
+        <Field.ErrorText id="gateway-routing-policy-providers-error" tabIndex={-1}>
+          {errors.modelProviderIds?.message}
+        </Field.ErrorText>
+      </Field.Root>
+
+      <Separator />
+
+      <ModelTiersSection
+        control={control}
+        organizationId={organizationId}
+        boundProviderTypes={boundProviderTypes}
+        onTierChange={(tier: ModelTier, modelId) => setValue(`tiers.${tier}`, modelId)}
+        onDefaultModelChange={(modelId) => setValue("defaultModel", modelId)}
+      />
+
+      <Separator />
+
+      <ModelNameMappingSection control={control} register={register} />
+
+      <Separator />
+
+      <RestrictionsSection control={control} register={register} />
+    </VStack>
+  );
+}
+
+/** Reasons the policy cannot be saved as it stands. */
+function Problems({ problems }: { problems: string[] }) {
+  if (problems.length === 0) return null;
+  return (
+    <Alert.Root status="warning" size="sm">
+      <Alert.Indicator />
+      <Alert.Content>
+        {problems.map((problem) => (
+          <Alert.Description key={problem}>{problem}</Alert.Description>
+        ))}
+      </Alert.Content>
+    </Alert.Root>
+  );
+}
+
+/**
+ * A save failure is shown here rather than as a toast: the form that failed is
+ * still on screen, and a toast racing the drawer overlay is how a rejected
+ * save came to look like a no-op.
+ */
+function SaveError({
+  isEditing,
+  message,
+  onDismiss,
+}: {
+  isEditing: boolean;
+  message: string;
+  onDismiss: () => void;
+}) {
+  return (
+    <Alert.Root status="error" size="sm">
+      <Alert.Indicator />
+      <Alert.Content>
+        <Alert.Title>
+          {isEditing ? "Couldn't save the policy" : "Couldn't create the policy"}
+        </Alert.Title>
+        <Alert.Description>{message}</Alert.Description>
+      </Alert.Content>
+      <Button size="xs" variant="ghost" onClick={onDismiss} aria-label="Dismiss the error">
+        <X size={12} />
+      </Button>
+    </Alert.Root>
+  );
+}

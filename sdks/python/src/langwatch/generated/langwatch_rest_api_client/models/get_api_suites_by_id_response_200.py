@@ -4,9 +4,23 @@ from collections.abc import Mapping
 from typing import TYPE_CHECKING, Any, TypeVar, cast
 
 from attrs import define as _attrs_define
-from attrs import field as _attrs_field
+
+from ..models.get_api_suites_by_id_response_200_kind import GetApiSuitesByIdResponse200Kind
+from ..types import UNSET, Unset
 
 if TYPE_CHECKING:
+    from ..models.get_api_suites_by_id_response_200_scope_type_0_type_0 import (
+        GetApiSuitesByIdResponse200ScopeType0Type0,
+    )
+    from ..models.get_api_suites_by_id_response_200_scope_type_0_type_1 import (
+        GetApiSuitesByIdResponse200ScopeType0Type1,
+    )
+    from ..models.get_api_suites_by_id_response_200_scope_type_0_type_2 import (
+        GetApiSuitesByIdResponse200ScopeType0Type2,
+    )
+    from ..models.get_api_suites_by_id_response_200_scope_type_0_type_3 import (
+        GetApiSuitesByIdResponse200ScopeType0Type3,
+    )
     from ..models.get_api_suites_by_id_response_200_targets_item import GetApiSuitesByIdResponse200TargetsItem
 
 
@@ -28,6 +42,10 @@ class GetApiSuitesByIdResponse200:
         created_at (str):
         updated_at (str):
         platform_url (str):
+        kind (GetApiSuitesByIdResponse200Kind | Unset): custom is a hand-assembled run plan; folder is a test suite that
+            groups scenarios filed into it. Absent on servers that predate test suites.
+        scope (GetApiSuitesByIdResponse200ScopeType0Type0 | GetApiSuitesByIdResponse200ScopeType0Type1 |
+            GetApiSuitesByIdResponse200ScopeType0Type2 | GetApiSuitesByIdResponse200ScopeType0Type3 | None | Unset):
     """
 
     id: str
@@ -41,9 +59,30 @@ class GetApiSuitesByIdResponse200:
     created_at: str
     updated_at: str
     platform_url: str
-    additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
+    kind: GetApiSuitesByIdResponse200Kind | Unset = UNSET
+    scope: (
+        GetApiSuitesByIdResponse200ScopeType0Type0
+        | GetApiSuitesByIdResponse200ScopeType0Type1
+        | GetApiSuitesByIdResponse200ScopeType0Type2
+        | GetApiSuitesByIdResponse200ScopeType0Type3
+        | None
+        | Unset
+    ) = UNSET
 
     def to_dict(self) -> dict[str, Any]:
+        from ..models.get_api_suites_by_id_response_200_scope_type_0_type_0 import (
+            GetApiSuitesByIdResponse200ScopeType0Type0,
+        )
+        from ..models.get_api_suites_by_id_response_200_scope_type_0_type_1 import (
+            GetApiSuitesByIdResponse200ScopeType0Type1,
+        )
+        from ..models.get_api_suites_by_id_response_200_scope_type_0_type_2 import (
+            GetApiSuitesByIdResponse200ScopeType0Type2,
+        )
+        from ..models.get_api_suites_by_id_response_200_scope_type_0_type_3 import (
+            GetApiSuitesByIdResponse200ScopeType0Type3,
+        )
+
         id = self.id
 
         name = self.name
@@ -70,8 +109,26 @@ class GetApiSuitesByIdResponse200:
 
         platform_url = self.platform_url
 
+        kind: str | Unset = UNSET
+        if not isinstance(self.kind, Unset):
+            kind = self.kind.value
+
+        scope: dict[str, Any] | None | Unset
+        if isinstance(self.scope, Unset):
+            scope = UNSET
+        elif isinstance(self.scope, GetApiSuitesByIdResponse200ScopeType0Type0):
+            scope = self.scope.to_dict()
+        elif isinstance(self.scope, GetApiSuitesByIdResponse200ScopeType0Type1):
+            scope = self.scope.to_dict()
+        elif isinstance(self.scope, GetApiSuitesByIdResponse200ScopeType0Type2):
+            scope = self.scope.to_dict()
+        elif isinstance(self.scope, GetApiSuitesByIdResponse200ScopeType0Type3):
+            scope = self.scope.to_dict()
+        else:
+            scope = self.scope
+
         field_dict: dict[str, Any] = {}
-        field_dict.update(self.additional_properties)
+
         field_dict.update(
             {
                 "id": id,
@@ -87,11 +144,27 @@ class GetApiSuitesByIdResponse200:
                 "platformUrl": platform_url,
             }
         )
+        if kind is not UNSET:
+            field_dict["kind"] = kind
+        if scope is not UNSET:
+            field_dict["scope"] = scope
 
         return field_dict
 
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
+        from ..models.get_api_suites_by_id_response_200_scope_type_0_type_0 import (
+            GetApiSuitesByIdResponse200ScopeType0Type0,
+        )
+        from ..models.get_api_suites_by_id_response_200_scope_type_0_type_1 import (
+            GetApiSuitesByIdResponse200ScopeType0Type1,
+        )
+        from ..models.get_api_suites_by_id_response_200_scope_type_0_type_2 import (
+            GetApiSuitesByIdResponse200ScopeType0Type2,
+        )
+        from ..models.get_api_suites_by_id_response_200_scope_type_0_type_3 import (
+            GetApiSuitesByIdResponse200ScopeType0Type3,
+        )
         from ..models.get_api_suites_by_id_response_200_targets_item import GetApiSuitesByIdResponse200TargetsItem
 
         d = dict(src_dict)
@@ -127,6 +200,71 @@ class GetApiSuitesByIdResponse200:
 
         platform_url = d.pop("platformUrl")
 
+        _kind = d.pop("kind", UNSET)
+        kind: GetApiSuitesByIdResponse200Kind | Unset
+        if isinstance(_kind, Unset):
+            kind = UNSET
+        else:
+            kind = GetApiSuitesByIdResponse200Kind(_kind)
+
+        def _parse_scope(
+            data: object,
+        ) -> (
+            GetApiSuitesByIdResponse200ScopeType0Type0
+            | GetApiSuitesByIdResponse200ScopeType0Type1
+            | GetApiSuitesByIdResponse200ScopeType0Type2
+            | GetApiSuitesByIdResponse200ScopeType0Type3
+            | None
+            | Unset
+        ):
+            if data is None:
+                return data
+            if isinstance(data, Unset):
+                return data
+            try:
+                if not isinstance(data, dict):
+                    raise TypeError()
+                scope_type_0_type_0 = GetApiSuitesByIdResponse200ScopeType0Type0.from_dict(data)
+
+                return scope_type_0_type_0
+            except (TypeError, ValueError, AttributeError, KeyError):
+                pass
+            try:
+                if not isinstance(data, dict):
+                    raise TypeError()
+                scope_type_0_type_1 = GetApiSuitesByIdResponse200ScopeType0Type1.from_dict(data)
+
+                return scope_type_0_type_1
+            except (TypeError, ValueError, AttributeError, KeyError):
+                pass
+            try:
+                if not isinstance(data, dict):
+                    raise TypeError()
+                scope_type_0_type_2 = GetApiSuitesByIdResponse200ScopeType0Type2.from_dict(data)
+
+                return scope_type_0_type_2
+            except (TypeError, ValueError, AttributeError, KeyError):
+                pass
+            try:
+                if not isinstance(data, dict):
+                    raise TypeError()
+                scope_type_0_type_3 = GetApiSuitesByIdResponse200ScopeType0Type3.from_dict(data)
+
+                return scope_type_0_type_3
+            except (TypeError, ValueError, AttributeError, KeyError):
+                pass
+            return cast(
+                GetApiSuitesByIdResponse200ScopeType0Type0
+                | GetApiSuitesByIdResponse200ScopeType0Type1
+                | GetApiSuitesByIdResponse200ScopeType0Type2
+                | GetApiSuitesByIdResponse200ScopeType0Type3
+                | None
+                | Unset,
+                data,
+            )
+
+        scope = _parse_scope(d.pop("scope", UNSET))
+
         get_api_suites_by_id_response_200 = cls(
             id=id,
             name=name,
@@ -139,23 +277,8 @@ class GetApiSuitesByIdResponse200:
             created_at=created_at,
             updated_at=updated_at,
             platform_url=platform_url,
+            kind=kind,
+            scope=scope,
         )
 
-        get_api_suites_by_id_response_200.additional_properties = d
         return get_api_suites_by_id_response_200
-
-    @property
-    def additional_keys(self) -> list[str]:
-        return list(self.additional_properties.keys())
-
-    def __getitem__(self, key: str) -> Any:
-        return self.additional_properties[key]
-
-    def __setitem__(self, key: str, value: Any) -> None:
-        self.additional_properties[key] = value
-
-    def __delitem__(self, key: str) -> None:
-        del self.additional_properties[key]
-
-    def __contains__(self, key: str) -> bool:
-        return key in self.additional_properties

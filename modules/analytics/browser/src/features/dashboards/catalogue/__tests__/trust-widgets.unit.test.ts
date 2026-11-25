@@ -1,0 +1,95 @@
+/**
+ * The "Can I trust my numbers?" widgets read what their prototype cards show: checked on
+ * the stored code and the LangWatchQL each one runs.
+ */
+
+import { describe, expect, it } from "vitest";
+
+import { CATALOGUE_WIDGETS } from "../model/catalogue-widgets.ts";
+import { implementedWidget } from "../model/widget-implementations.ts";
+import { CATALOGUE_WIDGET_BUILDS } from "../widgets/index.ts";
+
+function buildOf(id: string) {
+  const build = CATALOGUE_WIDGET_BUILDS[id];
+  if (!build) throw new Error(`no build for ${id}`);
+  return { code: build.code.tsx, sql: build.queries };
+}
+
+describe("given the Can I trust my numbers? widgets", () => {
+  /** @scenario "AC166 Can I trust my numbers?: data health names each missing field and what it unlocks" */
+  it("counts each field as a filter, so its gap is never the frame's setup view", () => {
+    const { code, sql } = buildOf("data-health");
+    for (const flag of [
+      "toUInt8(notEmpty(Models)) AS named",
+      "toUInt8(UserId IS NOT NULL) AS user",
+      "toUInt8(ConversationId IS NOT NULL) AS conversation",
+      "toUInt8(notEmpty(Labels) OR CustomerId IS NOT NULL) AS labels",
+      "toUInt8(MetadataOutcome != '') AS outcome",
+    ]) {
+      expect(sql.fields).toContain(flag);
+    }
+    // The result reads only the field, its counts and an example id, never a trace column.
+    expect(sql.fields).toMatch(
+      /^SELECT arrayJoin\(splitByChar\(',', '[a-z_,]+'\)\) AS field,\n  multiIf\(/,
+    );
+    expect(code).toContain('"Cards that need it:\\n"');
+    expect(code).toContain("<AllGood title={report.headline.title}");
+  });
+
+  /** @scenario "AC166 Can I trust my numbers?: data health names each missing field and what it unlocks" */
+  it("names the built widgets that read each field", () => {
+    const { code } = buildOf("data-health");
+    const fields = JSON.parse(
+      code.slice(
+        code.indexOf("[", code.indexOf("const FIELDS")),
+        code.indexOf("];", code.indexOf("const FIELDS")) + 1,
+      ),
+    ) as {
+      key: string;
+      unlocks: string[];
+    }[];
+    const unlocks = new Map(fields.map(({ key, unlocks: names }) => [key, names]));
+
+    expect(fields.map(({ key }) => key)).toEqual([
+      "model",
+      "cost",
+      "conversation",
+      "user",
+      "labels",
+      "outcome",
+    ]);
+    expect(unlocks.get("cost")).toContain("How much is my agent costing me?");
+    expect(unlocks.get("cost")).not.toContain("What is my agent not sending yet?");
+  });
+
+  /** @scenario "AC167 Can I trust my numbers?: cost accuracy counts traces with a model but no price" */
+  it("counts traces with a model and those with an unpriced span, and lists the models", () => {
+    const { code, sql } = buildOf("cost-accuracy");
+    expect(sql.trend).toContain("uniqExactIf(TraceId, notEmpty(Models)) AS with_model");
+    expect(sql.trend).toContain("uniqExactIf(TraceId, UnpricedSpanCount > 0) AS unpriced");
+    expect(sql.models).toContain("ARRAY JOIN UnpricedModels AS model");
+    expect(code).toContain("Models with no price");
+    expect(code).toContain('<AllGood title="All costs priced"');
+    expect(implementedWidget("cost-accuracy")?.definition.description).toContain(
+      "before 7 October 2026",
+    );
+  });
+
+  /** @scenario "AC168 Can I trust my numbers?: noise is traffic that clearly comes from tests, staging and the like" */
+  it("reads origins and non-production environments, never health checks or duplicates", () => {
+    const { code, sql } = buildOf("noise");
+    expect(sql.sources).toContain("has(['playground', 'evaluation', 'simulation'], Origin)");
+    // Typed columns copied from the maps, never the maps themselves (goose 00128).
+    expect(sql.sources).toContain("lower(DeploymentEnvironment)");
+    expect(sql.sources).toContain("lower(MetadataEnvironment)");
+    expect(sql.sources).toContain("arrayMap((label) -> lower(label), Labels)");
+    expect(sql.sources).not.toContain("Attributes[");
+    expect(sql.sources).toContain("'staging'");
+    expect(sql.sources).not.toMatch(/health|duplicate/i);
+    expect(code).toContain('header: "Of cost"');
+    expect(code).toContain('<AllGood title="No test traffic"');
+    expect(CATALOGUE_WIDGETS.find(({ id }) => id === "noise")?.why).not.toMatch(
+      /health|duplicate/i,
+    );
+  });
+});

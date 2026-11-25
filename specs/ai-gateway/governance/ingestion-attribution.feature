@@ -43,10 +43,10 @@ Feature: Ingestion attribution invariant — credential is authoritative; payloa
     - specs/ai-gateway/governance/architecture-invariants.feature      (TenantId scoping)
 
   Implementation lives at:
-    - platform/app/src/server/governance/activity-monitor/                (subscriber + stamping)
-    - platform/app/ee/governance/services/governanceProject.service.ts    (hidden Gov)
-    - platform/app/src/server/routes/ingest/                              (receivers)
-    - platform/app/src/server/governance/ingestion/ottl/                  (OTTL transforms — guard scope)
+    - enterprise/modules/governance/process/src/ (activity-monitor)                (subscriber + stamping)
+    - enterprise/modules/governance/process/src/repositories/prisma/prisma.governance-setup-state.repository.ts (hidden Gov)
+    - enterprise/modules/governance/process/src/transport/api-rest/                              (receivers)
+    - enterprise/packages/composition/api/src/governance/ottl-gateway.client.ts                  (OTTL transforms — guard scope)
 
   Background:
     Given the org has all four ingestion paths active:
@@ -100,7 +100,7 @@ Feature: Ingestion attribution invariant — credential is authoritative; payloa
         searchable attributes (informational) but NEVER promoted to
         the RBAC-load-bearing `TenantId` field
     And users A / B / C — even if they are members of the same org —
-        cannot see these spans on their /me Traces explorer (because
+        cannot see these spans on their /coding-agents Traces explorer (because
         `TenantId` does not match their personalProjectId)
     And the org admin sees these spans only via the hidden Governance
         Project read path (per `governance:view` + the Layer-1 filter)

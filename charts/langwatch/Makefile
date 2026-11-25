@@ -27,7 +27,7 @@ deps:
 images:
 	$(MAKE) -C $(CH_CHART) images
 	docker build -t $(APP_IMAGE) -f $(APP_DIR)/infra/docker/Dockerfile $(APP_DIR)
-	docker build -t $(NLP_IMAGE) -f $(APP_DIR)/infra/docker/Dockerfile.langwatch_nlp $(APP_DIR)
+	docker build -t $(NLP_IMAGE) -f $(APP_DIR)/infra/docker/Dockerfile.go-services --target nlp $(APP_DIR)
 	docker build -t $(LANGEVALS_IMAGE) -f $(APP_DIR)/infra/docker/Dockerfile.langevals $(APP_DIR)
 
 ## Build + load all images into Kind
@@ -95,7 +95,7 @@ example-up: deps
 	@kind load docker-image $(LANGEVALS_IMAGE) --name $(KIND_CLUSTER)
 	$(HELM_SAFE) upgrade --install $(RELEASE) . \
 	  -f $(VALUES) \
-	  --wait --timeout 10m
+	  --wait --timeout 45m
 
 ## Tear down the example release
 example-down:
