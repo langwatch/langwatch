@@ -69,7 +69,7 @@ export function findUnapplicableFilterValue({
         kind: "unsupported_value",
         filterField: field,
         filterName,
-        received: String(received),
+        received: typeof received === "string" ? received : JSON.stringify(received),
         accepted: BOOLEAN_FILTER_VALUES,
       };
     }
