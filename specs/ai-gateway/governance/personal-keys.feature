@@ -93,7 +93,7 @@ Feature: AI Gateway Governance — Personal virtual keys
   Scenario: When the default RoutingPolicy has zero providers, personal-key issuance fails with a clear error (validate-before-mint)
     Given organization "acme" HAS a default RoutingPolicy
     But that policy has zero ProviderCredentials in its `providerCredentialIds` chain
-    When the /me portal calls `api.personalVirtualKeys.issuePersonal`
+    When the /coding-agents portal calls `api.personalVirtualKeys.issuePersonal`
     Then the response status is 422
     And the response body contains `{ "error": "routing_policy_has_no_providers", "message": "Your organization admin must bind at least one provider to the default routing policy before personal keys can be issued." }`
     And no personal VK is created
@@ -106,9 +106,9 @@ Feature: AI Gateway Governance — Personal virtual keys
     # same either way. Neither path reports a green success.
 
   @bdd @personal-keys @issuance @policy-resolution
-  Scenario: Empty-policy invariant applies symmetrically to /me portal mint and CLI device-flow mint
+  Scenario: Empty-policy invariant applies symmetrically to /coding-agents portal mint and CLI device-flow mint
     Given the same empty-default-policy state above
-    When EITHER the /me portal calls `api.personalVirtualKeys.issuePersonal`
+    When EITHER the /coding-agents portal calls `api.personalVirtualKeys.issuePersonal`
     OR the CLI asks `POST /api/auth/cli/virtual-key` for a key
     Then neither surface reports success: the portal returns HTTP 422
     `routing_policy_has_no_providers`, the CLI returns HTTP 409

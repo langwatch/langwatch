@@ -8,6 +8,7 @@ import type { RetentionCategory, ScopeAssignment } from "@langwatch/data-retenti
 import type {
   ApplyRetentionExtensionCommandData,
   RecordRetentionExtensionCommandData,
+  RecordRetentionPolicyChangeCommandData,
   RequestStoredRetentionApplyCommandData,
   StoredRetentionMode,
 } from "../eventing/retention-extension.events.ts";
@@ -17,6 +18,7 @@ import type { SeatRetentionPolicyService } from "./seat-retention-policy.service
 type Senders = Readonly<{
   record: (data: RecordRetentionExtensionCommandData) => Promise<unknown>;
   request: (data: RequestStoredRetentionApplyCommandData) => Promise<unknown>;
+  change: (data: RecordRetentionPolicyChangeCommandData) => Promise<unknown>;
   apply: (data: ApplyRetentionExtensionCommandData) => Promise<unknown>;
 }>;
 
@@ -93,6 +95,36 @@ export class RetentionExtensionService {
     });
   }
 
+  /** Records a period saved at one scope, lengthening or not; keyed by the save. */
+  async recordChange({
+    organizationId,
+    scope,
+    category,
+    retentionDays,
+    shortens,
+    changeId,
+    at,
+  }: {
+    organizationId: string;
+    scope: ScopeAssignment;
+    category: RetentionCategory;
+    retentionDays: number;
+    shortens: boolean;
+    changeId: string;
+    at: number;
+  }): Promise<void> {
+    await this.senders().change({
+      tenantId: organizationId,
+      organizationId,
+      changeId,
+      scope,
+      category,
+      retentionDays,
+      shortens,
+      changedAt: at,
+    });
+  }
+
   /** Records an admin's ask to rewrite the scope's stored rows to the periods they resolve to. */
   async requestApply({
     organizationId,
@@ -147,6 +179,7 @@ export class RetentionExtensionService {
           category,
           mode: mode ?? "raise",
           occurredAt: at,
+          ...(scope ? { scope } : {}),
         });
       }
     }

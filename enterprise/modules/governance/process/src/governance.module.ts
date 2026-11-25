@@ -18,12 +18,15 @@ import { governanceActivityMonitorEventing } from "./eventing/governance-activit
 import { GOVERNANCE_COST_CHARGE_PROJECTION_NAME } from "./eventing/governance-cost-charge.projection.ts";
 import { ingestionPullReconcileEventing } from "./eventing/ingestion-pull-reconcile.pipeline.ts";
 import { ingestionPullEventing } from "./eventing/ingestion-pull.pipeline.ts";
+import { ingestionSourceLifecycleEventing } from "./eventing/ingestion-source-lifecycle.pipeline.ts";
 import { pulledUsageEventing } from "./eventing/pulled-usage.pipeline.ts";
 import { GOVERNANCE_SETTLING_WINDOW_DAYS } from "./features/cost/rules/governance-cost-summary.rules.ts";
+import { agentStopEventing } from "./features/kill-switch/eventing/agent-stop.pipeline.ts";
 import { ocsfPushEventing } from "./features/ocsf/eventing/ocsf-push.pipeline.ts";
 import { agentRegistryEventing } from "./features/registry/eventing/agent-registry.pipeline.ts";
 import { governanceRepositories } from "./repositories/governance-repositories.registry.ts";
 import { activityMonitorTrpcTransport } from "./transport/activity-monitor.trpc.ts";
+import { agentKillSwitchRest } from "./transport/agent-kill-switch.rest.ts";
 import { agentRegistryRest } from "./transport/agent-registry.rest.ts";
 import { aiToolsTrpcTransport } from "./transport/ai-tools.trpc.ts";
 import { anomalyRulesTrpcTransport } from "./transport/anomaly-rules.trpc.ts";
@@ -32,6 +35,7 @@ import { governanceAgentsTrpcTransport } from "./transport/governance-agents.trp
 import { governanceCliRest } from "./transport/governance-cli.rest.ts";
 import { governanceCostTrpcTransport } from "./transport/governance-cost.trpc.ts";
 import { governanceIngestRest } from "./transport/governance-ingest.rest.ts";
+import { governanceKillSwitchTrpcTransport } from "./transport/governance-kill-switch.trpc.ts";
 import { governancePeopleTrpcTransport } from "./transport/governance-people.trpc.ts";
 import { governanceRest } from "./transport/governance.rest.ts";
 import { governanceTrpcTransport } from "./transport/governance.trpc.ts";
@@ -77,6 +81,7 @@ export const governanceProcessModule: PublishedProcessModule<"governance", Gover
     .withTransports(
       governanceRest,
       agentRegistryRest,
+      agentKillSwitchRest,
       ocsfSiemRest,
       governanceCliRest,
       governanceIngestRest,
@@ -88,6 +93,7 @@ export const governanceProcessModule: PublishedProcessModule<"governance", Gover
       governanceTrpcTransport,
       anomalyRulesTrpcTransport,
       activityMonitorTrpcTransport,
+      governanceKillSwitchTrpcTransport,
       personalSessionsTrpcTransport,
       ingestionKeyTrpcTransport,
       sessionPolicyTrpcTransport,
@@ -135,7 +141,9 @@ export const governanceProcessModule: PublishedProcessModule<"governance", Gover
     .withEventing(ingestionPullReconcileEventing)
     .withEventing(governanceActivityMonitorEventing)
     .withEventing(codingAssistantBillingEventing)
+    .withEventing(ingestionSourceLifecycleEventing)
     .withEventing(agentRegistryEventing)
+    .withEventing(agentStopEventing)
     .withEventing(ocsfPushEventing)
     // Background, after old writers are gone: an older image edits coding-assistant configs
     // without a fact and appends pulled usage without a charge (governance-deploy-steps.feature).

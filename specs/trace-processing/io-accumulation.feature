@@ -56,3 +56,24 @@ Feature: Trace I/O accumulation — human-readable summary text
     Given a root span's input has been folded
     When a non-root span that started earlier is folded
     Then computedInput is still the root span's input
+
+Rule: A launcher's declared input and output win over Claude Code's raw text
+
+  A tool that launches Claude Code (Laze) wraps each request in context the
+  agent needs: memory, the sender, the command that answers. The agent then
+  answers through a tool call, so its last text is a marker, not the reply.
+  The launcher knows both, and declares them on the log records it forwards.
+
+  @unit @trace-summary
+  Scenario: A user prompt's declared input replaces the wrapped prompt
+    Given a Claude Code user_prompt record whose prompt is a launcher's wrapper
+    And the record declares langwatch.input as the request inside it
+    When the record's input is read
+    Then the trace input is the declared request
+
+  @unit @trace-summary
+  Scenario: A declared output is kept over the agent's later closing text
+    Given a Claude Code record that declares langwatch.output as the reply the agent posted
+    And a later conversational response carries the agent's closing marker
+    When both records are folded into the trace summary
+    Then the trace output is still the declared reply

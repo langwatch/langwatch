@@ -6,13 +6,13 @@ The server half of [trace](../README.md). Traces: ingestion and canonicalisation
 
 ## Installation
 
-`defineProcessModule("trace").withRepositories(traceRepositories).withChannels(traceChannels).withApi(TraceModule).withTransports(tracesTrpcTransport, sharedTraceTrpcTransport, spansTrpcTransport, exportProgressTrpcTransport, traceEditOverlayTrpcTransport, traceExportRest, traceLegacyRest, tracesRest, trackedEventRest, trackedEventLegacyPathRest, collectorRest, otlpIngestRest).provideMiddlewareContext(…).withDoors(…).withEventing(traceProcessingEventing).withEventing(traceProjectMilestonesEventing).withEventing(traceCollectorEvaluationsEventing).withEventing(traceIngestSourceBillingEventing).withMigrations(…).withIdIndexes(TRACE_ID_INDEXES, …)`, `src/trace.module.ts:56`.
+`defineProcessModule("trace").withRepositories(traceRepositories).withChannels(traceChannels).withApi(TraceModule).withTransports(tracesTrpcTransport, sharedTraceTrpcTransport, spansTrpcTransport, exportProgressTrpcTransport, traceEditOverlayTrpcTransport, traceExportRest, traceLegacyRest, tracesRest, trackedEventRest, trackedEventLegacyPathRest, collectorRest, otlpIngestRest).provideMiddlewareContext(…).withDoors(…).withEventing(traceProcessingEventing).withEventing(traceProjectMilestonesEventing).withEventing(traceCollectorEvaluationsEventing).withEventing(traceIngestSourceBillingEventing).withMigrations(…).withIdIndexes(TRACE_ID_INDEXES, …)`, `src/trace.module.ts:90`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
 ## Module API (`TraceApi`)
 
-Peers call these through the token, declared at `../contract/src/trace.api.ts:202`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/trace.api.ts:204`; nothing else in this package is public.
 It extends `TraceOtlpIngestApi`.
 
 #### `extractInlineMediaFromEvent`
@@ -65,6 +65,14 @@ Where the span widgets' history starts, from the span_analytics replay's recorde
 getSpanAnalyticsFloor(): Promise<SpanAnalyticsFloor>;
 ```
 
+#### `getManagedPromptVersionFloor`
+
+Where `LastUsedPromptVersionId` is known from, read from the managed prompt version replay's ledger row. Read-only; a failed step or an unreadable ledger answers `unknown`, never throws.
+
+```typescript
+getManagedPromptVersionFloor(): Promise<TraceManagedPromptVersionFloor>;
+```
+
 #### `renderSpanMessages`
 
 One named span's chat messages as JSON, and whether the trace holds it.
@@ -103,10 +111,12 @@ Main's `getNormalizedSpansByTraceId`: a trace's stored spans, attributes unresol
 findNormalizedSpansByTraceId(input: { authorization: Authorization; traceId: string; limit?: number; }): Promise<NormalizedSpan[]>;
 ```
 
-#### `resolveIngestWaitTimeout`
+#### `resolveTraceSettleSettings`
+
+The project's recommended verdict-time trace wait, measured on its own span arrivals.
 
 ```typescript
-resolveIngestWaitTimeout(input: TraceIngestWaitInput): Promise<number>;
+resolveTraceSettleSettings(input: TraceIngestWaitInput): Promise<TraceSettleSettings>;
 ```
 
 #### `getEvaluationSpans`
@@ -719,10 +729,10 @@ findDailyAttributedSpend(input: { projectId: string; matches: readonly TraceAttr
 
 #### `countAttributedTracesByValue`
 
-Matching traces since `sinceMs`, counted per `valueKey` value among `values`.
+Matching traces since `sinceMs`, counted per `valueKey` value that equals one of `values` or starts with one of `valuePrefixes`.
 
 ```typescript
-countAttributedTracesByValue(input: { projectId: string; matches: readonly TraceAttributeMatch[]; valueKey: string; values: readonly string[]; sinceMs: number; }): Promise<{ value: string; count: number }[]>;
+countAttributedTracesByValue(input: { projectId: string; matches: readonly TraceAttributeMatch[]; valueKey: string; values: readonly string[]; valuePrefixes?: readonly string[]; sinceMs: number; }): Promise<{ value: string; count: number }[]>;
 ```
 
 #### `findAttributedTracesBefore`
@@ -780,7 +790,7 @@ translateTraceFilter(input: { query: string; tenantId: string; timeRange: { from
 A legacy `filters` document compiled to parameterized ClickHouse conditions over `trace_summaries ts`; Trace owns the grammar because it owns the tables. `fenced` writes side-table subqueries for a statement read through a proof's fence (ADR-177).
 
 ```typescript
-translateLegacyFilters(input: { filters: Readonly<Record<string, unknown>>; window?: { startDate?: number; endDate?: number }; fenced?: boolean; }): { conditions: string[]; params: Record<string, unknown>; hasUnsupportedFilters: boolean };
+translateLegacyFilters(input: { filters: Readonly<Record<string, unknown>>; window?: { startDate?: number; endDate?: number }; fenced?: boolean; /** Lets a span-type filter read span_analytics where it is complete. */ spanAnalyticsFloor?: SpanAnalyticsFloor | null; }): { conditions: string[]; params: Record<string, unknown>; hasUnsupportedFilters: boolean };
 ```
 
 #### `compileExplorerTraceFilter`
@@ -1084,7 +1094,7 @@ canonicalizeSpanAttributes(input: CanonicalizeSpanAttributesInput): Canonicalize
 A log record's input and output, each cut to Trace's 64 KiB projection preview.
 
 ```typescript
-extractLogRecordIO(input: LogRecordReceivedEventData): { input: string | null; output: string | null; truncated: boolean; };
+extractLogRecordIO(input: LogRecordReceivedEventData): { input: string | null; output: string | null; outputDeclared: boolean; truncated: boolean; };
 ```
 
 #### `recordLogContributions`
@@ -1336,7 +1346,7 @@ type Response = unknown;
 
 |             |                                      |
 | ----------- | ------------------------------------ |
-| Declared at | `src/transport/traces.rest.ts:308`   |
+| Declared at | `src/transport/traces.rest.ts:309`   |
 | Base URL    | `/api/traces`, twin `/api/v1/traces` |
 | Addressing  | dated                                |
 | Credential  | project                              |
@@ -1346,21 +1356,38 @@ type Response = unknown;
 
 Search traces for a project
 
-Permission `traces:view`. Declared at `src/transport/traces.rest.ts:312`.
+Permission `traces:view`. Declared at `src/transport/traces.rest.ts:313`.
 
 Answers at `/api/traces/search`, `/api/v1/traces/search`; also, undocumented, `/api/traces/2026-08-07/search`, `/api/v1/traces/2026-08-07/search`, `/api/traces/latest/search`, `/api/v1/traces/latest/search`.
 
 ```typescript
 type Body = z.infer<typeof traceSearchBodySchema>; // ../contract/src/trace-rest.schemas.ts:131
-// Response: inline, src/transport/traces.rest.ts:317
+// Response: inline, src/transport/traces.rest.ts:318
 type Response = unknown;
+```
+
+#### `GET /settle-settings` · `getTraceSettleSettings`
+
+Recommended trace wait for a scenario judge
+
+Permission `traces:view`. Declared at `src/transport/traces.rest.ts:340`.
+
+Answers at `/api/traces/settle-settings`, `/api/v1/traces/settle-settings`; also, undocumented, `/api/traces/2026-08-07/settle-settings`, `/api/v1/traces/2026-08-07/settle-settings`, `/api/traces/latest/settle-settings`, `/api/v1/traces/latest/settle-settings`.
+
+```typescript
+// Response: traceSettleSettingsSchema, ../contract/src/trace.queries.ts:76
+interface Response {
+  waitTimeoutMs: number;
+  waitExtensionMs: number;
+  quietPeriodMs: number;
+}
 ```
 
 #### `GET /facets` · `getTraceFacets`
 
 Discover what the trace filter fields hold
 
-Permission `traces:view`. Declared at `src/transport/traces.rest.ts:339`.
+Permission `traces:view`. Declared at `src/transport/traces.rest.ts:364`.
 
 Answers at `/api/traces/facets`, `/api/v1/traces/facets`; also, undocumented, `/api/traces/2026-08-07/facets`, `/api/v1/traces/2026-08-07/facets`, `/api/traces/latest/facets`, `/api/v1/traces/latest/facets`.
 
@@ -1382,7 +1409,7 @@ type Response = Record<string, unknown>;
 
 Derived coding-agent transcript for a trace: what the agent did, in order, with per-call token and cost economics. Empty entries for traces without coding-agent content.
 
-Permission `traces:view`. Declared at `src/transport/traces.rest.ts:372`.
+Permission `traces:view`. Declared at `src/transport/traces.rest.ts:397`.
 
 Answers at `/api/traces/:traceId/transcript`, `/api/v1/traces/:traceId/transcript`; also, undocumented, `/api/traces/2026-08-07/:traceId/transcript`, `/api/v1/traces/2026-08-07/:traceId/transcript`, `/api/traces/latest/:traceId/transcript`, `/api/v1/traces/latest/:traceId/transcript`.
 
@@ -1398,7 +1425,7 @@ type Response = z.infer<typeof transcriptRestResponseSchema>; // ../contract/src
 
 Update metadata on a trace after creation. Inserts a synthetic span carrying the new attributes through the standard ingestion pipeline. New keys are added, existing keys are updated, missing keys are preserved. Labels replace entirely.
 
-Permission `traces:update`. Declared at `src/transport/traces.rest.ts:411`.
+Permission `traces:update`. Declared at `src/transport/traces.rest.ts:436`.
 
 Answers at `/api/traces/:traceId/metadata`, `/api/v1/traces/:traceId/metadata`; also, undocumented, `/api/traces/2026-08-07/:traceId/metadata`, `/api/v1/traces/2026-08-07/:traceId/metadata`, `/api/traces/latest/:traceId/metadata`, `/api/v1/traces/latest/:traceId/metadata`.
 
@@ -1418,7 +1445,7 @@ interface Response {
 
 Get a single trace by ID.
 
-Permission `traces:view`. Declared at `src/transport/traces.rest.ts:437`.
+Permission `traces:view`. Declared at `src/transport/traces.rest.ts:462`.
 
 Answers at `/api/traces/:traceId`, `/api/v1/traces/:traceId`; also, undocumented, `/api/traces/2026-08-07/:traceId`, `/api/v1/traces/2026-08-07/:traceId`, `/api/traces/latest/:traceId`, `/api/v1/traces/latest/:traceId`.
 
@@ -2068,7 +2095,7 @@ interface Input {
   occurredAtMs?: number;
   tenantId?: string;
 }
-type Output = z.infer<typeof agentCallGraphSchema>; // ../contract/src/trace-read.contract.ts:289
+type Output = z.infer<typeof agentCallGraphSchema>; // ../contract/src/trace-read.contract.ts:278
 
 // traces.spanDetail
 // Input: inline, ../contract/src/traces.trpc.ts:599

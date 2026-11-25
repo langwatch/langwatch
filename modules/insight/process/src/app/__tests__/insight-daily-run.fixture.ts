@@ -7,12 +7,13 @@
 import type { AnalyticsApi, LangWatchQLProtections } from "@langwatch/analytics-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import {
-  type Dashboard,
+  type Board,
   type DashboardApi,
   DashboardNotFoundError,
   type DashboardScope,
   dashboardStanding,
   type DashboardViewer,
+  DEFAULT_DASHBOARD_HOME_PRODUCT,
   DEFAULT_DASHBOARD_SCOPE,
 } from "@langwatch/dashboard-contract";
 import {
@@ -341,7 +342,7 @@ function scriptedLangy(world: RunWorld) {
   return { api, starts, waits, stops, turns };
 }
 
-function storedBoard({ id, board }: { id: string; board: ScriptedBoard }): Dashboard {
+function storedBoard({ id, board }: { id: string; board: ScriptedBoard }): Board {
   return {
     id,
     projectId: board.projectId ?? PROJECT,
@@ -351,6 +352,7 @@ function storedBoard({ id, board }: { id: string; board: ScriptedBoard }): Dashb
     createdById: board.createdById ?? null,
     scope: board.scope ?? DEFAULT_DASHBOARD_SCOPE,
     organizationId: board.organizationId ?? null,
+    homeProduct: DEFAULT_DASHBOARD_HOME_PRODUCT,
     createdAt: new Date(0),
     updatedAt: new Date(0),
   };
@@ -363,7 +365,7 @@ type BoardRead = { projectId: string; viewer?: DashboardViewer };
  * A board the reader may not open is not found, exactly as one that does not exist.
  */
 function boardReader(world: RunWorld) {
-  const standingOf = ({ board, projectId, viewer }: BoardRead & { board: Dashboard }) =>
+  const standingOf = ({ board, projectId, viewer }: BoardRead & { board: Board }) =>
     dashboardStanding({ board, viewer, place: { projectId, organizationId: ORGANIZATION } });
   const stored = () =>
     [...world.boards].map(([id, board]) => ({ ...storedBoard({ id, board }), board }));
@@ -371,7 +373,7 @@ function boardReader(world: RunWorld) {
     open: ({ dashboardId, ...read }: BoardRead & { dashboardId: string }) => {
       const found = stored().find(({ id }) => id === dashboardId);
       if (!found || standingOf({ ...read, board: found }) === "none") {
-        throw new DashboardNotFoundError(read.projectId);
+        throw new DashboardNotFoundError({ projectId: read.projectId });
       }
       return found;
     },
@@ -386,7 +388,7 @@ type BoardReadRecord = { read: "board" | "widgets"; viewer: unknown; dashboardId
 function scriptedDashboard(world: RunWorld) {
   const boardReads: BoardReadRecord[] = [];
   const boards = boardReader(world);
-  const widgetsOf = (found: Dashboard & { board: ScriptedBoard }) =>
+  const widgetsOf = (found: Board & { board: ScriptedBoard }) =>
     found.board.widgets.map((scripted, at) =>
       widget({ boardId: found.id, projectId: found.projectId, at, scripted }),
     );

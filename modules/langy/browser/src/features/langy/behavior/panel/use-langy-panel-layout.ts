@@ -35,9 +35,10 @@ export function useLangyPanelPlacement() {
   const panelMode = useLangyStore((s) => s.panelMode);
   const floating = panelMode === "floating";
   const reduceMotion = useReducedMotion();
-  const { currentDrawer } = useDrawer();
+  const { currentDrawer, inPlaceDrawerOpen } = useDrawer();
+  const drawerShowing = !!currentDrawer || !!inPlaceDrawerOpen;
   const drawerEdgeHeld = useLingeringDodge({
-    active: !!currentDrawer,
+    active: drawerShowing,
     releaseDelayMs: LANGY_DODGE_STAGGER_MS,
     immediate: reduceMotion,
   });
@@ -47,7 +48,7 @@ export function useLangyPanelPlacement() {
     floating,
     reduceMotion,
     drawerEdgeHeld,
-    isDrawerCompanion: isOpen && !!currentDrawer && !floating,
+    isDrawerCompanion: isOpen && drawerShowing && !floating,
     floatingDodgesDrawer: isOpen && drawerEdgeHeld && floating,
     floatingPanelWidth: resolveFloatingPanelWidth(viewportWidth),
   };

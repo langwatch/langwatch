@@ -13,6 +13,7 @@ const SPAN_STATUS_FACET: ExpressionCategoricalDef = {
   group: "span",
   table: "stored_spans",
   expression: STATUS_EXPRESSION,
+  lightExpression: STATUS_EXPRESSION,
 };
 
 export class ClickHouseTraceFacetSpanStatusRepository {

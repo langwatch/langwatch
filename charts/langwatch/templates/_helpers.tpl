@@ -1543,6 +1543,22 @@ LWQL_POSTGRES_READER_PASSWORD
 {{- end -}}
 {{- end -}}
 
+{{/* PII_REDACTION_MODEL_ENDPOINT: the chart's Service when piiRedactionModel.enabled,
+     else piiRedactionModel.externalEndpoint, else nothing. */}}
+{{- define "langwatch.piiRedactionModel.endpoint" -}}
+{{- if .Values.piiRedactionModel.enabled -}}
+http://{{ .Release.Name }}-pii-redaction-model:{{ .Values.piiRedactionModel.service.port }}
+{{- else -}}
+{{- .Values.piiRedactionModel.externalEndpoint | default "" | trim -}}
+{{- end -}}
+{{- end -}}
+
+{{/* The common labels without app.kubernetes.io/name and instance, for a
+     component that sets its own: langwatch.labels repeats both keys. */}}
+{{- define "langwatch.componentLabels" -}}
+{{- toYaml (omit (include "langwatch.labels" . | fromYaml) "app.kubernetes.io/name" "app.kubernetes.io/instance") -}}
+{{- end -}}
+
 {{- define "langwatch.storedObjects.localFilesystemIsActive" -}}
 {{- if and .Values.app.storedObjects.localFilesystem.enabled (not .Values.app.dataplane.enabled) -}}
 true
@@ -2121,6 +2137,12 @@ here, once, by name, so both consuming templates agree.
       key: {{ (index .Values "langyagent").secrets.internalSecretKey | default "LANGY_INTERNAL_SECRET" }}
 {{- include "langwatch.langyCallbackUrlEnv" . | nindent 0 }}
 {{- end }}
+{{- /* Strict PII analysis goes to this model; unset, it stays on Presidio.
+       Only the app and workers call it, so it is not in sharedEnv. */}}
+{{- with (include "langwatch.piiRedactionModel.endpoint" .) }}
+- name: PII_REDACTION_MODEL_ENDPOINT
+  value: {{ . | quote }}
+{{- end }}
 {{- /* Langy's rollout flag is SYSTEM-scoped and defaults off, because
        the hosted product opens it one cohort at a time. A self-hosted
        install has a single cohort — the people who installed it — so
@@ -2137,6 +2159,11 @@ here, once, by name, so both consuming templates agree.
 {{- end }}
 {{- if and (index .Values "langyagent").chartManaged (index .Values "langyagent").enableForAllUsers }}
 {{- $forcedFlags = append $forcedFlags "release_langy_enabled" }}
+{{- end }}
+{{- /* Configuring a PII redaction model is the decision to use it, as for
+       Langy. Its price is the server's rule: never priced on self-hosted. */}}
+{{- if include "langwatch.piiRedactionModel.endpoint" . }}
+{{- $forcedFlags = append $forcedFlags "release_pii_redaction_model_enabled" }}
 {{- end }}
 {{- if $forcedFlags }}
 - name: FEATURE_FLAG_FORCE_ENABLE

@@ -171,6 +171,32 @@ describe("liftLogContribution", () => {
     });
   });
 
+  describe("when a launcher declares its own session on the resource", () => {
+    /** @scenario a launcher's declared session groups every harness session it runs */
+    it("keys every run's records on the declared session", () => {
+      const { lift, dispatched } = makeLift();
+
+      for (const [recordId, sessionId] of [
+        ["rec-a", "cc-run-1"],
+        ["rec-b", "cc-run-2"],
+      ] as const) {
+        lift(
+          canonicalLogRecord({
+            recordId,
+            attributes: { "event.name": "claude_code.user_prompt", "session.id": sessionId },
+            providerSessionId: sessionId,
+            resourceAttributes: { "langwatch.session.id": "agent_scout" },
+          }),
+        );
+      }
+
+      expect(dispatched.map((contribution) => contribution.sessionId)).toEqual([
+        "agent_scout",
+        "agent_scout",
+      ]);
+    });
+  });
+
   describe("when a Cowork session's events arrive", () => {
     /** @scenario a Cowork session is an agent session */
     /** @scenario Cowork telemetry that shares Claude Code's event vocabulary is still Cowork */

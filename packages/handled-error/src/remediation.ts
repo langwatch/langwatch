@@ -33,6 +33,19 @@ const registry = {
       "A key that reads exactly one project, such as a project API key, needs none: it defaults to that project",
     ],
   },
+  billing_only_keeps_billing: {
+    tips: [
+      "To stop a Billing-only member paying, remove them from the organization",
+      "To keep them in the organization without Billing, change their organization role to a seat role first, then turn Billing off",
+    ],
+  },
+  billing_only_no_team_access: {
+    tips: [
+      "Send the Billing-only invite with no `teams` and no `teamIds`",
+      "For someone not yet in the organization who needs a team, invite them with a seat role instead, which uses a seat",
+      "For a current Billing-only member, change their organization role to a seat role first, then add them to the team",
+    ],
+  },
   projects_unreadable: {
     tips: [
       "Ask an admin to grant the key's owner `analytics:view` on a project, or use a key that has it",
@@ -126,10 +139,18 @@ const registry = {
   // ---- traces ----
   trace_not_found: {
     tips: [
-      "Check the trace id; traces are deleted after the retention window",
       "If you just sent this trace, retry in a few seconds; ingestion is asynchronous",
+      "The id was looked up as a trace id, a trace id prefix, a span id and a scenario run id, in this project and every project of the organisation you can read",
+      'Find it by what it contained instead: `langwatch trace search -q "<text>" --since 30d`',
+      "Traces are deleted after the project's retention window",
     ],
     docsPath: "/platform/data-retention",
+  },
+  scenario_run_has_many_traces: {
+    tips: [
+      "Open one of the listed traces: `langwatch trace get <traceId>`",
+      'List them all: `langwatch trace search --filter "scenarioRun:<scenarioRunId>" --since 30d`',
+    ],
   },
   trace_withheld_over_plan: {
     tips: [
@@ -169,7 +190,12 @@ const registry = {
     ],
   },
   filter_field_unknown: {
-    tips: ["Use one of the fields listed in meta.knownFields", "Field names are case-sensitive"],
+    tips: [
+      "Use one of the fields listed in meta.knownFields; meta.hint names the likely one",
+      "Field names are case-sensitive",
+      "Text in the trace input or output has no field: search it with a quoted phrase and no field, or -q",
+      "`label:<name>` matches the trace's metadata labels",
+    ],
   },
   filter_value_refused: {
     tips: [
@@ -613,6 +639,74 @@ const registry = {
     ],
     docsPath: "/governance/agent-registry",
   },
+  agent_stop_already_open: {
+    tips: [
+      "Read the open stop with GET /api/governance/agents/{agentId}/stop",
+      "Approve, deny or restore it before requesting a new stop",
+    ],
+    docsPath: "/governance/kill-switch",
+  },
+  agent_stop_not_found: {
+    tips: ["List stops with GET /api/governance/agent-stops and use an `id` from that list"],
+    docsPath: "/governance/kill-switch",
+  },
+  agent_stop_not_pending: {
+    tips: ["Only a stop whose status is `pending_approval` takes an approval or a denial"],
+    docsPath: "/governance/kill-switch",
+  },
+  agent_stop_not_restorable: {
+    tips: ["Restore a stop whose status is `quarantined`, `stop_failed` or `restore_failed`"],
+    docsPath: "/governance/kill-switch",
+  },
+  agent_stop_not_retryable: {
+    tips: ["Retry a stop whose status is `quarantined`, `stop_failed` or `restore_failed`"],
+    docsPath: "/governance/kill-switch",
+  },
+  agent_stop_plan_changed: {
+    tips: [
+      "Read the plan again with GET /api/governance/agents/{agentId}/stop-plan and confirm its targets",
+    ],
+    docsPath: "/governance/kill-switch",
+  },
+  agent_stop_plan_conflict: {
+    tips: [
+      "Read the plan again with GET /api/governance/agents/{agentId}/stop-plan, apply your change to it and send its `version` as `expectedVersion`",
+    ],
+    docsPath: "/governance/kill-switch",
+  },
+  agent_stop_plan_empty: {
+    tips: ["Set the agent's targets with PUT /api/governance/agents/{agentId}/stop-plan"],
+    docsPath: "/governance/kill-switch",
+  },
+  agent_stop_self_approval: {
+    tips: ["Approve with a different API key, or have a person approve it in the Agents page"],
+    docsPath: "/governance/kill-switch",
+  },
+  agent_stop_target_invalid: {
+    tips: [
+      "A serving endpoint target names a Databricks Genie governance source of this organisation",
+      "A Bedrock target names an AWS connection of this organisation",
+      "A virtual key target names a virtual key of this organisation",
+    ],
+    docsPath: "/governance/kill-switch",
+  },
+  agent_stop_target_not_found: {
+    tips: [
+      "A Bedrock target names the alias's region, agent id and alias id as the AWS console shows them",
+      "A serving endpoint target names an endpoint of the source's Databricks workspace",
+    ],
+    docsPath: "/governance/kill-switch",
+  },
+  governance_aws_connection_in_use: {
+    tips: [
+      "Remove the Bedrock targets that use it from every stop plan, and restore the stops that still hold it",
+    ],
+    docsPath: "/governance/kill-switch",
+  },
+  governance_aws_connection_not_found: {
+    tips: ["Create the AWS connection on the Agents page before naming it in a stop plan"],
+    docsPath: "/governance/kill-switch",
+  },
   agent_offline: {
     tips: [
       "Start the process that runs the decorated function; the agent shows Online in the agents list once it connects",
@@ -869,6 +963,15 @@ const registry = {
     docsPath: "/platform/model-providers",
   },
 
+  ai_content_filtered: {
+    tips: [
+      "The provider's own content filter refused the input; on Azure OpenAI the answer is 400 content_filter, often a jailbreak (Prompt Shields) match on instruction-like text",
+      "Relax or adjust the content filter on the deployment the feature's model points at, or try other text",
+      "Retrying the same text fails the same way",
+    ],
+    docsPath: "/platform/model-providers",
+  },
+
   model_provider_unavailable: {
     tips: [
       "meta.reason is not_configured when the project has no row for the provider, disabled when the row is switched off",
@@ -1049,7 +1152,7 @@ const registry = {
   },
   langy_agent_errored: {
     tips: [
-      "The model call was rejected upstream; check meta/reasons for the provider's typed failure, then retry",
+      "The reply failed before it finished; when meta/reasons name a cause, fix that first, then retry",
     ],
   },
   langy_turn_timeout: {
