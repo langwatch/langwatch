@@ -119,21 +119,35 @@ export class LangyWorkerStoppedError extends HandledError {
   }
 }
 
+/** Tips for an agent failure with no captured cause: nothing says the provider refused it. */
+const AGENT_ERRORED_WITHOUT_CAUSE_TIPS = [
+  "The reply failed before it finished and no cause was recorded; your message is safe, send it again",
+] as const;
+
 /**
- * The agent itself reported the turn failed (`agent_error`): the worker is alive and answered
- * deterministically — typically its LLM call was rejected by the provider or gateway.
+ * The agent itself reported the turn failed (`agent_error`). With a captured cause in `reasons`
+ * the cause names the failure and decides retry; with none, nothing says the call was refused
+ * upstream and a plain resend often works, so the error is retryable.
  */
 export class LangyAgentErroredError extends HandledError {
   declare readonly code: "langy_agent_errored";
 
-  constructor(options: { reasons?: readonly Error[]; fault?: "provider" | "platform" } = {}) {
+  constructor(
+    options: {
+      reasons?: readonly Error[];
+      retryable?: boolean;
+      fault?: "provider" | "platform";
+    } = {},
+  ) {
+    const hasCause = (options.reasons?.length ?? 0) > 0;
     super("langy_agent_errored", "agent reported the turn failed", {
       httpStatus: 502,
-      // The agent answered deterministically — typically its LLM call was
-      // rejected by the provider or gateway. A provider refusing a setting the platform
-      // itself sent is the platform's fault (#9442).
-      fault: options.fault ?? "provider",
-      ...remediation("langy_agent_errored"),
+      // A provider refusing a setting the platform itself sent is the platform's fault (#9442).
+      fault: options.fault ?? (hasCause ? "provider" : "platform"),
+      retryable: options.retryable === true || !hasCause,
+      ...(hasCause
+        ? remediation("langy_agent_errored")
+        : { tips: AGENT_ERRORED_WITHOUT_CAUSE_TIPS }),
       reasons: options.reasons,
     });
     this.name = "LangyAgentErroredError";
@@ -277,8 +291,12 @@ export class LangyTurnErrors {
         const refusedOurSetting = [...PROVIDER_UNSUPPORTED_PARAMETER_REASONS].some((reason) =>
           LangyTurnErrors.domainErrorChainHas(cause, reason),
         );
+        // Any retryable captured cause makes the failure worth another try.
+        const retryable =
+          cause.retryable || reasons.some((r) => r instanceof HandledError && r.retryable);
         return new LangyAgentErroredError({
           reasons,
+          retryable,
           ...(refusedOurSetting ? { fault: "platform" as const } : {}),
         });
       }

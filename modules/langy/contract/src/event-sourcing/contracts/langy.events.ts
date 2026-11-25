@@ -79,6 +79,14 @@ const langyMessageRecordedEventDataSchemaDefinition = z.object({
   parts: z.array(langyMessagePartSchema).default([]),
   /** Derived from the first user message; operational state keeps the first non-empty. */
   title: z.string().nullable().optional(),
+  /** Set when CI on this pull request commit started the turn, not the person. */
+  ciFollowUp: z
+    .object({
+      repositoryFullName: z.string(),
+      prNumber: z.number().int().positive(),
+      headSha: z.string(),
+    })
+    .optional(),
 });
 export interface LangyMessageRecordedEventDataSchema extends Named<
   typeof langyMessageRecordedEventDataSchemaDefinition

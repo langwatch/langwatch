@@ -4,6 +4,7 @@ import type { AuthzApi } from "@langwatch/authz-contract";
 import {
   PersonaHomeResolverService,
   type PersonaResolution,
+  type PersonaResolverInput,
 } from "@langwatch/enterprise-governance-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
@@ -20,7 +21,8 @@ type PersonaHomePeers = {
   permissions: Pick<AuthzApi, "getDecision">;
   users: Pick<UserApi, "findLastHomePath">;
   featureFlags: Pick<FeatureFlagApi, "isEnabled">;
-  organizations: Pick<OrganizationApi, "findPrimaryIntent">;
+  organizations: Pick<OrganizationApi, "findPrimaryIntent" | "findMemberById">;
+  isSaas: boolean;
 };
 
 /** Main's `governance.resolveHome`: every signal gathered, then the pure persona policy. */
@@ -43,7 +45,7 @@ export class PersonaHomeService {
   }): Promise<PersonaResolution> {
     const { setupState, projects, entitlements, permissions, users, featureFlags, organizations } =
       this.peers;
-    const [state, memberSlugs, plan, manage, lastHomePath, hasGovernanceUi, intent] =
+    const [state, memberSlugs, plan, manage, lastHomePath, hasGovernanceUi, intent, planHome] =
       await Promise.all([
         setupState.resolve(organizationId),
         projects.findSharedProjectSlugs({ organizationId, memberUserId: userId, limit: 1 }),
@@ -62,6 +64,7 @@ export class PersonaHomeService {
           })
           .catch(() => false),
         organizations.findPrimaryIntent(organizationId).catch(() => null),
+        this.planHomeOf({ organizationId, userId }).catch(() => null),
       ]);
     const [firstProjectSlug = null] =
       memberSlugs.length === 0 && manage.permitted
@@ -81,6 +84,21 @@ export class PersonaHomeService {
       isEnterprise: plan?.type === "ENTERPRISE",
       hasGovernanceUi,
       firstProjectSlug,
+      planHome,
     });
+  }
+
+  /** The plan page for a Billing-only member (ADR-205), who reaches nothing else; else null. */
+  private async planHomeOf({
+    organizationId,
+    userId,
+  }: {
+    organizationId: string;
+    userId: string;
+  }): Promise<PersonaResolverInput["planHome"]> {
+    const { organizations, isSaas } = this.peers;
+    const member = await organizations.findMemberById({ organizationId, userId }, { id: userId });
+    if (member?.billingOnly !== true) return null;
+    return isSaas ? "/settings/subscription" : "/settings/license";
   }
 }

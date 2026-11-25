@@ -35,4 +35,20 @@ export class BrowserOriginGuard {
       return false;
     }
   }
+
+  /**
+   * Over plain HTTP no `Sec-Fetch-Site` is sent and a same-origin EventSource sends no `Origin`,
+   * so there an unsignalled `text/event-stream` request passes: a cross-origin stream carries
+   * `Origin`, and a navigation cannot ask for that type. Spec: sse-lane-subscriptions-only.feature
+   */
+  static isOwnEventStream(
+    request: OriginBearingRequest,
+    { plainHttp }: { plainHttp: boolean },
+  ): boolean {
+    if (BrowserOriginGuard.isFromOwnOrigin(request)) return true;
+    if (!plainHttp) return false;
+    if (request.req.header("sec-fetch-site") || request.req.header("origin")) return false;
+
+    return (request.req.header("accept") ?? "").includes("text/event-stream");
+  }
 }

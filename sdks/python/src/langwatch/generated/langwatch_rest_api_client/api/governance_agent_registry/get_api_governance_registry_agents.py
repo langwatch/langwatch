@@ -5,6 +5,7 @@ import httpx
 
 from ... import errors
 from ...client import AuthenticatedClient, Client
+from ...models.get_api_governance_registry_agents_posture import GetApiGovernanceRegistryAgentsPosture
 from ...models.get_api_governance_registry_agents_response_200 import GetApiGovernanceRegistryAgentsResponse200
 from ...models.get_api_governance_registry_agents_response_400 import GetApiGovernanceRegistryAgentsResponse400
 from ...models.get_api_governance_registry_agents_response_401 import GetApiGovernanceRegistryAgentsResponse401
@@ -21,6 +22,7 @@ def _get_kwargs(
     cursor: str | Unset = UNSET,
     updated_since: datetime.datetime | Unset = UNSET,
     status: GetApiGovernanceRegistryAgentsStatus | Unset = UNSET,
+    posture: GetApiGovernanceRegistryAgentsPosture | Unset = UNSET,
 ) -> dict[str, Any]:
 
     params: dict[str, Any] = {}
@@ -39,6 +41,12 @@ def _get_kwargs(
         json_status = status.value
 
     params["status"] = json_status
+
+    json_posture: str | Unset = UNSET
+    if not isinstance(posture, Unset):
+        json_posture = posture.value
+
+    params["posture"] = json_posture
 
     params = {k: v for k, v in params.items() if v is not UNSET and v is not None}
 
@@ -126,6 +134,7 @@ def sync_detailed(
     cursor: str | Unset = UNSET,
     updated_since: datetime.datetime | Unset = UNSET,
     status: GetApiGovernanceRegistryAgentsStatus | Unset = UNSET,
+    posture: GetApiGovernanceRegistryAgentsPosture | Unset = UNSET,
 ) -> Response[
     GetApiGovernanceRegistryAgentsResponse200
     | GetApiGovernanceRegistryAgentsResponse400
@@ -137,15 +146,17 @@ def sync_detailed(
     """List the organisation's agent registry
 
      Every agent LangWatch sees for the organisation: agents defined in its projects, agents a governance
-    source listed (Databricks Genie, Copilot Studio) and agents its traces name in `gen_ai.agent.name`.
-    Ordered by last change, oldest first; pass `next_cursor` back as `cursor`. `updated_since` returns
-    only entries changed at or after that instant.
+    source listed (Databricks Genie, Copilot Studio, AWS Bedrock, Google Vertex AI, an ARD registry) and
+    agents its traces name in `gen_ai.agent.name`. Ordered by last change, oldest first; pass
+    `next_cursor` back as `cursor`. `updated_since` returns only entries changed at or after that
+    instant. `posture` returns only `governed`, `shadow` or `dormant` entries.
 
     Args:
         limit (int | Unset):  Default: 50.
         cursor (str | Unset):
         updated_since (datetime.datetime | Unset):
         status (GetApiGovernanceRegistryAgentsStatus | Unset):
+        posture (GetApiGovernanceRegistryAgentsPosture | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -160,6 +171,7 @@ def sync_detailed(
         cursor=cursor,
         updated_since=updated_since,
         status=status,
+        posture=posture,
     )
 
     response = client.get_httpx_client().request(
@@ -176,6 +188,7 @@ def sync(
     cursor: str | Unset = UNSET,
     updated_since: datetime.datetime | Unset = UNSET,
     status: GetApiGovernanceRegistryAgentsStatus | Unset = UNSET,
+    posture: GetApiGovernanceRegistryAgentsPosture | Unset = UNSET,
 ) -> (
     GetApiGovernanceRegistryAgentsResponse200
     | GetApiGovernanceRegistryAgentsResponse400
@@ -188,15 +201,17 @@ def sync(
     """List the organisation's agent registry
 
      Every agent LangWatch sees for the organisation: agents defined in its projects, agents a governance
-    source listed (Databricks Genie, Copilot Studio) and agents its traces name in `gen_ai.agent.name`.
-    Ordered by last change, oldest first; pass `next_cursor` back as `cursor`. `updated_since` returns
-    only entries changed at or after that instant.
+    source listed (Databricks Genie, Copilot Studio, AWS Bedrock, Google Vertex AI, an ARD registry) and
+    agents its traces name in `gen_ai.agent.name`. Ordered by last change, oldest first; pass
+    `next_cursor` back as `cursor`. `updated_since` returns only entries changed at or after that
+    instant. `posture` returns only `governed`, `shadow` or `dormant` entries.
 
     Args:
         limit (int | Unset):  Default: 50.
         cursor (str | Unset):
         updated_since (datetime.datetime | Unset):
         status (GetApiGovernanceRegistryAgentsStatus | Unset):
+        posture (GetApiGovernanceRegistryAgentsPosture | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -212,6 +227,7 @@ def sync(
         cursor=cursor,
         updated_since=updated_since,
         status=status,
+        posture=posture,
     ).parsed
 
 
@@ -222,6 +238,7 @@ async def asyncio_detailed(
     cursor: str | Unset = UNSET,
     updated_since: datetime.datetime | Unset = UNSET,
     status: GetApiGovernanceRegistryAgentsStatus | Unset = UNSET,
+    posture: GetApiGovernanceRegistryAgentsPosture | Unset = UNSET,
 ) -> Response[
     GetApiGovernanceRegistryAgentsResponse200
     | GetApiGovernanceRegistryAgentsResponse400
@@ -233,15 +250,17 @@ async def asyncio_detailed(
     """List the organisation's agent registry
 
      Every agent LangWatch sees for the organisation: agents defined in its projects, agents a governance
-    source listed (Databricks Genie, Copilot Studio) and agents its traces name in `gen_ai.agent.name`.
-    Ordered by last change, oldest first; pass `next_cursor` back as `cursor`. `updated_since` returns
-    only entries changed at or after that instant.
+    source listed (Databricks Genie, Copilot Studio, AWS Bedrock, Google Vertex AI, an ARD registry) and
+    agents its traces name in `gen_ai.agent.name`. Ordered by last change, oldest first; pass
+    `next_cursor` back as `cursor`. `updated_since` returns only entries changed at or after that
+    instant. `posture` returns only `governed`, `shadow` or `dormant` entries.
 
     Args:
         limit (int | Unset):  Default: 50.
         cursor (str | Unset):
         updated_since (datetime.datetime | Unset):
         status (GetApiGovernanceRegistryAgentsStatus | Unset):
+        posture (GetApiGovernanceRegistryAgentsPosture | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -256,6 +275,7 @@ async def asyncio_detailed(
         cursor=cursor,
         updated_since=updated_since,
         status=status,
+        posture=posture,
     )
 
     response = await client.get_async_httpx_client().request(**kwargs)
@@ -270,6 +290,7 @@ async def asyncio(
     cursor: str | Unset = UNSET,
     updated_since: datetime.datetime | Unset = UNSET,
     status: GetApiGovernanceRegistryAgentsStatus | Unset = UNSET,
+    posture: GetApiGovernanceRegistryAgentsPosture | Unset = UNSET,
 ) -> (
     GetApiGovernanceRegistryAgentsResponse200
     | GetApiGovernanceRegistryAgentsResponse400
@@ -282,15 +303,17 @@ async def asyncio(
     """List the organisation's agent registry
 
      Every agent LangWatch sees for the organisation: agents defined in its projects, agents a governance
-    source listed (Databricks Genie, Copilot Studio) and agents its traces name in `gen_ai.agent.name`.
-    Ordered by last change, oldest first; pass `next_cursor` back as `cursor`. `updated_since` returns
-    only entries changed at or after that instant.
+    source listed (Databricks Genie, Copilot Studio, AWS Bedrock, Google Vertex AI, an ARD registry) and
+    agents its traces name in `gen_ai.agent.name`. Ordered by last change, oldest first; pass
+    `next_cursor` back as `cursor`. `updated_since` returns only entries changed at or after that
+    instant. `posture` returns only `governed`, `shadow` or `dormant` entries.
 
     Args:
         limit (int | Unset):  Default: 50.
         cursor (str | Unset):
         updated_since (datetime.datetime | Unset):
         status (GetApiGovernanceRegistryAgentsStatus | Unset):
+        posture (GetApiGovernanceRegistryAgentsPosture | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -307,5 +330,6 @@ async def asyncio(
             cursor=cursor,
             updated_since=updated_since,
             status=status,
+            posture=posture,
         )
     ).parsed

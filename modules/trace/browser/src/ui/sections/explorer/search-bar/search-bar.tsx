@@ -25,6 +25,7 @@ import { usePreviewTracesActive } from "../../../../behavior/explorer/onboarding
 import { setFilterChipLabels } from "../../../../behavior/explorer/search-bar/filter-highlight.ts";
 import { registerInstantEvalRoute } from "../../../../behavior/langy/instant-eval-route.bridge.ts";
 import { useLangyStore } from "../../../../behavior/langy/langy.store.ts";
+import { getTraceDrawer } from "../../../../behavior/trace-drawer.ts";
 import { useOptionalTraceHost } from "../../../../behavior/trace-host.ts";
 import { useFloatRect } from "../../../../behavior/use-float-rect.ts";
 import { useGlobalAiShortcut } from "../../../../behavior/use-global-ai-shortcut.ts";
@@ -153,7 +154,11 @@ export const SearchBar: React.FC = () => {
   const langyPanelOpen = useLangyStore((s) => s.isOpen);
   const [langyAskMode, setLangyAskMode] = useState(false);
   const openLangyAsk = useCallback(() => {
-    if (!useLangyStore.getState().isOpen) return setLangyAskMode(true);
+    // Over an open trace drawer the floating ask bar would sit under it, so the panel
+    // opens instead and the drawer narrows beside it.
+    if (!useLangyStore.getState().isOpen && !getTraceDrawer().isOpen) {
+      return setLangyAskMode(true);
+    }
     askLangyFromSearch();
   }, [askLangyFromSearch]);
   // The floating ask bar exists because the panel is closed; if the panel

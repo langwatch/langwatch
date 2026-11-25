@@ -14,6 +14,7 @@ function channelsFor(settings: Partial<DataPrivacyServerConfig>) {
       googleDlpDisabled: undefined,
       enforcement: undefined,
       nodeEnvironment: undefined,
+      isSaas: true,
       langevalsEndpoint: "http://langevals:5562",
       piiRedactionModelEndpoint: undefined,
       ...settings,

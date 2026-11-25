@@ -22,6 +22,7 @@ import { MemoryAuthzAdmissionRepository } from "../../repositories/memory/memory
 import { MemoryAuthzAuditTrailRepository } from "../../repositories/memory/memory.authz-audit-trail.repository.ts";
 import { MemoryAuthzBillingGrantRepository } from "../../repositories/memory/memory.authz-billing-grant.repository.ts";
 import { MemoryAuthzBraidLockRepository } from "../../repositories/memory/memory.authz-braid-lock.repository.ts";
+import { MemoryAuthzBraidWriteRepository } from "../../repositories/memory/memory.authz-braid-write.repository.ts";
 import { MemoryAuthzGrantProjectionRepository } from "../../repositories/memory/memory.authz-grant-projection.repository.ts";
 import { MemoryAuthzLedgerReadRepository } from "../../repositories/memory/memory.authz-ledger-read.repository.ts";
 import { MemoryAuthzLineageEpochRepository } from "../../repositories/memory/memory.authz-lineage-epoch.repository.ts";
@@ -79,6 +80,7 @@ function repositoriesOver(memory: AuthzMemoryStore): AuthzRepositories {
     ledgerReads: MemoryAuthzLedgerReadRepository.create({ memory }),
     billingGrants: MemoryAuthzBillingGrantRepository.create({ memory }),
     braidLocks: MemoryAuthzBraidLockRepository.create(),
+    braidWrites: MemoryAuthzBraidWriteRepository.create(),
     organizationPolicies: MemoryAuthzOrganizationPolicyRepository.create(),
   };
 }
@@ -139,10 +141,24 @@ export async function braidWorld({
   enterprise = true,
   epochCacheEnabled = false,
   braidsReleased = true,
-}: { enterprise?: boolean; epochCacheEnabled?: boolean; braidsReleased?: boolean } = {}) {
+  braidsEnabled = true,
+}: {
+  enterprise?: boolean;
+  epochCacheEnabled?: boolean;
+  braidsReleased?: boolean;
+  /** The organisation's "Braids enabled" setting; a world turns it on unless a test says not. */
+  braidsEnabled?: boolean;
+} = {}) {
   const memory = AuthzMemoryStore.create();
   seedOrganisation(memory);
   const repositories = repositoriesOver(memory);
+  if (braidsEnabled) {
+    await repositories.organizationPolicies.setBraidsEnabled({
+      organizationId: ORG,
+      braidsEnabled: true,
+      updatedByUserId: "seed",
+    });
+  }
   const channels = memoryAuthzChannels({ braidsReleasedFor: braidsReleased ? [ORG] : [] });
   const app = AuthzModule.create({
     dependencies: {},

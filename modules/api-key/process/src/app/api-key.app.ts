@@ -266,6 +266,7 @@ export class ApiKeyModule implements ApiKeyApi, ApiKeyProjectsDoorApi, ApiKeyOrg
       usage: setup.repositories.signingKeyUsage,
       projects: setup.dependencies.projects,
       flags: setup.channels.flags,
+      settings: setup.dependencies.authorization,
       braidSignatures,
     });
 

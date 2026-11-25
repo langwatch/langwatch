@@ -11,7 +11,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { useLangyConversationDeepLink } from "../../../../../behavior/use-langy-conversation-deep-link.ts";
 
-const setSearchParams = vi.fn();
+const navigate = vi.fn();
+const hash = { current: "" };
 const searchParams = { current: new URLSearchParams() };
 const detailResult = {
   current: {
@@ -24,7 +25,12 @@ const openPanel = vi.fn();
 const selectConversation = vi.fn();
 
 vi.mock("react-router", () => ({
-  useSearchParams: () => [searchParams.current, setSearchParams] as const,
+  useLocation: () => ({
+    pathname: "/my-project/traces",
+    search: `?${searchParams.current.toString()}`,
+    hash: hash.current,
+  }),
+  useNavigate: () => navigate,
 }));
 
 vi.mock("../../../../../behavior/use-organization-team-project.ts", () => ({
@@ -44,12 +50,13 @@ vi.mock("../../../../../behavior/langy.store.ts", () => ({
 beforeEach(() => {
   vi.clearAllMocks();
   searchParams.current = new URLSearchParams("langyConversation=langyconv_1&tab=traces");
+  hash.current = "";
 });
 
-/** What `setSearchParams` was asked to leave in the address bar. */
+/** What the hook was asked to leave in the address bar. */
 function strippedParams(): URLSearchParams {
-  const update = setSearchParams.mock.calls[0]?.[0] as (prev: URLSearchParams) => URLSearchParams;
-  return update(searchParams.current);
+  const to = navigate.mock.calls[0]?.[0] as { search: string };
+  return new URLSearchParams(to.search);
 }
 
 describe("useLangyConversationDeepLink", () => {
@@ -72,6 +79,47 @@ describe("useLangyConversationDeepLink", () => {
     });
   });
 
+  describe("given a question link beside the conversation link", () => {
+    it("leaves both to the question link, which opens a new conversation", () => {
+      searchParams.current = new URLSearchParams("langyConversation=langyconv_1&langyPrompt=hi");
+      detailResult.current = { data: { id: "langyconv_1" }, isSuccess: true, isError: false };
+
+      renderHook(() => useLangyConversationDeepLink());
+
+      expect(selectConversation).not.toHaveBeenCalled();
+      expect(navigate).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("given the Trace Explorer's query in the hash", () => {
+    it("keeps the hash when it drops the parameter", async () => {
+      hash.current = "#all-traces?q=trace.attribute.laze.agent.id%3Aagt_1";
+      detailResult.current = { data: { id: "langyconv_1" }, isSuccess: true, isError: false };
+
+      renderHook(() => useLangyConversationDeepLink());
+
+      await waitFor(() => expect(navigate).toHaveBeenCalled());
+      expect(navigate.mock.calls[0]?.[0]).toMatchObject({
+        pathname: "/my-project/traces",
+        hash: "#all-traces?q=trace.attribute.laze.agent.id%3Aagt_1",
+      });
+    });
+  });
+
+  describe("given a blank question beside the conversation link", () => {
+    /** @scenario "A blank question beside a conversation link still opens that conversation" */
+    it("opens the named conversation", async () => {
+      searchParams.current = new URLSearchParams(
+        "langyConversation=langyconv_1&langy=open&langyPrompt=",
+      );
+      detailResult.current = { data: { id: "langyconv_1" }, isSuccess: true, isError: false };
+
+      renderHook(() => useLangyConversationDeepLink());
+
+      await waitFor(() => expect(selectConversation).toHaveBeenCalledWith("langyconv_1"));
+    });
+  });
+
   describe("given a link to a conversation I cannot see", () => {
     /** @scenario "A link to a conversation I cannot see is refused silently" */
     it("switches nothing and still drops the parameter", async () => {
@@ -79,7 +127,7 @@ describe("useLangyConversationDeepLink", () => {
 
       renderHook(() => useLangyConversationDeepLink());
 
-      await waitFor(() => expect(setSearchParams).toHaveBeenCalled());
+      await waitFor(() => expect(navigate).toHaveBeenCalled());
       expect(selectConversation).not.toHaveBeenCalled();
       expect(openPanel).not.toHaveBeenCalled();
       expect(strippedParams().has("langyConversation")).toBe(false);
@@ -96,7 +144,7 @@ describe("useLangyConversationDeepLink", () => {
 
       renderHook(() => useLangyConversationDeepLink());
 
-      expect(setSearchParams).not.toHaveBeenCalled();
+      expect(navigate).not.toHaveBeenCalled();
       expect(selectConversation).not.toHaveBeenCalled();
     });
   });

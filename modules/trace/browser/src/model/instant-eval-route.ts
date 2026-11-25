@@ -21,6 +21,16 @@ export interface InstantEvalRoutePayload {
   target: InstantEvalSearchTarget;
   /** The explicit `field:value` terms typed alongside the sentence. */
   otherQuery: string;
+  /**
+   * The bar text as typed, chip included. Set only for a chip typed by hand and
+   * not under an `OR`, so its run puts the text back as written, `NOT` kept.
+   */
+  typedQuery?: string;
+  /**
+   * The questions this submit first marked as Instant Evals, every chip of it, not only this run's.
+   * Declining the run or Skip drops only these marks, so one made earlier keeps a `NOT` pending.
+   */
+  newlyTypedQuestions?: string[];
   /** The sentence quoted as one phrase, merged with `otherQuery`. */
   fallbackQuery: string;
   timeRange: { from: number; to: number };

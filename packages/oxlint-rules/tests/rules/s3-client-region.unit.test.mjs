@@ -128,6 +128,15 @@ new S3Client({ ...aws.build({ region, endpoint }) });`;
       expect(messageIds(bound)).toEqual([]);
     });
   });
+
+  describe("when the region comes from the shared rule for a known bucket", () => {
+    /** @scenario "A region from the shared rule for a known bucket is accepted" */
+    it("reports nothing, since s3RegionFor applies s3RegionOf first", () => {
+      const code =
+        "new S3Client({ region: s3RegionFor({ region, endpoint, bucket, askBucket }) });";
+      expect(messageIds(code)).toEqual([]);
+    });
+  });
 });
 
 describe("given the AWS client package", () => {

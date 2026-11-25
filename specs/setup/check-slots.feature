@@ -297,6 +297,18 @@ Feature: Machine-wide slots for whole-repo checks
     Then it runs directly under haven's caps, asking neither rush nor haven
 
   @unit
+  Scenario: A rush preload that gates nothing leaves the run to haven's slot
+    Given rush's Node preload is on NODE_OPTIONS but its names list is missing or does not name the program
+    When "haven machine slot run" starts the run
+    Then haven queues it in its own slot instead of handing it to rush
+
+  @unit
+  Scenario: A launcher never hands its run on twice
+    Given a launcher handed its run to rush or haven
+    When rush or haven starts the launcher again without holding a slot for it
+    Then the launcher runs the tool directly and never hands the run on again
+
+  @unit
   Scenario: Without rush, haven queues as before
     Given rush's gate holds no shim for the program, or the shim's rush is not runnable
     When tsc, vitest, oxlint or with-build-slot.sh starts a run
