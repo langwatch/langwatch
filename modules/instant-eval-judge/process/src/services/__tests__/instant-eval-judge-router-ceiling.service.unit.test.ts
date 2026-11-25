@@ -4,12 +4,13 @@
  * @see modules/instant-eval-judge/specs/instant-eval-judge-router.feature
  */
 
-import type {
-  InstantEvalJudgeCostCeiling,
-  InstantEvalJudgement,
-  InstantEvalJudgeRoutePricing,
-  InstantEvalJudgeRouteRequest,
-  InstantEvalQuestion,
+import {
+  InstantEvalClassifierUnavailableError,
+  type InstantEvalJudgeCostCeiling,
+  type InstantEvalJudgement,
+  type InstantEvalJudgeRoutePricing,
+  type InstantEvalJudgeRouteRequest,
+  type InstantEvalQuestion,
 } from "@langwatch/instant-eval-judge-contract";
 import { describe, expect, it, vi } from "vitest";
 
@@ -81,6 +82,27 @@ class RecordingCeiling implements InstantEvalJudgeCostCeiling {
     this.held -= input.heldNanoUsd;
     this.billed += input.costNanoUsd;
     this.settled.push(input);
+  }
+}
+
+/** Room for one send at a time: a second send waits until the first settles. */
+class OneSendCeiling implements InstantEvalJudgeCostCeiling {
+  waited = 0;
+  private isBusy = false;
+  private readonly waiting: (() => void)[] = [];
+
+  async hold(): Promise<boolean> {
+    if (this.isBusy) {
+      this.waited += 1;
+      await new Promise<void>((resolve) => this.waiting.push(resolve));
+    }
+    this.isBusy = true;
+    return true;
+  }
+
+  settle(): void {
+    this.isBusy = false;
+    this.waiting.shift()?.();
   }
 }
 
@@ -261,6 +283,147 @@ describe("InstantEvalJudgeRouterService under a cost ceiling", () => {
     expect(judgement.skippedReason).toBeUndefined();
     expect(judgement.verdicts).toHaveLength(3);
     expect(judgement.routing?.flags ?? []).not.toContain("cost_ceiling:decision-a");
+  });
+});
+
+describe("InstantEvalJudgeRouterService under a cost ceiling, given a send that throws or bills past its hold", () => {
+  const router = ({
+    classify,
+    judge,
+    logger = { error: vi.fn(), warn: vi.fn() },
+  }: {
+    classify: () => Promise<InstantEvalJudgement>;
+    judge?: (signal?: AbortSignal) => never;
+    logger?: { error: () => void; warn: () => void };
+  }) =>
+    InstantEvalJudgeRouterService.create({
+      table: syntheticRouteTable(),
+      pricing: PRICING,
+      classifier: MemoryInstantEvalClassifierChannel.create({ answer: classify }),
+      hostedDecisions: ScriptedInstantEvalHostedDecisionsChannel.create({
+        answer: () => judged(0.5),
+      }),
+      llmJudge: ScriptedInstantEvalLlmJudgeChannel.create({
+        answer: (_request, signal) => {
+          if (!judge) throw new Error("no LLM leg expected");
+          return judge(signal);
+        },
+      }),
+      limiter: MemoryInstantEvalRateLimiter.create(),
+      logger,
+    });
+
+  /** @scenario "A send that throws frees its hold on the ceiling" */
+  it("frees an unrouted classifier send's hold when the classifier throws", async () => {
+    const score = rating("s", "how polite");
+    const ceiling = new RecordingCeiling(QUERY_CEILING_NANO_USD);
+    const failing = router({
+      classify: () => Promise.reject(new InstantEvalClassifierUnavailableError()),
+    });
+
+    await expect(
+      failing.classify({
+        projectId: "project-1",
+        text: TEXT,
+        questions: [score],
+        route: SEARCH,
+        costCeiling: ceiling,
+      }),
+    ).rejects.toBeInstanceOf(InstantEvalClassifierUnavailableError);
+
+    expect(ceiling.holds).toHaveLength(1);
+    expect(ceiling.settled).toEqual([{ heldNanoUsd: ceiling.holds[0], costNanoUsd: 0 }]);
+    expect(ceiling.held).toBe(0);
+  });
+
+  /** @scenario "A send that throws frees its hold on the ceiling" */
+  it("lets a send waiting on a ceiling with room for one go once the send ahead throws", async () => {
+    const score = rating("s", "how polite");
+    let calls = 0;
+    const sharing = router({
+      classify: async () => {
+        calls += 1;
+        if (calls === 1) throw new InstantEvalClassifierUnavailableError();
+        return {
+          verdicts: [{ questionId: score.id, score: 3 }],
+          inputTokens: 10,
+          isTextTruncated: false,
+        };
+      },
+    });
+    const ceiling = new OneSendCeiling();
+    const ask = () =>
+      sharing.classify({
+        projectId: "project-1",
+        text: TEXT,
+        questions: [score],
+        route: SEARCH,
+        costCeiling: ceiling,
+      });
+
+    const [first, second] = await Promise.allSettled([ask(), ask()]);
+
+    expect(first.status).toBe("rejected");
+    expect(second.status).toBe("fulfilled");
+    expect(ceiling.waited).toBe(1);
+  }, 1_000);
+
+  /** @scenario "A send that throws frees its hold on the ceiling" */
+  it("frees a routed send's hold when the caller's stop makes it throw", async () => {
+    const stop = new AbortController();
+    const ceiling = new RecordingCeiling(QUERY_CEILING_NANO_USD);
+    const stopping = router({
+      classify: async () => judged(0.5),
+      judge: () => {
+        stop.abort(new Error("query cancelled"));
+        throw new Error("query cancelled");
+      },
+    });
+
+    await expect(
+      stopping.classify({
+        projectId: "project-1",
+        text: TEXT,
+        questions: [Q],
+        route: SEARCH,
+        costCeiling: ceiling,
+        signal: stop.signal,
+      }),
+    ).rejects.toBeDefined();
+
+    // The primary and the escalation were each held, and both holds were let go.
+    expect(ceiling.holds).toHaveLength(2);
+    expect(ceiling.settled.map((s) => s.heldNanoUsd)).toEqual(ceiling.holds);
+    expect(ceiling.held).toBe(0);
+  });
+
+  /** @scenario "Under a cost ceiling each send holds its worst case first" */
+  it("logs at error an unrouted classifier send billed past its worst case", async () => {
+    const score = rating("s", "how polite");
+    const logger = { error: vi.fn(), warn: vi.fn() };
+    const ceiling = new RecordingCeiling(Number.MAX_SAFE_INTEGER);
+    const overbilled = router({
+      classify: async () => ({
+        verdicts: [{ questionId: score.id, score: 3 }],
+        inputTokens: 100_000_000,
+        isTextTruncated: false,
+      }),
+      logger,
+    });
+
+    await overbilled.classify({
+      projectId: "project-1",
+      text: TEXT,
+      questions: [score],
+      route: SEARCH,
+      costCeiling: ceiling,
+    });
+
+    expect(ceiling.billed).toBeGreaterThan(ceiling.holds[0]!);
+    expect(logger.error).toHaveBeenCalledWith(
+      { backend: "classifier", heldNanoUsd: ceiling.holds[0], costNanoUsd: ceiling.billed },
+      "Instant Evals send cost more than its worst case; the query ceiling under-held",
+    );
   });
 });
 

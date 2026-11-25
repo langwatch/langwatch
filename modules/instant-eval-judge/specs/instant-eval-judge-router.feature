@@ -361,6 +361,14 @@ Feature: Routing an Instant Evals judgement across decision models and LLMs
     And a gate send holds its worst case on the gate's own framed text, settled like any send
     And a gate the ceiling refuses is not sent, so its question goes the hard way, flagged "cost_ceiling"
     And a long trace is held at what its channel can send, so it is not refused for bytes it never sends
+    And a send billed past its worst case, the unrouted classifier call included, is logged at error
+
+  @unit @regression
+  Scenario: A send that throws frees its hold on the ceiling
+    Given a routed call that carries a cost ceiling with room left
+    When an unrouted classifier call throws, or the caller's stop makes a routed send throw
+    Then the send's hold is let go with nothing billed for it
+    And no send waiting on the ceiling behind it waits forever
 
   @unit
   Scenario: A send whose worst case passes the ceiling is not sent

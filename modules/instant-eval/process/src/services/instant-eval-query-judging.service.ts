@@ -16,7 +16,6 @@ import type {
 } from "@langwatch/instant-eval-judge-contract";
 import {
   INSTANT_EVAL_PRICING,
-  InstantEvalQueryCostCeiling,
   NANO_USD_PER_USD,
   instantEvalCostUsd,
   instantEvalPriceUsd,
@@ -36,6 +35,7 @@ import type {
   InstantEvalJudgeUsage,
 } from "./instant-eval-judge-rows.service.ts";
 import type { InstantEvalJudgedSpendService } from "./instant-eval-judged-spend.service.ts";
+import { InstantEvalQueryCostCeilingService } from "./instant-eval-query-cost-ceiling.service.ts";
 import type { InstantEvalSearchRoutingService } from "./instant-eval-search-routing.service.ts";
 
 /** The route a routed judged query sends: the table picks its slot and mode. */
@@ -143,7 +143,7 @@ export class InstantEvalQueryJudgingService {
     const ceilingNanoUsd = instantEvalRoutedQueryCeilingNanoUsd({
       queryTokenBudget: this.options.queryTokenBudget,
     });
-    const costCeiling = new InstantEvalQueryCostCeiling({ ceilingNanoUsd });
+    const costCeiling = InstantEvalQueryCostCeilingService.create({ ceilingNanoUsd });
     return { isRouted: true, costCeiling, ceilingNanoUsd };
   }
 

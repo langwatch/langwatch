@@ -5,7 +5,7 @@
  * @see specs/lwql/eval-functions.feature
  */
 
-import type { InstantEvalJudgeCostCeiling } from "./instant-eval-judge.api.ts";
+import type { InstantEvalJudgeCostCeiling } from "@langwatch/instant-eval-judge-contract";
 
 type Waiter = {
   readonly nanoUsd: number;
@@ -13,14 +13,23 @@ type Waiter = {
   readonly detach: () => void;
 };
 
-export class InstantEvalQueryCostCeiling implements InstantEvalJudgeCostCeiling {
+export class InstantEvalQueryCostCeilingService implements InstantEvalJudgeCostCeiling {
   #heldNanoUsd = 0;
   #billedNanoUsd = 0;
   readonly #waiters: Waiter[] = [];
   readonly #ceilingNanoUsd: number;
 
-  constructor({ ceilingNanoUsd }: { ceilingNanoUsd: number }) {
+  private constructor(ceilingNanoUsd: number) {
     this.#ceilingNanoUsd = ceilingNanoUsd;
+  }
+
+  /** A fresh ceiling for one query: nothing billed or held yet. */
+  static create({
+    ceilingNanoUsd,
+  }: {
+    ceilingNanoUsd: number;
+  }): InstantEvalQueryCostCeilingService {
+    return new InstantEvalQueryCostCeilingService(ceilingNanoUsd);
   }
 
   /** A worst case that is not a finite cost (an unpriced backend) is never held. */

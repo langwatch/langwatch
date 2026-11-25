@@ -50,10 +50,11 @@
       | Backend | Kind | Input / output USD per 1M | Timeout | Fallbacks | Reasoning effort |
       |---|---|---|---|---|---|
       | `decisions` | `decisions` | 0.10 / 0 | 30 s | none | n/a |
-      | `llm_high` | `openai_responses` | 0.10 / 0.50 | 10 s | `llm_fallback` | `high` |
+      | `llm_high` | `openai_responses` | 0.10 / 0.50 | 300 s (decision 12's floor) | `llm_fallback` | `high` |
       | `llm_fallback` | `anthropic_messages` | 0.10 / 0.50 | 30 s | none | n/a |
 
-      Every `routes.search` slot (each bucket and `arithmetic`) is `{ "instant": { "primary": "decisions", "escalateTo": "llm_high", "threshold": 0.40 } }` and names no other mode, so every mode falls back to it. Decisions answers every yes-or-no question; one with sureness `|2p - 1|` under 0.40 (about the least-sure 10%) goes to the OpenAI Responses leg at high effort, and its failure or a call past 10 s goes to the Anthropic leg. Score and category questions stay on the hosted classifier unless `kinds` routes them (decision 5). The other jobs' slots are unchanged. Prices are list prices as of 2026-11-25, to be confirmed before deploy.
+      Every `routes.search` slot (each bucket and `arithmetic`) is `{ "instant": { "primary": "decisions", "escalateTo": "llm_high", "threshold": 0.40 } }` and names no other mode, so every mode falls back to it. Decisions answers every yes-or-no question; one with sureness `|2p - 1|` under 0.40 (about the least-sure 10%) goes to the OpenAI Responses leg at high effort, and its failure or a call past its 300 s timeout goes to the Anthropic leg. Score and category questions stay on the hosted classifier unless `kinds` routes them (decision 5). The other jobs' slots are unchanged. Prices are list prices as of 2026-11-25, to be confirmed before deploy.
+    - **Open before deploy.** The route decision asked for the Anthropic fallback after 10 s on the high-effort leg. Decision 12 refuses a reasoning backend's timeout under 300 s, so the table above waits 300 s. Keeping the 300 s wait, or a scoped exception to the floor for this leg (a cut-off call is LangWatch's unbilled cost), is a product decision taken before the flag is turned on.
     - **Rollout.** The ceiling travels in process with the request and is on no event, so an old pod during a rolling deploy simply sends no route (it does not know the flag). Turn the flag on only after the release has fully rolled out, and only once the search slots above are in the deployed table; with the public jev-only table a routed query is answered and billed as today, at the routed model name.
 
 ## Relation to ADR-174

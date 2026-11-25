@@ -29,6 +29,7 @@ import {
   type InstantEvalJudgeKindPart,
 } from "../rules/instant-eval-judge-route-merge.rules.ts";
 import { instantEvalJudgeRoutePlanOf } from "../rules/instant-eval-judge-route.rules.ts";
+import { InstantEvalJudgeCeilingSendService } from "./instant-eval-judge-ceiling-send.service.ts";
 import {
   InstantEvalJudgeRouteRunService,
   type InstantEvalJudgeRouteRunDeps,
@@ -174,34 +175,39 @@ export class InstantEvalJudgeRouterService {
   }: RoutedClassification): Promise<InstantEvalJudgement> {
     const { classifier, limiter, table, pricing } = this.deps;
     if (!classifier) return instantEvalSkipped("classifier_not_configured");
-    const heldNanoUsd = costCeiling
-      ? instantEvalJudgeClassifierWorstCaseNanoUsd({
-          table,
-          pricing,
-          job: route.job,
-          text,
-          questions,
-        })
-      : 0;
-    if (costCeiling && !(await costCeiling.hold(heldNanoUsd, signal))) {
-      this.logger.warn(
-        { projectId, job: route.job, heldNanoUsd },
-        "Instant Evals unrouted send refused by the query cost ceiling",
-      );
-      return instantEvalSkipped("query_cost_ceiling");
-    }
-    let costNanoUsd = 0;
-    try {
+    const classify = async (bill: (costNanoUsd: number) => void) => {
       const judgement = await classifier.classify(
         { projectId, text, questions, limiter },
         ...(signal ? [signal] : []),
       );
       const { inputTokens, outputTokens = 0 } = judgement;
-      costNanoUsd = instantEvalJudgeClassifierCostOf({ table, pricing, inputTokens, outputTokens });
+      const costNanoUsd = instantEvalJudgeClassifierCostOf({
+        table,
+        pricing,
+        inputTokens,
+        outputTokens,
+      });
+      bill(costNanoUsd);
       return { ...judgement, costNanoUsd };
-    } finally {
-      costCeiling?.settle({ heldNanoUsd, costNanoUsd });
-    }
+    };
+    if (!costCeiling) return classify(() => undefined);
+    const heldNanoUsd = instantEvalJudgeClassifierWorstCaseNanoUsd({
+      table,
+      pricing,
+      job: route.job,
+      text,
+      questions,
+    });
+    const sent = await InstantEvalJudgeCeilingSendService.create({
+      costCeiling,
+      logger: this.logger,
+    }).send({ heldNanoUsd, signal, backend: "classifier", send: classify });
+    if (sent.isHeld) return sent.value;
+    this.logger.warn(
+      { projectId, job: route.job, heldNanoUsd },
+      "Instant Evals unrouted send refused by the query cost ceiling",
+    );
+    return instantEvalSkipped("query_cost_ceiling");
   }
 }
 

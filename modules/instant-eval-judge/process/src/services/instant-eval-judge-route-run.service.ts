@@ -39,6 +39,7 @@ import {
   type InstantEvalJudgeRoutePlan,
 } from "../rules/instant-eval-judge-route.rules.ts";
 import { isUnsureAnswer } from "../rules/instant-eval-judge-sureness.rules.ts";
+import { InstantEvalJudgeCeilingSendService } from "./instant-eval-judge-ceiling-send.service.ts";
 import { InstantEvalJudgeDecisionLegService } from "./instant-eval-judge-decision-leg.service.ts";
 import { InstantEvalJudgeGatedLegsService } from "./instant-eval-judge-gated-legs.service.ts";
 import { InstantEvalJudgeLlmLegService } from "./instant-eval-judge-llm-leg.service.ts";
@@ -59,7 +60,7 @@ export class InstantEvalJudgeRouteRunService {
   private readonly projectId: string;
   private readonly signal: AbortSignal | undefined;
   private readonly logger: Pick<Logger, "error">;
-  private readonly costCeiling: InstantEvalJudgeCostCeiling | undefined;
+  private readonly ceilingSend: InstantEvalJudgeCeilingSendService | undefined;
   private readonly flags: string[] = [];
   private inputTokens = 0;
   private costNanoUsd = 0;
@@ -77,7 +78,10 @@ export class InstantEvalJudgeRouteRunService {
     this.projectId = input.projectId;
     this.signal = input.signal;
     this.logger = input.logger;
-    this.costCeiling = input.costCeiling;
+    const { costCeiling, logger } = input;
+    this.ceilingSend = costCeiling
+      ? InstantEvalJudgeCeilingSendService.create({ costCeiling, logger })
+      : undefined;
     const { inputView, isViewMissing, refusedView, longerView } = input.plan;
     if (isViewMissing) this.flags.push(`${inputView}_view_missing`);
     if (refusedView) this.flags.push(`${refusedView}_view_refused`);
@@ -303,8 +307,8 @@ export class InstantEvalJudgeRouteRunService {
     /** A decision model's own text in place of the plan's view: the gate's framing of the case. */
     text?: string;
   }): Promise<Leg> {
-    const { costCeiling } = this;
-    if (!costCeiling) return this.sendOne({ ...input, paid: (spend) => void this.paid(spend) });
+    const { ceilingSend } = this;
+    if (!ceilingSend) return this.sendOne({ ...input, paid: (spend) => void this.paid(spend) });
     const { backend, questions, text } = input;
     const { table, pricing } = this.deps;
     const heldNanoUsd = instantEvalJudgeSendWorstCaseNanoUsd({
@@ -315,27 +319,15 @@ export class InstantEvalJudgeRouteRunService {
       text: text ?? this.longestPlanText(),
       questions,
     });
-    if (!(await costCeiling.hold(heldNanoUsd, this.signal))) {
-      this.flags.push(`cost_ceiling:${backend}`);
-      return { outcome: "failed", reason: "query_cost_ceiling" };
-    }
-    let costNanoUsd = 0;
-    try {
-      return await this.sendOne({
-        ...input,
-        paid: (spend) => {
-          costNanoUsd += this.paid(spend);
-        },
-      });
-    } finally {
-      costCeiling.settle({ heldNanoUsd, costNanoUsd });
-      if (costNanoUsd > heldNanoUsd) {
-        this.logger.error(
-          { backend, heldNanoUsd, costNanoUsd },
-          "Instant Evals routed send cost more than its worst case; the query ceiling under-held",
-        );
-      }
-    }
+    const sent = await ceilingSend.send({
+      heldNanoUsd,
+      signal: this.signal,
+      backend,
+      send: (bill) => this.sendOne({ ...input, paid: (spend) => bill(this.paid(spend)) }),
+    });
+    if (sent.isHeld) return sent.value;
+    this.flags.push(`cost_ceiling:${backend}`);
+    return { outcome: "failed", reason: "query_cost_ceiling" };
   }
 
   /** The plan's longer text, its view or the full one: what any send of this plan may carry. */

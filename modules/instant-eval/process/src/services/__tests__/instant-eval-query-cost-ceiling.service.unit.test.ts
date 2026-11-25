@@ -4,15 +4,15 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { InstantEvalQueryCostCeiling } from "../instant-eval-query-cost-ceiling.ts";
+import { InstantEvalQueryCostCeilingService } from "../instant-eval-query-cost-ceiling.service.ts";
 
 /** Lets every settled promise's continuation run. */
 const flushed = () => new Promise<void>((resolve) => setImmediate(resolve));
 
-describe("InstantEvalQueryCostCeiling", () => {
+describe("InstantEvalQueryCostCeilingService", () => {
   /** @scenario "A routed query's ceiling holds sends up to the ceiling and no further" */
   it("holds sends while billed plus held stays within the ceiling", async () => {
-    const ceiling = new InstantEvalQueryCostCeiling({ ceilingNanoUsd: 100 });
+    const ceiling = InstantEvalQueryCostCeilingService.create({ ceilingNanoUsd: 100 });
 
     expect(await ceiling.hold(60)).toBe(true);
     expect(await ceiling.hold(40)).toBe(true);
@@ -20,7 +20,7 @@ describe("InstantEvalQueryCostCeiling", () => {
 
   /** @scenario "A routed query's ceiling holds sends up to the ceiling and no further" */
   it("frees a settled hold and counts what the send billed in its place", async () => {
-    const ceiling = new InstantEvalQueryCostCeiling({ ceilingNanoUsd: 100 });
+    const ceiling = InstantEvalQueryCostCeilingService.create({ ceilingNanoUsd: 100 });
     await ceiling.hold(60);
     ceiling.settle({ heldNanoUsd: 60, costNanoUsd: 10 });
 
@@ -31,7 +31,7 @@ describe("InstantEvalQueryCostCeiling", () => {
 
   /** @scenario "A routed query's ceiling holds sends up to the ceiling and no further" */
   it("refuses at once, holding nothing, a send that passes the ceiling with nothing held", async () => {
-    const ceiling = new InstantEvalQueryCostCeiling({ ceilingNanoUsd: 100 });
+    const ceiling = InstantEvalQueryCostCeilingService.create({ ceilingNanoUsd: 100 });
 
     expect(await ceiling.hold(101)).toBe(false);
     expect(await ceiling.hold(100)).toBe(true);
@@ -39,7 +39,7 @@ describe("InstantEvalQueryCostCeiling", () => {
 
   /** @scenario "A routed query's ceiling holds sends up to the ceiling and no further" */
   it("never holds a worst case that is not a finite cost", async () => {
-    const ceiling = new InstantEvalQueryCostCeiling({ ceilingNanoUsd: 100 });
+    const ceiling = InstantEvalQueryCostCeilingService.create({ ceilingNanoUsd: 100 });
 
     expect(await ceiling.hold(Number.POSITIVE_INFINITY)).toBe(false);
     expect(await ceiling.hold(Number.NaN)).toBe(false);
@@ -49,7 +49,7 @@ describe("InstantEvalQueryCostCeiling", () => {
 
   /** @scenario "A send that fits only once sends in flight settle waits for them" */
   it("waits for a hold in flight to settle, then holds the send that now fits", async () => {
-    const ceiling = new InstantEvalQueryCostCeiling({ ceilingNanoUsd: 100 });
+    const ceiling = InstantEvalQueryCostCeilingService.create({ ceilingNanoUsd: 100 });
     await ceiling.hold(60);
     let answer: boolean | undefined;
     void ceiling.hold(60).then((isHeld) => (answer = isHeld));
@@ -63,7 +63,7 @@ describe("InstantEvalQueryCostCeiling", () => {
 
   /** @scenario "A send that fits only once sends in flight settle waits for them" */
   it("refuses a waiting send once what was billed leaves it no room even with nothing held", async () => {
-    const ceiling = new InstantEvalQueryCostCeiling({ ceilingNanoUsd: 100 });
+    const ceiling = InstantEvalQueryCostCeilingService.create({ ceilingNanoUsd: 100 });
     await ceiling.hold(60);
     const waiting = ceiling.hold(60);
 
@@ -75,7 +75,7 @@ describe("InstantEvalQueryCostCeiling", () => {
 
   /** @scenario "A send that fits only once sends in flight settle waits for them" */
   it("rejects a waiting send with the caller's stop and holds nothing for it", async () => {
-    const ceiling = new InstantEvalQueryCostCeiling({ ceilingNanoUsd: 100 });
+    const ceiling = InstantEvalQueryCostCeilingService.create({ ceilingNanoUsd: 100 });
     await ceiling.hold(60);
     const stop = new AbortController();
     const waiting = ceiling.hold(60, stop.signal);
@@ -89,7 +89,7 @@ describe("InstantEvalQueryCostCeiling", () => {
 
   /** @scenario "A send that fits only once sends in flight settle waits for them" */
   it("keeps a later send that fits now waiting behind an earlier one, and grants them in order", async () => {
-    const ceiling = new InstantEvalQueryCostCeiling({ ceilingNanoUsd: 100 });
+    const ceiling = InstantEvalQueryCostCeilingService.create({ ceilingNanoUsd: 100 });
     await ceiling.hold(60);
     const granted: string[] = [];
     const first = ceiling.hold(60).then((isHeld) => granted.push(`first:${isHeld}`));
@@ -104,7 +104,7 @@ describe("InstantEvalQueryCostCeiling", () => {
 
   /** @scenario "A send that fits only once sends in flight settle waits for them" */
   it("wakes the send queued behind a stopped one with no settle", async () => {
-    const ceiling = new InstantEvalQueryCostCeiling({ ceilingNanoUsd: 100 });
+    const ceiling = InstantEvalQueryCostCeilingService.create({ ceilingNanoUsd: 100 });
     await ceiling.hold(60);
     const stop = new AbortController();
     const stopped = ceiling.hold(60, stop.signal).catch(() => "stopped");
@@ -125,7 +125,7 @@ describe("InstantEvalQueryCostCeiling", () => {
     // The shipped search route: 128 long rows judged at once, each holding about 0.0076 USD and
     // billed about 40% of that; 128 holds pass the 0.60 USD ceiling, the spend does not.
     const ceilingNanoUsd = 600_000_000;
-    const ceiling = new InstantEvalQueryCostCeiling({ ceilingNanoUsd });
+    const ceiling = InstantEvalQueryCostCeilingService.create({ ceilingNanoUsd });
     const worstNanoUsd = 7_600_000;
     const billedNanoUsd = 3_000_000;
     let inFlight = 0;
