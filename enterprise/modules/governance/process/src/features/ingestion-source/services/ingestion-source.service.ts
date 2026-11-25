@@ -188,7 +188,10 @@ export class IngestionSourceService {
     );
   }
 
-  /** Security Lake has its own routes and checks: neither its type nor adapter is accepted. */
+  /**
+   * What the generic create and edit may touch: Security Lake has routes and checks of its own, so
+   * neither its source type nor its adapter is accepted here, sent or already stored.
+   */
   async assertGenericallyManaged(input: {
     organizationId: string;
     sourceType?: string;
@@ -238,9 +241,9 @@ export class IngestionSourceService {
       organizationId: input.organizationId,
       kind: PROJECT_KIND.INTERNAL_GOVERNANCE,
     });
-    // Only a push source has a secret: a pull or pure-S3 source authenticates outbound,
-    // so a minted secret would be stored and shown without authenticating anything.
-    // The empty hash is the sentinel for "there is no secret here", which the ingest door reads.
+    // Only a push source has a secret: a pull-mode or pure-S3 source authenticates outbound, so a
+    // minted secret would be stored and shown without authenticating anything. The empty hash is
+    // the sentinel for "there is no secret here", which is what the ingest door reads.
     const ingestSecret = isPushSourceType({ sourceType: input.sourceType })
       ? this.secrets.generate()
       : null;
@@ -456,7 +459,9 @@ export class IngestionSourceService {
   }
 
   /**
-   * Archived, deleted and never-ours projects all read as "absent" and are no longer routed to.
+   * Of the trace destinations these sources point at, the ones that are still live projects of
+   * this organization — archived, deleted and never-ours all collapse to "absent", and all
+   * three mean the puller has stopped routing.
    */
   async liveTraceProjectIds(
     sources: readonly { traceProjectId?: string | null }[],

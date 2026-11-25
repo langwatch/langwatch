@@ -158,34 +158,29 @@ function messageOf(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
-type SetupFailureMatch =
-  | { kind: "setup-gap"; failure: LwqlSetupFailure }
-  | { kind: "not-a-setup-gap" };
+function otherFailure(summary: string): LwqlSetupFailure {
+  return { kind: "other", store: "unknown", reason: `provisioning failed (${summary})` };
+}
 
-function setupFailureOf(error: unknown): SetupFailureMatch {
+/** One error's known setup gap, or kind "other" when it is none of them. */
+function setupFailureOf({ error, summary }: { error: unknown; summary: string }): LwqlSetupFailure {
   const failure = error as { code?: unknown; meta?: { code?: unknown } } | null;
   const message = messageOf(error);
   const clickHouseCode = Number(failure?.code);
   if (clickHouseCode === CLICKHOUSE_ACCESS_DENIED || /Not enough privileges/.test(message)) {
     const grant = CLICKHOUSE_MISSING_GRANT.exec(message)?.[1] ?? "access management";
     return {
-      kind: "setup-gap",
-      failure: {
-        kind: "missing_grant",
-        store: "clickhouse",
-        reason: `the ClickHouse user lacks the grant ${grant}`,
-      },
+      kind: "missing_grant",
+      store: "clickhouse",
+      reason: `the ClickHouse user lacks the grant ${grant}`,
     };
   }
   const setting = CLICKHOUSE_UNPREFIXED_SETTING.exec(message)?.[1];
   if (clickHouseCode === CLICKHOUSE_UNKNOWN_SETTING || setting !== undefined) {
     return {
-      kind: "setup-gap",
-      failure: {
-        kind: "custom_settings_prefix",
-        store: "clickhouse",
-        reason: `the ClickHouse server does not accept the setting ${setting ?? "custom_api_key_hash"}: add custom_ to custom_settings_prefixes in its config and restart it`,
-      },
+      kind: "custom_settings_prefix",
+      store: "clickhouse",
+      reason: `the ClickHouse server does not accept the setting ${setting ?? "custom_api_key_hash"}: add custom_ to custom_settings_prefixes in its config and restart it`,
     };
   }
   if (
@@ -194,15 +189,12 @@ function setupFailureOf(error: unknown): SetupFailureMatch {
   ) {
     const grant = POSTGRES_MISSING_GRANT.exec(message)?.[1]?.trim() ?? "create role";
     return {
-      kind: "setup-gap",
-      failure: {
-        kind: "missing_grant",
-        store: "postgres",
-        reason: `the PostgreSQL user has no permission to ${grant} (CREATEROLE)`,
-      },
+      kind: "missing_grant",
+      store: "postgres",
+      reason: `the PostgreSQL user has no permission to ${grant} (CREATEROLE)`,
     };
   }
-  return { kind: "not-a-setup-gap" };
+  return otherFailure(summary);
 }
 
 /** Classifies a provisioning failure: a missing grant, a missing settings prefix, or other. */
@@ -215,8 +207,8 @@ export function classifyLwqlSetupFailure({
   summary: string;
 }): LwqlSetupFailure {
   for (const link of errorChain(error)) {
-    const match = setupFailureOf(link);
-    if (match.kind === "setup-gap") return match.failure;
+    const failure = setupFailureOf({ error: link, summary });
+    if (failure.kind !== "other") return failure;
   }
-  return { kind: "other", store: "unknown", reason: `provisioning failed (${summary})` };
+  return otherFailure(summary);
 }

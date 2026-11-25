@@ -36,8 +36,8 @@ const USER_ADMIN_INCLUDE = {
 } as const;
 
 /**
- * Each users-list column as the SQL it orders by; Status ranks Active, Unverified, Pending
- * SSO, Deactivated.
+ * Each users-list column as the SQL it orders by; Status ranks Active, Unverified, Pending SSO,
+ * Deactivated.
  */
 const USER_ORDER_BY: Record<AdminUserSortField, Prisma.Sql> = {
   id: Prisma.sql`u."id"`,
@@ -143,10 +143,7 @@ export class PrismaInstanceAdminRepository extends InstanceAdminRepository {
     }
   }
 
-  /**
-   * Users order in SQL across the whole search, then the page's rows load with their
-   * memberships.
-   */
+  /** Users order in SQL across the whole search, then the page's rows load with memberships. */
   private async listUsers(params: AdminOperationParams): Promise<AdminListResult> {
     const filter = params.filter ?? {};
     const query = typeof filter.query === "string" && filter.query ? filter.query : undefined;
