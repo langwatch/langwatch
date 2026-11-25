@@ -69,9 +69,9 @@ export function sqlOf({ form, label }: { form: Form; label: QueryLabel }): strin
 }
 
 /**
- * Fails if any run hit the cap, was refused, carries a server exception code, or read no rows:
- * a capped run's rowsRead counts only the rows read before the abort, so it may not be compared.
- * att-change/change may rightly return none, as no version first appears inside the seed's period.
+ * Fails if a run hit the cap, was refused, has a server exception code, or read no rows. No-data
+ * runs pass cap and drift checks with a meaningless peak, and capped peak is the cap, not a
+ * measure. att-change/change may rightly find none: no version first appears in the seed's period.
  */
 export function expectAnswered({ runs, context }: { runs: readonly Run[]; context: string }): void {
   expect(runs.length, context).toBeGreaterThan(0);
