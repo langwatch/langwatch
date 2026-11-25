@@ -5,7 +5,7 @@
  */
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { AreaTimeseries } from "../index.ts";
+import { AreaTimeseries, GroupedBars, ProjectionBars, StackedBars } from "../index.ts";
 import { zonedParts } from "../utc-instant.ts";
 
 interface Element {
@@ -15,6 +15,7 @@ interface Element {
 }
 
 const BUCKET = "2026-11-26 00:00:00";
+const ROWS = [{ bucket: BUCKET, n: 1 }];
 const globals = globalThis as Record<string, unknown>;
 
 function frameWindow(timezone: string | undefined) {
@@ -100,5 +101,36 @@ describe("given a reader in America/Los_Angeles", () => {
       hour: 5,
       minute: 30,
     });
+  });
+
+  /** @scenario "TZ12 The charts library labels axes and tooltips on the reader's clock" */
+  it.each([
+    ["StackedBars", () => StackedBars({ data: ROWS, x: "bucket", series: ["n"] })],
+    ["GroupedBars", () => GroupedBars({ data: ROWS, x: "bucket", series: ["n"] })],
+    [
+      "ProjectionBars",
+      () => ProjectionBars({ data: ROWS, x: "bucket", y: "n", projectionFrom: BUCKET }),
+    ],
+  ] as const)("heads the %s tooltip with the reader's clock, like its axis", (_name, render) => {
+    globals.window = frameWindow("America/Los_Angeles");
+    const tree = elements(render());
+    const tooltip = tree.find((element) => element.type === "Tooltip");
+    const label = tooltip?.props?.labelFormatter as (value: unknown) => string;
+
+    expect(label(BUCKET)).toBe("Nov 25, 16:00");
+  });
+
+  /** @scenario "TZ12 The charts library labels axes and tooltips on the reader's clock" */
+  it("dates two day buckets apart rather than reading both as midnight", () => {
+    globals.window = frameWindow("UTC");
+    const data = [
+      { bucket: "2026-11-25 00:00:00", n: 1 },
+      { bucket: "2026-11-26 00:00:00", n: 2 },
+    ];
+    const tree = elements(AreaTimeseries({ data, x: "bucket", series: "n" }));
+    const axis = tree.find((element) => element.type === "XAxis");
+    const tick = axis?.props?.tickFormatter as (value: unknown) => string;
+
+    expect(data.map((row) => tick(row.bucket))).toEqual(["11-25", "11-26"]);
   });
 });

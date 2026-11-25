@@ -68,11 +68,15 @@ function run({
   timeZone,
   parameters,
   answers,
+  timeWindow = DST_WEEK,
+  granularitySeconds = 86_400,
 }: {
   sql: string;
   timeZone?: string;
   parameters?: Record<string, string>;
   answers?: readonly (readonly Record<string, unknown>[])[];
+  timeWindow?: { start: string; end: string };
+  granularitySeconds?: number;
 }) {
   const executor = new ScriptedExecutor(answers);
   const service = LangWatchQLService.create({
@@ -86,8 +90,8 @@ function run({
     project: { id: "project-1", lwqlKey: "key-1" },
     protections: EVERYTHING_VISIBLE,
     sql,
-    timeWindow: DST_WEEK,
-    granularitySeconds: 86_400,
+    timeWindow,
+    granularitySeconds,
     ...(timeZone ? { timeZone } : {}),
     ...(parameters ? { parameters } : {}),
   });
@@ -130,6 +134,44 @@ describe("given a statement that buckets by {dashboard_context_timezone:String}"
         { start: "2026-11-01T07:00:00Z", n: 3 },
         { start: "2026-11-02T08:00:00Z", n: 0 },
       ]);
+    });
+  });
+
+  describe("when the reader is ahead of UTC", () => {
+    /** @scenario "TZ10 The completeness buckets follow the same zone" */
+    it("lists every hour of the window, none dropped by the offset", async () => {
+      const { result } = run({
+        sql: ZONED_SQL,
+        timeZone: "Asia/Tokyo",
+        timeWindow: { start: "2026-11-01T00:00:00.000Z", end: "2026-11-02T00:00:00.000Z" },
+        granularitySeconds: 3_600,
+        answers: [[], []],
+      });
+
+      const { completeness } = await result;
+
+      expect(completeness?.buckets).toHaveLength(24);
+      expect(completeness?.buckets?.at(-1)?.start).toBe("2026-11-01T23:00:00Z");
+    });
+  });
+
+  describe("when the window crosses the night the clocks go forward", () => {
+    /** @scenario "TZ10 The completeness buckets follow the same zone" */
+    it("lists each minute once, the skipped hour folded onto the real one", async () => {
+      const { result } = run({
+        sql: ZONED_SQL,
+        timeZone: "America/New_York",
+        timeWindow: { start: "2026-03-08T06:58:00.000Z", end: "2026-03-08T08:02:00.000Z" },
+        granularitySeconds: 60,
+        answers: [[], []],
+      });
+
+      const { completeness } = await result;
+      const starts = completeness?.buckets?.map((bucket) => bucket.start) ?? [];
+
+      expect(starts).toHaveLength(64);
+      expect(new Set(starts).size).toBe(64);
+      expect([starts[0], starts.at(-1)]).toEqual(["2026-03-08T06:58:00Z", "2026-03-08T08:01:00Z"]);
     });
   });
 

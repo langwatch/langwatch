@@ -348,17 +348,17 @@ function windowBuckets({
   timeZone: string;
 }): { start: string; n: number }[] {
   const counts = new Map(rows.map((row) => [countOf(row.bucket), countOf(row.n)]));
-  const start = Temporal.Instant.from(timeWindow.start);
   const endSeconds = Temporal.Instant.from(timeWindow.end).epochMilliseconds / 1000;
-  const startWall = start.toZonedDateTimeISO(timeZone).toPlainDateTime();
-  const startWallSeconds = startWall.toZonedDateTime("UTC").epochMilliseconds / 1000;
+  const startWallSeconds = wallSeconds({ instant: timeWindow.start, timeZone });
+  const endWallSeconds = wallSeconds({ instant: timeWindow.end, timeZone });
   const shift = LWQL_BUCKET_ALIGNMENT_SECONDS;
   const firstWall =
     Math.floor((Math.floor(startWallSeconds) - shift) / granularitySeconds) * granularitySeconds +
     shift;
   // One step past the window covers the hour a DST night adds to the wall clock.
-  const steps = Math.ceil((endSeconds - firstWall) / granularitySeconds) + 2;
+  const steps = Math.ceil((endWallSeconds - firstWall) / granularitySeconds) + 2;
   const buckets: { start: string; n: number }[] = [];
+  const seen = new Set<number>();
   for (let step = 0; step < steps; step += 1) {
     const wall = firstWall + step * granularitySeconds;
     const instant = Temporal.Instant.fromEpochMilliseconds(wall * 1000)
@@ -368,10 +368,18 @@ function windowBuckets({
       .toInstant();
     const seconds = instant.epochMilliseconds / 1000;
     if (seconds >= endSeconds) break;
-    if (buckets.at(-1)?.start === instant.toString()) continue;
+    // A wall time the spring-forward night skips lands on a real later time the loop visits too.
+    if (seen.has(seconds)) continue;
+    seen.add(seconds);
     buckets.push({ start: instant.toString(), n: counts.get(seconds) ?? 0 });
   }
   return buckets;
+}
+
+/** An instant's wall-clock time in the zone, as seconds on a UTC clock reading the same digits. */
+function wallSeconds({ instant, timeZone }: { instant: string; timeZone: string }): number {
+  const wall = Temporal.Instant.from(instant).toZonedDateTimeISO(timeZone).toPlainDateTime();
+  return wall.toZonedDateTime("UTC").epochMilliseconds / 1000;
 }
 
 /** ClickHouse JSON quotes 64-bit integers, so a count can arrive as a string. */

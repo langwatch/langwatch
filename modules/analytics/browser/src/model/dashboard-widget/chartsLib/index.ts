@@ -144,9 +144,11 @@ function isTimeLikeColumn(data: Row[], key: string): boolean {
   return false;
 }
 
+const DAY_MS = 24 * 60 * 60 * 1000;
+
 /**
  * Axis tick formatter for an XAxis's `dataKey`. Time-like columns render on the
- * reader's clock as "MM-DD" when the series spans more than one day, else "HH:mm";
+ * reader's clock as "MM-DD" when the series spans more than a day or steps by days, else "HH:mm";
  * everything else (and unparsable values) falls back to the raw string.
  */
 function axisTickFormatter(key: string, data: Row[]): (value: unknown) => string {
@@ -157,7 +159,10 @@ function axisTickFormatter(key: string, data: Row[]): (value: unknown) => string
       .map((row) => bucketEpochMs(row[key]))
       .filter((t): t is number => t !== undefined);
     if (times.length > 0) {
-      spansMultipleDays = Math.max(...times) - Math.min(...times) > 24 * 60 * 60 * 1000;
+      const sorted = [...new Set(times)].toSorted((a, b) => a - b);
+      const steps = sorted.slice(1).map((time, index) => time - sorted[index]!);
+      spansMultipleDays =
+        sorted.at(-1)! - sorted[0]! > DAY_MS || (steps.length > 0 && Math.min(...steps) >= DAY_MS);
     }
   }
   return (value: unknown): string => {
@@ -561,6 +566,11 @@ function bucketDate(value: unknown): string {
   return `${day}, ${String(local.hour).padStart(2, "0")}:${String(local.minute).padStart(2, "0")}`;
 }
 
+/** A bar tooltip's heading: a time-like column on the reader's clock, like the axis below it. */
+function tooltipLabelFormatter(key: string, data: Row[]): ((label: unknown) => string) | undefined {
+  return isTimeLikeColumn(data, key) ? (label: unknown) => bucketDate(label) : undefined;
+}
+
 const GAP_BRIDGE = "__gap";
 
 /**
@@ -886,6 +896,7 @@ export function StackedBars({ data, x, series, projectionFrom, colors, height }:
             tickFormatter: compactNumber,
           }),
           h(R.Tooltip, {
+            labelFormatter: tooltipLabelFormatter(x, data),
             contentStyle: {
               background: c.tooltipBg,
               border: `1px solid ${c.tooltipBorder}`,
@@ -951,6 +962,7 @@ export function GroupedBars({ data, x, series, colors, height }: GroupedBarsProp
             tickFormatter: compactNumber,
           }),
           h(R.Tooltip, {
+            labelFormatter: tooltipLabelFormatter(x, data),
             contentStyle: {
               background: c.tooltipBg,
               border: `1px solid ${c.tooltipBorder}`,
@@ -1024,6 +1036,7 @@ export function ProjectionBars({
             : undefined,
       }),
       h(R.Tooltip, {
+        labelFormatter: tooltipLabelFormatter(x, data),
         contentStyle: {
           background: c.tooltipBg,
           border: `1px solid ${c.tooltipBorder}`,
