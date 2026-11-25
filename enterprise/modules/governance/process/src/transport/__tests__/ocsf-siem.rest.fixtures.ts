@@ -18,6 +18,7 @@ import { HandledError } from "@langwatch/handled-error";
 import type { LogApi } from "@langwatch/log-contract";
 import type { MetricApi } from "@langwatch/metric-contract";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
+import type { NotificationService } from "@langwatch/notification-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import { ResourceScope } from "@langwatch/process";
 import type { InternalProject, ProjectApi } from "@langwatch/project-contract";
@@ -175,6 +176,7 @@ export async function buildApi({
     repositories,
     dependencies: {
       webhooks: createApiFixture<WebhookApi>({ getAll: async () => [] }),
+      notifications: createApiFixture<NotificationService>(),
       agents: createApiFixture<AgentApi>(),
       projects: createApiFixture<ProjectApi>({
         getOrganizationId: async () => ORG,

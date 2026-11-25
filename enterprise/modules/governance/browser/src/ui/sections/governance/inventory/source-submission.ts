@@ -79,6 +79,10 @@ const PULL_CONFIG_OWNED_FIELDS: Partial<Record<SourceType, readonly string[]>> =
   // the builder turns the switch's form value into a real boolean, and the
   // raw value winning the merge would hand the adapter a string.
   databricks_genie: ["workspaceUrl", "spaceIds", "warehouseId", "readPaidGenieBill"],
+  // Comma-separated in the form, arrays in the adapter's schema.
+  aws_bedrock_agents: ["regions"],
+  gcp_vertex_agent_engine: ["targets"],
+  ard_registry: ["registryUrl", "searchUrl"],
   // The builder normalises `environmentUrl` (trailing slashes stripped) and
   // turns `botIds` from a comma-separated string into an array. The raw form
   // values winning the merge would leave a string where the adapter's schema
@@ -268,6 +272,11 @@ const EDITABLE_PULL_CONFIG_SOURCE_TYPES: readonly SourceType[] = [
   // Three credentials, answered together: all blank keeps the stored app
   // registration, all three replace it, anything between is refused (#9275).
   "copilot_studio_dataverse",
+  // One secret each (the Google key, the registry token) or none (AWS signs with a connection),
+  // so a blank secret can only mean "keep the stored one".
+  "aws_bedrock_agents",
+  "gcp_vertex_agent_engine",
+  "ard_registry",
 ];
 
 /**
