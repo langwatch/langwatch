@@ -17,12 +17,12 @@ const MODEL_WINDOW = `OccurredAt >= subtractDays(${START}, ${NEW_MODEL_LOOKBACK_
 
 // A model is new only once some other model ran a day before it, so the day a
 // project starts sending traffic is not marked as a change.
-const NEW_MODELS = `SELECT Model, min(OccurredAt) AS first_seen
-  FROM (SELECT arrayJoin(Models) AS Model, OccurredAt
+const NEW_MODELS = `SELECT ChangedModel, min(OccurredAt) AS first_seen
+  FROM (SELECT arrayJoin(Models) AS ChangedModel, OccurredAt
     FROM trace_metrics
     WHERE ${MODEL_WINDOW})
-  WHERE Model != ''
-  GROUP BY Model
+  WHERE ChangedModel != ''
+  GROUP BY ChangedModel
   HAVING first_seen >= ${START}
     AND first_seen >= addDays((SELECT min(OccurredAt) FROM trace_metrics
       WHERE ${MODEL_WINDOW}), 1)`;
@@ -33,10 +33,10 @@ const VERSION_WINDOW = `OccurredAt >= subtractDays(${START}, ${NEW_MODEL_LOOKBAC
 
 // A release is the first trace of an application version (service.version, else
 // metadata.version), by the same rule as a model: the project's first version is no release.
-const NEW_RELEASES = `SELECT AppVersion AS Version, min(OccurredAt) AS first_seen
+const NEW_RELEASES = `SELECT AppVersion AS ReleasedVersion, min(OccurredAt) AS first_seen
   FROM trace_metrics
   WHERE ${VERSION_WINDOW}
-  GROUP BY Version
+  GROUP BY ReleasedVersion
   HAVING first_seen >= ${START}
     AND first_seen >= addDays((SELECT min(OccurredAt) FROM trace_metrics
       WHERE ${VERSION_WINDOW}), 1)`;
@@ -50,12 +50,12 @@ WHERE ${inPeriod("v.CreatedAt")}
 LIMIT 50
 UNION ALL
 SELECT ${bucketOf("first_seen")} AS bucket, toDateTime(first_seen) AS at,
-  concat('Model: ', Model) AS label
+  concat('Model: ', ChangedModel) AS label
 FROM (${NEW_MODELS})
 LIMIT 50
 UNION ALL
 SELECT ${bucketOf("first_seen")} AS bucket, toDateTime(first_seen) AS at,
-  concat('Release ', Version) AS label
+  concat('Release ', ReleasedVersion) AS label
 FROM (${NEW_RELEASES})
 LIMIT 50`;
 
