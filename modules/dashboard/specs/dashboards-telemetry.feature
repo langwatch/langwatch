@@ -220,6 +220,13 @@ Feature: Dashboards telemetry: product events and query telemetry
     And it carries no query text and no SQL
     And a widget query the server refused is not reported here, since its "LangWatchQL failed" line already counts it
 
+  @integration
+  Scenario: Telemetry: a widget that keeps crashing with new messages stops reporting after five
+    Given a widget's sandboxed frame throws while drawing, with a different first line each time
+    When it has been reported five times while mounted
+    Then the sixth and later distinct crashes send no exception
+    And a crash already reported in that mount still sends nothing more
+
   @unit
   Scenario: Telemetry: query metrics carry only low-cardinality labels
     When a LangWatchQL query runs

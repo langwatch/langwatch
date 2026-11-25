@@ -291,6 +291,28 @@ describe("given a placed dashboard widget whose frame reports an error", () => {
     });
   });
 
+  describe("when the widget keeps crashing with new first lines", () => {
+    /** @scenario "Telemetry: a widget that keeps crashing with new messages stops reporting after five" */
+    it("reports the first five distinct crashes and no more", () => {
+      const analytics = new RecordingUiAnalytics();
+      renderWithDesignSystem(reportingWidget(analytics));
+      const crashWith = (text: string) => ({ level: "error", source: "lw.error", text }) as const;
+
+      act(() => {
+        for (let n = 1; n <= 7; n++) lastFrameProps().onLog(crashWith(`Render error: row ${n}`));
+        lastFrameProps().onLog(crashWith("Render error: row 1"));
+      });
+
+      expect(analytics.exceptions.map(({ error }) => error)).toEqual([
+        "Render error: row 1",
+        "Render error: row 2",
+        "Render error: row 3",
+        "Render error: row 4",
+        "Render error: row 5",
+      ]);
+    });
+  });
+
   describe("when the frame's own libraries do not load", () => {
     /** @scenario "Telemetry: a chart or a board header action that crashes while drawing is reported as an exception" */
     it("reports it under the frame's load surface", () => {

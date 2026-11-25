@@ -38,6 +38,12 @@ const reportedSurface = (entry: ChartFrameLogEntry) => {
   return undefined;
 };
 
+/**
+ * Widget text is author-controlled, so distinct texts are unbounded: past this many reports per
+ * mount the frame's errors stop reaching PostHog, and the per-text dedup alone is not enough.
+ */
+const MAX_REPORTED_EXCEPTIONS_PER_MOUNT = 5;
+
 const MAX_CRASH_TITLE_LENGTH = 200;
 
 /**
@@ -85,6 +91,7 @@ export function useFrameDiagnostic({
     if (surface === undefined) return;
     const error = surface === "dashboard_widget_frame" ? crashTitle(entry.text) : entry.text;
     if (reported.current.has(error)) return;
+    if (reported.current.size >= MAX_REPORTED_EXCEPTIONS_PER_MOUNT) return;
     reported.current.add(error);
     // A string, not an Error: the host's stack would point at this file, not the widget.
     reporting.current.analytics.captureException({
