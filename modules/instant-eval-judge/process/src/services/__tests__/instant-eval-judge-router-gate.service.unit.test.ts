@@ -460,6 +460,32 @@ describe("InstantEvalJudgeRouterService, given a gated plan", () => {
     });
 
     /** @scenario "A gated branch that cannot answer is answered by the other backend, flagged" */
+    it("asks the escalation only for the easy questions the primary left unanswered", async () => {
+      const { classify, hostedDecisions, llmJudge } = harness({
+        gate: rated(0),
+        decisions: () => decided(0.9, Q.id),
+        llm: () => llmSays(true),
+      });
+      const judgement = await classify([Q, Q2]);
+      expect(hostedDecisions.requests.map((r) => r.questions.map((q) => q.id))).toEqual([
+        ["q", "q2"],
+      ]);
+      expect(llmJudge.requests.map((r) => r.question.id)).toEqual(["q2"]);
+      expect(judgement.verdicts).toEqual([
+        { questionId: "q", probability: 0.9 },
+        { questionId: "q2", probability: 1 },
+      ]);
+      expect(judgement.routing).toMatchObject({
+        answeredBy: { "decision-a": 1, "llm-b": 1 },
+        escalated: 1,
+      });
+      expect(judgement.routing?.flags).toEqual(
+        expect.arrayContaining(["gate:easy", "primary_failed"]),
+      );
+      expect(judgement.costNanoUsd).toBe(2 * GATE_COST + DECISIONS_COST + LLM_COST);
+    });
+
+    /** @scenario "A gated branch that cannot answer is answered by the other backend, flagged" */
     it("skips with the platform's reason when neither can, keeping the gate billed", async () => {
       const { classify } = harness({
         gate: rated(4),
