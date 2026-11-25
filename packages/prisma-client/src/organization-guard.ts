@@ -188,6 +188,8 @@ const ORG_SCOPED_MODELS: Record<string, OrgScopedModelConfig> = {
   },
   OrganizationAccessNotice: {},
   OrganizationSeatLease: {},
+  // One row per retention scope; read by organizationId, written by row id.
+  RetentionApplyStatus: {},
   // "Which personal teams does this person own" is a READ bounded by the named owner: a personal
   // team has exactly one. Any other Team query, and every write, still names its organization.
   Team: {
@@ -326,6 +328,9 @@ const ORG_SCOPED_MODELS: Record<string, OrgScopedModelConfig> = {
   AiToolEntry: {},
   GatewayBudget: {},
   GatewayConnectUpstream: {},
+  // projectId is null for an organization-wide target, so the row is bound by
+  // organizationId, never by projectId.
+  GatewayA2ATarget: {},
   // Per-bucket period boundaries for attributed-user templates. Bound by
   // organizationId, or by the parent budget (org-owned) through budgetId /
   // the compound unique key.
@@ -364,6 +369,10 @@ const ORG_SCOPED_MODELS: Record<string, OrgScopedModelConfig> = {
   NurturingOrganizationCreated: {
     extraBound: ({ clause, action }) => READ_ACTIONS.has(action) && isTraceWindowEndSweep(clause),
   },
+  // Nurturing's plan copy: one row per organization, by its id.
+  NurturingOrganizationPlan: {},
+  // Nurturing's gateway key copy: a key by its organization and id.
+  NurturingVirtualKey: {},
   // Nurturing's member copy: an organization's rows, or a READ of the named members' other rows.
   NurturingOrganizationMember: {
     extraBound: ({ clause, action }) => READ_ACTIONS.has(action) && hasUserBound(clause),
@@ -379,6 +388,19 @@ const ORG_SCOPED_MODELS: Record<string, OrgScopedModelConfig> = {
   NurturingTracedProject: {
     extraBound: ({ clause }) => typeof clauseField(clause, "projectId") === "string",
   },
+  // The digest's enrolled cohort, one row per organization keyed by it. The weekly plan reads
+  // the whole list (organization ids only, no customer content); every write names one.
+  DigestCohortOrganization: {
+    platformScopeActions: ["findMany"],
+  },
+  // The digest's weekly folds: a project's week and a person's week within one organization.
+  // Written by the fold's row id, read by organization; the retention sweep across
+  // organizations is raw SQL that says why it skips the tenant check.
+  DigestProjectWeek: {},
+  DigestUserWeek: {},
+  // A person's digest send for one week, stamped with the organization whose week it carried;
+  // claimed by a create naming that organization, read back by its row id.
+  DigestSend: {},
 };
 
 /**

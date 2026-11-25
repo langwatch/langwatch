@@ -16,45 +16,18 @@ export const PROJECT_USAGE_WINDOW_MS = 30 * DAY_MS;
 export const PROJECT_USAGE_TRIAL_WINDOW_MS = 14 * DAY_MS;
 
 /**
- * How long after an organization's creation its traces are counted, and its trace traits sent:
- * the free window plus a week for the emails that follow it. Past it nothing reads the counts, so
- * none is kept: trace-day rows and Customer.io traits only matter while the emails run.
+ * How long after an organization's creation its traces are read, and its trace traits sent: the
+ * free window plus a week for the emails that follow it. The folds count every trace; past the
+ * window no read takes them, and the window-end sweep drops them.
  */
 export const TRACE_COUNTING_WINDOW_MS = PROJECT_USAGE_TRIAL_WINDOW_MS + 7 * DAY_MS;
 
-/** Whether a trace at `at` is counted: its organization is known and still in its window. */
+/** Whether traces are read at `at`: its organization is known and still in its window. */
 export function isTraceCounted({
   organizationCreatedAt,
   at,
 }: Readonly<{ organizationCreatedAt: number | null; at: number }>): boolean {
   return organizationCreatedAt !== null && at - organizationCreatedAt < TRACE_COUNTING_WINDOW_MS;
-}
-
-/**
- * How long a project's trace batches are retried with no placement copy, measured from when any
- * worker first saw it uncopied. Measured project-to-copy lag 0.7-2.7 s on the dev stack
- * (2026-11-11); 5 min is a floor.
- */
-export const UNCOPIED_PROJECT_RETRY_WINDOW_MS = 5 * 60 * 1000;
-
-/**
- * The queue's delay before a batch waiting for its project's copy comes back. A named delay also
- * stops the queue splitting the batch to find a culprit: there is none, only a copy not there yet.
- */
-export const UNCOPIED_PROJECT_RETRY_DELAY_MS = 30 * 1000;
-
-/** How long a worker trusts its cached drop of a project before reading its placement copy again. */
-export const UNCOPIED_PROJECT_DROP_CACHE_TTL_MS = 10 * 60 * 1000;
-
-/** What a batch of a project nurturing has no placement copy of does: fail to be retried, or drop. */
-export type UncopiedProjectOutcome = "retry" | "drop";
-
-/** Whether an uncopied project's batch retries: less than the window has passed since first seen. */
-export function retriesUncopiedProject({
-  firstSeenAt,
-  now,
-}: Readonly<{ firstSeenAt: number; now: number }>): boolean {
-  return now - firstSeenAt < UNCOPIED_PROJECT_RETRY_WINDOW_MS;
 }
 
 /** The traits read from trace days: rolling, so each is removed when the window ends. */
@@ -124,7 +97,10 @@ export function windowStartDayOf(now: number): string {
   return utcDayOf(now - PROJECT_USAGE_WINDOW_MS);
 }
 
-/** The days after signup whose activity is a trait, `active_day_<n>`. */
+/**
+ * The days after signup whose activity is a trait, `active_day_<n>`: kept until the campaigns
+ * read trace_active_day.
+ */
 const TRACKED_SIGNUP_DAYS = [0, 1, 12, 13] as const;
 type SignupDayTraits = Pick<
   CioOrganizationUsageTraits,
@@ -187,6 +163,23 @@ export function emptyProjectUsage(projectId: string): NurturingProjectUsageState
     activeDays: [],
     LastEventOccurredAt: 0,
   };
+}
+
+/**
+ * The projects' evaluation days, one usage row per project holding only its days: the shape of the
+ * retired evaluation row, so the days count toward the habit and toward nothing else.
+ */
+export function evaluationActivityOf(
+  days: readonly Readonly<{ projectId: string; day: string }>[],
+): NurturingProjectUsageState[] {
+  const byProject = new Map<string, string[]>();
+  for (const { projectId, day } of days) {
+    byProject.set(projectId, [...(byProject.get(projectId) ?? []), day]);
+  }
+  return [...byProject].map(([projectId, projectDays]) => ({
+    ...emptyProjectUsage(projectId),
+    activeDays: projectDays.toSorted(),
+  }));
 }
 
 /**

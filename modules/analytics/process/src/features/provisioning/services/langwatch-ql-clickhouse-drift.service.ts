@@ -3,10 +3,14 @@
  * @see specs/lwql/api.feature
  */
 import { baseViewName } from "../../../rules/lwql-dedup-floor.rules.ts";
+import { traceIdsBaseViewName } from "../../../rules/lwql-dedup-trace-ids.rules.ts";
 import { LWQL_VIEW_CATALOG, pickLwqlViewByName } from "../../../rules/lwql-view-catalog.rules.ts";
 import { LangWatchQLCatalogShapesService } from "../../../services/langwatch-ql-catalog-shapes.service.ts";
 
 const catalogShapes = LangWatchQLCatalogShapesService.create();
+
+/** The view a floored or trace-ids twin is cut from, whose columns it carries; else `name`. */
+const twinBase = (name: string) => baseViewName(traceIdsBaseViewName(name));
 
 /** What the probe found in ClickHouse for the relations it looked at. */
 export type LwqlRelationsFound = Readonly<{
@@ -40,8 +44,8 @@ export class LangWatchQLClickHouseDriftService {
     // A floored twin carries its view's columns (analytics ADR-005); system.columns lists none for
     // a parameterised view, so it is judged by its view's, and drifts with it.
     const lacksColumns = (name: string) => {
-      const view = pickLwqlViewByName(baseViewName(name));
-      const held = found.columns[name] ?? found.columns[baseViewName(name)];
+      const view = pickLwqlViewByName(twinBase(name));
+      const held = found.columns[name] ?? found.columns[twinBase(name)];
       return !!view && !!held && view.columns.some((column) => !held.includes(column.name));
     };
     // A PostgreSQL-backed view reads its engine table's columns, so that table is rebuilt too.

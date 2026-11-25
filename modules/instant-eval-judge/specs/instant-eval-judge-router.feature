@@ -266,23 +266,43 @@ Feature: Routing an Instant Evals judgement across decision models and LLMs
     Given a self-hosted install, where IS_SAAS is unset
     When the router flag is read with no operator row and no override
     Then it is off, so the LLM-judge caller sends no route
-    And the Instant Evals column of Default models does not offer routing
+    And the judge picker names LangWatch's hosted model LangWatch Instant (preview), never LangWatch Evals (preview)
     And an operator can still switch it on for the install
 
   # --- The LLM-judge caller (ADR-190 open question 2: one caller behind the flag) ---
 
+  # LangWatch Evals (preview) is the router: the picker saves it as langwatch/instant-evals, the id the
+  # previous release reads, and langwatch/evals-preview reads the same. The LangWatch Instant (preview) id,
+  # langwatch/instant-preview, is the hosted decision model alone, never routed (ADR-182).
+
   @unit
-  Scenario: An LLM judge on LangWatch Evals Preview is routed when the flag is on
+  Scenario: An LLM judge on LangWatch Evals (preview) is routed when the flag is on
     Given the router flag is on for the project's organization
-    And the project's Instant Evals column is LangWatch Evals Preview
-    When an LLM judge evaluation runs on Instant Evals
+    And an LLM judge evaluation whose model is LangWatch Evals (preview)
+    When it runs on Instant Evals
     Then the judge call carries the route for the "llm_judge" job
     And the flag is read for the project within its organization, so an organization rule applies
 
   @unit
+  Scenario: An LLM judge on LangWatch Instant (preview) is never routed
+    Given the router flag is on for the project's organization
+    And an LLM judge evaluation whose model is LangWatch Instant (preview)
+    When it runs on Instant Evals
+    Then the judge call carries no route
+    And the router flag is not read
+
+  @unit
+  Scenario: A judge saved on langwatch/instant-evals, the id the picker writes, is routed
+    Given the router flag is on for the project's organization
+    And an LLM judge evaluation whose model is stored as "langwatch/instant-evals"
+    When it runs on Instant Evals
+    Then the judge call carries the route for the "llm_judge" job, as before the split
+
+  @unit
   Scenario: With the router flag off an LLM judge keeps today's single classifier call
     Given the router flag is off for the project's organization
-    When an LLM judge evaluation runs on Instant Evals
+    And an LLM judge evaluation whose model is LangWatch Evals (preview)
+    When it runs on Instant Evals
     Then the judge call carries no route
 
   @unit

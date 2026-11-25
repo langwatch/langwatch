@@ -6,7 +6,7 @@ import type { CodingAgentRouter } from "../behavior/coding-agent-router.ts";
 export type ConversationTurn = { traceId: string; timestamp: number };
 
 /** The conversation read for a session; a group project's names the member that recorded it. */
-export function conversationContextInput({
+function conversationContextInput({
   projectId,
   sessionId,
   tenantId,
@@ -18,7 +18,11 @@ export function conversationContextInput({
   return { projectId, conversationId: sessionId, ...(tenantId ? { tenantId } : {}) };
 }
 
-/** The session's last stored turn, or null when none of them was stored. */
+/**
+ * The session's newest stored turn, or null when none was stored. The session's own trace map
+ * answers first (newest stored trace); the conversation read, which pages from the oldest turn,
+ * is the fallback for a session the map does not hold.
+ */
 export async function lastTurnOfSession({
   utils,
   projectId,
@@ -30,19 +34,16 @@ export async function lastTurnOfSession({
   sessionId: string;
   tenantId: string | undefined;
 }): Promise<ConversationTurn | null> {
-  const context = await utils.traces.conversationContext.fetch(
-    conversationContextInput({ projectId, sessionId, tenantId }),
-  );
-  const lastTurn = context?.turns[context.turns.length - 1];
-  if (lastTurn) return lastTurn;
-
-  // A launcher (Laze) names the trace's conversation after its own thread, not the agent's
-  // session, so the session's own trace map is asked next.
   const mapped = await utils.codingAgents.lastTurn.fetch({
     projectId: tenantId ?? projectId,
     sessionId,
   });
-  return mapped ? { traceId: mapped.traceId, timestamp: mapped.occurredAtMs } : null;
+  if (mapped) return { traceId: mapped.traceId, timestamp: mapped.occurredAtMs };
+
+  const context = await utils.traces.conversationContext.fetch(
+    conversationContextInput({ projectId, sessionId, tenantId }),
+  );
+  return context?.turns[context.turns.length - 1] ?? null;
 }
 
 /**

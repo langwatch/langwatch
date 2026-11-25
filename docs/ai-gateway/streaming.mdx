@@ -132,12 +132,13 @@ for chunk in client.chat.completions.create(
     pass
 ```
 
-On `/v1/chat/completions`, a stream that closes with zero total tokens carries one more frame before `data: [DONE]`:
+On `/v1/chat/completions`, a stream that closes with zero total tokens carries one SSE comment line before `data: [DONE]`:
 
 ```text
-event: warning
-data: {"warning":"provider_did_not_report_usage_on_stream"}
+: provider_did_not_report_usage_on_stream
 ```
+
+Spec-compliant clients skip comment lines, so strict OpenAI-compatible parsers never see it as a chunk. It stays visible to `curl -N` and log scrapers.
 
 That stream debits zero tokens, so it passes budget enforcement without being counted. The `gateway_streaming_usage_missing_total` metric counts these per provider and model. Alert on any positive rate. See [Observability](/ai-gateway/observability#traffic-and-lifecycle).
 

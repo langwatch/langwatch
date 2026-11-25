@@ -103,7 +103,7 @@ type StatementFacts = {
 };
 
 /** `value` as a tree node, in a list of none or one. */
-function nodesOf(value: unknown): SqlAstNode[] {
+export function nodesOf(value: unknown): SqlAstNode[] {
   return typeof value === "object" &&
     value !== null &&
     typeof (value as SqlAstNode).type === "string"
@@ -112,7 +112,7 @@ function nodesOf(value: unknown): SqlAstNode[] {
 }
 
 /** Where a node sits in the statement; every node the parser returns carries it. */
-function getSpan(node: SqlAstNode): Span {
+export function getSpan(node: SqlAstNode): Span {
   const { start, end } =
     (node.location as { start?: { offset?: unknown }; end?: { offset?: unknown } } | undefined) ??
     {};
@@ -122,15 +122,24 @@ function getSpan(node: SqlAstNode): Span {
   return { start: start.offset, end: end.offset };
 }
 
-/** Every node under `value` that `keep` accepts, skipping the fields that say nothing. */
-function collectNodes(value: unknown, keep: (node: SqlAstNode) => boolean): SqlAstNode[] {
-  if (Array.isArray(value)) return value.flatMap((item) => collectNodes(item, keep));
-  return nodesOf(value).flatMap((node) => [
-    ...(keep(node) ? [node] : []),
-    ...Object.entries(node)
-      .filter(([field]) => !METADATA_FIELDS.includes(field))
-      .flatMap(([, child]) => collectNodes(child, keep)),
-  ]);
+/**
+ * Every node under `value` that `keep` accepts, skipping the fields that say nothing. A node
+ * `enter` refuses is neither kept nor descended into.
+ */
+export function collectNodes(
+  value: unknown,
+  keep: (node: SqlAstNode) => boolean,
+  enter: (node: SqlAstNode) => boolean = () => true,
+): SqlAstNode[] {
+  if (Array.isArray(value)) return value.flatMap((item) => collectNodes(item, keep, enter));
+  return nodesOf(value)
+    .filter(enter)
+    .flatMap((node) => [
+      ...(keep(node) ? [node] : []),
+      ...Object.entries(node)
+        .filter(([field]) => !METADATA_FIELDS.includes(field))
+        .flatMap(([, child]) => collectNodes(child, keep, enter)),
+    ]);
 }
 
 function conjuncts(value: unknown): SqlAstNode[] {

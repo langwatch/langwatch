@@ -273,6 +273,36 @@ func TestWaitIgnoresASupersededRunOfTheSameWorkflow(t *testing.T) {
 	require.NoError(t, waiter(t, api, time.Second).Wait(context.Background()))
 }
 
+// @scenario "A cancelled check that a newer run of its workflow renamed does not block the review"
+func TestWaitIgnoresACancelledCheckFromASupersededRunUnderAnotherName(t *testing.T) {
+	api := &fakeAPI{
+		responses: []response{{200, []run{
+			in(cancelled("app / test-unit"), 1, 10),
+			in(ok("app / test-unit (worker)"), 2, 11),
+			in(ok("app / test-unit (ui)"), 3, 11),
+		}}},
+		workflowRuns: [][]run{{workflowRun(7, 10), workflowRun(7, 11)}},
+	}
+
+	require.NoError(t, waiter(t, api, time.Second).Wait(context.Background()))
+}
+
+// @scenario "A failed check from an older run of the workflow still blocks the review"
+func TestWaitKeepsAFailedCheckFromAnOlderRunOfTheWorkflow(t *testing.T) {
+	api := &fakeAPI{
+		responses: []response{{200, []run{
+			in(failed("lint"), 1, 10),
+			in(ok("app / test-unit (worker)"), 2, 11),
+		}}},
+		workflowRuns: [][]run{{workflowRun(7, 10), workflowRun(7, 11)}},
+	}
+
+	err := waiter(t, api, time.Second).Wait(context.Background())
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "lint (failure)")
+}
+
 // @scenario "Same-named checks from different workflows are counted separately"
 func TestWaitKeepsSameNamedChecksFromDifferentWorkflows(t *testing.T) {
 	api := &fakeAPI{

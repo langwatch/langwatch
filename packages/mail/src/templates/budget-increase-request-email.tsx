@@ -164,5 +164,8 @@ export const sendBudgetIncreaseRequestEmail = async ({
   ...props
 }: SendBudgetIncreaseRequestEmailInput & { mailer: MailSender }): Promise<void> => {
   const { subject, html } = await renderMailTemplate(budgetIncreaseRequestEmailTemplate, props);
-  await sendEmail({ mailer, content: { to, subject, html } });
+  await sendEmail({
+    mailer,
+    content: { to, subject, html, template: budgetIncreaseRequestEmailTemplate.id },
+  });
 };

@@ -1,6 +1,10 @@
 import { moduleApi } from "@langwatch/module";
 
 import type { NurturingSignal } from "./nurturing-signals.ts";
+import type {
+  TransactionalEmail,
+  TransactionalEmailOutcome,
+} from "./nurturing-transactional-email.ts";
 /**
  * The complete data model nurturing pushes to Customer.io. Every date is Unix
  * seconds: Customer.io's timestamp conditions match nothing else.
@@ -62,6 +66,8 @@ export interface CioPersonTraits extends CioOrganizationUsageTraits {
   name: string;
   first_name?: string;
   role: string;
+  /** The org seat (lite_member/member/admin/developer), not the sign-up `role` (job title). */
+  seat?: string;
   company_size: string;
   signup_usage: string;
   signup_solution: string;
@@ -115,6 +121,10 @@ export interface CioPersonTraits extends CioOrganizationUsageTraits {
   usage_page_viewed_at?: number;
   // The person got an answer from Langy in a conversation they own; only ever set true
   saw_langy_first_message?: boolean;
+  // A gateway key was created for or by the person; only ever set true, so a revoke keeps it
+  has_virtual_key?: boolean;
+  // A gateway key told to the person served its first request; only ever set true
+  has_app_request?: boolean;
 
   // Evaluation milestones
   has_evaluations: boolean;
@@ -156,6 +166,9 @@ export interface CioPersonTraits extends CioOrganizationUsageTraits {
   // Comma list of the paths whose setup completed.
   guided_onboarding_completed_paths?: string;
   guided_onboarding_completed_at?: number;
+  // "coding" | "call": the start picked on Langy's governance opener. "call" is the choice
+  // the person made, never a booked call.
+  langy_start?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -168,6 +181,18 @@ export interface CioOrgTraits extends CioOrganizationUsageTraits {
   company_size: string;
   member_count: number;
   project_count: number;
+  /** Unix seconds of the organization's creation, as nurturing's own copy holds it. */
+  created_at?: number;
+  has_evaluation_results?: boolean;
+  evaluation_count?: number;
+  first_evaluation_at?: number;
+  /** A governance ingestion source was created; only ever set true. */
+  has_governance_source?: boolean;
+  /**
+   * A governance source took its first data; only ever set true. Pulled sources never record
+   * went-live, so it is never set for them.
+   */
+  has_governance_data?: boolean;
   onboarding_variant?: string;
   onboarding_paths?: string;
   onboarding_primary_path?: string;
@@ -199,6 +224,8 @@ export type CioEventName =
   | "experiment_ran"
   | "first_prompt_created"
   | "first_trace_integrated"
+  /** The person's latest organization traced on a UTC day: once per person and day. */
+  | "trace_active_day"
   | "first_evaluation_created"
   | "evaluation_ran"
   | "first_simulation_ran"
@@ -215,6 +242,8 @@ export type CioEventName =
   | "onboarding_path_gateway"
   | "onboarding_path_governance"
   | "guided_onboarding_path_completed"
+  /** Langy's governance opener was answered: `start` is "coding" or "call", never a booking. */
+  | "langy_start_chosen"
   /** Any signed-in usage, at most once per hour per person. */
   | "app_active"
   | "self_hosted_seats_crossed_threshold"
@@ -222,7 +251,16 @@ export type CioEventName =
   | "self_hosted_licensed_feature_without_license"
   | "self_hosted_license_expiring"
   | "self_hosted_domain_has_cloud_account"
-  | "self_hosted_license_sync_stale";
+  | "self_hosted_license_sync_stale"
+  | "virtual_key_created"
+  /** A key's budget crossed its warn line or its limit; `budget_reached` tells them apart. */
+  | "key_budget_threshold"
+  /** An organization's person keys spent without a budget this week; to its admin, weekly. */
+  | "gateway_spend_without_budget"
+  /** A governance ingestion source was created; to its creator, else the organization's admin. */
+  | "governance_source_connected"
+  /** A governance source took its first data; once per source, to its creator, else the admin. */
+  | "governance_source_live";
 
 // ---------------------------------------------------------------------------
 // Batch call discriminated union
@@ -246,7 +284,10 @@ export type CioBatchCall =
       type: "group";
       userId: string;
       groupId: string;
-      traits?: Partial<CioOrgTraits>;
+      traits?: Partial<CioOrgTraits> & {
+        /** The person's seat in this organization, per the Pipelines group spec. */
+        relationshipAttributes?: { seat?: string };
+      };
     };
 
 /**
@@ -255,6 +296,12 @@ export type CioBatchCall =
 export interface NurturingApi {
   /** Records the signal on nurturing's pipeline; its subscriber sends what main sent, once. */
   recordSignal(signal: NurturingSignal): Promise<void>;
+
+  /**
+   * Hands one rendered email to Customer.io's transactional API and says what became of it. A
+   * refusal is an answer, not a throw: the caller falls back to its own mailer.
+   */
+  sendTransactionalEmail(email: TransactionalEmail): Promise<TransactionalEmailOutcome>;
 }
 
 export const NurturingApi = moduleApi<NurturingApi>()("nurturing");

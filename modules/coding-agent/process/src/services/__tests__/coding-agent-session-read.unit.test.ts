@@ -10,10 +10,14 @@ import {
   TestMetricSeries,
   createTestProjects,
   TestSessions,
+  storedTracesFixture,
   TestTraceSessions,
   session,
 } from "../../__tests__/fixtures/coding-agent.fixture.ts";
-import { CODING_AGENT_SESSION_READ_WINDOW_MS } from "../coding-agent-session-read.service.ts";
+import {
+  CODING_AGENT_SESSION_READ_WINDOW_MS,
+  type CodingAgentStoredTraces,
+} from "../coding-agent-session-read.service.ts";
 import {
   MAX_SESSION_EVENTS_PAGE_SIZE,
   CodingAgentFeatureService,
@@ -29,12 +33,14 @@ function serviceWith(input: {
   traceSessions?: TestTraceSessions;
   metricSeries?: TestMetricSeries;
   events?: TestEvents;
+  storedTraces?: CodingAgentStoredTraces;
 }) {
   return CodingAgentFeatureService.create({
     sessions: input.sessions ?? new TestSessions(),
     traceSessions: input.traceSessions ?? new TestTraceSessions(),
     metricSeries: input.metricSeries ?? new TestMetricSeries(),
     sessionEvents: input.events ?? new TestEvents(),
+    storedTraces: input.storedTraces ?? storedTracesFixture(),
     github: new TestGithubService(),
     projects: createTestProjects(),
     billing: new TestBillingPolicy(),
@@ -171,7 +177,10 @@ describe("Coding Agent session reads", () => {
       sessionId: SESSION,
       occurredAtMs: TEST_NOW_MS - 1_000,
     };
-    const service = serviceWith({ sessions, traceSessions });
+    const storedTraces = storedTracesFixture({
+      findExistingTraceIds: async ({ traceIds }) => [...traceIds],
+    });
+    const service = serviceWith({ sessions, traceSessions, storedTraces });
 
     await expect(
       service.findLastTurnOfSession({ projectId: PROJECT, sessionId: SESSION }),
@@ -182,8 +191,56 @@ describe("Coding Agent session reads", () => {
         sessionId: SESSION,
         fromMs: startedAtMs - CODING_AGENT_SESSION_READ_WINDOW_MS,
         toMs: TEST_NOW_MS + CODING_AGENT_SESSION_READ_WINDOW_MS,
+        limit: 50,
       },
     ]);
+  });
+
+  /** @scenario "A trace the session's telemetry only named is skipped for one that was stored" */
+  it("skips a newer mapped trace that was never stored for the newest stored one", async () => {
+    const traceSessions = new TestTraceSessions();
+    const mapped = (traceId: string, occurredAtMs: number) => ({
+      tenantId: PROJECT,
+      traceId,
+      sessionId: SESSION,
+      occurredAtMs,
+    });
+    traceSessions.recent = [
+      mapped("named-by-a-log-only", TEST_NOW_MS - 1_000),
+      mapped(TRACE, TEST_NOW_MS - 60_000),
+      mapped("older", TEST_NOW_MS - 120_000),
+    ];
+    const asked: { projectId: string; traceIds: readonly string[] }[] = [];
+    const storedTraces = storedTracesFixture({
+      findExistingTraceIds: async (input) => {
+        asked.push(input);
+        return input.traceIds.filter((traceId) => traceId !== "named-by-a-log-only");
+      },
+    });
+    const service = serviceWith({ traceSessions, storedTraces });
+
+    await expect(
+      service.findLastTurnOfSession({ projectId: PROJECT, sessionId: SESSION }),
+    ).resolves.toEqual({ traceId: TRACE, occurredAtMs: TEST_NOW_MS - 60_000 });
+    expect(asked).toEqual([
+      { projectId: PROJECT, traceIds: ["named-by-a-log-only", TRACE, "older"] },
+    ]);
+  });
+
+  it("answers nothing when none of the session's mapped traces was stored", async () => {
+    const traceSessions = new TestTraceSessions();
+    traceSessions.mapping = {
+      tenantId: PROJECT,
+      traceId: TRACE,
+      sessionId: SESSION,
+      occurredAtMs: TEST_NOW_MS - 1_000,
+    };
+    const storedTraces = storedTracesFixture({ findExistingTraceIds: async () => [] });
+    const service = serviceWith({ traceSessions, storedTraces });
+
+    await expect(
+      service.findLastTurnOfSession({ projectId: PROJECT, sessionId: SESSION }),
+    ).resolves.toBeNull();
   });
 
   it("answers nothing when no trace of the session was mapped", async () => {

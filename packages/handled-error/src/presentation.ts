@@ -72,6 +72,41 @@ const CODEX_AUTH_FAILURE_COPY: Partial<Record<string, { title: string; descripti
   },
 };
 
+/**
+ * Whether a server remediation tip is for a person. A tip that points at a `meta` field is written
+ * for an API caller, who can read that field; a person never sees `meta` (ADR-045).
+ */
+export function isTipForPeople(tip: string): boolean {
+  return !/\bmeta\./.test(tip);
+}
+
+/** The tips for people that add something the description didn't already say. */
+export function supplementalTips({
+  tips,
+  description,
+}: {
+  tips: readonly string[];
+  description: string;
+}): string[] {
+  const forPeople = tips.filter(isTipForPeople);
+  const target = normaliseProse(description);
+  if (!target) return forPeople;
+
+  return forPeople.filter((tip) => {
+    const candidate = normaliseProse(tip);
+    if (!candidate) return false;
+    return !target.includes(candidate);
+  });
+}
+
+/** Words only: two sentences that say the same thing must compare equal. */
+function normaliseProse(text: string): string {
+  return text
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
 /** Reads a string out of `meta` without trusting it. */
 const str = (error: HandledErrorShape, key: string, fallback: string): string => {
   const value = error.meta[key];
@@ -427,12 +462,16 @@ const presentations = {
   trace_not_found: {
     title: "Trace not found",
     describe: () =>
-      "It may have been deleted, or it may still be arriving. Traces take a few seconds to appear.",
+      "No project you can read holds this id yet. If it was just sent, it may still be arriving: try again in a few seconds. Otherwise it may have passed the retention window.",
   },
   trace_attribute_values_withheld: {
     title: "Attribute values withheld",
     describe: () =>
       "This project hides captured input or output from you, or an attribute policy restricts this key to an audience you are not in. Facet a named field instead, such as model, status or evaluator, or call the facets endpoint with no field to see what this project has.",
+  },
+  scenario_run_has_many_traces: {
+    title: "That is a scenario run id",
+    describe: () => "The run produced several traces. Pick one of the listed trace ids to open it.",
   },
   trace_withheld_over_plan: {
     title: "Trace held until your plan is sorted",
@@ -499,7 +538,8 @@ const presentations = {
     title: "Unknown filter field",
     describe: (error) => {
       const field = str(error, "field", "");
-      return field ? `There's no field called "${field}".` : "";
+      const hint = str(error, "hint", "");
+      return field ? [`There's no field called "${field}".`, hint].filter(Boolean).join(" ") : "";
     },
   },
   filter_value_refused: {
@@ -725,6 +765,10 @@ const presentations = {
   dashboard_not_found: {
     title: "Dashboard not found",
     describe: () => "It may have been deleted. Reload to see the current list.",
+  },
+  dashboard_home_needs_org_scope: {
+    title: "Only an LLM Ops dashboard can be shared with a project",
+    describe: () => "Share it with everyone in the organization, or keep it to yourself.",
   },
   dashboard_read_only_here: {
     title: "This dashboard is read-only here",
@@ -3244,6 +3288,18 @@ const presentations = {
     title: "Add a billing email first",
     describe: () => "Billing needs an email address on the account before this can go through.",
   },
+  billing_only_keeps_billing: {
+    // Billing is the whole of a Billing-only membership (ADR-205); without it nothing is taken away.
+    title: "A Billing-only member always pays",
+    describe: () =>
+      "Billing only is the whole of their membership. To stop them paying, remove them from the organization, or move them to a seat role first.",
+  },
+  billing_only_no_team_access: {
+    // The Billing-only person reaches the plan and invoices, never a project (ADR-205).
+    title: "A Billing-only member joins no team",
+    describe: () =>
+      "Billing only covers the plan, the card and the invoices. To give them a team, invite them with a seat role, or change a current member's role to a seat role first.",
+  },
   billing_plan_price_missing: {
     // fault: platform. The plan the customer picked has no price set up on our
     // side, so there is nothing for them to correct — and telling them to
@@ -4687,6 +4743,47 @@ const presentations = {
       "Another annotation queue in this project already uses it. Pick a different name.",
   },
 
+  // ---- weekly digest emails ----
+  digest_member_not_found: {
+    title: "Member not found",
+    describe: () =>
+      "Only active members of this organization can get a test digest. Pick someone else.",
+  },
+  digest_link_invalid: {
+    title: "This link isn't valid",
+    describe: () => "It may have expired or been changed. Use the link from the latest email.",
+  },
+  digest_nothing_to_send: {
+    title: "Nothing to send this week",
+    describe: () =>
+      "This member's weekly email has no new items to show this week, so nothing was sent.",
+  },
+  digest_links_unavailable: {
+    title: "Unsubscribe links are unavailable",
+    describe: () => "This is on our side. Try again later.",
+  },
+  digest_operator_address_missing: {
+    title: "Your account has no email address",
+    describe: () => "Add an email address to your account, then send the test again.",
+  },
+  digest_organization_not_enrolled: {
+    title: "Organization not enrolled",
+    describe: () => "Enrol this organization in the digest before sending a test.",
+  },
+  digest_member_unsubscribed: {
+    title: "Member opted out",
+    describe: () => "This member opted out of the digest, so no test is sent. Pick someone else.",
+  },
+  digest_public_base_url_missing: {
+    title: "Public address not configured",
+    describe: () => "This is on our side. Try again later.",
+  },
+  digest_unsubscribe_rate_limited: {
+    // Read on the digest's unsubscribe page, by someone with no session and nothing to fix.
+    title: "Too many attempts just now",
+    describe: () => "Wait a minute, then open the link again.",
+  },
+
   // ---- automations & notifications ----
   automation_not_found: {
     title: "Automation not found",
@@ -5440,6 +5537,14 @@ const presentations = {
     title: "That model call didn't go through",
     describe: () => "Try again in a moment, or pick a different model.",
   },
+  ai_content_filtered: {
+    // fault: provider. The model settings work; the provider's content filter
+    // refused this text, so pointing at the model configuration would send the
+    // reader to fix something that is not broken.
+    title: "The provider's content filter blocked this text",
+    describe: () =>
+      "Your model provider refused this text under its content policy. Other text still works. To allow it, relax the content filter on your provider's deployment.",
+  },
   ai_query_provider_error: {
     // fault: provider. Same shape as above, but the reader is mid-search, so
     // rephrasing is the first thing worth trying.
@@ -5856,7 +5961,7 @@ const presentations = {
   checkup_lwql_not_provisionable: {
     title: "LWQL functions cannot be provisioned",
     describe: () =>
-      "Give the ClickHouse user permission to create functions, or set a user defined path.",
+      "Set user_defined_zookeeper_path on every ClickHouse replica so functions live in Keeper.",
   },
   checkup_model_provider_refused: {
     title: "A model provider refused the test call",
@@ -6084,6 +6189,19 @@ const presentations = {
   voice_session_invalid: {
     title: "The session is invalid or has expired",
     describe: () => "Start the call again.",
+  },
+  gateway_a2a_target_headers_need_replacing: {
+    title: "Upstream headers need replacing",
+    describe: () =>
+      "The upstream URL now points at a different origin, so its saved headers were not kept. Enter the headers for the new upstream, or save it with none.",
+  },
+  gateway_a2a_target_name_taken: {
+    title: "Agent target name taken",
+    describe: () => "Another agent target in this scope uses that name. Pick a different name.",
+  },
+  gateway_a2a_target_not_found: {
+    title: "Agent target not found",
+    describe: () => "It may have been deleted. Reload to see the current list.",
   },
   gateway_cache_rule_not_found: {
     title: "Cache rule not found",

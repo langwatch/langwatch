@@ -240,7 +240,7 @@ const REDACTED_SCALAR_FIELDS_BY_ACTION: Record<string, readonly string[]> = {
  * Field names that carry credential material whatever mutation they ride on.
  */
 const SENSITIVE_FIELD_NAME =
-  /(password|passphrase|privatekey|publickey|secretkey|sharedsecret|clientsecret|signingkey|apikey|accesskey|encryptionkey|licensekey|certificate|secret|token(?!s)|credential|slackwebhook|webhookurl|authorization|bearer)/;
+  /(password|passphrase|privatekey|publickey|secretkey|sharedsecret|clientsecret|signingkey|apikey|accesskey|encryptionkey|licensekey|certificate|secret|token(?!s)|credential|slackwebhook|webhookurl|authorization|bearer|upstreamheaders)/;
 
 /**
  * A name ending in `Id` or `Ids` NAMES a credential; it does not carry one.
