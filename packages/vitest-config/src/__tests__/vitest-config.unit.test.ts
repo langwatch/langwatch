@@ -42,11 +42,14 @@ describe("moduleVitestTestOptions", () => {
       ]);
     });
 
-    it("omits include, testTimeout and dir when unasked, and sets up only the logger", () => {
+    it("omits include, testTimeout and dir when unasked, and sets up only the logger and the timer guard", () => {
       const test = moduleVitestTestOptions({ kind: "node" }) ?? {};
 
       expect("include" in test).toBe(false);
-      expect(test.setupFiles).toEqual([expect.stringMatching(/logger-setup\.ts$/)]);
+      expect(test.setupFiles).toEqual([
+        expect.stringMatching(/logger-setup\.ts$/),
+        expect.stringMatching(/timer-guard\.ts$/),
+      ]);
       expect("testTimeout" in test).toBe(false);
       expect("dir" in test).toBe(false);
     });
@@ -96,6 +99,7 @@ describe("moduleVitestTestOptions", () => {
       expect(test?.exclude).toEqual(["**/fixtures/**", BROWSER_TEST_GLOB]);
       expect(test?.setupFiles).toEqual([
         expect.stringMatching(/logger-setup\.ts$/),
+        expect.stringMatching(/timer-guard\.ts$/),
         "./vitest.setup.ts",
       ]);
       expect(test?.testTimeout).toBe(30_000);
