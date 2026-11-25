@@ -4,6 +4,7 @@ import { moduleApi } from "@langwatch/module";
 
 import type { ConversationView } from "./conversation/conversation-steps.ts";
 import type { TraceAgentSeen } from "./features/analytics/trace-agent-traffic.ts";
+import type { TraceManagedPromptVersionFloor } from "./features/analytics/trace-managed-prompt-version-floor.ts";
 import type {
   TraceAttributedRecency,
   TraceAttributedSpendComparison,
@@ -234,6 +235,11 @@ export interface TraceApi extends TraceOtlpIngestApi {
   renderTraceMessages(input: { trace: Trace; side: TraceMessagesSide }): Promise<string | null>;
   /** Where the span widgets' history starts, from the span_analytics replay's recorded since. */
   getSpanAnalyticsFloor(): Promise<SpanAnalyticsFloor>;
+  /**
+   * Where `LastUsedPromptVersionId` is known from, read from the managed prompt version replay's
+   * ledger row. Read-only; a failed step or an unreadable ledger answers `unknown`, never throws.
+   */
+  getManagedPromptVersionFloor(): Promise<TraceManagedPromptVersionFloor>;
   /** One named span's chat messages as JSON, and whether the trace holds it. */
   renderSpanMessages(input: { trace: Trace; spanId: string }): Promise<TraceRenderedSpanMessages>;
   /** The whole trace as one JSON object, spans included. */
@@ -748,12 +754,16 @@ export interface TraceApi extends TraceOtlpIngestApi {
     groupBy: TraceDailySpendGroup;
     window: TraceModelSpendWindow;
   }): Promise<TraceDailyGroupSpend[]>;
-  /** Matching traces since `sinceMs`, counted per `valueKey` value among `values`. */
+  /**
+   * Matching traces since `sinceMs`, counted per `valueKey` value that equals one of `values` or
+   * starts with one of `valuePrefixes`.
+   */
   countAttributedTracesByValue(input: {
     projectId: string;
     matches: readonly TraceAttributeMatch[];
     valueKey: string;
     values: readonly string[];
+    valuePrefixes?: readonly string[];
     sinceMs: number;
   }): Promise<{ value: string; count: number }[]>;
   /** The newest matching traces before `beforeMs`, at most `limit`, with the asked attributes. */
@@ -814,6 +824,8 @@ export interface TraceApi extends TraceOtlpIngestApi {
     filters: Readonly<Record<string, unknown>>;
     window?: { startDate?: number; endDate?: number };
     fenced?: boolean;
+    /** Lets a span-type filter read span_analytics where it is complete. */
+    spanAnalyticsFloor?: SpanAnalyticsFloor | null;
   }): { conditions: string[]; params: Record<string, unknown>; hasUnsupportedFilters: boolean };
   /**
    * The Explorer's own filter: the query compiled, hidden origins left out

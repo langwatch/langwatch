@@ -9,7 +9,7 @@ import {
   formatUsd,
 } from "./digest-parts.tsx";
 import { ActionRow, DetailTable } from "./email-layout.tsx";
-import { defineTemplate } from "./registry.ts";
+import { defineTemplate, renderMailTemplate } from "./registry.ts";
 
 export const digestCodingAgentWeekProps = z.object({
   ...digestCommonFields,
@@ -26,28 +26,47 @@ export const digestCodingAgentWeekProps = z.object({
   commits: z.number().int().nonnegative().optional(),
   pullRequests: z.number().int().nonnegative().optional(),
   topRepo: z.string().min(1).optional().describe("The repository with the most sessions"),
+  totalsAtLeast: z
+    .boolean()
+    .optional()
+    .describe("The week held more metric series than it keeps, so each total is a floor"),
   weekUrl: z.url().describe("Already a tracked redirect"),
 });
 
 export type DigestCodingAgentWeekProps = z.infer<typeof digestCodingAgentWeekProps>;
 
+/** A total missing the series the week dropped reads as a floor. */
+const floorOf = ({
+  totalsAtLeast,
+  text,
+}: {
+  totalsAtLeast: boolean | undefined;
+  text: string;
+}): string => (totalsAtLeast ? `at least ${text}` : text);
+
 export const digestCodingAgentWeekSubject = ({
   sessions,
   costUsd,
-}: DigestCodingAgentWeekProps): string =>
-  `Your coding agents this week: ${formatCount(sessions)} sessions, ${formatUsd(costUsd)}`;
+  totalsAtLeast,
+}: DigestCodingAgentWeekProps): string => {
+  const cost = floorOf({ totalsAtLeast, text: formatUsd(costUsd) });
+  return `Your coding agents this week: ${formatCount(sessions)} sessions, ${cost}`;
+};
 
 export const DigestCodingAgentWeek = (props: DigestCodingAgentWeekProps) => {
   const { sessions, tokens, costUsd, activeMinutes, linesChanged, commits, pullRequests, topRepo } =
     props;
+  const floor = (text: string) => floorOf({ totalsAtLeast: props.totalsAtLeast, text });
+  const tokensText = floor(formatCompact(tokens));
+  const costText = floor(formatUsd(costUsd));
 
   return (
     <DigestFrame
-      preview={`${formatCount(sessions)} sessions, ${formatCompact(tokens)} tokens, ${formatUsd(costUsd)}`}
+      preview={`${formatCount(sessions)} sessions, ${tokensText} tokens, ${costText}`}
       heading={`Your coding-agent week, ${props.weekLabel}`}
       hero={{
         value: formatCount(sessions),
-        caption: `coding-agent sessions, ${formatMinutes(activeMinutes)} active`,
+        caption: `coding-agent sessions, ${floor(formatMinutes(activeMinutes))} active`,
       }}
       whatsNew={props.whatsNew}
       reason="You use coding agents with LangWatch."
@@ -55,15 +74,17 @@ export const DigestCodingAgentWeek = (props: DigestCodingAgentWeekProps) => {
     >
       <DetailTable
         rows={[
-          { label: "Cost", value: formatUsd(costUsd) },
-          { label: "Tokens", value: formatCompact(tokens) },
+          { label: "Cost", value: costText },
+          { label: "Tokens", value: tokensText },
           ...(linesChanged === undefined
             ? []
-            : [{ label: "Lines changed", value: formatCount(linesChanged) }]),
-          ...(commits === undefined ? [] : [{ label: "Commits", value: formatCount(commits) }]),
+            : [{ label: "Lines changed", value: floor(formatCount(linesChanged)) }]),
+          ...(commits === undefined
+            ? []
+            : [{ label: "Commits", value: floor(formatCount(commits)) }]),
           ...(pullRequests === undefined
             ? []
-            : [{ label: "Pull requests", value: formatCount(pullRequests) }]),
+            : [{ label: "Pull requests", value: floor(formatCount(pullRequests)) }]),
           ...(topRepo ? [{ label: "Top repository", value: topRepo }] : []),
         ]}
       />
@@ -124,3 +145,11 @@ export const digestCodingAgentWeekTemplate = defineTemplate({
     },
   },
 });
+
+/** Rendered by the digest module, which owns the envelope and its one-click unsubscribe. */
+export const renderDigestCodingAgentWeekEmail = async (
+  props: DigestCodingAgentWeekProps,
+): Promise<{ subject: string; html: string }> => {
+  const { subject, html } = await renderMailTemplate(digestCodingAgentWeekTemplate, props);
+  return { subject, html };
+};

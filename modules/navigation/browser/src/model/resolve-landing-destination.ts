@@ -1,6 +1,6 @@
 import { CODING_AGENTS_PATH } from "@langwatch/user-contract";
 
-import { type ProductId, productById } from "./products.ts";
+import { type ProductId, productById, productHomeHref } from "./products.ts";
 
 export interface LandingDestinationInput {
   /**
@@ -19,6 +19,8 @@ export interface LandingDestinationInput {
   serverHomeDestination: string | null;
   /** Last non-personal project slug known on this device, if any. */
   projectSlug: string | null;
+  /** Dashboards then lands on the organization's library, as the rail opens it. */
+  hasOrganizationLibrary?: boolean;
 }
 
 /** Landing destination ("/") in order: pin, remembered product, server resolver, safety nets */
@@ -28,11 +30,13 @@ export function resolveLandingDestination({
   reachableProducts,
   serverHomeDestination,
   projectSlug,
+  hasOrganizationLibrary = false,
 }: LandingDestinationInput): string | null {
   if (pinnedPath) return pinnedPath;
 
   if (rememberedProduct && reachableProducts.includes(rememberedProduct)) {
-    const home = productById(rememberedProduct).homeHref({ projectSlug });
+    const product = productById(rememberedProduct);
+    const home = productHomeHref({ product, projectSlug, hasOrganizationLibrary });
     if (home) return home;
   }
 

@@ -199,6 +199,49 @@ describe("a peer fold projection", () => {
     await eventSourcing.close();
   });
 
+  /** @scenario "A fold's enqueue filter declines an event before staging" */
+  it("never stages an owner event its enqueue filter declines, judged on the parsed data", async () => {
+    const { store, rows } = memoryFoldStore();
+    const eventSourcing = runtime();
+    const owner = eventSourcing.register(ownerPipeline());
+    eventSourcing.register(
+      definePipeline({ name: "host", aggregate: defineAggregate({ type: "global" }) })
+        .withEvents([])
+        .withPeerFoldProjection({
+          events: peerSpan,
+          fold: {
+            name: "costTotals",
+            version: "2026-10-07",
+            eventTypes: [SPAN_RECEIVED],
+            init: () => ({ costs: [], LastEventOccurredAt: 0 }),
+            // Deliberately ungated, so a declined event that reached apply would show.
+            apply: (state, event: PeerEvent<typeof peerSpan>) => ({
+              costs: [...state.costs, event.data.cost],
+              LastEventOccurredAt: Math.max(state.LastEventOccurredAt, event.occurredAt),
+            }),
+            store,
+            LastEventOccurredAtKey: "LastEventOccurredAt",
+            options: {
+              enqueue: { filter: (event: PeerEvent<typeof peerSpan>) => event.data.cost > 0 },
+            },
+          },
+        })
+        .build(),
+    );
+
+    await owner.service.storeEvents(
+      [
+        span({ id: "e1", aggregateId: "trace-a", cost: 0, occurredAt: 10 }),
+        span({ id: "e2", aggregateId: "trace-a", cost: 3, occurredAt: 11 }),
+      ],
+      { tenantId },
+    );
+
+    await vi.waitFor(() => expect(rows.get("trace-a")?.state.costs).toEqual([3]));
+    expect(rows.get("trace-a")?.applied).toEqual(["e2"]);
+    await eventSourcing.close();
+  });
+
   /** @scenario "A peer fold's subscriber reacts to its committed state" */
   it("hands its subscriber the event and the state with that event folded in", async () => {
     const { store } = memoryFoldStore();

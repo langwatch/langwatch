@@ -6,7 +6,7 @@ Feature: What the Instant Evals judge costs us, and what the customer is charged
 
   Two rules, chosen by whether a judgement carries a cost.
   Unrouted (ADR-174 decision 13, moved here from Instant Evals unchanged): input tokens at the
-  classifier's published rate and markup, under the model langwatch-evals-preview.
+  classifier's published rate and markup, under the model langwatch-instant-preview.
   Routed (ADR-190): the summed cost of every call the route made, input and output tokens at
   deploy-time per-backend prices, at the same markup, under the model langwatch-judge. A judgement
   that carries a cost, including 0, is a routed one, and it names the input tokens that cost covers.
@@ -23,7 +23,7 @@ Feature: What the Instant Evals judge costs us, and what the customer is charged
   Scenario: An unrouted spend row names the product, never a backend
     Given an unrouted run's priced spend
     When its spend row is built
-    Then its model is langwatch-evals-preview
+    Then its model is langwatch-instant-preview
     And it names no route table backend id
 
   @unit

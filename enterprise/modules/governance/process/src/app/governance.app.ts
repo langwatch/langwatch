@@ -35,6 +35,13 @@ import { AuthzApi } from "@langwatch/authz-contract";
 import { DataRetentionApi } from "@langwatch/data-retention-contract";
 import { EnterpriseGatewayApi } from "@langwatch/enterprise-gateway-contract";
 import {
+  type SecurityLakeConnectionTest,
+  type SecurityLakeConnectionTestInput,
+  type SecurityLakeSource,
+  type SecurityLakeSourceCreateInput,
+  type SecurityLakeCallers,
+  type SecurityLakeSourceHealth,
+  type SecurityLakeSourceUpdateInput,
   type CliBootstrapResult,
   type Department,
   type DepartmentAssignments,
@@ -301,6 +308,10 @@ import {
   ActivityMonitorService,
   type ActivityMonitorTraces,
 } from "../features/ingestion-source/services/ingestion-source-activity.service.ts";
+import {
+  IngestionSourceFactsService,
+  type IngestionSourceFactSenders,
+} from "../features/ingestion-source/services/ingestion-source-facts.service.ts";
 import { IngestionSourceReadService } from "../features/ingestion-source/services/ingestion-source-read.service.ts";
 import {
   IngestionSecretConfiguration,
@@ -335,6 +346,10 @@ import type { OcsfPushIntent } from "../features/ocsf/eventing/ocsf-push-deliver
 import { OcsfSiemExportService } from "../features/ocsf/services/ocsf-siem-export.service.ts";
 import { OcsfSiemIngestService } from "../features/ocsf/services/ocsf-siem-ingest.service.ts";
 import { OcsfSiemPushService } from "../features/ocsf/services/ocsf-siem-push.service.ts";
+import { SecurityLakeCallersService } from "../features/ocsf/services/security-lake-callers.service.ts";
+import { SecurityLakePullerService } from "../features/ocsf/services/security-lake-puller.service.ts";
+import { SecurityLakeReaderService } from "../features/ocsf/services/security-lake-reader.service.ts";
+import { SecurityLakeSourceService } from "../features/ocsf/services/security-lake-source.service.ts";
 import { PersonaHomeService } from "../features/personal/services/persona-home.service.ts";
 import { PersonalIngestionKeyService } from "../features/personal/services/personal-ingestion-key.service.ts";
 import { PersonalUsageDashboardService } from "../features/personal/services/personal-usage-dashboard.service.ts";
@@ -353,6 +368,7 @@ import {
 import type { GovernanceRepositories } from "../repositories/governance.repositories.ts";
 import { governanceOperatorReads } from "../repositories/prisma/prisma.suppression-snapshot.repository.ts";
 import { anomalyRuleConfigComplaint } from "../rules/anomaly-rule-config-error.rules.ts";
+import { readsAwsAsDeployment } from "../rules/deployment-aws-identity.rules.ts";
 import { exemptOriginsOf, vendorBasesOf, type VendorBases } from "../rules/vendor-bases.rules.ts";
 import { DefaultGovernanceAdminWorkspaceViewAuditService } from "../services/admin-workspace-view-audit.service.ts";
 import { AggregateReconcilerService } from "../services/aggregate-reconciler.service.ts";
@@ -507,6 +523,7 @@ interface GovernanceAppDependencies {
       | "findMemberTeamIds"
       | "assignTeamDepartment"
       | "findPrimaryIntent"
+      | "findMemberById"
       | "getTeam"
       | "getTeamWithMembers"
       | "getMember"
@@ -638,7 +655,10 @@ export class GovernanceModule implements GovernanceRestApi {
         allowedHosts: config?.allowedProxyHosts ?? [],
       },
       vendorBases: vendorBasesOf({ config }),
+      // A self-hosted operator's own AWS identity (an instance or pod role) reads a keyless S3 source.
+      deploymentAwsIdentity: readsAwsAsDeployment({ config }),
       bedrockAgentEndpoint: config?.bedrockAgentEndpoint,
+      isSaas: config?.isSaas ?? false,
     });
   }
 
@@ -653,7 +673,9 @@ export class GovernanceModule implements GovernanceRestApi {
     ingestRateLimitDisabled,
     pullEgress,
     vendorBases,
+    deploymentAwsIdentity,
     bedrockAgentEndpoint,
+    isSaas,
   }: {
     ottl: GovernanceOttlGateway;
     ingestionSecrets: IngestionSecretService;
@@ -665,10 +687,14 @@ export class GovernanceModule implements GovernanceRestApi {
     ingestRateLimitDisabled: boolean;
     pullEgress: GovernanceEgressPolicy;
     vendorBases: VendorBases;
+    deploymentAwsIdentity: boolean;
     bedrockAgentEndpoint: string | undefined;
+    isSaas: boolean;
   }) {
+    this.deploymentAwsIdentity = deploymentAwsIdentity;
     this.dependencies = dependencies;
     this.vendorBases = vendorBases;
+    this.pullEgress = pullEgress;
     this.repositories = repositories;
     const tenantHistory = GovernanceTenantHistoryService.create({
       projects: dependencies.projects,
@@ -876,6 +902,7 @@ export class GovernanceModule implements GovernanceRestApi {
       users: dependencies.users,
       featureFlags: dependencies.featureFlags,
       organizations: dependencies.organizations,
+      isSaas,
     });
     this.workspaceViews = DefaultGovernanceAdminWorkspaceViewAuditService.create({
       auditLog: dependencies.auditLog,
@@ -953,11 +980,25 @@ export class GovernanceModule implements GovernanceRestApi {
       providerAccounts: HttpProviderAccountChannel.create({ vendorBases }),
       diagnostics: { warn: (message, context) => logger.warn(context, message) },
       ottl,
+      facts: this.ingestionSourceFacts,
+      deploymentAwsIdentity,
     });
     this.ottl = ottl;
     this.sourceReads = IngestionSourceReadService.create({
       sources: this.ingestionSources,
       pullRuns: repositories.ingestionPullRuns,
+      projects: dependencies.projects,
+    });
+    this.securityLakeCallers = SecurityLakeCallersService.create({
+      events: repositories.ocsfEvents,
+      traces: dependencies.traces,
+      projects: dependencies.projects,
+    });
+    this.securityLakeSources = SecurityLakeSourceService.create({
+      sources: this.ingestionSources,
+      pullRuns: this.sourceReads,
+      queue: governanceListingChannels.live.securityLakeQueue.create({ egress: pullEgress }),
+      events: repositories.ocsfEvents,
       projects: dependencies.projects,
     });
     // The source store opens stored credentials under CREDENTIALS_SECRET, the key main sealed them with.
@@ -1178,7 +1219,13 @@ export class GovernanceModule implements GovernanceRestApi {
   private readonly workspaceViews: DefaultGovernanceAdminWorkspaceViewAuditService;
   private readonly pullLifecycle: IngestionPullLifecycleService;
   private readonly ingestionSources: IngestionSourceService;
+  /** The created and went-live facts nurturing reacts to; senders arrive at registration. */
+  private readonly ingestionSourceFacts = IngestionSourceFactsService.create({
+    reportError: (error) => logger.warn({ error }, "ingestion source fact not recorded"),
+  });
   private readonly sourceReads: IngestionSourceReadService;
+  private readonly securityLakeCallers: SecurityLakeCallersService;
+  private readonly securityLakeSources: SecurityLakeSourceService;
   private readonly personaHome: PersonaHomeService;
   private readonly ottl: GovernanceOttlGateway;
   private readonly ocsfExport: DefaultGovernanceOcsfExportService;
@@ -1192,6 +1239,8 @@ export class GovernanceModule implements GovernanceRestApi {
   private readonly repositories: GovernanceRepositories;
   private readonly http: GovernanceHttpClient;
   private readonly vendorBases: VendorBases;
+  private readonly pullEgress: GovernanceEgressPolicy;
+  private readonly deploymentAwsIdentity: boolean;
   private ingestionPullCommands: EventingSenders | undefined;
   private pulledUsageCommands: EventingSenders | undefined;
   private codingAssistantBillingCommands: EventingSenders | undefined;
@@ -1449,6 +1498,10 @@ export class GovernanceModule implements GovernanceRestApi {
     this.pulledUsageCommands = commands;
   }
 
+  connectIngestionSourceFacts(senders: IngestionSourceFactSenders): void {
+    this.ingestionSourceFacts.connect(senders);
+  }
+
   connectCodingAssistantBilling(commands: EventingSenders): void {
     this.codingAssistantBillingCommands = commands;
   }
@@ -1482,13 +1535,22 @@ export class GovernanceModule implements GovernanceRestApi {
   private ingestionPullProcess(): IngestionPullProcess {
     const { repositories, http, dependencies } = this;
     const diagnostics = IngestionPullLogService.create();
-    const objects = governanceListingChannels.live.objectStore.create();
+    const objects = governanceListingChannels.live.objectStore.create({ egress: this.pullEgress });
     const pullers = PullerRegistryService.create();
     pullers.register(HttpPollingPullerAdapter.create({ http, diagnostics }));
-    pullers.register(S3PollingPullerService.create({ objects, diagnostics }));
+    const { deploymentAwsIdentity } = this;
+    pullers.register(
+      S3PollingPullerService.create({ objects, diagnostics, deploymentAwsIdentity }),
+    );
     pullers.register(HttpCopilotStudioChannel.create({ http, vendorBases: this.vendorBases }));
     pullers.register(HttpCopilotStudioDataverseChannel.create(http, this.vendorBases));
-    pullers.register(OpenAiComplianceReferencePullerService.create({ objects, diagnostics }));
+    pullers.register(
+      OpenAiComplianceReferencePullerService.create({
+        objects,
+        diagnostics,
+        deploymentAwsIdentity,
+      }),
+    );
     pullers.register(OpenAiAdminPullerService.create(http, this.vendorBases));
     pullers.register(
       ClaudeComplianceReferencePullerAdapter.create({
@@ -1499,6 +1561,18 @@ export class GovernanceModule implements GovernanceRestApi {
     );
     pullers.register(AnthropicAdminPullerService.create(http, this.vendorBases));
     pullers.register(DatabricksGeniePullerService.create(http));
+    pullers.register(
+      SecurityLakePullerService.create({
+        reader: SecurityLakeReaderService.create({
+          queue: governanceListingChannels.live.securityLakeQueue.create({
+            egress: this.pullEgress,
+          }),
+          objects,
+          events: repositories.ocsfEvents,
+        }),
+        projects: { ensureInternal: (input) => this.tenantHistory.ensureInternal(input) },
+      }),
+    );
     const worker = IngestionPullWorkerService.create({
       sources: repositories.ingestionSources,
       registry: pullers,
@@ -1794,6 +1868,7 @@ export class GovernanceModule implements GovernanceRestApi {
   async ingestionSourceCreate(
     input: IngestionSourceCreateInput & { actorUserId: string },
   ): Promise<{ source: IngestionSourceDto; ingestSecret: string | null }> {
+    await this.ingestionSources.assertGenericallyManaged(input);
     const created = await this.ingestionSources.createSource(input);
     return {
       source: await this.sourceReads.present(created.source),
@@ -1802,7 +1877,46 @@ export class GovernanceModule implements GovernanceRestApi {
   }
 
   async ingestionSourceUpdate(input: IngestionSourceUpdateInput): Promise<IngestionSourceDto> {
+    await this.ingestionSources.assertGenericallyManaged(input);
     return this.sourceReads.present(await this.ingestionSources.updateSource(input));
+  }
+
+  securityLakeSourceCreate(
+    input: SecurityLakeSourceCreateInput & { organizationId: string; actorUserId: string | null },
+  ): Promise<SecurityLakeSource> {
+    return this.securityLakeSources.create(input);
+  }
+
+  securityLakeSourceUpdate(
+    input: SecurityLakeSourceUpdateInput & { id: string; organizationId: string },
+  ): Promise<SecurityLakeSource> {
+    return this.securityLakeSources.update(input);
+  }
+
+  securityLakeSourceGet(input: {
+    id: string;
+    organizationId: string;
+  }): Promise<SecurityLakeSource> {
+    return this.securityLakeSources.get(input);
+  }
+
+  securityLakeSourceTest(
+    input: SecurityLakeConnectionTestInput & { id: string; organizationId: string },
+  ): Promise<SecurityLakeConnectionTest> {
+    return this.securityLakeSources.testConnection(input);
+  }
+
+  securityLakeSourceHealth(input: {
+    id: string;
+    organizationId: string;
+  }): Promise<SecurityLakeSourceHealth> {
+    return this.securityLakeSources.health(input);
+  }
+
+  securityLakeCallersWithoutTraces(input: {
+    organizationId: string;
+  }): Promise<SecurityLakeCallers> {
+    return this.securityLakeCallers.withoutTraces(input);
   }
 
   async ingestionSourceRotateSecret(input: {

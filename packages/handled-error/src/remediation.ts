@@ -33,6 +33,19 @@ const registry = {
       "A key that reads exactly one project, such as a project API key, needs none: it defaults to that project",
     ],
   },
+  billing_only_keeps_billing: {
+    tips: [
+      "To stop a Billing-only member paying, remove them from the organization",
+      "To keep them in the organization without Billing, change their organization role to a seat role first, then turn Billing off",
+    ],
+  },
+  billing_only_no_team_access: {
+    tips: [
+      "Send the Billing-only invite with no `teams` and no `teamIds`",
+      "For someone not yet in the organization who needs a team, invite them with a seat role instead, which uses a seat",
+      "For a current Billing-only member, change their organization role to a seat role first, then add them to the team",
+    ],
+  },
   projects_unreadable: {
     tips: [
       "Ask an admin to grant the key's owner `analytics:view` on a project, or use a key that has it",
@@ -946,6 +959,15 @@ const registry = {
       "Open Settings, then Default Models, and set a model for the role in meta.role",
       "Set it at the organization scope so every team and project inherits it; a project scope covers that project only",
       "Enabling a provider is not enough on its own: the role still needs a model chosen for it",
+    ],
+    docsPath: "/platform/model-providers",
+  },
+
+  ai_content_filtered: {
+    tips: [
+      "The provider's own content filter refused the input; on Azure OpenAI the answer is 400 content_filter, often a jailbreak (Prompt Shields) match on instruction-like text",
+      "Relax or adjust the content filter on the deployment the feature's model points at, or try other text",
+      "Retrying the same text fails the same way",
     ],
     docsPath: "/platform/model-providers",
   },

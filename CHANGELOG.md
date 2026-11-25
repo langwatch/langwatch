@@ -1,5 +1,50 @@
 # Changelog
 
+## [3.28.0](https://github.com/langwatch/langwatch/compare/langwatch@v3.27.0...langwatch@v3.28.0) (2026-11-23)
+
+
+### Features
+
+* **aigateway:** a2a proxy with per-target policy, scanning and tracing ([#9643](https://github.com/langwatch/langwatch/issues/9643)) ([9802015](https://github.com/langwatch/langwatch/commit/9802015b69cb229c3be97180cddf53cc246aed8f))
+* **governance:** ingest OCSF AI events from AWS Security Lake ([#9638](https://github.com/langwatch/langwatch/issues/9638)) ([0db90c2](https://github.com/langwatch/langwatch/commit/0db90c242a639ef1adaf89148e816950a430a5c8))
+
+
+### Bug Fixes
+
+* **analytics:** filter content keys from LWQL map columns with one regex, not a lambda per prefix ([#9809](https://github.com/langwatch/langwatch/issues/9809)) ([6e53832](https://github.com/langwatch/langwatch/commit/6e53832e9633de80a17888e85345ff224fe18077))
+* **auth:** prune dead link-error spellings and pin the library's codes ([#9753](https://github.com/langwatch/langwatch/issues/9753)) ([f11fcc0](https://github.com/langwatch/langwatch/commit/f11fcc0db4c68d43561a51d017e192e10ff985c6))
+* **langy:** never show sign-in steps for Langy's own key and refuse a blank sandbox key ([#9495](https://github.com/langwatch/langwatch/issues/9495)) ([71c0cca](https://github.com/langwatch/langwatch/commit/71c0cca7a155c46140eed3b5917918e6eaab611b))
+* **model-provider:** send the NLP secret on translate calls ([#9799](https://github.com/langwatch/langwatch/issues/9799)) ([a9f3742](https://github.com/langwatch/langwatch/commit/a9f374250041f0ca32728ac612ee4e9c0d496405))
+* **model-provider:** translate trace text that reads like instructions, and name a provider content filter refusal ([#9804](https://github.com/langwatch/langwatch/issues/9804)) ([efacb2e](https://github.com/langwatch/langwatch/commit/efacb2ede2c90343ecfaa8cb8306e388656bbc1c))
+* self-hosted install fixes for plain HTTP, live streams, GitHub-less Langy and missing models ([#9818](https://github.com/langwatch/langwatch/issues/9818)) ([392b56a](https://github.com/langwatch/langwatch/commit/392b56a0b52dedcc0021bcce876b2e69916a91de))
+* **trace:** negate the whole group under a NOT in trace search ([#9807](https://github.com/langwatch/langwatch/issues/9807)) ([711539f](https://github.com/langwatch/langwatch/commit/711539f587b3ba19606ffbe0425710842c181603))
+
+## [3.27.0](https://github.com/langwatch/langwatch/compare/langwatch@v3.26.0...langwatch@v3.27.0) (2026-11-23)
+
+
+### Features
+
+* **auth:** the device flow approval page names Laze when Laze connects a project ([#9500](https://github.com/langwatch/langwatch/issues/9500)) ([e832bdc](https://github.com/langwatch/langwatch/commit/e832bdc5833b630ce378da08ceb232ebae50d88e))
+* **ci:** a release publishes the PII redaction model image to Docker Hub, signed ([#9672](https://github.com/langwatch/langwatch/issues/9672)) ([ccbd6d6](https://github.com/langwatch/langwatch/commit/ccbd6d68bbd281c32da3cd70f3303fa7b079168d))
+* **data-retention:** record each retention change and apply, and flag stored rows on another period ([#9785](https://github.com/langwatch/langwatch/issues/9785)) ([2747898](https://github.com/langwatch/langwatch/commit/274789821717a4cefa45cb18f4e7e91c637b66e7))
+
+
+### Bug Fixes
+
+* **cli:** device login codes live 15 minutes and a rerun waits on the same code ([#9786](https://github.com/langwatch/langwatch/issues/9786)) ([4dfb94d](https://github.com/langwatch/langwatch/commit/4dfb94d0e291edeab511fc35b1794233dce682fa))
+* follow-ups to the PII redaction model release review ([#9795](https://github.com/langwatch/langwatch/issues/9795)) ([b2774dd](https://github.com/langwatch/langwatch/commit/b2774dd4d7df433ff607700243f29207bfb3f1f7))
+* **helm:** add the PII redaction model to the chart, off until its public image ships ([#9633](https://github.com/langwatch/langwatch/issues/9633)) ([23c8e19](https://github.com/langwatch/langwatch/commit/23c8e195bf68809b6ab0f1ae6fa7834169e27459))
+* **helm:** define the PII redaction model image once in the chart values ([#9800](https://github.com/langwatch/langwatch/issues/9800)) ([132ea71](https://github.com/langwatch/langwatch/commit/132ea7189fb70778c8a04bc7630a28aeebe8ff6d))
+* **langy:** clearer empty trace searches, retryable causeless agent errors and literal local_grep fallback ([#9780](https://github.com/langwatch/langwatch/issues/9780)) ([69386bb](https://github.com/langwatch/langwatch/commit/69386bbe934d19a134f5c9c64a3978e2e78c8110))
+* **security:** raise JS floors for high alerts (undici, toml, effect, msal-node and more) ([#9784](https://github.com/langwatch/langwatch/issues/9784)) ([914b46c](https://github.com/langwatch/langwatch/commit/914b46c21fd712caa32d0aaba24e5b11595ed59c))
+* **security:** raise uv floors for nltk, pyasn1, pypdf, filelock, dnspython and joserfc ([#9783](https://github.com/langwatch/langwatch/issues/9783)) ([0e3f51f](https://github.com/langwatch/langwatch/commit/0e3f51f4c40b0f3ac3dc6d2376bf6e91912c8baf))
+* **trace:** keep a NOT eval chip honest about rows it never judged ([#9757](https://github.com/langwatch/langwatch/issues/9757)) ([9639067](https://github.com/langwatch/langwatch/commit/963906747ae6a6af722993b77734d1fabd7d65cf))
+
+
+### Code Refactoring
+
+* **data-privacy:** name the model-routing level and usage count for what they hold ([#9584](https://github.com/langwatch/langwatch/issues/9584)) ([88574a2](https://github.com/langwatch/langwatch/commit/88574a26ecca6b10be61a7873a7f5867f30854e5))
+
 ## [3.26.0](https://github.com/langwatch/langwatch/compare/langwatch@v3.25.0...langwatch@v3.26.0) (2026-11-22)
 
 

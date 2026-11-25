@@ -26,6 +26,8 @@ const personaResolverInputSchemaDefinition = z
     isEnterprise: z.boolean(),
     hasGovernanceUi: z.boolean(),
     firstProjectSlug: z.string().nullable(),
+    /** The plan page for a Billing-only member (ADR-205); null for everyone else. */
+    planHome: z.enum(["/settings/subscription", "/settings/license"]).nullable(),
   })
   .strict();
 export interface PersonaResolverInputSchema extends Named<
@@ -62,6 +64,19 @@ export class PersonaHomeResolverService {
 
   resolve(input: PersonaResolverInput): PersonaResolution {
     const persona = this.detectPersona(input);
+
+    // A Billing-only member reaches nothing else (ADR-205): the plan page beats every other rule,
+    // and the browser's remembered product, which is why it answers as an override.
+    if (input.planHome) {
+      return {
+        persona,
+        destination: input.planHome,
+        isOverride: true,
+        governanceUiEnabled: input.hasGovernanceUi,
+        intentPinned: false,
+        firstProjectSlug: input.firstProjectSlug,
+      };
+    }
 
     if (input.organizationIntent) {
       const projectHome = input.firstProjectSlug ? `/${input.firstProjectSlug}` : "/settings";
@@ -117,6 +132,7 @@ export class PersonaHomeResolverService {
         isEnterprise: input.isEnterprise ?? false,
         hasGovernanceUi: input.hasGovernanceUi ?? false,
         firstProjectSlug: input.firstProjectSlug,
+        planHome: input.planHome ?? null,
       });
     } catch {
       return {

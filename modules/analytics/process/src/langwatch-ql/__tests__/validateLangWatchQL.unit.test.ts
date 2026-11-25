@@ -343,6 +343,24 @@ describe("validateLangWatchQL given a read of evaluation_metrics' floored twin",
       ),
     ).toEqual([]);
   });
+
+  /** @scenario "A caller cannot read a trace-ids twin directly" */
+  it.each<[string, string, LangWatchQLViolationCode]>([
+    ["by name", "SELECT 1 FROM traces__ids LIMIT 1", "TABLE_NOT_ALLOWED"],
+    ["database-qualified", "SELECT 1 FROM analytics.traces__ids LIMIT 1", "TABLE_NOT_ALLOWED"],
+    [
+      "inside a subquery",
+      "SELECT 1 FROM traces WHERE TraceId IN (SELECT TraceId FROM trace_metrics__ids) LIMIT 1",
+      "TABLE_NOT_ALLOWED",
+    ],
+    [
+      "as a table function",
+      "SELECT 1 FROM traces__ids(lwql_trace_ids = ['t1']) LIMIT 1",
+      "TABLE_FUNCTION",
+    ],
+  ])("refuses a trace-ids twin %s", (_case, sql, code) => {
+    expect(codesOf(validateLangWatchQL({ sql, ...twinPolicy }))).toContain(code);
+  });
 });
 
 describe("validateLangWatchQL given a table function", () => {

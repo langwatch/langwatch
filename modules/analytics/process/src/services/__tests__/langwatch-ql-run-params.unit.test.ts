@@ -143,7 +143,7 @@ describe("given a statement that does not read the sources parameter", () => {
     expect(result.params).not.toHaveProperty("dashboard_context_sources");
     expect(result.diagnostics).toContainEqual({
       code: "SOURCES_IGNORED",
-      message: "This query doesn't read {dashboard_context_sources}, so it counts every origin.",
+      message: "This query doesn't read the sources you picked, so they change nothing it counts.",
     });
   });
 

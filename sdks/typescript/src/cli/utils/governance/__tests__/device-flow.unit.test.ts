@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from "vitest";
+import { afterEach, describe, it, expect, vi } from "vitest";
 
 import {
   startDeviceCode,
@@ -423,5 +423,41 @@ describe("logout", () => {
     await expect(logout({ baseUrl: "http://x", fetchImpl }, "rt")).rejects.toBeInstanceOf(
       DeviceFlowError,
     );
+  });
+});
+
+describe("the wait for an approval", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  /** @scenario The CLI waits as long as the server says the code lives */
+  it("keeps polling for the whole lifetime the server answered, then reports it expired", async () => {
+    let clock = 1_800_000_000_000;
+    vi.spyOn(Date, "now").mockImplementation(() => clock);
+    const polledAt: number[] = [];
+    const started = clock;
+    const fetchImpl = vi.fn().mockImplementation((url: string) => {
+      if (String(url).includes("/device-approval")) return Promise.resolve(emptyResponse(404));
+      polledAt.push((clock - started) / 1000);
+      clock += 100_000;
+      return Promise.resolve(emptyResponse(428));
+    });
+
+    await expect(
+      pollUntilDone(
+        { baseUrl: "http://x", fetchImpl },
+        {
+          device_code: "DC",
+          user_code: "u",
+          verification_uri: "http://x/cli/auth",
+          expires_in: 900,
+          interval: 0.01,
+        },
+      ),
+    ).rejects.toMatchObject({ kind: "expired" });
+
+    expect(polledAt[0]).toBe(0);
+    expect(polledAt.at(-1)).toBe(900);
   });
 });

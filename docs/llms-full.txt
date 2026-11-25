@@ -873,6 +873,19 @@ PII redaction masks personal data in stored content and replaces each value with
 
 Card numbers and Brazilian CPF are checksum-validated before redaction. Attribute values over 250,000 characters are skipped. When the deep detection service cannot be reached, LangWatch applies the Essential level and marks the span with `langwatch.privacy.pii_incomplete`.
 
+### Strict with the LangWatch PII Redaction Model
+
+On LangWatch Cloud, an organization that has the model turned on sees an **Essential** or **Strict** picker on the page. Strict then runs the LangWatch PII Redaction Model, which finds names, places and other personal data that rule-based detection misses.
+
+- **Price:** $0.50 per 1M characters, excluding VAT, pay as you go. A span of 1,000 characters costs $0.0005.
+- **What is billed:** each span, log record or metric point the model answers, by the characters it was sent, even when it finds no personal data. Essential detection runs first, so a phone number is already masked and counted as its marker. A metric's attributes are sent again with every export, and each export is billed.
+- **No free amount and no minimum:** billing starts at the first character of the month, and a short span costs only its characters: 50 characters cost $0.000025.
+- **Fallbacks are free:** a span with over 8,000 characters left after Essential detection, or one sent while the model is unavailable, goes to the rule-based detector (Presidio) and can then go to Google Cloud DLP. It is not charged. Long spans are not split across model calls yet.
+- **How it is billed:** monthly, as its own line on a Growth plan paid in US dollars. Each answered record is one `pii_redaction` row on the [billing events](/ai-gateway/billing-events) ledger. A [gateway budget](/ai-gateway/budgets) does not cap it, so a spent budget never turns redaction off.
+- **Choosing it:** the page asks you to confirm the price before it turns Strict on. Cancel and the organization keeps its current level; Essential never calls the model and is never charged. An organization that has Strict included sees it as "Included for your organization", with no price.
+
+On a self-hosted deployment the model is part of the Enterprise license and is not priced; see [PII redaction model](/self-hosting/configuration/sizing-and-scaling#pii-redaction-model).
+
 **Exceptions** are regular expressions that must not be redacted, for example an internal id format like `00[0-9]{12}`. A rule holds up to 50. LangWatch refuses a pattern that would also match ordinary data such as a card number, an email or a phone number.
 
 ## Secrets redaction
@@ -1227,7 +1240,7 @@ The **Default Models** section on the same page sets the model each feature uses
 
 Click **Add config**, pick the scopes and the models. A project config beats a team config, which beats an organization config. A feature that no config names inherits from the wider scope.
 
-The **Instant Evals** column takes only decision models: LangWatch Evals Preview, the default, or one on your own key. See [Run Instant Evals on your own decision model](/features/instant-evals/own-model).
+The **Instant Evals** column takes only decision models: LangWatch Instant (preview), the default, or one on your own key. See [Run Instant Evals on your own decision model](/features/instant-evals/own-model).
 
 <Frame>
 <img src="/images/platform/model-providers-default-models.png" alt="The Default Models section with one config and the Add config button" />
@@ -1329,6 +1342,7 @@ A team role applies to one team and, through inheritance, to every project in it
 | `routingPolicies`   | view   | view                         | manage                      |
 | `gatewayGuardrails` | view   | view                         | manage                      |
 | `gatewayCacheRules` | view   | view                         | manage                      |
+| `gatewayA2aTargets` | view   | view                         | manage                      |
 | `gatewayUsage`      | view   | view                         | view                        |
 | `gatewayLogs`       | view   | view                         | view                        |
 
@@ -1398,6 +1412,7 @@ Each table lists the actions a resource accepts. Resources marked **organization
 | `routingPolicies`   | view, manage                                                    | any               |
 | `gatewayGuardrails` | view, attach, detach, manage                                    | any               |
 | `gatewayCacheRules` | view, create, update, delete, manage                            | any               |
+| `gatewayA2aTargets` | view, manage                                                    | any               |
 | `gatewayUsage`      | view                                                            | any               |
 | `gatewayLogs`       | view                                                            | any               |
 | `gatewaySpend`      | view, manage                                                    | organization only |
@@ -2506,6 +2521,106 @@ that are already past it.
 
 ---
 
+# FILE: ./ai-gateway/a2a-proxy.mdx
+
+---
+title: A2A proxy
+description: Register an agent-to-agent (A2A) target and call it through the gateway at /a2a/<name> with a virtual key.
+sidebarTitle: A2A proxy
+---
+
+The gateway proxies [A2A v1.0](https://a2a-protocol.org/latest/specification/) calls under `/a2a/{target}`. An agent calls another agent through the gateway instead of directly. The gateway checks the caller's virtual key, applies the target's allow list and block switch, scans messages and replies with the key's guardrails, and puts the hop in the caller's trace.
+
+A target is an A2A agent registered for a project. It holds the agent's upstream base URL, its Agent Card URL, the headers the gateway sends upstream, an optional allow list of virtual keys and a block switch.
+
+<Note>
+  There is no settings page for A2A targets yet. Until it ships, register targets with the
+  `gatewayA2aTargets` control plane procedures described below.
+</Note>
+
+## Register a target
+
+Call the procedures from a TypeScript client that already has a session, in the same way as the other gateway procedures. Creating, editing, blocking and archiving need `gatewayA2aTargets:manage`; listing needs `gatewayA2aTargets:view`. Managing virtual keys does not reach targets. See [RBAC](/ai-gateway/rbac).
+
+```ts
+await trpc.gatewayA2aTargets.create.mutate({
+  organizationId: "org_123",
+  projectId: "project_456", // null for a target shared by the organization
+  name: "billing", // the path segment: /a2a/billing
+  agentName: "Billing agent",
+  cardUrl: "https://billing.acme.com/.well-known/agent-card.json",
+  upstreamUrl: "https://billing.acme.com/a2a",
+  upstreamHeaders: { Authorization: "Bearer <token for the upstream>" },
+  allowedVirtualKeyIds: null, // or a list of virtual key ids
+});
+```
+
+| Field                  | Rules                                                                                                                                                   |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `name`                 | Lowercase letters, digits and hyphens, up to 63 characters, starting with a letter or digit. Unique within the project or organization.                  |
+| `agentName`            | A display name, 1 to 128 characters.                                                                                                                    |
+| `cardUrl`, `upstreamUrl` | `http` or `https` URLs. They cannot hold a user name or password: put credentials in `upstreamHeaders`.                                               |
+| `upstreamHeaders`      | At most 20 headers, values up to 4096 characters. The gateway sets `Content-Type`, `Content-Length`, `A2A-Version`, `Host`, `traceparent` and `tracestate` itself, so a target cannot set them. Values are stored sealed and never shown again: reads return header names only. |
+| `allowedVirtualKeyIds` | `null` admits every virtual key that reaches the target's scope. A list admits only the keys it names.                                                  |
+| `blocked`, `blockReason` | Optional. A blocked target refuses every caller.                                                                                                       |
+
+The other procedures are:
+
+| Procedure                                                      | Use                                                                                  |
+| -------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| `list`, `listForProject`                                       | List the targets of an organization, or of one project.                              |
+| `update`, `updateForProject`                                   | Change a target. Sending `upstreamHeaders` replaces the whole set.                   |
+| `setBlocked`, `setBlockedForProject`                           | Block or unblock a target, with a reason.                                            |
+| `archive`, `archiveForProject`                                 | Remove a target.                                                                     |
+
+Moving `upstreamUrl` to another scheme, host or port is refused unless the same call sends new `upstreamHeaders` (an empty set is fine), so saved headers never follow the upstream to a new origin. The `...ForProject` procedures check the permission on the project and only see that project's targets. Every write is recorded in the [audit log](/ai-gateway/audit) with header names and no values. A change reaches the gateway within moments.
+
+A virtual key sees the targets of every scope its own scopes reach. A key whose traces land in a project but whose scopes do not reach it does not see that project's targets.
+
+## Call a target
+
+Send the caller's [virtual key](/ai-gateway/virtual-keys#the-key-format-and-how-to-send-it) as `Authorization: Bearer`, as on the LLM routes. The key is never forwarded upstream.
+
+```bash
+curl https://gateway.acme.com/a2a/billing \
+  -H "Authorization: Bearer $LANGWATCH_VIRTUAL_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "jsonrpc": "2.0",
+    "id": 1,
+    "method": "SendMessage",
+    "params": {
+      "message": {
+        "messageId": "m1",
+        "role": "ROLE_USER",
+        "parts": [{ "text": "Which invoices are overdue?" }]
+      }
+    }
+  }'
+```
+
+The gateway forwards the body to the target's `upstreamUrl` and returns the upstream reply. Streamed replies stream through.
+
+The gateway serves both A2A bindings. The HTTP+JSON binding goes to the same prefix, for example `POST /a2a/billing/message:send`, which the gateway forwards to `message:send` under the upstream base URL.
+
+Fetch the Agent Card at `GET /a2a/billing/.well-known/agent-card.json`. The gateway fetches the card from the target's `cardUrl` and points its `url` at `/a2a/billing` on the gateway. It keeps only the interfaces whose URL is the target's `upstreamUrl`, rewritten to the same gateway address, and removes the rest. It drops the card's signatures, which signed the upstream URLs it replaced and would no longer verify.
+
+Other card fields, such as `documentationUrl`, are returned as the upstream sent them and can still name the upstream host.
+
+The gateway builds those URLs only from its public base URL, never from the request's `Host` header. Without it the gateway refuses Agent Card fetches and extended-card calls with `a2a_public_url_unset` (HTTP 503, JSON-RPC `-32024`). Other A2A calls still work.
+
+Set `A2A_PUBLIC_BASE_URL` on the gateway to its public origin, for example `https://gateway.acme.com`. With the Helm chart, set `gateway.publicUrl` in the umbrella chart (`publicUrl` in the gateway chart). It is not derived from `ingress.gateway.host` for the gateway, so set it even when the chart Ingress publishes the gateway.
+
+## What can refuse a call
+
+An unknown name and a key missing from the allow list both answer `a2a_target_not_found`, so a caller cannot tell the two apart. Other refusals include a blocked target, a guardrail block, an exhausted rate limit or budget on the key, and an upstream that did not answer. A JSON-RPC call gets a JSON-RPC error and an HTTP+JSON call gets an HTTP status. See [Errors](/ai-gateway/api/errors) for every reason and code.
+
+## Self-hosting
+
+A self-hosted install must route `/a2a` to the gateway Service as well as `/v1` and `/health`. The chart Ingress does this when you set `ingress.gateway.host` with `ingress.enabled` and `gateway.chartManaged` both true. For your own routes, see [Routing](/self-hosting/deployment/routing).
+
+---
+
 # FILE: ./ai-gateway/api/audio.mdx
 
 ---
@@ -3382,6 +3497,35 @@ When only the status and the message are available, the gateway writes the same 
   still holds an `error` key when the call failed. Read the body rather than the status on those
   responses.
 </Note>
+
+## A2A proxy errors
+
+Calls to `/a2a/{target}` answer in the A2A binding the caller used. A JSON-RPC call gets a JSON-RPC error with `error.code`, `error.message` and `error.data.reason`. An HTTP+JSON call gets the HTTP status and a body with `error.code` (the status), `error.status`, `error.message` and `error.reason`. Branch on the reason.
+
+| Reason                        | JSON-RPC code | HTTP | Cause                                                                              |
+| ----------------------------- | ------------- | ---- | ---------------------------------------------------------------------------------- |
+| `a2a_invalid_request`         | -32600        | 400  | The body or path is not a valid A2A request.                                       |
+| `a2a_operation_not_supported` | -32601        | 404  | The method and path is not an A2A operation.                                       |
+| `a2a_target_blocked`          | -32011        | 403  | An administrator blocked the A2A agent.                                            |
+| `a2a_content_blocked`         | -32012        | 403  | A guardrail blocked the message or the reply.                                      |
+| `a2a_target_not_found`        | -32013        | 404  | No such A2A agent in the project, or the key is not on its allow list.             |
+| `a2a_scan_unavailable`        | -32014        | 503  | The guardrail scan could not complete and the key fails closed.                    |
+| `a2a_upstream_unreachable`    | -32015        | 502  | The A2A agent did not answer, redirected, or its stream broke off.                 |
+| `a2a_unauthenticated`         | -32016        | 401  | The request carried no virtual key.                                                |
+| `a2a_registry_unavailable`    | -32017        | 503  | The gateway could not read the key's A2A agents.                                   |
+| `a2a_content_unscannable`     | -32018        | 422  | The request is not JSON the guardrail scan can read. A reply like that gets 502.   |
+| `a2a_payload_too_large`       | -32019        | 413  | The request body is over 1 MiB. A reply or stream event over 1 MiB gets 502.       |
+| `a2a_too_many_requests`       | -32020        | 429  | The key has 8 A2A calls in flight.                                                 |
+| `a2a_rate_limited`            | -32021        | 429  | The key is over its requests-per-minute or requests-per-day limit.                 |
+| `a2a_budget_exceeded`         | -32022        | 402  | A budget on the key is used up.                                                    |
+| `a2a_target_not_https`        | -32023        | 502  | The gateway calls customer endpoints over https only and the agent's URL is http.  |
+| `a2a_public_url_unset`        | -32024        | 503  | The gateway has no `A2A_PUBLIC_BASE_URL`, so it refuses Agent Card calls.          |
+
+The gateway calls an A2A agent under the same egress rule as provider endpoints. With `BLOCK_LOCAL_HTTP_CALLS` on, a private address is refused (`a2a_upstream_unreachable`) unless the host in the agent's URL is in `ALLOWED_PROXY_HOSTS`.
+
+An entry in `ALLOWED_PROXY_HOSTS` matches only the host the URL names, never an address that a name resolves to: to admit an agent whose URL names an IP address, list that IP address; to admit one whose URL names a hostname, list the hostname.
+
+A query parameter the agent's registered URL sets always wins: the gateway drops a caller parameter of the same name.
 
 ## Streaming errors
 
@@ -4931,7 +5075,7 @@ Spend events, spend summaries and the webhook endpoints are an Enterprise capabi
 
 An outcome that arrives after settlement is recorded as `success` or `error`. A `success` event is never downgraded.
 
-An [Instant Eval](/api-reference/instant-evals/running-an-instant-eval) query or run is also one spend event, recorded as `success` with no `admitted` step before it. It carries `request_type: "instant_eval"`, model `langwatch-evals-preview` (or `langwatch-judge` for a routed LLM judge; older events carry `jev`), an empty virtual key and no provider; `usage.input_tokens` is what the judge read, `cost` is the customer price, and `metadata` holds the request count.
+An [Instant Eval](/api-reference/instant-evals/running-an-instant-eval) query or run is also one spend event, recorded as `success` with no `admitted` step before it. It carries `request_type: "instant_eval"`, model `langwatch-instant-preview` (or `langwatch-judge` for a routed LLM judge; older events carry `langwatch-evals-preview` or `jev`), an empty virtual key and no provider; `usage.input_tokens` is what the judge read, `cost` is the customer price, and `metadata` holds the request count.
 
 A run's event id starts with `instanteval_` followed by the run id, so a run finished twice is one event. Budgets debit it like any other spend.
 
@@ -7680,7 +7824,7 @@ The LangWatch AI Gateway is two processes. The gateway service is a Go binary on
 
 | Component | Where it runs | What it does |
 |---|---|---|
-| Gateway service | The `aigateway` Go binary, port `5563` by default | Serves `/v1/chat/completions`, `/v1/messages`, `/v1/responses`, `/v1/embeddings`, `/v1/audio/speech`, `/v1/audio/transcriptions`, `/v1/images/generations`, `/v1/images/edits`, `/v1/models`, and a Gemini passthrough under `/v1beta`. Health on `/healthz`, `/readyz`, `/startupz` and `/health`; Prometheus metrics on `/metrics` of the metrics listener (port `9464`, bearer `METRICS_API_KEY`, opt-in). |
+| Gateway service | The `aigateway` Go binary, port `5563` by default | Serves `/v1/chat/completions`, `/v1/messages`, `/v1/responses`, `/v1/embeddings`, `/v1/audio/speech`, `/v1/audio/transcriptions`, `/v1/images/generations`, `/v1/images/edits`, `/v1/models`, a Gemini passthrough under `/v1beta`, and the agent-to-agent proxy under `/a2a`. Health on `/healthz`, `/readyz`, `/startupz` and `/health`; Prometheus metrics on `/metrics` of the metrics listener (port `9464`, bearer `METRICS_API_KEY`, opt-in). |
 | Request pipeline | Inside the gateway service | Runs each request through interceptors in this order: spend admission, rate limit, policy rules, model resolution, cache rules, budget precheck, guardrails, trace span, then the provider dispatch. |
 | Provider dispatch | Inside the gateway service | Sends the request to the first credential in the routing chain through Bifrost and falls through to the next credential on a provider failure. A per-credential circuit breaker opens after 10 failures in 30 seconds and lets one probe through every 60 seconds. |
 | Auth cache | Inside the gateway service | Caches resolved virtual keys in an in-memory LRU of 10,000 entries. See [Auth cache](#auth-cache). |
@@ -7946,6 +8090,28 @@ An event is identified by `source` and `metadata.uid`: sending it again replaces
 The tRPC query `governance.ocsfExport` still returns the governance events in their stored OCSF 1.1 row shape, for the signed-in UI. Use the REST routes above for a SIEM job.
 
 **Also check:** [Anomaly rules](/ai-governance/anomaly-rules) for how a fired alert reaches you, and [Retention](/ai-gateway/governance/retention) for how long the source traces are kept.
+
+## Read AI events from AWS Security Lake
+
+LangWatch can subscribe to your AWS Security Lake and read the CloudTrail management and data events for Bedrock and SageMaker calls. Add a Security Lake source under Governance, Ingestion sources, with the subscriber role ARN, Region and queue URL that Security Lake gave you when you created the subscriber.
+
+LangWatch generates the source's external id when you add it. You can't choose it. Copy it from the source's edit form, or read it from the API, and set it as the `sts:ExternalId` condition in the subscriber role's trust policy. The trust policy must require it, or any LangWatch customer that knows the role ARN could ask LangWatch to assume your role.
+
+LangWatch reads each Parquet object the queue announces, keeps the model, agent and endpoint calls, and deletes the message only after the events are written. A message that keeps failing is recorded as poison once it passes its receive limit.
+
+### Minimal IAM for the subscriber role
+
+The access keys you store on the source are the base identity. That identity needs `sts:AssumeRole` on the subscriber role, and the role's trust policy must allow it only with the external id LangWatch generated as the `sts:ExternalId` condition. Before each read, LangWatch assumes the subscriber role with that external id and reads the queue and the bucket with the role's temporary credentials.
+
+The subscriber role needs only these permissions:
+
+- `s3:GetObject` on the Security Lake bucket prefix of the selected sources.
+- `sqs:ReceiveMessage`, `sqs:DeleteMessage`, `sqs:ChangeMessageVisibility` and `sqs:GetQueueAttributes` on the subscriber queue. LangWatch extends a message's visibility while it reads the file. The connection test uses `sqs:GetQueueAttributes`.
+- `kms:Decrypt` on the lake key, only when the lake uses a customer managed KMS key.
+
+### Callers without traces
+
+The source page lists the principals that called a model in the last 30 days and sent no traces. A principal counts as traced when a trace in any project of the organisation carries its ARN in the `aws.principal.arn` attribute.
 
 ---
 
@@ -10478,6 +10644,7 @@ The gateway adds its own resources to that model. Provider credentials, the audi
 | `routingPolicies` | Routing policies. | `view`, `manage` |
 | `gatewayGuardrails` | Attaching and detaching guardrails on a key. | `view`, `attach`, `detach`, `manage` |
 | `gatewayCacheRules` | Cache rules, and `/api/gateway/v1/cache-rules*`. | `view`, `create`, `update`, `delete`, `manage` |
+| `gatewayA2aTargets` | The [A2A agents](/ai-gateway/a2a-proxy) the gateway may call, and the upstream headers it sends them. | `view`, `manage` |
 | `gatewayUsage` | The Usage page and `GET /api/gateway/v1/virtual-keys/:id/spend`. | `view` |
 | `gatewaySpend` | Spend events and spend summaries under `/api/gateway/v1/spend-events*`, `/api/gateway/v1/spend-summaries` and `/api/gateway/v1/end-users/:id/spend`. Organization tier only. | `view`, `manage` |
 | `webhookEndpoints` | Webhook endpoints, their secrets and delivery logs. Organization tier only. | `view`, `manage` |
@@ -10507,6 +10674,8 @@ Team roles apply on the teams and projects the binding names. Organization roles
 | `gatewayGuardrails:attach`, `detach`, `manage` | | | yes | |
 | `gatewayCacheRules:view` | yes | yes | yes | |
 | `gatewayCacheRules:create`, `update`, `delete`, `manage` | | | yes | |
+| `gatewayA2aTargets:view` | yes | yes | yes | |
+| `gatewayA2aTargets:manage` | | | yes | |
 | `gatewayUsage:view` | yes | yes | yes | |
 | `auditLog:view` | | | yes | |
 | `gatewaySpend:view`, `manage` | | | | yes |
@@ -11458,14 +11627,22 @@ Time spans are a plain count of seconds on a `_SECONDS` or `_S` variable: `300`,
 
 ## Provider endpoint security
 
-These apply to the base URLs customers configure on their own provider credentials. Cloud metadata addresses, `0.0.0.0`, `::` and link-local ranges are refused in every configuration.
+These apply to the base URLs customers configure on their own provider credentials and to the upstream and Agent Card URLs of A2A targets. Cloud metadata addresses, `0.0.0.0`, `::` and link-local ranges are refused in every configuration.
 
 | Var                              | Default | Purpose                                                                                                                             |
 | -------------------------------- | ------- | ----------------------------------------------------------------------------------------------------------------------------------- |
 | `BLOCK_LOCAL_HTTP_CALLS`         | `false` | Refuse a provider endpoint that resolves to a private, loopback or otherwise non-public address                                     |
 | `REQUIRE_HTTPS_CUSTOM_ENDPOINTS` | `false` | Refuse a provider endpoint with an `http://` scheme                                                                                 |
-| `ALLOWED_PROXY_HOSTS`            | empty   | Comma-separated hostnames, matched case-insensitively, allowed past the endpoint check on a private address while `BLOCK_LOCAL_HTTP_CALLS` is on. Chat dispatch still refuses private addresses until the block is off |
+| `ALLOWED_PROXY_HOSTS`            | empty   | Comma-separated hosts, matched case-insensitively, allowed past the endpoint check on a private address while `BLOCK_LOCAL_HTTP_CALLS` is on. Chat dispatch still refuses private addresses until the block is off. See the matching rule below |
 | `SSL_CERT_DIR`                   | unset   | Colon-separated directories of PEM CA certificates trusted beside the public roots, for provider endpoints on a private CA            |
+
+An `ALLOWED_PROXY_HOSTS` entry matches the host a URL names, as written: a hostname entry admits that hostname and every address it resolves to, and an IP address entry admits a URL whose host is that IP address. The address a hostname resolves to is never matched, so listing `127.0.0.1` admits `https://127.0.0.1` but not `https://localhost`. Provider endpoints and A2A targets follow the same rule.
+
+## A2A proxy
+
+| Var                   | Default | Purpose                                                                                                                                                                                                                                                                                       |
+| --------------------- | ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `A2A_PUBLIC_BASE_URL` | unset   | The gateway's public origin, an absolute URL such as `https://gateway.example.com`. The gateway builds the URLs in the Agent Cards it serves on `/a2a` from it. Unset, Agent Card calls are refused with `a2a_public_url_unset`; every other A2A call still works. The chart sets it from `publicUrl` (`gateway.publicUrl` in the langwatch chart) |
 
 ## Browser access
 
@@ -11649,7 +11826,7 @@ ingress:
       secretName: gateway-tls
 ```
 
-Replace both hosts. The chart renders a second Ingress, `<release>-gateway-ingress`, with the same `className` and `annotations`. It routes `/v1` and `/health` on the gateway host to the gateway Service. The control plane derives the public URL CLI users get from `ingress.gateway.host`.
+Replace both hosts. The chart renders a second Ingress, `<release>-gateway-ingress`, with the same `className` and `annotations`. It routes `/v1`, `/a2a` and `/health` on the gateway host to the gateway Service. The control plane derives the public URL CLI users get from `ingress.gateway.host`.
 
 With `className: nginx` the chart adds annotations to the gateway Ingress only. They keep streamed responses unbuffered, let a stream run for an hour, and raise the body limit to 32 MB. Keys in `ingress.gateway.annotations` override them.
 
@@ -12026,7 +12203,7 @@ ingress:
   className: nginx
   # ...your app hosts, tls and annotations
   gateway:
-    host: gateway.acme.com        # publishes /v1 and /health on this host
+    host: gateway.acme.com        # publishes /v1, /a2a and /health on this host
     tls:
       secretName: gateway-tls
   # className nginx adds the streaming, timeout and body-size annotations
@@ -12036,8 +12213,9 @@ gateway:
   chartManaged: true
 
   # Externally reachable URL the control plane hands to CLI users at login.
-  # Leave empty to derive https://<ingress.gateway.host> from the ingress below.
-  publicUrl: ""
+  # The gateway also builds A2A Agent Card URLs from it and refuses Agent
+  # Card calls while it is empty, so set it to https://<ingress.gateway.host>.
+  publicUrl: https://gateway.acme.com
 
   # Where the gateway reaches the control plane. Empty resolves to
   # http://<release>-app:5560, the app Service of this install.
@@ -12265,7 +12443,7 @@ Expected:
 
 This probe reaches the gateway because `networkPolicy.enabled` is `false` by default. With the network policy on, the gateway admits only the selectors in `networkPolicy.ingressFrom`, and this pod is not one of them. Add a selector for the probe pod to `ingressFrom` to run it.
 
-The chart Ingress is no way around this: it publishes `/v1` and `/health` only, so `/healthz` does not answer through it. To check the process from outside the cluster, use `/health` and read step 3, which covers what its `control_plane` field means. To reach `/healthz` from outside, add your own route to the gateway Service for it, as described in [Routing and ingress controllers](/self-hosting/deployment/routing).
+The chart Ingress is no way around this: it publishes `/v1`, `/a2a` and `/health` only, so `/healthz` does not answer through it. To check the process from outside the cluster, use `/health` and read step 3, which covers what its `control_plane` field means. To reach `/healthz` from outside, add your own route to the gateway Service for it, as described in [Routing and ingress controllers](/self-hosting/deployment/routing).
 
 ## 3. The gateway reaches the control plane
 
@@ -44574,7 +44752,7 @@ If your organisation leaves Enterprise, its braids **pause** and are kept. No tr
 
 ---
 title: Dashboards
-description: Build dashboards of charts over your LangWatch data, or start one from the Agent health template for an at-a-glance view of your project.
+description: Build dashboards of charts over your LangWatch data, or start one from the My agent at a glance template for a quick view of your project.
 ---
 
 ## Open Dashboards
@@ -44583,8 +44761,9 @@ Dashboards is a product in the product switcher at the top left of LangWatch.
 On LangWatch Cloud, no setup is needed.
 
 On a self-hosted install, Dashboards stays off until an operator turns it on in
-**Ops > Feature flags**. Turn on `release_dashboards` to open Dashboards, and
-`release_lwql_workbench` to build and edit widgets on a dashboard.
+**Ops > Feature flags**. Turn on `release_dashboards` to open Dashboards.
+Building and editing widgets on a dashboard also needs `release_lwql_workbench`,
+which is on by default on a self-hosted install.
 
 ## Your first dashboard
 
@@ -44620,12 +44799,13 @@ cannot be renamed or deleted.
 
 A dashboard without widgets shows the ask bar, suggested questions, and "Or start
 from a template" with the three From LangWatch dashboards and a **View all
-templates** link. The templates library lists every ready template by Grow,
-Protect, Profit and Trust, with a search box and filters for the category and
-the agent type.
+templates** link. The templates library lists every ready template once, the
+ones teams need most first, with a search box and filters for the category and
+the agent type. Picking an agent type shows the templates made for it, each with
+the widgets that suit that kind of agent.
 
 **Add to this project** on a card creates a new dashboard named after the template
-(numbered "Agent health 2" and so on if the name is taken), at the scope Project,
+(numbered "My agent at a glance 2" and so on if the name is taken), at the scope Project,
 with the template's widgets. A template you already added shows **Added**,
 linking to its dashboard.
 
@@ -44638,13 +44818,13 @@ prompt is drafted.
 A widget whose data is not set up yet says what is missing and links to the
 page that sets it up, such as evaluations, scenarios or feedback.
 
-The Agent health template holds five widgets:
+The My agent at a glance template holds five widgets:
 
-- This period
-- Status today
-- Needs attention
-- Top request my agent cannot serve
-- Conversations resolved per day
+- Is my agent doing its job?
+- Is my agent working right now?
+- What should I fix first this week?
+- What do users ask for most that my agent can't do?
+- Does my agent resolve more conversations each day?
 
 A new dashboard is yours like any other: every widget on it can be edited,
 duplicated, moved, resized or deleted, and your changes do not affect the
@@ -44652,8 +44832,8 @@ template.
 
 ## From LangWatch dashboards
 
-The From LangWatch group in the sidebar holds Release check, "Can I trust my
-numbers?" and Where my agent breaks. Each is a template shown live over your
+The From LangWatch group in the sidebar holds "Ready to ship?", "Fix missing
+data" and "Errors and failures". Each is a template shown live over your
 data and read-only: you cannot move, edit or add anything on it, and LangWatch
 stores no copy.
 
@@ -45317,7 +45497,7 @@ The estimate counts the rows exactly, measures the text of fifty rows spread acr
 
 Without a paid plan, your organization can spend 1 USD on Instant Evals in total, across all of its projects. Run `estimate` to see what is left, as `freeBudgetRemainingUsd`. Once you pass the budget, a new run or a judged `langwatch query` is refused with `instant_eval_free_budget_exhausted`, carrying `spentUsd` and `budgetUsd`, until you upgrade the organization. If a run is under way when the budget runs out, it stops there and you keep the verdicts it wrote.
 
-A paid plan has no free budget: it is billed monthly for what was judged, up to the row cap. A gateway budget set to block on the project, the team or the organization still applies: once it is reached, a new run or a judged query is refused with `instant_eval_gateway_budget_exceeded`, and a run under way stops there and keeps the verdicts it wrote.
+A paid plan has no free budget and no 1 USD limit; the row cap still applies. Instant Evals are not charged on its invoice yet. A gateway budget set to block on the project, the team or the organization still applies: once it is reached, a new run or a judged query is refused with `instant_eval_gateway_budget_exceeded`, and a run under way stops there and keeps the verdicts it wrote.
 
 ## Where the spend shows up
 
@@ -45474,13 +45654,13 @@ keywords: langwatch, instant evals, decision model, own key, bring your own key,
 description: Run Instant Evals on a decision model in your own provider account, set up Azure, and read the rows your model cannot judge.
 ---
 
-## LangWatch Evals Preview or your own model
+## LangWatch Instant (preview) or your own model
 
-Instant Evals run on **LangWatch Evals Preview** by default, billed as in [Limits and cost](/features/instant-evals/limits-and-cost). You can pick a decision model in your own provider account instead, per organization, team or project. Your provider then bills you for each row, and LangWatch does not.
+Instant Evals run on **LangWatch Instant (preview)** by default, billed as in [Limits and cost](/features/instant-evals/limits-and-cost). You can pick a decision model in your own provider account instead, per organization, team or project. Your provider then bills you for each row, and LangWatch does not.
 
 ## The models you can pick
 
-The picker is one list: LangWatch's **Evals Preview** first, then the models on your own keys. Each row shows its provider's logo and a title. OpenAI's and Azure's `gpt-6-luna` both read **Decisions API**, and the logo tells them apart. The other titles name the provider and the model. A model whose provider has no key yet is listed but greyed out, with a line saying which key to add.
+The picker is one list: **LangWatch Instant (preview)** first, then the models on your own keys. Each row shows its provider's logo and a title. OpenAI's and Azure's `gpt-6-luna` both read **Decisions API**, and the logo tells them apart. The other titles name the provider and the model. A model whose provider has no key yet is listed but greyed out, with a line saying which key to add.
 
 | Provider to add       | Model in the picker             | What the provider needs                                                                          |
 | --------------------- | ------------------------------- | ------------------------------------------------------------------------------------------------ |
@@ -45513,7 +45693,7 @@ The picker is one list: LangWatch's **Evals Preview** first, then the models on 
     <Frame>
       <img
         src="/images/instant-evals/own-model-picker.png"
-        alt="Edit default models drawer for the ACME organization, with the Instant Evals picker open: Evals Preview first, then Decisions API on OpenAI ticked, then models whose provider has no key yet"
+        alt="Edit default models drawer for an organization, with the Instant Evals picker open: LangWatch Instant (preview) first, then Decisions API on Azure OpenAI ticked, then models whose provider has no key yet"
       />
     </Frame>
   </Step>
@@ -45565,7 +45745,7 @@ Without the deployment, every row is skipped as `classifier_not_configured`.
 
 ## When your model cannot answer
 
-A run on your own model never falls back to LangWatch Evals Preview. Rows it cannot judge are marked `skipped` with the reason in `error`, and the run carries on. When the key is refused for every row of a page, the run fails with `instant_eval_decision_model_key_invalid` instead, so it does not read as a run where no row matched. List skipped rows with `langwatch instant-eval results <run-id> --status skipped`.
+A run on your own model never falls back to LangWatch Instant (preview). Rows it cannot judge are marked `skipped` with the reason in `error`, and the run carries on. When the key is refused for every row of a page, the run fails with `instant_eval_decision_model_key_invalid` instead, so it does not read as a run where no row matched. List skipped rows with `langwatch instant-eval results <run-id> --status skipped`.
 
 | `error`                           | Why                                                                                                         | Fix                                                                         |
 | --------------------------------- | ----------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
@@ -45580,8 +45760,8 @@ Rate limits and outages are retried before the row is skipped. Refused keys and 
 
 - **Cost.** Your provider bills you. LangWatch does not, and the [free budget](/features/instant-evals/limits-and-cost#the-free-budget) does not apply.
 - **Limits.** The [row, question and text limits](/features/instant-evals/limits-and-cost#limits) still apply.
-- **Data.** Each row's text and your questions go to your provider, under your agreement with it. LangWatch Evals Preview never sees them.
-- **Search bar.** Still runs on LangWatch Evals Preview.
+- **Data.** Each row's text and your questions go to your provider, under your agreement with it. LangWatch Instant (preview) never sees them.
+- **Search bar.** Still runs on LangWatch Instant (preview).
 
 ---
 
@@ -48418,6 +48598,39 @@ await langwatch.experiments.runWithResults("my-experiment", { datasetVersion: 1 
 
 Test suite runs also accept a `parameters` field. There the values apply to every scenario in the run. See [Scenario run parameters](/agent-testing/run-parameters).
 
+### Gate on evaluator results
+
+By default a platform run fails the job only when something breaks: in the SDKs, when a cell errors, and in the CLI, when the run itself fails. A failed evaluation does not fail the job. To stop a merge when quality drops, opt in:
+
+
+  ### Python
+
+```python
+result = langwatch.experiment.run("my-experiment")
+result.print_summary(fail_on_evaluator_failures=True)
+```
+
+  ### TypeScript
+
+```typescript
+const result = await langwatch.experiments.run("my-experiment");
+result.printSummary({ failOnEvaluatorFailures: true });
+```
+
+  ### CLI
+
+```bash
+npx langwatch experiment run my-experiment --wait --fail-on-evaluator-failures
+```
+
+
+
+With the flag, the job exits with code 1 when any evaluator returns a failing verdict or errors instead of judging (a bad key or a timeout, for example), as well as on the default failures. An evaluator that errors on every row gave no verdict, so it never passes the gate.
+
+The CLI flag needs `--wait`. Add `-f json` to the CLI to print the run status as JSON, with each evaluator's passed, failed and errored counts under `summary.evaluators`. An evaluator that only returns scores shows "no verdicts" instead of a pass rate.
+
+The flag needs a server that reports evaluator results. If the run summary has none, the job exits with code 1 and says so, rather than passing without checking.
+
 ---
 
 ## Option 2: Experiments via SDK
@@ -48607,7 +48820,7 @@ Both approaches output a CI-friendly summary:
 The `print_summary()` method:
 
 - Outputs results in a structured format
-- Returns exit code 1 if any evaluations failed (unless `exit_on_failure=False`)
+- Returns exit code 1 on failures (unless `exit_on_failure=False`). For a platform run that means an errored cell; to also fail on failed evaluations, see [Gate on evaluator results](#gate-on-evaluator-results)
 - Provides a link to view detailed results in LangWatch
 
 ---
@@ -50648,7 +50861,11 @@ Open [Experiments](https://app.langwatch.ai/@project/experiments), click **New E
 <Step title="Create the judge">
 On the prompt column, click **Add evaluator**, then **New Evaluator**. Pick the **LLM as Judge** category and **LLM-as-a-Judge Boolean Evaluator**.
 
-Name it, pick the judge model, and replace the default prompt with your criteria. The model picker also lists **Decision models**, such as OpenAI Decisions API, TypeSafe Jev, Cloudflare Clef or Gemini Decision 1, which answer yes or no, score and category questions on your own provider key. [Your own model](/features/instant-evals/own-model) lists each one and the key it needs. Write the criteria as a checklist the judge can apply to one answer at a time. For example:
+Name it, pick the judge model, and replace the default prompt with your criteria. The model picker also lists **Decision models**, such as OpenAI Decisions API, TypeSafe Jev, Cloudflare Clef or Gemini Decision 1, which answer yes or no, score and category questions on your own provider key. [Your own model](/features/instant-evals/own-model) lists each one and the key it needs.
+
+On LangWatch Cloud the picker can also list **Instant Evals**, a judge that needs no key of your own; see [Judge with Instant Evals](#judge-with-instant-evals).
+
+Write the criteria as a checklist the judge can apply to one answer at a time. For example:
 
 ```text
 You are evaluating a business coaching assistant.
@@ -50683,6 +50900,14 @@ Click an evaluator chip to open its **Result** block. **Status** is the verdict 
 </Frame>
 </Step>
 </Steps>
+
+## Judge with Instant Evals
+
+On LangWatch Cloud, once Instant Evals is switched on for your organization, the judge model picker lists **Instant Evals** first. It runs on LangWatch's key, so it needs no model provider or key of your own. A self-hosted install cannot judge with it yet. How Instant Evals is switched on, and who processes the text, is in [Where the judged text goes](/features/instant-evals/limits-and-cost#where-the-judged-text-goes).
+
+- **What it reads.** Your prompt, plus the input, output and contexts you mapped, each as its own section. Your input, output and contexts share the room the judge has. A short one stays whole; a long one keeps its beginning and its end, so a long input never pushes out a short output.
+- **What it returns.** The Boolean, Score and Category judges keep their usual result. A Score judge on Instant Evals shows a minimum and a maximum: a whole-number range of at most ten values, such as 1 to 5 (but not 0 to 1), is asked as it is, and any other range is asked on 1 to 10 and mapped back onto yours. With no range set, the score is between 0 and 1.
+- **What it costs.** Each judged call is one Instant Evals row on the [billing events](/ai-gateway/billing-events) ledger, and the result's cost is its price. A call that judged no text records no row and no cost. An organization that is not billed per use can spend 1 USD on Instant Evals in total, shared with Instant Evals runs and judged queries; past it, the judge returns an error with `instant_eval_free_budget_exhausted` instead of a verdict.
 
 ## Calibrate the judge
 
@@ -63407,6 +63632,8 @@ Use the `langwatch` CLI for everything: documentation (`langwatch docs ...`, `la
 
 Turn a question ("show cost per model as a bar chart") into a widget on a dashboard: one React file rendering data pulled through named LangWatchQL queries. The loop is: **discover the schema → write the queries → write the widget → add it to a dashboard → prove it runs**.
 
+A broad question ("Is our AI saving us time?", "Is quality holding?") still ends in a widget on the board. Pick the one or two numbers in the project's own traces that speak to it (traces handled per day, typical duration, the share that passed an evaluation), chart those, and say in your answer what the widget shows and what it cannot tell. Stay in this skill until the widget is on the board: do not switch to another skill or look for the answer outside the LangWatch data.
+
 Reach for this instead of `lwql-charts` when the visualization is not a plain Vega-Lite spec over one query result — custom layout, multiple queries in one widget, conditional rendering, or anything a component can do that a declarative spec cannot.
 
 ## Prerequisites
@@ -63433,15 +63660,22 @@ The `langwatch dashboard` commands use the project of your API key. Only `langwa
 
 ## Step 1: Discover the schema before writing any SQL
 
-Never guess dataset or column names. The schema command lists every dataset your credentials may query, each column's type and description, and a runnable example query per dataset:
+Never guess dataset or column names. The schema command lists every view your credentials may query, each column's type and description, and a runnable example query per view. It is large (hundreds of kilobytes), so never print it whole: save it to a file, read the view names, then read only the view you need.
 
 ```bash
-langwatch dashboard widget schema -f json
+langwatch dashboard widget schema -f json > schema.json
+jq -r '.views[] | "\(.name) (\(.timeColumn)): \(.description)"' schema.json
+jq '.views[] | select(.name | endswith(".trace_metrics"))' schema.json
 ```
 
-Read the datasets, their grain, their time column, and which columns are `available` to you.
+Read the view's grain, its time column, and which columns are `available` to you. A view's full name carries the database this deployment serves it from (`langwatch.trace_metrics` on LangWatch Cloud, `analytics.trace_metrics` on some self-hosted installs): write the name exactly as `schema.json` gives it. The examples below use the Cloud spelling. The views most questions need:
 
-**Seed data is stale** (newest trace 2026-08-04 as of this writing). Write SQL with a wide time window — `WHERE timestamp >= subtractDays(now(), 400)` — not a narrow recent one. A query that legitimately returns 0 rows because of a narrow window is not a bug; widen the window before assuming something is broken.
+- `trace_metrics`: one row per trace with cost, latency, tokens, the user, conversation and `Source` (the origin). Traces, cost, latency and usage questions start here.
+- `evaluation_metrics` and `trace_evaluation_metrics`: evaluation and online evaluation outcomes.
+- `judgments`: Instant Eval verdicts, one row per run, trace and question. `langwatch instant-eval list -f json` gives each run's id and question; filter with `RunId = '<id>'`, and `Passed = 1` is a trace the question matched.
+- `span_metrics` and `model_usage_by_minute`: per span and per model.
+
+Every query reads the dashboard's own period: bound the view's time column with `{dashboard_context_period_start:DateTime}` and `{dashboard_context_period_end:DateTime}` (Step 2), never a fixed window such as `subtractDays(now(), 400)`. Try the statement once before writing the widget, with the dashboard period from your context: `langwatch query run "<sql>" --start "<period start>" --end "<period end>" --format json` (this command takes `--format`, not `-f`). Zero rows over the period is an answer, not a bug.
 
 ## Step 2: Write the queries file
 
@@ -63459,7 +63693,7 @@ Read the datasets, their grain, their time column, and which columns are `availa
 [
   {
     "name": "cost_by_model",
-    "sql": "SELECT model, sum(costCents) / 100.0 AS cost FROM traces WHERE timestamp >= subtractDays(now(), 400) GROUP BY model ORDER BY cost DESC LIMIT 10",
+    "sql": "SELECT Model AS model, sum(CostSum) AS cost FROM langwatch.model_usage_by_minute WHERE BucketStart >= {dashboard_context_period_start:DateTime} AND BucketStart < {dashboard_context_period_end:DateTime} GROUP BY model ORDER BY cost DESC LIMIT 10",
     "parameters": []
   }
 ]
@@ -63475,7 +63709,7 @@ Fetch data with the `LW.useChartQuery(name, params)` hook, where `name` matches 
 const { data, isLoading, isError, error } = LW.useChartQuery("cost_by_model", {});
 ```
 
-- `data` is the query's result rows, or `null` until the first result lands. An empty array (`data.length === 0`) means the query genuinely returned zero rows — not an error; against stale seed data that is expected unless the SQL uses a wide window (see Step 1).
+- `data` is the query's result rows, or `null` until the first result lands. An empty array (`data.length === 0`) means the query genuinely returned zero rows — not an error: draw an empty state that says there is no data for the period.
 - `isLoading` is `true` only for the first fetch, before any data has ever landed. `isFetching` is `true` for any fetch in flight, including a background refetch — use it if you want to show a subtle "updating" state without clearing the chart.
 - `isError` is `true` on failure; `error` is then an `Error` (`error.message`) — it never throws into the component. An undeclared param, a reserved-param misuse, or a SQL error all surface here instead of crashing the widget. `status` is `"pending" | "error" | "success"` if you prefer a single field to branch on.
 - The hook auto-refetches when the page's time window changes, and when `params` changes by value — pass a plain object, not one you rebuild with a different identity every render for no reason. Call the returned `refetch()` to re-run it manually (e.g. from a button).
@@ -63486,28 +63720,38 @@ Params are validated against the query's declared `parameters` before anything i
 
 For code outside a component (or when you need a raw promise instead of hook semantics), `LW.query(name, params)` is the low-level escape hatch the hook is built on: it returns a promise that resolves to `{ rows, statistics }` or rejects with `{ code, title, message }`.
 
+### Colours and size: follow the dashboard
+
+The widget runs in a frame on the dashboard, in the reader's light or dark theme. The frame sets the theme's colours as CSS variables, so use only these, written as `var(--chakra-colors-fg)`:
+
+- `--chakra-colors-fg` (text), `--chakra-colors-fg-subtle` (labels, axes), `--chakra-colors-border-muted` (grid lines, tile borders)
+- `--chakra-colors-bg-card` and `--chakra-colors-border-card` (a tooltip or panel), `--chakra-colors-fg-error`, `--chakra-colors-fg-success`
+- `--chakra-colors-chart-1` to `--chakra-colors-chart-8` (series colours)
+
+Never write a hex colour, `white` or a light background such as `#f8fafc`: a stat tile like that is a white block in dark mode. A tile has no background of its own, only a `1px solid var(--chakra-colors-border-muted)` border. `LW.theme` (`"light"` or `"dark"`) is there for anything the variables do not cover.
+
+A new widget lands half the board wide and about 200 px tall inside. Fill that space rather than guessing a height: the outer element is `height: "100%"` and a flex column, at most one row of stat tiles goes on top, and the chart takes the rest (`flex: 1, minHeight: 0`, with `<ResponsiveContainer width="100%" height="100%">`). Never give a chart a fixed pixel height: one taller than the card hides its bars until the reader drags the card bigger.
+
 ### Prebuilt charts: `@langwatch/charts`
 
 Ten chart primitives, prebuilt and themed, so most widgets don't need to hand-roll a Recharts layout: `MetricStat`, `Sparkline`, `AreaTimeseries`, `StackedBars`, `GroupedBars`, `ProjectionBars`, `Donut`, `Leaderboard`, `Heatmap`. Plus `LwqlChart`, an auto-picker that infers a chart type (area / bars / donut / leaderboard / table) from a query's row shape — pass it `data`, and optionally `kind` to force one.
 
-Every component consumes `LW.useChartQuery` rows directly and themes itself — no color or style props needed.
+Every component consumes `LW.useChartQuery` rows directly, themes itself and fills its card when you pass no `height` — no color or style props needed.
 
 ```jsx
 export default function Widget() {
   const { data, isLoading, isError, error } = LW.useChartQuery("cost_by_model", {});
 
-  if (isError) return <div style={{ fontSize: 11, color: "#b00" }}>{error.message}</div>;
-  if (isLoading || data === null) return <div style={{ fontSize: 11, color: "#666" }}>Loading…</div>;
+  if (isError) return <div style={{ fontSize: 11, color: "var(--chakra-colors-fg-error)" }}>{error.message}</div>;
+  if (isLoading || data === null) return <div style={{ fontSize: 11, color: "var(--chakra-colors-fg-subtle)" }}>Loading…</div>;
 
   return <LwqlChart data={data} />;
 }
 ```
 
-More worked examples: `platform/app/scripts/north-star-widgets/`.
-
 ### Drill-down: `LW.navigate`
 
-`LW.navigate(target, params)` sends the user to another LangWatch page from inside a widget. `target` is a route key, never a path: `"traces"` and `"trace"` take `params` keyed by filter field ids (e.g. `"metadata.user_id"`) or `traceId`, which the host resolves into the Trace Explorer URL; `"scenarios"`, `"onlineEvaluations"`, `"annotations"`, `"gatewayVirtualKeys"` and `"codingSessions"` open that page of the project and take no params.
+`LW.navigate(target, params)` sends the user to another LangWatch page from inside a widget. `target` is a route key, never a path: `"traces"` and `"trace"` take `params` keyed by filter field ids (e.g. `"metadata.user_id"`) or `traceId`, which the host resolves into the Trace Explorer URL; `"scenarios"`, `"onlineEvaluations"`, `"annotations"`, `"gatewayVirtualKeys"`, `"codingSessions"` and `"modelCosts"` (Settings, Model costs) open that page and take no params; `"metadataDocs"` opens the metadata and labels docs page in a new tab.
 
 `Leaderboard` wraps this for you: pass `navigateTo={{ target, params: (row) => ({ ... }) }}` and a row click navigates. An unknown `target` is ignored rather than erroring.
 
@@ -63561,33 +63805,43 @@ langwatch dashboard widget delete <dashboardId> <widgetId>
 ```jsx
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 
+const color = (name) => `var(--chakra-colors-${name})`;
+
 export default function Widget() {
   const { data, isLoading, isError, error } = LW.useChartQuery("daily_traces", {});
 
   if (isError) {
-    return <div style={{ fontSize: 11, color: "#b00" }}>{error.message}</div>;
+    return <div style={{ fontSize: 11, color: color("fg-error") }}>{error.message}</div>;
   }
   if (isLoading || data === null) {
-    return <div style={{ fontSize: 11, color: "#666" }}>Loading…</div>;
+    return <div style={{ fontSize: 11, color: color("fg-subtle") }}>Loading…</div>;
+  }
+  if (data.length === 0) {
+    return <div style={{ fontSize: 11, color: color("fg-subtle") }}>No traces in this period.</div>;
   }
 
   const rows = data.map((row) => ({
     day: String(row.day).slice(0, 10),
     traces: Number(row.traces),
   }));
+  const total = rows.reduce((sum, row) => sum + row.traces, 0);
 
   return (
-    <div>
-      <div style={{ fontSize: 11, color: "#666", marginBottom: 4 }}>{rows.length} rows</div>
-      <ResponsiveContainer width="100%" height={230}>
-        <BarChart data={rows}>
-          <CartesianGrid strokeDasharray="3 3" />
-          <XAxis dataKey="day" tick={{ fontSize: 10 }} />
-          <YAxis allowDecimals={false} />
-          <Tooltip />
-          <Bar dataKey="traces" fill="#f97316" />
-        </BarChart>
-      </ResponsiveContainer>
+    <div style={{ height: "100%", display: "flex", flexDirection: "column", gap: 4 }}>
+      <div style={{ fontSize: 11, color: color("fg-subtle") }}>{total.toLocaleString()} traces</div>
+      <div style={{ flex: 1, minHeight: 0 }}>
+        <ResponsiveContainer width="100%" height="100%">
+          <BarChart data={rows}>
+            <CartesianGrid stroke={color("border-muted")} vertical={false} />
+            <XAxis dataKey="day" tick={{ fontSize: 10, fill: color("fg-subtle") }} />
+            <YAxis allowDecimals={false} tick={{ fontSize: 10, fill: color("fg-subtle") }} />
+            <Tooltip
+              contentStyle={{ background: color("bg-card"), border: `1px solid ${color("border-card")}` }}
+            />
+            <Bar dataKey="traces" fill={color("chart-1")} />
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
     </div>
   );
 }
@@ -63599,7 +63853,7 @@ export default function Widget() {
 [
   {
     "name": "daily_traces",
-    "sql": "SELECT toStartOfDay(timestamp) AS day, count() AS traces FROM traces WHERE timestamp >= subtractDays(now(), 400) GROUP BY day ORDER BY day",
+    "sql": "SELECT toStartOfDay(OccurredAt) AS day, uniqExact(TraceId) AS traces FROM langwatch.trace_metrics WHERE OccurredAt >= {dashboard_context_period_start:DateTime} AND OccurredAt < {dashboard_context_period_end:DateTime} AND Source IN {dashboard_context_sources:Array(String)} GROUP BY day ORDER BY day",
     "parameters": []
   }
 ]
@@ -63623,7 +63877,7 @@ langwatch dashboard widget add <dashboardId> \
 - `dashboard_widget_query_undeclared_param` (shows up in the hook's `error`) — the widget code passed a param the query's `parameters` array doesn't declare; add the declaration or stop passing it.
 - `dashboard_widget_query_reserved_param` (shows up in the hook's `error`) — the widget code passed `dashboard_context_period_start`, `dashboard_context_period_end`, or `dashboard_context_granularity_seconds` directly as a param; these are bound by the executor from the page window, never by the caller.
 - "Cannot import '\<specifier>'" — the widget imported something other than `react`, `react-dom`, `react-dom/client`, `recharts`, or `@langwatch/charts`; use only those, or the corresponding global.
-- A query returning 0 rows against seed data — the seed's newest trace is 2026-08-04; widen the time window before assuming the query is wrong.
+- A query returning 0 rows over the dashboard's period — the project has no matching data in that window; say so in the widget's empty state rather than widening the window.
 ````
 
         </div>
@@ -66055,6 +66309,7 @@ The table lists each limit's current value; the **Kind** column marks which ones
 | GitHub pull requests per day           | 20                             | Hardcoded       | `LANGY_GITHUB_PRS_PER_DAY` (a code constant, not an env var)     |
 | Max concurrent workers                 | 20 (default)                   | Configurable    | `LANGY_MAX_WORKERS`                                              |
 | Idle worker reap                       | 10 minutes (600000 ms default) | Configurable    | `LANGY_WORKER_IDLE_MS`                                           |
+| Max worker age                         | 5 hours (18000000 ms default)  | Configurable    | `LANGY_WORKER_MAX_AGE_MS`                                        |
 | Per-session LangWatch API key lifetime | Short-lived, auto-expiring     | Fixed by design | Minted per chat, owned by the requesting user                    |
 | GitHub installation token lifetime     | 1 hour                         | Fixed by GitHub | Minted per turn, cached in Redis just under 1 hour, self-expires |
 
@@ -66070,7 +66325,7 @@ Langy runs one isolated worker per conversation. `LANGY_MAX_WORKERS` caps how ma
 
 ### Idle worker reap
 
-A worker with no activity for longer than `LANGY_WORKER_IDLE_MS` (default 600000 ms, 10 minutes) is reaped. Its clone and per-worker home are deleted, so no sensitive data stays at rest worker-side. A later turn in the same conversation spawns a fresh worker. See [Sandbox](/langy/security/sandbox).
+A worker with no activity for longer than `LANGY_WORKER_IDLE_MS` (default 600000 ms, 10 minutes) is reaped. Its clone and per-worker home are deleted, so no sensitive data stays at rest worker-side. A later turn in the same conversation spawns a fresh worker. A worker older than `LANGY_WORKER_MAX_AGE_MS` (default 5 hours) is replaced between turns, never during one, so its session key never expires mid-conversation; the next turn gets a fresh worker and key and resumes the session. See [Sandbox](/langy/security/sandbox).
 
 ### Per-session LangWatch API key
 
@@ -68706,7 +68961,7 @@ The PII redaction model does the Strict PII level's analysis instead of Presidio
 - Each replica analyzes one batch at a time. Another batch waits for it; the model gives each batch 45 s, waiting included, and fails one it cannot finish in that time; that batch falls back to Presidio without pausing the model for other batches.
 - At that rate a 1,000-character span takes 3 to 4 seconds, so one replica handles roughly 15 such spans a minute. Add replicas for more Strict traffic.
 - A batch over 8,000 characters, or one the model does not answer within 50 s, goes to Presidio instead. After a timeout, that process sends every Strict batch to Presidio for 2 minutes.
-- The model needs an Enterprise license: an organization without one stays on Presidio, whatever the chart sets.
+- The model needs an Enterprise license: an organization without one stays on Presidio, whatever the chart sets. It is not priced per character here; the price on LangWatch Cloud does not apply to a self-hosted deployment.
 - With neither `piiRedactionModel.enabled` nor `piiRedactionModel.externalEndpoint` set, Strict stays on Presidio. An `externalEndpoint` sends a licensed organization's Strict analysis to that model even when `enabled` is `false`.
 - If the model is down, Strict falls back to Presidio, so turning it off or losing a pod never stops redaction.
 
@@ -69182,7 +69437,9 @@ Setting the code in `LANGWATCH_LICENSE_KEY` or `app.license.key` instead redeems
 
 The license refreshes on the daily sync from then on, so a renewal or a change of seats reaches the install without a new key by email. **Refresh license** on the same page fetches it now instead of waiting for the sync.
 
-The paste and the file upload stay on the License page for an air-gapped install, which receives a signed license key from LangWatch and enters it with **Enter license key** or **Upload license file**. Neither needs a connection. The page detects the form, so a value pasted under the other option is still accepted. The install still sends the daily usage report unless you switch it off, see [Air-gapped installs and existing licenses](#air-gapped-installs-and-existing-licenses).
+The paste and the file upload stay on the License page for an air-gapped install, which receives a signed license key from LangWatch and enters it with **Enter license key** or **Upload license file**. Neither needs a connection.
+
+The page detects the form, so a value pasted under the other option is still accepted. The install still sends the daily usage report unless you switch it off, see [Air-gapped installs and existing licenses](#air-gapped-installs-and-existing-licenses).
 
 ## Endpoints and variables
 
@@ -69270,7 +69527,9 @@ A delivered license that does not verify is not applied. The install keeps the l
 
 ## Instant Evals through Connect
 
-An install whose license names **Instant Evals** judges through LangWatch. The license turns them on, with no release flag to set. A self-hosted install cannot judge with a key of its own, so without Connect its eval functions are published as unavailable. Judging on your own infrastructure is planned for a later release. An organization whose admin switched it off publishes the eval functions as unavailable, so a query never comes back with judged columns that are all empty.
+An install whose license names **Instant Evals** judges through LangWatch. The license turns them on, with no release flag to set. Without Connect, a project can still run Instant Evals on its own decision model and key, picked in the Instant Evals column of **Settings, Default models** (see [Run Instant Evals on your own decision model](/features/instant-evals/own-model)). That needs no license and no release flag.
+
+A project with neither publishes its eval functions as unavailable. An organization whose admin switched off judging through LangWatch publishes them as unavailable too, so a query never comes back with judged columns that are all empty. A project on its own decision model is not affected by that switch.
 
 When a sentence typed in trace search can't be judged, the popover under the search bar says why:
 
@@ -69279,11 +69538,9 @@ When a sentence typed in trace search can't be judged, the popover under the sea
 | Your license doesn't include Instant Evals | Contact us to add them to your license. |
 | Instant Evals are switched off for your organization | An organization admin switches them back on in **Settings, Connect**. |
 | This install isn't connected to LangWatch | Switch Connect on, and allow outbound HTTPS to `connect.langwatch.ai` and `gateway.langwatch.ai`. |
-| Instant Evals are off on this install | The install has judging turned off. Whoever runs it sets `RELEASE_INSTANT_EVALS=1`, with a judge configured. |
+| Instant Evals are off on this install | The install has judging turned off. Whoever runs it configures a judge, or the project picks its own decision model in the Instant Evals column of **Settings, Default models**. |
 
 On an install that judges through LangWatch, the "Instant Evals can't run right now" popover also names both addresses, so check that they are still reachable.
-
-With `RELEASE_INSTANT_EVALS=1` set, the four popovers above never show: a sentence that can't be judged gets "Instant Evals can't run right now" instead, whatever the reason. An install that judges through LangWatch needs no flag, so remove it there to get the popover that says why.
 
 Judging is charged at the list rate, 0.0546 USD per million input tokens the judge reads, and counts against your cap. The 1 USD free budget of the Cloud free plan does not apply here: your commit and your cap govern instead. See [Limits and cost](/features/instant-evals/limits-and-cost) for what a run reads and costs.
 
@@ -69752,7 +70009,7 @@ spec:
   source:
     repoURL: https://langwatch.github.io/langwatch
     chart: langwatch
-    targetRevision: 3.26.0 # x-release-please-version
+    targetRevision: 3.28.0 # x-release-please-version
     helm:
       releaseName: langwatch
       values: |
@@ -69807,7 +70064,7 @@ spec:
   sources:
     - repoURL: https://langwatch.github.io/langwatch
       chart: langwatch
-      targetRevision: 3.26.0 # x-release-please-version
+      targetRevision: 3.28.0 # x-release-please-version
       helm:
         releaseName: langwatch
         valueFiles:
@@ -70216,7 +70473,7 @@ For air-gapped or private environments, mirror the images to your own registry:
 ```bash
 # The release you are mirroring. Every tag below follows it, so set it once.
 # Pick the version from https://github.com/langwatch/langwatch/releases
-VERSION=3.26.0 # x-release-please-version
+VERSION=3.28.0 # x-release-please-version
 REGISTRY=registry.example.com
 
 for image in langwatch langwatch_nlp langevals; do
@@ -70232,13 +70489,13 @@ Then configure the Helm chart, giving every tag the version you mirrored:
 images:
   app:
     repository: registry.example.com/langwatch/langwatch
-    tag: "3.26.0" # x-release-please-version
+    tag: "3.28.0" # x-release-please-version
   langwatch_nlp:
     repository: registry.example.com/langwatch/langwatch_nlp
-    tag: "3.26.0" # x-release-please-version
+    tag: "3.28.0" # x-release-please-version
   langevals:
     repository: registry.example.com/langwatch/langevals
-    tag: "3.26.0" # x-release-please-version
+    tag: "3.28.0" # x-release-please-version
 ```
 
 Mirror and override the bundled services the same way: `gateway.image.repository`, `langyagent.image.repository`, `clickhouse.image.repository`, `postgresql.image.repository`, `redis.image.repository`, `prometheus.server.image.repository`, `cronjobs.image.repository` and `app.storedObjects.localFilesystem.serializeUpgradesImage` (the image the stored-objects upgrade hooks run).
@@ -70287,6 +70544,25 @@ Deploy LangWatch on any Kubernetes cluster using the official Helm chart. The ch
 - A StorageClass that supports dynamic provisioning (for persistent volumes)
 - A domain name (for Ingress with TLS)
 - **Default resource requirements:** ~5 CPU and ~17 Gi RAM (requests). See [Size Overlays](#size-overlays) for smaller or larger configurations.
+
+<Note>
+The chart's PersistentVolumeClaims use the cluster's default StorageClass. A new EKS cluster (1.33 and later) has none, so the claims stay `Pending` and the pods never start. Install the EBS CSI driver add-on and mark a StorageClass as default, for example:
+
+```yaml
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: gp3
+  annotations:
+    storageclass.kubernetes.io/is-default-class: "true"
+provisioner: ebs.csi.aws.com
+parameters:
+  type: gp3
+volumeBindingMode: WaitForFirstConsumer
+```
+
+Or name a class in the chart values: `postgresql.primary.persistence.storageClass`, `clickhouse.storage.storageClass`, `redis.master.persistence.storageClass` and `app.storedObjects.localFilesystem.storageClassName`.
+</Note>
 
 ## Quick Start
 
@@ -70342,7 +70618,7 @@ workers:
     - { name: ADMIN_EMAILS, value: "you@yourcompany.com" }
 ```
 
-Experimental features stay off until an operator turns them on in **Ops > Feature flags** (`/ops/feature-flags`), for all projects or for chosen ones. Dashboard widgets need both `release_dashboards` and `release_lwql_workbench`. The Query API (`POST /api/v1/query`) works without either.
+Shipped features are on by default on a self-hosted install, including LangWatchQL (`release_lwql_workbench`) and Instant Evals (`release_instant_evals`). Experimental features stay off until an operator turns them on in **Ops > Feature flags** (`/ops/feature-flags`), for all projects or for chosen ones. The same page switches a feature off. Dashboard widgets need both `release_dashboards` and `release_lwql_workbench`. The Query API (`POST /api/v1/query`) works without either.
 
 ### License
 
@@ -71087,10 +71363,11 @@ LangWatch uses two hostnames. Browsers and SDKs reach the app. LLM clients and c
 | App | `/api/internal` | Prefix | Do not route. Block it. | |
 | Gateway, for example `gateway.acme.com` | `/v1` | Prefix | `<release>-gateway` | `80` |
 | Gateway | `/health` | Exact | `<release>-gateway` | `80` |
+| Gateway | `/a2a` | Prefix | `<release>-gateway` | `80` |
 
-`<release>` is the Helm release name. The gateway Service forwards port 80 to container port 5563.
+`<release>` is the Helm release name. The gateway Service forwards its port to container port 5563. Port 80 is the default; if you set `gateway.service.port`, use that port in every route that names the gateway Service.
 
-Do not expose any other gateway path. `/healthz`, `/readyz`, `/startupz`, `/debug/control-plane` and `/internal/*` are for in-cluster use only. Metrics are served on a separate port (`9464`) and are not part of the gateway Service. Gemini-native clients also need `/v1beta`. Add it as a third Prefix rule if you use them.
+Do not expose any other gateway path. `/healthz`, `/readyz`, `/startupz`, `/debug/control-plane` and `/internal/*` are for in-cluster use only. Metrics are served on a separate port (`9464`) and are not part of the gateway Service. `/a2a` is the agent-to-agent proxy; route it if agents call A2A targets through the gateway. Gemini-native clients also need `/v1beta`. Add it as another Prefix rule if you use them.
 
 `/api/internal` on the app is the private control plane that the gateway and the Langy agent call over cluster DNS. The chart Ingress blocks it by default with `ingress.blockedPaths`. Your own routes must block it too. See [Security](/self-hosting/security#private-control-plane-paths-are-blocked-at-the-ingress).
 
@@ -71216,6 +71493,7 @@ spec:
     - matches:
         - path: { type: PathPrefix, value: /v1 }
         - path: { type: Exact, value: /health }
+        - path: { type: PathPrefix, value: /a2a }
       backendRefs:
         - name: langwatch-gateway
           port: 80
@@ -71520,7 +71798,7 @@ Periodic work (topic clustering, alert triggers, webhook delivery log pruning) i
 
 ## Network Topology
 
-The App is exposed externally. The AI Gateway is exposed only when you set `ingress.gateway.host`, which renders a second Ingress for `/v1` and `/health` with the app Ingress class. See [Routing](/self-hosting/deployment/routing). Everything else is cluster-internal:
+The App is exposed externally. The AI Gateway is exposed only when you set `ingress.gateway.host`, which needs `ingress.enabled` and `gateway.chartManaged`. The chart-managed gateway Ingress is a second Ingress for `/v1`, `/a2a` and `/health` with the app Ingress class. See [Routing](/self-hosting/deployment/routing). Everything else is cluster-internal:
 
 | Component | Service Type | External |
 |-----------|-------------|----------|
@@ -71643,6 +71921,7 @@ The agent-side variables (`LANGY_*` apart from the one below) are set on the `la
 |---|---|---|---|
 | `LANGY_MAX_WORKERS` | Max concurrent worker subprocesses before the pod returns 503. | No | `20` |
 | `LANGY_WORKER_IDLE_MS` | Idle-worker reap timeout. | No | `600000` (10 min) |
+| `LANGY_WORKER_MAX_AGE_MS` | Max worker age. A worker older than this is replaced between turns, so its session key (6 hours) never expires mid-conversation. | No | `18000000` (5 hours) |
 | `LANGY_READINESS_TIMEOUT_MS` | How long to wait for a freshly spawned worker to report ready. The Go default is 15000; the chart raises it to 60000 for gVisor cold boot. | No | `60000` (chart) |
 | `LANGY_WORKSPACE_ROOT` | Writable workspace root (an `emptyDir` mount). | No | `/workspace` |
 
@@ -74013,7 +74292,7 @@ LangWatch container images and CLI packages are published with verifiable supply
 
 ### Container images (Docker Hub)
 
-Every release of `langwatch/langwatch`, `langwatch/langwatch_nlp`, `langwatch/langevals`, and `langwatch/ai-gateway` is signed with [Sigstore](https://www.sigstore.dev/) cosign using keyless OIDC. Both the multi-arch index manifest and each per-platform manifest (linux/amd64, linux/arm64) are signed by digest. A CycloneDX SBOM is generated per platform and attached as a cosign attestation against the matching platform manifest digest, so the SBOM you verify always corresponds to the architecture you actually pulled.
+Every release of `langwatch/langwatch`, `langwatch/langwatch_nlp`, `langwatch/langevals`, `langwatch/ai-gateway`, `langwatch/langyagent` and `langwatch/pii-redaction-model` is signed with [Sigstore](https://www.sigstore.dev/) cosign using keyless OIDC. Both the multi-arch index manifest and each per-platform manifest (linux/amd64, linux/arm64) are signed by digest. A CycloneDX SBOM is generated per platform and attached as a cosign attestation against the matching platform manifest digest, so the SBOM you verify always corresponds to the architecture you actually pulled.
 
 Verify a signature with [cosign](https://github.com/sigstore/cosign):
 
@@ -75244,7 +75523,7 @@ helm search repo langwatch/langwatch --versions
 # x-release-please-start-version
 helm upgrade langwatch langwatch/langwatch \
   --namespace langwatch \
-  --version 3.26.0 \
+  --version 3.28.0 \
   -f values-production.yaml
 # x-release-please-end
 ```
@@ -75458,7 +75737,7 @@ ingress:
       secretName: gateway-tls
 ```
 
-With `className: nginx` the chart still adds the streaming and timeout annotations to the gateway Ingress, and now sets a 32 MB body limit. The paths are fixed at `/v1` (Prefix) and `/health` (Exact). For other paths, such as `/v1beta`, write your own route. If you relied on a cert-manager issuer only on the gateway Ingress, add it to `ingress.annotations` or `ingress.gateway.annotations`.
+With `className: nginx` the chart still adds the streaming and timeout annotations to the gateway Ingress, and now sets a 32 MB body limit. The paths are fixed at `/v1` (Prefix), `/a2a` (Prefix) and `/health` (Exact). For other paths, such as `/v1beta`, write your own route. If you relied on a cert-manager issuer only on the gateway Ingress, add it to `ingress.annotations` or `ingress.gateway.annotations`.
 
 A values file that still sets `gateway.ingress.*` fails to render with a message naming `ingress.gateway.host`, so the Ingress cannot disappear on upgrade without an error. `gateway.ingress.enabled: false` on its own is accepted. If you route to the gateway another way, remove the block and set `gateway.publicUrl`. See [Routing and ingress controllers](/self-hosting/deployment/routing).
 
@@ -78054,6 +78333,64 @@ Pull governance events, project traces and the audit log as OCSF 1.9.0 API Activ
 ---
 title: "Push OCSF events in from another source"
 openapi: "POST /api/v1/governance/ocsf/ingest"
+---
+
+---
+
+# FILE: ./api-reference/governance-security-lake/add-an-aws-security-lake-source.mdx
+
+---
+title: "Add an AWS Security Lake source"
+openapi: "POST /api/v1/governance/security-lake/sources"
+---
+
+---
+
+# FILE: ./api-reference/governance-security-lake/edit-an-aws-security-lake-source.mdx
+
+---
+title: "Edit an AWS Security Lake source"
+openapi: "PATCH /api/v1/governance/security-lake/sources/{sourceId}"
+---
+
+---
+
+# FILE: ./api-reference/governance-security-lake/overview.mdx
+
+---
+title: "Overview"
+description: "Add an AWS Security Lake subscriber as a source, test its queue and read its health. LangWatch reads the subscriber queue on the source's schedule and stores the AI activity it finds as OCSF events."
+---
+
+## Intro
+
+Add an AWS Security Lake subscriber as a source, test its queue and read its health. LangWatch reads the subscriber queue on the source's schedule and stores the AI activity it finds as OCSF events.
+
+---
+
+# FILE: ./api-reference/governance-security-lake/read-a-security-lake-source-s-health.mdx
+
+---
+title: "Read a Security Lake source's health"
+openapi: "GET /api/v1/governance/security-lake/sources/{sourceId}/health"
+---
+
+---
+
+# FILE: ./api-reference/governance-security-lake/read-a-security-lake-source.mdx
+
+---
+title: "Read a Security Lake source"
+openapi: "GET /api/v1/governance/security-lake/sources/{sourceId}"
+---
+
+---
+
+# FILE: ./api-reference/governance-security-lake/test-a-security-lake-source-s-connection.mdx
+
+---
+title: "Test a Security Lake source's connection"
+openapi: "POST /api/v1/governance/security-lake/sources/{sourceId}/test"
 ---
 
 ---
@@ -82494,9 +82831,13 @@ Input tokens are the text the judge reads, the questions asked about it and a sm
 
 `POST /api/v1/instant-evals/estimate` returns the price of a run before it starts, from the rows the statement matches and a sample of their size. See [Running an Instant Eval](/api-reference/instant-evals/running-an-instant-eval).
 
-Organizations without a paid plan have a **$1 free budget** for Instant Evals in total, across all their projects. Past it, a new run or a judged query is refused until the organization upgrades. Paid plans have no such limit and are billed monthly for what was judged.
+Organizations without a paid plan have a **$1 free budget** for Instant Evals in total, across all their projects. Past it, a new run or a judged query is refused until the organization upgrades. Paid plans have no such limit, and Instant Evals are not charged on their invoice yet.
 
 Every judged query and run is one spend event on the [billing events](/ai-gateway/billing-events) ledger, so a [gateway budget](/ai-gateway/budgets) set on a project or an organization caps Instant Evals the same way it caps gateway traffic.
+
+## PII redaction model
+
+Strict PII redaction with the LangWatch PII Redaction Model is priced separately from events, at **$0.50 per 1M characters** sent to the model, excluding VAT. Spans, log records and metric points are all billed this way. There is no free monthly amount and no minimum per record, and a record the model does not answer is not charged. See [Strict with the LangWatch PII Redaction Model](/platform/data-privacy#strict-with-the-langwatch-pii-redaction-model) for what is billed and how to turn it on.
 
 ## Custom data retention
 

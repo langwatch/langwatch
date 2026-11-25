@@ -142,15 +142,24 @@ function isNavigableTarget(target: string): target is NavigableTarget {
   return (NAVIGABLE_TARGETS as readonly string[]).includes(target);
 }
 
+/** The public docs pages a target opens in a new tab, beside the app. */
+const DOCS_PAGES = {
+  metadataDocs: "https://langwatch.ai/docs/integration/metadata-and-labels",
+} as const;
+
 /** The page targets that take no params: each key names one fixed page of the project. */
 const PAGE_PATHS: Readonly<
-  Record<Exclude<NavigableTarget, "traces" | "trace">, (projectSlug: string) => string>
+  Record<
+    Exclude<NavigableTarget, "traces" | "trace" | keyof typeof DOCS_PAGES>,
+    (projectSlug: string) => string
+  >
 > = {
   scenarios: (projectSlug) => `/${projectSlug}/simulations/scenarios`,
   onlineEvaluations: (projectSlug) => `/${projectSlug}/online-evaluations`,
   annotations: (projectSlug) => `/${projectSlug}/annotations`,
   gatewayVirtualKeys: () => "/gateway/virtual-keys",
   codingSessions: (projectSlug) => `/${projectSlug}/sessions`,
+  modelCosts: () => "/settings/model-costs",
 };
 
 export function useDashboardWidgetChartNavigate(
@@ -174,6 +183,11 @@ export function useDashboardWidgetChartNavigate(
 
       if (target === "traces") {
         host.navigate(`/${projectSlug}/traces#${buildTracesFragment(params)}`);
+        return;
+      }
+
+      if (target === "metadataDocs") {
+        window.open(DOCS_PAGES[target], "_blank", "noopener,noreferrer");
         return;
       }
 

@@ -27,6 +27,26 @@ export function isCodeModePoll(name: string): boolean {
   return name === POLL_TOOL;
 }
 
+/** A transcript entry as far as telling a metadata-only session goes. */
+type SessionEntry = Readonly<{ kind: string; name?: unknown; input?: unknown; text?: unknown }>;
+
+/**
+ * Whether a Code Mode session was exported without content: it ran scripts, none of them
+ * carries its source, and no prompt carries text. Its rows then say so once, not on each line.
+ */
+export function isMetadataOnlySession(entries: readonly SessionEntry[]): boolean {
+  const scripts = entries.filter(
+    (entry) =>
+      entry.kind === "tool" && typeof entry.name === "string" && isCodeModeScript(entry.name),
+  );
+  if (scripts.length === 0) return false;
+  if (scripts.some((entry) => readCodeModeScript(entry.input).code !== null)) return false;
+  return !entries.some(
+    (entry) =>
+      entry.kind === "user_prompt" && typeof entry.text === "string" && entry.text.trim() !== "",
+  );
+}
+
 export interface CodeModeScript {
   /** The short label the model gave the script; null when not exported. */
   description: string | null;

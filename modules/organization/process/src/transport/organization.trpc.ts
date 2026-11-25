@@ -385,6 +385,7 @@ function memberRecordOnWire(
     updatedAt: toDate(member.updatedAt),
     departmentId: member.departmentId,
     disabledAt: member.disabledAt && toDate(member.disabledAt),
+    billingOnly: member.billingOnly ?? false,
     user: {
       id: member.user.id,
       name: member.user.name,
@@ -410,6 +411,7 @@ function memberDirectoryOnWire(
       updatedAt: toDate(member.updatedAt),
       departmentId: member.departmentId,
       disabledAt: member.disabledAt && toDate(member.disabledAt),
+      billingOnly: member.billingOnly ?? false,
       seatPendingSince: member.seatPendingSince ? toDate(member.seatPendingSince) : null,
       user: {
         id: member.user.id,

@@ -125,6 +125,10 @@ type BundleConfig struct {
 	// CacheRules lists priority-ordered cache control rules.
 	CacheRules []CacheRule
 
+	// A2ATargets lists the agents this key may reach through /a2a/{target},
+	// project-scoped entries already preferred over org-wide ones of the same name.
+	A2ATargets []A2ATarget
+
 	// TraceProjectID is the project customer traces are EXPORTED to. It is NOT
 	// necessarily the VK's own project: the control plane stores a destination on
 	// the key when it is created, and a key shared across a team or organization
