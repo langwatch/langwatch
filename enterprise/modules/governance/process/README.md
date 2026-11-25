@@ -1623,7 +1623,7 @@ Permission `complianceExport:view`. Entitlement `enterprise` (feature `OCSF_EXPO
 Answers at `/api/governance/ocsf/events`, `/api/v1/governance/ocsf/events`.
 
 ```typescript
-// Query: ocsfEventsQuerySchema, ../contract/src/features/ocsf/ocsf-siem.ts:87
+// Query: ocsfEventsQuerySchema, ../contract/src/features/ocsf/ocsf-siem.ts:102
 interface Query {
   limit?: number;
   since?: string;
@@ -1632,7 +1632,7 @@ interface Query {
   source_type?: string;
   source_id?: string;
 }
-// Response: ocsfEventsPageSchema, ../contract/src/features/ocsf/ocsf-siem.ts:122
+// Response: ocsfEventsPageSchema, ../contract/src/features/ocsf/ocsf-siem.ts:137
 interface Response {
   ocsf_version: string;
   data: Record<string, unknown>[];
@@ -1650,7 +1650,7 @@ Permission `complianceExport:view`. Entitlement `enterprise` (feature `OCSF_EXPO
 Answers at `/api/governance/ocsf/traces`, `/api/v1/governance/ocsf/traces`.
 
 ```typescript
-// Query: ocsfTracesQuerySchema, ../contract/src/features/ocsf/ocsf-siem.ts:96
+// Query: ocsfTracesQuerySchema, ../contract/src/features/ocsf/ocsf-siem.ts:111
 interface Query {
   limit?: number;
   since?: string;
@@ -1658,7 +1658,7 @@ interface Query {
   cursor?: string;
   project_id?: string;
 }
-type Response = z.infer<typeof ocsfEventsPageSchema>; // ../contract/src/features/ocsf/ocsf-siem.ts:122
+type Response = z.infer<typeof ocsfEventsPageSchema>; // ../contract/src/features/ocsf/ocsf-siem.ts:137
 ```
 
 #### `GET /api/governance/ocsf/audit` · `listOcsfAudit`
@@ -1670,14 +1670,14 @@ Permission `complianceExport:view`. Entitlement `enterprise` (feature `OCSF_EXPO
 Answers at `/api/governance/ocsf/audit`, `/api/v1/governance/ocsf/audit`.
 
 ```typescript
-// Query: ocsfAuditQuerySchema, ../contract/src/features/ocsf/ocsf-siem.ts:104
+// Query: ocsfAuditQuerySchema, ../contract/src/features/ocsf/ocsf-siem.ts:119
 interface Query {
   limit?: number;
   since?: string;
   until?: string;
   cursor?: string;
 }
-type Response = z.infer<typeof ocsfEventsPageSchema>; // ../contract/src/features/ocsf/ocsf-siem.ts:122
+type Response = z.infer<typeof ocsfEventsPageSchema>; // ../contract/src/features/ocsf/ocsf-siem.ts:137
 ```
 
 #### `POST /api/governance/ocsf/ingest` · `ingestOcsfEvents`
@@ -1689,8 +1689,8 @@ Permission `governance:manage`. Entitlement `enterprise` (feature `OCSF_EXPORT`)
 Answers at `/api/governance/ocsf/ingest`, `/api/v1/governance/ocsf/ingest`.
 
 ```typescript
-type Body = z.infer<typeof ocsfIngestRequestSchema>; // ../contract/src/features/ocsf/ocsf-siem.ts:168
-// Response: ocsfIngestResponseSchema, ../contract/src/features/ocsf/ocsf-siem.ts:179
+type Body = z.infer<typeof ocsfIngestRequestSchema>; // ../contract/src/features/ocsf/ocsf-siem.ts:183
+// Response: ocsfIngestResponseSchema, ../contract/src/features/ocsf/ocsf-siem.ts:194
 interface Response {
   accepted: number;
 }

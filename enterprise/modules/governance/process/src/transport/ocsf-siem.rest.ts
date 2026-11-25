@@ -35,7 +35,7 @@ const BODY_LIMIT_BULK_BYTES = resolveRequestBound("bodyLimitBulkBytes", "ENTERPR
 const BODY_LIMIT_JSON_BYTES = resolveRequestBound("bodyLimitJsonBytes", "ENTERPRISE");
 
 const PAGING =
-  "Pass `next_cursor` back as `cursor` to read on; it is always set, so a puller stores it between runs. `has_more` is true when more events are already waiting. `since` (ISO 8601) starts the first read and a cursor carries its own position. `until` (ISO 8601) is not in the cursor: send it with every page.";
+  "Pass `next_cursor` back as `cursor` to read on; it is always set, so a puller stores it between runs. `has_more` is true when more events are already waiting. `since` (ISO 8601 with an offset, 1970-01-01T00:00:00Z or later) starts the first read and a cursor carries its own position. `until` (same format and lower bound) is not in the cursor: send it with every page.";
 
 export const ocsfSiemRest = defineRestRouter(GovernanceRestApi)
   .withNamespace("governance-ocsf")
