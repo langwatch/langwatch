@@ -55,6 +55,15 @@ function renderDialog(
   return host;
 }
 
+/** A clipboard write the test resolves by hand, so it can land after the dialog has closed. */
+function pendingCopy(): { promise: Promise<boolean>; resolve: (ok: boolean) => void } {
+  let resolve!: (ok: boolean) => void;
+  const promise = new Promise<boolean>((done) => {
+    resolve = done;
+  });
+  return { promise, resolve };
+}
+
 function useInCodeSection(): HTMLElement {
   return screen.getByRole("region", { name: "Use in Code" });
 }
@@ -452,6 +461,59 @@ describe("given a token has just been minted", () => {
       } finally {
         vi.useRealTimers();
       }
+    });
+
+    /** @scenario The dialog closes while a copy is still pending, and the copied state is never shown or reset afterwards */
+    it.each([
+      ["Copy API key", async () => screen.getByRole("button", { name: "Copy API key" })],
+      [
+        "the .env box",
+        async () => within(await boxLabelled(".env")).getByRole("button", { name: /copy/i }),
+      ],
+    ])("schedules no reset and logs nothing when %s resolves after unmount", async (_, button) => {
+      const host = renderDialog();
+      const pending = pendingCopy();
+      const clipboard = vi.spyOn(host, "copyToClipboard").mockReturnValue(pending.promise);
+      const errorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
+      const timerSpy = vi.spyOn(globalThis, "setTimeout");
+      fireEvent.click(await button());
+      expect(clipboard).toHaveBeenCalledTimes(1);
+
+      cleanup();
+      timerSpy.mockClear();
+      await act(async () => {
+        pending.resolve(true);
+        await pending.promise;
+        await vi.advanceTimersByTimeAsync(2000);
+      });
+
+      expect(timerSpy).not.toHaveBeenCalledWith(expect.any(Function), 2000);
+      expect(errorSpy).not.toHaveBeenCalled();
+      errorSpy.mockRestore();
+      timerSpy.mockRestore();
+    });
+
+    /** @scenario Copying twice restarts the reset window */
+    it("keeps the tick past the first window when copied again, then clears it after the second", async () => {
+      renderDialog();
+      const box = await boxLabelled(".env");
+      const copyButton = within(box).getByRole("button", { name: /copy/i });
+      const isChecked = () => copyButton.querySelector("svg.lucide-check") !== null;
+
+      fireEvent.click(copyButton);
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(1500);
+      });
+      fireEvent.click(copyButton);
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(1000);
+      });
+      expect(isChecked()).toBe(true);
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(1100);
+      });
+      expect(isChecked()).toBe(false);
     });
 
     /** @scenario Copy success is announced to assistive tech */
