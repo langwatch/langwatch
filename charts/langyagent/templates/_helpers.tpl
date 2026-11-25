@@ -76,7 +76,7 @@ ENVIRONMENT,PORT,LANGY_MAX_WORKERS,LANGY_WORKER_IDLE_MS,LANGY_WORKER_MAX_AGE_MS,
        number renders as its digits; anything else renders as toString does. */ -}}
 {{- define "langyagent.string" -}}
 {{- if and (kindIs "float64" .) (eq (floor .) .) -}}
-{{- int64 . -}}
+{{- printf "%.0f" . -}}
 {{- else -}}
 {{- toString . -}}
 {{- end -}}

@@ -39,6 +39,7 @@ extraConfig:
 service:
   annotations:
     example.com/budget: 2000000
+    example.com/huge: 100000000000000000000
 podLabels:
   generation: 3000000
 `
@@ -66,6 +67,7 @@ var Checks = []Check{
 			`LANGY_RATIO: "0.5"`,
 			`LOG_FORMAT: "json"`,
 			`example.com/budget: "2000000"`,
+			`example.com/huge: "100000000000000000000"`,
 			`generation: "3000000"`,
 		},
 	},
@@ -97,9 +99,13 @@ func (c Check) Run(render Render, dir string) error {
 
 // Verify reports every wanted line the manifest lacks and any number in scientific notation.
 func Verify(manifest string, want []string) error {
+	lines := map[string]bool{}
+	for _, line := range strings.Split(manifest, "\n") {
+		lines[strings.TrimSpace(line)] = true
+	}
 	var problems []string
 	for _, line := range want {
-		if !strings.Contains(manifest, line) {
+		if !lines[line] {
 			problems = append(problems, "missing "+line)
 		}
 	}

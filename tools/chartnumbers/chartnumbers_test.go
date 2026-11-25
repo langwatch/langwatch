@@ -42,9 +42,16 @@ func TestVerifyNamesScientificNotation(t *testing.T) {
 	}
 }
 
-func TestVerifyPassesDigits(t *testing.T) {
-	if err := Verify(`LANGY_WORKER_MAX_AGE_MS: "18000000"`, []string{`LANGY_WORKER_MAX_AGE_MS: "18000000"`}); err != nil {
+func TestVerifyPassesAnIndentedLine(t *testing.T) {
+	if err := Verify("data:\n  LANGY_WORKER_MAX_AGE_MS: \"18000000\"\n", []string{`LANGY_WORKER_MAX_AGE_MS: "18000000"`}); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestVerifyRefusesAKeyThatOnlyEndsTheSame(t *testing.T) {
+	manifest := "data:\n  OTHER_LANGY_WORKER_MAX_AGE_MS: \"18000000\"\n"
+	if err := Verify(manifest, []string{`LANGY_WORKER_MAX_AGE_MS: "18000000"`}); err == nil {
+		t.Fatal("a prefixed key must not satisfy the wanted line")
 	}
 }
 
