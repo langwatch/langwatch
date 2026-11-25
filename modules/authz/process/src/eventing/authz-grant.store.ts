@@ -26,6 +26,7 @@ import {
   type AuthzSharedProjectGrant,
   type DefineRoleCommandData,
   type GrantEventSource,
+  GrantPrincipalNotFoundError,
   newAuthzGrantId,
   type RevokeGrantCommandData,
 } from "@langwatch/authz-contract";
@@ -353,8 +354,8 @@ export class EventingAuthzLedgerAdapter implements AuthzCompatibilityLedger {
 
   /**
    * Each USER principal's current lifetime, read under its membership row
-   * lock. A user with no live membership refuses the batch: letting the grant
-   * through unstamped is the race this exists to close.
+   * lock. A user with no live membership refuses the batch as a principal outside the
+   * organisation: letting the grant through unstamped is the race this exists to close.
    */
   private async captureMembershipStamps({
     organizationId,
@@ -371,7 +372,10 @@ export class EventingAuthzLedgerAdapter implements AuthzCompatibilityLedger {
       userIds,
     });
     const stamps = new Map(rows.map((row) => [row.userId, row.membershipStamp]));
-    if (userIds.some((userId) => !stamps.has(userId))) throw new BindingMissingError();
+    const outside = userIds.find((userId) => !stamps.has(userId));
+    if (outside !== undefined) {
+      throw new GrantPrincipalNotFoundError({ principalType: "user", principalId: outside });
+    }
     return stamps;
   }
 
@@ -571,7 +575,10 @@ export class EventingAuthzLedgerAdapter implements AuthzCompatibilityLedger {
     return { grantId, wasAttached: true };
   }
 
-  /** ADR-201 §1: one braid's grant under a fresh id; the caller holds the reader's lock. */
+  /**
+   * ADR-201 §1: appends one braid's grant under the id its write recorded; the caller holds the
+   * lock and awaits the projection with `awaitSharedProjectGrants`, so it knows the append landed.
+   */
   async attachBraidGrant({
     organizationId,
     readerProjectId,
@@ -580,6 +587,9 @@ export class EventingAuthzLedgerAdapter implements AuthzCompatibilityLedger {
     expiresAtMs,
     replacesGrantId,
     actor,
+    grantId,
+    commandId,
+    occurredAtMs,
   }: {
     organizationId: string;
     readerProjectId: string;
@@ -588,15 +598,18 @@ export class EventingAuthzLedgerAdapter implements AuthzCompatibilityLedger {
     expiresAtMs?: number;
     replacesGrantId?: string;
     actor: LedgerActor;
+    /** Recorded by the braid service before the send; a resend reuses both (ADR-201 §1). */
+    grantId: string;
+    commandId: string;
+    occurredAtMs: number;
   }): Promise<{ grantId: string }> {
     refusePlatformTenant(organizationId);
-    const grantId = newAuthzGrantId();
     await (
       await this.commands()
     ).commands.attachGrant.send({
       tenantId: organizationId,
       organizationId,
-      commandId: this.options.newCommandId?.() ?? newCommandId(),
+      commandId,
       grant: {
         grantId,
         principal: { type: "project", id: readerProjectId },
@@ -607,10 +620,9 @@ export class EventingAuthzLedgerAdapter implements AuthzCompatibilityLedger {
         ...(replacesGrantId === undefined ? {} : { replacesGrantId }),
         source: GRANT_SOURCE_BRAID,
         actor,
-        occurredAtMs: this.now(),
+        occurredAtMs,
       },
     });
-    await this.awaitSharedProjectGrants({ organizationId, grantIds: [grantId] });
     return { grantId };
   }
 

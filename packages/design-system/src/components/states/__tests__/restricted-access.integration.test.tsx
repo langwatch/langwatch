@@ -108,6 +108,44 @@ describe("given an access gate inside a card", () => {
     expect(words).toContainElement(screen.getByRole("button", { name: "Request access" }));
   });
 
+  /** @scenario A gate that is a page's only content sits on the centre axis */
+  it("centres the words, the children and the actions when centred", () => {
+    renderWithDesignSystem(
+      <AccessState
+        kind="upgrade"
+        title="See every agent call"
+        description="Part of the Enterprise plan."
+        actions={<button type="button">See plans</button>}
+        centered
+        data-testid="gate"
+      >
+        <div data-testid="illustration" style={{ width: "100%" }} />
+      </AccessState>,
+    );
+    const gate = screen.getByTestId("gate");
+    const childrenWrapper = screen.getByTestId("illustration").parentElement!;
+    const actions = screen.getByRole("button", { name: "See plans" }).parentElement!;
+
+    expect(gate).toHaveAttribute("data-centered");
+    expect(getComputedStyle(gate).textAlign).toBe("center");
+    expect(getComputedStyle(gate).alignItems).toBe("center");
+    expect(getComputedStyle(childrenWrapper).alignItems).toBe("center");
+    // The wrapper spans the gate, so a child that fills the width still fills it.
+    expect(getComputedStyle(childrenWrapper).width).toBe("var(--chakra-sizes-full)");
+    expect(getComputedStyle(actions).justifyContent).toBe("center");
+  });
+
+  /** @scenario A gate that is a page's only content sits on the centre axis */
+  it("keeps the words on the start edge when not centred", () => {
+    renderWithDesignSystem(
+      <AccessState kind="upgrade" title="Locked" description="Upgrade." data-testid="gate" />,
+    );
+    const gate = screen.getByTestId("gate");
+
+    expect(gate).not.toHaveAttribute("data-centered");
+    expect(getComputedStyle(gate).textAlign).not.toBe("center");
+  });
+
   /** @scenario A gate inside a card draws no box of its own */
   it("stacks the lock above the words when it draws its own box", () => {
     renderWithDesignSystem(

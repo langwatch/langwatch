@@ -49,7 +49,6 @@ const MOVED_LABELS = [
   "gen-acceptance/actions",
   "gen-acceptance/seen",
   "gen-dropoff/main",
-  "data-health/fields",
 ];
 
 // The `traces` form each moved query had on main before tasks#1117, as the catalogue stored it.

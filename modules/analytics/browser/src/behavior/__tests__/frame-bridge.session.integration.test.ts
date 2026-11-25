@@ -17,6 +17,7 @@ const CONTEXT = {
   granularitySeconds: 60,
   theme: "light" as const,
 };
+const DARK_CONTEXT = { ...CONTEXT, theme: "dark" as const, colors: { "bg.card": "#18181b" } };
 const RESULT = {
   columns: [],
   rows: [],
@@ -35,6 +36,7 @@ afterEach(() => {
 function attach(
   executeQuery: ChartFrameExecuteQuery = () => new Promise(() => undefined),
   queryLane: WidgetQueryLane = createWidgetQueryLane({ limit: 8 }),
+  readDashboardContext: () => typeof CONTEXT | typeof DARK_CONTEXT = () => CONTEXT,
 ) {
   const iframe = document.createElement("iframe");
   document.body.appendChild(iframe);
@@ -47,10 +49,12 @@ function attach(
     source: "export default () => null;",
     executeQuery,
     queryLane,
-    dashboardContext: CONTEXT,
+    readDashboardContext,
     onLog: (entry) => events.push({ log: entry }),
     onHeightChange: (px) => events.push({ height: px }),
     onNavigate: (args) => events.push({ navigate: args }),
+    onAskLangy: (subject) => events.push({ askLangy: subject }),
+    onSignal: (signal) => events.push({ signal }),
     onTeardown: () => events.push("teardown"),
     onIdleChange: (idle) => events.push({ idle }),
   });
@@ -90,6 +94,15 @@ describe("the frame bridge session", () => {
     ]);
   });
 
+  /** @scenario "AC260b Langy widgets: switching the theme repaints a widget in the new colours" */
+  it("sends the context as it reads when the frame loads, not when the bridge began", () => {
+    let context: typeof CONTEXT | typeof DARK_CONTEXT = CONTEXT;
+    const { inits, load } = attach(undefined, undefined, () => context);
+    context = DARK_CONTEXT;
+    load();
+    expect(inits).toMatchObject([{ message: { type: "lw:init", dashboardContext: DARK_CONTEXT } }]);
+  });
+
   it("forwards height, navigation, logs and errors from the frame", async () => {
     const { events, load, send, bridge } = attach();
     load();
@@ -104,6 +117,54 @@ describe("the frame bridge session", () => {
       { log: { level: "warn", source: "console", text: "a b" } },
       { log: { level: "error", source: "render", text: "boom" } },
     ]);
+    bridge.dispose();
+  });
+
+  /**
+   * @scenario "AC124 Chart asks: clicking a bar or a point drafts Langy about that category and the period"
+   * @scenario "AC245 Chart asks: a click says what kind of value was clicked, its raw value and the bucket it starts"
+   */
+  it("forwards a clicked mark's kind, label, value, bucket and series, cut to length", async () => {
+    const { events, load, send, bridge } = attach();
+    load();
+    const at = "2026-11-03T00:00:00.000Z";
+    await send({
+      type: "lw:ask-langy",
+      subject: { kind: "day", label: " Nov 3 ", at, series: "Errors", extra: "dropped" },
+    });
+    await send({
+      type: "lw:ask-langy",
+      subject: { kind: "model", label: "gpt-5", value: "openai/gpt-5" },
+    });
+    await send({ type: "lw:ask-langy", subject: { label: "x".repeat(300), at: "Nov 3" } });
+    expect(events).toEqual([
+      { askLangy: { kind: "day", label: "Nov 3", at, series: "Errors" } },
+      { askLangy: { kind: "model", label: "gpt-5", value: "openai/gpt-5" } },
+      { askLangy: { label: "x".repeat(200) } },
+    ]);
+    bridge.dispose();
+  });
+
+  /** @scenario "AC244 Widget actions: Investigate and Propose a fix show only while the widget reports its problem" */
+  it("forwards a widget's problem signal and drops one of any other shape", async () => {
+    const { events, load, send, bridge } = attach();
+    load();
+    await send({ type: "lw:signal", signal: { problem: true } });
+    await send({ type: "lw:signal", signal: { problem: "yes" } });
+    await send({ type: "lw:signal" });
+    await send({ type: "lw:signal", signal: { problem: false } });
+    expect(events).toEqual([{ signal: { problem: true } }, { signal: { problem: false } }]);
+    bridge.dispose();
+  });
+
+  /** @scenario "AC124c Chart asks: a chart with nothing to investigate offers no click" */
+  it("drops an ask that names no label", async () => {
+    const { events, load, send, bridge } = attach();
+    load();
+    await send({ type: "lw:ask-langy", subject: { label: "  " } });
+    await send({ type: "lw:ask-langy", subject: "gpt-5" });
+    await send({ type: "lw:ask-langy" });
+    expect(events).toEqual([]);
     bridge.dispose();
   });
 

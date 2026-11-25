@@ -45,6 +45,7 @@
     "@langwatch/handled-error": "workspace:*",
     "@langwatch/instant-eval-contract": "workspace:*",
     "@langwatch/ksuid": "workspace:*",
+    "@langwatch/langy-client": "workspace:*",
     "@langwatch/langy-contract": "workspace:*",
     "@langwatch/model-provider-contract": "workspace:*",
     "@langwatch/observability": "workspace:*",
@@ -101,6 +102,7 @@
   "devDependencies": {
     "@langwatch/ksuid": "workspace:*",
     "@langwatch/span-normalisation": "workspace:*",
+    "@langwatch/test-harness": "workspace:*",
     "@langwatch/vitest-config": "workspace:*",
     "@tanstack/react-query": "catalog:",
     "@testing-library/jest-dom": "catalog:",

@@ -4,7 +4,7 @@
  * Spec: modules/authz/specs/braids-screen.feature, "The dialog builds a braid".
  */
 
-import { screen, waitFor, within } from "@testing-library/react";
+import { act, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -304,13 +304,15 @@ describe("the braid dialog", () => {
         await screen.findByTestId("braid-condition-check", {}, { timeout: 2000 }),
       ).toHaveAttribute("role", "alert");
       const orAt = CONDITION.length + 1;
-      expect(monacoRecorded.markers).toEqual([
-        expect.objectContaining({
-          message: expect.stringContaining("isn't supported."),
-          startColumn: orAt + 1,
-          endColumn: orAt + 3,
-        }),
-      ]);
+      await waitFor(() =>
+        expect(monacoRecorded.markers).toEqual([
+          expect.objectContaining({
+            message: expect.stringContaining("isn't supported."),
+            startColumn: orAt + 1,
+            endColumn: orAt + 3,
+          }),
+        ]),
+      );
       expect(screen.getByTestId("braid-save")).toBeDisabled();
 
       expect(screen.queryByTestId("braid-viewers")).toBeNull();
@@ -378,8 +380,50 @@ describe("the braid dialog", () => {
     });
   });
 
+  describe("when the dialog opens on a phone-width screen", () => {
+    /** @scenario The dialog fits a phone-width screen */
+    it("lets the form column shrink below its content's width", () => {
+      openDialog();
+
+      const columns = getComputedStyle(screen.getByTestId("braid-dialog-columns"));
+      expect(columns.gridTemplateColumns).toMatch(/^minmax\(0,\s*1fr\)$/);
+    });
+  });
+
+  describe("when ana accepts a key after the editor closed the bracket", () => {
+    /** @scenario Accepting an attribute key closes its bracket once */
+    it('gives attributes["orchestrator"] with one closing bracket', async () => {
+      braidTraces.state.attributeKeys = [{ key: "orchestrator", spanCount: 1200 }];
+      const { user } = openDialog();
+      await writeCondition(user, "attributes[]");
+      await waitFor(() => expect(monacoRecorded.provider).toBeDefined());
+      const text = "attributes[]";
+      const caret = "attributes[".length;
+
+      const [offered] = await waitFor(() => {
+        const result = monacoRecorded.provider!.provideCompletionItems(monacoRecorded.model, {
+          lineNumber: 1,
+          column: caret + 1,
+        }) as {
+          suggestions: {
+            insertText: string;
+            range: { startColumn: number; endColumn: number };
+          }[];
+        };
+        expect(result.suggestions).toHaveLength(1);
+        return result.suggestions;
+      });
+      // Monaco's default accept replaces exactly the item's range with its text.
+      const { startColumn, endColumn } = offered!.range;
+      const accepted =
+        text.slice(0, startColumn - 1) + offered!.insertText + text.slice(endColumn - 1);
+
+      expect(accepted).toBe('attributes["orchestrator"]');
+    });
+  });
+
   describe("when ana presses Escape in the condition", () => {
-    it("closes only the suggestion list while it is open, and the dialog after", async () => {
+    it("closes only the suggestion list while it is open, and asks before closing after", async () => {
       const { host, user } = openDialog();
       await writeCondition(user, "attributes[");
       const list = document.createElement("div");
@@ -393,6 +437,33 @@ describe("the braid dialog", () => {
 
       list.classList.remove("visible");
       await user.keyboard("{Escape}");
+      expect(await screen.findByRole("alertdialog", { name: "Discard this braid?" })).toBeVisible();
+      expect(host.queries).toEqual([]);
+    });
+
+    /** @scenario Escape asks before throwing away a changed draft */
+    it("discards the typed draft only once ana confirms", async () => {
+      const { host, user } = openDialog();
+      await pickReader(user);
+      await writeCondition(user, CONDITION);
+
+      await user.keyboard("{Escape}");
+      const ask = await screen.findByRole("alertdialog", { name: "Discard this braid?" });
+      expect(host.queries).toEqual([]);
+
+      // The confirm sits over the dialog, whose layer refuses pointer events in jsdom.
+      act(() => within(ask).getByRole("button", { name: "Discard" }).click());
+      expect(host.queries).toEqual([expect.objectContaining({ braid: undefined })]);
+    });
+
+    /** @scenario Escape asks before throwing away a changed draft */
+    it("closes an untouched dialog on Escape without asking", async () => {
+      const { host, user } = openDialog();
+      await screen.findByTestId("braid-condition");
+
+      await user.keyboard("{Escape}");
+
+      expect(screen.queryByRole("alertdialog")).toBeNull();
       expect(host.queries).toEqual([expect.objectContaining({ braid: undefined })]);
     });
   });
@@ -688,7 +759,66 @@ describe("the braid dialog", () => {
         }),
       );
       expect(host.queries.at(-1)).toEqual({ braid: undefined });
-      expect(host.successes.at(-1)?.title).toBe("Braid created");
+      expect(host.successes.at(-1)?.title).toBe("Braided into orchestrator");
+    });
+
+    describe("and the server answers that the access change is still processing", () => {
+      /** @scenario A braid still being saved is not offered for another save */
+      it("closes saying the braid is being saved, without inviting a retry", async () => {
+        braidsFake.state.saveError = { code: "authz_grant_not_confirmed", httpStatus: 503 };
+        const { host, user } = openDialog();
+        await pickReader(user);
+        await user.click(screen.getByTestId("braid-save"));
+
+        expect(host.successes.at(-1)?.title).toBe("The braid is being saved");
+        expect(host.failures).toEqual([]);
+        expect(host.queries.at(-1)).toEqual({ braid: undefined });
+      });
+    });
+
+    describe("and the first save fails before the server answers", () => {
+      let user: ReturnType<typeof userEvent.setup>;
+      beforeEach(async () => {
+        braidsFake.state.saveError = new Error("network down");
+        ({ user } = openDialog());
+        await pickReader(user);
+        await writeCondition(user, CONDITION);
+        await user.click(screen.getByTestId("braid-save"));
+      });
+
+      /** @scenario Saving the same braid again resends its command id */
+      it("resends the same command id for the same terms", async () => {
+        braidsFake.state.saveError = undefined;
+        await user.click(screen.getByTestId("braid-save"));
+
+        const sent = braidsFake.state.create.mock.calls.map(
+          ([input]) => (input as { commandId: string }).commandId,
+        );
+        expect(sent).toHaveLength(2);
+        expect(sent[0]).toMatch(/^[A-Za-z0-9_-]{16,64}$/);
+        expect(sent[1]).toBe(sent[0]);
+      });
+
+      it("sends a new command id once the condition changes", async () => {
+        await writeCondition(user, `${CONDITION} and attributes["tier"] == "gold"`);
+        await user.click(screen.getByTestId("braid-save"));
+
+        const sent = braidsFake.state.create.mock.calls.map(
+          ([input]) => (input as { commandId: string }).commandId,
+        );
+        expect(sent).toHaveLength(2);
+        expect(sent[1]).not.toBe(sent[0]);
+      });
+    });
+
+    /** @scenario The condition field says the reader's members can read it */
+    it("says the reader's members can read the condition", async () => {
+      const { user } = openDialog();
+      await pickReader(user);
+
+      expect(
+        screen.getByText(/Members of orchestrator can read this condition/),
+      ).toBeInTheDocument();
     });
 
     describe("and the server refuses it", () => {
@@ -739,6 +869,20 @@ describe("the braid dialog", () => {
       expect(braidsFake.state.change).toHaveBeenCalledWith(
         expect.objectContaining({ braidId: "b-1", readerProjectId: "p-orch", where: changed }),
       );
+    });
+
+    /** @scenario Editing a braid shows its real start */
+    it("reads the window from the braid's start date and time, never From now", async () => {
+      const startedToday = Date.now() - 60 * 60 * 1000;
+      braidsFake.state.project = {
+        intoOtherProjects: [liveBraid({ fromMs: startedToday })],
+        fromOtherProjects: [],
+      };
+      openDialog({ braid: "b-1" });
+
+      const summary = await screen.findByTestId("braid-window-summary");
+      expect(summary).not.toHaveTextContent("From now");
+      expect(summary).toHaveTextContent(/From .*UTC/);
     });
 
     /** @scenario Editing a braid saves only a change */

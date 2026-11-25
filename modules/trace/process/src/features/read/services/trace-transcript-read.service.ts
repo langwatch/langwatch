@@ -173,6 +173,7 @@ export class TraceTranscriptReadService {
       logs: logs.map((row) => ({
         timestampMs: row.timeUnixMs,
         attributes: row.attributes,
+        resourceAttributes: row.resourceAttributes,
         serviceName: row.resourceAttributes["service.name"] ?? null,
       })),
     });

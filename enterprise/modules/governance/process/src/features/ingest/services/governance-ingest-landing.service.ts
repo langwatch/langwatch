@@ -25,6 +25,6 @@ export class GovernanceIngestLandingService {
   }
 
   recordEvent(source: GovernanceIngestionSource): Promise<unknown> {
-    return this.members.sources.recordEventReceived(source.id);
+    return this.members.sources.recordEventReceived(source);
   }
 }

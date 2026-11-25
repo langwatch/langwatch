@@ -139,6 +139,36 @@ describe("heavy launchers and rush's gate", () => {
     }
   });
 
+  /** @scenario "A launcher never hands its run on twice" */
+  it("oxlint: a run haven starts again is not handed back to haven", () => {
+    for (const launcher of [launchers[2]]) {
+      const dir = mkdtempSync(join(tmpdir(), "heavy-launchers-"));
+      const calls = join(dir, "haven.calls");
+      const haven = join(dir, "haven");
+      writeFileSync(
+        haven,
+        `#!/bin/sh\necho call >> '${calls}'\nwhile [ "$1" != "--" ]; do shift; done\nshift\nexec "$@"\n`,
+      );
+      chmodSync(haven, 0o755);
+      const result = spawnSync(
+        process.execPath,
+        [...launcher.argv, ...(launcher.sub ?? []), "probe"],
+        {
+          cwd: dir,
+          encoding: "utf8",
+          timeout: 30_000,
+          env: { PATH: "/usr/bin:/bin", HOME: dir, RUSH_HOME: dir, HAVEN_BIN: haven },
+        },
+      );
+      assert.notEqual(
+        result.signal,
+        "SIGTERM",
+        `${launcher.program} kept handing its run to haven`,
+      );
+      assert.equal(readFileSync(calls, "utf8").trim(), "call", launcher.program);
+    }
+  });
+
   /** @scenario "haven's own UI rebuild never waits behind agent runs" */
   it("with-build-slot.sh: haven's stack build skips rush and haven, keeping the caps", () => {
     const helper = {

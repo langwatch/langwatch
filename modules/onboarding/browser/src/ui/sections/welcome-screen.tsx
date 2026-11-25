@@ -195,7 +195,7 @@ function initializedLandingPath({
   // track landings: finish what the user actually came to do.
   if (returnTo) return returnTo;
   // Land via "/" so the home resolver applies the org-intent rule
-  // (including the kill-switch fallback) instead of hardcoding /me.
+  // (including the kill-switch fallback) instead of hardcoding /coding-agents.
   if (isGovernanceTrack) return "/";
   // LLMOps signups always get a project; the null case is the
   // governance track, which returned above.

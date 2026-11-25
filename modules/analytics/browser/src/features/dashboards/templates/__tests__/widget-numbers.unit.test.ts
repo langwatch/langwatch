@@ -6,6 +6,7 @@
 
 import { describe, expect, it } from "vitest";
 
+import { MIDDLE } from "../model/question-chart-widgets.ts";
 import { NUMBERS } from "../model/widget-code-parts.ts";
 
 interface Helpers {
@@ -56,5 +57,19 @@ describe("the template number helpers", () => {
     expect(helpers.ratio(null, 4)).toBeNull();
     expect(helpers.ratio(1, 0)).toBeNull();
     expect(helpers.ratio(1, null)).toBeNull();
+  });
+});
+
+describe("the median a far-off bucket is read against", () => {
+  // oxlint-disable-next-line no-implied-eval
+  const middle = new Function(`${NUMBERS}\n${MIDDLE}\nreturn middle;`)() as (
+    values: unknown[],
+  ) => number | null;
+
+  /** @scenario "Template number helpers keep a missing value as a gap" */
+  it("averages the two middle values for an even count and skips gaps", () => {
+    expect(middle([1, 1, 10, 20])).toBe(5.5);
+    expect(middle([3, null, 1, 2])).toBe(2);
+    expect(middle([null])).toBeNull();
   });
 });

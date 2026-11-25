@@ -27,6 +27,13 @@ Feature: A module folds and maps a peer pipeline's events into its own state
     Then the state is unchanged and records the event once
 
   @unit
+  Scenario: A fold's enqueue filter declines an event before staging
+    Given a module declares a peer fold whose enqueue filter takes only some of the owner's events
+    When the owner's pipeline appends an event the filter declines and one it takes
+    Then only the event it takes is staged on the fold's lane
+    And the declined event mints no fold job and leaves the state unchanged
+
+  @unit
   Scenario: A peer fold's subscriber reacts to its committed state
     Given a module declares a peer fold with a subscriber
     When the owner's pipeline appends an event the fold takes

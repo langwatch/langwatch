@@ -12,7 +12,13 @@ import { Menu } from "@langwatch/design-system/menu";
 import { Badge, Box, Button, Text } from "@langwatch/design-system/primitives";
 import { Pause } from "lucide-react";
 
-import { type BraidRow, type BraidSide, braidAuditHref } from "../../../model/braids/braids.ts";
+import {
+  type BraidActivityCounts,
+  type BraidRow,
+  type BraidSide,
+  braidAuditHref,
+  braidRowActionsLabel,
+} from "../../../model/braids/braids.ts";
 import { BraidCondition } from "../../elements/braid-condition.tsx";
 import { BraidProjectLabel } from "../../elements/braid-project.tsx";
 import { BRAID_WINDOW_HEADER, BraidCreated, BraidWindow } from "../../elements/braid-window.tsx";
@@ -26,19 +32,32 @@ export type BraidsTableProps = {
   canEdit: boolean;
   canRemove: boolean;
   /** Spans per braid over the last 24 hours; undefined while counting. */
-  activity: ReadonlyMap<string, number> | undefined;
+  activity: BraidActivityCounts;
   onEdit: (row: BraidRow) => void;
   onRemove: (row: BraidRow) => void;
 };
 
 /** The Last 24 hours cell: the one place a paused row says so. */
-function Activity({ paused, spans }: { paused: boolean; spans: number | undefined }) {
+function Activity({ paused, spans }: { paused: boolean; spans: number | "failed" | undefined }) {
   if (paused) {
     return (
       <Badge size="sm" colorPalette="gray" width="fit-content" data-testid="braid-paused">
         <Pause size={12} aria-hidden />
         Paused
       </Badge>
+    );
+  }
+  if (spans === "failed") {
+    return (
+      <Text
+        textStyle="sm"
+        color="fg.warning"
+        data-testid="braid-activity"
+        data-failed
+        title="The span count could not be read just now. Reload the page to try again."
+      >
+        Couldn't count spans
+      </Text>
     );
   }
   return (
@@ -69,12 +88,6 @@ function auditHref({ row, projectName }: { row: BraidRow; projectName: string })
     readerName: projectName,
     ownerSlug: row.otherProject.slug,
   });
-}
-
-function rowName(row: BraidRow): string {
-  return row.side === "into"
-    ? `braid into ${row.otherProject.name}`
-    : `braid from ${row.otherProject.name}`;
 }
 
 export function BraidsTable({
@@ -128,7 +141,10 @@ export function BraidsTable({
               />
             </ListTable.Cell>
             <ListTable.Cell nowrap>
-              <Activity paused={paused} spans={activity?.get(row.braidId)} />
+              <Activity
+                paused={paused}
+                spans={activity === "failed" ? activity : activity?.get(row.braidId)}
+              />
             </ListTable.Cell>
             <ListTable.ActionCell>
               <Menu.Root>
@@ -136,7 +152,7 @@ export function BraidsTable({
                   <Button
                     size="xs"
                     variant="ghost"
-                    aria-label={`Actions for the ${rowName(row)}`}
+                    aria-label={braidRowActionsLabel(row)}
                     data-testid="braid-row-actions"
                   >
                     <MoreVerticalIcon size={14} aria-hidden />

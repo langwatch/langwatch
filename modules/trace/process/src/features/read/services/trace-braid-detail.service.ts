@@ -10,7 +10,10 @@ import {
 
 /** The peers a braided read asks about owners and audits through (ADR-201 §5, §8). */
 export interface TraceBraidDirectory {
-  authz: Pick<AuthzApi, "hasPermission" | "listBraids" | "recordBraidedSpansView">;
+  authz: Pick<
+    AuthzApi,
+    "assertBraidsReleased" | "hasPermission" | "listBraids" | "recordBraidedSpansView"
+  >;
   projects: Pick<ProjectApi, "findSummaryById">;
 }
 
@@ -24,6 +27,12 @@ export class TraceBraidDetailService {
 
   private constructor(directory: TraceBraidDirectory) {
     this.#directory = directory;
+  }
+
+  /** The owner's name for copy shown to the reader; its id when the project is gone. */
+  async ownerName({ ownerProjectId }: { ownerProjectId: string }): Promise<string> {
+    const owner = await this.#directory.projects.findSummaryById(ownerProjectId);
+    return owner?.name ?? ownerProjectId;
   }
 
   /** The span panel's `braid`: the owner's slug only for a viewer who may open the owner. */
