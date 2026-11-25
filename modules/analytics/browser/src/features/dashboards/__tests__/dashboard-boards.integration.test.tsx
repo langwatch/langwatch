@@ -537,7 +537,7 @@ describe("a member's board", () => {
         expect(host.langyAsks).toHaveLength(1);
         const [ask] = host.langyAsks;
         expect(ask?.question).toBeUndefined();
-        expect(ask?.draft).toMatch(/^What does ".+" show over the last 30 days\?/);
+        expect(ask?.draft).toMatch(/^Hey Langy, about the .+ chart: $/);
         expect(ask?.context[1]?.ref).toContain(`how to answer it: ${traffic.prompt}`);
         expect(ask?.context[0]).toMatchObject({ kind: "dashboard", label: "Weekly review" });
         expect(ask?.context[0]?.ref).toContain('dashboard "Weekly review" (id board-1)');
@@ -837,7 +837,7 @@ describe("a member's board", () => {
         await waitFor(() => expect(host.lastQuery).toEqual({ addBlock: void 0 }));
         await waitFor(() => expect(host.langyAsks).toHaveLength(1));
         expect(server.state.widgets.map(({ name }) => name)).toEqual([traffic.question]);
-        expect(host.langyAsks[0]?.draft).toContain(`What does "${traffic.question}" show`);
+        expect(host.langyAsks[0]?.draft).toBe(`Hey Langy, about the ${traffic.question} chart: `);
         expect(host.langyAsks[0]?.context[1]?.ref).toContain(`widget "${traffic.question}"`);
         expect(host.langyAsks[0]?.context[1]?.ref).toContain("queries (LangWatchQL):");
       });

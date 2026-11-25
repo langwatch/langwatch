@@ -226,7 +226,7 @@ describe("an ask made on a new board before it was stored", () => {
   });
 
   /** @scenario "AC162e Asking Langy on a new board stores it first" */
-  it("leaves a widget's name and queries as they were, and moves only its key", () => {
+  it("moves the board id in a widget's ref and key, leaving its name and queries", () => {
     const board = boardSubject({ board: { id: "new", name: "Untitled dashboard 3" }, widgets: [] });
     const widget = {
       id: "w-1",
@@ -237,7 +237,14 @@ describe("an ask made on a new board before it was stored", () => {
 
     const told = askAboutStoredBoard({ request: asked, draftId: "new", dashboardId: "board-9" });
 
-    expect(told.context[1]?.ref).toBe(asked.context[1]?.ref);
+    expect(told.context[1]?.ref).toBe(
+      asked.context[1]?.ref?.replace(
+        'on dashboard "Untitled dashboard 3" (id new)',
+        'on dashboard "Untitled dashboard 3" (id board-9)',
+      ),
+    );
+    expect(told.context[1]?.ref).toContain('widget "dashboard \\"y\\" (id new)" (id w-1)');
+    expect(told.context[1]?.ref).toContain(`SELECT 'dashboard "z" (id new)'`);
     expect(told.context[1]?.key).toBe("dashboard:board-9:widget:w-1");
     expect(told.context[0]?.ref).toContain('"Untitled dashboard 3" (id board-9)');
   });

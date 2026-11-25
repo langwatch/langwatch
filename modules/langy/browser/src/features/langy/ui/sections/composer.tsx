@@ -70,6 +70,7 @@ const CONTEXT_ICON: Record<LangyContextChip["kind"], LucideIcon> = {
   prompt: FileText,
   dataset: Database,
   dashboard: LayoutDashboard,
+  widget: LayoutDashboard,
   scenario: MessagesSquare,
   evaluation: ClipboardCheck,
   selection: ListChecks,
@@ -107,7 +108,11 @@ function useComposerFocusHandoff({
     const frame = requestAnimationFrame(() => {
       const field = textareaRef.current;
       field?.focus();
-      if (field && document.activeElement === field) consumeComposerFocus();
+      // The cursor waits at the end of a seeded draft, so the reader types on from it.
+      if (field && document.activeElement === field) {
+        field.setSelectionRange(field.value.length, field.value.length);
+        consumeComposerFocus();
+      }
     });
     return () => cancelAnimationFrame(frame);
   }, [composerFocusRequested, hero, consumeComposerFocus, textareaRef, panelShownCount]);

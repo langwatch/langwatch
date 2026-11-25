@@ -123,7 +123,8 @@ describe("Ask Langy on a widget card", () => {
 
     describe("when the member clicks it", () => {
       /** @scenario "AC121 Ask Langy: clicking drafts the widget's prompt with its name, queries and the period" */
-      it("hands Langy a draft of the widget's prompt, the widget and the period, with the board", async () => {
+      /** @scenario "AC121c Ask Langy: the widget rides as a widget chip, its queries never in the text" */
+      it("opens Langy with the short draft and the widget chip, with the board", async () => {
         const user = userEvent.setup({ pointerEventsCheck: 0 });
         const host = openBoard({ server: inMemoryServer() });
 
@@ -132,8 +133,9 @@ describe("Ask Langy on a widget card", () => {
         expect(host.langyAsks).toHaveLength(1);
         const [request] = host.langyAsks;
         expect(request?.question).toBeUndefined();
-        expect(request?.draft).toMatch(/^What does "Traffic" show over the last 30 days\?/);
+        expect(request?.draft).toBe("Hey Langy, about the Traffic chart: ");
         expect(request?.draft).not.toContain(SQL);
+        expect(request?.context[1]).toMatchObject({ kind: "widget", label: "widget: Traffic" });
         const widgetRef = request?.context[1]?.ref ?? "";
         expect(widgetRef).toContain(`how to answer it: ${PROMPT}`);
         expect(widgetRef).toContain("description: Traces per bucket");

@@ -1,5 +1,3 @@
-import { LANGY_WIDGET_CHIP_LABEL_PREFIX } from "@langwatch/langy-contract";
-
 import { type LangyContextChip } from "../../../behavior/langy.store.ts";
 import { shortenChipId } from "./langy-context-chips.ts";
 
@@ -30,6 +28,7 @@ const CHIP_ACTIONS: Record<Exclude<LangyContextChip["kind"], "selection">, strin
   prompt: "Langy will read this prompt and its versions.",
   scenario: "Langy will read this simulation run.",
   dashboard: "Langy will read this dashboard.",
+  widget: "Langy will read this widget's data and queries.",
   workflow: "Langy will read this workflow and how it is wired up.",
   agent: "Langy will read this agent's configuration.",
   automation: "Langy will read this automation, what fires it and what it does.",
@@ -37,15 +36,10 @@ const CHIP_ACTIONS: Record<Exclude<LangyContextChip["kind"], "selection">, strin
   project: "Langy always works in the project you have open.",
 };
 
-/** A widget rides as a dashboard chip; it hands over its own data and queries. */
-const WIDGET_ACTION = "Langy will read this widget's data and queries.";
-
 export function describeChipContext(chip: LangyContextChip): LangyChipExplanation {
   if (chip.kind === "selection") return describeSelection(chip);
-  const isWidget =
-    chip.kind === "dashboard" && chip.label.startsWith(LANGY_WIDGET_CHIP_LABEL_PREFIX);
   return {
-    action: isWidget ? WIDGET_ACTION : CHIP_ACTIONS[chip.kind],
+    action: CHIP_ACTIONS[chip.kind],
     ...(chip.ref ? { payload: chip.ref } : {}),
   };
 }
