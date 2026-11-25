@@ -160,6 +160,48 @@ Feature: Migration order check
     Then the check passes
     And an edit inside the replay step's call still fails the check
 
+  # .withIdIndexes declares its step without quoting the id; another module's
+  # `after: [...]` list may quote it, and that reference is not a declaration.
+  @unit
+  Scenario: A released id-index step is frozen in its declaring call, not where another step orders after it
+    Given a release manifest on the base branch names "gateway:fill-id-indexes" and "ops:fill-event-log-id-index"
+    And the gateway module file declares the first with .withIdIndexes and no step option
+    And the ops module file declares the second with .withIdIndexes, after "gateway:fill-id-indexes"
+    And a comment line sits between the ops module's chain links before that call
+    When the PR adds an unrelated line to the ops module file
+    Then the check passes
+    And an edit inside either .withIdIndexes call still fails the check for that step
+    And removing the gateway's .withIdIndexes call fails the check as a removed step
+
+  # Only code declares: a comment can neither hide a call nor stand in for one,
+  # and a call belongs to the module whose defineProcessModule chain it is on.
+  @unit
+  Scenario: A released id-index step is read from its owner's call in code
+    Given the same released id-index steps
+    When the gateway's call has a space before its bracket and the PR edits it
+    Or a comment naming another step sits above the ops call's step option and the PR edits that call
+    Or the ops call's step option key is quoted, as "step" or 'step', and the PR edits that call
+    Or the gateway's defineProcessModule call is wrapped across lines with a trailing comma and the PR edits its call
+    Then the check fails for that step
+    When one module's chain holds two .withIdIndexes calls, one with no step option and one with its own
+    Then an edit to either call fails the check only when that call's own step was released
+    When the PR comments the gateway's call out
+    Or another module's file names the gateway module in a comment beside an identical call
+    Then removing the gateway's call still fails the check as a removed step
+
+  @unit
+  Scenario: An after list with a comment before its colon or its bracket is still a reference
+    Given a released step is named only in an `after: /* comment */ [...]` or `after /* comment */: [...]` list
+    When the PR adds an unrelated line to that file
+    Then the check passes
+
+  # Only an `after` property in code starts a reference list.
+  @unit
+  Scenario: After-list text in a comment or a string is not an after list
+    Given a file names a released step in code, after a comment or a string holding "after: ["
+    When the PR adds an unrelated line to that file
+    Then the check fails for that step
+
   @unit
   Scenario: A code step no release manifest names yet may still change
     Given a module file declares the code step "topic:seed-clusters"

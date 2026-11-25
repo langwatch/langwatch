@@ -40,6 +40,23 @@ type Bundle struct {
 	// it the key is finished and the request is refused. The zero value means
 	// the key has no expiration date and never runs out.
 	VirtualKeyExpiresAt time.Time
+
+	// SecretValidUntil is the end of the rotation grace when the presented
+	// credential is a rotated key's previous secret, from the
+	// secret_valid_until claim; zero otherwise. Only a new token sets it: a
+	// config refresh describes the key, not the secret, and leaves it as is.
+	SecretValidUntil time.Time
+}
+
+// ServesUntil is the instant this bundle stops being servable from cache: the
+// earlier of the key's own expiration date and the presented secret's grace
+// end. The zero value means neither applies.
+func (b *Bundle) ServesUntil() time.Time {
+	until := b.VirtualKeyExpiresAt
+	if !b.SecretValidUntil.IsZero() && (until.IsZero() || b.SecretValidUntil.Before(until)) {
+		until = b.SecretValidUntil
+	}
+	return until
 }
 
 // KeyExpired reports whether the virtual key's own expiration date has passed
@@ -51,6 +68,13 @@ type Bundle struct {
 // instant would answer a request the control plane rejects.
 func (b *Bundle) KeyExpired(now time.Time) bool {
 	return !b.VirtualKeyExpiresAt.IsZero() && !now.Before(b.VirtualKeyExpiresAt)
+}
+
+// SecretEnded reports whether the presented secret's rotation grace has ended
+// at instant now. The key itself may still serve its current secret, so an
+// ended secret is an unknown credential, not an expired key.
+func (b *Bundle) SecretEnded(now time.Time) bool {
+	return !b.SecretValidUntil.IsZero() && !now.Before(b.SecretValidUntil)
 }
 
 // ConnectServiceManagedModels is the entitlement a license needs before its
@@ -100,6 +124,10 @@ type BundleConfig struct {
 
 	// CacheRules lists priority-ordered cache control rules.
 	CacheRules []CacheRule
+
+	// A2ATargets lists the agents this key may reach through /a2a/{target},
+	// project-scoped entries already preferred over org-wide ones of the same name.
+	A2ATargets []A2ATarget
 
 	// TraceProjectID is the project customer traces are EXPORTED to. It is NOT
 	// necessarily the VK's own project: the control plane stores a destination on

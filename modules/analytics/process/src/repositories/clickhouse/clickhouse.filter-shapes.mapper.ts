@@ -1,3 +1,5 @@
+import type { SpanAnalyticsFloor } from "@langwatch/trace-contract";
+
 import type { FilterOption } from "../filter-options.repository.ts";
 
 /** Trace's translation of the other filters a picker is narrowed by. */
@@ -19,6 +21,8 @@ export type ClickHouseFilterQueryParams = {
    * inside the member's window, not when it ran (ADR-177 v4.15).
    */
   readsMembers?: boolean;
+  /** Where span_analytics is complete; absent or null, span types come from stored_spans. */
+  spanAnalyticsFloor?: SpanAnalyticsFloor | null | undefined;
 };
 
 /**

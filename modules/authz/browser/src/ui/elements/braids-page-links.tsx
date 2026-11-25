@@ -5,9 +5,7 @@ import { Link } from "@langwatch/browser-host/link";
 import { HStack, Text } from "@langwatch/design-system/primitives";
 import { ExternalLink } from "lucide-react";
 
-import { BRAIDS_GUIDE_HREF } from "../../model/braids/braids.ts";
-
-const ORGANIZATION_BRAIDS_HREF = "/settings/organization-braids";
+import { BRAIDS_GUIDE_HREF, ORGANIZATION_BRAIDS_HREF } from "../../model/braids/braids.ts";
 
 export function BraidsPageLinks({
   organization,

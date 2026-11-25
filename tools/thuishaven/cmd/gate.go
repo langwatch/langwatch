@@ -25,7 +25,7 @@ func runHeavy(ctx context.Context, d deps, inv invocation) error {
 	if class := inv.value("--class"); class != "" && class != domain.HeavySlotClass {
 		return fmt.Errorf("haven machine run has one slot class today, %q — not %q", domain.HeavySlotClass, class)
 	}
-	if domain.UnderRushGate(os.Getenv) {
+	if domain.UnderRushGate(os.Getenv, os.ReadFile, nil) {
 		return execUnderRush([]string{"bash", "-lc", shell}, d.worktree)
 	}
 	return d.orch.RunHeavy(ctx, app.HeavyRun{

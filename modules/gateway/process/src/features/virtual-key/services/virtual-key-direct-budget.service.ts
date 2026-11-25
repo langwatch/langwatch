@@ -1,5 +1,5 @@
 import type { GatewayBudget } from "@langwatch/gateway-contract";
-import { GatewayWindow } from "@langwatch/gateway-contract";
+import { effectiveBudgetPeriod } from "@langwatch/gateway-contract";
 import { createLogger } from "@langwatch/observability";
 import type { ProjectApi } from "@langwatch/project-contract";
 /**
@@ -184,7 +184,7 @@ export class VirtualKeyDirectBudgetService {
         // stored instant is only rewritten when the window changes, so a
         // budget that has been running for days carries a reset moment
         // that has already passed.
-        resetsAt: GatewayWindow.nextResetAt(budget.window, now).toString({
+        resetsAt: effectiveBudgetPeriod(budget, now).resetsAt.toString({
           fractionalSecondDigits: 3,
         }),
       });

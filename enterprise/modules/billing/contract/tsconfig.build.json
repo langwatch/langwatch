@@ -8,7 +8,7 @@
       "@langwatch/enterprise-billing-contract": ["./src/index.ts"]
     }
   },
-  "files": ["./src/index.ts"],
+  "files": ["./src/index.ts", "./src/testing.ts"],
   "include": ["src/**/*.ts", "src/**/*.tsx", "src/**/*.json"],
   "exclude": [
     "**/__tests__/**",
@@ -18,11 +18,16 @@
     "**/*.spec.*",
     "**/*.stories.*",
     "**/*.bench.*",
-    "**/__bench__/**"
+    "**/__bench__/**",
+    "**/testing.ts",
+    "**/testing.tsx"
   ],
   "references": [
     {
       "path": "../../../../packages/config/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../modules/data-retention/contract/tsconfig.build.json"
     },
     {
       "path": "../../licensing/contract/tsconfig.build.json"

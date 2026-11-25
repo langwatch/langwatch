@@ -1,7 +1,7 @@
 Feature: AI Tools Portal - Default catalog provisioning
   As a brand-new organization signing up to LangWatch
   I want the standard set of AI tools provisioned for me automatically
-  So that my members' /me portal renders useful tiles on its very first
+  So that my members' /coding-agents portal renders useful tiles on its very first
   load instead of an "Add your first tools" empty state
 
     Provisioning is zero-touch and strictly conservative: it only ever
@@ -72,7 +72,7 @@ Feature: AI Tools Portal - Default catalog provisioning
   @integration
   Scenario: A member's first portal load of a zero-row organization returns the provisioned catalog
     Given a MEMBER of the brand-new organization
-    When the member opens their /me portal for the first time
+    When the member opens their /coding-agents portal for the first time
     Then the portal shows the 9 standard tiles, all enabled
     And the member sees tile sections, never the empty state
 

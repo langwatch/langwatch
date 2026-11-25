@@ -1,41 +1,68 @@
 import { type Authorization, honourSpanBraids, withoutSpanBraids } from "@langwatch/authorization";
+import type { AuthzApi } from "@langwatch/authz-contract";
 import { type EntitlementApi, isEnterpriseTier } from "@langwatch/entitlement-contract";
+import type { Logger } from "@langwatch/observability";
 import { nowInstant } from "@langwatch/time";
 
 import { TraceTtlCacheService } from "../../../services/trace-ttl-cache.service.ts";
 import { readsBraidedSpans } from "../../braid/rules/braided-span-owner.rules.ts";
 
 type BraidPlans = Pick<EntitlementApi, "getActivePlan">;
+type BraidSettings = Pick<AuthzApi, "getOrganizationPolicy">;
+type TraceBraidPauseDeps = {
+  plans: BraidPlans;
+  settings: BraidSettings;
+  logger: Pick<Logger, "error">;
+};
 
 /**
- * Braids pause below Enterprise and are kept (ADR-201 §9): the trace module, which owns the
- * merged read, asks the plan, and only it may honour them; a proof it never saw reads none. Cached
- * per organisation for no longer than the proof that asked lives.
+ * Braids pause below Enterprise and while the organisation has Braids turned off (ADR-201 §9).
+ * Cached per organisation no longer than the asking proof, so a change shows within its bound;
+ * a failed setting read drops the braids for that read alone and keeps the own-project grant.
  */
 export class TraceBraidPauseService {
-  static create(deps: { plans: BraidPlans }): TraceBraidPauseService {
-    return new TraceBraidPauseService(deps.plans);
+  static create(deps: TraceBraidPauseDeps): TraceBraidPauseService {
+    return new TraceBraidPauseService(deps);
   }
 
-  readonly #enterprise = TraceTtlCacheService.create<boolean>(0);
+  readonly #honours = TraceTtlCacheService.create<boolean>(0);
 
-  private constructor(private readonly plans: BraidPlans) {}
+  private constructor(private readonly deps: TraceBraidPauseDeps) {}
 
-  /** The proof as the read may honour it: braids honoured on Enterprise, stripped below it. */
+  /** The proof as the read may honour it: braids honoured when on, stripped while paused. */
   async honoured({ authorization }: { authorization: Authorization }): Promise<Authorization> {
     if (!readsBraidedSpans(authorization)) return authorization;
-    const enterprise = await this.isEnterprise(authorization);
-    return enterprise ? honourSpanBraids({ authorization }) : withoutSpanBraids(authorization);
+    const honours = await this.honoursBraids(authorization);
+    return honours ? honourSpanBraids({ authorization }) : withoutSpanBraids(authorization);
   }
 
-  private async isEnterprise(authorization: Authorization): Promise<boolean> {
+  private async honoursBraids(authorization: Authorization): Promise<boolean> {
     const { organizationId } = authorization.scope;
-    const cached = await this.#enterprise.get(organizationId);
+    const cached = await this.#honours.get(organizationId);
     if (cached.kind === "hit") return cached.value;
-    const plan = await this.plans.getActivePlan({ organizationId });
-    const enterprise = isEnterpriseTier(plan.type);
+    const { honours, known } = await this.askHonours({ organizationId });
     const lifeMs = authorization.expiresAt - nowInstant().epochMilliseconds;
-    if (lifeMs > 0) await this.#enterprise.set(organizationId, enterprise, lifeMs);
-    return enterprise;
+    if (known && lifeMs > 0) await this.#honours.set(organizationId, honours, lifeMs);
+    return honours;
+  }
+
+  /** The plan first: below Enterprise the setting is never asked. An unread setting is not kept. */
+  private async askHonours({
+    organizationId,
+  }: {
+    organizationId: string;
+  }): Promise<{ honours: boolean; known: boolean }> {
+    const plan = await this.deps.plans.getActivePlan({ organizationId });
+    if (!isEnterpriseTier(plan.type)) return { honours: false, known: true };
+    try {
+      const policy = await this.deps.settings.getOrganizationPolicy({ organizationId });
+      return { honours: policy.braidsEnabled, known: true };
+    } catch (error) {
+      this.deps.logger.error(
+        { error, organizationId },
+        "braids setting read failed; braids dropped",
+      );
+      return { honours: false, known: false };
+    }
   }
 }

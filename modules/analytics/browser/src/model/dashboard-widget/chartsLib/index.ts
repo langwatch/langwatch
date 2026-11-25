@@ -34,7 +34,17 @@ declare const window: {
 // Theme + color helpers
 // ---------------------------------------------------------------------------
 
-const DEFAULT_HEIGHT = 240;
+/**
+ * A chart with no height fills the frame, which is the card's body, so no bar is cut off at
+ * the size a new widget lands at. Inside a parent with no height of its own it keeps this floor.
+ */
+const DEFAULT_HEIGHT = "100%";
+const MIN_FILL_HEIGHT_PX = 120;
+
+/** The floor a chart with no height keeps; a passed height, `"100%"` included, is kept as given. */
+function fillFloor(height: number | string | undefined): { minHeight?: number } {
+  return height === undefined ? { minHeight: MIN_FILL_HEIGHT_PX } : {};
+}
 
 /** Resolved by the host before crossing the opaque iframe boundary. */
 function token(name: string): string {
@@ -527,7 +537,7 @@ export interface AreaTimeseriesProps {
   stacked?: boolean;
   projectionFrom?: string | number;
   colors?: string[];
-  height?: number;
+  height?: number | string;
   /** How the hover prints a value. */
   format?: MetricFormat;
   /** What the hover says over a bucket with no data, from its date: "No evals ran on Oct 7". */
@@ -683,7 +693,7 @@ export function AreaTimeseries({
   stacked,
   projectionFrom,
   colors,
-  height = DEFAULT_HEIGHT,
+  height,
   format,
   gapLabel = (date) => `No data on ${date}`,
 }: AreaTimeseriesProps) {
@@ -750,14 +760,14 @@ export function AreaTimeseries({
 
   return h(
     "div",
-    { style: { height, display: "flex", flexDirection: "column" } },
+    { style: { height: height ?? DEFAULT_HEIGHT, display: "flex", flexDirection: "column" } },
     keys.length > 1 && legendBar(keys, palette, c),
     h(
       "div",
       { style: { flex: 1, minHeight: 0 } },
       h(
         R.ResponsiveContainer,
-        { width: "100%", height: "100%" },
+        { width: "100%", height: "100%", ...fillFloor(height) },
         h(
           R.ComposedChart,
           { data: rows, margin: { top: 6, right: 8, bottom: 0, left: 0 } },
@@ -832,17 +842,10 @@ export interface StackedBarsProps {
   series: string[];
   projectionFrom?: string | number;
   colors?: string[];
-  height?: number;
+  height?: number | string;
 }
 
-export function StackedBars({
-  data,
-  x,
-  series,
-  projectionFrom,
-  colors,
-  height = DEFAULT_HEIGHT,
-}: StackedBarsProps) {
+export function StackedBars({ data, x, series, projectionFrom, colors, height }: StackedBarsProps) {
   const R = recharts();
   const c = chrome();
   const palette = paletteFor(colors);
@@ -850,14 +853,14 @@ export function StackedBars({
 
   return h(
     "div",
-    { style: { height, display: "flex", flexDirection: "column" } },
+    { style: { height: height ?? DEFAULT_HEIGHT, display: "flex", flexDirection: "column" } },
     series.length > 1 && legendBar(series, palette, c),
     h(
       "div",
       { style: { flex: 1, minHeight: 0 } },
       h(
         R.ResponsiveContainer,
-        { width: "100%", height: "100%" },
+        { width: "100%", height: "100%", ...fillFloor(height) },
         h(
           R.BarChart,
           { data, margin: { top: 6, right: 8, bottom: 0, left: 0 } },
@@ -905,30 +908,24 @@ export interface GroupedBarsProps {
   x: string;
   series: string[];
   colors?: string[];
-  height?: number;
+  height?: number | string;
 }
 
-export function GroupedBars({
-  data,
-  x,
-  series,
-  colors,
-  height = DEFAULT_HEIGHT,
-}: GroupedBarsProps) {
+export function GroupedBars({ data, x, series, colors, height }: GroupedBarsProps) {
   const R = recharts();
   const c = chrome();
   const palette = paletteFor(colors);
 
   return h(
     "div",
-    { style: { height, display: "flex", flexDirection: "column" } },
+    { style: { height: height ?? DEFAULT_HEIGHT, display: "flex", flexDirection: "column" } },
     series.length > 1 && legendBar(series, palette, c),
     h(
       "div",
       { style: { flex: 1, minHeight: 0 } },
       h(
         R.ResponsiveContainer,
-        { width: "100%", height: "100%" },
+        { width: "100%", height: "100%", ...fillFloor(height) },
         h(
           R.BarChart,
           { data, margin: { top: 6, right: 8, bottom: 0, left: 0 } },
@@ -976,7 +973,7 @@ export interface ProjectionBarsProps {
   projectionFrom: string | number;
   budget?: number;
   colors?: string[];
-  height?: number;
+  height?: number | string;
 }
 
 export function ProjectionBars({
@@ -986,7 +983,7 @@ export function ProjectionBars({
   projectionFrom,
   budget,
   colors,
-  height = DEFAULT_HEIGHT,
+  height,
 }: ProjectionBarsProps) {
   const R = recharts();
   const c = chrome();
@@ -995,7 +992,7 @@ export function ProjectionBars({
 
   return h(
     R.ResponsiveContainer,
-    { width: "100%", height },
+    { width: "100%", height: height ?? DEFAULT_HEIGHT, ...fillFloor(height) },
     h(
       R.BarChart,
       { data, margin: { top: 6, right: 8, bottom: 0, left: 0 } },
@@ -1061,24 +1058,17 @@ export interface DonutProps {
   valueKey: string;
   centerLabel?: string;
   colors?: string[];
-  height?: number;
+  height?: number | string;
 }
 
-export function Donut({
-  data,
-  nameKey,
-  valueKey,
-  centerLabel,
-  colors,
-  height = DEFAULT_HEIGHT,
-}: DonutProps) {
+export function Donut({ data, nameKey, valueKey, centerLabel, colors, height }: DonutProps) {
   const R = recharts();
   const c = chrome();
   const palette = paletteFor(colors);
 
   return h(
     "div",
-    { style: { height, display: "flex", flexDirection: "column" } },
+    { style: { height: height ?? DEFAULT_HEIGHT, display: "flex", flexDirection: "column" } },
     data.length > 1 &&
       legendBar(
         data.map((row) => String(row[nameKey])),
@@ -1090,7 +1080,7 @@ export function Donut({
       { style: { flex: 1, minHeight: 0, position: "relative", width: "100%" } },
       h(
         R.ResponsiveContainer,
-        { width: "100%", height: "100%" },
+        { width: "100%", height: "100%", ...fillFloor(height) },
         h(
           R.PieChart,
           {},
@@ -1154,7 +1144,7 @@ export interface LeaderboardProps {
   valueKey: string;
   max?: number;
   format?: MetricFormat;
-  height?: number;
+  height?: number | string;
   navigateTo?: { target: string; params: (row: Row) => object };
   /**
    * The report's unpriced models, for a cost list by model: each gets a "no price" row with a
@@ -1299,7 +1289,7 @@ export interface HeatmapProps {
   colorScale?: [string, string];
   /** "count": a cell with no row is 0. "measure" (default): it is a gap, drawn empty. */
   kind?: SeriesKind;
-  height?: number;
+  height?: number | string;
 }
 
 /** The default heatmap scale, also the fallback for an unparsable colorScale. */
@@ -1401,7 +1391,7 @@ export function Heatmap({
 // Table (internal — LwqlChart's fallback kind; not exported on its own)
 // ---------------------------------------------------------------------------
 
-function Table({ data, height }: { data: Row[]; height?: number }) {
+function Table({ data, height }: { data: Row[]; height?: number | string }) {
   const c = chrome();
   const cols = columnsOf(data);
   return h(
@@ -1475,7 +1465,7 @@ export interface LwqlChartProps {
   y?: string | string[];
   series?: string;
   colors?: string[];
-  height?: number;
+  height?: number | string;
   /** The report's unpriced models; a leaderboard lists each with "no price". */
   unpriced?: { models: readonly string[] };
 }
@@ -1525,16 +1515,7 @@ function inferShape(data: Row[], x?: string, y?: string | string[]): InferredSha
  * `series`) and renders it -- see the file header and the per-kind rules in this module.
  */
 // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: independent fallbacks.
-export function LwqlChart({
-  data,
-  kind,
-  x,
-  y,
-  series,
-  colors,
-  height = DEFAULT_HEIGHT,
-  unpriced,
-}: LwqlChartProps) {
+export function LwqlChart({ data, kind, x, y, series, colors, height, unpriced }: LwqlChartProps) {
   const inferred = inferShape(data, x, y);
   const resolvedKind = kind ?? inferred.kind;
   const resolvedX = x ?? inferred.x;

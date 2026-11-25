@@ -8,8 +8,10 @@ import {
   braidDraftChanged,
   braidDraftOf,
   braidTargetLabel,
+  braidStartsNow,
   braidTargetOptions,
   braidsOnPair,
+  newBraidDraft,
   pairBraidsPhrase,
   testTraceRows,
   withSignedCalls,
@@ -197,5 +199,22 @@ describe("braidTargetOptions", () => {
 
       expect(options.map((option) => option.projectId)).toEqual(["p-agg", "p-a", "p-own"]);
     });
+  });
+});
+
+describe("newBraidDraft", () => {
+  const nowMs = Date.UTC(2026, 10, 18, 14, 37, 12);
+
+  /** @scenario A new braid starts when it is made, not at midnight */
+  it("starts at the moment the dialog opened, never the start of that UTC day", () => {
+    const draft = newBraidDraft({ nowMs });
+
+    expect(draft.fromMs).toBe(nowMs);
+    expect(braidStartsNow({ fromMs: draft.fromMs, nowMs })).toBe(true);
+  });
+
+  /** @scenario Editing a braid shows its real start */
+  it("says a start earlier today is not now", () => {
+    expect(braidStartsNow({ fromMs: Date.UTC(2026, 10, 18), nowMs })).toBe(false);
   });
 });

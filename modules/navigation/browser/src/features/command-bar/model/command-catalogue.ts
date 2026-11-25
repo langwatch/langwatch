@@ -1,3 +1,4 @@
+import { NEW_DASHBOARD_PATH } from "@langwatch/analytics-client";
 import type { FrontendFeatureFlag } from "@langwatch/feature-flag-contract";
 import type { ProjectNavigation } from "@langwatch/project-contract";
 import {
@@ -642,6 +643,20 @@ export const actionCommands: Command[] = [
     keywords: ["invite", "member", "teammate", "add", "user", "people", "organization", "team"],
   },
 ];
+
+/**
+ * "Create a dashboard": the organization's library with its create dialog open, as each Dashboards
+ * section's "+" opens it. Offered only beside the Dashboards entry, and only where that library is.
+ */
+export const createDashboardCommand: Command = {
+  id: "action-create-dashboard",
+  label: "Create a dashboard",
+  description: "Open the new dashboard dialog",
+  icon: Plus,
+  category: "actions",
+  keywords: ["new dashboard", "create", "analytics", "chart"],
+  path: NEW_DASHBOARD_PATH,
+};
 
 /**
  * Support/help commands that open external links.

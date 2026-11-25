@@ -8,32 +8,47 @@ import { bucketOf, END, inPeriod, START } from "../../templates/model/lwql-perio
 /** How far back a model must have been silent for its first call to count as a change. */
 const NEW_MODEL_LOOKBACK_DAYS = 30;
 
-const MODEL_WINDOW = `BucketStart >= subtractDays(${START}, ${NEW_MODEL_LOOKBACK_DAYS})
-    AND BucketStart < ${END}
-    AND Model != ''`;
+// trace_metrics, not the per-minute rollup: the rollup keeps no origin, so a model only Langy or
+// a simulation ran would read as a change to production. Here the widget's sources apply.
+const MODEL_WINDOW = `OccurredAt >= subtractDays(${START}, ${NEW_MODEL_LOOKBACK_DAYS})
+      AND OccurredAt < ${END}
+      AND notEmpty(Models)`;
 
 // A model is new only once some other model ran a day before it, so the day a
 // project starts sending traffic is not marked as a change.
-const NEW_MODELS = `SELECT Model, min(BucketStart) AS first_seen
-  FROM model_usage_by_minute
-  WHERE ${MODEL_WINDOW}
+const NEW_MODELS = `SELECT Model, min(OccurredAt) AS first_seen
+  FROM (SELECT arrayJoin(Models) AS Model, OccurredAt
+    FROM trace_metrics
+    WHERE ${MODEL_WINDOW})
+  WHERE Model != ''
   GROUP BY Model
   HAVING first_seen >= ${START}
-    AND first_seen >= addDays((SELECT min(BucketStart) FROM model_usage_by_minute
+    AND first_seen >= addDays((SELECT min(OccurredAt) FROM trace_metrics
       WHERE ${MODEL_WINDOW}), 1)`;
 
 /** Every change in the period, unordered, with the bucket a chart marks it on. */
 export const CHANGES_SQL = `SELECT ${bucketOf("v.CreatedAt")} AS bucket, toDateTime(v.CreatedAt) AS at,
-  concat(p.PromptHandle, ' v', toString(v.VersionNumber)) AS label
+  concat('Prompt ', p.PromptHandle, ' v', toString(v.VersionNumber)) AS label
 FROM prompt_versions AS v
 INNER JOIN prompts AS p ON p.PromptId = v.PromptId
 WHERE ${inPeriod("v.CreatedAt")}
 LIMIT 50
 UNION ALL
 SELECT ${bucketOf("first_seen")} AS bucket, toDateTime(first_seen) AS at,
-  concat('model ', Model) AS label
+  concat('Model: ', Model) AS label
 FROM (${NEW_MODELS})
 LIMIT 50`;
+
+/**
+ * The name a person knows each managed prompt version by, "handle vN", keyed by the version id
+ * a trace stores; newest first, so a widget names the versions it marks.
+ */
+export const PROMPT_VERSION_NAMES_SQL = `SELECT v.PromptVersionId AS id,
+  concat(p.PromptHandle, ' v', toString(v.VersionNumber)) AS name
+FROM prompt_versions AS v
+INNER JOIN prompts AS p ON p.PromptId = v.PromptId
+ORDER BY v.CreatedAt DESC
+LIMIT 500`;
 
 /** The moment of the newest change in the period; the epoch when there was none. */
 export const LAST_CHANGE_AT = `greatest(

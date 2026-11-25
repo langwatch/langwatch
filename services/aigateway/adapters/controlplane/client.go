@@ -117,14 +117,14 @@ func forbiddenKeyRefusal(ctx context.Context, respBody []byte) error {
 	switch rejection.Error.Code {
 	case "virtual_key_disabled":
 		return herr.New(ctx, domain.ErrKeyDisabled, herr.M{
-			"message": "This key is disabled. An administrator can re-enable it; the key material is unchanged.",
+			"message": domain.KeyDisabledMessage,
 		})
 	case "virtual_key_expired":
 		return herr.New(ctx, domain.ErrKeyExpired, herr.M{
 			"message": domain.KeyExpiredMessage,
 		})
 	}
-	return herr.New(ctx, domain.ErrKeyRevoked, nil)
+	return herr.New(ctx, domain.ErrKeyRevoked, herr.M{"message": domain.KeyRevokedMessage})
 }
 
 // ResolveKey exchanges a presented credential for a domain.Bundle: a raw
@@ -138,7 +138,7 @@ func (c *Client) ResolveKey(ctx context.Context, key domain.PresentedKey) (*doma
 	endpoint, _ := url.JoinPath(c.baseURL, "/api/internal/gateway/resolve-key")
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(payload))
 	if err != nil {
-		return nil, herr.New(ctx, domain.ErrAuthUpstream, nil, err)
+		return nil, herr.New(ctx, domain.ErrAuthUpstream, nil, err).WithRetryable(true)
 	}
 	req.Header.Set("Content-Type", "application/json")
 	c.setCommonHeaders(req)
@@ -146,7 +146,7 @@ func (c *Client) ResolveKey(ctx context.Context, key domain.PresentedKey) (*doma
 
 	resp, err := c.client.Do(req)
 	if err != nil {
-		return nil, herr.New(ctx, domain.ErrAuthUpstream, nil, err)
+		return nil, herr.New(ctx, domain.ErrAuthUpstream, nil, err).WithRetryable(true)
 	}
 	defer func() { _ = resp.Body.Close() }()
 	respBody, _ := io.ReadAll(resp.Body)
@@ -161,19 +161,19 @@ func (c *Client) ResolveKey(ctx context.Context, key domain.PresentedKey) (*doma
 	case resp.StatusCode == http.StatusForbidden:
 		return nil, forbiddenKeyRefusal(ctx, respBody)
 	case resp.StatusCode != http.StatusOK:
-		return nil, herr.New(ctx, domain.ErrAuthUpstream, nil, fmt.Errorf("control plane returned %d", resp.StatusCode))
+		return nil, herr.New(ctx, domain.ErrAuthUpstream, nil, fmt.Errorf("control plane returned %d", resp.StatusCode)).WithRetryable(true)
 	}
 
 	var result struct {
 		Token string `json:"jwt"`
 	}
 	if err := json.Unmarshal(respBody, &result); err != nil {
-		return nil, herr.New(ctx, domain.ErrAuthUpstream, nil, err)
+		return nil, herr.New(ctx, domain.ErrAuthUpstream, nil, err).WithRetryable(true)
 	}
 
 	mapClaims, err := c.verifier.Verify(result.Token)
 	if err != nil {
-		return nil, herr.New(ctx, domain.ErrAuthUpstream, nil, err)
+		return nil, herr.New(ctx, domain.ErrAuthUpstream, nil, err).WithRetryable(true)
 	}
 
 	return claimsToBundle(extractClaims(mapClaims)), nil
@@ -480,6 +480,9 @@ type Claims struct {
 	// than the claim sees nothing at all; both decode to 0, which means the
 	// key never expires.
 	VirtualKeyExpiresAt int64
+	// SecretValidUntil is the secret_valid_until claim in unix seconds: the
+	// rotation grace end of a previous secret, 0 for any other credential.
+	SecretValidUntil int64
 	// ConnectServices is the connect_services claim: the hosted services the
 	// license behind the presented token is entitled to. Non-nil only when the
 	// control plane sent the claim, which it does for a license token and for
@@ -507,6 +510,9 @@ func extractClaims(m map[string]any) *Claims {
 	}
 	if v, ok := m["vk_expires_at"].(float64); ok {
 		c.VirtualKeyExpiresAt = int64(v)
+	}
+	if v, ok := m["secret_valid_until"].(float64); ok {
+		c.SecretValidUntil = int64(v)
 	}
 	if v, ok := m["connect_services"].([]any); ok {
 		c.ConnectServices = connectServicesClaim(v)
@@ -540,6 +546,9 @@ func claimsToBundle(c *Claims) *domain.Bundle {
 	// clock comparison would read as an expired key.
 	if c.VirtualKeyExpiresAt > 0 {
 		b.VirtualKeyExpiresAt = time.Unix(c.VirtualKeyExpiresAt, 0)
+	}
+	if c.SecretValidUntil > 0 {
+		b.SecretValidUntil = time.Unix(c.SecretValidUntil, 0)
 	}
 	return b
 }

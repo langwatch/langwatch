@@ -21,6 +21,7 @@ export function BraidsEnterpriseUpsell() {
   return (
     <AccessState
       kind="upgrade"
+      centered
       title="See every agent call, across projects"
       description="Braids show spans from one project inside another project's traces, under conditions your admins control. Braids are part of the Enterprise plan."
       data-testid="braids-enterprise-upsell"
@@ -37,13 +38,13 @@ export function BraidsEnterpriseUpsell() {
         </>
       }
     >
-      <Stack gap={5}>
+      <Stack gap={5} align="center">
         <Box maxWidth="2xl" width="full">
           <Card variant="image-frame">
             <FeatureIllustration feature="braids" name="enterprise" />
           </Card>
         </Box>
-        <HStack gap={5} flexWrap="wrap" as="ul" listStyleType="none">
+        <HStack gap={5} flexWrap="wrap" justify="center" as="ul" listStyleType="none">
           {OFFERS.map((offer) => (
             <HStack as="li" key={offer} gap={1.5} textStyle="sm" color="fg.muted">
               <Box color="fg.success" display="inline-flex">

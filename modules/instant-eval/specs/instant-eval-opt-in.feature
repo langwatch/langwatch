@@ -26,7 +26,8 @@ Feature: An organization switches Instant Evals on itself, once it has read wher
     by the flag alone, which is how one that asked gets them, and a switch thrown before it was on
     an enterprise plan no longer counts;
   - an install that does not judge through LangWatch, which has judging turned off or is a
-    development checkout with its own key, is released by the operator's release flag.
+    development checkout with its own key, is released by the operator's release flag, which is
+    on by default off LangWatch Cloud, so only an operator who switched it off holds it back.
 
   Rule: The offer depends on the plan, the deployment, and whether the member may throw the switch
 
@@ -232,7 +233,7 @@ Feature: An organization switches Instant Evals on itself, once it has read wher
       Then a closable popover anchored under the search bar asks the reader to pick a decision model
       And it says in one line that Instant Evals run on a decision model of their own
       And it shows the decision model picker in place
-      And it neither says Instant Evals aren't enabled nor offers to contact us nor names Evals Preview
+      And it neither says Instant Evals aren't enabled nor offers to contact us nor names LangWatch Instant (preview)
       And no estimate is requested and the typed query stays in the bar
       And closing it, by Escape or a click outside, keeps the typed query and searches nothing
 
@@ -245,7 +246,7 @@ Feature: An organization switches Instant Evals on itself, once it has read wher
       When the reader submits an eval chip
       Then the picker is the one Default models shows for Instant Evals
       And the decision models the project's keys would run can be picked
-      And it never lists Evals Preview
+      And it never lists LangWatch Instant (preview)
       And the rest of the catalogue is greyed out, each saying which key to add
       And "Configure available models" at the foot of the picker's list opens Model Providers in a new tab
       When the reader picks Azure Microsoft Decision 1
@@ -262,7 +263,7 @@ Feature: An organization switches Instant Evals on itself, once it has read wher
       When the reader submits an eval chip
       Then the popover says Instant Evals need a decision model and asks a project admin to pick one
       And it links to Default models in a new tab and shows no picker
-      And it neither offers to contact us nor names Evals Preview
+      And it neither offers to contact us nor names LangWatch Instant (preview)
 
     @integration
     Scenario: Instant Evals off for an enterprise organization open the contact-us popover
@@ -346,7 +347,7 @@ Feature: An organization switches Instant Evals on itself, once it has read wher
       Given a self-serve organization on the hosted service with LangWatch's hosted model switched off
       When the popover asks what to offer a member who may manage the organization
       Then it offers a word with us, never the switch, and LangWatch's own model is not released
-      And so Default models lists no Evals Preview and the popover asks for an own decision model
+      And so Default models lists no LangWatch Instant (preview) and the popover asks for an own decision model
 
     @unit
     Scenario: The server refuses the switch for an organization with hosted switched off
@@ -383,9 +384,9 @@ Feature: An organization switches Instant Evals on itself, once it has read wher
       Then the hosted classifier answers it
 
     @unit
-    Scenario: An LLM judge on Evals Preview is an error for an organization with hosted switched off
+    Scenario: An LLM judge on LangWatch Instant (preview) is an error for an organization with hosted switched off
       Given an organization with LangWatch's hosted model switched off
-      And an LLM judge on Instant Evals in a project whose column is Evals Preview
+      And an LLM judge on Instant Evals in a project whose column is LangWatch Instant (preview)
       When the evaluation runs
       Then it is an error saying no decision model is set up, and the judge is never called
       And the judge router flag is never read
