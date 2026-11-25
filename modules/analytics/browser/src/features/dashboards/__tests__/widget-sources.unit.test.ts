@@ -6,6 +6,7 @@
 import { TRACE_SOURCES } from "@langwatch/analytics-contract";
 import { describe, expect, it } from "vitest";
 
+import { cardLimitMessages } from "../../dashboard-widget/behavior/use-dashboard-widget-executor.ts";
 import {
   picksNoSources,
   runSources,
@@ -13,7 +14,6 @@ import {
   widgetCardSourcesLine,
   widgetSourcesLine,
 } from "../model/widget-sources.ts";
-import { cardLimitMessages } from "../../dashboard-widget/behavior/use-dashboard-widget-executor.ts";
 
 const READS =
   "SELECT count() FROM trace_metrics WHERE Source IN {dashboard_context_sources:Array(String)}";

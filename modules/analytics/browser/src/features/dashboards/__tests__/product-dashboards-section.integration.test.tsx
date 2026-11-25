@@ -353,7 +353,7 @@ describe("a product's Dashboards section", () => {
       });
 
       const list = await screen.findByRole("list", { name: "New dashboard" });
-      const row = within(list).getByRole("link", { name: /Untitled dashboard/ });
+      const row = await within(list).findByRole("link", { name: /Untitled dashboard/ });
       expect(row).toHaveAttribute("aria-current", "page");
       expect(screen.queryByText("No dashboards yet")).toBeNull();
     });

@@ -185,7 +185,11 @@ export function boardQuestion({
   const attached = boardAskContext({ board, period });
   const asked =
     board.templateId === void 0
-      ? context({ ref: `${BOARD_QUESTION_ANSWER}; ${attached.ref}`, label: attached.label })
+      ? context({
+          ref: `${BOARD_QUESTION_ANSWER}; ${attached.ref}`,
+          label: attached.label,
+          key: boardKey(board),
+        })
       : attached;
   return { question: question.trim(), context: [asked] };
 }
