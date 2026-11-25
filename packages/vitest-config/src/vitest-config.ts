@@ -125,7 +125,6 @@ export function moduleVitestTestOptions(
     // jsdom lane would collect the browser lane's files and fail them.
     exclude: [...(exclude ?? DEFAULT_EXCLUDE), BROWSER_TEST_GLOB],
     ...(include ? { include } : {}),
-    setupFiles: resolvedSetupFiles,
     ...(testTimeout === undefined ? {} : { testTimeout }),
     ...(dir === undefined ? {} : { dir }),
     ...test,
