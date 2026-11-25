@@ -262,8 +262,8 @@ describe("given a data-privacy policy that cannot be read", () => {
     }).resolveMemberProtections({ userId: "user-1", projectId: PROJECT_ID });
 
     const columns =
-      lwql.describeSchema({ protections }).views.find((view) => view.name === "traces")
-        ?.columns ?? [];
+      lwql.describeSchema({ protections }).views.find((view) => view.name === "traces")?.columns ??
+      [];
     const unavailable = columns.filter((column) => !column.available).map((column) => column.name);
     expect(unavailable).toEqual(expect.arrayContaining(["CapturedInput", "CapturedOutput"]));
     expect(
