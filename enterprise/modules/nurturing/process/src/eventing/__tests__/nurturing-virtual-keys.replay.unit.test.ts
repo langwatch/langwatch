@@ -645,14 +645,13 @@ async function liveWorker({ events }: { events: ReplayEvent[] }) {
     config: {
       customerIoRegion: void 0,
       customerIoBaseUrl: void 0,
-      customerIoAppApiBaseUrl: void 0,
       posthogKey: void 0,
       posthogHost: void 0,
     },
     resources: { own: () => void 0, ownService: () => void 0 },
     secrets: new ScopedSecrets(async (_handle, build) => build(undefined)),
     repositories,
-    channels: { customerIo, customerIoTransactional: void 0, posthog: void 0 },
+    channels: { customerIo, posthog: void 0 },
   });
   // nurturingEventing builds `app.pipeline()`; the usage pipeline syncs, as a channel is present.
   const nurturing = app.pipeline();
@@ -675,7 +674,6 @@ async function liveWorker({ events }: { events: ReplayEvent[] }) {
     config: {
       customerIoRegion: void 0,
       customerIoBaseUrl: void 0,
-      customerIoAppApiBaseUrl: void 0,
       posthogKey: void 0,
       posthogHost: void 0,
     },
