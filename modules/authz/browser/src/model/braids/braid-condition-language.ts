@@ -118,6 +118,13 @@ function insideString(before: string): boolean {
   return open;
 }
 
+/** LangWatch's own attributes (`langwatch.signature` and the rest) are never a condition's key. */
+const RESERVED_KEY_PREFIX = "langwatch.";
+
+function offerableKey({ key }: { key: string }): boolean {
+  return !key.startsWith(RESERVED_KEY_PREFIX);
+}
+
 function attributeKeyCompletions({
   text,
   offset,
@@ -143,6 +150,7 @@ function attributeKeyCompletions({
   if (rest.startsWith("]")) take(1);
   const replaceFrom = quoted ? offset - typed.length - 1 : offset;
   const items = attributeKeys
+    .filter(offerableKey)
     .toSorted((a, b) => b.spanCount - a.spanCount || a.key.localeCompare(b.key))
     .map(({ key, spanCount }, index) => ({
       label: key,

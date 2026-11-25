@@ -17,6 +17,8 @@ export const BRAID_CONDITION_MAX_TERMS = 16;
 export const BRAID_CONDITION_MAX_DEPTH = 4;
 /** Distinct compiled conditions one reader's proof may hold. */
 export const BRAID_MAX_DISTINCT_CONDITIONS = 50;
+/** Owner hops the held rule follows from a reader span; an owner further away stays hidden. */
+export const BRAID_HELD_MAX_HOPS = 4;
 /** Verified marks: `<prefix><key>` holds the id of the project that signed `key` (§4). */
 export const VERIFIED_ATTRIBUTE_PREFIX = "langwatch.reserved.verified.";
 

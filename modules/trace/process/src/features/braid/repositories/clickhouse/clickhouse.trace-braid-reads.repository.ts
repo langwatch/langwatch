@@ -19,6 +19,7 @@ import { z } from "zod";
 
 import { ClickHouseTraceSpanRepository } from "../../../../repositories/clickhouse/trace-span.repository.ts";
 import type { TraceSpanSummaryRecord } from "../../../../repositories/trace-projected-read.repository.ts";
+import type { TraceSpanKey } from "../../rules/braid-held-trace.rules.ts";
 import {
   NO_BRAID_TRACE_COUNTS,
   TraceBraidReadsRepository,
@@ -29,7 +30,19 @@ import {
 } from "../trace-braid-reads.repository.ts";
 
 const count = z.coerce.number().int().min(0);
+/** The reader's 24-hour braid count: stopped at 10 s or 4 GiB and not retried (ADR-201 §8). */
+const READER_ACTIVITY_LIMITS = {
+  clickhouse_settings: {
+    max_execution_time: "10",
+    timeout_overflow_mode: "throw",
+    max_memory_usage: String(4 * 1024 * 1024 * 1024),
+  },
+  retryOnTimeout: false,
+} as const;
 const traceIdRowsSchema = z.array(z.looseObject({ TraceId: z.string() }));
+const parentRowsSchema = z.array(z.looseObject({ TraceId: z.string(), ParentSpanId: z.string() }));
+/** A trace and span id as one bound key, so the set is a plain string array. */
+const spanKeyOf = (key: TraceSpanKey) => `${key.traceId}/${key.spanId}`;
 const ownerCountsRowsSchema = z.array(
   z.looseObject({
     every: count,
@@ -187,6 +200,68 @@ export class ClickHouseTraceBraidReadsRepository extends TraceBraidReadsReposito
         LIMIT {limit:UInt32}
       `,
       query_params: { sinceMs: input.sinceMs, limit: input.limit },
+      format: "JSONEachRow",
+    });
+    return traceIdRowsSchema.parse(await result.json()).map((row) => row.TraceId);
+  }
+
+  async findOutsideParents(input: {
+    authorization: Authorization;
+    traceIds: readonly string[];
+    sinceMs: number;
+    limit: number;
+  }): Promise<TraceSpanKey[]> {
+    const client = this.clickhouse.as(input.authorization, { reads: "traces" });
+    const result = await client.query({
+      // ID_BOUND_SKIP: bounded by the reader's trace ids and the 7-day StartTime floor.
+      query: `
+        SELECT DISTINCT TraceId, ParentSpanId
+        FROM stored_spans
+        WHERE ${tenantScope("StartTime")}
+          AND TraceId IN {traceIds:Array(String)}
+          AND StartTime >= ${millis("sinceMs")}
+          AND SpanId NOT IN ('', '0000000000000000')
+          AND ParentSpanId NOT IN ('', '0000000000000000')
+          AND (TraceId, ParentSpanId) NOT IN (
+            SELECT TraceId, SpanId
+            FROM stored_spans
+            WHERE ${tenantScope("StartTime")}
+              AND TraceId IN {traceIds:Array(String)}
+              AND StartTime >= ${millis("sinceMs")}
+          )
+        LIMIT {limit:UInt32}
+      `,
+      query_params: { traceIds: [...input.traceIds], sinceMs: input.sinceMs, limit: input.limit },
+      format: "JSONEachRow",
+    });
+    return parentRowsSchema
+      .parse(await result.json())
+      .map((row) => ({ traceId: row.TraceId, spanId: row.ParentSpanId }));
+  }
+
+  async findTracesHoldingSpans(input: {
+    authorization: Authorization;
+    spans: readonly TraceSpanKey[];
+    sinceMs: number;
+  }): Promise<string[]> {
+    if (input.spans.length === 0) return [];
+    const client = this.clickhouse.as(input.authorization, { reads: "traces" });
+    const result = await client.query({
+      // ID_BOUND_SKIP: bounded by the other project's parent span keys and the 7-day floor.
+      query: `
+        SELECT DISTINCT TraceId
+        FROM stored_spans
+        WHERE ${tenantScope("StartTime")}
+          AND TraceId IN {traceIds:Array(String)}
+          AND StartTime >= ${millis("sinceMs")}
+          AND SpanId NOT IN ('', '0000000000000000')
+          AND concat(TraceId, '/', SpanId) IN {spanKeys:Array(String)}
+      `,
+      query_params: {
+        traceIds: [...new Set(input.spans.map((span) => span.traceId))],
+        spanKeys: input.spans.map(spanKeyOf),
+        sinceMs: input.sinceMs,
+      },
       format: "JSONEachRow",
     });
     return traceIdRowsSchema.parse(await result.json()).map((row) => row.TraceId);
@@ -359,6 +434,7 @@ export class ClickHouseTraceBraidReadsRepository extends TraceBraidReadsReposito
         GROUP BY TenantId
       `,
       query_params: { sinceMs: input.sinceMs, ...columns.params },
+      ...READER_ACTIVITY_LIMITS,
       format: "JSONEachRow",
     });
     const rows = ownerActivityRowsSchema.parse(await result.json());

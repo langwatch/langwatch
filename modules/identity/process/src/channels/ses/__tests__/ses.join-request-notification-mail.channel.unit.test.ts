@@ -17,38 +17,9 @@ describe("SesJoinRequestNotificationMailChannel", () => {
   describe("when each of the six mails is sent with a delivery key", () => {
     /** @scenario "Each join-request mail carries a delivery key naming its notice and its recipient" */
     it("hands the sender that key intact", async () => {
-      const sent: EmailContent[] = [];
-      const channel = SesJoinRequestNotificationMailChannel.create({
-        mailer: {
-          send: async (content) => {
-            sent.push(content);
-          },
-        },
-        baseUrl: "https://app.langwatch.test",
-      });
-      const admin = { adminEmail: "priya@acme.example", organizationName: "Acme" };
-      const requester = { requesterEmail: "morgan@acme.example", organizationName: "Acme" };
+      const { channel, sent } = recordingChannel();
 
-      await channel.sendRequestArrived({
-        ...admin,
-        requesterName: "Morgan",
-        domain: "acme.example",
-        idempotencyKey: "key-arrived",
-      });
-      await channel.sendRequestStillWaiting({
-        ...admin,
-        requesterName: "Morgan",
-        idempotencyKey: "key-waiting",
-      });
-      await channel.sendRequestApproved({ ...requester, idempotencyKey: "key-approved" });
-      await channel.sendRequestRejected({ ...requester, idempotencyKey: "key-rejected" });
-      await channel.sendRequestExpired({ ...requester, idempotencyKey: "key-expired" });
-      await channel.sendJoinedAutomatically({
-        ...admin,
-        memberName: "Morgan",
-        domain: "acme.example",
-        idempotencyKey: "key-joined",
-      });
+      await sendEachOfTheSix(channel);
 
       expect(sent.map((content) => content.idempotencyKey)).toEqual([
         "key-arrived",
@@ -57,6 +28,22 @@ describe("SesJoinRequestNotificationMailChannel", () => {
         "key-rejected",
         "key-expired",
         "key-joined",
+      ]);
+    });
+
+    /** @scenario "Each routed message's sender names its template" */
+    it("names each mail's template", async () => {
+      const { channel, sent } = recordingChannel();
+
+      await sendEachOfTheSix(channel);
+
+      expect(sent.map((content) => content.template)).toEqual([
+        "join-request-arrived",
+        "join-request-reminder",
+        "join-request-approved",
+        "join-request-rejected",
+        "join-request-expired",
+        "domain-auto-joined",
       ]);
     });
   });
@@ -117,4 +104,31 @@ function recordingChannel() {
     baseUrl: "https://app.langwatch.test",
   });
   return { channel, sent };
+}
+
+/** Sends each of the six mails once, in a fixed order, each under its own delivery key. */
+async function sendEachOfTheSix(channel: SesJoinRequestNotificationMailChannel) {
+  const admin = { adminEmail: "priya@acme.example", organizationName: "Acme" };
+  const requester = { requesterEmail: "morgan@acme.example", organizationName: "Acme" };
+
+  await channel.sendRequestArrived({
+    ...admin,
+    requesterName: "Morgan",
+    domain: "acme.example",
+    idempotencyKey: "key-arrived",
+  });
+  await channel.sendRequestStillWaiting({
+    ...admin,
+    requesterName: "Morgan",
+    idempotencyKey: "key-waiting",
+  });
+  await channel.sendRequestApproved({ ...requester, idempotencyKey: "key-approved" });
+  await channel.sendRequestRejected({ ...requester, idempotencyKey: "key-rejected" });
+  await channel.sendRequestExpired({ ...requester, idempotencyKey: "key-expired" });
+  await channel.sendJoinedAutomatically({
+    ...admin,
+    memberName: "Morgan",
+    domain: "acme.example",
+    idempotencyKey: "key-joined",
+  });
 }

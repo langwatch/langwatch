@@ -88,6 +88,8 @@ export interface UserRepository {
   /** Every account on this address, case aside, oldest first: rows stored before lower-casing. */
   findByEmailAnyCase(email: string): Promise<UserProfile[]>;
   create(input: CreateUserInput): Promise<UserProfile>;
+  /** The created fact for a row written outside these mints, stamped with its stored creation. */
+  appendCreatedFact(id: string): Promise<void>;
   createCredentialUser(input: CreateCredentialUserRow): Promise<CreatedCredentialUser>;
   createPasskeyUser(input: CreatePasskeyUserRow): Promise<CreatedUser>;
   hasPassword(id: string): Promise<boolean>;

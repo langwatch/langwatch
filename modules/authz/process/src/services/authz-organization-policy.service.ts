@@ -1,6 +1,7 @@
 import type {
   AuthzOrganizationInput,
   AuthzOrganizationPolicy,
+  AuthzSetBraidsEnabledInput,
   AuthzSetBraidsPolicyInput,
 } from "@langwatch/authz-contract";
 import { nowInstant, Temporal } from "@langwatch/time";
@@ -10,6 +11,7 @@ import type { AuthzEpochRepository } from "../repositories/authz-epoch.repositor
 import type { AuthzOrganizationPolicyRepository } from "../repositories/authz-organization-policy.repository.ts";
 
 export const BRAIDS_POLICY_CHANGED_ACTION = "authz.organization_policy.braids_changed";
+export const BRAIDS_ENABLED_CHANGED_ACTION = "authz.organization_policy.braids_enabled_changed";
 
 /**
  * ADR-201 §2: an organisation can keep braids to its admins. A change is stored, audited, then
@@ -59,6 +61,31 @@ export class AuthzOrganizationPolicyService {
         braidsOrganizationAdminsOnly,
         previous: previous.braidsOrganizationAdminsOnly,
       },
+    });
+    await this.deps.epoch.bump({ organizationId });
+    return this.deps.policies.getPolicy({ organizationId });
+  }
+
+  /** Off pauses the organisation's braids and keeps them; the epoch bump ends cached proofs. */
+  async setBraidsEnabled({
+    organizationId,
+    braidsEnabled,
+    actor,
+  }: AuthzSetBraidsEnabledInput): Promise<AuthzOrganizationPolicy> {
+    const previous = await this.deps.policies.getPolicy({ organizationId });
+    await this.deps.policies.setBraidsEnabled({
+      organizationId,
+      braidsEnabled,
+      updatedByUserId: actor.id ?? actor.type,
+    });
+    const now = this.deps.now?.() ?? nowInstant().epochMilliseconds;
+    await this.deps.auditTrail.insert({
+      id: `authz-org-braids-enabled-${organizationId}-${now}`,
+      createdAt: Temporal.Instant.fromEpochMilliseconds(now),
+      userId: actor.type === "user" ? actor.id : null,
+      organizationId,
+      action: BRAIDS_ENABLED_CHANGED_ACTION,
+      metadata: { braidsEnabled, previous: previous.braidsEnabled },
     });
     await this.deps.epoch.bump({ organizationId });
     return this.deps.policies.getPolicy({ organizationId });

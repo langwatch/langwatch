@@ -7,7 +7,7 @@ import { Mail, MoreVertical, RefreshCw, Trash2 } from "lucide-react";
 
 import type { RouterOutputs } from "../../behavior/organization-api.ts";
 import { IdentityChip, IdentityRow, IdentityRowList } from "../elements/identity-row.tsx";
-import { orgRoleOptions } from "../elements/organization-user-role-field.tsx";
+import { seatLabel } from "../elements/organization-user-role-field.tsx";
 
 type OrganizationInvite = RouterOutputs["invite"]["getOrganizationPendingInvites"][number];
 
@@ -74,7 +74,7 @@ export const InviteRow = ({
 }: InviteRowProps) => {
   const displayStatus = invite.displayStatus;
   const chip = STATUS_CHIPS[displayStatus] ?? STATUS_CHIPS.PENDING!;
-  const roleLabel = orgRoleOptions.find((o) => o.value === invite.role)?.label ?? invite.role;
+  const roleLabel = seatLabel({ role: invite.role, billingOnly: invite.billingOnly });
   const isOpen = displayStatus === "PENDING" || displayStatus === "EXPIRED";
   const canResend = isAdmin && isOpen;
   const canViewLink = displayStatus === "PENDING";

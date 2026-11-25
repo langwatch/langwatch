@@ -67,11 +67,30 @@ describe("given an eval chip with a registered run", () => {
     });
 
     /** @scenario "A negated eval chip keeps the traces the judge did not match" */
-    it("negates the verdict subquery under NOT", () => {
+    it("keeps only judged rows whose latest verdict did not pass, under NOT", () => {
       const result = compile('NOT eval:"the user is annoyed"', [run()]);
-      expect(result?.sql).toMatch(
-        /^\(\(TenantId, TraceId\) NOT IN \(SELECT TenantId, TraceId FROM instant_eval_judgments/,
+      const where = `${tenantSet()} AND RunId = {evalRun_0:String} AND CreatedAt >= fromUnixTimestamp64Milli({evalWrittenFrom_1:Int64}) AND CreatedAt <= fromUnixTimestamp64Milli({evalWrittenUntil_2:Int64})`;
+      const group = "GROUP BY TenantId, TraceId, SpanId, QuestionId";
+      // A row the run never judged (past the cap, after a stop, newer than the run) is in neither
+      // set, so it is not listed as a non-match.
+      expect(result?.sql).toBe(
+        `(((TenantId, TraceId) IN (SELECT TenantId, TraceId FROM instant_eval_judgments WHERE ${where} ${group} HAVING argMax(coalesce(Passed, 2), UpdatedAt) = 0))` +
+          ` AND ((TenantId, TraceId) NOT IN (SELECT TenantId, TraceId FROM instant_eval_judgments WHERE ${where} ${group} HAVING argMax(Passed, UpdatedAt) = 1)))`,
       );
+    });
+
+    /** @scenario "A negated eval chip keeps the traces the judge did not match" */
+    it("keeps only judged conversations that did not pass, for a threads run under NOT", () => {
+      const result = compile('NOT eval.conversation:"the user is annoyed"', [
+        run({ target: "threads" }),
+      ]);
+      expect(result?.sql).toMatch(
+        /^\(\(\(TenantId, Attributes\['gen_ai\.conversation\.id'\]\) IN \(SELECT/,
+      );
+      expect(result?.sql).toContain(
+        "HAVING argMax(coalesce(Passed, 2), UpdatedAt) = 0 AND MatchedThreadId != ''",
+      );
+      expect(result?.sql).toContain(") NOT IN (SELECT TenantId, argMax(ThreadId, UpdatedAt)");
     });
 
     it("matches the question by its words, whatever the spacing", () => {
@@ -98,12 +117,52 @@ describe("given an eval chip and no run that fits it", () => {
       expect(compile('eval.trace:"the user is annoyed"')?.sql).toBe("1 = 0");
     });
 
+    /** @scenario "An eval chip with no registered run matches nothing" */
+    it("matches no rows for a forcing spelling under NOT either", () => {
+      expect(compile('NOT eval.trace:"the user is annoyed"')?.sql).toBe("1 = 0");
+    });
+
     /** @scenario "A bare eval chip with no registered run keeps its older meaning" */
     it("reads the bare field as an evaluator name", () => {
       const result = compile("eval:faithfulness");
       expect(result?.sql).toContain("FROM evaluation_runs");
       expect(result?.sql).toContain("EvaluatorName = {evaluatorName_0:String}");
       expect(result?.params.evaluatorName_0).toBe("faithfulness");
+    });
+  });
+
+  describe("when a NOT reaches the chip across an OR, beside a sibling chip with a run", () => {
+    /** @scenario "A NOT the run of a typed chip cannot answer is refused" */
+    it.each([
+      'NOT eval:"the user is annoyed" OR eval.trace:"the user is annoyed"',
+      'NOT eval.trace:"the user is annoyed" OR eval:"the user is annoyed"',
+    ])("applies the run to the sibling only, the NOT matching nothing: %s", (queryText) => {
+      const result = compile(queryText, [run()]);
+      const runParams = Object.values(result?.params ?? {}).filter((value) => value === "run-1");
+      expect(runParams).toHaveLength(1);
+      expect(result?.sql).toMatch(/^\(?1 = 0 OR /);
+      expect(result?.sql).not.toContain("NOT (1 = 0)");
+      expect(result?.sql).not.toContain("FROM evaluation_runs");
+    });
+
+    /** @scenario "A NOT the run of a typed chip cannot answer is refused" */
+    it("matches nothing for the NOT alone, so counts and exports list no unjudged row", () => {
+      expect(compile('NOT eval.trace:"the user is annoyed" OR status:error', [run()])?.sql).toMatch(
+        /^\(?1 = 0 OR /,
+      );
+    });
+
+    /** @scenario "A NOT the run of a typed chip cannot answer is refused" */
+    it("applies the run to a positive sibling spelled the same way, as it applies none to the NOT", () => {
+      const result = compile(
+        '(NOT eval:"the user is annoyed" OR status:error) AND eval:"the user is annoyed"',
+        [run()],
+      );
+      const runParams = Object.values(result?.params ?? {}).filter((value) => value === "run-1");
+      expect(runParams).toHaveLength(1);
+      expect(result?.sql).toContain("HAVING argMax(Passed, UpdatedAt) = 1");
+      expect(result?.sql).toContain("1 = 0 OR ");
+      expect(result?.sql).not.toContain("FROM evaluation_runs");
     });
   });
 });

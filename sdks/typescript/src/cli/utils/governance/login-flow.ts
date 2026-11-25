@@ -12,6 +12,7 @@ import type { Ora } from "ora";
 
 import { normalizeEndpoint } from "../../../internal/endpoint";
 import { rememberProjectName } from "../identityNotice";
+import { writeSecretFile } from "../secret-file";
 import { createSpinner } from "../spinner";
 import {
   type BudgetOverviewResponse,
@@ -21,10 +22,17 @@ import {
   getCliBootstrap,
   listIngestionKeys,
 } from "./cli-api";
-import { type GovernanceConfig, displayConfigPath, loadConfig, saveConfig } from "./config";
+import {
+  assertConfigWritable,
+  type GovernanceConfig,
+  displayConfigPath,
+  loadConfig,
+  saveConfig,
+} from "./config";
 import {
   createProjectLoginKey,
   type CredentialType,
+  type DeviceCode,
   DeviceFlowError,
   type ExchangeApiKeyResult,
   type ExchangeDeviceSessionResult,
@@ -34,7 +42,13 @@ import {
   startDeviceCode,
 } from "./device-flow";
 import { printIngestionKeyNotice } from "./ingestion-key-notice";
-import { formatLoginCeremony, type LoginCeremonyBudgetLine } from "./login-ceremony";
+import { expiryPhrase, formatLoginCeremony, type LoginCeremonyBudgetLine } from "./login-ceremony";
+import {
+  clearPendingLogin,
+  type PendingLoginRequest,
+  resumablePendingLogin,
+  savePendingLogin,
+} from "./pending-login";
 import { keptWiringLines, refreshTelemetryWiringForLogin } from "./telemetry-refresh";
 
 export interface RunUnifiedLoginOptions {
@@ -341,22 +355,85 @@ export async function runUnifiedLoginFlow(
     );
   }
 
-  const dc = await startDeviceCode(
-    { baseUrl },
-    {
-      credentialType: kind,
-      management: kind === "device_session" && opts.management === true,
-    },
-  );
+  // A device session is saved to the config; refuse before the server creates one that is lost.
+  if (kind === "device_session") assertConfigWritable();
+
+  const management = kind === "device_session" && opts.management === true;
+  const request = { control_plane_url: baseUrl, kind, management, cwd: process.cwd() };
+  const resumed = resumablePendingLogin({ request });
+  try {
+    return await waitOnDeviceCode({ opts, cfg, request, resumed });
+  } catch (err) {
+    // A code an earlier run left can lapse on the server before its own clock says so.
+    if (!(err instanceof ResumedCodeLapsedError)) throw err;
+    return waitOnDeviceCode({ opts, cfg, request, resumed: undefined });
+  }
+}
+
+/** The code a resumed login waited on had lapsed: the login starts a fresh one. */
+class ResumedCodeLapsedError extends Error {}
+
+/** Why the wait ended, as the person reads it; the pending code is forgotten once it is spent. */
+function loginFailure({
+  err,
+  resumed,
+  deviceCode,
+}: {
+  err: unknown;
+  resumed: boolean;
+  deviceCode: string;
+}): unknown {
+  if (!(err instanceof DeviceFlowError)) return err;
+  if (err.kind === "denied" || err.kind === "expired") clearPendingLogin({ deviceCode });
+  if (err.kind === "expired" && resumed) return new ResumedCodeLapsedError(err.message);
+  switch (err.kind) {
+    case "denied":
+      return new Error("authorization denied — you can retry `langwatch login`");
+    case "expired":
+      return new Error("authorization request expired — run `langwatch login` again");
+    default:
+      return err;
+  }
+}
+
+async function waitOnDeviceCode({
+  opts,
+  cfg,
+  request,
+  resumed,
+}: {
+  opts: RunUnifiedLoginOptions;
+  cfg: GovernanceConfig;
+  request: PendingLoginRequest;
+  resumed: DeviceCode | undefined;
+}): Promise<GovernanceConfig> {
+  const baseUrl = request.control_plane_url;
+  const isQuiet = opts.isQuiet === true;
+  const dc =
+    resumed ??
+    (await startDeviceCode(
+      { baseUrl },
+      { credentialType: request.kind, management: request.management },
+    ));
+  if (!resumed) savePendingLogin({ request, deviceCode: dc });
   const verifyURL =
     dc.verification_uri_complete ??
     `${normalizeEndpoint(dc.verification_uri)}?user_code=${encodeURIComponent(dc.user_code)}`;
 
   console.log();
+  if (resumed) {
+    console.log(chalk.gray("Still waiting on the code an earlier login on this machine started."));
+  }
   console.log(chalk.cyan(`Opening: ${verifyURL}`));
   console.log(
     chalk.gray(
       `If your browser doesn't open, paste the URL above and enter code: ${chalk.bold(dc.user_code)}`,
+    ),
+  );
+  const rerunFrom = request.kind === "project_api_key" ? " in this folder" : "";
+  console.log(
+    chalk.gray(
+      `The code expires in ${expiryPhrase(dc.expires_in)}. If this command stops before you approve, run it again${rerunFrom}: it waits on the same code.`,
     ),
   );
   console.log();
@@ -380,23 +457,14 @@ export async function runUnifiedLoginFlow(
   process.once("SIGINT", onSigint);
   try {
     const result = await pollUntilDone({ baseUrl }, dc);
+    clearPendingLogin({ deviceCode: dc.device_code });
     if (result.kind === "device_session") {
       return await completeDeviceSession({ cfg, result, spinner, isQuiet });
     }
     return await completeProjectKey({ cfg, result, spinner });
   } catch (err) {
     spinner.fail();
-    if (err instanceof DeviceFlowError) {
-      switch (err.kind) {
-        case "denied":
-          throw new Error("authorization denied — you can retry `langwatch login`");
-        case "expired":
-          throw new Error("authorization request expired — run `langwatch login` again");
-        default:
-          throw err;
-      }
-    }
-    throw err;
+    throw loginFailure({ err, resumed: resumed !== undefined, deviceCode: dc.device_code });
   } finally {
     process.removeListener("SIGINT", onSigint);
   }
@@ -517,7 +585,7 @@ interface EnvWriteResult {
 function writeApiKeyToEnv(apiKey: string): EnvWriteResult {
   const envPath = path.join(process.cwd(), ".env");
   if (!fs.existsSync(envPath)) {
-    fs.writeFileSync(envPath, `LANGWATCH_API_KEY=${apiKey}\n`);
+    writeSecretFile(envPath, `LANGWATCH_API_KEY=${apiKey}\n`);
     return { created: true, updated: false, path: envPath };
   }
   const content = fs.readFileSync(envPath, "utf-8");

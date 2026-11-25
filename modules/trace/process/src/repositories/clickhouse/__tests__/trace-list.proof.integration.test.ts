@@ -469,8 +469,35 @@ describe.skipIf(!clickHouseConfigured)("TraceListClickHouseRepository through th
       });
     });
 
-    describe("when filters reach side tables no twin row has a match in", () => {
+    describe("when filters reach side tables keyed by tenant and id", () => {
       it("runs each one across the members and matches by tenant and id", async () => {
+        // The trace run judged member A's copy of the shared id "no", and B's not at all.
+        await ch.insert({
+          table: "instant_eval_judgments",
+          values: [
+            {
+              TenantId: TWIN_A,
+              RunId: `run-${run}`,
+              TraceId: TWIN_TRACE_ID,
+              QuestionId: "matched",
+              ThreadId: "",
+              SpanId: "",
+              Kind: "boolean",
+              Status: "judged",
+              Passed: 0,
+              Score: null,
+              Label: "",
+              Probability: 0.1,
+              Probabilities: "",
+              Error: "",
+              OccurredAt: new Date(TODAY),
+              CreatedAt: new Date(TODAY),
+              UpdatedAt: new Date(TODAY),
+            },
+          ],
+          format: "JSONEachRow",
+          clickhouse_settings: { async_insert: 0, wait_for_async_insert: 0 },
+        });
         const evalRuns: ResolvedInstantEvalRun[] = [
           {
             question: "is it twinned",
@@ -487,7 +514,7 @@ describe.skipIf(!clickHouseConfigured)("TraceListClickHouseRepository through th
             writtenUntil: WINDOW.to,
           },
         ];
-        const twinIds = async (queryText: string) => {
+        const twinRows = async (queryText: string) => {
           const page = await repo.listAll({
             authorization: twinProof(),
             timeRange: WINDOW,
@@ -501,18 +528,20 @@ describe.skipIf(!clickHouseConfigured)("TraceListClickHouseRepository through th
                 evalRuns,
               }) ?? undefined,
           });
-          return page.rows.length;
+          return page.rows.map(rowKey);
         };
 
-        for (const field of [
-          "scenarioVerdict:success",
-          "evaluator:nobody",
-          'eval:"is it twinned"',
-          'eval.conversation:"is the thread twinned"',
-        ]) {
-          expect(await twinIds(field)).toBe(0);
-          expect(await twinIds(`NOT ${field}`)).toBe(4);
+        for (const field of ["scenarioVerdict:success", "evaluator:nobody"]) {
+          expect(await twinRows(field)).toHaveLength(0);
+          expect(await twinRows(`NOT ${field}`)).toHaveLength(4);
         }
+        // An eval chip's NOT keeps only rows the run judged "no": member A's copy alone.
+        // A fence on the id alone would keep member B's unjudged copy too.
+        expect(await twinRows('eval:"is it twinned"')).toHaveLength(0);
+        expect(await twinRows('NOT eval:"is it twinned"')).toEqual([`${TWIN_A}:${TWIN_TRACE_ID}`]);
+        // The threads run judged nothing, so its chip matches no row either way.
+        expect(await twinRows('eval.conversation:"is the thread twinned"')).toHaveLength(0);
+        expect(await twinRows('NOT eval.conversation:"is the thread twinned"')).toHaveLength(0);
       });
     });
 

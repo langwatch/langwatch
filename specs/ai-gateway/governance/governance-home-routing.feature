@@ -485,7 +485,7 @@ Feature: Governance home — route, nav promotion, persona detection
     Then the GovernanceLayout renders without bouncing them to
       project-onboarding (DashboardLayout's `orgScope` flag bypasses
       the `redirectToProjectOnboarding` gate, same effect as
-      `personalScope` for `/me/*` routes)
+      `personalScope` for `/coding-agents/*` routes)
     And the org-name chip + indicator render correctly even with
       project=null
 

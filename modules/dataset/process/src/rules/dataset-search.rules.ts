@@ -18,21 +18,6 @@ export type DatasetSearchCaps = { maxRows: number; maxBytes: number };
  */
 export const DATASET_SEARCH_SCAN_BATCH = 1_000;
 
-/** Chunk byte size measured from rows (metadata unreliable). Serialized once
- * per chunk; JSON encoding, not JSONL file bytes.
- */
-export const measureRowsBytes = (rows: unknown[]): number => {
-  try {
-    return Buffer.byteLength(JSON.stringify(rows) ?? "");
-  } catch {
-    // Rows parsed from JSONL cannot hold a cycle, so this is unreachable by the
-    // scan that calls it — but a chunk that cannot be measured still cost
-    // something to fetch, and reporting zero would make it free and buy passage
-    // for every chunk after it. One byte per row is a floor, not a reading.
-    return rows.length;
-  }
-};
-
 /**
  * Reduce a raw search input to the text to match on, or `undefined` when there
  * is nothing to search for. Whitespace-only input is "no search" rather than a

@@ -98,6 +98,7 @@ import {
   callerTraceContext,
   deriveAuditTarget,
   isSilencedCall,
+  markFailureAnswered,
   recordTrpcCall,
   trpcFailureTraceIds,
   type TrpcFailureTraceIds,
@@ -441,6 +442,10 @@ export type TrpcProcedureRequest<TContext extends object> = Readonly<{
   refusedOnAggregate?: true;
   /** Present exactly when the procedure's audit row names a target its input does not. */
   audit?: TrpcAuditTarget;
+  /** Present exactly when the mutation leaves no generic audit row: the reason it gave. */
+  auditExempt?: string;
+  /** Present exactly when an exempt mutation's refusals still take the generic row. */
+  auditRefusals?: "generic";
   /** Present exactly when the module hears of a caller its door refused (Q51). */
   onRefused?: TrpcRefusalHook<unknown, unknown>;
   /** What the procedure asks the process for; the mount binds each one. */
@@ -569,6 +574,15 @@ export interface TrpcRouterAccess<
    * does not carry, and on a procedure that runs with no caller.
    */
   withAudit(target: TrpcAuditTarget): TrpcRouterAccess<Api, Contract, Implemented, Name, Contexts>;
+  /**
+   * No generic audit row, the reason saying why (as REST's `withoutAudit`): its service records
+   * its own rows, refusals included; `refusals: "generic"` keeps the row for a refusal. Refused on
+   * a query, with an empty reason, beside `withAudit` and twice.
+   */
+  withoutAudit(
+    reason: string,
+    options?: TrpcAuditExemption,
+  ): TrpcRouterAccess<Api, Contract, Implemented, Name, Contexts>;
   /**
    * What the module does when the door refuses a caller: handed the parsed input and the caller,
    * awaited before the refusal is answered unchanged; a hook that throws fails the call.
@@ -716,6 +730,8 @@ type Implementation = Readonly<{
   mintsCredential?: true;
   refusedOnAggregate?: true;
   audit?: TrpcAuditTarget;
+  auditExempt?: string;
+  auditRefusals?: "generic";
   onRefused?: TrpcRefusalHook<unknown, unknown>;
   contexts: readonly MiddlewareContext[];
   handle(args: never, ...contexts: never[]): unknown;
@@ -760,11 +776,16 @@ type PermissionArgument =
   | readonly AuthzPermission[];
 
 /** What a selected procedure has declared beside its middleware context, before its access. */
+/** What an exempt mutation's service leaves to the generic trail: by default, nothing. */
+export type TrpcAuditExemption = Readonly<{ refusals?: "generic" }>;
+
 type ProcedureMarks = Readonly<{
   entitlement?: EntitlementGate;
   mintsCredential?: true;
   refusedOnAggregate?: true;
   audit?: TrpcAuditTarget;
+  auditExempt?: string;
+  auditRefusals?: "generic";
   onRefused?: TrpcRefusalHook<unknown, unknown>;
 }>;
 
@@ -895,11 +916,21 @@ function routerBuilder<Api, Contract extends BuiltTrpcContract, Implemented exte
         return selected(name, contexts, { ...marks, onRefused: hook });
       },
       withAudit: (target: TrpcAuditTarget) => {
+        assertAuditUndeclared({ contract, name, marks });
         assertAuditTarget({ contract, name, target, declared: marks.audit });
 
         return selected(name, contexts, {
           ...marks,
           audit: { target: target.target, via: target.via },
+        });
+      },
+      withoutAudit: (reason: string, options?: TrpcAuditExemption) => {
+        assertAuditExemption({ contract, name, reason, marks });
+
+        return selected(name, contexts, {
+          ...marks,
+          auditExempt: reason,
+          ...(options?.refusals === "generic" ? { auditRefusals: "generic" as const } : {}),
         });
       },
       withPermission: (
@@ -1178,6 +1209,42 @@ function permissionAllOf({
   return { kind: "permission-all", permissions: together, ...(via ? { via } : {}) };
 }
 
+/** A procedure says once whether it leaves a generic row: a target and an exemption contradict. */
+function assertAuditUndeclared({
+  contract,
+  name,
+  marks,
+}: {
+  contract: TrpcContract;
+  name: string;
+  marks: ProcedureMarks;
+}): void {
+  if (marks.auditExempt === undefined) return;
+  throw new Error(`tRPC ${contract.namespace}.${name} already declares withoutAudit()`);
+}
+
+/** Only a mutation writes a row to stand down, once, with a reason a reader can check. */
+function assertAuditExemption({
+  contract,
+  name,
+  reason,
+  marks,
+}: {
+  contract: TrpcContract;
+  name: string;
+  reason: string;
+  marks: ProcedureMarks;
+}): void {
+  const address = `tRPC ${contract.namespace}.${name}`;
+
+  if (reason.trim().length === 0) throw new Error(`${address} withoutAudit needs a reason`);
+  if (marks.audit) throw new Error(`${address} already declares withAudit()`);
+  assertAuditUndeclared({ contract, name, marks });
+  if (contract.members[name]?.kind !== "mutation") {
+    throw new Error(`${address} is not a mutation, so it writes no audit row to leave out`);
+  }
+}
+
 /**
  * One audit target per mutation, over a field its input carries: a query writes no row, and a
  * field the parser drops would name no scope to resolve.
@@ -1437,6 +1504,8 @@ export function createTrpcRuntime<
     const built = (throttle ? checked.use(throttle) : checked).use(
       auditTrail(members, {
         anonymous,
+        exempt: request.auditExempt !== undefined,
+        refusalsToGeneric: request.auditRefusals === "generic",
         ...(request.audit ? { target: auditTargetPort({ members, request }) } : {}),
       }),
     );
@@ -2336,10 +2405,36 @@ function rowTarget({
   return result.ok ? deriveAuditTarget(path, result.data) : {};
 }
 
+/**
+ * An exempt mutation's service records its own rows, refusals included, so the generic
+ * failed-call row stands down too, unless the declaration kept it for refusals.
+ */
+async function serviceAudited({
+  next,
+  refusalsToGeneric,
+}: {
+  next: () => Promise<MiddlewareResult<object>>;
+  refusalsToGeneric: boolean;
+}): Promise<MiddlewareResult<object>> {
+  const result = await next();
+  if (!result.ok && !refusalsToGeneric) markFailureAnswered(result.error);
+  return result;
+}
+
 /** Writes the audit row for a mutation, with the arguments the owner redacted. */
 function auditTrail<TContext extends TrpcRuntimeContext & object>(
   members: TrpcRuntimeMembers<TContext>,
-  { anonymous, target: declared }: { anonymous: boolean; target?: ResolvableAuditTarget },
+  {
+    anonymous,
+    exempt,
+    refusalsToGeneric,
+    target: declared,
+  }: {
+    anonymous: boolean;
+    exempt: boolean;
+    refusalsToGeneric: boolean;
+    target?: ResolvableAuditTarget;
+  },
 ) {
   return async ({
     ctx,
@@ -2356,9 +2451,9 @@ function auditTrail<TContext extends TrpcRuntimeContext & object>(
     input: unknown;
     getRawInput: GetRawInputFn;
   }): Promise<MiddlewareResult<object>> => {
-    // There is nobody to attribute a public procedure's write to, so the trail
-    // is not asked who it was.
+    // There is nobody to attribute a public procedure's write to.
     if (anonymous) return next();
+    if (exempt) return serviceAudited({ next, refusalsToGeneric });
 
     const actor = members.identity.caller(ctx).actor;
 
@@ -2388,6 +2483,8 @@ function auditTrail<TContext extends TrpcRuntimeContext & object>(
       // authorization decision was about; the metadata names the human.
       metadata: impersonatorId ? { impersonatorId } : undefined,
     });
+    // This row carries the refusal, so the generic failed-call row is not written beside it.
+    if (!result.ok) markFailureAnswered(result.error);
 
     return result;
   };

@@ -31,8 +31,14 @@ const listInvoices = vi.fn<BillingSubscriptionApi["listInvoices"]>();
 const developerSeats = vi.fn<BillingSubscriptionApi["developerSeats"]>();
 const previewDeveloperSeats = vi.fn<BillingSubscriptionApi["previewDeveloperSeats"]>();
 const setDeveloperSeats = vi.fn<BillingSubscriptionApi["setDeveloperSeats"]>();
+const paymentRecovery = vi.fn<BillingSubscriptionApi["paymentRecovery"]>();
+const paymentRecoveryDetails = vi.fn<BillingSubscriptionApi["paymentRecoveryDetails"]>();
+const paymentRecoveryPayLink = vi.fn<BillingSubscriptionApi["paymentRecoveryPayLink"]>();
 
 const billing: BillingSubscriptionApi = {
+  paymentRecovery,
+  paymentRecoveryDetails,
+  paymentRecoveryPayLink,
   getOrCreateCustomerId,
   updateSubscriptionItems,
   createOrUpdateSubscription,
@@ -85,6 +91,9 @@ describe("given the mounted subscription router", () => {
         "getLastSubscription",
         "listInvoices",
         "manage",
+        "paymentRecovery",
+        "paymentRecoveryDetails",
+        "paymentRecoveryPayLink",
         "previewDeveloperSeats",
         "previewProration",
         "prospective",
@@ -107,6 +116,9 @@ describe("given the mounted subscription router", () => {
         getLastSubscription: "query",
         listInvoices: "query",
         manage: "mutation",
+        paymentRecovery: "query",
+        paymentRecoveryDetails: "query",
+        paymentRecoveryPayLink: "mutation",
         previewDeveloperSeats: "query",
         previewProration: "query",
         prospective: "mutation",
@@ -137,6 +149,31 @@ describe("given a caller who may read the organization but not manage it", () =>
         viewer.getLastSubscription({ organizationId: ORGANIZATION }),
       ).resolves.toBeNull();
       expect(createOrUpdateSubscription).not.toHaveBeenCalled();
+    });
+  });
+});
+
+describe("given an organization with an open recovery case", () => {
+  describe("when a member without subscription management asks for the case details", () => {
+    /** @scenario "Only people who can manage the subscription read the recovery case" */
+    it("refuses the details and the pay link, and still answers whether it is paused", async () => {
+      const viewer = routerFor((permission) => permission === "organization:view").createCaller({
+        actor: { id: "user_ana" },
+        email: "ana@acme.com",
+      });
+      paymentRecovery.mockResolvedValue({ state: "paused" });
+
+      await expect(
+        viewer.paymentRecoveryDetails({ organizationId: ORGANIZATION }),
+      ).rejects.toMatchObject({ cause: { code: "permission_denied" } });
+      await expect(
+        viewer.paymentRecoveryPayLink({ organizationId: ORGANIZATION }),
+      ).rejects.toMatchObject({ cause: { code: "permission_denied" } });
+      await expect(viewer.paymentRecovery({ organizationId: ORGANIZATION })).resolves.toEqual({
+        state: "paused",
+      });
+      expect(paymentRecoveryDetails).not.toHaveBeenCalled();
+      expect(paymentRecoveryPayLink).not.toHaveBeenCalled();
     });
   });
 });

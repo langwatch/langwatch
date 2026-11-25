@@ -275,6 +275,9 @@
     },
     {
       "path": "../../modules/prompt/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../enterprise/modules/digest/process/tsconfig.build.json"
     }
   ]
 }

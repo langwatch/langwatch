@@ -11,12 +11,14 @@ import {
   codingAgentTrpcProjectScopeSchema,
   codingAgentTrpcPullRequestDetailInputSchema,
   codingAgentTrpcRecentSessionsInputSchema,
+  codingAgentTrpcSessionScopeSchema,
   codingAgentTrpcTraceScopeSchema,
   codingAgentTrpcUsageTotalsInputSchema,
 } from "./coding-agent-trpc.schemas.ts";
 import {
   codingAgentPersonalPullRequestUsageWithConnectionSchema,
   codingAgentPullRequestDetailSchema,
+  codingAgentSessionLastTurnSchema,
   codingAgentSessionListRowSchema,
   codingAgentSessionSchema,
   codingAgentUsageTotalsSchema,
@@ -57,6 +59,12 @@ export const codingAgentTrpc = defineTrpcContract("codingAgents")
   .query("session")
   .withInput(codingAgentTrpcTraceScopeSchema.omit({ occurredAtMs: true }))
   .withOutput(codingAgentSessionSchema.nullable())
+
+  // The session's most recent stored trace, found through its own trace map, so a
+  // launcher thread naming the trace's conversation still opens the replay.
+  .query("lastTurn")
+  .withInput(codingAgentTrpcSessionScopeSchema)
+  .withOutput(codingAgentSessionLastTurnSchema.nullable())
 
   // One trace's transcript through the viewer's redactions. Main: `traces.codingAgentTranscript`.
   .query("transcript")

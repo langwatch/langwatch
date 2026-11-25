@@ -4,8 +4,14 @@
  * race between two sessions re-reads config and retries with the winner's pair.
  */
 
-import type { GovernanceConfig } from "./config";
-import { loadConfig, saveConfig } from "./config";
+import {
+  assertConfigWritable,
+  type configWriteProblem,
+  displayConfigPath,
+  type GovernanceConfig,
+  loadConfig,
+  saveConfig,
+} from "./config";
 import * as deviceFlow from "./device-flow";
 
 /**
@@ -22,6 +28,8 @@ export interface SessionRefreshDeps {
   loadImpl?: typeof loadConfig;
   /** Seam for tests; defaults to writing ~/.langwatch/config.json. */
   saveImpl?: typeof saveConfig;
+  /** Seam for tests; defaults to a real write next to ~/.langwatch/config.json. */
+  writeProblemImpl?: typeof configWriteProblem;
   fetchImpl?: typeof fetch;
 }
 
@@ -73,10 +81,13 @@ function applyRefreshResult(
   cfg.expires_at = Math.floor(Date.now() / 1000) + result.expires_in;
   try {
     saveImpl(cfg);
-  } catch {
-    // A read-only home directory still gets a working token for this
-    // run; the next run just refreshes again.
-    void 0;
+  } catch (err) {
+    // The write check passed a moment ago, so this is rare; the old refresh token is spent now,
+    // so say so rather than let the next run log the person out with no explanation.
+    process.stderr.write(
+      `langwatch: the refreshed session could not be saved to ${displayConfigPath()} ` +
+        `(${messageOf(err)}); the next run may ask you to log in again.\n`,
+    );
   }
 }
 
@@ -145,6 +156,8 @@ export async function refreshSession(
 
   const attempted = cfg.refresh_token;
   if (!attempted) return { status: "unavailable" };
+  // Rotation spends the refresh token: never rotate one the CLI cannot save.
+  assertConfigWritable(deps.writeProblemImpl);
 
   try {
     applyRefreshResult(cfg, await refreshImpl(opts, attempted), saveImpl);

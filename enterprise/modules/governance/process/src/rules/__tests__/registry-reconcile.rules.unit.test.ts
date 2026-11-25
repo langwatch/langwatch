@@ -18,6 +18,10 @@ function draft(overrides: Partial<RegistryDraft> = {}): RegistryDraft {
     source: "langwatch",
     management: "managed",
     shadow: false,
+    dormant: false,
+    platform: null,
+    labels: {},
+    owner_label: null,
     kind: "connected",
     name: "Field agent",
     description: null,
@@ -173,6 +177,72 @@ describe("planRegistryChanges()", () => {
 
       expect(changes.writes[0]?.entry).toMatchObject({ status: "removed", version: 2 });
       expect(changes.events.map((event) => event.type)).toEqual(["governance.agent.removed"]);
+    });
+  });
+
+  describe("given an entry stored before the dormant flag existed", () => {
+    /** @scenario "An entry stored before dormancy existed turns dormant without a new version" */
+    it("stores its first dormancy at the same version and appends nothing", () => {
+      const stored = held(registered([draft()])).map((row) => ({
+        ...row,
+        dormancyBaselined: false,
+      }));
+
+      const changes = planRegistryChanges({
+        stored,
+        drafts: [draft({ dormant: true })],
+        now: T1,
+        newId: idsFrom("second"),
+      });
+
+      expect(changes.events).toEqual([]);
+      expect(
+        changes.writes.map(({ entry }) => [entry.version, entry.dormant, entry.posture]),
+      ).toEqual([[1, true, "dormant"]]);
+      const again = planRegistryChanges({
+        stored: held(changes),
+        drafts: [draft({ dormant: true })],
+        now: T1,
+        newId: idsFrom("third"),
+      });
+      expect(again).toEqual({ writes: [], events: [] });
+    });
+
+    it("still versions a dormancy that comes with another change", () => {
+      const stored = held(registered([draft()])).map((row) => ({
+        ...row,
+        dormancyBaselined: false,
+      }));
+
+      const changes = planRegistryChanges({
+        stored,
+        drafts: [
+          draft({
+            dormant: true,
+            model: { provider: "openai", model: "gpt-5-mini", parameters: {} },
+          }),
+        ],
+        now: T1,
+        newId: idsFrom("second"),
+      });
+
+      expect(changes.events.map((event) => event.type)).toEqual(["governance.agent.versioned"]);
+    });
+  });
+
+  describe("given an entry stored with the dormant flag", () => {
+    /** @scenario "A listed agent with no traffic for the dormancy window is dormant" */
+    it("versions it when it turns dormant", () => {
+      const changes = planRegistryChanges({
+        stored: held(registered([draft()])),
+        drafts: [draft({ dormant: true })],
+        now: T1,
+        newId: idsFrom("second"),
+      });
+
+      expect(changes.events.map((event) => [event.type, event.toVersion])).toEqual([
+        ["governance.agent.versioned", 2],
+      ]);
     });
   });
 
