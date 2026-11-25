@@ -28,15 +28,14 @@ import { EVERY_CATALOGUE_PERMISSION } from "../../services/__tests__/lwql-catalo
 import { AnalyticsModule } from "../analytics.app.ts";
 import { analyticsTestSecrets } from "./analytics-secrets.fixture.ts";
 
-const logged = vi.hoisted(() => ({ errors: [] as { fields: unknown; message: string }[] }));
+const logged = await vi.hoisted(async () => {
+  const { createTestLogger } = await import("@langwatch/test-harness");
+  return createTestLogger();
+});
 
 vi.mock("@langwatch/observability", async (importActual) => {
   const actual = await importActual<typeof Observability>();
-  const record = (fields: unknown, message: string) => logged.errors.push({ fields, message });
-  return {
-    ...actual,
-    createLogger: () => ({ info: record, warn: record, error: record, debug: () => void 0 }),
-  };
+  return { ...actual, createLogger: () => logged.logger };
 });
 
 const ORGANIZATION_ID = "org-1";
@@ -333,7 +332,7 @@ describe("AnalyticsModule.runLangWatchQLForKey", () => {
   describe("when an organisation-wide key runs over all projects and the engine fails", () => {
     /** @scenario "Telemetry: a failed query is logged at its fault's level with the projects it ran over" */
     it("names the projects its scope resolved to on the failed-run line", async () => {
-      logged.errors.length = 0;
+      logged.lines.length = 0;
       const { app } = await appOver({
         listed: [project("project-a"), project("project-b")],
         grants: ["analytics:view"],
@@ -347,8 +346,8 @@ describe("AnalyticsModule.runLangWatchQLForKey", () => {
         }),
       ).rejects.toBeDefined();
 
-      const failed = logged.errors.find(({ message }) => message === "LangWatchQL failed");
-      expect(failed?.fields).toMatchObject({ projectIds: ["project-a", "project-b"] });
+      const failed = logged.lines.findLine("warn", "LangWatchQL failed");
+      expect(failed).toMatchObject({ projectIds: ["project-a", "project-b"] });
     });
   });
 });
@@ -357,7 +356,7 @@ describe("AnalyticsModule.executeLangWatchQL", () => {
   describe("when a member's run names projects other than its own and the engine fails", () => {
     /** @scenario "Telemetry: a failed query is logged at its fault's level with the projects it ran over" */
     it("names the projects its scope resolved to on the failed-run line", async () => {
-      logged.errors.length = 0;
+      logged.lines.length = 0;
       const { app } = await appOver({
         listed: [project("project-a"), project("project-b"), project("project-c")],
         grants: ["analytics:view"],
@@ -373,8 +372,8 @@ describe("AnalyticsModule.executeLangWatchQL", () => {
         }),
       ).rejects.toBeDefined();
 
-      const failed = logged.errors.find(({ message }) => message === "LangWatchQL failed");
-      expect(failed?.fields).toMatchObject({ projectIds: ["project-b", "project-c"] });
+      const failed = logged.lines.findLine("warn", "LangWatchQL failed");
+      expect(failed).toMatchObject({ projectIds: ["project-b", "project-c"] });
     });
   });
 });

@@ -12,6 +12,7 @@ import {
 } from "@langwatch/browser-host/testing";
 import { createUiQueryClient } from "@langwatch/browser/query-client";
 import { answeringUiTransport, type UiProcedureAnswer } from "@langwatch/browser/testing-transport";
+import { DEFAULT_DASHBOARD_HOME_PRODUCT } from "@langwatch/dashboard-contract";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render } from "@testing-library/react";
 import type { ReactElement } from "react";
@@ -19,10 +20,11 @@ import type { ReactElement } from "react";
 import { analyticsApi } from "../../../behavior/analytics-api.ts";
 import { AnalyticsTestHarness, type StubAnalyticsHost } from "../../../testing.tsx";
 
-/** What a board row carries when the project in view ("proj-1") owns it, at the scope Project. */
+/** What a board row carries when the project in view ("proj-1") owns it: LLM Ops, at Project. */
 export const HOME_BOARD = {
   projectId: "proj-1",
   scope: "PROJECT",
+  homeProduct: DEFAULT_DASHBOARD_HOME_PRODUCT,
   organizationId: null,
   ownerProject: null,
 } as const;

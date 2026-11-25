@@ -909,15 +909,18 @@ Feature: Dashboards v2 polish and bring-your-own-AI
 
   @unit @integration
   Scenario: AC182 Organization board: the Project chip says whose data it shows
-    Given an Organization board
-    Then its header has a chip "Project <project>", naming the project whose data is on screen
-    When the reader opens the chip
-    Then it lists the projects of the organization they can open, one to choose, with no
-      "All projects", and marks the project that owns the board "owner"
-    And choosing one opens the same board under that project
-    And a Project or Only me board has no such chip
-    # That holds in a project view. At org level the chip will also offer "All projects"
-    # (dashboards-organization-area.feature, @q1-all-projects).
+    Given an Organization board homed in LLM Ops
+    Then its header reads "Data from <project>", read-only, naming the project in view whose data is on screen
+    And it offers no project to switch to; the LLM Ops top bar switches the project in view
+    And a Project board's header reads "Data from <its own project>", read-only
+    And an Organization board homed in Gateway or Governance names no project, since it reads the organization's data
+    And with release_dashboards_organization_area off, an Organization board's header instead has a chip
+      "Project <project>"; opening it lists the projects of the organization the reader can open,
+      one to choose, with "Whose data this dashboard shows. One project at a time.", no
+      "All projects", the owning project marked "owner" and a note on who edits it
+    And choosing one opens the same board under that project, and a Project board has no such chip
+    # Title kept for its bound tests; the chip became a read-only label (owner, 2026-11-23; D2,
+    # dashboards-organization-area.feature).
 
   @integration
   Scenario: AC183 A board the reader may not open is not available
@@ -1345,10 +1348,10 @@ Feature: Dashboards v2 polish and bring-your-own-AI
   Scenario: From LangWatch: the heading's (i) says what these boards are
     Given the Dashboards sidebar shows the From LangWatch group
     When the member hovers over the (i) beside its heading, or moves keyboard focus to it
-    Then it says "Dashboards LangWatch made for you. They are read-only and improve over time.
-      Duplicate one to make a copy you can edit."
+    Then it says "Dashboards LangWatch made for you. They improve over time. Change one and it
+      becomes your own copy."
     And the heading and its fold control stay exactly where they were
-    # Owner list, 2026-10-08; the prototype uses the same words
+    # Owner list, 2026-10-08; words changed on 2026-11-24, when a change began to make a copy
 
   @unit @integration
   Scenario: AC165 A pin can point at a From LangWatch board
@@ -1362,12 +1365,16 @@ Feature: Dashboards v2 polish and bring-your-own-AI
     Then "What do you want to know?" sits under the header
     And without Langy a stored board keeps it to find a widget, and a From LangWatch board has none unless the member may create dashboards
 
+  # Owner, 2026-11-23: "templates should only be llm ops, not also on the dashboards page".
+  # A board homed elsewhere shows no templates; an LLM Ops one shows them at "/dashboards/<id>" too
+  # (dashboards-organization-area.feature, "Only an empty LLM Ops board offers templates").
   @integration
   Scenario: Boards: every empty board shows one view
-    Given a board with no widgets
+    Given an LLM Ops board with no widgets, opened in its project
     Then it shows the ask bar, the suggested questions,
       "Or start from a template" with the three From LangWatch boards and "View all templates"
-    And each card opens its live board
+    And each card makes the member's own board from that template and opens it
+    And a card whose board cannot be made leaves the member on the empty board, told why
 
   @integration
   Scenario: Boards: the suggested questions show in full at every width
@@ -1386,7 +1393,33 @@ Feature: Dashboards v2 polish and bring-your-own-AI
 
   @integration
   Scenario: Boards: no pin or pencil by the board title
-    Then the board title has no pin and no rename pencil; both live in the sidebar menu
+    Then the board title has no pin and no rename pencil
+    And a board is renamed by clicking its title, or by Rename in a library or sidebar row's menu
+
+  # Owner, 2026-11-23: "I want to be able to click to edit the title of the dashboards on the
+  # dashboard pages". Rename is offered by the rule the library and sidebar menus use.
+  @integration
+  Scenario: Boards: clicking the title renames the board
+    Given a board of a project where the member holds analytics:update, not their My dashboard
+    When they click the board's title
+    Then the title becomes a field holding the name
+    When they type a new name and press Enter, or leave the field
+    Then the name, trimmed, is saved in the project that owns the board, a toast says "Dashboard renamed" and the title shows it
+    And a blank or unchanged name saves nothing and shows the title again
+    # Evidence: haven browser screenshots of the title, the field and the renamed title, light and dark, and the quoted boards.update input
+
+  @integration
+  Scenario: Boards: Escape cancels a rename from the title
+    Given the member is renaming a board from its title
+    When they press Escape
+    Then the title shows the old name and nothing is saved
+    # Evidence: a haven browser screenshot after Escape, and no boards.update call
+
+  @integration
+  Scenario: Boards: a reader who may not rename sees a plain title
+    Given a board of a project where the member does not hold analytics:update, or their own My dashboard
+    Then its title is plain text, and clicking it edits nothing
+    # Evidence: a haven browser screenshot of a view-only member's board title
 
   @integration
   Scenario: Boards: My dashboard has no description placeholder
@@ -1394,13 +1427,68 @@ Feature: Dashboards v2 polish and bring-your-own-AI
     Then it shows no "Add a description"
     And every other board without a description offers "Add a description"
 
+  # Owner, 2026-11-24: "we should always give users full options, and just ask 'this is a
+  # langwatch maintained dashboard, are you sure you want to modify it' ... 'Yes, modify it'".
   @integration
-  Scenario: From LangWatch: a template board is live and read-only
+  Scenario: From LangWatch: a template board is live and offers every edit
+    Given a member who may create dashboards
     When the member opens /[project]/dashboards/curated/<template id>
-    Then the template's widgets run over the project's data, badged "From LangWatch"
-    And nothing can be moved, edited or added, and nothing is stored
-    And its header has no "Duplicate to edit" button
+    Then the template's widgets run over the project's data, badged "From LangWatch", and nothing is stored
+    And it offers what an own board does: "Add a widget", the title and description to click, and on each widget a drag handle, "Edit code" and "Delete"
+    And its header offers "Use this template" and no "Duplicate to edit" button
     And an unknown template id shows the not-found page
+
+  @integration
+  Scenario: From LangWatch: a member who may not create dashboards gets no edit control
+    Given a member who may not create dashboards
+    When the member opens a From LangWatch board
+    Then it has no "Add a widget" and no "Use this template", its title and description are plain text
+    And each widget's menu holds only Export CSV, with no drag handle
+
+  @unit @integration
+  Scenario: From LangWatch: the first change asks before it makes the member's own copy
+    Given a member who may create dashboards on a From LangWatch board
+    When they rename it, change its description, press "Add a widget", move a widget, or pick a widget's "Edit code" or "Delete"
+    Then "Modify a LangWatch dashboard?" says "This dashboard is maintained by LangWatch. If you change it, it becomes your own copy and stops getting LangWatch updates. You can add the original again from Templates at any time."
+    And it offers "Cancel" and "Yes, modify it"
+    And a blank or unchanged name or description asks nothing
+
+  @integration
+  Scenario: From LangWatch: Cancel changes nothing
+    Given "Modify a LangWatch dashboard?" is open
+    When the member presses "Cancel"
+    Then the dialog closes, nothing is stored and the member stays on the unchanged board
+
+  @unit @integration
+  Scenario: From LangWatch: Yes, modify it makes the member's own copy and opens it on their change
+    Given "Modify a LangWatch dashboard?" is open after a change
+    When the member presses "Yes, modify it"
+    Then a board with the template's name, numbered from 2 when taken, is made for the project with the template's widgets and description
+    And a new name or description is saved on it, a deleted widget is left out, and a moved widget keeps where it was dropped
+    And it opens, with "Add a widget" open after "Add a widget", and the widget's editor open after "Edit code"
+    And "dashboards.created.dashboard" is sent with createdFrom "duplicate_curated" and the From LangWatch board's templateId
+
+  # No state hides a From LangWatch board per member, so its entry stays where it is listed; a
+  # pin is the one place the copy can take over.
+  @integration
+  Scenario: From LangWatch: the copy takes over the From LangWatch board's pin
+    Given the member pinned a From LangWatch board
+    When they change it and press "Yes, modify it"
+    Then the copy is pinned in the From LangWatch board's place among their pins, and the From LangWatch board is unpinned
+
+  @integration
+  Scenario: From LangWatch: a copy that cannot be made leaves the member on the board
+    Given "Modify a LangWatch dashboard?" is open
+    When the member presses "Yes, modify it" and the copy cannot be made
+    Then the member stays on the From LangWatch board and a toast says "Couldn't make your copy of the dashboard"
+    And no half-made board is left behind
+
+  @integration
+  Scenario: From LangWatch: Use this template makes the member's own board from it
+    Given a member who may create dashboards on a From LangWatch board
+    When they press "Use this template"
+    Then a board named after the template, numbered from 2 when taken, is made for the project with its widgets, and it opens
+    And the template's report prompt is drafted in Langy, unsent, as adding a template does
 
   @unit @integration
   Scenario: From LangWatch: every widget on a template board has code
@@ -1537,8 +1625,8 @@ Feature: Dashboards v2 polish and bring-your-own-AI
     Given Langy is on for the project and the member may start a conversation
     When the member opens a saved board or a read-only From LangWatch board
     Then every widget card on it has an "Ask Langy" button, shown while the card is hovered or focused
-    And on a From LangWatch board it sits beside a menu that holds only Export CSV, and
-      clicking it drafts that widget's prompt with the board as context, as on a saved board
+    And on a From LangWatch board it sits beside a menu that holds only Export CSV for a member
+      who may not create dashboards, and clicking it drafts that widget's prompt with the board as context, as on a saved board
     And when Langy is off or the member may not start a conversation, no card shows it
 
   @unit @integration
@@ -2254,11 +2342,27 @@ Feature: Dashboards v2 polish and bring-your-own-AI
 
   @unit
   Scenario: AC213 Diagnostics: a card shows what the server limited as one (i) line
-    Given a card whose run answered SHARE_WINDOW_LIMITED, SOURCES_IGNORED or GRANULARITY_COARSENED
+    Given a card whose run answered SHARE_WINDOW_LIMITED or GRANULARITY_COARSENED
     Then the card shows one (i) line holding the messages of those diagnostics
     And a card whose run was not limited shows no such line
     And the line names no project and counts none
     # Evidence: a haven browser screenshot of a limited card and of an unlimited one
+
+  @unit
+  Scenario: AC213b Diagnostics: a card leaves SOURCES_IGNORED to its sources line
+    Given a widget whose query does not read {dashboard_context_sources:Array(String)}
+    When its run answers a SOURCES_IGNORED diagnostic
+    Then the card's (i) line leaves that diagnostic out
+    And the sources line already says the widget counts every source
+    And no card footer shows the "{dashboard_context_sources}" placeholder
+    # The diagnostic is written for the query's author (CLI, MCP, the editor); a reader never wrote the SQL
+
+  @unit
+  Scenario: AC213c Sources line: a view named with its database still keeps its origin
+    Given a widget whose query reads "langwatch.trace_metrics" or "analytics.trace_metrics" and not {dashboard_context_sources:Array(String)}
+    Then its sources line says "Sources: all sources"
+    And never that sources don't apply
+    # The database a deployment serves the views from differs: "langwatch" on Cloud, "analytics" by default
 
   @unit
   Scenario: AC212 Skill: the dashboard-widgets skill teaches projects, the reserved names and params
@@ -2266,6 +2370,67 @@ Feature: Dashboards v2 polish and bring-your-own-AI
     Then the skill names {dashboard_context_sources} and {dashboard_context_projects} as reserved, the type Array(String), that a query is kept to its sources only where its SQL reads the first, that `projects` defaults to the board's project, and that every run answers with params, a flat map of each declared placeholder by its SQL name, and diagnostics, which say when the server limited the run or ignored a setting (SHARE_WINDOW_LIMITED, SOURCES_IGNORED, GRANULARITY_COARSENED)
     And it shows `--projects A,B` and the queries file's "projects"
     # Evidence: the compiled skill text, quoted
+
+  # ---------------------------------------------------------------------------
+  # Widgets Langy builds: themed, sized to their card, made from a dashboard question
+  # ---------------------------------------------------------------------------
+
+  @unit
+  Scenario: AC260 Langy widgets: the skill teaches the theme's colours, never fixed ones
+    Given Langy builds a widget with the dashboard-widgets skill
+    Then the skill names the colour variables the frame sets for the dashboard's theme, such as var(--chakra-colors-fg) and var(--chakra-colors-bg-card)
+    And it says never to write a hex colour, white or a light background, so a tile stays readable in dark mode
+    And its worked example uses only those variables
+    # Evidence: the compiled skill text, quoted
+
+  @integration
+  Scenario: AC260b Langy widgets: switching the theme repaints a widget in the new colours
+    Given a board with a widget open in the light theme
+    When the reader switches to the dark theme
+    Then the widget's frame starts again with the dark theme's colour variables
+    # The frame reads the colours when it loads, after the new theme has painted, not when it began
+
+  @unit
+  Scenario: AC261 Langy widgets: the skill teaches a widget to fill its card
+    Given Langy builds a widget with the dashboard-widgets skill
+    Then the skill says a new widget lands half the board wide and about 200 px tall inside
+    And it says to fill the card with height 100%, a chart in the space left, and never a fixed pixel height
+    And its worked example fills the card
+    # Evidence: the compiled skill text, quoted
+
+  @unit
+  Scenario: AC262 Langy widgets: a prebuilt chart with no height fills its card
+    Given a widget draws a @langwatch/charts chart and passes no height
+    Then the chart takes the height of the card it sits in, so no bar is cut off at the default size
+    And it keeps a minimum height when its parent gives it none
+    And a height the widget passes still wins
+
+  @unit
+  Scenario: AC263 Langy widgets: the skill reads one view of the schema, not all of it
+    Given Langy builds a widget with the dashboard-widgets skill
+    Then the skill says to save the schema to a file and read the view names, then the one view it needs
+    And it names the common views: trace_metrics for traces, cost and latency, evaluation_metrics for evaluations, judgments for Instant Eval verdicts
+    And it says a query reads the dashboard's period through the reserved period names, never a fixed window such as the last 400 days
+    # A turn that printed the whole schema (465 KB) took 60 model calls and five minutes for one chart
+
+  @unit
+  Scenario: AC264 Langy widgets: a data question asked with a dashboard open becomes a widget on it
+    Given a member has a dashboard open and asks Langy a question about their data, such as "Is our AI saving us time?"
+    Then Langy's rules send it to the dashboard-widgets skill
+    And the answer is a widget added to that dashboard, not a chart drawn only in the chat
+    # Langy's rules are the same for every model; nothing here is written for one provider
+
+  @unit
+  Scenario: AC264b Langy widgets: a question from a board's ask bar asks for a widget on that board
+    Given a member types "Is our AI saving us time?" in the "What do you want to know?" bar of a dashboard they saved
+    Then the board context sent with the question says to answer by adding a widget to that dashboard, then say the answer in a sentence
+    And on a From LangWatch dashboard, which is read-only, the context asks for no widget
+
+  @unit
+  Scenario: AC264c Langy widgets: a broad question still ends in a widget on the board
+    Given Langy builds a widget with the dashboard-widgets skill for a broad question such as "Is our AI saving us time?"
+    Then the skill says to chart the one or two numbers in the project's traces that speak to it and say what the widget cannot tell
+    And to stay in the skill until the widget is on the board, without switching skills or looking outside the LangWatch data
 
   # ---------------------------------------------------------------------------
   # Guard rails

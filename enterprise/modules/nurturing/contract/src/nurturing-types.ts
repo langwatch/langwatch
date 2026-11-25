@@ -165,6 +165,9 @@ export interface CioPersonTraits extends CioOrganizationUsageTraits {
   // Comma list of the paths whose setup completed.
   guided_onboarding_completed_paths?: string;
   guided_onboarding_completed_at?: number;
+  // "coding" | "call": the start picked on Langy's governance opener. "call" is the choice
+  // the person made, never a booked call.
+  langy_start?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -238,6 +241,8 @@ export type CioEventName =
   | "onboarding_path_gateway"
   | "onboarding_path_governance"
   | "guided_onboarding_path_completed"
+  /** Langy's governance opener was answered: `start` is "coding" or "call", never a booking. */
+  | "langy_start_chosen"
   /** Any signed-in usage, at most once per hour per person. */
   | "app_active"
   | "self_hosted_seats_crossed_threshold"

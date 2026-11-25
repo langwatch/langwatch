@@ -7298,6 +7298,9 @@ importers:
       '@langwatch/time':
         specifier: workspace:*
         version: link:../../../packages/time
+      '@langwatch/user-contract':
+        specifier: workspace:*
+        version: link:../../user/contract
       zod:
         specifier: 'catalog:'
         version: 4.6.7

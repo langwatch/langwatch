@@ -52,9 +52,9 @@ export function readsSourcesParameter(sql: string): boolean {
   return codeOf(sql).includes(SOURCES_PLACEHOLDER);
 }
 
-/** The distinct views a query names after FROM or JOIN, in the order first named. */
+/** The distinct views a query names after FROM or JOIN, with or without their database. */
 export function namedViews(sql: string): string[] {
-  const named = [...codeOf(sql).matchAll(/\b(?:FROM|JOIN)\s+(?:analytics\.)?([a-z_]+)/gi)].map(
+  const named = [...codeOf(sql).matchAll(/\b(?:FROM|JOIN)\s+(?:[a-z_]+\.)?([a-z_]+)/gi)].map(
     (match) => match[1] ?? "",
   );
 

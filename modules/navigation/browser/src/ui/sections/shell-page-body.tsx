@@ -15,7 +15,7 @@ import { PaymentRecoveryBanner } from "../../behavior/lent-payment-recovery-bann
 import { navigationApi } from "../../behavior/navigation-api.ts";
 import { useNavigationHost } from "../../model/navigation-host.ts";
 import { planManagementHref } from "../../model/plan-management-href.ts";
-import { isPathUnder } from "../../model/products.ts";
+import { isOrganizationDashboardsPath, isPathUnder } from "../../model/products.ts";
 import { isResolverAddress } from "../../model/resolve-shell-route.ts";
 import { SETTINGS_MEASURE, settingsColumnCss } from "../../model/settings-column.ts";
 import { cloudAdminGroup, instanceGroup } from "../../model/settings-menu.ts";
@@ -76,6 +76,8 @@ function readerMayOpenThePage({
   // membership of the ambient team cannot be confirmed: without this a member
   // on /coding-agents/* hits the refusal and the page never renders.
   if (isPersonalScopeRoute || isDemoProject) return true;
+  // The organization's Dashboards library names no team: it asks each project's own access.
+  if (isOrganizationDashboardsPath(pathname)) return true;
   // Administrators created through a role binding alone have no membership row
   // and still have full team access.
   if (organizationRole === ORGANIZATION_ADMIN_ROLE) return true;

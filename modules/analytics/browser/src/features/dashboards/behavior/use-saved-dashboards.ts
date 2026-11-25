@@ -5,7 +5,11 @@
  */
 
 import { useUiAnalytics } from "@langwatch/browser-host/analytics";
-import type { DashboardProject, DashboardScope } from "@langwatch/dashboard-contract";
+import type {
+  DashboardHomeProduct,
+  DashboardProject,
+  DashboardScope,
+} from "@langwatch/dashboard-contract";
 import { useRef, useState } from "react";
 
 import { analyticsApi } from "../../../behavior/analytics-api.ts";
@@ -28,6 +32,8 @@ export type SavedBoard = {
   /** Null for a board older than creators. */
   createdById: string | null;
   scope: DashboardScope;
+  /** The product whose sidebar lists it, which decides whose data it reads (ADR-002, D2). */
+  homeProduct: DashboardHomeProduct;
   organizationId: string | null;
   /** The owning project, named only where the board is listed in another project. */
   ownerProject: DashboardProject | null;
@@ -45,6 +51,7 @@ function savedBoardOf({
   description,
   createdById,
   scope,
+  homeProduct,
   organizationId,
   ownerProject,
   isStarred,
@@ -57,6 +64,7 @@ function savedBoardOf({
     description,
     createdById,
     scope,
+    homeProduct,
     organizationId,
     ownerProject,
     isStarred,
@@ -180,6 +188,8 @@ export function useSavedDashboards() {
     organizationBoards,
     /** True until the first list answer arrives, so a board lookup never reads "missing" early. */
     isLoading: list.data === void 0 && !list.isError,
+    /** A held list being read again: a board just made elsewhere may not be in it yet. */
+    isRefreshing: list.isFetching,
     loadError: list.error,
     isCreating: isMakingBoard || create.isPending || star.isPending,
     isDeleting: remove.isPending,

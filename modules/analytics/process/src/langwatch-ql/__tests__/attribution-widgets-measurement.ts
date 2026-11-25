@@ -12,6 +12,9 @@ import { type LangWatchQLClickHouseHarness, selectRows } from "./lwql-clickhouse
 
 const flooredRead = LangWatchQLFlooredReadService.create();
 
+/** ClickHouse's MEMORY_LIMIT_EXCEEDED: the run hit the cap, so it is not a measurement. */
+export const MEMORY_LIMIT_EXCEEDED = 241;
+
 /**
  * Made once per file run: system.query_log persists in a reused container and runCount restarts,
  * so a comment without it could match an earlier invocation's entry.
@@ -66,13 +69,17 @@ export function sqlOf({ form, label }: { form: Form; label: QueryLabel }): strin
 }
 
 /**
- * Fails if any run was refused, carries a server exception code, or read no rows: a run over no
- * data would pass the cap and the drift checks with a meaningless peak. att-change/change may
- * rightly return none, as no version first appears inside the seed's period.
+ * Fails if a run hit the cap, was refused, has a server exception code, or read no rows. No-data
+ * runs pass cap and drift checks with a meaningless peak, and capped peak is the cap, not a
+ * measure. att-change/change may rightly find none: no version first appears in the seed's period.
  */
 export function expectAnswered({ runs, context }: { runs: readonly Run[]; context: string }): void {
   expect(runs.length, context).toBeGreaterThan(0);
   for (const run of runs) {
+    expect(
+      run.exceptionCode === MEMORY_LIMIT_EXCEEDED,
+      `${context} hit the memory cap, so its peak is the cap and not a measure: ${described(runs)}`,
+    ).toBe(false);
     expect(run.refusal, `${context}: ${described(runs)}`).toBeUndefined();
     expect(run.exceptionCode, `${context}: ${described(runs)}`).toBe(0);
     expect(run.rowsRead, `${context}: ${described(runs)}`).toBeGreaterThan(0);

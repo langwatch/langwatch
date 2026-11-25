@@ -38,10 +38,20 @@ type GatewayFactsDependencies = Readonly<{
   logger: Readonly<{
     debug(payload: Readonly<Record<string, unknown>>, message: string): void;
     warn(payload: Readonly<Record<string, unknown>>, message: string): void;
+    error(payload: Readonly<Record<string, unknown>>, message: string): void;
   }>;
 }>;
 
 type Deliver = (signal: NurturingSignal) => Promise<void>;
+
+/**
+ * Attempts a key's first request gets while it waits for the key's copy: twelve retries, each
+ * waiting a full-jitter backoff from `getBackoffMs` (packages/group-queue). The upper bound is
+ * about 27 minutes (500ms doubling, capped at 600s); the expected wait is roughly half of that.
+ * Covers a copy lagging a backlog or the deploy's replay. Bounded so a key nurturing never copies
+ * ends instead of holding its queue group.
+ */
+export const KEY_FIRST_REQUEST_COPY_ATTEMPTS = 13;
 
 /**
  * Turns gateway's key facts into one person's signal, reading only nurturing's own copies: a
@@ -113,18 +123,32 @@ export class NurturingGatewayFactsService {
 
   /**
    * A live USER key's first request, told to whoever its creation was told to: the person a
-   * campaign waiting on the key's first use reads.
+   * campaign waiting on the key's first use reads. Gateway records a key's first request once,
+   * so a key not copied yet fails the delivery to be retried, up to
+   * {@link KEY_FIRST_REQUEST_COPY_ATTEMPTS}; a key whose copy never reached nurturing (a lost or failed copy) then ends unsent.
    */
   async keyFirstRequested({
     data,
     deliver,
-  }: Readonly<{ data: RecordVkFirstRequestCommandData; deliver: Deliver }>): Promise<void> {
+    deliveryAttempt,
+  }: Readonly<{
+    data: RecordVkFirstRequestCommandData;
+    deliver: Deliver;
+    /** The queue's 1-based delivery attempt; absent counts as the first, so the job still retries. */
+    deliveryAttempt?: number;
+  }>): Promise<void> {
     const { virtual_key_id: virtualKeyId, organization_id: organizationId } = data;
     const [key] = await this.dependencies.keys.findKey({ organizationId, virtualKeyId });
     if (!key) {
-      this.dependencies.logger.warn(
-        { virtualKeyId, reason: "key_not_copied" },
-        "a key's first request names a key nurturing holds no copy of; nothing is sent",
+      const attempt = deliveryAttempt ?? 1;
+      if (attempt < KEY_FIRST_REQUEST_COPY_ATTEMPTS) {
+        throw new Error(
+          `Key ${virtualKeyId} has no copy in nurturing yet (attempt ${attempt}); retrying its first request`,
+        );
+      }
+      this.dependencies.logger.error(
+        { virtualKeyId, reason: "key_not_copied", deliveryAttempt: attempt },
+        "a key's first request names a key nurturing holds no copy of after its retries; nothing is sent",
       );
       return;
     }

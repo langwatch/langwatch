@@ -13,6 +13,7 @@ let orgFlags: Record<string, Record<string, boolean>> = {};
 
 vi.mock("../../../behavior/navigation-api.ts", () => ({
   navigationApi: {
+    boards: { resolve: { useQuery: () => ({ data: undefined, isError: false }) } },
     featureFlag: {
       isEnabledForEachOrganization: {
         useQuery: (input: { flag: string }) => ({
