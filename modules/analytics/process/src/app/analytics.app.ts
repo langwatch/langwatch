@@ -116,7 +116,11 @@ import { readLegacyTimeseriesBody } from "../rules/analytics-legacy-body.rules.t
 import { savedWorkbenchChartPlatformUrl as savedWorkbenchChartPlatformUrl_ } from "../rules/analytics-platform-url.rules.ts";
 import type { LwqlAccessModelOwner } from "../rules/langwatch-ql-config-store.rules.ts";
 import { langWatchQLJudgementCalls } from "../rules/langwatch-ql-judgement-questions.rules.ts";
-import { keyMaySpend, keyReachProjectIds, keyRunTelemetry } from "../rules/langwatch-ql-key-caller.rules.ts";
+import {
+  keyMaySpend,
+  keyReachProjectIds,
+  keyRunTelemetry,
+} from "../rules/langwatch-ql-key-caller.rules.ts";
 import { DEFAULT_LWQL_RESULT_LIMITS } from "../rules/langwatch-ql-result-limits.rules.ts";
 import {
   langWatchQLQueryHashKey,
