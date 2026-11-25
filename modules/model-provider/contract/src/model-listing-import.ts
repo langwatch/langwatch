@@ -56,5 +56,13 @@ function apiRoot(url: string): string {
   const normalized = parts
     ? `${(parts[1] ?? "").toLowerCase()}${(parts[2] ?? "").toLowerCase()}${parts[3] ?? ""}`
     : trimmed;
-  return normalized.replace(/\/+$/, "").replace(/\/v1$/, "").replace(/\/+$/, "");
+  const root = trimTrailingSlashes(normalized);
+  return trimTrailingSlashes(root.endsWith("/v1") ? root.slice(0, -3) : root);
+}
+
+/** Drops trailing slashes in one linear pass; an anchored `/\/+$/` backtracks on long runs. */
+function trimTrailingSlashes(value: string): string {
+  let end = value.length;
+  while (end > 0 && value[end - 1] === "/") end--;
+  return value.slice(0, end);
 }
