@@ -59,8 +59,8 @@ import { NurturingClaimReleaseService } from "./nurturing-claim-release.service.
 import { NurturingClaimedCallsDeliveryService } from "./nurturing-claimed-calls-delivery.service.ts";
 import { NurturingCustomerIoSenderService } from "./nurturing-customer-io-sender.service.ts";
 import { NurturingErasedPeopleService } from "./nurturing-erased-people.service.ts";
+import { NurturingFailureReportService } from "./nurturing-failure-report.service.ts";
 import type { NurturingGuidedOnboardingBackfillService } from "./nurturing-guided-onboarding-backfill.service.ts";
-import { NurturingGuidedOnboardingDeliveryService } from "./nurturing-guided-onboarding-delivery.service.ts";
 import { NurturingJoinedOrganizationService } from "./nurturing-joined-organization.service.ts";
 import type { NurturingMemberFactsService } from "./nurturing-member-facts.service.ts";
 import { NurturingOwnCodingDeliveryService } from "./nurturing-own-coding-delivery.service.ts";
@@ -68,7 +68,7 @@ import { NurturingPlanSyncService } from "./nurturing-plan-sync.service.ts";
 import { NurturingPostHogDeliveryService } from "./nurturing-posthog-delivery.service.ts";
 import type { NurturingService } from "./nurturing.service.ts";
 
-const reportFailure = NurturingCustomerIoSenderService.reportFailure;
+const { reportFailure } = NurturingFailureReportService;
 
 /** Well under Customer.io's 500KB per batch: one member's identify is a few hundred bytes. */
 const MEMBER_BATCH_SIZE = 100;
@@ -111,13 +111,11 @@ export class NurturingDeliveryService {
       planSync: NurturingPlanSyncService;
       erasedPeople: NurturingErasedPeopleService;
       customerIoSender: NurturingCustomerIoSenderService | undefined;
-      guidedOnboarding: NurturingGuidedOnboardingDeliveryService | undefined;
     }>,
   ) {}
 
   static create(deps: NurturingDeliveryService["deps"]): NurturingDeliveryService {
     const { claims, customerIo, posthog } = deps;
-    const customerIoSender = customerIo && NurturingCustomerIoSenderService.create(customerIo);
     return new NurturingDeliveryService(deps, {
       postHogDelivery: posthog && NurturingPostHogDeliveryService.create(posthog),
       ownCodingDelivery:
@@ -137,13 +135,7 @@ export class NurturingDeliveryService {
         members: deps.members,
       }),
       erasedPeople: NurturingErasedPeopleService.create(deps.erasedUsers),
-      customerIoSender,
-      guidedOnboarding:
-        customerIoSender &&
-        NurturingGuidedOnboardingDeliveryService.create({
-          sender: customerIoSender,
-          backfill: deps.guidedBackfill,
-        }),
+      customerIoSender: customerIo && NurturingCustomerIoSenderService.create(customerIo),
     });
   }
 
@@ -172,7 +164,7 @@ export class NurturingDeliveryService {
     this.toPostHogSafely(signal);
     await this.identifyCodingAgentMembers(signal);
     await this.parts.ownCodingDelivery?.deliver(signal);
-    await this.parts.guidedOnboarding?.deliver(signal);
+    await this.deps.guidedBackfill?.deliver(signal);
     if (memberBatch) this.identifyInBatches(memberBatch);
   }
 

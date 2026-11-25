@@ -98,6 +98,11 @@ Feature: PostHog guided onboarding events
     Then a "guided_onboarding_path_completed" event is tracked with path governance
 
   @unit
+  Scenario: choosing Langy's start is tracked with the start
+    Given a guided onboarding event "start_chosen" with the start call
+    Then a "guided_onboarding_start_chosen" event is tracked for the user with start call
+
+  @unit
   Scenario: attaching a conversation tracks nothing
     Given a guided onboarding event "conversation_attached"
     Then no PostHog event is tracked

@@ -123,6 +123,16 @@ Feature: Customer.io guided onboarding traits and campaign triggers
     And the organization group carries onboarding_variant "guided"
     And neither carries onboarding_primary_path, since no path is picked yet
 
+  # No backfill recovers the variant of an organization that picks no path, so a refused
+  # send must retry rather than leave the trait empty.
+  @unit
+  Scenario: a refused variant assignment fails its delivery, so its job retries
+    Given an organization assigned the "guided" onboarding variant
+    And Customer.io refuses the variant assignment
+    When the delivery is retried after Customer.io recovers
+    Then its creator is identified with onboarding_variant "guided"
+    And the organization group carries onboarding_variant "guided"
+
   @unit
   Scenario: a login backfills the picked paths of the person's latest organization, once
     Given a member whose latest organization picked gateway then llmops in the guided variant
@@ -131,12 +141,21 @@ Feature: Customer.io guided onboarding traits and campaign triggers
     And the organization group carries onboarding_primary_path "gateway" once
 
   @unit
-  Scenario: a backfill sends the state read after its claim, not the one read before it
+  Scenario: a backfill sends the state read after its claim
     Given a member whose latest organization picked gateway in the guided variant
-    And another member picks llmops first after the backfill's first read and before its claim
+    And another member picks llmops first while the backfill takes its claim
     When their session starts
     Then they are identified with onboarding_primary_path "llmops"
     And the organization group carries onboarding_primary_path "llmops"
+
+  # The claim is taken before any read, so every later login of a settled person costs one
+  # claim, not a membership read and an organization read.
+  @unit
+  Scenario: a sent backfill reads nothing on a later login
+    Given a member whose backfill was sent
+    When their session starts again after the attempt's hour has passed
+    Then the organization's guided state is not read
+    And no Customer.io call is made
 
   @unit
   Scenario: a login before any pick sends no backfill and keeps it for a later login

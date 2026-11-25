@@ -43,19 +43,22 @@ function collectAnnouncements(): {
 function createOrganizations(seed: Readonly<Record<string, GuidedOnboardingRecord>> = {}): {
   api: OrganizationApi;
   records: Map<string, GuidedOnboardingRecord>;
+  writes: string[];
 } {
   const records = new Map(Object.entries(seed));
+  const writes: string[] = [];
   const api = createApiFixture<OrganizationApi>({
     readGuidedOnboardingState: ({ organizationId }) =>
       Promise.resolve(
         records.get(organizationId) ?? { state: { paths: [], donePaths: [] }, variant: null },
       ),
     writeGuidedOnboardingState: ({ organizationId, record }) => {
+      writes.push(organizationId);
       records.set(organizationId, record);
       return Promise.resolve(record);
     },
   });
-  return { api, records };
+  return { api, records, writes };
 }
 
 describe("GuidedOnboardingService path guards", () => {
@@ -356,6 +359,32 @@ describe("GuidedOnboardingService over a real organization read/write", () => {
     await service.recordLangyStart(actor, { start: "coding" });
 
     expect(records.get("org_1")?.state.langyStart).toBe("coding");
+    expect(announced.events.map((event) => event.payload)).toEqual([
+      { start: "call" },
+      { start: "coding" },
+    ]);
+  });
+
+  /** @scenario "recording the same Langy start again changes and announces nothing" */
+  it("writes and announces nothing when the start repeats the recorded one", async () => {
+    const { api, writes } = createOrganizations({
+      org_1: {
+        state: { paths: ["governance"], donePaths: [], langyStart: "call" },
+        variant: "guided",
+      },
+    });
+    const announced = collectAnnouncements();
+    const service = GuidedOnboardingService.create({
+      organizations: api,
+      announce: announced.announce,
+    });
+    const actor = { organizationId: "org_1", userId: "user_1" };
+
+    const state = await service.recordLangyStart(actor, { start: "call" });
+
+    expect(state.langyStart).toBe("call");
+    expect(writes).toEqual([]);
+    expect(announced.events).toEqual([]);
   });
 
   /** @scenario "attaching a conversation tracks nothing" */

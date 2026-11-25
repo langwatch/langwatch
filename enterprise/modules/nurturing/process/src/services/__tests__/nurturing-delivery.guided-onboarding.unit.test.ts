@@ -23,8 +23,9 @@ import { NurturingGuidedOnboardingBackfillService } from "../nurturing-guided-on
 import { NurturingService } from "../nurturing.service.ts";
 import { unplacedMemberFacts } from "./nurturing-member-facts.test-helpers.ts";
 
-/** Every call Customer.io was handed, single or batched, in the order it was handed. */
+/** Every call Customer.io was handed, single or batched, in the order; refuses batches on ask. */
 class RecordingChannel extends CustomerIoChannel {
+  refusing = false;
   readonly sent: CioBatchCall[] = [];
   async identifyUser(input: { userId: string; traits: Partial<CioPersonTraits> }): Promise<void> {
     this.sent.push({ type: "identify", ...input });
@@ -38,6 +39,7 @@ class RecordingChannel extends CustomerIoChannel {
     this.sent.push({ type: "group", ...input });
   }
   async batch(calls: CioBatchCall[]): Promise<void> {
+    if (this.refusing) throw new Error("Customer.io refused");
     this.sent.push(...calls);
   }
 }
@@ -79,23 +81,46 @@ async function deliveryWithGuidedOrganization() {
   return { channel, delivery };
 }
 
+const variantAssigned: NurturingSignal = {
+  kind: "onboarding_variant_assigned",
+  sourceEventId: "org-1",
+  tenantId: "org-1",
+  occurredAt: 1_500,
+  userId: "user-1",
+  organizationId: "org-1",
+  variant: "guided",
+};
+
 describe("NurturingDeliveryService for guided onboarding", () => {
   describe("when an organization is assigned the guided variant", () => {
     /** @scenario "the assigned experiment variant reaches the creator and the organization" */
     it("identifies the creator and groups the organization with the variant alone", async () => {
       const { channel, delivery } = await deliveryWithGuidedOrganization();
-      const signal: NurturingSignal = {
-        kind: "onboarding_variant_assigned",
-        sourceEventId: "org-1",
-        tenantId: "org-1",
-        occurredAt: 1_500,
-        userId: "user-1",
-        organizationId: "org-1",
-        variant: "guided",
-      };
-
-      await delivery.deliver({ key: "onboarding_variant_assigned:org-1", signal });
+      await delivery.deliver({ key: "onboarding_variant_assigned:org-1", signal: variantAssigned });
       await settle();
+
+      expect(channel.sent).toEqual([
+        { type: "identify", userId: "user-1", traits: { onboarding_variant: "guided" } },
+        {
+          type: "group",
+          userId: "user-1",
+          groupId: "org-1",
+          traits: { onboarding_variant: "guided" },
+        },
+      ]);
+    });
+
+    /** @scenario "a refused variant assignment fails its delivery, so its job retries" */
+    it("rejects while Customer.io refuses, then sends the variant on the retry", async () => {
+      const { channel, delivery } = await deliveryWithGuidedOrganization();
+      const key = "onboarding_variant_assigned:org-1";
+      channel.refusing = true;
+
+      await expect(delivery.deliver({ key, signal: variantAssigned })).rejects.toThrow(
+        "Customer.io refused",
+      );
+      channel.refusing = false;
+      await delivery.deliver({ key, signal: variantAssigned });
 
       expect(channel.sent).toEqual([
         { type: "identify", userId: "user-1", traits: { onboarding_variant: "guided" } },

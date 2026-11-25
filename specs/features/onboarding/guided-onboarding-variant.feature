@@ -223,6 +223,16 @@ Feature: Guided onboarding variant
     And a "start_chosen" event is announced with the start call
     When the start coding is recorded after it
     Then the guided state carries the start coding
+    And a "start_chosen" event is announced with the start coding
+
+  # A retried CLI call repeats the start it already recorded: announcing it again
+  # would count the choice twice in Customer.io and PostHog.
+  @unit
+  Scenario: recording the same Langy start again changes and announces nothing
+    Given an organization in the guided variant whose recorded start is call
+    When the start call is recorded again
+    Then the guided state is not written
+    And no event is announced
 
   # ============================================================================
   # The CLI reaches the same state through the project's credential

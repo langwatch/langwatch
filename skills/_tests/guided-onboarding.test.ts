@@ -197,7 +197,7 @@ describe("the guided-onboarding skill", () => {
         "a turn whose lines were all said this way ends with no reply text at all",
       );
       expect(rendered).toContain(
-        "The proposal is the one exception: it is the `question` field of its bare question.",
+        "The proposal and the governance opener are the two exceptions: each is the `question` field of its bare question, never said with `say`.",
       );
       // Every verbatim line is introduced by a say instruction, at its moment.
       for (const key of [

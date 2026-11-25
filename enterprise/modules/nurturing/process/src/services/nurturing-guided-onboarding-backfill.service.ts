@@ -12,7 +12,7 @@ import type { NurturingService } from "./nurturing.service.ts";
 
 const nurturingLogger = createLogger("langwatch:nurturing");
 
-/** Once per person and organization, so this outlives any realistic replay of a login. */
+/** Once per person, so this outlives any realistic replay of a login. */
 const BACKFILL_WINDOW_SECONDS = 365 * 24 * 60 * 60;
 
 /**
@@ -30,11 +30,10 @@ type GuidedOnboardingBackfillDependencies = Readonly<{
 
 /**
  * The first-login backfill: a person who picked paths before the live hooks reached Customer.io
- * gets their latest organization's guided traits on their next session, once. The claim is taken
- * only for a state with picks, for an hour; a successful send holds it for the year, and a failed
- * one gives it back, or lets it lapse, so a later login sends it. The calls are idempotent, so a
- * send whose year-long hold failed is harmlessly sent again on a later login. A failure only
- * logs: the login's own delivery never fails for it.
+ * gets their latest organization's guided traits on their next session, once. The claim comes
+ * first, so a settled person costs one claim and no read. An attempt holds it for an hour; a sent
+ * backfill holds it for the year, and an empty or failed one gives it back, or lets it lapse.
+ * A failure only logs: the login's own delivery never fails for it.
  * @see specs/nurturing/guided-onboarding-customer-io.feature
  */
 export class NurturingGuidedOnboardingBackfillService {
@@ -56,22 +55,15 @@ export class NurturingGuidedOnboardingBackfillService {
   }
 
   private async backfill(userId: string): Promise<void> {
-    const { claims, customerIo, members } = this.dependencies;
-    const memberships = await members.findMembershipsOfUsers({ userIds: [userId] });
-    const [latest] = latestCurrentMemberships(memberships);
-    if (!latest) return;
-    const { organizationId } = latest;
-
-    if ((await this.callsFor({ userId, organizationId })).length === 0) return;
-
-    const claimKey = `nurturing:guided_onboarding_backfill:${userId}:${organizationId}`;
+    const { claims, customerIo } = this.dependencies;
+    const claimKey = `nurturing:guided_onboarding_backfill:${userId}`;
     if (!(await claims.claim(claimKey, ATTEMPT_WINDOW_SECONDS))) return;
     const release = () => NurturingClaimReleaseService.create(claims).releasedAll([claimKey]);
     let calls: CioBatchCall[];
     try {
-      // Read again after the claim so another member's newer pick is not reverted by this send;
+      // Read only after the claim so another member's newer pick is not reverted by this send;
       // what the few milliseconds left still miss, the next live path event overwrites.
-      calls = await this.callsFor({ userId, organizationId });
+      calls = await this.callsFor(userId);
       if (calls.length > 0) await customerIo.batchOrThrow(calls);
     } catch (error) {
       nurturingLogger.warn(
@@ -89,11 +81,13 @@ export class NurturingGuidedOnboardingBackfillService {
     await claims.claim(claimKey, BACKFILL_WINDOW_SECONDS);
   }
 
-  private async callsFor({
-    userId,
-    organizationId,
-  }: Readonly<{ userId: string; organizationId: string }>): Promise<CioBatchCall[]> {
-    const { organizations } = this.dependencies;
+  /** The backfill of the person's latest organization; none for a person in no organization. */
+  private async callsFor(userId: string): Promise<CioBatchCall[]> {
+    const { members, organizations } = this.dependencies;
+    const memberships = await members.findMembershipsOfUsers({ userIds: [userId] });
+    const [latest] = latestCurrentMemberships(memberships);
+    if (!latest) return [];
+    const { organizationId } = latest;
     const { state, variant } = await organizations.readGuidedOnboardingState({ organizationId });
     return fireGuidedOnboardingBackfill({ userId, organizationId, variant, state });
   }

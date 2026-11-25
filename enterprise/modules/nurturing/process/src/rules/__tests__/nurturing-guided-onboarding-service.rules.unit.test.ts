@@ -472,6 +472,17 @@ describe("fireGuidedOnboardingPostHog()", () => {
     ]);
   });
 
+  /** @scenario "choosing Langy's start is tracked with the start" */
+  it("names the start choice and carries the start", () => {
+    const decided = decide({ event: "start_chosen", payload: { start: "call" } });
+
+    expect(decided).toMatchObject({
+      userId: "user-1",
+      event: "guided_onboarding_start_chosen",
+      properties: { start: "call", organization_id: "org_1" },
+    });
+  });
+
   /** @scenario "connecting a provider tracks the provider and the model, never a key" */
   it("carries the provider and the model and drops any other payload field", () => {
     const decided = decide({

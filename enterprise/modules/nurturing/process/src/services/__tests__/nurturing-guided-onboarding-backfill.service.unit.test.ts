@@ -126,20 +126,27 @@ describe("NurturingGuidedOnboardingBackfillService", () => {
     });
   });
 
-  describe("given another member's pick lands between the first read and the claim", () => {
-    /** @scenario "a backfill sends the state read after its claim, not the one read before it" */
+  describe("given another member's pick lands while the backfill takes its claim", () => {
+    /** @scenario "a backfill sends the state read after its claim" */
     it("sends the organization's newer picks", async () => {
-      const { channel, backfill, guided } = await backfillOver({
-        state: { paths: ["gateway"], donePaths: [] },
-        variant: "guided",
-      });
-      guided.read = () => {
-        const snapshot = guided.record;
+      const memory = MemoryNurturingClaimRepository.create();
+      const onClaim = { run: () => {} };
+      const claims: NurturingClaimRepository = {
+        claim: (key, ttlSeconds) => {
+          onClaim.run();
+          return memory.claim(key, ttlSeconds);
+        },
+        release: (key) => memory.release(key),
+      };
+      const { channel, backfill, guided } = await backfillOver(
+        { state: { paths: ["gateway"], donePaths: [] }, variant: "guided" },
+        claims,
+      );
+      onClaim.run = () => {
         guided.record = {
           state: { paths: ["llmops", "gateway"], donePaths: [] },
           variant: "guided",
         };
-        return Promise.resolve(snapshot);
       };
 
       await backfill.deliver(sessionStarted(2_000));
@@ -151,25 +158,25 @@ describe("NurturingGuidedOnboardingBackfillService", () => {
     });
   });
 
-  describe("given the picks are gone by the read after the claim", () => {
-    it("sends nothing and gives the claim back, so a later login sends the next picks", async () => {
+  describe("given a member whose backfill was already sent", () => {
+    /** @scenario "a sent backfill reads nothing on a later login" */
+    it("reads no organization state on the next session", async () => {
       const { channel, backfill, guided } = await backfillOver({
         state: { paths: ["gateway"], donePaths: [] },
         variant: "guided",
       });
+      await backfill.deliver(sessionStarted(2_000));
+      const reads: string[] = [];
+      const read = guided.read;
       guided.read = () => {
-        const snapshot = guided.record;
-        guided.record = { state: { paths: [], donePaths: [] }, variant: "guided" };
-        return Promise.resolve(snapshot);
+        reads.push("organization");
+        return read();
       };
 
-      await backfill.deliver(sessionStarted(2_000));
-      expect(channel.sent).toEqual([]);
-
-      guided.record = { state: { paths: ["governance"], donePaths: [] }, variant: "guided" };
-      guided.read = () => Promise.resolve(guided.record);
+      vi.setSystemTime(LOGIN_AT + TWO_HOURS_MS);
       await backfill.deliver(sessionStarted(3_000));
 
+      expect(reads).toEqual([]);
       expect(channel.sent.map((call) => call.type)).toEqual(["identify", "group"]);
     });
   });

@@ -218,12 +218,15 @@ export class GuidedOnboardingService {
 
   /**
    * The start picked on Langy's governance opener. A second pick replaces the first, so the
-   * trait follows the latest answer; "call" is the choice, never a booking.
+   * trait follows the latest answer; "call" is the choice, never a booking. Repeating the
+   * current start changes and announces nothing, so a retried CLI call cannot count twice.
    */
   async recordLangyStart(
     actor: GuidedOnboardingActor,
     { start }: { start: LangyStart },
   ): Promise<GuidedOnboardingState> {
+    const current = await this.getState(actor);
+    if (current.langyStart === start) return current;
     return this.write(actor, {
       event: "start_chosen",
       payload: { start },

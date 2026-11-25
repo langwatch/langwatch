@@ -22,10 +22,10 @@ function recipientDigestOf(userId: string): string {
 }
 
 /**
- * Sends a gateway key or governance source signal's calls in order, each claimed by type and
- * recipient inside the signal's claim: a retry after the first call went sends the rest alone, or
- * all of them to a new person. A refused call gives back its claim and the signal's, then fails
- * the delivery so its job retries.
+ * Sends a claimed signal's calls in order, each claimed by type and recipient inside the
+ * signal's claim: a retry after the first call went sends the rest alone, or all of them to a new
+ * person. A refused call gives back its claim and the signal's, then fails the delivery so its
+ * job retries.
  */
 export class NurturingClaimedCallsDeliveryService {
   static create(
