@@ -14,7 +14,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 The judge call and the cloud classifier behind it (ADR-174 decisions 10, 13). It calls no peer: what it checks before each call comes from its own copies of its peers' facts.
 
-Peers call these through the token, declared at `../contract/src/instant-eval-judge.api.ts:20`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/instant-eval-judge.api.ts:24`; nothing else in this package is public.
 
 #### `isClassifierConfigured`
 
@@ -38,6 +38,14 @@ One metered judge call: cloud only, unknown project, budget, classify, price, pr
 
 ```typescript
 judge(input: InstantEvalJudgeCall): Promise<InstantEvalJudgeAnswer>;
+```
+
+#### `judgeScenario`
+
+One metered scenario judge call, on LangWatch Cloud only: each criterion is routed alone as a `scenario_judge` question and the call is recorded as one priced fact. A refusal or an unavailable judge is returned, never thrown, and a verdict is never made up.
+
+```typescript
+judgeScenario(input: InstantEvalScenarioJudgeCall): Promise<InstantEvalScenarioJudgeAnswer>;
 ```
 
 #### `recordSpend`
@@ -99,10 +107,10 @@ Declared at `src/eventing/instant-eval-judge-spend.pipeline.ts:41`. Events: `ins
 
 | Kind   | Leaf                      | Environment variable                    | Declared at                                       |
 | ------ | ------------------------- | --------------------------------------- | ------------------------------------------------- |
-| secret | `classifierApiKey`        | `JEV_API_KEY`                           | `src/app/instant-eval-judge.app.ts:78`            |
-| secret | `hostedDecisionsApiKey`   | `INSTANT_EVAL_DECISIONS_API_KEY`        | `src/app/instant-eval-judge.app.ts:79`            |
-| secret | `llmJudgeAnthropicApiKey` | `INSTANT_EVAL_ANTHROPIC_API_KEY`        | `src/app/instant-eval-judge.app.ts:80`            |
-| secret | `llmJudgeOpenAiApiKey`    | `INSTANT_EVAL_OPENAI_API_KEY`           | `src/app/instant-eval-judge.app.ts:81`            |
+| secret | `classifierApiKey`        | `JEV_API_KEY`                           | `src/app/instant-eval-judge.app.ts:81`            |
+| secret | `hostedDecisionsApiKey`   | `INSTANT_EVAL_DECISIONS_API_KEY`        | `src/app/instant-eval-judge.app.ts:82`            |
+| secret | `llmJudgeAnthropicApiKey` | `INSTANT_EVAL_ANTHROPIC_API_KEY`        | `src/app/instant-eval-judge.app.ts:83`            |
+| secret | `llmJudgeOpenAiApiKey`    | `INSTANT_EVAL_OPENAI_API_KEY`           | `src/app/instant-eval-judge.app.ts:84`            |
 | config | `classifierBaseUrl`       | `JEV_BASE_URL`                          | `../contract/src/instant-eval-judge.config.ts:32` |
 | config | `classifierModel`         | `JEV_MODEL`                             | `../contract/src/instant-eval-judge.config.ts:40` |
 | config | `globalTokensPerSecond`   | `INSTANT_EVAL_GLOBAL_TOKENS_PER_SECOND` | `../contract/src/instant-eval-judge.config.ts:42` |

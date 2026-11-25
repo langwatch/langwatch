@@ -239,6 +239,14 @@ const instantEvalJudgeRouteTableSchemaDefinition = z
     routes: perJob(z.record(z.string(), routeSlotSchema)),
     /** Score and category questions' slots; a kind left out takes today's classifier call. */
     kinds: kindsSchema.default({}),
+    /**
+     * The LLM backend that answers a scenario judge's turn decision (go on, or judge now). That
+     * phase is not routed; a table without it answers no turn decision.
+     */
+    scenarioDecision: z
+      .object({ backend: z.string().min(1) })
+      .readonly()
+      .optional(),
   })
   .superRefine((table, ctx) => {
     for (const issue of routeTableIssues(table)) ctx.addIssue({ code: "custom", message: issue });
@@ -270,7 +278,17 @@ function routeTableIssues(table: RouteTableShape): string[] {
     issues.push(...backendIssues({ table, name, backend }));
   }
   issues.push(...kindIssues({ table, slotKeys }));
+  issues.push(...scenarioDecisionIssues(table));
   return issues;
+}
+
+/** The turn decision is the judge's own tool call, which only an LLM backend can take. */
+function scenarioDecisionIssues(table: RouteTableShape): string[] {
+  const name = table.scenarioDecision?.backend;
+  if (name === undefined) return [];
+  if (!table.backends[name]) return [`scenarioDecision: unknown backend ${name}`];
+  if (!isLlmBackendOf(table)(name)) return [`scenarioDecision: ${name} is not an LLM backend`];
+  return [];
 }
 
 /** Each routed kind's default slot and every slot it names, on known jobs and slot keys. */
@@ -484,6 +502,17 @@ function isLlmBackendOf(table: RouteTableShape) {
     const kind = table.backends[name]?.kind;
     return kind === "anthropic_messages" || kind === "openai_responses";
   };
+}
+
+/** Whether a backend answers as an LLM: one question per call, taken as sure. */
+export function isInstantEvalJudgeLlmBackend({
+  backend,
+  table,
+}: {
+  backend: string;
+  table: InstantEvalJudgeRouteTable;
+}): boolean {
+  return isLlmBackendOf(table)(backend);
 }
 
 /** Every backend an entry may call, its gate included, in the order it may call them. */

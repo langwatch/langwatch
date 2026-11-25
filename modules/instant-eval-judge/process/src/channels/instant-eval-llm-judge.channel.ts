@@ -8,6 +8,7 @@ import type {
   InstantEvalJudgeJob,
   InstantEvalJudgeReasoningEffort,
   InstantEvalQuestion,
+  InstantEvalScenarioJudgeTool,
   InstantEvalSkipReason,
 } from "@langwatch/instant-eval-judge-contract";
 import { Secret } from "@langwatch/secrets";
@@ -49,6 +50,35 @@ export type InstantEvalLlmJudgeAnswer =
       outputTokens: number;
     }>;
 
+/** A caller's own tool call, sent whole: the scenario judge's verdict or its turn decision. */
+export interface InstantEvalLlmToolCallRequest {
+  readonly wire: InstantEvalLlmJudgeWire;
+  /** The provider's model id, from the route table; there is no default. */
+  readonly model: string;
+  readonly system: string;
+  readonly user: string;
+  readonly tools: readonly InstantEvalScenarioJudgeTool[];
+  /** The one tool the model must call; absent, it must call one of `tools`. */
+  readonly forcedTool?: string;
+  readonly timeoutMs: number;
+}
+
+/** The tool called with its arguments and the tokens billed, or a skip that may still bill. */
+export type InstantEvalLlmToolCallAnswer =
+  | Readonly<{
+      outcome: "answered";
+      tool: string;
+      input: unknown;
+      inputTokens: number;
+      outputTokens: number;
+    }>
+  | Readonly<{
+      outcome: "skipped";
+      reason: InstantEvalSkipReason;
+      inputTokens: number;
+      outputTokens: number;
+    }>;
+
 export interface InstantEvalLlmJudgeChannel {
   /** Whether this install holds LangWatch's key for the wire. */
   isConfigured(wire: InstantEvalLlmJudgeWire): boolean;
@@ -56,4 +86,9 @@ export interface InstantEvalLlmJudgeChannel {
     request: InstantEvalLlmJudgeRequest,
     signal?: AbortSignal,
   ): Promise<InstantEvalLlmJudgeAnswer>;
+  /** One send of the caller's own messages and tools; never a retry. */
+  call(
+    request: InstantEvalLlmToolCallRequest,
+    signal?: AbortSignal,
+  ): Promise<InstantEvalLlmToolCallAnswer>;
 }

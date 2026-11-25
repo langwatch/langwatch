@@ -31,7 +31,11 @@ export function instantEvalJudgeRouteBootIssues({
   isHeld?: (kind: InstantEvalJudgeBackendKind) => boolean;
 }): string[] {
   const issues: string[] = [];
-  for (const name of reachableBackendsOf(table)) {
+  // The turn decision's backend is called outside every slot, so it is checked beside them.
+  for (const name of new Set([
+    ...reachableBackendsOf(table),
+    ...scenarioDecisionBackendsOf(table),
+  ])) {
     const backend = table.backends[name];
     if (!backend) continue;
     if (!pricing.backends[name]) issues.push(`backend ${name}: no price in the route pricing`);
@@ -64,6 +68,14 @@ export function instantEvalJudgeQueryHoldPricingOf({
   );
   const usdPerMillionInputTokens = Math.max(classifierPricing.usdPerMillionInputTokens, ...rates);
   return { ...classifierPricing, usdPerMillionInputTokens };
+}
+
+/** The scenario turn decision's backend when it is switched on, with its enabled fallbacks. */
+function scenarioDecisionBackendsOf(table: InstantEvalJudgeRouteTable): string[] {
+  const backend = table.scenarioDecision?.backend;
+  if (backend === undefined) return [];
+  const own = table.backends[backend]?.enabled === true ? [backend] : [];
+  return [...own, ...instantEvalJudgeEnabledFallbacksOf({ backend, table })];
 }
 
 /** Each enabled backend a usable entry of the jobs (all, unless named) may call, with fallbacks. */

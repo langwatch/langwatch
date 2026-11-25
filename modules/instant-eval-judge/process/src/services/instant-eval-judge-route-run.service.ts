@@ -35,9 +35,11 @@ import {
   type InstantEvalJudgeRoutePlan,
 } from "../rules/instant-eval-judge-route.rules.ts";
 import { isUnsureAnswer } from "../rules/instant-eval-judge-sureness.rules.ts";
+import { instantEvalScenarioLlmVerdictOf } from "../rules/instant-eval-scenario-judge.rules.ts";
 import { InstantEvalJudgeDecisionLegService } from "./instant-eval-judge-decision-leg.service.ts";
 import { InstantEvalJudgeGatedLegsService } from "./instant-eval-judge-gated-legs.service.ts";
 import { InstantEvalJudgeLlmLegService } from "./instant-eval-judge-llm-leg.service.ts";
+import type { InstantEvalScenarioLlmVerdictService } from "./instant-eval-scenario-llm-verdict.service.ts";
 
 export type InstantEvalJudgeRouteRunDeps = Readonly<{
   table: InstantEvalJudgeRouteTable;
@@ -48,6 +50,24 @@ export type InstantEvalJudgeRouteRunDeps = Readonly<{
   limiter: InstantEvalRateLimiter;
 }>;
 
+/**
+ * A scenario criterion's routed call: its LLM legs read the judge's own verdict call, shared by
+ * every criterion of the judgement, by this criterion's key instead of asking a question.
+ */
+export type InstantEvalJudgeScenarioLeg = Readonly<{
+  criterionKey: string;
+  verdicts: InstantEvalScenarioLlmVerdictService;
+}>;
+
+type InstantEvalJudgeRouteRunInput = Readonly<{
+  deps: InstantEvalJudgeRouteRunDeps;
+  plan: InstantEvalJudgeRoutePlan;
+  projectId: string;
+  signal: AbortSignal | undefined;
+  logger: Pick<Logger, "error">;
+  scenario?: InstantEvalJudgeScenarioLeg | undefined;
+}>;
+
 /** One routed call's legs, the calls they paid for and what the routing reports. */
 export class InstantEvalJudgeRouteRunService {
   private readonly deps: InstantEvalJudgeRouteRunDeps;
@@ -55,35 +75,25 @@ export class InstantEvalJudgeRouteRunService {
   private readonly projectId: string;
   private readonly signal: AbortSignal | undefined;
   private readonly logger: Pick<Logger, "error">;
+  private readonly scenario: InstantEvalJudgeScenarioLeg | undefined;
   private readonly flags: string[] = [];
   private inputTokens = 0;
   private costNanoUsd = 0;
 
-  private constructor(input: {
-    deps: InstantEvalJudgeRouteRunDeps;
-    plan: InstantEvalJudgeRoutePlan;
-    projectId: string;
-    signal: AbortSignal | undefined;
-    logger: Pick<Logger, "error">;
-  }) {
+  private constructor(input: InstantEvalJudgeRouteRunInput) {
     this.deps = input.deps;
     this.plan = input.plan;
     this.projectId = input.projectId;
     this.signal = input.signal;
     this.logger = input.logger;
+    this.scenario = input.scenario;
     const { inputView, isViewMissing, refusedView, longerView } = input.plan;
     if (isViewMissing) this.flags.push(`${inputView}_view_missing`);
     if (refusedView) this.flags.push(`${refusedView}_view_refused`);
     if (longerView) this.flags.push(`${longerView}_view_not_shorter`);
   }
 
-  static create(input: {
-    deps: InstantEvalJudgeRouteRunDeps;
-    plan: InstantEvalJudgeRoutePlan;
-    projectId: string;
-    signal: AbortSignal | undefined;
-    logger: Pick<Logger, "error">;
-  }): InstantEvalJudgeRouteRunService {
+  static create(input: InstantEvalJudgeRouteRunInput): InstantEvalJudgeRouteRunService {
     return new InstantEvalJudgeRouteRunService(input);
   }
 
@@ -344,6 +354,10 @@ export class InstantEvalJudgeRouteRunService {
   }): Promise<Leg> {
     // The table refuses an LLM backend with no model at boot; this keeps the type honest.
     if (!model) return { outcome: "failed", reason: "classifier_not_configured" };
+    if (this.scenario) {
+      const call = { wire, model, timeoutMs };
+      return this.readScenarioVerdict({ scenario: this.scenario, backend, call, questions });
+    }
     const { llmJudge, limiter } = this.deps;
     const leg = InstantEvalJudgeLlmLegService.create({
       llmJudge,
@@ -359,6 +373,38 @@ export class InstantEvalJudgeRouteRunService {
     const { answers, reason } = await leg.ask({ call, questions });
     if (answers.size === 0) return { outcome: "failed", reason };
     if (answers.size < questions.length) this.flags.push(`${backend}_partial:${reason}`);
+    return { outcome: "answered", backend, answers, isTextTruncated: false, limiterWaitMs: 0 };
+  }
+
+  /** The judgement's shared verdict call on this backend, read by this criterion's key. */
+  private async readScenarioVerdict({
+    scenario: { criterionKey, verdicts },
+    backend,
+    call,
+    questions,
+  }: {
+    scenario: InstantEvalJudgeScenarioLeg;
+    backend: string;
+    call: { wire: "anthropic_messages" | "openai_responses"; model: string; timeoutMs: number };
+    questions: readonly InstantEvalQuestion[];
+  }): Promise<Leg> {
+    const reading = await verdicts.read({
+      backend,
+      call,
+      paid: (spend) => this.paid({ backend, ...spend }),
+    });
+    if (reading.outcome === "failed") return { outcome: "failed", reason: reading.reason };
+    const answer = reading.criteria.get(criterionKey);
+    if (answer === undefined) return { outcome: "failed", reason: "classifier_failed" };
+    const answers = new Map(
+      questions.map((question) => [
+        question.id,
+        {
+          verdict: instantEvalScenarioLlmVerdictOf({ questionId: question.id, answer }),
+          sureness: 1,
+        },
+      ]),
+    );
     return { outcome: "answered", backend, answers, isTextTruncated: false, limiterWaitMs: 0 };
   }
 

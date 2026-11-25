@@ -1,0 +1,153 @@
+/**
+ * The judge's own tool call over a stand-in socket: what is sent on each wire, what is read back,
+ * and the skip a provider failure maps to after one send. No network.
+ * @see modules/instant-eval-judge/specs/instant-eval-scenario-judge.feature
+ */
+import { MockAgent } from "undici";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
+
+import { HttpInstantEvalLlmJudgeChannel } from "../http/http.instant-eval-llm-judge.channel.ts";
+
+const FINISH = {
+  name: "finish_test",
+  description: "Complete the test with a final verdict",
+  parameters: { type: "object", properties: { criteria: { type: "object" } } },
+};
+
+let agent: MockAgent;
+
+const sentText = (body: unknown): string => (typeof body === "string" ? body : "");
+
+beforeEach(() => {
+  agent = new MockAgent();
+  agent.disableNetConnect();
+});
+
+afterEach(async () => {
+  await agent.close();
+});
+
+function llm(keys = { anthropic_messages: "lw-anthropic", openai_responses: "lw-openai" }) {
+  return HttpInstantEvalLlmJudgeChannel.create({ keys, dispatcher: agent });
+}
+
+const request = (wire: "anthropic_messages" | "openai_responses") => ({
+  wire,
+  model: "llm-model",
+  system: "You are an LLM as a judge delivering the final verdict",
+  user: "<transcript>user: my order is late</transcript>",
+  tools: [FINISH],
+  forcedTool: "finish_test",
+  timeoutMs: 1_000,
+});
+
+describe("HttpInstantEvalLlmJudgeChannel.call", () => {
+  /** @scenario "The judge's own call is sent on the leg's wire with its tool forced" */
+  it("sends the judge's messages to OpenAI Responses and reads the forced function call", async () => {
+    let sent: Record<string, unknown> = {};
+    let headers: Record<string, string> = {};
+    agent
+      .get("https://api.openai.com")
+      .intercept({ path: "/v1/responses", method: "POST" })
+      .reply(200, (options) => {
+        sent = JSON.parse(sentText(options.body)) as Record<string, unknown>;
+        headers = options.headers as Record<string, string>;
+        return {
+          output: [
+            {
+              type: "function_call",
+              name: "finish_test",
+              arguments: JSON.stringify({ criteria: { criterion_0: "true" }, reasoning: "r" }),
+            },
+          ],
+          usage: { input_tokens: 800, output_tokens: 60 },
+        };
+      });
+
+    const answer = await llm().call(request("openai_responses"));
+
+    expect(answer).toEqual({
+      outcome: "answered",
+      tool: "finish_test",
+      input: { criteria: { criterion_0: "true" }, reasoning: "r" },
+      inputTokens: 800,
+      outputTokens: 60,
+    });
+    expect(headers.authorization).toBe("Bearer lw-openai");
+    expect(sent.tool_choice).toEqual({ type: "function", name: "finish_test" });
+    expect(sent.input).toEqual([
+      { role: "developer", content: "You are an LLM as a judge delivering the final verdict" },
+      { role: "user", content: "<transcript>user: my order is late</transcript>" },
+    ]);
+    expect((sent.tools as { name: string }[]).map((tool) => tool.name)).toEqual(["finish_test"]);
+  });
+
+  /** @scenario "The judge's own call is sent on the leg's wire with its tool forced" */
+  it("sends the judge's messages to Anthropic Messages and reads the forced tool use", async () => {
+    let sent: Record<string, unknown> = {};
+    agent
+      .get("https://api.anthropic.com")
+      .intercept({ path: "/v1/messages", method: "POST" })
+      .reply(200, (options) => {
+        sent = JSON.parse(sentText(options.body)) as Record<string, unknown>;
+        return {
+          content: [{ type: "tool_use", name: "finish_test", input: { criteria: {} } }],
+          usage: { input_tokens: 300, output_tokens: 20 },
+        };
+      });
+
+    const answer = await llm().call(request("anthropic_messages"));
+
+    expect(answer).toMatchObject({ outcome: "answered", tool: "finish_test", inputTokens: 300 });
+    expect(sent.system).toBe("You are an LLM as a judge delivering the final verdict");
+    expect(sent.tool_choice).toEqual({ type: "tool", name: "finish_test" });
+  });
+
+  /** @scenario "A provider failure of the judge's own call is a failed leg, never a retry" */
+  it.each([
+    [429, "classifier_rate_limited"],
+    [500, "classifier_provider_unavailable"],
+  ] as const)("skips a %i after one send", async (status, reason) => {
+    let sends = 0;
+    agent
+      .get("https://api.openai.com")
+      .intercept({ path: "/v1/responses", method: "POST" })
+      .reply(status, () => {
+        sends += 1;
+        return { error: { message: "provider text that must not surface" } };
+      })
+      .persist();
+
+    const answer = await llm().call(request("openai_responses"));
+
+    expect(answer).toEqual({ outcome: "skipped", reason, inputTokens: 0, outputTokens: 0 });
+    expect(sends).toBe(1);
+  });
+
+  it("bills the tokens of an answer that called no offered tool", async () => {
+    agent
+      .get("https://api.openai.com")
+      .intercept({ path: "/v1/responses", method: "POST" })
+      .reply(200, {
+        output: [{ type: "message" }],
+        usage: { input_tokens: 800, output_tokens: 60 },
+      });
+
+    const answer = await llm().call(request("openai_responses"));
+
+    expect(answer).toEqual({
+      outcome: "skipped",
+      reason: "classifier_failed",
+      inputTokens: 800,
+      outputTokens: 60,
+    });
+  });
+
+  it("skips a wire this install holds no key for, sending nothing", async () => {
+    const answer = await llm({ anthropic_messages: "lw-anthropic" } as never).call(
+      request("openai_responses"),
+    );
+
+    expect(answer).toMatchObject({ outcome: "skipped", reason: "classifier_not_configured" });
+  });
+});

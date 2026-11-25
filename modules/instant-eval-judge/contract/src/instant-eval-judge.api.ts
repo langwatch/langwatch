@@ -12,6 +12,10 @@ import type {
   InstantEvalJudgeRouteRequest,
   InstantEvalJudgeRouting,
 } from "./instant-eval-judge-route.ts";
+import type {
+  InstantEvalScenarioJudgeAnswer,
+  InstantEvalScenarioJudgeCall,
+} from "./instant-eval-scenario-judge.ts";
 
 /**
  * The judge call and the cloud classifier behind it (ADR-174 decisions 10, 13). It calls no
@@ -35,6 +39,12 @@ export interface InstantEvalJudgeApi {
    * only classifies, at no price (ADR-182 decision 7).
    */
   judge(input: InstantEvalJudgeCall): Promise<InstantEvalJudgeAnswer>;
+  /**
+   * One metered scenario judge call, on LangWatch Cloud only: each criterion is routed alone as a
+   * `scenario_judge` question and the call is recorded as one priced fact. A refusal or an
+   * unavailable judge is returned, never thrown, and a verdict is never made up.
+   */
+  judgeScenario(input: InstantEvalScenarioJudgeCall): Promise<InstantEvalScenarioJudgeAnswer>;
   /**
    * Prices and records what an Instant Evals run or judged query spent, under the organization
    * the caller resolved, so no project is looked up (ADR-174 decision 13). Throws when the priced
@@ -296,6 +306,8 @@ export interface InstantEvalVerdict {
   readonly label?: string;
   /** Every option's probability, for a category. Sums to one. */
   readonly probabilities?: Readonly<Record<string, number>>;
+  /** A scenario criterion a judge read and could not settle; it carries no probability. */
+  readonly isInconclusive?: true;
 }
 
 /** Everything one classification answered, whether or not it answered. */
