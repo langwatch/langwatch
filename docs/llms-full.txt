@@ -91614,7 +91614,7 @@ Creating (and updating) validates the queries file's shape and the widget's JS/T
 
 ## Dashboards and their widgets
 
-A dashboard is the page widgets live on. **Use an existing dashboard** when the user is on one, named one, or one clearly fits; **create one** only when they ask for a new dashboard, or none fits and they agree.
+A dashboard is the page widgets live on. The dashboard the user is on arrives in your context with its id: a chart they ask for there goes on that board, even when they phrase it as "another dashboard" or "now a chart of...". **Create a board** only when they ask for a separate or new board by name ("make a new dashboard called X"), or they are on no board and none fits. When you do create one, say so in the first line of your reply and name it, so they know where to look.
 
 ```bash
 langwatch dashboard list -f json                          # ids, names, widget counts

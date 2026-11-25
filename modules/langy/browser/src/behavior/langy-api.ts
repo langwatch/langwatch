@@ -6,7 +6,12 @@ import type { agentTrpc } from "@langwatch/agent-contract";
 import type { annotationScoreTrpc, annotationTrpc } from "@langwatch/annotation-contract";
 import { createModuleApi, type ContractApiMap, type OutputsFromMap } from "@langwatch/api/web";
 import type { automationTrpc } from "@langwatch/automation-contract";
-import type { dashboardTrpc, dashboardWidgetTrpc, graphTrpc } from "@langwatch/dashboard-contract";
+import type {
+  boardTrpc,
+  dashboardTrpc,
+  dashboardWidgetTrpc,
+  graphTrpc,
+} from "@langwatch/dashboard-contract";
 import type { datasetRecordTrpc, datasetTrpc } from "@langwatch/dataset-contract";
 import type { evaluatorTrpc } from "@langwatch/evaluator-contract";
 import type { batchRecordTrpc, experimentsTrpc } from "@langwatch/experiment-contract";
@@ -36,6 +41,7 @@ export type LangyApiMap = ContractApiMap<typeof langyTrpc> &
   ContractApiMap<typeof tracesTrpc> &
   ContractApiMap<typeof organizationTrpc> &
   ContractApiMap<typeof dashboardTrpc> &
+  ContractApiMap<typeof boardTrpc> &
   ContractApiMap<typeof dashboardWidgetTrpc> &
   ContractApiMap<typeof graphTrpc> &
   ContractApiMap<typeof integrationsChecksTrpc> &
