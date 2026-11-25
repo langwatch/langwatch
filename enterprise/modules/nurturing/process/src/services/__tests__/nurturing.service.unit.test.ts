@@ -114,7 +114,7 @@ describe("NurturingService", () => {
     describe("when called with user ID, event name, and properties", () => {
       /** @scenario 'Track call sends event payload to Customer.io' */
       /** @scenario "A Customer.io track goes behind an identify that carries the person's email" */
-      it("sends the event payload behind an identify with the person's email, in one batch", async () => {
+      it("sends the identify with the person's email in its own batch, then the track", async () => {
         const { service, fetchFn } = createService();
 
         await service.trackEvent({
@@ -125,15 +125,18 @@ describe("NurturingService", () => {
           },
         });
 
-        expect(fetchFn).toHaveBeenCalledTimes(1);
+        expect(fetchFn).toHaveBeenCalledTimes(2);
         const [url, options] = fetchFn.mock.calls[0]!;
         expect(url).toBe("https://cdp.customer.io/v1/batch");
         expect(options.method).toBe("POST");
 
-        const body = JSON.parse(options.body);
-        expect(body).toEqual({
+        expect(JSON.parse(fetchFn.mock.calls[0]![1].body)).toEqual({
           batch: [
             { type: "identify", userId: "user-123", traits: { email: "user-123@example.com" } },
+          ],
+        });
+        expect(JSON.parse(fetchFn.mock.calls[1]![1].body)).toEqual({
+          batch: [
             {
               type: "track",
               userId: "user-123",
@@ -142,6 +145,22 @@ describe("NurturingService", () => {
             },
           ],
         });
+      });
+
+      /** @scenario "A Customer.io track is held back when its identify is not taken" */
+      it("sends no track when the identify is not taken, and does not reject", async () => {
+        const { service, fetchFn } = createService({
+          fetchFn: createMockFetch({ ok: false, status: 500 }),
+        });
+
+        await expect(
+          service.trackEvent({ userId: "user-123", event: "signed_up" }),
+        ).resolves.toBeUndefined();
+
+        expect(fetchFn).toHaveBeenCalledTimes(1);
+        expect(
+          JSON.parse(fetchFn.mock.calls[0]![1].body).batch.map((c: { type: string }) => c.type),
+        ).toEqual(["identify"]);
       });
     });
 
@@ -217,7 +236,7 @@ describe("NurturingService", () => {
   describe("batch()", () => {
     describe("when called with multiple identify and track calls", () => {
       /** @scenario 'Batch call combines multiple operations into a single request' */
-      it("sends a single HTTP request to the batch endpoint containing all calls", async () => {
+      it("sends the identifies in one batch first, then the track and group in a second", async () => {
         const { service, fetchFn } = createService({ emails: { "user-1": "a@b.com" } });
 
         const calls: CioBatchCall[] = [
@@ -242,19 +261,16 @@ describe("NurturingService", () => {
 
         await service.batch(calls);
 
-        expect(fetchFn).toHaveBeenCalledTimes(1);
+        expect(fetchFn).toHaveBeenCalledTimes(2);
         const [url, options] = fetchFn.mock.calls[0]!;
         expect(url).toBe("https://cdp.customer.io/v1/batch");
         expect(options.method).toBe("POST");
 
-        const body = JSON.parse(options.body);
-        expect(body).toEqual({
+        expect(JSON.parse(fetchFn.mock.calls[0]![1].body)).toEqual({
+          batch: [{ type: "identify", userId: "user-1", traits: { email: "a@b.com" } }],
+        });
+        expect(JSON.parse(fetchFn.mock.calls[1]![1].body)).toEqual({
           batch: [
-            {
-              type: "identify",
-              userId: "user-1",
-              traits: { email: "a@b.com" },
-            },
             {
               type: "track",
               userId: "user-1",
@@ -424,6 +440,21 @@ describe("NurturingService", () => {
     });
 
     describe("when an OrThrow call is sent", () => {
+      /** @scenario "A Customer.io track is held back when its identify is not taken" */
+      it("rejects with the failure and sends no track when the identify is not taken", async () => {
+        const fetchFn = createMockFetch({ ok: false, status: 500 });
+        const { service } = createService({ fetchFn });
+
+        await expect(
+          service.trackEventOrThrow({ userId: "user-123", event: "joined_organization" }),
+        ).rejects.toThrow("HTTP 500");
+
+        expect(fetchFn).toHaveBeenCalledTimes(1);
+        expect(
+          JSON.parse(fetchFn.mock.calls[0]![1].body).batch.map((c: { type: string }) => c.type),
+        ).toEqual(["identify"]);
+      });
+
       it("rejects with the failure and sends nothing, so a claiming caller retries", async () => {
         const { service, fetchFn } = createService({ users: failingUsers() });
 

@@ -70,20 +70,28 @@ function emailOf(userId: string): string {
   return userId === "user-1" ? "jane@example.com" : `${userId}@example.com`;
 }
 
-/** A track as nurturing sends it alone: one batch, behind an identify carrying the email. */
-function trackRequest(track: Record<string, unknown> & { userId: string }) {
-  return {
-    path: "/v1/batch",
-    body: {
-      batch: [
-        { type: "identify", userId: track.userId, traits: { email: emailOf(track.userId) } },
-        expect.objectContaining({ type: "track", ...track }),
-      ],
+/**
+ * A track as nurturing sends it: the person's addressed identify in its own batch, awaited,
+ * then the track in a batch of its own (the order Customer.io does not promise within one batch).
+ */
+function trackRequests(track: Record<string, unknown> & { userId: string }) {
+  return [
+    {
+      path: "/v1/batch",
+      body: {
+        batch: [
+          { type: "identify", userId: track.userId, traits: { email: emailOf(track.userId) } },
+        ],
+      },
     },
-  };
+    {
+      path: "/v1/batch",
+      body: { batch: [expect.objectContaining({ type: "track", ...track })] },
+    },
+  ];
 }
 
-/** The tracks among recorded requests: each one rides its own batch (see trackRequest). */
+/** The tracks among recorded requests: each one rides its own batch (see trackRequests). */
 function tracksOf(sent: readonly { path: string; body: unknown }[]) {
   return sent.filter(
     ({ path, body }) =>
@@ -177,7 +185,7 @@ describe("NurturingDeliveryService", () => {
         { userId: "user-1", event: "scenario_created", properties: { projectId: "project-1" } },
       ]);
       expect(cio.sent).toEqual([
-        trackRequest({
+        ...trackRequests({
           userId: "user-1",
           event: "scenario_created",
           properties: { scenario_id: "scenario-1", project_id: "project-1" },
@@ -206,7 +214,7 @@ describe("NurturingDeliveryService", () => {
       await settle();
 
       expect(posthog.tracked).toHaveLength(1);
-      expect(cio.sent).toHaveLength(1);
+      expect(tracksOf(cio.sent)).toHaveLength(1);
     });
   });
 
@@ -273,7 +281,7 @@ describe("NurturingDeliveryService", () => {
             },
           }),
         },
-        trackRequest({
+        ...trackRequests({
           userId: "admin-1",
           event: "first_trace_integrated",
           properties: {
@@ -437,7 +445,7 @@ describe("NurturingDeliveryService", () => {
             traits: { workflow_count: 2, email: "jane@example.com" },
           }),
         },
-        trackRequest({
+        ...trackRequests({
           userId: "user-1",
           event: "workflow_created",
           properties: { workflow_id: "workflow-1", project_id: "project-1" },
@@ -784,7 +792,7 @@ describe("NurturingDeliveryService", () => {
             traits: { last_active_at: expect.any(Number), email: "user-app-active@example.com" },
           }),
         },
-        trackRequest({ userId: "user-app-active", event: "app_active" }),
+        ...trackRequests({ userId: "user-app-active", event: "app_active" }),
       ]);
     });
   });
@@ -843,7 +851,7 @@ describe("NurturingDeliveryService", () => {
     const at = { tenantId: "project-1", occurredAt: 1_792_664_000_123 };
     const seconds = 1_792_664_000;
 
-    /** The identify and group traits sent; a track's own batch (see trackRequest) is not one. */
+    /** The identify and group traits sent; a track's batches (see trackRequests) are not one. */
     async function identifiedTraits(signal: NurturingSignal): Promise<unknown[]> {
       const { cio, delivery } = deliveryOverBothSinks();
       await delivery.deliver({ key: `${signal.kind}:${signal.sourceEventId}`, signal });
@@ -852,7 +860,10 @@ describe("NurturingDeliveryService", () => {
         if (path === "/v1/batch") {
           const { batch } = body as { batch: { type: string; traits: unknown }[] };
           if (batch.some(({ type }) => type === "track")) return [];
-          return batch.map(({ traits }) => traits);
+          // The address-only identify that precedes a track is not a fact.
+          return batch
+            .map(({ traits }) => traits)
+            .filter((traits) => Object.keys(traits as object).join() !== "email");
         }
         if (path !== "/v1/identify" && path !== "/v1/group") return [];
         return [(body as { traits: unknown }).traits];
@@ -1005,7 +1016,7 @@ describe("NurturingDeliveryService", () => {
         },
       ]);
       expect(cio.sent.filter((call) => call.path === "/v1/batch")).toEqual([
-        trackRequest({
+        ...trackRequests({
           userId: "user-1",
           event: "self_hosted_license_expiring",
           properties: { instance_id: "instance-1" },
@@ -1129,7 +1140,7 @@ describe("NurturingDeliveryService", () => {
             traits: expect.objectContaining({ evaluation_count: 7, email: "admin-1@example.com" }),
           }),
         },
-        trackRequest({
+        ...trackRequests({
           userId: "admin-1",
           event: "evaluation_ran",
           properties: { evaluation_id: "eval-3", score: 1, passed: true, count: 3 },
@@ -1261,19 +1272,22 @@ describe("NurturingDeliveryService", () => {
       await settle();
 
       expect(cio.sent.filter((call) => call.path === "/v1/group")).toHaveLength(1);
-      expect(cio.sent.filter((call) => call.path !== "/v1/group").slice(0, 2)).toEqual([
-        {
-          path: "/v1/identify",
-          body: expect.objectContaining({
-            traits: expect.objectContaining({
-              has_evaluations: true,
-              evaluation_count: 2,
-              email: "admin-1@example.com",
-            }),
+      const sent = cio.sent.filter((call) => call.path !== "/v1/group");
+      expect(sent[0]).toEqual({
+        path: "/v1/identify",
+        body: expect.objectContaining({
+          traits: expect.objectContaining({
+            has_evaluations: true,
+            evaluation_count: 2,
+            email: "admin-1@example.com",
           }),
-        },
-        trackRequest({ userId: "admin-1", event: "first_evaluation_created" }),
-      ]);
+        }),
+      });
+      expect(sent).toEqual(
+        expect.arrayContaining(
+          trackRequests({ userId: "admin-1", event: "first_evaluation_created" }),
+        ),
+      );
     });
   });
 

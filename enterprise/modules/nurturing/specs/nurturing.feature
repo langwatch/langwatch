@@ -85,6 +85,13 @@ Feature: Nurturing sends the signals its owners record
     And a person with no email is tracked nothing
 
   @unit
+  Scenario: A Customer.io track is held back when its identify is not taken
+    Given a Customer.io track for a person with an email
+    When Customer.io does not take the identify
+    Then the track is not sent
+    And an OrThrow caller is rejected with the failure, while a fire-and-forget caller resolves and reports it
+
+  @unit
   Scenario: A Customer.io outage is logged and the delivery completes
     Given Customer.io answers every call with a server error
     When a created scenario's signal is delivered

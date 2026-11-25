@@ -751,8 +751,9 @@ describe("given a worker composing nurturing with a recording Customer.io channe
         gatewayEvent({ type: GATEWAY_VK_LIFECYCLE_EVENT_TYPE, data: lifecycleFact(createdKey) }),
       );
 
-      expect(worker.customerIo.requests).toHaveLength(1);
-      // The channel's batchOrThrow resolves through batch, so the send records as "batch".
+      expect(worker.customerIo.requests).toHaveLength(2);
+      // The channel's batchOrThrow resolves through batch, so each send records as "batch".
+      // The identify carrying the address is sent first, awaited, then the track.
       expect(worker.customerIo.requests).toMatchObject([
         {
           method: "batch",
@@ -762,8 +763,11 @@ describe("given a worker composing nurturing with a recording Customer.io channe
               userId: ADMIN_USER_ID,
               traits: { email: `${ADMIN_USER_ID}@example.com` },
             },
-            { type: "track", userId: ADMIN_USER_ID, event: "virtual_key_created" },
           ],
+        },
+        {
+          method: "batch",
+          input: [{ type: "track", userId: ADMIN_USER_ID, event: "virtual_key_created" }],
         },
       ]);
     });

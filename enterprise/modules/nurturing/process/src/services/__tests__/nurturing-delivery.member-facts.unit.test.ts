@@ -60,7 +60,7 @@ const addressed = (userId: string, traits: object) => ({ ...traits, email: addre
 /**
  * Customer.io over a recording fetch: a batch's items are unpacked into one call each. A failed
  * joined_organization request is not recorded, as Customer.io never took it. Every track must
- * ride behind its person's addressed identify in the same request; that address-only identify
+ * follow an earlier request carrying its person's addressed identify; that address-only identify
  * is checked here and left out of identifies(), which are the facts.
  */
 function customerIo({
@@ -69,6 +69,7 @@ function customerIo({
   const calls: Call[] = [];
   const unaddressed: Call[] = [];
   let batchRequests = 0;
+  const addressedUsers = new Set<string>();
   let failure = failFirstJoinedOrganization;
   const service = NurturingService.create({
     users: peopleWithEmails(),
@@ -91,7 +92,11 @@ function customerIo({
           if (failed === "a network error") throw new TypeError("fetch failed");
           return new Response("customer.io is down", { status: 500 });
         }
-        unaddressed.push(...tracks.filter((track) => !isAddressed({ items, track })));
+        unaddressed.push(...tracks.filter((track) => !addressedUsers.has(track.userId)));
+        for (const item of items) {
+          if (item.path === "/v1/identify" && isAddressedIdentify(item))
+            addressedUsers.add(item.userId);
+        }
         if (path === "/v1/batch" && tracks.length === 0) batchRequests += 1;
         calls.push(...items);
         return new Response(null, { status: 200 });
@@ -116,16 +121,9 @@ function customerIo({
   };
 }
 
-/** Whether an identify of the track's person, carrying their address, goes before it in its request. */
-function isAddressed({ items, track }: { items: readonly Call[]; track: Call }): boolean {
-  return items
-    .slice(0, items.indexOf(track))
-    .some(
-      (item) =>
-        item.path === "/v1/identify" &&
-        item.userId === track.userId &&
-        (item.traits as { email?: string } | undefined)?.email === addressOf(track.userId),
-    );
+/** Whether an identify carries its person's own address, the one a track needs before it. */
+function isAddressedIdentify(item: Call): boolean {
+  return (item.traits as { email?: string } | undefined)?.email === addressOf(item.userId);
 }
 
 function isEqual(left: unknown, right: unknown): boolean {
