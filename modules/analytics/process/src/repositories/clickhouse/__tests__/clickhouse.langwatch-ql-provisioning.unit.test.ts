@@ -645,10 +645,10 @@ describe("readCollectionState", () => {
     });
   });
 
-  /** @scenario "A private ClickHouse with a source table not policed for the reader after provisioning warns" */
   describe("when it reads the row policies on the source tables", () => {
     const tables = ["acme_db.guarded", "acme_db.broad"];
 
+    /** @scenario "A private ClickHouse with a source table not policed for the reader after provisioning warns" */
     it("returns each policy raw, with the table names bound rather than interpolated", async () => {
       const queries: { query: string; query_params?: Record<string, unknown> }[] = [];
       const policies = await provisioning({
