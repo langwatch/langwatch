@@ -142,12 +142,17 @@ import { UpgradeDiagnosticsService } from "../services/upgrade-diagnostics.servi
 /** Seat counts over organization's membership rows, read through its shares (R-C1f, Q9). */
 function seatCountsOver(
   organizations: Pick<MemberSeatRepository, "countMemberSeats">,
-): Pick<LicensingInfrastructure["repository"], "getMemberCount" | "getMembersLiteCount"> {
+): Pick<
+  LicensingInfrastructure["repository"],
+  "getMemberCount" | "getMembersLiteCount" | "getMembersDeveloperCount"
+> {
   return {
     getMemberCount: async (organizationId) =>
       (await organizations.countMemberSeats({ organizationId })).fullMembers,
     getMembersLiteCount: async (organizationId) =>
       (await organizations.countMemberSeats({ organizationId })).liteMembers,
+    getMembersDeveloperCount: async (organizationId) =>
+      (await organizations.countMemberSeats({ organizationId })).developers,
   };
 }
 
@@ -750,6 +755,10 @@ export class LicensingModule implements LicensingApiContract {
 
   countFullSeatsInUse(input: { organizationId: string }): Promise<number> {
     return this.#service.countFullSeatsInUse(input.organizationId);
+  }
+
+  countDevelopersInUse(input: { organizationId: string }): Promise<number> {
+    return this.#service.countDevelopersInUse(input.organizationId);
   }
 
   getConnectedSeats(input: { organizationId: string }): Promise<ConnectedSeats> {

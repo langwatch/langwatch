@@ -13,6 +13,8 @@ import { useFilteredCommands } from "../behavior/use-filtered-commands.ts";
 vi.mock("../../../behavior/navigation-api.ts", () => ({
   navigationApi: {
     personalWorkspaceFeatures: { get: { useQuery: () => ({ data: undefined }) } },
+    // The organization's Dashboards flags never answer here, so no home moves to the library.
+    featureFlag: { isEnabledForEachOrganization: { useQuery: () => ({ isLoading: true }) } },
   },
 }));
 

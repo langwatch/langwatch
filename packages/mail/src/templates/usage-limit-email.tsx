@@ -355,5 +355,8 @@ export const sendUsageLimitEmail = async ({
   ...props
 }: UsageLimitEmailProps & { to: string; mailer: MailSender }) => {
   const { subject, html } = await renderMailTemplate(usageLimitEmailTemplate, props);
-  await sendEmail({ mailer, content: { to, subject, html } });
+  await sendEmail({
+    mailer,
+    content: { to, subject, html, template: usageLimitEmailTemplate.id },
+  });
 };

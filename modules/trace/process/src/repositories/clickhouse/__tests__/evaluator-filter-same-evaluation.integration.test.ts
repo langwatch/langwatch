@@ -3,9 +3,10 @@
  * the failing verdict sits on another evaluator, the only shape that tells
  * "X failed" from "X ran and something failed".
  * @see https://github.com/langwatch/tasks/issues/918
+ * @see specs/traces-v2/search.feature
  */
 import type { ClickHouseClient } from "@clickhouse/client";
-import { tenantScope } from "@langwatch/clickhouse-client";
+import { checkTenantScope, tenantScope } from "@langwatch/clickhouse-client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
@@ -106,18 +107,23 @@ function evaluationRow({
 
 let ch: ClickHouseClient;
 
-/** The trace ids a compiled filter selects, sorted. */
-async function matching(filter: string, tenant = tenantId): Promise<string[]> {
+/** The statement a compiled filter runs as, expanded for one project. */
+function statementFor(filter: string, tenant: string) {
   const compiled = traceQueryTranslation.translateFilter({
     queryText: filter,
     timeRange: WINDOW,
   });
   if (!compiled) throw new Error(`compiled to nothing: ${filter}`);
-  const statement = expandStatementForProject({
+  return expandStatementForProject({
     query: `SELECT DISTINCT TraceId FROM trace_summaries ts WHERE ${tenantScope("OccurredAt")} AND ${compiled.sql}`,
     queryParams: compiled.params,
     projectId: tenant,
   });
+}
+
+/** The trace ids a compiled filter selects, sorted. */
+async function matching(filter: string, tenant = tenantId): Promise<string[]> {
+  const statement = statementFor(filter, tenant);
   const result = await ch.query({
     query: statement.query,
     query_params: statement.queryParams,
@@ -302,6 +308,30 @@ describe.skipIf(!clickHouseConfigured)(
         expect(
           await matching("evaluator:X AND NOT evaluatorVerdict:fail", versionsTenantId),
         ).not.toContain(X_RAN_TWICE);
+      });
+    });
+
+    describe("when a NOT covers the evaluator and its result", () => {
+      /** @scenario "NOT over an evaluator group keeps the evaluator's own results together" */
+      it.each([
+        ["NOT (evaluator:X AND evaluatorVerdict:fail)", tenantId, [X_PASSED_Y_FAILED]],
+        ["NOT (evaluator:X AND NOT evaluatorVerdict:pass)", tenantId, [X_PASSED_Y_FAILED]],
+        [
+          "NOT (evaluator:X AND NOT evaluatorVerdict:fail)",
+          versionsTenantId,
+          [X_RAN_TWICE, X_SCHEDULED_THEN_FAILED].toSorted(),
+        ],
+      ])("keeps exactly the traces the group leaves out for %s", async (filter, tenant, kept) => {
+        const statement = statementFor(filter, tenant);
+        expect(
+          checkTenantScope({
+            sql: statement.query,
+            params: statement.queryParams,
+            tenantId: tenant,
+            tenantIds: [tenant],
+          }),
+        ).toBeNull();
+        expect(await matching(filter, tenant)).toEqual(kept);
       });
     });
 

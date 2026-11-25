@@ -141,14 +141,14 @@ one component and one exemplar; a screen that disagrees is the defect.
 
 ### Page title and header actions
 
-Every page inside the app chrome, workspace, settings, governance and `/me` alike, opens with
+Every page inside the app chrome, workspace, settings, governance and `/coding-agents` alike, opens with
 `PageLayout.Header` (the 48px bar) holding `PageLayout.Heading`. Actions sit after a `<Spacer />`
 and are `PageLayout.HeaderButton` only, no raw `Button`. At most one is `primary` (solid,
 the page's main action); the rest are outline, and a page with no main action has none
 (ruled 2026-10-02, Alex). Full-screen tools
 (studio, traces explorer, workbench) and card screens (auth, onboarding, authorize) carry no bar.
 Exemplar: `modules/workflow/browser/src/ui/sections/workflows/workflows-screen.tsx:46`.
-Pages never size their title. Account pages (every `/me` page, Settings > Profile and
+Pages never size their title. Account pages (every `/coding-agents` page, Settings > Profile and
 Security) get a large one from the route table's `heading: "account"` (ruled 2026-10-02, Alex).
 
 ```tsx

@@ -34,19 +34,6 @@ export const AGENT_KIND_CHIP_LABELS: Readonly<Record<AgentKind, string>> = {
   vendor: "Agent platform",
 };
 
-/** How a focus template names its agent kind: "Release check: voice focus". */
-export const AGENT_KIND_FOCUS_LABELS: Readonly<Record<AgentKind, string>> = {
-  "support-bot": "support bot",
-  rag: "RAG",
-  vendor: "agent platform",
-  voice: "voice",
-  extraction: "extraction",
-  regulated: "regulated",
-  "tools-agent": "tools agent",
-  generative: "generative",
-  coding: "coding",
-};
-
 export const PERSONAS = [
   "eng",
   "product",

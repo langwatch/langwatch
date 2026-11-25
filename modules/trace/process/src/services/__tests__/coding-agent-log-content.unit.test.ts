@@ -127,6 +127,7 @@ describe("logContentKeys", () => {
 const KNOWN_METADATA_ATTRS: ReadonlySet<string> = new Set([
   "event.name",
   "call_id",
+  "tool_use_id",
   "tool_name",
   "mcp_server",
   "mcp_server_name",

@@ -78,6 +78,7 @@ const GATEWAY_RESOURCES: AuthzResource[] = [
   "gatewayLogs",
   "gatewayUsage",
   "gatewayCacheRules",
+  "gatewayA2aTargets",
   "gatewaySpend",
   "webhookEndpoints",
 ];

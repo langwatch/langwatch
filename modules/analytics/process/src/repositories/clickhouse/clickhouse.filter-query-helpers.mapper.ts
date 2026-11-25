@@ -1,4 +1,5 @@
 import { tenantScope } from "@langwatch/clickhouse-client";
+import { type SpanAnalyticsSource, spanAnalyticsSourceOf } from "@langwatch/trace-contract";
 
 import type { FilterOption } from "../filter-options.repository.ts";
 import type { ClickHouseFilterQueryParams } from "./clickhouse.filter-shapes.mapper.ts";
@@ -38,6 +39,22 @@ export function buildStoredSpansConditions(_params: ClickHouseFilterQueryParams)
     "StartTime <= fromUnixTimestamp64Milli({endDate:UInt64})",
   ];
   return conditions.join(" AND ");
+}
+
+/** Where a span picker reads span types for its StartTime window. */
+export function spanTypeOptionsSource(params: ClickHouseFilterQueryParams): SpanAnalyticsSource {
+  return spanAnalyticsSourceOf({
+    floor: params.spanAnalyticsFloor,
+    windowStartMs: params.startDate,
+  });
+}
+
+/** The floor parameter a split span picker binds; none for any other source. */
+export function spanTypeOptionsParams(
+  params: ClickHouseFilterQueryParams,
+): Record<string, unknown> {
+  const source = spanTypeOptionsSource(params);
+  return source.kind === "split" ? { spanAnalyticsFrom: source.fromMs } : {};
 }
 
 /** A side table's rows narrowed to the traces `conditions` pick, matched on tenant and trace. */

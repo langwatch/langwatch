@@ -63,6 +63,10 @@ class FakeAuditLog implements AuditLogApi {
   async findByTargetKind() {
     return [];
   }
+
+  async findForOrganization() {
+    return [];
+  }
 }
 
 /** Fixed window, in memory - no Redis needed to prove the throttle shape. */

@@ -137,7 +137,7 @@ SSE chunks reach clients promptly, and a 32m body size to match
 the render rather than being dropped.
 
 For Envoy Gateway, other Gateway API implementations, or this chart
-installed on its own, route `/v1` and `/health` to the Service yourself and
+installed on its own, route `/v1`, `/a2a` and `/health` to the Service yourself and
 follow
 [Routing and ingress controllers](https://docs.langwatch.ai/self-hosting/deployment/routing).
 

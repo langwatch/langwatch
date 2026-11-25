@@ -27,6 +27,11 @@ export function ingestionSourceStatusIsOff(status: string): boolean {
   return !LIVE_STATUSES.has(status);
 }
 
+/** No data has reached the source yet, so the next event it takes is its first. */
+export function ingestionSourceAwaitsFirstEvent(status: string): boolean {
+  return status === "awaiting_first_event";
+}
+
 /**
  * Neither archived nor switched off: the source takes events, pushed or pulled.
  * `archivedAt` is an instant or date on the server and an ISO string on the wire.

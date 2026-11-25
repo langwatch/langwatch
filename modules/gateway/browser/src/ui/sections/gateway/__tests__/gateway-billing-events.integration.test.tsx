@@ -162,6 +162,22 @@ describe("BillingEventsPage", () => {
     expect(screen.getByTestId("billing-events-table")).toHaveTextContent("Instant Evals");
   });
 
+  /** @scenario A spend row with no virtual key and the pii redaction request type reads as PII redaction */
+  it("names a keyless pii redaction row PII redaction", () => {
+    listQuery.mockReturnValue({
+      data: {
+        rows: [{ ...SPEND_ROW, virtualKeyId: "", requestType: "pii_redaction" }],
+        nextCursor: null,
+        virtualKeyNames: {},
+        clickHouseDisabled: false,
+      },
+      isLoading: false,
+      isFetching: false,
+    });
+    renderPage();
+    expect(screen.getByTestId("billing-events-table")).toHaveTextContent("PII redaction");
+  });
+
   /** @scenario The ledger explains itself when ClickHouse is disabled */
   it("explains the ClickHouse-disabled degrade", () => {
     listQuery.mockReturnValue({

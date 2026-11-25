@@ -1,12 +1,15 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
  * The hourly sweep that ends organizations' trace windows: an organization that stops tracing
- * syncs no more, so only a schedule can tell Customer.io its rolling trace traits ended.
+ * syncs no more, so only a schedule can tell Customer.io its rolling trace traits ended. It also
+ * drops every trace day older than the usage window, since the folds count every project's traces.
  * Spec: enterprise/modules/nurturing/specs/project-usage.feature
  */
 import type { IntentSpec, WakeHandler } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import { z } from "zod";
+
+import { windowStartDayOf } from "../rules/nurturing-project-usage.rules.ts";
 
 const nurturingLogger = createLogger("langwatch:nurturing");
 
@@ -48,6 +51,8 @@ export const traceWindowEndWake: WakeHandler<TraceWindowEndState, TraceWindowEnd
 
 export interface TraceWindowEndRunDeps {
   readonly traceWindowsEnded: (input: Readonly<{ after: number; upTo: number }>) => Promise<void>;
+  /** Drops every project's trace days before `beforeDay`, those of projects that never synced too. */
+  readonly pruneTraceDaysBefore: (input: Readonly<{ beforeDay: string }>) => Promise<void>;
   readonly deleteDispatchedBefore: (params: {
     processName: string;
     before: number;
@@ -55,13 +60,21 @@ export interface TraceWindowEndRunDeps {
   readonly now: () => number;
 }
 
-/** A failed sweep throws, so the outbox retries it; the prune is bookkeeping and may wait. */
+/**
+ * A failed sweep throws, so the outbox retries it; the prunes are bookkeeping and may wait for the
+ * next hour's sweep.
+ */
 export function runTraceWindowEnd(
   deps: TraceWindowEndRunDeps,
 ): (sweep: z.output<typeof traceWindowEndSweepSchema>) => Promise<void> {
   return async (sweep) => {
     const startedAt = deps.now();
     await deps.traceWindowsEnded(sweep);
+    await deps
+      .pruneTraceDaysBefore({ beforeDay: windowStartDayOf(startedAt) })
+      .catch((error: unknown) => {
+        nurturingLogger.warn({ error }, "the trace days past the usage window could not be pruned");
+      });
     await deps
       .deleteDispatchedBefore({
         processName: TRACE_WINDOW_END_PROCESS_NAME,

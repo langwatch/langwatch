@@ -16,11 +16,13 @@ import { MemoryNurturingMilestonesRepository } from "../../repositories/memory/m
 import { MemoryNurturingProjectDirectoryRepository } from "../../repositories/memory/memory.nurturing-project-directory.repository.ts";
 import { NurturingMilestonesService } from "../../services/nurturing-milestones.service.ts";
 import { nurturingBatchLane } from "../nurturing-batch.subscriber.ts";
+import { organizationAdminFactOf } from "../nurturing-project-usage.pipeline.ts";
 
 function laneOverMemory() {
   const claimed = new Set<string>();
+  const milestones = MemoryNurturingMilestonesRepository.create();
   const service = NurturingMilestonesService.create({
-    milestones: MemoryNurturingMilestonesRepository.create(),
+    milestones,
     projects: MemoryNurturingProjectDirectoryRepository.create({
       placed: new Map([["project-1", "org-1"]]),
     }),
@@ -43,7 +45,7 @@ function laneOverMemory() {
         deliver: async (signal) => void delivered.push(signal),
       }),
   });
-  return { service, lane, delivered };
+  return { milestones, lane, delivered };
 }
 
 const settled: EvaluationLifecycleCompletedEventData = {
@@ -67,14 +69,17 @@ const item = {
 describe("nurturingBatchLane", () => {
   describe("when the same settled evaluation is delivered twice", () => {
     it("counts it once and raises one signal", async () => {
-      const { service, lane, delivered } = laneOverMemory();
-      await service.projectCreated({
-        tenantId: "project-1",
-        projectId: "project-1",
-        organizationId: "org-1",
-        occurredAt: 1,
-        adminUserId: "admin-1",
-      });
+      const { milestones, lane, delivered } = laneOverMemory();
+      // The organization as the usage pipeline's admin map folds project's created fact.
+      await milestones.recordAdminFact(
+        organizationAdminFactOf({
+          tenantId: "project-1",
+          projectId: "project-1",
+          organizationId: "org-1",
+          occurredAt: 1,
+          adminUserId: "admin-1",
+        }),
+      );
 
       await lane.handleBatch([item]);
       await lane.handleBatch([item]);

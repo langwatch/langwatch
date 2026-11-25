@@ -152,8 +152,8 @@ export const LANGY_OPTIMIZE_LOOP_CRITERIA = [
   "Langy narrates the loop: a short line before each run saying what changed and why, and a short line after saying what the numbers did. Silence across a whole run fails.",
   "The conclusion carries numbers: the pass rate (or score) before and after, and what happened to cost. Improvement claims without numbers fail.",
   "If the numbers end level or worse, Langy says so plainly instead of declaring a winner. A run that ends with a real improvement satisfies this criterion.",
-  "If three consecutive attempts fail to beat the best candidate, Langy stops and reports what it tried rather than continuing to churn. A run that improves before that point satisfies this criterion.",
-  "Langy runs at most 6 measured attempts. On the sixth it stops and reports the best result it found instead of starting a seventh. A run that stops earlier, on any other stop condition, satisfies this criterion; do not mark it inconclusive.",
+  "If several attempts in a row fail to beat the best candidate, Langy stops and reports what it tried rather than continuing to churn. A run that keeps improving satisfies this criterion.",
+  "Before the first run, Langy states an attempts budget with its reason, and it stops when that budget is spent instead of starting another attempt. A run that stops earlier, on any other stop condition, satisfies the stopping half; do not mark it inconclusive.",
   ...LANGY_CORE_RULE_CRITERIA,
 ];
 
