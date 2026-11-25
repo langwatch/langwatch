@@ -146,6 +146,8 @@ describe.skipIf(!DB_URL)("OrganizationScopeGraphService over Postgres", () => {
       expect(organization.members).toEqual([{ role: "MEMBER" }]);
       expect(organization.teams.map((each) => each.id)).toEqual([team.own, team.bound]);
       expect(organization.teams.map((each) => each.personalOf)).toEqual([null, null]);
+      // The sidebar reads the organization's age off the graph (product-sidebars.feature).
+      expect(organization.createdAt).toBeInstanceOf(Date);
     });
 
     /** @scenario "A team reached through a binding carries the caller's membership" */

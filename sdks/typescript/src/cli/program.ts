@@ -4985,6 +4985,17 @@ function registerOnboardingCommands(program: Command): void {
       return impl(path);
     },
   );
+
+  emitsResult(
+    onboardingCmd
+      .command("start <start>")
+      .description("Record the start picked on Langy's governance opener: coding or call")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (start: string) => {
+      const { onboardingStartCommand: impl } = await import("./commands/onboarding/start.js");
+      return impl(start);
+    },
+  );
 }
 
 function registerUiCommands(program: Command): void {

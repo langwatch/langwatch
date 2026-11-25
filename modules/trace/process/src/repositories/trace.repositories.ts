@@ -56,6 +56,8 @@ export interface TraceRepositories {
   readonly spanAnalytics: SpanAnalyticsRepository;
   /** The span_analytics replay step's ledger row: where the span widgets' history starts. */
   readonly spanAnalyticsFloor: SpanAnalyticsFloorRepository;
+  /** The managed prompt version replay's ledger row: where LastUsedPromptVersionId is known. */
+  readonly managedPromptVersionLedger: SpanAnalyticsFloorRepository;
   /** The two folds' warm state; without it a fold reads back a lossy row mid-trace. */
   readonly summaryFoldCache: TraceSummaryFoldCacheRepository;
   readonly analyticsFoldCache: TraceAnalyticsFoldCacheRepository;

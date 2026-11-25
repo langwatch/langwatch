@@ -5,6 +5,7 @@
  */
 
 import type {
+  LangWatchQLChartCrashContext,
   LangWatchQLDataset,
   LangWatchQLDatasetColumn,
 } from "@langwatch/analytics-contract/visualization";
@@ -22,6 +23,7 @@ export interface LangWatchQLVegaLiteChartProps {
   readonly columnsByDataset: Readonly<Record<string, readonly LangWatchQLDatasetColumn[]>>;
   readonly ariaLabel?: string;
   readonly isResultNoteHidden?: boolean;
+  readonly crashContext?: LangWatchQLChartCrashContext;
 }
 
 export function ThemedLangWatchQLVegaLiteChart(props: LangWatchQLVegaLiteChartProps) {

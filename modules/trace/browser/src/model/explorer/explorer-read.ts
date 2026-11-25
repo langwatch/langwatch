@@ -2,7 +2,7 @@ import { buildFacetStateLookup, type ExplorerState, parse } from "@langwatch/tra
 
 import type { ExplorerResults } from "../../behavior/rows.slice.ts";
 
-/** One value the query filters on, as the sidebar would show it. */
+/** One value the query filters on, as the query writes it (the sidebar may show it "in group"). */
 interface ActiveFacet {
   field: string;
   value: string;

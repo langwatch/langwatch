@@ -14,6 +14,7 @@ export function ProjectSwitcherCombobox({
   currentProjectIsAggregate = false,
   showTeamHeaders,
   onCreateProjectForTeam,
+  onOpenProject,
 }: {
   groups: ProjectPickerGroup[];
   currentProjectId: string;
@@ -23,6 +24,8 @@ export function ProjectSwitcherCombobox({
   onCreateProjectForTeam:
     | (({ teamId, orgId }: { teamId: string; orgId: string }) => void)
     | undefined;
+  /** Takes a pick instead of navigating to its address; absent, the pick navigates. */
+  onOpenProject?: (href: string) => void;
 }) {
   const host = useNavigationHost();
   return (
@@ -32,7 +35,7 @@ export function ProjectSwitcherCombobox({
       currentProjectName={currentProjectName}
       currentProjectIsAggregate={currentProjectIsAggregate}
       showTeamHeaders={showTeamHeaders}
-      onOpenProject={(href) => host.navigate(href)}
+      onOpenProject={onOpenProject ?? ((href) => host.navigate(href))}
       onCreateProjectForTeam={onCreateProjectForTeam}
       triggerTestId="navigation-project-switcher"
       tourAnchor="project-switcher"

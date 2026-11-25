@@ -1,17 +1,20 @@
 import {
+  GatewayA2aTargetHeadersNeedReplacingError,
   GatewayA2aTargetNameTakenError,
   createGatewayA2aTargetInputSchema,
   gatewayA2aTargetHeadersSchema,
   gatewayA2aTargetResourceSchema,
   type CreateGatewayA2aTargetInput,
   type GatewayA2aTargetResource,
-  type UpdateGatewayA2aTargetInput,
 } from "@langwatch/gateway-contract";
 import { generate } from "@langwatch/ksuid";
 import type { Prisma, PrismaClient } from "@langwatch/prisma-client/generated";
 import { z } from "zod";
 
-import { GatewayA2aTargetRepository } from "../gateway-a2a-target.repository.ts";
+import {
+  GatewayA2aTargetRepository,
+  type GatewayA2aTargetUpdate,
+} from "../gateway-a2a-target.repository.ts";
 import type { GatewayPersistenceTransaction } from "../gateway-transaction.repository.ts";
 import type { GatewayCipher } from "../gateway.repositories.ts";
 
@@ -52,7 +55,7 @@ export class PrismaGatewayA2aTargetRepository extends GatewayA2aTargetRepository
       where: { organizationId: input.organizationId, projectId: input.projectId, archivedAt: null },
       orderBy: [{ name: "asc" }, { id: "asc" }],
     });
-    return rows.map((row) => this.#toResource(row, true));
+    return rows.map((row) => this.#toResource(row));
   }
 
   async findById(input: {
@@ -96,24 +99,41 @@ export class PrismaGatewayA2aTargetRepository extends GatewayA2aTargetRepository
   }
 
   async update(
-    input: UpdateGatewayA2aTargetInput,
+    input: GatewayA2aTargetUpdate,
     transaction?: GatewayPersistenceTransaction,
   ): Promise<GatewayA2aTargetResource> {
     const allowList = input.allowedVirtualKeyIds;
-    const row = await this.#client(transaction).gatewayA2ATarget.update({
-      where: { id: input.id, organizationId: input.organizationId },
-      data: {
-        agentName: input.agentName,
-        cardUrl: input.cardUrl,
-        upstreamUrl: input.upstreamUrl,
-        encryptedUpstreamHeaders:
-          input.upstreamHeaders === undefined ? undefined : this.#seal(input.upstreamHeaders),
-        restrictToAllowList: allowList === undefined ? undefined : allowList !== null,
-        allowedVirtualKeyIds: allowList === undefined ? undefined : (allowList ?? []),
-        blocked: input.blocked,
-        blockReason: input.blockReason,
-      },
-    });
+    const expected = input.expectedUpstream;
+    const where = {
+      id: input.id,
+      organizationId: input.organizationId,
+      // One statement checks the upstream the edit was checked against, so nothing slips between.
+      ...(expected && {
+        upstreamUrl: expected.upstreamUrl,
+        encryptedUpstreamHeaders: expected.hasUpstreamHeaders ? { not: null } : null,
+      }),
+    };
+    const row = await this.#client(transaction)
+      .gatewayA2ATarget.update({
+        where,
+        data: {
+          agentName: input.agentName,
+          cardUrl: input.cardUrl,
+          upstreamUrl: input.upstreamUrl,
+          encryptedUpstreamHeaders:
+            input.upstreamHeaders === undefined ? undefined : this.#seal(input.upstreamHeaders),
+          restrictToAllowList: allowList === undefined ? undefined : allowList !== null,
+          allowedVirtualKeyIds: allowList === undefined ? undefined : (allowList ?? []),
+          blocked: input.blocked,
+          blockReason: input.blockReason,
+        },
+      })
+      .catch((error: unknown) => {
+        if (expected && recordNotFoundSchema.validate(error)) {
+          throw new GatewayA2aTargetHeadersNeedReplacingError();
+        }
+        throw error;
+      });
     return this.#toResource(row);
   }
 
@@ -150,6 +170,9 @@ export class PrismaGatewayA2aTargetRepository extends GatewayA2aTargetRepository
     });
   }
 }
+
+/** Prisma's answer when an update's `where` matched no row: here, a guard that no longer holds. */
+const recordNotFoundSchema = z.object({ code: z.literal("P2025") });
 
 /** Prisma reports the live-name index (`GatewayA2ATarget_live_name_key`) as `P2002`. */
 const uniqueViolationSchema = z.object({

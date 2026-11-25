@@ -3,12 +3,15 @@ import { describe, expect, it } from "vitest";
 
 import {
   analyzeOrGroups,
+  buildFacetDisplayLookup,
   buildFacetStateLookup,
   getFacetValues,
   extractRangeValue,
   type OrGroup,
   type OrGroupAnalysis,
   describeAstProblem,
+  displayStateFor,
+  getFacetValueState,
 } from "../trace-query-analysis.ts";
 import {
   addSameFieldOrValue,
@@ -887,6 +890,177 @@ describe("buildFacetStateLookup", () => {
       expect(get("status", "warning")).toBe("neutral");
       expect(get("model", "gpt-5-mini")).toBe("neutral");
     });
+  });
+});
+
+describe("buildFacetDisplayLookup", () => {
+  const statesOf = (query: string) => Object.fromEntries(buildFacetDisplayLookup(parse(query)));
+
+  describe("given a term a group makes optional", () => {
+    /** @scenario "A value a group in the search bar makes optional is marked as in group" */
+    it.each([
+      ["NOT (status:error AND model:x)", ["status|error", "model|x"], "grouped-exclude"],
+      ["NOT (status:error model:x)", ["status|error", "model|x"], "grouped-exclude"],
+      ["-status:error OR NOT model:x", ["status|error", "model|x"], "grouped-exclude"],
+      ["status:error OR model:x", ["status|error", "model|x"], "grouped-include"],
+      ["NOT (NOT (status:error OR model:x))", ["status|error", "model|x"], "grouped-include"],
+      [
+        "(status:error AND model:a) OR (status:ok AND model:b)",
+        ["status|error", "model|a", "status|ok", "model|b"],
+        "grouped-include",
+      ],
+      ["status:error OR timeout", ["status|error"], "grouped-include"],
+      ["NOT (model:a AND model:b)", ["model|a", "model|b"], "grouped-exclude"],
+      [
+        "(status:error AND user:u1) OR status:ok",
+        ["status|error", "user|u1", "status|ok"],
+        "grouped-include",
+      ],
+      [
+        "NOT (status:error AND (status:ok OR model:x))",
+        ["status|error", "status|ok", "model|x"],
+        "grouped-exclude",
+      ],
+    ])("marks every term of %s as %s", (query, keys, state) => {
+      const states = statesOf(query);
+      for (const key of keys) expect(states[key]).toBe(state);
+    });
+
+    it("keeps a required term beside the group marked", () => {
+      const states = statesOf("(status:error OR model:x) AND user:u1");
+      expect(states).toEqual({
+        "status|error": "grouped-include",
+        "model|x": "grouped-include",
+        "user|u1": "include",
+      });
+    });
+  });
+
+  describe("given a required term that also sits in a group", () => {
+    it.each([
+      "status:error AND (status:error OR model:x)",
+      "(status:error OR model:x) AND status:error",
+    ])("keeps it included in %s", (query) => {
+      expect(statesOf(query)).toEqual({ "status|error": "include", "model|x": "grouped-include" });
+    });
+  });
+
+  describe("given a term every branch of a group requires", () => {
+    it.each([
+      [
+        "(status:error AND model:a) OR (status:error AND model:b)",
+        { "status|error": "include", "model|a": "grouped-include", "model|b": "grouped-include" },
+      ],
+      [
+        "(NOT status:error AND model:a) OR (NOT status:error AND model:b)",
+        { "status|error": "exclude", "model|a": "grouped-include", "model|b": "grouped-include" },
+      ],
+      [
+        "NOT (status:error OR model:a) OR NOT (status:error OR model:b)",
+        { "status|error": "exclude", "model|a": "grouped-exclude", "model|b": "grouped-exclude" },
+      ],
+      [
+        "NOT ((status:error OR model:a) AND (status:error OR model:b))",
+        { "status|error": "exclude", "model|a": "grouped-exclude", "model|b": "grouped-exclude" },
+      ],
+      [
+        "user:u1 AND ((status:error AND model:a) OR (status:error AND model:b))",
+        {
+          "user|u1": "include",
+          "status|error": "include",
+          "model|a": "grouped-include",
+          "model|b": "grouped-include",
+        },
+      ],
+    ])("keeps it marked in %s", (query, expected) => {
+      expect(statesOf(query)).toEqual(expected);
+    });
+
+    it.each([
+      "(status:error AND model:a) OR (NOT status:error AND model:b)",
+      "(NOT status:error AND model:a) OR (status:error AND model:b)",
+      "NOT status:error OR (status:error AND model:x)",
+    ])("leaves it grouped, signed as a click reads it, when %s uses it both ways", (query) => {
+      expect(statesOf(query)["status|error"]).toBe("grouped-include");
+    });
+  });
+
+  describe("given a term the query both negates as required and names plainly", () => {
+    it.each([
+      ["NOT status:error AND (status:error OR model:x)", "grouped-include"],
+      ["(status:error OR model:x) AND NOT status:error", "grouped-include"],
+      ["status:error AND NOT status:error", "include"],
+      ["NOT status:error AND status:error", "include"],
+    ])("signs it in %s as a click reads it, %s", (query, state) => {
+      expect(statesOf(query)["status|error"]).toBe(state);
+    });
+  });
+
+  describe("when a row's display state is read beside the state its click reads", () => {
+    it.each([
+      "NOT (status:error AND model:x)",
+      "status:error OR model:x",
+      "-status:error OR NOT model:x",
+      "(NOT status:error AND model:a) OR (status:error AND model:b)",
+      "NOT status:error OR (status:error AND model:x)",
+      "NOT (model:a AND model:b)",
+      "NOT status:error AND (status:error OR model:x)",
+      "(status:error OR model:x) AND NOT status:error",
+      "status:error AND NOT status:error",
+      "NOT (evaluator:abc AND evaluatorVerdict:fail)",
+      "status:error AND NOT (status:error AND model:x)",
+      "NOT ((status:error OR model:x) AND user:u1)",
+      "status:error AND model:x",
+      "NOT (status:error OR model:x)",
+      "status:error OR status:warning",
+      "(NOT status:error AND model:a) OR (NOT status:error AND model:b)",
+    ])("gives every marked term of %s the sign its click reads", (query) => {
+      const ast = parse(query);
+      for (const [key, state] of buildFacetDisplayLookup(ast)) {
+        const [field = "", value = ""] = key.split("|");
+        const clickState = getFacetValueState(ast, field, value);
+        expect(clickState).not.toBe("neutral");
+        expect({ key, negated: state === "exclude" || state === "grouped-exclude" }).toEqual({
+          key,
+          negated: clickState === "exclude",
+        });
+      }
+    });
+  });
+
+  describe("given terms every result must match", () => {
+    /** @scenario "Values every result must match keep their include or exclude mark" */
+    it.each([
+      ["status:error AND model:x", { "status|error": "include", "model|x": "include" }],
+      ["NOT (status:error OR model:x)", { "status|error": "exclude", "model|x": "exclude" }],
+      [
+        "status:error OR status:warning",
+        { "status|error": "include", "status|warning": "include" },
+      ],
+      [
+        "(status:error OR status:ok) AND model:x",
+        { "status|error": "include", "status|ok": "include", "model|x": "include" },
+      ],
+      [
+        "user:u1 AND (status:error OR status:ok)",
+        { "user|u1": "include", "status|error": "include", "status|ok": "include" },
+      ],
+      ["NOT status:error", { "status|error": "exclude" }],
+    ])("marks %s as before", (query, expected) => {
+      expect(statesOf(query)).toEqual(expected);
+    });
+  });
+});
+
+describe("displayStateFor", () => {
+  const lookup = buildFacetDisplayLookup(parse("NOT (status:error AND model:x)"));
+
+  it("reads a named row's state from the lookup", () => {
+    expect(displayStateFor({ lookup, field: "status", value: "error" })).toBe("grouped-exclude");
+  });
+
+  it("reads a row the query does not name as neutral", () => {
+    expect(displayStateFor({ lookup, field: "status", value: "ok" })).toBe("neutral");
   });
 });
 

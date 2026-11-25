@@ -58,7 +58,10 @@ describe("ClickHouseOcsfEventsRepository Security Lake reads", () => {
             CallCount: "1",
           },
         ]),
-      ).rejects.toThrow(/Models/);
+      ).rejects.toMatchObject({
+        name: "ZodError",
+        issues: [expect.objectContaining({ code: "invalid_type", path: [0, "Models"] })],
+      });
     });
   });
 
@@ -71,7 +74,10 @@ describe("ClickHouseOcsfEventsRepository Security Lake reads", () => {
 
     /** @scenario "A Security Lake read refuses a row of the wrong shape" */
     it("refuses a count that is not a number", async () => {
-      await expect(countOf([{ Events: "many" }])).rejects.toThrow(/Events/);
+      await expect(countOf([{ Events: "many" }])).rejects.toMatchObject({
+        name: "ZodError",
+        issues: [expect.objectContaining({ code: "invalid_type", path: [0, "Events"] })],
+      });
     });
   });
 });

@@ -46,6 +46,8 @@ export const FRONTEND_FEATURE_FLAGS = [
   "release_dashboards",
   // With release_dashboards, the sidebar's Dashboards section in Gateway and Coding agents too.
   "release_dashboards_in_every_product",
+  // With release_dashboards, the organization-wide area: the /dashboards library and its pages.
+  "release_dashboards_organization_area",
   // The Insights inbox, its sidebar entry, the topbar bell and "Save as insight" on Langy answers.
   "release_insights",
   // The Braids pages and their settings entry; braids already made still apply.
@@ -58,7 +60,8 @@ export const FRONTEND_FEATURE_FLAGS = [
   "release_instant_evals",
   // The own decision models in the Instant Evals column of Default models (ADR-182).
   "release_instant_evals_own_decision_model",
-  // LangWatch Evals Preview says it routes through the LangWatch Judge (ADR-190).
+  // The judge picker names the hosted model LangWatch Evals (preview), the LangWatch Judge router
+  // (ADR-190).
   "release_instant_evals_judge_router",
   // The Data Privacy page's Essential or Strict organization picker, Strict's
   // price and its example (modules/data-privacy/specs/pii-redaction-level-picker.feature).

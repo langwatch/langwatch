@@ -8,8 +8,6 @@ import { PrismaRepository } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
 import {
-  emptyProjectUsage,
-  foldProjectUsage,
   type NurturingProjectUsageState,
   nurturingProjectUsageStateSchema,
 } from "../../rules/nurturing-project-usage.rules.ts";
@@ -23,10 +21,10 @@ import {
 type NurturingProjectUsageDatabase = Pick<PrismaClient, "nurturingProjectUsageView">;
 
 /**
- * The peer folds' Postgres rows (`NurturingProjectUsageView`): one per project and owner, plus the
- * project's evaluation-day row, the folded usage as JSON. A row of another projection version reads
- * as undecodable: the fold has no re-fold path (no refoldOnStoreMiss), so the executor throws
- * rather than fold over it, and the organization's read leaves it out.
+ * The peer folds' Postgres rows (`NurturingProjectUsageView`): one per project and owner, the
+ * folded usage as JSON. A row of another projection version reads as undecodable: the fold has no
+ * re-fold path (no refoldOnStoreMiss), so the executor throws rather than fold over it, and the
+ * organization's read leaves it out, as it leaves out the retired evaluation-day rows.
  */
 export class PrismaNurturingProjectUsageRepository
   extends PrismaRepository.for("NurturingProjectUsageView")
@@ -90,31 +88,6 @@ export class PrismaNurturingProjectUsageRepository
     };
   }
 
-  async recordEvaluationDay({
-    projectId,
-    occurredAt,
-  }: Readonly<{ projectId: string; occurredAt: number }>): Promise<void> {
-    const where = { projectId_owner: { projectId, owner: EVALUATION_ACTIVITY_OWNER } };
-    const row = await this.#database.nurturingProjectUsageView.findUnique({ where });
-    const current =
-      row?.projectionVersion === NURTURING_PROJECT_USAGE_PROJECTION_VERSION
-        ? nurturingProjectUsageStateSchema.parse(row.folded)
-        : emptyProjectUsage(projectId);
-    const next = foldProjectUsage(current, { kind: "evaluation_completed", occurredAt });
-    if (row && next.activeDays.join() === current.activeDays.join()) return;
-    const columns = {
-      folded: next,
-      appliedEventIds: [],
-      projectionVersion: NURTURING_PROJECT_USAGE_PROJECTION_VERSION,
-      updatedAt: new Date(next.LastEventOccurredAt),
-    };
-    await this.#database.nurturingProjectUsageView.upsert({
-      where,
-      create: { projectId, owner: EVALUATION_ACTIVITY_OWNER, ...columns },
-      update: columns,
-    });
-  }
-
   async findForProjects({
     projectIds,
   }: Readonly<{ projectIds: readonly string[] }>): Promise<NurturingProjectUsageState[]> {
@@ -122,6 +95,7 @@ export class PrismaNurturingProjectUsageRepository
     const rows = await this.#database.nurturingProjectUsageView.findMany({
       where: {
         projectId: { in: [...projectIds] },
+        owner: { not: EVALUATION_ACTIVITY_OWNER },
         projectionVersion: NURTURING_PROJECT_USAGE_PROJECTION_VERSION,
       },
     });

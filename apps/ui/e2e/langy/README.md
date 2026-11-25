@@ -220,7 +220,7 @@ sends when it ends, and each path's script from the `guided-onboarding` skill.
 | ------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `guided-onboarding-coding.scenario.test.ts`                  | the one command, and the completion recorded                                                                                                                                 |
 | `guided-onboarding-gateway.scenario.test.ts`                 | the key the tour minted is reused; a skipped tour gets the no-worries line and mints the key once                                                                            |
-| `guided-onboarding-governance.scenario.test.ts`              | the sources question, the pick, the navigate to the sources page                                                                                                             |
+| `guided-onboarding-governance.scenario.test.ts`              | the start question, the coding start recorded, the completion and the one line                                                                                               |
 | `guided-onboarding-home-offer.scenario.test.ts`              | a second kickoff ("Let's set up Gateway then.") into the attached conversation                                                                                               |
 | `guided-onboarding-llmops-share-folder.scenario.test.ts`     | code access first, a typed question mid-setup, the folder shared, tracing and the connect call, the proposal, the scenario in the drawer, the run, the suite, the completion |
 | `guided-onboarding-llmops-describe.scenario.test.ts`         | "I'd rather describe it", the one line, the second code access ask                                                                                                           |
@@ -264,7 +264,7 @@ sends when it ends, and each path's script from the `guided-onboarding` skill.
   snippet has to name).
 
 The watcher answers the `question` cards (the proposal, the governance
-sources) through an async picker, so a file can read the world before it
+start) through an async picker, so a file can read the world before it
 answers: the share-folder file lists the project's scenarios while the
 proposal is still open and asserts the list is empty. The watcher also records
 every `navigate` instruction of the turns it follows (`navigateHrefs`), which
@@ -290,10 +290,12 @@ Each file's header links here rather than repeating its narrative.
   (done because Langy ran `langwatch onboarding complete-path coding`) and
   the conversation's title, which the kickoff names and the brief never
   replaces.
-- **governance**: the tour walks the pages, so Langy's part is one line — it
-  records the path as done and says the line, nothing else (no question, no
-  page opened). Layer 2 is the absence of a question card and a navigate
-  instruction on the stream, the complete-path call, and the guided state.
+- **governance**: the tour walks the pages, so Langy opens no page. It asks
+  how the person wants to start (the watcher picks "Track my coding agent"),
+  records it with `langwatch onboarding start coding`, records the path as
+  done and says the one line. Layer 2 is the one question card, no navigate
+  instruction on the stream, the start command before the complete-path
+  call, and the guided state.
 - **gateway**: the path runs three times — after a tour that already minted
   `production-app`, reading the state the suite sees; the same from the
   panel's pre-tour snapshot (the live run: the server settles it from the

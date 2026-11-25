@@ -11,8 +11,12 @@ import {
   type GatewayA2aTargetWire,
   type UpdateGatewayA2aTargetInput,
 } from "@langwatch/gateway-contract";
+import type { ProjectApi } from "@langwatch/project-contract";
 
-import type { GatewayA2aTargetRepository } from "../repositories/gateway-a2a-target.repository.ts";
+import type {
+  GatewayA2aTargetRepository,
+  GatewayA2aTargetUpdate,
+} from "../repositories/gateway-a2a-target.repository.ts";
 import type {
   GatewayAuditAction,
   GatewayAuditRepository,
@@ -30,11 +34,14 @@ import {
   a2aTargetToDto,
   a2aTargetsForProject,
 } from "../rules/gateway-a2a-target.rules.ts";
+import { assertProjectInOrganization } from "../rules/gateway-project-scope.rules.ts";
 
 type GatewayA2aTargetServiceDependencies = {
   repository: GatewayA2aTargetRepository;
   changeEvents: GatewayChangeEventsRepository;
   auditLog: GatewayAuditRepository;
+  /** Where a project-scoped target's project is checked against the target's organization. */
+  projects: Pick<ProjectApi, "findWithTeam">;
   transactions: GatewayTransactionRepository;
 };
 
@@ -47,12 +54,14 @@ export class GatewayA2aTargetService {
   private readonly repository: GatewayA2aTargetRepository;
   private readonly changeEvents: GatewayChangeEventsRepository;
   private readonly auditLog: GatewayAuditRepository;
+  private readonly projects: Pick<ProjectApi, "findWithTeam">;
   private readonly transactions: GatewayTransactionRepository;
 
   private constructor(input: GatewayA2aTargetServiceDependencies) {
     this.repository = input.repository;
     this.changeEvents = input.changeEvents;
     this.auditLog = input.auditLog;
+    this.projects = input.projects;
     this.transactions = input.transactions;
   }
 
@@ -95,6 +104,7 @@ export class GatewayA2aTargetService {
     });
   }
 
+  /** Unseals headers: the DTO every list ends at names them, and drops their values. */
   list(organizationId: string): Promise<GatewayA2aTargetResource[]> {
     return this.repository.findAll(organizationId);
   }
@@ -153,6 +163,10 @@ export class GatewayA2aTargetService {
 
   async create(input: CreateGatewayA2aTargetInput): Promise<GatewayA2aTargetResource> {
     const parsed = createGatewayA2aTargetInputSchema.parse(input);
+    if (parsed.projectId !== null) {
+      const project = await this.projects.findWithTeam(parsed.projectId);
+      assertProjectInOrganization({ project, organizationId: parsed.organizationId });
+    }
     const existing = await this.repository.findAll(parsed.organizationId, { headers: false });
     if (existing.some((t) => t.name === parsed.name && t.projectId === parsed.projectId)) {
       throw new GatewayA2aTargetNameTakenError(parsed.name);
@@ -191,7 +205,7 @@ export class GatewayA2aTargetService {
       action,
       actorUserId: parsed.actorUserId,
       before,
-      write: (tx) => this.repository.update(parsed, tx),
+      write: (tx) => this.repository.update(guardedUpdate({ before, edit: parsed }), tx),
     });
   }
 
@@ -264,6 +278,24 @@ export class GatewayA2aTargetService {
       input.blocked ? "gateway.a2a_target.blocked" : "gateway.a2a_target.unblocked",
     );
   }
+}
+
+/** The edit to write: a URL move keeping saved headers lands only on the upstream it checked. */
+function guardedUpdate({
+  before,
+  edit,
+}: {
+  before: GatewayA2aTargetResource;
+  edit: UpdateGatewayA2aTargetInput;
+}): GatewayA2aTargetUpdate {
+  if (edit.upstreamUrl === undefined || edit.upstreamHeaders !== undefined) return edit;
+  return {
+    ...edit,
+    expectedUpstream: {
+      upstreamUrl: before.upstreamUrl,
+      hasUpstreamHeaders: Object.keys(before.upstreamHeaders).length > 0,
+    },
+  };
 }
 
 /**

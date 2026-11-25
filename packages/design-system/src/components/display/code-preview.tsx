@@ -281,10 +281,19 @@ function SnippetCopyButton({
 }) {
   const [copied, setCopied] = useState(false);
   const resetTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-  useEffect(() => () => clearTimeout(resetTimer.current), []);
+  const isMountedRef = useRef(false);
+  // Cleanup runs before an await resumes, so the mounted flag guards the resumed copy.
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+      clearTimeout(resetTimer.current);
+    };
+  }, []);
   const name = `Copy ${label.toLowerCase()}`;
   const copy = async (value: string) => {
-    if (!(await copyText({ text: value, what: label }))) return;
+    const didCopy = await copyText({ text: value, what: label });
+    if (!isMountedRef.current || !didCopy) return;
     setCopied(true);
     clearTimeout(resetTimer.current);
     resetTimer.current = setTimeout(() => setCopied(false), 2000);

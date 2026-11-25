@@ -66,6 +66,7 @@ function renderTopBar({
           activeProductId: null,
           isSettingsRoute: false,
           seatRefusal: null,
+          openBoard: null,
           showDevelopmentIndicator: false,
           isCompactSidebar: false,
           isMobile: false,

@@ -82,10 +82,11 @@ function LangyShiftedRoot({ showLangy, children }: { showLangy: boolean; childre
   // While a drawer is open the panel rides beside it as a floating companion
   // (see LangyPanel), so the dock's reservation releases and the page gets
   // its width back underneath the overlay pair.
-  const { currentDrawer } = useDrawer();
+  const { currentDrawer, inPlaceDrawerOpen } = useDrawer();
   // Only Sidebar mode reserves room (pushes content left). Floating mode
   // overlays the page — content stays full width and the card floats over it.
-  const shifted = showLangy && isOpen && panelMode === "sidebar" && !currentDrawer;
+  const shifted =
+    showLangy && isOpen && panelMode === "sidebar" && !currentDrawer && !inPlaceDrawerOpen;
   // Publish the reservation truth for a claiming shell (see the store): this
   // wrapper owns the visibility gate, the shell only consumes the result.
   useEffect(() => {

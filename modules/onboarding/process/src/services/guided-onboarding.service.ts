@@ -15,6 +15,7 @@ import {
   type GuidedOnboardingRecordedEventName,
   type GuidedOnboardingState,
   type GuidedPath,
+  type LangyStart,
 } from "@langwatch/onboarding-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import { nowInstant } from "@langwatch/time";
@@ -212,6 +213,24 @@ export class GuidedOnboardingService {
         donePaths: [...state.donePaths, known],
         currentPath: state.currentPath === known ? undefined : state.currentPath,
       }),
+    });
+  }
+
+  /**
+   * The start picked on Langy's governance opener. A second pick replaces the first, so the
+   * trait follows the latest answer; "call" is the choice, never a booking. Repeating the
+   * current start changes and announces nothing, so a retried CLI call cannot count twice.
+   */
+  async recordLangyStart(
+    actor: GuidedOnboardingActor,
+    { start }: { start: LangyStart },
+  ): Promise<GuidedOnboardingState> {
+    const current = await this.getState(actor);
+    if (current.langyStart === start) return current;
+    return this.write(actor, {
+      event: "start_chosen",
+      payload: { start },
+      mutate: (state) => ({ ...state, langyStart: start }),
     });
   }
 

@@ -1,6 +1,6 @@
 /**
- * The saved-dashboards list analytics lends navigation's sidebar on dashboards pages, and the
- * member's starred dashboards it lends the other products' sidebars (§10.1).
+ * The saved-dashboards list analytics lends navigation's sidebar on dashboards pages, the pinned
+ * section with the organization's area off, and each product's Dashboards section (§10.1).
  */
 
 import { uiTokens } from "@langwatch/module";
@@ -29,3 +29,17 @@ export type StarredDashboardsProps = { project?: StarredDashboardsProject };
  */
 export const StarredDashboardsToken =
   uiTokens("analytics").component<StarredDashboardsProps>("starredDashboards");
+
+/**
+ * The products a board can be homed in, in rail order: the dashboard contract's `homeProduct`
+ * (ADR-002, decision 8), named here so navigation can hand one over without that contract.
+ */
+export const DASHBOARD_HOME_PRODUCTS = ["llm-ops", "me", "gateway", "governance"] as const;
+export type DashboardHomeProduct = (typeof DASHBOARD_HOME_PRODUCTS)[number];
+
+/** What a product's sidebar hands its Dashboards section: the product it lists and creates in. */
+export type ProductDashboardsProps = { product: DashboardHomeProduct };
+
+/** A product sidebar's "Dashboards" section with the organization's area on: its boards and "+". */
+export const ProductDashboardsToken =
+  uiTokens("analytics").component<ProductDashboardsProps>("productDashboards");

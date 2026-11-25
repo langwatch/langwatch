@@ -25,6 +25,7 @@ import {
   withTenantCapability,
 } from "../../rules/langwatch-ql-tenant-capability.rules.ts";
 import { isFlooredViewName } from "../../rules/lwql-dedup-floor.rules.ts";
+import { isTraceIdsViewName } from "../../rules/lwql-dedup-trace-ids.rules.ts";
 import {
   type LangWatchQLConnection,
   type LangWatchQLExecutionRequest,
@@ -84,12 +85,13 @@ function namesAnAppFunction(sql: string): boolean {
 }
 
 /**
- * The refusal names, as an unknown table function, a floored twin this statement reads.
- * Matched on the twin's own name: the rewrite keeps the caller's quoting of the database.
+ * The refusal names, as an unknown table function, a floored or trace-ids twin the statement
+ * reads. Matched on the twin's own name: the rewrite keeps the caller's quoting of the database.
  */
-function namesMissingFlooredTwin({ error, sql }: { error: unknown; sql: string }): boolean {
+function namesMissingTwin({ error, sql }: { error: unknown; sql: string }): boolean {
   const twin = extractUnknownTableFunction(error)?.split(".").at(-1);
-  return twin !== undefined && isFlooredViewName(twin) && sql.includes(`${twin}(`);
+  const isTwin = twin !== undefined && (isFlooredViewName(twin) || isTraceIdsViewName(twin));
+  return isTwin && sql.includes(`${twin}(`);
 }
 
 /** What a failed governed run is reported as. */
@@ -136,9 +138,9 @@ function refusalFor({
     return new LangWatchQLBusyError({ reasons: [toError(error)] });
   }
 
-  // A floored twin not provisioned yet is read as a table function the server lacks: the
+  // A twin not provisioned yet is read as a table function the server lacks: the
   // deployment is missing an object, as code 60 says for a plain view, so the floor falls back.
-  if (namesMissingFlooredTwin({ error, sql })) {
+  if (namesMissingTwin({ error, sql })) {
     return new LangWatchQLUnavailableError({ reasons: [toError(error)] });
   }
 

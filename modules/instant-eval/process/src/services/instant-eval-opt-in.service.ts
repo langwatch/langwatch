@@ -102,7 +102,8 @@ export class InstantEvalOptInService {
     userId: string;
   }): Promise<InstantEvalOptInOffer> {
     if (!this.peers.isSaas()) return this.selfHostedOffer(organizationId);
-    // Never the switch: the popover then asks for an own model, and Evals Preview is not listed.
+    // Never the switch: the popover then asks for an own model, and LangWatch Instant (preview) is
+    // not listed.
     if (await this.isHostedOff({ projectId, organizationId })) return "contact_us";
     if (!(await this.switchOffered(organizationId))) return "contact_us";
     if (!(await this.peers.mayManageOrganization({ userId, organizationId }))) return "ask_admin";

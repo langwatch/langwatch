@@ -92,7 +92,7 @@ const permissionsSchema = z.array(z.string());
  * Fetched once and shared between getMemberCount and getMembersLiteCount.
  */
 interface MemberClassificationContext {
-  users: { userId: string; role: OrganizationUserRole }[];
+  users: { userId: string; role: OrganizationUserRole; billingOnly: boolean }[];
   customRoleMap: Map<string, string[]>;
   userPermissionsMap: Map<string, string[]>;
   pendingInvites: {
@@ -101,6 +101,7 @@ interface MemberClassificationContext {
     role: OrganizationUserRole;
     email: string;
     teamAssignments: TeamAssignment[] | null;
+    billingOnly: boolean;
   }[];
 }
 
@@ -226,11 +227,13 @@ export class PrismaOrganizationSeatRepository extends OrganizationSeatRepository
           role: user.role,
           permissions: context.userPermissionsMap.get(user.userId),
           userId: user.userId,
+          billingOnly: user.billingOnly,
         })),
         ...context.pendingInvites.map((invite) => ({
           role: invite.role,
           email: invite.email,
           permissions: this.getInvitePermissions(invite.teamAssignments, context.customRoleMap),
+          billingOnly: invite.billingOnly,
         })),
       ],
       holds,
@@ -251,6 +254,7 @@ export class PrismaOrganizationSeatRepository extends OrganizationSeatRepository
       userId: user.userId,
       role: user.role,
       permissions: context.userPermissionsMap.get(user.userId),
+      billingOnly: user.billingOnly,
     }));
     const invitations = context.pendingInvites.map((invite) => ({
       ...invite,
@@ -264,6 +268,14 @@ export class PrismaOrganizationSeatRepository extends OrganizationSeatRepository
     ).map((hold) => ({ ...hold, expiresAt: fromDate(hold.heldUntil).epochMilliseconds }));
     const isFull = (holder: { role: OrganizationUserRole; permissions: string[] | undefined }) =>
       classifyMemberType(holder.role, holder.permissions) === "FullMember";
+    const seatOf = (holder: {
+      role: OrganizationUserRole;
+      permissions: string[] | undefined;
+      billingOnly: boolean;
+    }) =>
+      seatKindOf(
+        classifyMemberType(holder.role, holder.permissions, { billingOnly: holder.billingOnly }),
+      );
     return [
       ...countedSeatHolds({ holders: [...members, ...invitations], holds }).map((hold) => ({
         holder: { kind: "hold" as const, userId: hold.userId, expiresAt: hold.expiresAt },
@@ -274,13 +286,17 @@ export class PrismaOrganizationSeatRepository extends OrganizationSeatRepository
         fullUserIds: new Set(members.filter(isFull).map(({ userId }) => userId)),
         fullInvitations: invitations.filter(isFull),
       }),
-      ...members.map(({ userId, role, permissions }) => ({
-        holder: { kind: "member" as const, userId },
-        seat: seatKindOf(classifyMemberType(role, permissions)),
+      ...members.map((member) => ({
+        holder: { kind: "member" as const, userId: member.userId },
+        seat: seatOf(member),
       })),
-      ...invitations.map(({ id, expiresAt, role, permissions }) => ({
-        holder: { kind: "invitation" as const, inviteId: id, expiresAt },
-        seat: seatKindOf(classifyMemberType(role, permissions)),
+      ...invitations.map((invitation) => ({
+        holder: {
+          kind: "invitation" as const,
+          inviteId: invitation.id,
+          expiresAt: invitation.expiresAt,
+        },
+        seat: seatOf(invitation),
       })),
     ];
   }
@@ -295,7 +311,7 @@ export class PrismaOrganizationSeatRepository extends OrganizationSeatRepository
   }): Promise<MemberType | null> {
     const user = await this.prisma.organizationUser.findFirst({
       where: { organizationId, userId, ...SEAT_HOLDING_MEMBER },
-      select: { userId: true, role: true },
+      select: { userId: true, role: true, billingOnly: true },
     });
     if (user === null) return null;
     if (user.role !== OrganizationUserRole.EXTERNAL) {
@@ -306,7 +322,9 @@ export class PrismaOrganizationSeatRepository extends OrganizationSeatRepository
       [user],
       await this.getCustomRoleMap(organizationId),
     );
-    return classifyMemberType(user.role, permissions.get(userId));
+    return classifyMemberType(user.role, permissions.get(userId), {
+      billingOnly: user.billingOnly,
+    });
   }
 
   /** The person's live hold, unless they hold a full seat again as a member or by invitation. */
@@ -371,12 +389,12 @@ export class PrismaOrganizationSeatRepository extends OrganizationSeatRepository
   }): Promise<MemberType | null> {
     const invite = await this.prisma.organizationInvite.findFirst({
       where: { id: inviteId, organizationId, ...seatHoldingInvitation() },
-      select: { role: true, teamAssignments: true },
+      select: { role: true, teamAssignments: true, billingOnly: true },
     });
     if (invite === null) return null;
     const teamAssignments = teamAssignmentsSchema.safeParse(invite.teamAssignments).data ?? null;
     if (teamAssignments === null || teamAssignments.length === 0) {
-      return classifyMemberType(invite.role, undefined);
+      return classifyMemberType(invite.role, undefined, { billingOnly: invite.billingOnly });
     }
     return classifyMemberType(
       invite.role,
@@ -393,7 +411,7 @@ export class PrismaOrganizationSeatRepository extends OrganizationSeatRepository
   ): Promise<MemberClassificationContext> {
     const users = await this.prisma.organizationUser.findMany({
       where: { organizationId, ...SEAT_HOLDING_MEMBER },
-      select: { userId: true, role: true },
+      select: { userId: true, role: true, billingOnly: true },
     });
 
     const customRoleMap = await this.getCustomRoleMap(organizationId);
@@ -405,7 +423,14 @@ export class PrismaOrganizationSeatRepository extends OrganizationSeatRepository
 
     const pendingInvites = await this.prisma.organizationInvite.findMany({
       where: { organizationId, ...seatHoldingInvitation() },
-      select: { id: true, expiration: true, role: true, teamAssignments: true, email: true },
+      select: {
+        id: true,
+        expiration: true,
+        role: true,
+        teamAssignments: true,
+        email: true,
+        billingOnly: true,
+      },
     });
 
     return {
@@ -418,6 +443,7 @@ export class PrismaOrganizationSeatRepository extends OrganizationSeatRepository
         role: i.role,
         email: i.email,
         teamAssignments: teamAssignmentsSchema.safeParse(i.teamAssignments).data ?? null,
+        billingOnly: i.billingOnly,
       })),
     };
   }

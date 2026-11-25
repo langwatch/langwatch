@@ -274,6 +274,15 @@ describe("langyUnattendedPermissions", () => {
   });
 });
 
+describe("A2A targets", () => {
+  /** They hold sealed upstream credentials, so Langy reads them and never registers one. */
+  it("grants gatewayA2aTargets:view and refuses gatewayA2aTargets:manage", () => {
+    expect(classifyForLangy("gatewayA2aTargets:view").disposition).toBe("granted");
+    expect(classifyForLangy("gatewayA2aTargets:manage").disposition).toBe("excluded");
+    expect(langyCandidatePermissions()).not.toContain("gatewayA2aTargets:manage");
+  });
+});
+
 describe("braiding", () => {
   /** ADR-201 §2: braiding is a person's decision, so an agent never braids. */
   it("refuses braids:manage and never mints it on Langy's key", () => {
