@@ -172,19 +172,8 @@ function findWeightedScore({
       return [{ score: mean, spread: Math.sqrt(variance) }];
     }
   }
-  return findBareScore({ question, answer });
-}
-
-/** A score with no distribution is a level position: named levels' index, else a range offset. */
-function findBareScore({
-  question,
-  answer,
-}: {
-  question: InstantEvalScoreQuestion;
-  answer: ClassifierAnswer;
-}): { score: number }[] {
-  if (typeof answer.score !== "number") return [];
-  return [{ score: question.levels ? answer.score : question.range.min + answer.score }];
+  // A bare score is a level position; named levels start at 0, so the offset holds for them too.
+  return typeof answer.score === "number" ? [{ score: question.range.min + answer.score }] : [];
 }
 
 /**

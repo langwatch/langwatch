@@ -42,7 +42,8 @@ const KINDS_TAKING_A_REASONING_EFFORT: readonly InstantEvalJudgeBackendKind[] = 
 
 /**
  * The gate's frozen questions, versioned by name, with how many levels each scores on: a
- * threshold keeps its meaning with its name.
+ * threshold keeps its meaning with its name. The level wording lives in the process package's
+ * instant-eval-judge-gate.rules.ts, whose unit test keeps the two counts equal.
  */
 export const INSTANT_EVAL_JUDGE_GATE_QUESTIONS = {
   difficulty_v1: { levelCount: 5 },
