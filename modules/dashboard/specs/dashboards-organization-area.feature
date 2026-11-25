@@ -50,6 +50,36 @@ Feature: Organization-wide Dashboards area
     # Evidence: one screenshot per address and sidebar above with the flag off, each paired
     # with the base commit's screenshot of the same address
 
+  @integration
+  Scenario: With the flag off, a board's title has no inline rename, as on main
+    Given "the organization's Dashboards area" is off for "Acme"
+    When I open a stored board in "Shop"
+    Then its title is drawn with no rename control
+    # Evidence: the rendered title with no button in it
+
+  @integration
+  Scenario: With the flag off, an Organization board keeps the Project chip, as on main
+    Given "the organization's Dashboards area" is off for "Acme"
+    When I open an Organization board in "Shop"
+    Then the header shows the Project chip "Project: Shop" and no "Data from" label
+    # Evidence: the chip's aria-label in the rendered header
+
+  @integration
+  Scenario: An Organization board in a project reads its data from a label, not a chip
+    Given "the organization's Dashboards area" is on for "Acme"
+    When I open an Organization board in "Shop"
+    Then the header shows "Data from Shop" and no Project chip
+    # Evidence: the label's aria-label in the rendered header
+
+  @integration
+  Scenario: With the flag off, a From LangWatch board is read-only, as on main
+    Given "the organization's Dashboards area" is off for "Acme"
+    And I may create dashboards in "Shop"
+    When I open "/shop/dashboards/curated/<id>"
+    Then the board shows its widgets with no "Add a widget", no "Use this template", no title or description edit, and no widget edit, drag or delete
+    And no copy-on-change dialog can open
+    # Evidence: the quoted tRPC calls, with no dashboards or dashboardWidgets write
+
   # ---- The Coding agents rename: page titles (draft AC4; S0) ----
   @integration @unimplemented
   Scenario: Every Coding agents page title says Coding agents
@@ -302,15 +332,16 @@ Feature: Organization-wide Dashboards area
     # Evidence: haven browser screenshot
 
   # ---- Data at org level vs project view (1211; D1) ----
-  # Next PR: "All projects" at the organization level (ADR-002, decision 9; D1).
-  @unit @integration @q1-all-projects @unimplemented
-  Scenario: An org-level board reads every project I may read
-    Given an Organization board whose widget stores no projects
-    When I open it at "/dashboards/<id>"
-    Then the widget's run asks for projects "all"
-    And {dashboard_context_projects:Array(String)} is bound to ["Ops", "Shop"] in stable order
-    And the chip reads "All projects", and the card line reads "Projects: All projects"
-    # Evidence: the run's params, and a screenshot of the chip and the card line
+  # D2: a Gateway or Governance board reads the organization; an LLM Ops board reads the project in view.
+  @unit @integration
+  Scenario: A Gateway or Governance board's widget reads every project I may read
+    Given an Organization board homed in Gateway or Governance, whose widget stores no projects
+    When I open it
+    Then the widget's run asks for projects "all", and its header names no project
+    And a widget that stores its own projects asks for those projects instead
+    And with release_dashboards_organization_area off, the run asks for no projects, the header keeps
+      the Project chip and an empty board offers its templates, as before
+    # Evidence: the run's params with the flag on and off, and a screenshot of each header
 
   # Next PR: "All projects" at the organization level (ADR-002, decision 9; D1).
   @unit @integration @q1-all-projects @unimplemented

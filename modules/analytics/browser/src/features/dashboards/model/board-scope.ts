@@ -203,3 +203,26 @@ export const BOARD_UNAVAILABLE = {
   title: "This dashboard is not available",
   body: "It was deleted, or the person who made it set its scope to Only me. If you need it, ask them to set it to Project.",
 } as const;
+
+/** The Project chip on an Organization board: whose data the board shows. */
+export const PROJECT_CHIP = {
+  name: "Project",
+  menuHint: "Whose data this dashboard shows. One project at a time.",
+  ownerTag: "owner",
+} as const;
+
+/** Under the Project menu: who can edit, kept apart from whose data is shown. */
+export function projectMenuNote({
+  owner,
+  isHere,
+  canOpenOwner,
+}: {
+  owner: string;
+  isHere: boolean;
+  canOpenOwner: boolean;
+}): string {
+  if (isHere) return `${owner} owns this dashboard, so it is edited here.`;
+  return canOpenOwner
+    ? `${owner} owns this dashboard. Choose it to edit the dashboard.`
+    : `${owner} owns this dashboard. You do not have access to that project.`;
+}

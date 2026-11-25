@@ -65,6 +65,7 @@ describe("given an Organization board opened under two different projects", () =
 });
 
 describe("given a Gateway or Governance board, which reads the organization (ADR-002, D2)", () => {
+  /** @scenario "A Gateway or Governance board's widget reads every project I may read" */
   it('runs a widget that names no projects over "all" the member may read', async () => {
     const run = await runUnder("proj-anchor", { readsEveryProject: true });
 

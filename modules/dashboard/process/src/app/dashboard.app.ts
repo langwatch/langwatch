@@ -34,6 +34,7 @@ import {
   type DashboardProject,
   type DashboardScope,
   type DashboardScopeImpact,
+  type DashboardScopeProjects,
   type DashboardStar,
   type StarredDashboard,
   type DashboardGraphCountScope,
@@ -239,7 +240,7 @@ export class DashboardModule implements DashboardApi {
           users: setup.dependencies.users,
         }),
         stars: DashboardStarService.create({ repository: boards, access }),
-        scopes: DashboardScopeService.create({ repository: boards, access, projects }),
+        scopes: DashboardScopeService.create({ repository: boards, access, projects, authz }),
         charts: SavedWorkbenchChartService.create({
           repository: setup.repositories.dashboards,
           policy: SavedWorkbenchChartPolicyService.create({ analytics }),
@@ -539,6 +540,16 @@ export class DashboardModule implements DashboardApi {
   }): Promise<DashboardScopeImpact> {
     await this.#requireDashboardsEnabled(input.projectId);
     return this.#scopes.getImpact(input);
+  }
+
+  /** The projects an Organization board opens under for this member. */
+  async listDashboardScopeProjects(input: {
+    projectId: string;
+    dashboardId: string;
+    viewer: DashboardViewer;
+  }): Promise<DashboardScopeProjects> {
+    await this.#requireDashboardsEnabled(input.projectId);
+    return this.#scopes.listProjects(input);
   }
 
   /** Whether each Flight Deck source ever recorded a row, as this member reads the project. */
