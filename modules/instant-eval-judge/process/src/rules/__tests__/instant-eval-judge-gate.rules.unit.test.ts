@@ -57,6 +57,21 @@ describe("instantEvalJudgeGateInputOf", () => {
   });
 
   /** @scenario "The gate reads a frozen framing of the case" */
+  it("shows a text of exactly 12,000 characters whole and cuts one of 12,001 to its two ends", () => {
+    const head = "a".repeat(6_000);
+    const tail = "b".repeat(6_000);
+    const framed = (text: string) =>
+      instantEvalJudgeGateInputOf({ job: "llm_judge", task: "t", text });
+
+    const whole = framed(head + tail);
+    expect(whole).toContain(`<text>\n${head}${tail}\n</text>`);
+    expect(whole).not.toContain("characters cut");
+
+    const cut = framed(`${head}X${tail}`);
+    expect(cut).toContain(`<text>\n${head}\n\n[... 1 characters cut ...]\n\n${tail}\n</text>`);
+  });
+
+  /** @scenario "The gate reads a frozen framing of the case" */
   it("names the job being judged", () => {
     const of = (job: "search" | "scenario_judge") =>
       sha256(

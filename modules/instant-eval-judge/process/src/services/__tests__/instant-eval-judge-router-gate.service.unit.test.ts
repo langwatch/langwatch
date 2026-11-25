@@ -92,6 +92,20 @@ const llmDown: InstantEvalLlmJudgeAnswer = {
   outputTokens: 0,
 };
 
+/** A wait that ends only once two callers are waiting on it, so it hangs for asks made in turn. */
+function bothArrived(): () => Promise<void> {
+  let arrived = 0;
+  let release!: () => void;
+  const both = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  return () => {
+    arrived += 1;
+    if (arrived === 2) release();
+    return both;
+  };
+}
+
 function harness({
   gate = rated(0),
   decisions = () => decided(0.9),
@@ -269,6 +283,35 @@ describe("InstantEvalJudgeRouterService, given a gated plan", () => {
       });
       expect(judgement.costNanoUsd).toBe(2 * GATE_COST + DECISIONS_COST + LLM_COST);
     });
+
+    /** @scenario "A gate rates each question of a call on its own" */
+    it("sends both gate asks, then both branches, side by side", async () => {
+      // Each fake answers only once both of its pair have arrived, so asking in turn hangs: the
+      // second gate send never starts, the first times out, and both branches would go hard;
+      // a branch awaited before the other started hangs past this test's timeout.
+      const gateBoth = bothArrived();
+      const branchesBoth = bothArrived();
+      const { classify } = harness({
+        gate: async (request) => {
+          await gateBoth();
+          return rated(request.text.includes("Task: is the user upset") ? 0.2 : 3.4)(request);
+        },
+        decisions: async (questions) => {
+          await branchesBoth();
+          return decided(0.9, questions[0]!.id);
+        },
+        llm: async () => {
+          await branchesBoth();
+          return llmSays(false);
+        },
+      });
+      const judgement = await classify([Q, Q2]);
+      expect(judgement.routing).toMatchObject({
+        answeredBy: { "decision-a": 1, "llm-b": 1 },
+        escalated: 0,
+        flags: ["gate:easy", "gate:hard"],
+      });
+    }, 1_000);
 
     /** @scenario "A gate rates each question of a call on its own" */
     it("reports the longest of the side-by-side waits, never their sum", async () => {
