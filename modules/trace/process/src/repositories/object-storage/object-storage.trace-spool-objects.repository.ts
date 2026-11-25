@@ -1,6 +1,7 @@
-import { Readable } from "node:stream";
+import type { Readable } from "node:stream";
 
 import type { ObjectStorage } from "@langwatch/process-stores";
+import { readableBody } from "@langwatch/process-stores/members";
 
 import {
   type TraceSpoolDestinationKind,
@@ -40,8 +41,7 @@ export class ObjectStorageTraceSpoolObjectsRepository extends TraceSpoolObjectsR
 
   async read(at: TraceSpoolObjectAddress): Promise<Readable> {
     const body = await this.objects.read(at);
-    // The member's own stream frees its socket however a reader stops; a wrapper would not.
-    return body instanceof Readable ? body : Readable.from(body);
+    return readableBody(body);
   }
 
   async remove(at: TraceSpoolObjectAddress): Promise<void> {

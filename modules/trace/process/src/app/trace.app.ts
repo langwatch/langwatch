@@ -78,6 +78,7 @@ import {
   type SharedTraceDto,
   type Span,
   type SpanAnalyticsFloor,
+  type TraceManagedPromptVersionFloor,
   type SpanDetail,
   type BraidActivity,
   type BraidAttributeKeys,
@@ -95,6 +96,7 @@ import {
   type TopicCountsResult,
   type Trace,
   type TraceIngestWaitInput,
+  type TraceSettleSettings,
   type TraceCanonicalisationService,
   type TraceExportDownload,
   type TraceExportDownloadInput,
@@ -218,6 +220,8 @@ import {
   type TraceAgentSeen,
   type TraceWithholding,
   traceWithholdingOf,
+  filtersReadSpanType,
+  UNKNOWN_SPAN_ANALYTICS_FLOOR,
 } from "@langwatch/trace-contract";
 import type { ConversationView } from "@langwatch/trace-contract/conversation";
 import type { z } from "zod";
@@ -233,6 +237,7 @@ import { TraceSummaryStore } from "../eventing/trace-summary.store.ts";
 import { EventingTraceTopicAssignment } from "../eventing/trace-topic-assignment.commands.ts";
 import type { TraceBraidReadsRepository } from "../features/braid/repositories/trace-braid-reads.repository.ts";
 import {
+  ownerAudienceNamed,
   selectedSpanOwnerOf,
   verifiedMarksOf,
 } from "../features/braid/rules/braided-span-owner.rules.ts";
@@ -299,8 +304,14 @@ import {
 import type {
   ResolveTraceSpansBatchFn,
   ResolveTraceSpansFn,
+  SpanAnalyticsFloorFor,
   TraceLegacyReadRepository,
 } from "../features/legacy/repositories/trace-legacy-read.repository.ts";
+import {
+  normaliseTraceLookupId,
+  traceIdLookupKinds,
+  type TraceByIdRead,
+} from "../features/legacy/rules/trace-id-lookup.rules.ts";
 import {
   type GenerateFilterConditionsResult,
   translateLegacyFilters,
@@ -315,8 +326,8 @@ import {
 } from "../features/legacy/rules/trace-legacy-search-body.rules.ts";
 import { LegacyFilterMatchingService } from "../features/legacy/services/legacy-filter-matching.service.ts";
 import { LegacyTraceMappingService } from "../features/legacy/services/legacy-trace-mapping.service.ts";
+import { AmbiguousTraceIdPrefixError } from "../features/legacy/services/trace-alternate-id.service.ts";
 import {
-  AmbiguousTraceIdPrefixError,
   TraceLegacyReadService,
   type BlobResolutionDeps,
 } from "../features/legacy/services/trace-legacy-read.service.ts";
@@ -356,6 +367,7 @@ import { TraceDrawerReadService } from "../features/read/services/trace-drawer-r
 import { TraceListService } from "../features/read/services/trace-list-read.service.ts";
 import { TraceLogRecordIOService } from "../features/read/services/trace-log-record-io.service.ts";
 import { LogRecordStorageService } from "../features/read/services/trace-log-record-read.service.ts";
+import { TraceOtherProjectLookupService } from "../features/read/services/trace-other-project-lookup.service.ts";
 import { TraceReadBoundsService } from "../features/read/services/trace-read-bounds.service.ts";
 import {
   TraceReadFullIoService,
@@ -424,6 +436,7 @@ import {
   TraceEvaluationOutcomesMigrationService,
 } from "../services/trace-evaluation-outcomes-migration.service.ts";
 import { TraceInstantEvalRunService } from "../services/trace-instant-eval-run.service.ts";
+import { TraceManagedPromptVersionFloorService } from "../services/trace-managed-prompt-version-floor.service.ts";
 import {
   TraceMetadataWriteService,
   type TraceSpanIngest,
@@ -815,6 +828,8 @@ export interface TraceAppDependencies {
   requestBounds: Pick<EntitlementApi, "requestBound">;
   /** The plan the merged read asks before honouring braids; below Enterprise they pause (§9). */
   braidPlans: Pick<EntitlementApi, "getActivePlan">;
+  /** The organisation's "Braids enabled" setting the merged read also asks; off pauses braids. */
+  braidSettings: Pick<AuthzApi, "getOrganizationPolicy">;
   /** Owner names, the viewer's standing on an owner and the read audit (ADR-201 §5, §8). */
   braidDirectory: TraceBraidDirectory;
   /** Prices braided spans without a cost of their own for the header. */
@@ -831,6 +846,8 @@ export interface TraceAppDependencies {
    * reaches it: absent members raise by name, never admit a caller.
    */
   ingestCredential?: TraceIngestCredentialService;
+  /** Where a by-id miss is looked for next: the organisation's other readable projects. */
+  otherProjectLookup?: TraceOtherProjectLookupService;
   /** The plan's monthly allowance both ingestion doors ask; absent, a test graph meters nothing. */
   ingestAllowance?: TraceIngestAllowanceService;
   /** Trace's fold of governance's billing fact; its pipeline folds, the OTLP door reads. */
@@ -939,6 +956,7 @@ type TraceReaderCompositionOptions = {
    */
   requestBounds: TraceAppDependencies["requestBounds"];
   braidPlans: TraceAppDependencies["braidPlans"];
+  braidSettings: TraceAppDependencies["braidSettings"];
   braidDirectory: TraceAppDependencies["braidDirectory"];
   /** The export door's rate window and in-flight slots, built by the app from its registry. */
   exportBounds: TraceAppDependencies["exportBounds"];
@@ -958,6 +976,8 @@ type TraceLegacyReadCompositionOptions = {
   blobResolutionDeps?: BlobResolutionDeps | undefined;
   /** The tenant's retention policy; absent, the span read floors at the platform default. */
   retentionResolver?: DataRetentionApi | undefined;
+  /** The floor a span type filter reads by, never throwing; absent, it reads stored_spans. */
+  spanAnalyticsFloor?: SpanAnalyticsFloorFor | undefined;
 };
 
 type TraceTreeCompositionOptions = {
@@ -1034,6 +1054,7 @@ export class TraceModule implements TraceApi, CollectorApp {
         ...(publicBaseUrl === undefined ? {} : { publicBaseUrl }),
         requestBounds: dependencies.plans,
         braidPlans: dependencies.plans,
+        braidSettings: dependencies.authz,
         braidDirectory: { authz: dependencies.authz, projects: dependencies.projects },
         ingestAllowance: TraceIngestAllowanceService.create({ entitlement: dependencies.plans }),
         exportBounds: TraceExportBoundsService.create({
@@ -1062,6 +1083,9 @@ export class TraceModule implements TraceApi, CollectorApp {
     app.#usageCount = setup.repositories.usageCount;
     app.#agentTraffic = setup.repositories.agentTraffic;
     app.#spanAnalyticsFloor = setup.repositories.spanAnalyticsFloor;
+    app.#managedPromptVersionFloor = TraceManagedPromptVersionFloorService.create({
+      ledger: setup.repositories.managedPromptVersionLedger,
+    });
     app.#preconditionSamples = TracePreconditionSampleService.create({
       traces: app,
       evaluators: setup.dependencies.evaluators,
@@ -1194,6 +1218,16 @@ export class TraceModule implements TraceApi, CollectorApp {
         traceCanonicalisation: options.canonicalisation,
         retentionResolver: options.dataRetention,
         blobResolutionDeps,
+        spanAnalyticsFloor: (filters) =>
+          filtersReadSpanType(filters)
+            ? options.repositories.spanAnalyticsFloor
+                .findReplayStep()
+                .then(spanAnalyticsFloorOf)
+                .catch((error: unknown) => {
+                  logger.warn({ error }, "span_analytics floor unreadable; reading stored_spans");
+                  return UNKNOWN_SPAN_ANALYTICS_FLOOR;
+                })
+            : Promise.resolve(UNKNOWN_SPAN_ANALYTICS_FLOOR),
       }),
       editOverlay,
       logRecordStorage: logRecords,
@@ -1205,6 +1239,8 @@ export class TraceModule implements TraceApi, CollectorApp {
       topicNames: options.repositories.topicNames,
       facets: CLICKHOUSE_FACET_CATALOG,
       discoverUpdates: options.tenantBroadcast,
+      lightFloor: async () =>
+        spanAnalyticsFloorOf(await options.repositories.spanAnalyticsFloor.findReplayStep()),
     });
     const protections = TraceViewerProtectionService.create(options.protections);
     // Own-only: the records and viewer reads carry no door proof (ruling TRACE-PROOF-SHARE).
@@ -1338,6 +1374,7 @@ export class TraceModule implements TraceApi, CollectorApp {
         foldReadAuthorizer({ authz: options.protections.authz, codePath })(params),
       requestBounds: options.requestBounds,
       braidPlans: options.braidPlans,
+      braidSettings: options.braidSettings,
       braidDirectory: options.braidDirectory,
       exportBounds: options.exportBounds,
       shareReadLimiter: options.shareReadLimiter,
@@ -1350,6 +1387,11 @@ export class TraceModule implements TraceApi, CollectorApp {
             }),
           }
         : {}),
+      otherProjectLookup: TraceOtherProjectLookupService.create({
+        projects: options.projects,
+        authz: options.protections.authz,
+        existence: options.repositories.existence,
+      }),
       ...(options.ingestAllowance ? { ingestAllowance: options.ingestAllowance } : {}),
       ingestSourceBilling,
       publicBaseUrl: options.publicBaseUrl,
@@ -1437,6 +1479,7 @@ export class TraceModule implements TraceApi, CollectorApp {
   #usageCount: TraceUsageCountRepository | null = null;
   #agentTraffic: TraceAgentTrafficRepository | null = null;
   #spanAnalyticsFloor: SpanAnalyticsFloorRepository | null = null;
+  #managedPromptVersionFloor = TraceManagedPromptVersionFloorService.create({ ledger: null });
   #preconditionSamples: TracePreconditionSampleService | null = null;
 
   readPreconditionSampleTraces(
@@ -1546,7 +1589,11 @@ export class TraceModule implements TraceApi, CollectorApp {
     });
     this.#exportProgress = TraceExportProgressService.create({ updates: this.#tenantUpdates });
     const { authorizeRead } = dependencies;
-    this.#braidPause = TraceBraidPauseService.create({ plans: dependencies.braidPlans });
+    this.#braidPause = TraceBraidPauseService.create({
+      plans: dependencies.braidPlans,
+      settings: dependencies.braidSettings,
+      logger,
+    });
     this.#braidDetail = TraceBraidDetailService.create({ directory: dependencies.braidDirectory });
     // The one holder of the span store and the braid reads: each returns an owner's span, or
     // totals and counts of them, audited (ADR-201 §8).
@@ -1733,8 +1780,8 @@ export class TraceModule implements TraceApi, CollectorApp {
     return this.#exportDownload.download(input);
   }
 
-  resolveIngestWaitTimeout(input: TraceIngestWaitInput): Promise<number> {
-    return this.#getTree().resolveIngestWaitTimeout(input);
+  resolveTraceSettleSettings(input: TraceIngestWaitInput): Promise<TraceSettleSettings> {
+    return this.#getTree().resolveTraceSettleSettings(input);
   }
 
   formatSpansDigest(input: { spans: Span[] }): Promise<string> {
@@ -1776,6 +1823,10 @@ export class TraceModule implements TraceApi, CollectorApp {
   async getSpanAnalyticsFloor(): Promise<SpanAnalyticsFloor> {
     const records = this.#spanAnalyticsFloor ? await this.#spanAnalyticsFloor.findReplayStep() : [];
     return spanAnalyticsFloorOf(records);
+  }
+
+  getManagedPromptVersionFloor(): Promise<TraceManagedPromptVersionFloor> {
+    return this.#managedPromptVersionFloor.getFloor();
   }
 
   async renderSpanMessages(input: {
@@ -1895,6 +1946,10 @@ export class TraceModule implements TraceApi, CollectorApp {
     });
   }
   async findTrace(input: TraceFindTraceInput): Promise<Trace | undefined> {
+    return this.#findTraceById(input);
+  }
+
+  async #findTraceById(input: TraceFindTraceInput): Promise<TraceByIdRead | undefined> {
     return this.#contentReader.findTrace({
       ...input,
       authorization: await this.#authorizeContentRead({
@@ -2038,10 +2093,17 @@ export class TraceModule implements TraceApi, CollectorApp {
     const selected = selectedSpanOwnerOf({ authorization, ownerProjectId: input.ownerProjectId });
     const braidOwner = selected.kind === "braid" ? selected.ownerProjectId : undefined;
     // A braided span: its owner's policy, the viewer's standing on the owner (ADR-201 §5).
-    const protections = await this.resolveViewerProtections({
+    const resolved = await this.resolveViewerProtections({
       projectId: braidOwner ?? input.projectId,
       userId: input.viewerUserId,
     });
+    const protections =
+      braidOwner === undefined
+        ? resolved
+        : ownerAudienceNamed({
+            protections: resolved,
+            ownerName: await this.#braidDetail.ownerName({ ownerProjectId: braidOwner }),
+          });
     await this.assertTraceNotWithheld({
       authorization,
       traceId: input.traceId,
@@ -2490,6 +2552,7 @@ export class TraceModule implements TraceApi, CollectorApp {
   extractLogRecordIO(input: LogRecordReceivedEventData): {
     input: string | null;
     output: string | null;
+    outputDeclared: boolean;
     truncated: boolean;
   } {
     const io = TraceLogRecordIOService.create(this.#dependencies.traces.canonicalisation).extractIO(
@@ -2502,6 +2565,7 @@ export class TraceModule implements TraceApi, CollectorApp {
     return {
       input: previewInput,
       output: previewOutput,
+      outputDeclared: io.outputDeclared === true,
       truncated: previewInput !== io.input || previewOutput !== io.output,
     };
   }
@@ -2828,6 +2892,7 @@ export class TraceModule implements TraceApi, CollectorApp {
     filters: Readonly<Record<string, unknown>>;
     window?: { startDate?: number; endDate?: number };
     fenced?: boolean;
+    spanAnalyticsFloor?: SpanAnalyticsFloor | null;
   }): GenerateFilterConditionsResult {
     return translateLegacyFilters(input);
   }
@@ -3130,6 +3195,10 @@ export class TraceModule implements TraceApi, CollectorApp {
 
   readTraceEventsForViewer(input: TraceDrawerReadInput): Promise<DerivedTraceEvent[]> {
     return this.#drawer.traceEvents(input);
+  }
+
+  readLangwatchSignalsForViewer(input: TraceDrawerReadInput): Promise<SpanLangwatchSignals[]> {
+    return this.#drawer.langwatchSignals(input);
   }
 
   /** One trace's summary fold, read from the named member when the header names one. */
@@ -3693,6 +3762,7 @@ export class TraceModule implements TraceApi, CollectorApp {
     matches: readonly TraceAttributeMatch[];
     valueKey: string;
     values: readonly string[];
+    valuePrefixes?: readonly string[];
     sinceMs: number;
   }): Promise<{ value: string; count: number }[]> {
     const { projectId, ...query } = input;
@@ -3932,9 +4002,57 @@ export class TraceModule implements TraceApi, CollectorApp {
     await TraceMetadataWriteService.create({ ingest }).updateTraceMetadata(input);
   }
 
-  /** Port of main's REST transcript route: the key's protections, the trace, its transcript. */
-  /** `GET /api/traces/:traceId` for an API key: the trace, its evaluations and its address. */
+  /**
+   * `GET /api/traces/:traceId` for an API key. A miss is looked for only in the organisation's
+   * other projects the key itself may read and served from there; otherwise trace_not_found.
+   * Spec: trace-lookup-by-id.feature.
+   */
   async getTraceByIdForApiKey(input: {
+    projectId: string;
+    traceId: string;
+    format: "digest" | "json";
+    projectSlug: string;
+    principal: PrincipalRef | null;
+  }): Promise<Record<string, unknown>> {
+    try {
+      return await this.#renderTraceForApiKey(input);
+    } catch (error) {
+      if (!(error instanceof TraceNotFoundError)) throw error;
+      const normalisedId = normaliseTraceLookupId(input.traceId);
+      const lookup = this.#dependencies.otherProjectLookup
+        ? await this.#dependencies.otherProjectLookup.locate({
+            projectId: input.projectId,
+            traceId: normalisedId,
+            principal: input.principal,
+          })
+        : { searchedProjectSlugs: [] };
+      const located = lookup.located;
+      if (located) {
+        const served = await this.#renderTraceForApiKey({
+          ...input,
+          projectId: located.project.id,
+          projectSlug: located.project.slug,
+        });
+        return {
+          ...served,
+          project: {
+            id: located.project.id,
+            slug: located.project.slug,
+            name: located.project.name,
+          },
+        };
+      }
+      throw new TraceNotFoundError(input.traceId, {
+        searched: {
+          normalisedId,
+          projectSlugs: [input.projectSlug, ...lookup.searchedProjectSlugs],
+          as: traceIdLookupKinds(normalisedId),
+        },
+      });
+    }
+  }
+
+  async #renderTraceForApiKey(input: {
     projectId: string;
     traceId: string;
     format: "digest" | "json";
@@ -3958,17 +4076,34 @@ export class TraceModule implements TraceApi, CollectorApp {
       projectSlug: input.projectSlug,
       path: tracePath({ traceId: resolvedTraceId, occurredAtMs: trace.timestamps?.started_at }),
     });
+    const notes = {
+      ...(trace.lookup
+        ? {
+            requested_id: trace.lookup.requestedId,
+            resolved_from: trace.lookup.resolvedFrom,
+          }
+        : {}),
+      ...(trace.stillIngesting ? { still_ingesting: true } : {}),
+    };
+    const { lookup: _lookup, stillIngesting: _stillIngesting, ...plain } = trace;
     if (input.format === "digest") {
       return {
         trace_id: resolvedTraceId,
-        formatted_trace: await this.formatSpansDigest({ spans: trace.spans ?? [] }),
-        timestamps: trace.timestamps,
-        metadata: trace.metadata,
+        formatted_trace: await this.formatSpansDigest({ spans: plain.spans ?? [] }),
+        timestamps: plain.timestamps,
+        metadata: plain.metadata,
         evaluations,
         platformUrl,
+        ...notes,
       };
     }
-    return { ...trace, evaluations, ascii_tree: generateAsciiTree(trace.spans), platformUrl };
+    return {
+      ...plain,
+      evaluations,
+      ascii_tree: generateAsciiTree(plain.spans),
+      platformUrl,
+      ...notes,
+    };
   }
 
   async readTraceTranscript(input: {
@@ -3994,10 +4129,10 @@ export class TraceModule implements TraceApi, CollectorApp {
     traceId: string;
     protections: Protections;
     withEditOverlay?: boolean;
-  }): Promise<Trace> {
-    let trace: Trace | undefined;
+  }): Promise<TraceByIdRead> {
+    let trace: TraceByIdRead | undefined;
     try {
-      trace = await this.findTrace(input);
+      trace = await this.#findTraceById(input);
     } catch (err) {
       if (err instanceof AmbiguousTraceIdPrefixError) {
         throw new TraceIdAmbiguousError(input.traceId, err.candidateTraceIds);

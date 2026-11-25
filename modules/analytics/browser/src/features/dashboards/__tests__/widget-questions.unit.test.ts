@@ -52,11 +52,10 @@ describe("the picker's questions", () => {
         period: PERIOD,
       });
 
-      expect(request.draft?.startsWith(first!.prompt)).toBe(true);
-      expect(request.draft).toContain(
-        "Dashboard period: 2026-09-01T00:00:00Z to 2026-09-08T00:00:00Z",
+      expect(request.draft).toBe(first!.prompt);
+      expect(request.context[0]?.ref).toContain(
+        "period: 2026-09-01T00:00:00Z to 2026-09-08T00:00:00Z, one bucket per 1 day",
       );
-      expect(request.draft).toContain("one bucket per 1 day");
       expect(request.context[0]?.ref).toContain('dashboard "Weekly review" (id board-1)');
       expect(request.context[0]?.ref).toContain("widgets: Status");
     });

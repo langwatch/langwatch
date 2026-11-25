@@ -1,0 +1,409 @@
+/** Spec: modules/notification/specs/customer-io-transactional.feature */
+import type { SendEmailCommand } from "@langwatch/notification-contract";
+import type * as TestHarness from "@langwatch/test-harness";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+const captured = vi.hoisted(() => ({
+  lines: [] as { level: number; msg?: string; [field: string]: unknown }[],
+}));
+
+vi.mock("@langwatch/observability", async (importOriginal) => {
+  const harness = await vi.importActual<typeof TestHarness>("@langwatch/test-harness");
+  const { logger, lines } = harness.createTestLogger();
+  captured.lines = lines;
+  return { ...(await importOriginal<object>()), createLogger: () => logger };
+});
+
+import {
+  type EmailContent,
+  EmailDelivery,
+  type MailGatewaySettings,
+} from "../../channels/email-delivery.channel.ts";
+import {
+  type CustomerIoMailRefusal,
+  MemoryCustomerIoMailChannel,
+} from "../../channels/memory/memory.customer-io-mail.channel.ts";
+import { MailDeliveryService } from "../mail-delivery.service.ts";
+
+const WARN_LEVEL = 40;
+const ERROR_LEVEL = 50;
+const DEFAULT_FROM = "LangWatch <contact@langwatch.test>";
+
+const settings: MailGatewaySettings = {
+  provider: undefined,
+  ses: { enabled: false },
+  sendgrid: {},
+  smtp: {},
+  resend: {},
+};
+
+/**
+ * The install's own mailer, recorded rather than delivered; told to fail, it refuses all sends,
+ * or only those to the recipients in `failuresFor`.
+ */
+class OwnMailer extends EmailDelivery {
+  readonly sent: EmailContent[] = [];
+  readonly failuresFor = new Map<string, Error>();
+  failure: Error | undefined;
+
+  defaultFrom(): string {
+    return DEFAULT_FROM;
+  }
+
+  async send(content: EmailContent): Promise<void> {
+    const recipientFailure =
+      typeof content.to === "string" ? this.failuresFor.get(content.to) : undefined;
+    const failure = this.failure ?? recipientFailure;
+    if (failure) throw failure;
+    this.sent.push(content);
+  }
+}
+
+function compose() {
+  const customerIo = MemoryCustomerIoMailChannel.create();
+  const ownMailer = new OwnMailer();
+  const mail = MailDeliveryService.create({
+    settings: () => Promise.resolve(settings),
+    delivery: ownMailer,
+    customerIo,
+  });
+  return { customerIo, ownMailer, mail };
+}
+
+const usageLimit = (): SendEmailCommand => ({
+  to: "ada@acme.test",
+  subject: "You reached your plan's usage limit",
+  html: "<p>Upgrade to keep tracing</p>",
+  template: "usage-limit",
+});
+
+const warnings = () => captured.lines.filter((line) => line.level === WARN_LEVEL);
+
+beforeEach(() => {
+  captured.lines.length = 0;
+});
+
+describe("given Customer.io refuses a usage-limit send", () => {
+  const refusals: [string, CustomerIoMailRefusal][] = [
+    ["a 500", { outcome: "refused", reason: "status", status: 500 }],
+    ["a 400", { outcome: "refused", reason: "status", status: 400 }],
+    ["a 429", { outcome: "refused", reason: "status", status: 429 }],
+    ["a timeout", { outcome: "refused", reason: "timeout" }],
+    ["a network error", { outcome: "refused", reason: "network" }],
+  ];
+
+  describe.each(refusals)("when it answers with %s", (_name, refusal) => {
+    /** @scenario "A failed usage-limit send still reaches the person" */
+    it("sends it once through the own mailer, unchanged, and warns naming the template", async () => {
+      const { customerIo, ownMailer, mail } = compose();
+      customerIo.refuse(refusal);
+
+      await mail.sendEmail(usageLimit());
+
+      expect(customerIo.sent).toHaveLength(1);
+      expect(ownMailer.sent).toEqual([
+        {
+          to: "ada@acme.test",
+          subject: "You reached your plan's usage limit",
+          html: "<p>Upgrade to keep tracing</p>",
+        },
+      ]);
+      expect(warnings()).toHaveLength(1);
+      expect(warnings()[0]).toMatchObject({
+        template: "usage-limit",
+        reason: refusal.reason,
+        ...(refusal.status === undefined ? {} : { status: refusal.status }),
+      });
+    });
+  });
+
+  describe("when the call to nurturing itself throws", () => {
+    /** @scenario "A failed usage-limit send still reaches the person" */
+    it("still sends it once through the own mailer", async () => {
+      const { ownMailer } = compose();
+      const mail = MailDeliveryService.create({
+        settings: () => Promise.resolve(settings),
+        delivery: ownMailer,
+        customerIo: {
+          send: () => Promise.reject(new Error("nurturing is not connected yet")),
+        },
+      });
+
+      await mail.sendEmail(usageLimit());
+
+      expect(ownMailer.sent).toHaveLength(1);
+      expect(warnings()[0]).toMatchObject({ template: "usage-limit", reason: "unexpected" });
+    });
+  });
+});
+
+describe("given a routed message to two recipients", () => {
+  describe("when Customer.io refuses the send to one of them", () => {
+    /** @scenario "Only the recipient Customer.io refused falls back" */
+    it("has the own mailer send to that recipient only", async () => {
+      const { customerIo, ownMailer, mail } = compose();
+      customerIo.refuse({ outcome: "refused", reason: "status", status: 503 }, "grace@acme.test");
+
+      await mail.sendEmail({
+        to: ["ada@acme.test", "grace@acme.test"],
+        subject: "Usage limit reached",
+        html: "<p>limit</p>",
+        template: "usage-limit",
+        idempotencyKey: "usage:org-1",
+      });
+
+      expect(customerIo.sent.map((email) => email.to)).toEqual([
+        "ada@acme.test",
+        "grace@acme.test",
+      ]);
+      expect(ownMailer.sent).toEqual([
+        {
+          to: "grace@acme.test",
+          subject: "Usage limit reached",
+          html: "<p>limit</p>",
+          idempotencyKey: "usage:org-1:grace@acme.test",
+        },
+      ]);
+    });
+  });
+});
+
+describe("given a routed message to one recipient with an idempotency key", () => {
+  describe("when Customer.io refuses the send", () => {
+    /** @scenario "A single-recipient fallback keeps the caller's key" */
+    it("has the own mailer send with the caller's key unchanged", async () => {
+      const { customerIo, ownMailer, mail } = compose();
+      customerIo.refuse({ outcome: "refused", reason: "status", status: 503 }, "ada@acme.test");
+
+      await mail.sendEmail({
+        to: "ada@acme.test",
+        subject: "Usage limit reached",
+        html: "<p>limit</p>",
+        template: "usage-limit",
+        idempotencyKey: "usage:org-1",
+      });
+
+      expect(ownMailer.sent).toEqual([
+        {
+          to: "ada@acme.test",
+          subject: "Usage limit reached",
+          html: "<p>limit</p>",
+          idempotencyKey: "usage:org-1",
+        },
+      ]);
+    });
+  });
+});
+
+describe("given nurturing answers off, as it does without the App API key", () => {
+  describe("when a routed message to two recipients is sent", () => {
+    /** @scenario "Without IS_SAAS or the key nothing reaches Customer.io" */
+    it("sends the original envelope once, with both recipients and the caller's key", async () => {
+      const { customerIo, ownMailer, mail } = compose();
+      customerIo.turnOff();
+
+      await mail.sendEmail({
+        to: ["ada@acme.test", "grace@acme.test"],
+        undisclosedRecipients: ["linus@acme.test"],
+        subject: "Usage limit reached",
+        html: "<p>limit</p>",
+        template: "usage-limit",
+        idempotencyKey: "usage:org-1",
+      });
+
+      expect(ownMailer.sent).toEqual([
+        {
+          to: ["ada@acme.test", "grace@acme.test"],
+          bcc: ["linus@acme.test"],
+          subject: "Usage limit reached",
+          html: "<p>limit</p>",
+          idempotencyKey: "usage:org-1",
+        },
+      ]);
+      expect(warnings()).toEqual([]);
+    });
+  });
+});
+
+describe("given a replyless routed message", () => {
+  describe("when it is sent through Customer.io", () => {
+    /** @scenario "A replyless routed message reaches the real recipient and answers to no-reply" */
+    it("hands Customer.io the real recipient, answering to the no-reply address", async () => {
+      const { customerIo, ownMailer, mail } = compose();
+
+      await mail.sendEmail({ ...usageLimit(), replyless: { tag: "81d9d46cce00" } });
+
+      expect(customerIo.sent).toEqual([
+        expect.objectContaining({
+          identifiers: { email: "ada@acme.test" },
+          to: "ada@acme.test",
+          replyTo: "LangWatch Triggers <no-reply+81d9d46cce00@langwatch.test>",
+        }),
+      ]);
+      expect(ownMailer.sent).toEqual([]);
+    });
+  });
+});
+
+describe.each([
+  ["trigger-digest", "its unsubscribe token and trace previews"],
+  ["budget-increase-request", "the requester's own words"],
+  ["invite-re-request", "the invited person's address"],
+  ["seat-request", "the asking person's address"],
+])("given a %s message, which carries %s", (template) => {
+  describe("when it is sent", () => {
+    /** @scenario "A message carrying a token, customer content or a third party's address stays on the own mailer" */
+    it("sends it through the own mailer and nothing to Customer.io", async () => {
+      const { customerIo, ownMailer, mail } = compose();
+
+      await mail.sendEmail({ ...usageLimit(), template });
+
+      expect(customerIo.sent).toEqual([]);
+      expect(ownMailer.sent).toEqual([
+        expect.objectContaining({
+          to: "ada@acme.test",
+          subject: "You reached your plan's usage limit",
+          html: "<p>Upgrade to keep tracing</p>",
+        }),
+      ]);
+    });
+  });
+});
+
+describe("given Customer.io and the own mailer both refuse a routed send", () => {
+  describe("when the message is sent", () => {
+    /** @scenario "When both Customer.io and the own mailer fail the send fails with the own mailer's error" */
+    it("rejects with the own mailer's error", async () => {
+      const { customerIo, ownMailer, mail } = compose();
+      customerIo.refuse({ outcome: "refused", reason: "status", status: 500 });
+      const refusal = new Error("SMTP relay refused the message");
+      ownMailer.failure = refusal;
+
+      await expect(mail.sendEmail(usageLimit())).rejects.toBe(refusal);
+    });
+  });
+});
+
+describe("given Customer.io refuses both recipients of a routed send", () => {
+  describe("when the own mailer fails for the first recipient only", () => {
+    /** @scenario "One recipient's failed fallback does not cost the next recipient the message" */
+    it("still sends to the second, logs the failure and rejects with the first's error", async () => {
+      const { customerIo, ownMailer, mail } = compose();
+      customerIo.refuse({ outcome: "refused", reason: "status", status: 500 });
+      const refusal = new TypeError("SMTP relay refused ada");
+      ownMailer.failuresFor.set("ada@acme.test", refusal);
+
+      await expect(
+        mail.sendEmail({ ...usageLimit(), to: ["ada@acme.test", "grace@acme.test"] }),
+      ).rejects.toBe(refusal);
+
+      expect(ownMailer.sent.map((content) => content.to)).toEqual(["grace@acme.test"]);
+      expect(captured.lines.filter((line) => line.level === ERROR_LEVEL)).toEqual([
+        expect.objectContaining({
+          errorName: "TypeError",
+          msg: "The own mailer failed to send an email",
+        }),
+      ]);
+    });
+  });
+
+  describe("when the own mailer fails for both recipients", () => {
+    /** @scenario "Every failed fallback is logged and the first one is raised" */
+    it("logs one error per failure and rejects with the first", async () => {
+      const { customerIo, ownMailer, mail } = compose();
+      customerIo.refuse({ outcome: "refused", reason: "status", status: 500 });
+      const first = new TypeError("SMTP relay refused ada");
+      ownMailer.failuresFor.set("ada@acme.test", first);
+      ownMailer.failuresFor.set("grace@acme.test", new RangeError("SMTP relay refused grace"));
+
+      await expect(
+        mail.sendEmail({ ...usageLimit(), to: ["ada@acme.test", "grace@acme.test"] }),
+      ).rejects.toBe(first);
+
+      expect(
+        captured.lines.filter((line) => line.level === ERROR_LEVEL).map((line) => line.errorName),
+      ).toEqual(["TypeError", "RangeError"]);
+    });
+  });
+});
+
+describe("given a routed message with a hidden recipient", () => {
+  describe("when it is sent through Customer.io", () => {
+    /** @scenario "The reply-to and hidden recipients reach Customer.io" */
+    it("gives every recipient its own request carrying the reply-to", async () => {
+      const { customerIo, mail } = compose();
+
+      await mail.sendEmail({
+        to: "ada@acme.test",
+        undisclosedRecipients: ["grace@acme.test"],
+        replyless: { tag: "tag" },
+        subject: "You reached your plan's usage limit",
+        html: "<p>Upgrade to keep tracing</p>",
+        template: "usage-limit",
+      });
+
+      const shared = {
+        transactionalMessageId: "usage-limit",
+        from: DEFAULT_FROM,
+        subject: "You reached your plan's usage limit",
+        body: "<p>Upgrade to keep tracing</p>",
+        replyTo: "LangWatch Triggers <no-reply+tag@langwatch.test>",
+      };
+      expect(customerIo.sent).toEqual([
+        { ...shared, to: "ada@acme.test", identifiers: { email: "ada@acme.test" } },
+        { ...shared, to: "grace@acme.test", identifiers: { email: "grace@acme.test" } },
+      ]);
+    });
+  });
+});
+
+describe("given a routed message carrying a per-recipient unsubscribe token", () => {
+  describe("when it is sent", () => {
+    /** @scenario "Every other message stays on the own mailer on Cloud" */
+    it("leaves it to the own mailer", async () => {
+      const { customerIo, ownMailer, mail } = compose();
+
+      await mail.sendEmail({
+        ...usageLimit(),
+        unsubscribe: { url: "https://app.langwatch.test/api/unsubscribe?token=t" },
+      });
+
+      expect(customerIo.sent).toEqual([]);
+      expect(ownMailer.sent).toHaveLength(1);
+    });
+  });
+});
+
+describe("given a routed message with an attachment", () => {
+  describe("when it is sent", () => {
+    /** @scenario "Every other message stays on the own mailer on Cloud" */
+    it("leaves it to the own mailer", async () => {
+      const { customerIo, ownMailer, mail } = compose();
+
+      await mail.sendEmail({
+        ...usageLimit(),
+        attachments: [{ filename: "usage.csv", content: "a,b", contentType: "text/csv" }],
+      });
+
+      expect(customerIo.sent).toEqual([]);
+      expect(ownMailer.sent).toHaveLength(1);
+    });
+  });
+});
+
+describe("given a send through Customer.io that succeeds and one that falls back", () => {
+  describe("when the log lines are read", () => {
+    /** @scenario "No log line carries the key or a recipient address" */
+    it("carries neither recipient address", async () => {
+      const { customerIo, mail } = compose();
+      await mail.sendEmail(usageLimit());
+      customerIo.refuse({ outcome: "refused", reason: "network" });
+      await mail.sendEmail({ ...usageLimit(), to: "Grace <grace@acme.test>" });
+
+      const logged = JSON.stringify(captured.lines);
+      expect(captured.lines.length).toBeGreaterThan(0);
+      expect(logged).not.toContain("ada@acme.test");
+      expect(logged).not.toContain("grace@acme.test");
+    });
+  });
+});

@@ -169,6 +169,8 @@ export const AuditLogApi = moduleApi<AuditLogApi>()("audit-log");
 const recordAuditLogCommandSchemaDefinition = z.object({
   ...auditLogEntrySchema.shape,
   idempotencyKey: z.string().min(1).optional(),
+  /** The action's moment in epoch ms, inside the key's second: a keyed row is dated with it. */
+  occurredAt: z.number().int().nonnegative().optional(),
 });
 export interface RecordAuditLogCommandSchema extends Named<
   typeof recordAuditLogCommandSchemaDefinition

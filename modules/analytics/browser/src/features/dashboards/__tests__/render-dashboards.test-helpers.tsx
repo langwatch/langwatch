@@ -5,11 +5,14 @@
  */
 
 import type { ChartFrameDashboardContext } from "@langwatch/analytics-contract/chart-frame-protocol";
-import { UiAnalytics, type UiAnalyticsEvent } from "@langwatch/browser-host/analytics";
 import { UiHostServicesContextProvider } from "@langwatch/browser-host/capabilities";
-import { createUiHostServicesFromHost } from "@langwatch/browser-host/testing";
+import {
+  createUiHostServicesFromHost,
+  RecordingUiAnalytics,
+} from "@langwatch/browser-host/testing";
 import { createUiQueryClient } from "@langwatch/browser/query-client";
 import { answeringUiTransport, type UiProcedureAnswer } from "@langwatch/browser/testing-transport";
+import { DEFAULT_DASHBOARD_HOME_PRODUCT } from "@langwatch/dashboard-contract";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render } from "@testing-library/react";
 import type { ReactElement } from "react";
@@ -17,10 +20,11 @@ import type { ReactElement } from "react";
 import { analyticsApi } from "../../../behavior/analytics-api.ts";
 import { AnalyticsTestHarness, type StubAnalyticsHost } from "../../../testing.tsx";
 
-/** What a board row carries when the project in view ("proj-1") owns it, at the scope Project. */
+/** What a board row carries when the project in view ("proj-1") owns it: LLM Ops, at Project. */
 export const HOME_BOARD = {
   projectId: "proj-1",
   scope: "PROJECT",
+  homeProduct: DEFAULT_DASHBOARD_HOME_PRODUCT,
   organizationId: null,
   ownerProject: null,
 } as const;
@@ -49,20 +53,7 @@ export function renderDashboards({
   );
 }
 
-/** The analytics destination the shell installs, recording instead of sending. */
-export class RecordingUiAnalytics extends UiAnalytics {
-  readonly events: UiAnalyticsEvent[] = [];
-
-  track(event: UiAnalyticsEvent): void {
-    this.events.push(event);
-  }
-
-  identify(): void {}
-
-  group(): void {}
-
-  reset(): void {}
-}
+export { RecordingUiAnalytics };
 
 /** Puts a recording destination above the element, through the real host-service seam. */
 export function withAnalytics(element: ReactElement, analytics: RecordingUiAnalytics) {

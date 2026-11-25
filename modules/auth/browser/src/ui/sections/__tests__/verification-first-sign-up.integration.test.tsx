@@ -569,7 +569,7 @@ describe("given the sign-up screen", () => {
       expect(await screen.findByTestId("signed-in-handoff")).toHaveTextContent(
         "You're signed in as sam@acme.com. Taking you to LangWatch.",
       );
-      expect(hardRedirectMock).toHaveBeenCalledWith("/invite/accept");
+      await waitFor(() => expect(hardRedirectMock).toHaveBeenCalledWith("/invite/accept"));
       expect(screen.queryByTestId("account-ready")).toBeNull();
     });
 
@@ -806,7 +806,9 @@ describe("given the sign-up screen", () => {
       );
       expect(screen.queryByText("That confirmation link no longer works")).toBeNull();
       expect(screen.queryByRole("button", { name: /send a new link/i })).toBeNull();
-      expect(hardRedirectMock).toHaveBeenCalledWith("/invite/accept?inviteCode=abc");
+      await waitFor(() =>
+        expect(hardRedirectMock).toHaveBeenCalledWith("/invite/accept?inviteCode=abc"),
+      );
     });
   });
 

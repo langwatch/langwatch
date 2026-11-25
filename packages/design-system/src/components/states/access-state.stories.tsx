@@ -38,6 +38,17 @@ export const Inset: Story = {
     ),
   ],
 };
+/** A page's only content, with an illustration under the words: on the centre axis. */
+export const Centered: Story = {
+  args: {
+    centered: true,
+    children: (
+      <Card.Root width="full" maxWidth="2xl" height="160px" variant="subtle">
+        <Card.Body>Illustration</Card.Body>
+      </Card.Root>
+    ),
+  },
+};
 export const Permission: Story = {
   args: {
     kind: "permission",

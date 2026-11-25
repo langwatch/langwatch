@@ -23,13 +23,14 @@ function moduleWith(customerIo: CustomerIoChannel | undefined): Promise<Nurturin
     config: {
       customerIoRegion: void 0,
       customerIoBaseUrl: void 0,
+      customerIoAppApiBaseUrl: void 0,
       posthogKey: void 0,
       posthogHost: void 0,
     },
     resources: { own: () => void 0, ownService: () => void 0 },
     secrets: new ScopedSecrets(async (_handle, build) => build(undefined)),
     repositories: MemoryNurturingRepositories.create(),
-    channels: { customerIo, posthog: void 0 },
+    channels: { customerIo, customerIoTransactional: void 0, posthog: void 0 },
   });
 }
 

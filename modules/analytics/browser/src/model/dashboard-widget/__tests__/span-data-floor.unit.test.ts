@@ -82,6 +82,7 @@ describe("readsSpanMetrics", () => {
   it.each([
     ["SELECT 1 FROM span_metrics", true],
     ["SELECT 1 FROM analytics.span_metrics", true],
+    ["SELECT 1 FROM langwatch.span_metrics", true],
     ["SELECT 1 FROM t JOIN span_metrics AS s ON s.TraceId = t.TraceId", true],
     ["SELECT 1 FROM spans", false],
     ["SELECT 1 FROM span_metrics_v2", false],

@@ -3,9 +3,11 @@
 import {
   type GovernanceOcsfExportRow,
   OCSF_PUSHED_SOURCE_TYPE,
+  SECURITY_LAKE_SOURCE_TYPE,
 } from "@langwatch/enterprise-governance-contract";
 import { createLogger } from "@langwatch/observability";
 import { toDate } from "@langwatch/time";
+import { z } from "zod";
 
 import { type GovernanceSeatReportRow, seatReportsOf } from "../../rules/ocsf-seat-report.rules.ts";
 import {
@@ -19,6 +21,10 @@ import type {
   GovernanceOcsfEventWriter,
   GovernanceClickHouseTenantResolver,
 } from "../governance.repositories.ts";
+import type {
+  SecurityLakeCallerRepository,
+  SecurityLakeCallerRow,
+} from "../security-lake-caller.repository.ts";
 
 /**
  * ClickHouseOcsfEventsRepository — read and write side of the
@@ -37,6 +43,27 @@ import type {
  * Migration: 00023_create_governance_ocsf_events.sql
  */
 const TABLE_NAME = "governance_ocsf_events" as const;
+
+/** One Security Lake caller row; ClickHouse sends its UInt64 columns as strings. */
+const securityLakeCallerRowSchema = z
+  .object({
+    Principal: z.string(),
+    Models: z.array(z.string()),
+    Regions: z.array(z.string()),
+    LastCallMs: z.coerce.number().finite(),
+    CallCount: z.coerce.number().finite(),
+  })
+  .transform((row): SecurityLakeCallerRow => ({
+    principalArn: row.Principal,
+    models: row.Models,
+    regions: row.Regions,
+    lastCallMs: row.LastCallMs,
+    callCount: row.CallCount,
+  }));
+
+const securityLakeCallerRowsSchema = z.array(securityLakeCallerRowSchema);
+
+const securityLakeEventCountRowsSchema = z.array(z.object({ Events: z.coerce.number().finite() }));
 
 /**
  * Rows per INSERT. A run's kept events arrive as one array and each carries
@@ -175,7 +202,8 @@ export class ClickHouseOcsfEventsRepository
     GovernanceOcsfEventWriter,
     OcsfEventBatchWriter,
     OcsfSeatReportReader,
-    OcsfIngestOrderedReader
+    OcsfIngestOrderedReader,
+    SecurityLakeCallerRepository
 {
   private constructor(private readonly resolveClient: GovernanceClickHouseTenantResolver) {}
 
@@ -412,7 +440,7 @@ export class ClickHouseOcsfEventsRepository
         FROM ${TABLE_NAME}
         WHERE TenantId = {tenantId:String}
           AND ActionName = {actionName:String}
-          AND SourceType != {pushedSourceType:String}
+          AND SourceType NOT IN ({pushedSourceType:String}, {securityLakeSourceType:String})
         GROUP BY SourceId, TargetName
         ORDER BY SourceId, TargetName
       `,
@@ -420,6 +448,7 @@ export class ClickHouseOcsfEventsRepository
         tenantId: input.tenantId,
         actionName: input.actionName,
         pushedSourceType: OCSF_PUSHED_SOURCE_TYPE,
+        securityLakeSourceType: SECURITY_LAKE_SOURCE_TYPE,
       },
       format: "JSONEachRow",
     });
@@ -438,5 +467,73 @@ export class ClickHouseOcsfEventsRepository
         rawOcsfJson: String(row.LatestRawOcsfJson ?? ""),
       }),
     );
+  }
+
+  /** Security Lake callers grouped by role ARN (the session issuer), else the user uid. */
+  async findSecurityLakeCallers(input: {
+    tenantId: string;
+    sinceMs: number;
+    limit: number;
+  }): Promise<SecurityLakeCallerRow[]> {
+    const client = await this.resolveClient(input.tenantId);
+    const result = await client.query({
+      query: `
+        SELECT
+          Principal,
+          arrayFilter(x -> x != '', groupUniqArray(16)(TargetName)) AS Models,
+          arrayFilter(x -> x != '', groupUniqArray(16)(Region))     AS Regions,
+          max(toUnixTimestamp64Milli(EventTime))                     AS LastCallMs,
+          uniqExact(EventId)                                         AS CallCount
+        FROM (
+          SELECT
+            EventId,
+            EventTime,
+            TargetName,
+            if(
+              JSONExtractString(RawOcsfJson, 'actor', 'session', 'issuer') != '',
+              JSONExtractString(RawOcsfJson, 'actor', 'session', 'issuer'),
+              JSONExtractString(RawOcsfJson, 'actor', 'user', 'uid')
+            ) AS Principal,
+            JSONExtractString(RawOcsfJson, 'cloud', 'region') AS Region
+          FROM ${TABLE_NAME}
+          WHERE TenantId = {tenantId:String}
+            AND SourceType = {sourceType:String}
+            AND EventTime >= fromUnixTimestamp64Milli({sinceMs:UInt64})
+        )
+        WHERE Principal != ''
+        GROUP BY Principal
+        ORDER BY LastCallMs DESC
+        LIMIT {limit:UInt32}
+      `,
+      query_params: {
+        tenantId: input.tenantId,
+        sourceType: SECURITY_LAKE_SOURCE_TYPE,
+        sinceMs: input.sinceMs,
+        limit: input.limit,
+      },
+      format: "JSONEachRow",
+    });
+    return securityLakeCallerRowsSchema.parse(await result.json());
+  }
+
+  async countSecurityLakeEvents(input: { tenantId: string; sourceId: string }): Promise<number> {
+    const client = await this.resolveClient(input.tenantId);
+    const result = await client.query({
+      query: `
+        SELECT uniqExact(EventId) AS Events
+        FROM ${TABLE_NAME}
+        WHERE TenantId = {tenantId:String}
+          AND SourceType = {sourceType:String}
+          AND SourceId = {sourceId:String}
+      `,
+      query_params: {
+        tenantId: input.tenantId,
+        sourceType: SECURITY_LAKE_SOURCE_TYPE,
+        sourceId: input.sourceId,
+      },
+      format: "JSONEachRow",
+    });
+    const [row] = securityLakeEventCountRowsSchema.parse(await result.json());
+    return row?.Events ?? 0;
   }
 }

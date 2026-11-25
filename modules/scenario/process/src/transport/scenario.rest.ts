@@ -70,6 +70,8 @@ function toScenarioResponse(scenario: Scenario): {
   parameters: ScenarioParameterDefinition[];
   simulatorModel: string | null;
   judgeModel: string | null;
+  traceQuietPeriodMs: number | null;
+  traceWaitTimeoutMs: number | null;
   maxTurns: number | null;
   minTurns: number | null;
   testSuiteId: string | null;
@@ -84,6 +86,8 @@ function toScenarioResponse(scenario: Scenario): {
     parameters: parseScenarioParameterDefinitions(scenario.parameters),
     simulatorModel: scenario.simulatorModel,
     judgeModel: scenario.judgeModel,
+    traceQuietPeriodMs: scenario.traceQuietPeriodMs ?? null,
+    traceWaitTimeoutMs: scenario.traceWaitTimeoutMs ?? null,
     maxTurns: scenario.maxTurns,
     minTurns: scenario.minTurns,
     testSuiteId: scenario.testSuiteId,
@@ -205,6 +209,12 @@ export function createScenarioRest(): Readonly<{
             ...(body.parameters !== undefined && { parameters: body.parameters }),
             ...(body.simulatorModel !== undefined && { simulatorModel: body.simulatorModel }),
             ...(body.judgeModel !== undefined && { judgeModel: body.judgeModel }),
+            ...(body.traceQuietPeriodMs !== undefined && {
+              traceQuietPeriodMs: body.traceQuietPeriodMs,
+            }),
+            ...(body.traceWaitTimeoutMs !== undefined && {
+              traceWaitTimeoutMs: body.traceWaitTimeoutMs,
+            }),
             ...(body.maxTurns !== undefined && { maxTurns: body.maxTurns }),
             ...(body.minTurns !== undefined && { minTurns: body.minTurns }),
             ...(body.testSuiteId !== undefined && { testSuiteId: body.testSuiteId }),

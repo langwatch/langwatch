@@ -14,6 +14,8 @@ import {
   PII_REDACTION_NANO_USD_PER_CHARACTER,
 } from "@langwatch/data-privacy-contract/pii-redaction-spend";
 
+import type { PrivacyLicence } from "./data-privacy-host.ts";
+
 /** The two levels the organization picker offers. */
 export type OrganizationPiiLevel = "essential" | "strict";
 
@@ -43,21 +45,69 @@ export const PII_REDACTION_MODEL_PRICE_UNIT = "per 1M characters excl. VAT, pay 
 
 export const STRICT_BILLING_NOTE =
   "Pay as you go, no quota or plan. Every span the model answers is billed by the characters sent, even when it finds nothing. Spans that fall back to the rule-based detector are free. Essential stays included.";
-export const STRICT_FREE_NOTE = "Strict has no charge for your organization.";
+const STRICT_FREE_NOTE = "Strict has no charge for your organization.";
+const STRICT_LICENSED_NOTE =
+  "Strict is included with your Enterprise license, with no usage price.";
+
+/** Why Strict is included: the organization's free list on Cloud, the license self-hosted. */
+export function includedFor({ licensed }: { licensed: boolean }): string {
+  return licensed ? "with your Enterprise license" : "for your organization";
+}
+
+export function strictFreeNote({ licensed }: { licensed: boolean }): string {
+  return licensed ? STRICT_LICENSED_NOTE : STRICT_FREE_NOTE;
+}
 export const STRICT_FALLBACK_NOTE = `If the model is unavailable or a span's text is over ${PII_REDACTION_MODEL_MAX_BATCH_CHARACTERS.toLocaleString("en-US")} characters in total, that span is redacted by our rule-based detector (Presidio) instead. If that detector fails, the text can be sent to Google Cloud DLP.`;
-export const STRICT_RULE_BASED_NOTE =
-  "Strict here uses the rule-based detector. The LangWatch PII Redaction Model is available on LangWatch Cloud.";
+const STRICT_RULE_BASED = "Strict here uses the rule-based detector.";
+
+/** Self-hosted Strict without the model: why, and what to do. Never names LangWatch Cloud. */
+export const STRICT_RULE_BASED_NOTES = {
+  "turn-on": `${STRICT_RULE_BASED} Your Enterprise license includes the ${PII_REDACTION_MODEL_NAME}: ask whoever runs your deployment to turn it on.`,
+  licence: STRICT_RULE_BASED,
+} as const;
+export type StrictRuleBasedNote = keyof typeof STRICT_RULE_BASED_NOTES;
+
 export const STRICT_BILLED_NOTE =
   "Strict is billed from the next trace. Projects or teams with their own Strict rule keep it when the organization moves to Essential.";
 
 /**
- * What the page offers for Strict: the model on Cloud with the flag (free on the free list), the
- * rule-based detector on a self-hosted deployment, or null for today's page.
+ * What the page offers for Strict: the model (free on the free list, or with the licence
+ * self-hosted), the rule-based detector with a note, or null for today's page.
  */
 export type PiiRedactionModelOffer =
-  | { kind: "model"; free: boolean }
-  | { kind: "rule-based" }
+  | { kind: "model"; free: boolean; licensed?: boolean }
+  | { kind: "rule-based"; note: Exclude<StrictRuleBasedNote, "licence"> }
+  /** `activate`: this reader may activate a license, so the advert links there. */
+  | { kind: "rule-based"; note: "licence"; activate: boolean }
   | null;
+
+/**
+ * The Strict offer: on Cloud the flag gates the model and the free list prices it. Self-hosted it
+ * comes with the Enterprise license, never priced: licensed with the flag, the model; licensed
+ * without it, ask for it; unlicensed, the advert; a plan unanswered or unreadable, nothing.
+ */
+export function piiRedactionModelOfferOf({
+  isSaaS,
+  modelFlag,
+  freeFlag,
+  licence,
+  mayManageLicence,
+}: {
+  isSaaS: boolean;
+  /** `undefined` while the flags are not answered yet: no offer then, so nothing flashes. */
+  modelFlag: boolean | undefined;
+  freeFlag: boolean;
+  licence: PrivacyLicence;
+  mayManageLicence: boolean;
+}): PiiRedactionModelOffer {
+  if (isSaaS) return modelFlag === true ? { kind: "model", free: freeFlag } : null;
+  if (licence === "loading" || licence === "unknown" || modelFlag === undefined) return null;
+  if (licence === "none")
+    return { kind: "rule-based", note: "licence", activate: mayManageLicence };
+  return modelFlag
+    ? { kind: "model", free: true, licensed: true }
+    : { kind: "rule-based", note: "turn-on" };
+}
 
 /** The second thought a level change asks for, or null when it needs none. */
 type LevelChangeConfirmation = {

@@ -4,6 +4,7 @@ import { memoryObjectStorage } from "@langwatch/process-stores";
 import {
   StoredObjectNotFoundError,
   type StoredObjectDeliveryCapability,
+  type StoredObjectFileRow,
   type StoredObjectOwnerResolver,
   type StoredObjectStorageDestination,
 } from "@langwatch/stored-object-contract";
@@ -108,6 +109,10 @@ export class MemoryStoredObjectStorage extends StoredObjectBytesRepository {
   async uploadsThroughProcess(): Promise<boolean> {
     return this.signed === "through-process";
   }
+
+  async signCheckupUpload(): Promise<void> {
+    await this.signUpload();
+  }
 }
 
 /** Seals under the process's random key, as the memory tier does. */
@@ -150,13 +155,20 @@ export class FixedStoredObjectDelivery extends StoredObjectDelivery {
 export class MemoryStoredObjectFiles implements StoredObjectFileReader {
   head: StoredObjectProbe = { status: "not_found" };
   read: StoredObjectFileStreamRead | null = null;
+  /** How many reads opened the object's bytes. */
+  opened = 0;
 
   async headById(): Promise<StoredObjectProbe> {
     return this.head;
   }
 
+  async findRowById(): Promise<StoredObjectFileRow | null> {
+    return this.read?.row ?? null;
+  }
+
   async getById(): Promise<StoredObjectFileStreamRead> {
     if (!this.read) throw new StoredObjectNotFoundError();
+    this.opened += 1;
     return this.read;
   }
 }

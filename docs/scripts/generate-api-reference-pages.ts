@@ -346,6 +346,13 @@ const ENDPOINT_GROUPS: EndpointGroup[] = [
       "Read every AI agent in your organization with its endpoints, model, instructions, tools and owner, as JSON or as an ARD v0.91 manifest, and follow its changes through the change feed. Needs an organization API key.",
   },
   {
+    name: "Agent Kill Switch",
+    dirName: "governance-kill-switch",
+    pathPrefixes: ["/api/governance/agents", "/api/governance/agent-stops"],
+    overviewDescription:
+      "Stop a registry agent on the targets of its stop plan: Databricks serving endpoints, Amazon Bedrock agent aliases and gateway virtual keys. Set each agent's stop plan, request a stop, approve or deny it, read every target's outcome, retry a failed stop and restore the agent. Needs an organization API key on an Enterprise plan with the agent registry. Reads need the governance:view permission and changes need governance:manage.",
+  },
+  {
     name: "Coding Agents",
     dirName: "coding-agents",
     pathPrefixes: ["/api/v1/coding-agent", "/api/coding-agent"],
@@ -527,6 +534,19 @@ const ENDPOINT_GROUPS: EndpointGroup[] = [
       "GET /api/v1/governance/ocsf/traces",
       "GET /api/v1/governance/ocsf/audit",
       "POST /api/v1/governance/ocsf/ingest",
+    ],
+  },
+  {
+    name: "Security Lake Sources",
+    dirName: "governance-security-lake",
+    pathPrefixes: ["/api/governance/security-lake"],
+    overviewDescription:
+      "Add an AWS Security Lake subscriber as a source, test its queue and read its health. LangWatch reads the subscriber queue on the source's schedule and stores the AI activity it finds as OCSF events.",
+    endpointOrder: [
+      "POST /api/v1/governance/security-lake/sources",
+      "PATCH /api/v1/governance/security-lake/sources/{sourceId}",
+      "POST /api/v1/governance/security-lake/sources/{sourceId}/test",
+      "GET /api/v1/governance/security-lake/sources/{sourceId}/health",
     ],
   },
   {

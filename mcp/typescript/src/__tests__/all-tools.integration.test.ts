@@ -1751,6 +1751,41 @@ describe("All MCP tools integration", () => {
       });
     });
 
+    describe("when an update names inputs, outputs and parameters", () => {
+      /** @scenario Changing inputs, outputs and parameters through platform_update_prompt */
+      it("sends those fields unchanged in the update request", async () => {
+        const { handleUpdatePrompt } = await import("../tools/update-prompt.ts");
+        const fields = {
+          inputs: [
+            { identifier: "question", type: "str" },
+            { identifier: "language", type: "str" },
+          ],
+          outputs: [
+            {
+              identifier: "answer",
+              type: "json_schema",
+              json_schema: { type: "object", properties: { answer: { type: "string" } } },
+            },
+          ],
+          parameters: { search_iterations: 5 },
+          temperature: 0.2,
+          maxTokens: 512,
+        };
+        await handleUpdatePrompt({
+          idOrHandle: "greeting-bot",
+          commitMessage: "Add a language variable",
+          ...fields,
+        });
+
+        const req = lastRequests["PUT /api/v1/prompts/greeting-bot"];
+        expect(req).toBeDefined();
+        expect(JSON.parse(req!.body)).toEqual({
+          commitMessage: "Add a language variable",
+          ...fields,
+        });
+      });
+    });
+
     describe("when an update omits tags", () => {
       /** @scenario Tag-to-version mapping stays unchanged when an update omits tags */
       it("does not send a tags field in the update request", async () => {

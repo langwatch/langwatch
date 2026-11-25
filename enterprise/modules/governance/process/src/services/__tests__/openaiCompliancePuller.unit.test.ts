@@ -34,6 +34,9 @@ const objects: GovernanceObjectStore = {
     if (!object) throw new Error(`stub: missing ${key}`);
     return object.body;
   },
+  async readBytes(input) {
+    return new TextEncoder().encode(await objects.readText(input));
+  },
 };
 
 const PERSON_ID = "u_123";
@@ -66,7 +69,13 @@ async function pullOneLine() {
   ];
   const puller = OpenAiComplianceReferencePullerService.create({ objects });
   const config = puller.validateConfig(ADMIN_INPUT);
-  const result = await puller.runOnce({ cursor: null, credentials: {} }, config);
+  const result = await puller.runOnce(
+    {
+      cursor: null,
+      credentials: { aws_access_key_id: "access", aws_secret_access_key: "secret" },
+    },
+    config,
+  );
   // A precondition of every test below, not an assertion of any of them: a
   // line that failed to parse would make each test fail on a missing event.
   if (result.errorCount !== 0 || result.events.length !== 1) {

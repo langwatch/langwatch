@@ -72,6 +72,41 @@ const CODEX_AUTH_FAILURE_COPY: Partial<Record<string, { title: string; descripti
   },
 };
 
+/**
+ * Whether a server remediation tip is for a person. A tip that points at a `meta` field is written
+ * for an API caller, who can read that field; a person never sees `meta` (ADR-045).
+ */
+export function isTipForPeople(tip: string): boolean {
+  return !/\bmeta\./.test(tip);
+}
+
+/** The tips for people that add something the description didn't already say. */
+export function supplementalTips({
+  tips,
+  description,
+}: {
+  tips: readonly string[];
+  description: string;
+}): string[] {
+  const forPeople = tips.filter(isTipForPeople);
+  const target = normaliseProse(description);
+  if (!target) return forPeople;
+
+  return forPeople.filter((tip) => {
+    const candidate = normaliseProse(tip);
+    if (!candidate) return false;
+    return !target.includes(candidate);
+  });
+}
+
+/** Words only: two sentences that say the same thing must compare equal. */
+function normaliseProse(text: string): string {
+  return text
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
 /** Reads a string out of `meta` without trusting it. */
 const str = (error: HandledErrorShape, key: string, fallback: string): string => {
   const value = error.meta[key];
@@ -427,12 +462,16 @@ const presentations = {
   trace_not_found: {
     title: "Trace not found",
     describe: () =>
-      "It may have been deleted, or it may still be arriving. Traces take a few seconds to appear.",
+      "No project you can read holds this id yet. If it was just sent, it may still be arriving: try again in a few seconds. Otherwise it may have passed the retention window.",
   },
   trace_attribute_values_withheld: {
     title: "Attribute values withheld",
     describe: () =>
       "This project hides captured input or output from you, or an attribute policy restricts this key to an audience you are not in. Facet a named field instead, such as model, status or evaluator, or call the facets endpoint with no field to see what this project has.",
+  },
+  scenario_run_has_many_traces: {
+    title: "That is a scenario run id",
+    describe: () => "The run produced several traces. Pick one of the listed trace ids to open it.",
   },
   trace_withheld_over_plan: {
     title: "Trace held until your plan is sorted",
@@ -499,7 +538,8 @@ const presentations = {
     title: "Unknown filter field",
     describe: (error) => {
       const field = str(error, "field", "");
-      return field ? `There's no field called "${field}".` : "";
+      const hint = str(error, "hint", "");
+      return field ? [`There's no field called "${field}".`, hint].filter(Boolean).join(" ") : "";
     },
   },
   filter_value_refused: {
@@ -726,6 +766,10 @@ const presentations = {
     title: "Dashboard not found",
     describe: () => "It may have been deleted. Reload to see the current list.",
   },
+  dashboard_home_needs_org_scope: {
+    title: "Only an LLM Ops dashboard can be shared with a project",
+    describe: () => "Share it with everyone in the organization, or keep it to yourself.",
+  },
   dashboard_read_only_here: {
     title: "This dashboard is read-only here",
     describe: () =>
@@ -886,7 +930,12 @@ const presentations = {
   braids_not_enabled: {
     title: "Braids aren't switched on here",
     describe: () =>
-      "This organisation can't manage braids yet. Braids it already has keep showing their spans.",
+      "This organisation can't manage braids yet. Removing a braid and revoking a signing key still work.",
+  },
+  braids_turned_off: {
+    title: "Braids is turned off",
+    describe: () =>
+      "An organisation admin can turn Braids on in organisation settings. Until then, existing braids are paused and kept.",
   },
   broadcaster_not_active: {
     title: "Live updates disconnected",
@@ -2749,6 +2798,9 @@ const presentations = {
     // is a message they can forward as-is.
     title: "You don't have access to this",
     describe: (error) => {
+      if (str(error, "denialReason", "") === "braids-kept-to-organisation-admins") {
+        return "Your organisation keeps braids to its admins, so only they can create, change or remove them. Ask an organisation admin.";
+      }
       const permission = str(error, "permission", "");
       return permission
         ? `Ask an organization admin to grant you "${permission}" on this project.`
@@ -3235,6 +3287,18 @@ const presentations = {
   billing_customer_email_required: {
     title: "Add a billing email first",
     describe: () => "Billing needs an email address on the account before this can go through.",
+  },
+  billing_only_keeps_billing: {
+    // Billing is the whole of a Billing-only membership (ADR-205); without it nothing is taken away.
+    title: "A Billing-only member always pays",
+    describe: () =>
+      "Billing only is the whole of their membership. To stop them paying, remove them from the organization, or move them to a seat role first.",
+  },
+  billing_only_no_team_access: {
+    // The Billing-only person reaches the plan and invoices, never a project (ADR-205).
+    title: "A Billing-only member joins no team",
+    describe: () =>
+      "Billing only covers the plan, the card and the invoices. To give them a team, invite them with a seat role, or change a current member's role to a seat role first.",
   },
   billing_plan_price_missing: {
     // fault: platform. The plan the customer picked has no price set up on our
@@ -3813,6 +3877,63 @@ const presentations = {
     title: "Agent not found in the registry",
     describe: () => "No agent in this organisation's registry has that id.",
   },
+  agent_stop_already_open: {
+    title: "This agent already has an open stop",
+    describe: () =>
+      "Approve, deny or restore the stop that is open before you request another one.",
+  },
+  agent_stop_not_found: {
+    title: "Stop not found",
+    describe: () => "No kill switch stop in this organisation has that id.",
+  },
+  agent_stop_not_pending: {
+    title: "This stop is no longer waiting for an approval",
+    describe: () => "Someone already approved or denied it. Reload to see its status.",
+  },
+  agent_stop_not_restorable: {
+    title: "This stop cannot be restored",
+    describe: () => "Only a quarantined stop, or one that failed, can be restored.",
+  },
+  agent_stop_not_retryable: {
+    title: "This stop cannot be retried",
+    describe: () => "Only a stop that is quarantined, or one that failed, can be stopped again.",
+  },
+  agent_stop_plan_changed: {
+    title: "The stop plan changed",
+    describe: () => "Someone edited this agent's stop plan. Check the targets again, then confirm.",
+  },
+  agent_stop_plan_conflict: {
+    title: "Someone else saved this stop plan",
+    describe: () => "Your changes were not saved. Reload the plan, then make your changes again.",
+  },
+  agent_stop_plan_empty: {
+    title: "This agent has no stop plan",
+    describe: () =>
+      "Add a serving endpoint, a Bedrock agent alias or a virtual key to its stop plan first.",
+  },
+  agent_stop_self_approval: {
+    title: "The credential that requested a stop cannot approve it",
+    describe: () => "Ask another person or API key with governance:manage to approve it.",
+  },
+  agent_stop_target_invalid: {
+    title: "A stop plan target is not valid",
+    describe: () =>
+      "Each target must name a Databricks source, an AWS connection or a virtual key of this organisation.",
+  },
+  agent_stop_target_not_found: {
+    title: "A stop plan target does not exist",
+    describe: () =>
+      "The Bedrock agent alias or serving endpoint was not found. Check its region, ids or name.",
+  },
+  governance_aws_connection_in_use: {
+    title: "This AWS connection is still in use",
+    describe: () =>
+      "A stop plan target or a stop that is not restored yet signs with it. Remove those targets or restore the stop first.",
+  },
+  governance_aws_connection_not_found: {
+    title: "AWS connection not found",
+    describe: () => "No AWS connection in this organisation has that id.",
+  },
   anomaly_rule_not_found: {
     title: "Anomaly rule not found",
     describe: () => "It may have been deleted. Reload to see the current list.",
@@ -3834,6 +3955,11 @@ const presentations = {
     title: "The judgements couldn't be made right now",
     describe: () => "The query ran, but nothing could be judged. Try again in a moment.",
   },
+  instant_eval_decision_model_key_invalid: {
+    title: "The Instant Evals model's key couldn't be used",
+    describe: () =>
+      "Your model provider refused the key for this project's Instant Evals model, or it has none. Check it in Settings > Model Providers.",
+  },
   instant_eval_estimate_unavailable: {
     title: "We couldn't work out the size of this run",
     describe: () => "The estimate failed on our side. Try again, or start the run without one.",
@@ -3848,6 +3974,17 @@ const presentations = {
       const allowance = typeof budget === "number" ? `$${budget.toFixed(2)}` : "the free";
       return `Organizations without a paid plan can judge up to ${allowance} of text in total. Upgrade your plan under Settings, Plan & billing to keep running Instant Evals.`;
     },
+  },
+  instant_eval_gateway_budget_exceeded: {
+    title: "A gateway budget stopped Instant Evals",
+    // The budget is one the customer set to block, so the way out is theirs:
+    // raise or remove it. The scope says whose budget it is.
+    titleFor: (error) => {
+      const owner = budgetMetaWord(error, "scope", BUDGET_SCOPE_OWNERS);
+      return owner ? `${owner} gateway budget stopped Instant Evals` : undefined;
+    },
+    describe: () =>
+      "The budget is set to block once it is reached, and Instant Evals count against it. Raise or remove it under AI Gateway, Budgets to keep judging.",
   },
   instant_eval_memory_judge_in_production: {
     title: "This installation's Instant Evals judge is for development only",
@@ -4319,6 +4456,11 @@ const presentations = {
     title: "Too many files opened at once",
     describe: () => "Wait a moment, then open the file again.",
   },
+  stored_object_write_conflict: {
+    // Every row write lost to another writer; nothing failed, so a retry settles it.
+    title: "The file changed while we were updating it",
+    describe: () => "Try again in a moment.",
+  },
   dataset_not_ready: {
     // A state, not a breakage — the rows are still being prepared. Waiting is
     // a real action, so this is not the "we've been notified" shape.
@@ -4419,6 +4561,20 @@ const presentations = {
     title: "Storage for this workspace isn't set up",
     describe: () =>
       "Nothing was saved. An administrator has to set up storage before rows can be added.",
+  },
+  storage_credentials_refused: {
+    // fault: platform. The deployment's own storage key or identity was turned
+    // away; only an administrator can change it, and the tips say where.
+    title: "Storage turned this workspace's credentials away",
+    describe: () =>
+      "Nothing was read or saved. An administrator has to check the storage credentials this deployment uses.",
+  },
+  storage_permission_denied: {
+    // fault: platform. The identity signs in but holds no data access; the
+    // role to grant is in the tips, for the administrator.
+    title: "Storage won't let this workspace read or save files",
+    describe: () =>
+      "Nothing was read or saved. An administrator has to give this deployment's storage identity access to its files.",
   },
   export_failed: {
     // fault: platform. The export ran on our side and did not finish, so the
@@ -4585,6 +4741,47 @@ const presentations = {
     title: "That name is taken",
     describe: () =>
       "Another annotation queue in this project already uses it. Pick a different name.",
+  },
+
+  // ---- weekly digest emails ----
+  digest_member_not_found: {
+    title: "Member not found",
+    describe: () =>
+      "Only active members of this organization can get a test digest. Pick someone else.",
+  },
+  digest_link_invalid: {
+    title: "This link isn't valid",
+    describe: () => "It may have expired or been changed. Use the link from the latest email.",
+  },
+  digest_nothing_to_send: {
+    title: "Nothing to send this week",
+    describe: () =>
+      "This member's weekly email has no new items to show this week, so nothing was sent.",
+  },
+  digest_links_unavailable: {
+    title: "Unsubscribe links are unavailable",
+    describe: () => "This is on our side. Try again later.",
+  },
+  digest_operator_address_missing: {
+    title: "Your account has no email address",
+    describe: () => "Add an email address to your account, then send the test again.",
+  },
+  digest_organization_not_enrolled: {
+    title: "Organization not enrolled",
+    describe: () => "Enrol this organization in the digest before sending a test.",
+  },
+  digest_member_unsubscribed: {
+    title: "Member opted out",
+    describe: () => "This member opted out of the digest, so no test is sent. Pick someone else.",
+  },
+  digest_public_base_url_missing: {
+    title: "Public address not configured",
+    describe: () => "This is on our side. Try again later.",
+  },
+  digest_unsubscribe_rate_limited: {
+    // Read on the digest's unsubscribe page, by someone with no session and nothing to fix.
+    title: "Too many attempts just now",
+    describe: () => "Wait a minute, then open the link again.",
   },
 
   // ---- automations & notifications ----
@@ -5340,6 +5537,14 @@ const presentations = {
     title: "That model call didn't go through",
     describe: () => "Try again in a moment, or pick a different model.",
   },
+  ai_content_filtered: {
+    // fault: provider. The model settings work; the provider's content filter
+    // refused this text, so pointing at the model configuration would send the
+    // reader to fix something that is not broken.
+    title: "The provider's content filter blocked this text",
+    describe: () =>
+      "Your model provider refused this text under its content policy. Other text still works. To allow it, relax the content filter on your provider's deployment.",
+  },
   ai_query_provider_error: {
     // fault: provider. Same shape as above, but the reader is mid-search, so
     // rephrasing is the first thing worth trying.
@@ -5756,7 +5961,7 @@ const presentations = {
   checkup_lwql_not_provisionable: {
     title: "LWQL functions cannot be provisioned",
     describe: () =>
-      "Give the ClickHouse user permission to create functions, or set a user defined path.",
+      "Set user_defined_zookeeper_path on every ClickHouse replica so functions live in Keeper.",
   },
   checkup_model_provider_refused: {
     title: "A model provider refused the test call",
@@ -5984,6 +6189,19 @@ const presentations = {
   voice_session_invalid: {
     title: "The session is invalid or has expired",
     describe: () => "Start the call again.",
+  },
+  gateway_a2a_target_headers_need_replacing: {
+    title: "Upstream headers need replacing",
+    describe: () =>
+      "The upstream URL now points at a different origin, so its saved headers were not kept. Enter the headers for the new upstream, or save it with none.",
+  },
+  gateway_a2a_target_name_taken: {
+    title: "Agent target name taken",
+    describe: () => "Another agent target in this scope uses that name. Pick a different name.",
+  },
+  gateway_a2a_target_not_found: {
+    title: "Agent target not found",
+    describe: () => "It may have been deleted. Reload to see the current list.",
   },
   gateway_cache_rule_not_found: {
     title: "Cache rule not found",
