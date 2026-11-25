@@ -121,34 +121,6 @@ const JUDGED_UNIT_TRACES = `SELECT ${TRACE_KEY} AS trace,
     WHERE ${JUDGED_IN_BOTH_PERIODS})
   GROUP BY trace`;
 
-/**
- * Each judged trace once, as {@link JUDGED_UNIT_TRACES}, with the managed prompt version
- * streamed in beside the verdicts, so no second join (analytics ADR-004); a trace with only a
- * managed-version row is no judged trace and is left out.
- */
-const JUDGED_VERSION_TRACES = `SELECT t.trace AS trace,
-    argMin(t.unit, t.at) AS unit,
-    argMin(t.version, t.at) AS version,
-    min(t.at) AS at,
-    any(t.managed) AS managed,
-    countIf(t.judged = 1 AND t.passed = 1) AS passed,
-    countIf(t.judged = 1) AS judged
-  FROM (
-    SELECT ${TRACE_KEY} AS trace, ${METRICS_UNIT} AS unit, MetadataPromptVersion AS version,
-      TraceOccurredAt AS at,
-      CAST(NULL AS Nullable(String)) AS managed, Passed AS passed, 1 AS judged
-    FROM trace_evaluation_metrics
-    WHERE ${JUDGED_IN_BOTH_PERIODS}
-    UNION ALL
-    SELECT ${TRACE_KEY} AS trace, '' AS unit, '' AS version, ${AFTER_EVERY_ROW} AS at,
-      LastUsedPromptVersionId AS managed, CAST(NULL AS Nullable(Bool)) AS passed, 0 AS judged
-    FROM traces
-    WHERE ${inPeriodAndPrevious("OccurredAt")}
-      AND LastUsedPromptVersionId != ''
-  ) AS t
-  GROUP BY t.trace
-  HAVING at < ${AFTER_EVERY_ROW}`;
-
 export const UNIT_VOLUME_SQL = `WITH ${METRICS_UNIT_KEY}
 SELECT unit_key, ${METRICS_UNIT} AS unit,
   uniqExact(${METRICS_CONVERSATION}) AS conversations,
@@ -234,6 +206,36 @@ const MANAGED_VERSION_PER_TRACE = `SELECT ${TRACE_KEY} AS trace,
         )
       GROUP BY trace
       HAVING ${TRACE_IN_SOURCES}`;
+
+/**
+ * Each judged trace once, with the managed prompt version streamed in beside the verdicts from
+ * `trace_metrics`, as {@link VERSIONS} reads it: no join (analytics ADR-004). A trace with only a
+ * managed-version row is no judged trace and is left out.
+ */
+const JUDGED_VERSION_TRACES = `SELECT t.trace AS trace,
+    argMin(t.unit, t.at) AS unit,
+    argMin(t.version, t.at) AS version,
+    min(t.at) AS at,
+    any(t.managed) AS managed,
+    countIf(t.judged = 1 AND t.passed = 1) AS passed,
+    countIf(t.judged = 1) AS judged
+  FROM (
+    SELECT ${TRACE_KEY} AS trace, ${METRICS_UNIT} AS unit, MetadataPromptVersion AS version,
+      TraceOccurredAt AS at,
+      CAST(NULL AS Nullable(String)) AS managed, Passed AS passed, 1 AS judged
+    FROM trace_evaluation_metrics
+    WHERE ${JUDGED_IN_BOTH_PERIODS}
+    UNION ALL
+    SELECT trace, '' AS unit, '' AS version, ${AFTER_EVERY_ROW} AS at,
+      managed, CAST(NULL AS Nullable(Bool)) AS passed, 0 AS judged
+    FROM (
+      ${MANAGED_VERSION_PER_TRACE}
+    )
+    WHERE anchored < ${END}
+      AND managed != ''
+  ) AS t
+  GROUP BY t.trace
+  HAVING at < ${AFTER_EVERY_ROW}`;
 
 /**
  * Each version's first use inside both windows, never all history, as it was on `traces`: a

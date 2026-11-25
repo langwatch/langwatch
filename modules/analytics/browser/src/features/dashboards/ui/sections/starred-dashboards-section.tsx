@@ -41,13 +41,13 @@ export function StarredDashboardsSection({ project }: StarredDashboardsProps) {
   if (!project) return <PinnedDashboards />;
   return (
     <InProject project={project}>
-      <PinnedDashboards projectName={project.name} />
+      <PinnedDashboards />
     </InProject>
   );
 }
 
-/** The section over the project in scope; a `projectName` is said in its title. */
-function PinnedDashboards({ projectName }: { projectName?: string }) {
+/** The section over the project in scope. */
+function PinnedDashboards() {
   const host = useAnalyticsHost();
   const favourites = useFavourites();
   const { mayCreate } = useBoardReader();
@@ -60,13 +60,7 @@ function PinnedDashboards({ projectName }: { projectName?: string }) {
   // A member who may not add one sees the section only for what it lists.
   if (!mayCreate && links.length === 0) return null;
   const frame = (create?: CreateControls) => (
-    <SectionFrame
-      projectName={projectName}
-      links={links}
-      isLoaded={isLoaded}
-      projectSlug={projectSlug}
-      create={create}
-    />
+    <SectionFrame links={links} isLoaded={isLoaded} projectSlug={projectSlug} create={create} />
   );
   // The create path reads the board list to name the new one; only members who may create mount it.
   return mayCreate ? <WithCreate>{frame}</WithCreate> : frame();
@@ -82,27 +76,25 @@ function WithCreate({ children }: { children: (create: CreateControls) => ReactN
 }
 
 function SectionFrame({
-  projectName,
   links,
   isLoaded,
   projectSlug,
   create,
 }: {
-  projectName: string | undefined;
   links: StarredLink[];
   isLoaded: boolean;
   projectSlug: string;
   create?: CreateControls;
 }) {
   const shown = links.slice(0, PINNED_SHOWN_MAX);
-  const label = projectName ? `Dashboards · ${projectName}` : "Dashboards";
+  // One title in every product (G13); the project shows in the top bar, not here.
+  const label = "Dashboards";
 
   return (
     <VStack as="section" aria-label={label} align="stretch" gap={0.5} width="full">
       {/* The same frame and label as navigation's own groups, so it reads like "Build". */}
       <HStack minHeight="28px" paddingX={2} paddingTop={2.5} paddingBottom={0.5} gap={1}>
-        {/* A long project name is clipped, never pushing the "+" out of the column. */}
-        <Box minWidth={0} overflow="hidden" title={projectName}>
+        <Box minWidth={0} overflow="hidden">
           <SidebarSectionLabel label={label} />
         </Box>
         {create && <NewDashboardButton isCreating={create.isCreating} onCreate={create.onAdd} />}
