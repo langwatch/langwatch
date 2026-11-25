@@ -11,8 +11,7 @@ import { z } from "zod";
 
 import { type GovernanceSeatReportRow, seatReportsOf } from "../../rules/ocsf-seat-report.rules.ts";
 import {
-  OCSF_API_ACTIVITY_CLASS_UID,
-  OCSF_APPLICATION_ACTIVITY_CATEGORY_UID,
+  governanceOcsfExportRowOf,
   OCSF_STORED_SCHEMA_VERSION,
 } from "../governance.repositories.ts";
 import type {
@@ -172,6 +171,7 @@ function toExportRow(r: OcsfExportCHRow): GovernanceOcsfExportRow {
 }
 
 function toOcsfEventValues(row: GovernanceOcsfEvent): Record<string, unknown> {
+  const { classUid, categoryUid, typeUid } = governanceOcsfExportRowOf(row);
   return {
     TenantId: row.tenantId,
     OcsfSchemaVersion: OCSF_STORED_SCHEMA_VERSION,
@@ -179,10 +179,10 @@ function toOcsfEventValues(row: GovernanceOcsfEvent): Record<string, unknown> {
     TraceId: row.traceId,
     SourceId: row.sourceId,
     SourceType: row.sourceType,
-    ClassUid: row.classUid ?? OCSF_API_ACTIVITY_CLASS_UID,
-    CategoryUid: row.categoryUid ?? OCSF_APPLICATION_ACTIVITY_CATEGORY_UID,
+    ClassUid: classUid,
+    CategoryUid: categoryUid,
     ActivityId: row.activityId,
-    TypeUid: row.typeUid ?? (row.classUid ?? OCSF_API_ACTIVITY_CLASS_UID) * 100 + row.activityId,
+    TypeUid: typeUid,
     SeverityId: row.severityId,
     // `eventTime` is a Temporal Instant on this branch; the client wants a Date.
     EventTime: toDate(row.eventTime),
