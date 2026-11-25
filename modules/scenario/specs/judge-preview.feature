@@ -1,0 +1,155 @@
+Feature: LangWatch Judge (preview) as the scenario judge
+
+  As a team running scenarios on LangWatch Cloud
+  I want to pick LangWatch Judge (preview) as the judge of a scenario run
+  So that runs are judged by LangWatch's own model without bringing a provider key
+
+  The scenario judge is a chat model inside the scenario SDK. LangWatch Judge (preview) is served
+  to it as one OpenAI-shaped, non-streamed endpoint on the app, so neither runner changes: the
+  prefetch points the judge at that endpoint with the run's own key, the endpoint turns the
+  judge's call into a judge-leaf call (modules/instant-eval-judge/specs/
+  instant-eval-scenario-judge.feature) and answers with the tool call the judge asked for. It is
+  offered behind release_langwatch_judge_preview, on LangWatch Cloud only. A verdict is never made
+  up: when nothing can answer, the run ends as an error.
+
+  @unit
+  Scenario: The judge's verdict call becomes one leaf call with a criterion per tool property
+    Given the scenario judge's verdict request with the finish_test tool
+    When it is read
+    Then each property of the tool's criteria is a criterion, keyed by its name with its description as text
+    And the description is the text of the system prompt's scenario block
+    And the content is the judge's user message
+
+  @unit
+  Scenario: A custom system prompt without a scenario block is kept whole
+    Given a verdict request whose system prompt has no scenario block
+    When it is read
+    Then the description is the whole system prompt
+
+  @unit
+  Scenario: The judge's turn decision call is read as the decision phase
+    Given a request that offers continue_test and make_verdict
+    When it is read
+    Then it is a decision call with no criteria and those two tools
+
+  @unit
+  Scenario: Trace exploration tools are never passed on
+    Given a verdict request that also offers expand_trace, grep_trace and wait_for_traces
+    When it is read
+    Then the leaf call carries the finish_test tool alone
+
+  @unit
+  Scenario: A request that is not a scenario judge call is refused
+    Given a chat request with no judge tool
+    When it is read
+    Then it is refused as invalid, saying the model judges scenario runs only
+
+  @unit
+  Scenario: A streamed request is refused
+    Given a judge request that asks for a stream
+    When it is read
+    Then it is refused as invalid, naming stream
+
+  @unit
+  Scenario: A verdict is answered as the judge's finish_test tool call
+    Given a judged verdict with a met, an unmet and an inconclusive criterion
+    When the answer is formatted
+    Then the completion carries one finish_test tool call with true, false and inconclusive by key
+    And the verdict is failure
+    And the usage counts the billed input tokens
+
+  @unit
+  Scenario: The verdict follows the criteria
+    Given judged criteria
+    When the answer is formatted
+    Then any unmet criterion makes the verdict failure
+    And otherwise any inconclusive criterion makes it inconclusive
+    And otherwise it is success
+
+  @unit
+  Scenario: A verdict with no explanation lists its criteria, naming no backend
+    Given a judged verdict that carries no reasoning
+    When the answer is formatted
+    Then the reasoning lists the criteria as met, not met or inconclusive
+
+  @unit
+  Scenario: A turn decision is answered as the tool the judge offered
+    Given a judged decision to continue and one to judge now
+    When each is formatted
+    Then the completion calls continue_test and make_verdict with no arguments
+
+  @unit
+  Scenario: The endpoint answers the judge's call through the judge leaf
+    Given LangWatch Cloud with the judge preview flag on
+    When the scenario judge posts its verdict call
+    Then the judge leaf is asked once for the project the key belongs to
+    And the judge gets the finish_test tool call
+
+  @unit
+  Scenario: An unavailable judge is an error, never a verdict
+    Given the judge leaf answers unavailable
+    When the scenario judge posts its call
+    Then the endpoint answers 503 and no verdict
+
+  @unit
+  Scenario: A spent free budget is a payment-required error
+    Given the judge leaf refuses for a spent free budget
+    When the scenario judge posts its call
+    Then the endpoint answers 402 with the budget message
+
+  @unit
+  Scenario: The endpoint refuses where the judge preview flag is off
+    Given LangWatch Cloud with the judge preview flag off for the organization
+    When the scenario judge posts its call
+    Then the endpoint answers 403 and the judge leaf is never asked
+
+  @unit
+  Scenario: The endpoint refuses on a self-hosted install
+    Given an installation that is not LangWatch Cloud
+    When the scenario judge posts its call
+    Then the endpoint answers 403, no flag is read and the judge leaf is never asked
+
+  @unit
+  Scenario: The endpoint needs a project key
+    Given a request with no valid key
+    When it is posted
+    Then the endpoint answers 401
+
+  @unit
+  Scenario: The flag is read for the project within its organization
+    Given LangWatch Cloud
+    When availability is asked for a project
+    Then release_langwatch_judge_preview is read with the project and its organization
+
+  @unit
+  Scenario: A run judged by LangWatch Judge (preview) is pointed at the app's own endpoint
+    Given a run whose judge model is langwatch/judge-preview on LangWatch Cloud with the flag on
+    When the run is prefetched
+    Then the judge's parameters name the OpenAI-shaped model, the app's judge preview address and the run's key
+    And the run records langwatch/judge-preview as its judge model
+    And no provider is asked for the judge
+
+  @unit
+  Scenario: A run on LangWatch Judge (preview) is refused before it starts where it may not judge
+    Given a run whose judge model is langwatch/judge-preview
+    When it is prefetched on a self-hosted install, or with the flag off
+    Then the run is refused with a message naming LangWatch Judge (preview) and what to pick instead
+
+  @unit
+  Scenario: LangWatch Judge (preview) cannot play another role
+    Given a run whose simulator model is langwatch/judge-preview
+    When the run is prefetched
+    Then it is refused with a message saying the model can only be the judge
+
+  @unit
+  Scenario: The scenario SDK's client reads the endpoint's answer as its tool call
+    Given the client the scenario runner builds for the judge, pointed at the endpoint
+    When it asks for a verdict with the finish_test tool forced
+    Then it reads one finish_test tool call with the criteria by key
+
+  @unit
+  Scenario: The judge preview flag is off by default, on Cloud and self-hosted
+    Given the feature flag registry
+    When release_langwatch_judge_preview is read
+    Then it is a product flag that is off by default
+    And it is off by default on a self-hosted install

@@ -20,6 +20,7 @@ import type { TraceApi } from "@langwatch/trace-contract";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
 import { describe, expect, it } from "vitest";
 
+import { judgePreviewAvailabilityFixture } from "../../../../__tests__/support/judge-preview.fixture.ts";
 import type { ScenarioRunSecretSeal } from "../../../../repositories/scenario.repository.ts";
 import type { ScenarioService } from "../../../../services/scenario.service.ts";
 import { ScenarioExecutionPrefetcherService } from "../scenario-execution-prefetcher.service.ts";
@@ -49,6 +50,7 @@ const httpAgent: Agent = JSON.parse(
 /** A prefetcher whose scenario store throws on any read, so reading a row fails the test. */
 function prefetcher({ agent }: { agent: Agent | "missing" }) {
   return ScenarioExecutionPrefetcherService.create({
+    judgePreviewAvailability: judgePreviewAvailabilityFixture(),
     runSecretSeal: createApiFixture<ScenarioRunSecretSeal>({}),
     config: {
       langwatchEndpoint: "http://app:5560",

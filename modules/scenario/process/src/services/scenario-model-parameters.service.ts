@@ -1,4 +1,5 @@
 import {
+  isLangWatchJudgeModelId,
   ModelProviderInvalidError,
   ModelProviderNotFoundError,
   type ModelProviderApi,
@@ -11,6 +12,9 @@ import {
 } from "@langwatch/scenario-contract";
 
 const logger = createLogger("langwatch:scenarios:model-parameters");
+
+const JUDGE_ONLY_MESSAGE =
+  "LangWatch Judge (preview) can only be the judge of a scenario run. Pick another model for this role.";
 
 export type ModelParamsFailureReason = ScenarioModelParametersFailureReason;
 
@@ -27,6 +31,10 @@ export class ScenarioModelParametersService {
 
   async prepare(input: { projectId: string; model: string }): Promise<ModelParamsResult> {
     const { projectId, model } = input;
+    // The judge's own parameters are prepared by the prefetch; here the model is in another role.
+    if (isLangWatchJudgeModelId(model)) {
+      return { success: false, reason: "invalid_model_format", message: JUDGE_ONLY_MESSAGE };
+    }
     const providerKey = model.split("/")[0];
     if (!model.includes("/") || !providerKey) {
       return {

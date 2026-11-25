@@ -196,6 +196,14 @@ export const FEATURE_FLAGS = [
       "Routes an organization's Instant Evals judgements through the LangWatch Judge router: a decision model answers what it is sure of and an LLM answers the rest, priced by the summed cost of every call. On by default on LangWatch Cloud; turn it off per organization via a targeting rule. Off by default on a self-hosted install, whose judgements through Connect carry no route, so it never offers routing unless an operator switches it on. On, the judge picker names LangWatch's hosted model LangWatch Evals (preview), and an LLM judge on it (saved as langwatch/instant-evals, or on langwatch/evals-preview) sends the llm_judge route where the project's Instant Evals column is LangWatch's; a judge on langwatch/instant-preview, and any judge answered by an own decision model, is never routed. Off, the picker names it LangWatch Instant (preview), no caller sends a route, and every judgement is the single hosted classifier call it is today. The route table and prices are deploy-time configuration; with none set, as on a self-hosted install, every slot goes to the hosted classifier at its published rate, so the answer and the cost are today's.",
   },
   {
+    key: "release_langwatch_judge_preview",
+    scope: "PRODUCT",
+    defaultValue: false,
+    selfHostedDefaultValue: false,
+    description:
+      "Offers LangWatch Judge (preview), LangWatch's hosted model for the scenario judge, to an organization. Off by default; turn it on for one organization with a targeting rule { organizationId }. On, the Judge column of Default models and the scenario and suite judge pickers list LangWatch Judge (preview) as pickable, and a run whose judge is langwatch/judge-preview is judged by the LangWatch Judge router: every criterion is routed as its own question and the judgement is billed as one Instant Evals spend row under the model langwatch-judge-preview. Off, the model is listed as coming soon, saving it is refused, and a run that already holds it is refused before it starts with a message naming the model. Always off on a self-hosted install: the model runs on LangWatch Cloud only. The route table and prices are deploy-time configuration (INSTANT_EVAL_JUDGE_ROUTES and INSTANT_EVAL_JUDGE_PRICING); turn the flag on only after they name the scenario_judge routes and a scenarioDecision backend.",
+  },
+  {
     key: "release_lwql_workbench",
     scope: "PRODUCT",
     defaultValue: false,

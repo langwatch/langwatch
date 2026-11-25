@@ -13,6 +13,16 @@ export const LANGWATCH_DECISION_MODEL_ID = "langwatch/instant-preview";
 export const LANGWATCH_EVALS_MODEL_ID = "langwatch/evals-preview";
 
 /**
+ * LangWatch's hosted scenario judge. Not a decision model: it is stored and read under this id,
+ * and only the Judge column and a scenario's or suite's judge may hold it.
+ */
+export const LANGWATCH_JUDGE_MODEL_ID = "langwatch/judge-preview";
+
+export function isLangWatchJudgeModelId(id: string): boolean {
+  return id === LANGWATCH_JUDGE_MODEL_ID;
+}
+
+/**
  * The id every LangWatch hosted pick is written as, in Default models and judge settings: the one
  * the previous release reads (expand then contract, ADR-182 amendment 2026-11-23). Where the
  * router flag is on, a judge on it is routed. Writing the -preview ids is a planned follow-up.
@@ -96,7 +106,7 @@ export const LANGWATCH_DECISION_PREVIEWS: readonly LangWatchDecisionPreview[] = 
   { id: LANGWATCH_DECISION_MODEL_ID, ...INSTANT_PREVIEW, fills: ["INSTANT_EVALS"] },
   { id: LANGWATCH_EVALS_MODEL_ID, ...EVALS_PREVIEW, fills: [], isJudgeRouter: true },
   {
-    id: "langwatch/judge-preview",
+    id: LANGWATCH_JUDGE_MODEL_ID,
     label: "LangWatch Judge (preview)",
     description: "Optimized for scenario judge",
     fills: [],

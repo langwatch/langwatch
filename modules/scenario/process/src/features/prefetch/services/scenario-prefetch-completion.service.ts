@@ -1,6 +1,9 @@
 import { ApiKeyPermissionDeniedError } from "@langwatch/api-key-contract";
 import { HandledError } from "@langwatch/handled-error";
-import { ModelNotConfiguredError } from "@langwatch/model-provider-contract";
+import {
+  isLangWatchJudgeModelId,
+  ModelNotConfiguredError,
+} from "@langwatch/model-provider-contract";
 import { createLogger } from "@langwatch/observability";
 import { resolveRunModels, resolveRunTraceWait } from "@langwatch/scenario-contract";
 import type {
@@ -20,6 +23,7 @@ import {
   type ModelParamsResult,
 } from "../../../services/scenario-model-parameters.service.ts";
 import type { ScenarioRunKeyService } from "../../../services/scenario-run-key.service.ts";
+import type { JudgePreviewModelParametersService } from "../../judge-preview/services/judge-preview-model-parameters.service.ts";
 import type { ScenarioExecutionPrefetchConfig } from "./scenario-execution-prefetcher.service.ts";
 import type { ScenarioTargetPrefetchService } from "./scenario-target-prefetch.service.ts";
 
@@ -87,6 +91,8 @@ type CompletionOptions = {
   config: ScenarioExecutionPrefetchConfig;
   lookups: ScenarioExecutionLookupService;
   modelParameters: ScenarioModelParametersService;
+  /** The judge's parameters when its model is LangWatch Judge (preview). */
+  judgePreview: JudgePreviewModelParametersService;
   traces: TraceApi;
   /** Mints the per-run key a code agent's sandbox holds. */
   runKeys: Pick<ScenarioRunKeyService, "sandboxTokenFor">;
@@ -149,7 +155,11 @@ export class ScenarioPrefetchCompletionService {
       return models.result;
     }
 
-    const prepared = await this.prepareModels(input.context.projectId, models);
+    const prepared = await this.prepareModels({
+      projectId: input.context.projectId,
+      models,
+      runKey,
+    });
     const modelFailure = this.modelFailure(input.context, models, prepared);
     if (modelFailure) {
       return modelFailure;
@@ -398,10 +408,16 @@ export class ScenarioPrefetchCompletionService {
     }
   }
 
-  private async prepareModels(
-    projectId: string,
-    models: Extract<ResolvedModels, { success: true }>,
-  ): Promise<PreparedModels> {
+  /** LangWatch Judge (preview) is this app's own endpoint; any other model is a provider's. */
+  private async prepareModels({
+    projectId,
+    models,
+    runKey,
+  }: {
+    projectId: string;
+    models: Extract<ResolvedModels, { success: true }>;
+    runKey: string;
+  }): Promise<PreparedModels> {
     const [adapter, simulator, judge] = await Promise.all([
       models.adapter !== void 0
         ? this.options.modelParameters.prepare({
@@ -410,7 +426,9 @@ export class ScenarioPrefetchCompletionService {
           })
         : Promise.resolve(void 0),
       this.options.modelParameters.prepare({ projectId, model: models.simulator }),
-      this.options.modelParameters.prepare({ projectId, model: models.judge }),
+      isLangWatchJudgeModelId(models.judge)
+        ? this.options.judgePreview.prepare({ projectId, runKey })
+        : this.options.modelParameters.prepare({ projectId, model: models.judge }),
     ]);
 
     return { adapter, simulator, judge };

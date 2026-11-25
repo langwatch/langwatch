@@ -18,6 +18,7 @@ import type {
   ScenarioGoChildChannel,
 } from "../channels/scenario-child.channel.ts";
 import { ScenarioChildChoiceService } from "../features/child/services/scenario-child-choice.service.ts";
+import { JudgePreviewAvailabilityService } from "../features/judge-preview/services/judge-preview-availability.service.ts";
 import { ScenarioExecutionPrefetcherService } from "../features/prefetch/services/scenario-execution-prefetcher.service.ts";
 import { ScenarioVoiceTargetService } from "../features/voice/services/scenario-voice-target.service.ts";
 import type { VoiceNonceRegistryService } from "../features/voice/services/voice-nonce-registry.service.ts";
@@ -130,6 +131,11 @@ export class ScenarioExecutorService {
       secrets: peers.secrets,
       traces: peers.traces,
       apiKeys: peers.apiKeys,
+      judgePreviewAvailability: JudgePreviewAvailabilityService.create({
+        featureFlags: peers.featureFlags,
+        projects: peers.projects,
+        isSaas: config.isSaas,
+      }),
       voiceTargets: ScenarioVoiceTargetService.create({
         agents: peers.agents,
         modelProviders: peers.modelProviders,

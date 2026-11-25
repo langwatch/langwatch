@@ -13,6 +13,7 @@ import type { EntitlementApi, Plan } from "@langwatch/entitlement-contract";
 import type { EvaluationApi } from "@langwatch/evaluation-contract";
 import type { EvaluatorApi } from "@langwatch/evaluator-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
+import type { InstantEvalJudgeApi } from "@langwatch/instant-eval-judge-contract";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { PresenceApi } from "@langwatch/presence-contract";
 import type { ResourceOwnership } from "@langwatch/process";
@@ -63,6 +64,9 @@ export async function createScenarioRestTestApp(
     plans?: Partial<EntitlementApi>;
     featureFlags?: Partial<FeatureFlagApi>;
     projects?: Partial<ProjectApi>;
+    judges?: Partial<InstantEvalJudgeApi>;
+    /** Whether the install is LangWatch Cloud; absent, it is self-hosted. */
+    isSaas?: boolean;
   } = {},
 ) {
   const simulations = options.simulations ?? {};
@@ -78,6 +82,7 @@ export async function createScenarioRestTestApp(
     },
     dependencies: {
       agents: createApiFixture<AgentApi>(),
+      judges: createApiFixture<InstantEvalJudgeApi>(options.judges, "Instant Evals judge API"),
       evaluations: createApiFixture<EvaluationApi>(),
       users: createApiFixture<UserApi>(),
       projects: createApiFixture<ProjectApi>(
@@ -111,7 +116,11 @@ export async function createScenarioRestTestApp(
       ),
     },
     resources: createApiFixture<ResourceOwnership>(),
-    config: { ...scenarioTestConfig, publicBaseUrl: "https://app.langwatch.test" },
+    config: {
+      ...scenarioTestConfig,
+      publicBaseUrl: "https://app.langwatch.test",
+      ...(options.isSaas === undefined ? {} : { isSaas: options.isSaas }),
+    },
     secrets: scenarioTestSecrets,
   });
 
