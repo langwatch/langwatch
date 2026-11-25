@@ -115,6 +115,7 @@ export function AuditLogEntry({
   const target = auditTargetLine({
     targetKind: log.targetKind,
     targetId: log.targetId,
+    targetName: log.targetName,
     projectName: log.projectId ? projectLabel(log.projectId) : null,
   });
   const hasDiff = log.before != null || log.after != null;

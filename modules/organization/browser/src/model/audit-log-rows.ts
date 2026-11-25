@@ -68,6 +68,12 @@ function words(segment: string): string[] {
     .map((word) => word.toLowerCase());
 }
 
+const IRREGULAR_PARTICIPLES: ReadonlySet<string> = new Set(["set"]);
+
+function isParticiple(word: string): boolean {
+  return word.endsWith("ed") || IRREGULAR_PARTICIPLES.has(word);
+}
+
 function singular(word: string): string {
   return word.endsWith("s") && !word.endsWith("ss") ? word.slice(0, -1) : word;
 }
@@ -101,10 +107,12 @@ export function auditActionPhrase(action: string): string {
     index === all.length - 1 ? singular(word) : word,
   );
   const [first = "", ...rest] = verbWords;
+  const last = verbWords.at(-1) ?? "";
   const past = PAST[first];
+  // `stop_requested` names a thing already in the past: "Stop requested", not "Stopped requested".
+  if (past && rest.length > 0 && isParticiple(last)) return sentence(verbWords);
   if (past) return sentence([past, ...(rest.length > 0 ? rest : noun)]);
 
-  const last = verbWords.at(-1) ?? "";
   if (verbWords.length > 1 && last.endsWith("ed")) {
     return sentence([last, ...verbWords.slice(0, -1)]);
   }
@@ -139,15 +147,18 @@ export type AuditTargetLine = { kind: "words"; text: string } | { kind: "id"; id
 export function auditTargetLine({
   targetKind,
   targetId,
+  targetName = null,
   projectName,
 }: {
   targetKind: string | null | undefined;
   targetId: string | null | undefined;
+  targetName?: string | null;
   projectName: string | null;
 }): AuditTargetLine {
   if (targetKind === BRAID_AUDIT_TARGET_KIND) {
     return { kind: "words", text: projectName ? `Braid owned by ${projectName}` : "Braid" };
   }
+  if (targetName) return { kind: "words", text: targetName };
   return targetId ? { kind: "id", id: targetId } : null;
 }
 
@@ -254,6 +265,7 @@ type RunFields = Pick<
   | "action"
   | "targetKind"
   | "targetId"
+  | "targetName"
   | "projectId"
   | "error"
   | "source"
@@ -269,6 +281,7 @@ function runKey(log: RunFields): string {
     log.action,
     log.targetKind,
     log.targetId,
+    log.targetName,
     log.projectId,
     log.error,
     log.source,

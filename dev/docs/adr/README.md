@@ -116,6 +116,7 @@ Reusable framework decisions live with their packages:
 | [199](./199-clickhouse-serverless-backups-run-in-the-ch-config-sidecar.md)            | clickhouse-serverless backups run in the ch-config sidecar, decided by pure functions                                      | Accepted                  |
 | [201](./201-pii-redaction-model-call-is-metered.md)                                   | A PII redaction model call is priced per character and metered like Instant Evals                                          | Proposed                  |
 | [202](./202-ops-agent-access.md)                                                      | The ops agent reaches a customer organization only through a passkey-approved, one-hour key                                | Accepted                  |
+| [205](./205-billing-only-is-a-flagged-membership.md)                                  | Billing only is a flagged Lite membership, not a new organization role                                                     | Proposed                  |
 
 Package-local decisions are indexed beside their owners. The framework
 records are the [Eventing ADR index](../../../packages/eventing/adrs/README.md)

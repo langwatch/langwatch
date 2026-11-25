@@ -32,6 +32,7 @@ describe("organizationAuditLogPageSchema", () => {
           source: "gateway",
           targetKind: "budget",
           targetId: "budget_1",
+          targetName: "Engineering budget",
           before: { limit: 1 },
           after: { limit: 2 },
           actorUserId: null,

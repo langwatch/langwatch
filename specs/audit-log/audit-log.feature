@@ -219,6 +219,11 @@ Feature: Unified Audit Log
     And a braid row with no project reads "Braid" alone
     And any other target keeps its id on that line
 
+  @unit
+  Scenario: An entry row names its target by the name the row recorded
+    Given a row whose metadata records its target's name
+    Then the line under its phrase reads that name, not the target id
+
   @integration
   Scenario: The feed reads by day
     Then entries sit under "Today", "Yesterday" or their date ("Oct 8"), newest first

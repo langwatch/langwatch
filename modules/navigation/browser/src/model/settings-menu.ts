@@ -156,6 +156,8 @@ export interface SettingsMenuGates {
   isPlatformAdmin: boolean;
   /** `release_braids` answered on; false while it is still loading, so no entry flickers. */
   braidsEnabled: boolean;
+  /** The organisation already has braids: shown with the flag off so an admin can end them. */
+  braidsPresent?: boolean;
 }
 
 export type EnterprisePlanGate = "included" | "locked" | "pending";
@@ -217,6 +219,8 @@ function organizationGroup({
         href: "/settings",
         isExactMatch: true,
         icon: Settings2,
+        // The organisation's Braids page is organisation-wide, so it lights no Project entry.
+        alsoActiveAt: ["/settings/organization-braids"],
       },
       // Keys sit here rather than in Access, where four enterprise entries
       // came first and left a page most readers use at the bottom of a group
@@ -356,6 +360,7 @@ function projectGroup({
   isLiteMember,
   enterprisePlan,
   braidsEnabled,
+  braidsPresent = false,
 }: SettingsMenuGates): SettingsMenuGroup {
   return {
     id: "settings-project",
@@ -377,13 +382,11 @@ function projectGroup({
           ]
         : []),
       { label: "Integrations", href: "/settings/integrations", icon: Blocks },
-      ...(!isLiteMember && braidsEnabled
+      ...(!isLiteMember && (braidsEnabled || braidsPresent)
         ? enterpriseEntry({
             item: {
               label: "Braids",
               href: "/settings/braids",
-              // The one Braids entry: the organization's braids page lights it too.
-              alsoActiveAt: ["/settings/organization-braids"],
               icon: Waypoints,
               feature: "braids",
             },
@@ -492,11 +495,12 @@ export function cloudAdminGroup(): SettingsMenuGroup {
 export function settingsMenu(gates: SettingsMenuGates): SettingsMenuGroup[] {
   const groups: SettingsMenuGroup[] = [
     youGroup(),
+    // Right under You: from a project, Settings lands on its General page (ADR-098 amendment).
+    projectGroup(gates),
     organizationGroup(gates),
     accessGroup(gates),
     aiInfrastructureGroup(gates),
     dataControlsGroup(gates),
-    projectGroup(gates),
   ];
 
   return groups.filter((group) => group.items.length > 0);

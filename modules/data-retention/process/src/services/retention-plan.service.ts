@@ -1,7 +1,8 @@
+import { isGrowthSeatEventPlan } from "@langwatch/enterprise-billing-contract";
 import { isEnterpriseTier, type EntitlementApi } from "@langwatch/entitlement-contract";
 
 /**
- * Organization's retention plan permissions; only the two booleans affecting
+ * Organization's retention plan permissions; only the booleans affecting
  * billing/licensing leave this package to avoid coupling to plan readers.
  */
 export type DataRetentionPlan = Readonly<{
@@ -16,10 +17,12 @@ export type DataRetentionPlan = Readonly<{
    * to the restrictive menu, the data-loss-safe direction.
    */
   uncapped: boolean;
+  /** A Growth seat plan on SaaS: a length above 90 days, or forever, adds storage to its bill. */
+  billsStorage: boolean;
 }>;
 
 /**
- * The plan behind a retention gate, reduced to the two facts retention tiers on. Which plan
+ * The plan behind a retention gate, reduced to the facts retention tiers on. Which plan
  * types count as enterprise is entitlement's answer; an unknown tier fails closed.
  */
 export class RetentionPlanService {
@@ -44,6 +47,10 @@ export class RetentionPlanService {
       ...(input.userId ? { user: { id: input.userId } } : {}),
     });
 
-    return { free: plan.free, uncapped: !this.isSaas || isEnterpriseTier(plan.type) };
+    return {
+      free: plan.free,
+      uncapped: !this.isSaas || isEnterpriseTier(plan.type),
+      billsStorage: this.isSaas && isGrowthSeatEventPlan(plan.type),
+    };
   }
 }

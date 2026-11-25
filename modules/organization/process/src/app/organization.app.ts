@@ -29,6 +29,7 @@ import {
   LiteMemberViewerOnlyError,
   OrganizationApi,
   type OrganizationIdPage,
+  type OrganizationOperatorSummary,
   type OrganizationIdPageInput,
   type OrganizationUsageCount,
   type OrganizationApiCreateInvitationsInput,
@@ -196,8 +197,14 @@ import { OrganizationJoinRequestsService } from "../services/organization-join-r
 import type { OrganizationJoinRequests } from "../services/organization-join-requests.service.ts";
 import { OrganizationLifecycleNoticeService } from "../services/organization-lifecycle-notice.service.ts";
 import type { OrganizationLifecycleSenders } from "../services/organization-lifecycle-notice.service.ts";
+import {
+  OrganizationMemberListingService,
+  type OrganizationMemberListingPage,
+  type OrganizationMemberListingSenders,
+} from "../services/organization-member-listing.service.ts";
 import type { OrganizationGrantCache } from "../services/organization-member-role.service.ts";
 import { OrganizationMembershipService } from "../services/organization-membership.service.ts";
+import { OrganizationOperatorDirectoryService } from "../services/organization-operator-directory.service.ts";
 import { OrganizationScopeGraphService } from "../services/organization-scope-graph.service.ts";
 import { OrganizationSeatLeaseService } from "../services/organization-seat-lease.service.ts";
 import { OrganizationSeatLicenseService } from "../services/organization-seat-license.service.ts";
@@ -427,6 +434,13 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
       createAndAssign: (input, by) => application.createAndAssign(input, by),
       ensurePersonalWorkspace: (input, by) => application.ensurePersonalWorkspace(input, by),
     });
+    application.#operatorDirectory = OrganizationOperatorDirectoryService.create({
+      organizations: setup.repositories.organization,
+      membership,
+    });
+    application.#memberListing = OrganizationMemberListingService.create({
+      organizations: setup.repositories.organization,
+    });
     application.#privateDataplanes = PrivateDataplaneRecordService.create({
       routes: setup.repositories.privateClickHouseRoutes,
       accounts: setup.repositories.privateS3Accounts,
@@ -645,6 +659,8 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
   #joinRequests!: OrganizationJoinRequests;
   #initialization!: OrganizationInitializationService;
   #privateDataplanes!: PrivateDataplaneRecordService;
+  #memberListing!: OrganizationMemberListingService;
+  #operatorDirectory!: OrganizationOperatorDirectoryService;
   #seatRequests!: SeatRequestService;
   #seatPeak!: SeatPeakService;
   #seatPeakCorrections!: SeatPeakCorrectionService;
@@ -1102,6 +1118,15 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
         admission,
       })
       .catch((error: unknown) => this.#infrastructure.signals.reportError(error));
+    // A held seat is recorded when it is given (admitWaitingMember); a repeat call adds nothing.
+    if (admission.outcome === "created" && !admission.pending) {
+      this.#infrastructure.lifecycle.memberAdmitted({
+        organizationId: input.organizationId,
+        userId: input.userId,
+        role: admission.seat,
+        via: "create_membership",
+      });
+    }
     return admission;
   }
 
@@ -1149,6 +1174,19 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
    */
   listAllIds(input?: OrganizationIdPageInput): Promise<OrganizationIdPage> {
     return this.#dependencies.organizations.listAllIds(input);
+  }
+
+  searchForOperators(input: {
+    query: string;
+    limit: number;
+  }): Promise<OrganizationOperatorSummary[]> {
+    return this.#operatorDirectory.search(input);
+  }
+
+  findForOperators(input: {
+    organizationIds: readonly string[];
+  }): Promise<OrganizationOperatorSummary[]> {
+    return this.#operatorDirectory.find(input);
   }
 
   countUsage(input: { organizationIds: readonly string[] }): Promise<OrganizationUsageCount> {
@@ -1883,6 +1921,22 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
 
   connectLifecycle(senders: OrganizationLifecycleSenders): void {
     this.#infrastructure.lifecycle.connect(senders);
+  }
+
+  /** The member listing's sender, from the same pipeline. */
+  connectMemberListing(senders: OrganizationMemberListingSenders): void {
+    this.#memberListing.connect(senders);
+  }
+
+  /**
+   * The `organization:list-member-facts` step's page: one page of organizations' active members.
+   */
+  listMemberFactsPage(input: {
+    afterOrganizationId: string | null;
+    limit: number;
+    dryRun: boolean;
+  }): Promise<OrganizationMemberListingPage> {
+    return this.#memberListing.listPage(input);
   }
 
   /** organization_audit: audit facts committed with their change; audit-log reacts (§9). */

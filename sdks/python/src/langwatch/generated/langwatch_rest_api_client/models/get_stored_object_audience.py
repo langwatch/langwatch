@@ -14,6 +14,7 @@ class GetStoredObjectAudience(str, Enum):
     DATASETSVIEW = "datasets:view"
     EVALUATIONSVIEW = "evaluations:view"
     EXPERIMENTSVIEW = "experiments:view"
+    GATEWAYA2ATARGETSVIEW = "gatewayA2aTargets:view"
     GATEWAYBUDGETSVIEW = "gatewayBudgets:view"
     GATEWAYCACHERULESVIEW = "gatewayCacheRules:view"
     GATEWAYGUARDRAILSVIEW = "gatewayGuardrails:view"

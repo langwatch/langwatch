@@ -25,7 +25,7 @@ import {
   SessionReader,
   type TransportSelection,
 } from "@langwatch/api/hosting";
-import { ClientAddress, SecurityHeaders } from "@langwatch/api/policy";
+import { ClientAddress, SecurityHeaders, servesPlainHttp } from "@langwatch/api/policy";
 import {
   BrowserSessionIdentity,
   canonicalErrorAnswer,
@@ -224,7 +224,12 @@ class ApiSurface {
     });
     this.#rest?.assertEveryRouteDeclared();
     const api = composeApiApplication(
-      { rest: this.#rest, trpc: this.#trpc, docsOrigins: composition.docsOrigins },
+      {
+        rest: this.#rest,
+        trpc: this.#trpc,
+        docsOrigins: composition.docsOrigins,
+        plainHttp: servesPlainHttp(composition.publicBaseUrl),
+      },
       selected,
     );
     const clientAddress = ClientAddress.fromTrustedProxies({
@@ -233,7 +238,12 @@ class ApiSurface {
     });
     const mux = HttpMux.create({ reporter: composition.logger })
       .use(clientAddress)
-      .use(SecurityHeaders.strict({ production: composition.production }))
+      .use(
+        SecurityHeaders.strict({
+          production: composition.production,
+          publicBaseUrl: composition.publicBaseUrl,
+        }),
+      )
       .route("/api", api, { onFailure: answerApiFailure });
     for (const path of apiRootPaths(api))
       mux.route(path, api, { onFailure: answerApiFailure, exact: true });
@@ -395,6 +405,8 @@ export function composeApiApplication(
     rest?: RestHost | undefined;
     trpc?: TrpcHost | undefined;
     docsOrigins?: readonly string[] | undefined;
+    /** The deployment is served without TLS, so live streams arrive without `Sec-Fetch-Site`. */
+    plainHttp?: boolean | undefined;
   },
   policies: { trpc?: SecurityHeaders; rest?: SecurityHeaders } = {},
 ): Hono {
@@ -414,7 +426,7 @@ export function composeApiApplication(
     for (const [name, value] of Object.entries(policy?.headers ?? {})) context.header(name, value);
   });
 
-  if (hosts.trpc) root.route("/", trpcLanes(hosts.trpc));
+  if (hosts.trpc) root.route("/", trpcLanes(hosts.trpc, { plainHttp: hosts.plainHttp === true }));
 
   if (hosts.rest) {
     mountApiDiscovery({ root, restApp: hosts.rest.app });
@@ -453,7 +465,7 @@ const answerApiFailure: HttpFailureAnswer = (failure) => canonicalErrorAnswer(fa
  * and the subscription lane at `/api/sse`, so a procedure is reachable live
  * exactly when it is reachable at all.
  */
-function trpcLanes(trpc: TrpcHost): Hono {
+function trpcLanes(trpc: TrpcHost, { plainHttp }: { plainHttp: boolean }): Hono {
   const app = new Hono();
   app.onError((failure) => answerApiFailure(failure));
   // The same access record every REST family writes, so a dashboard 5xx is seen and alerted
@@ -505,6 +517,7 @@ function trpcLanes(trpc: TrpcHost): Hono {
   // The context each subscription's caller was built over, so its access record names the user.
   const sseContexts = new WeakMap<Request, TrpcRequestContext>();
   const sse = SseLane.create({
+    plainHttp,
     members: {
       procedureTypeAt: (path) => trpc.procedureTypeAt(path),
       createCaller: async ({ request, signal }) => {

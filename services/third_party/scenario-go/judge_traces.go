@@ -2,6 +2,7 @@ package scenario
 
 import (
 	"context"
+	"math"
 	"time"
 
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
@@ -30,12 +31,12 @@ type TraceSettleTarget struct {
 // registered with Configure(WithRemoteTraceFetcher(...)) or set on the
 // judge config.
 type RemoteTraceFetcher interface {
-	// SettleWait waits until every trace settled or the timeout passed, and
-	// reports whether all settled. Unsettled traces get a synthetic error
-	// span. It never fails.
-	SettleWait(ctx context.Context, target TraceSettleTarget) (allSettled bool)
-	// ExtendSettle waits once more for still unsettled traces.
-	ExtendSettle(ctx context.Context, target TraceSettleTarget)
+	// SettleWait waits until every trace settled or the timeout passed.
+	// Unsettled traces get a synthetic error span. It never fails.
+	SettleWait(ctx context.Context, target TraceSettleTarget) SettleOutcome
+	// ExtendSettle waits once more for traces still unsettled or settled on
+	// the quiet period alone.
+	ExtendSettle(ctx context.Context, target TraceSettleTarget) SettleOutcome
 	// NoneSettled reports whether not one of the traces ever settled.
 	NoneSettled(threadID string, traceIDs []string) bool
 	// RecordMissingTraceIDs records that fetching is on but no message
@@ -43,6 +44,15 @@ type RemoteTraceFetcher interface {
 	RecordMissingTraceIDs(threadID string, collector *SpanCollector)
 	// ClearThread drops the fetch state of a thread.
 	ClearThread(threadID string)
+}
+
+// SettleOutcome is the result of a settle-wait.
+type SettleOutcome struct {
+	// AllSettled: every given trace id settled cleanly.
+	AllSettled bool
+	// Unconfirmed: at least one settled trace has no wrapping agent span, so
+	// only the quiet period vouches for it and spans may still be arriving.
+	Unconfirmed bool
 }
 
 // traceSettings are the resolved remote trace options of one judge call.
@@ -65,18 +75,52 @@ func resolveTraceSettings(cfg ScenarioConfig, own RemoteTraceFetcher) traceSetti
 	}
 	ts.timeout = firstPositive("TraceWaitTimeout", DefaultTraceWaitTimeout, cfg.TraceWaitTimeout, s.TraceWaitTimeout)
 	ts.extension = firstPositive("TraceWaitExtension", ts.timeout, cfg.TraceWaitExtension, s.TraceWaitExtension)
-	ts.quietPeriod = DefaultTraceQuietPeriod
-	for _, d := range []*time.Duration{cfg.TraceQuietPeriod, s.TraceQuietPeriod} {
+	ts.quietPeriod = resolveQuietPeriod(DefaultTraceQuietPeriod, cfg.TraceQuietPeriod, s.TraceQuietPeriod)
+	return ts
+}
+
+// resolveJudgeTraceSettings is resolveTraceSettings with the LangWatch
+// project's recommendation between Configure and the defaults, asked only
+// when neither the run nor Configure sets the wait timeout or quiet period.
+func resolveJudgeTraceSettings(ctx context.Context, cfg ScenarioConfig, own RemoteTraceFetcher) traceSettings {
+	ts := resolveTraceSettings(cfg, own)
+	s := currentSettings()
+	timeoutSet := cfg.TraceWaitTimeout != 0 || s.TraceWaitTimeout != 0
+	quietSet := cfg.TraceQuietPeriod != nil || s.TraceQuietPeriod != nil
+	recommender, ok := ts.fetcher.(TraceSettingsRecommender)
+	if !ts.fetch || !ok || (timeoutSet && quietSet) {
+		return ts
+	}
+	rec, ok := recommender.RecommendedTraceSettings(ctx, cfg.LangWatch)
+	if !ok {
+		return ts
+	}
+	ts.timeout = firstPositive("TraceWaitTimeout", DefaultTraceWaitTimeout, cfg.TraceWaitTimeout, s.TraceWaitTimeout, deref(rec.WaitTimeout))
+	ts.extension = firstPositive("TraceWaitExtension", ts.timeout, cfg.TraceWaitExtension, s.TraceWaitExtension, deref(rec.WaitExtension))
+	ts.quietPeriod = resolveQuietPeriod(DefaultTraceQuietPeriod, cfg.TraceQuietPeriod, s.TraceQuietPeriod, rec.QuietPeriod)
+	return ts
+}
+
+func deref(d *time.Duration) time.Duration {
+	if d == nil {
+		return 0
+	}
+	return *d
+}
+
+// resolveQuietPeriod returns the first non-negative set quiet period,
+// warning about negative ones, else fallback.
+func resolveQuietPeriod(fallback time.Duration, values ...*time.Duration) time.Duration {
+	for _, d := range values {
 		if d == nil {
 			continue
 		}
 		if *d >= 0 {
-			ts.quietPeriod = *d
-			break
+			return *d
 		}
 		logger().Warn("TraceQuietPeriod must be a non-negative duration; ignoring it", "value", d.String())
 	}
-	return ts
+	return fallback
 }
 
 // resolveTraceFetcher picks the judge's own fetcher, the registered one, or
@@ -148,6 +192,11 @@ func discoveryTools(spans []sdktrace.ReadOnlySpan) []JudgeTool {
 							"items":       map[string]any{"type": "string"},
 							"description": "Span IDs (or 8-char prefixes) to expand",
 						},
+						"offset": map[string]any{
+							"type":        "integer",
+							"minimum":     0,
+							"description": "Character offset of the page to read; 0 or omitted for the first page",
+						},
 					},
 					"required":             []any{"span_ids"},
 					"additionalProperties": false,
@@ -155,8 +204,14 @@ func discoveryTools(spans []sdktrace.ReadOnlySpan) []JudgeTool {
 			},
 			Execute: func(_ context.Context, args string) (string, error) {
 				var ids []string
+				offset := 0
 				if v, err := jsjson.Parse(args); err == nil {
 					if obj, ok := v.(jsjson.Object); ok {
+						if o, ok := obj.Get("offset"); ok {
+							if n, ok := o.(float64); ok && n > 0 {
+								offset = int(min(n, math.MaxInt32))
+							}
+						}
 						if list, ok := obj.Get("span_ids"); ok {
 							if arr, ok := list.([]any); ok {
 								for _, e := range arr {
@@ -168,7 +223,7 @@ func discoveryTools(spans []sdktrace.ReadOnlySpan) []JudgeTool {
 						}
 					}
 				}
-				return spandigest.ExpandTrace(spans, ids), nil
+				return spandigest.ExpandTrace(spans, ids, offset), nil
 			},
 		},
 		{

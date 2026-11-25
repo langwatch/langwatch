@@ -1,5 +1,5 @@
 import { counter, gauge, histogram } from "@langwatch/observability/metrics";
-import { nowInstant } from "@langwatch/time";
+import { nowEpochMs } from "@langwatch/time";
 
 import { GroupQueueError, NonRetryableGroupQueueError } from "./errors.ts";
 
@@ -279,7 +279,7 @@ export function recordDroppedJob(labels: {
   reason: string;
 }): void {
   gqJobsDroppedTotal.inc(labels);
-  gqJobsLastDroppedTimestampSeconds.set(nowInstant().epochMilliseconds / 1000, labels);
+  gqJobsLastDroppedTimestampSeconds.set(nowEpochMs() / 1000, labels);
 }
 
 /**

@@ -1,7 +1,7 @@
 import { performance } from "node:perf_hooks";
 
 import type { Logger } from "@langwatch/observability";
-import { nowInstant } from "@langwatch/time";
+import { nowEpochMs } from "@langwatch/time";
 import type fastq from "fastq";
 
 import { gqJobsDispatchedTotal } from "./metrics.ts";
@@ -281,7 +281,7 @@ export class GroupQueueDispatcher {
       // The claim scans candidates strictly below its clock, and a timer can fire on the due
       // millisecond itself: re-arm until it has passed, or the candidate waits out the idle poll.
       const arm = () => {
-        const nowMs = nowInstant().epochMilliseconds;
+        const nowMs = nowEpochMs();
         if (nowMs > dueAtMs) this.wake?.();
         else timer = setTimeout(arm, dueAtMs - nowMs + 1);
       };
@@ -296,7 +296,7 @@ export class GroupQueueDispatcher {
 
   /** A group passed over while running, or due soon, is claimed just after its candidate score. */
   private async nextListedPollAtMs(): Promise<number> {
-    const nowMs = nowInstant().epochMilliseconds;
+    const nowMs = nowEpochMs();
     const idleAtMs = nowMs + this.params.signalTimeoutSec * 1000;
     if (this.saturated() || this.scannedCandidates.length === 0) return idleAtMs;
     try {
@@ -337,18 +337,16 @@ export class GroupQueueDispatcher {
     if (this.saturated()) return null;
     try {
       const passOver = this.passOver;
-      if (passOver && passOver.untilMs > nowInstant().epochMilliseconds) {
+      if (passOver && passOver.untilMs > nowEpochMs()) {
         // A passed-over group waits for a peer: wake as it lapses, or for one due after the claim.
         const next = await this.params.scripts.getEarliestReadyScore({
           afterMs: passOver.scannedToMs,
         });
-        return (
-          Math.min(passOver.untilMs, next ?? passOver.untilMs) - nowInstant().epochMilliseconds
-        );
+        return Math.min(passOver.untilMs, next ?? passOver.untilMs) - nowEpochMs();
       }
       const earliest = await this.params.scripts.getEarliestReadyScore();
       if (earliest === null) return null;
-      return earliest - nowInstant().epochMilliseconds;
+      return earliest - nowEpochMs();
     } catch {
       // Peek is best-effort; fall back to the fixed interval.
       return null;
@@ -366,7 +364,7 @@ export class GroupQueueDispatcher {
 
   /** One claim over the allow-list, or over each open list in turn while slots remain. */
   private async claim(maxJobs: number): Promise<DispatchedWork[]> {
-    this.claimedAtMs = nowInstant().epochMilliseconds;
+    this.claimedAtMs = nowEpochMs();
     this.passOver = null;
     if (!this.params.listedGroupsKeys) return this.claimUnlisted(maxJobs);
     const work: DispatchedWork[] = [];
@@ -398,7 +396,7 @@ export class GroupQueueDispatcher {
         await this.claimCandidates({ allowedGroupsKey: allowList, jobs: maxJobs }),
       );
     }
-    const nowMs = nowInstant().epochMilliseconds;
+    const nowMs = nowEpochMs();
     const { claims, passedOverUntilMs } = await this.params.scripts.claimBatch({
       nowMs,
       activeTtlSec: this.params.activeTtlSec,
@@ -421,7 +419,7 @@ export class GroupQueueDispatcher {
     jobs: number;
     listKey?: string;
   }): Promise<DispatchResult[]> {
-    const nowMs = nowInstant().epochMilliseconds;
+    const nowMs = nowEpochMs();
     const { claims, passedOverUntilMs } = await this.params.scripts.claimBatch({
       nowMs,
       activeTtlSec: this.params.activeTtlSec,

@@ -12,6 +12,7 @@ import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
 import {
   CannotRemoveSelfAsLastAdminError,
+  BillingOnlyNoTeamAccessError,
   DeveloperSeatNoSharedAccessError,
   LiteMemberViewerOnlyError,
   TeamLastAdminRequiredError,
@@ -26,6 +27,7 @@ import {
   OrganizationSlugTakenError,
   ORGANIZATION_KIND,
   auditImpersonationMetadataSchema,
+  auditTargetNameMetadataSchema,
 } from "@langwatch/organization-contract";
 import type {
   FullyLoadedOrganization,
@@ -315,6 +317,68 @@ async function landedInTime(write: () => Promise<unknown>): Promise<boolean> {
     if (error instanceof AuthzGrantNotConfirmedError) return false;
     throw error;
   }
+}
+
+/** What the role change left on the row: when it wrote, and the department it found. */
+type WrittenMembership = { at: Date; departmentId: string | null };
+
+/**
+ * The row is as the role change left it, or only its department moved since: a department
+ * edit takes no seat lock and moves `updatedAt`, but undoes nothing the change wrote.
+ */
+function untouchedSinceOrDepartmentOnly(
+  written: WrittenMembership,
+): Prisma.OrganizationUserWhereInput {
+  const departmentMoved: Prisma.OrganizationUserWhereInput[] =
+    written.departmentId === null
+      ? [{ departmentId: { not: null } }]
+      : [{ departmentId: null }, { departmentId: { not: written.departmentId } }];
+  return {
+    OR: [{ updatedAt: written.at }, { updatedAt: { gt: written.at }, OR: departmentMoved }],
+  };
+}
+
+/** Puts the row and seat hold back as the role change found them, unless a later write moved on. */
+async function restoreMembershipRow({
+  tx,
+  organizationId,
+  userId,
+  role,
+  previous,
+  seatMoved,
+}: {
+  tx: Prisma.TransactionClient;
+  organizationId: string;
+  userId: string;
+  role: OrganizationUserRole;
+  previous: {
+    role: OrganizationUserRole;
+    billingOnly: boolean;
+    written: WrittenMembership | null;
+    fullSeatSince: Date | null;
+    hold: Prisma.SeatHoldGetPayload<object> | null;
+    seatColumns: { fullSeatSince?: Date | null };
+  };
+  seatMoved: boolean;
+}): Promise<void> {
+  const restored = await tx.organizationUser.updateMany({
+    where: {
+      organizationId,
+      userId,
+      role,
+      billingOnly: false,
+      ...(previous.written ? untouchedSinceOrDepartmentOnly(previous.written) : {}),
+      ...(seatMoved ? { fullSeatSince: previous.seatColumns.fullSeatSince ?? null } : {}),
+    },
+    data: {
+      role: previous.role,
+      billingOnly: previous.billingOnly,
+      ...(seatMoved ? { fullSeatSince: previous.fullSeatSince } : {}),
+    },
+  });
+  if (restored.count === 0 || !seatMoved) return;
+  await tx.seatHold.deleteMany({ where: { organizationId, userId } });
+  if (previous.hold) await tx.seatHold.create({ data: previous.hold });
 }
 
 async function emitScopeBindingPlans({
@@ -706,6 +770,8 @@ async function readMemberSeat({
   const membership = await tx.organizationUser.findUnique({
     where: { userId_organizationId: { userId, organizationId } },
   });
+  // A Billing-only member joins no team (ADR-205); a seat role must be given first.
+  if (membership?.billingOnly) throw new BillingOnlyNoTeamAccessError();
   return membership?.role ?? "no-membership";
 }
 
@@ -1715,6 +1781,7 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
         disabledAt: true,
         createdAt: true,
         updatedAt: true,
+        billingOnly: true,
         user: { select: { id: true, name: true, email: true } },
       },
     });
@@ -1757,6 +1824,7 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
           disabledAt: true,
           createdAt: true,
           updatedAt: true,
+          billingOnly: true,
           user: { select: { id: true, name: true, email: true } },
         },
         orderBy: [{ user: { name: "asc" } }, { user: { email: "asc" } }, { userId: "asc" }],
@@ -1870,6 +1938,7 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
         createdAt: true,
         fullSeatSince: true,
         seatPendingSince: true,
+        billingOnly: true,
         user: { select: { email: true, name: true } },
       },
     });
@@ -1883,6 +1952,7 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
         seatPendingSince: row.seatPendingSince ? fromDate(row.seatPendingSince) : null,
         email: row.user.email,
         name: row.user.name,
+        billingOnly: row.billingOnly,
       },
     ];
   }
@@ -2177,6 +2247,7 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
             },
             data: {
               role: OrganizationUserRole.MEMBER,
+              billingOnly: false,
               disabledAt: null,
               seatPendingSince: null,
               pendingSsoGrantId: pendingAdmissionId,
@@ -2260,6 +2331,7 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
       });
 
       const seatMoves = input.seat !== undefined && input.seat.kind !== "unchanged";
+      let written: WrittenMembership | null = null;
       const previousHold = seatMoves
         ? await tx.seatHold.findUnique({
             where: { organizationId_userId: { organizationId, userId } },
@@ -2278,10 +2350,13 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
             userId,
             seat: input.seat,
           });
-          await tx.organizationUser.update({
+          const row = await tx.organizationUser.update({
             where: { userId_organizationId: { userId, organizationId } },
-            data: { role, ...columns },
+            // Any role change ends Billing only; the new role is metered (ADR-205).
+            data: { role, billingOnly: false, ...columns },
+            select: { updatedAt: true, departmentId: true },
           });
+          written = { at: row.updatedAt, departmentId: row.departmentId };
           return columns;
         },
       });
@@ -2360,6 +2435,8 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
 
       return {
         role: currentMember.role,
+        billingOnly: currentMember.billingOnly,
+        written,
         fullSeatSince: currentMember.fullSeatSince,
         hold: previousHold,
         seatColumns,
@@ -2397,8 +2474,9 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
   }
 
   /**
-   * Puts back the role, the seat date and the hold a role change replaced, only while the
-   * membership still stands as that change left it, so a later change is never undone.
+   * Puts back the role, the Billing-only flag, the seat date and the hold a role change
+   * replaced, only while the membership still stands as that change left it, so a later
+   * change is never undone.
    */
   private async restoreRoleAndSeat({
     organizationId,
@@ -2413,13 +2491,15 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
     actorUserId: string | null;
     previous: {
       role: OrganizationUserRole;
+      billingOnly: boolean;
+      written: WrittenMembership | null;
       fullSeatSince: Date | null;
       hold: Prisma.SeatHoldGetPayload<object> | null;
       seatColumns: { fullSeatSince?: Date | null };
     };
   }): Promise<void> {
     const seatMoved = "fullSeatSince" in previous.seatColumns;
-    if (previous.role === role && !seatMoved) return;
+    if (previous.role === role && !previous.billingOnly && !seatMoved) return;
     await this.prisma.$transaction(async (tx) => {
       // The seat and its hold go back with the role, so the changes recorded with them are undone.
       await this.seatChanges.movingMember({
@@ -2428,23 +2508,8 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
         userId,
         cause: "role_changed",
         actorUserId,
-        write: async () => {
-          const restored = await tx.organizationUser.updateMany({
-            where: {
-              organizationId,
-              userId,
-              role,
-              ...(seatMoved ? { fullSeatSince: previous.seatColumns.fullSeatSince ?? null } : {}),
-            },
-            data: {
-              role: previous.role,
-              ...(seatMoved ? { fullSeatSince: previous.fullSeatSince } : {}),
-            },
-          });
-          if (restored.count === 0 || !seatMoved) return;
-          await tx.seatHold.deleteMany({ where: { organizationId, userId } });
-          if (previous.hold) await tx.seatHold.create({ data: previous.hold });
-        },
+        write: () =>
+          restoreMembershipRow({ tx, organizationId, userId, role, previous, seatMoved }),
       });
     });
   }
@@ -2574,6 +2639,7 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
         source: isGateway ? "gateway" : "platform",
         targetKind: log.targetKind,
         targetId: log.targetId,
+        targetName: auditTargetNameMetadataSchema.safeParse(log.metadata).data?.targetName ?? null,
         before: log.before,
         after: log.after,
         actorUserId: actorIds.get(log.id) ?? null,

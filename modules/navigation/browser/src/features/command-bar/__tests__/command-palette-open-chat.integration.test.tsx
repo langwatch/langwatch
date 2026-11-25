@@ -12,6 +12,8 @@ const emptyQuery = { data: undefined, isLoading: false };
 vi.mock("../../../behavior/navigation-api.ts", () => ({
   navigationApi: {
     personalWorkspaceFeatures: { get: { useQuery: () => emptyQuery } },
+    // The organization's Dashboards flags never answer here, so no home moves to the library.
+    featureFlag: { isEnabledForEachOrganization: { useQuery: () => ({ isLoading: true }) } },
     agents: { getAll: { useQuery: () => emptyQuery } },
     workflow: { getAll: { useQuery: () => emptyQuery } },
   },

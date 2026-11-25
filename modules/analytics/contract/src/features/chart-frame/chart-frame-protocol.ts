@@ -4,6 +4,9 @@
  * one `lw:init` over `postMessage` with a transferred `MessagePort`; the rest travels the port.
  */
 
+import { Temporal } from "@langwatch/time";
+import { z } from "zod";
+
 import type {
   LangWatchQLDiagnostic,
   LangWatchQLStatistics,
@@ -43,6 +46,8 @@ export interface ChartFrameDashboardContext {
    * what makes a refresh tick a distinct context change for `useChartQuery`.
    */
   readonly refreshedAt?: number;
+  /** Set when the host takes `LW.askLangy`: only then may a chart make its marks clickable. */
+  readonly canAskLangy?: boolean;
 }
 
 /**
@@ -163,6 +168,8 @@ export const NAVIGABLE_TARGETS = [
   "annotations",
   "gatewayVirtualKeys",
   "codingSessions",
+  "modelCosts",
+  "metadataDocs",
 ] as const;
 export type NavigableTarget = (typeof NAVIGABLE_TARGETS)[number];
 
@@ -171,6 +178,130 @@ export interface LwNavigateMessage {
   readonly target: string;
   readonly params: Readonly<Record<string, unknown>>;
 }
+
+/** What a clicked bar, row, point or legend entry asks Langy about. */
+export interface ChartAskSubject {
+  /** What the clicked value is, in the reader's words: "day", "model", "topic", "error type". */
+  readonly kind?: string;
+  /** The value as the card shows it. */
+  readonly label: string;
+  /** The value as the data holds it, when it differs from the label (a model id, a topic id). */
+  readonly value?: string;
+  /** The start of the clicked bucket, as an ISO instant. */
+  readonly at?: string;
+  /** The series under the pointer when the click landed on one point in time. */
+  readonly series?: string;
+}
+
+/** The longest label or bucket the host keeps from a frame's ask; the rest is cut. */
+export const CHART_ASK_TEXT_MAX_LENGTH = 200;
+
+/** The longest value kind the host keeps: a few words such as "skill, MCP or CLI". */
+export const CHART_ASK_KIND_MAX_LENGTH = 40;
+
+/**
+ * `LW.askLangy(subject)`: the host drafts a Langy prompt about it. Author code is semi-trusted,
+ * so the host reads the subject through `readChartAsk` and drops anything else.
+ */
+export interface LwAskLangyMessage {
+  readonly type: "lw:ask-langy";
+  readonly subject: unknown;
+}
+
+/** A frame's ask as the host reads it: a subject, or nameless when it names no label. */
+export type ChartAskReading =
+  | { readonly kind: "subject"; readonly subject: ChartAskSubject }
+  | { readonly kind: "nameless" };
+
+const NAMELESS_ASK: ChartAskReading = { kind: "nameless" };
+
+/** Text or a number, trimmed and cut; anything else reads as empty. */
+const askText = (max: number) =>
+  z
+    .unknown()
+    .optional()
+    .transform((value) =>
+      typeof value === "string" || typeof value === "number"
+        ? String(value).trim().slice(0, max)
+        : "",
+    );
+
+/** Whether `at` is an ISO instant: a date, a time and a zone. */
+function isInstant(at: string): boolean {
+  try {
+    Temporal.Instant.from(at);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+const chartAskSchema = z.object({
+  kind: askText(CHART_ASK_KIND_MAX_LENGTH),
+  label: askText(CHART_ASK_TEXT_MAX_LENGTH),
+  value: askText(CHART_ASK_TEXT_MAX_LENGTH),
+  at: askText(CHART_ASK_TEXT_MAX_LENGTH).transform((at) => (at && isInstant(at) ? at : "")),
+  series: askText(CHART_ASK_TEXT_MAX_LENGTH),
+});
+
+/** Reads what a frame's ask names, cut to length; an `at` that is no ISO instant is dropped. */
+export function readChartAsk(raw: unknown): ChartAskReading {
+  const parsed = chartAskSchema.safeParse(raw);
+  if (!parsed.success || parsed.data.label.length === 0) return NAMELESS_ASK;
+  const { kind, label, value, at, series } = parsed.data;
+  const subject: ChartAskSubject = {
+    ...(kind ? { kind } : {}),
+    label,
+    ...(value && value !== label ? { value } : {}),
+    ...(at ? { at } : {}),
+    ...(series ? { series } : {}),
+  };
+  return { kind: "subject", subject };
+}
+
+/**
+ * What a widget says about the state it draws: `problem` while the problem it watches for is on
+ * the card (the error rate rose, a cost jumped). The host shows the widget's problem actions
+ * only while it is; a widget that never signals shows none.
+ */
+export interface ChartSignal {
+  readonly problem: boolean;
+}
+
+/** `LW.signal({ problem })`; the frame posts it only when it changes. */
+export interface LwSignalMessage {
+  readonly type: "lw:signal";
+  readonly signal: unknown;
+}
+
+const chartSignalSchema = z.object({ problem: z.boolean() });
+
+/** A frame's signal as the host reads it: the state it names, or malformed. */
+export type ChartSignalReading =
+  | { readonly kind: "signal"; readonly signal: ChartSignal }
+  | { readonly kind: "malformed" };
+
+/** Reads a frame's signal; anything that is not `{ problem: boolean }` reads as malformed. */
+export function readChartSignal(raw: unknown): ChartSignalReading {
+  const parsed = chartSignalSchema.safeParse(raw);
+  return parsed.success
+    ? { kind: "signal", signal: { problem: parsed.data.problem } }
+    : { kind: "malformed" };
+}
+/**
+ * The frame's error-panel titles for a crash while drawing, as its "lw.error" line starts; a
+ * compile error, no default export or failed import is the widget source's own, not one of these.
+ */
+export const CHART_FRAME_CRASH_TITLES = {
+  renderCrash: "Widget crashed while rendering",
+  renderError: "Render error",
+} as const;
+
+/** The frame's error-panel titles for its own libraries (React, Recharts, Babel) not loading. */
+export const CHART_FRAME_LOAD_FAILURE_TITLES = {
+  librariesUnavailable: "Chart libraries failed to load",
+  compilerUnavailable: "Compiler failed to load",
+} as const;
 
 /** Where a forwarded log/error line originated inside the frame. */
 export type ChartFrameLogSource = "console" | "error" | "unhandledrejection" | "lw.error";
@@ -199,6 +330,8 @@ export type FrameToParentMessage =
   | LwQueryMessage
   | LwSetHeightMessage
   | LwNavigateMessage
+  | LwAskLangyMessage
+  | LwSignalMessage
   | LwLogMessage
   | LwErrorMessage
   | LwHeartbeatMessage;

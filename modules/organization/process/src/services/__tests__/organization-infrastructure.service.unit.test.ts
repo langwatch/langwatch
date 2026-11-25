@@ -34,6 +34,7 @@ import type * as groupRepositoryModule from "../../repositories/group.repository
 import {
   OrganizationRepository,
   type EnsuredPersonalTeam,
+  type OrganizationActiveMemberPage,
   type PersonalWorkspaceFeatureProject,
   type PersonalWorkspaceResourceIds,
   type StoredOrganizationSettings,
@@ -54,6 +55,14 @@ class StubRepository extends OrganizationRepository {
   }
 
   async findPresenceSettingPage(): Promise<[]> {
+    return [];
+  }
+
+  async findActiveMemberPage(): Promise<OrganizationActiveMemberPage> {
+    return { lastOrganizationId: null, organizations: 0, members: [] };
+  }
+
+  async findOperatorRows(): Promise<[]> {
     return [];
   }
 

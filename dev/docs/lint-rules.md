@@ -1330,15 +1330,15 @@ Messages:
 
 - `missingRegion`
   - what: This `new S3Client` names no region on at least one path.
-  - fix: Pass `region: s3RegionOf({ region, endpoint })` from `@langwatch/aws-client` on every path. See the `platform-primitives` skill.
+  - fix: Pass `region: s3RegionOf({ region, endpoint })` from `@langwatch/aws-client` on every path, or `s3RegionFor({ region, endpoint, bucket, askBucket })` for a client that knows its bucket. See the `platform-primitives` skill.
   - why: With no region the SDK guesses from the process environment, not from the configured endpoint.
 - `regionNotShared`
-  - what: This `new S3Client` takes its region from somewhere other than `s3RegionOf`.
-  - fix: Pass `region: s3RegionOf({ region, endpoint })` from `@langwatch/aws-client`, or a `const` bound to that call. See the `platform-primitives` skill.
+  - what: This `new S3Client` takes its region from somewhere other than `s3RegionOf` or `s3RegionFor`.
+  - fix: Pass `region: s3RegionOf({ region, endpoint })` from `@langwatch/aws-client`, or a `const` bound to that call; a client that knows its bucket passes `s3RegionFor({ region, endpoint, bucket, askBucket })`. See the `platform-primitives` skill.
   - why: A hand-picked region drifts per client; one sent `auto` to AWS, which refuses to sign with it.
 - `unreadableOptions`
   - what: This `new S3Client` gets options the rule cannot read, so it cannot see their region.
-  - fix: Build the options inline or in a `const` here, with `region: s3RegionOf({ region, endpoint })`. See the `platform-primitives` skill.
+  - fix: Build the options inline or in a `const` here, with `region: s3RegionOf({ region, endpoint })` or `s3RegionFor({ region, endpoint, bucket, askBucket })`. See the `platform-primitives` skill.
   - why: A region hidden behind a parameter or a mutable binding escapes the one shared region rule.
 
 ## `langwatch/schema-outside-contract`
@@ -1586,7 +1586,7 @@ Messages:
   - why: One clock: every moment in the product is a Temporal.Instant.
 - `mintNowMilliseconds`
   - what: {{name}} reads the current moment as Date epoch milliseconds.
-  - fix: Call `nowInstant().epochMilliseconds` from @langwatch/time.
+  - fix: Call `nowEpochMs()` from @langwatch/time when you only need the count; call `nowInstant()` when you need an Instant.
   - why: One clock: every moment in the product is a Temporal.Instant.
 - `parseInstant`
   - what: {{name}} parses a moment through Date.

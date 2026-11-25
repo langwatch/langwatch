@@ -25,8 +25,40 @@ describe("given a recorded action slug", () => {
     ["gateway.budget.created", "Created budget"],
     ["gateway.virtual_key.guardrail_attached", "Attached guardrail"],
     ["routingPolicy.personalContext", "Routing policy personal context"],
+    ["governance.agent.stop_requested", "Stop requested"],
+    ["governance.agent.stop_approved", "Stop approved"],
+    ["governance.agent.stop_plan_set", "Stop plan set"],
+    ["governance.agent.restore_requested", "Restore requested"],
+    ["governance.agent.restore_failed", "Restore failed"],
+    ["governance.agent.quarantined", "Quarantined agent"],
+    ["governance.agent.restored", "Restored agent"],
   ])("reads %s as %s", (action, phrase) => {
     expect(auditActionPhrase(action)).toBe(phrase);
+  });
+});
+
+describe("given an action recorded before the kill switch", () => {
+  /** @scenario An audit row reads as a sentence, with the recorded action kept beside it */
+  it.each([
+    ["organization.setMemberDisabled", "Set member disabled"],
+    ["aiTools.setEnabled", "Set enabled"],
+    ["virtualKeys.update", "Updated virtual key"],
+    ["apiKey.create", "Created api key"],
+    ["team.archive", "Archived team"],
+    ["secrets.delete", "Deleted secret"],
+    ["project.updateEmbeddingsModel", "Updated embeddings model"],
+    ["authz.grants.revoke", "Revoked grant"],
+    ["identity.joinRequests.setJoining", "Set joining"],
+    ["license.upload", "License upload"],
+  ])("keeps reading %s as %s", (action, phrase) => {
+    expect(auditActionPhrase(action)).toBe(phrase);
+  });
+
+  /** @scenario An audit row reads as a sentence, with the recorded action kept beside it */
+  it("reads a verb used as an adjective before a participle as written", () => {
+    expect(auditActionPhrase("user.email.duplicate_address_tagged")).toBe(
+      "Duplicate address tagged",
+    );
   });
 });
 
@@ -74,6 +106,18 @@ describe("given the line under a row's phrase", () => {
       auditTargetLine({ targetKind: "role_binding", targetId: "rolebinding_1", projectName: "p" }),
     ).toEqual({ kind: "id", id: "rolebinding_1" });
     expect(auditTargetLine({ targetKind: null, targetId: null, projectName: null })).toBeNull();
+  });
+
+  /** @scenario An entry row names its target by the name the row recorded */
+  it("reads a target by its recorded name rather than its id", () => {
+    expect(
+      auditTargetLine({
+        targetKind: "governance_agent",
+        targetId: "agentreg_1",
+        targetName: "Finance close",
+        projectName: null,
+      }),
+    ).toEqual({ kind: "words", text: "Finance close" });
   });
 });
 
@@ -274,6 +318,7 @@ const row = (id: string, overrides: Record<string, unknown> = {}) => ({
   action: "authz.grants.attach",
   targetKind: null,
   targetId: null,
+  targetName: null,
   projectId: null,
   error: null,
   source: "platform" as const,
@@ -302,6 +347,17 @@ describe("given consecutive identical events", () => {
   it("never folds a failed attempt into a successful one", () => {
     const runs = groupAuditRuns([row("a"), row("b", { error: "FORBIDDEN" })]);
     expect(runs).toHaveLength(2);
+  });
+
+  /** @scenario A burst of identical events by one actor reads as one row */
+  it("keeps events on one target apart when the target's recorded name changed", () => {
+    const named = { targetKind: "governance_aws_connection", targetId: "awsconn_1" };
+    const runs = groupAuditRuns([
+      row("a", { ...named, targetName: "ACME production" }),
+      row("b", { ...named, targetName: "ACME production" }),
+      row("c", { ...named, targetName: "ACME staging" }),
+    ]);
+    expect(runs.map((run) => run.entries.map((entry) => entry.id))).toEqual([["a", "b"], ["c"]]);
   });
 });
 

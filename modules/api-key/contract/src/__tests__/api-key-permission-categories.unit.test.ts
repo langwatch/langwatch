@@ -195,6 +195,7 @@ describe("categoryPermissions()", () => {
         "gatewayLogs:view",
         "gatewayUsage:view",
         "gatewayCacheRules:view",
+        "gatewayA2aTargets:view",
         "gatewaySpend:view",
         "webhookEndpoints:view",
       ]);

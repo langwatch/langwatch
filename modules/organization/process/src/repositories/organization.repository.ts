@@ -45,8 +45,37 @@ export type PersonalWorkspaceFeatureProject = {
   personalFeatures: unknown;
 };
 
+/** One organization as an operator's search reads it, before its administrators are named. */
+export type OrganizationOperatorRow = Readonly<{
+  id: string;
+  name: string;
+  slug: string;
+  createdAt: Instant;
+  memberCount: number;
+}>;
+
+/** What an operator's read names: a search over name, slug and id, or a list of ids. */
+export type OrganizationOperatorQuery =
+  | Readonly<{ query: string; limit: number }>
+  | Readonly<{ organizationIds: readonly string[] }>;
+
 /** One organization's stored presence switch, as the presence step reads it a page at a time. */
 export type OrganizationPresenceSettingRow = Readonly<{ id: string; presenceEnabled: boolean }>;
+
+/** One membership neither disabled nor held by a deactivated user, with its row's creation time. */
+export type OrganizationActiveMemberRow = Readonly<{
+  organizationId: string;
+  userId: string;
+  joinedAt: Instant;
+}>;
+
+/** A page of organizations in id order and their active members. */
+export type OrganizationActiveMemberPage = Readonly<{
+  /** The page's last organization, where the next page starts; null past the end. */
+  lastOrganizationId: string | null;
+  organizations: number;
+  members: readonly OrganizationActiveMemberRow[];
+}>;
 
 /**
  * The stored settings row, before decryption: `tryFindSettings` is the
@@ -81,11 +110,21 @@ export abstract class OrganizationSettingsCipher {
 export abstract class OrganizationRepository {
   /** Organization ids ordered by id, after the cursor; no limit reads them all. */
   abstract listAllIds(input?: OrganizationIdPageInput): Promise<OrganizationIdPage>;
+  /** Customer organizations an operator searched for or named, by name; system ones left out. */
+  abstract findOperatorRows(input: OrganizationOperatorQuery): Promise<OrganizationOperatorRow[]>;
   /** Organizations' presence switches in id order after `afterId`, system ones left out. */
   abstract findPresenceSettingPage(input: {
     afterId: string | null;
     limit: number;
   }): Promise<OrganizationPresenceSettingRow[]>;
+  /**
+   * Up to `limit` organizations in id order after `afterId`, system ones included, and their
+   * members whose membership is not disabled and whose user is not deactivated.
+   */
+  abstract findActiveMemberPage(input: {
+    afterId: string | null;
+    limit: number;
+  }): Promise<OrganizationActiveMemberPage>;
   /** The usage report's counts; the caller never passes an empty organization list. */
   abstract countUsage(input: {
     organizationIds: readonly string[];

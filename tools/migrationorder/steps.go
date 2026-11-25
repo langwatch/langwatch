@@ -36,7 +36,8 @@ type ReleasedStep struct {
 	// Path is repository-relative, on the base branch.
 	Path string
 	// Base is the declaration on the base branch: the step call (stepCalls)
-	// holding the id, or the whole file when no such call encloses it.
+	// holding the id or the owner's id-index fill call (idIndexBlock), else
+	// the whole file when neither encloses it.
 	Base string
 	// Head is the same declaration on the branch head, at HeadPath; empty
 	// when the branch no longer declares the id anywhere.
@@ -59,7 +60,7 @@ type StepInput struct {
 func CheckSteps(in StepInput) []Finding {
 	var findings []Finding
 	for _, step := range in.Released {
-		restore := fmt.Sprintf("restore the defineMigrationStep block declaring %s as `git show %s:%s` has it, and declare the change as a new step with a new id",
+		restore := fmt.Sprintf("restore the declaration of %s as `git show %s:%s` has it, and declare the change as a new step with a new id",
 			step.ID, in.BaseRef, shellArg(step.Path))
 		switch {
 		case step.Head == "":
@@ -96,8 +97,9 @@ func isCodeStep(id string) bool {
 }
 
 // Steps reads the released code steps from the manifests on baseRef and on
-// every release line, finds the base branch declaration of each by its quoted
-// id, and the same declaration on HEAD: at the same path first, else anywhere.
+// every release line, finds the base branch declaration of each (a step call
+// quoting its id, or its owner's id-index fill call), and the same declaration
+// on HEAD: at the same path first, else anywhere.
 func (r Repo) Steps(ctx context.Context, baseRef string, releasedRefs ...string) (StepInput, error) {
 	in := StepInput{BaseRef: baseRef}
 	releaseOf := map[string]string{}
@@ -146,8 +148,9 @@ func (r Repo) Steps(ctx context.Context, baseRef string, releasedRefs ...string)
 	return in, nil
 }
 
-// baseDeclarations returns the base branch files declaring id in a
-// step call (stepCalls); when none does, every file naming it, whole.
+// baseDeclarations returns the base branch files declaring id in a step
+// call (stepBlock); when none does, every file naming it other than in an
+// after list, whole.
 func (reader *fileReader) baseDeclarations(ref, id string, declared []declaration) ([]ReleasedStep, error) {
 	var steps, wholeFiles []ReleasedStep
 	for _, d := range declared {
@@ -158,7 +161,9 @@ func (reader *fileReader) baseDeclarations(ref, id string, declared []declaratio
 		if err != nil {
 			return nil, err
 		}
-		wholeFiles = append(wholeFiles, ReleasedStep{ID: id, Path: d.path, Base: content, wholeFile: true})
+		if !referencesOnly(content, id) {
+			wholeFiles = append(wholeFiles, ReleasedStep{ID: id, Path: d.path, Base: content, wholeFile: true})
+		}
 		if block := stepBlock(content, id); block != "" {
 			steps = append(steps, ReleasedStep{ID: id, Path: d.path, Base: block})
 		}
@@ -170,7 +175,7 @@ func (reader *fileReader) baseDeclarations(ref, id string, declared []declaratio
 }
 
 // findBlock returns the first file on ref, by path, that declares id in a
-// step call (stepCalls), and that call.
+// step call (stepCalls) or its owner's id-index fill call, and that call.
 func (reader *fileReader) findBlock(ref, id string, declared []declaration) (string, string, error) {
 	for _, d := range declared {
 		if d.id != id {
@@ -225,17 +230,25 @@ func (reader *fileReader) read(ref, file string) (string, error) {
 
 // idProperty matches the id property of a step declaration, any quote style.
 func idProperty(id string) *regexp.Regexp {
-	quoted := regexp.QuoteMeta(id)
-	return regexp.MustCompile(`\bid\s*:\s*(?:"` + quoted + `"|'` + quoted + `'|` + "`" + quoted + "`" + `)`)
+	return regexp.MustCompile(`\bid\s*:\s*` + quotedLiteral(id))
 }
 
 // stepCalls are the calls a module declares a code step with. A replay step
 // is one too: missing it froze its whole module file.
 var stepCalls = []string{"defineMigrationStep(", "defineProjectionReplayStep("}
 
-// stepBlock returns the step call (stepCalls) whose id property is id, found
-// by balanced brackets from the call start; empty when none is.
+// stepBlock returns the call declaring id: a step call (stepCalls) whose id
+// property is id, else the id-index fill naming it (idIndexBlock).
 func stepBlock(content, id string) string {
+	if block := stepCallBlock(content, id); block != "" {
+		return block
+	}
+	return idIndexBlock(content, id)
+}
+
+// stepCallBlock returns the step call (stepCalls) whose id property is id,
+// found by balanced brackets from the call start; empty when none is.
+func stepCallBlock(content, id string) string {
 	for _, loc := range idProperty(id).FindAllStringIndex(content, -1) {
 		for _, call := range stepCalls {
 			for start := strings.LastIndex(content[:loc[0]], call); start >= 0; start = strings.LastIndex(content[:start], call) {
@@ -248,55 +261,64 @@ func stepBlock(content, id string) string {
 	return ""
 }
 
-// closingParen returns the index of the bracket closing the one at open,
-// skipping string literals and comments; -1 when it never closes.
-func closingParen(content string, open int) int {
-	depth := 0
-	for i := open; i < len(content); i++ {
-		switch c := content[i]; c {
-		case '(', '{', '[':
-			depth++
-		case ')', '}', ']':
-			depth--
-			if depth == 0 {
-				return i
-			}
-		case '"', '\'', '`':
-			i = skipString(content, i, c)
-		case '/':
-			i = skipComment(content, i)
+// idIndexMethod declares a step without its id: `<module>:<step option>`, or
+// `<module>:fill-id-indexes` with no step option (id-index-fill-step.ts).
+const (
+	idIndexMethod      = "withIdIndexes"
+	defaultIDIndexStep = "fill-id-indexes"
+)
+
+// idIndexStepOption matches the step option, its key bare or quoted; the
+// first group is the colon, the second the step name.
+var idIndexStepOption = regexp.MustCompile(`(?:\bstep|"step"|'step')\s*(:)\s*["'` + "`" + `]([^"'` + "`" + `]+)["'` + "`" + `]`)
+
+// idIndexBlock returns the idIndexMethod call chained on the owner's
+// defineProcessModule whose step id is id; empty when none is.
+func idIndexBlock(content, id string) string {
+	owner, name, _ := strings.Cut(id, ":")
+	for _, call := range ownerCalls(content, owner, idIndexMethod) {
+		if idIndexStepName(call) == name {
+			return call
 		}
 	}
-	return -1
+	return ""
 }
 
-func skipString(content string, start int, quote byte) int {
-	for i := start + 1; i < len(content); i++ {
-		switch content[i] {
-		case '\\':
-			i++
-		case quote:
-			return i
+// idIndexStepName reads the step option off the call's own options object,
+// never off a comment, a string or a nested object.
+func idIndexStepName(call string) string {
+	depths := codeDepths(call)
+	for _, match := range idIndexStepOption.FindAllStringSubmatchIndex(call, -1) {
+		if depths[match[2]] == 2 {
+			return call[match[4]:match[5]]
 		}
 	}
-	return len(content)
+	return defaultIDIndexStep
 }
 
-func skipComment(content string, start int) int {
-	rest := content[start:]
-	switch {
-	case strings.HasPrefix(rest, "//"):
-		if end := strings.IndexByte(rest, '\n'); end >= 0 {
-			return start + end
+// afterList matches `after:` up to its list's bracket, comments allowed on
+// either side of the colon.
+var afterList = regexp.MustCompile(`(?s)\bafter(?:\s|/\*.*?\*/|//[^\n]*)*:(?:\s|/\*.*?\*/|//[^\n]*)*\[`)
+
+// referencesOnly reports whether every quoted id in content sits in an
+// `after: [...]` list in code: another step ordering itself after id, not
+// declaring it.
+func referencesOnly(content, id string) bool {
+	depths := codeDepths(content)
+	var lists [][2]int
+	for _, loc := range afterList.FindAllStringIndex(content, -1) {
+		if depths[loc[0]] < 0 {
+			continue
 		}
-		return len(content)
-	case strings.HasPrefix(rest, "/*"):
-		if end := strings.Index(rest[2:], "*/"); end >= 0 {
-			return start + 2 + end + 1
-		}
-		return len(content)
+		lists = append(lists, [2]int{loc[1] - 1, closingParen(content, loc[1]-1)})
 	}
-	return start
+	for _, loc := range regexp.MustCompile(quotedLiteral(id)).FindAllStringIndex(content, -1) {
+		inList := func(list [2]int) bool { return list[0] < loc[0] && loc[1] <= list[1] }
+		if !slices.ContainsFunc(lists, inList) {
+			return false
+		}
+	}
+	return true
 }
 
 // readManifests adds every code step id the manifests on ref name, keeping
@@ -347,13 +369,68 @@ type declaration struct {
 
 // declaringFiles finds the non-test files under StepRoots on ref that hold a
 // step id as a quoted literal outside a comment, the form
-// defineMigrationStep({ id }) takes; a doc comment naming a step declares nothing.
+// defineMigrationStep({ id }) takes, and those naming idIndexMethod, which
+// declares its id without quoting it; a doc comment naming a step declares nothing.
 func (r Repo) declaringFiles(ctx context.Context, ref string, ids []string) ([]declaration, error) {
-	args := []string{"grep", "-F", "--full-name"}
+	quoted, err := r.quotedDeclarations(ctx, ref, ids)
+	if err != nil {
+		return nil, err
+	}
+	calls, err := r.idIndexDeclarations(ctx, ref, ids)
+	if err != nil {
+		return nil, err
+	}
+	found := slices.Concat(quoted, calls)
+	slices.SortFunc(found, func(a, b declaration) int { return strings.Compare(a.path+a.id, b.path+b.id) })
+	return slices.Compact(found), nil
+}
+
+// quotedDeclarations finds the files on ref holding a step id in any quote
+// style on a line that is not a comment.
+func (r Repo) quotedDeclarations(ctx context.Context, ref string, ids []string) ([]declaration, error) {
+	var patterns []string
 	for _, id := range ids {
 		for _, quote := range []string{`"`, `'`, "`"} {
-			args = append(args, "-e", quote+id+quote)
+			patterns = append(patterns, quote+id+quote)
 		}
+	}
+	lines, err := r.grep(ctx, ref, patterns)
+	if err != nil {
+		return nil, err
+	}
+	var found []declaration
+	for _, line := range lines {
+		found = append(found, parseDeclarations(ref, line, ids)...)
+	}
+	return found, nil
+}
+
+// idIndexDeclarations makes each file on ref naming idIndexMethod a candidate
+// for every id; idIndexBlock then keeps only the owner's call in code.
+func (r Repo) idIndexDeclarations(ctx context.Context, ref string, ids []string) ([]declaration, error) {
+	lines, err := r.grep(ctx, ref, []string{idIndexMethod})
+	if err != nil {
+		return nil, err
+	}
+	var found []declaration
+	for _, line := range lines {
+		file, _, ok := splitGrepLine(ref, line)
+		if !ok {
+			continue
+		}
+		for _, id := range ids {
+			found = append(found, declaration{id: id, path: file})
+		}
+	}
+	return found, nil
+}
+
+// grep returns `git grep` lines for the fixed patterns under StepRoots on
+// ref; no match is no lines, not an error.
+func (r Repo) grep(ctx context.Context, ref string, patterns []string) ([]string, error) {
+	args := []string{"grep", "-F", "--full-name"}
+	for _, pattern := range patterns {
+		args = append(args, "-e", pattern)
 	}
 	args = append(args, ref, "--")
 	args = append(args, StepRoots...)
@@ -362,27 +439,28 @@ func (r Repo) declaringFiles(ctx context.Context, ref string, ids []string) ([]d
 	if err != nil && (!errors.As(err, &exit) || exit.ExitCode() != 1) {
 		return nil, err
 	}
-	var found []declaration
-	for _, line := range lines(out) {
-		found = append(found, parseDeclarations(ref, line, ids)...)
-	}
-	slices.SortFunc(found, func(a, b declaration) int { return strings.Compare(a.path+a.id, b.path+b.id) })
-	return slices.Compact(found), nil
+	return lines(out), nil
 }
 
-// parseDeclarations reads one `git grep` line, <ref>:<path>:<content>, into the
-// step ids it quotes, skipping test files, which may name a step without
-// declaring it, and comment lines.
-func parseDeclarations(ref, line string, ids []string) []declaration {
+// splitGrepLine reads one `git grep` line, <ref>:<path>:<content>, skipping
+// test files, which may name a step without declaring it.
+func splitGrepLine(ref, line string) (file, content string, ok bool) {
 	rest, ok := strings.CutPrefix(line, ref+":")
 	if !ok {
-		return nil
+		return "", "", false
 	}
-	file, content, ok := strings.Cut(rest, ":")
+	file, content, ok = strings.Cut(rest, ":")
 	if !ok || strings.Contains(file, "/__tests__/") || strings.Contains(file, ".test.") {
-		return nil
+		return "", "", false
 	}
-	if isCommentLine(content) {
+	return file, content, true
+}
+
+// parseDeclarations reads one `git grep` line into the step ids it quotes,
+// skipping test files and comment lines.
+func parseDeclarations(ref, line string, ids []string) []declaration {
+	file, content, ok := splitGrepLine(ref, line)
+	if !ok || isCommentLine(content) {
 		return nil
 	}
 	var found []declaration

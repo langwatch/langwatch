@@ -49,8 +49,8 @@ describe("webhook event registry", () => {
     expect(eventMatches([], "gateway.request.completed")).toBe(false);
   });
 
-  it("the match-all selector matches every registered type", () => {
-    for (const t of WEBHOOK_EVENT_TYPES) {
+  it("the match-all selector matches every registered type except OCSF events", () => {
+    for (const t of WEBHOOK_EVENT_TYPES.filter((entry) => !entry.type.startsWith("ocsf."))) {
       expect(eventMatches(["*"], t.type)).toBe(true);
     }
   });
@@ -62,5 +62,20 @@ describe("webhook event registry", () => {
     expect(isValidEventSelector("*")).toBe(true);
     expect(isValidEventSelector("nonsense.*")).toBe(false);
     expect(isValidEventSelector("gateway.request.imagined")).toBe(false);
+  });
+});
+
+describe("eventMatches() for OCSF events", () => {
+  it("does not match ocsf.event with the * selector", () => {
+    expect(eventMatches(["*"], "ocsf.event")).toBe(false);
+  });
+
+  it("matches ocsf.event when the endpoint names it or ocsf.*", () => {
+    expect(eventMatches(["ocsf.event"], "ocsf.event")).toBe(true);
+    expect(eventMatches(["ocsf.*"], "ocsf.event")).toBe(true);
+  });
+
+  it("keeps * matching every other event type", () => {
+    expect(eventMatches(["*"], "gateway.request.completed")).toBe(true);
   });
 });

@@ -36,6 +36,9 @@
       "path": "../../modules/stored-object/process/tsconfig.build.json"
     },
     {
+      "path": "../../modules/stored-object/contract/tsconfig.build.json"
+    },
+    {
       "path": "../../modules/staff-access/process/tsconfig.build.json"
     },
     {
@@ -166,6 +169,9 @@
     },
     {
       "path": "../../enterprise/modules/enterprise-gateway/process/tsconfig.build.json"
+    },
+    {
+      "path": "../../enterprise/modules/digest/process/tsconfig.build.json"
     },
     {
       "path": "../../enterprise/modules/demo-data/process/tsconfig.build.json"

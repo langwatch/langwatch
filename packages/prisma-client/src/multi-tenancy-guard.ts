@@ -37,13 +37,10 @@ const RAW_TENANT_COMPARISON_RE =
   /"?\b(?:projectId|organizationId|tenantId)"?\s*(?:=\s*(?:ANY\s*\(\s*)?|IN\s*\(\s*)(?:\?|\$\d+)/i;
 
 // An INSERT ... VALUES writes its own rows, so naming a tenant column in its column list scopes it.
-const RAW_INSERT_COLUMNS_RE = /^\s*INSERT\s+INTO\s+[^\s(][^(]*\(([^)]*)\)\s*VALUES\b/i;
+// Two steps, each quantifier stopping at one delimiter, keep matching linear (CodeQL
+// js/polynomial-redos): `INTO\s+[^(]+` and `[^)]*name[^)]*` both backtrack quadratically.
+const RAW_INSERT_COLUMNS_RE = /^\s*INSERT\s+INTO\s[^(]+\(([^)]*)\)\s*VALUES\b/i;
 const RAW_TENANT_COLUMN_RE = /\b(?:projectId|organizationId|tenantId)\b/i;
-
-function insertNamesTenantColumn(sql: string): boolean {
-  const columns = RAW_INSERT_COLUMNS_RE.exec(sql)?.[1];
-  return columns !== undefined && RAW_TENANT_COLUMN_RE.test(columns);
-}
 
 // The table a skipped statement names first, for the skip counter's label.
 const RAW_TABLE_RE = /\b(?:FROM|INTO|UPDATE|JOIN)\s+"?([A-Za-z_][\w]*)"?/i;
@@ -138,6 +135,14 @@ const GLOBAL_MODELS = [
   // the operator, never a tenant, like Passkey.
   "StaffAccessRequester",
   "StaffAccessChallenge",
+  // A person's opt-out of the weekly digest, keyed by userId alone and honoured in every
+  // organization they belong to, like WebPushSubscription.
+  "DigestSubscription",
+  // The digest's one settings row (the weekly send's switch), like InstanceIdentity.
+  "DigestSettings",
+  // Nurturing's erased accounts, by a hash of the id alone: an erasure spans every organization,
+  // like AuthzUserStanding; written in raw SQL only.
+  "NurturingErasedUser",
 ] as const;
 
 /**
@@ -935,7 +940,7 @@ function assertRawTenancy(params: GuardParams, onSkipped: OnSkippedTenantCheck):
     return;
   }
   if (RAW_TENANT_COMPARISON_RE.test(sql)) return;
-  if (insertNamesTenantColumn(sql)) return;
+  if (insertsTenantColumn(sql)) return;
 
   throw new Error(
     "The raw query compares no tenant column with a bound parameter. Add " +
@@ -943,6 +948,11 @@ function assertRawTenancy(params: GuardParams, onSkipped: OnSkippedTenantCheck):
       "`skipTenantCheck({ SKIP_TENANT_CHECK: true })` under a comment giving the reason " +
       "if the query intentionally spans tenants.",
   );
+}
+
+function insertsTenantColumn(sql: string): boolean {
+  const columns = RAW_INSERT_COLUMNS_RE.exec(sql)?.[1];
+  return columns !== undefined && RAW_TENANT_COLUMN_RE.test(columns);
 }
 
 /** A throwing counter or logger must not refuse a statement the guard already allowed. */

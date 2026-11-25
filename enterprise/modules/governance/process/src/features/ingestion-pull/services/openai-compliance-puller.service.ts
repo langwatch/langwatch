@@ -88,6 +88,7 @@ export class OpenAiComplianceReferencePullerService implements GovernancePuller<
   static create(options: {
     objects: GovernanceObjectStore;
     diagnostics?: IngestionPullDiagnosticsSink;
+    deploymentAwsIdentity?: boolean;
   }): OpenAiComplianceReferencePullerService {
     return new OpenAiComplianceReferencePullerService(
       S3PollingPullerService.create({ ...options, id: "openai_compliance" }),

@@ -1635,6 +1635,54 @@ describe("guardOrganizationId: nurturing's trace window sweep and member copy", 
   });
 });
 
+describe("guardOrganizationId: the digest's cohort and weekly folds", () => {
+  const runOrganizationGuard = (params: GuardParams) =>
+    guardOrganizationId(
+      params,
+      vi.fn(async () => "ok"),
+    );
+
+  describe("when the weekly plan reads the enrolled cohort", () => {
+    it("permits the list and refuses a write that names no organization", async () => {
+      await expect(
+        runOrganizationGuard({ model: "DigestCohortOrganization", action: "findMany", args: {} }),
+      ).resolves.toBe("ok");
+      await expect(
+        runOrganizationGuard({
+          model: "DigestCohortOrganization",
+          action: "deleteMany",
+          args: { where: {} },
+        }),
+      ).rejects.toThrow(/organizationId/);
+    });
+  });
+
+  describe("when a weekly fold is read", () => {
+    it.each(["DigestProjectWeek", "DigestUserWeek"])(
+      "permits %s by organization or row id, and refuses a read across organizations",
+      async (model) => {
+        await expect(
+          runOrganizationGuard({
+            model,
+            action: "findMany",
+            args: { where: { organizationId: "org-1", isoWeek: { in: ["2026-W46"] } } },
+          }),
+        ).resolves.toBe("ok");
+        await expect(
+          runOrganizationGuard({ model, action: "findUnique", args: { where: { id: "fold-1" } } }),
+        ).resolves.toBe("ok");
+        await expect(
+          runOrganizationGuard({
+            model,
+            action: "findMany",
+            args: { where: { isoWeek: { in: ["2026-W46"] } } },
+          }),
+        ).rejects.toThrow(/organizationId/);
+      },
+    );
+  });
+});
+
 describe("guardOrganizationId — organizationId as an operator or a composite key", () => {
   const runOrganizationGuard = (params: GuardParams) =>
     guardOrganizationId(

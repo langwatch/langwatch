@@ -183,6 +183,11 @@ export class MemoryAuthzManagedGrantRepository extends AuthzManagedGrantReposito
     return this.memory.memberships.get(key)?.role ?? null;
   }
 
+  async isBillingOnlyMember(input: { organizationId: string; userId: string }): Promise<boolean> {
+    const key = this.memory.membershipKey(input.organizationId, input.userId);
+    return this.memory.memberships.get(key)?.billingOnly === true;
+  }
+
   async isGroupInOrganization(input: {
     organizationId: string;
     groupId: string;

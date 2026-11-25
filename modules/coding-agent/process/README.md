@@ -12,7 +12,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 ## Module API (`CodingAgentApi`)
 
-Peers call these through the token, declared at `../contract/src/coding-agent.api.ts:64`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/coding-agent.api.ts:65`; nothing else in this package is public.
 
 #### `findBySessionId`
 
@@ -20,10 +20,18 @@ Peers call these through the token, declared at `../contract/src/coding-agent.ap
 findBySessionId(input: CodingAgentSessionLookupInput): Promise<CodingAgentSession | null>;
 ```
 
-#### `findSessionForTrace`
+#### `findSessionForTraceForViewer`
+
+The session one trace belongs to, its name blanked unless the viewer may read content.
 
 ```typescript
-findSessionForTrace(input: { projectId: string; traceId: string; }): Promise<CodingAgentSession | null>;
+findSessionForTraceForViewer(input: { projectId: string; traceId: string; authorization: Authorization }, by: CodingAgentViewer): Promise<CodingAgentSession | null>;
+```
+
+#### `findLastTurnOfSession`
+
+```typescript
+findLastTurnOfSession(input: { projectId: string; sessionId: string; }): Promise<CodingAgentSessionLastTurn | null>;
 ```
 
 #### `readTranscriptForViewer`
@@ -235,7 +243,7 @@ type Response = z.infer<typeof pullRequestUsageResponseSchema>; // src/rules/pul
 
 ### `codingAgents`
 
-Contract `../contract/src/coding-agent.trpc.ts:25`, router `src/transport/coding-agent.trpc.ts:29`.
+Contract `../contract/src/coding-agent.trpc.ts:27`, router `src/transport/coding-agent.trpc.ts:29`.
 
 | Procedure                        | Kind  | Gate                     | Input                                         | Output                                                    |
 | -------------------------------- | ----- | ------------------------ | --------------------------------------------- | --------------------------------------------------------- |
@@ -245,18 +253,19 @@ Contract `../contract/src/coding-agent.trpc.ts:25`, router `src/transport/coding
 | `codingAgents.pullRequestUsage`  | query | Permission `traces:view` | `codingAgentTrpcProjectScopeSchema`           | `codingAgentPersonalPullRequestUsageWithConnectionSchema` |
 | `codingAgents.pullRequestDetail` | query | Permission `traces:view` | `codingAgentTrpcPullRequestDetailInputSchema` | `codingAgentPullRequestDetailSchema`                      |
 | `codingAgents.session`           | query | Permission `traces:view` | inline                                        | inline                                                    |
+| `codingAgents.lastTurn`          | query | Permission `traces:view` | `codingAgentTrpcSessionScopeSchema`           | inline                                                    |
 | `codingAgents.transcript`        | query | Permission `traces:view` | `codingAgentTrpcTraceScopeSchema`             | `codingAgentTranscriptSchema`                             |
 | `codingAgents.sessionGroups`     | query | Permission `traces:view` | `traceSessionGroupsInputSchema`               | `tracesSessionsPageSchema`                                |
 
 ```typescript
 // codingAgents.usageTotals
-// Input: codingAgentTrpcUsageTotalsInputSchema, ../contract/src/coding-agent-trpc.schemas.ts:39
+// Input: codingAgentTrpcUsageTotalsInputSchema, ../contract/src/coding-agent-trpc.schemas.ts:50
 interface Input {
   projectId: string;
   fromMs?: number;
   toMs?: number;
 }
-// Output: codingAgentUsageTotalsSchema, ../contract/src/coding-agent.ts:486
+// Output: codingAgentUsageTotalsSchema, ../contract/src/coding-agent.ts:497
 interface Output {
   sessionCount: number;
   costUsd: number;
@@ -269,55 +278,67 @@ interface Output {
 }
 
 // codingAgents.recentSessions
-// Input: codingAgentTrpcRecentSessionsInputSchema, ../contract/src/coding-agent-trpc.schemas.ts:51
+// Input: codingAgentTrpcRecentSessionsInputSchema, ../contract/src/coding-agent-trpc.schemas.ts:62
 interface Input {
   projectId: string;
   fromMs?: number;
   toMs?: number;
   limit?: number;
 }
-// Output: codingAgentSessionSchema.array() (inline, ../contract/src/coding-agent.trpc.ts:35)
+// Output: codingAgentSessionSchema.array() (inline, ../contract/src/coding-agent.trpc.ts:37)
 
 // codingAgents.sessionsList
 // Input: codingAgentTrpcProjectScopeSchema, ../contract/src/coding-agent-trpc.schemas.ts:15
 interface Input {
   projectId: string;
 }
-// Output: codingAgentSessionListRowSchema.array() (inline, ../contract/src/coding-agent.trpc.ts:41)
+// Output: codingAgentSessionListRowSchema.array() (inline, ../contract/src/coding-agent.trpc.ts:43)
 
 // codingAgents.pullRequestUsage
 type Input = z.infer<typeof codingAgentTrpcProjectScopeSchema>; // ../contract/src/coding-agent-trpc.schemas.ts:15
-type Output = z.infer<typeof codingAgentPersonalPullRequestUsageWithConnectionSchema>; // ../contract/src/coding-agent.ts:876
+type Output = z.infer<typeof codingAgentPersonalPullRequestUsageWithConnectionSchema>; // ../contract/src/coding-agent.ts:887
 
 // codingAgents.pullRequestDetail
-// Input: codingAgentTrpcPullRequestDetailInputSchema, ../contract/src/coding-agent-trpc.schemas.ts:63
+// Input: codingAgentTrpcPullRequestDetailInputSchema, ../contract/src/coding-agent-trpc.schemas.ts:74
 interface Input {
   projectId: string;
   repositoryHost: string;
   repositoryFullName: string;
   prNumber: number;
 }
-type Output = z.infer<typeof codingAgentPullRequestDetailSchema>; // ../contract/src/coding-agent.ts:785
+type Output = z.infer<typeof codingAgentPullRequestDetailSchema>; // ../contract/src/coding-agent.ts:796
 
 // codingAgents.session
-// Input: inline, ../contract/src/coding-agent.trpc.ts:58
+// Input: inline, ../contract/src/coding-agent.trpc.ts:60
 interface Input {
   projectId: string;
   traceId: string;
 }
-// Output: codingAgentSessionSchema.nullable() (inline, ../contract/src/coding-agent.trpc.ts:59)
+// Output: codingAgentSessionSchema.nullable() (inline, ../contract/src/coding-agent.trpc.ts:61)
+
+// codingAgents.lastTurn
+// Input: codingAgentTrpcSessionScopeSchema, ../contract/src/coding-agent-trpc.schemas.ts:26
+interface Input {
+  projectId: string;
+  sessionId: string;
+}
+// Output: inline, ../contract/src/coding-agent.trpc.ts:67
+type Output = {
+  traceId: string;
+  occurredAtMs: number;
+} | null;
 
 // codingAgents.transcript
-// Input: codingAgentTrpcTraceScopeSchema, ../contract/src/coding-agent-trpc.schemas.ts:27
+// Input: codingAgentTrpcTraceScopeSchema, ../contract/src/coding-agent-trpc.schemas.ts:38
 interface Input {
   projectId: string;
   traceId: string;
   occurredAtMs?: number;
 }
-type Output = z.infer<typeof codingAgentTranscriptSchema>; // ../contract/src/coding-agent-transcript.ts:104
+type Output = z.infer<typeof codingAgentTranscriptSchema>; // ../contract/src/coding-agent-transcript.ts:107
 
 // codingAgents.sessionGroups
-type Input = z.infer<typeof traceSessionGroupsInputSchema>; // ../../trace/contract/src/traces.trpc.ts:163
+type Input = z.infer<typeof traceSessionGroupsInputSchema>; // ../../trace/contract/src/traces.trpc.ts:164
 type Output = z.infer<typeof tracesSessionsPageSchema>; // ../../trace/contract/src/trace.responses.ts:148
 ```
 
@@ -360,8 +381,8 @@ Declared at `src/eventing/coding-agent-project-milestones.pipeline.ts:18`. Event
 
 | Kind   | Leaf                    | Environment variable               | Declared at                                |
 | ------ | ----------------------- | ---------------------------------- | ------------------------------------------ |
-| secret | `repositoryKey`         | `CREDENTIALS_SECRET`               | `src/app/coding-agent.app.ts:156`          |
-| secret | `repositoryKeyFallback` | `NEXTAUTH_SECRET`                  | `src/app/coding-agent.app.ts:157`          |
+| secret | `repositoryKey`         | `CREDENTIALS_SECRET`               | `src/app/coding-agent.app.ts:158`          |
+| secret | `repositoryKeyFallback` | `NEXTAUTH_SECRET`                  | `src/app/coding-agent.app.ts:159`          |
 | config | `foldCacheTtlSeconds`   | `LANGWATCH_FOLD_CACHE_TTL_SECONDS` | `../contract/src/coding-agent.config.ts:4` |
 
 <!-- readme:generated:end -->

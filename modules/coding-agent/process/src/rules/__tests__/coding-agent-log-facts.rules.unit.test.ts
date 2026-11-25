@@ -8,6 +8,7 @@
 
 import type { ContributeLogFactsCommandData } from "@langwatch/coding-agent-contract";
 import {
+  SESSION_NAME_FACT_KEY,
   SESSION_TITLE_FACT_KEY,
   SESSION_TITLE_FALLBACK_FACT_KEY,
 } from "@langwatch/coding-agent-contract";
@@ -167,6 +168,32 @@ describe("liftLogContribution", () => {
       expect(contribution!.facts["service.version"]).toBe("2.0.1");
       // No correlation on the record: the contribution carries no trace.
       expect(contribution!.traceId).toBeNull();
+    });
+  });
+
+  describe("when a launcher declares its own session on the resource", () => {
+    /** @scenario a launcher's declared session groups every harness session it runs */
+    it("keys every run's records on the declared session", () => {
+      const { lift, dispatched } = makeLift();
+
+      for (const [recordId, sessionId] of [
+        ["rec-a", "cc-run-1"],
+        ["rec-b", "cc-run-2"],
+      ] as const) {
+        lift(
+          canonicalLogRecord({
+            recordId,
+            attributes: { "event.name": "claude_code.user_prompt", "session.id": sessionId },
+            providerSessionId: sessionId,
+            resourceAttributes: { "langwatch.session.id": "agent_scout" },
+          }),
+        );
+      }
+
+      expect(dispatched.map((contribution) => contribution.sessionId)).toEqual([
+        "agent_scout",
+        "agent_scout",
+      ]);
     });
   });
 
@@ -549,6 +576,52 @@ describe("liftLogContribution", () => {
 
       expect(dispatched).toHaveLength(1);
       expect(dispatched[0]!.facts[SESSION_TITLE_FALLBACK_FACT_KEY]).toBeUndefined();
+    });
+  });
+
+  describe("when the launcher names the session in the resource attributes", () => {
+    const promptEvent = ({
+      resourceName,
+      recordName,
+    }: {
+      resourceName: string;
+      recordName?: string;
+    }) =>
+      canonicalLogRecord({
+        attributes: {
+          "event.name": "user_prompt",
+          "session.id": "sess-named",
+          prompt: "## Your skills\nInstalled: triage.",
+          ...(recordName === undefined ? {} : { "langwatch.session.name": recordName }),
+        },
+        resourceAttributes: { "service.version": "2.0.1", "langwatch.session.name": resourceName },
+      });
+
+    /** @scenario A launcher names its sessions through the resource attributes */
+    it("contributes the resource's name", () => {
+      const { lift, dispatched } = makeLift();
+
+      lift(promptEvent({ resourceName: "Scout" }));
+
+      expect(dispatched[0]!.facts[SESSION_NAME_FACT_KEY]).toBe("Scout");
+    });
+
+    /** @scenario A name on the record itself outranks the resource's name */
+    it("keeps the record's own name", () => {
+      const { lift, dispatched } = makeLift();
+
+      lift(promptEvent({ resourceName: "Scout", recordName: "pr-reviewer" }));
+
+      expect(dispatched[0]!.facts[SESSION_NAME_FACT_KEY]).toBe("pr-reviewer");
+    });
+
+    /** @scenario A blank resource name names nothing */
+    it("contributes no name for a whitespace resource name", () => {
+      const { lift, dispatched } = makeLift();
+
+      lift(promptEvent({ resourceName: "   " }));
+
+      expect(dispatched[0]!.facts[SESSION_NAME_FACT_KEY]).toBeUndefined();
     });
   });
 

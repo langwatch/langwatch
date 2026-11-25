@@ -168,6 +168,8 @@ export type EnrichedAuditLog = {
   targetKind: string | null;
   /** Gateway resource id — only set when source="gateway". */
   targetId: string | null;
+  /** The target's name as the row recorded it (`metadata.targetName`), shown in place of its id. */
+  targetName: string | null;
   /** Gateway-side diff (before state). Only set when source="gateway". */
   before: unknown;
   /** Gateway-side diff (after state). Only set when source="gateway". */
@@ -218,6 +220,13 @@ export interface AuditStaffAccessMetadataSchema extends Named<
 export const auditStaffAccessMetadataSchema: AuditStaffAccessMetadataSchema =
   auditStaffAccessMetadataSchemaDefinition;
 export type AuditStaffAccess = z.infer<typeof auditStaffAccessMetadataSchema>;
+/** A producer that knows its target's name records it as `metadata.targetName`. */
+const auditTargetNameMetadataSchemaDefinition = z.object({ targetName: z.string().min(1) });
+export interface AuditTargetNameMetadataSchema extends Named<
+  typeof auditTargetNameMetadataSchemaDefinition
+> {}
+export const auditTargetNameMetadataSchema: AuditTargetNameMetadataSchema =
+  auditTargetNameMetadataSchemaDefinition;
 
 /**
  * How colleagues on a matching domain get into an organization; identity's join ledger

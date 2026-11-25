@@ -69,10 +69,12 @@ const TOKEN_RATE_FIELDS: readonly (keyof NonNullable<LLMModelEntry["pricing"]>)[
   "inputCostPerToken",
   "outputCostPerToken",
   "audioCostPerToken",
+  "audioOutputCostPerToken",
   "imageCostPerToken",
   "imageOutputCostPerToken",
   "inputCacheReadPerToken",
   "inputCacheWritePerToken",
+  "inputCacheWrite1hPerToken",
 ];
 
 function pricedUnits(entry: LLMModelEntry): Set<string> {
@@ -197,6 +199,21 @@ describe("catalog price coverage", () => {
         expect(
           zeroRated,
           "These models rate zero even when every billable quantity is one, so a real request bills nothing.",
+        ).toEqual([]);
+      });
+    });
+  });
+
+  describe("given every entry in the merged catalog", () => {
+    describe("when its priced units are counted", () => {
+      /** @scenario "The committed catalogue prices every model in one unit" */
+      it("finds no entry priced in more than one unit", () => {
+        const multiUnit = catalogEntries
+          .filter(([, entry]) => pricedUnits(entry).size > 1)
+          .map(([id, entry]) => `${id} prices ${[...pricedUnits(entry)].join("+")}`);
+        expect(
+          multiUnit,
+          "A span reporting tokens and a duration would be charged twice. Keep the token rates.",
         ).toEqual([]);
       });
     });

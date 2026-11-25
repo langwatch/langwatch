@@ -5,6 +5,7 @@ import {
 } from "@langwatch/onboarding-contract";
 import {
   type OrganizationJoinSetting,
+  BillingOnlyNoTeamAccessError,
   OrganizationHasNoTeamError,
   OrganizationNotFoundError,
   PersonalProjectNotFoundError,
@@ -32,6 +33,9 @@ import {
   type StoredOrganizationSettings,
   type OrganizationTeamProject,
   type OrganizationPresenceSettingRow,
+  type OrganizationActiveMemberPage,
+  type OrganizationOperatorQuery,
+  type OrganizationOperatorRow,
 } from "../organization.repository.ts";
 import type {
   MemoryOrganizationDatabase,
@@ -70,6 +74,31 @@ export class MemoryOrganizationRepository extends OrganizationRepository {
     return { ids: page, next: page[page.length - 1] ?? null };
   }
 
+  async findOperatorRows(input: OrganizationOperatorQuery): Promise<OrganizationOperatorRow[]> {
+    const needle = "query" in input ? input.query.toLowerCase() : "";
+    const matches = (row: MemoryOrganizationRow) =>
+      "organizationIds" in input
+        ? input.organizationIds.includes(row.id)
+        : [row.id, row.name, row.slug].some((value) => value.toLowerCase().includes(needle));
+    const rows = [...this.memory.organizations.values()]
+      .filter((row) => row.kind !== ORGANIZATION_KIND.SYSTEM && matches(row))
+      .toSorted(
+        (left, right) =>
+          left.name.localeCompare(right.name) ||
+          left.createdAt.epochMilliseconds - right.createdAt.epochMilliseconds,
+      )
+      .slice(0, "limit" in input ? input.limit : undefined);
+    return rows.map((row) => ({
+      id: row.id,
+      name: row.name,
+      slug: row.slug,
+      createdAt: row.createdAt,
+      memberCount: this.memory.organizationUsers.filter(
+        (member) => member.organizationId === row.id,
+      ).length,
+    }));
+  }
+
   async findPresenceSettingPage({
     afterId,
     limit,
@@ -83,6 +112,38 @@ export class MemoryOrganizationRepository extends OrganizationRepository {
       .toSorted((a, b) => (a.id < b.id ? -1 : 1))
       .slice(0, limit)
       .map((row) => ({ id: row.id, presenceEnabled: row.presenceEnabled }));
+  }
+
+  async findActiveMemberPage({
+    afterId,
+    limit,
+  }: {
+    afterId: string | null;
+    limit: number;
+  }): Promise<OrganizationActiveMemberPage> {
+    const ids = [...this.memory.organizations.keys()]
+      .filter((id) => afterId === null || id > afterId)
+      .toSorted()
+      .slice(0, limit);
+    // As the Postgres join: a membership with no user row is not listed.
+    const members = this.memory.organizationUsers
+      .filter((row) => ids.includes(row.organizationId) && row.disabledAt === null)
+      .filter((row) => {
+        const user = this.memory.users.get(row.userId);
+        return user !== undefined && user.deactivatedAt === null;
+      })
+      .toSorted((left, right) => {
+        if (left.organizationId !== right.organizationId) {
+          return left.organizationId < right.organizationId ? -1 : 1;
+        }
+        return left.userId < right.userId ? -1 : 1;
+      })
+      .map((row) => ({
+        organizationId: row.organizationId,
+        userId: row.userId,
+        joinedAt: row.createdAt,
+      }));
+    return { lastOrganizationId: ids.at(-1) ?? null, organizations: ids.length, members };
   }
 
   /** The memory rows carry no legacy single sign-on column, so no provider is named here. */
@@ -520,6 +581,13 @@ export class MemoryOrganizationRepository extends OrganizationRepository {
     };
     resources: PersonalWorkspaceResourceIds;
   }): Promise<EnsuredPersonalTeam> {
+    const billingOnly = this.memory.organizationUsers.some(
+      (member) =>
+        member.userId === input.workspace.userId &&
+        member.organizationId === input.workspace.organizationId &&
+        member.billingOnly === true,
+    );
+    if (billingOnly) throw new BillingOnlyNoTeamAccessError();
     const existing = this.findPersonalTeam(input.workspace);
     if (existing) return existing;
 

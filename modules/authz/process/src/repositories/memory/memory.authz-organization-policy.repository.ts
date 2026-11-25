@@ -22,6 +22,11 @@ export class MemoryAuthzOrganizationPolicyRepository extends AuthzOrganizationPo
   }: {
     organizationId: string;
   }): Promise<AuthzOrganizationPolicy> {
+    return this.#rowOf({ organizationId });
+  }
+
+  /** Read and written in the same tick, so a seeded setting holds before the first await. */
+  #rowOf({ organizationId }: { organizationId: string }): AuthzOrganizationPolicy {
     return this.#rows.get(organizationId) ?? defaultOrganizationPolicy({ organizationId });
   }
 
@@ -34,9 +39,28 @@ export class MemoryAuthzOrganizationPolicyRepository extends AuthzOrganizationPo
     braidsOrganizationAdminsOnly: boolean;
     updatedByUserId: string;
   }): Promise<void> {
+    const current = this.#rowOf({ organizationId });
     this.#rows.set(organizationId, {
-      organizationId,
+      ...current,
       braidsOrganizationAdminsOnly,
+      updatedByUserId,
+      updatedAtMs: this.now(),
+    });
+  }
+
+  async setBraidsEnabled({
+    organizationId,
+    braidsEnabled,
+    updatedByUserId,
+  }: {
+    organizationId: string;
+    braidsEnabled: boolean;
+    updatedByUserId: string;
+  }): Promise<void> {
+    const current = this.#rowOf({ organizationId });
+    this.#rows.set(organizationId, {
+      ...current,
+      braidsEnabled,
       updatedByUserId,
       updatedAtMs: this.now(),
     });

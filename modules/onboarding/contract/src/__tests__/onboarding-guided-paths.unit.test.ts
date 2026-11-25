@@ -16,7 +16,7 @@ describe("guidedPathLanding", () => {
       expect(guidedPathLanding({ path: "llmops", projectSlug: "acme" })).toBe("/acme/traces");
       expect(guidedPathLanding({ path: "gateway", projectSlug: "acme" })).toBe("/gateway");
       expect(guidedPathLanding({ path: "governance", projectSlug: "acme" })).toBe("/governance");
-      expect(guidedPathLanding({ path: "coding", projectSlug: "acme" })).toBe("/me");
+      expect(guidedPathLanding({ path: "coding", projectSlug: "acme" })).toBe("/coding-agents");
     });
   });
 });
