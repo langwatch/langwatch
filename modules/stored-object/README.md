@@ -35,6 +35,6 @@ Anything else stored-object needs belongs to another module and is reached throu
 
 ## Who depends on stored-object
 
-[dataset](../dataset/README.md), [experiment](../experiment/README.md), [ops](../ops/README.md), [trace](../trace/README.md), [user](../user/README.md) (as a peer).
+[dataset](../dataset/README.md), [experiment](../experiment/README.md), [langy](../langy/README.md), [ops](../ops/README.md), [trace](../trace/README.md), [user](../user/README.md) (as a peer).
 
 <!-- readme:generated:end -->
