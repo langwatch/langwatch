@@ -5,7 +5,7 @@
  * @see modules/dashboard/specs/dashboards-v2.feature
  */
 
-import type { DashboardStar } from "@langwatch/dashboard-contract";
+import type { DashboardIcon, DashboardStar } from "@langwatch/dashboard-contract";
 
 import type { ScopedBoard } from "./board-scope.ts";
 import { curatedBoardPath, dashboardsPath, myDashboardId } from "./boards.ts";
@@ -14,6 +14,8 @@ import type { CuratedBoard } from "./curated-boards.ts";
 /** A stored board, as much of it as the sidebar reads. */
 export interface SidebarBoard extends ScopedBoard {
   readonly description: string | null;
+  /** A name on the dashboard icon allow-list; null or absent draws the default glyph. */
+  readonly icon?: DashboardIcon | null;
   /** The owning project, named only where the board is listed in another project. */
   readonly ownerProject: { readonly name: string } | null;
 }

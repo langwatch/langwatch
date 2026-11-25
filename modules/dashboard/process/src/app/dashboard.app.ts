@@ -31,6 +31,7 @@ import {
   type Board,
   type BoardSummary,
   type DashboardHomeProduct,
+  type DashboardIcon,
   type DashboardProject,
   type DashboardScope,
   type DashboardScopeImpact,
@@ -477,18 +478,20 @@ export class DashboardModule implements DashboardApi {
     /** Made at this scope in the same write; the door asked what setting it later would. */
     scope?: DashboardScope;
     homeProduct?: DashboardHomeProduct;
+    icon?: DashboardIcon;
   }): Promise<Board> {
     await this.#requireDashboardsEnabled(input.projectId);
     return this.#boards.createBoard(input);
   }
 
-  /** A board's inline name and description. */
+  /** A board's inline name, description and icon. */
   async updateBoard(input: {
     projectId: string;
     dashboardId: string;
     viewer?: DashboardViewer;
     name?: string;
     description?: string | null;
+    icon?: DashboardIcon | null;
   }): Promise<Board> {
     await this.#requireDashboardsEnabled(input.projectId);
     return this.#boards.updateBoard(input);

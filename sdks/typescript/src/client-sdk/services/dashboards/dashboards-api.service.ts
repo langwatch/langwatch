@@ -12,6 +12,9 @@ type Json<T> = T extends { content: { "application/json": infer Body } } ? Body 
 /** A dashboard as `/api/v1/dashboards/{dashboardId}` answers it. */
 export type Dashboard = Json<paths["/api/v1/dashboards/{dashboardId}"]["get"]["responses"]["200"]>;
 
+/** A Lucide icon name from the dashboards allow-list. */
+export type DashboardIconName = NonNullable<Dashboard["icon"]>;
+
 /** One row of the dashboards list, with its widget count. */
 export type DashboardListItem = Json<
   paths["/api/v1/dashboards"]["get"]["responses"]["200"]
@@ -85,23 +88,25 @@ export class DashboardsApiService {
     return data as Dashboard;
   }
 
-  async create({ name }: { name: string }): Promise<Dashboard> {
+  async create({ name, icon }: { name: string; icon?: DashboardIconName }): Promise<Dashboard> {
     const { data, error, response } = await this.apiClient.POST("/api/v1/dashboards", {
-      body: { name },
+      body: { name, ...(icon === undefined ? {} : { icon }) },
     });
     if (error) this.handleApiError({ operation: "create dashboard", error, response });
     return data as Dashboard;
   }
 
-  /** `description: null` clears it; a field left out keeps its value. */
+  /** `description: null` clears it, `icon: null` resets the glyph; a field left out is kept. */
   async update({
     dashboardId,
     name,
     description,
+    icon,
   }: {
     dashboardId: string;
     name?: string;
     description?: string | null;
+    icon?: DashboardIconName | null;
   }): Promise<Dashboard> {
     const operation = `update dashboard "${dashboardId}"`;
     const { data, error, response } = await this.apiClient.PATCH(
@@ -111,6 +116,7 @@ export class DashboardsApiService {
         body: {
           ...(name === undefined ? {} : { name }),
           ...(description === undefined ? {} : { description }),
+          ...(icon === undefined ? {} : { icon }),
         },
       },
     );

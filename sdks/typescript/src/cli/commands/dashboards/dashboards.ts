@@ -1,6 +1,9 @@
 import chalk from "chalk";
 
-import { DashboardsApiService } from "@/client-sdk/services/dashboards/dashboards-api.service";
+import {
+  type DashboardIconName,
+  DashboardsApiService,
+} from "@/client-sdk/services/dashboards/dashboards-api.service";
 
 import { resolveCredentials } from "../../utils/apiKey";
 import { formatRelativeTime, formatTable, sanitizeTerminalText } from "../../utils/formatting";
@@ -66,6 +69,7 @@ export const getDashboardCommand = async (dashboardId: string): Promise<CommandR
           `  ${chalk.gray("Name:")}  ${chalk.cyan(sanitizeTerminalText(dashboard.name))}`,
         );
         console.log(`  ${chalk.gray("Scope:")} ${dashboard.scope}`);
+        console.log(`  ${chalk.gray("Icon:")}  ${dashboard.icon ?? "default"}`);
         if (dashboard.platformUrl) {
           console.log(`  ${chalk.gray("View:")}  ${chalk.underline(dashboard.platformUrl)}`);
         }
@@ -78,12 +82,18 @@ export const getDashboardCommand = async (dashboardId: string): Promise<CommandR
   }
 };
 
-export const createDashboardCommand = async (name: string): Promise<CommandResult | void> => {
+export const createDashboardCommand = async (
+  name: string,
+  options: { icon?: DashboardIconName } = {},
+): Promise<CommandResult | void> => {
   await resolveCredentials();
   const spinner = createSpinner(`Creating dashboard "${name}"...`).start();
 
   try {
-    const dashboard = await new DashboardsApiService().create({ name });
+    const dashboard = await new DashboardsApiService().create({
+      name,
+      ...(options.icon === undefined ? {} : { icon: options.icon }),
+    });
     spinner.succeed(
       `Created dashboard "${chalk.cyan(sanitizeTerminalText(dashboard.name))}" ${chalk.gray(`(id: ${dashboard.id})`)}`,
     );
@@ -105,13 +115,22 @@ export const createDashboardCommand = async (name: string): Promise<CommandResul
 /** A call naming nothing is refused locally, matching the API's own refusal. */
 export const updateDashboardCommand = async (
   dashboardId: string,
-  options: { name?: string; description?: string; clearDescription?: boolean },
+  options: {
+    name?: string;
+    description?: string;
+    clearDescription?: boolean;
+    icon?: DashboardIconName;
+    clearIcon?: boolean;
+  },
 ): Promise<CommandResult | void> => {
   await resolveCredentials();
   const description = options.clearDescription ? null : options.description;
-  if (options.name === undefined && description === undefined) {
+  const icon = options.clearIcon ? null : options.icon;
+  if (options.name === undefined && description === undefined && icon === undefined) {
     console.error(
-      chalk.red("Error: nothing to update — pass --name, --description or --clear-description"),
+      chalk.red(
+        "Error: nothing to update — pass --name, --description, --clear-description, --icon or --clear-icon",
+      ),
     );
     process.exit(1);
   }
@@ -122,6 +141,7 @@ export const updateDashboardCommand = async (
       dashboardId,
       ...(options.name === undefined ? {} : { name: options.name }),
       ...(description === undefined ? {} : { description }),
+      ...(icon === undefined ? {} : { icon }),
     });
     spinner.succeed(`Updated dashboard "${chalk.cyan(sanitizeTerminalText(dashboard.name))}"`);
 

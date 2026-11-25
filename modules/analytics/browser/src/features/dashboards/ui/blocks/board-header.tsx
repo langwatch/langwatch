@@ -8,17 +8,21 @@ import { type BoardHeaderActionProps, BoardHeaderActionToken } from "@langwatch/
 import { useUiAnalytics } from "@langwatch/browser-host/analytics";
 import { IsolatedErrorBoundary } from "@langwatch/browser-host/isolated-error-boundary";
 import { useLentAll } from "@langwatch/browser-host/lent";
+import type { DashboardIcon } from "@langwatch/dashboard-contract";
 import { Button, Heading, HStack, Spacer, Text, VStack } from "@langwatch/design-system/primitives";
 import { Sparkles } from "lucide-react";
 import { type ReactNode, Suspense, useState } from "react";
 
 import { InlineTextField } from "../elements/inline-text-field.tsx";
+import { BoardIconPicker, BoardTitleIcon } from "./board-icon-picker.tsx";
 
 export function BoardHeader({
   name,
   description,
   isFromLangWatch = false,
   scope,
+  icon = null,
+  onPickIcon,
   onRename,
   onDescribe,
   pointer,
@@ -32,6 +36,10 @@ export function BoardHeader({
   isFromLangWatch?: boolean;
   /** A stored board's scope control, beside the title. */
   scope?: ReactNode;
+  /** A stored board's icon; none draws the default glyph where it may be changed. */
+  icon?: DashboardIcon | null;
+  /** Absent where the reader may not change the icon: it is then shown, not a button. */
+  onPickIcon?: (icon: DashboardIcon | null) => void;
   /** Absent where the reader may not rename the board: its title is then plain text. */
   onRename?: (name: string) => void;
   /** Absent where the reader cannot edit the board. */
@@ -48,6 +56,11 @@ export function BoardHeader({
     <VStack align="stretch" gap={2} marginBottom={5}>
       <HStack gap={3}>
         <HStack columnGap={2.5} rowGap={1} flex={1} minWidth={0} flexWrap="wrap">
+          {onPickIcon ? (
+            <BoardIconPicker icon={icon} onPick={onPickIcon} />
+          ) : (
+            icon && <BoardTitleIcon icon={icon} />
+          )}
           <BoardTitle name={name} onRename={onRename} />
           {isFromLangWatch && <FromLangWatchBadge />}
           {scope}

@@ -5,6 +5,7 @@ import {
   dashboardHomeProductSchema,
   DEFAULT_DASHBOARD_HOME_PRODUCT,
   type DashboardHomeProduct,
+  type DashboardIcon,
   type DashboardScope,
   type DashboardStar,
   type StarredDashboard,
@@ -74,6 +75,7 @@ const boardRow = (row: DashboardsV2): BoardRecord =>
     scope: row.scope,
     organizationId: row.organizationId,
     homeProduct: homeProductOf(row.homeProduct),
+    icon: row.icon,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   });
@@ -146,6 +148,7 @@ export class PrismaBoardRepository
     createdById?: string | null;
     scope?: DashboardScope;
     homeProduct?: DashboardHomeProduct;
+    icon?: DashboardIcon | null;
     organizationId?: string | null;
   }): Promise<BoardRecord> {
     return boardRow(

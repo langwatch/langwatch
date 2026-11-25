@@ -10,6 +10,7 @@ import type {
 import type { Trigger } from "@langwatch/automation-contract";
 import { moduleApi } from "@langwatch/module";
 
+import type { DashboardIcon } from "./board-icon.ts";
 import type {
   Board,
   BoardSummary,
@@ -143,9 +144,11 @@ export interface DashboardApi {
     createdById?: string;
     scope?: DashboardScope;
     homeProduct?: DashboardHomeProduct;
+    icon?: DashboardIcon;
   }): Promise<Board>;
   /**
-   * The board's name and description, an absent field left as it is; `dashboards_not_enabled`
+   * The board's name, description and icon (`null` resets it), an absent field left as it is;
+   * `dashboards_not_enabled`
    * while `release_dashboards` is off.
    */
   updateBoard(input: {
@@ -154,6 +157,7 @@ export interface DashboardApi {
     viewer?: DashboardViewer;
     name?: string;
     description?: string | null;
+    icon?: DashboardIcon | null;
   }): Promise<Board>;
   /**
    * The board, its widgets, every star on it and its stale legacy copy (AC199b);

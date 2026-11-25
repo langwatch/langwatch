@@ -3,7 +3,7 @@
  * the Prisma ones are the twins of. Spec: dashboards-v2.feature.
  */
 import { DashboardNotFoundError, MY_DASHBOARD_NAME } from "@langwatch/dashboard-contract";
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 
 import {
   createDashboardTestAuthz,
@@ -53,6 +53,74 @@ const codeOf = (call: Promise<unknown>) =>
   );
 
 describe("BoardService", () => {
+  describe("given a board with an icon", () => {
+    const viewer = { userId: "member-1" };
+    let service: ReturnType<typeof serviceWith>["service"];
+    let created: Awaited<ReturnType<BoardService["createBoard"]>>;
+
+    beforeEach(async () => {
+      ({ service } = serviceWith());
+      created = await service.createBoard({
+        projectId: PROJECT,
+        name: "Trends",
+        createdById: viewer.userId,
+        icon: "chart-line",
+      });
+    });
+
+    /** @scenario "A board's icon is created, updated, reset and read through the API" */
+    it("stores it on create, changes it, resets it to null and lists it", async () => {
+      const ref = { projectId: PROJECT, dashboardId: created.id, viewer };
+      const changed = await service.updateBoard({ ...ref, icon: "rocket" });
+      const renamed = await service.updateBoard({ ...ref, name: "Launches" });
+      const listed = await service.findBoards({ projectId: PROJECT, viewer });
+      const reset = await service.updateBoard({ ...ref, icon: null });
+
+      expect({
+        created: created.icon,
+        changed: changed.icon,
+        renamedKeeps: renamed.icon,
+        listed: listed.map(({ icon }) => icon),
+        reset: reset.icon,
+      }).toEqual({
+        created: "chart-line",
+        changed: "rocket",
+        renamedKeeps: "rocket",
+        listed: ["rocket"],
+        reset: null,
+      });
+    });
+
+    /** @scenario "A server refuses an icon off the allow-list" */
+    it("refuses an icon off the allow-list on create and update, and keeps the board", async () => {
+      const refused = await Promise.all([
+        service
+          .createBoard({ projectId: PROJECT, name: "Other", icon: "not-an-icon" as never })
+          .then(
+            () => "<resolved>",
+            () => "refused",
+          ),
+        service
+          .updateBoard({
+            projectId: PROJECT,
+            dashboardId: created.id,
+            viewer,
+            icon: "not-an-icon" as never,
+          })
+          .then(
+            () => "<resolved>",
+            () => "refused",
+          ),
+      ]);
+      const kept = await service.findBoards({ projectId: PROJECT, viewer });
+
+      expect({ refused, boards: kept.map(({ name, icon }) => [name, icon]) }).toEqual({
+        refused: ["refused", "refused"],
+        boards: [["Trends", "chart-line"]],
+      });
+    });
+  });
+
   describe("given a member creates a board", () => {
     /** @scenario "AC156 No board is pinned unless the member pins it" */
     it("stars it for nobody, the creator included", async () => {

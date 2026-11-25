@@ -353,6 +353,7 @@ function storedBoard({ id, board }: { id: string; board: ScriptedBoard }): Board
     scope: board.scope ?? DEFAULT_DASHBOARD_SCOPE,
     organizationId: board.organizationId ?? null,
     homeProduct: DEFAULT_DASHBOARD_HOME_PRODUCT,
+    icon: null,
     createdAt: new Date(0),
     updatedAt: new Date(0),
   };

@@ -89,9 +89,12 @@ class DashboardsFacade:
         """Read one dashboard."""
         return self._send("GET", f"/api/v1/dashboards/{_quote(dashboard_id)}")
 
-    def create(self, *, name: str) -> Dict[str, Any]:
-        """Create an empty dashboard."""
-        return self._send("POST", "/api/v1/dashboards", {"name": name})
+    def create(self, *, name: str, icon: Optional[str] = None) -> Dict[str, Any]:
+        """Create an empty dashboard, optionally with a Lucide `icon` name from the allow-list."""
+        body: Dict[str, Any] = {"name": name}
+        if icon is not None:
+            body["icon"] = icon
+        return self._send("POST", "/api/v1/dashboards", body)
 
     def update(
         self,
@@ -99,15 +102,18 @@ class DashboardsFacade:
         *,
         name: Optional[str] = None,
         description: Optional[str] = _UNSET,
+        icon: Optional[str] = _UNSET,
     ) -> Dict[str, Any]:
-        """Change a dashboard's name or description; `description=None` clears it."""
+        """Change a dashboard's name, description or icon; `None` clears a description or icon."""
         body: Dict[str, Any] = {}
         if name is not None:
             body["name"] = name
         if description is not _UNSET:
             body["description"] = description
+        if icon is not _UNSET:
+            body["icon"] = icon
         if not body:
-            raise ValueError("Provide at least one of name or description.")
+            raise ValueError("Provide at least one of name, description or icon.")
         return self._send("PATCH", f"/api/v1/dashboards/{_quote(dashboard_id)}", body)
 
     def delete(self, dashboard_id: str) -> Dict[str, Any]:

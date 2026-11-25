@@ -3,6 +3,7 @@ import {
   DashboardNotFoundError,
   DEFAULT_DASHBOARD_HOME_PRODUCT,
   type DashboardHomeProduct,
+  type DashboardIcon,
   type DashboardScope,
   type DashboardStar,
   type StarredDashboard,
@@ -62,6 +63,7 @@ export class MemoryBoardRepository implements BoardRepository {
     createdById?: string | null;
     scope?: DashboardScope;
     homeProduct?: DashboardHomeProduct;
+    icon?: DashboardIcon | null;
     organizationId?: string | null;
   }): Promise<BoardRecord> {
     const board = boardSchema.parse({

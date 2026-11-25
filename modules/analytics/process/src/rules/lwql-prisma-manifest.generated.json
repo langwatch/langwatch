@@ -9543,6 +9543,15 @@
           "documentation": "The product whose sidebar lists it: llm-ops, me, gateway or governance (ADR-002,\ndecision 8). Every board made before homes existed is llm-ops."
         },
         {
+          "name": "icon",
+          "columnName": "icon",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": "A Lucide icon name from the dashboard contract's allow-list; null draws the default glyph."
+        },
+        {
           "name": "excludedOrigins",
           "columnName": "excludedOrigins",
           "type": "Json",

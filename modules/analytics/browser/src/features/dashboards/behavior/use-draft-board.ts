@@ -9,6 +9,7 @@ import { type UiAnalytics, useUiAnalytics } from "@langwatch/browser-host/analyt
 import { defineSlice } from "@langwatch/browser-host/global-store";
 import type {
   DashboardHomeProduct,
+  DashboardIcon,
   DashboardProject,
   DashboardScope,
 } from "@langwatch/dashboard-contract";
@@ -28,7 +29,12 @@ import { withBlockPickerOpen } from "./use-block-picker-address.ts";
 import type { SavedBoard } from "./use-saved-dashboards.ts";
 
 /** What a draft's first edit, or one made while it is being stored, carries. */
-export type DraftEdit = { name?: string; description?: string | null; pin?: boolean };
+export type DraftEdit = {
+  name?: string;
+  description?: string | null;
+  icon?: DashboardIcon | null;
+  pin?: boolean;
+};
 
 /** Where a draft lives and what it is stored as; the dialog picks them, "+" takes defaults. */
 type DraftFrame = {
@@ -53,6 +59,7 @@ type DraftState = DraftFrame & {
   projectId: string | undefined;
   name: string | undefined;
   description: string | null;
+  icon: DashboardIcon | null;
   pin: boolean;
   /** The board this draft became, once stored. */
   savedId: string | undefined;
@@ -65,6 +72,7 @@ type DraftState = DraftFrame & {
 const FRESH = {
   name: void 0,
   description: null,
+  icon: null,
   pin: false,
   savedId: void 0,
   saving: void 0,
@@ -230,19 +238,20 @@ function storedBoardPath({
 async function applyEdit({
   writer,
   dashboardId,
-  edit: { name, description, pin },
+  edit: { name, description, icon, pin },
 }: {
   writer: DraftWriter;
   dashboardId: string;
   edit: DraftEdit;
 }): Promise<void> {
   const { utils, projectId, host } = writer;
-  if (name !== void 0 || description !== void 0) {
+  if (name !== void 0 || description !== void 0 || icon !== void 0) {
     await utils.client.boards.update.mutate({
       projectId,
       dashboardId,
       ...(name === void 0 ? {} : { name }),
       ...(description === void 0 ? {} : { description }),
+      ...(icon === void 0 ? {} : { icon }),
     });
   }
   if (!pin) return;
@@ -280,11 +289,12 @@ async function storeDraft({
   if (isHeld(at)) useDraftStore.setState({ savedId: created.id });
   // A cleared description stays cleared; a pin taken off while this ran is not written.
   const description = edit.description === void 0 ? at.description : edit.description;
+  const icon = edit.icon === void 0 ? at.icon : edit.icon;
   const pin = (at.pin || edit.pin === true) && (!isHeld(at) || useDraftStore.getState().pin);
   await applyEdit({
     writer,
     dashboardId: created.id,
-    edit: { description: description ?? void 0, pin },
+    edit: { description: description ?? void 0, icon: icon ?? void 0, pin },
   }).catch((error: unknown) =>
     host.failed({ error, fallbackTitle: "Couldn't save the description" }),
   );
@@ -309,6 +319,7 @@ function materialiseDraft({ writer, edit }: { writer: DraftWriter; edit: DraftEd
   useDraftStore.setState({
     ...(edit.name === void 0 ? {} : { name: edit.name }),
     ...(edit.description === void 0 ? {} : { description: edit.description }),
+    ...(edit.icon === void 0 ? {} : { icon: edit.icon }),
     ...(edit.pin ? { pin: true } : {}),
   });
   const { saving } = at;
@@ -363,6 +374,7 @@ export function useDraftBoard({ takenNames }: { takenNames: readonly string[] })
     projectId,
     name: held.name ?? untitledBoardName({ takenNames }),
     description: held.description,
+    icon: held.icon,
     createdById: host.userId() ?? null,
     scope: held.scope,
     homeProduct: held.homeProduct,

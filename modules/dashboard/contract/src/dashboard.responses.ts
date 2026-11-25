@@ -5,6 +5,7 @@ import type { Named } from "@langwatch/module";
  */
 import { z } from "zod";
 
+import { storedDashboardIconSchema } from "./board-icon.ts";
 import {
   boardSchema,
   dashboardHomeProductSchema,
@@ -39,6 +40,7 @@ const boardTrpcSummarySchemaDefinition = z
   .object({
     ...dashboardTrpcSummarySchema.shape,
     homeProduct: dashboardHomeProductSchema,
+    icon: storedDashboardIconSchema,
     isStarred: z.boolean(),
     /** The project that owns an Organization board listed in another project; null at home. */
     ownerProject: dashboardProjectSchema.nullable(),

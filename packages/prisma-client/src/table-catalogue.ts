@@ -1255,6 +1255,7 @@ export const prismaModelFieldCatalogue = {
     "scope",
     "organizationId",
     "homeProduct",
+    "icon",
     "excludedOrigins",
     "createdAt",
     "updatedAt"

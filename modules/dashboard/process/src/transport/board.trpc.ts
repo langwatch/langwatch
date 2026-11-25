@@ -71,6 +71,7 @@ export const boardTrpcTransport: TrpcRouterDeclaration<DashboardApi, typeof boar
         name: input.name,
         createdById: actor.id,
         ...(input.homeProduct === undefined ? {} : { homeProduct: input.homeProduct }),
+        ...(input.icon === undefined ? {} : { icon: input.icon }),
       }),
     )
 
@@ -84,6 +85,7 @@ export const boardTrpcTransport: TrpcRouterDeclaration<DashboardApi, typeof boar
         createdById: actor.id,
         scope: input.scope,
         ...(input.homeProduct === undefined ? {} : { homeProduct: input.homeProduct }),
+        ...(input.icon === undefined ? {} : { icon: input.icon }),
       }),
     )
 
@@ -96,6 +98,7 @@ export const boardTrpcTransport: TrpcRouterDeclaration<DashboardApi, typeof boar
         viewer: { userId: actor.id },
         ...(input.name === undefined ? {} : { name: input.name }),
         ...(input.description === undefined ? {} : { description: input.description }),
+        ...(input.icon === undefined ? {} : { icon: input.icon }),
       }),
     )
 

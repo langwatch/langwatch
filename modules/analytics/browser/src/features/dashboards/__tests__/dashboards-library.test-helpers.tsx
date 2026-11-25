@@ -40,6 +40,7 @@ export const row = ({
   id,
   name,
   description: null,
+  icon: null,
   createdById,
   ownerName,
   scope,
