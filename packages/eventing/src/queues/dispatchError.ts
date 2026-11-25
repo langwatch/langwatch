@@ -1,4 +1,4 @@
-import { nowInstant, toEpochMs } from "@langwatch/time";
+import { nowEpochMs, toEpochMs } from "@langwatch/time";
 /** Typed error to signal if a dispatch failure is retryable (see ADR-027). */
 export class DispatchError extends Error {
   readonly retryable: boolean;
@@ -46,7 +46,7 @@ export class DispatchError extends Error {
 const MAX_RETRY_AFTER_MS = 60 * 60 * 1000; // 1h
 export function parseRetryAfterMs(
   headerValue: string | null | undefined,
-  now: number = nowInstant().epochMilliseconds,
+  now: number = nowEpochMs(),
 ): number | undefined {
   if (!headerValue) return undefined;
   const trimmed = headerValue.trim();

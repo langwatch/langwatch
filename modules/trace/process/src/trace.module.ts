@@ -6,7 +6,13 @@ import {
 import { defineProcessModule, type PublishedProcessModule } from "@langwatch/process";
 import { nowInstant } from "@langwatch/time";
 import type { TraceApi, TraceServerConfig } from "@langwatch/trace-contract";
-import { defineMigrationStep, defineProjectionReplayStep } from "@langwatch/upgrade/step";
+import {
+  defineMigrationStep,
+  defineProjectionReplayStep,
+  type LaneReplayer,
+  type MigrationStep,
+  type MigrationStepDefinition,
+} from "@langwatch/upgrade/step";
 
 import { TraceModule } from "./app/trace.app.ts";
 import { traceChannels } from "./channels/trace-channels.registry.ts";
@@ -18,6 +24,10 @@ import { traceCollectorEvaluationsEventing } from "./features/ingestion/eventing
 import { traceIngestSourceBillingEventing } from "./features/ingestion/eventing/trace-ingest-source-billing.pipeline.ts";
 import { TRACE_ID_INDEXES } from "./repositories/clickhouse/clickhouse.trace-id-indexes.database.ts";
 import { traceRepositories } from "./repositories/trace-repositories.registry.ts";
+import {
+  MANAGED_PROMPT_VERSION_REPLAY_STEP_ID,
+  MANAGED_VERSION_REPLAY_HOURS,
+} from "./rules/managed-prompt-version-replay.rules.ts";
 import {
   RECORD_EVALUATION_OUTCOMES_STEP_ID,
   TRACE_EVALUATION_ANALYTICS_REPLAY_STEP_ID,
@@ -47,6 +57,30 @@ import { traceLegacyRest } from "./transport/trace-legacy.rest.ts";
 import { tracesRest } from "./transport/traces.rest.ts";
 import { tracesTrpcTransport } from "./transport/traces.trpc.ts";
 import { trackedEventLegacyPathRest, trackedEventRest } from "./transport/tracked-event.rest.ts";
+
+/**
+ * Refolds the 122 days att-change reads so each trace_analytics row carries its trace's managed
+ * prompt version (goose 00133), once no older writer is left to write rows without it.
+ * `after` names the lane's earlier replays: two replays of one lane share its markers and pause.
+ */
+export function managedPromptVersionReplayStep({
+  replayer,
+  after,
+}: {
+  replayer: LaneReplayer;
+  after: NonNullable<MigrationStepDefinition["after"]>;
+}): MigrationStep {
+  return defineProjectionReplayStep({
+    id: MANAGED_PROMPT_VERSION_REPLAY_STEP_ID,
+    description:
+      "Refolds the last 122 days of trace analytics rows so they carry the managed prompt version each trace last used.",
+    lane: TRACE_ANALYTICS_PROJECTION_NAME,
+    since: nowInstant().subtract({ hours: MANAGED_VERSION_REPLAY_HOURS }).toString(),
+    needsOldWritersGone: true,
+    after,
+    replayer,
+  });
+}
 
 /**
  * Canonical Trace server feature installer: the registry chooses every repository tier, and
@@ -131,6 +165,18 @@ export const traceProcessModule: PublishedProcessModule<"trace", TraceApi, Trace
           });
         },
       });
+      // After both: the outcomes are in the log and the lane's own replay has run, so this pass
+      // writes every recent trace's evaluation rows from the whole history (trace ADR-003).
+      const replayEvaluationAnalytics = defineProjectionReplayStep({
+        id: TRACE_EVALUATION_ANALYTICS_REPLAY_STEP_ID,
+        description:
+          "Refolds the last 62 days of traces so each carries its evaluation rows for the stock widgets.",
+        lane: TRACE_ANALYTICS_PROJECTION_NAME,
+        since: nowInstant().subtract({ hours: EVALUATION_OUTCOMES_BACKFILL_HOURS }).toString(),
+        needsOldWritersGone: true,
+        after: [recordEvaluationOutcomes, replayTraceAnalytics],
+        replayer,
+      });
       return [
         defineMigrationStep({
           id: "trace:track-updated-at-index-materialisation",
@@ -194,17 +240,10 @@ export const traceProcessModule: PublishedProcessModule<"trace", TraceApi, Trace
           },
         }),
         recordEvaluationOutcomes,
-        // After both: the outcomes are in the log and the lane's own replay has run, so this pass
-        // writes every recent trace's evaluation rows from the whole history (trace ADR-003).
-        defineProjectionReplayStep({
-          id: TRACE_EVALUATION_ANALYTICS_REPLAY_STEP_ID,
-          description:
-            "Refolds the last 62 days of traces so each carries its evaluation rows for the stock widgets.",
-          lane: TRACE_ANALYTICS_PROJECTION_NAME,
-          since: nowInstant().subtract({ hours: EVALUATION_OUTCOMES_BACKFILL_HOURS }).toString(),
-          needsOldWritersGone: true,
-          after: [recordEvaluationOutcomes, replayTraceAnalytics],
+        replayEvaluationAnalytics,
+        managedPromptVersionReplayStep({
           replayer,
+          after: [replayTraceAnalytics, replayEvaluationAnalytics],
         }),
       ];
     })

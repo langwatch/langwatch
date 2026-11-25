@@ -1,4 +1,4 @@
-import { type ProductId, productById, productFromPathname } from "./products.ts";
+import { type ProductId, productById, productFromPathname, productHomeHref } from "./products.ts";
 
 const RETURN_KEY = "langwatch:nav:settings-return:v1";
 
@@ -88,19 +88,19 @@ function targetFromRememberedProduct({
   rememberedProduct,
   reachableProducts,
   projectSlug,
+  hasOrganizationLibrary,
 }: {
   rememberedProduct: ProductId | null;
   reachableProducts: readonly ProductId[];
   projectSlug: string | null;
+  hasOrganizationLibrary: boolean;
 }): SettingsBackTarget | null {
   if (!rememberedProduct) return null;
   if (!reachableProducts.includes(rememberedProduct)) return null;
-  const home = productById(rememberedProduct).homeHref({ projectSlug });
+  const product = productById(rememberedProduct);
+  const home = productHomeHref({ product, projectSlug, hasOrganizationLibrary });
   if (!home) return null;
-  return {
-    label: `Back to ${productById(rememberedProduct).label}`,
-    href: home,
-  };
+  return { label: `Back to ${product.label}`, href: home };
 }
 
 export function resolveSettingsBackTarget({
@@ -108,11 +108,14 @@ export function resolveSettingsBackTarget({
   rememberedProduct,
   reachableProducts,
   projectSlug,
+  hasOrganizationLibrary = false,
 }: {
   organizationId: string | null;
   rememberedProduct: ProductId | null;
   reachableProducts: readonly ProductId[];
   projectSlug: string | null;
+  /** Dashboards then goes back to the organization's library, as the rail opens it. */
+  hasOrganizationLibrary?: boolean;
 }): SettingsBackTarget {
   return (
     targetFromCapturedPath(organizationId) ??
@@ -120,6 +123,7 @@ export function resolveSettingsBackTarget({
       rememberedProduct,
       reachableProducts,
       projectSlug,
+      hasOrganizationLibrary,
     }) ?? { label: "Back", href: "/" }
   );
 }

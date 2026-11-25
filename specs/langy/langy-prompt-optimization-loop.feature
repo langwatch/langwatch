@@ -87,16 +87,17 @@ Feature: Langy runs the prompt improvement loop on the workbench
     Then Langy says the result is level rather than declaring a winner
 
   @e2e
-  Scenario: Langy stops after three attempts that fail to beat the best candidate
-    When three consecutive attempts fail to beat the best candidate
+  Scenario: Langy stops when attempts stop beating the best candidate
+    When several attempts in a row fail to beat the best candidate and no new hypothesis is worth a run
     Then Langy stops and reports what it tried
     And it offers the reader the choice of publishing the best draft or carrying on
 
   @e2e
-  Scenario: Langy stops once it spends the attempt budget
-    When six measured attempts have run and the goal is still not met
+  Scenario: Langy stops once it spends the attempts budget it set
+    Given Langy stated an attempts budget and its reason before the first run
+    When the budget is spent and the goal is still not met
     Then Langy stops and reports the best result it found
-    And it does not start a seventh attempt
+    And it does not start another attempt
 
   @e2e
   Scenario: A wrong golden answer is reported as a dataset problem, not prompt-fitted around

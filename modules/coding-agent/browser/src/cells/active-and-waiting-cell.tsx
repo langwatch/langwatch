@@ -7,8 +7,8 @@ import { MissingValue } from "../ui/elements/cells/missing-value.tsx";
 
 /**
  * How long the agent worked against how long it stood waiting on its human.
- * The second figure is usually the one nobody had measured, and it is what
- * turns "the session took all afternoon" into something actionable.
+ * Both figures are peers at the same size; only colour tells them apart, so a
+ * row showing one of them lines up with a row showing the other.
  */
 export const ActiveAndWaitingCell: React.FC<{ row: SessionListRow }> = ({ row }) => {
   const waitingSeconds = row.blockedOnUserMs / 1000;
@@ -24,7 +24,7 @@ export const ActiveAndWaitingCell: React.FC<{ row: SessionListRow }> = ({ row })
         </Text>
       ) : null}
       {waitingSeconds > 0 ? (
-        <Text fontSize="xs" color="fg.muted" whiteSpace="nowrap">
+        <Text fontSize="sm" color="fg.muted" whiteSpace="nowrap">
           {formatDurationSeconds(waitingSeconds)} waiting
         </Text>
       ) : null}

@@ -4,7 +4,7 @@ The browser half of [authz](../README.md). What a browser installs when it insta
 
 <!-- readme:generated:start (tools/readmegen; edit the code, then `pnpm generate:readmes`) -->
 
-Declared in `src/authz.web.ts:13` (`defineBrowserModule("authz")`), exported as `authzWeb` at `./declaration`.
+Declared in `src/authz.web.ts:12` (`defineBrowserModule("authz")`), exported as `authzWeb` at `./declaration`.
 
 Installed by ui, from the app's generated module list (`pnpm generate:modules`).
 
@@ -30,8 +30,9 @@ Opened from lists the other modules (and `ui`, the app) whose browser source nam
 ## Calls
 
 - `withApi(authzApi)`, tRPC contracts: –.
-- Client packages (package.json): `@langwatch/api-key-client`, `@langwatch/trace-client`.
+- Client packages (package.json): `@langwatch/api-key-client`, `@langwatch/project-client`, `@langwatch/trace-client`.
 - Host APIs it requires: `AuthzHostApi`.
+- Capabilities: `braidsPresence`.
 - Config slices: `authz`.
 
 <!-- readme:generated:end -->

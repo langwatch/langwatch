@@ -51,12 +51,7 @@ function makeDeps(over: LangyTurnDepsOverrides = {}) {
     token: "sk-lw-warm",
     apiKeyId: "key-warm",
   }));
-  const checkPermit = vi.fn(async () => ({ allowed: true }));
-  const reservePermit = vi.fn(async () => ({
-    reserved: false,
-    allowed: true,
-    resetAt: 0,
-  }));
+  const checkPermit = vi.fn(async () => ({ allowed: true, resetAt: 0 }));
   const getOrProvision = vi.fn(async () =>
     workerCredentials({
       organizationId: "org-1",
@@ -81,8 +76,6 @@ function makeDeps(over: LangyTurnDepsOverrides = {}) {
     models: { resolve: vi.fn(async () => ({ modelId: "openai/gpt-5-mini" })) },
     worker: { probe, warm, dispatch, cancel },
     permits: {
-      reserve: reservePermit,
-      release: vi.fn(async () => {}),
       check: checkPermit,
     },
     perDayPrCap: 5,
@@ -102,7 +95,6 @@ function makeDeps(over: LangyTurnDepsOverrides = {}) {
       dispatch,
       mintSessionKey,
       checkPermit,
-      reservePermit,
       getOrProvision,
       getModelsAllowed,
     },
@@ -226,13 +218,11 @@ describe("LangyTurnWarmService.warmConversationWorker", () => {
         githubToken: "gh-token",
         githubLogin: "octo",
       });
-      mocks.checkPermit.mockResolvedValue({ allowed: false });
+      mocks.checkPermit.mockResolvedValue({ allowed: false, resetAt: 0 });
       const service = LangyTurnWarmService.create(deps);
 
       await service.warmConversationWorker(warmInput());
 
-      // Check-only: the permit view, never the reserving one.
-      expect(mocks.reservePermit).not.toHaveBeenCalled();
       const probeArgs = mocks.probe.mock.calls[0]![0];
       expect(probeArgs.hasGithubAuth).toBe(false);
       const warmArgs = mocks.warm.mock.calls[0]![0] as {

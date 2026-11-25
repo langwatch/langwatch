@@ -103,4 +103,27 @@ describe("MigrationBlobS3Repository", () => {
       });
     });
   });
+
+  describe("given a regional AWS endpoint and no region named", () => {
+    describe("when the driver builds its client", () => {
+      /** @scenario "Every S3 client picks its region by the same rule" */
+      it("takes the region the shared rule reads from the host, not the SDK default", () => {
+        const built: { region?: string; targetHost: string }[] = [];
+        MigrationBlobS3Repository.create({
+          aws: {
+            build: (input: { region?: string; targetHost: string }) => {
+              built.push(input);
+              return {};
+            },
+          } as never,
+          config: { bucket: "test-bucket", endpoint: "https://s3.eu-west-1.amazonaws.com" },
+        });
+
+        expect(built[0]).toMatchObject({
+          region: "eu-west-1",
+          targetHost: "https://s3.eu-west-1.amazonaws.com",
+        });
+      });
+    });
+  });
 });

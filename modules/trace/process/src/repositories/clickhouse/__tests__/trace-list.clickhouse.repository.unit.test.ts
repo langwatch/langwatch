@@ -9,8 +9,9 @@ import { describe, expect, it, vi } from "vitest";
 import { ownProof } from "../../../__tests__/support/authorization-proofs.fixture.ts";
 import { TraceListClickHouseRepository } from "../trace-list.repository.ts";
 
-/** The full-window version dedup, identified by its GROUP BY. */
-const DEDUP_AGGREGATE = "GROUP BY TenantId, TraceId";
+/** The full-window version dedup, identified by its two per-trace aggregates. */
+const DEDUP_AGGREGATE = "HAVING min(UpdatedAt) < max(UpdatedAt)";
+const DEDUP_AGGREGATES_PER_READ = 2;
 
 /** Where the outer page stage hands the chosen row identities to the inner one. */
 const IDENTITY_HANDOVER = "(TenantId, TraceId, UpdatedAt) IN (";
@@ -61,7 +62,9 @@ describe("TraceListClickHouseRepository.listAll (unit)", () => {
 
       const pageQuery = queries.find(isPageQuery);
       expect(pageQuery).toBeDefined();
-      expect(occurrences({ haystack: pageQuery!, needle: DEDUP_AGGREGATE })).toBe(1);
+      expect(occurrences({ haystack: pageQuery!, needle: DEDUP_AGGREGATE })).toBe(
+        DEDUP_AGGREGATES_PER_READ,
+      );
     });
 
     it("carries the winning row's identity from the inner page stage to the outer read", async () => {
@@ -83,7 +86,9 @@ describe("TraceListClickHouseRepository.listAll (unit)", () => {
 
       const countQuery = queries.find(isCountQuery);
       expect(countQuery).toBeDefined();
-      expect(occurrences({ haystack: countQuery!, needle: DEDUP_AGGREGATE })).toBe(1);
+      expect(occurrences({ haystack: countQuery!, needle: DEDUP_AGGREGATE })).toBe(
+        DEDUP_AGGREGATES_PER_READ,
+      );
     });
   });
 
@@ -131,7 +136,9 @@ describe("TraceListClickHouseRepository.listAll (unit)", () => {
         const dedupBodies = sql
           .split(DEDUP_AGGREGATE)
           .slice(0, -1)
-          .map((chunk) => chunk.slice(chunk.lastIndexOf("SELECT TenantId")));
+          .map((chunk) =>
+            chunk.slice(chunk.lastIndexOf("SELECT sipHash128(TenantId, TraceId) AS id")),
+          );
         for (const body of dedupBodies) {
           expect(body).not.toContain(USER_FILTER);
         }

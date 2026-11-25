@@ -151,6 +151,11 @@ describe("the Stored Objects persistence", () => {
     expect(
       readFileSync(path.join(PROCESS_ROOT, "src", "services", "stored-object.service.ts"), "utf8"),
     ).toMatch(/export class StoredObjectService\b/);
-    expect(existsSync(path.join(PROCESS_ROOT, "src", "eventing"))).toBe(false);
+    const eventing = path.join(PROCESS_ROOT, "src", "eventing");
+    const pipelines = readdirSync(eventing).filter((name) => name.endsWith(".pipeline.ts"));
+    expect(pipelines).toEqual(["stored-object-maintenance.pipeline.ts"]);
+    const maintenance = readFileSync(path.join(eventing, pipelines[0]!), "utf8");
+    expect(maintenance).toMatch(/\.withEvents\(\[\]\)/);
+    expect(maintenance).not.toMatch(/Projection|withCommand|withEventSubscriber/);
   });
 });

@@ -1,6 +1,7 @@
 import { idIndexedClientDouble } from "@langwatch/clickhouse-client/testing";
 import type { EvaluationRunData } from "@langwatch/evaluation-contract";
 import { SecurityError } from "@langwatch/eventing";
+import { parse } from "@langwatch/ksuid";
 import { describe, expect, it, vi } from "vitest";
 
 import {
@@ -166,6 +167,46 @@ describe("ClickHouseEvaluationRepository", () => {
     expect(record._retention_days).toBe(31);
     expect(String(record.Details)).toContain("[lw-truncated]");
     expect(String(record.Error)).toContain("[lw-truncated]");
+  });
+
+  describe("given a run row stored without an IdLayout", () => {
+    /**
+     * @scenario "An evaluation run stored before its id layout was recorded keeps its id on the next write"
+     */
+    it("reads it back as v1-legacy and writes the same legacy id again", async () => {
+      const { client, floor, repository } = harness([
+        [{ scheduledAtMs: null }],
+        [{ scheduledAtMs: null }],
+        [fixtureRow()],
+      ]);
+      const stored = await repository.getByEvaluationId({
+        authorization: ownProof({ projectId: "org_1" }),
+        evaluationId: "evaluation_1",
+        retention: floor,
+      });
+      await repository.upsert({ tenantId: "org_1", data: stored });
+      await repository.upsert({ tenantId: "org_1", data: run });
+
+      const [rewritten, beforeTheColumn] = client.inserts as Record<string, unknown>[];
+      expect(stored.idLayout).toBe("v1-legacy");
+      expect(rewritten?.IdLayout).toBe("v1-legacy");
+      expect(parse(String(rewritten?.ProjectionId)).layout).toBe("v1-legacy");
+      expect(rewritten?.ProjectionId).toBe(beforeTheColumn?.ProjectionId);
+      expect(rewritten?.LastProcessedEventId).toBe(rewritten?.ProjectionId);
+    });
+  });
+
+  describe("given a run that was never stored", () => {
+    /** @scenario "A new evaluation run mints a corrected id and records its layout" */
+    it("writes a v2 id and records IdLayout v2", async () => {
+      const { client, repository } = harness();
+      await repository.upsert({ tenantId: "org_1", data: { ...run, idLayout: "v2" } });
+
+      const record = client.inserts[0] as Record<string, unknown>;
+      expect(record.IdLayout).toBe("v2");
+      expect(parse(String(record.ProjectionId)).layout).toBe("v2");
+      expect(record.LastProcessedEventId).toBe(record.ProjectionId);
+    });
   });
 
   /** @scenario evaluation rows stay merge-safe regardless of input size */

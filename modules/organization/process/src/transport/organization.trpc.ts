@@ -264,6 +264,23 @@ export const organizationTrpcTransport: TrpcRouterDeclaration<
     return { success: true as const, teamsLeftWithoutAdmin };
   })
 
+  /** A security policy of the organization's, so an administrator's to read and to change. */
+  .procedure("getDocsPlaygroundPolicy")
+  .withPermission("organization:manage")
+  .handle(({ app, input }) => app.getDocsPlaygroundPolicy({ organizationId: input.organizationId }))
+
+  .procedure("saveDocsPlaygroundPolicy")
+  .withPermission("organization:manage")
+  .handle(async ({ app, input, actor }) => {
+    await app.saveDocsPlaygroundPolicy({
+      organizationId: input.organizationId,
+      docsPlaygroundSessionsEnabled: input.docsPlaygroundSessionsEnabled,
+      changedByUserId: actor.id,
+    });
+
+    return { success: true as const };
+  })
+
   .procedure("getAuditLogs")
   .withEntitlement("enterprise", { feature: "AUDIT_LOGS" })
   .withMiddlewareContext(organizationSessionPersonContext)
@@ -368,6 +385,7 @@ function memberRecordOnWire(
     updatedAt: toDate(member.updatedAt),
     departmentId: member.departmentId,
     disabledAt: member.disabledAt && toDate(member.disabledAt),
+    billingOnly: member.billingOnly ?? false,
     user: {
       id: member.user.id,
       name: member.user.name,
@@ -393,6 +411,7 @@ function memberDirectoryOnWire(
       updatedAt: toDate(member.updatedAt),
       departmentId: member.departmentId,
       disabledAt: member.disabledAt && toDate(member.disabledAt),
+      billingOnly: member.billingOnly ?? false,
       seatPendingSince: member.seatPendingSince ? toDate(member.seatPendingSince) : null,
       user: {
         id: member.user.id,

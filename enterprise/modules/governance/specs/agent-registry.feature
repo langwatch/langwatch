@@ -149,6 +149,29 @@ Feature: Agent registry with ARD discovery and change events
     Then the first page holds versions 1 and 2 with a cursor
     And the page after that cursor holds version 3 and no cursor
 
+  @integration
+  Scenario: An entry another release wrote with a source this release does not know is left out of every list
+    Given the registry holds two agents
+    And one entry carries a source this release does not know, as after a rollback
+    When the registry lists its entries, in one page or one entry at a time
+    Then the list holds the other agent and pages to its end
+    And the read does not fail
+
+  @unit @integration
+  Scenario: An event another release wrote with a type this release does not know is left out of the feed and versions
+    Given the registry feed holds an undelivered event of a type only a later release knows, as after a rollback
+    When the feed and the agent's versions are read one page at a time
+    Then every page answers, the event is left out with a warning, and the cursor pages past it to the end
+    And the webhook fan-out leaves it out of the undelivered events it pushes
+
+  @integration
+  Scenario: An undelivered event this release cannot read never holds back the events after it
+    Given more undelivered events of a known type than one fan-out takes, whose payload only a later release reads
+    And a readable event written after them
+    When the webhook fan-out reads its undelivered events
+    Then it pages past the unreadable ones to the readable event
+    And it leaves the unreadable ones undelivered, for the later release to push
+
   @unit
   Scenario: A source that cannot be read removes nothing
     Given the registry holds active agents

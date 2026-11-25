@@ -280,6 +280,34 @@ Feature: Buying seats
       Then the confirm reads "Add 2 developer seats · €10/mo"
       And the summary reads "Developer seats 2 × €5"
 
+    @unit
+    Scenario: The Developer seat stepper stops at the Developers in use
+      Given the subscription bills 3 Developer seats and 2 Developers are in use
+      When I lower the Developer seats in Manage seats
+      Then the stepper does not go under 2
+      And it reads "2 people use Developer seats. Remove someone in Users to go lower."
+
+    @unit
+    Scenario: The Developer seat stepper never plans Developer seats nobody asked for
+      Given the subscription bills no Developer seats and 2 Developers are in use
+      When I open Manage seats
+      Then the Developer seats read 0 and the stepper's floor is 0
+
+    @unit
+    Scenario: Raising Developer seats skips the counts below the Developers in use
+      Given the subscription bills no Developer seats and 2 Developers are in use
+      When I raise the Developer seats in Manage seats
+      Then the Developer seats read 2
+      And it reads "2 people use Developer seats, so you need at least 2."
+      When I lower them again
+      Then the Developer seats read 0
+
+    @unit
+    Scenario: Developers counted after a lower pick lift the pick to the floor
+      Given Manage seats lowered the Developer seats from 3 to 1 before the Developers in use were counted
+      When 2 Developers are counted in use
+      Then the Developer seats read 2
+
     @integration
     Scenario: Confirming Developer seats changes the subscription
       Given Manage seats on Growth adds 2 Developer seats at €5 a month
@@ -327,6 +355,7 @@ Feature: Buying seats
     @unit
     Scenario: Lowering Developer seats changes the line from the next period with no credit
       Given the subscription bills 3 Developer seats
+      And 1 Developer is in use
       When an administrator sets 1 Developer seat
       Then the Developer seat line moves to 1 with no proration
 

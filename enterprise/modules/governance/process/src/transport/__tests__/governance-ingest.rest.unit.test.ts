@@ -239,6 +239,20 @@ describe("the ingestion-source receivers", () => {
       },
     );
 
+    /** @scenario "A disabled source answers a wrong endpoint as unknown" */
+    it("answers its secret on another source's endpoint with the bare 401", async () => {
+      const api = mountIngest({ source: { ...SOURCE, status: "disabled" } });
+
+      const response = await api.post("/api/ingest/otel/src_other", traceBody);
+
+      expect(response.status).toBe(401);
+      await expect(response.json()).resolves.toMatchObject({
+        code: "ingestion_source_unauthorized",
+      });
+    });
+  });
+
+  describe("given a live source", () => {
     it.each([
       ["OTLP traces", `/api/ingest/otel/${SOURCE_ID}`, traceBody, "traceCollection"],
       ["OTLP logs", `/api/ingest/otel/${SOURCE_ID}/v1/logs`, logBody, "logCollection"],
@@ -260,18 +274,6 @@ describe("the ingestion-source receivers", () => {
         expect(api[channel]).toHaveBeenCalled();
       },
     );
-
-    /** @scenario "A disabled source answers a wrong endpoint as unknown" */
-    it("answers its secret on another source's endpoint with the bare 401", async () => {
-      const api = mountIngest({ source: { ...SOURCE, status: "disabled" } });
-
-      const response = await api.post("/api/ingest/otel/src_other", traceBody);
-
-      expect(response.status).toBe(401);
-      await expect(response.json()).resolves.toMatchObject({
-        code: "ingestion_source_unauthorized",
-      });
-    });
   });
 
   describe("given a disabled source the admin set back to active", () => {
@@ -285,7 +287,9 @@ describe("the ingestion-source receivers", () => {
 
       expect(refused.status).toBe(403);
       expect(response.status).toBe(202);
-      expect(api.ingestionSourceRecordEventReceived).toHaveBeenCalledWith(SOURCE_ID);
+      expect(api.ingestionSourceRecordEventReceived).toHaveBeenCalledWith(
+        expect.objectContaining({ id: SOURCE_ID }),
+      );
     });
   });
 
@@ -379,7 +383,9 @@ describe("the ingestion-source receivers", () => {
           { key: "langwatch.ingestion_source.id", value: { stringValue: SOURCE_ID } },
         ]),
       );
-      expect(api.ingestionSourceRecordEventReceived).toHaveBeenCalledWith(SOURCE_ID);
+      expect(api.ingestionSourceRecordEventReceived).toHaveBeenCalledWith(
+        expect.objectContaining({ id: SOURCE_ID }),
+      );
     });
   });
 
@@ -399,7 +405,9 @@ describe("the ingestion-source receivers", () => {
       expect(logCollection).toHaveBeenCalledWith(
         expect.objectContaining({ tenantId: "gov_project", organizationId: ORGANIZATION_ID }),
       );
-      expect(api.ingestionSourceRecordEventReceived).toHaveBeenCalledWith(SOURCE_ID);
+      expect(api.ingestionSourceRecordEventReceived).toHaveBeenCalledWith(
+        expect.objectContaining({ id: SOURCE_ID }),
+      );
     });
   });
 
@@ -472,7 +480,9 @@ describe("the ingestion-source receivers", () => {
       expect(response.status).toBe(202);
       await expect(response.json()).resolves.toMatchObject({ accepted: true, bytes: 15 });
       expect(logCollection).toHaveBeenCalledTimes(1);
-      expect(api.ingestionSourceRecordEventReceived).toHaveBeenCalledWith(SOURCE_ID);
+      expect(api.ingestionSourceRecordEventReceived).toHaveBeenCalledWith(
+        expect.objectContaining({ id: SOURCE_ID }),
+      );
     });
   });
 

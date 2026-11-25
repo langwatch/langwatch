@@ -7,6 +7,11 @@
 import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
+import {
+  AGENT_STOP_WEBHOOK_EVENT_TYPES,
+  agentStopViewSchema,
+} from "../kill-switch/agent-kill-switch.ts";
+
 export const AGENT_REGISTRY_SOURCES = [
   "langwatch",
   "databricks",
@@ -129,6 +134,27 @@ export interface AgentRegistryEventSchema extends Named<
 export const agentRegistryEventSchema: AgentRegistryEventSchema =
   agentRegistryEventSchemaDefinition;
 export type AgentRegistryEvent = z.infer<typeof agentRegistryEventSchema>;
+
+/**
+ * A kill switch milestone's webhook body: a registry event's fields bar `sequence`, plus the stop.
+ * Webhook only, never in the feed, until every supported release reads unknown event types.
+ */
+const { sequence: _feedPosition, ...registryEventFields } =
+  agentRegistryEventSchemaDefinition.shape;
+const agentStopMilestoneEventSchemaDefinition = z.object({
+  ...registryEventFields,
+  type: z.enum(AGENT_STOP_WEBHOOK_EVENT_TYPES),
+  from_version: z.null(),
+  to_version: z.null(),
+  tool: z.null(),
+  stop: agentStopViewSchema,
+});
+export interface AgentStopMilestoneEventSchema extends Named<
+  typeof agentStopMilestoneEventSchemaDefinition
+> {}
+export const agentStopMilestoneEventSchema: AgentStopMilestoneEventSchema =
+  agentStopMilestoneEventSchemaDefinition;
+export type AgentStopMilestoneEvent = z.infer<typeof agentStopMilestoneEventSchema>;
 
 export const AGENT_REGISTRY_PAGE_LIMIT_MAX = 200;
 /** The most active agents the ARD manifest and search read, latest change first. */

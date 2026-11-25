@@ -6,13 +6,15 @@
 
 import { describe, expect, it } from "vitest";
 
-import { MAX_WIDGET_DRAFT_LENGTH } from "../../langy/model/board-langy.ts";
 import {
   CATALOGUE_TEMPLATES,
   CATALOGUE_WIDGETS,
   templateSetupNeeds,
   templateWidgetGaps,
 } from "../index.ts";
+
+/** A report prompt stays short enough to read in the composer at a glance. */
+const MAX_REPORT_PROMPT_LENGTH = 3_000;
 
 describe("given every template's report prompt", () => {
   /** @scenario "Template prompt: Langy also checks what the template needs that is not set up yet" */
@@ -47,7 +49,7 @@ describe("given every template's report prompt", () => {
         ({ widget, gap }) => !reportPrompt.includes(`"${widget}" needs ${gap}`),
       );
       expect(missing, id).toEqual([]);
-      expect(reportPrompt.length, id).toBeLessThan(MAX_WIDGET_DRAFT_LENGTH / 2);
+      expect(reportPrompt.length, id).toBeLessThan(MAX_REPORT_PROMPT_LENGTH);
     }
     expect(CATALOGUE_TEMPLATES.some(({ widgets }) => templateWidgetGaps(widgets).length > 0)).toBe(
       true,

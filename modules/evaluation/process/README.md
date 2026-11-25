@@ -303,14 +303,14 @@ type Response = unknown;
 
 Contract `../contract/src/evaluation.trpc.ts:26`, router `src/transport/evaluation.trpc.ts:10`.
 
-| Procedure                                     | Kind     | Gate                                            | Input                                     | Output                       |
-| --------------------------------------------- | -------- | ----------------------------------------------- | ----------------------------------------- | ---------------------------- |
-| `evaluations.availableEvaluators`             | query    | Permission `evaluations:view`                   | `evaluationProjectScopeSchema`            | `evaluatorCatalogueSchema`   |
-| `evaluations.availableCustomEvaluators`       | query    | Permission `evaluations:view`                   | `evaluationProjectScopeSchema`            | inline                       |
-| `evaluations.runEvaluation`                   | mutation | Permission `evaluations:manage`                 | `runTraceEvaluationInputSchema`           | `evaluationRunOutcomeSchema` |
-| `evaluations.warmupLambda`                    | mutation | Permission `evaluations:view`                   | `warmupEvaluatorsInputSchema`             | `evaluationWarmupSchema`     |
-| `evaluations.getMonitorPerformanceForProject` | query    | Permission `evaluations:view or analytics:view` | `monitorPerformanceForProjectInputSchema` | inline                       |
-| `evaluations.getEvaluationInputs`             | query    | Permission `traces:view`                        | `evaluationInputsInputSchema`             | `evaluationInputsSchema`     |
+| Procedure                                     | Kind     | Gate                                             | Input                                     | Output                       |
+| --------------------------------------------- | -------- | ------------------------------------------------ | ----------------------------------------- | ---------------------------- |
+| `evaluations.availableEvaluators`             | query    | Permission `evaluations:view`                    | `evaluationProjectScopeSchema`            | `evaluatorCatalogueSchema`   |
+| `evaluations.availableCustomEvaluators`       | query    | Permission `evaluations:view`                    | `evaluationProjectScopeSchema`            | inline                       |
+| `evaluations.runEvaluation`                   | mutation | Permission `evaluations:manage`                  | `runTraceEvaluationInputSchema`           | `evaluationRunOutcomeSchema` |
+| `evaluations.warmupLambda`                    | mutation | Permission `evaluations:view`                    | `warmupEvaluatorsInputSchema`             | `evaluationWarmupSchema`     |
+| `evaluations.getMonitorPerformanceForProject` | query    | Permission `evaluations:view and analytics:view` | `monitorPerformanceForProjectInputSchema` | inline                       |
+| `evaluations.getEvaluationInputs`             | query    | Permission `traces:view`                         | `evaluationInputsInputSchema`             | `evaluationInputsSchema`     |
 
 ```typescript
 // evaluations.availableEvaluators

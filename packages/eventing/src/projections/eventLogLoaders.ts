@@ -13,7 +13,8 @@ export interface AggregateEventLog<Stored extends Event = Event> {
 
 /**
  * Wires a fold's history loaders (out-of-order re-fold, store-miss re-fold and its paged
- * variant) over one aggregate type's event log, leaving any loader the fold already carries.
+ * variant) and its event-log probe over one aggregate type's event log, leaving any loader the
+ * fold already carries.
  */
 export function wireFoldEventLoaders<Stored extends Event>({
   fold,
@@ -21,7 +22,7 @@ export function wireFoldEventLoaders<Stored extends Event>({
 }: {
   fold: Pick<
     FoldProjectionDefinition<unknown>,
-    "eventLoader" | "eventLoaderUpTo" | "eventLoaderUpToPaged"
+    "eventLoader" | "eventLoaderUpTo" | "eventLoaderUpToPaged" | "eventLogProbe"
   >;
   log: AggregateEventLog<Stored>;
 }): void {
@@ -37,7 +38,7 @@ export function wireFoldEventLoaders<Stored extends Event>({
   // History up to AND including the delivered event in log order, so a store-miss re-fold
   // never pre-applies an event persisted but still queued (per-aggregate FIFO delivers it next).
   fold.eventLoaderUpTo ??= loadUpTo({ aggregateType, eventStore });
-  // One (timestamp, eventId)-ordered page; no occurredAt re-sort, as the streaming path
+  // One page in event_log's key order; no occurredAt re-sort, as the streaming path
   // serves order-insensitive folds only.
   const getEventsUpToPaged = eventStore.getEventsUpToPaged?.bind(eventStore);
   if (!fold.eventLoaderUpToPaged && getEventsUpToPaged) {
@@ -51,6 +52,17 @@ export function wireFoldEventLoaders<Stored extends Event>({
         limit: ctx.limit,
       })),
     ];
+  }
+  const probeEventsBefore = eventStore.probeEventsBefore?.bind(eventStore);
+  if (!fold.eventLogProbe && probeEventsBefore) {
+    fold.eventLogProbe = (ctx) =>
+      probeEventsBefore({
+        aggregateId: ctx.aggregateId,
+        context: { tenantId: createTenantId(ctx.tenantId) },
+        aggregateType,
+        event: ctx.event as Stored,
+        ignoreEventIds: ctx.ignoreEventIds,
+      });
   }
 }
 

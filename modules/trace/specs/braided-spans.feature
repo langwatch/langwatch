@@ -41,6 +41,86 @@ Feature: Braided spans in the reader's traces
       When sam lists or searches "orchestrator" traces
       Then that trace is not listed
       And opening its id from "orchestrator" is answered as not found
+      And a trace "orchestrator" holds only by sharing its trace id, with no span linked to a "specialists" span, shows no "specialists" span
+
+    @integration
+    Scenario: A reader span sharing only the trace id with the owner shows no owner span
+      Given an "orchestrator" span and matching "specialists" spans under one trace id
+      And no "orchestrator" span is the parent or the child of a "specialists" span
+      When sam opens the trace
+      Then no "specialists" span appears
+
+    @integration
+    Scenario: A reader span linked as parent or child of an owner span shows the matching owner spans
+      Given an "orchestrator" span that is the parent of a "specialists" span in one trace
+      And "specialists" spans deeper in that trace, some matching the condition and some not
+      When sam opens the trace
+      Then every matching "specialists" span in the trace appears, not only the linked one
+      And the same holds when the "specialists" span is the parent and the "orchestrator" span its child
+
+    @integration
+    Scenario: A forged reader span reusing a known trace id but an unknown span id shows nothing
+      Given a "specialists" trace that "orchestrator" recorded nothing in
+      And someone with the "orchestrator" ingest key sends one span under that trace id, with a span id and parent span id of its own choosing
+      When sam opens the trace
+      Then no "specialists" span appears
+
+    @integration
+    Scenario: A reader span with an empty or all-zero span id links to nothing
+      Given a "specialists" trace whose root span has no parent
+      And someone with the "orchestrator" ingest key sends one span under that trace id with an empty span id
+      And another with the all-zero span id "0000000000000000"
+      When sam opens either trace
+      Then no "specialists" span appears
+      And an empty or all-zero span id or parent span id never equals any span on either side
+
+    @integration
+    Scenario: A call that returns to the reader holds the trace across every hop
+      Given an "orchestrator" span that calls "specialists", whose span calls "orchestrator" again in the same trace
+      When sam opens the trace
+      Then the matching "specialists" spans appear between the two "orchestrator" hops
+
+    # A chain of owners is held hop by hop, each hop through its own braid (decided by Alex,
+    # 2026-11-18). A braid's grant still never passes on to a third project (braids.feature).
+
+    @integration
+    Scenario: An owner called by another braided owner is held through it
+      Given a third project "search" with a live braid into "orchestrator" with no condition
+      And an "orchestrator" span that calls "specialists", whose span calls "search", in one trace
+      And no "search" span is the parent or the child of an "orchestrator" span
+      When sam opens the trace
+      Then the matching "specialists" spans and the "search" spans appear
+
+    @integration
+    Scenario: An owner whose caller does not braid into the reader stays hidden
+      Given a third project "search" with a live braid into "orchestrator", and no braid from "specialists"
+      And an "orchestrator" span that calls "specialists", whose span calls "search", in one trace
+      When sam opens the trace
+      Then no "specialists" span and no "search" span appears
+
+    @integration
+    Scenario: A project that braids nothing into the reader breaks the chain
+      Given a third project "search" with a live braid into "orchestrator" with no condition
+      And a project "billing" with no braid into "orchestrator"
+      And an "orchestrator" span that calls "specialists", which calls "billing", which calls "search", in one trace
+      When sam opens the trace
+      Then the matching "specialists" spans appear
+      And no "billing" span and no "search" span appears
+
+    @integration
+    Scenario: An owner past the hop bound stays hidden
+      Given five owner projects, each with a live braid into "orchestrator" with no condition
+      And an "orchestrator" span that calls the first, each calling the next, in one trace
+      When sam opens the trace
+      Then the spans of the first four owners appear
+      And no span of the fifth owner appears
+
+    @integration
+    Scenario: A chain that returns to the reader holds every braided owner on it
+      Given a third project "search" with a live braid into "orchestrator" with no condition
+      And a "search" span that calls "specialists", whose span calls "orchestrator", in one trace
+      When sam opens the trace
+      Then the matching "specialists" spans and the "search" spans appear
 
     @integration
     Scenario: Spans are matched per owner by trace id
@@ -93,8 +173,15 @@ Feature: Braided spans in the reader's traces
     Scenario: The fence shows owner spans only in traces the reader holds
       Given a "specialists" trace that "orchestrator" recorded nothing in, with spans matching the condition
       When any span read for "orchestrator" is fenced
-      Then the fence admits a "specialists" span only in a trace "orchestrator" holds a span of
-      And that check is the fence's own, with "orchestrator" bound as a parameter
+      Then the fence admits a "specialists" span only in a trace where an "orchestrator" span and a "specialists" span are parent and child, either way, or where the link runs through owners braided into "orchestrator"
+      And a shared trace id alone holds nothing
+      And that check is the fence's own, with "orchestrator" and the braid owners bound as parameters
+
+    @unit
+    Scenario: A chain of braided owners is held hop by hop up to the bound
+      When any span read for "orchestrator" is fenced under braids
+      Then the held set follows owner spans linked to the reader's spans, then to the spans of owners already held, one hop at a time
+      And it stops after BRAID_HELD_MAX_HOPS owner hops, with no "or" inside any of its selects
 
     @unit
     Scenario: A plain tenant marker under a braids fence is refused
@@ -178,6 +265,13 @@ Feature: Braided spans in the reader's traces
       And the "orchestrator" spans show theirs
 
     @unit
+    Scenario: A braided span's redaction names the owner project
+      Given "specialists" hides span input from sam
+      When sam opens a braided "specialists" span in an "orchestrator" trace
+      Then the redacted input says it is visible to members of "specialists"
+      And never "members of this project", which would read as "orchestrator"
+
+    @unit
     Scenario: A viewer with no role on the owner project is outside its role-keyed audiences
       Given "specialists" shows span input only to its own admins
       When sam, an admin of "orchestrator" with no role on "specialists", opens a braided span
@@ -259,7 +353,7 @@ Feature: Braided spans in the reader's traces
       When sam selects a braided span
       Then commenting, suggesting an edit and opening it in the playground are off, each saying why
       And a prompt it ran is listed as the owner's, with opening the prompt and the playground off
-      And the span says it is shown because it matches the braid's condition
+      And the span says it is shown because it matches the braid's condition, each matched condition on its own line as code
 
     @integration
     Scenario: Opening the owner project is offered only to someone who can open it
@@ -367,6 +461,14 @@ Feature: Braided spans in the reader's traces
       And a read whose entry cannot be written fails and returns no "specialists" span
 
     @unit
+    Scenario: The instrumentation badges of a braided trace open the trace as the span tree does
+      Given a live braid from "specialists" into "orchestrator"
+      And sam's plan withholds the "orchestrator" trace he asks for
+      When sam reads that trace's instrumentation badges
+      Then the read is refused as withheld before any span is read
+      And otherwise each badge row names the "specialists" span's owner, as the span tree does
+
+    @unit
     Scenario: A span read that skips the audit door cannot be written
       Given the reads the trace module's span store and braid reads answer
       When any of them returns a "specialists" span, or totals or counts derived from one
@@ -389,6 +491,22 @@ Feature: Braided spans in the reader's traces
       When an admin previews a condition for a braid from "specialists" into "orchestrator"
       Then the preview counts the traces that get every "specialists" span, some of them, or none
       And traces with nothing braided are still counted
+      And a trace whose "orchestrator" and "specialists" spans are not parent and child counts as none
+      And a trace holding "specialists" only through another braided owner counts as none, since the preview reads only the two projects
+
+    @unit
+    Scenario: Testing a trace marks nothing braided when no reader span is linked to an owner span
+      Given an "orchestrator" trace whose "specialists" spans match the condition but none is parent or child of an "orchestrator" span
+      When an admin tests the condition against that trace
+      Then the "specialists" spans are returned, none marked braided
+
+    @unit
+    Scenario: Testing a trace and the preview hold a trace only through links the reader's fence holds
+      Given an "orchestrator" trace whose root starts before the earliest window of every braid into "orchestrator"
+      And a "specialists" span that is a child of that root
+      When an admin tests the condition against that trace or previews it
+      Then the "specialists" spans are returned, none marked braided
+      And the preview reads links only from that earliest window, as the live fence does
 
     @integration
     Scenario: The preview counts calls that would stay hidden for want of a valid signature
@@ -398,7 +516,7 @@ Feature: Braided spans in the reader's traces
     @integration
     Scenario: Testing a trace renders it exactly as the reader will see it
       When an admin tests a condition against an "orchestrator" trace id
-      Then that trace is returned with exactly the spans "orchestrator" would see under the condition
+      Then that trace is returned with exactly the spans "orchestrator" would see under the condition through a direct link
 
     @unit
     Scenario: The preview asks for read access on both projects at the door

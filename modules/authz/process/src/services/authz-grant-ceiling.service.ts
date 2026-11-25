@@ -1,5 +1,6 @@
 import {
   assertBindingScopeCanGrantPermissions,
+  AuthzBillingOnlyNoAccessError,
   CustomRoleIdRequiredError,
   CustomRoleNotAssignableError,
   GrantExceedsCallerPermissionsError,
@@ -48,7 +49,10 @@ function assertScopeCanGrantRole({
 /** The escalation ceiling: a binding never confers what the caller lacks at its scope. */
 export class AuthzGrantCeilingService {
   static create(options: {
-    bindings: Pick<AuthzManagedGrantRepository, "findAssignableRoles" | "findBinding">;
+    bindings: Pick<
+      AuthzManagedGrantRepository,
+      "findAssignableRoles" | "findBinding" | "isBillingOnlyMember"
+    >;
     permissions: Pick<AuthzGrantWriterPermissions, "findPermissionsBeyondCaller">;
   }): AuthzGrantCeilingService {
     return new AuthzGrantCeilingService(options.bindings, options.permissions);
@@ -57,7 +61,7 @@ export class AuthzGrantCeilingService {
   private constructor(
     private readonly bindings: Pick<
       AuthzManagedGrantRepository,
-      "findAssignableRoles" | "findBinding"
+      "findAssignableRoles" | "findBinding" | "isBillingOnlyMember"
     >,
     private readonly permissions: Pick<AuthzGrantWriterPermissions, "findPermissionsBeyondCaller">,
   ) {}
@@ -114,6 +118,21 @@ export class AuthzGrantCeilingService {
    * The ceiling for a ledger write that arrives already composed (`attachBindings`): a person or
    * key never grants beyond what it holds; a `system` write follows from an act already checked.
    */
+  /** Billing only holds no binding at any scope (ADR-205): refused before anything is written. */
+  async assertNoBillingOnlyPrincipal({
+    organizationId,
+    userIds,
+  }: {
+    organizationId: string;
+    userIds: readonly (string | null | undefined)[];
+  }): Promise<void> {
+    for (const userId of new Set(userIds)) {
+      if (userId && (await this.bindings.isBillingOnlyMember({ organizationId, userId }))) {
+        throw new AuthzBillingOnlyNoAccessError();
+      }
+    }
+  }
+
   async assertBindingsWithinCaller({
     organizationId,
     caller,

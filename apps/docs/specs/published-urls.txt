@@ -12,6 +12,7 @@
 /agent-testing/other-ways-to-connect
 /agent-testing/overview
 /agent-testing/red-team-open-source
+/agent-testing/red-team-templates
 /agent-testing/red-teaming
 /agent-testing/results
 /agent-testing/run-from-ci
@@ -26,6 +27,7 @@
 /agent-testing/test-suites
 /agent-testing/voice-agents
 /ai-gateway
+/ai-gateway/a2a-proxy
 /ai-gateway/api
 /ai-gateway/api/audio
 /ai-gateway/api/chat-completions
@@ -347,6 +349,22 @@
 /api-reference/governance-agent-registry/overview
 /api-reference/governance-agent-registry/read-the-registry-change-feed
 /api-reference/governance-agent-registry/search-the-registry-ard-search
+/api-reference/governance-kill-switch/approve-a-pending-stop
+/api-reference/governance-kill-switch/deny-a-pending-stop
+/api-reference/governance-kill-switch/get-an-agent-s-latest-stop
+/api-reference/governance-kill-switch/get-an-agent-s-stop-plan
+/api-reference/governance-kill-switch/list-the-organisation-s-agent-stops
+/api-reference/governance-kill-switch/overview
+/api-reference/governance-kill-switch/replace-an-agent-s-stop-plan
+/api-reference/governance-kill-switch/restore-a-stopped-agent
+/api-reference/governance-kill-switch/retry-a-stop
+/api-reference/governance-kill-switch/stop-an-agent
+/api-reference/governance-security-lake/add-an-aws-security-lake-source
+/api-reference/governance-security-lake/edit-an-aws-security-lake-source
+/api-reference/governance-security-lake/overview
+/api-reference/governance-security-lake/read-a-security-lake-source
+/api-reference/governance-security-lake/read-a-security-lake-source-s-health
+/api-reference/governance-security-lake/test-a-security-lake-source-s-connection
 /api-reference/grants
 /api-reference/grants/change-a-grant-s-role
 /api-reference/grants/get-a-grant
@@ -558,8 +576,10 @@
 /api-reference/teams/remove-member
 /api-reference/teams/update-team
 /api-reference/test-suites
+/api-reference/test-suites/apply-a-suite-template
 /api-reference/test-suites/create-test-suites
 /api-reference/test-suites/delete-test-suites
+/api-reference/test-suites/list-suite-templates
 /api-reference/test-suites/list-test-suites
 /api-reference/test-suites/overview
 /api-reference/test-suites/read-one-test-suite
@@ -574,6 +594,7 @@
 /api-reference/traces/get-transcript
 /api-reference/traces/overview
 /api-reference/traces/projection-dsl
+/api-reference/traces/recommended-trace-wait-for-a-scenario-judge
 /api-reference/traces/search
 /api-reference/traces/update-trace-metadata
 /api-reference/triggers
@@ -703,6 +724,7 @@
 /features/topic-clustering
 /features/webhooks
 /governance/agent-registry
+/governance/kill-switch
 /guardrails/overview
 /guardrails/setting-up-guardrails
 /hybrid-setup
@@ -860,6 +882,7 @@
 /langy/security/sandbox
 /langy/token-usage-and-cost
 /observability
+/observability/multi-agent-a2a
 /observability/overview
 /observability/trace-vs-activity-ingestion
 /optimization-studio/datasets
@@ -974,3 +997,8 @@
 /workflows/overview
 /workflows/workflow-as-agent
 /workflows/workflow-as-evaluator
+/api-reference/governance-ocsf/export-governance-events-as-ocsf-1-9-0
+/api-reference/governance-ocsf/export-project-traces-as-ocsf-1-9-0
+/api-reference/governance-ocsf/export-the-audit-log-as-ocsf-1-9-0
+/api-reference/governance-ocsf/overview
+/api-reference/governance-ocsf/push-ocsf-events-in-from-another-source

@@ -1,7 +1,7 @@
 // Screens ask application port; plan for Enterprise surfaces; the query holds the open tab.
 
 import type { UiDrawerToken } from "@langwatch/browser-host/declarations";
-import { createContext, useContext } from "react";
+import { createContext, useContext, type ReactNode } from "react";
 
 // Route and writes guard on organization:manage; prevents leaked organization data.
 export const AUTHZ_MANAGE_PERMISSION = "organization:manage";
@@ -84,6 +84,9 @@ export abstract class AuthzHostApi {
   abstract succeeded(notice: AuthzSuccessNotice): void;
 
   abstract failed(failure: AuthzFailureNotice): void;
+
+  /** The project switcher the project module lends; null when none is lent. */
+  abstract projectSwitcher(): ReactNode | null;
 }
 
 const AuthzHostContext = createContext<AuthzHostApi | undefined>(void 0);

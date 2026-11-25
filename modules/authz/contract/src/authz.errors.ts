@@ -219,6 +219,39 @@ export class AuthzLiteMemberViewerOnlyError extends HandledError {
 }
 
 /** A role on anything shared was asked for somebody on a Developer seat (ADR-171). */
+/** Billing only holds the Billing grant and nothing else (ADR-205); a seat role comes first. */
+export class AuthzBillingOnlyNoAccessError extends HandledError {
+  declare readonly code: "billing_only_no_team_access";
+
+  constructor(scopeName?: string | null) {
+    super(
+      "billing_only_no_team_access",
+      "A Billing-only member holds no team, project or organization role; give them a seat role first.",
+      {
+        meta: scopeName ? { scopeName } : {},
+        httpStatus: 409,
+        fault: "customer",
+        ...remediation("billing_only_no_team_access"),
+      },
+    );
+    this.name = "AuthzBillingOnlyNoAccessError";
+  }
+}
+
+/** Billing is the whole of a Billing-only membership (ADR-205): removing it takes nothing away. */
+export class AuthzBillingOnlyKeepsBillingError extends HandledError {
+  declare readonly code: "billing_only_keeps_billing";
+
+  constructor() {
+    super(
+      "billing_only_keeps_billing",
+      "A Billing-only member always holds Billing; remove them, or move them to a seat role first.",
+      { httpStatus: 409, fault: "customer", ...remediation("billing_only_keeps_billing") },
+    );
+    this.name = "AuthzBillingOnlyKeepsBillingError";
+  }
+}
+
 export class AuthzDeveloperSeatNoSharedAccessError extends HandledError {
   declare readonly code: "developer_seat_no_shared_access";
 
@@ -605,6 +638,34 @@ export class BraidConditionLimitReachedError extends HandledError {
       { httpStatus: 422, fault: "customer", meta },
     );
     this.name = "BraidConditionLimitReachedError";
+  }
+}
+
+/** A braid management call while `release_braids` is off; existing braids keep applying. */
+export class BraidsNotEnabledError extends HandledError {
+  declare readonly code: "braids_not_enabled";
+
+  constructor() {
+    super("braids_not_enabled", "Braids are not enabled for this organisation", {
+      httpStatus: 403,
+      fault: "customer",
+      ...remediation("braids_not_enabled"),
+    });
+    this.name = "BraidsNotEnabledError";
+  }
+}
+
+/** Braid management while the organisation has Braids turned off; its braids are paused. */
+export class BraidsTurnedOffError extends HandledError {
+  declare readonly code: "braids_turned_off";
+
+  constructor() {
+    super("braids_turned_off", "Braids is turned off for this organisation", {
+      httpStatus: 403,
+      fault: "customer",
+      ...remediation("braids_turned_off"),
+    });
+    this.name = "BraidsTurnedOffError";
   }
 }
 

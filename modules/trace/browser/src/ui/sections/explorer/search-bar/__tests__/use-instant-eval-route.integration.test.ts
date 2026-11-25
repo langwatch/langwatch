@@ -7,7 +7,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
  * The refusals on the Explorer's `instant_eval` route: a popover over the chip, or a phrase.
  * @see specs/traces-v2/instant-eval-search.feature ("A refusal is a popover, never an error state")
  */
-import { useFilterStore } from "../../../../../behavior/explorer.store.ts";
+import { useFilterStore, useViewStore } from "../../../../../behavior/explorer.store.ts";
+import { useInstantEvalRunStore } from "../../../../../features/instant-eval/behavior/instant-eval-run.store.ts";
 import type { InstantEvalRoutePayload } from "../../../../../model/instant-eval-route.ts";
 import { useInstantEvalRoute } from "../use-instant-eval-route.ts";
 
@@ -248,6 +249,186 @@ describe("given the router answered instant_eval", () => {
     act(() => result.current.confirmRun());
 
     expect(mutations.start.mutate).toHaveBeenCalledTimes(1);
+  });
+
+  /** @scenario "An Instant Eval route starts a run" */
+  it("still rebuilds the chip beside the other terms for a routed sentence", () => {
+    const { result } = renderHook(() => useInstantEvalRoute({ isInstantEvalAvailable: true }));
+    act(() => result.current.onInstantEvalRoute(payload));
+    act(() => estimateCallbacks().onSuccess?.({ rows: 120, isRowsCapped: false, priceUsd: 0.1 }));
+    act(() => startCallbacks().onSuccess?.({ id: "run-1" }));
+
+    expect(useFilterStore.getState().queryText).toBe(CHIP_QUERY);
+  });
+});
+
+describe("given a chip typed by hand under NOT", () => {
+  const typed: InstantEvalRoutePayload = {
+    ...payload,
+    sentence: "the user is annoyed",
+    otherQuery: "",
+    fallbackQuery: 'NOT eval:"the user is annoyed"',
+    typedQuery: 'NOT eval:"the user is annoyed"',
+  };
+
+  /** @scenario "A chip typed by hand starts its run on Enter" */
+  it("keeps the NOT in the bar once the run starts", () => {
+    const { result } = renderHook(() => useInstantEvalRoute({ isInstantEvalAvailable: true }));
+    act(() => result.current.onInstantEvalRoute(typed));
+    act(() => estimateCallbacks().onSuccess?.({ rows: 120, isRowsCapped: false, priceUsd: 0.1 }));
+    act(() => startCallbacks().onSuccess?.({ id: "run-1" }));
+
+    expect(useFilterStore.getState().queryText).toBe('NOT eval:"the user is annoyed"');
+  });
+
+  /** @scenario "A chip typed by hand starts its run on Enter" */
+  it("keeps the NOT under a refusal popover", () => {
+    const { result } = renderHook(() => useInstantEvalRoute({ isInstantEvalAvailable: true }));
+    act(() => result.current.onInstantEvalRoute(typed));
+    act(() =>
+      estimateCallbacks().onError?.(handledError({ code: "instant_eval_classifier_unavailable" })),
+    );
+
+    expect(result.current.refusal).toEqual({ kind: "model" });
+    expect(useFilterStore.getState().queryText).toBe('NOT eval:"the user is annoyed"');
+  });
+
+  /** @scenario "A pending chip under NOT is not judged yet" */
+  it("drops the typed mark when the reader declines or closes the cost dialog", () => {
+    useFilterStore.setState({ projectId: "project-1" });
+    const mark = { projectId: "project-1", question: "the user is annoyed" };
+    useInstantEvalRunStore.setState({ typedQuestions: {} });
+    useInstantEvalRunStore.getState().markTyped(mark);
+    const { result } = renderHook(() => useInstantEvalRoute({ isInstantEvalAvailable: true }));
+    act(() =>
+      result.current.onInstantEvalRoute({ ...typed, newlyTypedQuestions: ["the user is annoyed"] }),
+    );
+    act(() =>
+      estimateCallbacks().onSuccess?.({ rows: 90_000, isRowsCapped: false, priceUsd: 0.5 }),
+    );
+    // The dialog's Search-words button and its close both land on this one handler.
+    act(() => result.current.searchWordsInstead());
+
+    expect(useInstantEvalRunStore.getState().typedQuestions).toEqual({});
+    expect(useFilterStore.getState().queryText).toBe('NOT eval:"the user is annoyed"');
+  });
+
+  /** @scenario "A pending chip under NOT is not judged yet" */
+  it("drops every mark the submit made on a declined dialog, not only the run's question", () => {
+    useFilterStore.setState({ projectId: "project-1" });
+    useInstantEvalRunStore.setState({ typedQuestions: {} });
+    useInstantEvalRunStore.getState().markTyped({ projectId: "project-1", question: "b" });
+    useInstantEvalRunStore
+      .getState()
+      .markTyped({ projectId: "project-1", question: typed.sentence });
+    const { result } = renderHook(() => useInstantEvalRoute({ isInstantEvalAvailable: true }));
+    act(() =>
+      result.current.onInstantEvalRoute({ ...typed, newlyTypedQuestions: [typed.sentence, "b"] }),
+    );
+    act(() =>
+      estimateCallbacks().onSuccess?.({ rows: 90_000, isRowsCapped: false, priceUsd: 0.5 }),
+    );
+    act(() => result.current.searchWordsInstead());
+
+    expect(useInstantEvalRunStore.getState().typedQuestions).toEqual({});
+  });
+
+  /** @scenario "A pending chip under NOT is not judged yet" */
+  it("drops the marks the submit made when the reader closes the refusal popover", () => {
+    useFilterStore.setState({ projectId: "project-1" });
+    useInstantEvalRunStore.setState({ typedQuestions: {} });
+    useInstantEvalRunStore.getState().markTyped({ projectId: "project-1", question: "b" });
+    useInstantEvalRunStore
+      .getState()
+      .markTyped({ projectId: "project-1", question: typed.sentence });
+    // Instant Evals off: a legacy NOT eval:<evaluator name> meets the popover, no estimate.
+    const { result } = renderHook(() => useInstantEvalRoute({ isInstantEvalAvailable: false }));
+    act(() =>
+      result.current.onInstantEvalRoute({ ...typed, newlyTypedQuestions: [typed.sentence, "b"] }),
+    );
+    expect(result.current.refusal).not.toBeNull();
+
+    act(() => result.current.dismissRefusal());
+
+    expect(useInstantEvalRunStore.getState().typedQuestions).toEqual({});
+    expect(useFilterStore.getState().queryText).toBe('NOT eval:"the user is annoyed"');
+  });
+
+  /** @scenario "A pending chip under NOT is not judged yet" */
+  it.each([
+    ["the refusal popover", false],
+    ["the cost dialog", true],
+  ])("drops the marks the submit made when a later Enter supersedes %s", (_label, available) => {
+    useFilterStore.setState({ projectId: "project-1" });
+    useInstantEvalRunStore.setState({ typedQuestions: {} });
+    useInstantEvalRunStore.getState().markTyped({ projectId: "project-1", question: "b" });
+    const { result } = renderHook(() => useInstantEvalRoute({ isInstantEvalAvailable: available }));
+    act(() => result.current.onInstantEvalRoute({ ...typed, newlyTypedQuestions: ["b"] }));
+    if (available) {
+      act(() =>
+        estimateCallbacks().onSuccess?.({ rows: 90_000, isRowsCapped: false, priceUsd: 0.5 }),
+      );
+    }
+
+    act(() => result.current.abandonPendingRun());
+
+    expect(useInstantEvalRunStore.getState().typedQuestions).toEqual({});
+  });
+
+  /** @scenario "A pending chip under NOT is not judged yet" */
+  it("keeps a mark made before the submit when the reader closes the refusal popover", () => {
+    useFilterStore.setState({ projectId: "project-1" });
+    const mark = { projectId: "project-1", question: "the user is annoyed" };
+    useInstantEvalRunStore.setState({ typedQuestions: {} });
+    useInstantEvalRunStore.getState().markTyped(mark);
+    const before = useInstantEvalRunStore.getState().typedQuestions;
+    const { result } = renderHook(() => useInstantEvalRoute({ isInstantEvalAvailable: false }));
+    act(() => result.current.onInstantEvalRoute(typed));
+
+    act(() => result.current.dismissRefusal());
+
+    expect(useInstantEvalRunStore.getState().typedQuestions).toEqual(before);
+  });
+
+  /** @scenario "A pending chip under NOT is not judged yet" */
+  it.each([
+    ["a declined cost dialog", "decline"],
+    ["a failed estimate", "error"],
+  ])("keeps a mark made before the submit after %s", (_label, outcome) => {
+    useFilterStore.setState({ projectId: "project-1" });
+    const mark = { projectId: "project-1", question: "the user is annoyed" };
+    useInstantEvalRunStore.setState({ typedQuestions: {} });
+    useInstantEvalRunStore.getState().markTyped(mark);
+    const before = useInstantEvalRunStore.getState().typedQuestions;
+    const { result } = renderHook(() => useInstantEvalRoute({ isInstantEvalAvailable: true }));
+    // A chip run on an earlier window, judged again on a new one: the submit added no mark.
+    act(() => result.current.onInstantEvalRoute(typed));
+    if (outcome === "decline") {
+      act(() =>
+        estimateCallbacks().onSuccess?.({ rows: 90_000, isRowsCapped: false, priceUsd: 0.5 }),
+      );
+      act(() => result.current.searchWordsInstead());
+    } else {
+      act(() => estimateCallbacks().onError?.(new Error("network")));
+    }
+
+    expect(useInstantEvalRunStore.getState().typedQuestions).toEqual(before);
+  });
+
+  /** @scenario "A chip typed by hand starts its run on Enter" */
+  it("re-spells the chip in place, NOT kept, when the lens changed before the run started", () => {
+    const lensId = useViewStore.getState().activeLensId;
+    const { result } = renderHook(() => useInstantEvalRoute({ isInstantEvalAvailable: true }));
+    act(() => result.current.onInstantEvalRoute(typed));
+    act(() => estimateCallbacks().onSuccess?.({ rows: 120, isRowsCapped: false, priceUsd: 0.1 }));
+    try {
+      act(() => useViewStore.setState({ activeLensId: "conversations" }));
+      act(() => startCallbacks().onSuccess?.({ id: "run-1" }));
+
+      expect(useFilterStore.getState().queryText).toBe('NOT eval.trace:"the user is annoyed"');
+    } finally {
+      useViewStore.setState({ activeLensId: lensId });
+    }
   });
 });
 

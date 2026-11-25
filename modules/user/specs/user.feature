@@ -151,6 +151,19 @@ Feature: Canonical user lifecycle
     Then exactly one "lw.user.created" intent is committed to user's fact outbox with the account row, carrying no address or name
     And it is keyed by the user alone, so a redelivery or the seed step records nothing new
 
+  # Better Auth writes social and single sign-on accounts itself; auth's after-create hook asks.
+  @unit
+  Scenario: An account Better Auth wrote records user's created fact once
+    Given an account Better Auth wrote without passing a mint
+    When auth asks user to record its created fact, once or again on a retried sign-in
+    Then exactly one "lw.user.created" intent is committed to user's fact outbox, stamped with the row's stored creation time
+    And an id with no account is refused, so auth can log it
+
+  @unit
+  Scenario: An account Better Auth wrote is a sign-up to the first-user seed
+    When user records the created fact of an account Better Auth wrote
+    Then the fact is not marked backfilled, so a self-hosted install's first such user becomes platform operator
+
   @unit
   Scenario: A mint answers while the event bus is down
     Given the event bus cannot take user's facts
@@ -413,17 +426,17 @@ Feature: Canonical user lifecycle
       And the issue action is disabled with a "Setting up your workspace" hint
       And the personal workspace is read again
 
-    # /me renders before its organisation resolves; a placeholder id would be answered FORBIDDEN.
+    # /coding-agents renders before its organisation resolves; a placeholder id would be answered FORBIDDEN.
     @integration
     Scenario: The trace ingest section waits for the organisation before reading
-      Given /me has rendered and its organisation has not resolved yet
+      Given /coding-agents has rendered and its organisation has not resolved yet
       When the trace ingest section renders
       Then it sends no ingestion template or key read
       And no read names a placeholder organisation
 
     @integration
     Scenario: The trace ingest section reads for the organisation once it resolves
-      Given /me whose organisation has resolved
+      Given /coding-agents whose organisation has resolved
       When the trace ingest section renders
       Then it reads the ingestion templates and keys for that organisation
 
@@ -436,14 +449,14 @@ Feature: Canonical user lifecycle
   Rule: The personal workspace offers the Langy ask only to a reader who may start a Langy turn
 
     @integration
-    Scenario: A reader who may start a Langy turn is offered Explore via Langy on /me
+    Scenario: A reader who may start a Langy turn is offered Explore via Langy on /coding-agents
       Given a reader holding "langy:create" where Langy is rolled out
       When the personal workspace host is asked whether the assistant can be asked
       Then it answers yes
       And asking it hands the prompt to Langy's ask
 
     @integration
-    Scenario: A reader who may not start a Langy turn is not offered Explore via Langy on /me
+    Scenario: A reader who may not start a Langy turn is not offered Explore via Langy on /coding-agents
       Given a reader without "langy:create", or where Langy is not rolled out
       When the personal workspace host is asked whether the assistant can be asked
       Then it answers no
@@ -470,3 +483,31 @@ Feature: Canonical user lifecycle
     And her account address routes to that connection
     When "ivy" opens her Password settings
     Then they do not offer to set a password
+
+  # /api/v1/me/project is an identity-only read: it asks no permission, so a key that holds only
+  # "traces:create" can still name the project it writes to (a client builds its traces link).
+  Rule: Any API key bound to a project reads that project's identity at /api/v1/me/project
+
+    @integration
+    Scenario: An ingestion key reads the identity of the project it is bound to
+      Given an ingestion key holding only "traces:create" on a project
+      When it asks GET /api/v1/me/project with "Authorization: Bearer <key>"
+      Then it answers 200 with that project's id, name, slug and whether it is personal
+
+    @integration
+    Scenario: A legacy project key reads the identity of its project
+      Given a project's legacy key
+      When it asks GET /api/v1/me/project
+      Then it answers 200 with that project's identity
+
+    @integration
+    Scenario: A key cannot read the identity of a project it is not bound to
+      Given ingestion keys on two projects
+      When the second project's key asks GET /api/v1/me/project naming the first project with X-Project-Id
+      Then it is refused with 401 and no project identity
+
+    @integration
+    Scenario: A revoked key is refused the project's identity
+      Given an ingestion key that was revoked
+      When it asks GET /api/v1/me/project
+      Then it is refused with 401 and no project identity

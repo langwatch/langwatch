@@ -21,15 +21,18 @@ import {
 function laneAliases() {
   return buildNurturingPipeline({
     deliver: async () => undefined,
-    projectCreated: async () => undefined,
     guidedTurnFailed: async () => undefined,
     usageReportReceived: async () => undefined,
     evaluationsCompleted: async () => undefined,
     simulationRunsFinished: async () => undefined,
     codingSessionsStored: async () => undefined,
-    recordPersonalOwner: async () => undefined,
-    recordTracedProject: async () => undefined,
     forgetErasedUser: async () => undefined,
+    virtualKeyCreated: async () => undefined,
+    keyBudgetCrossed: async () => undefined,
+    keyFirstRequested: async () => undefined,
+    unbudgetedSpendRecorded: async () => undefined,
+    governanceSourceConnected: async () => undefined,
+    governanceSourceLive: async () => undefined,
   }).laneAliases;
 }
 

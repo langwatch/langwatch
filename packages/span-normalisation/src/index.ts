@@ -17,6 +17,7 @@ export {
 } from "./canonicalAttributes.ts";
 export { isRecord, isReplyTextPart } from "./canonicalGuard.ts";
 export { parseJsonStringValues } from "./canonicalJson.ts";
+export { asSessionKey, readDeclaredSessionKey } from "./langwatch/langwatchIdentity.ts";
 export { extractLastUserMessageText, extractMessageContentText } from "./canonicalMessage.ts";
 export {
   claudeCacheWritesLongLived,

@@ -54,6 +54,10 @@ class RecordingAuditLog implements AuditLogApi {
         metadata: command.metadata ?? null,
       }));
   }
+
+  async findForOrganization() {
+    return [];
+  }
 }
 
 const noUsers = createApiFixture<UserApi>();

@@ -19,6 +19,7 @@ import {
   type ResolvedDataPrivacy,
   type SpanContentDropResult,
 } from "@langwatch/data-privacy-contract";
+import { EntitlementApi } from "@langwatch/entitlement-contract";
 import { createTenantId, type EventingCommands } from "@langwatch/eventing";
 import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { OtlpResource, OtlpSpan } from "@langwatch/otlp/trace-request";
@@ -133,6 +134,7 @@ export class DataPrivacyModule implements DataPrivacyApi {
   static readonly dependencies = {
     featureFlags: FeatureFlagApi,
     permissions: AuthzApi,
+    entitlements: EntitlementApi,
   };
   static readonly config = dataPrivacyConfig;
   static readonly secrets = {
@@ -201,6 +203,7 @@ export class DataPrivacyModule implements DataPrivacyApi {
     };
     const requestIdKey = await getRequestIdKey({ secrets, config });
     const spend = PiiRedactionSpendService.create({
+      selfHosted: !config.isSaas,
       requestIdKey: requestIdKey.kind === "keyed" ? requestIdKey.key : void 0,
       featureFlags: dependencies.featureFlags,
       recordSpendPriced: async (fact) => {
@@ -223,6 +226,8 @@ export class DataPrivacyModule implements DataPrivacyApi {
         }),
         featureFlags: dependencies.featureFlags,
         scopes: projectScopes,
+        selfHosted: !config.isSaas,
+        entitlements: dependencies.entitlements,
         spend,
         metrics,
       }),

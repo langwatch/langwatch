@@ -182,3 +182,11 @@ Feature: Gateway Prometheus metrics
       Given a virtual key permitting arbitrary model names
       When a caller sends an unrecognised model
       Then no new series is created for that caller-supplied value
+
+  Rule: a deployment that never scrapes still receives the gateway's series
+
+    Scenario: gateway series are pushed over OTLP as well as scraped
+      Given a deployment that pushes metrics over OTLP and never scrapes the pull door
+      When the OTLP reader exports
+      Then gateway_http_requests_total and its latency histogram are carried
+      And the Go runtime and process families are not sent twice

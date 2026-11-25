@@ -123,8 +123,24 @@ export interface InstantEvalClassification {
   readonly route?: InstantEvalJudgeRouteRequest;
 }
 
-/** The model a judge's settings name to be answered by Instant Evals (ADR-174 decision 11). */
+/**
+ * The model a judge's settings are saved with to be answered by Instant Evals (ADR-174 decision
+ * 11): the id the previous release reads. The -preview ids read the same (ADR-182).
+ */
 export const INSTANT_EVAL_JUDGE_MODEL_ID = "langwatch/instant-evals";
+
+/** The evaluators Instant Evals answers; no other evaluator is offered a LangWatch model. */
+export const INSTANT_EVAL_JUDGE_EVALUATOR_TYPES = [
+  "langevals/llm_boolean",
+  "langevals/llm_score",
+  "langevals/llm_category",
+] as const;
+
+export function isInstantEvalJudgeEvaluatorType(evaluatorType: string | undefined): boolean {
+  return (INSTANT_EVAL_JUDGE_EVALUATOR_TYPES as readonly (string | undefined)[]).includes(
+    evaluatorType,
+  );
+}
 
 /**
  * Switches LangWatch's hosted judge off for an organization, whatever its plan, switch or license;
@@ -331,6 +347,12 @@ export interface InstantEvalClassifierLimits {
   readonly transcriptFitBytesPerInputToken: number;
   /** Below any judged text measured; the too-large retry cuts at this ratio. */
   readonly retryBytesPerInputToken: number;
+  /**
+   * Tokens the judge bills on every request beyond the text and the questions.
+   * Provisional: read off e2e bills (190 to 220 per row), not yet measured alone.
+   * Must stay under `reserveTokens`, which keeps room for it in every request.
+   */
+  readonly requestOverheadTokens: number;
 }
 
 /** The shipped classifier's caps, measured against the live API. */
@@ -344,4 +366,5 @@ export const INSTANT_EVAL_CLASSIFIER_LIMITS: InstantEvalClassifierLimits = {
   fitBytesPerInputToken: 2,
   transcriptFitBytesPerInputToken: 2.4,
   retryBytesPerInputToken: 1.5,
+  requestOverheadTokens: 200,
 };

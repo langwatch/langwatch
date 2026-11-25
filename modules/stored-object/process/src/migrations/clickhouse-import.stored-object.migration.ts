@@ -24,6 +24,9 @@ import type {
 } from "../repositories/stored-object-record.repository.ts";
 import { legacyStorageAddressOf } from "../rules/legacy-storage-address.rules.ts";
 
+// IRREVERSIBLE: no down step. The import only copies: ClickHouse keeps every legacy row and
+// legacy reads keep working, while a copied row may since be confirmed, moved or deleted, so
+// removing it would lose writes made after the import.
 type ClickHouseImportStoredObjectMigrationOptions = Readonly<{
   legacy: StoredObjectLegacySourceRepository;
   records: StoredObjectRecordRepository;
@@ -126,24 +129,29 @@ export class ClickHouseImportStoredObjectMigration {
     const address = legacyStorageAddressOf({ projectId, storageUri: row.storageUri });
     const fingerprint = this.fingerprint(row);
     const current = await this.options.records.findById({ tenantId: projectId, id });
-    if (current?.source === "canonical" || current?.legacyFingerprint === fingerprint) {
-      return "unchanged";
-    }
+    // A deleted row stays deleted, whatever its legacy version did since.
+    const isSettled =
+      current?.source === "canonical" ||
+      current?.status === "deleted" ||
+      current?.legacyFingerprint === fingerprint;
+    if (isSettled) return "unchanged";
     const now = this.now();
-    await this.options.records.upsert(
-      this.importedRecord({
-        row,
-        projectId,
-        id,
-        sha256,
-        mediaType,
-        audience,
-        fingerprint,
-        current,
-        now,
-        address,
-      }),
-    );
+    const imported = this.importedRecord({
+      row,
+      projectId,
+      id,
+      sha256,
+      mediaType,
+      audience,
+      fingerprint,
+      current,
+      now,
+      address,
+    });
+    // A row a delete or another import wrote since the read is left as that writer left it.
+    if (!current) return (await this.options.records.insert(imported)) ? "imported" : "unchanged";
+    const moved = await this.options.records.transition({ expected: current, next: imported });
+    if (!moved) return "unchanged";
     return "imported";
   }
 

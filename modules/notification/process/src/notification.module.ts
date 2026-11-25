@@ -5,6 +5,7 @@ import type {
 import { defineProcessModule, type PublishedProcessModule } from "@langwatch/process";
 
 import { NotificationModule } from "./app/notification.app.ts";
+import { notificationChannels } from "./channels/notification-channels.registry.ts";
 import { webPushEventing } from "./eventing/web-push.pipeline.ts";
 import { notificationRepositories } from "./repositories/notification-repositories.registry.ts";
 import { notificationTrpcTransport } from "./transport/notification.trpc.ts";
@@ -15,6 +16,7 @@ export const notificationProcessModule: PublishedProcessModule<
   NotificationServerConfig
 > = defineProcessModule("notification")
   .withRepositories(notificationRepositories)
+  .withChannels(notificationChannels)
   .withApi(NotificationModule)
   .withTransports(notificationTrpcTransport)
   .withEventing(webPushEventing);

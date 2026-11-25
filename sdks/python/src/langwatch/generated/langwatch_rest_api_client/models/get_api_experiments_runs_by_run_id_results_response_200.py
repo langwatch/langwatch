@@ -48,6 +48,8 @@ class GetApiExperimentsRunsByRunIdResultsResponse200:
         progress (float | None | Unset):
         total (float | None | Unset):
         concurrency (int | None | Unset): Cells the run executed at once. Null for a run that recorded none.
+        repeat (int | None | Unset): How many times the run repeated every dataset row. Run row `r * repeat + k` is
+            repetition `k` of dataset row `r`. Null for a run that ran each row once.
         targets (list[GetApiExperimentsRunsByRunIdResultsResponse200TargetsType0Item] | None | Unset): Resolves the
             targetId each dataset row and evaluation carries
     """
@@ -63,6 +65,7 @@ class GetApiExperimentsRunsByRunIdResultsResponse200:
     progress: float | None | Unset = UNSET
     total: float | None | Unset = UNSET
     concurrency: int | None | Unset = UNSET
+    repeat: int | None | Unset = UNSET
     targets: list[GetApiExperimentsRunsByRunIdResultsResponse200TargetsType0Item] | None | Unset = UNSET
 
     def to_dict(self) -> dict[str, Any]:
@@ -110,6 +113,12 @@ class GetApiExperimentsRunsByRunIdResultsResponse200:
         else:
             concurrency = self.concurrency
 
+        repeat: int | None | Unset
+        if isinstance(self.repeat, Unset):
+            repeat = UNSET
+        else:
+            repeat = self.repeat
+
         targets: list[dict[str, Any]] | None | Unset
         if isinstance(self.targets, Unset):
             targets = UNSET
@@ -143,6 +152,8 @@ class GetApiExperimentsRunsByRunIdResultsResponse200:
             field_dict["total"] = total
         if concurrency is not UNSET:
             field_dict["concurrency"] = concurrency
+        if repeat is not UNSET:
+            field_dict["repeat"] = repeat
         if targets is not UNSET:
             field_dict["targets"] = targets
 
@@ -229,6 +240,15 @@ class GetApiExperimentsRunsByRunIdResultsResponse200:
 
         concurrency = _parse_concurrency(d.pop("concurrency", UNSET))
 
+        def _parse_repeat(data: object) -> int | None | Unset:
+            if data is None:
+                return data
+            if isinstance(data, Unset):
+                return data
+            return cast(int | None | Unset, data)
+
+        repeat = _parse_repeat(d.pop("repeat", UNSET))
+
         def _parse_targets(
             data: object,
         ) -> list[GetApiExperimentsRunsByRunIdResultsResponse200TargetsType0Item] | None | Unset:
@@ -267,6 +287,7 @@ class GetApiExperimentsRunsByRunIdResultsResponse200:
             progress=progress,
             total=total,
             concurrency=concurrency,
+            repeat=repeat,
             targets=targets,
         )
 

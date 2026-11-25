@@ -1,6 +1,7 @@
 import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 import { Skeleton, Text, VStack } from "@langwatch/design-system/primitives";
+import { codingAgentsPath } from "@langwatch/user-contract";
 
 import { CodingAgentPullRequestsTable } from "../../../behavior/lent-coding-agent-tables.tsx";
 import { usePersonalRouter } from "../../../behavior/personal-workspace-router.ts";
@@ -39,7 +40,7 @@ export function ProjectPullRequestsScreen() {
               {
                 kind: "setting",
                 label: "Connect your AI tools",
-                href: "/me/configure",
+                href: codingAgentsPath({ page: "configure" }),
                 onNavigate: ({ href }) => router.push(href),
               },
             ]}
