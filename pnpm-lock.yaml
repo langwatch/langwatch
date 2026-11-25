@@ -228,8 +228,8 @@ catalogs:
       specifier: ^11.14.0
       version: 11.14.0
     '@hono/node-server':
-      specifier: ^2.1.3
-      version: 2.1.8
+      specifier: ^2.1.11
+      version: 2.1.11
     '@hookform/resolvers':
       specifier: ^5.4.0
       version: 5.4.0
@@ -345,14 +345,14 @@ catalogs:
       specifier: ^14.6.1
       version: 14.6.8
     '@trpc/client':
-      specifier: 11.18.0
-      version: 11.18.0
+      specifier: 11.29.11
+      version: 11.29.11
     '@trpc/react-query':
-      specifier: 11.18.0
-      version: 11.18.0
+      specifier: 11.29.11
+      version: 11.29.11
     '@trpc/server':
-      specifier: ^11.18.0
-      version: 11.18.0
+      specifier: ^11.29.11
+      version: 11.29.11
     '@types/bcrypt':
       specifier: ^6.0.0
       version: 6.0.0
@@ -724,13 +724,13 @@ overrides:
   '@fastify/busboy@<3.2.2': '>=3.2.2 <4'
   '@grpc/grpc-js@<1.14.5': '>=1.14.5 <2'
   '@hono/node-server@<1.19.13': '>=1.19.13 <2'
-  '@hono/node-server@>=2.0.0 <2.1.3': '>=2.1.3 <3'
+  '@hono/node-server@>=2.0.0 <2.1.11': '>=2.1.11 <3'
   '@langchain/community>fast-xml-parser': ^5.7.0
   '@langchain/core@<0.3.80': '>=0.3.80'
   '@langwatch/scenario': 1.8.1
   '@langwatch/scenario@1.8.1>langwatch': workspace:*
   '@modelcontextprotocol/client@>=2.0.0 <2.2.0': '>=2.2.0 <3'
-  '@modelcontextprotocol/sdk>@hono/node-server': '>=2.1.3 <3'
+  '@modelcontextprotocol/sdk>@hono/node-server': '>=2.1.11 <3'
   '@modelcontextprotocol/sdk@>=1.10.0 <1.32.0': '>=1.32.0 <2'
   '@opensearch-project/opensearch': '-'
   '@opentelemetry/core@<2.8.0': '>=2.8.0'
@@ -750,7 +750,7 @@ overrides:
   braces: ^3.0.3
   cross-spawn: ^7.0.6
   deepmerge-ts@<8.0.0: 8.0.0
-  dompurify@<3.4.16: '>=3.4.16 <4'
+  dompurify@<3.5.0: '>=3.5.0 <4'
   effect@<3.22.1: '>=3.22.1 <4'
   esbuild@<0.28.1: '>=0.28.1'
   exec-sh: ^0.4.0
@@ -2138,13 +2138,13 @@ importers:
         version: 5.101.4(react@19.2.8)
       '@trpc/client':
         specifier: 'catalog:'
-        version: 11.18.0(@trpc/server@11.18.0(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2)))(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2))
+        version: 11.29.11(@trpc/server@11.29.11(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2)))(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2))
       '@trpc/react-query':
         specifier: 'catalog:'
-        version: 11.18.0(@tanstack/react-query@5.101.4(react@19.2.8))(@trpc/client@11.18.0(@trpc/server@11.18.0(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2)))(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2)))(@trpc/server@11.18.0(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2)))(react@19.2.8)(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2))
+        version: 11.29.11(@tanstack/react-query@5.101.4(react@19.2.8))(@trpc/client@11.29.11(@trpc/server@11.29.11(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2)))(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2)))(@trpc/server@11.29.11(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2)))(react@19.2.8)(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2))
       '@trpc/server':
         specifier: 'catalog:'
-        version: 11.18.0(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2))
+        version: 11.29.11(@types/express@5.0.6)(@types/ws@8.18.1)(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2))
       better-auth:
         specifier: 'catalog:'
         version: 1.7.11(@opentelemetry/api@1.9.1)(@prisma/client@7.10.0(prisma@7.10.0(@types/node@26.2.0)(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(magicast@0.5.4)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2)))(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2)))(mysql2@3.24.2(@types/node@26.2.0))(pg@8.22.0)(prisma@7.10.0(@types/node@26.2.0)(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(magicast@0.5.4)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2)))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(vitest@5.0.5)
@@ -2862,7 +2862,7 @@ importers:
         version: 7.1.0(debug@4.4.3(supports-color@10.2.2))(supports-color@10.2.2)
       '@trpc/server':
         specifier: 'catalog:'
-        version: 11.18.0(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2))
+        version: 11.29.11(@types/express@5.0.6)(@types/ws@8.18.1)(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2))
       geoip-country:
         specifier: ^5.0.202607010001
         version: 5.0.202607010001
@@ -3233,7 +3233,7 @@ importers:
         version: link:../../../../modules/user/contract
       '@trpc/server':
         specifier: 'catalog:'
-        version: 11.18.0(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2))
+        version: 11.29.11(@types/express@5.0.6)(@types/ws@8.18.1)(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2))
       zod:
         specifier: 'catalog:'
         version: 4.6.7
@@ -3668,7 +3668,7 @@ importers:
         version: 0.55.0(@opentelemetry/api@1.9.1)
       '@trpc/server':
         specifier: 'catalog:'
-        version: 11.18.0(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2))
+        version: 11.29.11(@types/express@5.0.6)(@types/ws@8.18.1)(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2))
       hono:
         specifier: 'catalog:'
         version: 4.13.13
@@ -3945,7 +3945,7 @@ importers:
         version: 7.1.0(debug@4.4.3(supports-color@10.2.2))(supports-color@10.2.2)
       '@trpc/server':
         specifier: 'catalog:'
-        version: 11.18.0(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2))
+        version: 11.29.11(@types/express@5.0.6)(@types/ws@8.18.1)(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2))
       undici:
         specifier: 'catalog:'
         version: 8.12.4
@@ -4552,7 +4552,7 @@ importers:
         version: 7.1.0(debug@4.4.3(supports-color@10.2.2))(supports-color@10.2.2)
       '@trpc/server':
         specifier: 'catalog:'
-        version: 11.18.0(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2))
+        version: 11.29.11(@types/express@5.0.6)(@types/ws@8.18.1)(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2))
       hono:
         specifier: 'catalog:'
         version: 4.13.13
@@ -4744,7 +4744,7 @@ importers:
         version: link:../../../../packages/time
       '@trpc/server':
         specifier: 'catalog:'
-        version: 11.18.0(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2))
+        version: 11.29.11(@types/express@5.0.6)(@types/ws@8.18.1)(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2))
       better-auth:
         specifier: 'catalog:'
         version: 1.7.11(@opentelemetry/api@1.9.1)(@prisma/client@7.10.0(prisma@7.10.0(@types/node@26.2.0)(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(magicast@0.5.4)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2)))(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2)))(mysql2@3.24.2(@types/node@26.2.0))(pg@8.22.0)(prisma@7.10.0(@types/node@26.2.0)(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(magicast@0.5.4)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2)))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(vitest@5.0.5)
@@ -5120,7 +5120,7 @@ importers:
         version: link:../../trace/contract
       '@trpc/server':
         specifier: 'catalog:'
-        version: 11.18.0(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2))
+        version: 11.29.11(@types/express@5.0.6)(@types/ws@8.18.1)(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2))
       '@types/ws':
         specifier: 'catalog:'
         version: 8.18.1
@@ -5228,10 +5228,10 @@ importers:
         version: 3.14.5(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       '@trpc/client':
         specifier: 'catalog:'
-        version: 11.18.0(@trpc/server@11.18.0(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2)))(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2))
+        version: 11.29.11(@trpc/server@11.29.11(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2)))(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2))
       '@trpc/react-query':
         specifier: 'catalog:'
-        version: 11.18.0(@tanstack/react-query@5.101.4(react@19.2.8))(@trpc/client@11.18.0(@trpc/server@11.18.0(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2)))(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2)))(@trpc/server@11.18.0(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2)))(react@19.2.8)(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2))
+        version: 11.29.11(@tanstack/react-query@5.101.4(react@19.2.8))(@trpc/client@11.29.11(@trpc/server@11.29.11(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2)))(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2)))(@trpc/server@11.29.11(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2)))(react@19.2.8)(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2))
       chakra-react-select:
         specifier: 'catalog:'
         version: 6.1.3(@chakra-ui/react@3.36.0(@emotion/react@11.14.0(@types/react@19.2.18)(react@19.2.8)(supports-color@10.2.2))(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(@types/react@19.2.18)(next-themes@0.4.6(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(supports-color@10.2.2)
@@ -5523,7 +5523,7 @@ importers:
         version: 1.9.1
       '@trpc/server':
         specifier: 'catalog:'
-        version: 11.18.0(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2))
+        version: 11.29.11(@types/express@5.0.6)(@types/ws@8.18.1)(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2))
       hono:
         specifier: 'catalog:'
         version: 4.13.13
@@ -5764,7 +5764,7 @@ importers:
         version: link:../../user/contract
       '@trpc/server':
         specifier: 'catalog:'
-        version: 11.18.0(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2))
+        version: 11.29.11(@types/express@5.0.6)(@types/ws@8.18.1)(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2))
       hono:
         specifier: 'catalog:'
         version: 4.13.13
@@ -6038,7 +6038,7 @@ importers:
         version: link:../../../packages/time
       '@trpc/server':
         specifier: 'catalog:'
-        version: 11.18.0(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2))
+        version: 11.29.11(@types/express@5.0.6)(@types/ws@8.18.1)(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2))
       hono:
         specifier: 'catalog:'
         version: 4.13.13
@@ -6140,7 +6140,7 @@ importers:
         version: link:../../../packages/vitest-config
       '@trpc/server':
         specifier: 'catalog:'
-        version: 11.18.0(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2))
+        version: 11.29.11(@types/express@5.0.6)(@types/ws@8.18.1)(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2))
       '@types/node':
         specifier: ^26.0.1
         version: 26.2.0
@@ -6249,7 +6249,7 @@ importers:
         version: 14.6.8(@testing-library/dom@10.4.1)
       '@trpc/client':
         specifier: 'catalog:'
-        version: 11.18.0(@trpc/server@11.18.0(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2)))(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2))
+        version: 11.29.11(@trpc/server@11.29.11(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2)))(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2))
       '@types/react':
         specifier: 'catalog:'
         version: 19.2.18
@@ -6461,7 +6461,7 @@ importers:
         version: 7.1.0(debug@4.4.3(supports-color@10.2.2))(supports-color@10.2.2)
       '@trpc/server':
         specifier: 'catalog:'
-        version: 11.18.0(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2))
+        version: 11.29.11(@types/express@5.0.6)(@types/ws@8.18.1)(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2))
       bcrypt:
         specifier: 'catalog:'
         version: 6.0.0
@@ -6710,7 +6710,7 @@ importers:
         version: link:../../user/contract
       '@trpc/server':
         specifier: 'catalog:'
-        version: 11.18.0(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2))
+        version: 11.29.11(@types/express@5.0.6)(@types/ws@8.18.1)(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2))
       hono:
         specifier: 'catalog:'
         version: 4.13.13
@@ -7034,7 +7034,7 @@ importers:
         version: 7.1.0(debug@4.4.3(supports-color@10.2.2))(supports-color@10.2.2)
       '@trpc/server':
         specifier: 'catalog:'
-        version: 11.18.0(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2))
+        version: 11.29.11(@types/express@5.0.6)(@types/ws@8.18.1)(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2))
       croner:
         specifier: 'catalog:'
         version: 10.0.1
@@ -7275,7 +7275,7 @@ importers:
         version: link:../../user/contract
       '@trpc/server':
         specifier: 'catalog:'
-        version: 11.18.0(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2))
+        version: 11.29.11(@types/express@5.0.6)(@types/ws@8.18.1)(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2))
       hono:
         specifier: 'catalog:'
         version: 4.13.13
@@ -8085,7 +8085,7 @@ importers:
         version: link:../../user/contract
       '@trpc/server':
         specifier: 'catalog:'
-        version: 11.18.0(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2))
+        version: 11.29.11(@types/express@5.0.6)(@types/ws@8.18.1)(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2))
       ai:
         specifier: ^6.0.161
         version: 6.0.217(zod@4.6.7)
@@ -8213,7 +8213,7 @@ importers:
         version: link:../../trace/contract
       '@trpc/server':
         specifier: 'catalog:'
-        version: 11.18.0(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2))
+        version: 11.29.11(@types/express@5.0.6)(@types/ws@8.18.1)(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2))
       zod:
         specifier: 'catalog:'
         version: 4.6.7
@@ -8386,7 +8386,7 @@ importers:
         version: link:../../workflow/contract
       '@trpc/server':
         specifier: 'catalog:'
-        version: 11.18.0(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2))
+        version: 11.29.11(@types/express@5.0.6)(@types/ws@8.18.1)(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2))
       hono:
         specifier: 'catalog:'
         version: 4.13.13
@@ -8747,7 +8747,7 @@ importers:
         version: link:../../workflow/contract
       '@trpc/server':
         specifier: 'catalog:'
-        version: 11.18.0(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2))
+        version: 11.29.11(@types/express@5.0.6)(@types/ws@8.18.1)(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2))
       hono:
         specifier: 'catalog:'
         version: 4.13.13
@@ -8883,10 +8883,10 @@ importers:
         version: 3.14.5(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       '@trpc/client':
         specifier: 'catalog:'
-        version: 11.18.0(@trpc/server@11.18.0(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2)))(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2))
+        version: 11.29.11(@trpc/server@11.29.11(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2)))(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2))
       '@trpc/react-query':
         specifier: 'catalog:'
-        version: 11.18.0(@tanstack/react-query@5.101.4(react@19.2.8))(@trpc/client@11.18.0(@trpc/server@11.18.0(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2)))(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2)))(@trpc/server@11.18.0(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2)))(react@19.2.8)(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2))
+        version: 11.29.11(@tanstack/react-query@5.101.4(react@19.2.8))(@trpc/client@11.29.11(@trpc/server@11.29.11(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2)))(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2)))(@trpc/server@11.29.11(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2)))(react@19.2.8)(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2))
       fast-deep-equal:
         specifier: 'catalog:'
         version: 3.1.3
@@ -9162,7 +9162,7 @@ importers:
         version: 1.43.0
       '@trpc/server':
         specifier: 'catalog:'
-        version: 11.18.0(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2))
+        version: 11.29.11(@types/express@5.0.6)(@types/ws@8.18.1)(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2))
       hono:
         specifier: 'catalog:'
         version: 4.13.13
@@ -9685,7 +9685,7 @@ importers:
         version: link:../../webhook/contract
       '@trpc/server':
         specifier: 'catalog:'
-        version: 11.18.0(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2))
+        version: 11.29.11(@types/express@5.0.6)(@types/ws@8.18.1)(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2))
       hono:
         specifier: 'catalog:'
         version: 4.13.13
@@ -9881,7 +9881,7 @@ importers:
         version: link:../../../packages/time
       '@trpc/server':
         specifier: 'catalog:'
-        version: 11.18.0(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2))
+        version: 11.29.11(@types/express@5.0.6)(@types/ws@8.18.1)(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2))
       hono:
         specifier: 'catalog:'
         version: 4.13.13
@@ -10184,7 +10184,7 @@ importers:
         version: link:../../../packages/vitest-config
       '@trpc/server':
         specifier: 'catalog:'
-        version: 11.18.0(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2))
+        version: 11.29.11(@types/express@5.0.6)(@types/ws@8.18.1)(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2))
       '@types/node':
         specifier: ^26.0.1
         version: 26.2.0
@@ -10865,7 +10865,7 @@ importers:
         version: 14.6.8(@testing-library/dom@10.4.1)
       '@trpc/client':
         specifier: 'catalog:'
-        version: 11.18.0(@trpc/server@11.18.0(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2)))(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2))
+        version: 11.29.11(@trpc/server@11.29.11(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2)))(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2))
       '@types/react':
         specifier: 'catalog:'
         version: 19.2.18
@@ -11056,7 +11056,7 @@ importers:
         version: 1.9.1
       '@trpc/server':
         specifier: 'catalog:'
-        version: 11.18.0(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2))
+        version: 11.29.11(@types/express@5.0.6)(@types/ws@8.18.1)(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2))
       ai:
         specifier: ^6.0.161
         version: 6.0.217(zod@4.6.7)
@@ -11592,7 +11592,7 @@ importers:
         version: 0.3.16
       '@trpc/server':
         specifier: 'catalog:'
-        version: 11.18.0(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2))
+        version: 11.29.11(@types/express@5.0.6)(@types/ws@8.18.1)(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2))
       ai:
         specifier: ^6.0.161
         version: 6.0.217(zod@4.6.7)
@@ -11828,7 +11828,7 @@ importers:
         version: link:../../../packages/vitest-config
       '@trpc/server':
         specifier: 'catalog:'
-        version: 11.18.0(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2))
+        version: 11.29.11(@types/express@5.0.6)(@types/ws@8.18.1)(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2))
       typescript:
         specifier: 'catalog:'
         version: 7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2)
@@ -12425,7 +12425,7 @@ importers:
         version: link:../../workflow/contract
       '@trpc/server':
         specifier: 'catalog:'
-        version: 11.18.0(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2))
+        version: 11.29.11(@types/express@5.0.6)(@types/ws@8.18.1)(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2))
       zod:
         specifier: 'catalog:'
         version: 4.6.7
@@ -12822,7 +12822,7 @@ importers:
         version: link:../../workflow/contract
       '@trpc/server':
         specifier: 'catalog:'
-        version: 11.18.0(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2))
+        version: 11.29.11(@types/express@5.0.6)(@types/ws@8.18.1)(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2))
       hono:
         specifier: 'catalog:'
         version: 4.13.13
@@ -13177,7 +13177,7 @@ importers:
         version: 7.1.0(debug@4.4.3(supports-color@10.2.2))(supports-color@10.2.2)
       '@trpc/server':
         specifier: 'catalog:'
-        version: 11.18.0(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2))
+        version: 11.29.11(@types/express@5.0.6)(@types/ws@8.18.1)(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2))
       hono:
         specifier: 'catalog:'
         version: 4.13.13
@@ -13428,7 +13428,7 @@ importers:
         version: link:../../../packages/upgrade
       '@trpc/server':
         specifier: 'catalog:'
-        version: 11.18.0(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2))
+        version: 11.29.11(@types/express@5.0.6)(@types/ws@8.18.1)(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2))
       ioredis:
         specifier: 'catalog:'
         version: 5.10.1(supports-color@10.2.2)
@@ -13732,7 +13732,7 @@ importers:
         version: link:../../user/contract
       '@trpc/server':
         specifier: 'catalog:'
-        version: 11.18.0(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2))
+        version: 11.29.11(@types/express@5.0.6)(@types/ws@8.18.1)(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2))
       hono:
         specifier: 'catalog:'
         version: 4.13.13
@@ -14069,7 +14069,7 @@ importers:
         version: link:../../workflow/contract
       '@trpc/server':
         specifier: 'catalog:'
-        version: 11.18.0(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2))
+        version: 11.29.11(@types/express@5.0.6)(@types/ws@8.18.1)(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2))
       hono:
         specifier: 'catalog:'
         version: 4.13.13
@@ -14527,10 +14527,10 @@ importers:
         version: 14.6.8(@testing-library/dom@10.4.1)
       '@trpc/client':
         specifier: 'catalog:'
-        version: 11.18.0(@trpc/server@11.18.0(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2)))(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2))
+        version: 11.29.11(@trpc/server@11.29.11(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2)))(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2))
       '@trpc/server':
         specifier: 'catalog:'
-        version: 11.18.0(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2))
+        version: 11.29.11(@types/express@5.0.6)(@types/ws@8.18.1)(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2))
       '@types/react':
         specifier: 'catalog:'
         version: 19.2.18
@@ -14763,7 +14763,7 @@ importers:
         version: 1.9.1
       '@trpc/server':
         specifier: 'catalog:'
-        version: 11.18.0(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2))
+        version: 11.29.11(@types/express@5.0.6)(@types/ws@8.18.1)(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2))
       '@xyflow/react':
         specifier: 'catalog:'
         version: 12.11.1(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(immer@11.1.8)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
@@ -14967,7 +14967,7 @@ importers:
         version: link:../../../packages/time
       '@trpc/server':
         specifier: 'catalog:'
-        version: 11.18.0(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2))
+        version: 11.29.11(@types/express@5.0.6)(@types/ws@8.18.1)(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2))
       zod:
         specifier: 'catalog:'
         version: 4.6.7
@@ -15108,7 +15108,7 @@ importers:
         version: link:../../../packages/time
       '@trpc/server':
         specifier: 'catalog:'
-        version: 11.18.0(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2))
+        version: 11.29.11(@types/express@5.0.6)(@types/ws@8.18.1)(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2))
       ioredis:
         specifier: 'catalog:'
         version: 5.10.1(supports-color@10.2.2)
@@ -15289,7 +15289,7 @@ importers:
         version: link:../../../packages/vitest-config
       '@trpc/server':
         specifier: 'catalog:'
-        version: 11.18.0(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2))
+        version: 11.29.11(@types/express@5.0.6)(@types/ws@8.18.1)(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2))
       '@types/node':
         specifier: ^26.0.1
         version: 26.2.0
@@ -15410,7 +15410,7 @@ importers:
         version: 1.9.1
       '@trpc/server':
         specifier: 'catalog:'
-        version: 11.18.0(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2))
+        version: 11.29.11(@types/express@5.0.6)(@types/ws@8.18.1)(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2))
       hono:
         specifier: 'catalog:'
         version: 4.13.13
@@ -15599,7 +15599,7 @@ importers:
         version: link:../../../packages/upgrade
       '@trpc/server':
         specifier: 'catalog:'
-        version: 11.18.0(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2))
+        version: 11.29.11(@types/express@5.0.6)(@types/ws@8.18.1)(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2))
       hono-openapi:
         specifier: 'catalog:'
         version: 1.3.1(f84d9ff9cf7810df4834d1fd27590923)
@@ -15776,7 +15776,7 @@ importers:
         version: link:../../../packages/upgrade
       '@trpc/server':
         specifier: 'catalog:'
-        version: 11.18.0(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2))
+        version: 11.29.11(@types/express@5.0.6)(@types/ws@8.18.1)(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2))
       ioredis:
         specifier: 'catalog:'
         version: 5.10.1(supports-color@10.2.2)
@@ -15978,7 +15978,7 @@ importers:
         version: 3.30.6(@floating-ui/dom@1.7.6)(@tiptap/core@3.30.6(@tiptap/pm@3.30.6))(@tiptap/pm@3.30.6)(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       '@trpc/react-query':
         specifier: 'catalog:'
-        version: 11.18.0(@tanstack/react-query@5.101.4(react@19.2.8))(@trpc/client@11.18.0(@trpc/server@11.18.0(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2)))(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2)))(@trpc/server@11.18.0(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2)))(react@19.2.8)(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2))
+        version: 11.29.11(@tanstack/react-query@5.101.4(react@19.2.8))(@trpc/client@11.29.11(@trpc/server@11.29.11(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2)))(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2)))(@trpc/server@11.29.11(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2)))(react@19.2.8)(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2))
       chakra-react-select:
         specifier: 'catalog:'
         version: 6.1.3(@chakra-ui/react@3.36.0(@emotion/react@11.14.0(@types/react@19.2.18)(react@19.2.8)(supports-color@10.2.2))(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(@types/react@19.2.18)(next-themes@0.4.6(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(supports-color@10.2.2)
@@ -16063,10 +16063,10 @@ importers:
         version: 14.6.8(@testing-library/dom@10.4.1)
       '@trpc/client':
         specifier: 'catalog:'
-        version: 11.18.0(@trpc/server@11.18.0(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2)))(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2))
+        version: 11.29.11(@trpc/server@11.29.11(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2)))(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2))
       '@trpc/server':
         specifier: 'catalog:'
-        version: 11.18.0(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2))
+        version: 11.29.11(@types/express@5.0.6)(@types/ws@8.18.1)(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2))
       '@types/numeral':
         specifier: 'catalog:'
         version: 2.0.5
@@ -16356,7 +16356,7 @@ importers:
         version: 2.10.0(@opentelemetry/api@1.9.1)
       '@trpc/server':
         specifier: 'catalog:'
-        version: 11.18.0(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2))
+        version: 11.29.11(@types/express@5.0.6)(@types/ws@8.18.1)(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2))
       ai:
         specifier: ^6.0.161
         version: 6.0.217(zod@4.6.7)
@@ -16659,7 +16659,7 @@ importers:
         version: link:../contract
       '@trpc/server':
         specifier: 'catalog:'
-        version: 11.18.0(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2))
+        version: 11.29.11(@types/express@5.0.6)(@types/ws@8.18.1)(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2))
       bcrypt:
         specifier: 'catalog:'
         version: 6.0.0
@@ -16806,7 +16806,7 @@ importers:
         version: link:../contract
       '@trpc/server':
         specifier: 'catalog:'
-        version: 11.18.0(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2))
+        version: 11.29.11(@types/express@5.0.6)(@types/ws@8.18.1)(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2))
       hono:
         specifier: 'catalog:'
         version: 4.13.13
@@ -16945,10 +16945,10 @@ importers:
         version: 3.14.5(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       '@trpc/client':
         specifier: 'catalog:'
-        version: 11.18.0(@trpc/server@11.18.0(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2)))(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2))
+        version: 11.29.11(@trpc/server@11.29.11(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2)))(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2))
       '@trpc/react-query':
         specifier: 'catalog:'
-        version: 11.18.0(@tanstack/react-query@5.101.4(react@19.2.8))(@trpc/client@11.18.0(@trpc/server@11.18.0(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2)))(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2)))(@trpc/server@11.18.0(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2)))(react@19.2.8)(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2))
+        version: 11.29.11(@tanstack/react-query@5.101.4(react@19.2.8))(@trpc/client@11.29.11(@trpc/server@11.29.11(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2)))(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2)))(@trpc/server@11.29.11(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2)))(react@19.2.8)(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2))
       '@xyflow/react':
         specifier: 'catalog:'
         version: 12.11.1(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(immer@11.1.8)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
@@ -17224,7 +17224,7 @@ importers:
         version: link:../contract
       '@trpc/server':
         specifier: 'catalog:'
-        version: 11.18.0(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2))
+        version: 11.29.11(@types/express@5.0.6)(@types/ws@8.18.1)(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2))
       ai:
         specifier: ^6.0.161
         version: 6.0.217(zod@4.6.7)
@@ -17264,7 +17264,7 @@ importers:
     dependencies:
       '@hono/node-server':
         specifier: 'catalog:'
-        version: 2.1.8(hono@4.13.13)
+        version: 2.1.11(hono@4.13.13)
       '@langwatch/authorization':
         specifier: workspace:*
         version: link:../authorization
@@ -17291,13 +17291,13 @@ importers:
         version: 5.101.4(react@19.2.8)
       '@trpc/client':
         specifier: 'catalog:'
-        version: 11.18.0(@trpc/server@11.18.0(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2)))(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2))
+        version: 11.29.11(@trpc/server@11.29.11(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2)))(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2))
       '@trpc/react-query':
         specifier: 'catalog:'
-        version: 11.18.0(@tanstack/react-query@5.101.4(react@19.2.8))(@trpc/client@11.18.0(@trpc/server@11.18.0(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2)))(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2)))(@trpc/server@11.18.0(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2)))(react@19.2.8)(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2))
+        version: 11.29.11(@tanstack/react-query@5.101.4(react@19.2.8))(@trpc/client@11.29.11(@trpc/server@11.29.11(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2)))(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2)))(@trpc/server@11.29.11(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2)))(react@19.2.8)(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2))
       '@trpc/server':
         specifier: 'catalog:'
-        version: 11.18.0(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2))
+        version: 11.29.11(@types/express@5.0.6)(@types/ws@8.18.1)(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2))
       hono:
         specifier: 'catalog:'
         version: 4.13.13
@@ -17448,10 +17448,10 @@ importers:
         version: 5.101.4(react@19.2.8)
       '@trpc/client':
         specifier: 'catalog:'
-        version: 11.18.0(@trpc/server@11.18.0(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2)))(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2))
+        version: 11.29.11(@trpc/server@11.29.11(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2)))(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2))
       '@trpc/server':
         specifier: 'catalog:'
-        version: 11.18.0(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2))
+        version: 11.29.11(@types/express@5.0.6)(@types/ws@8.18.1)(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2))
       lucide-react:
         specifier: 'catalog:'
         version: 1.22.0(react@19.2.8)
@@ -18485,7 +18485,7 @@ importers:
         version: link:../time
       '@trpc/server':
         specifier: 'catalog:'
-        version: 11.18.0(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2))
+        version: 11.29.11(@types/express@5.0.6)(@types/ws@8.18.1)(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2))
       hono:
         specifier: 'catalog:'
         version: 4.13.13
@@ -20981,8 +20981,8 @@ packages:
   '@hexagon/base64@1.1.28':
     resolution: {integrity: sha512-lhqDEAvWixy3bZ+UOYbPwUbBkwBq5C1LAJ/xPC8Oi+lL54oyakv/npbA0aU2hgCsx/1NUd4IBvV03+aUBWxerw==}
 
-  '@hono/node-server@2.1.8':
-    resolution: {integrity: sha512-jdf7FHh6A1lzjpHHQUgxsg2GeER2vMetnAOfeActzcoli6jamlK+NAwL6Dsr5Fl3BS3tYUQzCdtZjU8Qxv7bEA==}
+  '@hono/node-server@2.1.11':
+    resolution: {integrity: sha512-KzKz9vl4vvr1vgLHamj+g5uonbrj5NwAdO3yzOS6cd2HjALVeOgTgeZOyAzNxejbkfOOPIcvuf/Tg8l1pEFLog==}
     engines: {node: '>=20'}
     peerDependencies:
       hono: '>=4.13.5 <5'
@@ -24199,27 +24199,42 @@ packages:
       react: ^19.2.7
       react-dom: ^19.2.7
 
-  '@trpc/client@11.18.0':
-    resolution: {integrity: sha512-wOqeg3Fvl25V1ZisQhUD3K8G60ZJDlSGJNSyeXrLH24xAo5w6GSR2Kzb1cSNY9Y+IQ2YZvYGZstBU+V/ulo/ow==}
-    hasBin: true
+  '@trpc/client@11.29.11':
+    resolution: {integrity: sha512-DsHmoPI3qUMGG10238JMwjV/rtuPt0JtiNIUbzl6ybCr3pUdhYrRJloQEAztzGFlvUteYD7o80GxO6e0LuAp6A==}
     peerDependencies:
-      '@trpc/server': 11.18.0
+      '@trpc/server': 11.29.11
       typescript: '>=5.7.2'
 
-  '@trpc/react-query@11.18.0':
-    resolution: {integrity: sha512-C1+Wwm2pCeUJucI+bnFpxGYjNuvV+ko1BC1T9tUxBVdrhHRCdn9ubxdevdLSAa49XRJRJiZnSuzl3Ys/yvs1vg==}
+  '@trpc/react-query@11.29.11':
+    resolution: {integrity: sha512-LDf5eM76Flkoiak9/+DDAHmWllc7vRpDeeQ0BIKimLU+Cif4FC9h6j1R8bvUU3xclQYJRleXYngMZjccsK17bg==}
+    deprecated: '@trpc/react-query only gets bug fixes and will be removed in the next major version of tRPC. Use @trpc/tanstack-react-query instead: https://trpc.io/docs/client/tanstack-react-query/migrating'
     peerDependencies:
       '@tanstack/react-query': ^5.80.3
-      '@trpc/client': 11.18.0
-      '@trpc/server': 11.18.0
+      '@trpc/client': 11.29.11
+      '@trpc/server': 11.29.11
       react: ^19.2.7
       typescript: '>=5.7.2'
 
-  '@trpc/server@11.18.0':
-    resolution: {integrity: sha512-JAvXOuNTxgXjIDfQaOvDq1j66LMNfDJUH1IU7Slfn8EvRv2EkH6ehu3A7zpYhjO0syHHiYg77v2lG2JFJgvw7Q==}
-    hasBin: true
+  '@trpc/server@11.29.11':
+    resolution: {integrity: sha512-guaAFs00YhnDXqOPBqPqJDmGOyEn77f3E3qTCmZ6W2txY5zA79VdnWrpldNucLrBIahXzLOdVU6I20KXLBiF4Q==}
     peerDependencies:
+      '@types/aws-lambda': '*'
+      '@types/express': '*'
+      '@types/ws': '*'
+      fastify: '*'
+      next: '>=15.5.15'
       typescript: '>=5.7.2'
+    peerDependenciesMeta:
+      '@types/aws-lambda':
+        optional: true
+      '@types/express':
+        optional: true
+      '@types/ws':
+        optional: true
+      fastify:
+        optional: true
+      next:
+        optional: true
 
   '@tsrs/darwin-arm64@0.18.0-ts7.1.0-dev.20260929':
     resolution: {integrity: sha512-sAirMpaGA9uRQm2W+t4zC7PjnijNuFa4PCSIfLKKo0JyAUCRfnMeev0UGBQ9F3g+9Nz187tvikUs5Irh5+eajA==}
@@ -26388,8 +26403,8 @@ packages:
     resolution: {integrity: sha512-gYzvtM72ZtxQO0T048kd6HWSbbGCNOUwcnfQ01cqIJ4X2IYKFFHZ5mKvrQETcFXxsRObZulDaKmy//R7TPtsBg==}
     engines: {node: '>=20.19.0'}
 
-  dompurify@3.4.17:
-    resolution: {integrity: sha512-B/pSlYVHQ58kqISD/yDjuJ1yfzI34m1gF4lAod2bwSRhiN4K5Cl3H8Af7hqB2PmTL911tdEudnnXn5FnhRoz0w==}
+  dompurify@3.5.0:
+    resolution: {integrity: sha512-LYC0ZkE8P1V42JsRYTwMdme/2ET8SpOc5AA2eOFjP/IadvRd2fwiT4TVz5vkfy0XUx12aS2UaRkTnfVPNOv9vw==}
 
   domutils@3.2.2:
     resolution: {integrity: sha512-6kZKyUajlDuqlHKVX1w7gyslj9MPIXzIFiz/rGu35uC1wMi+kMhQwGhl4lt9unC9Vb9INnY9Z3/ZA3+FhASLaw==}
@@ -33171,7 +33186,7 @@ snapshots:
 
   '@hexagon/base64@1.1.28': {}
 
-  '@hono/node-server@2.1.8(hono@4.13.13)':
+  '@hono/node-server@2.1.11(hono@4.13.13)':
     dependencies:
       hono: 4.13.13
 
@@ -33640,7 +33655,7 @@ snapshots:
 
   '@modelcontextprotocol/sdk@1.32.0(@cfworker/json-schema@4.1.1)(supports-color@10.2.2)(zod@4.6.7)':
     dependencies:
-      '@hono/node-server': 2.1.8(hono@4.13.13)
+      '@hono/node-server': 2.1.11(hono@4.13.13)
       ajv: 8.20.0
       ajv-formats: 3.0.1(ajv@8.20.0)
       content-type: 1.0.5
@@ -36045,22 +36060,25 @@ snapshots:
     transitivePeerDependencies:
       - '@floating-ui/dom'
 
-  '@trpc/client@11.18.0(@trpc/server@11.18.0(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2)))(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2))':
+  '@trpc/client@11.29.11(@trpc/server@11.29.11(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2)))(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2))':
     dependencies:
-      '@trpc/server': 11.18.0(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2))
+      '@trpc/server': 11.29.11(@types/express@5.0.6)(@types/ws@8.18.1)(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2))
       typescript: 7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2)
 
-  '@trpc/react-query@11.18.0(@tanstack/react-query@5.101.4(react@19.2.8))(@trpc/client@11.18.0(@trpc/server@11.18.0(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2)))(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2)))(@trpc/server@11.18.0(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2)))(react@19.2.8)(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2))':
+  '@trpc/react-query@11.29.11(@tanstack/react-query@5.101.4(react@19.2.8))(@trpc/client@11.29.11(@trpc/server@11.29.11(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2)))(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2)))(@trpc/server@11.29.11(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2)))(react@19.2.8)(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2))':
     dependencies:
       '@tanstack/react-query': 5.101.4(react@19.2.8)
-      '@trpc/client': 11.18.0(@trpc/server@11.18.0(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2)))(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2))
-      '@trpc/server': 11.18.0(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2))
+      '@trpc/client': 11.29.11(@trpc/server@11.29.11(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2)))(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2))
+      '@trpc/server': 11.29.11(@types/express@5.0.6)(@types/ws@8.18.1)(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2))
       react: 19.2.8
       typescript: 7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2)
 
-  '@trpc/server@11.18.0(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2))':
+  '@trpc/server@11.29.11(@types/express@5.0.6)(@types/ws@8.18.1)(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2))':
     dependencies:
       typescript: 7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2)
+    optionalDependencies:
+      '@types/express': 5.0.6
+      '@types/ws': 8.18.1
 
   '@tsrs/darwin-arm64@0.18.0-ts7.1.0-dev.20260929':
     optional: true
@@ -38670,7 +38688,7 @@ snapshots:
     dependencies:
       domelementtype: 3.0.0
 
-  dompurify@3.4.17:
+  dompurify@3.5.0:
     optionalDependencies:
       '@types/trusted-types': 2.0.7
 
@@ -40510,7 +40528,7 @@ snapshots:
       d3-sankey: 0.12.3
       dagre-d3-es: 7.0.14
       dayjs: 1.11.23
-      dompurify: 3.4.17
+      dompurify: 3.5.0
       es-toolkit: 1.51.0
       katex: 0.16.47
       khroma: 2.1.0
@@ -40854,7 +40872,7 @@ snapshots:
 
   monaco-editor@0.55.1:
     dependencies:
-      dompurify: 3.4.17
+      dompurify: 3.5.0
       marked: 14.0.0
 
   monacopilot@1.2.12(monaco-editor@0.55.1):
@@ -41796,7 +41814,7 @@ snapshots:
       '@posthog/core': 1.47.0
       '@posthog/types': 1.402.3
       core-js: 3.50.0
-      dompurify: 3.4.17
+      dompurify: 3.5.0
       fflate: 0.4.9
       preact: 10.29.8
       query-selector-shadow-dom: 1.0.1

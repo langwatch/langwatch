@@ -15,6 +15,12 @@ members = ["sdks/python", "packages/ksuid-python"]
 required-version = ">=0.9.25"
 exclude-newer = "7 days"
 
+# litellm 1.110.0 fixes CVE-2026-93355, GHSA-2364-6whj-g7vx, GHSA-fjxr-j47c-4x2x
+# and GHSA-wpm4-hgr2-xjwr but is inside the 7-day window above: admit litellm up
+# to a fixed date so the rest of the tree keeps the cooldown. Drop it once the
+# date is more than 7 days old (dev/docs/best_practices/dependency-age-gates.md).
+exclude-newer-package = { litellm = "2026-11-18T12:00:00Z" }
+
 # Transitive-dependency security pins. Keep these even when the importing
 # package isn't a direct dependency, so a future re-resolution can't silently
 # pull a vulnerable version back in.

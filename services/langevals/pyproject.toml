@@ -66,6 +66,11 @@ packages = ["langevals"]
 
 [tool.uv]
 exclude-newer = "7 days"
+# litellm 1.110.0 fixes CVE-2026-93355, GHSA-2364-6whj-g7vx, GHSA-fjxr-j47c-4x2x
+# and GHSA-wpm4-hgr2-xjwr but is inside the 7-day window above: admit litellm up
+# to a fixed date so the rest of the tree keeps the cooldown. Drop it once the
+# date is more than 7 days old (dev/docs/best_practices/dependency-age-gates.md).
+exclude-newer-package = { litellm = "2026-11-18T12:00:00Z" }
 # uv 0.9.25+ supports the exclude-newer-package emergency exceptions (dev/docs/best_practices/dependency-age-gates.md).
 required-version = ">=0.9.25"
 override-dependencies = [
@@ -105,8 +110,10 @@ override-dependencies = [
   #
   # litellm auth bypass via Host header injection AND via OIDC userinfo cache
   # key collision (both CRITICAL), plus four further advisories fixed across
-  # 1.83.7 / 1.83.10 / 1.83.14, then GHSA-7hp6-4w63-5g45 fixed in 1.100.4.
-  "litellm>=1.100.4",
+  # 1.83.7 / 1.83.10 / 1.83.14, then GHSA-7hp6-4w63-5g45 fixed in 1.100.4, then
+  # CVE-2026-93355, GHSA-2364-6whj-g7vx, GHSA-fjxr-j47c-4x2x and
+  # GHSA-wpm4-hgr2-xjwr fixed in 1.110.0.
+  "litellm>=1.110.0",
   # Pillow: heap overflow / DoS across several decoders, then 28 advisories
   # covering <13.0.0, three of them critical.
   "pillow>=13.0.0",
