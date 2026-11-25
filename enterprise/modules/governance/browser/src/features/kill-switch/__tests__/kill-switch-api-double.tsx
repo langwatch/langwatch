@@ -110,7 +110,12 @@ function useDoubleQuery(procedure: string, input: unknown, options?: { enabled?:
   };
 }
 
-function useDoubleMutation(procedure: string) {
+type MutationCallbacks = {
+  onSuccess?: (data: unknown) => unknown;
+  onError?: (error: unknown) => unknown;
+};
+
+function useDoubleMutation(procedure: string, hooks: MutationCallbacks = {}) {
   const [state, setState] = useState<{ pending: boolean; variables: unknown }>({
     pending: false,
     variables: undefined,
@@ -129,9 +134,21 @@ function useDoubleMutation(procedure: string) {
       setState({ pending: false, variables: undefined });
     }
   };
+  /** Runs the hook's callbacks, then the call's, as React Query does. */
+  const mutate = (input: unknown, call: MutationCallbacks = {}) =>
+    void mutateAsync(input).then(
+      async (data) => {
+        await hooks.onSuccess?.(data);
+        await call.onSuccess?.(data);
+      },
+      async (error: unknown) => {
+        await hooks.onError?.(error);
+        await call.onError?.(error);
+      },
+    );
   return {
     mutateAsync,
-    mutate: (input: unknown) => void mutateAsync(input).catch(() => undefined),
+    mutate,
     isPending: state.pending,
     variables: state.variables,
     error: null,
@@ -141,7 +158,7 @@ function useDoubleMutation(procedure: string) {
 const LEAVES: Record<string, (path: string) => unknown> = {
   useQuery: (path) => (input: unknown, options?: { enabled?: boolean }) =>
     useDoubleQuery(path, input, options),
-  useMutation: (path) => () => useDoubleMutation(path),
+  useMutation: (path) => (hooks?: MutationCallbacks) => useDoubleMutation(path, hooks),
 };
 
 function utilsNode(path: string[]): unknown {

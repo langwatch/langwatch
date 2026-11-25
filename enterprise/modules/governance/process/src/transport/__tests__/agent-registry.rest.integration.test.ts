@@ -1,6 +1,7 @@
 /**
  * The agent registry door over the real governance application and memory repositories:
- * access, paging, filters and the change feed. Spec: specs/agent-registry.feature
+ * access, paging, filters, the change feed and the settings. Spec: specs/agent-registry.feature,
+ * specs/cloud-agent-discovery.feature
  */
 import type { Agent, AgentApi } from "@langwatch/agent-contract";
 import type { ApiKeyApi } from "@langwatch/api-key-contract";
@@ -18,6 +19,7 @@ import { HandledError } from "@langwatch/handled-error";
 import type { LogApi } from "@langwatch/log-contract";
 import type { MetricApi } from "@langwatch/metric-contract";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
+import type { NotificationService } from "@langwatch/notification-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import { ResourceScope } from "@langwatch/process";
 import type { ProjectApi } from "@langwatch/project-contract";
@@ -58,6 +60,10 @@ function draft(name: string): RegistryDraft {
     source: "langwatch",
     management: "managed",
     shadow: false,
+    dormant: false,
+    platform: null,
+    labels: {},
+    owner_label: null,
     kind: "signature",
     name,
     description: null,
@@ -113,6 +119,7 @@ async function buildApi({
     repositories,
     dependencies: {
       webhooks: createApiFixture<WebhookApi>(),
+      notifications: createApiFixture<NotificationService>(),
       agents: createApiFixture<AgentApi>({
         list: async () => ({
           data: [AGENT],
@@ -198,7 +205,34 @@ async function buildApi({
       body: JSON.stringify(body),
     });
 
-  return { app, repositories, seed, get, post };
+  const put = (path: string, body: unknown) =>
+    hono.request(path, {
+      method: "PUT",
+      headers: { Authorization: `Bearer ${KEY}`, "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+
+  /** Seeds one entry per posture, as a reconcile would write them. */
+  const seedPostures = () =>
+    repositories.agentRegistry.applyChanges({
+      organizationId: ORG,
+      plan: (stored) => {
+        let next = 0;
+        return planRegistryChanges({
+          stored,
+          drafts: [
+            draft("governed-bot"),
+            { ...draft("shadow-bot"), source: "traffic", management: "observed", shadow: true },
+            { ...draft("dormant-bot"), dormant: true },
+          ],
+          now: Temporal.Instant.from("2026-11-10T00:00:00Z"),
+          newId: () => `posture-${++next}`,
+        });
+      },
+      baselineAt: Temporal.Instant.from("2026-11-10T00:00:00Z"),
+    });
+
+  return { app, repositories, seed, seedPostures, get, post, put };
 }
 
 describe("the agent registry REST family", () => {
@@ -375,6 +409,78 @@ describe("the agent registry REST family", () => {
         limit: 100,
       });
       expect(entries.map((entry) => entry.name)).toEqual(["Field agent"]);
+    });
+  });
+
+  describe("given a governed, a shadow and a dormant entry", () => {
+    /** @scenario "The registry list filters by posture" */
+    it("returns only the entries of the asked posture", async () => {
+      const { seedPostures, get } = await buildApi();
+      await seedPostures();
+
+      const answers = await Promise.all(
+        ["dormant", "shadow", "governed"].map(async (posture) => {
+          const response = await get(`/api/governance/registry/agents?posture=${posture}`);
+          const body = (await response.json()) as { data: { name: string; posture: string }[] };
+          return body.data.map((entry) => [entry.name, entry.posture]);
+        }),
+      );
+
+      expect(answers).toEqual([
+        [["dormant-bot", "dormant"]],
+        [["shadow-bot", "shadow"]],
+        [["governed-bot", "governed"]],
+      ]);
+    });
+  });
+
+  describe("given an organisation that never set a dormancy window", () => {
+    /** @scenario "The dormancy window is read and saved per organisation" */
+    it("reads 30 days, then the 14 days the admin saved", async () => {
+      const { get, put } = await buildApi({
+        grants: ["governance:view", "ingestionSources:manage"],
+      });
+
+      const before = await get("/api/governance/registry/settings");
+      expect(before.status).toBe(200);
+      expect(await before.json()).toEqual({ data: { dormant_after_days: 30 } });
+
+      const saved = await put("/api/governance/registry/settings", { dormant_after_days: 14 });
+      expect(saved.status).toBe(200);
+
+      const after = await get("/api/governance/registry/settings");
+      expect(await after.json()).toEqual({ data: { dormant_after_days: 14 } });
+    });
+  });
+
+  describe("when an admin saves a dormancy window of 0 days", () => {
+    /** @scenario "A dormancy window outside 1 to 365 days is refused" */
+    it("refuses it as a validation error and keeps 30 days", async () => {
+      const { get, put } = await buildApi({
+        grants: ["governance:view", "ingestionSources:manage"],
+      });
+
+      const refused = await put("/api/governance/registry/settings", { dormant_after_days: 0 });
+      const body = (await refused.json()) as { code: string };
+
+      expect(refused.status).toBe(422);
+      expect(body.code).toBe("validation_error");
+      expect(await (await get("/api/governance/registry/settings")).json()).toEqual({
+        data: { dormant_after_days: 30 },
+      });
+    });
+  });
+
+  describe("given a member holding only governance:view", () => {
+    /** @scenario "Saving the dormancy window needs ingestionSources:manage" */
+    it("refuses the save as forbidden", async () => {
+      const { put } = await buildApi({ grants: ["governance:view"] });
+
+      const refused = await put("/api/governance/registry/settings", { dormant_after_days: 14 });
+      const body = (await refused.json()) as { code: string };
+
+      expect(refused.status).toBe(403);
+      expect(body.code).toBe("forbidden");
     });
   });
 });
