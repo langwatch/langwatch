@@ -1,6 +1,5 @@
 /**
- * With no LangWatchQL password set, provisioning derives both from the key pepper and converges
- * in `sql` mode. The server-wide PostgreSQL reader role's DDL is left out; the lock still runs.
+ * An install that sets no LangWatchQL password gets both derived from the key pepper, in `sql` mode.
  * @see modules/analytics/specs/analytics-lwql-default-credentials.feature
  * @vitest-environment node
  */

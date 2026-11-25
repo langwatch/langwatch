@@ -11,6 +11,7 @@ import {
   formatAgentLastActive,
   formatAgentRequests,
 } from "./agent-figure";
+import { AgentPostureBadge } from "./agent-posture-badge";
 import type { AgentRowExtras } from "./agent-row-extras";
 import { AGENT_HEALTH_LABELS, AGENT_SOURCE_LABELS, formatRegistered } from "./agent-rows";
 
@@ -69,6 +70,7 @@ export function AgentsTable({
                   <Text textStyle="sm" fontWeight="medium">
                     {agent.name}
                   </Text>
+                  <AgentPostureBadge posture={agent.posture} />
                   {/* The same claim the card makes, in the same place: on the
                     row, because the row is what a reader quotes. */}
                   {sample && (
