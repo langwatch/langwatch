@@ -111,6 +111,32 @@ export type LangyAttachmentRef = Readonly<{
 
 const FILE_URL = /^\/api\/files\/([^/]+)\/([^/]+)\/([^/]+)$/;
 
+/** Where a confirmed image is stored, read from its address. */
+export type LangyAttachmentAddress = Readonly<{
+  projectId: string;
+  objectId: string;
+  filename: string;
+}>;
+
+/** The stored image an address names, or `not_stored` for any other address. */
+export function langyAttachmentAddressOf(url: string): LangyAttachmentAddress | "not_stored" {
+  const match = FILE_URL.exec(url);
+  if (!match?.[1] || !match[2] || !match[3]) return "not_stored";
+  return {
+    projectId: decodeURIComponent(match[1]),
+    objectId: decodeURIComponent(match[2]),
+    filename: decodeURIComponent(match[3]),
+  };
+}
+
+/** An image chip in a message's text: `[▣ name.png]` where the image was put. */
+export const LANGY_IMAGE_CHIP_TEXT = /\[▣ ([^\]\n]+)\]/g;
+
+/** The text with each image chip read as its file name, for places that show plain text. */
+export function withImageChipsAsNames(text: string): string {
+  return text.replace(LANGY_IMAGE_CHIP_TEXT, "$1");
+}
+
 /**
  * The images a message's parts name in this project, in order. A file part whose address is
  * another project's, or is not a stored file at all, names nothing.
@@ -127,12 +153,11 @@ export function langyAttachmentRefsOf({
     if (typeof part !== "object" || part === null) continue;
     const { type, url, mediaType, filename } = part as Record<string, unknown>;
     if (type !== "file" || typeof url !== "string" || typeof mediaType !== "string") continue;
-    const match = FILE_URL.exec(url);
-    if (!match?.[1] || !match[2] || !match[3]) continue;
-    if (decodeURIComponent(match[1]) !== projectId) continue;
+    const address = langyAttachmentAddressOf(url);
+    if (address === "not_stored" || address.projectId !== projectId) continue;
     refs.push({
-      objectId: decodeURIComponent(match[2]),
-      filename: typeof filename === "string" ? filename : decodeURIComponent(match[3]),
+      objectId: address.objectId,
+      filename: typeof filename === "string" ? filename : address.filename,
       mediaType,
     });
   }

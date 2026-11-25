@@ -11,6 +11,7 @@ import {
   deriveLangyChoicesLockState,
   githubProgressFromToolParts,
   isLangyCallStoppedText,
+  LANGY_IMAGE_CHIP_TEXT,
 } from "@langwatch/langy-contract";
 import { findGuidedKickoffParts } from "@langwatch/onboarding-contract";
 import type { UIMessage } from "ai";
@@ -34,6 +35,7 @@ import { githubPrsFromToolParts } from "../../../../model/shared/langy/github-pr
 import { LangyFailedCard } from "../../../../ui/elements/derived-cards/langy-failed-card.tsx";
 import { LangyGitHubProgressCard } from "../../../../ui/elements/github/langy-github-progress-card.tsx";
 import { LangyCardBoundary } from "../../../../ui/elements/langy-card-boundary.tsx";
+import { useLangyImageUrl } from "../../../composer/behavior/use-langy-image-url.ts";
 import { LangyInlineImageChip } from "../../../composer/ui/elements/langy-image-chip.tsx";
 import { LangyImageThumb } from "../../../composer/ui/elements/langy-image-thumb.tsx";
 import {
@@ -171,6 +173,16 @@ function MessageContentImpl(props: MessageContentProps) {
   return <AssistantMessage {...props} />;
 }
 
+/** One image a sent message carries, drawn from its signed URL once it is minted. */
+function SentImageThumb({ url, name }: { url: string; name: string }) {
+  const image = useLangyImageUrl({ url });
+  if (image.status === "failed") {
+    return <LangyImageThumb name={name} status="failed" error="This image can't be shown" />;
+  }
+  if (image.status === "pending") return <LangyImageThumb name={name} status="uploading" />;
+  return <LangyImageThumb name={name} src={image.url} status="ready" />;
+}
+
 /** The images a message carries as file parts, in order. */
 function messageImages(message: UIMessage): { url: string; filename: string }[] {
   return message.parts.flatMap((part) =>
@@ -180,13 +192,11 @@ function messageImages(message: UIMessage): { url: string; filename: string }[] 
   );
 }
 
-const IMAGE_CHIP_TEXT = /\[▣ [^\]\n]+\]/g;
-
 /** The person's words with each image chip drawn where it was written. */
 function TextWithImageChips({ text }: { text: string }) {
   const pieces: ReactNode[] = [];
   let at = 0;
-  for (const match of text.matchAll(IMAGE_CHIP_TEXT)) {
+  for (const match of text.matchAll(LANGY_IMAGE_CHIP_TEXT)) {
     const start = match.index;
     if (start > at) pieces.push(text.slice(at, start));
     pieces.push(<LangyInlineImageChip key={`chip:${start}`} label={match[0]} />);
@@ -250,7 +260,7 @@ function PlainMessage({
       {images.length > 0 ? (
         <Box display="flex" gap={2} flexWrap="wrap" justifyContent="flex-end">
           {images.map((image) => (
-            <LangyImageThumb key={image.url} name={image.filename} src={image.url} status="ready" />
+            <SentImageThumb key={image.url} url={image.url} name={image.filename} />
           ))}
         </Box>
       ) : null}

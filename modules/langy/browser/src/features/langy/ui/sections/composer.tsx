@@ -197,7 +197,7 @@ function ComposerRail({
       paddingBottom={2}
       paddingTop={0}
       // The hero stays bare: see the note on the context summary in ComposerImpl.
-      display={hero ? "none" : undefined}
+      display={hero ? "none" : "flex"}
     >
       {onAttach ? <AttachImageButton onAttach={onAttach} disabled={locked} /> : null}
       <Box flex={1} minWidth={0} />

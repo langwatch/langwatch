@@ -10802,6 +10802,9 @@ importers:
       '@langwatch/slack-contract':
         specifier: workspace:*
         version: link:../../slack/contract
+      '@langwatch/stored-object-contract':
+        specifier: workspace:*
+        version: link:../../stored-object/contract
       '@langwatch/suite-contract':
         specifier: workspace:*
         version: link:../../suite/contract

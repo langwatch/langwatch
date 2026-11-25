@@ -26,6 +26,7 @@ import type { projectTrpc } from "@langwatch/project-contract";
 import type { promptTagTrpc, promptTrpc } from "@langwatch/prompt-contract";
 import type { scenarioTrpc } from "@langwatch/scenario-contract";
 import type { secretTrpc } from "@langwatch/secret-contract";
+import type { storedObjectTrpc } from "@langwatch/stored-object-contract";
 import type { suiteTrpc } from "@langwatch/suite-contract";
 import type { tracesTrpc } from "@langwatch/trace-contract";
 import type { userTrpc } from "@langwatch/user-contract";
@@ -47,6 +48,8 @@ export type LangyApiMap = ContractApiMap<typeof langyTrpc> &
   ContractApiMap<typeof userTrpc> &
   ContractApiMap<typeof notificationTrpc> &
   ContractApiMap<typeof automationTrpc> &
+  // The images a sent message shows, read through short-lived signed URLs.
+  ContractApiMap<typeof storedObjectTrpc> &
   // The lists a Langy write can change, invalidated as its result lands.
   ContractApiMap<typeof scenarioTrpc> &
   ContractApiMap<typeof suiteTrpc> &

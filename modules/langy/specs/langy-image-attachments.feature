@@ -91,3 +91,16 @@ Feature: Images attached to a Langy message reach the model
     Given a user message with five images
     When the turn starts
     Then the turn is refused with langy_attachment_refused naming the limit of four images
+
+  @unit
+  Scenario: A conversation title shows an image by its file name
+    Given a first message "What does [▣ pasted-4d80e6.png] show?"
+    When the conversation takes its title from it
+    Then the title reads "What does pasted-4d80e6.png show?"
+
+  @integration
+  Scenario: A sent message shows its images from signed URLs
+    Given a sent user message that carries a stored image
+    When the conversation shows it
+    Then the image is drawn from a short-lived signed URL for that stored file
+    And the image's chip in the text shows its file name
