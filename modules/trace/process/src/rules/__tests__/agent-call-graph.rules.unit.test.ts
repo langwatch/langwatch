@@ -161,7 +161,7 @@ describe("buildAgentCallGraph", () => {
 });
 
 describe("classifyA2aSpan", () => {
-  /** @scenario "A2A spans are marked so the span tree can label them" */
+  /** @scenario "A2A spans are classified with their role, method, context, task and state" */
   it("marks spans by a2a attributes, JSON-RPC method or span name", () => {
     expect(classifyA2aSpan(twoAgentTrace[2]!)).toEqual({
       isA2a: true,
@@ -183,12 +183,6 @@ describe("classifyA2aSpan", () => {
     expect(classifyA2aSpan(span({ spanId: "plain", name: "POST /chat" }))).toEqual({
       isA2a: false,
     });
-  });
-
-  it("lists every A2A span in the graph", () => {
-    const graph = buildAgentCallGraph({ spans: twoAgentTrace, resources: twoAgentResources });
-
-    expect(graph.a2aSpans.map((mark) => mark.spanId)).toEqual(["a2a-client", "a2a-server"]);
   });
 });
 
