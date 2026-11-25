@@ -43,7 +43,7 @@ type ScenarioLlmVerdictInput = Readonly<{
 
 export class InstantEvalScenarioLlmVerdictService {
   private readonly sends = new Map<string, Promise<ScenarioLlmVerdict>>();
-  private firstReasoning = "";
+  private readonly reasonings = new Map<string, string>();
 
   private constructor(private readonly input: ScenarioLlmVerdictInput) {}
 
@@ -51,9 +51,9 @@ export class InstantEvalScenarioLlmVerdictService {
     return new InstantEvalScenarioLlmVerdictService(input);
   }
 
-  /** The explanation of the first whole call that answered; empty when none did. */
-  explanation(): string {
-    return this.firstReasoning;
+  /** The explanation the backend's whole call gave; empty when it sent none or did not answer. */
+  explanationOf(backend: string): string {
+    return this.reasonings.get(backend) ?? "";
   }
 
   /**
@@ -71,15 +71,17 @@ export class InstantEvalScenarioLlmVerdictService {
   }): Promise<ScenarioLlmVerdict> {
     const sent = this.sends.get(backend);
     if (sent) return sent;
-    const send = this.send({ call, paid });
+    const send = this.send({ backend, call, paid });
     this.sends.set(backend, send);
     return send;
   }
 
   private async send({
+    backend,
     call,
     paid,
   }: {
+    backend: string;
     call: InstantEvalScenarioLlmVerdictCall;
     paid: (spend: { inputTokens: number; outputTokens: number }) => void;
   }): Promise<ScenarioLlmVerdict> {
@@ -97,7 +99,7 @@ export class InstantEvalScenarioLlmVerdictService {
       if (answer.outcome !== "answered") return { outcome: "failed", reason: answer.reason };
       const reading = findInstantEvalScenarioVerdictReading(answer.input);
       if (!reading) return { outcome: "failed", reason: "classifier_failed" };
-      this.firstReasoning ||= reading.reasoning ?? "";
+      if (reading.reasoning) this.reasonings.set(backend, reading.reasoning);
       return { outcome: "read", ...reading };
     } catch (error) {
       if (signal?.aborted) throw error;

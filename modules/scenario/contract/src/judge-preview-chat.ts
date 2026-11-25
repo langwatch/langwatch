@@ -82,4 +82,6 @@ export type JudgePreviewChatCompletion = z.infer<typeof judgePreviewChatCompleti
 export type JudgePreviewChatInput = Readonly<{
   projectId: string;
   request: JudgePreviewChatRequest;
+  /** The caller's disconnect: it stops the judge's routed legs, and what they paid is billed. */
+  signal?: AbortSignal;
 }>;

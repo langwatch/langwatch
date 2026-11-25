@@ -42,6 +42,13 @@ Feature: A scenario judgement answered by the judge router
     And both criteria are read from that call by their keys
     And the call's tokens are billed once
 
+  @unit @regression
+  Scenario: The verdict carries the shared call's reasoning only when that call settled every criterion
+    Given an unsure criterion read from the judge's own verdict call
+    When a sure decision answer settles another criterion of the same verdict
+    Then the verdict carries no reasoning, so the report explains it from the criteria results
+    And when the shared call settled every criterion its reasoning is carried
+
   @unit
   Scenario: Criteria past the parallel cap share the same send and keep their order
     Given nine criteria that all get an unsure decision answer
@@ -223,3 +230,9 @@ Feature: A scenario judgement answered by the judge router
     And the install holds no Gemini key
     When the judge boots
     Then it refuses, naming the backend and its kind
+
+  @unit
+  Scenario: A Gemini call on an install with no Gemini key is skipped and sends nothing
+    Given an install that holds no Gemini key
+    When a call is sent on the gemini_generate_content wire
+    Then it is skipped as not configured and no request leaves the install

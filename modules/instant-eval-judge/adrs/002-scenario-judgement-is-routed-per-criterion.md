@@ -35,10 +35,10 @@ on a decision model and sent the unsure ones to an LLM that read the judge's who
    decided; one that billed no tokens records none.
 5. **A verdict is never made up.** A criterion no leg answered is inconclusive. A judgement
    nothing answered is `unavailable`, and its caller reports an error, not a failed run.
-6. **One verdict is one spend row** under the model `langwatch-judge-preview`, priced as ADR-190
+6. **One paid verdict is one spend row** under the model `langwatch-judge-preview`, priced as ADR-190
    decision 3: the summed cost of every call times the one markup. Its request count is the number
-   of criteria. A scenario run therefore writes one row per turn decision (decision 4) and one for
-   its verdict. An LLM-as-judge evaluation keeps `langwatch-judge`.
+   of criteria. A scenario run therefore writes one row per paid turn decision (decision 4) and
+   one for its paid verdict; a verdict that billed no tokens records none. An LLM-as-judge evaluation keeps `langwatch-judge`.
 7. **The table decides the backends.** Nothing in the leaf names a provider for this job. Boot
    checks a price and a key for the decision backend as it does for a slot's backends.
 8. **A gated entry works per criterion (2026-11-25).** The gate (ADR-190 decision 11) rates each

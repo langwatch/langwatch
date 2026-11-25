@@ -1,6 +1,6 @@
 /**
- * LangWatch Judge (preview) for a scenario run: where it may judge, the parameters a run's judge
- * gets, and one call answered through the judge leaf or refused by name.
+ * One call of the scenario judge on LangWatch Judge (preview), answered through the judge leaf or
+ * refused by name.
  * @see modules/scenario/specs/judge-preview.feature
  */
 import type {
@@ -22,7 +22,6 @@ import { verdictRequest } from "../../../../__tests__/support/judge-preview-requ
 import { judgePreviewAvailabilityFixture } from "../../../../__tests__/support/judge-preview.fixture.ts";
 import { JUDGE_PREVIEW_NOT_ON_CLOUD } from "../judge-preview-availability.service.ts";
 import { JudgePreviewChatService } from "../judge-preview-chat.service.ts";
-import { JudgePreviewModelParametersService } from "../judge-preview-model-parameters.service.ts";
 
 const PROJECT_ID = "project-1";
 
@@ -61,44 +60,14 @@ function chat({
     ids: { next: () => "id-1" },
     clock: { now: () => Temporal.Instant.fromEpochMilliseconds(1_760_000_000_500) },
   });
-  const complete = () => service.complete({ projectId: PROJECT_ID, request: verdictRequest() });
+  const complete = (signal?: AbortSignal) =>
+    service.complete({
+      projectId: PROJECT_ID,
+      request: verdictRequest(),
+      ...(signal ? { signal } : {}),
+    });
   return { complete, asked, flagChecks };
 }
-
-describe("JudgePreviewAvailabilityService", () => {
-  /** @scenario "The flag is read for the project within its organization" */
-  it("reads the release flag for the project within its organization", async () => {
-    const flagChecks: unknown[][] = [];
-    const availability = judgePreviewAvailabilityFixture({
-      isSaas: true,
-      isFlagOn: true,
-      organizationId: "organization-9",
-      flagChecks,
-    });
-
-    const answer = await availability.availabilityFor({ projectId: PROJECT_ID });
-
-    expect(answer).toEqual({ isAvailable: true });
-    expect(flagChecks).toEqual([
-      [
-        "release_langwatch_judge_preview",
-        { kind: "project", projectId: PROJECT_ID, organizationId: "organization-9" },
-      ],
-    ]);
-  });
-
-  it("is unavailable for a project with no organization, which no rule could name", async () => {
-    const availability = judgePreviewAvailabilityFixture({
-      isSaas: true,
-      isFlagOn: true,
-      organizationId: null,
-    });
-
-    const answer = await availability.availabilityFor({ projectId: PROJECT_ID });
-
-    expect(answer).toMatchObject({ isAvailable: false });
-  });
-});
 
 describe("JudgePreviewChatService", () => {
   describe("given LangWatch Cloud with the judge preview flag on", () => {
@@ -116,6 +85,16 @@ describe("JudgePreviewChatService", () => {
       ]);
       expect(completion).toMatchObject({ id: "chatcmpl_id-1", created: 1_760_000_000 });
       expect(completion.choices[0]?.message.tool_calls[0]?.function.name).toBe("finish_test");
+    });
+
+    /** @scenario "A caller that disconnects stops the judge's legs" */
+    it("passes the request's stop signal to the judge leaf", async () => {
+      const { complete, asked } = chat();
+      const stop = new AbortController();
+
+      await complete(stop.signal);
+
+      expect(asked[0]?.signal).toBe(stop.signal);
     });
 
     /** @scenario "An unavailable judge is an error, never a verdict" */
@@ -143,6 +122,7 @@ describe("JudgePreviewChatService", () => {
       });
     });
 
+    /** @scenario "A project the judge has not learned is refused at the endpoint" */
     it("throws not available, in its own words, for a project the leaf has not learned", async () => {
       const { complete } = chat({
         answer: {
@@ -158,6 +138,7 @@ describe("JudgePreviewChatService", () => {
       });
     });
 
+    /** @scenario "A not-on-Cloud answer from the judge leaf is refused in the words used before a run" */
     it("refuses in the same words as before a run when the leaf says it is not on Cloud", async () => {
       const { complete } = chat({
         answer: {
@@ -228,66 +209,5 @@ describe("JudgePreviewChatService", () => {
     ).rejects.toBeInstanceOf(JudgePreviewRequestInvalidError);
     expect(asked).toHaveLength(0);
     expect(flagChecks).toHaveLength(0);
-  });
-});
-
-describe("JudgePreviewModelParametersService", () => {
-  const prepare = ({
-    isSaas = true,
-    isFlagOn = true,
-    isConfigured = true,
-    langwatchEndpoint = "https://app.langwatch.test/",
-  } = {}) =>
-    JudgePreviewModelParametersService.create({
-      availability: judgePreviewAvailabilityFixture({ isSaas, isFlagOn, isConfigured }),
-      langwatchEndpoint,
-    }).prepare({ projectId: PROJECT_ID, runKey: "run-key-1" });
-
-  /** @scenario "A run judged by LangWatch Judge (preview) is pointed at the app's own endpoint" */
-  it("names the OpenAI-shaped model, the app's judge preview address and the run's key", async () => {
-    await expect(prepare()).resolves.toEqual({
-      success: true,
-      params: {
-        model: "openai/langwatch-judge-preview",
-        api_base: "https://app.langwatch.test/api/judge-preview/v1",
-        api_key: "run-key-1",
-      },
-    });
-  });
-
-  /** @scenario "A run on LangWatch Judge (preview) is refused before it starts where it may not judge" */
-  it("refuses on a self-hosted install and with the flag off, saying what to pick instead", async () => {
-    const selfHosted = await prepare({ isSaas: false });
-    const flagOff = await prepare({ isFlagOn: false });
-
-    expect(selfHosted).toMatchObject({
-      success: false,
-      message: expect.stringMatching(
-        /LangWatch Judge \(preview\) runs on LangWatch Cloud only.*Pick another judge model/,
-      ),
-    });
-    expect(flagOff).toMatchObject({
-      success: false,
-      message: expect.stringMatching(
-        /LangWatch Judge \(preview\) is not turned on.*Pick another judge model/,
-      ),
-    });
-  });
-
-  /** @scenario "A run on LangWatch Judge (preview) is refused before it starts where it is not set up" */
-  it("refuses a run before it starts where the route table names no turn decision backend", async () => {
-    await expect(prepare({ isConfigured: false })).resolves.toEqual({
-      success: false,
-      reason: "provider_not_enabled",
-      message:
-        "LangWatch Judge (preview) is not set up on this installation yet, so it cannot judge. Pick another judge model on the scenario, the suite or in Default models.",
-    });
-  });
-
-  it("refuses when the installation's own address is not configured", async () => {
-    await expect(prepare({ langwatchEndpoint: "" })).resolves.toMatchObject({
-      success: false,
-      reason: "missing_params",
-    });
   });
 });

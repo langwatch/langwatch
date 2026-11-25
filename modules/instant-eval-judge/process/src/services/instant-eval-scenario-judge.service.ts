@@ -122,7 +122,7 @@ export class InstantEvalScenarioJudgeService {
       (one) => one.status === "fulfilled" && one.value.verdicts.length > 0,
     );
     if (criteria.length > 0 && !isAnswered) return { outcome: "unavailable" };
-    const reasoning = verdicts.explanation();
+    const reasoning = sharedCallReasoningOf({ settled, verdicts });
     return {
       outcome: "judged",
       phase: "verdict",
@@ -315,6 +315,28 @@ export class InstantEvalScenarioJudgeService {
       );
     }
   }
+}
+
+/**
+ * The shared call's explanation when one backend answered every criterion, else empty: a
+ * criterion settled by another leg could contradict it.
+ */
+function sharedCallReasoningOf({
+  settled,
+  verdicts,
+}: {
+  settled: readonly PromiseSettledResult<InstantEvalJudgement>[];
+  verdicts: InstantEvalScenarioLlmVerdictService;
+}): string {
+  const backends = new Set<string>();
+  for (const one of settled) {
+    if (one.status !== "fulfilled") return "";
+    const [backend, ...others] = Object.keys(one.value.routing?.answeredBy ?? {});
+    if (backend === undefined || others.length > 0) return "";
+    backends.add(backend);
+  }
+  const [sole, ...more] = [...backends];
+  return sole === undefined || more.length > 0 ? "" : verdicts.explanationOf(sole);
 }
 
 /** What every criterion's legs paid, a stopped one's included, so a stop still bills them. */

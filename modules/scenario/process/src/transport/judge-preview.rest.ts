@@ -31,7 +31,11 @@ export const judgePreviewRest = defineRestRouter(ScenarioApi)
       "Answer one call of the scenario judge with LangWatch Judge (preview): the verdict on a run's criteria, or whether the conversation goes on. Not streamed. LangWatch Cloud only.",
     responses: baseResponses,
   })
-  .handle(({ app, input, scope }) =>
-    app.completeJudgePreviewChat({ projectId: scope.id, request: input }),
+  .handle(({ app, input, scope, signal }) =>
+    app.completeJudgePreviewChat({
+      projectId: scope.id,
+      request: input,
+      ...(signal ? { signal } : {}),
+    }),
   )
   .build();

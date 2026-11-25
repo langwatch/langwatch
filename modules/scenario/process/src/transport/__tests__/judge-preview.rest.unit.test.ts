@@ -68,12 +68,13 @@ async function endpoint({
     onError: canonicalErrorResponse,
     middlewareContext: [projectContext],
   });
-  const post = (body: unknown = verdictRequest()) =>
+  const post = (body: unknown = verdictRequest(), signal?: AbortSignal) =>
     mounted.fetch(
       new Request("http://api.test/api/judge-preview/v1/chat/completions", {
         method: "POST",
         headers: { "content-type": "application/json", authorization: "Bearer run-key" },
         body: JSON.stringify(body),
+        ...(signal ? { signal } : {}),
       }),
     );
   return { post, asked, flagChecks };
@@ -100,6 +101,19 @@ describe("POST /api/judge-preview/v1/chat/completions", () => {
         reasoning: "It refunded and never apologised.",
         verdict: "failure",
       });
+    });
+
+    /** @scenario "A caller that disconnects stops the judge's legs" */
+    it("asks the judge leaf with a signal that stops when the caller disconnects", async () => {
+      const { post, asked } = await endpoint();
+      const caller = new AbortController();
+
+      await post(verdictRequest(), caller.signal);
+      const signal = asked[0]?.signal;
+      expect(signal?.aborted).toBe(false);
+      caller.abort();
+
+      expect(signal?.aborted).toBe(true);
     });
 
     /** @scenario "An unavailable judge is an error, never a verdict" */

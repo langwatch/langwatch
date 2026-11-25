@@ -1,7 +1,7 @@
 /**
  * One call of the scenario judge on LangWatch Judge (preview): the judge's chat request becomes a
- * judge-leaf call and its answer the tool call the judge asked for. It throws a named error where
- * the judge may not or cannot answer, so the run ends as an error, never on an invented verdict.
+ * judge-leaf call and its answer the tool call the judge asked for, or a named error, never an
+ * invented verdict. The caller sends no stable id, so a retried turn (timeout, 503) bills again.
  * @see modules/scenario/specs/judge-preview.feature
  */
 import type {
@@ -46,11 +46,16 @@ export class JudgePreviewChatService {
   async complete({
     projectId,
     request,
+    signal,
   }: JudgePreviewChatInput): Promise<JudgePreviewChatCompletion> {
     const call = judgePreviewLeafCallOf(request);
     const availability = await this.deps.availability.availabilityFor({ projectId });
     if (!availability.isAvailable) throw new JudgePreviewNotAvailableError(availability.message);
-    const answer = await this.deps.judges.judgeScenario({ projectId, ...call });
+    const answer = await this.deps.judges.judgeScenario({
+      projectId,
+      ...call,
+      ...(signal ? { signal } : {}),
+    });
     return judgePreviewChatCompletionOf({
       answer: judgedOrThrow(answer),
       call,

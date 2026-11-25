@@ -135,6 +135,12 @@ Feature: Judge column in Default models
     And with the flag off neither picker lists it
 
   @unit
+  Scenario: Saving LangWatch Judge (preview) as the Judge default stores it as picked
+    Given the judge preview flag is on for my organization
+    When a Default models config picks langwatch/judge-preview for Judge
+    Then the config is stored with langwatch/judge-preview under Judge, never another model's id
+
+  @unit
   Scenario: Saving LangWatch Judge (preview) is refused where its flag is off
     Given the judge preview flag is off for my organization
     When a Default models config newly picks langwatch/judge-preview for Judge

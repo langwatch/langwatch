@@ -98,6 +98,31 @@ Feature: LangWatch Judge (preview) as the scenario judge
     Then the endpoint answers 402 with the budget message
 
   @unit
+  Scenario: A project outside an organization is refused
+    Given LangWatch Cloud and a project with no organization
+    When availability is asked for it
+    Then it is not available, since no flag rule could name it
+
+  @unit
+  Scenario: A project the judge has not learned is refused at the endpoint
+    Given the judge leaf refuses for a project it has not learned
+    When the scenario judge posts its call
+    Then the endpoint answers 403 saying LangWatch Judge (preview) has not learned the project yet
+
+  @unit
+  Scenario: A not-on-Cloud answer from the judge leaf is refused in the words used before a run
+    Given the judge leaf refuses because it is not configured
+    When the scenario judge posts its call
+    Then the endpoint answers 403 with the same message a run gets before it starts
+
+  @unit @regression
+  Scenario: A caller that disconnects stops the judge's legs
+    Given the scenario judge posts its call
+    When its connection closes before the answer
+    Then the judge leaf is asked with that request's stop signal
+    And a retried call runs and is billed again, since the caller sends no stable id
+
+  @unit
   Scenario: The endpoint refuses where the judge preview flag is off
     Given LangWatch Cloud with the judge preview flag off for the organization
     When the scenario judge posts its call
@@ -142,6 +167,12 @@ Feature: LangWatch Judge (preview) as the scenario judge
     When a run on LangWatch Judge (preview) is prefetched, or the endpoint is called
     Then it is refused with a message saying it is not set up and what to pick instead
     And the judge leaf is never asked to judge
+
+  @unit
+  Scenario: An endpoint on an install with no own address is refused
+    Given LangWatch Cloud with the flag on and no configured address for this installation
+    When a run on LangWatch Judge (preview) is prefetched
+    Then it is refused for missing parameters, since the judge has no endpoint to reach
 
   @unit
   Scenario: LangWatch Judge (preview) cannot play another role

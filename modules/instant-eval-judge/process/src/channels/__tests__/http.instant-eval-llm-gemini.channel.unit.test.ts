@@ -251,6 +251,7 @@ describe("HttpInstantEvalLlmJudgeChannel on a Gemini backend", () => {
     });
   });
 
+  /** @scenario "A Gemini call on an install with no Gemini key is skipped and sends nothing" */
   it("skips when this install holds no Gemini key, sending nothing", async () => {
     const channel = HttpInstantEvalLlmJudgeChannel.create({
       keys: { openai_responses: "lw-openai" },

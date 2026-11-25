@@ -279,12 +279,50 @@ describe("given a scenario verdict call on LangWatch Cloud", () => {
           { key: "criterion_1", result: "unmet" },
           { key: "criterion_2", result: "met" },
         ],
-        reasoning: "the transcript settles it",
       });
       // Three decision requests at 1 USD per million, one LLM call at 10 in and 100 out.
       expect(recorded).toHaveLength(1);
       expect(recorded[0]?.costNanoUsd).toBe(3 * 1_000 * 1_000 + 2_000 * 10_000 + 100 * 100_000);
       expect(recorded[0]?.inputTokens).toBe(3 * DECISION_TOKENS + 2_000);
+    });
+  });
+
+  describe("when the shared call's reasoning sits beside criteria it did not settle", () => {
+    /** @scenario "The verdict carries the shared call's reasoning only when that call settled every criterion" */
+    it("leaves the reasoning out, so it cannot contradict a criterion settled elsewhere", async () => {
+      const { service } = harness({
+        probabilities: { criterion_0: 0.6, criterion_1: 0.002, criterion_2: 0.4 },
+        // The LLM says criterion_1 was met; the sure decision answer says it was not.
+        toolCall: () =>
+          finishTest({ criterion_0: "false", criterion_1: "true", criterion_2: "true" }),
+      });
+
+      const answer = await service.judge(scenarioJudgeCall());
+
+      expect(answer).toMatchObject({
+        criteria: expect.arrayContaining([{ key: "criterion_1", result: "unmet" }]),
+      });
+      expect(answer).not.toHaveProperty("reasoning");
+    });
+
+    /** @scenario "The verdict carries the shared call's reasoning only when that call settled every criterion" */
+    it("carries the reasoning when the shared call settled every criterion", async () => {
+      const { service } = harness({
+        probabilities: { criterion_0: 0.6, criterion_1: 0.5, criterion_2: 0.4 },
+        toolCall: () =>
+          finishTest({ criterion_0: "false", criterion_1: "true", criterion_2: "true" }),
+      });
+
+      const answer = await service.judge(scenarioJudgeCall());
+
+      expect(answer).toMatchObject({
+        criteria: [
+          { key: "criterion_0", result: "unmet" },
+          { key: "criterion_1", result: "met" },
+          { key: "criterion_2", result: "met" },
+        ],
+        reasoning: "the transcript settles it",
+      });
     });
   });
 
@@ -754,6 +792,8 @@ describe("given a gated scenario route", () => {
           { key: "criterion_2", result: "met" },
         ],
       });
+      // The decision model settled the easy criterion, so the shared call's reasoning is left out.
+      expect(answer).not.toHaveProperty("reasoning");
       // Three gate sends at 5, one decision request at 1, one LLM call at 10 in and 100 out.
       expect(recorded).toHaveLength(1);
       expect(recorded[0]?.costNanoUsd).toBe(

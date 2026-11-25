@@ -177,16 +177,20 @@ describe("ModelProviderDefaultsWriteService and LangWatch Judge (preview)", () =
       ).rejects.toThrow("is not a decision model");
     });
 
-    it("accepts it as the Judge default", async () => {
-      const writer = await writerOver({ isOwnModelOn: false, isJudgePreviewOn: true });
+    /** @scenario "Saving LangWatch Judge (preview) as the Judge default stores it as picked" */
+    it("accepts it as the Judge default and stores it as picked", async () => {
+      const { defaults } = MemoryModelProviderRepositories.create();
+      const writer = await writerOver({ isOwnModelOn: false, isJudgePreviewOn: true, defaults });
 
-      await expect(
-        writer.save({
-          config: { JUDGE: "langwatch/judge-preview" },
-          scopes: [SCOPE],
-          authorId: null,
-        }),
-      ).resolves.toBeDefined();
+      const saved = await writer.save({
+        config: { JUDGE: "langwatch/judge-preview" },
+        scopes: [SCOPE],
+        authorId: null,
+      });
+
+      const [stored] = await defaults.findForOrganization(ORGANIZATION);
+      expect(saved.config).toEqual({ JUDGE: "langwatch/judge-preview" });
+      expect(stored?.config).toEqual({ JUDGE: "langwatch/judge-preview" });
     });
   });
 
