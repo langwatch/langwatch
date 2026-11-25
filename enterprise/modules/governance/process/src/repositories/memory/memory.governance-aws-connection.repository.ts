@@ -2,10 +2,12 @@
 
 import { randomBytes } from "node:crypto";
 
+import type { AuditLogIntent } from "@langwatch/audit-log-contract";
 import { GovernanceAwsConnectionNotFoundError } from "@langwatch/enterprise-governance-contract";
 import { aesEncryption, type Encryption } from "@langwatch/process-stores";
 import { nowInstant } from "@langwatch/time";
 
+import { stopTimestamp } from "../../features/kill-switch/rules/agent-stop.rules.ts";
 import {
   type GovernanceAwsConnectionRecord,
   GovernanceAwsConnectionRepository,
@@ -24,14 +26,14 @@ type MemoryAwsConnectionRow = {
   createdAt: string;
 };
 
-function recordOf(row: MemoryAwsConnectionRow): GovernanceAwsConnectionRecord {
+function recordOf(row: MemoryAwsConnectionRow, cipher: Encryption): GovernanceAwsConnectionRecord {
   return {
     id: row.id,
     organizationId: row.organizationId,
     name: row.name,
     accessKeyId: row.accessKeyId,
     roleArn: row.roleArn,
-    hasExternalId: row.encryptedExternalId !== null,
+    externalId: row.encryptedExternalId === null ? null : cipher.decrypt(row.encryptedExternalId),
     createdAt: row.createdAt,
   };
 }
@@ -49,9 +51,25 @@ export class MemoryGovernanceAwsConnectionRepository extends GovernanceAwsConnec
     return new MemoryGovernanceAwsConnectionRepository(cipher);
   }
 
-  /** The rows as stored, sealed values included, for a test to read. */
-  storedRows(): MemoryAwsConnectionRow[] {
-    return structuredClone(this.rows);
+  /** The audit intents committed with the writes, as the outbox holds them. */
+  readonly auditIntents: AuditLogIntent[] = [];
+  #auditRefusal: string | null = null;
+
+  /** Test-only levers the repository interface never declares. */
+  readonly testing = {
+    /** The next audit append throws `message`, so its write rolls back as a transaction would. */
+    refuseNextAudit: (message: string): void => {
+      this.#auditRefusal = message;
+    },
+    /** The rows as stored, sealed values included, for a test to read. */
+    storedRows: (): MemoryAwsConnectionRow[] => structuredClone(this.rows),
+  };
+
+  private commitAudit(audit: AuditLogIntent): void {
+    const refusal = this.#auditRefusal;
+    this.#auditRefusal = null;
+    if (refusal) throw new Error(refusal);
+    this.auditIntents.push(audit);
   }
 
   async create(input: {
@@ -62,6 +80,7 @@ export class MemoryGovernanceAwsConnectionRepository extends GovernanceAwsConnec
     secretAccessKey: string | null;
     roleArn: string | null;
     externalId: string | null;
+    audit: AuditLogIntent;
   }): Promise<GovernanceAwsConnectionRecord> {
     const row: MemoryAwsConnectionRow = {
       id: input.id,
@@ -72,10 +91,11 @@ export class MemoryGovernanceAwsConnectionRepository extends GovernanceAwsConnec
         input.secretAccessKey === null ? null : this.cipher.encrypt(input.secretAccessKey),
       roleArn: input.roleArn,
       encryptedExternalId: input.externalId === null ? null : this.cipher.encrypt(input.externalId),
-      createdAt: nowInstant().toString({ fractionalSecondDigits: 3 }),
+      createdAt: stopTimestamp(nowInstant().epochMilliseconds),
     };
+    this.commitAudit(input.audit);
     this.rows.push(row);
-    return recordOf(row);
+    return recordOf(row, this.cipher);
   }
 
   async findAll({
@@ -83,7 +103,9 @@ export class MemoryGovernanceAwsConnectionRepository extends GovernanceAwsConnec
   }: {
     organizationId: string;
   }): Promise<GovernanceAwsConnectionRecord[]> {
-    return this.rows.filter((row) => row.organizationId === organizationId).map(recordOf);
+    return this.rows
+      .filter((row) => row.organizationId === organizationId)
+      .map((row) => recordOf(row, this.cipher));
   }
 
   async findByIds({
@@ -95,7 +117,7 @@ export class MemoryGovernanceAwsConnectionRepository extends GovernanceAwsConnec
   }): Promise<GovernanceAwsConnectionRecord[]> {
     return this.rows
       .filter((row) => row.organizationId === organizationId && ids.includes(row.id))
-      .map(recordOf);
+      .map((row) => recordOf(row, this.cipher));
   }
 
   async getCredentials({
@@ -121,11 +143,23 @@ export class MemoryGovernanceAwsConnectionRepository extends GovernanceAwsConnec
     };
   }
 
-  async delete({ organizationId, id }: { organizationId: string; id: string }): Promise<boolean> {
+  async delete({
+    organizationId,
+    id,
+    audit,
+    whileLocked,
+  }: {
+    organizationId: string;
+    id: string;
+    audit: AuditLogIntent;
+    whileLocked?: () => Promise<void>;
+  }): Promise<boolean> {
+    await whileLocked?.();
     const index = this.rows.findIndex(
       (row) => row.organizationId === organizationId && row.id === id,
     );
     if (index < 0) return false;
+    this.commitAudit(audit);
     this.rows.splice(index, 1);
     return true;
   }

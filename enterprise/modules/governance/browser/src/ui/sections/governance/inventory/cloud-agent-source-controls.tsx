@@ -19,9 +19,8 @@ import { HandledErrorAlert } from "@langwatch/error-views";
 import { Plus, X } from "lucide-react";
 import { useState } from "react";
 
-import { useAwsConnections } from "../../../../features/aws-connection/behavior/use-aws-connections.ts";
-import { AwsConnectionForm } from "../../../../features/aws-connection/ui/sections/aws-connection-form.tsx";
 import { DashboardSelect } from "../../../../features/ingestion-sources/dashboard-select.tsx";
+import { AwsConnectionForm, useAwsConnections } from "../../../../features/kill-switch/index.ts";
 import {
   isAwsRegion,
   isVertexTarget,

@@ -18,8 +18,7 @@ import {
   VStack,
 } from "@langwatch/design-system/primitives";
 import { Select } from "@langwatch/design-system/select";
-import { Switch } from "@langwatch/design-system/switch";
-import { type Ref, type RefObject, useEffect, useMemo, useRef, useState } from "react";
+import { type Ref, type RefObject, useEffect, useRef, useState } from "react";
 
 import {
   buildRetentionMenuItems,
@@ -92,6 +91,7 @@ export function AddOverrideDrawer({
   currentProjectId,
   isPlatformAdmin,
   isEnterprise,
+  billedLocked = false,
   isSaving,
   onSave,
   editTarget,
@@ -105,12 +105,11 @@ export function AddOverrideDrawer({
   /** True for enterprise (and self-hosted, which resolves to enterprise). Paid
    *  non-enterprise orgs get the fixed short menu with no custom field. */
   isEnterprise: boolean;
+  /** The plan bills storage above 90 days and the reader lacks `subscription:manage`. */
+  billedLocked?: boolean;
   isSaving: boolean;
-  onSave: (params: {
-    scopes: ScopeAssignment[];
-    retentionDays: number;
-    applyToExisting: boolean;
-  }) => void;
+  /** Saves the rule only; the page then offers to apply it to stored data. */
+  onSave: (params: { scopes: ScopeAssignment[]; retentionDays: number }) => void;
   /** When set, the drawer edits this existing policy: the scope is locked and
    *  shown read-only, and the retention is prefilled. Absent = add mode. */
   editTarget?: RetentionEditTarget | null;
@@ -125,18 +124,13 @@ export function AddOverrideDrawer({
 }) {
   // The retention menu is plan-gated: paid orgs get a fixed short pair, while
   // enterprise/self-hosted get the full list plus a custom field.
-  const presets = useMemo(() => retentionPresetsForTier(isEnterprise), [isEnterprise]);
+  const presets = retentionPresetsForTier(isEnterprise);
   const defaultPreset = presets[0]?.value ?? CUSTOM_PRESET_VALUE;
 
   const [scopes, setScopes] = useState<ScopeAssignment[]>([]);
   const [preset, setPreset] = useState<string>(defaultPreset);
   const [customAmount, setCustomAmount] = useState<string>("");
   const [customUnit, setCustomUnit] = useState<RetentionUnit>("weeks");
-  // Default OFF: a new/edited policy applies to future ingestion only unless the
-  // user explicitly opts in. Applying to existing data triggers a ClickHouse
-  // ALTER … UPDATE rewrite across all of the scope's parts — an expensive,
-  // hard-to-undo operation — so it must be a deliberate choice, not the default.
-  const [applyToExisting, setApplyToExisting] = useState<boolean>(false);
   const [attempted, setAttempted] = useState(false);
 
   const isEditing = !!editTarget;
@@ -151,17 +145,9 @@ export function AddOverrideDrawer({
   // (enterprise/self-hosted only)]. Paid orgs get neither custom nor
   // keep-forever, so their entire menu is the fixed short pair. Built by a pure
   // helper (unit-tested) so the plan gating doesn't depend on rendering.
-  const presetCollection = useMemo(
-    () =>
-      createListCollection({
-        items: buildRetentionMenuItems({
-          isEnterprise,
-          isPlatformAdmin,
-          legacyDays,
-        }),
-      }),
-    [isEnterprise, isPlatformAdmin, legacyDays],
-  );
+  const presetCollection = createListCollection({
+    items: buildRetentionMenuItems({ isEnterprise, isPlatformAdmin, legacyDays, billedLocked }),
+  });
 
   useEffect(() => {
     if (!open) return;
@@ -178,7 +164,6 @@ export function AddOverrideDrawer({
       setPreset(init.preset);
       setCustomAmount(init.amount);
       setCustomUnit(init.unit);
-      setApplyToExisting(false);
       return;
     }
     // Add mode: default to the current project so the picker opens on the
@@ -191,7 +176,6 @@ export function AddOverrideDrawer({
     setPreset(defaultPreset);
     setCustomAmount("");
     setCustomUnit("weeks");
-    setApplyToExisting(false);
     // Reinit when drawer opens, edit target changes, or plan/admin flags settle.
     // Exclude currentProjectId and available.projects to avoid wiping edits.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -214,7 +198,7 @@ export function AddOverrideDrawer({
       focusFirstProblem({ noScope, preset, refs: { scopeRef, amountRef, presetRef } });
       return;
     }
-    onSave({ scopes, retentionDays: resolvedDays, applyToExisting });
+    onSave({ scopes, retentionDays: resolvedDays });
   };
 
   return (
@@ -300,22 +284,6 @@ export function AddOverrideDrawer({
             </Field.HelperText>
           )}
         </Field.Root>
-
-        <HStack gap={3} align="start">
-          <Switch
-            checked={applyToExisting}
-            onCheckedChange={({ checked }) => setApplyToExisting(checked === true)}
-          />
-          <VStack align="start" gap={0}>
-            <Text fontWeight="600" fontSize="sm">
-              Apply this change to existing data
-            </Text>
-            <Text fontSize="xs" color="fg.muted">
-              Rewrites this project's existing rows so the new retention takes effect immediately,
-              not just for new ingestion.
-            </Text>
-          </VStack>
-        </HStack>
       </VStack>
     </Drawer>
   );

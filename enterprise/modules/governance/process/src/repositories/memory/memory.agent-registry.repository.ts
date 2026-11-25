@@ -2,6 +2,7 @@
 
 import {
   AgentRegistryEntryNotFoundError,
+  agentRegistryEventSchema,
   type AgentRegistryEntry,
   type AgentRegistryEvent,
   type AgentRegistryPosture,
@@ -17,11 +18,38 @@ import {
 } from "../../features/registry/rules/registry-reconcile.rules.ts";
 import {
   AgentRegistryRepository,
+  type RegistryEntryPage,
   type RegistryEntryPosition,
+  type RegistryEventPage,
 } from "../agent-registry.repository.ts";
 
 type MemoryRow = StoredRegistryEntry & { organizationId: string };
-type MemoryEvent = { event: AgentRegistryEvent; deliveryRecordedAt: Instant | null };
+/** A stored row's `type` is a string, as in Postgres: another release may have written it. */
+type StoredEvent = Omit<AgentRegistryEvent, "type"> & { type: string };
+type MemoryEvent = { event: StoredEvent; deliveryRecordedAt: Instant | null };
+
+/** As the Prisma repository: a full page passes on its last row, readable or not. */
+function eventPageOf({
+  held,
+  limit,
+}: {
+  held: readonly MemoryEvent[];
+  limit: number;
+}): RegistryEventPage {
+  const page = held.slice(0, limit);
+  const last = page.at(-1);
+  return {
+    events: readableEventsOf(page),
+    next: page.length === limit && last ? BigInt(last.event.sequence) : null,
+  };
+}
+
+function readableEventsOf(held: readonly MemoryEvent[]): AgentRegistryEvent[] {
+  return held.flatMap(({ event }) => {
+    const parsed = agentRegistryEventSchema.safeParse(event);
+    return parsed.success ? [structuredClone(parsed.data)] : [];
+  });
+}
 
 function epochMsOf(iso: string): number {
   return Temporal.Instant.from(iso).epochMilliseconds;
@@ -143,7 +171,7 @@ export class MemoryAgentRegistryRepository extends AgentRegistryRepository {
     updatedSince?: Instant;
     status?: AgentRegistryStatus;
     posture?: AgentRegistryPosture;
-  }): Promise<{ entries: AgentRegistryEntry[]; hasMore: boolean }> {
+  }): Promise<RegistryEntryPage> {
     const matching = this.entriesOf(organizationId)
       .filter((entry) => !status || entry.status === status)
       .filter((entry) => !posture || entry.posture === posture)
@@ -155,7 +183,13 @@ export class MemoryAgentRegistryRepository extends AgentRegistryRepository {
           !after || byPosition(entry, { ...entry, updated_at: after.updatedAt, id: after.id }) > 0,
       )
       .toSorted(byPosition);
-    return { entries: matching.slice(0, limit), hasMore: matching.length > limit };
+    const entries = matching.slice(0, limit);
+    const last = entries.at(-1);
+    return {
+      entries,
+      hasMore: matching.length > limit,
+      ...(last ? { last: { updatedAt: last.updated_at, id: last.id } } : {}),
+    };
   }
 
   async getEntry({
@@ -170,7 +204,7 @@ export class MemoryAgentRegistryRepository extends AgentRegistryRepository {
     return found;
   }
 
-  async findEventsAfter({
+  async listEventsAfter({
     organizationId,
     after,
     limit,
@@ -178,14 +212,16 @@ export class MemoryAgentRegistryRepository extends AgentRegistryRepository {
     organizationId: string;
     after?: bigint;
     limit: number;
-  }): Promise<AgentRegistryEvent[]> {
-    return this.eventsOf(organizationId)
-      .filter(({ event }) => after === undefined || BigInt(event.sequence) > after)
-      .slice(0, limit)
-      .map(({ event }) => structuredClone(event));
+  }): Promise<RegistryEventPage> {
+    return eventPageOf({
+      held: this.eventsOf(organizationId).filter(
+        ({ event }) => after === undefined || BigInt(event.sequence) > after,
+      ),
+      limit,
+    });
   }
 
-  async findEventsOfEntry({
+  async listEventsOfEntry({
     organizationId,
     entryId,
     after,
@@ -195,12 +231,13 @@ export class MemoryAgentRegistryRepository extends AgentRegistryRepository {
     entryId: string;
     after?: bigint;
     limit: number;
-  }): Promise<AgentRegistryEvent[]> {
-    return this.eventsOf(organizationId)
-      .filter(({ event }) => event.agent_id === entryId)
-      .filter(({ event }) => after === undefined || BigInt(event.sequence) > after)
-      .slice(0, limit)
-      .map(({ event }) => structuredClone(event));
+  }): Promise<RegistryEventPage> {
+    return eventPageOf({
+      held: this.eventsOf(organizationId)
+        .filter(({ event }) => event.agent_id === entryId)
+        .filter(({ event }) => after === undefined || BigInt(event.sequence) > after),
+      limit,
+    });
   }
 
   async findUndeliveredEvents({
@@ -210,10 +247,9 @@ export class MemoryAgentRegistryRepository extends AgentRegistryRepository {
     organizationId: string;
     limit: number;
   }): Promise<AgentRegistryEvent[]> {
-    return this.eventsOf(organizationId)
-      .filter(({ deliveryRecordedAt }) => deliveryRecordedAt === null)
-      .slice(0, limit)
-      .map(({ event }) => structuredClone(event));
+    return readableEventsOf(
+      this.eventsOf(organizationId).filter(({ deliveryRecordedAt }) => deliveryRecordedAt === null),
+    ).slice(0, limit);
   }
 
   async markDeliveryRecorded({
@@ -229,6 +265,18 @@ export class MemoryAgentRegistryRepository extends AgentRegistryRepository {
     for (const held of this.eventsOf(organizationId)) {
       if (ids.has(held.event.id)) held.deliveryRecordedAt = at;
     }
+  }
+
+  async findSourceKeys({
+    organizationId,
+    ids,
+  }: {
+    organizationId: string;
+    ids: readonly string[];
+  }): Promise<{ id: string; sourceKey: string }[]> {
+    return this.rows
+      .filter((row) => row.organizationId === organizationId && ids.includes(row.id))
+      .map((row) => ({ id: row.id, sourceKey: row.sourceKey }));
   }
 
   private entriesOf(organizationId: string): AgentRegistryEntry[] {

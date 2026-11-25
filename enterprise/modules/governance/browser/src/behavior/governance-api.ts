@@ -24,6 +24,13 @@ import type {
   OttlValidationResult,
   QuarantineFillStats,
   TestAgentListingResult,
+  SecurityLakeCallers,
+  SecurityLakeConnectionTest,
+  SecurityLakeConnectionTestRequest,
+  SecurityLakeSource,
+  SecurityLakeSourceCreateRequest,
+  SecurityLakeSourceHealth,
+  SecurityLakeSourceUpdateRequest,
 } from "@langwatch/enterprise-governance-contract";
 import type * as enterpriseGovernanceContractModule from "@langwatch/enterprise-governance-contract";
 
@@ -225,6 +232,42 @@ export type GovernanceApiMap = ContractApiMap<typeof activityMonitorTrpc> &
     };
 
     ingestionSources: {
+      securityLakeCreate: {
+        mutation: {
+          input: { organizationId: string } & SecurityLakeSourceCreateRequest;
+          output: SecurityLakeSource;
+        };
+      };
+      securityLakeUpdate: {
+        mutation: {
+          input: { organizationId: string; id: string } & SecurityLakeSourceUpdateRequest;
+          output: SecurityLakeSource;
+        };
+      };
+      securityLakeGet: {
+        query: {
+          input: { organizationId: string; id: string };
+          output: SecurityLakeSource;
+        };
+      };
+      securityLakeTestConnection: {
+        mutation: {
+          input: { organizationId: string; id: string } & SecurityLakeConnectionTestRequest;
+          output: SecurityLakeConnectionTest;
+        };
+      };
+      securityLakeHealth: {
+        query: {
+          input: { organizationId: string; id: string };
+          output: SecurityLakeSourceHealth;
+        };
+      };
+      securityLakeCallersWithoutTraces: {
+        query: {
+          input: { organizationId: string };
+          output: SecurityLakeCallers;
+        };
+      };
       list: {
         query: {
           input: { organizationId: string };

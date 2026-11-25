@@ -13,7 +13,11 @@ export {
   storageConnectSources,
   type StorageEndpoints,
 } from "./content-security-policy.ts";
-export { SecurityHeaders } from "./security-headers.ts";
+export {
+  SecurityHeaders,
+  servesPlainHttp,
+  type TransportSecurityOptions,
+} from "./security-headers.ts";
 export {
   restSurfaceDefaults,
   trpcSurfaceDefaults,

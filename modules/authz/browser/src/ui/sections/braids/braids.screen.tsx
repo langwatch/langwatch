@@ -15,7 +15,8 @@ import { type ReactNode, useEffect, useState } from "react";
 
 import {
   useBraidActivity,
-  useBraidsPolicy,
+  useBraidsReleased,
+  useBraidsSettings,
   useProjectBraids,
   useRemoveBraid,
 } from "../../../behavior/use-braids.ts";
@@ -27,15 +28,20 @@ import {
   type BraidsPlanState,
   type BraidsSection,
   braidAffordances,
+  braidsPauses,
   braidsPlanState,
+  braidsStatus,
   braidsSectionOf,
+  ORGANIZATION_BRAIDS_HREF,
   projectBraidRows,
 } from "../../../model/braids/braids.ts";
 import { BraidsEnterpriseUpsell } from "../../blocks/braids/braids-enterprise-upsell.tsx";
 import { BraidsHowItWorks } from "../../blocks/braids/braids-how-it-works.tsx";
 import { BraidsTable } from "../../blocks/braids/braids-table.tsx";
 import { RemoveBraidDialog } from "../../blocks/braids/remove-braid-dialog.tsx";
+import { BraidsNotEnabledBanner } from "../../elements/braids-not-enabled-banner.tsx";
 import { BraidsPageLinks } from "../../elements/braids-page-links.tsx";
+import { BraidsPlanPausedBanner } from "../../elements/braids-plan-paused-banner.tsx";
 import { BraidsTitle } from "../../elements/braids-title.tsx";
 import { NO_RULE_UNDER_HEADER } from "../../elements/no-rule-under-header.ts";
 import { SectionErrorNotice } from "../../elements/section-error-notice.tsx";
@@ -157,19 +163,35 @@ function BraidsSectionBand({
   );
 }
 
-function PausedBanner({ total }: { total: number }) {
+/** The organisation has Braids turned off: who can turn it on, and what happened to the braids. */
+function TurnedOffBanner({
+  total,
+  isOrganizationAdmin,
+}: {
+  total: number;
+  isOrganizationAdmin: boolean;
+}) {
+  const kept =
+    total === 0
+      ? "New braids can be made once it is on."
+      : `${total === 1 ? "This project's braid is" : `This project's ${total} braids are`} paused and kept, and start working again when it is on.`;
   return (
     <Banner
-      status="warning"
-      title="Braids are paused"
+      status="info"
+      title="Braids is off for your organisation"
+      data-testid="braids-turned-off"
       action={
-        <BannerAction asChild>
-          <Link href="/settings/plans">See plans</Link>
-        </BannerAction>
+        isOrganizationAdmin ? (
+          <BannerAction asChild>
+            <Link href={ORGANIZATION_BRAIDS_HREF}>Turn on Braids</Link>
+          </BannerAction>
+        ) : undefined
       }
     >
-      Braids need the Enterprise plan. Your {total === 1 ? "braid is" : `${total} braids are`} kept
-      and start working again when you upgrade.
+      {kept}{" "}
+      {isOrganizationAdmin
+        ? "You can turn it on in the organisation's Braids settings."
+        : "Ask an organisation admin to turn it on."}
     </Banner>
   );
 }
@@ -190,20 +212,48 @@ function KeptToAdminsBanner() {
   );
 }
 
-/** Paused and kept-to-admins notices, above the sections. */
+/** Not-enabled, turned-off, paused and kept-to-admins notices, above the sections. */
 function BraidsNotices({
+  released,
+  turnedOff,
+  turnedOn,
   paused,
   total,
   keptToAdmins,
+  isOrganizationAdmin,
 }: {
+  released: boolean;
+  turnedOff: boolean;
+  /** Known on; undefined while the setting is unread. */
+  turnedOn: boolean | undefined;
   paused: boolean;
   total: number;
   keptToAdmins: boolean;
+  isOrganizationAdmin: boolean;
 }) {
-  if (!paused && !keptToAdmins) return null;
+  if (released && !turnedOff && !paused && !keptToAdmins) return null;
   return (
     <Stack gap={4} paddingBottom={4}>
-      {paused ? <PausedBanner total={total} /> : null}
+      {released ? null : (
+        <BraidsNotEnabledBanner
+          removeHere
+          status={braidsStatus({
+            byOrganization: turnedOff,
+            byPlan: paused,
+            settingRead: turnedOn !== undefined,
+          })}
+        />
+      )}
+      {released && turnedOff ? (
+        <TurnedOffBanner total={total} isOrganizationAdmin={isOrganizationAdmin} />
+      ) : null}
+      {paused ? (
+        <BraidsPlanPausedBanner
+          kept={total === 1 ? "Your braid is" : `Your ${total} braids are`}
+          isSingleBraid={total === 1}
+          turnedOn={turnedOn}
+        />
+      ) : null}
       {keptToAdmins ? <KeptToAdminsBanner /> : null}
     </Stack>
   );
@@ -213,10 +263,12 @@ function BraidsNotices({
 function SigningKeysBand({
   projectId,
   planState,
+  canIssue,
   onNewKey,
 }: {
   projectId: string;
   planState: BraidsPlanState;
+  canIssue: boolean;
   onNewKey: (() => void) | undefined;
 }) {
   return (
@@ -233,7 +285,7 @@ function SigningKeysBand({
       }
       data-testid="braids-section-keys"
     >
-      <BraidsSigningKeys projectId={projectId} planState={planState} />
+      <BraidsSigningKeys projectId={projectId} planState={planState} canIssue={canIssue} />
     </SettingsSection>
   );
 }
@@ -261,11 +313,18 @@ export default function BraidsScreen() {
   const host = useAuthzHost();
   const { organizationId, projectId } = host.scope();
   const { isEnterprise, isLoading: isPlanLoading } = host.plan();
+  // Off, the page lists existing braids read-only with Remove (Alex, 2026-11-18).
+  const releasedFlag = useBraidsReleased();
+  const released = releasedFlag === true;
   const braids = useProjectBraids({ projectId });
-  const policy = useBraidsPolicy({ organizationId });
+  const { keptToAdmins, turnedOff, turnedOn } = useBraidsSettings({ organizationId });
   const [removing, setRemoving] = useState<BraidRow | null>(null);
   const removal = useRemoveBraid({ onRemoved: () => setRemoving(null) });
-  const activity = useBraidActivity({ projectId, braids: braids.data });
+  const activity = useBraidActivity({
+    projectId,
+    braids: braids.data,
+    enabled: isEnterprise && released && !turnedOff,
+  });
   const { query } = host.route();
   const openBraid = (braid: string | undefined) =>
     host.setQuery({ ...query, [BRAID_QUERY_KEY]: braid });
@@ -277,7 +336,9 @@ export default function BraidsScreen() {
     document.getElementById(SECTION_ANCHORS[section])?.scrollIntoView({ block: "start" });
   }, [section, loaded]);
 
-  if (!projectId || isPlanLoading || braids.isLoading) return <LoadingBraids />;
+  if (!projectId || isPlanLoading || releasedFlag === undefined || braids.isLoading) {
+    return <LoadingBraids />;
+  }
   if (braids.isError || !braids.data) {
     return (
       <>
@@ -296,7 +357,7 @@ export default function BraidsScreen() {
     isEnterprise,
     braidCount: rows.into.length + rows.from.length,
   });
-  if (planState === "upsell") {
+  if (planState === "upsell" && released) {
     return (
       <>
         <BraidsHeader projectName={projectName} locked />
@@ -307,14 +368,16 @@ export default function BraidsScreen() {
     );
   }
 
-  const keptToAdmins = policy.data?.braidsOrganizationAdminsOnly ?? false;
   const can: BraidAffordances = braidAffordances({
     canManage: host.hasPermission(BRAIDS_MANAGE_PERMISSION),
     planState,
     keptToOrganizationAdmins: keptToAdmins,
+    released,
+    turnedOn: !turnedOff,
   });
-  const paused = planState === "paused";
-  const canManageKeys = planState === "enterprise" && host.hasPermission(BRAIDS_MANAGE_PERMISSION);
+  const pauses = braidsPauses({ planState, turnedOff });
+  const paused = pauses.byPlan;
+  const pausedByOrganization = pauses.byOrganization;
   const seesOrganization = host.hasPermission(AUTHZ_MANAGE_PERMISSION);
   const total = rows.into.length + rows.from.length;
   const table = (side: "into" | "from") => (
@@ -322,7 +385,7 @@ export default function BraidsScreen() {
       side={side}
       projectName={projectName}
       rows={side === "into" ? rows.into : rows.from}
-      paused={paused}
+      paused={paused || pausedByOrganization}
       canEdit={can.canEditInto}
       canRemove={can.canRemove}
       activity={activity}
@@ -350,8 +413,16 @@ export default function BraidsScreen() {
         }
       />
       <Stack gap={0} css={NO_RULE_UNDER_HEADER}>
-        <BraidsNotices paused={paused} total={total} keptToAdmins={can.showKeptToAdminsNote} />
-        {total === 0 ? (
+        <BraidsNotices
+          released={released}
+          turnedOff={pausedByOrganization}
+          turnedOn={turnedOn}
+          paused={paused}
+          total={total}
+          keptToAdmins={can.showKeptToAdminsNote}
+          isOrganizationAdmin={seesOrganization}
+        />
+        {total === 0 && released ? (
           <Box paddingBottom={6}>
             <BraidsHowItWorks projectName={projectName} />
           </Box>
@@ -377,16 +448,18 @@ export default function BraidsScreen() {
             </BraidsSectionBand>
           </>
         )}
+        {/* Off, keys list with Revoke only: a leaked key still verifies (Alex, 2026-11-18). */}
         <SigningKeysBand
           projectId={projectId}
           planState={planState}
+          canIssue={released && !pausedByOrganization}
           onNewKey={
-            canManageKeys
+            can.canCreate
               ? () => host.setQuery({ ...query, [SIGNING_KEY_QUERY_KEY]: "new" })
               : undefined
           }
         />
-        <WhoMayBraidHint keptToAdmins={keptToAdmins} />
+        {released ? <WhoMayBraidHint keptToAdmins={keptToAdmins} /> : null}
       </Stack>
       {dialogOpen ? (
         <BraidDialog

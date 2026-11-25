@@ -16,6 +16,22 @@ import type {
 /** Keyset position in the entry listing: ascending by last material change, then id. */
 export type RegistryEntryPosition = { updatedAt: string; id: string };
 
+/**
+ * `last` is the position of the last row read, readable or not, so a page of entries another
+ * release wrote (an unknown source after a rollback) is skipped rather than read again.
+ */
+export type RegistryEntryPage = {
+  entries: AgentRegistryEntry[];
+  hasMore: boolean;
+  last?: RegistryEntryPosition;
+};
+
+/**
+ * A page of the change feed. A row another release wrote with a type or payload this release
+ * cannot read is left out, and `next` (the last row's sequence, or null at the end) passes it.
+ */
+export type RegistryEventPage = { events: AgentRegistryEvent[]; next: bigint | null };
+
 /** The agent registry and its append-only change feed (specs/agent-registry.feature). */
 export abstract class AgentRegistryRepository {
   /**
@@ -53,21 +69,24 @@ export abstract class AgentRegistryRepository {
     updatedSince?: Instant;
     status?: AgentRegistryStatus;
     posture?: AgentRegistryPosture;
-  }): Promise<{ entries: AgentRegistryEntry[]; hasMore: boolean }>;
+  }): Promise<RegistryEntryPage>;
   /** Throws `agent_registry_entry_not_found` when the organisation holds no such entry. */
   abstract getEntry(input: { organizationId: string; id: string }): Promise<AgentRegistryEntry>;
-  abstract findEventsAfter(input: {
+  abstract listEventsAfter(input: {
     organizationId: string;
     after?: bigint;
     limit: number;
-  }): Promise<AgentRegistryEvent[]>;
-  abstract findEventsOfEntry(input: {
+  }): Promise<RegistryEventPage>;
+  abstract listEventsOfEntry(input: {
     organizationId: string;
     entryId: string;
     after?: bigint;
     limit: number;
-  }): Promise<AgentRegistryEvent[]>;
-  /** Events whose webhook fan-out is not yet recorded, oldest first. */
+  }): Promise<RegistryEventPage>;
+  /**
+   * Events this release can read whose webhook fan-out is not yet recorded, oldest first. Rows it
+   * cannot read are paged past and left undelivered, so they never hold back the rows after them.
+   */
   abstract findUndeliveredEvents(input: {
     organizationId: string;
     limit: number;
@@ -77,4 +96,9 @@ export abstract class AgentRegistryRepository {
     eventIds: readonly string[];
     at: Instant;
   }): Promise<void>;
+  /** Each entry's source key, for the entries of the organisation among `ids`. */
+  abstract findSourceKeys(input: {
+    organizationId: string;
+    ids: readonly string[];
+  }): Promise<{ id: string; sourceKey: string }[]>;
 }

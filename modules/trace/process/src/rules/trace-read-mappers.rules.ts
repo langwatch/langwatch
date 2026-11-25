@@ -139,6 +139,8 @@ export function mapLegacySpanSummaryToTreeNode(row: SpanSummaryRow): SpanTreeNod
     cacheReadTokens: row.cacheReadTokens,
     cacheCreationTokens: row.cacheCreationTokens,
     updatedAtMs: row.updatedAtMs,
+    agentName: row.agentName ?? null,
+    isA2aCall: row.isA2aCall ?? false,
     ...(row.ownerProjectId === undefined ? {} : { ownerProjectId: row.ownerProjectId }),
   };
 }

@@ -1,5 +1,6 @@
 import { randomBytes } from "node:crypto";
 
+import { skipTenantCheck } from "@langwatch/prisma-client";
 import {
   Prisma,
   type PrismaClient,
@@ -50,7 +51,11 @@ import {
   DEFAULT_SUITE_SLUG,
   pickFreeSuiteSlug,
 } from "../../rules/default-suite.rules.ts";
-import { ScenarioRepository, type ScenarioPlanRecord } from "../scenario.repository.ts";
+import {
+  ScenarioRepository,
+  type ScenarioPlanRecord,
+  type TestSuiteCap,
+} from "../scenario.repository.ts";
 
 type ScenarioWriteInput = ScenarioUpdateInput & { actor: ScenarioActor };
 
@@ -62,6 +67,36 @@ function slugify(value: string): string {
       .replace(/[^a-z0-9]+/g, "-")
       .replace(/^-|-$/g, "") || "test-suite"
   );
+}
+
+/** `sourceTemplateId` is storage-only: it marks a template-made row for the Free cap count. */
+function mapScenario(row: PrismaScenario): Scenario {
+  const { sourceTemplateId: _, ...scenario } = row;
+  return scenarioSchema.parse(scenario);
+}
+
+function testSuiteData({
+  input,
+  slug,
+}: {
+  input: ScenarioTestSuiteCreateInput & { id: string };
+  slug: string;
+}) {
+  return {
+    id: input.id,
+    projectId: input.projectId,
+    name: input.name,
+    slug,
+    kind: "test_suite",
+    scenarioIds: [],
+    targets: [],
+    repeatCount: 1,
+    labels: [],
+    fields: input.fields ?? [],
+    evaluators: input.evaluators ?? [],
+    templateId: input.templateId ?? null,
+    templateVersion: input.templateVersion ?? null,
+  };
 }
 
 function mapTestSuite(row: unknown): ScenarioTestSuite {
@@ -115,7 +150,7 @@ export class PrismaScenarioRepository extends ScenarioRepository {
   }
 
   async create(
-    input: ScenarioCreateInput & { id: string; actor: ScenarioActor },
+    input: ScenarioCreateInput & { id: string; actor: ScenarioActor; sourceTemplateId?: string },
   ): Promise<Scenario> {
     return this.database.$transaction(async (transaction) => {
       if (input.testSuiteId) {
@@ -130,7 +165,7 @@ export class PrismaScenarioRepository extends ScenarioRepository {
       const row = await transaction.scenario.create({
         data: { ...scenarioInput, parameters },
       });
-      const scenario = scenarioSchema.parse(row);
+      const scenario = mapScenario(row);
       await transaction.scenarioVersion.create({
         data: {
           scenarioId: scenario.id,
@@ -158,7 +193,7 @@ export class PrismaScenarioRepository extends ScenarioRepository {
       throw new ScenarioNotFoundError(input.id);
     }
 
-    return scenarioSchema.parse(row);
+    return mapScenario(row);
   }
 
   async findByIdIncludingArchived(input: ScenarioIdentity): Promise<Scenario> {
@@ -169,14 +204,14 @@ export class PrismaScenarioRepository extends ScenarioRepository {
       throw new ScenarioNotFoundError(input.id);
     }
 
-    return scenarioSchema.parse(row);
+    return mapScenario(row);
   }
 
   async readByIdIncludingArchived(input: ScenarioIdentity): Promise<ScenarioLookup> {
     const row = await this.database.scenario.findFirst({
       where: scenarioWhere(input, true),
     });
-    return row ? { found: true, scenario: scenarioSchema.parse(row) } : { found: false };
+    return row ? { found: true, scenario: mapScenario(row) } : { found: false };
   }
 
   async findAll(input: { projectId: string }): Promise<Scenario[]> {
@@ -184,7 +219,7 @@ export class PrismaScenarioRepository extends ScenarioRepository {
       where: { ...input, archivedAt: null },
       orderBy: { updatedAt: "desc" },
     });
-    return rows.map((row) => scenarioSchema.parse(row));
+    return rows.map((row) => mapScenario(row));
   }
 
   count(input: { projectId: string }): Promise<number> {
@@ -195,8 +230,73 @@ export class PrismaScenarioRepository extends ScenarioRepository {
 
   async countActiveByProjects(input: { projectIds: string[] }): Promise<number> {
     if (input.projectIds.length === 0) return 0;
-    return this.database.scenario.count({
-      where: { projectId: { in: input.projectIds }, archivedAt: null },
+    const where = { projectId: { in: input.projectIds }, archivedAt: null };
+    const [plain, templateMade] = await Promise.all([
+      this.database.scenario.count({ where: { ...where, sourceTemplateId: null } }),
+      this.database.scenario.findMany({
+        where: { ...where, sourceTemplateId: { not: null } },
+        select: {
+          sourceTemplateId: true,
+          testSuite: { select: { templateId: true, archivedAt: true } },
+        },
+      }),
+    ]);
+    return plain + templateMade.filter((row) => !isInItsTemplateSuite(row)).length;
+  }
+
+  async countActiveTestSuitesByProjects(input: { projectIds: string[] }): Promise<number> {
+    return this.countCappedTestSuites(this.database, input.projectIds);
+  }
+
+  async createCappedTestSuite(
+    input: ScenarioTestSuiteCreateInput & { id: string; cap: TestSuiteCap },
+  ): Promise<{ testSuite: ScenarioTestSuite } | { current: number }> {
+    const { cap, ...suite } = input;
+    const baseSlug = slugify(suite.name);
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      try {
+        return await this.database.$transaction(async (transaction) => {
+          await transaction.$executeRaw` ${skipTenantCheck({
+            // Transaction-scoped advisory lock; the organization is in the lock key.
+            SKIP_TENANT_CHECK: true,
+          })}
+SELECT pg_advisory_xact_lock(hashtextextended(${`scenario-suite-cap:${cap.organizationId}`}, 0))`;
+          const current = await this.countCappedTestSuites(transaction, cap.projectIds);
+          if (current >= cap.max) return { current };
+          const taken = await transaction.simulationSuite.findMany({
+            where: { projectId: suite.projectId, slug: { startsWith: baseSlug } },
+            select: { slug: true },
+          });
+          const slug = pickFreeSuiteSlug({
+            baseSlug,
+            takenSlugs: taken.map((row) => row.slug),
+            randomSuffix: () => randomBytes(3).toString("hex"),
+          });
+          const row = await transaction.simulationSuite.create({
+            data: testSuiteData({ input: suite, slug }),
+          });
+          return { testSuite: mapTestSuite(row) };
+        });
+      } catch (error) {
+        if (!this.isSlugConflict(error)) throw error;
+      }
+    }
+    throw new ScenarioTestSuiteSlugUnavailableError(suite.name);
+  }
+
+  private countCappedTestSuites(
+    database: Prisma.TransactionClient,
+    projectIds: string[],
+  ): Promise<number> {
+    if (projectIds.length === 0) return Promise.resolve(0);
+    return database.simulationSuite.count({
+      where: {
+        projectId: { in: projectIds },
+        kind: "test_suite",
+        archivedAt: null,
+        NOT: { templateId: null, name: { equals: DEFAULT_SUITE_NAME, mode: "insensitive" } },
+        OR: [{ templateId: { not: null } }, { testSuiteScenarios: { some: { archivedAt: null } } }],
+      },
     });
   }
 
@@ -285,7 +385,7 @@ export class PrismaScenarioRepository extends ScenarioRepository {
     return this.database.$transaction(async (transaction) => {
       const found = await this.lockScenario(transaction, input.projectId, input.id);
       if (!found) throw new ScenarioNotFoundError(input.id);
-      if (found.archivedAt) return scenarioSchema.parse(found);
+      if (found.archivedAt) return mapScenario(found);
 
       const testSuites = await this.lockTestSuites(transaction, input.projectId, [
         found.testSuiteId,
@@ -299,7 +399,7 @@ export class PrismaScenarioRepository extends ScenarioRepository {
       if (found.testSuiteId && testSuite?.kind === "test_suite" && testSuite.archivedAt === null) {
         await this.reconcileLockedTestSuite(transaction, input.projectId, found.testSuiteId);
       }
-      return scenarioSchema.parse(row);
+      return mapScenario(row);
     });
   }
 
@@ -433,19 +533,7 @@ export class PrismaScenarioRepository extends ScenarioRepository {
       const slug = suffix === 0 ? baseSlug : `${baseSlug}-${suffix + 1}`;
       try {
         const row = await this.database.simulationSuite.create({
-          data: {
-            id: input.id,
-            projectId: input.projectId,
-            name: input.name,
-            slug,
-            kind: "test_suite",
-            scenarioIds: [],
-            targets: [],
-            repeatCount: 1,
-            labels: [],
-            fields: input.fields ?? [],
-            evaluators: input.evaluators ?? [],
-          },
+          data: testSuiteData({ input, slug }),
         });
         return mapTestSuite(row);
       } catch (error) {
@@ -589,7 +677,7 @@ export class PrismaScenarioRepository extends ScenarioRepository {
       throw new ScenarioNotFoundError(input.id);
     }
 
-    return scenarioSchema.parse(row);
+    return mapScenario(row);
   }
 
   private assertExpectedVersion(input: ScenarioWriteInput, current: Scenario): void {
@@ -653,7 +741,7 @@ export class PrismaScenarioRepository extends ScenarioRepository {
         },
         data,
       });
-      return scenarioSchema.parse(row);
+      return mapScenario(row);
     } catch (error) {
       if (expectedVersion !== void 0 && this.isRecordNotFound(error)) {
         throw new ScenarioStaleVersionError(current.version);
@@ -862,4 +950,16 @@ export class PrismaScenarioRepository extends ScenarioRepository {
   private isRecordNotFound(error: unknown): boolean {
     return error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2025";
   }
+}
+
+/** A template scenario skips the scenario cap only while it sits in its own live template suite. */
+function isInItsTemplateSuite(row: {
+  sourceTemplateId: string | null;
+  testSuite: { templateId: string | null; archivedAt: Date | null } | null;
+}): boolean {
+  return (
+    row.testSuite !== null &&
+    row.testSuite.archivedAt === null &&
+    row.testSuite.templateId === row.sourceTemplateId
+  );
 }

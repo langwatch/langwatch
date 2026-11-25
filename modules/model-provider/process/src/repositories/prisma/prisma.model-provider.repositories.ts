@@ -15,7 +15,7 @@ export class PostgresModelProviderRepositories {
   }: Readonly<{
     prisma: PrismaClient;
     encryption: ModelProviderCredentialCipher;
-  }>): Omit<ModelProviderRepositories, "rateLimits"> {
+  }>): Omit<ModelProviderRepositories, "rateLimits" | "servedModels"> {
     const credentials = PrismaModelProviderCredentialMapper.create({ cipher: encryption });
     return {
       providers: PrismaModelProviderRepository.create(prisma, credentials),

@@ -43,6 +43,8 @@ export * from "./features/cost/coding-assistant-billing.commands.ts";
 export * from "./features/cost/coding-assistant-billing.events.ts";
 export * from "./features/ingestion/ottl.ts";
 export * from "./ocsf-export.ts";
+export * from "./features/ocsf/ocsf-siem.ts";
+export * from "./features/ocsf/security-lake.ts";
 export * from "./features/personal/persona-home.ts";
 export * from "./features/personal/personal-usage.ts";
 export * from "./features/personal/personal-budget-overview.ts";

@@ -1,13 +1,16 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-/** What a read answers about a connection: never the secret access key or the external id. */
+import type { AuditLogIntent } from "@langwatch/audit-log-contract";
+
+/** What a read answers about a connection: never the secret access key. */
 export type GovernanceAwsConnectionRecord = {
   id: string;
   organizationId: string;
   name: string;
   accessKeyId: string | null;
   roleArn: string | null;
-  hasExternalId: boolean;
+  /** Opened from its seal: the role's trust policy names it, so a read shows it. */
+  externalId: string | null;
   createdAt: string;
 };
 
@@ -21,7 +24,8 @@ export type GovernanceAwsCredentials = {
 
 /**
  * The AWS connections a Bedrock kill switch target signs with. The secret access key and the
- * external id are sealed with the process cipher before they reach the store.
+ * external id are sealed with the process cipher before they reach the store. A create or delete
+ * appends its `audit` intent to the kill switch audit outbox in the same commit.
  */
 export abstract class GovernanceAwsConnectionRepository {
   abstract create(input: {
@@ -32,6 +36,7 @@ export abstract class GovernanceAwsConnectionRepository {
     secretAccessKey: string | null;
     roleArn: string | null;
     externalId: string | null;
+    audit: AuditLogIntent;
   }): Promise<GovernanceAwsConnectionRecord>;
   abstract findAll(input: { organizationId: string }): Promise<GovernanceAwsConnectionRecord[]>;
   /** The connections of the organisation among `ids`; another organisation's id is left out. */
@@ -44,6 +49,14 @@ export abstract class GovernanceAwsConnectionRepository {
     organizationId: string;
     id: string;
   }): Promise<GovernanceAwsCredentials>;
-  /** Whether a row was deleted. */
-  abstract delete(input: { organizationId: string; id: string }): Promise<boolean>;
+  /**
+   * Whether a row was deleted; the audit intent is appended only with a deletion. `whileLocked`
+   * runs under `awsConnectionsLockKey` right before the delete; a throw keeps the row.
+   */
+  abstract delete(input: {
+    organizationId: string;
+    id: string;
+    audit: AuditLogIntent;
+    whileLocked?: () => Promise<void>;
+  }): Promise<boolean>;
 }

@@ -74,7 +74,7 @@ export class AgentRegistryReadsService {
     status?: AgentRegistryStatus;
     posture?: AgentRegistryPosture;
   }): Promise<AgentRegistryPage> {
-    const { entries, hasMore } = await this.deps.registry.listEntries({
+    const { entries, hasMore, last } = await this.deps.registry.listEntries({
       organizationId,
       limit,
       ...(cursor ? { after: decodeCursor(cursor) } : {}),
@@ -82,11 +82,9 @@ export class AgentRegistryReadsService {
       ...(status ? { status } : {}),
       ...(posture ? { posture } : {}),
     });
-    const last = entries.at(-1);
     return {
       data: entries,
-      next_cursor:
-        hasMore && last ? encodeCursor({ updatedAt: last.updated_at, id: last.id }) : null,
+      next_cursor: hasMore && last ? encodeCursor(last) : null,
     };
   }
 
@@ -106,16 +104,13 @@ export class AgentRegistryReadsService {
     limit: number;
   }): Promise<AgentRegistryEventPage> {
     await this.deps.registry.getEntry({ organizationId, id });
-    const events = await this.deps.registry.findEventsOfEntry({
+    const { events, next } = await this.deps.registry.listEventsOfEntry({
       organizationId,
       entryId: id,
       ...(cursor ? { after: BigInt(cursor) } : {}),
       limit,
     });
-    return {
-      data: events,
-      next_cursor: events.length === limit ? (events.at(-1)?.sequence ?? null) : null,
-    };
+    return { data: events, next_cursor: next === null ? null : next.toString() };
   }
 
   async listEvents({
@@ -127,15 +122,12 @@ export class AgentRegistryReadsService {
     cursor?: string;
     limit: number;
   }): Promise<AgentRegistryEventPage> {
-    const events = await this.deps.registry.findEventsAfter({
+    const { events, next } = await this.deps.registry.listEventsAfter({
       organizationId,
       ...(cursor ? { after: BigInt(cursor) } : {}),
       limit,
     });
-    return {
-      data: events,
-      next_cursor: events.length === limit ? (events.at(-1)?.sequence ?? null) : null,
-    };
+    return { data: events, next_cursor: next === null ? null : next.toString() };
   }
 
   async ardManifest({ organizationId }: { organizationId: string }): Promise<ArdManifest> {

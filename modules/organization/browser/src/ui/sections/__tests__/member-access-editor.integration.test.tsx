@@ -11,6 +11,7 @@ import type { ReactNode } from "react";
 import type * as reactModule from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { BILLING_ONLY_SEAT } from "../../../model/member-invite-form.ts";
 import { OrganizationUserRole } from "../../../model/prisma-types.ts";
 import type { PendingGrant } from "../group-grant-input-row.tsx";
 import type * as groupGrantInputRowModule from "../group-grant-input-row.tsx";
@@ -117,18 +118,22 @@ vi.mock("../../../behavior/organization-feedback.ts", () => ({
       mockToasterCreate({ title: fallbackTitle, type: "error" }),
 }));
 
-vi.mock("../../elements/organization-user-role-field.tsx", () => ({
+vi.mock("../../elements/organization-user-role-field.tsx", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
   OrganizationUserRoleField: ({
     value,
     onChange,
+    roles,
   }: {
     value: OrganizationUserRole;
     onChange: (role: OrganizationUserRole) => void;
+    roles?: readonly string[];
   }) => (
     <button
       type="button"
       data-testid="org-role-field"
       data-value={value}
+      data-roles={roles?.join(",")}
       onClick={() => onChange(mockNextSeat.current as OrganizationUserRole)}
     >
       Change role
@@ -752,6 +757,63 @@ describe("<MemberAccessEditor/>", () => {
 
       expect(screen.getByText("Data Scientist")).toBeTruthy();
       expect(screen.queryByText("Applies as Viewer while on a Lite Member seat")).toBeNull();
+    });
+  });
+
+  describe("given a Billing-only member", () => {
+    /** @scenario "A role change clears Billing only and the new role is metered" */
+    it("shows Billing only as their seat and says it reaches no team or project", () => {
+      renderEditor({ memberRole: OrganizationUserRole.EXTERNAL, memberBillingOnly: true });
+
+      expect(screen.getByTestId("org-role-field").getAttribute("data-value")).toBe(
+        BILLING_ONLY_SEAT,
+      );
+      expect(screen.getByTestId("org-role-field").getAttribute("data-roles")).toContain(
+        BILLING_ONLY_SEAT,
+      );
+      expect(screen.getByTestId("billing-only-no-access")).toBeTruthy();
+    });
+
+    /** @scenario "A role change clears Billing only and the new role is metered" */
+    it("saves a move to a Lite Member seat as a role change", async () => {
+      renderEditor({ memberRole: OrganizationUserRole.EXTERNAL, memberBillingOnly: true });
+
+      fireEvent.click(screen.getByTestId("org-role-field"));
+      fireEvent.click(screen.getByRole("button", { name: /^save$/i }));
+
+      await vi.waitFor(() => {
+        expect(mockUpdateMemberRole).toHaveBeenCalledWith({
+          organizationId: "org-1",
+          userId: "user-1",
+          role: OrganizationUserRole.EXTERNAL,
+        });
+      });
+    });
+    describe("when the admin stages a grant on a Lite Member seat, then picks Billing only again", () => {
+      /** @scenario "A Billing-only member is given no team, project or personal workspace" */
+      it("drops the staged grant and leaves nothing to save", () => {
+        renderEditor({ memberRole: OrganizationUserRole.EXTERNAL, memberBillingOnly: true });
+
+        fireEvent.click(screen.getByTestId("org-role-field"));
+        fireEvent.click(screen.getByTestId("stub-add-binding"));
+        expect(screen.getByRole("button", { name: /^save$/i })).not.toBeDisabled();
+
+        mockNextSeat.current = BILLING_ONLY_SEAT;
+        fireEvent.click(screen.getByTestId("org-role-field"));
+
+        expect(screen.getByTestId("billing-only-no-access")).toBeTruthy();
+        expect(screen.getByRole("button", { name: /^save$/i })).toBeDisabled();
+      });
+    });
+  });
+
+  describe("given a member who is not Billing only", () => {
+    it("does not offer Billing only as a seat", () => {
+      renderEditor();
+
+      expect(screen.getByTestId("org-role-field").getAttribute("data-roles")).not.toContain(
+        BILLING_ONLY_SEAT,
+      );
     });
   });
 

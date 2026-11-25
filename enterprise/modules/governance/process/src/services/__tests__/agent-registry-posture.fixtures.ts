@@ -162,7 +162,8 @@ export function setup({
   };
 
   const entries = () => registry.findEntries({ organizationId: ORG, limit: 100 });
-  const events = () => registry.findEventsAfter({ organizationId: ORG, limit: 100 });
+  const events = async () =>
+    (await registry.listEventsAfter({ organizationId: ORG, limit: 100 })).events;
   const reconcile = () => service.reconcileOrganization({ organizationId: ORG });
   return {
     service,

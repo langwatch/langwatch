@@ -65,6 +65,6 @@ Anything else ops needs belongs to another module and is reached through its `*A
 
 ## Who depends on ops
 
-[enterprise-ops](../../enterprise/modules/enterprise-ops/README.md) (as a peer).
+[digest](../../enterprise/modules/digest/README.md), [enterprise-ops](../../enterprise/modules/enterprise-ops/README.md) (as a peer).
 
 <!-- readme:generated:end -->

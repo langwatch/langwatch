@@ -9,6 +9,7 @@
 export { AgentCard } from "./agent-card";
 export { AgentFilterBar } from "./agent-filter-bar";
 export { AgentFleetSummaryStrip } from "./agent-fleet-summary-strip";
+export type { AgentRowExtras } from "./agent-row-extras";
 export {
   type AgentsLayout,
   AgentsLayoutControl,

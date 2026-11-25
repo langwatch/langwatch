@@ -24,7 +24,10 @@ function recordingSenders(): {
   const sent: RecordInstallationConnectedCommandData[] = [];
   return {
     sent,
-    senders: { recordInstallationConnected: { send: async (data) => void sent.push(data) } },
+    senders: {
+      recordInstallationConnected: { send: async (data) => void sent.push(data) },
+      recordPullRequestChecksCompleted: { send: async () => undefined },
+    },
   };
 }
 

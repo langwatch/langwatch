@@ -125,6 +125,11 @@ export type NormalizedPullEvent = z.infer<typeof normalizedPullEventSchema>;
 export type PullResult = {
   events: NormalizedPullEvent[];
   /**
+   * Events the adapter wrote to storage itself instead of returning in `events`. Counted with
+   * them, so a source fed this way still reads as receiving events. Optional: absent reads as 0.
+   */
+  writtenCount?: number;
+  /**
    * The cursor to persist. Advanced past everything this run consumed —
    * INCLUDING input it deliberately skipped — or the incoming cursor unchanged
    * when the run made no progress.

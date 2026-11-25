@@ -14,6 +14,8 @@ import {
   gcpVertexAgentEnginePullConfigSchema,
   OPENAI_ADMIN_ADAPTER_ID,
   openaiAdminPullConfigSchema,
+  SECURITY_LAKE_ADAPTER_ID,
+  securityLakePullConfigSchema,
 } from "@langwatch/enterprise-governance-contract";
 import type { z } from "zod";
 
@@ -28,26 +30,41 @@ const PULL_CONFIG_SCHEMAS: ReadonlyMap<string, z.ZodType> = new Map<string, z.Zo
   [DATABRICKS_GENIE_ADAPTER_ID, databricksGeniePullConfigSchema],
   [ANTHROPIC_ADMIN_ADAPTER_ID, anthropicAdminPullConfigSchema],
   [OPENAI_ADMIN_ADAPTER_ID, openaiAdminPullConfigSchema],
+  [SECURITY_LAKE_ADAPTER_ID, securityLakePullConfigSchema],
   [AWS_BEDROCK_AGENTS_ADAPTER_ID, awsBedrockAgentsPullConfigSchema],
   [GCP_VERTEX_AGENT_ENGINE_ADAPTER_ID, gcpVertexAgentEnginePullConfigSchema],
   [ARD_REGISTRY_ADAPTER_ID, ardRegistryPullConfigSchema],
 ]);
 
-type RequiredCredentials = {
-  /** What the form calls the credentials as a whole, and how to ask for all of them at once. */
-  ask: string;
-  fields: readonly (readonly [string, string])[];
+/** A bucket or queue read as the source, never with the worker's own AWS identity. */
+const S3_POLLING_ADAPTER_ID = "s3_polling";
+/** Read by the S3 polling puller too, so it needs the same pair. */
+const OPENAI_COMPLIANCE_ADAPTER_ID = "openai_compliance";
+const S3_PULLER_ADAPTER_IDS: ReadonlySet<string> = new Set([
+  S3_POLLING_ADAPTER_ID,
+  OPENAI_COMPLIANCE_ADAPTER_ID,
+]);
+type RequiredCredentials = { group: string; fields: readonly (readonly [string, string])[] };
+const AWS_KEY_PAIR: RequiredCredentials = {
+  group: "Access keys: enter the access key ID and secret access key together",
+  fields: [
+    ["aws_access_key_id", "access key ID"],
+    ["aws_secret_access_key", "secret access key"],
+  ],
 };
 
 /**
  * The credentials an adapter cannot sign in without, by the form's name for each. The config
  * schemas leave `credentials` out because the stored form is sealed, so this is checked apart.
  */
-const REQUIRED_CREDENTIALS: ReadonlyMap<string, RequiredCredentials> = new Map([
+const REQUIRED_CREDENTIALS: ReadonlyMap<string, RequiredCredentials> = new Map<
+  string,
+  RequiredCredentials
+>([
   [
     COPILOT_STUDIO_DATAVERSE_ADAPTER_ID,
     {
-      ask: "App registration: enter the tenant ID, client ID and client secret together",
+      group: "App registration: enter the tenant ID, client ID and client secret together",
       fields: [
         ["tenantId", "tenant ID"],
         ["clientId", "client ID"],
@@ -58,10 +75,13 @@ const REQUIRED_CREDENTIALS: ReadonlyMap<string, RequiredCredentials> = new Map([
   [
     GCP_VERTEX_AGENT_ENGINE_ADAPTER_ID,
     {
-      ask: "Service account: paste the service account key JSON",
+      group: "Service account: paste the service account key JSON",
       fields: [["serviceAccountJson", "service account key"]],
     },
   ],
+  [SECURITY_LAKE_ADAPTER_ID, AWS_KEY_PAIR],
+  [S3_POLLING_ADAPTER_ID, AWS_KEY_PAIR],
+  [OPENAI_COMPLIANCE_ADAPTER_ID, AWS_KEY_PAIR],
 ]);
 
 /** The form's names for the fields an adapter can refuse, so a refusal points at what to fix. */
@@ -81,6 +101,10 @@ const FIELD_LABELS: Readonly<Record<string, string>> = {
   bucketWidth: "Bucket width",
   startingAt: "Read history from",
   schedule: "Pull schedule",
+  region: "Region",
+  subscriberRoleArn: "Subscriber role ARN",
+  queueUrl: "SQS queue URL",
+  sources: "Sources",
 };
 
 /**
@@ -129,10 +153,12 @@ export function findPullConfigFieldErrors(
 /**
  * What is missing from the credentials a save sends, for an adapter that cannot sign in without
  * them. Read only where the save sends credentials of its own (a create, or an edit replacing
- * them), since an edit that sends none keeps the stored ones.
+ * them), since an edit that sends none keeps the stored ones. With `deploymentAwsIdentity` an S3
+ * polling source that sends no key at all reads as the deployment, so only a half pair is refused.
  */
 export function findPullCredentialComplaints(
   parserConfig: Record<string, unknown> | null | undefined,
+  { deploymentAwsIdentity = false }: { deploymentAwsIdentity?: boolean } = {},
 ): string[] {
   const adapter = parserConfig?.adapter;
   if (typeof adapter !== "string") return [];
@@ -150,8 +176,10 @@ export function findPullCredentialComplaints(
     })
     .map(([, label]) => label);
   if (missing.length === 0) return [];
+  const sentNone = missing.length === required.fields.length;
+  if (deploymentAwsIdentity && S3_PULLER_ADAPTER_IDS.has(adapter) && sentNone) return [];
 
-  return [`${required.ask}; missing ${joinLabels(missing)}.`];
+  return [`${required.group}; missing ${joinLabels(missing)}.`];
 }
 
 function joinLabels(labels: readonly string[]): string {

@@ -82,6 +82,11 @@ export async function cloudWorld() {
       secretAccessKey: "acme-secret-access-key-0001",
       roleArn: null,
       externalId: null,
+      audit: {
+        idempotencyKey: `audit-${organizationId}`,
+        organizationId,
+        action: "governance.agent.aws_connection_created",
+      },
     });
 
   const awsSource = async ({ awsConnectionId }: { awsConnectionId: string }) =>

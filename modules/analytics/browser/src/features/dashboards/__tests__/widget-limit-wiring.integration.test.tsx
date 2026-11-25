@@ -130,7 +130,13 @@ describe("given a limit failure on a stored board's widget while the board is be
           period={PERIOD}
           periodKey="30d:auto"
           isWriting
-          langy={{ ask: vi.fn(), setUp: vi.fn(), setUpMissing: vi.fn() }}
+          langy={{
+            ask: vi.fn(),
+            setUp: vi.fn(),
+            setUpMissing: vi.fn(),
+            askAbout: vi.fn(),
+            act: vi.fn(),
+          }}
           onEdit={vi.fn()}
           onDuplicate={vi.fn()}
           onDelete={vi.fn()}

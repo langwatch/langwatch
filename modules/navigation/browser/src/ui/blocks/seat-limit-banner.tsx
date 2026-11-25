@@ -5,18 +5,20 @@ import { NavigationLink } from "../elements/navigation-link.tsx";
 
 /**
  * Shown on every page while the organization uses more seats than its plan or license
- * includes (specs/licensing/subscription-page.feature, enterprise-lock.feature). A self-hosted
- * install manages its license; Cloud Enterprise contacts sales; other plans compare plans.
+ * includes (specs/licensing/subscription-page.feature, over-plan-trace-withholding.feature).
+ * Self-hosted manages its license, Cloud Enterprise contacts sales, others compare plans.
  */
 export function SeatLimitBanner({
   message,
   isEnterprisePlan,
   isSaaS,
+  isOverPlan = false,
   planManagementHref,
 }: {
   message: string;
   isEnterprisePlan: boolean;
   isSaaS: boolean;
+  isOverPlan?: boolean;
   planManagementHref: string;
 }) {
   if (!isSaaS) {
@@ -33,6 +35,28 @@ export function SeatLimitBanner({
         }
       >
         Add seats to your license to keep everyone.
+      </Banner>
+    );
+  }
+  if (isOverPlan) {
+    return (
+      <Banner
+        status="warning"
+        placement="top"
+        title={message || "Your organization has more members than your plan includes"}
+        data-testid="seat-limit-banner"
+        action={
+          <>
+            <BannerAction asChild>
+              <NavigationLink href={planManagementHref}>Compare plans</NavigationLink>
+            </BannerAction>
+            <BannerAction asChild>
+              <NavigationLink href="/settings/members">Manage members</NavigationLink>
+            </BannerAction>
+          </>
+        }
+      >
+        New traces are saved and will show once you upgrade your plan or remove members.
       </Banner>
     );
   }

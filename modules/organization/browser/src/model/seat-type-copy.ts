@@ -25,5 +25,11 @@ export const SEAT_TYPE_COPY = {
     "They cannot open or be added to any shared project or team, and they are " +
     "never counted against your member seats. Move them to a Member seat if " +
     "they need shared projects.",
+  billingOnlyShortDescription: "Pays for the plan, takes no seat",
+  billingOnlyExplanation:
+    "Billing only is for the person who pays. They can upgrade the plan, update " +
+    "the card, download invoices and approve seat requests. They see no " +
+    "projects, traces or settings, and they never use a seat, on any plan. " +
+    "Give them a seat later from the members list if they need more.",
   seatTypesDocPath: "/ai-governance/roles-and-permissions#seats",
 };

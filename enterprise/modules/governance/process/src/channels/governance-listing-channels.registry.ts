@@ -18,8 +18,10 @@ import { MemoryGenieSpacesChannel } from "./memory/memory.genie-spaces.channel.t
 import { MemoryMicrosoftDirectoryChannel } from "./memory/memory.microsoft-directory.channel.ts";
 import { MemoryObjectStoreChannel } from "./memory/memory.object-store.channel.ts";
 import { MemoryProviderSignInChannel } from "./memory/memory.provider-sign-in.channel.ts";
+import { MemorySecurityLakeQueueChannel } from "./memory/memory.security-lake-queue.channel.ts";
 import { MemoryVertexAgentEngineChannel } from "./memory/memory.vertex-agent-engine.channel.ts";
 import { S3ObjectStoreChannel } from "./s3/s3.object-store.channel.ts";
+import { SqsSecurityLakeQueueChannel } from "./sqs/sqs.security-lake-queue.channel.ts";
 
 /** Who and what a provider lists, one per subject, and the source buckets its pullers read. */
 export const governanceListingChannels = {
@@ -34,6 +36,7 @@ export const governanceListingChannels = {
     objectStore: S3ObjectStoreChannel,
     providerSignIn: HttpProviderSignInChannel,
     vertexAgentEngine: HttpVertexAgentEngineChannel,
+    securityLakeQueue: SqsSecurityLakeQueueChannel,
   },
   memory: {
     adminApiUsers: MemoryAdminApiUsersChannel,
@@ -46,5 +49,6 @@ export const governanceListingChannels = {
     objectStore: MemoryObjectStoreChannel,
     providerSignIn: MemoryProviderSignInChannel,
     vertexAgentEngine: MemoryVertexAgentEngineChannel,
+    securityLakeQueue: MemorySecurityLakeQueueChannel,
   },
 };

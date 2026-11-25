@@ -1,5 +1,11 @@
 /** Spec: enterprise/modules/governance/specs/agent-registry.feature */
 import type { Agent, AgentApi } from "@langwatch/agent-contract";
+import type {
+  AgentRegistryEventPage,
+  AgentRegistryEventType,
+  AgentStopView,
+} from "@langwatch/enterprise-governance-contract";
+import { InMemoryProcessStore } from "@langwatch/eventing";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { createTestLogger } from "@langwatch/test-harness";
@@ -9,9 +15,12 @@ import type { TraceApi, TraceAgentSeen } from "@langwatch/trace-contract";
 import type { WebhookApi, WebhookEndpointView } from "@langwatch/webhook-contract";
 import { describe, expect, it, vi } from "vitest";
 
-import type {
-  AgentRegistryAlertIntent,
-  AgentRegistryDeliveryIntent,
+import { OutboxAgentRegistryDelivery } from "../../features/registry/eventing/agent-registry-delivery.intent.ts";
+import {
+  AGENT_REGISTRY_DELIVERY_PROCESS_KEY,
+  AGENT_REGISTRY_DELIVERY_PROCESS_NAME,
+  type AgentRegistryAlertIntent,
+  type AgentRegistryDeliveryIntent,
 } from "../../features/registry/eventing/agent-registry-delivery.process.ts";
 import { AgentRegistryReadsService } from "../../features/registry/services/agent-registry-reads.service.ts";
 import {
@@ -89,6 +98,7 @@ function setup({
   organizationIds = [ORG],
   enterpriseOrganizationIds = organizationIds,
   now = () => NOW,
+  deliveryOutbox,
 }: {
   agents?: Agent[];
   endpoints?: WebhookEndpointView[];
@@ -96,6 +106,8 @@ function setup({
   organizationIds?: string[];
   enterpriseOrganizationIds?: string[];
   now?: () => Instant;
+  /** Replaces the recording outbox; `null` stands for the api, where no outbox runs. */
+  deliveryOutbox?: AgentRegistryDeliveryOutbox | null;
 } = {}) {
   const state: {
     agents: Agent[];
@@ -155,7 +167,7 @@ function setup({
     entitlements: {
       hasEnterprisePlan: async (organizationId) => state.enterprise.has(organizationId),
     },
-    outbox: () => outbox,
+    outbox: () => (deliveryOutbox === undefined ? outbox : (deliveryOutbox ?? undefined)),
     publicBaseUrl: "https://app.langwatch.test",
     logger: createTestLogger().logger,
     now,
@@ -200,7 +212,9 @@ describe("AgentRegistryService", () => {
 
       await service.reconcileOrganization({ organizationId: ORG });
 
-      const [event] = await registry.findEventsAfter({ organizationId: ORG, limit: 10 });
+      const {
+        events: [event],
+      } = await registry.listEventsAfter({ organizationId: ORG, limit: 10 });
       expect(event?.type).toBe("governance.agent.registered");
       expect(outbox.intents.map((intent) => [intent.endpointId, intent.eventId])).toEqual([
         ["hook-governance", event?.id],
@@ -423,7 +437,7 @@ describe("AgentRegistryService", () => {
       release();
       await stale;
 
-      const feed = await registry.findEventsAfter({ organizationId: ORG, limit: 10 });
+      const { events: feed } = await registry.listEventsAfter({ organizationId: ORG, limit: 10 });
       expect(feed.map((event) => event.type)).toEqual(["governance.agent.registered"]);
       const [entry] = await registry.findEntries({ organizationId: ORG, limit: 10 });
       expect(entry?.status).toBe("active");
@@ -490,12 +504,232 @@ describe("AgentRegistryService", () => {
 
       await service.seedAll({});
 
-      const feed = await registry.findEventsAfter({ organizationId: ORG, limit: 10 });
+      const { events: feed } = await registry.listEventsAfter({ organizationId: ORG, limit: 10 });
       expect(feed.map((event) => event.type)).toEqual(["governance.agent.registered"]);
       expect(outbox.intents).toEqual([]);
       await expect(
         registry.findUndeliveredEvents({ organizationId: ORG, limit: 10 }),
       ).resolves.toEqual([]);
+    });
+  });
+
+  describe("when a stop's milestones are announced", () => {
+    function stopOf(agentId: string, status: AgentStopView["status"]): AgentStopView {
+      return {
+        id: "agentstop-1",
+        agentId,
+        agentName: "Field agent",
+        status,
+        severity: "high",
+        approval: "required",
+        trigger: "user",
+        reason: "leaking prices",
+        requestedBy: { userId: "user-ops", apiKeyId: null },
+        decidedByUserId: null,
+        restoredByUserId: null,
+        targets: [],
+        requestedAt: "2026-11-12T00:00:00.000Z",
+        decidedAt: null,
+        quarantinedAt: null,
+        restoreRequestedAt: null,
+        restoredAt: null,
+      };
+    }
+
+    /** When the milestone was reached, a minute before the announce runs at `NOW`. */
+    const MILESTONE_AT = Date.parse("2026-11-11T23:59:00.000Z");
+
+    const MILESTONES = [
+      ["governance.agent.stop_requested", "pending_approval"],
+      ["governance.agent.quarantined", "quarantined"],
+      ["governance.agent.restored", "restored"],
+    ] as const;
+
+    /** @scenario A kill switch milestone is pushed to each subscribed webhook and written to no registry feed */
+    it("records one intent per milestone and subscribed endpoint and appends no feed event", async () => {
+      const { service, registry, outbox } = setup({
+        endpoints: [
+          endpoint("hook-governance", ["governance.agent.*"]),
+          endpoint("hook-quarantine", ["governance.agent.quarantined"]),
+          endpoint("hook-gateway", ["gateway.*"]),
+        ],
+      });
+      await service.reconcileOrganization({ organizationId: ORG });
+      const [entry] = await registry.findEntries({ organizationId: ORG, limit: 1 });
+      if (!entry) throw new Error("no registry entry");
+
+      for (const [milestone, status] of MILESTONES) {
+        await service.announceStop({
+          organizationId: ORG,
+          eventId: `agentstop-1_${milestone}`,
+          milestone,
+          occurredAt: MILESTONE_AT,
+          stop: stopOf(entry.id, status),
+        });
+      }
+
+      expect(outbox.intents.map((intent) => [intent.endpointId, intent.eventType])).toEqual([
+        ["hook-governance", "governance.agent.stop_requested"],
+        ["hook-governance", "governance.agent.quarantined"],
+        ["hook-quarantine", "governance.agent.quarantined"],
+        ["hook-governance", "governance.agent.restored"],
+      ]);
+      const [body] = outbox.intents.map((intent) => intent.body);
+      expect(body).toMatchObject({
+        id: "agentstop-1_governance.agent.stop_requested",
+        type: "governance.agent.stop_requested",
+        agent_id: entry.id,
+        agent: { id: entry.id },
+        stop: { id: "agentstop-1", status: "pending_approval" },
+        occurred_at: "2026-11-11T23:59:00.000Z",
+      });
+      expect(body).not.toHaveProperty("sequence");
+      const feed = await registry.listEventsAfter({ organizationId: ORG, limit: 100 });
+      const versions = await registry.listEventsOfEntry({
+        organizationId: ORG,
+        entryId: entry.id,
+        limit: 100,
+      });
+      expect(feed.events.map((event) => event.type)).toEqual(["governance.agent.registered"]);
+      expect(versions.events.map((event) => event.type)).toEqual(["governance.agent.registered"]);
+      await expect(
+        registry.findUndeliveredEvents({ organizationId: ORG, limit: 10 }),
+      ).resolves.toEqual([]);
+    });
+
+    /** @scenario A redelivered kill switch milestone is pushed once */
+    it("keeps one outbox intent per endpoint however often the milestone is announced", async () => {
+      const processStore = InMemoryProcessStore.createForTesting();
+      const { service, registry } = setup({
+        deliveryOutbox: OutboxAgentRegistryDelivery.create(processStore),
+      });
+      await service.reconcileOrganization({ organizationId: ORG });
+      const [entry] = await registry.findEntries({ organizationId: ORG, limit: 1 });
+      if (!entry) throw new Error("no registry entry");
+      const announce = () =>
+        service.announceStop({
+          organizationId: ORG,
+          eventId: "agentstop-1_quarantined_0",
+          milestone: "governance.agent.quarantined",
+          occurredAt: MILESTONE_AT,
+          stop: stopOf(entry.id, "quarantined"),
+        });
+
+      await Promise.all([announce(), announce()]);
+      await announce();
+
+      const messages = await processStore.findMessagesByRef({
+        ref: {
+          processName: AGENT_REGISTRY_DELIVERY_PROCESS_NAME,
+          projectId: ORG,
+          processKey: AGENT_REGISTRY_DELIVERY_PROCESS_KEY,
+        },
+      });
+      expect(messages.map((message) => message.messageKey)).toEqual([
+        "agent-registry:agentstop-1_quarantined_0:hook-governance",
+      ]);
+    });
+
+    /** @scenario A redelivered kill switch milestone is pushed once */
+    it("stamps the moment the milestone was reached, so a later redelivery carries it too", async () => {
+      let now = NOW;
+      const { service, registry } = setup({ now: () => now });
+      await service.reconcileOrganization({ organizationId: ORG });
+      const [entry] = await registry.findEntries({ organizationId: ORG, limit: 1 });
+      if (!entry) throw new Error("no registry entry");
+      const announce = () =>
+        service.announceStop({
+          organizationId: ORG,
+          eventId: "agentstop-1_quarantined_0",
+          milestone: "governance.agent.quarantined",
+          occurredAt: MILESTONE_AT,
+          stop: stopOf(entry.id, "quarantined"),
+        });
+
+      const first = await announce();
+      now = now.add({ minutes: 5 });
+      const redelivered = await announce();
+
+      expect(first.occurred_at).toBe("2026-11-11T23:59:00.000Z");
+      expect(redelivered.occurred_at).toBe(first.occurred_at);
+    });
+
+    /** @scenario A redelivered kill switch milestone is pushed once */
+    it("refuses where no outbox runs, so the announcement is retried rather than lost", async () => {
+      const { service, registry } = setup({ deliveryOutbox: null });
+      await service.reconcileOrganization({ organizationId: ORG });
+      const [entry] = await registry.findEntries({ organizationId: ORG, limit: 1 });
+      if (!entry) throw new Error("no registry entry");
+
+      await expect(
+        service.announceStop({
+          organizationId: ORG,
+          eventId: "agentstop-1_quarantined_0",
+          milestone: "governance.agent.quarantined",
+          occurredAt: MILESTONE_AT,
+          stop: stopOf(entry.id, "quarantined"),
+        }),
+      ).rejects.toThrow(/outbox/);
+    });
+  });
+
+  describe("when another release wrote an event of a type this release does not know", () => {
+    /** Every event a reader pages through, one page at a time, as `sequence:type`. */
+    async function readToEnd(
+      read: (cursor: string | undefined) => Promise<AgentRegistryEventPage>,
+    ): Promise<string[]> {
+      const seen: string[] = [];
+      let cursor: string | undefined;
+      for (let page = 0; page < 10; page++) {
+        const { data, next_cursor } = await read(cursor);
+        seen.push(...data.map((event) => `${event.sequence}:${event.type}`));
+        if (next_cursor === null) return seen;
+        cursor = next_cursor;
+      }
+      throw new Error("the feed did not reach its end");
+    }
+
+    /** @scenario An event another release wrote with a type this release does not know is left out of the feed and versions */
+    it("leaves it out of the feed, the versions and the push, and pages past it", async () => {
+      const { service, reads, registry, outbox, state } = setup();
+      await service.reconcileOrganization({ organizationId: ORG });
+      const [entry] = await registry.findEntries({ organizationId: ORG, limit: 1 });
+      if (!entry) throw new Error("no registry entry");
+      await registry.applyChanges({
+        organizationId: ORG,
+        baselineAt: NOW,
+        // Another release wrote it: its event type union held this one, so the cast stands for it.
+        plan: () => ({
+          writes: [],
+          events: [
+            {
+              id: "foreign-1",
+              type: "governance.agent.a_later_release_type" as AgentRegistryEventType,
+              entryId: entry.id,
+              fromVersion: null,
+              toVersion: null,
+              tool: null,
+              occurredAt: NOW,
+              agent: entry,
+            },
+          ],
+        }),
+      });
+      state.agents = [...state.agents, connectedAgent("agent-2", "Desk agent")];
+      await service.reconcileOrganization({ organizationId: ORG });
+
+      const feed = await readToEnd((cursor) =>
+        reads.listEvents({ organizationId: ORG, limit: 1, cursor }),
+      );
+      const versions = await readToEnd((cursor) =>
+        reads.listVersions({ organizationId: ORG, id: entry.id, limit: 1, cursor }),
+      );
+
+      expect(feed).toEqual(["1:governance.agent.registered", "3:governance.agent.registered"]);
+      expect(versions).toEqual(["1:governance.agent.registered"]);
+      expect(outbox.intents.map((intent) => intent.eventType)).toEqual([
+        "governance.agent.registered",
+      ]);
     });
   });
 });

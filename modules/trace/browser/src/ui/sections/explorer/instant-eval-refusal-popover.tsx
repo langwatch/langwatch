@@ -262,7 +262,7 @@ function refusalCopyFor(
   }
   return {
     title: "Instant Evals aren't enabled for this project yet",
-    body: `${powerful} Contact us so we can activate Evals Preview, our hosted model, for you.`,
+    body: `${powerful} Contact us so we can activate LangWatch Instant (preview), our hosted model, for you.`,
     action: { label: "Contact us", href: CONTACT_US_HREF },
     ownModel: OWN_MODEL_LINK,
     dismiss: "Not now",

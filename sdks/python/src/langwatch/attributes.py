@@ -68,7 +68,7 @@ class AttributeKey:
     LangWatchMetrics = "langwatch.metrics"
     LangWatchCustomerId = "langwatch.customer.id"
     LangWatchThreadId = "langwatch.thread.id"
-    LangWatchSessionId = "langwatch.session.id"  # We use thread_id for session_id
+    LangWatchSessionId = "langwatch.session.id"  # Groups a coding agent's runs into one session
     LangWatchEventEvaluationCustom = "langwatch.evaluation.custom"
     LangWatchEventEvaluationLog = "langwatch.evaluation.log"
 
