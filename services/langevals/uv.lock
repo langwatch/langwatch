@@ -68,7 +68,7 @@ overrides = [
     { name = "setuptools", specifier = ">=84.1.0" },
     { name = "strawberry-graphql", specifier = ">=0.327.2" },
     { name = "torch", specifier = ">=2.13.0" },
-    { name = "tornado", specifier = ">=6.6" },
+    { name = "tornado", specifier = ">=6.6.1" },
     { name = "urllib3", specifier = ">=2.8.0" },
 ]
 
