@@ -7,16 +7,24 @@ import { describe, expect, it } from "vitest";
 import {
   MODEL_LISTING_MAX_CHARACTERS,
   MODEL_LISTING_MAX_MODELS,
-  listedModelsFromListing,
-  listedModelsFromListingText,
+  readModelListing,
+  readModelListingText,
 } from "../model-listing.rules.ts";
 
-describe("listedModelsFromListing", () => {
+const NOT_A_LISTING = { kind: "not-a-listing" };
+
+function listedModels(body: unknown) {
+  const read = readModelListing(body);
+  if (read.kind !== "listing") throw new Error("expected a listing");
+  return read.models;
+}
+
+describe("readModelListing", () => {
   describe("given an OpenAI-shaped listing", () => {
     /** @scenario Listing entries become importable models */
     it("yields the listed ids in order", () => {
       expect(
-        listedModelsFromListing({
+        listedModels({
           object: "list",
           data: [
             { id: "model-a", object: "model" },
@@ -28,7 +36,7 @@ describe("listedModelsFromListing", () => {
 
     it("skips entries without a usable id and duplicates", () => {
       expect(
-        listedModelsFromListing({
+        listedModels({
           data: [
             { id: "model-a" },
             { id: "" },
@@ -43,7 +51,7 @@ describe("listedModelsFromListing", () => {
     });
 
     it("reads a Gemini-shaped listing by name", () => {
-      expect(listedModelsFromListing({ models: [{ name: "models/gemini-3-pro" }] })).toEqual([
+      expect(listedModels({ models: [{ name: "models/gemini-3-pro" }] })).toEqual([
         { id: "gemini-3-pro" },
       ]);
     });
@@ -53,7 +61,7 @@ describe("listedModelsFromListing", () => {
     /** @scenario Listing metadata is read only when the entry states it */
     it("reads max tokens, reasoning and the embeddings marker", () => {
       expect(
-        listedModelsFromListing({
+        listedModels({
           data: [
             {
               id: "reasoner",
@@ -79,7 +87,7 @@ describe("listedModelsFromListing", () => {
 
     it("reads reasoning from supported parameters, never from an empty efforts list", () => {
       expect(
-        listedModelsFromListing({
+        listedModels({
           data: [
             { id: "with", supported_parameters: ["temperature", "reasoning"] },
             { id: "without", supported_parameters: ["temperature"] },
@@ -93,14 +101,14 @@ describe("listedModelsFromListing", () => {
   describe("given a body that is not a listing", () => {
     /** @scenario A body that is not a model listing yields no listing */
     it("yields no listing", () => {
-      expect(listedModelsFromListingText("<html>nope</html>")).toBeNull();
-      expect(listedModelsFromListingText('{"error": "nope"}')).toBeNull();
-      expect(listedModelsFromListingText("[]")).toBeNull();
-      expect(listedModelsFromListing(null)).toBeNull();
+      expect(readModelListingText("<html>nope</html>")).toEqual(NOT_A_LISTING);
+      expect(readModelListingText('{"error": "nope"}')).toEqual(NOT_A_LISTING);
+      expect(readModelListingText("[]")).toEqual(NOT_A_LISTING);
+      expect(readModelListing(null)).toEqual(NOT_A_LISTING);
     });
 
     it("yields an empty listing for an empty data array", () => {
-      expect(listedModelsFromListingText('{"data": []}')).toEqual([]);
+      expect(readModelListingText('{"data": []}')).toEqual({ kind: "listing", models: [] });
     });
   });
 
@@ -110,14 +118,14 @@ describe("listedModelsFromListing", () => {
       const oversized = JSON.stringify({
         data: [{ id: "a", padding: "x".repeat(MODEL_LISTING_MAX_CHARACTERS) }],
       });
-      expect(listedModelsFromListingText(oversized)).toBeNull();
+      expect(readModelListingText(oversized)).toEqual(NOT_A_LISTING);
 
       const data = Array.from({ length: MODEL_LISTING_MAX_MODELS + 10 }, (_, index) => ({
         id: `m-${index}`,
       }));
-      const models = listedModelsFromListing({ data });
+      const models = listedModels({ data });
       expect(models).toHaveLength(MODEL_LISTING_MAX_MODELS);
-      expect(models?.at(-1)?.id).toBe(`m-${MODEL_LISTING_MAX_MODELS - 1}`);
+      expect(models.at(-1)?.id).toBe(`m-${MODEL_LISTING_MAX_MODELS - 1}`);
     });
   });
 });

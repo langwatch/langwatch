@@ -11,7 +11,7 @@ type RegistryModelsModalProps = {
   open: boolean;
   onClose: () => void;
   provider: string;
-  /** The provider's own models, listed instead of the catalogue: a custom provider serves only these. */
+  /** The provider's own models in place of the catalogue: a custom provider serves only these. */
   providerModels?: CustomModelEntry[];
   /** `card` keeps the card ground the onboarding page gives its dialogs. */
   ground?: "card";

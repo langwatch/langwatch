@@ -3,31 +3,28 @@
  * "See all models" on a custom provider lists the provider's own models.
  * @see specs/model-providers/custom-provider-model-import.feature
  */
-import type { ModelProviderEditorValue } from "@langwatch/model-provider-contract";
 import { cleanup, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import type {
-  UseModelProviderFormActions,
-  UseModelProviderFormState,
-} from "../../../behavior/use-model-provider-form.ts";
 import { renderWithModelProviderHost } from "../../../testing.tsx";
 import { CustomModelInputSection } from "../model-provider-custom-model-input.tsx";
 
 const state = {
-  customModels: [{ modelId: "model-a", displayName: "Model A", mode: "chat" }],
-  customEmbeddingsModels: [{ modelId: "embed-a", displayName: "Embed A", mode: "embedding" }],
-} as unknown as UseModelProviderFormState;
+  customModels: [{ modelId: "model-a", displayName: "Model A", mode: "chat" as const }],
+  customEmbeddingsModels: [
+    { modelId: "embed-a", displayName: "Embed A", mode: "embedding" as const },
+  ],
+};
 
 const actions = {
   addCustomModel: vi.fn(),
   removeCustomModel: vi.fn(),
   addCustomEmbeddingsModel: vi.fn(),
   removeCustomEmbeddingsModel: vi.fn(),
-} as unknown as UseModelProviderFormActions;
+};
 
-const provider = { provider: "custom", enabled: true } as unknown as ModelProviderEditorValue;
+const provider = { provider: "custom" };
 
 describe("CustomModelInputSection", () => {
   afterEach(() => cleanup());

@@ -7,7 +7,11 @@
 import http from "node:http";
 import type { AddressInfo } from "node:net";
 
-import { MASKED_KEY_PLACEHOLDER, type Model } from "@langwatch/model-provider-contract";
+import {
+  MASKED_KEY_PLACEHOLDER,
+  ModelProviderTestRateLimitedError,
+  type Model,
+} from "@langwatch/model-provider-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
@@ -335,7 +339,7 @@ describe.skipIf(!DB_URL)(
           for (let attempt = 0; attempt < 100; attempt++) {
             await limiter.assertAvailable({ organizationId: fixture.organizationId });
           }
-        }).rejects.toThrow();
+        }).rejects.toThrow(ModelProviderTestRateLimitedError);
 
         const saved = await save({ customModels: [manual] });
 

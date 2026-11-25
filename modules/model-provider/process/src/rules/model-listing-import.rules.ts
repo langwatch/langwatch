@@ -58,7 +58,7 @@ export function mergeListedModels({
     }
   }
 
-  // Listings come in no useful order, so new entries are sorted by id to keep a long list scannable.
+  // Listings come in no useful order, so new entries are sorted by id to keep long lists scannable.
   return {
     customModels: [...customModels, ...sortById(addedChat)],
     customEmbeddingsModels: [...customEmbeddingsModels, ...sortById(addedEmbeddings)],

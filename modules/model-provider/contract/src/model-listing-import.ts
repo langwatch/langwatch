@@ -1,6 +1,7 @@
 /**
  * Which saves import models from a provider's own `/v1/models` listing, shared by the save and
- * the drawer that keeps Save enabled for them. Spec: specs/model-providers/custom-provider-model-import.feature
+ * the drawer that keeps Save enabled for them.
+ * Spec: specs/model-providers/custom-provider-model-import.feature
  */
 import type { Named } from "@langwatch/module";
 import { z } from "zod";
@@ -21,14 +22,15 @@ const modelImportOutcomeSchemaDefinition = z.discriminatedUnion("status", [
 export interface ModelImportOutcomeSchema extends Named<
   typeof modelImportOutcomeSchemaDefinition
 > {}
-/** What a save did with the provider's model listing; absent when the provider has none to import. */
+/** What a save did with the provider's model listing; absent when there is nothing to import. */
 export const modelImportOutcomeSchema: ModelImportOutcomeSchema =
   modelImportOutcomeSchemaDefinition;
 export type ModelImportOutcome = z.infer<typeof modelImportOutcomeSchema>;
 
 /**
  * Whether saving this provider imports from its model listing: every custom provider, and an
- * OpenAI provider on a base URL other than OpenAI's own. OpenAI itself takes its models from the catalogue.
+ * OpenAI provider on a base URL other than OpenAI's own. OpenAI itself takes its models from the
+ * catalogue.
  */
 export function importsModelListing({
   provider,
@@ -47,7 +49,7 @@ export function isSameEndpoint(a: string, b: string): boolean {
   return apiRoot(a) === apiRoot(b);
 }
 
-/** Scheme and host compare case-insensitively; the path keeps its case, a server may route on it. */
+/** Scheme and host compare case-insensitively; the path keeps its case, servers may route on it. */
 function apiRoot(url: string): string {
   const trimmed = url.trim();
   const parts = /^([a-z][a-z0-9+.-]*:\/\/)([^/?#]*)([^?#]*)/i.exec(trimmed);

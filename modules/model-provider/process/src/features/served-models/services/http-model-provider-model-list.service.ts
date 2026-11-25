@@ -5,8 +5,8 @@ import {
 
 import {
   type ListedModel,
-  listedModelsFromListing,
-  listedModelsFromListingText,
+  readModelListing,
+  readModelListingText,
 } from "../../../rules/model-listing.rules.ts";
 import {
   type AuthStrategy,
@@ -60,7 +60,8 @@ const asString = (value: unknown): string => (typeof value === "string" ? value.
 
 /** The ids in a models answer: OpenAI and Anthropic say `data[].id`, Gemini `models[].name`. */
 export function modelIdsFromListing(body: unknown): string[] {
-  return (listedModelsFromListing(body) ?? []).map((model) => model.id);
+  const read = readModelListing(body);
+  return read.kind === "listing" ? read.models.map((model) => model.id) : [];
 }
 
 type ListingTarget =
@@ -166,7 +167,8 @@ export class HttpModelProviderModelListService extends ModelProviderModelList {
         signal: deadline,
       });
       if (!response.ok) return null;
-      return listedModelsFromListingText(await response.text());
+      const read = readModelListingText(await response.text());
+      return read.kind === "listing" ? read.models : null;
     } catch {
       return null;
     }

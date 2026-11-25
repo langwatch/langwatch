@@ -89,7 +89,7 @@ export interface ModelProviderSchema extends Named<typeof modelProviderSchemaDef
 export const modelProviderSchema: ModelProviderSchema = modelProviderSchemaDefinition;
 export type ModelProvider = z.infer<typeof modelProviderSchema>;
 
-/** A save's answer: the stored row, and what the save imported from the provider's model listing. */
+/** A save's answer: the stored row, and what it imported from the provider's model listing. */
 export type ModelProviderSave = ModelProvider & { modelImport?: ModelImportOutcome };
 
 const modelProviderSummarySchemaDefinition = modelProviderSchema

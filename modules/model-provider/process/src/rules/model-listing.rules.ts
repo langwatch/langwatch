@@ -43,62 +43,77 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
 
 const asString = (value: unknown): string => (typeof value === "string" ? value.trim() : "");
 
-/** OpenAI and Anthropic answer `data[]`, Gemini `models[]`; null when the body is neither. */
-function entriesOf(body: unknown): unknown[] | null {
-  if (!isRecord(body)) return null;
-  if (Array.isArray(body.data)) return body.data;
-  return Array.isArray(body.models) ? body.models : null;
+/** What reading a body found: a listing (maybe with no usable entries), or no listing at all. */
+export type ModelListingRead =
+  | { kind: "listing"; models: ListedModel[] }
+  | { kind: "not-a-listing" };
+
+const NOT_A_LISTING: ModelListingRead = { kind: "not-a-listing" };
+
+type ListingEntries = { kind: "entries"; entries: unknown[] } | { kind: "not-a-listing" };
+
+/** OpenAI and Anthropic answer `data[]`, Gemini `models[]`. */
+function readListingEntries(body: unknown): ListingEntries {
+  if (isRecord(body) && Array.isArray(body.data)) return { kind: "entries", entries: body.data };
+  if (isRecord(body) && Array.isArray(body.models)) {
+    return { kind: "entries", entries: body.models };
+  }
+  return { kind: "not-a-listing" };
 }
 
-/**
- * The models in a listing body, in order, deduplicated and capped. Null means the body is not a
- * listing at all; an empty array means a listing with no usable entries.
- */
-export function listedModelsFromListing(body: unknown): ListedModel[] | null {
-  const entries = entriesOf(body);
-  if (!entries) return null;
+/** The models in a listing body, in order, deduplicated and capped. */
+export function readModelListing(body: unknown): ModelListingRead {
+  const read = readListingEntries(body);
+  if (read.kind === "not-a-listing") return NOT_A_LISTING;
+  const { entries } = read;
 
   const seen = new Set<string>();
   const models: ListedModel[] = [];
   for (const entry of entries) {
     if (models.length >= MODEL_LISTING_MAX_MODELS) break;
-    const model = toListedModel(entry);
+    const [model] = toListedModels(entry);
     if (!model || seen.has(model.id)) continue;
     seen.add(model.id);
     models.push(model);
   }
-  return models;
+  return { kind: "listing", models };
 }
 
-/** Same as {@link listedModelsFromListing}, from the raw body text. */
-export function listedModelsFromListingText(text: string): ListedModel[] | null {
-  if (text.length > MODEL_LISTING_MAX_CHARACTERS) return null;
+/** Same as {@link readModelListing}, from the raw body text. */
+export function readModelListingText(text: string): ModelListingRead {
+  if (text.length > MODEL_LISTING_MAX_CHARACTERS) return NOT_A_LISTING;
   try {
-    return listedModelsFromListing(JSON.parse(text) as unknown);
+    return readModelListing(JSON.parse(text) as unknown);
   } catch {
-    return null;
+    return NOT_A_LISTING;
   }
 }
 
-function toListedModel(entry: unknown): ListedModel | undefined {
-  if (!isRecord(entry)) return undefined;
+/** One entry as a model, or none when it has no usable id. */
+function toListedModels(entry: unknown): ListedModel[] {
+  if (!isRecord(entry)) return [];
   const id = (asString(entry.id) || asString(entry.name)).replace(/^models\//, "");
-  if (id === "" || id.length > MAX_MODEL_ID_LENGTH) return undefined;
+  if (id === "" || id.length > MAX_MODEL_ID_LENGTH) return [];
 
-  const model: ListedModel = { id };
-  const maxTokens = readMaxTokens(entry);
-  if (maxTokens !== undefined) model.maxTokens = maxTokens;
-  if (readsReasoning(entry)) model.hasReasoning = true;
-  if (marksEmbedding(entry)) model.isEmbedding = true;
-  return model;
+  return [
+    {
+      id,
+      ...maxTokensOf(entry),
+      ...(readsReasoning(entry) && { hasReasoning: true }),
+      ...(marksEmbedding(entry) && { isEmbedding: true }),
+    },
+  ];
 }
 
-function readMaxTokens(entry: Record<string, unknown>): number | undefined {
+/** The context window as a partial model: empty when the entry states none. */
+function maxTokensOf(entry: Record<string, unknown>): Pick<ListedModel, "maxTokens"> {
   for (const field of MAX_TOKENS_FIELDS) {
     const value = entry[field];
-    if (typeof value === "number" && Number.isInteger(value) && value > 0) return value;
+    if (typeof value === "number" && Number.isInteger(value) && value > 0) {
+      return { maxTokens: value };
+    }
   }
-  return undefined;
+  return {};
 }
 
 function readsReasoning(entry: Record<string, unknown>): boolean {

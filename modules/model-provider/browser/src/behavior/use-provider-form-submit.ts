@@ -121,7 +121,7 @@ function optionalScopes(scopes: ProviderScope[] | undefined): ProviderScope[] | 
 }
 
 /** Empty is how the operator clears a name, and the server reads absence for that. */
-/** Tells the user what the save imported; nothing when the provider has no listing or no new model. */
+/** Tells the user what the save imported; nothing when there is no listing or no new model. */
 function modelImportToast({
   modelImport,
   providerName,

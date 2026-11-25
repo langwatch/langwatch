@@ -63,7 +63,7 @@ export class ModelProviderModelImportService {
     // A managed row's credential is not the customer's to probe with.
     if (!keys || "MANAGED" in keys) return {};
     const endpointKey = findModelProviderDefinition(write.provider)?.endpointKey;
-    const endpoint = endpointKey ? stringOf(keys[endpointKey]) : undefined;
+    const endpoint = endpointKey ? textOf(keys[endpointKey]) : "";
     if (!importsModelListing({ provider: write.provider, baseUrl: endpoint })) return {};
 
     // Stored ids belong to the endpoint that listed them; a move clears them even unlisted.
@@ -121,8 +121,8 @@ export class ModelProviderModelImportService {
   }
 }
 
-const stringOf = (value: unknown): string | undefined =>
-  typeof value === "string" ? value : undefined;
+/** A credential field as text; anything not a string reads as no value. */
+const textOf = (value: unknown): string => (typeof value === "string" ? value : "");
 
 /** A key rotation on the same endpoint keeps the listing history; a new endpoint starts fresh. */
 function isSameListingEndpoint({
@@ -132,11 +132,11 @@ function isSameListingEndpoint({
 }: {
   existing: ModelProvider | null;
   endpointKey: string | undefined;
-  endpoint: string | undefined;
+  endpoint: string;
 }): boolean {
   if (!existing) return false;
   if (!endpointKey) return true;
-  const stored = stringOf(existing.customKeys?.[endpointKey]);
-  if (stored === undefined || endpoint === undefined) return stored === endpoint;
+  const stored = textOf(existing.customKeys?.[endpointKey]);
+  if (stored === "" || endpoint === "") return stored === endpoint;
   return isSameEndpoint(stored, endpoint);
 }
