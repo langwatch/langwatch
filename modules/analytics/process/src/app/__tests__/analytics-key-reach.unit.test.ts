@@ -90,6 +90,7 @@ async function appOver(input: {
 }) {
   const accessAsked: string[] = [];
   const keysAsked: string[] = [];
+  const peopleAsked: string[] = [];
   const app = await AnalyticsModule.create({
     dependencies: {
       featureFlags: createApiFixture<FeatureFlagApi>(),
@@ -98,7 +99,12 @@ async function appOver(input: {
           keysAsked.push(apiKeyId);
           return Promise.resolve(input.grants.includes(permission));
         },
-        can: ({ permission }) => Promise.resolve(input.grants.includes(permission)),
+        can: ({ principal, permission, scope }) => {
+          peopleAsked.push(
+            `${principal.type}:${"id" in principal ? principal.id : ""}@${"id" in scope ? scope.id : ""}`,
+          );
+          return Promise.resolve(input.grants.includes(permission));
+        },
         hasPermission: ({ permission }) => Promise.resolve(input.grants.includes(permission)),
         getScope: ({ projectId }) =>
           Promise.resolve({
@@ -178,7 +184,7 @@ async function appOver(input: {
     secrets: analyticsTestSecrets(),
   });
 
-  return { app, accessAsked, keysAsked };
+  return { app, accessAsked, keysAsked, peopleAsked };
 }
 
 async function referenceFor(input: { listed: readonly Project[]; grants: readonly string[] }) {
@@ -369,7 +375,7 @@ describe("given a project-bound access token, the hosted MCP's OAuth sign-in", (
   describe("when its person holds analytics:view on the bound project", () => {
     /** @scenario "A project-bound access token runs a LangWatchQL query as its person" */
     it("opens the reference's LangWatchQL half, judged as the person and never as a key", async () => {
-      const { app, keysAsked } = await appOver({
+      const { app, keysAsked, peopleAsked } = await appOver({
         listed: [project("project-a")],
         grants: ["analytics:view", "traces:view"],
       });
@@ -378,6 +384,20 @@ describe("given a project-bound access token, the hosted MCP's OAuth sign-in", (
 
       expect(reference.lwql.enabled).toBe(true);
       expect(keysAsked).toEqual([]);
+      expect(new Set(peopleAsked)).toEqual(
+        new Set(["user:admin-1@project-a", `user:admin-1@${ORGANIZATION_ID}`]),
+      );
+    });
+  });
+
+  describe("when its person lacks analytics:view on the bound project", () => {
+    /** @scenario "A project-bound access token runs a LangWatchQL query as its person" */
+    it("closes the reference's LangWatchQL half, as it is closed to that person", async () => {
+      const { app } = await appOver({ listed: [project("project-a")], grants: ["traces:view"] });
+
+      const reference = await app.describeQueryReferenceForKey({ reach: TOKEN });
+
+      expect(reference.lwql.enabled).toBe(false);
     });
   });
 
@@ -403,7 +423,7 @@ describe("given a project-bound access token, the hosted MCP's OAuth sign-in", (
     /** @scenario "A project-bound access token reads only the project it is bound to" */
     it("ran over the bound project alone", async () => {
       logged.lines.length = 0;
-      const { app } = await appOver({
+      const { app, peopleAsked } = await appOver({
         listed: [project("project-a"), project("project-b")],
         grants: ["analytics:view"],
       });
@@ -418,6 +438,7 @@ describe("given a project-bound access token, the hosted MCP's OAuth sign-in", (
 
       const failed = logged.lines.findLine("warn", "LangWatchQL failed");
       expect(failed).toMatchObject({ projectIds: ["project-a"] });
+      expect(peopleAsked.some((asked) => asked.endsWith("@project-b"))).toBe(false);
     });
   });
 });
