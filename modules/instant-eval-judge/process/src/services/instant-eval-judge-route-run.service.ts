@@ -9,6 +9,7 @@ import {
   InstantEvalJudgeStoppedError,
   instantEvalSkipped,
   isInstantEvalSpendBillable,
+  type InstantEvalJudgeCostCeiling,
   type InstantEvalJudgeRoutePricing,
   type InstantEvalJudgeReasoningEffort,
   type InstantEvalJudgeRouteGate,
@@ -24,7 +25,10 @@ import type {
 } from "../channels/instant-eval-classifier.channel.ts";
 import type { InstantEvalHostedDecisionsChannel } from "../channels/instant-eval-hosted-decisions.channel.ts";
 import type { InstantEvalLlmJudgeChannel } from "../channels/instant-eval-llm-judge.channel.ts";
-import { instantEvalJudgeCallCostOf } from "../rules/instant-eval-judge-route-cost.rules.ts";
+import {
+  instantEvalJudgeCallCostOf,
+  instantEvalJudgeSendWorstCaseNanoUsd,
+} from "../rules/instant-eval-judge-route-cost.rules.ts";
 import {
   instantEvalJudgeLegsJoined,
   instantEvalRoutedVerdictsOf,
@@ -55,6 +59,7 @@ export class InstantEvalJudgeRouteRunService {
   private readonly projectId: string;
   private readonly signal: AbortSignal | undefined;
   private readonly logger: Pick<Logger, "error">;
+  private readonly costCeiling: InstantEvalJudgeCostCeiling | undefined;
   private readonly flags: string[] = [];
   private inputTokens = 0;
   private costNanoUsd = 0;
@@ -65,12 +70,14 @@ export class InstantEvalJudgeRouteRunService {
     projectId: string;
     signal: AbortSignal | undefined;
     logger: Pick<Logger, "error">;
+    costCeiling?: InstantEvalJudgeCostCeiling | undefined;
   }) {
     this.deps = input.deps;
     this.plan = input.plan;
     this.projectId = input.projectId;
     this.signal = input.signal;
     this.logger = input.logger;
+    this.costCeiling = input.costCeiling;
     const { inputView, isViewMissing, refusedView, longerView } = input.plan;
     if (isViewMissing) this.flags.push(`${inputView}_view_missing`);
     if (refusedView) this.flags.push(`${refusedView}_view_refused`);
@@ -83,6 +90,8 @@ export class InstantEvalJudgeRouteRunService {
     projectId: string;
     signal: AbortSignal | undefined;
     logger: Pick<Logger, "error">;
+    /** A judged query's spend cap: each send holds its worst case first (ADR-190 decision 13). */
+    costCeiling?: InstantEvalJudgeCostCeiling | undefined;
   }): InstantEvalJudgeRouteRunService {
     return new InstantEvalJudgeRouteRunService(input);
   }
@@ -285,18 +294,70 @@ export class InstantEvalJudgeRouteRunService {
   }
 
   /**
-   * One backend's answer. Only the caller's stop is rethrown: the leg's own timeout is a leg that
-   * failed, so the paid legs before it stay billed and the page is not retried for it.
+   * One backend's answer. Under a cost ceiling the send first holds its worst case, and a send the
+   * ceiling cannot hold is a failed leg that sends nothing; the hold becomes what the send billed.
    */
-  private async askOne({
-    backend,
-    questions,
-    text,
-  }: {
+  private async askOne(input: {
     backend: string;
     questions: readonly InstantEvalQuestion[];
     /** A decision model's own text in place of the plan's view: the gate's framing of the case. */
     text?: string;
+  }): Promise<Leg> {
+    const { costCeiling } = this;
+    if (!costCeiling) return this.sendOne({ ...input, paid: (spend) => void this.paid(spend) });
+    const { backend, questions, text } = input;
+    const { table, pricing } = this.deps;
+    const heldNanoUsd = instantEvalJudgeSendWorstCaseNanoUsd({
+      backend,
+      table,
+      pricing,
+      job: this.plan.job,
+      text: text ?? this.longestPlanText(),
+      questions,
+    });
+    if (!costCeiling.hold(heldNanoUsd)) {
+      this.flags.push(`cost_ceiling:${backend}`);
+      return { outcome: "failed", reason: "classifier_rate_limited" };
+    }
+    let costNanoUsd = 0;
+    try {
+      return await this.sendOne({
+        ...input,
+        paid: (spend) => {
+          costNanoUsd += this.paid(spend);
+        },
+      });
+    } finally {
+      costCeiling.settle({ heldNanoUsd, costNanoUsd });
+      if (costNanoUsd > heldNanoUsd) {
+        this.logger.error(
+          { backend, heldNanoUsd, costNanoUsd },
+          "Instant Evals routed send cost more than its worst case; the query ceiling under-held",
+        );
+      }
+    }
+  }
+
+  /** The plan's longer text, its view or the full one: what any send of this plan may carry. */
+  private longestPlanText(): string {
+    const { text, fullText } = this.plan;
+    return text.length > fullText.length ? text : fullText;
+  }
+
+  /**
+   * One backend's send. Only the caller's stop is rethrown: the leg's own timeout is a leg that
+   * failed, so the paid legs before it stay billed and the page is not retried for it.
+   */
+  private async sendOne({
+    backend,
+    questions,
+    text,
+    paid,
+  }: {
+    backend: string;
+    questions: readonly InstantEvalQuestion[];
+    text?: string | undefined;
+    paid: (spend: { backend: string; inputTokens: number; outputTokens: number }) => void;
   }): Promise<Leg> {
     const config = this.deps.table.backends[backend];
     if (!config) return { outcome: "failed", reason: "classifier_provider_unavailable" };
@@ -308,6 +369,7 @@ export class InstantEvalJudgeRouteRunService {
         questions,
         timeoutMs: config.timeoutMs,
         reasoningEffort: config.reasoningEffort,
+        paid,
       });
     }
     const { table, classifier, hostedDecisions, limiter } = this.deps;
@@ -320,7 +382,7 @@ export class InstantEvalJudgeRouteRunService {
       plan: this.plan,
       signal: this.signal,
       flag: (flag) => this.flags.push(flag),
-      paid: (spend) => this.paid(spend),
+      paid,
     });
     const { kind, model, timeoutMs } = config;
     return leg.ask({ backend, kind, model, timeoutMs, questions, text });
@@ -334,6 +396,7 @@ export class InstantEvalJudgeRouteRunService {
     questions,
     timeoutMs,
     reasoningEffort,
+    paid,
   }: {
     backend: string;
     wire: "anthropic_messages" | "openai_responses";
@@ -341,6 +404,7 @@ export class InstantEvalJudgeRouteRunService {
     questions: readonly InstantEvalQuestion[];
     timeoutMs: number;
     reasoningEffort: InstantEvalJudgeReasoningEffort | undefined;
+    paid: (spend: { backend: string; inputTokens: number; outputTokens: number }) => void;
   }): Promise<Leg> {
     // The table refuses an LLM backend with no model at boot; this keeps the type honest.
     if (!model) return { outcome: "failed", reason: "classifier_not_configured" };
@@ -353,7 +417,7 @@ export class InstantEvalJudgeRouteRunService {
       text: this.plan.fullText,
       signal: this.signal,
       logger: this.logger,
-      paid: (spend) => this.paid({ backend, ...spend }),
+      paid: (spend) => paid({ backend, ...spend }),
     });
     const call = { wire, model, timeoutMs, ...(reasoningEffort ? { reasoningEffort } : {}) };
     const { answers, reason } = await leg.ask({ call, questions });
@@ -362,6 +426,7 @@ export class InstantEvalJudgeRouteRunService {
     return { outcome: "answered", backend, answers, isTextTruncated: false, limiterWaitMs: 0 };
   }
 
+  /** Bills one send into the run's spend and answers what it cost us. */
   private paid({
     backend,
     inputTokens,
@@ -370,8 +435,8 @@ export class InstantEvalJudgeRouteRunService {
     backend: string;
     inputTokens: number;
     outputTokens: number;
-  }): void {
-    if (inputTokens <= 0 && outputTokens <= 0) return;
+  }): number {
+    if (inputTokens <= 0 && outputTokens <= 0) return 0;
     this.inputTokens += inputTokens;
     const cost = instantEvalJudgeCallCostOf({
       backend,
@@ -381,7 +446,7 @@ export class InstantEvalJudgeRouteRunService {
     });
     if (cost.outcome === "priced") {
       this.costNanoUsd += cost.costNanoUsd;
-      return;
+      return cost.costNanoUsd;
     }
     this.flags.push(`unpriced:${backend}`);
     // Boot refuses a table with an unpriced reachable backend, so this is a bug, not a deploy slip.
@@ -389,6 +454,7 @@ export class InstantEvalJudgeRouteRunService {
       { backend },
       "Instant Evals router called a backend with no configured price",
     );
+    return 0;
   }
 
   /**

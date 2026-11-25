@@ -344,6 +344,45 @@ Feature: Routing an Instant Evals judgement across decision models and LLMs
     And the judge picker names LangWatch's hosted model LangWatch Instant (preview), never LangWatch Evals (preview)
     And an operator can still switch it on for the install
 
+  @unit
+  Scenario: Routed search has its own rollout flag, off everywhere by default
+    Given the feature flag registry
+    When the search router flag is read with no targeting rule, on LangWatch Cloud or self-hosted
+    Then it is off, so no judged query sends the "search" route until a rule turns it on
+
+  # --- A judged query's cost ceiling (ADR-190 decision 13) ---
+
+  @unit
+  Scenario: Under a cost ceiling each send holds its worst case first
+    Given a routed call that carries a cost ceiling with room left
+    When the router sends a leg
+    Then it first holds that send's worst-case cost on the ceiling
+    And once the send answers the hold is swapped for what the send was billed
+
+  @unit
+  Scenario: A send whose worst case passes the ceiling is not sent
+    Given a routed call whose ceiling has room for the primary's worst case but not the escalation's
+    When the primary answers unsure
+    Then the LLM leg is never called
+    And the primary verdict is kept, flagged "escalation_failed" and "cost_ceiling"
+    And a ceiling without room for the primary sends nothing and skips the text as rate limited
+
+  @unit
+  Scenario: A kind the table does not route holds the classifier's worst case too
+    Given a routed call with a cost ceiling that asks a question the table does not route
+    When the ceiling has no room for the classifier's worst case
+    Then the classifier is not called and the text is skipped as rate limited
+
+  @unit
+  Scenario: A send's worst case bounds what it can bill
+    Given a backend's prices and a text with its questions
+    When its worst-case cost is read
+    Then it prices every UTF-8 byte of what is sent as a token, plus a fixed slack per send
+    And it takes the dearer of the base and long-context rates
+    And an LLM adds its output cap at its output rate, the reasoning cap where an effort is set
+    And an LLM or Decisions backend is counted once per question, Jev once for all
+    And a backend with no price can never be held
+
   # --- The LLM-judge caller (ADR-190 open question 2: one caller behind the flag) ---
 
   # LangWatch Evals (preview) is the router: the picker saves it as langwatch/instant-evals, the id the

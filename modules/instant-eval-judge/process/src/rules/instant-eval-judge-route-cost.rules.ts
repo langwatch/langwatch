@@ -6,10 +6,17 @@
 
 import {
   instantEvalCostUsd,
+  type InstantEvalJudgeJob,
   type InstantEvalJudgeRoutePricing,
   type InstantEvalJudgeRouteTable,
+  type InstantEvalQuestion,
   NANO_USD_PER_USD,
 } from "@langwatch/instant-eval-judge-contract";
+
+import {
+  instantEvalLlmJudgeMaxOutputTokensOf,
+  instantEvalLlmJudgePromptOf,
+} from "./instant-eval-llm-judge-wire.rules.ts";
 
 const NANO_USD_PER_MILLION_TOKENS_PER_USD = 1_000;
 
@@ -64,4 +71,116 @@ export function instantEvalJudgeClassifierCostOf({
     if (cost.outcome === "priced") return cost.costNanoUsd;
   }
   return Math.round(instantEvalCostUsd({ inputTokens }) * NANO_USD_PER_USD);
+}
+
+/**
+ * Tokens one send may bill beyond the UTF-8 bytes it is built from (a token is at least one
+ * byte): message framing and a request's fixed part, which the classifier measured at about 200.
+ */
+const INSTANT_EVAL_JUDGE_SEND_SLACK_TOKENS = 1_024;
+
+/**
+ * Output tokens a decision model is allowed per question: it answers a probability or a label,
+ * and Decisions reports none. Priced only where the pricing sets an output rate for it.
+ */
+const INSTANT_EVAL_JUDGE_DECISION_OUTPUT_TOKENS_PER_QUESTION = 256;
+
+/**
+ * The most one send can cost us, in nano-USD: a token per byte at the dearer of the base and long
+ * rates, plus an output cap at the output rate. LLM and Decisions sends are per question, Jev's
+ * for all. Infinite for an unpriced backend, so a ceiling never sends it (ADR-190 decision 13).
+ */
+export function instantEvalJudgeSendWorstCaseNanoUsd({
+  backend,
+  table,
+  pricing,
+  job,
+  text,
+  questions,
+}: {
+  backend: string;
+  table: InstantEvalJudgeRouteTable;
+  pricing: InstantEvalJudgeRoutePricing;
+  job: InstantEvalJudgeJob;
+  /** The longest text the send may carry. */
+  text: string;
+  questions: readonly InstantEvalQuestion[];
+}): number {
+  const config = table.backends[backend];
+  const price = pricing.backends[backend];
+  if (!config || !price) return Number.POSITIVE_INFINITY;
+  const rates = price.longContext ? [price, price.longContext] : [price];
+  const inputRate = Math.max(...rates.map((rate) => rate.usdPerMillionInputTokens));
+  const outputRate = Math.max(...rates.map((rate) => rate.usdPerMillionOutputTokens));
+  const costOf = ({ bytes, outputTokens }: { bytes: number; outputTokens: number }) =>
+    ((bytes + INSTANT_EVAL_JUDGE_SEND_SLACK_TOKENS) * inputRate + outputTokens * outputRate) *
+    NANO_USD_PER_MILLION_TOKENS_PER_USD;
+  if (config.kind === "anthropic_messages" || config.kind === "openai_responses") {
+    const outputTokens = instantEvalLlmJudgeMaxOutputTokensOf({
+      wire: config.kind,
+      reasoningEffort: config.reasoningEffort,
+    });
+    return ceilNanoUsd(
+      sumOf(
+        questions.map((question) => {
+          const { system, user, tool } = instantEvalLlmJudgePromptOf({ job, question, text });
+          const bytes = utf8BytesOf(system) + utf8BytesOf(user) + utf8BytesOf(JSON.stringify(tool));
+          return costOf({ bytes, outputTokens });
+        }),
+      ),
+    );
+  }
+  const textBytes = utf8BytesOf(text);
+  const sends = config.kind === "jev" ? [questions] : questions.map((question) => [question]);
+  return ceilNanoUsd(
+    sumOf(
+      sends.map((asked) =>
+        costOf({
+          bytes: textBytes + utf8BytesOf(JSON.stringify(asked)),
+          outputTokens: asked.length * INSTANT_EVAL_JUDGE_DECISION_OUTPUT_TOKENS_PER_QUESTION,
+        }),
+      ),
+    ),
+  );
+}
+
+/** The hosted classifier's worst case for a call the router does not route, priced as it is. */
+export function instantEvalJudgeClassifierWorstCaseNanoUsd({
+  table,
+  pricing,
+  job,
+  text,
+  questions,
+}: {
+  table: InstantEvalJudgeRouteTable;
+  pricing: InstantEvalJudgeRoutePricing;
+  job: InstantEvalJudgeJob;
+  text: string;
+  questions: readonly InstantEvalQuestion[];
+}): number {
+  const priced = Object.entries(table.backends).find(
+    ([backend, config]) => config.kind === "jev" && pricing.backends[backend],
+  );
+  if (priced) {
+    const [backend] = priced;
+    return instantEvalJudgeSendWorstCaseNanoUsd({ backend, table, pricing, job, text, questions });
+  }
+  const bytes = utf8BytesOf(text) + utf8BytesOf(JSON.stringify(questions));
+  const inputTokens = bytes + INSTANT_EVAL_JUDGE_SEND_SLACK_TOKENS;
+  return ceilNanoUsd(instantEvalCostUsd({ inputTokens }) * NANO_USD_PER_USD);
+}
+
+const utf8 = new TextEncoder();
+
+function utf8BytesOf(text: string): number {
+  return utf8.encode(text).length;
+}
+
+/** Up to a whole nano-USD, after dropping float noise below a thousandth of one. */
+function ceilNanoUsd(nanoUsd: number): number {
+  return Math.ceil(Math.round(nanoUsd * 1_000) / 1_000);
+}
+
+function sumOf(values: readonly number[]): number {
+  return values.reduce((total, value) => total + value, 0);
 }

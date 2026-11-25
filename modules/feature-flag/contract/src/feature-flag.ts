@@ -196,6 +196,14 @@ export const FEATURE_FLAGS = [
       "Routes an organization's Instant Evals judgements through the LangWatch Judge router: a decision model answers what it is sure of and an LLM answers the rest, priced by the summed cost of every call. On by default on LangWatch Cloud; turn it off per organization via a targeting rule. Off by default on a self-hosted install, whose judgements through Connect carry no route, so it never offers routing unless an operator switches it on. On, the judge picker names LangWatch's hosted model LangWatch Evals (preview), and an LLM judge on it (saved as langwatch/instant-evals, or on langwatch/evals-preview) sends the llm_judge route where the project's Instant Evals column is LangWatch's; a judge on langwatch/instant-preview, and any judge answered by an own decision model, is never routed. Off, the picker names it LangWatch Instant (preview), no caller sends a route, and every judgement is the single hosted classifier call it is today. The route table and prices are deploy-time configuration; with none set, as on a self-hosted install, every slot goes to the hosted classifier at its published rate, so the answer and the cost are today's.",
   },
   {
+    key: "release_instant_evals_search_router",
+    scope: "PRODUCT",
+    defaultValue: false,
+    selfHostedDefaultValue: false,
+    description:
+      "Sends an organization's judged LangWatchQL queries through the LangWatch Judge router with the search route (ADR-190 decision 13): a decision model answers each question and an LLM answers the ones it is least sure of. Off by default everywhere; enable per organization with a targeting rule. Only queries on LangWatch's hosted model on LangWatch Cloud route: a project on its own decision model, and a self-hosted install judging through Connect, never send the route. On, each query is held at its cost ceiling and charged at the summed cost of its calls plus the one markup, never past the ceiling. Off, a judged query is the single hosted classifier call at its published rate. Instant Eval runs are never routed by this flag. Separate from release_instant_evals_judge_router, which routes LLM-judge evaluations only.",
+  },
+  {
     key: "release_lwql_workbench",
     scope: "PRODUCT",
     defaultValue: false,

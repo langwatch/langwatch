@@ -17,7 +17,10 @@ import {
   instantEvalJudgeQueryHoldPricingOf,
   instantEvalJudgeRouteBootIssues,
 } from "../instant-eval-judge-route-boot.rules.ts";
-import { instantEvalJudgeCallCostOf } from "../instant-eval-judge-route-cost.rules.ts";
+import {
+  instantEvalJudgeCallCostOf,
+  instantEvalJudgeSendWorstCaseNanoUsd,
+} from "../instant-eval-judge-route-cost.rules.ts";
 import { instantEvalJudgeFirstSendLeadsOf } from "../instant-eval-judge-route-merge.rules.ts";
 import { instantEvalJudgeRoutePlanOf } from "../instant-eval-judge-route.rules.ts";
 import {
@@ -320,6 +323,103 @@ describe("a routed call's cost", () => {
     expect(cost({ backend: "other", inputTokens: 1, outputTokens: 0 })).toEqual({
       outcome: "unpriced",
     });
+  });
+});
+
+describe("a send's worst case", () => {
+  const ONE = yesNo("q", "is it");
+  const TWO = yesNo("r", "is it not");
+  const worstTable = syntheticRouteTable({
+    backends: {
+      dec: { kind: "decisions", model: "decision-model" },
+      jv: { kind: "jev" },
+      llm: { kind: "openai_responses", model: "llm-model" },
+      llmHigh: { kind: "openai_responses", model: "llm-model", reasoningEffort: "high" },
+      ant: { kind: "anthropic_messages", model: "llm-model" },
+    },
+  });
+  const llmPrice = { usdPerMillionInputTokens: 1, usdPerMillionOutputTokens: 5 };
+  const pricing = {
+    version: "test",
+    backends: {
+      dec: { usdPerMillionInputTokens: 0.1, usdPerMillionOutputTokens: 0 },
+      jv: { usdPerMillionInputTokens: 0.05, usdPerMillionOutputTokens: 0 },
+      llm: llmPrice,
+      llmHigh: llmPrice,
+      ant: llmPrice,
+    },
+  };
+  const worst = ({
+    backend,
+    text = "abc",
+    questions = [ONE],
+    prices = pricing,
+  }: {
+    backend: string;
+    text?: string;
+    questions?: (typeof ONE)[];
+    prices?: typeof pricing | Record<string, unknown>;
+  }) =>
+    instantEvalJudgeSendWorstCaseNanoUsd({
+      backend,
+      table: worstTable,
+      pricing: prices as typeof pricing,
+      job: "search",
+      text,
+      questions,
+    });
+
+  /** @scenario "A send's worst case bounds what it can bill" */
+  it("counts Jev once for all questions and Decisions once per question, a byte a token", () => {
+    // Jev: 3 text bytes + 107 bytes of both questions + 1,024 slack, at 0.05 per million.
+    expect(worst({ backend: "jv", questions: [ONE, TWO] })).toBe(56_700);
+    // Decisions: (3 + 52 + 1,024) and (3 + 56 + 1,024) tokens at 0.1 per million.
+    expect(worst({ backend: "dec", questions: [ONE, TWO] })).toBe(216_200);
+  });
+
+  /** @scenario "A send's worst case bounds what it can bill" */
+  it("reads UTF-8 bytes, not characters", () => {
+    expect(worst({ backend: "dec", text: "é" }) - worst({ backend: "dec", text: "e" })).toBe(100);
+  });
+
+  /** @scenario "A send's worst case bounds what it can bill" */
+  it("takes the dearer long-context rate even for a short text, and a decision model's output allowance", () => {
+    const prices = {
+      version: "test",
+      backends: {
+        dec: {
+          usdPerMillionInputTokens: 0.1,
+          usdPerMillionOutputTokens: 1,
+          longContext: {
+            aboveInputTokens: 100_000,
+            usdPerMillionInputTokens: 0.3,
+            usdPerMillionOutputTokens: 0,
+          },
+        },
+      },
+    };
+    // 1,079 tokens at the long 0.3, plus 256 output tokens at the base 1.0.
+    expect(worst({ backend: "dec", prices })).toBe(323_700 + 256_000);
+  });
+
+  /** @scenario "A send's worst case bounds what it can bill" */
+  it("adds an LLM's output cap per question, the reasoning cap where an effort is set", () => {
+    const plain = worst({ backend: "llm" });
+    // 32,000 against 8,000 output tokens at 5 per million.
+    expect(worst({ backend: "llmHigh" }) - plain).toBe(24_000 * 5 * 1_000);
+    expect(worst({ backend: "ant" })).toBe(plain);
+    expect(plain).toBeGreaterThan(8_000 * 5 * 1_000 + 1_024 * 1_000);
+    const both = worst({ backend: "llm", questions: [ONE, TWO] });
+    expect(both).toBeGreaterThan(2 * plain);
+    expect(both).toBeLessThan(2 * plain + 100 * 1_000);
+  });
+
+  /** @scenario "A send's worst case bounds what it can bill" */
+  it("is infinite for a backend with no price or not in the table", () => {
+    expect(worst({ backend: "jv", prices: { version: "test", backends: {} } })).toBe(
+      Number.POSITIVE_INFINITY,
+    );
+    expect(worst({ backend: "missing" })).toBe(Number.POSITIVE_INFINITY);
   });
 });
 
