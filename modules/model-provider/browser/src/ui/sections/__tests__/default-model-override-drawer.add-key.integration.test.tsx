@@ -9,6 +9,7 @@ import { cleanup, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { useDefaultModelsDraftStore } from "../../../behavior/default-models-draft.store.ts";
 import { FakeModelProviderHost, renderWithModelProviderHost } from "../../../testing.tsx";
 import { DefaultModelOverrideDrawer } from "../default-model-override-drawer.tsx";
 import "@testing-library/jest-dom/vitest";
@@ -126,6 +127,7 @@ describe("<DefaultModelOverrideDrawer/> Add key on a decision model", () => {
   });
   afterEach(() => {
     mockOpenDrawer.mockReset();
+    useDefaultModelsDraftStore.getState().clear();
     cleanup();
   });
 
@@ -164,6 +166,56 @@ describe("<DefaultModelOverrideDrawer/> Add key on a decision model", () => {
         { replace: false },
       );
       expect(instantEvalsTrigger()).toHaveTextContent("Choose a decision model");
+    });
+
+    /** @scenario "Edits made before Add key are still there when the drawer comes back" */
+    it("keeps the unsaved draft for the drawer to restore", async () => {
+      const user = userEvent.setup({ pointerEventsCheck: 0 });
+      renderWithModelProviderHost(<DefaultModelOverrideDrawer editingId="cfg_1" />);
+
+      await user.click(instantEvalsTrigger());
+      await user.click(
+        within(instantEvalsOption("Inception Mercury Decide")).getByRole("button", {
+          name: "Add key",
+          hidden: true,
+        }),
+      );
+
+      expect(useDefaultModelsDraftStore.getState().draft).toEqual({
+        target: "cfg_1",
+        scopes: [{ scopeType: "ORGANIZATION", scopeId: "org-1" }],
+        config: { DEFAULT: "openai/gpt-5.5" },
+      });
+    });
+  });
+
+  describe("given the drawer comes back from the provider form with a kept draft", () => {
+    /** @scenario "Edits made before Add key are still there when the drawer comes back" */
+    it("restores the scopes picked before Add key, then forgets the draft", () => {
+      useDefaultModelsDraftStore.getState().keep({
+        target: "cfg_1",
+        scopes: [{ scopeType: "TEAM", scopeId: "team-1" }],
+        config: { DEFAULT: "openai/gpt-5.5" },
+      });
+      renderWithModelProviderHost(<DefaultModelOverrideDrawer editingId="cfg_1" />);
+
+      const lastInput = mockListDecisionModels.mock.calls.at(-1)?.[0];
+      expect(lastInput).toMatchObject({ scopes: [{ scopeType: "TEAM", scopeId: "team-1" }] });
+      expect(useDefaultModelsDraftStore.getState().draft).toBeNull();
+    });
+
+    it("ignores a draft kept for another config", () => {
+      useDefaultModelsDraftStore.getState().keep({
+        target: "cfg_other",
+        scopes: [{ scopeType: "TEAM", scopeId: "team-1" }],
+        config: {},
+      });
+      renderWithModelProviderHost(<DefaultModelOverrideDrawer editingId="cfg_1" />);
+
+      const lastInput = mockListDecisionModels.mock.calls.at(-1)?.[0];
+      expect(lastInput).toMatchObject({
+        scopes: [{ scopeType: "ORGANIZATION", scopeId: "org-1" }],
+      });
     });
   });
 

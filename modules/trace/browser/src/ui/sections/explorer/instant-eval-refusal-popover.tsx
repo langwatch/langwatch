@@ -522,7 +522,9 @@ function TurnOnInstantEvals({
           testId="instant-eval-turn-on-own-model"
         />
       )}
-      {!canManageOrganization && <AskAnAdmin href={INSTANT_EVALS_SETUP_HREF} />}
+      {!canManageOrganization && (
+        <AskAnAdmin href={copy.ownModel ? INSTANT_EVALS_SETUP_HREF : CONNECT_SETTINGS_HREF} />
+      )}
       <HStack gap={2}>
         <Text textStyle="xs">
           <RoutedLink href={copy.more.href} target="_blank" rel="noopener noreferrer">
@@ -538,32 +540,51 @@ function TurnOnInstantEvals({
   );
 }
 
-/** What a member sees in place of the buttons: who can act, and a link to send them. */
+/**
+ * What a member sees in place of the buttons: who can act, and a link to send them. Without
+ * clipboard access the address stays on screen, selectable, with a line saying to copy it by hand.
+ */
 function AskAnAdmin({ href }: { href: string }) {
-  const [copied, setCopied] = useState(false);
+  const [copyState, setCopyState] = useState<"idle" | "copied" | "failed">("idle");
   const address = typeof window === "undefined" ? href : `${window.location.origin}${href}`;
+  const copy = async () => {
+    try {
+      if (!navigator.clipboard) throw new Error("clipboard unavailable");
+      await navigator.clipboard.writeText(address);
+      setCopyState("copied");
+    } catch {
+      setCopyState("failed");
+    }
+  };
+  const copied = copyState === "copied";
   return (
     <VStack align="stretch" gap={1} data-testid="instant-eval-ask-admin">
       <Text textStyle="xs" fontWeight="medium">
         Only an admin can turn this on
       </Text>
       <HStack gap={2}>
-        <Text textStyle="xs" color="fg.muted" fontFamily="mono" truncate flex={1} minWidth={0}>
+        <Text
+          textStyle="xs"
+          color="fg.muted"
+          fontFamily="mono"
+          truncate={copyState !== "failed"}
+          wordBreak="break-all"
+          userSelect="all"
+          flex={1}
+          minWidth={0}
+          data-testid="instant-eval-ask-admin-address"
+        >
           {address}
         </Text>
-        <Button
-          size="xs"
-          variant="outline"
-          onClick={() => {
-            void navigator.clipboard?.writeText(address).then(() => setCopied(true));
-          }}
-        >
+        <Button size="xs" variant="outline" onClick={() => void copy()}>
           {copied ? <Check size={14} /> : <Copy size={14} />}
           {copied ? "Copied" : "Copy link"}
         </Button>
       </HStack>
       <Text textStyle="xs" color="fg.muted">
-        Send it to an admin. It opens this choice for them.
+        {copyState === "failed"
+          ? "Couldn't copy it. Select the link above and send it to an admin."
+          : "Send it to an admin so they can turn it on."}
       </Text>
     </VStack>
   );

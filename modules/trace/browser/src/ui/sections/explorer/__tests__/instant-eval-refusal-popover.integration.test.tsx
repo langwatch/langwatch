@@ -440,6 +440,32 @@ describe("given an eval chip refused on a self-hosted install", () => {
       );
       expect(await screen.findByRole("button", { name: "Copied" })).toBeInTheDocument();
     });
+
+    /** @scenario "A member whose browser can't copy is left the link to copy by hand" */
+    it("keeps the link on screen and says to copy it by hand when the write is refused", async () => {
+      const writeText = vi.fn().mockRejectedValue(new DOMException("denied", "NotAllowedError"));
+      Object.defineProperty(navigator, "clipboard", { value: { writeText }, configurable: true });
+      renderRefusal("ask_operator");
+
+      await userEvent.click(screen.getByRole("button", { name: "Copy link" }));
+
+      expect(await screen.findByText(/Select the link above/)).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Copied" })).toBeNull();
+      expect(screen.getByTestId("instant-eval-ask-admin-address")).toHaveTextContent(
+        `${window.location.origin}${INSTANT_EVALS_SETUP_HREF}`,
+      );
+    });
+
+    /** @scenario "A member whose browser can't copy is left the link to copy by hand" */
+    it("says to copy it by hand when the browser has no clipboard", async () => {
+      Object.defineProperty(navigator, "clipboard", { value: undefined, configurable: true });
+      renderRefusal("ask_operator");
+
+      await userEvent.click(screen.getByRole("button", { name: "Copy link" }));
+
+      expect(await screen.findByText(/Select the link above/)).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Copied" })).toBeNull();
+    });
   });
 
   describe("when own decision models are switched off for the organization", () => {
@@ -451,6 +477,17 @@ describe("given an eval chip refused on a self-hosted install", () => {
       expect(screen.getByTestId("instant-eval-refusal").textContent).not.toMatch(
         /own decision model/i,
       );
+    });
+
+    /** @scenario "With own decision models switched off, a self-hosted install is offered LangWatch Instant (preview) only" */
+    it("gives a member the Connect settings link to send", async () => {
+      const writeText = vi.fn().mockResolvedValue(undefined);
+      Object.defineProperty(navigator, "clipboard", { value: { writeText }, configurable: true });
+      renderRefusal("not_in_license", { offersOwnModel: false });
+
+      await userEvent.click(screen.getByRole("button", { name: "Copy link" }));
+
+      expect(writeText).toHaveBeenCalledWith(`${window.location.origin}${CONNECT_SETTINGS_HREF}`);
     });
   });
 

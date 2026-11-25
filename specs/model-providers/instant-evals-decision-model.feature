@@ -502,6 +502,18 @@ Feature: Instant Evals decision model column in Default models
     And the Instant Evals column holds "Inception Mercury Decide", saved only when I save the drawer
 
   @integration
+  Scenario: Edits made before Add key are still there when the drawer comes back
+    Given I changed the scopes of a config in the Default models drawer without saving
+    When I press "Add key" on "Inception Mercury Decide" and come back from the provider form
+    Then the drawer still holds the scopes I picked
+
+  @integration
+  Scenario: Cancelling the provider form returns to the Default models drawer
+    Given I pressed "Add key" on "Inception Mercury Decide" in the Default models drawer
+    When I cancel or close the provider form
+    Then the Default models drawer comes back instead of closing with it
+
+  @integration
   Scenario: A picked model the new key does not reach is left unpicked
     Given I pressed "Add key" on "Inception Mercury Decide" in the Default models drawer
     When I save an Inception key that does not reach every scope of the config

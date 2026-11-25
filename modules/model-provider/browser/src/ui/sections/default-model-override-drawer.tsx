@@ -36,6 +36,7 @@ import {
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
+import { useDefaultModelsDraftStore } from "../../behavior/default-models-draft.store.ts";
 import { modelProviderApi } from "../../behavior/model-provider-api.ts";
 import { useHostedDecisionModelOffered } from "../../behavior/use-hosted-decision-model.ts";
 import {
@@ -407,7 +408,10 @@ export function DefaultModelOverrideDrawer({
   // renders it when `drawer.open === "defaultModelOverride"`. closeDrawer
   // pops the URL param and unmounts.
   const open = true;
-  const onClose = closeDrawer;
+  const onClose = () => {
+    useDefaultModelsDraftStore.getState().clear();
+    closeDrawer();
+  };
 
   // Ask the server what the cascade would resolve for each role +
   // feature key if the picked scopes had nothing set. The drawer uses
@@ -438,10 +442,14 @@ export function DefaultModelOverrideDrawer({
     });
     if (!next) return;
 
+    // Back from a provider form opened by Add key: the edits made before it come back.
+    const kept = useDefaultModelsDraftStore.getState().draft;
+    const restored = kept?.target === next.target ? kept : next;
+    if (kept) useDefaultModelsDraftStore.getState().clear();
     hydratedForRef.current = next.target;
     setAttempted(false);
-    setScopes(next.scopes);
-    setConfig(next.config);
+    setScopes(restored.scopes);
+    setConfig(restored.config);
   }, [editingId, editing]);
 
   const inheritedQuery = modelProviderApi.modelProvider.getInheritedValuesForScopes.useQuery(
@@ -506,7 +514,12 @@ export function DefaultModelOverrideDrawer({
   const decisionOptions = canManageProviders
     ? withAddKeyActions({
         options: listedDecisionOptions,
-        onAddKey: ({ provider, model }) =>
+        onAddKey: ({ provider, model }) => {
+          useDefaultModelsDraftStore.getState().keep({
+            target: hydratedForRef.current ?? editingId ?? CREATE_TARGET,
+            scopes,
+            config,
+          });
           openDrawer(
             "editModelProvider",
             {
@@ -517,7 +530,8 @@ export function DefaultModelOverrideDrawer({
               returnPick: model,
             },
             { replace: false },
-          ),
+          );
+        },
       })
     : listedDecisionOptions;
 

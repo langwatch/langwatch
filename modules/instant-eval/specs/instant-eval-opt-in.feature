@@ -125,12 +125,22 @@ Feature: An organization switches Instant Evals on itself, once it has read wher
       And "Copy link" copies the address of Model providers with the Instant Evals picker open
 
     @integration
+    Scenario: A member whose browser can't copy is left the link to copy by hand
+      Given an eval chip refused on a self-hosted install without hosted judging
+      And the reader may not manage the organization
+      And the browser refuses clipboard access
+      When the reader presses "Copy link"
+      Then the button never reads "Copied"
+      And the popover says to select the link and send it to an admin
+
+    @integration
     Scenario: With own decision models switched off, a self-hosted install is offered LangWatch Instant (preview) only
       Given an eval chip refused on a self-hosted install without hosted judging
       And own decision models are switched off for the organization
       When the popover opens
       Then only the "LangWatch Instant (preview)" card is shown
       And the popover never mentions the own decision model
+      And a member's "Copy link" copies the address of Settings, Connect
 
     @integration
     Scenario: A judgement that fails on an install judging through LangWatch names the addresses it needs

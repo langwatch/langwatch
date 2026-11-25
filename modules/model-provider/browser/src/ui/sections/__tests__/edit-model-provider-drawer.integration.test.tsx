@@ -9,21 +9,30 @@ import { cleanup, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const { mockUpdate, mockValidateApiKey, mockProviders, mockCloseDrawer, mockGoBackWith, stack } =
-  vi.hoisted(() => ({
-    mockUpdate: vi.fn().mockResolvedValue({ id: "mp-1" }),
-    mockValidateApiKey: vi.fn().mockResolvedValue({ valid: true }),
-    mockCloseDrawer: vi.fn(),
-    mockGoBackWith: vi.fn(),
-    stack: { canGoBack: false },
-    mockProviders: {
-      current: [] as Record<string, unknown>[],
-    },
-  }));
+const {
+  mockUpdate,
+  mockValidateApiKey,
+  mockProviders,
+  mockCloseDrawer,
+  mockGoBack,
+  mockGoBackWith,
+  stack,
+} = vi.hoisted(() => ({
+  mockUpdate: vi.fn().mockResolvedValue({ id: "mp-1" }),
+  mockValidateApiKey: vi.fn().mockResolvedValue({ valid: true }),
+  mockCloseDrawer: vi.fn(),
+  mockGoBack: vi.fn(),
+  mockGoBackWith: vi.fn(),
+  stack: { canGoBack: false },
+  mockProviders: {
+    current: [] as Record<string, unknown>[],
+  },
+}));
 
 vi.mock("@langwatch/browser-host/drawer", () => ({
   useDrawer: () => ({
     closeDrawer: mockCloseDrawer,
+    goBack: mockGoBack,
     goBackWith: mockGoBackWith,
     canGoBack: stack.canGoBack,
   }),
@@ -245,6 +254,26 @@ describe("given the model-provider editor drawer", () => {
       await waitFor(() =>
         expect(mockGoBackWith).toHaveBeenCalledWith({ pick: "openai/decisions:gpt-6-luna" }),
       );
+      expect(mockCloseDrawer).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "Cancelling the provider form returns to the Default models drawer" */
+    it("goes back to the picker's drawer on Cancel, keeping the stack", async () => {
+      stack.canGoBack = true;
+      const user = userEvent.setup({ pointerEventsCheck: 0 });
+      renderWithModelProviderHost(
+        <EditModelProviderDrawer
+          providerKey="openai"
+          modelProviderId="new"
+          projectId="proj-1"
+          returnPick="openai/decisions:gpt-6-luna"
+        />,
+        new FakeModelProviderHost(),
+      );
+
+      await user.click(await screen.findByRole("button", { name: /cancel/i }));
+
+      expect(mockGoBack).toHaveBeenCalledTimes(1);
       expect(mockCloseDrawer).not.toHaveBeenCalled();
     });
   });

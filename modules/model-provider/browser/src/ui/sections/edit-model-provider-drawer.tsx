@@ -24,8 +24,11 @@ type EditModelProviderDrawerProps = {
 
 export const EditModelProviderDrawer = (props: EditModelProviderDrawerProps) => {
   const { projectId, organizationId, modelProviderId, providerKey, returnPick } = props;
-  const { closeDrawer, goBackWith, canGoBack } = useDrawer();
-  const onSaved = returnPick && canGoBack ? () => goBackWith({ pick: returnPick }) : undefined;
+  const { closeDrawer, goBack, goBackWith, canGoBack } = useDrawer();
+  // Opened from the Instant Evals picker: saving hands the model back, cancelling just goes back.
+  const isPickerSubFlow = !!returnPick && canGoBack;
+  const onSaved = isPickerSubFlow ? () => goBackWith({ pick: returnPick }) : undefined;
+  const onClose = isPickerSubFlow ? goBack : closeDrawer;
   const [saveState, setSaveState] = useState<ModelProviderSaveState>({
     busy: false,
     label: "Save",
@@ -68,7 +71,7 @@ export const EditModelProviderDrawer = (props: EditModelProviderDrawerProps) => 
 
   return (
     <Drawer
-      onClose={closeDrawer}
+      onClose={onClose}
       size="xl"
       title={title || "Model provider"}
       icon={
@@ -83,7 +86,7 @@ export const EditModelProviderDrawer = (props: EditModelProviderDrawerProps) => 
         isFormDataLoading
           ? void 0
           : {
-              cancel: { onClick: closeDrawer },
+              cancel: { onClick: onClose },
               busy: saveState.busy,
               primaryAction: {
                 label: saveState.label,
