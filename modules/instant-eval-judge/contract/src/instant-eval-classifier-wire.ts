@@ -36,6 +36,7 @@ export function toClassifierQuestions(
 }
 
 function toClassifierQuestion(question: InstantEvalQuestion): ClassifierWireQuestion {
+  assertLevelsMatchRange(question);
   if (question.kind === "boolean") {
     const { criteria } = question;
     return {
@@ -58,6 +59,20 @@ function toClassifierQuestion(question: InstantEvalQuestion): ClassifierWireQues
     instructions: question.instructions,
     criteria: categoryCriteria(question),
   };
+}
+
+/**
+ * Named levels are read back as 0-based indexes, so a range other than 0 to the last index
+ * would report a score outside it. Refused before any call rather than read wrong.
+ */
+function assertLevelsMatchRange(question: InstantEvalQuestion): void {
+  if (question.kind !== "score" || !question.levels) return;
+  const { min, max } = question.range;
+  if (min !== 0 || max !== question.levels.length - 1) {
+    throw new Error(
+      `Score question "${question.id}" names ${question.levels.length} levels, so its range must be 0 to ${question.levels.length - 1}, not ${min} to ${max}`,
+    );
+  }
 }
 
 function categoryCriteria(question: InstantEvalCategoryQuestion): Record<string, string> {

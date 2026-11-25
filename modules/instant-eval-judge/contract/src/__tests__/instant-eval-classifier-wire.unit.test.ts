@@ -304,6 +304,16 @@ describe("given a score question that names its levels", () => {
   });
 
   /** @scenario "The gate reads a frozen framing of the case" */
+  it("refuses to send names whose range is not 0 to the last level index", () => {
+    expect(() => toClassifierQuestions([{ ...difficulty, range: { min: 1, max: 10 } }])).toThrow(
+      /range must be 0 to 2, not 1 to 10/,
+    );
+    expect(() => toClassifierQuestions([{ ...difficulty, range: { min: 0, max: 4 } }])).toThrow(
+      /range must be 0 to 2/,
+    );
+  });
+
+  /** @scenario "The gate reads a frozen framing of the case" */
   it("takes a bare score as the level index, and drops a key that names no level", () => {
     expect(read({ type: "score", score: 1.4 })).toBe(1.4);
     expect(read({ type: "score", probabilities: { "": 1, harder: 1 } })).toBeUndefined();
