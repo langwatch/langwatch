@@ -430,6 +430,7 @@ function LangyPanel({
     restoreDraftOnFailure,
   });
   const queue = useLangyQueuedFollowUp({
+    projectId,
     isBusy,
     failed: !!failure.turnError,
     recovering: failure.recovery.isRecovering || failure.recovery.willAutoRecover,

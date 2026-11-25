@@ -79,3 +79,30 @@ Feature: Messages sent while Langy is working wait their turn
     Given queued messages are being sent as the follow-up turn
     When that send fails before a turn starts
     Then their text and images are back in the composer
+    But if I typed something new since, they wait in the queue for Send now instead
+
+  @unit
+  Scenario: A message sent while a stop settles waits for Send now
+    Given I pressed Stop with nothing queued
+    When I send a message before the turn has stopped
+    Then the message stays queued and is not sent on its own
+
+  @unit
+  Scenario: What I am typing stays when the queued messages go
+    Given a message is queued while Langy works
+    And I am typing a new message
+    When the turn ends and the queued message is sent
+    Then what I was typing is still in the composer
+
+  @unit
+  Scenario: A new chat's queued messages never go to a conversation I pick
+    Given a message is queued during the first turn of a new chat
+    When I open an existing conversation before that turn names the new chat
+    Then the message is not sent to the conversation I opened
+    And it waits with the new chat for Send now
+
+  @unit
+  Scenario: Queued messages wait while no project is open
+    Given a message is queued while Langy works
+    When the turn ends while no project is open
+    Then the message stays queued

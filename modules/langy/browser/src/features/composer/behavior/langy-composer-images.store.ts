@@ -37,6 +37,8 @@ interface LangyComposerImagesState {
   restore: (images: readonly LangyDraftImage[]) => void;
   /** Images a send is about to carry, given back to the draft if the send fails. */
   holdAsLastSent: (images: readonly LangyDraftImage[]) => void;
+  /** The last send's images, taken to go back in the queue when the draft is taken. */
+  takeLastSent: () => readonly LangyDraftImage[];
   restoreLastSent: () => void;
   clear: () => void;
 }
@@ -78,8 +80,14 @@ export const useLangyComposerImages = defineSlice<LangyComposerImagesState>({
     },
     restore: (images) => set((s) => ({ images: [...s.images, ...images] })),
     holdAsLastSent: (images) => {
-      revoke(get().lastSent);
+      const kept = new Set(images.map((image) => image.previewUrl));
+      revoke(get().lastSent.filter((image) => !kept.has(image.previewUrl)));
       set({ lastSent: images });
+    },
+    takeLastSent: () => {
+      const taken = get().lastSent;
+      set({ lastSent: [] });
+      return taken;
     },
     restoreLastSent: () => set((s) => ({ images: [...s.lastSent, ...s.images], lastSent: [] })),
     clear: () => {

@@ -27,13 +27,16 @@ export interface LangySendOptions {
   askedFrom?: LangyAskSurface;
   /** The images this send carries, given by a queued follow-up instead of the composer's. */
   images?: readonly LangyDraftImage[];
+  /** Leave the composer's draft alone: a queued follow-up is not what the person is typing. */
+  keepDraft?: boolean;
 }
 
 export type LangyPanelSend = (text: string, options?: LangySendOptions) => Promise<void>;
 
 /**
- * Give the user their words back when a send fails. A send that never reached a turn id leaves
- * nothing running, so the composer goes back to Send along with the words.
+ * Give the user their words back when a send fails: in the composer, or held in the queue when
+ * they have typed something new since. A send that never reached a turn id leaves nothing
+ * running, so the composer goes back to Send along with the words.
  */
 export function useLangyDraftRestore({
   lastSentTextRef,
@@ -46,9 +49,11 @@ export function useLangyDraftRestore({
       sentText: lastSentTextRef.current,
       draft: useLangyStore.getState().draft,
     });
+    const sentText = lastSentTextRef.current;
     lastSentTextRef.current = null;
     if (text) setDraft(text);
     if (text) useLangyComposerImages.getState().restoreLastSent();
+    if (!text && sentText) holdUnsent({ text: sentText });
     useLangyStore.getState().abandonSend();
   }, [setDraft, lastSentTextRef]);
 }
@@ -89,15 +94,39 @@ function sendPartsFor({
   return followUp;
 }
 
-/** While a turn runs, the person's own message waits in the queue instead of being refused. */
-function queueWhileBusy({ text }: { text: string }): void {
-  useLangyMessageQueue.getState().enqueue({
+/** A failed send whose words can't go back in the composer waits in the queue for Send now. */
+function holdUnsent({ text }: { text: string }): void {
+  const conversationId = useLangyStore.getState().activeConversationId;
+  const queue = useLangyMessageQueue.getState();
+  queue.enqueue({
     id: generate("langy").toString(),
-    conversationId: useLangyStore.getState().activeConversationId,
+    conversationId,
+    text,
+    images: useLangyComposerImages.getState().takeLastSent(),
+  });
+  queue.hold(conversationId);
+}
+
+/**
+ * While a turn runs, the person's own message waits in the queue instead of being refused. One
+ * sent while a stop settles waits for Send now, like everything queued before the stop.
+ */
+function queueWhileBusy({ text }: { text: string }): void {
+  const { activeConversationId: conversationId, turnPhase } = useLangyStore.getState();
+  const queue = useLangyMessageQueue.getState();
+  queue.enqueue({
+    id: generate("langy").toString(),
+    conversationId,
     text,
     images: useLangyComposerImages.getState().takeForQueue(),
   });
+  if (turnPhase === "stopping") queue.hold(conversationId);
   useLangyStore.getState().setDraft("");
+}
+
+/** `/feedback` summons the rating card on the latest answer, when there is one. */
+function pinFeedbackOn(messageId: string | undefined): void {
+  if (messageId) useLangyStore.getState().pinFeedback(messageId);
 }
 
 /**
@@ -151,16 +180,13 @@ export function useLangyPanelSend({
   const implementationRef = useRef<LangyPanelSend>(async () => undefined);
   implementationRef.current = async (
     text: string,
-    { keepOnFailure = true, askedFrom, images: given }: LangySendOptions = {},
+    { keepOnFailure = true, askedFrom, images: given, keepDraft }: LangySendOptions = {},
   ) => {
     const route = sendRouteOf({ text, askedFrom, given, projectId, isBusy });
     if (route === "ignore") return;
     if (route === "queue") return queueWhileBusy({ text });
-    setDraft("");
-    if (route === "feedback") {
-      if (latestAssistantMessageId) useLangyStore.getState().pinFeedback(latestAssistantMessageId);
-      return;
-    }
+    if (!keepDraft) setDraft("");
+    if (route === "feedback") return pinFeedbackOn(latestAssistantMessageId);
     const parts = sendPartsFor({ text, askedFrom, images: given });
     if (askedFrom) analytics.track(langyQuestionAsked({ surface: askedFrom }));
     // A new question opens a new recovery chain: the attempt budget is per question.
