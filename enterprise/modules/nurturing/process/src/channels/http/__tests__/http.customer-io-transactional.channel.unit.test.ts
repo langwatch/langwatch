@@ -270,9 +270,19 @@ describe("given Customer.io accepts a send with a reply that holds no delivery i
     ["an empty object", () => new Response("{}", { status: 202 })],
     ["a body that is not JSON", () => new Response("queued", { status: 202 })],
   ])("when the reply is %s", (_name, reply) => {
+    // The vitest config runs with isolate:false, so a sibling file may have loaded the channel
+    // before this file's logger mock applied, binding its logger to another instance. Re-evaluate
+    // the channel here so its logger is created from this file's mock.
+    let Channel: typeof HttpCustomerIoTransactionalChannel;
+    beforeEach(async () => {
+      vi.resetModules();
+      ({ HttpCustomerIoTransactionalChannel: Channel } =
+        await import("../http.customer-io-transactional.channel.ts"));
+    });
+
     /** @scenario "An accepted send with no readable delivery id still counts as taken" */
     it("reports it taken and logs the template, a recipient hash and the status, never the address or key", async () => {
-      const channel = HttpCustomerIoTransactionalChannel.create({
+      const channel = Channel.create({
         apiKey: API_KEY,
         region: undefined,
         fetchFn: network(() => Promise.resolve(reply())).fetchFn,
