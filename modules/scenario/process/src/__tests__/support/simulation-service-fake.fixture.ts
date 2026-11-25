@@ -43,6 +43,7 @@ const sentWrites = [
   "recordCutAtLimit",
   "refreshMetadata",
   "recordHooks",
+  "recordRedTeamReport",
 ] as const satisfies readonly (keyof SimulationService)[];
 
 /** The registry's simulation reads, answered by a service-shaped fake; any other read throws. */

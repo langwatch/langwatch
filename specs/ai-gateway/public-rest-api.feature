@@ -396,6 +396,14 @@ Feature: Public REST API — /api/gateway/v1/*
     And unspecified fields (description) are left untouched
     And the key's own budget row reflects the new window
 
+  @integration @rest @regression
+  Scenario: Updating one config section keeps every other section of the key's config
+    Given a key whose config sets a model allowlist, a cache mode, rate limits and tags
+    When I PATCH the key with a config naming only `fallback`
+    Then the response status is 200
+    And the stored config has the new fallback
+    And the model allowlist, cache mode, rate limits and tags are unchanged
+
   @integration @rest @rbac
   Scenario: Re-scoping over REST demands manage at the new scope
     When a legacy project key PATCHes a key's scopes to organization

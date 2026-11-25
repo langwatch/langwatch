@@ -47,6 +47,91 @@ Feature: AI Gateway Governance — CLI login (RFC 8628 device-code flow)
     And it attempts to open the verification_uri in the default browser
     And it begins polling "/api/auth/cli/exchange" at the returned interval
 
+  # ---------------------------------------------------------------------------
+  # Code lifetime — a person often opens the link minutes after an agent sent it
+  # ---------------------------------------------------------------------------
+
+  @integration
+  Scenario: A device code lives 15 minutes
+    When the CLI POSTs to "/api/auth/cli/device-code"
+    Then the response says the code expires in 900 seconds
+    And the approval page still finds the code 14 minutes later
+    And the code and its short user code are stored for 900 seconds
+
+  @unit
+  Scenario: The CLI says how long the code lives
+    Given the server answered a device code that expires in 900 seconds
+    When the CLI prints the address to open
+    Then it says the code expires in 15 minutes
+    And it says that running the command again waits on the same code
+    And for a project key login it says to run it again in the same folder
+
+  @unit
+  Scenario: The CLI waits as long as the server says the code lives
+    Given the server answered a device code that expires in 900 seconds
+    When the CLI waits for the approval
+    Then it keeps polling until 900 seconds have passed
+    And it reports the login as expired only after that
+
+  @unit
+  Scenario: A login that stops before the approval is picked up by the next run
+    Given a login started a device code and stopped before the person approved it
+    When the same login runs again on the same machine before the code expires
+    Then it asks for no new code
+    And it waits on the code the earlier run started
+    And the approval the person gives that code signs the machine in
+
+  @unit
+  Scenario: A code in its last seconds is still picked up
+    Given a login left a pending device code with 30 seconds left
+    When the same login runs again
+    Then it waits on that code rather than asking for a new one
+
+  @unit
+  Scenario: A code past its expiry is not picked up
+    Given a login left a pending device code whose expiry has passed
+    When the same login runs again
+    Then it asks the server for a new code
+    And the expired code is no longer kept
+
+  @unit
+  Scenario: A finished login leaves another login's code alone
+    Given a login is waiting on a device code
+    And another login saved its own pending code since
+    When the first login finishes
+    Then the other login's pending code is kept
+
+  @unit
+  Scenario: A login for something else starts its own code
+    Given a login left a pending device code for one control plane
+    When a login runs against another control plane, another credential type,
+      or, for a project key login, from another folder
+    Then it asks the server for a new code
+
+  @unit
+  Scenario: A device session login is picked up from any folder
+    Given a device session login left a pending device code
+    When the same login runs again from another folder
+    Then it waits on the earlier code
+
+  @unit
+  Scenario: The pending code is kept beside the config, readable only by its owner
+    When a login saves the device code it waits on
+    Then the file sits next to the CLI config file
+    And only its owner can read or write it
+
+  @unit
+  Scenario: A picked up code that lapsed starts a fresh one
+    Given a login left a pending device code
+    When the next run waits on it and the server answers that it expired
+    Then the CLI asks for a new code and prints it
+
+  @unit
+  Scenario: A denied or finished login forgets its code
+    Given a login is waiting on a device code
+    When the person denies it, or the login finishes
+    Then the next run asks for a new code
+
   @bdd @cli @device-flow @sso
   Scenario: User completes browser SSO and approves the device
     Given the CLI is polling with a valid device_code

@@ -40,6 +40,11 @@ const modelProviderListEntrySchemaDefinition = z
     rateLimitRpd: z.number().int().nonnegative().nullable().optional(),
     fallbackPriorityGlobal: z.number().int().nullable().optional(),
     providerConfig: z.record(z.string(), z.unknown()).nullable().optional(),
+    /**
+     * The bare model ids the provider's own model list answered with (cached), or null when it
+     * was not asked or did not answer: the picker then falls back to the catalogue.
+     */
+    servedModels: z.array(z.string()).nullable().optional(),
     /** See the docblock: carried by the domain, dropped by the projection. */
     isSystem: z.boolean().optional(),
   })

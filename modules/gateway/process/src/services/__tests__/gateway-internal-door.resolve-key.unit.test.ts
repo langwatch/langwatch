@@ -1,4 +1,7 @@
-import type { GatewayInternalProtocol, GatewayVirtualKeyRecord } from "@langwatch/gateway-contract";
+import type {
+  GatewayInternalProtocol,
+  GatewayPresentedVirtualKey,
+} from "@langwatch/gateway-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { Temporal } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
@@ -8,7 +11,7 @@ import { GatewayInternalDoorService } from "../gateway-internal-door.service.ts"
 
 const AT = Temporal.Instant.from("2026-09-01T00:00:00.000Z");
 
-const customerKey: GatewayVirtualKeyRecord = {
+const customerKey: GatewayPresentedVirtualKey = {
   id: "vk-customer",
   organizationId: "org-1",
   name: "customer key",
@@ -28,6 +31,7 @@ const customerKey: GatewayVirtualKeyRecord = {
   revision: 4n,
   previousHashedSecret: null,
   previousSecretValidUntil: null,
+  presentedPreviousSecret: false,
   revokedAt: null,
   revokedById: null,
   createdAt: AT,
@@ -75,6 +79,91 @@ describe("the internal door's resolve-key", () => {
         expect.not.objectContaining({ connect_services: expect.anything() }),
       );
       expect(resolveLicenseToken).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when the key is inside a rotation grace", () => {
+    /** @scenario A token minted inside a rotation grace ends with the grace */
+    it("ends the old secret at the grace end and keeps the key's own expiry", async () => {
+      const graceEnd = Temporal.Now.instant().add({ seconds: 40 });
+      const keyExpiresAt = Temporal.Now.instant().add({ hours: 1 });
+      const signJwt = vi.fn(() => ({ jwt: "signed.jwt", expiresAt: 1 }));
+      const door = GatewayInternalDoorService.create({
+        protocol: createApiFixture<GatewayInternalProtocol>({
+          findVirtualKeyBySecret: vi.fn(async () => ({
+            ...customerKey,
+            expiresAt: keyExpiresAt,
+            previousHashedSecret: "old-hash",
+            previousSecretValidUntil: graceEnd,
+            presentedPreviousSecret: true,
+          })),
+          resolveLicenseToken: vi.fn(),
+          signJwt,
+          touchVirtualKeyUsage: async () => undefined,
+        }),
+      });
+
+      await door.answerResolveKey({
+        raw: JSON.stringify({ key_presented: VirtualKeyCryptoService.mintSecret() }),
+        node: undefined,
+      });
+
+      expect(signJwt).toHaveBeenCalledWith(
+        expect.objectContaining({ notAfter: keyExpiresAt, secretNotAfter: graceEnd }),
+      );
+    });
+
+    /** @scenario The current secret keeps its own expiry during a rotation grace */
+    it("keeps the current secret's token at its normal expiry", async () => {
+      const signJwt = vi.fn(() => ({ jwt: "signed.jwt", expiresAt: 1 }));
+      const door = GatewayInternalDoorService.create({
+        protocol: createApiFixture<GatewayInternalProtocol>({
+          findVirtualKeyBySecret: vi.fn(async () => ({
+            ...customerKey,
+            previousHashedSecret: "old-hash",
+            previousSecretValidUntil: Temporal.Now.instant().add({ seconds: 40 }),
+            presentedPreviousSecret: false,
+          })),
+          resolveLicenseToken: vi.fn(),
+          signJwt,
+          touchVirtualKeyUsage: async () => undefined,
+        }),
+      });
+
+      await door.answerResolveKey({
+        raw: JSON.stringify({ key_presented: VirtualKeyCryptoService.mintSecret() }),
+        node: undefined,
+      });
+
+      expect(signJwt).toHaveBeenCalledWith(expect.objectContaining({ notAfter: null }));
+      expect(signJwt).toHaveBeenCalledWith(
+        expect.not.objectContaining({ secretNotAfter: expect.anything() }),
+      );
+    });
+
+    it("ignores a grace that already ended", async () => {
+      const signJwt = vi.fn(() => ({ jwt: "signed.jwt", expiresAt: 1 }));
+      const door = GatewayInternalDoorService.create({
+        protocol: createApiFixture<GatewayInternalProtocol>({
+          findVirtualKeyBySecret: vi.fn(async () => ({
+            ...customerKey,
+            previousSecretValidUntil: Temporal.Now.instant().subtract({ seconds: 40 }),
+            presentedPreviousSecret: true,
+          })),
+          resolveLicenseToken: vi.fn(),
+          signJwt,
+          touchVirtualKeyUsage: async () => undefined,
+        }),
+      });
+
+      await door.answerResolveKey({
+        raw: JSON.stringify({ key_presented: VirtualKeyCryptoService.mintSecret() }),
+        node: undefined,
+      });
+
+      expect(signJwt).toHaveBeenCalledWith(
+        expect.not.objectContaining({ secretNotAfter: expect.anything() }),
+      );
     });
   });
 });

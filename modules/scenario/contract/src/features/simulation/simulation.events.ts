@@ -2,6 +2,7 @@ import type { Named } from "@langwatch/module";
 import { onboardingVariantSchema } from "@langwatch/onboarding-contract";
 import { z } from "zod";
 
+import { redTeamRunReportSchema } from "../../scenario.ts";
 import { scenarioEvaluationResultSchema } from "../../schemas/event-schemas.ts";
 import { scenarioRunHooksSchema } from "../execution/scenario-hooks.ts";
 import { runEvaluatorsSchema } from "../run/scenario-run-evaluators.ts";
@@ -435,6 +436,32 @@ export type SimulationRunCutAtLimitRecordedEvent = z.infer<
   typeof SimulationRunCutAtLimitRecordedEventSchema
 >;
 
+/** RedTeamReportRecorded: a red team run's held or broke report, folded into metadata `redTeam`. */
+const simulationRunRedTeamReportRecordedEventDataSchemaDefinition = z.object({
+  scenarioRunId: z.string(),
+  report: redTeamRunReportSchema,
+});
+export interface SimulationRunRedTeamReportRecordedEventDataSchema extends Named<
+  typeof simulationRunRedTeamReportRecordedEventDataSchemaDefinition
+> {}
+export const simulationRunRedTeamReportRecordedEventDataSchema: SimulationRunRedTeamReportRecordedEventDataSchema =
+  simulationRunRedTeamReportRecordedEventDataSchemaDefinition;
+
+const SimulationRunRedTeamReportRecordedEventSchemaDefinition = z.object({
+  ...simulationEventSchema.shape,
+  type: z.literal(SIMULATION_RUN_EVENT_TYPES.RED_TEAM_REPORT_RECORDED),
+  version: z.literal(SIMULATION_EVENT_VERSIONS.RED_TEAM_REPORT_RECORDED),
+  data: simulationRunRedTeamReportRecordedEventDataSchema,
+});
+export interface SimulationRunRedTeamReportRecordedEventSchema extends Named<
+  typeof SimulationRunRedTeamReportRecordedEventSchemaDefinition
+> {}
+export const SimulationRunRedTeamReportRecordedEventSchema: SimulationRunRedTeamReportRecordedEventSchema =
+  SimulationRunRedTeamReportRecordedEventSchemaDefinition;
+export type SimulationRunRedTeamReportRecordedEvent = z.infer<
+  typeof SimulationRunRedTeamReportRecordedEventSchema
+>;
+
 /**
  * MetadataRefreshed: a later attempt's metadata merged over the run's, since the started
  * event is first-wins. `attemptId` is the idempotency identity; `occurredAt` cannot be, as every
@@ -575,6 +602,7 @@ export type SimulationProcessingEvent =
   | SimulationRunCutAtLimitRecordedEvent
   | SimulationRunMetadataRefreshedEvent
   | SimulationRunHooksRecordedEvent
+  | SimulationRunRedTeamReportRecordedEvent
   | SimulationRunDeletedEvent
   | SimulationSetArchivedEvent;
 
@@ -584,6 +612,7 @@ export {
   isSimulationRunCancelRequestedEvent,
   isSimulationRunCutAtLimitRecordedEvent,
   isSimulationRunHooksRecordedEvent,
+  isSimulationRunRedTeamReportRecordedEvent,
   isSimulationRunDeletedEvent,
   isSimulationRunEvaluatedEvent,
   isSimulationRunFinishedEvent,

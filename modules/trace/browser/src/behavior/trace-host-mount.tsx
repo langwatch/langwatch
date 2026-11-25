@@ -5,6 +5,8 @@
  */
 
 import { useUiHostServices } from "@langwatch/browser-host/capabilities";
+import { useLentOperations } from "@langwatch/browser-host/lent";
+import { type LangyAsk, LangyAskToken } from "@langwatch/langy-client";
 import { useMemo, type ReactNode } from "react";
 
 import { traceApi } from "./trace-api.ts";
@@ -17,6 +19,7 @@ import {
   type TraceHostProject,
   type TraceHostTeam,
   type TraceHostUser,
+  type TraceLangyAskRequest,
   type TraceRouteReading,
   type TraceSuccessNotice,
 } from "./trace-host.ts";
@@ -40,6 +43,8 @@ type TraceHostActions = {
   readonly navigate: (to: string, options?: { replace?: boolean }) => void;
   readonly succeeded: (notice: TraceSuccessNotice) => void;
   readonly failed: (failure: TraceFailureNotice) => void;
+  /** What Langy lends by token; absent where Langy is not installed. */
+  readonly langy: (() => Promise<LangyAsk>) | undefined;
 };
 
 class HostServiceTraceHost extends TraceHostApi {
@@ -118,9 +123,16 @@ class HostServiceTraceHost extends TraceHostApi {
     return () => void 0;
   }
 
-  /** Likewise the ask: no capability carries the agent's composer yet. */
-  askLangy(): void {
-    // Nothing to hand it to.
+  /** Through what Langy lends by token; with Langy not installed nothing is lent. */
+  askLangy(request: TraceLangyAskRequest): void {
+    const { langy } = this.actions;
+    if (!langy) return;
+    // A failed load reports itself; the button stays, so asking again retries the load.
+    langy()
+      .then((lent) => lent.ask(request))
+      .catch((error: unknown) =>
+        this.actions.failed({ error, fallbackTitle: "Couldn't open Langy" }),
+      );
   }
 }
 
@@ -219,6 +231,7 @@ function organizationReading(input: {
  */
 export default function TraceHostMount({ children }: { children?: ReactNode }) {
   const { session, navigation, route, feedback } = useUiHostServices();
+  const langy = useLentOperations(LangyAskToken);
   const { organization, team, project } = session.snapshot().scope;
   const actor = session.currentUser();
   const isSettled = session.isSettled();
@@ -283,6 +296,7 @@ export default function TraceHostMount({ children }: { children?: ReactNode }) {
             options?.replace === true ? navigation.replace(to) : navigation.navigate(to),
           succeeded: (notice) => feedback.succeeded(notice),
           failed: (failure) => feedback.failed(failure),
+          langy,
         },
       ),
     [
@@ -307,6 +321,7 @@ export default function TraceHostMount({ children }: { children?: ReactNode }) {
       navigation,
       route,
       feedback,
+      langy,
     ],
   );
 

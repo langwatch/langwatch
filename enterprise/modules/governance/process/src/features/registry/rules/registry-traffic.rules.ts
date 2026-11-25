@@ -9,6 +9,12 @@ import type { RegistryDraft } from "./registry-entry.rules.ts";
 export const REGISTRY_TRAFFIC_WINDOW_MS = 30 * 24 * 60 * 60 * 1000;
 /** Distinct agent names read per project per reconcile. */
 export const REGISTRY_TRAFFIC_LIMIT_PER_PROJECT = 200;
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/** The traffic read reaches back over the shadow window or the dormancy window, the longer. */
+export function registryTrafficReadWindowMs(dormantAfterDays: number): number {
+  return Math.max(REGISTRY_TRAFFIC_WINDOW_MS, dormantAfterDays * DAY_MS);
+}
 
 function normalised(name: string): string {
   return name.trim().toLowerCase();
@@ -95,6 +101,10 @@ export function trafficAgentDrafts({
         source: "traffic",
         management: "observed",
         shadow: true,
+        dormant: false,
+        platform: null,
+        labels: {},
+        owner_label: null,
         kind: "traced_agent",
         name: agent.agentName,
         description: null,
@@ -113,4 +123,63 @@ export function trafficAgentDrafts({
     }
   }
   return drafts;
+}
+
+type SeenInProject = { projectId: string; agents: readonly TraceAgentSeen[] };
+
+/** The traced agents last seen at or after `sinceMs`, per project. */
+export function seenSince({
+  seen,
+  sinceMs,
+}: {
+  seen: readonly SeenInProject[];
+  sinceMs: number;
+}): SeenInProject[] {
+  return seen.map(({ projectId, agents }) => ({
+    projectId,
+    agents: agents.filter((agent) => agent.lastSeenMs >= sinceMs),
+  }));
+}
+
+/**
+ * Listed drafts with their dormancy: dormant when older than the window (first sighting or source
+ * creation, the earlier) with no trace in it, matched as shadow detection matches. An unsettled
+ * read keeps the held answer. Spec: specs/cloud-agent-discovery.feature
+ */
+export function withDormancy({
+  listed,
+  seen,
+  nowMs,
+  dormantAfterDays,
+  unsettledProjectIds = new Set(),
+}: {
+  listed: readonly RegistryDraft[];
+  seen: readonly SeenInProject[];
+  nowMs: number;
+  dormantAfterDays: number;
+  unsettledProjectIds?: ReadonlySet<string>;
+}): RegistryDraft[] {
+  const windowMs = dormantAfterDays * DAY_MS;
+  const sinceMs = nowMs - windowMs;
+  const traced = seenSince({ seen, sinceMs });
+  return listed.map((draft) => {
+    const referenceMs = Math.min(
+      draft.firstSeenAt.epochMilliseconds,
+      draft.sourceCreatedAt?.epochMilliseconds ?? Number.POSITIVE_INFINITY,
+    );
+    if (nowMs - referenceMs < windowMs) return { ...draft, dormant: false };
+    const accounted = listedAccounts([draft]);
+    const isTraced = traced.some(({ projectId, agents }) =>
+      agents.some((agent) =>
+        accounted({ projectId, name: agent.agentName, agentId: agent.agentId }),
+      ),
+    );
+    if (isTraced || draft.shadow) return { ...draft, dormant: false };
+    const unsettled =
+      draft.project_id === null
+        ? unsettledProjectIds.size > 0
+        : unsettledProjectIds.has(draft.project_id);
+    if (unsettled) return { ...draft, dormant: false, dormancyUnsettled: true };
+    return { ...draft, dormant: true };
+  });
 }

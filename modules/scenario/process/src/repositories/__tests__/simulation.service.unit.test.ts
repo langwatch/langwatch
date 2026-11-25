@@ -39,6 +39,7 @@ class RecordingExecution extends SimulationExecutionRepository {
   async refreshMetadata(): Promise<void> {}
 
   async recordHooks(): Promise<void> {}
+  async recordRedTeamReport(): Promise<void> {}
 }
 
 describe("SimulationService", () => {

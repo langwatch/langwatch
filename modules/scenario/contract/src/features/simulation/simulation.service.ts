@@ -5,6 +5,7 @@ import type {
   SimulationRecordCutAtLimit,
   SimulationRefreshMetadata,
   SimulationRecordHooks,
+  SimulationRecordRedTeamReport,
   SimulationFinishRun,
   SimulationMessageSnapshot,
   SimulationQueueRun,
@@ -185,4 +186,5 @@ export abstract class SimulationService {
   abstract recordCutAtLimit(input: SimulationRecordCutAtLimit): Promise<void>;
   abstract refreshMetadata(input: SimulationRefreshMetadata): Promise<void>;
   abstract recordHooks(input: SimulationRecordHooks): Promise<void>;
+  abstract recordRedTeamReport(input: SimulationRecordRedTeamReport): Promise<void>;
 }

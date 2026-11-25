@@ -19,6 +19,8 @@ import type {
 import type {
   IntegrationMethodChosenEventData,
   InviteAcceptedEventData,
+  OrganizationMemberAdmittedEventData,
+  OrganizationMemberRoleChangedEventData,
   MembersInvitedEventData,
   OrganizationSignedUpEventData,
 } from "@langwatch/organization-contract";
@@ -72,6 +74,7 @@ export function guidedOnboardingSignal({
     case "tour_skipped":
     case "tour_replayed":
     case "path_completed":
+    case "start_chosen":
       return {
         kind: "guided_onboarding_progress",
         ...source,
@@ -149,6 +152,7 @@ export function seededAtRead({
 
 /** The organization a settled evaluation was counted against, as nurturing's own store holds it. */
 type CountedOrganization = Readonly<{
+  organizationId: string;
   adminUserId: string | null;
   seeded: boolean;
   evaluationCount: number;
@@ -168,7 +172,7 @@ export function evaluationCompletedSignal({
   count: number;
   organization: CountedOrganization;
 }>): NurturingSignal[] {
-  const { adminUserId, seeded, evaluationCount } = organization;
+  const { organizationId, adminUserId, seeded, evaluationCount } = organization;
   if (!adminUserId) return [];
   return [
     {
@@ -179,6 +183,7 @@ export function evaluationCompletedSignal({
       userId: adminUserId,
       projectId: latest.projectId,
       evaluationId: latest.evaluationId,
+      organizationId,
       evaluatorType: latest.evaluatorType,
       score: latest.score,
       passed: latest.passed,
@@ -189,19 +194,28 @@ export function evaluationCompletedSignal({
   ];
 }
 
-/** Every member of the organization carries whether it holds a subscription. */
+/**
+ * Every member of the organization carries whether it holds a subscription and, once billing
+ * names it, the plan. A field billing left out stays out: an old fact invents no plan.
+ */
 export function subscriptionChangedSignal({
   data,
   aggregateId,
 }: OwnerEvent<SubscriptionChangedEventData>): NurturingSignal {
+  const { plan, fromCatchUp } = data;
+  const sourceEventId = fromCatchUp
+    ? `${aggregateId}:subscription:catch-up:${data.occurredAt}`
+    : `${aggregateId}:subscription:${data.hasSubscription}:${data.occurredAt}`;
   return {
     kind: "subscription_changed",
-    sourceEventId: `${aggregateId}:subscription:${data.hasSubscription}:${data.occurredAt}`,
+    sourceEventId,
     tenantId: data.tenantId,
     occurredAt: data.occurredAt,
     organizationId: data.organizationId,
     memberUserIds: data.memberUserIds,
     hasSubscription: data.hasSubscription,
+    ...(plan === undefined ? {} : { plan }),
+    ...(fromCatchUp === undefined ? {} : { fromCatchUp }),
   };
 }
 
@@ -335,6 +349,43 @@ export function inviteAcceptedSignal({
   const sourceEventId = `${aggregateId}:${data.inviteId}`;
   const who = { userId, organizationId, organizationName, role };
   return { kind: "invite_accepted", sourceEventId, tenantId, occurredAt, ...who };
+}
+
+/** An admin's change of a member's role, once per person and moment. */
+export function memberRoleChangedSignal({
+  data,
+  aggregateId,
+}: OwnerEvent<OrganizationMemberRoleChangedEventData>): NurturingSignal {
+  const { tenantId, occurredAt, userId, organizationId, role, previousRole } = data;
+  const sourceEventId = `${aggregateId}:role:${userId}:${occurredAt}`;
+  return {
+    kind: "member_role_changed",
+    sourceEventId,
+    tenantId,
+    occurredAt,
+    userId,
+    organizationId,
+    role,
+    previousRole,
+  };
+}
+
+/** A person's admission by a path with no joined fact, once per person and moment. */
+export function memberAdmittedSignal({
+  data,
+  aggregateId,
+}: OwnerEvent<OrganizationMemberAdmittedEventData>): NurturingSignal {
+  const { tenantId, occurredAt, userId, organizationId, role } = data;
+  const sourceEventId = `${aggregateId}:admitted:${userId}:${occurredAt}`;
+  return {
+    kind: "member_admitted",
+    sourceEventId,
+    tenantId,
+    occurredAt,
+    userId,
+    organizationId,
+    role,
+  };
 }
 
 /** A person's chosen integration method, under their own id. */

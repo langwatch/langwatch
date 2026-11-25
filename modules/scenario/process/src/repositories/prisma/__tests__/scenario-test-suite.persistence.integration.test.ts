@@ -120,6 +120,7 @@ function service(clock = new TestClock()): ScenarioServiceContract {
     recordCutAtLimit: async () => {},
     refreshMetadata: async () => {},
     recordHooks: async () => {},
+    recordRedTeamReport: async () => {},
   } satisfies SimulationService;
 
   return ScenarioServiceContract.create({

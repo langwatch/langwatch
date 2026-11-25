@@ -27,6 +27,8 @@ type Holder = Readonly<{
   permissions: string[] | undefined;
   userId?: string;
   email?: string | null;
+  /** A Billing-only member or invitation holds no seat (ADR-205). */
+  billingOnly?: boolean;
 }>;
 
 /** Seat counts over organization's membership and invitation rows, through its shares (PC-SCIM-SEAT). */
@@ -69,7 +71,7 @@ export class PrismaScimSeatRepository implements ScimSeatRepository {
     const [users, customRoles, invites] = await Promise.all([
       this.prisma.organizationUser.findMany({
         where: { organizationId, disabledAt: null, user: { deactivatedAt: null } },
-        select: { userId: true, role: true },
+        select: { userId: true, role: true, billingOnly: true },
       }),
       this.prisma.customRole.findMany({
         where: { organizationId },
@@ -81,7 +83,7 @@ export class PrismaScimSeatRepository implements ScimSeatRepository {
           status: INVITE_STATUS.PENDING,
           OR: [{ expiration: { gt: toDate(nowInstant()) } }, { expiration: null }],
         },
-        select: { role: true, teamAssignments: true, email: true },
+        select: { role: true, teamAssignments: true, email: true, billingOnly: true },
       }),
     ]);
     const rolePermissions = new Map(
@@ -103,10 +105,12 @@ export class PrismaScimSeatRepository implements ScimSeatRepository {
         role: u.role,
         permissions: externalPermissions.get(u.userId),
         userId: u.userId,
+        billingOnly: u.billingOnly,
       })),
       ...invites.map((invite) => ({
         role: invite.role,
         email: invite.email,
+        billingOnly: invite.billingOnly,
         permissions: permissionsOf(
           (teamAssignmentsSchema.safeParse(invite.teamAssignments).data ?? []).map(
             (assignment) => assignment.customRoleId,

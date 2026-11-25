@@ -165,6 +165,13 @@ Feature: Shared Dataset service
     When the project's datasets are read
     Then the columns read as name and type and the dataset lists, never a 422 for the whole project
 
+  @unit @regression
+  Scenario: An import refused before its file is read gives the file's connection back
+    Given a dataset import from a stored file
+    When the import is refused before the first byte of the file is read
+    Then the file's byte stream is ended, so it holds no storage connection
+    And the file is opened only once the organization's limits have been read
+
   @integration
   Scenario: A storage migration pages one project's datasets by id, archived ones included
     Given a project holding a live and an archived dataset, and another project holding one

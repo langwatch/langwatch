@@ -12,6 +12,7 @@ import type {
   SimulationRecordCutAtLimit,
   SimulationRefreshMetadata,
   SimulationRecordHooks,
+  SimulationRecordRedTeamReport,
 } from "@langwatch/scenario-contract";
 
 /** Eventing is application composition; Simulation dispatches through this repository. */
@@ -29,4 +30,5 @@ export abstract class SimulationExecutionRepository {
   abstract recordCutAtLimit(input: SimulationRecordCutAtLimit): Promise<void>;
   abstract refreshMetadata(input: SimulationRefreshMetadata): Promise<void>;
   abstract recordHooks(input: SimulationRecordHooks): Promise<void>;
+  abstract recordRedTeamReport(input: SimulationRecordRedTeamReport): Promise<void>;
 }

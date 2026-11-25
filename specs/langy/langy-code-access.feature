@@ -176,6 +176,18 @@ Feature: Langy asks how to reach the customer's code, once
       And the card offers to try again
       And the card never keeps its loading line for a read that failed
 
+    # A cloud replay showed "Conversation not found" on the first message: the
+    # card and the panel read the folder state before the new conversation's
+    # projection folded, and the not-found stayed on the card.
+    @integration
+    Scenario: The card of a conversation that is still being created waits for it
+      Given I sent the first message of a new conversation
+      And its record has not been written yet
+      When the code access card renders
+      Then the card keeps its checking line and reads nothing yet
+      And no "Conversation not found" shows
+      And once the conversation is confirmed the card reads the folder state and asks
+
     @integration
     Scenario: Only the newest code access card can be answered
       Given Langy asked for code access earlier in this conversation
@@ -346,6 +358,15 @@ Feature: Langy asks how to reach the customer's code, once
       When I open the integrations settings
       Then the GitHub section shows that Langy uses GitHub for code changes
       And clearing it makes the next code change ask again
+
+    # The person's own record checked the call against the id alone, which
+    # refused the choice it was carrying, so a ticked remember box failed with
+    # "Check your input" every time.
+    @unit
+    Scenario: The person's record stores and clears the remembered choice
+      Given a signed-in person
+      When the remembered choice is set to GitHub, then cleared
+      Then each call is accepted and reaches their record with the choice it carried
 
     @unit
     Scenario: The local folder is never remembered

@@ -15,7 +15,6 @@ interface LangyTurnAttemptIdentity {
 
 /** Owns every compensating action until the durable turn acceptance commits. */
 export class LangyTurnAttemptService {
-  private permitReserved = false;
   private mintedApiKeyId: string | null = null;
   private turnCommitted = false;
 
@@ -29,10 +28,6 @@ export class LangyTurnAttemptService {
     deps: LangyTurnServiceDeps,
   ): LangyTurnAttemptService {
     return new LangyTurnAttemptService(identity, deps);
-  }
-
-  retainPermit(reserved: boolean): void {
-    this.permitReserved = reserved;
   }
 
   retainSessionKey(apiKeyId: string): void {
@@ -64,10 +59,6 @@ export class LangyTurnAttemptService {
     }
 
     const cleanups: Promise<unknown>[] = [this.deps.admission.abort({ ...this.identity })];
-    if (this.permitReserved) {
-      cleanups.push(this.deps.permits.release({ userId: this.identity.userId }));
-    }
-
     if (this.mintedApiKeyId) {
       cleanups.push(
         this.deps.sessionKeys.revoke({
