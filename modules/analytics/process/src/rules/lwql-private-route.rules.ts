@@ -38,17 +38,6 @@ export function readServerAddress({ url }: { url: string }): LwqlServerAddressRe
   }
 }
 
-/** Whether two addresses are one server and database. */
-export function isSameServerAddress({
-  left,
-  right,
-}: {
-  left: LwqlServerAddress;
-  right: LwqlServerAddress;
-}): boolean {
-  return left.origin === right.origin && left.database === right.database;
-}
-
 /**
  * The route's server and database, or a fixed refusal reason that carries none of the URL: a bad
  * scheme, no database (never the shared deployment's), a non-identifier or a reserved name.

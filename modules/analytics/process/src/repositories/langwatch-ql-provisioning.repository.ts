@@ -67,6 +67,14 @@ export interface ClickHouseAdminStatements {
   }): Promise<void>;
 }
 
+/** One row policy: the table it guards and who it applies to. */
+export interface LwqlRowPolicy {
+  readonly table: string;
+  readonly appliesTo: readonly string[];
+  readonly appliesToAll: boolean;
+  readonly hasExceptions: boolean;
+}
+
 /** The admin ClickHouse the access model is provisioned on, over one connection per run. */
 export abstract class LangWatchQLProvisioningRepository {
   abstract runStatements(input: {
@@ -111,14 +119,8 @@ export abstract class LangWatchQLProvisioningRepository {
   }): Promise<ConfigStoreLwqlEntity[]>;
   abstract probeOwner(input: { names: LwqlAccessModelIdentity }): Promise<LwqlAccessModelOwner>;
   abstract queryRows(sql: string): Promise<Record<string, unknown>[]>;
-  /**
-   * The `database.table` names among `tables` that `reader` is not guarded on: no row policy for
-   * it, or one that applies to everyone or all but some, which would OR with its own.
-   */
-  abstract findUnguardedTables(input: {
-    reader: string;
-    tables: readonly string[];
-  }): Promise<string[]>;
+  /** Every row policy on `tables` (`database.table`), as the server holds it. */
+  abstract findRowPolicies(input: { tables: readonly string[] }): Promise<LwqlRowPolicy[]>;
   abstract findKeyMapHashes(input: { table: string; tenantId: string }): Promise<string[]>;
   abstract insertKeyMapRows(input: {
     table: string;

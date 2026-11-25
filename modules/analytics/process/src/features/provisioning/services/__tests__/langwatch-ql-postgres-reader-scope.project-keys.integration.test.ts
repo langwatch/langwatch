@@ -9,8 +9,11 @@ import { createHash } from "node:crypto";
 
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
+import { PrismaLangWatchQLPostgresRepository } from "../../../../repositories/prisma/prisma.langwatch-ql-postgres.repository.ts";
 import { LWQL_PROJECT_KEYS_VIEW } from "../../rules/lwql-scoped-view.rules.ts";
 import {
+  ADMIN,
+  GROUP,
   PROJECT_A,
   PROJECT_B,
   provisioning,
@@ -86,6 +89,26 @@ describe("given the scoped project-keys copy over two organisations", () => {
     expect(Object.keys(seen.rows[0] ?? {}).toSorted()).toEqual(["KeyHash", "TenantId"]);
     expect(seen.text).not.toContain(keyOf(PROJECT_A));
     expect(seen.rows.map((row) => row.TenantId)).not.toContain(NO_KEY_PROJECT);
+  });
+
+  /** @scenario "The Postgres scoped schema carries a row-scoped copy of each project's key capability" */
+  it("passes the scoped-view guard and is granted, so a drift check never rebuilds it", async () => {
+    const connection = harness.connect(ADMIN);
+    try {
+      const state = await PrismaLangWatchQLPostgresRepository.create(
+        connection.database,
+      ).findScopedViewState({
+        appSchema: SCHEMA,
+        group: GROUP,
+        views: [LWQL_PROJECT_KEYS_VIEW],
+      });
+
+      expect(state.copies).toMatchObject([
+        { view: LWQL_PROJECT_KEYS_VIEW, exists: true, passesGuard: true },
+      ]);
+    } finally {
+      await connection.close();
+    }
   });
 
   /** @scenario "The Postgres scoped schema carries a row-scoped copy of each project's key capability" */

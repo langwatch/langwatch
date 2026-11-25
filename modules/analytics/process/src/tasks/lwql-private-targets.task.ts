@@ -13,9 +13,9 @@ import {
 } from "../features/provisioning/services/langwatch-ql-self-provisioning.service.ts";
 import { ClickHouseLangWatchQLProvisioningRepository } from "../repositories/clickhouse/clickhouse.langwatch-ql-provisioning.repository.ts";
 import { clickHouseErrorSummary } from "../rules/langwatch-ql-config-store.rules.ts";
+import { unguardedTables } from "../rules/lwql-private-policies.rules.ts";
 import { type LwqlPrivateReader, privateReaderOf } from "../rules/lwql-private-reader.rules.ts";
 import {
-  isSameServerAddress,
   type LwqlServerAddress,
   readPrivateRoute,
   readServerAddress,
@@ -25,8 +25,9 @@ import type { LwqlConvergencePlan } from "./lwql-provision.task.ts";
 
 const logger = createLogger("langwatch:task:lwql-private-targets");
 const selfProvisioning = LangWatchQLSelfProvisioningService.create();
+const sqlText = LangWatchQLSqlTextService.create();
 
-/** One unresponsive customer server must not hold the deploy: each request is bounded. */
+/** Bounds each request, not each target, so one unresponsive server cannot hold the deploy. */
 const PRIVATE_REQUEST_TIMEOUT_MS = 15_000;
 
 const SINGLE_NODE_BYPASS = "LWQL_ACCESS_MODEL_SQL_SINGLE_NODE";
@@ -91,27 +92,36 @@ export function privatePlanOf({
   };
 }
 
-/** The source tables the reader has no sole row policy on; none means every one is guarded. */
-async function findUnguardedTables({
+/** The source tables and the key map the reader has no sole row policy on; none means guarded. */
+async function tablesWithoutOwnPolicy({
   plan,
   reader,
 }: {
   plan: LwqlConvergencePlan;
   reader: LwqlPrivateReader;
 }): Promise<string[]> {
-  const sqlText = LangWatchQLSqlTextService.create();
+  const database = sqlText.assertIdentifier(plan.sourceDatabase(), "database");
+  const tables = [
+    ...selfProvisioning.policedTables({ names: plan.names, sourceDatabase: database }),
+    `${database}.${plan.names.keyMapTable}`,
+  ];
   const repository = plan.openRepository();
   try {
-    return await repository.findUnguardedTables({
+    const policies = await repository.findRowPolicies({ tables });
+    return unguardedTables({
+      policies,
+      tables,
       reader: sqlText.assertIdentifier(reader.username, "reader"),
-      tables: selfProvisioning.policedTables({
-        names: plan.names,
-        sourceDatabase: sqlText.assertIdentifier(plan.sourceDatabase(), "database"),
-      }),
     });
   } finally {
     await repository.close();
   }
+}
+
+/** Plain code-point order, so the owner of a database never depends on the locale. */
+function compareCodePoints({ left, right }: { left: string; right: string }): number {
+  if (left < right) return -1;
+  return left > right ? 1 : 0;
 }
 
 /** One private server: converge its ClickHouse half, then check every table is row-policed. */
@@ -127,7 +137,7 @@ async function provisionOne({
   converge: (plan: LwqlConvergencePlan) => Promise<void>;
 }): Promise<void> {
   await converge(plan);
-  const unguarded = await findUnguardedTables({ plan, reader });
+  const unguarded = await tablesWithoutOwnPolicy({ plan, reader });
   if (unguarded.length === 0) return;
   logger.warn(
     { organizationId, tables: unguarded },
@@ -156,19 +166,19 @@ function warnNotProvisioned({
   );
 }
 
-/** Why a route may not be provisioned, or null: unreadable, or the shared server's own database. */
+/** Why a route may not be provisioned: unreadable, or on a shared server whatever its database. */
 function refusalOf({
   endpoint,
-  sharedAddress,
+  sharedOrigins,
 }: {
   endpoint: LwqlPrivateEndpoint;
-  sharedAddress: LwqlServerAddress | null;
+  sharedOrigins: readonly string[];
 }): { address: LwqlServerAddress } | { reason: string } {
   const read = readPrivateRoute({ url: endpoint.url });
   if ("refusal" in read) return { reason: read.refusal };
   // A private reader's `CREATE OR REPLACE` would take over the shared server's row policies.
-  if (sharedAddress !== null && isSameServerAddress({ left: read.route, right: sharedAddress })) {
-    return { reason: "the route names the shared server's database" };
+  if (sharedOrigins.includes(read.route.origin)) {
+    return { reason: "the route names a shared server" };
   }
   return { address: read.route };
 }
@@ -176,11 +186,11 @@ function refusalOf({
 /** The address this endpoint may provision, or `skipped` once warned about or already owned. */
 function claimServer({
   endpoint,
-  sharedAddress,
+  sharedOrigins,
   owners,
 }: {
   endpoint: LwqlPrivateEndpoint;
-  sharedAddress: LwqlServerAddress | null;
+  sharedOrigins: readonly string[];
   owners: Map<string, string>;
 }): { claimed: LwqlServerAddress } | { skipped: true } {
   const { organizationId } = endpoint;
@@ -188,7 +198,7 @@ function claimServer({
     logger.warn("LangWatchQL private provisioning skipped a route that names no organisation");
     return { skipped: true };
   }
-  const checked = refusalOf({ endpoint, sharedAddress });
+  const checked = refusalOf({ endpoint, sharedOrigins });
   if ("reason" in checked) {
     logger.warn(
       { organizationId, reason: checked.reason },
@@ -213,7 +223,7 @@ function claimServer({
 /**
  * Converges each distinct private server and never throws: a failed target warns, URL and
  * passwords left out, and its organisation stays refused. The first organisation in id order owns
- * a server and database; another claiming it is refused. No key pepper, no reader, no target.
+ * a server and database; another claiming it is refused (this run only). No pepper, no target.
  */
 export async function provisionLwqlPrivateTargets({
   endpoints,
@@ -236,17 +246,16 @@ export async function provisionLwqlPrivateTargets({
     );
     return;
   }
-  const sharedRead = sharedUrl === undefined ? undefined : readServerAddress({ url: sharedUrl });
-  const sharedAddress =
-    sharedRead === undefined || "unreadable" in sharedRead
-      ? null
-      : { origin: sharedRead.address.origin, database: shared.sourceDatabase() };
+  const sharedOrigins = [sharedUrl, shared.request.connection.url].flatMap((url) => {
+    const read = url === undefined ? undefined : readServerAddress({ url });
+    return read === undefined || "unreadable" in read ? [] : [read.address.origin];
+  });
   const owners = new Map<string, string>();
   const ordered = [...endpoints].toSorted((a, b) =>
-    (a.organizationId ?? "").localeCompare(b.organizationId ?? ""),
+    compareCodePoints({ left: a.organizationId ?? "", right: b.organizationId ?? "" }),
   );
   for (const endpoint of ordered) {
-    const claimed = claimServer({ endpoint, sharedAddress, owners });
+    const claimed = claimServer({ endpoint, sharedOrigins, owners });
     if ("skipped" in claimed) continue;
     const { organizationId } = endpoint;
     if (organizationId === undefined) continue;

@@ -23,6 +23,7 @@ import {
   type LwqlCollectionState,
   type LwqlKeyMapInsertRow,
   type LwqlPostgresCredentials,
+  type LwqlRowPolicy,
   type ProvisioningFailureLevel,
   type RunClickHouseStatementsResult,
   type SkippedProvisioningStatement,
@@ -406,27 +407,19 @@ export class ClickHouseLangWatchQLProvisioningRepository extends LangWatchQLProv
     return this.client.rows(sql);
   }
 
-  async findUnguardedTables({
-    reader,
-    tables,
-  }: {
-    reader: string;
-    tables: readonly string[];
-  }): Promise<string[]> {
+  async findRowPolicies({ tables }: { tables: readonly string[] }): Promise<LwqlRowPolicy[]> {
     const rows = await this.client.rows(
-      `SELECT concat(database, '.', table) AS name, ` +
-        `countIf(has(apply_to_list, {reader:String})) AS own, ` +
-        `countIf(apply_to_all OR length(apply_to_except) > 0) AS broad ` +
-        `FROM system.row_policies WHERE concat(database, '.', table) IN {tables:Array(String)} ` +
-        `GROUP BY name`,
-      { reader, tables: [...tables] },
+      `SELECT concat(database, '.', table) AS name, apply_to_list, apply_to_all, ` +
+        `length(apply_to_except) > 0 AS has_exceptions FROM system.row_policies ` +
+        `WHERE concat(database, '.', table) IN {tables:Array(String)}`,
+      { tables: [...tables] },
     );
-    const guarded = new Set(
-      rows
-        .filter((row) => Number(row.own) > 0 && Number(row.broad) === 0)
-        .map((row) => String(row.name)),
-    );
-    return tables.filter((table) => !guarded.has(table));
+    return rows.map((row) => ({
+      table: String(row.name),
+      appliesTo: Array.isArray(row.apply_to_list) ? row.apply_to_list.map(String) : [],
+      appliesToAll: Number(row.apply_to_all) > 0,
+      hasExceptions: Number(row.has_exceptions) > 0,
+    }));
   }
 
   /** @param table Already qualified and validated by `keyMapTableQualifiedName`. */

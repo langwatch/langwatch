@@ -219,7 +219,7 @@ describe("LangWatchQLPlacementGateService", () => {
   });
 
   describe("given two organisations routed to one origin", () => {
-    /** @scenario "A second organization on an already-provisioned private database is refused and warned" */
+    /** @scenario "A second organization on a private database claimed in the same run is refused and warned" */
     it("probes each on its own, so the first's answer never admits the second", async () => {
       const answers: LangWatchQLAccessModelAnswer[] = ["provisioned", "not_provisioned"];
       const { run, privateProbes } = serviceOver({

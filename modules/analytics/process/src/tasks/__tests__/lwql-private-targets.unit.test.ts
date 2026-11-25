@@ -16,10 +16,12 @@ import { privateReaderOf } from "../../rules/lwql-private-reader.rules.ts";
 import { provisionLwqlPrivateTargets } from "../lwql-private-targets.task.ts";
 import { convergeLwqlPrivateRepository, type LwqlConvergencePlan } from "../lwql-provision.task.ts";
 
-const { logCalls, policyRows, policyChecks } = vi.hoisted(() => ({
+const { logCalls, policyRows, policyChecks, readerByUrl } = vi.hoisted(() => ({
   logCalls: [] as { level: string; fields: unknown; message: unknown }[],
+  /** 1: each table has the reader's own policy; 0: the first has none; 2: only another reader's. */
   policyRows: { n: 1 },
-  policyChecks: [] as { reader: string; tables: readonly string[] }[],
+  policyChecks: [] as { url: string; tables: readonly string[] }[],
+  readerByUrl: new Map<string, string>(),
 }));
 vi.mock("@langwatch/observability", async (importActual) => {
   const actual = await importActual<typeof Observability>();
@@ -40,10 +42,16 @@ vi.mock("@langwatch/observability", async (importActual) => {
 });
 vi.mock("../../repositories/clickhouse/clickhouse.langwatch-ql-provisioning.repository.ts", () => ({
   ClickHouseLangWatchQLProvisioningRepository: {
-    open: () => ({
-      findUnguardedTables: async (input: { reader: string; tables: readonly string[] }) => {
-        policyChecks.push(input);
-        return policyRows.n > 0 ? [] : [input.tables[0] ?? ""];
+    open: ({ url }: { url: string }) => ({
+      findRowPolicies: async ({ tables }: { tables: readonly string[] }) => {
+        policyChecks.push({ url, tables });
+        const reader = policyRows.n === 2 ? "langwatch_lwql_other" : (readerByUrl.get(url) ?? "");
+        return (policyRows.n === 0 ? tables.slice(1) : tables).map((table) => ({
+          table,
+          appliesTo: [reader],
+          appliesToAll: false,
+          hasExceptions: false,
+        }));
       },
       close: async () => undefined,
     }),
@@ -89,11 +97,18 @@ function run({
   endpoints,
   keyPepper = PEPPER,
   converge = async () => undefined,
+  shared = SHARED_PLAN,
 }: {
   endpoints: { organizationId?: string; url: string }[];
   keyPepper?: string | null;
   converge?: (plan: LwqlConvergencePlan) => Promise<void>;
+  shared?: LwqlConvergencePlan;
 }) {
+  for (const { organizationId, url } of endpoints) {
+    if (organizationId) {
+      readerByUrl.set(url, privateReaderOf({ keyPepper: PEPPER, organizationId }).username);
+    }
+  }
   const converged = vi.fn(converge);
   return {
     converged,
@@ -101,7 +116,7 @@ function run({
       endpoints,
       sharedUrl: SHARED_URL,
       keyPepper: keyPepper ?? undefined,
-      shared: SHARED_PLAN,
+      shared,
       converge: converged,
     }),
   };
@@ -166,7 +181,7 @@ describe("given a private ClickHouse whose admin user the route URL carries", ()
 });
 
 describe("given two organisations whose routes name one server and database", () => {
-  /** @scenario "A second organization on an already-provisioned private database is refused and warned" */
+  /** @scenario "A second organization on a private database claimed in the same run is refused and warned" */
   it("converges it once for the first organisation in id order and warns for the other", async () => {
     const { converged, done } = run({
       endpoints: [
@@ -187,7 +202,7 @@ describe("given two organisations whose routes name one server and database", ()
     expect(JSON.stringify(logCalls)).not.toContain("other-admin");
   });
 
-  /** @scenario "A second organization on an already-provisioned private database is refused and warned" */
+  /** @scenario "A second organization on a private database claimed in the same run is refused and warned" */
   it("converges one organisation's route listed twice once, with no warning", async () => {
     const { converged, done } = run({
       endpoints: [
@@ -203,7 +218,7 @@ describe("given two organisations whose routes name one server and database", ()
 });
 
 describe("given a private route naming the shared server's own database", () => {
-  /** @scenario "A private route naming the shared server's database is refused and warned" */
+  /** @scenario "A private route naming a shared server's origin is refused and warned" */
   it("refuses it however the URL is spelt, converges nothing and warns naming the organisation", async () => {
     const { converged, done } = run({
       endpoints: [
@@ -218,19 +233,42 @@ describe("given a private route naming the shared server's own database", () => 
     });
   });
 
-  /** @scenario "A private route naming the shared server's database is refused and warned" */
-  it("still provisions another database on the shared server's origin", async () => {
+  /** @scenario "A private route naming a shared server's origin is refused and warned" */
+  it("refuses another database on the shared server's origin too", async () => {
     const { converged, done } = run({
-      endpoints: [{ organizationId: "org-a", url: "http://admin:pw@shared.invalid:8123/acme_db" }],
+      endpoints: [
+        { organizationId: "org-a", url: "http://admin:pw@shared.invalid:8123/analytics" },
+      ],
     });
     await done;
 
-    expect(converged).toHaveBeenCalledTimes(1);
+    expect(converged).not.toHaveBeenCalled();
+    expect(logCalls.find((call) => call.level === "warn")?.fields).toMatchObject({
+      organizationId: "org-a",
+    });
+  });
+
+  /** @scenario "A private route naming a shared server's origin is refused and warned" */
+  it("refuses a route on the LangWatchQL connection's origin when that is set apart", async () => {
+    const apart: LwqlConvergencePlan = {
+      ...SHARED_PLAN,
+      request: {
+        ...SHARED_PLAN.request,
+        connection: { ...SHARED_PLAN.request.connection, url: "http://lwql.invalid:8123" },
+      },
+    };
+    const { converged, done } = run({
+      endpoints: [{ organizationId: "org-a", url: "http://admin:pw@LWQL.invalid:8123/analytics" }],
+      shared: apart,
+    });
+    await done;
+
+    expect(converged).not.toHaveBeenCalled();
   });
 });
 
 describe("given a route whose database name is not a plain identifier", () => {
-  /** @scenario "A private route naming the shared server's database is refused and warned" */
+  /** @scenario "A private route naming a shared server's origin is refused and warned" */
   it("refuses it before any statement or query, and warns without the URL", async () => {
     const { converged, done } = run({
       endpoints: [{ organizationId: "org-a", url: "https://admin:pw@acme.invalid/acme'db" }],
@@ -293,10 +331,13 @@ describe("given a private ClickHouse provisioned without error", () => {
     expect(logCalls.filter((call) => call.level === "warn")).toHaveLength(1);
 
     const [check] = policyChecks;
-    expect(check?.reader).toBe(
-      privateReaderOf({ keyPepper: PEPPER, organizationId: "org-acme" }).username,
-    );
     expect(check?.tables).toContain("acme_db.trace_summaries");
+    expect(check?.tables).toContain("acme_db.lwql_project_keys");
+
+    logCalls.length = 0;
+    policyRows.n = 2;
+    await run({ endpoints: [{ organizationId: "org-acme", url: ADMIN_URL }] }).done;
+    expect(logCalls.filter((call) => call.level === "warn")).toHaveLength(1);
 
     logCalls.length = 0;
     policyRows.n = 1;

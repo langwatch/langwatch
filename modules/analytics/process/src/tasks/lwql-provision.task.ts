@@ -67,7 +67,10 @@ import {
 } from "../rules/lwql-default-credentials.rules.ts";
 import type { LangWatchQLNames } from "../services/langwatch-ql-access-model.service.ts";
 import { LangWatchQLSqlModeClusterGuardService } from "../services/langwatch-ql-sql-mode-cluster-guard.service.ts";
-import { provisionLwqlPrivateTargets } from "./lwql-private-targets.task.ts";
+import {
+  type LwqlPrivateEndpoint,
+  provisionLwqlPrivateTargets,
+} from "./lwql-private-targets.task.ts";
 
 const lwqlProvisioning = LangWatchQLProductionProvisioningService.create();
 const clusterGuard = LangWatchQLSqlModeClusterGuardService.create();
@@ -752,7 +755,7 @@ export async function convergeLwqlAccessModel(input: LwqlConvergenceInput): Prom
   await attemptLwqlConvergence(input);
 }
 
-interface LwqlConvergenceInput {
+export interface LwqlConvergenceInput {
   database: LwqlProvisioningDatabase;
   plan: LwqlConvergencePlan;
   failOnError?: boolean;
@@ -923,7 +926,7 @@ function privateEndpointsOf({
   source,
 }: {
   source: Record<string, string | undefined>;
-}): ReturnType<typeof resolveClickHouseMigrationTaskConfig>["privateEndpoints"] {
+}): readonly LwqlPrivateEndpoint[] {
   try {
     return resolveClickHouseMigrationTaskConfig({ ...source }).privateEndpoints;
   } catch (error) {

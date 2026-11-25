@@ -13,7 +13,7 @@ class KeyMap extends LangWatchQLProvisioningRepository {
   inventoryConfigStore = vi.fn();
   probeOwner = vi.fn();
   queryRows = vi.fn();
-  findUnguardedTables = vi.fn();
+  findRowPolicies = vi.fn();
   readInventory = vi.fn();
   readCollectionState = vi.fn();
   probePostgresCollection = vi.fn();

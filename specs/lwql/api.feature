@@ -810,15 +810,15 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
     And that user's password is never written into a statement
 
   @unit
-  Scenario: A second organization on an already-provisioned private database is refused and warned
-    Given two organizations whose routes name the same server and database, whatever their credentials
+  Scenario: A second organization on a private database claimed in the same run is refused and warned
+    Given two organizations whose routes in one run name the same server and database
     When the upgrade provisions LangWatchQL
-    Then that database is converged once, for the first organization in id order
+    Then that database is converged once, for the first organization in code-point id order
     And the other is refused with a warning naming it, and its queries stay refused
 
   @unit
-  Scenario: A private route naming the shared server's database is refused and warned
-    Given an organization whose route names the same origin and database as the shared ClickHouse
+  Scenario: A private route naming a shared server's origin is refused and warned
+    Given an organization whose route names the origin of the shared ClickHouse or of its LangWatchQL connection, whatever the database
     When the upgrade provisions LangWatchQL
     Then nothing is converged for it and a warning names the organization
 
@@ -909,7 +909,7 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
   @unit
   Scenario: A private ClickHouse with a source table not policed for the reader after provisioning warns
     Given a private ClickHouse provisioned without error
-    And a source table has no row policy for the organization's reader, or one applying to all or all but some
+    And a source table or the key map has no row policy for the organization's reader, or one applying to all or all but some
     When the post-provisioning check reads the server
     Then a warning names the tables and says its queries are not isolated
 
