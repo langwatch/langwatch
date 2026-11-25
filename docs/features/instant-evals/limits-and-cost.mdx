@@ -36,7 +36,7 @@ For example, the first run on the [overview](/features/instant-evals/overview) j
 
 LangWatch can turn on routed search for your organization; it is off until then. With it on, a judged LangWatchQL query is answered by the LangWatch Judge, which may check a question more than once. Its price is what those checks cost LangWatch, plus 30%, rather than the rate above. Runs keep the rate above.
 
-Each routed query is held at its cap before it starts, and sends no check the cap has no room left for: that text keeps the answer it already has, or is skipped as rate limited.
+Each routed query is held at its per-query cost ceiling before it starts, 0.78 USD by default. No check is sent once the ceiling has no room left for it. That text keeps the answer it already has, or is skipped as `query_cost_ceiling`.
 
 ## Reading the cost before you start
 

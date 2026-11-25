@@ -10,10 +10,13 @@ import {
   type InstantEvalJudgeRoutePricing,
   type InstantEvalJudgeRouteTable,
   type InstantEvalQuestion,
+  instantEvalTextBudget,
   NANO_USD_PER_USD,
 } from "@langwatch/instant-eval-judge-contract";
 
+import { prepareInstantEvalText } from "./instant-eval-classifier-text.rules.ts";
 import {
+  INSTANT_EVAL_LLM_JUDGE_CONTENT_BUDGET_TOKENS,
   instantEvalLlmJudgeMaxOutputTokensOf,
   instantEvalLlmJudgePromptOf,
 } from "./instant-eval-llm-judge-wire.rules.ts";
@@ -86,9 +89,9 @@ const INSTANT_EVAL_JUDGE_SEND_SLACK_TOKENS = 1_024;
 const INSTANT_EVAL_JUDGE_DECISION_OUTPUT_TOKENS_PER_QUESTION = 256;
 
 /**
- * The most one send can cost us, in nano-USD: a token per byte at the dearer of the base and long
- * rates, plus an output cap at the output rate. LLM and Decisions sends are per question, Jev's
- * for all. Infinite for an unpriced backend, so a ceiling never sends it (ADR-190 decision 13).
+ * The most one send can cost us, in nano-USD: a token per byte of the text as its channel fits it,
+ * at the dearer rate, plus an output cap. LLM and Decisions sends are per question, Jev's for all.
+ * Infinite for an unpriced backend, so a ceiling never sends it (ADR-190 decision 13).
  */
 export function instantEvalJudgeSendWorstCaseNanoUsd({
   backend,
@@ -102,7 +105,7 @@ export function instantEvalJudgeSendWorstCaseNanoUsd({
   table: InstantEvalJudgeRouteTable;
   pricing: InstantEvalJudgeRoutePricing;
   job: InstantEvalJudgeJob;
-  /** The longest text the send may carry. */
+  /** The longest text the send may carry, before its channel fits it. */
   text: string;
   questions: readonly InstantEvalQuestion[];
 }): number {
@@ -120,23 +123,32 @@ export function instantEvalJudgeSendWorstCaseNanoUsd({
       wire: config.kind,
       reasoningEffort: config.reasoningEffort,
     });
+    const fitted = prepareInstantEvalText({
+      text,
+      budgetTokens: INSTANT_EVAL_LLM_JUDGE_CONTENT_BUDGET_TOKENS,
+    }).text;
     return ceilNanoUsd(
       sumOf(
         questions.map((question) => {
-          const { system, user, tool } = instantEvalLlmJudgePromptOf({ job, question, text });
+          const { system, user, tool } = instantEvalLlmJudgePromptOf({
+            job,
+            question,
+            text: fitted,
+          });
           const bytes = utf8BytesOf(system) + utf8BytesOf(user) + utf8BytesOf(JSON.stringify(tool));
           return costOf({ bytes, outputTokens });
         }),
       ),
     );
   }
-  const textBytes = utf8BytesOf(text);
   const sends = config.kind === "jev" ? [questions] : questions.map((question) => [question]);
   return ceilNanoUsd(
     sumOf(
       sends.map((asked) =>
         costOf({
-          bytes: textBytes + utf8BytesOf(JSON.stringify(asked)),
+          bytes:
+            fittedClassifierBytesOf({ text, questions: asked }) +
+            utf8BytesOf(JSON.stringify(asked)),
           outputTokens: asked.length * INSTANT_EVAL_JUDGE_DECISION_OUTPUT_TOKENS_PER_QUESTION,
         }),
       ),
@@ -165,12 +177,30 @@ export function instantEvalJudgeClassifierWorstCaseNanoUsd({
     const [backend] = priced;
     return instantEvalJudgeSendWorstCaseNanoUsd({ backend, table, pricing, job, text, questions });
   }
-  const bytes = utf8BytesOf(text) + utf8BytesOf(JSON.stringify(questions));
+  const bytes =
+    fittedClassifierBytesOf({ text, questions }) + utf8BytesOf(JSON.stringify(questions));
   const inputTokens = bytes + INSTANT_EVAL_JUDGE_SEND_SLACK_TOKENS;
   return ceilNanoUsd(instantEvalCostUsd({ inputTokens }) * NANO_USD_PER_USD);
 }
 
 const utf8 = new TextEncoder();
+
+/**
+ * The text's bytes as the classifier and Decisions channels fit it to the questions' budget: a
+ * send whose questions leave no budget sends nothing. A Decisions send asked one question of
+ * several fits at that one question's budget, never less than its channel keeps.
+ */
+function fittedClassifierBytesOf({
+  text,
+  questions,
+}: {
+  text: string;
+  questions: readonly InstantEvalQuestion[];
+}): number {
+  const budgetTokens = instantEvalTextBudget({ questions });
+  if (budgetTokens === 0) return 0;
+  return utf8BytesOf(prepareInstantEvalText({ text, budgetTokens }).text);
+}
 
 function utf8BytesOf(text: string): number {
   return utf8.encode(text).length;

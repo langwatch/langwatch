@@ -22,6 +22,9 @@ import type { InstantEvalLlmJudgeValue } from "./instant-eval-judge-sureness.rul
 const INSTANT_EVAL_LLM_JUDGE_WIRES = ["anthropic_messages", "openai_responses"] as const;
 export type InstantEvalLlmJudgeWire = (typeof INSTANT_EVAL_LLM_JUDGE_WIRES)[number];
 
+/** Content an LLM leg keeps, as langevals' judge fit does; its channel and worst case share it. */
+export const INSTANT_EVAL_LLM_JUDGE_CONTENT_BUDGET_TOKENS = 128_000;
+
 const SEARCH_SYSTEM_PROMPT =
   "You are an LLM evaluator answering a yes/no question about a trace or conversation";
 

@@ -184,7 +184,11 @@ export class InstantEvalJudgeRouterService {
         })
       : 0;
     if (costCeiling && !costCeiling.hold(heldNanoUsd)) {
-      return instantEvalSkipped("classifier_rate_limited");
+      defaultLogger.warn(
+        { projectId, job: route.job, heldNanoUsd },
+        "Instant Evals unrouted send refused by the query cost ceiling",
+      );
+      return instantEvalSkipped("query_cost_ceiling");
     }
     let costNanoUsd = 0;
     try {

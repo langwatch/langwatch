@@ -358,6 +358,9 @@ Feature: Routing an Instant Evals judgement across decision models and LLMs
     When the router sends a leg
     Then it first holds that send's worst-case cost on the ceiling
     And once the send answers the hold is swapped for what the send was billed
+    And a gate send holds its worst case on the gate's own framed text, settled like any send
+    And a gate the ceiling refuses is not sent, so its question goes the hard way, flagged "cost_ceiling"
+    And a long trace is held at what its channel can send, so it is not refused for bytes it never sends
 
   @unit
   Scenario: A send whose worst case passes the ceiling is not sent
@@ -365,19 +368,20 @@ Feature: Routing an Instant Evals judgement across decision models and LLMs
     When the primary answers unsure
     Then the LLM leg is never called
     And the primary verdict is kept, flagged "escalation_failed" and "cost_ceiling"
-    And a ceiling without room for the primary sends nothing and skips the text as rate limited
+    And a ceiling without room for the primary sends nothing and skips the text as "query_cost_ceiling"
 
   @unit
   Scenario: A kind the table does not route holds the classifier's worst case too
     Given a routed call with a cost ceiling that asks a question the table does not route
     When the ceiling has no room for the classifier's worst case
-    Then the classifier is not called and the text is skipped as rate limited
+    Then the classifier is not called and the text is skipped as "query_cost_ceiling", never as rate limited
 
   @unit
   Scenario: A send's worst case bounds what it can bill
     Given a backend's prices and a text with its questions
     When its worst-case cost is read
     Then it prices every UTF-8 byte of what is sent as a token, plus a fixed slack per send
+    And it counts the text as the backend's channel fits it: an LLM's content budget, or the budget the questions leave a decision model
     And it takes the dearer of the base and long-context rates
     And an LLM adds its output cap at its output rate, the reasoning cap where an effort is set
     And an LLM or Decisions backend is counted once per question, Jev once for all

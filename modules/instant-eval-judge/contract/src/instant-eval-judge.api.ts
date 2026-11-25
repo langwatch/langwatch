@@ -289,6 +289,8 @@ export const INSTANT_EVAL_SKIP_REASONS = [
   "classifier_key_invalid",
   // An own decision model's provider is down or answered unreadably; retry later (ADR-182).
   "classifier_provider_unavailable",
+  // A judged query's cost ceiling had no room for this send's worst case, so nothing was sent.
+  "query_cost_ceiling",
 ] as const;
 
 export type InstantEvalSkipReason = (typeof INSTANT_EVAL_SKIP_REASONS)[number];

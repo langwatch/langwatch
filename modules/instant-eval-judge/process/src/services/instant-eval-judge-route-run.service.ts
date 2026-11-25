@@ -317,7 +317,7 @@ export class InstantEvalJudgeRouteRunService {
     });
     if (!costCeiling.hold(heldNanoUsd)) {
       this.flags.push(`cost_ceiling:${backend}`);
-      return { outcome: "failed", reason: "classifier_rate_limited" };
+      return { outcome: "failed", reason: "query_cost_ceiling" };
     }
     let costNanoUsd = 0;
     try {

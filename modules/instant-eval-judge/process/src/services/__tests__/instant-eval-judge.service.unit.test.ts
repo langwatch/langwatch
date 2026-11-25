@@ -927,7 +927,7 @@ describe("given the unmetered classify the Api and the judge call share", () => 
 
   describe("when the routed call carries a cost ceiling with no room", () => {
     /** @scenario "A send whose worst case passes the ceiling is not sent" */
-    it("hands the ceiling to the router, which sends nothing and skips as rate limited", async () => {
+    it("hands the ceiling to the router, which sends nothing and skips on the query cost ceiling", async () => {
       const { service, classifier } = harness();
       const held: number[] = [];
 
@@ -945,7 +945,7 @@ describe("given the unmetered classify the Api and the judge call share", () => 
 
       expect(held.length).toBeGreaterThan(0);
       expect(classifier.classify).not.toHaveBeenCalled();
-      expect(judgement.skippedReason).toBe("classifier_rate_limited");
+      expect(judgement.skippedReason).toBe("query_cost_ceiling");
       expect(judgement.costNanoUsd ?? 0).toBe(0);
     });
   });

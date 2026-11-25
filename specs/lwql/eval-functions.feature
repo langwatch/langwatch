@@ -346,14 +346,14 @@ Feature: LangWatchQL eval functions — a judged column, computed by the classif
     And its cost is the classifier's own cost
     And the customer price carries the platform markup
 
-  @unit
+  @unit @integration
   Scenario: With the search router flag off a judged query sends no route
     Given the search router flag is off for the project's organization
     When a statement with an eval function is executed
     Then every classifier request carries no route and no cost ceiling
     And the query is held at the query token budget priced at the judge's hold rate, as before
 
-  @unit
+  @unit @integration
   Scenario: With the search router flag on a judged query is routed under its cost ceiling
     Given the search router flag is on for the project's organization
     When a statement with an eval function is executed
@@ -362,6 +362,10 @@ Feature: LangWatchQL eval functions — a judged column, computed by the classif
     And the query is held at that ceiling times the markup, the most it can be charged
     And its spend is recorded once, priced from the summed cost of its calls at the markup
     And the flag is read for the project within its organization, so an organization rule applies
+    And a row the ceiling has no room for is a null cell skipped as "query_cost_ceiling"
+    And LangWatch's own decision model passes the route and ceiling on to the judge
+    And a project on its own decision model, or an install judging through Connect, sends neither
+    And the module reads the real search router flag, so the flag alone turns routing on or off
 
   @unit
   Scenario: A routed query's ceiling holds sends up to the ceiling and no further

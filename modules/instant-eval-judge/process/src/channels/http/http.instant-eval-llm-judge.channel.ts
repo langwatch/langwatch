@@ -11,6 +11,7 @@ import { type Dispatcher, fetch as undiciFetch } from "undici";
 import { prepareInstantEvalText } from "../../rules/instant-eval-classifier-text.rules.ts";
 import { decisionFailureOf } from "../../rules/instant-eval-decision-wire.rules.ts";
 import {
+  INSTANT_EVAL_LLM_JUDGE_CONTENT_BUDGET_TOKENS,
   instantEvalLlmJudgeBodyOf,
   instantEvalLlmJudgePromptOf,
   readInstantEvalLlmJudgeAnswer,
@@ -33,9 +34,6 @@ const ENDPOINTS: Record<InstantEvalLlmJudgeWire, string> = {
 };
 
 const ANTHROPIC_VERSION = "2023-06-01";
-
-/** Content an LLM leg keeps, as langevals' judge fit does. */
-const LLM_CONTENT_BUDGET_TOKENS = 128_000;
 
 type Keys = Readonly<Partial<Record<InstantEvalLlmJudgeWire, string>>>;
 
@@ -69,7 +67,10 @@ export class HttpInstantEvalLlmJudgeChannel implements InstantEvalLlmJudgeChanne
   ): Promise<InstantEvalLlmJudgeAnswer> {
     const apiKey = this.keys[wire];
     if (!apiKey || !model) return skipped("classifier_not_configured");
-    const fitted = prepareInstantEvalText({ text, budgetTokens: LLM_CONTENT_BUDGET_TOKENS });
+    const fitted = prepareInstantEvalText({
+      text,
+      budgetTokens: INSTANT_EVAL_LLM_JUDGE_CONTENT_BUDGET_TOKENS,
+    });
     const prompt = instantEvalLlmJudgePromptOf({ job, question, text: fitted.text });
     const body = JSON.stringify(
       instantEvalLlmJudgeBodyOf({

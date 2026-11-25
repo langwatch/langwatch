@@ -723,7 +723,7 @@ describe("InstantEvalQueryJudgingService.judgeQuery", () => {
         if (!request.costCeiling?.hold(sendNanoUsd)) {
           return {
             verdicts: [],
-            skippedReason: "classifier_rate_limited",
+            skippedReason: "query_cost_ceiling",
             inputTokens: 0,
             isTextTruncated: false,
           };
@@ -744,7 +744,7 @@ describe("InstantEvalQueryJudgingService.judgeQuery", () => {
       const judged = await service.judgeQuery(query);
 
       expect(judged.rows).toEqual([{ annoyed: 1 }, { annoyed: null }]);
-      expect(judged.skipped).toEqual({ classifier_rate_limited: 1 });
+      expect(judged.skipped).toEqual({ query_cost_ceiling: 1 });
       expect(records[0]).toMatchObject({ costNanoUsd: sendNanoUsd });
     });
   });

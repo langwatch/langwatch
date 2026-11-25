@@ -5,6 +5,7 @@ import {
   INSTANT_EVAL_JUDGE_JOBS,
   INSTANT_EVAL_JUDGE_MODES,
   type InstantEvalJudgeRouteRequest,
+  instantEvalTextBudget,
 } from "@langwatch/instant-eval-judge-contract";
 import { describe, expect, it } from "vitest";
 
@@ -13,6 +14,7 @@ import {
   syntheticRouteTable,
   yesNo,
 } from "../../__tests__/support/instant-eval-judge-route.test-fakes.ts";
+import { prepareInstantEvalText } from "../instant-eval-classifier-text.rules.ts";
 import {
   instantEvalJudgeQueryHoldPricingOf,
   instantEvalJudgeRouteBootIssues,
@@ -27,6 +29,7 @@ import {
   instantEvalVerdictSurenessOf,
   isUnsureAnswer,
 } from "../instant-eval-judge-sureness.rules.ts";
+import { INSTANT_EVAL_LLM_JUDGE_CONTENT_BUDGET_TOKENS } from "../instant-eval-llm-judge-wire.rules.ts";
 
 const table = syntheticRouteTable();
 const UPSET = yesNo("q", "is the user upset");
@@ -412,6 +415,28 @@ describe("a send's worst case", () => {
     const both = worst({ backend: "llm", questions: [ONE, TWO] });
     expect(both).toBeGreaterThan(2 * plain);
     expect(both).toBeLessThan(2 * plain + 100 * 1_000);
+  });
+
+  /** @scenario "A send's worst case bounds what it can bill" */
+  it("prices a long text as its channel fits it, never the bytes it cuts", () => {
+    const long = `user: ${"the parcel came late again and nobody answered. ".repeat(42_000)}`;
+    const llmFit = prepareInstantEvalText({
+      text: long,
+      budgetTokens: INSTANT_EVAL_LLM_JUDGE_CONTENT_BUDGET_TOKENS,
+    }).text;
+    const decisionFit = prepareInstantEvalText({
+      text: long,
+      budgetTokens: instantEvalTextBudget({ questions: [ONE] }),
+    }).text;
+    expect(llmFit.length).toBeLessThan(long.length / 4);
+    expect(decisionFit.length).toBeLessThan(llmFit.length);
+    expect(worst({ backend: "llm", text: long })).toBe(worst({ backend: "llm", text: llmFit }));
+    expect(worst({ backend: "dec", text: long })).toBe(
+      worst({ backend: "dec", text: decisionFit }),
+    );
+    expect(worst({ backend: "jv", text: long })).toBe(worst({ backend: "jv", text: decisionFit }));
+    // About 2 MB unfitted would hold 0.20 USD on Decisions; fitted it holds under a cent.
+    expect(worst({ backend: "dec", text: long })).toBeLessThan(10_000_000);
   });
 
   /** @scenario "A send's worst case bounds what it can bill" */
