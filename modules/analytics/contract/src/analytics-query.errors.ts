@@ -174,3 +174,19 @@ export class AnalyticsFilterKeyRequiredError extends HandledError {
     this.name = "AnalyticsFilterKeyRequiredError";
   }
 }
+
+/** What a refused analytics filter carries, for {@link analyticsFilterRefusal}. */
+export type AnalyticsFilterRefusal =
+  | ({ kind: "unsupported_value" } & ConstructorParameters<
+      typeof AnalyticsFilterValueUnsupportedError
+    >[0])
+  | ({ kind: "key_required" } & ConstructorParameters<typeof AnalyticsFilterKeyRequiredError>[0]);
+
+/** The error a caller reads for a filter the query cannot apply. */
+export function analyticsFilterRefusal(
+  refusal: AnalyticsFilterRefusal,
+): AnalyticsFilterValueUnsupportedError | AnalyticsFilterKeyRequiredError {
+  return refusal.kind === "unsupported_value"
+    ? new AnalyticsFilterValueUnsupportedError(refusal)
+    : new AnalyticsFilterKeyRequiredError(refusal);
+}

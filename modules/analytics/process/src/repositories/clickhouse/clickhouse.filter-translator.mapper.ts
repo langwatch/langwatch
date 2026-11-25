@@ -4,7 +4,7 @@
  * IN subqueries are used rather than EXISTS; the two are equivalent here.
  */
 
-import type { FilterField } from "@langwatch/analytics-contract";
+import { analyticsFilterRefusal, type FilterField } from "@langwatch/analytics-contract";
 import { tenantSet } from "@langwatch/clickhouse-client";
 import {
   customMetadataKeyCondition,
@@ -13,10 +13,7 @@ import {
   type SpanAnalyticsSource,
 } from "@langwatch/trace-contract";
 
-import {
-  findUnapplicableFilterValue,
-  unapplicableFilterError,
-} from "../../rules/analytics-filter-values.rules.ts";
+import { findUnapplicableFilterValue } from "../../rules/analytics-filter-values.rules.ts";
 import { type CHTable, tableAliases } from "./clickhouse.field-mappings.mapper.ts";
 
 /**
@@ -188,7 +185,7 @@ export function translateFilter({
     values,
     depth: subkey ? 2 : key ? 1 : 0,
   });
-  if (unapplicable) throw unapplicableFilterError(unapplicable);
+  if (unapplicable) throw analyticsFilterRefusal(unapplicable);
 
   const handler = filterHandlers[field];
   return handler ? handler({ values, key, subkey, spanTimePredicate, spanAnalytics }) : noOpFilter;

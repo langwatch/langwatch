@@ -3,12 +3,7 @@
  * predicate (or none that matches) when it recognises nothing, so these are refused before
  * any SQL is built instead of answering numbers that look filtered and are not.
  */
-import {
-  AnalyticsFilterKeyRequiredError,
-  AnalyticsFilterValueUnsupportedError,
-  type FilterField,
-  type SeriesInput,
-} from "@langwatch/analytics-contract";
+import type { FilterField, SeriesInput } from "@langwatch/analytics-contract";
 
 /** The option values the options endpoint returns for a boolean field. */
 export const BOOLEAN_FILTER_VALUES: readonly string[] = ["true", "false"];
@@ -99,19 +94,4 @@ export function findUnapplicableFilter(filters: AnalyticsFilters): UnapplicableF
     }
   }
   return undefined;
-}
-
-/** The refusal a caller reads for an unapplicable filter. */
-export function unapplicableFilterError(
-  found: UnapplicableFilter,
-): AnalyticsFilterValueUnsupportedError | AnalyticsFilterKeyRequiredError {
-  return found.kind === "unsupported_value"
-    ? new AnalyticsFilterValueUnsupportedError(found)
-    : new AnalyticsFilterKeyRequiredError(found);
-}
-
-/** Throws when any value of the filter set cannot be applied; checked before any read. */
-export function refuseUnapplicableFilters(filters: AnalyticsFilters): void {
-  const found = findUnapplicableFilter(filters);
-  if (found) throw unapplicableFilterError(found);
 }

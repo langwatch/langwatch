@@ -1,4 +1,5 @@
 import {
+  analyticsFilterRefusal,
   analyticsMetricAggregations,
   type AnalyticsTimeseriesInput,
 } from "@langwatch/analytics-contract";
@@ -11,7 +12,7 @@ import {
   type Instant,
 } from "@langwatch/time";
 
-import { refuseUnapplicableFilters } from "../rules/analytics-filter-values.rules.ts";
+import { findUnapplicableFilter } from "../rules/analytics-filter-values.rules.ts";
 
 const MINUTES_PER_DAY = 24 * 60;
 const MAX_TIMESERIES_BUCKETS = 1000;
@@ -70,8 +71,10 @@ export class AnalyticsTimeseriesRequestService {
 
   /** Refused before the cache and the table router, so every builder answers the same. */
   refuseUnapplicableFilters(input: AnalyticsTimeseriesInput): void {
-    refuseUnapplicableFilters(input.filters);
-    for (const series of input.series) refuseUnapplicableFilters(series.filters);
+    for (const filters of [input.filters, ...input.series.map((series) => series.filters)]) {
+      const found = findUnapplicableFilter(filters);
+      if (found) throw analyticsFilterRefusal(found);
+    }
   }
 
   windowOf(parsed: AnalyticsTimeseriesInput): AnalyticsTimeseriesWindow {
