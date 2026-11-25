@@ -21,11 +21,13 @@ const board = ({
   name,
   createdById = "user-1",
   scope = "PROJECT",
+  myDashboardOfUserId = null,
 }: {
   id: string;
   name: string;
   createdById?: string;
   scope?: DashboardScope;
+  myDashboardOfUserId?: string | null;
 }) => ({
   ...HOME_BOARD,
   scope,
@@ -34,13 +36,19 @@ const board = ({
   order: 0,
   description: null,
   createdById,
+  myDashboardOfUserId,
   isStarred: false,
   createdAt: new Date("2026-01-01"),
   updatedAt: new Date("2026-01-01"),
   _count: { graphs: 0 },
 });
 
-const MINE = board({ id: "board-mine", name: "My dashboard", scope: "PRIVATE" });
+const MINE = board({
+  id: "board-mine",
+  name: "My dashboard",
+  scope: "PRIVATE",
+  myDashboardOfUserId: "user-1",
+});
 const WEEKLY = board({ id: "board-1", name: "Weekly review" });
 const LATENCY = board({ id: "board-2", name: "Latency" });
 const COSTS = board({ id: "board-3", name: "Costs", createdById: "user-2" });
@@ -86,14 +94,20 @@ function project({
   boards?: ReturnType<typeof board>[];
 }) {
   const calls: UiProcedureCall[] = [];
+  let stored = [...boards];
   const answer = (call: UiProcedureCall) => {
     calls.push(call);
+    // A rename is kept, so the re-read after it lists the new name as the server would.
+    if (call.path === "boards.update") {
+      const { dashboardId, name } = call.input as { dashboardId: string; name?: string };
+      stored = stored.map((row) => (row.id === dashboardId && name ? { ...row, name } : row));
+    }
     if (call.path === "boards.listStarred") {
       return listFails
         ? Promise.reject(new UiProcedureRefusal("FORBIDDEN", 403))
         : Promise.resolve(stars);
     }
-    if (call.path === "boards.getAll") return Promise.resolve(boards);
+    if (call.path === "boards.getAll") return Promise.resolve(stored);
     if (call.path === "boards.create") {
       return Promise.resolve({ ...board({ id: "board-new", name: "Untitled" }) });
     }
@@ -397,7 +411,7 @@ describe("the Dashboards sidebar", () => {
     });
 
     /** @scenario "AC163 My dashboard cannot be deleted" */
-    it("offers no Delete and no Rename on My dashboard", async () => {
+    it("offers Rename and a disabled Delete on My dashboard", async () => {
       const { user } = renderSection();
 
       await user.click(await screen.findByRole("button", { name: "Actions for My dashboard" }));
@@ -406,7 +420,47 @@ describe("the Dashboards sidebar", () => {
         "aria-disabled",
         "true",
       );
-      expect(screen.getByRole("menuitem", { name: "Rename" })).toHaveAttribute(
+      expect(screen.getByRole("menuitem", { name: "Rename" })).not.toHaveAttribute(
+        "aria-disabled",
+        "true",
+      );
+    });
+
+    /** @scenario "My dashboards made before the mark are marked by a background step" */
+    it("offers no Rename on a My dashboard the step has not marked yet", async () => {
+      const unmarked = { ...MINE, myDashboardOfUserId: null };
+      const { user } = renderSection({ boards: [WEEKLY, unmarked, LATENCY, COSTS] });
+
+      await user.click(await screen.findByRole("button", { name: "Actions for My dashboard" }));
+
+      expect(await screen.findByRole("menuitem", { name: "Rename" })).toHaveAttribute(
+        "aria-disabled",
+        "true",
+      );
+    });
+
+    /** @scenario "My dashboard can be renamed and stays the member's My dashboard" */
+    it("renames My dashboard from its menu and keeps it first, still undeletable", async () => {
+      const { user, calls } = renderSection();
+
+      await user.click(await screen.findByRole("button", { name: "Actions for My dashboard" }));
+      await user.click(await screen.findByRole("menuitem", { name: "Rename" }));
+      const field = await screen.findByRole("textbox");
+      await user.clear(field);
+      await user.type(field, "Team pulse{Enter}");
+
+      await waitFor(() =>
+        expect(inputsTo(calls, "boards.update")).toEqual([
+          { projectId: "proj-1", dashboardId: "board-mine", name: "Team pulse" },
+        ]),
+      );
+      expect(inputsTo(calls, "boards.create")).toEqual([]);
+
+      await waitFor(async () =>
+        expect(await namesIn("Your dashboards")).toEqual(["Team pulse", "Costs", "Weekly review"]),
+      );
+      await user.click(screen.getByRole("button", { name: "Actions for Team pulse" }));
+      expect(await screen.findByRole("menuitem", { name: "Delete" })).toHaveAttribute(
         "aria-disabled",
         "true",
       );

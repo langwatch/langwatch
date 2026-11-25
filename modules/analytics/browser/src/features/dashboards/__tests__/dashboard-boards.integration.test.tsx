@@ -47,6 +47,7 @@ type Board = typeof HOME_BOARD & {
   name: string;
   description: string | null;
   createdById: string | null;
+  myDashboardOfUserId?: string | null;
   isStarred: boolean;
   updatedAt: Date;
 };
@@ -466,6 +467,30 @@ describe("a member's board", () => {
         expect(host.navigations).toEqual([]);
         expect(callsTo(server, "boards.update")).toEqual([]);
         expect(screen.getByText("Or start from a template")).toBeInTheDocument();
+      });
+
+      /** @scenario "Boards: a template used on an empty board fills that board" */
+      it("takes the widgets back out when the board's description is refused", async () => {
+        const user = userEvent.setup();
+        const server = inMemoryServer({ boards: OWN_BOARDS, refuseBoardUpdates: 1 });
+        const { host } = openBoard({ server });
+        const template = curatedBoardById("release")!.card.board;
+
+        await user.click(await screen.findByRole("button", { name: `Use ${template.name}` }));
+
+        await waitFor(() =>
+          expect(host.failures).toEqual([
+            expect.objectContaining({
+              fallbackTitle: "Couldn't add the template to this dashboard",
+            }),
+          ]),
+        );
+        const created = callsTo(server, "dashboardWidgets.create");
+        expect(created).toHaveLength(template.widgets.length);
+        await waitFor(() =>
+          expect(callsTo(server, "dashboardWidgets.delete")).toHaveLength(template.widgets.length),
+        );
+        expect(await screen.findByText("Or start from a template")).toBeInTheDocument();
       });
     });
 
@@ -1216,8 +1241,8 @@ describe("a member's board", () => {
       expect(within(title).queryByRole("button")).toBeNull();
     });
 
-    /** @scenario "Boards: a reader who may not rename sees a plain title" */
-    it("shows My dashboard's title as plain text, edit rights or not", async () => {
+    /** @scenario "My dashboards made before the mark are marked by a background step" */
+    it("shows an unmarked My dashboard's title as plain text, edit rights or not", async () => {
       openBoard({
         server: inMemoryServer({
           boards: [{ ...OWN_BOARDS[0]!, id: "mine", name: "My dashboard" }],
@@ -1228,6 +1253,36 @@ describe("a member's board", () => {
 
       const title = await screen.findByRole("heading", { name: "My dashboard" });
       expect(within(title).queryByRole("button")).toBeNull();
+    });
+  });
+
+  describe("given the member's own My dashboard, marked theirs", () => {
+    /** @scenario "My dashboard can be renamed and stays the member's My dashboard" */
+    it("renames it from its title, keeping its mark", async () => {
+      const user = userEvent.setup({ pointerEventsCheck: 0 });
+      const server = inMemoryServer({
+        boards: [
+          { ...OWN_BOARDS[0]!, id: "mine", name: "My dashboard", myDashboardOfUserId: "user-1" },
+        ],
+      });
+      openBoard({
+        server,
+        dashboardId: "mine",
+        projectPermissions: { "proj-1": ["analytics:update"] },
+      });
+
+      const title = await screen.findByRole("heading", { name: "My dashboard" });
+      await user.click(await within(title).findByRole("button", { name: "My dashboard" }));
+      const field = screen.getByRole("textbox", { name: "Dashboard name" });
+      await user.clear(field);
+      await user.type(field, "Team pulse{Enter}");
+
+      await waitFor(() =>
+        expect(callsTo(server, "boards.update").map((call) => call.input)).toEqual([
+          { projectId: "proj-1", dashboardId: "mine", name: "Team pulse" },
+        ]),
+      );
+      expect(await screen.findByRole("heading", { name: "Team pulse" })).toBeInTheDocument();
     });
   });
 
@@ -1503,7 +1558,32 @@ describe("a member's board", () => {
         { projectId: "proj-1", name: "Untitled dashboard 1", homeProduct: "llm-ops" },
       ]);
       expect(server.state.widgets.map(({ dashboardId }) => dashboardId)).toEqual(["board-new-3"]);
-      expect(host.replacements).toEqual(["/test-project/dashboards/board-new-3?addBlock=open"]);
+      expect(host.replacements).toEqual(["/test-project/dashboards/board-new-3"]);
+    });
+
+    /** @scenario "AC162l A question asked from a new board's ask bar only goes to Langy" */
+    it("asks Langy a question typed in Add a widget, and leaves Add a widget closed", async () => {
+      const user = userEvent.setup();
+      const server = inMemoryServer({ boards: OWN_BOARDS });
+      const { host } = openBoard({
+        server,
+        dashboardId: "new",
+        query: { addBlock: "open" },
+        flags: LANGY_ON,
+        permissions: LANGY_MEMBER,
+      });
+      await screen.findByRole("dialog");
+
+      await user.type(pickerSearch(), "zzz why are my users unhappy{Enter}");
+
+      await waitFor(() => expect(host.langyAsks).toHaveLength(1));
+      expect(host.langyAsks[0]).toMatchObject({
+        question: "zzz why are my users unhappy",
+        askedFrom: "dashboard:board-new-3",
+      });
+      expect(callsTo(server, "boards.create")).toHaveLength(1);
+      expect(host.replacements).toEqual(["/test-project/dashboards/board-new-3"]);
+      await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
     });
 
     /** @scenario "AC162d Renaming, describing or pinning a new board stores it with that edit" */

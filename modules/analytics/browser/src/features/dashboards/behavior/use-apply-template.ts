@@ -71,11 +71,28 @@ export function useApplyTemplate({
       await placeTemplateWidgets({ client, projectId, dashboardId, widgets });
       return dashboardId;
     }
-    await placeTemplateWidgets({ client, projectId, dashboardId: board.id, widgets });
+    const placed = await placeTemplateWidgets({
+      client,
+      projectId,
+      dashboardId: board.id,
+      widgets,
+    });
     if (edit.name !== void 0 || edit.description !== void 0) {
-      await client.boards.update.mutate({ projectId, dashboardId: board.id, ...edit });
+      // A refused name or description takes the widgets back out: the template lands whole or not.
+      await client.boards.update
+        .mutate({ projectId, dashboardId: board.id, ...edit })
+        .catch(async (error: unknown) => {
+          await Promise.all(
+            placed.map((id) =>
+              client.dashboardWidgets.delete.mutate({ projectId, id }).catch(() => void 0),
+            ),
+          );
+          throw error;
+        });
     }
-    analytics.track(widgetAdded({ addedFrom: "template", addedCount: widgets.length }));
+    analytics.track(
+      widgetAdded({ addedFrom: "template", addedCount: widgets.length, templateId: template.id }),
+    );
     return board.id;
   };
 
@@ -85,11 +102,6 @@ export function useApplyTemplate({
     const edit = boardEdit({ board, template, takenNames });
     try {
       const dashboardId = await fill({ template, edit });
-      await Promise.all([
-        utils.dashboardWidgets.list.invalidate({ projectId }),
-        utils.boards.getAll.invalidate({ projectId }),
-        utils.boards.listInOrganization.invalidate(),
-      ]);
       if (!langy.enabled || !template.reportPrompt) return;
       const subject = boardSubject({
         board: { id: dashboardId, name: edit.name ?? board.name },
@@ -99,6 +111,12 @@ export function useApplyTemplate({
     } catch (error) {
       host.failed({ error, fallbackTitle: "Couldn't add the template to this dashboard" });
     } finally {
+      // On every exit, so the board shows each write that landed before another try.
+      await Promise.all([
+        utils.dashboardWidgets.list.invalidate({ projectId }),
+        utils.boards.getAll.invalidate({ projectId }),
+        utils.boards.listInOrganization.invalidate(),
+      ]);
       setApplyingId(void 0);
     }
   };

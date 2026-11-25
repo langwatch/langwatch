@@ -16,6 +16,7 @@ import type {
 import {
   type BoardPeriod,
   type BoardPeriodRange,
+  boardCustomInShort,
   boardPeriodInWords,
   bucketInWords,
 } from "../../model/board-period.ts";
@@ -155,13 +156,20 @@ export function boardContextChip({
   range: BoardPeriodRange;
   period: BoardPeriod;
 }): LangyContextChip {
-  const shown = `${range === "live" ? "Live" : range} · ${shortGrainText(period.granularitySeconds)}`;
+  const shown = `${rangeInShort({ range, period })} · ${shortGrainText(period.granularitySeconds)}`;
   return {
     id: boardKey(board),
     kind: "dashboard",
     label: `dashboard: ${board.name} · ${shown}`.slice(0, MAX_LABEL_LENGTH),
     ref: boardAskContext({ board, period }).ref,
   };
+}
+
+/** The range as the chip names it: "Live", "7d", or a custom window's dates. */
+function rangeInShort({ range, period }: { range: BoardPeriodRange; period: BoardPeriod }) {
+  if (range === "live") return "Live";
+  if (range !== "custom") return range;
+  return boardCustomInShort({ from: period.periodStart, to: period.periodEnd });
 }
 
 /** What a question from a stored board's ask bar asks for: the answer as a widget on it. */
@@ -191,7 +199,7 @@ export function boardQuestion({
           key: boardKey(board),
         })
       : attached;
-  return { question: question.trim(), context: [asked] };
+  return { question: question.trim(), context: [asked], askedFrom: boardKey(board) };
 }
 
 /** Opens Langy with the board attached and nothing asked, for the reader to write in. */
@@ -808,5 +816,8 @@ export function askAboutStoredBoard({
     ...(about === void 0
       ? {}
       : { about: about.ref === draftId ? { ...about, ref: dashboardId } : about }),
+    ...(request.askedFrom === void 0
+      ? {}
+      : { askedFrom: request.askedFrom === draftKey ? storedKey : request.askedFrom }),
   };
 }

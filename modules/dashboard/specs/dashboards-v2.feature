@@ -108,6 +108,32 @@ Feature: Dashboards v2 polish and bring-your-own-AI
     And a trace that arrived since the board opened shows
     # Decision: the end rounds up to the minute, as Live does, so a re-render does not refetch
 
+  @unit @integration
+  Scenario: AC19e A custom range reads a fixed window from a start to an end
+    Given a member opens the period menu on a board
+    When they pick "Custom" under Range and choose a start and an end in the date range fields
+      the traces page and Analytics Reports use
+    Then every widget on the board reads exactly that window
+    And the pill shows the window's first and last day
+    And auto grain picks the grain it picks for a preset range of that length
+    And a grain the window cannot carry is greyed out
+    And the window is written to the address, so a reload or a shared link opens the same window
+    # Decision: range=custom with from and to as ISO instants; a preset range reads as before
+
+  @unit @integration
+  Scenario: AC19f Refresh does not apply to a custom range that has ended
+    Given a board on a custom range whose end has passed
+    Then the Refresh choices are greyed out with a note that refresh applies only when the range
+      ends now
+    And the board does not poll, whatever refresh the member picked
+    And Refresh now still re-reads the window
+    # Decision: a custom range whose end is still ahead keeps the member's refresh
+
+  @unit
+  Scenario: AC19g An address without a usable custom window reads the default range
+    Given an address with range=custom and a from or to that is missing, unreadable or reversed
+    Then the board reads the default range of 30 days
+
   # ---------------------------------------------------------------------------
   # Bring-your-own-AI
   # ---------------------------------------------------------------------------
@@ -1450,6 +1476,15 @@ Feature: Dashboards v2 polish and bring-your-own-AI
     When they ask Langy about it
     Then the board is stored first, and the ask names the stored board's id
 
+  # Owner, 2026-11-25 (screen recording): a question typed into the bar of a new board opened
+  # "Add a widget" again on the stored board, with Langy already answering behind it.
+  @integration
+  Scenario: AC162l A question asked from a new board's ask bar only goes to Langy
+    Given the member opened a new board with "+"
+    When they type a question in the ask bar's "Add a widget" and press Enter
+    Then the board is stored and its address moves to it in place, with no "addBlock=open"
+    And "Add a widget" stays closed, and Langy is asked the question
+
   @integration
   Scenario: AC162f A refused store keeps the new board open
     Given the member opened a new board with "+"
@@ -1473,8 +1508,24 @@ Feature: Dashboards v2 polish and bring-your-own-AI
   @integration
   Scenario: AC163 My dashboard cannot be deleted
     When the member opens the "⋮" menu of their My dashboard
-    Then Rename and Delete are disabled
+    Then Delete is disabled and Rename is offered
     And its scope is not locked: the menu offers the three scope choices (AC178)
+
+  # Teammate report, 2026-11-25: "I can't rename 'My dashboard'". A stored mark, not the name,
+  # says whose My dashboard a board is, so a new name keeps it theirs.
+  @integration
+  Scenario: My dashboard can be renamed and stays the member's My dashboard
+    Given a member's My dashboard
+    When they rename it to "Team pulse" from its row menu
+    Then "Team pulse" is still first in the sidebar and still cannot be deleted
+    And /[project]/dashboards opens "Team pulse", and no new "My dashboard" is made
+
+  @unit
+  Scenario: My dashboards made before the mark are marked by a background step
+    Given a member made boards named "My dashboard" before boards carried the mark
+    When the upgrade's background step runs
+    Then the first of them in each project is marked theirs, and a second run changes nothing
+    And until it runs, that board is found by its name and creator, and Rename is not offered on it
 
   @integration
   Scenario: AC164 From LangWatch folds only when the member clicks it
@@ -1551,7 +1602,7 @@ Feature: Dashboards v2 polish and bring-your-own-AI
   # dashboard pages". Rename is offered by the rule the library and sidebar menus use.
   @integration
   Scenario: Boards: clicking the title renames the board
-    Given a board of a project where the member holds analytics:update, not their My dashboard
+    Given a board of a project where the member holds analytics:update, their My dashboard included
     When they click the board's title
     Then the title becomes a field holding the name
     When they type a new name and press Enter, or leave the field
@@ -1568,7 +1619,7 @@ Feature: Dashboards v2 polish and bring-your-own-AI
 
   @integration
   Scenario: Boards: a reader who may not rename sees a plain title
-    Given a board of a project where the member does not hold analytics:update, or their own My dashboard
+    Given a board of a project where the member does not hold analytics:update
     Then its title is plain text, and clicking it edits nothing
     # Evidence: a haven browser screenshot of a view-only member's board title
 
@@ -2450,7 +2501,7 @@ Feature: Dashboards v2 polish and bring-your-own-AI
     Given a stored widget whose query stores no projects, on a board open in project "P"
     When the card runs
     Then the run reads project "P" alone and {dashboard_context_projects:Array(String)} is bound to ["P"]
-    And the card line reads "Project: " and the project's name
+    And the card line names no project, since the board already says whose data it is
     # Evidence: a haven browser screenshot of the card line, and the params of the same run
 
   @unit @integration
@@ -2856,6 +2907,23 @@ Feature: Dashboards v2 polish and bring-your-own-AI
     Given Langy builds a widget with the dashboard-widgets skill for a broad question such as "Is our AI saving us time?"
     Then the skill says to chart the one or two numbers in the project's traces that speak to it and say what the widget cannot tell
     And to stay in the skill until the widget is on the board, without switching skills or looking outside the LangWatch data
+
+  @unit
+  Scenario: AC264d Langy follow-ups: a question from a board's ask bar names that board as where it came from
+    Given a member asks Langy from the ask bar, the suggested questions or "Add a widget" of a board
+    Then the ask carries that board as where it came from, the stored board's id on a new board
+
+  @unit
+  Scenario: AC264e Langy follow-ups: a second question from the same board continues the conversation
+    Given a member asked Langy a question from a board, and that started a conversation
+    When they ask another question from the same board within 6 hours, with that conversation still open
+    Then Langy sends it in that conversation, keeping its messages, instead of starting a new one
+
+  @unit
+  Scenario: AC264f Langy follow-ups: another board, a stale conversation or a new chat starts a new conversation
+    Given a member asked Langy a question from a board, and that started a conversation
+    When they ask from another board, or more than 6 hours later, or after New chat or opening another conversation
+    Then Langy starts a new conversation for the question
 
   # ---------------------------------------------------------------------------
   # Guard rails

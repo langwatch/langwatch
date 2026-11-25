@@ -228,9 +228,9 @@ function OpenBoard({ board, unsaved }: { board: SavedBoard; unsaved?: UnsavedBoa
     names,
     scope,
   });
-  const { range } = useBoardRange();
-  const autoRefresh = useDashboardAutoRefresh({ live: range === "live" });
-  const { grain, period, setRange, setGrain } = useBoardPeriod({
+  const { range, refreshApplies } = useBoardRange();
+  const autoRefresh = useDashboardAutoRefresh({ live: range === "live", ended: !refreshApplies });
+  const { grain, custom, period, setRange, setCustom, setGrain } = useBoardPeriod({
     refreshedAt: autoRefresh.refreshedAt,
   });
   const picker = useBlockPickerAddress();
@@ -300,8 +300,12 @@ function OpenBoard({ board, unsaved }: { board: SavedBoard; unsaved?: UnsavedBoa
               <BoardPeriodControl
                 range={range}
                 grain={grain}
+                custom={custom}
+                period={period}
                 refresh={autoRefresh.option}
+                refreshApplies={refreshApplies}
                 onRangeChange={setRange}
+                onCustomChange={setCustom}
                 onGrainChange={setGrain}
                 onRefreshChange={autoRefresh.setOption}
                 onRefreshNow={autoRefresh.refreshNow}

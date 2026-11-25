@@ -8,25 +8,24 @@ import {
   DEFAULT_DASHBOARD_HOME_PRODUCT,
   type DashboardHomeProduct,
   MY_DASHBOARD_NAME,
+  findMyDashboards,
+  type MyDashboardCandidate,
 } from "@langwatch/dashboard-contract";
 
 export { MY_DASHBOARD_NAME };
 
 /**
- * The member's own "My dashboard": the first board they made under that name. No column
- * marks a default board, so the name and the creator do; renaming it is not offered.
+ * The member's own "My dashboard": the board marked theirs, whatever it is named, or on a row
+ * the mark has not reached yet, the first they made under the default name.
  */
 export function myDashboardId({
   boards,
   userId,
 }: {
-  boards: readonly { id: string; name: string; createdById: string | null }[];
+  boards: readonly (MyDashboardCandidate & { id: string })[];
   userId: string | undefined;
 }): string | undefined {
-  if (userId === void 0) return void 0;
-  return boards.find(
-    ({ name, createdById }) => name === MY_DASHBOARD_NAME && createdById === userId,
-  )?.id;
+  return findMyDashboards({ boards, userId })[0]?.id;
 }
 
 /** The address of the area, or of one board in it. */

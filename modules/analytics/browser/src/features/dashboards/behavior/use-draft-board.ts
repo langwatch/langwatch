@@ -25,7 +25,7 @@ import {
   withQueryString,
 } from "../model/boards.ts";
 import { dashboardCreated } from "../model/dashboard-usage-events.ts";
-import { withBlockPickerOpen } from "./use-block-picker-address.ts";
+import { WIDGET_PICKER_QUERY_KEY, withBlockPickerOpen } from "./use-block-picker-address.ts";
 import type { SavedBoard } from "./use-saved-dashboards.ts";
 
 /**
@@ -306,7 +306,9 @@ async function storeDraft({
   const route = host.route();
   if (isHeld(at) && route.params.dashboardId === DRAFT_SEGMENT) {
     const path = storedBoardPath({ writer, at, dashboardId: created.id });
-    host.navigate(withQueryString({ path, query: route.query }), { replace: true });
+    // "Add a widget" made or asked the first edit and is closing; its key must not reopen it.
+    const query = { ...route.query, [WIDGET_PICKER_QUERY_KEY]: void 0 };
+    host.navigate(withQueryString({ path, query }), { replace: true });
   }
   return created.id;
 }
@@ -407,9 +409,11 @@ export function useDraftBoard({ takenNames }: { takenNames: readonly string[] })
     discard: () => {
       const at = useDraftStore.getState();
       if (at.projectId === projectId && at.saving !== void 0) return;
+      // A draft held for another project keeps that project's frame: leave by this one's address.
+      const fromOrganization = at.projectId === projectId && at.atOrganization;
       restartDraft(projectId);
       host.navigate(
-        at.atOrganization
+        fromOrganization
           ? ORGANIZATION_DASHBOARDS_PATH
           : dashboardsPath({ projectSlug: writer.projectSlug }),
         { replace: true },

@@ -145,11 +145,18 @@ export function dashboardFavourited({ starred }: { starred: boolean }): UiAnalyt
 export function widgetAdded({
   addedFrom,
   addedCount,
+  templateId,
 }: {
   addedFrom: WidgetAddedFrom;
   addedCount: number;
+  /** The template a whole set came from, when one did. */
+  templateId?: string;
 }): UiAnalyticsEvent {
-  return dashboardsEvent("widget", "added", { addedFrom, addedCount });
+  return dashboardsEvent("widget", "added", {
+    addedFrom,
+    addedCount,
+    ...(templateId === void 0 ? {} : { templateId }),
+  });
 }
 
 /** A widget's edit saved: "dashboards.edited.widget". */

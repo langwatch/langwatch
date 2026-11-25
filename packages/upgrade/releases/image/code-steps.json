@@ -117,6 +117,14 @@
     "needsOldWritersGone": false
   },
   {
+    "id": "dashboard:mark-my-dashboards",
+    "kind": "data",
+    "mode": "background",
+    "owner": "dashboard",
+    "description": "Marks each member's existing My dashboard, so renaming it keeps it theirs.",
+    "needsOldWritersGone": true
+  },
+  {
     "id": "data-retention:keep-control-plane-events-forever",
     "kind": "data",
     "mode": "background",

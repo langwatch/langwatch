@@ -8,9 +8,10 @@ import {
   type DashboardHomeProduct,
   type DashboardProject,
   type DashboardScope,
+  isMyDashboardOf,
 } from "@langwatch/dashboard-contract";
 
-import { MY_DASHBOARD_NAME, organizationBoardPath, untitledBoardName } from "./boards.ts";
+import { organizationBoardPath, untitledBoardName } from "./boards.ts";
 
 /** What the library's header says it is. */
 export const LIBRARY_HEADER = {
@@ -24,6 +25,8 @@ export type LibraryBoard = {
   readonly name: string;
   readonly description: string | null;
   readonly createdById: string | null;
+  /** Set to the reader's id on their own My dashboard; absent from an older server. */
+  readonly myDashboardOfUserId?: string | null;
   /** The author's display name; null when unknown. */
   readonly ownerName: string | null;
   readonly scope: DashboardScope;
@@ -41,6 +44,7 @@ export function libraryBoardOf({
   name,
   description,
   createdById,
+  myDashboardOfUserId,
   ownerName,
   scope,
   homeProduct,
@@ -52,6 +56,7 @@ export function libraryBoardOf({
     name,
     description,
     createdById,
+    myDashboardOfUserId,
     ownerName,
     scope,
     homeProduct,
@@ -150,32 +155,37 @@ export function libraryBoardPath(board: LibraryBoard): string | undefined {
   return organizationBoardPath({ dashboardId: board.id });
 }
 
-/** The member's own My dashboard, which keeps its name and is never deleted. */
+type MyDashboardFields = Pick<LibraryBoard, "name" | "createdById" | "myDashboardOfUserId">;
+
+/** The member's own My dashboard, which is never deleted. */
 export function isOwnMyDashboard({
   board,
   userId,
 }: {
-  board: Pick<LibraryBoard, "name" | "createdById">;
+  board: MyDashboardFields;
   userId: string | undefined;
 }): boolean {
-  return board.name === MY_DASHBOARD_NAME && userId !== void 0 && board.createdById === userId;
+  return isMyDashboardOf({ board, userId });
 }
 
 /**
  * Whether a board may be renamed, wherever Rename is offered (a library row, a sidebar row, the
- * board's title): by the member's edit grant in the project that owns it, never My dashboard.
+ * board's title): by the member's edit grant in the project that owns it. My dashboard too, once
+ * it is marked theirs: before that, a new name would make it an ordinary board (AC163).
  */
 export function mayRenameBoard({
   board,
   userId,
   mayEditInOwner,
 }: {
-  board: Pick<LibraryBoard, "name" | "createdById">;
+  board: MyDashboardFields;
   userId: string | undefined;
   /** `analytics:update` in the project that owns the board. */
   mayEditInOwner: boolean;
 }): boolean {
-  return mayEditInOwner && !isOwnMyDashboard({ board, userId });
+  const isUnmarkedMyDashboard =
+    isOwnMyDashboard({ board, userId }) && board.myDashboardOfUserId !== userId;
+  return mayEditInOwner && !isUnmarkedMyDashboard;
 }
 
 /** "Move to product…": `onMove` where the member may move it, else why not, shown disabled. */
@@ -206,7 +216,7 @@ const VIEW_ONLY_MOVE_REFUSAL = "You can view this dashboard but not change it.";
 
 /**
  * A board's menu, in the library and the product sidebars alike, from the member's grants in
- * the project that owns it. My dashboard keeps its name and shows Delete disabled; a board that
+ * the project that owns it. My dashboard shows Delete disabled; a board that
  * opens nowhere cannot be copied; one the member cannot edit shows Move disabled.
  */
 export function boardMenuActions({

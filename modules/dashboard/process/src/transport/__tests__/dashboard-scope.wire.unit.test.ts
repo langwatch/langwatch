@@ -717,6 +717,31 @@ describe("the Dashboards and Analytics Reports boards at the doors", () => {
     });
   });
 
+  /** @scenario "My dashboard can be renamed and stays the member's My dashboard" */
+  it("answers the My dashboard mark on boards.getAll, through a rename", async () => {
+    const { call } = appWith();
+    const made = (await call(AUTHOR, "boards.create", {
+      projectId: HOME,
+      name: MY_DASHBOARD_NAME,
+    })) as { id: string };
+    await call(AUTHOR, "boards.update", {
+      projectId: HOME,
+      dashboardId: made.id,
+      name: "Team pulse",
+    });
+
+    const listed = (await call(AUTHOR, "boards.getAll", { projectId: HOME })) as {
+      id: string;
+      name: string;
+      myDashboardOfUserId?: string | null;
+    }[];
+
+    expect(listed.find(({ id }) => id === made.id)).toMatchObject({
+      name: "Team pulse",
+      myDashboardOfUserId: AUTHOR,
+    });
+  });
+
   /** @scenario "AC199i Split: a board made in Analytics Reports is not pinned and not Only me" */
   it("makes My dashboard in Reports at Project with no star, and in Dashboards Only me and starred", async () => {
     const { call } = appWith();
