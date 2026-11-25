@@ -552,7 +552,10 @@ export type InstantEvalJudgeRouteRequest = z.infer<typeof instantEvalJudgeRouteR
 export interface InstantEvalJudgeRouting {
   /** Verdicts each backend supplied, by backend name. */
   readonly answeredBy: Readonly<Record<string, number>>;
-  /** Questions an unsure or failed primary, or a gate's hard branch, sent to the escalation. */
+  /**
+   * Questions an unsure or failed primary sent to the escalation. A gate's hard branch is a
+   * routing choice, reported by the `gate:hard` flag, and is not counted here.
+   */
   readonly escalated: number;
   readonly mode: InstantEvalJudgeMode;
   readonly slot: string;
