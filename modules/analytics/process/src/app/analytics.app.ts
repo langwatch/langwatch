@@ -331,6 +331,7 @@ function lwqlProvisioningOperations({
   database,
   connection,
   readerPassword,
+  isDerived,
   settings,
   projectKeys,
 }: {
@@ -339,6 +340,8 @@ function lwqlProvisioningOperations({
   database: LangWatchQlSupply["database"];
   connection: LangWatchQLConnection;
   readerPassword: string | undefined;
+  /** The passwords came from the key pepper: a provisioning failure warns instead of failing. */
+  isDerived: boolean;
   settings: AnalyticsServerConfig["langwatchQl"];
   projectKeys: ProjectApi;
 }): LwqlProvisioningOperations {
@@ -375,7 +378,11 @@ function lwqlProvisioningOperations({
     converge: async () => {
       // SQL mode only: in rendered mode a config store owns the access entities.
       if (settings.accessModelMode !== "sql" || readerPassword === undefined) return;
-      await convergeLwqlAccessModel({ database: database(), plan: plan(readerPassword) });
+      await convergeLwqlAccessModel({
+        database: database(),
+        plan: plan(readerPassword),
+        isDerived,
+      });
     },
     // Rendered mode only: SQL mode keeps its owner-probe re-provision, unchanged.
     findAppOwnedDrift: async () => {
@@ -388,6 +395,7 @@ function lwqlProvisioningOperations({
         database: database(),
         plan: plan(readerPassword),
         failOnError: true,
+        isDerived,
         only: drift,
       });
     },
@@ -609,6 +617,7 @@ export class AnalyticsModule
             database,
             connection,
             readerPassword: credentials.postgresReaderPassword,
+            isDerived: credentials.isDerived,
             settings: lwqlConfig,
             projectKeys: setup.dependencies.projects,
           })
