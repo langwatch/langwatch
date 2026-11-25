@@ -36,7 +36,6 @@ import { useIsMobileViewport } from "./use-is-mobile-viewport.ts";
 import { useOpenBoard } from "./use-open-board.ts";
 import { useOrganizationDashboardsArea } from "./use-organization-dashboards-area.ts";
 import { useOrganizationLibrary } from "./use-product-home.ts";
-import { useProjectAddressDestination } from "./use-project-address-redirect.ts";
 import { useReachableProducts } from "./use-reachable-products.ts";
 
 export interface NavigationShellReadyState {
@@ -93,7 +92,6 @@ export function useNavigationShellState({
   const organizationLibrary = useOrganizationDashboardsArea();
   const hasOrganizationLibrary = useOrganizationLibrary();
   const board = useOpenBoard({ enabled: hasOrganizationLibrary === true });
-  const projectAddressDestination = useProjectAddressDestination();
 
   const user = host.currentUser();
   const project = host.project();
@@ -104,14 +102,8 @@ export function useNavigationShellState({
   if (hasUnresolvedProjectParam) {
     return { status: "not-found" };
   }
-  const areaState = organizationAreaState({
-    host,
-    pathname,
-    organizationLibrary,
-    projectAddressDestination,
-  });
-  if (areaState !== null) {
-    return areaState;
+  if (isOrganizationAreaClosed({ host, pathname, organizationLibrary })) {
+    return { status: "not-found" };
   }
 
   // A board homed where the seat cannot go opens in the Dashboards chrome instead.
@@ -162,32 +154,24 @@ export function useNavigationShellState({
   };
 }
 
-/** What the organization's Dashboards area settles before any chrome; null lets the shell draw. */
-function organizationAreaState({
+/** Whether the Dashboards area, or the switched-off product at this address, is shut. */
+function isOrganizationAreaClosed({
   host,
   pathname,
   organizationLibrary,
-  projectAddressDestination,
 }: {
   host: ReturnType<typeof useNavigationHost>;
   pathname: string;
   organizationLibrary: ReturnType<typeof useOrganizationDashboardsArea>;
-  projectAddressDestination: string | null;
-}): NavigationShellState | null {
+}): boolean {
   const isFlagOff = (flag: FrontendFeatureFlag) => {
     const reading = host.featureFlag(FrontendFlags[flag]);
     return !reading.isLoading && !reading.enabled;
   };
-  // The organization's library is about no project, so its flags are the organization's.
-  const isClosed =
-    organizationLibrary === "elsewhere"
-      ? isSwitchedOffProductAt({ pathname, isFlagOff })
-      : organizationLibrary === "closed";
-  if (isClosed) return { status: "not-found" };
-  // With the library's flag off the address reads as before: a project it forwards to, if any.
-  if (organizationLibrary !== "legacy") return null;
-  const isForwarding = projectAddressDestination !== null || host.isLoading();
-  return isForwarding ? { status: "loading" } : { status: "not-found" };
+  // The organization's library is about no project, so its flag is the organization's.
+  return organizationLibrary === "elsewhere"
+    ? isSwitchedOffProductAt({ pathname, isFlagOff })
+    : organizationLibrary === "closed";
 }
 
 function isOrgless(host: ReturnType<typeof useNavigationHost>): boolean {

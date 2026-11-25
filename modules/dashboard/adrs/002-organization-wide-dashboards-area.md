@@ -85,7 +85,7 @@ home product is a column on `DashboardsV2` (decision 8, amended 2026-11-23).
    view stores the board in the **store project**: the member's last-used
    project where they hold `analytics:create`, else the first such project by
    name. With no such project nothing that makes a board is offered.
-4. **Addresses never change (amended).** A board made with the flag on lives at
+4. **Addresses never change (amended).** A board made in the area lives at
    `/dashboards/<id>`, whatever product made it. An LLM Ops `PROJECT` board
    lives at `/:project/dashboards/<id>`, as every board made before this change
    does. No address is rewritten after a move, and every address opens any
@@ -110,20 +110,19 @@ home product is a column on `DashboardsV2` (decision 8, amended 2026-11-23).
    `seatReachesProduct` untouched, so developer seats still get in. They see
    only boards from projects they can read, the same rule as today.
 
-   **Amended 2026-11-23 (D1, by the owner).** With the organisation area flag on,
+   **Amended 2026-11-23 (D1, by the owner).** In the organisation area,
    `/:project/dashboards...` draws LLM Ops chrome, and a board draws its home
    product's chrome.
 
-6. **Flags (amended; D4, 2026-11-23).** `release_dashboards_in_every_product`
-   (needs `release_dashboards`) now defaults on and gates only the Dashboards
-   section in the Gateway and Coding agents sidebars. The organization-wide area
-   ships behind its own frontend flag, `release_dashboards_organization_area`,
-   default off, so turning the in-every-product flag on never opens the area. On
-   a page with no project both flags are evaluated for the organization, and the
-   area exists only when at least one of its projects has Dashboards on. While
-   the area's flag is off the `/dashboards` addresses answer as before, no dialog
-   opens, home products are ignored so every board lists in LLM Ops, and personal
-   boards are hidden but kept.
+6. **Flags (amended 2026-11-25, by the owner).** The area and the Gateway and
+   Coding agents sections no longer have flags of their own:
+   `release_dashboards_in_every_product` and
+   `release_dashboards_organization_area` are deleted, and the navigation and
+   "All dashboards" always show. `release_dashboards` alone gates the area. On a
+   page with no project it is evaluated for the organization, and the area exists
+   only when at least one of its projects has Dashboards on; otherwise the
+   `/dashboards` addresses answer not-found. Home products are honoured, every
+   product lists its own boards, and no sidebar reads stars.
 7. **Release gate.** Hide boards whose owning project has `release_dashboards`
    off. This matches what that project shows today. The gate covers the area,
    not the data: "All projects" (decision 9) still reads a readable project
@@ -240,8 +239,7 @@ organizationId, userId }) -> { virtualKeyIds }`, with the narrow type
 ## Consequences
 
 - One expand-only migration adds the `homeProduct` column with a constant
-  default (amended 2026-11-23). Turning the flag off ignores it, so the area
-  reads as it did before; nothing is deleted.
+  default (amended 2026-11-23). Nothing is deleted.
 - The server lists boards across projects and resolves a board by id; each
   project is authorised separately with `analytics:view`.
 - The `release_dashboards` gate is checked per project on the server. The list
@@ -284,7 +282,8 @@ show one project's data, which does not give organization-level graphs.
 Rejected by D1.
 
 **Separate flags for the sidebar section and the organization area.** More
-combinations to test for one product ask. Rejected (D4).
+combinations to test for one product ask. Rejected (D4), and the flags were
+deleted on 2026-11-25.
 
 **An anchor-project door for the list** (`analytics:view` on any readable
 project) instead of `organization:view`. Kept as the fallback if

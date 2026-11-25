@@ -104,15 +104,13 @@ function scopeServer({
   boards,
   widgets = [],
   otherStars = 0,
-  projects = [HERE, CHECKOUT],
   organizationArea = false,
 }: {
   boards: Board[];
-  /** The organization's Dashboards area flag; off unless a scenario turns it on. */
+  /** Dashboards on for the organization; off unless a scenario turns it on. */
   organizationArea?: boolean;
   widgets?: ReturnType<typeof widget>[];
   otherStars?: number;
-  projects?: Project[];
 }) {
   const state = {
     boards: boards.map((board) => ({ ...board })),
@@ -138,10 +136,6 @@ function scopeServer({
         return Promise.resolve({ ...find(input.dashboardId) });
       case "boards.scopeImpact":
         return Promise.resolve({ otherStars });
-      case "boards.scopeProjects": {
-        const board = find(input.dashboardId);
-        return Promise.resolve({ ownerProject: board.ownerProject ?? HERE, projects });
-      }
       case "boards.create": {
         const created = own({
           id: `board-new-${state.boards.length + 1}`,
@@ -170,7 +164,7 @@ function scopeServer({
         state.widgets.push(created);
         return Promise.resolve({ ...created });
       }
-      // The organization's Dashboards area is off, so a missing board reads as AC183's page.
+      // Dashboards is off for the organization, so a missing board reads as AC183's page.
       case "featureFlag.isEnabledForEachOrganization":
         return Promise.resolve({
           enabledByOrganizationId: organizationArea ? { "org-1": true } : {},
@@ -544,40 +538,6 @@ describe("a board's scope in the browser", () => {
     });
 
     /** @scenario "AC182 Organization board: the Project chip says whose data it shows" */
-    it("names the project whose data is on screen in a chip, with the area off", async () => {
-      open({ server: scopeServer({ boards: [spend] }) });
-
-      const chip = await screen.findByRole("button", { name: "Project: Test Project" });
-
-      expect(chip.textContent).toBe("ProjectTest Project");
-    });
-
-    /** @scenario "AC182 Organization board: the Project chip says whose data it shows" */
-    it("lists the projects the reader can open, the owner marked, with no All projects", async () => {
-      const { user } = open({ server: scopeServer({ boards: [spend] }) });
-
-      await user.click(await screen.findByRole("button", { name: "Project: Test Project" }));
-
-      expect(await choices()).toEqual([
-        { name: "Test Project", ticked: true, text: "Test Projectowner" },
-        { name: "Checkout", ticked: false, text: "Checkout" },
-      ]);
-      expect(
-        screen.getByText("Whose data this dashboard shows. One project at a time."),
-      ).toBeInTheDocument();
-    });
-
-    /** @scenario "AC182 Organization board: the Project chip says whose data it shows" */
-    it("opens the same board under the project the reader chooses", async () => {
-      const { host, user } = open({ server: scopeServer({ boards: [spend] }) });
-
-      await user.click(await screen.findByRole("button", { name: "Project: Test Project" }));
-      await user.click(await screen.findByRole("menuitemradio", { name: "Checkout" }));
-
-      expect(host.navigations).toEqual(["/checkout/dashboards/board-1"]);
-    });
-
-    /** @scenario "AC182 Organization board: the Project chip says whose data it shows" */
     it("says whose data is on screen, read-only, with no project to switch to", async () => {
       open({ server: scopeServer({ boards: [spend], organizationArea: true }) });
 
@@ -589,18 +549,6 @@ describe("a board's scope in the browser", () => {
   });
 
   describe("given a Project board", () => {
-    /** @scenario "AC182 Organization board: the Project chip says whose data it shows" */
-    it("has no Project chip, and asks for no list of projects, with the area off", async () => {
-      const server = scopeServer({ boards: [WEEKLY] });
-      open({ server });
-      await screen.findByRole("button", { name: "Scope: Project" });
-
-      expect({
-        chip: screen.queryByRole("button", { name: /^Project:/ }),
-        asked: inputsTo(server, "boards.scopeProjects"),
-      }).toEqual({ chip: null, asked: [] });
-    });
-
     /** @scenario "AC182 Organization board: the Project chip says whose data it shows" */
     it("says its own project's data is on screen, read-only", async () => {
       open({ server: scopeServer({ boards: [WEEKLY], organizationArea: true }) });
@@ -619,11 +567,11 @@ describe("a board's scope in the browser", () => {
       organizationId: "org-1",
       homeProduct: "gateway",
     });
-    const withWidget = ({ organizationArea }: { organizationArea: boolean }) =>
+    const withWidget = () =>
       scopeServer({
         boards: [gateway],
         widgets: [widget({ id: "w-1", dashboardId: "board-1", name: "Spend" })],
-        organizationArea,
+        organizationArea: true,
       });
     /** Runs each widget's query as its frame would, then returns what the runs sent. */
     const widgetRuns = async (server: Server) => {
@@ -642,29 +590,13 @@ describe("a board's scope in the browser", () => {
     };
 
     /** @scenario "A Gateway or Governance board's widget reads every project I may read" */
-    it("names no project and reads every project, with the area on (ADR-002, D2)", async () => {
-      const server = withWidget({ organizationArea: true });
+    it("names no project and reads every project (ADR-002, D2)", async () => {
+      const server = withWidget();
       open({ server });
       await screen.findByRole("button", { name: "Scope: Organization" });
 
       expect(screen.queryByLabelText(/^Data from /)).toBeNull();
       expect(await widgetRuns(server)).toContainEqual(expect.objectContaining({ projects: "all" }));
-    });
-
-    /** @scenario "A Gateway or Governance board's widget reads every project I may read" */
-    it("keeps the Project chip and the project's data, with the area off", async () => {
-      const server = withWidget({ organizationArea: false });
-      open({ server });
-
-      expect(await screen.findByRole("button", { name: "Project: Test Project" })).toBeVisible();
-      for (const run of await widgetRuns(server)) expect(run).not.toHaveProperty("projects");
-    });
-
-    /** @scenario "A Gateway or Governance board's widget reads every project I may read" */
-    it("offers the empty-board templates, with the area off", async () => {
-      open({ server: scopeServer({ boards: [gateway] }) });
-
-      expect(await screen.findByText("Or start from a template")).toBeInTheDocument();
     });
   });
 

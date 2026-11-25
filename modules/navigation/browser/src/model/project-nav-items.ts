@@ -43,17 +43,6 @@ export function projectNavItemAt(pathname: string): ProjectNavItem | undefined {
   return Object.values(projectNavItems).find((item) => item.path === pathname);
 }
 
-/**
- * Where a route pattern stands in the Dashboards area: `undefined` outside it, otherwise
- * what follows `/dashboards/` (empty on the area's own address), which analytics reads.
- */
-export function dashboardsAreaAt(pattern: string): { openPath: string } | undefined {
-  const area = projectNavItems.dashboards.path;
-  if (pattern === area) return { openPath: "" };
-  if (!pattern.startsWith(`${area}/`)) return void 0;
-  return { openPath: pattern.slice(area.length + 1) };
-}
-
 /** Address to route pattern; normalize for pattern-based tests vs address-based host */
 export function toProjectRoutePattern({
   pathname,

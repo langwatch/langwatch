@@ -3,8 +3,8 @@ import { useLlmOpsProjectSlug } from "./use-llm-ops-project-slug.ts";
 import { useOrganizationDashboardsFlags } from "./use-organization-dashboards-area.ts";
 
 /**
- * Whether the organization has the Dashboards library: both its flags on for the organization
- * (ADR-002), undefined while they load. The one answer every product home reads.
+ * Whether the organization has the Dashboards library: Dashboards on for the organization
+ * (ADR-002), undefined while it loads. The one answer every product home reads.
  */
 export function useOrganizationLibrary(): boolean | undefined {
   const area = useOrganizationDashboardsFlags({ enabled: true });
@@ -18,7 +18,7 @@ export function useHasOrganizationLibrary(): boolean {
 
 /**
  * Where the product switcher and the rail open each product. Dashboards has none while the
- * library's flags load, so a click then opens nothing rather than the wrong Dashboards.
+ * library's flag loads, so a click then opens nothing rather than the wrong Dashboards.
  */
 export function useProductHome(): (product: ProductDefinition) => string | null {
   const projectSlug = useLlmOpsProjectSlug();

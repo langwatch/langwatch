@@ -975,13 +975,8 @@ Feature: Dashboards v2 polish and bring-your-own-AI
     And it offers no project to switch to; the LLM Ops top bar switches the project in view
     And a Project board's header reads "Data from <its own project>", read-only
     And an Organization board homed in Gateway or Governance names no project, since it reads the organization's data
-    And with release_dashboards_organization_area off, an Organization board's header instead has a chip
-      "Project <project>"; opening it lists the projects of the organization the reader can open,
-      one to choose, with "Whose data this dashboard shows. One project at a time.", no
-      "All projects", the owning project marked "owner" and a note on who edits it
-    And choosing one opens the same board under that project, and a Project board has no such chip
     # Title kept for its bound tests; the chip became a read-only label (owner, 2026-11-23; D2,
-    # dashboards-organization-area.feature).
+    # dashboards-organization-area.feature), and the chip itself was removed with the area's flag.
 
   @integration
   Scenario: AC183 A board the reader may not open is not available
@@ -990,7 +985,7 @@ Feature: Dashboards v2 polish and bring-your-own-AI
     Then the page reads "This dashboard is not available" and "It was deleted, or the person who
       made it set its scope to Only me. If you need it, ask them to set it to Project."
     And it shows nothing of the board's name, description or widgets
-    # That text holds with Dashboards in every product off. With it on, the page reads "This
+    # That text holds where the organization's area is shut. With it open, the page reads "This
     # dashboard was deleted or isn't shared with you." with "Back to Dashboards" (dashboards-organization-area.feature).
 
   @unit @integration

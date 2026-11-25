@@ -6,9 +6,8 @@ Feature: Organization-wide Dashboards area
   # it binds a test and drops the tag. The other tags name the level it binds at.
   # @q1-all-projects rests on product decision D1. A home product is a column on the board row,
   # not an event (ADR-002, decision 8 as built; see the scenario on boards made before homes).
-  # "The organization's Dashboards area" is the flag release_dashboards_organization_area (ADR-002,
-  # decision 6); "Dashboards in every product" is release_dashboards_in_every_product, which
-  # governs only the other products' sidebar sections. Both need release_dashboards.
+  # "The organization's Dashboards area" opens with release_dashboards for the organization
+  # (ADR-002, decision 6, amended 2026-11-25): it has no flag of its own.
   # Owner, 2026-11-23: "we can drop starred... If it's in the project + product, it goes on the
   # sidebar." Stars stay stored (column, repository, API); no screen in the area reads or writes them.
   # A "# Next PR" line marks a scenario this PR (S0: the library, the sidebars and the
@@ -21,69 +20,17 @@ Feature: Organization-wide Dashboards area
   Background:
     Given an organization "Acme" with projects "Shop" and "Ops", where release_dashboards is on
     And I read both projects unless a scenario says otherwise
-    And "the organization's Dashboards area" is on unless a scenario says otherwise
     And the expanded sidebar is 212px wide
-
-  # ---- Flag off: nothing new beyond PR 9698's rename and /me redirects (B8) ----
-  @integration
-  Scenario: With the flag off, /dashboards forwards to my project as before
-    Given "the organization's Dashboards area" is off for "Acme"
-    When I open "/dashboards"
-    Then I land on my last-used project's address, as the base commit of PR 9698 does, and no library page is drawn
-    # Evidence: the address after the forward
-
-  @integration @unimplemented
-  Scenario: With the flag off, the Dashboards area is as it was
-    Given "the organization's Dashboards area" is off
-    When I open "/dashboards", "/dashboards/<a board id>", "/dashboards/templates" or "/dashboards/curated/<id>"
-    Then I see the same page the base commit of PR 9698 shows for that address
-    And the Gateway, Governance and Coding agents sidebars are as the base commit draws them: the project's Dashboards section only where "Dashboards in every product" is on, and no "Starred dashboards" group
-    And the LLM Ops sidebar's Dashboards section lists my pins, at most 7, its "+" opens a new board stored on its first edit, and it has no "Browse templates"
-    And the Dashboards sidebar at "/shop/dashboards" is the one dashboards-v1 AC3 describes
-    And "/shop/dashboards" lands on my My dashboard of "Shop", as today
-    And switching project in the top bar on an Organization board at "/shop/dashboards/<id>" keeps the board open, re-read for the project switched to (D2)
-    And a not-available page shows AC183's text and no "Back to Dashboards"
-    And a board moved to Gateway while the flag was on is listed in LLM Ops again
-    And a Project board its author moved out while the flag was on lists in LLM Ops as Only me, for its author alone
-    And my personal boards are not shown anywhere, and none is deleted
-    And "Coding agents" replaces "Me", and "/me" addresses redirect to "/coding-agents"
-    # Evidence: one screenshot per address and sidebar above with the flag off, each paired
-    # with the base commit's screenshot of the same address
-
-  @integration
-  Scenario: With the flag off, a board's title has no inline rename, as on main
-    Given "the organization's Dashboards area" is off for "Acme"
-    When I open a stored board in "Shop"
-    Then its title is drawn with no rename control
-    # Evidence: the rendered title with no button in it
-
-  @integration
-  Scenario: With the flag off, an Organization board keeps the Project chip, as on main
-    Given "the organization's Dashboards area" is off for "Acme"
-    When I open an Organization board in "Shop"
-    Then the header shows the Project chip "Project: Shop" and no "Data from" label
-    # Evidence: the chip's aria-label in the rendered header
 
   @integration
   Scenario: An Organization board in a project reads its data from a label, not a chip
-    Given "the organization's Dashboards area" is on for "Acme"
     When I open an Organization board in "Shop"
     Then the header shows "Data from Shop" and no Project chip
     # Evidence: the label's aria-label in the rendered header
 
-  @integration
-  Scenario: With the flag off, a From LangWatch board is read-only, as on main
-    Given "the organization's Dashboards area" is off for "Acme"
-    And I may create dashboards in "Shop"
-    When I open "/shop/dashboards/curated/<id>"
-    Then the board shows its widgets with no "Add a widget", no "Use this template", no title or description edit, and no widget edit, drag or delete
-    And no copy-on-change dialog can open
-    # Evidence: the quoted tRPC calls, with no dashboards or dashboardWidgets write
-
   # ---- The Coding agents rename: page titles (draft AC4; S0) ----
   @integration @unimplemented
   Scenario: Every Coding agents page title says Coding agents
-    Given "the organization's Dashboards area" is on, and also when it is off
     When I open each page under "/coding-agents", and each old "/me" address that redirects there
     Then the browser tab's title names "Coding agents", never "Me"
     And the page header names "Coding agents", never "Me"
@@ -341,9 +288,7 @@ Feature: Organization-wide Dashboards area
     When I open it
     Then the widget's run asks for projects "all", and its header names no project
     And a widget that stores its own projects asks for those projects instead
-    And with release_dashboards_organization_area off, the run asks for no projects, the header keeps
-      the Project chip and an empty board offers its templates, as before
-    # Evidence: the run's params with the flag on and off, and a screenshot of each header
+    # Evidence: the run's params, and a screenshot of the header
 
   # Next PR: "All projects" at the organization level (ADR-002, decision 9; D1).
   @unit @integration @q1-all-projects @unimplemented
@@ -392,7 +337,6 @@ Feature: Organization-wide Dashboards area
     Then its past traffic still counts, as on its Gateway Usage page
     When the key list cannot be read
     Then the chart shows "Couldn't load" with Retry and no figures
-    And with release_dashboards_organization_area off, no run reads the governance project
     And the same board in the project view of "Shop" reads no governance trace
     And a LangWatchQL REST run with projects "all" binds no governance project, as before
     # Evidence: screenshots, signed in as each member, of the board's chart for K1 next to K1's Gateway Usage page (same period, same figure); of the hostile "count() FROM traces" chart; of the keyless member's chart; of my chart with M1 and without P1; and of the admin's chart without P1 and M1. The run response for each, showing params.dashboard_context_projects without the governance id.
@@ -470,7 +414,7 @@ Feature: Organization-wide Dashboards area
   @integration @unimplemented
   Scenario: Earlier per-project My dashboards are kept
     Given I had a My dashboard in "Shop" and in "Ops" before this change
-    When I open Dashboards in "Shop" for the first time with the flag on
+    When I open Dashboards in "Shop" for the first time
     Then my personal My dashboard starts with the widgets of my "Shop" one
     And both earlier ones still exist, listed in the library's LLM Ops group as "My dashboard · Shop" and "My dashboard · Ops", Only me
     # Evidence: the list answer, and screenshots of the section
@@ -751,11 +695,10 @@ Feature: Organization-wide Dashboards area
   # of its product when I can see it for the project in view, starred or not.
   @integration
   Scenario: No sidebar has a Starred dashboards group
-    Given "Dashboards in every product" and "the organization's Dashboards area" are on, and I starred boards before
+    Given I starred boards before
     When I am in LLM Ops, Gateway, Coding agents, Governance or the Dashboards sidebar
     Then there is no "Starred dashboards" group, and no project's pinned Dashboards section
     And a starred board is listed in its own product's Dashboards section like any other
-    And with "Dashboards in every product" off, Gateway, Coding agents and Governance show no Dashboards section
     # Evidence: screenshots of the five sidebars
 
   @integration
@@ -792,7 +735,7 @@ Feature: Organization-wide Dashboards area
   # menu", and "why are dashboard menu items smaller and with less padding than other items?"
   @integration
   Scenario: The open board's sidebar row is marked as the page I am on
-    Given a board listed in a product's Dashboards section, or pinned in LLM Ops with the library off
+    Given a board listed in a product's Dashboards section
     When I open it at "/dashboards/<id>" or at "/shop/dashboards/<id>"
     Then its row, and no other, is marked as the current page, filled as "Agent Testing" is
     And every Dashboards row has the height, padding, text style and colours of the sidebar's own entries
@@ -850,7 +793,7 @@ Feature: Organization-wide Dashboards area
     Given release_dashboards is off for every project of "Acme"
     When I open "/dashboards", "/dashboards/<id>" or "/dashboards/templates"
     Then I see the app's not-found page, and the rail and the product switcher have no Dashboards entry
-    And on a page with no project the flags are evaluated for the organization
+    And on a page with no project the flag is evaluated for the organization
     # Evidence: screenshots and the flag evaluation's target in the network panel
 
   # Next PR: home products (ADR-002, decision 8).
@@ -895,7 +838,7 @@ Feature: Organization-wide Dashboards area
   @integration
   Scenario: A project still holding the dashboards slug keeps its deeper pages
     Given I read a project whose slug is still "dashboards", before "project:reslug-reserved-dashboards" has run
-    When I open one of its pages below the area's own addresses, such as "/dashboards/messages/<trace id>", with the area's flag on or off
+    When I open one of its pages below the area's own addresses, such as "/dashboards/messages/<trace id>"
     Then the page opens in LLM Ops with its project chip, as before this change, and not as a not-found page or the Dashboards area
     And a board of that project at "/dashboards/dashboards/<id>" stays a project board in that project's Dashboards area
-    # Evidence: the shell drawing the page with the flag off and on
+    # Evidence: the shell drawing the page

@@ -14,7 +14,7 @@ import {
   RecordingUiAnalytics,
 } from "@langwatch/browser-host/testing";
 import type { UiProcedureCall } from "@langwatch/browser/testing-transport";
-import { cleanup, screen, within } from "@testing-library/react";
+import { cleanup, screen } from "@testing-library/react";
 import type { ReactElement } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -85,7 +85,6 @@ function openScreen({
   params,
   lends,
   board = {},
-  organizationArea,
   project,
   analytics,
 }: {
@@ -94,8 +93,6 @@ function openScreen({
   lends: readonly UiLend[];
   /** Fields of the stored board that differ from the default board. */
   board?: Record<string, unknown>;
-  /** The organization's Dashboards area flag, answered once given; unanswered when absent. */
-  organizationArea?: boolean;
   project?: AnalyticsHostProject;
   analytics?: UiAnalytics;
 }) {
@@ -120,12 +117,7 @@ function openScreen({
     host,
     answer: (call: UiProcedureCall) => {
       if (call.path === "featureFlag.isEnabledForEachOrganization") {
-        return organizationArea === undefined
-          ? NO_PROCEDURES(call)
-          : Promise.resolve({ enabledByOrganizationId: { "org-1": organizationArea } });
-      }
-      if (call.path === "boards.scopeProjects") {
-        return Promise.resolve({ ownerProject: OWNER, projects: [OWNER, SHOP] });
+        return Promise.resolve({ enabledByOrganizationId: { "org-1": true } });
       }
       if (call.path === "boards.getAll") return Promise.resolve([{ ...BOARD, ...board }]);
       if (call.path === "boards.listStarred") return Promise.resolve([]);
@@ -187,42 +179,8 @@ describe("given no module lends an action to the board header", () => {
   });
 });
 
-describe("given the organization's Dashboards area is off", () => {
-  describe("when a member opens a stored board", () => {
-    /** @scenario "With the flag off, a board's title has no inline rename, as on main" */
-    it("draws the title with no rename control", async () => {
-      openScreen({
-        element: <DashboardBoardScreen />,
-        params: { dashboardId: "board-1" },
-        lends: [],
-        organizationArea: false,
-      });
-
-      const heading = await screen.findByRole("heading", { name: "Weekly review" });
-      expect(within(heading).queryByRole("button")).toBeNull();
-    });
-  });
-
+describe("given the organization's Dashboards area", () => {
   describe("when a member opens an Organization board in a project", () => {
-    /** @scenario "With the flag off, an Organization board keeps the Project chip, as on main" */
-    it("shows the Project chip in place of the data label", async () => {
-      openScreen({
-        element: <DashboardBoardScreen />,
-        params: { dashboardId: "board-1" },
-        lends: [],
-        board: { scope: "ORGANIZATION", projectId: OWNER.id },
-        organizationArea: false,
-        project: SHOP,
-      });
-
-      expect(
-        await screen.findByRole("button", { name: `Project: ${SHOP.name}` }),
-      ).toBeInTheDocument();
-      expect(screen.queryByLabelText(/^Data from /)).toBeNull();
-    });
-  });
-
-  describe("when the organization's Dashboards area is on", () => {
     /** @scenario "An Organization board in a project reads its data from a label, not a chip" */
     it("shows the data label, and no Project chip", async () => {
       openScreen({
@@ -230,7 +188,6 @@ describe("given the organization's Dashboards area is off", () => {
         params: { dashboardId: "board-1" },
         lends: [],
         board: { scope: "ORGANIZATION", projectId: OWNER.id },
-        organizationArea: true,
         project: SHOP,
       });
 
