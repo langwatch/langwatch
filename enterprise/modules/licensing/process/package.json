@@ -58,6 +58,7 @@
     "@langwatch/time": "workspace:*",
     "@langwatch/upgrade": "workspace:*",
     "@langwatch/user-contract": "workspace:*",
+    "@slack/webhook": "catalog:",
     "@trpc/server": "catalog:",
     "undici": "catalog:",
     "zod": "catalog:"

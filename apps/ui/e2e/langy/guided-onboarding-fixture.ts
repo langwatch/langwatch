@@ -717,20 +717,21 @@ function copyProviderRow({
 // The kickoff
 // ---------------------------------------------------------------------------
 
-/** The first name the takeover greets: the signed-in user's. */
-async function firstNameOfTestUser(): Promise<string> {
+/** The first name the takeover greets: the signed-in user's, or none when it has no real name. */
+async function firstNameOfTestUser(): Promise<string | undefined> {
   const cookie = await getSessionCookie();
   try {
     const session = await fetch(`${APP_BASE}/api/auth/get-session`, {
       headers: { Cookie: cookie, Origin: APP_BASE },
       signal: AbortSignal.timeout(15_000),
     }).then((res) => res.json() as Promise<{ user?: { name?: string } }>);
-    const first = (session.user?.name ?? "").trim().split(/\s+/)[0];
-    if (first) return first;
+    const name = (session.user?.name ?? "").trim();
+    // Mirrors firstNameOf: a name holding an email anywhere is no name at all.
+    if (name && !name.includes("@")) return name.split(/\s+/)[0];
   } catch (error) {
-    console.debug(`[fixture] session read failed, falling back to the address: ${String(error)}`);
+    console.debug(`[fixture] session read failed, sending no first name: ${String(error)}`);
   }
-  return CONFIG.ADMIN_EMAIL.split("@")[0] ?? "there";
+  return undefined;
 }
 
 /** Which guided state the kickoff is composed from (README.md "guided-onboarding-fixture.ts"). */

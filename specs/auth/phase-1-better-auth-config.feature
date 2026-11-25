@@ -113,7 +113,7 @@ Feature: BetterAuth config (unmounted)
   # @unimplemented: the BetterAuth OAuth-callback hook chain is wired but the
   # guard logic for the "active-session-with-different-email" path lives across
   # Bound at config-layer: `accountLinking.allowDifferentEmails` defaults to
-  # false, which causes BetterAuth to fire LINKING_DIFFERENT_EMAILS_NOT_ALLOWED
+  # false, so the link callback redirects with email_does_not_match (1.7.x)
   # (surfaced as DIFFERENT_EMAIL_NOT_ALLOWED in the UI). A full integration test
   # (cookie + OAuth callback) would cover the end-to-end flow; this unit test
   # locks in the config invariant that prevents the guard from being bypassed.

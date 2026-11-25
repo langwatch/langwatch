@@ -4,6 +4,8 @@ import { describe, expect, it } from "vitest";
 
 import {
   auditBackLink,
+  auditProjectFilterIn,
+  auditTargetChipText,
   matchMemberId,
   readAuditPaging,
   readAuditTarget,
@@ -195,5 +197,80 @@ describe("given the members the user box matches against", () => {
     it("applies no user filter rather than filtering to nobody", () => {
       expect(matchMemberId(members, "carol")).toBeUndefined();
     });
+  });
+});
+
+describe("given a project filter picked in one organization", () => {
+  const filter = { organizationId: "org-acme", projectId: "proj-1" };
+
+  describe("when the reader is still in that organization", () => {
+    it("keeps filtering by that project", () => {
+      expect(auditProjectFilterIn({ filter, organizationId: "org-acme" })).toEqual(filter);
+    });
+  });
+
+  describe("when the reader has switched organization and stayed on the page", () => {
+    /** @scenario A project filter is forgotten when the organization changes under it */
+    it("rebases onto the new organization with no project at all", () => {
+      expect(auditProjectFilterIn({ filter, organizationId: "org-beta" })).toEqual({
+        organizationId: "org-beta",
+        projectId: null,
+      });
+    });
+  });
+
+  describe("when the reader switches away and comes back", () => {
+    /** @scenario A project filter is forgotten when the organization changes under it */
+    it("stays forgotten rather than reviving the project they once picked", () => {
+      const away = auditProjectFilterIn({ filter, organizationId: "org-beta" });
+      expect(auditProjectFilterIn({ filter: away, organizationId: "org-acme" })).toEqual({
+        organizationId: "org-acme",
+        projectId: null,
+      });
+    });
+  });
+
+  describe("when no project was ever picked", () => {
+    it("applies no project filter", () => {
+      const empty = { organizationId: "org-acme", projectId: null };
+      expect(auditProjectFilterIn({ filter: empty, organizationId: "org-acme" })).toEqual(empty);
+    });
+  });
+});
+
+describe("given a target label on a link that is not a braid's", () => {
+  /** @scenario A braid's target chip names its projects, never its grant id */
+  it("shows the target's id, not the label the link carries", () => {
+    const target = readAuditTarget({
+      targetKind: "virtual_key",
+      targetId: "vk_A",
+      targetLabel: "Prod key",
+    });
+    expect(target && auditTargetChipText(target)).toBe("virtual_key = vk_A…");
+  });
+});
+
+describe("given the audit log opened from a braid", () => {
+  /** @scenario A braid's target chip names its projects, never its grant id */
+  it("names the braid by its projects", () => {
+    const target = readAuditTarget({
+      targetKind: "braid",
+      targetId: "rolebinding_00041n",
+      targetLabel: "payments-agent → checkout-web",
+    });
+    expect(target && auditTargetChipText(target)).toBe("Braid: payments-agent → checkout-web");
+  });
+
+  /** @scenario A braid's target chip names its projects, never its grant id */
+  it("reads Braid alone when the link carries no label", () => {
+    const target = readAuditTarget({ targetKind: "braid", targetId: "rolebinding_00041n" });
+    expect(target && auditTargetChipText(target)).toBe("Braid");
+  });
+
+  /** @scenario A braid's target chip names its projects, never its grant id */
+  it("drops the label with the rest of the target when the chip clears", () => {
+    expect(
+      withoutAuditTarget({ targetKind: "braid", targetId: "rb_1", targetLabel: "a → b" }),
+    ).toEqual({});
   });
 });

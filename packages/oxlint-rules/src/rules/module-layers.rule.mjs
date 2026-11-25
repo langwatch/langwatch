@@ -8,7 +8,9 @@ const MESSAGE_FOR_LAYER = {
   channels: "channelCrossing",
   repositories: "repositoryCrossing",
   services: "serviceNamesABackend",
+  telemetry: "telemetryCrossing",
   transport: "transportCrossing",
+  vocabulary: "vocabularyCrossing",
 };
 
 /** A service's message follows what it named: a repository backend or a channel implementation. */
@@ -23,8 +25,11 @@ function messageIdFor({ layer, sourcePath, specifier }) {
   return SERVICE_MESSAGE_FOR_TARGET[targetLayer({ sourcePath, specifier })];
 }
 
+/** A module's process half, or a framework package that opted into the feature layout (ADR-181). */
 function isLayeredSource(file) {
-  return file.role === "process" && !file.isTest && isGovernedLayer(file.layer);
+  const layered = file.role === "process" || file.kind === "framework";
+
+  return layered && !file.isTest && isGovernedLayer(file.layer);
 }
 
 function sourceOf(node) {
@@ -69,6 +74,16 @@ export const moduleLayersRule = defineRule({
       what: "A service names {{crossed}} (`{{specifier}}`).",
       why: "A service works over repository interfaces; the registry chooses the backend.",
       fix: "Import the `repositories/<subject>.repository.ts` interface instead and take the implementation from the module's repository registry.",
+    },
+    vocabularyCrossing: {
+      what: "The vocabulary names {{crossed}} (`{{specifier}}`).",
+      why: "Vocabulary is a framework's leaf: every layer imports it, so it takes only vocabulary, rules and telemetry (ADR-181).",
+      fix: "Move the behaviour into a service and keep vocabulary to types, `define*` factories, builders, abstract bases and errors; a file that only needs a type writes `import type`.",
+    },
+    telemetryCrossing: {
+      what: "A telemetry module names {{crossed}} (`{{specifier}}`).",
+      why: "Telemetry holds the OTel instruments every layer records on, so it takes nothing of the package as a value (ADR-181).",
+      fix: "Import only types here and record the measurement from the layer that has the value.",
     },
     serviceNamesAChannelImplementation: {
       what: "A service names {{crossed}} (`{{specifier}}`).",

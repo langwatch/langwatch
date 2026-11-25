@@ -6,6 +6,7 @@ import {
   DataRetentionApi,
   PLATFORM_DEFAULT_RETENTION_DAYS,
 } from "@langwatch/data-retention-contract";
+import { BillingApi } from "@langwatch/enterprise-billing-contract";
 import { EntitlementApi } from "@langwatch/entitlement-contract";
 import { bootInstalledProcess } from "@langwatch/process";
 import { memoryStores } from "@langwatch/process-stores";
@@ -17,6 +18,7 @@ import { describe, expect, it } from "vitest";
 import { dataRetentionProcessModule } from "../../data-retention.module.ts";
 import {
   createDataRetentionTestAuthz,
+  createDataRetentionTestBilling,
   createDataRetentionTestEntitlement,
   createDataRetentionTestUsers,
   retentionTestGraph,
@@ -41,6 +43,7 @@ function process(
       testPeer({ token: AuthzApi, instance: createDataRetentionTestAuthz() }),
       testPeer({ token: UserApi, instance: createDataRetentionTestUsers() }),
       testPeer({ token: EntitlementApi, instance: createDataRetentionTestEntitlement() }),
+      testPeer({ token: BillingApi, instance: createDataRetentionTestBilling() }),
     ],
   });
 }
@@ -54,20 +57,32 @@ describe("data retention app installation", () => {
 
       expect(runtime.module(dataRetentionProcessModule).provided).toBe(app);
 
-      // The memory placement reader starts empty: a project with no row is refused, not defaulted.
+      // The memory placement reader starts empty: a project with no row gets the default.
       await expect(
         app.getResolvedForProject({ projectId: retentionTestGraph.projectId }),
-      ).rejects.toMatchObject({ code: "project_not_found" });
+      ).resolves.toEqual({
+        traces: PLATFORM_DEFAULT_RETENTION_DAYS,
+        scenarios: PLATFORM_DEFAULT_RETENTION_DAYS,
+        experiments: PLATFORM_DEFAULT_RETENTION_DAYS,
+      });
       expect(app.getPlatformDefaultRetentionDays()).toBe(PLATFORM_DEFAULT_RETENTION_DAYS);
 
       await expect(app.listByProject({ projectId: retentionTestGraph.projectId })).resolves.toEqual(
         [],
       );
 
-      // The settings page's read resolves through the same reader, so it refuses the same way.
+      // The settings page's read resolves through the same reader: the default, nothing to edit.
       await expect(
         app.getPolicySnapshot({ projectId: retentionTestGraph.projectId, userId: "user-1" }),
-      ).rejects.toMatchObject({ code: "project_not_found" });
+      ).resolves.toMatchObject({
+        canConfigureRetention: false,
+        rules: [],
+        effective: {
+          traces: PLATFORM_DEFAULT_RETENTION_DAYS,
+          scenarios: PLATFORM_DEFAULT_RETENTION_DAYS,
+          experiments: PLATFORM_DEFAULT_RETENTION_DAYS,
+        },
+      });
     } finally {
       await runtime.stop();
     }

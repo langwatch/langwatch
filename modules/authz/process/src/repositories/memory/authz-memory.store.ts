@@ -54,6 +54,8 @@ type AuthzMemoryMembershipRow = {
   membershipStamp: string;
   pendingSsoGrantId: string | null;
   createdAt: Instant;
+  /** A Billing-only member (ADR-205). */
+  billingOnly?: boolean;
 };
 
 /** A Group row; its members are `groupMemberships`. */
@@ -157,6 +159,15 @@ export class AuthzMemoryStore {
   }
 
   private constructor() {}
+
+  /** The grants a braid change replaced: any row, live or revoked, names them (ADR-201 §2). */
+  replacedGrantIds({ organizationId }: { organizationId: string }): Set<string> {
+    return new Set(
+      this.grants.flatMap((row) =>
+        row.organizationId === organizationId && row.replacesGrantId ? [row.replacesGrantId] : [],
+      ),
+    );
+  }
 
   /** Deactivated or erased, as the standing table says; no row means active. */
   isInactiveUser(userId: string): boolean {

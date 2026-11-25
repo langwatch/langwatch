@@ -10,17 +10,19 @@ import { formatCost, formatLatency } from "@langwatch/design-system/metric-value
 import { Button, Heading, HStack, VStack, Icon } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import type { SimulationRunStatus } from "@langwatch/scenario-contract";
-import { Square, Edit2, Play } from "lucide-react";
+import { CircleSlash, Square, Edit2, Play } from "lucide-react";
 import { useState } from "react";
 
 import { useCan } from "../../../../behavior/use-can.ts";
 import { CASE_EDITOR_DRAWER } from "../../../../model/agent-testing/cases/drawer-keys.ts";
+import { runHooksViewOf } from "../../../../model/run-hooks.ts";
 import { SCENARIO_RUN_STATUS_CONFIG } from "../../../../model/scenario-run-status-config.ts";
 import { hasNoResults } from "../../../../model/scenario-run-status.utils.ts";
 import { CaseVersionChip } from "../../../elements/agent-testing/shared/case-version-chip.tsx";
 import { CopyIdChip } from "../../../elements/copy-id-chip.tsx";
 import { CutAtLimitBadge, isCutAtLimitOf } from "../../../elements/cut-at-limit-badge.tsx";
 import { RunCriteriaChip } from "../../../elements/run-criteria-chip.tsx";
+import { HOOK_TAG_TONE } from "../../../elements/run-hook-bands.tsx";
 import { ScenarioRunActions } from "../../../elements/scenario-run-actions.tsx";
 import { ScenarioRunStatusIcon } from "../../../elements/scenario-run-status-icon.tsx";
 import { useRunStartedHandler } from "../cases/use-case-run-actions.ts";
@@ -55,14 +57,20 @@ function HeadingRow({
   scenarioState,
   displayTitle,
   scenarioVersion,
+  notScored,
 }: {
   scenarioState: RunScenarioState;
+  notScored: boolean;
   displayTitle: string;
   scenarioVersion: number | null;
 }) {
   return (
     <HStack gap={3} flex={1} minWidth={0}>
-      <ScenarioRunStatusIcon status={scenarioState.status} />
+      {notScored ? (
+        <Icon as={CircleSlash} color="fg.muted" boxSize="16px" aria-label="Not scored" />
+      ) : (
+        <ScenarioRunStatusIcon status={scenarioState.status} />
+      )}
       <Heading size="sm" truncate title={displayTitle}>
         {displayTitle}
       </Heading>
@@ -192,8 +200,11 @@ function HeaderActions({
 
 /** The numbers of the run, each one only there once the run carries it. */
 function ChipStrip({ detail, scenarioState }: SectionProps) {
+  const hooks = runHooksViewOf({ metadata: scenarioState.metadata, status: scenarioState.status });
   return (
     <HStack w="100%" gap={1.5} flexWrap="wrap">
+      {hooks.notScored && <Chip value="Not scored" tone="neutral" />}
+      {hooks.tag && <Chip value={hooks.tag.text} tone={HOOK_TAG_TONE[hooks.tag.tone]} />}
       <Chip
         label="Status"
         value={SCENARIO_RUN_STATUS_CONFIG[scenarioState.status as SimulationRunStatus].label}
@@ -223,6 +234,10 @@ function ChipStrip({ detail, scenarioState }: SectionProps) {
 export function RunDrawerHeaderBand({ detail, scenarioVersion, stop }: RunDrawerHeaderBandProps) {
   const { scenarioState } = detail;
   if (!scenarioState) return null;
+  const { notScored } = runHooksViewOf({
+    metadata: scenarioState.metadata,
+    status: scenarioState.status,
+  });
 
   return (
     <VStack
@@ -244,6 +259,7 @@ export function RunDrawerHeaderBand({ detail, scenarioVersion, stop }: RunDrawer
           scenarioState={scenarioState}
           displayTitle={detail.displayTitle}
           scenarioVersion={scenarioVersion}
+          notScored={notScored}
         />
         <HeaderActions detail={detail} scenarioState={scenarioState} stop={stop} />
       </HStack>

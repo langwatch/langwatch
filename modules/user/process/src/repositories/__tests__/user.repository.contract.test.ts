@@ -153,6 +153,23 @@ describe.each(backends)("given the $name user repositories", ({ create }) => {
     });
   });
 
+  describe("when an operator searches the accounts", () => {
+    /** @scenario "an operator finds a user by email, name or id" */
+    it("matches the address, the name or the id, case aside, ordered by address", async () => {
+      const { users } = create();
+      const dana = await users.create({ name: "Dana Reyes", email: "dana@acme.test" });
+      await users.create({ name: "Kay", email: "kay@other.test" });
+      const daniel = await users.create({ name: "Daniel", email: "bdaniel@acme.test" });
+
+      const byAddress = await users.searchProfiles({ query: "DANA@", limit: 10 });
+      expect(byAddress.map(({ id }) => id)).toEqual([dana.id]);
+      const byName = await users.searchProfiles({ query: "dan", limit: 10 });
+      expect(byName.map(({ id }) => id)).toEqual([daniel.id, dana.id]);
+      await expect(users.searchProfiles({ query: dana.id, limit: 10 })).resolves.toHaveLength(1);
+      await expect(users.searchProfiles({ query: "dan", limit: 1 })).resolves.toHaveLength(1);
+    });
+  });
+
   describe("when an account was stored with capitals in its address", () => {
     /** Rows written before addresses were lower-cased: the address step rewrites them. */
     it("rewrites the address only while the row still holds the one read", async () => {
@@ -372,6 +389,43 @@ describe.each(backends)("given the $name user repositories", ({ create }) => {
         users.deactivateWhileOthersActive({ id: second.id, deactivatedAt: at, others: [first.id] }),
       ).resolves.toEqual({ outcome: "none_active" });
       await expect(users.findById(second.id)).resolves.toMatchObject({ deactivatedAt: null });
+    });
+  });
+
+  describe("when accounts are created one after another and deactivated", () => {
+    /** @scenario "The install's first-created account is answered by id" */
+    it("answers the earliest-created account, deactivated or not, and none before any exists", async () => {
+      const { users } = create();
+      const at = fromDate(new Date(42));
+      await expect(users.findFirstCreatedId()).resolves.toBeNull();
+
+      const first = await users.create({ name: "First", email: "first@example.com" });
+      await expect(users.findFirstCreatedId()).resolves.toBe(first.id);
+
+      await users.setDeactivatedAt({ id: first.id, deactivatedAt: at });
+      // A later millisecond, so creation order does not fall back to the random id order.
+      await new Promise((resolve) => setTimeout(resolve, 5));
+      await users.create({ name: "Second", email: "second@example.com" });
+      await expect(users.findFirstCreatedId()).resolves.toBe(first.id);
+    });
+
+    /** @scenario "An erased first account leaves no account first-created" */
+    it("answers none once the first account is erased, and keeps it after a later one is", async () => {
+      const { users, dataErase } = create();
+      const first = await users.create({ name: "First", email: "first@example.com" });
+      // A later millisecond, so creation order does not fall back to the random id order.
+      await new Promise((resolve) => setTimeout(resolve, 5));
+      const second = await users.create({ name: "Second", email: "second@example.com" });
+      await new Promise((resolve) => setTimeout(resolve, 5));
+      const third = await users.create({ name: "Third", email: "third@example.com" });
+      const none = { projectIds: [], soleOwnedTeamIds: [], soleOwnedOrgIds: [] };
+
+      await dataErase.eraseUserAndOwnedResources({ userId: third.id, ...none });
+      await expect(users.findFirstCreatedId()).resolves.toBe(first.id);
+
+      await dataErase.eraseUserAndOwnedResources({ userId: first.id, ...none });
+      await expect(users.findFirstCreatedId()).resolves.toBeNull();
+      await expect(users.findById(second.id)).resolves.not.toBeNull();
     });
   });
 

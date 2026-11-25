@@ -28,7 +28,8 @@ export type ParameterConstraints = z.infer<typeof parameterConstraintsSchema>;
 
 export type ModelProviderDefinition = {
   name: string;
-  type: "llm" | "safety";
+  /** `decision`: holds a key for an Instant Evals decision model only (ADR-182). */
+  type: "llm" | "safety" | "decision";
   apiKey: string;
   endpointKey?: string;
   keysSchema: z.ZodType;
@@ -93,6 +94,11 @@ export type ModelProviderEditorValue = {
    * expression sources. Null or absent means the provider's registry default applies.
    */
   langySkipPermissionsModels?: string[] | null;
+  /**
+   * The bare model ids the provider's own model list answered with, or null when it was not
+   * asked or did not answer. A picker then offers only catalogue ids this list carries.
+   */
+  servedModels?: string[] | null;
   // Nullable like every other stored column on this row: the wire always
   // carries the key, and null is "no health check has recorded a verdict".
   healthStatus?: "UNKNOWN" | "HEALTHY" | "DEGRADED" | "CIRCUIT_OPEN" | null;
@@ -345,9 +351,17 @@ export const modelProviders = {
         AZURE_OPENAI_API_VERSION: z.string().nullable().optional(),
         AZURE_API_GATEWAY_BASE_URL: z.string().nullable().optional(),
         AZURE_API_GATEWAY_VERSION: z.string().nullable().optional(),
+        // Deployment names for the Instant Evals decision models; unset, the model's own name.
+        AZURE_OPENAI_DECISIONS_DEPLOYMENT: z.string().nullable().optional(),
+        AZURE_DECISION_1_DEPLOYMENT: z.string().nullable().optional(),
       })
       .passthrough(),
-    optionalKeys: ["AZURE_OPENAI_API_VERSION", "AZURE_API_GATEWAY_VERSION"],
+    optionalKeys: [
+      "AZURE_OPENAI_API_VERSION",
+      "AZURE_API_GATEWAY_VERSION",
+      "AZURE_OPENAI_DECISIONS_DEPLOYMENT",
+      "AZURE_DECISION_1_DEPLOYMENT",
+    ],
     enabledSince: Temporal.Instant.from("2023-01-01T00:00:00Z"),
   },
   bedrock: {
@@ -399,6 +413,14 @@ export const modelProviders = {
     keysSchema: z.object({ CEREBRAS_API_KEY: z.string().min(1) }),
     enabledSince: Temporal.Instant.from("2024-06-01T00:00:00Z"),
   },
+  doubleword: {
+    name: "Doubleword",
+    type: "llm",
+    langySkipPermissionsModels: NO_SKIP_PERMISSIONS_MODELS,
+    apiKey: "DOUBLEWORD_API_KEY",
+    keysSchema: z.object({ DOUBLEWORD_API_KEY: z.string().min(1) }),
+    enabledSince: Temporal.Instant.from("2026-10-01T00:00:00Z"),
+  },
   groq: {
     name: "Groq",
     type: "llm",
@@ -414,6 +436,69 @@ export const modelProviders = {
     apiKey: "VOYAGE_API_KEY",
     keysSchema: z.object({ VOYAGE_API_KEY: z.string().min(1) }),
     enabledSince: Temporal.Instant.from("2026-05-18T00:00:00Z"),
+  },
+  inception: {
+    name: "Inception",
+    type: "decision",
+    langySkipPermissionsModels: NO_SKIP_PERMISSIONS_MODELS,
+    apiKey: "INCEPTION_API_KEY",
+    keysSchema: z.object({ INCEPTION_API_KEY: z.string().min(1) }),
+    enabledSince: Temporal.Instant.from("2026-10-19T00:00:00Z"),
+    blurb:
+      "Mercury Decide, a decision model Instant Evals can run on. Your account is billed directly by Inception.",
+  },
+  perplexity: {
+    name: "Perplexity",
+    type: "decision",
+    langySkipPermissionsModels: NO_SKIP_PERMISSIONS_MODELS,
+    apiKey: "PERPLEXITY_API_KEY",
+    keysSchema: z.object({ PERPLEXITY_API_KEY: z.string().min(1) }),
+    enabledSince: Temporal.Instant.from("2026-10-19T00:00:00Z"),
+    blurb:
+      "Perplexity's decision model, which Instant Evals can run on. Your account is billed directly by Perplexity.",
+  },
+  cloudflare: {
+    name: "Cloudflare Workers AI",
+    type: "decision",
+    langySkipPermissionsModels: NO_SKIP_PERMISSIONS_MODELS,
+    apiKey: "CLOUDFLARE_API_TOKEN",
+    keysSchema: z.object({
+      CLOUDFLARE_ACCOUNT_ID: z.string().min(1),
+      CLOUDFLARE_API_TOKEN: z.string().min(1),
+    }),
+    enabledSince: Temporal.Instant.from("2026-10-19T00:00:00Z"),
+    blurb:
+      "Clef and Clef Flash, decision models Instant Evals can run on. Your account is billed directly by Cloudflare.",
+  },
+  typesafe: {
+    name: "TypeSafe",
+    type: "decision",
+    langySkipPermissionsModels: NO_SKIP_PERMISSIONS_MODELS,
+    apiKey: "TYPESAFE_API_KEY",
+    keysSchema: z.object({ TYPESAFE_API_KEY: z.string().min(1) }),
+    enabledSince: Temporal.Instant.from("2026-11-02T00:00:00Z"),
+    blurb:
+      "Jev, a decision model Instant Evals can run on. Your account is billed directly by TypeSafe.",
+  },
+  openrouter: {
+    name: "OpenRouter",
+    type: "decision",
+    langySkipPermissionsModels: NO_SKIP_PERMISSIONS_MODELS,
+    apiKey: "OPENROUTER_API_KEY",
+    keysSchema: z.object({ OPENROUTER_API_KEY: z.string().min(1) }),
+    enabledSince: Temporal.Instant.from("2026-11-02T00:00:00Z"),
+    blurb:
+      "Jev, Microsoft Decision 1 and Liquid d1.1, decision models Instant Evals can run on. Your account is billed directly by OpenRouter.",
+  },
+  fireworks: {
+    name: "Fireworks",
+    type: "decision",
+    langySkipPermissionsModels: NO_SKIP_PERMISSIONS_MODELS,
+    apiKey: "FIREWORKS_API_KEY",
+    keysSchema: z.object({ FIREWORKS_API_KEY: z.string().min(1) }),
+    enabledSince: Temporal.Instant.from("2026-11-02T00:00:00Z"),
+    blurb:
+      "Rune, a decision model Instant Evals can run on. Your account is billed directly by Fireworks.",
   },
   azure_safety: {
     name: "Azure Safety",
@@ -458,6 +543,25 @@ export function pickParameterConstraints(modelId: string): ParameterConstraints 
     | ModelProviderDefinition
     | undefined;
   return definition?.parameterConstraints;
+}
+
+/** Whether a stored deployment mapping names a deployment for a model. */
+export type DeploymentMappingLookup = { kind: "mapped"; deployment: string } | { kind: "unmapped" };
+
+/**
+ * The deployment a stored mapping names for a model, keyed bare (`gpt-4o`) or
+ * qualified (`azure/gpt-4o`). Execution and the guided probe both read it here.
+ */
+export function lookUpMappedDeployment({
+  deploymentMapping,
+  qualifiedModel,
+}: {
+  deploymentMapping: Record<string, string> | null | undefined;
+  qualifiedModel: string;
+}): DeploymentMappingLookup {
+  const bareModel = qualifiedModel.split("/").slice(1).join("/");
+  const deployment = deploymentMapping?.[bareModel] ?? deploymentMapping?.[qualifiedModel];
+  return deployment ? { kind: "mapped", deployment } : { kind: "unmapped" };
 }
 
 function isValidJson(value: string): boolean {

@@ -30,12 +30,13 @@ import type {
   AggregationFiltersInput,
   GetAllTracesForProjectInput,
   GetAllTracesForProjectOptions,
+  SpanAnalyticsFloor,
   TraceDateField,
   TraceSummaryListOptions,
   TraceSummaryListQuery,
   TraceSummaryPage,
 } from "@langwatch/trace-contract";
-import { isStorageAnchoredVersion } from "@langwatch/trace-contract";
+import { isStorageAnchoredVersion, latestTraceVersionOnly } from "@langwatch/trace-contract";
 import { getLangWatchTracer } from "langwatch";
 import { z } from "zod";
 
@@ -61,6 +62,7 @@ import {
   type PromptStudioSpanRow,
   derivePromptStudioSpan,
 } from "../../rules/trace-legacy-prompt-studio-span.rules.ts";
+import { summaryFromStoredSpans } from "../../rules/trace-legacy-spans-only-summary.rules.ts";
 import { traceStartedAt } from "../../rules/trace-legacy-summary-mapping.rules.ts";
 import {
   TraceLegacyReadRepository,
@@ -693,7 +695,8 @@ function buildLatestVersionOnly(scrollStart: number | undefined): string {
     scrollStart !== undefined
       ? " AND UpdatedAt <= fromUnixTimestamp64Milli({scrollStart:UInt64})"
       : "";
-  return ` AND (ts.TenantId, ts.TraceId, ts.UpdatedAt) IN (SELECT TenantId, TraceId, max(UpdatedAt) FROM trace_summaries WHERE TenantId = {tenantId:String} AND UpdatedAt >= fromUnixTimestamp64Milli({startDate:UInt64})${scrollSnapshotBound} GROUP BY TenantId, TraceId)`;
+  const where = `TenantId = {tenantId:String} AND UpdatedAt >= fromUnixTimestamp64Milli({startDate:UInt64})${scrollSnapshotBound}`;
+  return ` AND ${latestTraceVersionOnly({ where, alias: "ts" })}`;
 }
 
 /** Stored-span rows as the joined read selects them. */
@@ -705,7 +708,7 @@ const joinedSpanRowSchema = z.looseObject({
   ParentTraceId: chString.nullable(),
   ParentIsRemote: chBoolean.nullable(),
   Sampled: chBoolean,
-  StartTime: chNumber,
+  StartTimeMs: chNumber,
   EndTime: chNumber,
   DurationMs: chNumber,
   SpanName: chString,
@@ -751,6 +754,32 @@ function deriveSpanRange({
     return { from: Math.min(...occurredAts), to: Math.max(...occurredAts) };
   }
   return hasSummaryWindow ? effectiveOccurredAt : undefined;
+}
+
+/**
+ * The summary read's window in queryWindowed's centre and half-width form: the filed range plus
+ * the ±2-day margin, the epoch alone ([0, 0], the sentinel partition) for an unfiled batch, or
+ * no hint, which reads every partition.
+ */
+function summaryReadWindow({
+  filed,
+  unfiled,
+}: {
+  filed: OccurredAtRange | undefined;
+  unfiled: boolean;
+}): { hintMs: number | null; windowMs: number } {
+  if (filed) {
+    return {
+      hintMs: (filed.from + filed.to) / 2,
+      windowMs: (filed.to - filed.from) / 2 + DEFAULT_PARTITION_WINDOW_MS,
+    };
+  }
+
+  if (unfiled) {
+    return { hintMs: 0, windowMs: 0 };
+  }
+
+  return { hintMs: null, windowMs: DEFAULT_PARTITION_WINDOW_MS };
 }
 
 const retentionFloorLogger = createLogger("langwatch:clickhouse:retention-floor");
@@ -810,11 +839,12 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
   private translateFilters(
     filters: Record<string, unknown>,
     window: { startDate: number; endDate: number },
+    spanAnalyticsFloor: SpanAnalyticsFloor | null,
   ): { conditions: string[]; params: Record<string, unknown>; hasUnsupportedFilters: boolean } {
     if (Object.keys(filters).length === 0) {
       return { conditions: [], params: {}, hasUnsupportedFilters: false };
     }
-    return translateLegacyFilters({ filters, window });
+    return translateLegacyFilters({ filters, window, spanAnalyticsFloor });
   }
 
   private async resolveClient(projectId: string): Promise<TraceClickHouseClient> {
@@ -956,6 +986,107 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
         }
       },
     );
+  }
+
+  async resolveTraceIdsBySpanId({
+    authorization,
+    projectId,
+    spanId,
+    retentionDays,
+    limit,
+  }: {
+    authorization: Authorization;
+    projectId: string;
+    spanId: string;
+    retentionDays: RetentionDaysProvider | undefined;
+    limit: number;
+  }): Promise<string[]> {
+    const reader = this.reader({ authorization, projectId });
+    const fromMs = await this.floorOver(retentionDays).getFloorMs({
+      tenantId: projectId,
+      table: "stored_spans",
+    });
+    const result = await reader.query({
+      // ID_BOUND_SKIP: a span id has no id index; TenantId prunes, idx_span_id skips granules.
+      query: `
+        SELECT DISTINCT TraceId
+        FROM stored_spans
+        WHERE ${tenantScope("StartTime")}
+          AND SpanId = {spanId:String}
+          AND StartTime >= fromUnixTimestamp64Milli({fromMs:Int64})
+        LIMIT {limit:UInt32}
+      `,
+      query_params: { spanId, fromMs, limit },
+      format: "JSONEachRow",
+    });
+    return traceIdRowsSchema.parse(await result.json()).map((row) => row.TraceId);
+  }
+
+  async resolveTraceIdsByScenarioRunId({
+    authorization,
+    projectId,
+    scenarioRunId,
+    occurredAt,
+    limit,
+  }: {
+    authorization: Authorization;
+    projectId: string;
+    scenarioRunId: string;
+    occurredAt: { from: number; to: number };
+    limit: number;
+  }): Promise<string[]> {
+    const reader = this.reader({ authorization, projectId });
+    const result = await reader.query({
+      // ID_BOUND_SKIP: an attribute lookup, bounded by the caller's window.
+      query: `
+        SELECT TraceId
+        FROM trace_summaries
+        WHERE ${tenantScope("OccurredAt")}
+          AND Attributes['scenario.run_id'] = {scenarioRunId:String}
+          AND OccurredAt >= fromUnixTimestamp64Milli({fromMs:Int64})
+          AND OccurredAt <= fromUnixTimestamp64Milli({toMs:Int64})
+        GROUP BY TraceId
+        ORDER BY min(OccurredAt) ASC
+        LIMIT {limit:UInt32}
+      `,
+      query_params: { scenarioRunId, fromMs: occurredAt.from, toMs: occurredAt.to, limit },
+      format: "JSONEachRow",
+    });
+    return traceIdRowsSchema.parse(await result.json()).map((row) => row.TraceId);
+  }
+
+  async findTraceFromStoredSpans({
+    authorization,
+    projectId,
+    traceId,
+    retentionDays,
+  }: {
+    authorization: Authorization;
+    projectId: string;
+    traceId: string;
+    retentionDays: RetentionDaysProvider | undefined;
+  }): Promise<TraceLegacyRow[]> {
+    const reader = this.reader({ authorization, projectId });
+    const spanRows = await this.readJoinedSpanRows({
+      reader,
+      projectId,
+      batchTraceIds: [traceId],
+      spanRange: undefined,
+      maxSpanRows: undefined,
+      retentionDays,
+    });
+    if (spanRows.length === 0) return [];
+    const spans = spanRows.map((row) => this.mapSpanRow(row, projectId));
+    return [
+      {
+        summary: summaryFromStoredSpans({
+          traceId,
+          spans,
+          nowMs: nowInstant().epochMilliseconds,
+        }),
+        spans,
+      },
+    ];
   }
 
   async findTracesByThreadId({
@@ -1321,12 +1452,14 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
     options,
     retentionDays,
     ownRead,
+    spanAnalyticsFloor = null,
   }: {
     input: GetAllTracesForProjectInput;
     protections: Protections;
     options: GetAllTracesForProjectOptions;
     retentionDays: RetentionDaysProvider | undefined;
     ownRead: Authorization;
+    spanAnalyticsFloor?: SpanAnalyticsFloor | null;
   }): Promise<TraceLegacyPage> {
     return this.tracer.withActiveSpan(
       "TraceLegacyReadClickHouseRepository.getAllTracesForProject",
@@ -1366,10 +1499,11 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
             conditions: legacyFilterConditions,
             params: legacyFilterParams,
             hasUnsupportedFilters,
-          } = this.translateFilters(input.filters ?? {}, {
-            startDate: input.startDate,
-            endDate: input.endDate,
-          });
+          } = this.translateFilters(
+            input.filters ?? {},
+            { startDate: input.startDate, endDate: input.endDate },
+            spanAnalyticsFloor,
+          );
 
           if (hasUnsupportedFilters) {
             throw new Error("Filters contain unsupported fields for ClickHouse");
@@ -2108,6 +2242,7 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
         : "";
     const runQuery = async (ids: string[]) => {
       const result = await clickHouseClient.query({
+        // ID_BOUND_SKIP: a list page, bounded by the list's own date range.
         query: `
           SELECT
             ts.TraceId AS ts_TraceId,
@@ -2258,10 +2393,11 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
     } = buildEventOccurrenceWindows(occurredAts);
 
     const result = await reader.query({
+      // ID_BOUND_SKIP: bounded by the page's own trace occurrence windows.
       query: `
         SELECT
-          t.TraceId AS TraceId,
-          t.SpanId AS SpanId,
+          t.TraceId,
+          t.SpanId,
           toUnixTimestamp64Milli(t.StartTime) AS StartTimeMs,
           toUnixTimestamp64Milli(t.EndTime) AS EndTimeMs,
           mapFilter((k, v) -> startsWith(k, 'event.'), t.SpanAttributes) AS EventAttrs
@@ -2369,6 +2505,7 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
     traceIds: string[];
   }): Promise<ClickHouseEvaluationRunRow[]> {
     const runQuery = async (ids: string[]) => {
+      // ID_BOUND_SKIP: evaluation's index, registered by evaluation; moves there with trace-review.
       const result = await reader.query({
         query: `
           SELECT ${EVALUATION_RUN_COLUMNS_WITH_INPUTS}
@@ -2493,9 +2630,14 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
         WHERE ${tenantScope("OccurredAt")}
           AND TraceId IN ({traceIds:Array(String)})
           AND OccurredAt > fromUnixTimestamp64Milli(0)
+          {{idBound:trace_summaries.TraceId:traceIds}}
+        HAVING count() > 0
       `,
       query_params: { traceIds },
       format: "JSONEachRow",
+      // A trace the index has never seen is resolved over every partition, as before the index.
+      // No match answers no row (`HAVING`), so emptiness, the fallback and the miss count hold.
+      idBound: { onMiss: "unbounded" },
     });
     const rows = occurredAtRangeRowsSchema.parse(await result.json());
     const row = rows[0];
@@ -2529,9 +2671,16 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
         attributes: { "tenant.id": projectId },
       },
       async (_span) => {
-        const effectiveOccurredAt =
-          occurredAt ?? (await this.resolveOccurredAtOrNone({ reader, projectId, traceIds }));
-        const batchRead = { reader, projectId, effectiveOccurredAt, retentionDays };
+        const resolved = occurredAt
+          ? { range: occurredAt, unfiled: false }
+          : await this.resolveOccurredAtOrNone({ reader, projectId, traceIds });
+        const batchRead = {
+          reader,
+          projectId,
+          effectiveOccurredAt: resolved.range,
+          unfiled: resolved.unfiled,
+          retentionDays,
+        };
 
         try {
           return await this.readJoinedTraceBatch({ ...batchRead, batchTraceIds: traceIds });
@@ -2553,11 +2702,17 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
     reader: TenantScopedReader;
     projectId: string;
     traceIds: string[];
-  }): Promise<OccurredAtRange | undefined> {
+  }): Promise<{ range: OccurredAtRange | undefined; unfiled: boolean }> {
     // Callers that already know the traces' time pass `occurredAt`; thread-view paths only
     // have trace ids. Without a window the summary read below filters on TraceId alone, which
     // cannot prune partitions, so resolve the OccurredAt span from a cheap sort-key seek first.
-    return this.resolveOccurredAtRange({ reader, traceIds }).catch((error) => {
+    // A resolve that answers no filed summary leaves only epoch sentinel rows to find (ADR-087):
+    // `unfiled` bounds the summary read to that one partition instead of every partition.
+    const resolved = this.resolveOccurredAtRange({ reader, traceIds }).then((range) => ({
+      range,
+      unfiled: range === undefined,
+    }));
+    return resolved.catch((error) => {
       // Fail open: the resolve is a pure optimization, so a transient
       // failure must not break a read that previously succeeded. Fall
       // back to the unbounded (slower but correct) summary read.
@@ -2568,7 +2723,7 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
         },
         "OccurredAt resolve for batch trace read failed; falling back to unbounded summary read",
       );
-      return undefined;
+      return { range: undefined, unfiled: false };
     });
   }
 
@@ -2580,16 +2735,18 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
     reader,
     projectId,
     effectiveOccurredAt,
+    unfiled,
     retentionDays,
     traceIds,
   }: {
     reader: TenantScopedReader;
     projectId: string;
     effectiveOccurredAt: OccurredAtRange | undefined;
+    unfiled: boolean;
     retentionDays: RetentionDaysProvider | undefined;
     traceIds: string[];
   }): Promise<Map<string, TraceLegacyRow>> {
-    const batchRead = { reader, projectId, effectiveOccurredAt, retentionDays };
+    const batchRead = { reader, projectId, effectiveOccurredAt, unfiled, retentionDays };
 
     this.logger.warn(
       `Traces-with-spans join OOM for ${traceIds.length} traces, retrying in batches of ${TraceLegacyReadClickHouseRepository.SUMMARY_BATCH_SIZE}`,
@@ -2651,6 +2808,7 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
     reader,
     projectId,
     effectiveOccurredAt,
+    unfiled,
     retentionDays,
     batchTraceIds,
     maxSpanRows,
@@ -2658,6 +2816,8 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
     reader: TenantScopedReader;
     projectId: string;
     effectiveOccurredAt: OccurredAtRange | undefined;
+    /** No summary of these traces is filed after the epoch, per the resolve. */
+    unfiled: boolean;
     retentionDays: RetentionDaysProvider | undefined;
     batchTraceIds: string[];
     /** Rows the span read may return before ClickHouse refuses it. */
@@ -2666,6 +2826,7 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
     const { summaryRows, hasSummaryWindow } = await this.readJoinedSummaryRows({
       reader,
       effectiveOccurredAt,
+      unfiled,
       batchTraceIds,
     });
     // No matched summaries: the result map is built solely from summary
@@ -2727,27 +2888,26 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
   private async readJoinedSummaryRows({
     reader,
     effectiveOccurredAt,
+    unfiled,
     batchTraceIds,
   }: {
     reader: TenantScopedReader;
     effectiveOccurredAt: OccurredAtRange | undefined;
+    unfiled: boolean;
     batchTraceIds: string[];
   }): Promise<{ summaryRows: TraceSummaryRow[]; hasSummaryWindow: boolean }> {
     // When the caller knows the traces' approximate time, bound the summary read to those
-    // weekly partitions with a ±2-day safety margin; without a hint keep the unbounded read.
-    // resolveOccurredAtRange yields a range, not a point, so map it onto queryWindowed's
-    // centre+half-width form. Fallback "none": an empty result is authoritative here, and
-    // the caller below skips the span scan rather than widening it.
+    // weekly partitions with a ±2-day safety margin; an unfiled batch reads the epoch sentinel
+    // partition alone; with neither, keep the unbounded read. Fallback "none": an empty result
+    // is authoritative here, and the caller below skips the span scan rather than widening it.
     const hasSummaryWindow =
       effectiveOccurredAt !== undefined &&
       effectiveOccurredAt.from > 0 &&
       effectiveOccurredAt.to > 0;
-    const summaryHintMs = hasSummaryWindow
-      ? (effectiveOccurredAt.from + effectiveOccurredAt.to) / 2
-      : null;
-    const summaryWindowMs = hasSummaryWindow
-      ? (effectiveOccurredAt.to - effectiveOccurredAt.from) / 2 + DEFAULT_PARTITION_WINDOW_MS
-      : DEFAULT_PARTITION_WINDOW_MS;
+    const { hintMs: summaryHintMs, windowMs: summaryWindowMs } = summaryReadWindow({
+      filed: hasSummaryWindow ? effectiveOccurredAt : undefined,
+      unfiled,
+    });
 
     // Summaries first (light, one row per trace): they carry OccurredAt, which bounds the
     // heavy stored_spans scan below to the traces' weekly partitions. A span's StartTime
@@ -2763,6 +2923,7 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
         const summaryTimeFilterOuter = window ? window.sqlFor("t.OccurredAt") : "";
         const summaryTimeFilterInner = window ? window.sqlFor("OccurredAt") : "";
         const summaryResult = await reader.query({
+          // ID_BOUND_SKIP: bounded by the occurred range the index-bounded resolver found.
           query: `
         SELECT
           TraceId AS ts_TraceId,
@@ -2878,6 +3039,7 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
         const spanTimeFilterOuter = window ? window.sqlFor("t.StartTime") : "";
         const spanTimeFilterInner = window ? window.sqlFor("StartTime") : "";
         const spansResult = await reader.query({
+          // ID_BOUND_SKIP: bounded by the summaries' own occurred times read just above.
           query: `
         SELECT
           SpanId,
@@ -2887,7 +3049,7 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
           ParentTraceId,
           ParentIsRemote,
           Sampled,
-          toUnixTimestamp64Milli(StartTime) AS StartTime,
+          toUnixTimestamp64Milli(StartTime) AS StartTimeMs,
           toUnixTimestamp64Milli(EndTime) AS EndTime,
           DurationMs,
           SpanName,
@@ -2994,7 +3156,7 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
       ParentTraceId: string | null;
       ParentIsRemote: boolean | null;
       Sampled: boolean;
-      StartTime: number;
+      StartTimeMs: number;
       EndTime: number;
       DurationMs: number;
       SpanName: string;
@@ -3039,7 +3201,7 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
       parentTraceId: row.ParentTraceId,
       parentIsRemote: row.ParentIsRemote,
       sampled: row.Sampled,
-      startTimeUnixMs: row.StartTime,
+      startTimeUnixMs: row.StartTimeMs,
       endTimeUnixMs: row.EndTime,
       durationMs: row.DurationMs,
       name: row.SpanName,

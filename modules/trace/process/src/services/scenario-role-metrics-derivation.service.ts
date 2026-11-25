@@ -36,20 +36,27 @@ export class ScenarioRoleMetricsDerivationService {
     spanCosts: SpanCostService;
     now?: () => number;
   }): ScenarioRoleMetricsDerivationService {
-    return new ScenarioRoleMetricsDerivationService(
-      options.spans,
-      options.spanCosts,
-      options.now ?? (() => nowInstant().epochMilliseconds),
-    );
+    return new ScenarioRoleMetricsDerivationService({
+      ...options,
+      now: options.now ?? (() => nowInstant().epochMilliseconds),
+    });
   }
 
   private readonly memo = new Map<string, MemoEntry>();
 
-  private constructor(
-    private readonly spans: TraceDerivationSpanReaderRepository,
-    private readonly spanCosts: SpanCostService,
-    private readonly now: () => number,
-  ) {}
+  private readonly spans: TraceDerivationSpanReaderRepository;
+  private readonly spanCosts: SpanCostService;
+  private readonly now: () => number;
+
+  private constructor(options: {
+    spans: TraceDerivationSpanReaderRepository;
+    spanCosts: SpanCostService;
+    now: () => number;
+  }) {
+    this.spans = options.spans;
+    this.spanCosts = options.spanCosts;
+    this.now = options.now;
+  }
 
   async derive(input: ScenarioRoleMetricsInput): Promise<ScenarioRoleMetrics> {
     const read = async (): Promise<ScenarioRoleMetrics> =>

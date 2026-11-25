@@ -1,5 +1,12 @@
-/** Codex surfaces: Langy + FAST assists only. */
+/** Codex surfaces: Langy + the FAST assists that run through the AI gateway. */
 
+import {
+  INSTANT_EVAL_DECISION_FEATURE_KEY,
+  isDecisionModelId,
+  isLangWatchModelFillingRole,
+  isOwnDecisionModelId,
+} from "./decision-models.ts";
+import { findModelById } from "./model-catalog.ts";
 import { featuresByRole, type ModelRole } from "./model-feature-registry.ts";
 
 /** Langy's own conversation model. */
@@ -12,18 +19,41 @@ export const LANGY_CHAT_FEATURE_KEY = "langy.chat";
 export const CONNECTION_TEST_FEATURE_KEY = "model_provider.connection_test";
 
 /**
- * The rule, not a hand-kept list: Langy plus every FAST-role assist — the
- * fast tier IS the "light AI assists" the codex terms cover, so a new fast
- * feature is codex-allowed by construction. A test pins the expansion.
+ * FAST features that skip the AI gateway, the only road to codex: they hand
+ * LiteLLM parameters to langevals, which calls the provider itself. Allowing
+ * codex on them only moves the refusal from selection to execution.
+ */
+export const CODEX_NON_GATEWAY_FAST_FEATURE_KEYS: readonly string[] = [
+  "analytics.topic_clustering_llm",
+];
+
+/**
+ * Langy plus every FAST assist that runs through the gateway. A new FAST
+ * feature is codex-allowed unless listed as non-gateway above; a test pins it.
  */
 export const CODEX_ALLOWED_FEATURE_KEYS: readonly string[] = [
   LANGY_CHAT_FEATURE_KEY,
   CONNECTION_TEST_FEATURE_KEY,
-  ...featuresByRole("FAST").map((f) => f.key),
+  ...featuresByRole("FAST")
+    .map((f) => f.key)
+    .filter((key) => !CODEX_NON_GATEWAY_FAST_FEATURE_KEYS.includes(key)),
 ];
 
 export function isCodexAllowedFeature(featureKey: string): boolean {
   return CODEX_ALLOWED_FEATURE_KEYS.includes(featureKey);
+}
+
+/** The effort every Langy turn sends on the Responses lane (langyagent pi spawn.go). */
+export const LANGY_REASONING_EFFORT = "medium";
+
+/**
+ * Whether a Langy turn can call this model: OpenAI answers 400 unsupported_value to an effort
+ * the model does not take (gpt-5-pro takes only high). Other lanes map or omit the effort.
+ */
+export function acceptsLangyReasoningEffort(modelId: string): boolean {
+  if (!modelId.startsWith("openai/")) return true;
+  const allowed = findModelById(modelId)[0]?.reasoningConfig?.allowedValues;
+  return !allowed?.length || allowed.includes(LANGY_REASONING_EFFORT);
 }
 
 /**
@@ -52,16 +82,28 @@ export function isModelAllowedForFeature({
   modelId: string;
   featureKey: string;
 }): boolean {
+  if (featureKey === INSTANT_EVAL_DECISION_FEATURE_KEY) return isInstantEvalsColumnModel(modelId);
+  if (isDecisionModelId(modelId)) return false;
+  if (featureKey === LANGY_CHAT_FEATURE_KEY && !acceptsLangyReasoningEffort(modelId)) return false;
   if (!isCodexModel(modelId)) return true;
   return isCodexAllowedFeature(featureKey);
 }
 
 /**
- * Role-level defaults apply across every feature in the role, so a
- * restricted model may only sit on a role whose ENTIRE set is codex-allowed:
- * LANGY and FAST. DEFAULT and EMBEDDINGS carry general inference and stay closed.
+ * A restricted model may be the LANGY or FAST role default. FAST features in
+ * {@link CODEX_NON_GATEWAY_FAST_FEATURE_KEYS} step over it at resolution time.
+ * DEFAULT, EMBEDDINGS and JUDGE carry general inference and stay closed.
  */
 export function isModelAllowedAsRoleDefault(modelId: string, role: ModelRole): boolean {
+  // The Instant Evals column holds decision models only, and no other role holds one (ADR-182).
+  if (role === "INSTANT_EVALS") return isInstantEvalsColumnModel(modelId);
+  if (isDecisionModelId(modelId)) return false;
+  if (role === "LANGY" && !acceptsLangyReasoningEffort(modelId)) return false;
   if (!isCodexModel(modelId)) return true;
   return role === "LANGY" || role === "FAST";
+}
+
+/** An own decision model, or a LangWatch one whose catalogue entry fills the column. */
+function isInstantEvalsColumnModel(modelId: string): boolean {
+  return isOwnDecisionModelId(modelId) || isLangWatchModelFillingRole(modelId, "INSTANT_EVALS");
 }

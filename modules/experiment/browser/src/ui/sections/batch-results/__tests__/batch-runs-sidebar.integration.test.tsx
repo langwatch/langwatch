@@ -140,4 +140,24 @@ describe("BatchRunsSidebar", () => {
       expect(item.textContent).not.toContain("…");
     });
   });
+
+  describe("when a run read a version of its dataset", () => {
+    it("shows the version with that run and nothing with a run that read none", () => {
+      const runs = [
+        createRun({ runId: "run-versioned", createdAt: 1_000_000 }),
+        createRun({ runId: "run-inline", createdAt: 2_000_000 }),
+      ];
+
+      renderWithDesignSystem(
+        <BatchRunsSidebar
+          runs={runs}
+          onSelectRun={noop}
+          datasetVersions={{ "run-versioned": 2 }}
+        />,
+      );
+
+      expect(screen.getByTestId("run-item-run-versioned")).toHaveTextContent("Dataset v2");
+      expect(screen.getByTestId("run-item-run-inline")).not.toHaveTextContent("Dataset v");
+    });
+  });
 });

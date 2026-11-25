@@ -1,4 +1,4 @@
-import { nowInstant } from "@langwatch/time";
+import { nowEpochMs } from "@langwatch/time";
 import { z } from "zod";
 
 import { defineAggregate } from "../domain/definitions.ts";
@@ -62,7 +62,7 @@ export async function publishReadHints({
       JSON.stringify({
         tenantId: hint.tenantId,
         event: JSON.stringify({ path: hint.path }),
-        timestamp: nowInstant().epochMilliseconds,
+        timestamp: nowEpochMs(),
       }),
     );
   }

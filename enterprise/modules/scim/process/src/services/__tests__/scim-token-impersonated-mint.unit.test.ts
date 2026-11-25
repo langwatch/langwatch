@@ -22,7 +22,7 @@ describe("ScimTokenMintService.assertMayMint", () => {
         organizationId: "organization-1",
         by: { id: "member-1", impersonatorId: "operator-1" },
       }),
-    ).rejects.toMatchObject({ code: "permission_denied" });
+    ).rejects.toMatchObject({ code: "impersonation_cannot_mint_credential" });
     expect(findPermissionsBeyondCaller).not.toHaveBeenCalled();
   });
 });

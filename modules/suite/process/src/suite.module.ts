@@ -9,6 +9,7 @@ import { defineMigrationStep } from "@langwatch/upgrade/step";
 
 import { SuiteModule } from "#app/suite.app";
 import { suiteRunProcessingEventing } from "#eventing/suite-run-processing.pipeline";
+import { SUITE_ID_INDEXES } from "#repositories/clickhouse/clickhouse.suite-id-indexes.database";
 import { suiteRepositories } from "#repositories/suite-repositories.registry";
 import { SuiteRunReplayService } from "#services/suite-run-replay.service";
 import { createRunPlansRest } from "#transport/run-plans.rest";
@@ -66,4 +67,9 @@ export const suiteProcessModule: PublishedProcessModule<"suite", SuiteApi, Suite
           });
         },
       }),
-    ]);
+    ])
+    .withIdIndexes(SUITE_ID_INDEXES, {
+      after: ["scenario:fill-second-id-indexes"],
+      description:
+        "Fills the id index of suite runs from older rows, then marks them ready on each ClickHouse target.",
+    });

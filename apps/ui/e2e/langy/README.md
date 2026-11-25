@@ -220,7 +220,7 @@ sends when it ends, and each path's script from the `guided-onboarding` skill.
 | ------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `guided-onboarding-coding.scenario.test.ts`                  | the one command, and the completion recorded                                                                                                                                 |
 | `guided-onboarding-gateway.scenario.test.ts`                 | the key the tour minted is reused; a skipped tour gets the no-worries line and mints the key once                                                                            |
-| `guided-onboarding-governance.scenario.test.ts`              | the sources question, the pick, the navigate to the sources page                                                                                                             |
+| `guided-onboarding-governance.scenario.test.ts`              | the start question, the coding start recorded, the completion and the one line                                                                                               |
 | `guided-onboarding-home-offer.scenario.test.ts`              | a second kickoff ("Let's set up Gateway then.") into the attached conversation                                                                                               |
 | `guided-onboarding-llmops-share-folder.scenario.test.ts`     | code access first, a typed question mid-setup, the folder shared, tracing and the connect call, the proposal, the scenario in the drawer, the run, the suite, the completion |
 | `guided-onboarding-llmops-describe.scenario.test.ts`         | "I'd rather describe it", the one line, the second code access ask                                                                                                           |
@@ -264,7 +264,7 @@ sends when it ends, and each path's script from the `guided-onboarding` skill.
   snippet has to name).
 
 The watcher answers the `question` cards (the proposal, the governance
-sources) through an async picker, so a file can read the world before it
+start) through an async picker, so a file can read the world before it
 answers: the share-folder file lists the project's scenarios while the
 proposal is still open and asserts the list is empty. The watcher also records
 every `navigate` instruction of the turns it follows (`navigateHrefs`), which
@@ -290,10 +290,12 @@ Each file's header links here rather than repeating its narrative.
   (done because Langy ran `langwatch onboarding complete-path coding`) and
   the conversation's title, which the kickoff names and the brief never
   replaces.
-- **governance**: the tour walks the pages, so Langy's part is one line — it
-  records the path as done and says the line, nothing else (no question, no
-  page opened). Layer 2 is the absence of a question card and a navigate
-  instruction on the stream, the complete-path call, and the guided state.
+- **governance**: the tour walks the pages, so Langy opens no page. It asks
+  how the person wants to start (the watcher picks "Track my coding agent"),
+  records it with `langwatch onboarding start coding`, records the path as
+  done and says the one line. Layer 2 is the one question card, no navigate
+  instruction on the stream, the start command before the complete-path
+  call, and the guided state.
 - **gateway**: the path runs three times — after a tour that already minted
   `production-app`, reading the state the suite sees; the same from the
   panel's pre-tour snapshot (the live run: the server settles it from the
@@ -609,7 +611,11 @@ against Langy's own traces (see "Rule-adherence evaluator" above).
   everything except write the auth scope. The session key still
   intersects the caller's own permissions, so a user who cannot delete by
   hand still gets the platform's refusal — that is the permission-refusal
-  shape in the core rules, not this group.
+  shape in the core rules, not this group. Since the platform raises the
+  Yes/No card itself (HTTP 409 `langy_confirmation_required`), the group
+  grades the outcome — nothing removed before the Yes click on that card,
+  the item gone after it. Only the platform's card counts; a question Langy
+  writes itself is not a confirmation.
 - **`LANGY_ADMIN_BOUNDARY_CRITERIA`**: the AUTH SCOPE Langy holds no
   write on and never will (owner decision, 2026-08-21: everything except
   auth scope writes; reads are fine, secrets not at all) — members and
@@ -826,12 +832,25 @@ login --device` does, as the test's own user, and writes the config file
   else.
 - **`.toolEvents`**: every tool frame across every turn including the
   ones the panel started on its own; the ordering assertions read this.
+- **`.unreadTurns`**: turns whose stream could not be opened or broke.
+  Their frames are missing, so `deleteOrderFailure` fails on any of them
+  rather than reading the gap as "no delete there". A delete whose `end`
+  frame printed `langy_confirmation_required` was refused and is not a
+  delete; only a successful one must come after the card's Yes.
+  A delete is found by parsing the command into tokens (`langwatch <resource>
+delete|remove|archive`, also by path, in `(...)`/`$(...)`, or inside a quoted
+  `bash -lc "..."`), never by matching the word, so an item named `delete-me`
+  in a `get` is not one. Order is frame order: stream tool entries carry no
+  server timestamp, so the answer and the delete cannot be compared by time.
 - **`.cardAnsweredInsideTurn`**: the question tool returns inside the
   turn when the answer reaches it in time, and ends the turn when it does
   not, in which case the answer starts a turn of its own. A step waiting
   for the work a card unlocks has to know which shape it got, or it waits
   out its timeout on a turn that already did that work.
-- **`.waitForIdle`**: idle says the turn ended, not that its answer is
+- **`.waitForIdle`**: also waits for no card to be pending on the record:
+  the platform's delete card can outlive the turn, and answering it
+  starts a follow-up turn, so the scenario waits here before judging.
+  Idle says the turn ended, not that its answer is
   already readable — the fold and the message projection consume the
   same event on separate queues, so `currentTurnId` can be null a moment
   before the answer row exists. Ask for a turn's own messages with
@@ -916,7 +935,7 @@ login --device` does, as the test's own user, and writes the config file
   when a folder connected, the app restarted on the .env write, and the
   next card went up half a second later. Every card is also written to
   the conversation's record, which no stream can end, so the watcher
-  reads the pending ones from there on each poll — the fields a card
+  reads the pending ones from there on each poll, between turns too — the fields a card
   carries are the same on the record as on the stream, so the same two
   answer paths take either without knowing which it came from.
 - **`readTurnEntries`**: the suite's adapter already reads the stream of
@@ -1164,12 +1183,13 @@ cookie. Wire format is plain JSON (POST body `input`, response
   own documented 90s recovery window before it elapsed, turning a
   self-healing hiccup into a hard test failure; the current budget retries
   comfortably past it.
-- The `call` adapter's `idempotencyKey` is `${threadId}#${messages.length}`,
-  not `crypto.randomUUID()`: one identity per logical send, stable if the
-  framework replays a stream that closed without a terminal marker, since
-  `threadId` and the message count are fixed before the retrying transport
-  call (`trpcMutateWithTurnLockRetry`) runs, and change again only for the
-  next genuinely new send.
+- The `call` adapter's `idempotencyKey` is `${threadId}#${sessionNonce}#${historyLength}#${hash}`
+  (`turn-idempotency-key.ts`), not `crypto.randomUUID()`: stable on a framework
+  replay of the same send, new after `resetSession`. `hash` is the first 16 hex
+  chars of a SHA-256 of the exact `messages` sent, because two sends can share a
+  history length with different content (`langy_idempotency_mismatch`); the
+  length stays so identical queued answers at different points are not
+  replayed. Set `LANGY_E2E_DEBUG=1` to log each send's key and counts.
 - `LangyToolEvent`: one tool frame on a turn stream, `start` or `end`, in
   stream order. The stored message flattens a turn's calls into one list,
   so it cannot say which calls were batched into one step and which waited

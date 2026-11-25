@@ -23,3 +23,14 @@ function derOf(publicKey: string): Buffer | string {
 export function fingerprintOfLicenseKey(licenseKey: string): string {
   return createHash("sha256").update(licenseKey).digest("hex");
 }
+
+/** The instance-wide key licenses an organization unless it is bound to another one. */
+export function instanceKeyLicensesOrganization({
+  boundOrganizationId,
+  organizationId,
+}: {
+  boundOrganizationId: string | undefined;
+  organizationId: string;
+}): boolean {
+  return boundOrganizationId === void 0 || boundOrganizationId === organizationId;
+}

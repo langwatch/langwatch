@@ -10,13 +10,19 @@ import type {
   InstantEvalQueryJudgingInput,
 } from "@langwatch/instant-eval-contract";
 import type { InstantEvalPricing } from "@langwatch/instant-eval-judge-contract";
-import { instantEvalCostUsd, instantEvalPriceUsd } from "@langwatch/instant-eval-judge-contract";
+import {
+  instantEvalCostUsd,
+  instantEvalPriceUsd,
+  isInstantEvalSpendBillable,
+  pickInstantEvalRoutedSpend,
+} from "@langwatch/instant-eval-judge-contract";
 import { createLogger } from "@langwatch/observability";
 import { nowInstant, type Instant } from "@langwatch/time";
 
 import { instantEvalRunQuestions } from "../rules/instant-eval-run-questions.rules.ts";
 import { instantEvalQueryReservationId } from "../rules/instant-eval-spend-outcome.rules.ts";
 import type { InstantEvalFreeBudgetService } from "./instant-eval-free-budget.service.ts";
+import type { InstantEvalGatewayBudgetService } from "./instant-eval-gateway-budget.service.ts";
 import type {
   InstantEvalJudgeRowsService,
   InstantEvalJudgeUsage,
@@ -30,8 +36,9 @@ export class InstantEvalQueryJudgingService {
     private readonly options: {
       rows: Pick<InstantEvalJudgeRowsService, "judgeRows">;
       budget: Pick<InstantEvalFreeBudgetService, "reserve" | "release">;
+      gatewayBudget: Pick<InstantEvalGatewayBudgetService, "assertWithinGatewayBudget">;
       spend: Pick<InstantEvalJudgedSpendService, "recordSpend">;
-      pricing: InstantEvalPricing;
+      holdPricing: () => Promise<InstantEvalPricing>;
       queryTokenBudget: number;
       now: () => Instant;
     },
@@ -40,15 +47,18 @@ export class InstantEvalQueryJudgingService {
   static create({
     rows,
     budget,
+    gatewayBudget,
     spend,
-    pricing,
+    holdPricing,
     queryTokenBudget,
     now = nowInstant,
   }: {
     rows: Pick<InstantEvalJudgeRowsService, "judgeRows">;
     budget: Pick<InstantEvalFreeBudgetService, "reserve" | "release">;
+    gatewayBudget: Pick<InstantEvalGatewayBudgetService, "assertWithinGatewayBudget">;
     spend: Pick<InstantEvalJudgedSpendService, "recordSpend">;
-    pricing: InstantEvalPricing;
+    /** The judge's hold rates: the dearest input rate a routed call could reach. */
+    holdPricing: () => Promise<InstantEvalPricing>;
     /** Input tokens one query may send: the ceiling it is held at and refused past. */
     queryTokenBudget: number;
     now?: () => Instant;
@@ -56,8 +66,9 @@ export class InstantEvalQueryJudgingService {
     return new InstantEvalQueryJudgingService({
       rows,
       budget,
+      gatewayBudget,
       spend,
-      pricing,
+      holdPricing,
       queryTokenBudget,
       now,
     });
@@ -73,9 +84,11 @@ export class InstantEvalQueryJudgingService {
     const questions = instantEvalRunQuestions(judgements);
     if (questions.length === 0) return { rows, skipped: {} };
 
-    const { budget, queryTokenBudget } = this.options;
+    const { budget, gatewayBudget, queryTokenBudget } = this.options;
+    await gatewayBudget.assertWithinGatewayBudget({ projectId });
     const reservationId = instantEvalQueryReservationId();
-    await budget.reserve({ projectId, reservationId, priceUsd: this.#priceOf(queryTokenBudget) });
+    const priceUsd = await this.#holdPriceOf(queryTokenBudget);
+    await budget.reserve({ projectId, reservationId, priceUsd });
     let isRecorded = true;
     try {
       const judged = await this.options.rows.judgeRows({
@@ -98,8 +111,12 @@ export class InstantEvalQueryJudgingService {
     }
   }
 
-  #priceOf(inputTokens: number): number {
-    const { pricing } = this.options;
+  /**
+   * The token budget at the dearest base input rate a routed call could reach: a best-effort hold,
+   * not a hard cap on a routed query's spend (ADR-190 decision 7).
+   */
+  async #holdPriceOf(inputTokens: number): Promise<number> {
+    const pricing = await this.options.holdPricing();
 
     return instantEvalPriceUsd({ costUsd: instantEvalCostUsd({ inputTokens, pricing }), pricing });
   }
@@ -115,12 +132,13 @@ export class InstantEvalQueryJudgingService {
     projectId: string;
     usage: InstantEvalJudgeUsage;
   }): Promise<boolean> {
-    if (usage.inputTokens <= 0) return true;
+    if (!isInstantEvalSpendBillable(usage)) return true;
     try {
       await this.options.spend.recordSpend({
         projectId,
         inputTokens: usage.inputTokens,
         requests: usage.requests,
+        ...pickInstantEvalRoutedSpend(usage),
         occurredAt: this.options.now(),
       });
 

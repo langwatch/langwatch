@@ -7,6 +7,7 @@ import {
   parseProcessConfig,
   type ConfigOf,
 } from "@langwatch/config";
+import { z } from "zod";
 
 /**
  * The local launcher parses only controls that affect its own supervision.
@@ -21,6 +22,8 @@ export const localOrchestratorConfig = Config.define((c) => ({
   development: {
     aiGatewayDevBuild: c.env("LANGWATCH_AIGATEWAY_DEV_BUILD", environmentExactOneSchema),
     forceBundledPostgres: c.env("LANGWATCH_FORCE_BUNDLED_POSTGRES", environmentLegacyTruthySchema),
+    // A path or URL of an app archive to install instead of the release download (ADR-180).
+    appArchive: c.env("LANGWATCH_APP_ARCHIVE", z.string().min(1).optional()),
   },
 }));
 

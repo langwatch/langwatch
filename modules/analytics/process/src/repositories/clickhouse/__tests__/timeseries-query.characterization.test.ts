@@ -15,20 +15,22 @@ const input = {
 };
 
 describe("Analytics timeseries query compatibility", () => {
-  it("keeps the legacy tenant predicate and date parameter names", () => {
+  /** @scenario "A trace summaries series leaves its tenants to the proof" */
+  it("leaves the legacy statement's tenants to the proof and keeps its date parameter names", () => {
     const query = buildTimeseriesQuery(input);
 
-    expect(query.sql).toContain("TenantId = {tenantId:String}");
+    expect(query.sql).toContain("{{tenantScope:OccurredAt}}");
+    expect(query.sql).not.toContain("{tenantId:String}");
     expect(query.sql).toContain("{currentStart:DateTime64(3)}");
     expect(query.sql).toContain("{previousStart:DateTime64(3)}");
-    expect(query.params.tenantId).toBe("tenant-1");
+    expect(query.params).not.toHaveProperty("tenantId");
   });
 
   it("keeps the routed timezone in the ClickHouse bucket expression", () => {
     const query = buildRollupTimeseriesQuery(input);
 
     expect(query.sql).toContain("Europe/Amsterdam");
-    expect(query.sql).toContain("TenantId = {tenantId:String}");
-    expect(query.params.tenantId).toBe("tenant-1");
+    expect(query.sql).toContain("{{tenantScope:BucketStart}}");
+    expect(query.params).not.toHaveProperty("tenantId");
   });
 });

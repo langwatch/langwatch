@@ -97,3 +97,68 @@ Feature: Topic clustering runs on langevals
     When the FastAPI app starts up
     Then no routes for /topics/batch_clustering or /topics/incremental_clustering exist
     And per-evaluator routes (e.g. /langevals/basic/evaluate) work as today
+
+  # Batch and incremental clustering used to answer every failure as one 500,
+  # so a refused API key read the same as a crash of ours.
+  @unit
+  Scenario: A model provider refusal is answered as the customer's to fix
+    Given a batch or incremental clustering run whose model provider refuses the configured key, rate limits it, or rejects the request
+    And the same holds for a run with no model configured
+    When langevals answers
+    Then it answers with a 4xx carrying a stable code and fixed copy
+    And the provider's own words, which can quote the key, are not in the answer
+
+  @unit
+  Scenario: A failure of ours is still answered as a server error
+    Given a batch or incremental clustering run that fails for any other reason
+    When langevals answers
+    Then it answers with a 500 and logs the failure as an error
+
+  # A page of ~2,000 inputs sent as 99 sequential calls to a provider that
+  # takes ~2.5s a call ran past the gateway's 120s timeout every time.
+  @unit
+  Scenario: Embedding batches for one page are requested concurrently
+    Given a page whose inputs split into more embedding batches than one call carries
+    When langevals embeds the page
+    Then several batches are in flight at once, never more than the concurrency bound
+    And each input keeps its own embedding, in the order it was sent
+    And the provider usage of every batch is counted for the request
+
+  @unit
+  Scenario: A rate-limited embedding batch is retried in place
+    Given an embedding provider that rate limits a batch once, then answers
+    When langevals embeds a page
+    Then that batch is asked again and the page keeps every embedding
+    And no per-input fallback calls are made
+
+  @unit
+  Scenario: A batch still rate limited after its retries is raised to the caller
+    Given an embedding provider that rate limits a batch on every try
+    When langevals embeds a page
+    Then the rate limit is raised to the caller
+    And no per-input fallback calls are made
+    And the same holds when an earlier batch failed for another reason
+
+  @unit
+  Scenario: Any other failed embedding batch falls back to one call per input
+    Given an embedding provider that fails a batch call for a reason other than auth or rate limits
+    When langevals embeds a page
+    Then the page is embedded again one input per call
+    And no per-input call starts before every batch call in flight has returned
+
+  @unit
+  Scenario: Embedding a page stops at a provider auth refusal without retrying input by input
+    Given an embedding provider that refuses the configured key
+    When langevals embeds a page
+    Then the refusal is raised to the caller
+    And no per-input fallback calls are made
+
+  # litellm prices no Cloudflare model, and the unpriced cost used to throw
+  # away every topic name the model had already generated.
+  @unit
+  Scenario: Topic names from a model litellm cannot price are kept
+    Given a naming model that answers with names but has no litellm price
+    When langevals names the topics
+    Then every topic keeps the name the model gave it
+    And the naming cost counts that call as zero
+    And the same holds when pricing the call raises instead

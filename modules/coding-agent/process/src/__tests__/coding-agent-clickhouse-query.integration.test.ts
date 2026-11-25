@@ -4,12 +4,14 @@ import { z } from "zod";
 import { ClickHouseCodingAgentRepositories } from "../repositories/clickhouse/clickhouse.coding-agent.repositories.ts";
 import { CodingAgentProjectionPersistenceService } from "../services/coding-agent-projection-persistence.service.ts";
 import { CodingAgentFeatureService } from "../services/coding-agent.service.ts";
+import { ModelCatalogCostEstimatorService } from "../services/model-catalog-cost-estimator.service.ts";
 import {
   TEST_NOW_MS,
   TestBillingPolicy,
   TestClickHouseEndpoint,
   TestClock,
   TestGithubService,
+  storedTracesFixture,
   createTestProjects,
   session,
   sessionEventRecord,
@@ -34,10 +36,12 @@ async function runtime() {
     projections: CodingAgentProjectionPersistenceService.create(repositories),
     service: CodingAgentFeatureService.create({
       ...repositories,
+      storedTraces: storedTracesFixture(),
       github: new TestGithubService(),
       projects: createTestProjects(),
       billing: new TestBillingPolicy(),
       clock: new TestClock(),
+      modelProviders: ModelCatalogCostEstimatorService.create(),
     }),
   };
 }
@@ -60,7 +64,10 @@ describe("Coding Agent ClickHouse query contract", () => {
     });
 
     expect(endpoint.requests).toHaveLength(1);
-    expect(endpoint.requests[0]?.body).toContain("TimeUnixMs BETWEEN");
+    expect(endpoint.requests[0]?.body).toContain(
+      "AND TimeUnixMs >= fromUnixTimestamp64Milli({idBound_fromMs:Int64}) " +
+        "AND TimeUnixMs <= fromUnixTimestamp64Milli({idBound_toMs:Int64})",
+    );
     expect(endpoint.requests[0]?.body).toContain("EventKind IN");
     expect(endpoint.requests[0]?.body).toContain("(TimeUnixMs, RecordId) >");
     expect(endpoint.requests[0]?.body).toContain(
@@ -68,8 +75,8 @@ describe("Coding Agent ClickHouse query contract", () => {
     );
     expect(endpoint.requests[0]?.body).toContain("LIMIT 1 BY TimeUnixMs, RecordId");
     expect(endpoint.requests[0]?.body).toContain("LIMIT {limit:UInt32}");
-    expect(endpoint.requests[0]?.url).toContain("param_fromMs=100");
-    expect(endpoint.requests[0]?.url).toContain("param_toMs=200");
+    expect(endpoint.requests[0]?.url).toContain("param_idBound_fromMs=100");
+    expect(endpoint.requests[0]?.url).toContain("param_idBound_toMs=200");
     expect(endpoint.requests[0]?.url).toContain("param_cursorTimeMs=150");
   });
 

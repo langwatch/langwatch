@@ -74,9 +74,10 @@ distinct:
   statement.
 
 Either way this image renders the server-level prerequisites the model needs:
-the `default` user is granted `access_management` and `named_collection_control`
-(the right to create users, profiles, row policies and named collections through
-SQL — exercised by the SQL-DDL path); the `custom_` settings prefix is declared
+in `sql` mode the `default` user is granted `access_management` and
+`named_collection_control` (the right to create users, profiles, row policies and
+named collections through SQL); with `lwqlAccess.secretName` set it gets neither,
+only use of the `lwql_postgres*` collections the rendered model delivers; the `custom_` settings prefix is declared
 so the per-query tenant capability the app's queries rely on is accepted rather
 than rejected with `UNKNOWN_SETTING`; and
 `access_control_improvements.settings_constraints_replace_previous` is set, so
@@ -139,20 +140,58 @@ Shared by cold storage and backups. Required when either `cold.enabled` or `back
 
 ### Backups
 
-| Name                          | Description                                                              | Default                                        |
-| ----------------------------- | ------------------------------------------------------------------------ | ---------------------------------------------- |
-| `backup.enabled`              | Enable native ClickHouse BACKUP/RESTORE to S3 (requires `objectStorage`) | `false`                                        |
-| `backup.database`             | Database to back up                                                      | `langwatch`                                    |
-| `backup.user`                 | ClickHouse user for backup/restore operations                            | `default`                                      |
-| `backup.resources`            | CPU/memory requests + limits for the backup/restore Job containers       | requests `100m`/`128Mi`, limits `500m`/`512Mi` |
-| `backup.full.schedule`        | Cron schedule for full backups                                           | `0 */12 * * *`                                 |
-| `backup.incremental.schedule` | Cron schedule for incremental backups                                    | `0 * * * *`                                    |
+Native ClickHouse `BACKUP`/`RESTORE` to the `backups` disk on the object store,
+full and chained incrementals ([ADR-199](../../dev/docs/adr/199-clickhouse-serverless-backups-run-in-the-ch-config-sidecar.md)).
+`backup.mode` picks who takes them:
+
+- `cronjob` (default): the full and incremental CronJobs, as before.
+- `sidecar`: the ch-config sidecar in every ClickHouse pod, on one elected
+  runner, with the same schedules. No backup CronJobs render. It has no
+  readiness probe, so a backup problem never unreadies ClickHouse.
+- `cronjob-observe`: the CronJobs back up and the sidecar only decides and
+  exports metrics. Use it to check the sidecar and its alerts against real
+  backups before switching to `sidecar`; it never writes a second backup.
+
+Retention is the object store's lifecycle rule on the `clickhouse-backup/`
+prefix; set `backup.retentionDays` to match it. To restore, run the suspended
+`<release>-clickhouse-restore-template` CronJob as a Job with `BACKUP_NAME` and
+`CONFIRM_RESTORE=yes`, or inside a pod:
+`kubectl exec <pod> -c backup -- ch-config backup restore --name <name> --confirm`
+(`-c access` when access is on). `ch-config backup list` prints the names. With
+`access.dynamicOnly.enabled`, only `sidecar` mode is allowed: CronJobs and the
+restore template have no password to log in with, and the sidecar uses the
+per-boot local admin.
+
+| Name                                  | Description                                                                                  | Default                                        |
+| ------------------------------------- | -------------------------------------------------------------------------------------------- | ---------------------------------------------- |
+| `backup.enabled`                      | Enable native ClickHouse BACKUP/RESTORE to S3 (requires `objectStorage`)                     | `false`                                        |
+| `backup.database`                     | Database to back up                                                                          | `langwatch`                                    |
+| `backup.user`                         | ClickHouse user for backup/restore operations                                                | `default`                                      |
+| `backup.resources`                    | CPU/memory requests + limits for the backup/restore Job containers                           | requests `100m`/`128Mi`, limits `500m`/`512Mi` |
+| `backup.full.schedule`                | Cron schedule for full backups                                                               | `0 */12 * * *`                                 |
+| `backup.incremental.schedule`         | Cron schedule for incremental backups                                                        | `0 * * * *`                                    |
+| `backup.mode`                         | `cronjob`, `sidecar` or `cronjob-observe` (see above)                                        | `cronjob`                                      |
+| `backup.passwordSecret.name` / `.key` | Sidecar modes: Secret key with `backup.user`'s password, mounted as a file                   | chart Secret's password                        |
+| `backup.retentionDays`                | Lifecycle expiry of the backups prefix; set it 2 days past the window you need               | `7`                                            |
+| `backup.maxBandwidth`                 | Sidecar modes: `max_backup_bandwidth`, bytes per second                                      | `0` (unlimited)                                |
+| `backup.staleHours`                   | A backup in flight longer than this is overrunning (alerted); it still blocks a second one   | `12`                                           |
+| `backup.sidecar.runnerOrdinal`        | Pod ordinal that runs backups while it answers; else the next that does                      | `0`                                            |
+| `backup.sidecar.metricsPort`          | `/metrics`, `/status`, `/healthz` on the pod IP                                              | `8125`                                         |
+| `backup.sidecar.resources`            | The `backup` container, when access is off (with access on it shares the `access` container) | `10m`/`32Mi`, limits `200m`/`128Mi`            |
+| `backup.sidecar.podMonitor.enabled`   | Render a prometheus-operator `PodMonitor` for `/metrics`                                     | `false`                                        |
 
 ### Backup alerting
 
-Off by default. When enabled, the chart renders Prometheus alerting rules that
-watch the backup CronJobs through kube-state-metrics, so a Prometheus that
-scrapes kube-state-metrics is the only prerequisite.
+Off by default. When enabled, the chart renders Prometheus alerting rules. While
+backup CronJobs render, rules watch them through kube-state-metrics, so a
+Prometheus that scrapes kube-state-metrics is the only prerequisite. In
+`sidecar` and `cronjob-observe` modes further rules read the sidecar's own
+metrics, which Prometheus must scrape (`backup.sidecar.podMonitor.enabled`):
+`ClickHouseBackupStale`, `ClickHouseBackupFailing` and
+`ClickHouseBackupOverrunning` (a backup in flight past `backup.staleHours`) per
+mode (label `source: sidecar`), `ClickHouseBackupNoRunner` (also when the
+metrics are absent), `ClickHouseBackupMultipleRunners` and
+`ClickHouseBackupConfigError`.
 
 The alert to care about is `ClickHouseBackupStale`, which fires when a backup
 has no successful run inside its window. That is a different condition from "a
@@ -169,17 +208,19 @@ has gone away, which would otherwise resolve every other rule into silence).
 
 Runbook: [`dev/docs/runbooks/clickhouse-backup-alerts.md`](../../dev/docs/runbooks/clickhouse-backup-alerts.md).
 
-| Name                                       | Description                                                                     | Default                                   |
-| ------------------------------------------ | ------------------------------------------------------------------------------- | ----------------------------------------- |
-| `backup.monitoring.enabled`                | Render the backup alerting rules (also requires `backup.enabled`)               | `false`                                   |
-| `backup.monitoring.runbookUrl`             | Value for the `runbook_url` annotation on every alert                           | `""`                                      |
-| `backup.monitoring.additionalLabels`       | Labels merged into every alert, for Alertmanager or Grafana routing             | `{}`                                      |
-| `backup.monitoring.for`                    | How long a backup may look broken before the alert fires                        | `15m`                                     |
-| `backup.monitoring.absentFor`              | How long the CronJob's metrics may be missing before alerting                   | `30m`                                     |
-| `backup.monitoring.prometheusRule.enabled` | Emit a `PrometheusRule` instead of a ConfigMap (needs prometheus-operator CRDs) | `false`                                   |
-| `backup.monitoring.prometheusRule.labels`  | Extra labels on the `PrometheusRule`, for the operator's `ruleSelector`         | `{}`                                      |
-| `backup.monitoring.configMapLabels`        | Labels on the rules ConfigMap, for a rules sidecar to discover it               | `{langwatch.ai/prometheus-rules: "true"}` |
-| `backup.monitoring.targets`                | Backups to watch: `name`, `cronjob` or `cronjobName`, `staleAfterHours`         | full at 26h, incremental at 3h            |
+| Name                                        | Description                                                                     | Default                                   |
+| ------------------------------------------- | ------------------------------------------------------------------------------- | ----------------------------------------- |
+| `backup.monitoring.enabled`                 | Render the backup alerting rules (also requires `backup.enabled`)               | `false`                                   |
+| `backup.monitoring.runbookUrl`              | Value for the `runbook_url` annotation on every alert                           | `""`                                      |
+| `backup.monitoring.additionalLabels`        | Labels merged into every alert, for Alertmanager or Grafana routing             | `{}`                                      |
+| `backup.monitoring.for`                     | How long a backup may look broken before the alert fires                        | `15m`                                     |
+| `backup.monitoring.absentFor`               | How long the CronJob's metrics may be missing before alerting                   | `30m`                                     |
+| `backup.monitoring.prometheusRule.enabled`  | Emit a `PrometheusRule` instead of a ConfigMap (needs prometheus-operator CRDs) | `false`                                   |
+| `backup.monitoring.prometheusRule.labels`   | Extra labels on the `PrometheusRule`, for the operator's `ruleSelector`         | `{}`                                      |
+| `backup.monitoring.configMapLabels`         | Labels on the rules ConfigMap, for a rules sidecar to discover it               | `{langwatch.ai/prometheus-rules: "true"}` |
+| `backup.monitoring.targets`                 | Backups to watch: `name`, `cronjob` or `cronjobName`, `staleAfterHours`         | full at 26h, incremental at 3h            |
+| `backup.monitoring.sidecar.staleAfterHours` | Sidecar rules: hours without a completed backup, per mode                       | full `26`, incremental `3`                |
+| `backup.monitoring.sidecar.selector`        | Sidecar rules: PromQL matchers for the sidecar's series                         | this release's pods in the namespace      |
 
 Add an entry to `backup.monitoring.targets` for any other backup CronJob in the
 same namespace, including ones this chart does not create. Name it either way:
@@ -203,31 +244,100 @@ has no kube-state-metrics series and cannot be watched from here.
 
 ### Authentication
 
-| Name                               | Description                                                                                                                                                      | Default             |
-| ---------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------- |
-| `autogen.enabled`                  | Chart materialises the credentials Secret via per-key `lookup-or-rand` (existing values reused on upgrade). Must be enabled unless `auth.existingSecret` is set. | `false`             |
-| `auth.password`                    | Seed value when `autogen.enabled=true` and you want a deterministic password instead of `randAlphaNum`. Ignored when `auth.existingSecret` is set.               | `""`                |
-| `auth.clusterSecret`               | Seed value for the Keeper inter-node cluster secret (only used when `replicas>1`). Ignored when `auth.existingSecret` is set.                                    | `""`                |
-| `auth.existingSecret`              | Name of an operator-owned Secret. When set, the chart skips its own Secret render and a preflight Job verifies the required keys exist before pods roll.         | `""`                |
-| `auth.secretKeys.passwordKey`      | Key name for the password in both autogen and existingSecret paths                                                                                               | `password`          |
-| `auth.secretKeys.clusterSecretKey` | Key name for the Keeper cluster secret                                                                                                                           | `clusterSecret`     |
-| `preflight.enabled`                | Run the pre-install/pre-upgrade Secret-keys Job when `auth.existingSecret` is set                                                                                | `true`              |
-| `preflight.image`                  | Container image (needs `sh` + `kubectl` + `jq`; the Job fails fast if `jq` is missing)                                                                           | `alpine/k8s:1.30.0` |
-| `preflight.activeDeadlineSeconds`  | Hard timeout for the preflight Job                                                                                                                               | `60`                |
+| Name                               | Description                                                                                                                                                                                      | Default             |
+| ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------- |
+| `autogen.enabled`                  | Chart materialises the credentials Secret via per-key `lookup-or-rand` (existing values reused on upgrade). Must be enabled unless `auth.existingSecret` is set.                                 | `false`             |
+| `auth.password`                    | Seed value when `autogen.enabled=true` and you want a deterministic password instead of `randAlphaNum`. Ignored when `auth.existingSecret` is set.                                               | `""`                |
+| `auth.clusterSecret`               | Seed value for the Keeper inter-node cluster secret (only used when `replicas>1`). Ignored when `auth.existingSecret` is set.                                                                    | `""`                |
+| `auth.clusterSecretEnabled`        | Apply the cluster secret to `remote_servers` (`replicas>1`). Recommended, off by default: see [Cluster secret](../../infra/clickhouse-serverless/README.md#cluster-secret) before turning it on. | `false`             |
+| `auth.existingSecret`              | Name of an operator-owned Secret. When set, the chart skips its own Secret render and a preflight Job verifies the required keys exist before pods roll.                                         | `""`                |
+| `auth.secretKeys.passwordKey`      | Key name for the password in both autogen and existingSecret paths                                                                                                                               | `password`          |
+| `auth.secretKeys.clusterSecretKey` | Key name for the Keeper cluster secret                                                                                                                                                           | `clusterSecret`     |
+| `preflight.enabled`                | Run the pre-install/pre-upgrade Secret-keys Job when `auth.existingSecret` is set                                                                                                                | `true`              |
+| `preflight.image`                  | Container image (needs `sh` + `kubectl` + `jq`; the Job fails fast if `jq` is missing)                                                                                                           | `alpine/k8s:1.34.9` |
+| `preflight.activeDeadlineSeconds`  | Hard timeout for the preflight Job                                                                                                                                                               | `60`                |
 
-### Users
+### Users (deprecated)
 
-| Name    | Description                                                                 | Default |
-| ------- | --------------------------------------------------------------------------- | ------- |
-| `users` | Custom users string: `user1:pass1:readwrite:db1,db2;user2:pass2:readonly:*` | `""`    |
+| Name    | Description                                                                                                       | Default |
+| ------- | ----------------------------------------------------------------------------------------------------------------- | ------- |
+| `users` | Deprecated, no effect: earlier docs described it, but no chart version rendered it. Use `access`. Warned in NOTES | `""`    |
 
-Example:
+### Access: tiers, rolling passwords and token logins
+
+Off by default, and then the server has no `tier_*` role, profile or extra
+container. With `access.enabled`, the server carries four tiers as roles and
+settings profiles: `tier_inspect` (names only), `tier_read` (`SELECT` on its
+databases), `tier_write` (plus `INSERT`, `ALTER UPDATE`, `ALTER DELETE`, no DDL)
+and `tier_admin`; an access file declares users with one tier each, and a
+sidecar container keeps them current and verifies OIDC token logins on
+`127.0.0.1` inside the pod. `env.CLICKHOUSE_ACCESS_TIERS: "true"` renders the
+tiers alone, for users you write yourself. Design and limits: [ADR-198](../../dev/docs/adr/198-clickhouse-serverless-access-tiers-rolling-passwords-and-token-logins.md).
+
+| Name                               | Description                                                                                     | Default          |
+| ---------------------------------- | ----------------------------------------------------------------------------------------------- | ---------------- |
+| `access.enabled`                   | Run the access sidecar and mount the access file                                                | `false`          |
+| `access.config`                    | The access file (`issuers`, `users`), rendered into a ConfigMap                                 | `{}`             |
+| `access.extraFiles`                | More files next to `access.yaml` at `/etc/clickhouse-access/config/<name>`, such as a `ca_file` | `{}`             |
+| `access.existingConfigMap`         | Use this ConfigMap (its `access.yaml` key and any others) instead of `access.config`            | `""`             |
+| `access.passwordSecrets`           | Secrets mounted as password directories at `/etc/clickhouse-access/secrets/<name>`              | `[]`             |
+| `access.dynamicOnly.enabled`       | Token logins only, no static password (see below)                                               | `false`          |
+| `access.sidecar.resources`         | Sidecar requests and limits                                                                     | small            |
+| `env.CLICKHOUSE_ACCESS_LISTEN`     | Loopback address the sidecar listens on, for ClickHouse's token checks                          | `127.0.0.1:8124` |
+| `env.CLICKHOUSE_ACCESS_TIERS`      | Render the tiers without an access file                                                         | `false`          |
+| `env.READ_TIER_MAX_EXECUTION_TIME` | Execution-time cap (seconds) of the inspect and read tiers                                      | `300`            |
 
 ```yaml
-users: "analyst:s3cret:readonly:*;etl_user:p4ssword:readwrite:default,analytics"
+access:
+  enabled: true
+  passwordSecrets: [dashboards-passwords]
+  config:
+    issuers:
+      - name: cluster
+        url: https://oidc.example.com/cluster
+    users:
+      - name: dashboards
+        tier: read
+        databases: [langwatch]
+        login:
+          rolling: { dir: /etc/clickhouse-access/secrets/dashboards-passwords }
+      - name: report-job
+        tier: read
+        databases: [langwatch]
+        login:
+          token: { issuer: cluster, subject: "system:serviceaccount:reports:report-job" }
 ```
 
-This creates two users: `analyst` with read-only access to all databases, and `etl_user` with read-write access to `default` and `analytics`.
+Every key of `dashboards-passwords` is a valid password (16 characters or more),
+so a rotation is: add a key with the new password, move the client to it, delete
+the old key. A key `<name>.valid_until` holding an RFC 3339 instant ends `<name>`
+at that instant instead. Each change applies within about 10 seconds without a
+restart. Under the umbrella `langwatch` chart these values sit under
+`clickhouse.access`. The operator guide is in the docs: Self-hosting,
+Configuration, ClickHouse access.
+
+#### Dynamic-only mode
+
+`access.dynamicOnly.enabled: true` adds `mode: dynamic-only` to the access file
+(with `existingConfigMap`, put it in your file). The pod then holds no static
+password: `default` gets none and is locked, the credentials Secret mounts only
+the cluster secret (replicas) or nothing (one pod), and a `local_admin` password
+is generated at every start into an in-memory `emptyDir` shared with the
+sidecar. The sidecar's `/readyz` gates the pod's readiness. The chart refuses
+the mode with `passwordSecrets`, with replicas but no `auth.clusterSecretEnabled`,
+and with backups unless `backup.mode: sidecar` on one replica. Clients use short-lived tokens, for example a
+projected ServiceAccount token:
+
+```yaml
+volumes:
+  - name: clickhouse-token
+    projected:
+      sources:
+        - serviceAccountToken: { audience: clickhouse, expirationSeconds: 600, path: token }
+```
+
+The client reads the file for each connection. Example values:
+[`tests/values-dynamic-only.yaml`](tests/values-dynamic-only.yaml).
 
 ### Advanced
 

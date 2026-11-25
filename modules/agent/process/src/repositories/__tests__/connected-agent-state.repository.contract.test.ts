@@ -44,6 +44,7 @@ function call(owner = projectId): StoredCall {
     instanceId,
     replyTo: "pod_a",
     envelope: {
+      kind: "turn",
       callId,
       agentId,
       threadId: "thread_1",
@@ -118,6 +119,20 @@ describe.each(Object.entries(tiers))("ConnectedAgentStateRepository (%s)", (_nam
       });
       expect(await state.findInstance({ projectId, instanceId })).toEqual([
         { meta: meta({ podId: "pod_b" }), agentIds: [agentId] },
+      ]);
+    });
+
+    /** @scenario "A hook call reaches only an instance that declared that hook" */
+    it("keeps the hooks each agent declared, and drops them when saved again without", async () => {
+      const hooks = { [agentId]: { setup: true, teardown: false } };
+      await state.saveInstance({ meta: meta({ hooks }), agentIds: [agentId], ttlSeconds: 30 });
+      expect(await state.findInstance({ projectId, instanceId })).toEqual([
+        { meta: meta({ hooks }), agentIds: [agentId] },
+      ]);
+
+      await state.saveInstance({ meta: meta(), agentIds: [agentId], ttlSeconds: 30 });
+      expect(await state.findInstance({ projectId, instanceId })).toEqual([
+        { meta: meta(), agentIds: [agentId] },
       ]);
     });
 

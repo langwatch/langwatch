@@ -1,13 +1,18 @@
 import { DASHBOARD_SRCDOC_CHART_KIND } from "@langwatch/analytics-contract";
 import {
-  dashboardSchema,
+  boardSchema,
+  DashboardNotFoundError,
+  dashboardHomeProductSchema,
+  DEFAULT_DASHBOARD_HOME_PRODUCT,
+  type DashboardHomeProduct,
   type DashboardScope,
   type DashboardStar,
   type StarredDashboard,
 } from "@langwatch/dashboard-contract";
-import { PrismaRepository } from "@langwatch/prisma-client";
+import { isRecordNotFoundError, PrismaRepository } from "@langwatch/prisma-client";
 import type { DashboardsV2, Prisma } from "@langwatch/prisma-client/generated";
 
+import { starredBoardRow } from "../../rules/starred-board-row.rules.ts";
 import type {
   BoardReach,
   BoardRecord,
@@ -54,8 +59,12 @@ const memberStars = (input: MemberStars): Prisma.DashboardFavouriteWhereInput =>
   ],
 });
 
+/** A home this release does not know (a newer one wrote it) lists where every old board does. */
+const homeProductOf = (stored: string): DashboardHomeProduct =>
+  dashboardHomeProductSchema.catch(DEFAULT_DASHBOARD_HOME_PRODUCT).parse(stored);
+
 const boardRow = (row: DashboardsV2): BoardRecord =>
-  dashboardSchema.parse({
+  boardSchema.parse({
     id: row.id,
     projectId: row.projectId,
     name: row.name,
@@ -64,6 +73,7 @@ const boardRow = (row: DashboardsV2): BoardRecord =>
     createdById: row.createdById,
     scope: row.scope,
     organizationId: row.organizationId,
+    homeProduct: homeProductOf(row.homeProduct),
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   });
@@ -108,6 +118,17 @@ export class PrismaBoardRepository
     ];
   }
 
+  // Reads every board of these projects and leaves the filtering to the caller, in memory:
+  // fine for today's board counts, the first thing to narrow if organizations grow large.
+  async findBoardsInProjects(input: { projectIds: readonly string[] }): Promise<BoardRecord[]> {
+    if (input.projectIds.length === 0) return [];
+    const rows = await this.prisma.dashboardsV2.findMany({
+      where: { projectId: { in: [...input.projectIds] } },
+      orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+    });
+    return rows.map((row) => boardRow(row));
+  }
+
   async findBoardsByIds(
     input: BoardReach & { dashboardIds: readonly string[] },
   ): Promise<BoardRecord[]> {
@@ -124,6 +145,8 @@ export class PrismaBoardRepository
     name: string;
     createdById?: string | null;
     scope?: DashboardScope;
+    homeProduct?: DashboardHomeProduct;
+    organizationId?: string | null;
   }): Promise<BoardRecord> {
     return boardRow(
       await this.prisma.dashboardsV2.create({
@@ -149,9 +172,13 @@ export class PrismaBoardRepository
     const { projectId, dashboardId } = input;
     return this.transaction(async (transaction) => {
       // First, so an id only Reports holds is refused before anything else is touched.
-      const board = await transaction.dashboardsV2.delete({
-        where: { id: dashboardId, projectId },
-      });
+      // P2025: no DashboardsV2 row matched (unknown id, another project, a Reports-only id,
+      // or a second delete that raced this one).
+      const board = await transaction.dashboardsV2
+        .delete({ where: { id: dashboardId, projectId } })
+        .catch((error: unknown) => {
+          throw isRecordNotFoundError(error) ? new DashboardNotFoundError({ projectId }) : error;
+        });
       await transaction.dashboardWidget.deleteMany({ where: { projectId, dashboardId } });
       await transaction.dashboardFavourite.deleteMany({ where: { projectId, dashboardId } });
       await transaction.customGraph.deleteMany({
@@ -190,7 +217,7 @@ export class PrismaBoardRepository
       }
       const dashboard =
         favourite.dashboardId === null ? undefined : byId.get(favourite.dashboardId);
-      return dashboard ? [{ kind: "board", dashboard }] : [];
+      return dashboard ? [{ kind: "board", dashboard: starredBoardRow({ board: dashboard }) }] : [];
     });
   }
 

@@ -3,16 +3,29 @@
  * @see specs/scenarios/simulation-runner.feature (Worker-Based Execution scenarios)
  */
 
+import type { LanguageModelV3 } from "@ai-sdk/provider";
+import type { AgentHooks } from "@langwatch/agent-contract";
 import type { Logger } from "@langwatch/observability";
 import * as ScenarioRunner from "@langwatch/scenario";
 import {
   type CallLimitTimer,
+  CHILD_PROCESS,
   type ChildProcessJobData,
   createCallLimitTimer,
+  RED_TEAM_BREAK_SCORE,
+  type RedTeamConfig,
+  type RedTeamRunReport,
+  type ScenarioRunHooks,
   DEFAULT_CALLER_VOICE,
 } from "@langwatch/scenario-contract";
+import { nowInstant } from "@langwatch/time";
 import { type TracerProvider, trace } from "@opentelemetry/api";
+import { wrapLanguageModel } from "ai";
 
+import {
+  type ConnectedCallRun,
+  HttpSerializedConnectedAgentChannel,
+} from "../channels/http/http.serialized-connected-agent.channel.ts";
 import type { ScenarioHttp } from "../channels/http/http.serialized-http-agent.channel.ts";
 import { litellmModelChannels } from "../channels/litellm-model-channels.registry.ts";
 import type { NlpFetchTimeouts } from "../channels/nlp-fetch.channel.ts";
@@ -27,9 +40,25 @@ import {
   buildAgentGreetsFirstScript,
 } from "../rules/agent-first-script.rules.ts";
 import { buildCallerVoiceSimulatorConfig } from "../rules/caller-voice-simulator.rules.ts";
+import {
+  addOpeningUserTurn,
+  ATTACKER_EMPTY_REPLY_RETRIES,
+  AttackerNoReplyError,
+  hasReplyText,
+  isAttackerNoReply,
+  buildRedTeamRunReport,
+  getRedTeamRunConfig,
+  isRedTeamRun,
+  RED_TEAM_TIME_MARGIN_MS,
+  readRedTeamTurnScores,
+  redTeamTotalTurns,
+  EARLY_EXIT_REASONING_PREFIX,
+} from "../rules/red-team-run.rules.ts";
 import { buildRemoteTraceRunConfig } from "../rules/remote-trace-run.rules.ts";
 import { selectRoleModelParams } from "../rules/scenario-role-model.rules.ts";
 import { AgentTestScriptService } from "./agent-test-script.service.ts";
+import { RunStateRolesService } from "./run-state-roles.service.ts";
+import { ScenarioRunHooksError, ScenarioRunHooksService } from "./scenario-run-hooks.service.ts";
 
 /**
  * Some TracerProvider implementations (like ProxyTracerProvider) wrap a delegate. This interface
@@ -70,6 +99,10 @@ export interface ScenarioChildExecutionResult {
   agentInstance?: { hostname: string; label: string | null };
   /** LangWatch ended the voice call at the maximum call duration (AC28). */
   isCutAtLimit?: boolean;
+  /** A red team run's outcome and per-turn scores. */
+  redTeam?: RedTeamRunReport;
+  /** The setup and teardown the run called, when the agent declared any (ADR-180). */
+  hooks?: ScenarioRunHooks;
 }
 
 /**
@@ -118,13 +151,17 @@ function buildRunCast({
   jobData,
   adapter,
   nlpInternalSecret,
+  readState,
 }: {
   jobData: ChildProcessJobData;
   adapter: ScenarioRunner.AgentAdapter;
   nlpInternalSecret: string | undefined;
+  /** The run's hook state, which the simulated user and the judge then see on every turn. */
+  readState?: () => Record<string, unknown> | null;
 }): {
   agents: ScenarioRunner.AgentAdapter[];
   script?: ScenarioRunner.ScriptStep[];
+  redTeam?: RedTeamCast;
 } {
   if (jobData.script) {
     return AgentTestScriptService.create().build({
@@ -152,21 +189,151 @@ function buildRunCast({
     nlpServiceUrl,
     nlpInternalSecret,
   });
+  const baseJudge = ScenarioRunner.judgeAgent({ criteria: scenario.criteria, model: judgeModel });
+  if (isRedTeamRun(scenario)) {
+    return buildRedTeamCast({ adapter, scenario, simulatorModel, judge: baseJudge });
+  }
   // An inbound phone agent that greets on connect opens the run with its own
   // turn (so the greeting is captured first), then hands over to the
   // simulator/judge loop; every other run keeps the default cast, which opens
   // with the caller.
   const agentGreetsFirstScript = buildAgentGreetsFirstScript(jobData.adapterData);
+  const roles = {
+    userSimulator: ScenarioRunner.userSimulatorAgent({ model: simulatorModel, ...voiceSimConfig }),
+    judge: baseJudge,
+  };
+  const { userSimulator, judge } = readState
+    ? RunStateRolesService.create({ readState }).wrap(roles)
+    : roles;
   return {
-    agents: [
-      adapter,
-      ScenarioRunner.userSimulatorAgent({ model: simulatorModel, ...voiceSimConfig }),
-      ScenarioRunner.judgeAgent({
-        criteria: scenario.criteria,
-        model: judgeModel,
-      }),
-    ],
+    agents: [adapter, userSimulator, judge],
     ...(agentGreetsFirstScript ? { script: agentGreetsFirstScript } : {}),
+  };
+}
+
+/** The attacker a red team run plays in place of the user simulator, kept to read its scores. */
+interface RedTeamCast {
+  attacker: ScenarioRunner.AgentAdapter;
+  config: RedTeamConfig;
+  totalTurns: number;
+  progress: { turnsRun: number };
+}
+
+/**
+ * The attack turns, then the judge. A break ends the run as failed on the spot, so the finished
+ * run already carries the failure for the suite and every other reader of it. Once time is short
+ * of the child timeout, or the attacker model stays silent, the judge rules on the turns played.
+ */
+export function redTeamScript({
+  attacker,
+  totalTurns,
+  progress,
+  isOutOfTime,
+}: {
+  attacker: { checkEarlyExit(): boolean };
+  totalTurns: number;
+  progress: { turnsRun: number };
+  isOutOfTime: () => boolean;
+}): ScenarioRunner.ScriptStep[] {
+  const steps: ScenarioRunner.ScriptStep[] = [];
+  const attackerTurn: ScenarioRunner.ScriptStep = async (_state, executor) => {
+    try {
+      await executor.user();
+    } catch (error) {
+      if (!isAttackerNoReply(error)) throw error;
+      await executor.judge();
+    }
+  };
+  for (let turn = 0; turn < totalTurns; turn++) {
+    steps.push(attackerTurn, ScenarioRunner.agent(), async (state, executor) => {
+      progress.turnsRun += 1;
+      if (attacker.checkEarlyExit()) {
+        await executor.fail(`${EARLY_EXIT_REASONING_PREFIX} on turn ${state.currentTurn}`);
+        return;
+      }
+      if (progress.turnsRun < totalTurns && isOutOfTime()) await executor.judge();
+    });
+  }
+  steps.push(ScenarioRunner.judge());
+  return steps;
+}
+
+/**
+ * The attacker opens its first turn with only a system prompt, which Gemini refuses as empty
+ * contents; a prompt with no user or assistant message gains one user turn.
+ */
+export function withOpeningUserTurn(model: LanguageModelV3): LanguageModelV3 {
+  return wrapLanguageModel({
+    model,
+    middleware: {
+      specificationVersion: "v3",
+      transformParams: async ({ params }) => ({
+        ...params,
+        prompt: addOpeningUserTurn(params.prompt),
+      }),
+    },
+  });
+}
+
+/** An attacker reply with no text is asked again a few times before the attack ends. */
+export function withEmptyReplyRetry(model: LanguageModelV3): LanguageModelV3 {
+  return wrapLanguageModel({
+    model,
+    middleware: {
+      specificationVersion: "v3",
+      wrapGenerate: async ({ doGenerate }) => {
+        const attempts = ATTACKER_EMPTY_REPLY_RETRIES + 1;
+        for (let attempt = 1; attempt <= attempts; attempt++) {
+          const result = await doGenerate();
+          if (hasReplyText(result.content)) return result;
+        }
+        throw new AttackerNoReplyError(attempts);
+      },
+    },
+  });
+}
+
+/**
+ * A red team run's cast: the attacker plays the user with the simulator's model for attacks and
+ * its plan, the judge holds the scenario criteria, and the marathon script runs the turn budget.
+ */
+export function buildRedTeamCast({
+  adapter,
+  scenario,
+  simulatorModel,
+  judge,
+}: {
+  adapter: ScenarioRunner.AgentAdapter;
+  scenario: ChildProcessJobData["scenario"];
+  simulatorModel: LanguageModelV3;
+  judge: ScenarioRunner.AgentAdapter;
+}): {
+  agents: ScenarioRunner.AgentAdapter[];
+  script: ScenarioRunner.ScriptStep[];
+  redTeam: RedTeamCast;
+} {
+  const config = getRedTeamRunConfig(scenario);
+  const totalTurns = redTeamTotalTurns(config.maxTurns);
+  const progress = { turnsRun: 0 };
+  const turnsEndAt =
+    nowInstant().epochMilliseconds + CHILD_PROCESS.TIMEOUT_MS - RED_TEAM_TIME_MARGIN_MS;
+  const isOutOfTime = () => nowInstant().epochMilliseconds >= turnsEndAt;
+  const attackerModel = withEmptyReplyRetry(withOpeningUserTurn(simulatorModel));
+  const attackerConfig = {
+    target: config.attackGoal,
+    totalTurns,
+    model: attackerModel,
+    metapromptModel: attackerModel,
+    successScore: RED_TEAM_BREAK_SCORE,
+  };
+  const attacker =
+    config.strategy === "goat"
+      ? ScenarioRunner.redTeamGoat(attackerConfig)
+      : ScenarioRunner.redTeamCrescendo(attackerConfig);
+  return {
+    agents: [adapter, attacker, judge],
+    script: redTeamScript({ attacker, totalTurns, progress, isOutOfTime }),
+    redTeam: { attacker, config, totalTurns, progress },
   };
 }
 
@@ -189,6 +356,93 @@ function buildMaxTurnsRunConfig({
   };
 }
 
+/**
+ * The connected agent a scenario run calls hooks on, with the hooks it declared, or null when the
+ * run calls none. An agent test calls none.
+ */
+function hookTargetOf({
+  jobData,
+  adapter,
+}: {
+  jobData: ChildProcessJobData;
+  adapter: ScenarioRunner.AgentAdapter;
+}): { caller: HttpSerializedConnectedAgentChannel; declared: AgentHooks } | null {
+  const { adapterData } = jobData;
+  if (jobData.script || adapterData.type !== "connected") return null;
+  const declared = adapterData.hooks;
+  if (!declared?.setup && !declared?.teardown) return null;
+  if (!(adapter instanceof HttpSerializedConnectedAgentChannel)) return null;
+  return { caller: adapter, declared };
+}
+
+/** The scenario run every connected agent call names (ADR-180). */
+function callRunOf(jobData: ChildProcessJobData): ConnectedCallRun {
+  return {
+    ...(jobData.scenarioRunId ? { scenarioRunId: jobData.scenarioRunId } : {}),
+    scenarioName: jobData.scenario.name,
+    batchRunId: jobData.context.batchRunId,
+  };
+}
+
+/** The run's turns through the scenario library, up to its verdict. */
+function runScenarioTurns({
+  jobData,
+  runtime,
+  cast,
+  voiceMetadata,
+}: {
+  jobData: ChildProcessJobData;
+  runtime: ScenarioChildRuntime;
+  cast: ReturnType<typeof buildRunCast>;
+  voiceMetadata: Record<string, unknown>;
+}): ReturnType<typeof ScenarioRunner.run> {
+  const { context, scenario, parameters, target } = jobData;
+  const { langwatchEndpoint, langwatchApiKey } = runtime;
+  return ScenarioRunner.run(
+    {
+      id: scenario.id,
+      name: scenario.name,
+      description: scenario.situation,
+      setId: context.setId,
+      agents: cast.agents,
+      ...(cast.script ? { script: cast.script } : {}),
+      verbose: runtime.verbose,
+      // An http target's own spans land in the trace each turn propagates,
+      // so the judge fetches them back from the platform's trace API before
+      // any verdict. The wait budget comes from the prefetcher's per-project
+      // ingest-lag measurement unless the plan or scenario set one.
+      ...buildRemoteTraceRunConfig({
+        targetType: target.type,
+        traceWaitTimeoutMs: jobData.traceWaitTimeoutMs,
+        traceQuietPeriodMs: jobData.traceQuietPeriodMs,
+        langwatchEndpoint,
+        langwatchApiKey,
+      }),
+      // A red team script plays its whole budget, plus the judge's closing turn.
+      ...(cast.redTeam
+        ? { maxTurns: cast.redTeam.totalTurns + 1 }
+        : buildMaxTurnsRunConfig({ jobData, scenarioMaxTurns: scenario.maxTurns })),
+      ...(scenario.minTurns != null && { minTurns: scenario.minTurns }),
+      metadata: {
+        langwatch: {
+          targetReferenceId: target.referenceId,
+          targetType: target.type,
+          ...voiceMetadata,
+        },
+        ...(Object.keys(parameters).length > 0 ? { parameters } : {}),
+      },
+    },
+    {
+      batchRunId: context.batchRunId,
+      runId: jobData.scenarioRunId,
+      langwatch: {
+        endpoint: langwatchEndpoint,
+        apiKey: langwatchApiKey,
+      },
+    },
+  );
+}
+
 async function executeScenarioChildValue({
   jobData,
   runtime,
@@ -196,18 +450,9 @@ async function executeScenarioChildValue({
   jobData: ChildProcessJobData;
   runtime: ScenarioChildRuntime;
 }): Promise<ScenarioChildExecutionResult> {
-  const {
-    context,
-    scenario,
-    parameters,
-    adapterData,
-    modelParams,
-    nlpServiceUrl,
-    executeSyncRoute,
-    target,
-  } = jobData;
+  const { parameters, adapterData, modelParams, nlpServiceUrl, executeSyncRoute } = jobData;
 
-  const { langwatchEndpoint, langwatchApiKey, logger } = runtime;
+  const { langwatchApiKey, logger } = runtime;
 
   // The run's minted key rides LANGWATCH_API_KEY, the telemetry channel every
   // child already gets, so the job payload never carries it. The workflow and
@@ -225,62 +470,30 @@ async function executeScenarioChildValue({
     parameters,
     httpPort: runtime.httpPort,
     logger,
+    run: callRunOf(jobData),
   });
+  const hookTarget = hookTargetOf({ jobData, adapter });
   const cast = buildRunCast({
     jobData,
     adapter,
     nlpInternalSecret: runtime.nlpInternalSecret,
+    ...(hookTarget ? { readState: () => hookTarget.caller.runState } : {}),
   });
   const { voiceMetadata, callLimitTimer } = buildVoiceRunSetup({ jobData, adapter, runtime });
+  const runTurns = () => runScenarioTurns({ jobData, runtime, cast, voiceMetadata });
 
   // The timer clears on a rejected run too, or it could fire after the failure is reported.
-  let result: Awaited<ReturnType<typeof ScenarioRunner.run>>;
+  let ran: { value: Awaited<ReturnType<typeof ScenarioRunner.run>>; hooks?: ScenarioRunHooks };
   try {
-    result = await ScenarioRunner.run(
-      {
-        id: scenario.id,
-        name: scenario.name,
-        description: scenario.situation,
-        setId: context.setId,
-        agents: cast.agents,
-        ...(cast.script ? { script: cast.script } : {}),
-        verbose: runtime.verbose,
-        // An http target's own spans land in the trace each turn propagates,
-        // so the judge fetches them back from the platform's trace API before
-        // any verdict. The wait budget comes from the prefetcher's per-project
-        // ingest-lag measurement.
-        ...buildRemoteTraceRunConfig({
-          targetType: target.type,
-          traceWaitTimeoutMs: jobData.traceWaitTimeoutMs,
-          langwatchEndpoint,
-          langwatchApiKey,
-        }),
-        ...buildMaxTurnsRunConfig({
-          jobData,
-          scenarioMaxTurns: scenario.maxTurns,
-        }),
-        ...(scenario.minTurns != null && { minTurns: scenario.minTurns }),
-        metadata: {
-          langwatch: {
-            targetReferenceId: target.referenceId,
-            targetType: target.type,
-            ...voiceMetadata,
-          },
-          ...(Object.keys(parameters).length > 0 ? { parameters } : {}),
-        },
-      },
-      {
-        batchRunId: context.batchRunId,
-        runId: jobData.scenarioRunId,
-        langwatch: {
-          endpoint: langwatchEndpoint,
-          apiKey: langwatchApiKey,
-        },
-      },
-    );
+    ran = hookTarget
+      ? await ScenarioRunHooksService.create({ ...hookTarget, keepData: jobData.keepData }).around(
+          runTurns,
+        )
+      : { value: await runTurns() };
   } finally {
     callLimitTimer?.clear();
   }
+  const { value: result, hooks } = ran;
 
   // A failed test is still a successful execution — results are reported via SDK.
   if (result.success) {
@@ -309,6 +522,17 @@ async function executeScenarioChildValue({
   if (servedInstance) outputResult.agentInstance = servedInstance;
   // The parent records the marker so the run header can show "Cut at the call limit".
   if (callLimitTimer?.wasCut()) outputResult.isCutAtLimit = true;
+  if (hooks) outputResult.hooks = hooks;
+  if (cast.redTeam) {
+    outputResult.redTeam = buildRedTeamRunReport({
+      config: cast.redTeam.config,
+      totalTurns: cast.redTeam.totalTurns,
+      judgePassed: result.success,
+      reasoning: result.reasoning,
+      turnScores: readRedTeamTurnScores(cast.redTeam.attacker),
+      turnsRun: cast.redTeam.progress.turnsRun,
+    });
+  }
   return outputResult;
 }
 
@@ -366,6 +590,18 @@ function formatScenarioChildErrorValue(error: unknown): string {
   return parts.filter((p) => p.length > 0).join(": ");
 }
 
+/** The result line of a run that threw: the error, and the hooks it called when it had any. */
+function failureLineValue(error: unknown): ScenarioChildExecutionResult {
+  if (error instanceof ScenarioRunHooksError) {
+    return {
+      success: false,
+      error: formatScenarioChildErrorValue(error.reason),
+      hooks: error.hooks,
+    };
+  }
+  return { success: false, error: formatScenarioChildErrorValue(error) };
+}
+
 export class ScenarioChildExecutionService {
   static create(): ScenarioChildExecutionService {
     return new ScenarioChildExecutionService();
@@ -375,9 +611,9 @@ export class ScenarioChildExecutionService {
 
   static readonly execute = executeScenarioChildValue;
   static readonly flushTraces = flushScenarioOtelTracesValue;
-  static readonly formatError = formatScenarioChildErrorValue;
+  static readonly failureLine = failureLineValue;
 }
 
 export const executeScenarioChild = ScenarioChildExecutionService.execute;
 export const flushScenarioOtelTraces = ScenarioChildExecutionService.flushTraces;
-export const formatScenarioChildError = ScenarioChildExecutionService.formatError;
+export const scenarioChildFailureLine = ScenarioChildExecutionService.failureLine;

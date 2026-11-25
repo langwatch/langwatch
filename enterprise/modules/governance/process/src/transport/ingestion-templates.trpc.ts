@@ -23,7 +23,7 @@ export const ingestionTemplatesTrpcTransport: TrpcRouterDeclaration<
 
   .procedure("get")
   .withPermission("aiTools:view")
-  .handle(({ app, input }) => app.templateGetByIdForOrg(input))
+  .handle(({ app, input }) => app.templateGetByIdForMember(input))
 
   .procedure("create")
   .withPermission("aiTools:manage")

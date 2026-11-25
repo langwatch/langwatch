@@ -17,6 +17,7 @@ import {
 } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { cleanupTestRows } from "@langwatch/test-harness/prisma";
+import { fromDate } from "@langwatch/time";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import { MemoryMonitorRepository } from "../memory/memory.monitor.repository.ts";
@@ -194,6 +195,72 @@ function contractCases(backend: Backend): void {
       await expect(
         backend.repository().delete({ id: "monitor_absent", projectId: backend.projectId() }),
       ).rejects.toMatchObject({ code: "monitor_not_found" });
+    });
+  });
+
+  describe("when a monitor pauses itself at its current revision", () => {
+    /** @scenario "The pause reason is stored on the monitor row" */
+    it("reads back disabled with its pause time and reason, and a second pause changes nothing", async () => {
+      const written = await backend.repository().create(creation());
+      const key = { id: written.id, projectId: backend.projectId() };
+      const pausedAt = new Date("2026-10-25T09:30:00.000Z");
+
+      const first = await backend.repository().autoPause({
+        ...key,
+        revision: fromDate(written.updatedAt),
+        pausedAt: fromDate(pausedAt),
+        reason: "95% of evaluations failed in the last hour (114 of 120)",
+      });
+      const second = await backend.repository().autoPause({
+        ...key,
+        revision: fromDate(written.updatedAt),
+        pausedAt: fromDate(new Date("2026-10-25T09:31:00.000Z")),
+        reason: "a later reason",
+      });
+
+      expect([first, second]).toEqual([true, false]);
+      await expect(backend.repository().findById(key)).resolves.toMatchObject({
+        enabled: false,
+        autoPausedAt: pausedAt,
+        autoPausedReason: "95% of evaluations failed in the last hour (114 of 120)",
+      });
+    });
+
+    /** @scenario "Re-enabling a paused monitor clears the reason" */
+    it("clears the pause once the monitor is switched back on", async () => {
+      const written = await backend.repository().create(creation());
+      const key = { id: written.id, projectId: backend.projectId() };
+      await backend.repository().autoPause({
+        ...key,
+        revision: fromDate(written.updatedAt),
+        pausedAt: fromDate(new Date("2026-10-25T09:30:00.000Z")),
+        reason: "95% of evaluations failed in the last hour (114 of 120)",
+      });
+
+      await backend.repository().setEnabled({ ...key, enabled: true });
+
+      await expect(backend.repository().findById(key)).resolves.toMatchObject({
+        enabled: true,
+        autoPausedAt: null,
+        autoPausedReason: null,
+      });
+    });
+
+    it("refuses a pause naming a revision the monitor has moved past", async () => {
+      const written = await backend.repository().create(creation());
+
+      const applied = await backend.repository().autoPause({
+        id: written.id,
+        projectId: backend.projectId(),
+        revision: fromDate(new Date(written.updatedAt.getTime() - 1_000)),
+        pausedAt: fromDate(new Date("2026-10-25T09:30:00.000Z")),
+        reason: "stale",
+      });
+
+      expect(applied).toBe(false);
+      await expect(
+        backend.repository().findById({ id: written.id, projectId: backend.projectId() }),
+      ).resolves.toMatchObject({ enabled: true });
     });
   });
 

@@ -19,6 +19,7 @@ import {
   detectColdScan,
   RetryPolicy,
   routingDriver,
+  setIdIndexMissLogger,
   setWindowedReadMetrics,
   StatementReporter,
   TenantGuard,
@@ -37,6 +38,11 @@ import type { LimiterStats } from "@langwatch/limiter";
 import { createLogger } from "@langwatch/observability";
 import { counter, histogram, observableGauge } from "@langwatch/observability/metrics";
 
+import {
+  authenticatedFromFile,
+  ClickHousePasswordFile,
+  usernameOf,
+} from "./clickhouse-password-file.ts";
 import type { ClickHouseConfig } from "./config.ts";
 import type { BuiltMember } from "./datastore-members.ts";
 import { PrivateDataplaneRefusals } from "./private-dataplane-refusal.ts";
@@ -45,14 +51,32 @@ import { PrivateDataplaneRefusals } from "./private-dataplane-refusal.ts";
 class VendorClickHouseClientFactory extends ClickHouseClientFactory<ClickHouseClient> {
   private readonly logSink = createLogger("langwatch:clickhouse:driver");
 
-  constructor(private readonly config: ClickHouseConfig) {
+  private readonly config: ClickHouseConfig;
+  private readonly sharedPasswordFile: ClickHousePasswordFile | undefined;
+
+  constructor({
+    config,
+    sharedPasswordFile,
+  }: {
+    config: ClickHouseConfig;
+    sharedPasswordFile: ClickHousePasswordFile | undefined;
+  }) {
     super();
+    this.config = config;
+    this.sharedPasswordFile = sharedPasswordFile;
   }
 
   create(input: ClickHouseClientCreationInput): ClickHouseClient {
-    return createClient(
+    const client = createClient(
       vendorClickHouseClientOptions({ config: this.config, input, logSink: this.logSink }),
     );
+    // Only the shared endpoint: a private route carries its own credentials in its URL.
+    if (input.instance !== "shared" || this.sharedPasswordFile === undefined) return client;
+    return authenticatedFromFile({
+      client,
+      username: usernameOf(input.url),
+      passwordFile: this.sharedPasswordFile,
+    });
   }
 }
 
@@ -82,6 +106,7 @@ export function vendorClickHouseClientOptions({
 export function vendorClickHouseSettings(
   settings: ClickHouseConfig["settings"],
 ): ClickHouseSettings {
+  // The id-index view dedup setting is per insert (routingDriver), since async inserts refuse it.
   return { date_time_input_format: "best_effort", ...settings };
 }
 
@@ -267,6 +292,11 @@ export function buildClickHouse(options: {
 }): BuiltMember<ClickHouseQueryClient> {
   const { config } = options;
   const sharedUrl = config.url?.trim();
+  // Read before anything opens, so an unreadable file stops the boot by name.
+  const sharedPasswordFile =
+    sharedUrl && config.passwordFile
+      ? ClickHousePasswordFile.open({ path: config.passwordFile })
+      : undefined;
   const configuration = ClickHouseConfigService.create().resolve({
     ...(sharedUrl ? { shared: { url: sharedUrl, cluster: "shared" } } : {}),
     privateRoutes: (config.privateRoutes ?? []).map((route) => ({
@@ -282,7 +312,7 @@ export function buildClickHouse(options: {
 
   const connection = ClickHouseConnectionService.create({
     directory: options.directory,
-    clientFactory: new VendorClickHouseClientFactory(config),
+    clientFactory: new VendorClickHouseClientFactory({ config, sharedPasswordFile }),
     refusal: PrivateDataplaneRefusals.create().forClickHouse(),
     ...(config.maxTenantCacheEntries === undefined
       ? {}
@@ -290,6 +320,7 @@ export function buildClickHouse(options: {
   }).connect(configuration);
 
   setWindowedReadMetrics(clickHouseWindowedReadMetrics());
+  setIdIndexMissLogger(createLogger("langwatch:clickhouse:id-index"));
   const reporter = new StatementReporter({
     metrics: clickHouseStatementMetrics(),
     noticeLogger: createLogger("langwatch:clickhouse:resilient"),
@@ -345,6 +376,8 @@ export function buildClickHouse(options: {
         state: "malformed" as const,
       })),
     ],
+    organizationOf: (tenantId) => connection.organizationOf(tenantId),
+    placementOf: (tenantId) => connection.placementOf(tenantId),
   });
 
   return {

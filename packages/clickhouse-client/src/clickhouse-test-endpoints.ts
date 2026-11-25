@@ -2,16 +2,31 @@
  * Isolated endpoints for routing tests: native (databases per endpoint) or
  * containers. Schemas persist across runs.
  */
+import { createHash } from "node:crypto";
+import { readFileSync } from "node:fs";
+
 import { createClient } from "@clickhouse/client";
 import { ClickHouseContainer, type StartedClickHouseContainer } from "@testcontainers/clickhouse";
 import { customAlphabet } from "nanoid";
+
+export {
+  type ExplainQuery,
+  partsAfterPartitionPruning,
+  partsInExplain,
+} from "./partitionPruning.ts";
+export {
+  idIndexedClientDouble,
+  readyIdIndexedClientDouble,
+  type ScriptedStatements,
+} from "./idIndexedClientDouble.ts";
+export { type VendorStatements, vendorQueryClient } from "./vendorQueryClient.ts";
 
 /**
  * The ClickHouse image every container-backed test starts, here and in
  * globalSetup.ts. One symbol rather than one string per call site, so a version
  * bump cannot leave half the suite on the old image.
  */
-export const TEST_CLICKHOUSE_IMAGE = "clickhouse/clickhouse-server:25.10.2.65";
+export const TEST_CLICKHOUSE_IMAGE = "clickhouse/clickhouse-server:26.8.36.3";
 
 /**
  * Test container tuning: memory cap, caches off, pools for container. Same
@@ -51,6 +66,29 @@ export const TEST_CLICKHOUSE_TUNING = {
 </clickhouse>
 `,
 } as const;
+
+/** The users.d file the clickhouse-serverless image renders its default-profile pins from. */
+const PROFILE_PINS_PATH = new URL(
+  "../../../infra/clickhouse-serverless/internal/render/profile-pins.yaml",
+  import.meta.url,
+);
+
+/**
+ * The image's default-profile pins (25.10 query behaviour on 26.8) for a test container, read
+ * from the file the image embeds so the two cannot drift, and a label naming their content so a
+ * reused container restarts when they change.
+ */
+export function testClickHouseProfilePins(): {
+  file: { content: string; target: string };
+  label: Record<string, string>;
+} {
+  const content = readFileSync(PROFILE_PINS_PATH, "utf8");
+  const digest = createHash("sha256").update(content).digest("hex").slice(0, 16);
+  return {
+    file: { content, target: "/etc/clickhouse-server/users.d/zz-langwatch-profile-pins.yaml" },
+    label: { "langwatch.test.clickhouse-profile-pins": digest },
+  };
+}
 
 /**
  * Label stamped on every tuned test container. `withReuse` matches by hashing
@@ -128,16 +166,19 @@ export async function startTestClickHouseEndpoints({
   suite,
   names,
   environment,
+  image = TEST_CLICKHOUSE_IMAGE,
 }: {
   suite: string;
   names: string[];
   /** The test process's environment, read once by the caller (native server or containers). */
   environment: Readonly<Record<string, string | undefined>>;
+  /** The container image when no native server is configured; the shared default otherwise. */
+  image?: string;
 }): Promise<TestClickHouseEndpoint[]> {
   const baseUrl = nativeClickHouseBaseUrl(environment);
   return baseUrl
     ? startNativeEndpoints({ suite, names, baseUrl })
-    : startContainerEndpoints({ suite, names });
+    : startContainerEndpoints({ suite, names, image });
 }
 
 /** One database per endpoint on the shared native server. */
@@ -170,21 +211,25 @@ async function startNativeEndpoints({
 async function startContainerEndpoints({
   suite,
   names,
+  image,
 }: {
   suite: string;
   names: string[];
+  image: string;
 }): Promise<TestClickHouseEndpoint[]> {
+  const pins = testClickHouseProfilePins();
   const started = await Promise.all(
     names.map(async (name): Promise<[string, StartedClickHouseContainer]> => [
       name,
-      await new ClickHouseContainer(TEST_CLICKHOUSE_IMAGE)
+      await new ClickHouseContainer(image)
         .withLabels({
           "langwatch.test": "true",
           [`langwatch.test.${suite}`]: name,
           ...TEST_CLICKHOUSE_TUNING_LABEL,
+          ...pins.label,
         })
         .withReuse()
-        .withCopyContentToContainer([TEST_CLICKHOUSE_TUNING])
+        .withCopyContentToContainer([TEST_CLICKHOUSE_TUNING, pins.file])
         .withStartupTimeout(120_000)
         .start(),
     ]),

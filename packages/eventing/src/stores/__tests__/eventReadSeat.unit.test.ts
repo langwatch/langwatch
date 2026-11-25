@@ -1,12 +1,15 @@
 /**
  * @see packages/eventing/specs/event-read-seat.feature
+ * @see specs/clickhouse/id-index-reads.feature
  */
 import { generate, Ksuid } from "@langwatch/ksuid";
-import { describe, expect, it } from "vitest";
+import { createRecordingMeterProvider } from "@langwatch/observability/metrics/testing";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { createTenantId } from "../../domain/tenantId.ts";
 import { EventNotFoundError, ValidationError } from "../../services/errorHandling.ts";
 import { EVENT_READ_WINDOW_MS, EventLogReadSeat } from "../eventReadSeat.ts";
+import type { EventRepository } from "../repositories/eventRepository.types.ts";
 import { EventRepositoryMemory } from "../repositories/eventRepositoryMemory.ts";
 
 const TENANT = createTenantId("project-1");
@@ -37,7 +40,26 @@ async function seatHolding({
       IdempotencyKey: eventId,
     },
   ]);
-  return { seat: EventLogReadSeat.create({ repository }), eventId };
+  const reads: Parameters<EventRepository["getEventRecord"]>[0][] = [];
+  const recorded: Pick<
+    EventRepository,
+    "getEventRecord" | "getEventRecords" | "findEventRecordsOfAggregates"
+  > = {
+    getEventRecord: (request) => {
+      reads.push(request);
+      return repository.getEventRecord(request);
+    },
+    getEventRecords: (request) => repository.getEventRecords(request),
+    findEventRecordsOfAggregates: (request) => repository.findEventRecordsOfAggregates(request),
+  };
+  return { seat: EventLogReadSeat.create({ repository: recorded }), eventId, reads };
+}
+
+let meter = createRecordingMeterProvider();
+
+/** How many event reads were counted with `outcome` so far. */
+function countedEventReads(outcome: string): number {
+  return meter.valueOf("es_event_log_index_read_total", { read: "event", outcome });
 }
 
 /** The time a KSUID id carries, or a fixed time for an id that carries none. */
@@ -54,7 +76,13 @@ function read(seat: EventLogReadSeat, eventId: string, tenantId = TENANT) {
 }
 
 describe("EventLogReadSeat", () => {
-  describe("given an event recorded within two days of its id's time", () => {
+  beforeEach(() => {
+    meter = createRecordingMeterProvider();
+    meter.install();
+  });
+  afterEach(() => meter.uninstall());
+
+  describe("given an event recorded within seven days of its id's time", () => {
     /** @scenario "An event inside the window is answered" */
     it("answers the event with its data", async () => {
       const { seat, eventId } = await seatHolding({ occurredAt: (t) => t - DAY_MS });
@@ -66,14 +94,34 @@ describe("EventLogReadSeat", () => {
     });
   });
 
-  describe("given an event recorded more than two days from its id's time", () => {
-    /** @scenario "An event recorded outside the window is not found" */
-    it("fails as not found", async () => {
-      const { seat, eventId } = await seatHolding({
-        occurredAt: (t) => t + EVENT_READ_WINDOW_MS + DAY_MS,
+  describe("given an event stored eight weeks ago, occurred close to its id's time", () => {
+    /** @scenario "an event is found first in the window its id's time names" */
+    it("answers it from one read bounded to seven days either side of the id's time", async () => {
+      vi.useFakeTimers({ toFake: ["Date"], now: Date.now() - 56 * DAY_MS });
+      const eventId = generate("event").toString();
+      vi.useRealTimers();
+      const { seat, reads } = await seatHolding({ eventId, occurredAt: (t) => t + 60_000 });
+
+      await expect(read(seat, eventId)).resolves.toMatchObject({ id: eventId });
+
+      const idTimeMs = idTime(eventId);
+      expect(reads.map((each) => each.occurredAt)).toEqual([
+        { fromMs: idTimeMs - EVENT_READ_WINDOW_MS, toMs: idTimeMs + EVENT_READ_WINDOW_MS },
+      ]);
+    });
+  });
+
+  describe("given an event exported today whose occurred time is three months ago", () => {
+    /** @scenario "an event whose occurred time drifted far from its id falls back" */
+    it("finds nothing in the window, then answers it from the whole stream and counts it", async () => {
+      const { seat, eventId, reads } = await seatHolding({
+        occurredAt: (t) => t - 90 * DAY_MS,
       });
 
-      await expect(read(seat, eventId)).rejects.toBeInstanceOf(EventNotFoundError);
+      await expect(read(seat, eventId)).resolves.toMatchObject({ id: eventId });
+
+      expect(reads.map((each) => each.occurredAt !== undefined)).toEqual([true, false]);
+      expect(countedEventReads("window_fallback")).toBe(1);
     });
   });
 
@@ -95,6 +143,19 @@ describe("EventLogReadSeat", () => {
       });
 
       await expect(read(seat, eventId)).resolves.toMatchObject({ id: "not-a-ksuid" });
+    });
+
+    /** @scenario "an event id that is not a KSUID takes the existing lookup path" */
+    it("reads once, with no time taken from the id", async () => {
+      const { seat, eventId, reads } = await seatHolding({
+        eventId: "legacy-event-1",
+        occurredAt: () => 1_600_000_000_000,
+      });
+
+      await read(seat, eventId);
+
+      expect(reads).toHaveLength(1);
+      expect(reads[0]?.occurredAt).toBeUndefined();
     });
   });
 
@@ -153,6 +214,75 @@ describe("EventLogReadSeat", () => {
       ).resolves.toEqual([]);
       await expect(
         seat.findAggregateEvents({ tenantId: TENANT, aggregateType: "trace", aggregateId: " " }),
+      ).resolves.toEqual([]);
+    });
+  });
+
+  describe("when a page of streams is asked in one read", () => {
+    /** Two streams in two tenants, the first holding two events recorded out of order. */
+    async function pageSeat() {
+      const repository = EventRepositoryMemory.createForTesting();
+      const record = ({
+        tenantId,
+        aggregateId,
+        eventId,
+        at,
+      }: {
+        tenantId: string;
+        aggregateId: string;
+        eventId: string;
+        at: number;
+      }) => ({
+        TenantId: tenantId,
+        AggregateType: "user",
+        AggregateId: aggregateId,
+        EventId: eventId,
+        EventTimestamp: at,
+        EventOccurredAt: at,
+        EventType: "lw.user.deactivated",
+        EventVersion: "2025-12-14",
+        EventPayload: { at },
+        ProcessingTraceparent: "",
+        IdempotencyKey: eventId,
+      });
+      await repository.insertEventRecords([
+        record({ tenantId: "user_sam", aggregateId: "user_sam", eventId: "evt_2", at: 20 }),
+        record({ tenantId: "user_sam", aggregateId: "user_sam", eventId: "evt_1", at: 10 }),
+        record({ tenantId: "user_ana", aggregateId: "user_ana", eventId: "evt_3", at: 30 }),
+      ]);
+      return EventLogReadSeat.create({ repository });
+    }
+
+    /** @scenario "A page of streams is answered in one read, each stream oldest first" */
+    it("answers every asked stream, each oldest first, in its own tenant", async () => {
+      const seat = await pageSeat();
+
+      const events = await seat.findEventsOfAggregates({
+        aggregateType: "user",
+        aggregates: [
+          { tenantId: createTenantId("user_sam"), aggregateId: "user_sam" },
+          { tenantId: createTenantId("user_ana"), aggregateId: "user_ana" },
+        ],
+      });
+
+      const idsOf = (aggregateId: string) =>
+        events.filter((event) => event.aggregateId === aggregateId).map((event) => event.id);
+      expect(idsOf("user_sam")).toEqual(["evt_1", "evt_2"]);
+      expect(idsOf("user_ana")).toEqual(["evt_3"]);
+    });
+
+    /** @scenario "A page of streams answers nothing for a stream asked in another tenant" */
+    it("answers nothing for a stream asked under another tenant or with an empty id", async () => {
+      const seat = await pageSeat();
+
+      await expect(
+        seat.findEventsOfAggregates({
+          aggregateType: "user",
+          aggregates: [
+            { tenantId: createTenantId("user_ana"), aggregateId: "user_sam" },
+            { tenantId: TENANT, aggregateId: " " },
+          ],
+        }),
       ).resolves.toEqual([]);
     });
   });

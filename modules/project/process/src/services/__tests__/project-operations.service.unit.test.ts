@@ -38,6 +38,13 @@ class CharacterizationProjectDirectory implements ProjectOperationsDirectory {
   rotateLegacyApiKey: ProjectOperationsDirectory["rotateLegacyApiKey"] = (input) =>
     this.overrides.rotateLegacyApiKey?.(input) ?? this.unimplemented("rotateLegacyApiKey");
 
+  findLegacyApiKeyLastUsedAt: ProjectOperationsDirectory["findLegacyApiKeyLastUsedAt"] = (input) =>
+    this.overrides.findLegacyApiKeyLastUsedAt?.(input) ??
+    this.unimplemented("findLegacyApiKeyLastUsedAt");
+
+  findLiveLegacyKeys: ProjectOperationsDirectory["findLiveLegacyKeys"] = (input) =>
+    this.overrides.findLiveLegacyKeys?.(input) ?? this.unimplemented("findLiveLegacyKeys");
+
   private unimplemented(operation: string): Promise<never> {
     return Promise.reject(
       new Error(`CharacterizationProjectDirectory does not implement ${operation}`),
@@ -391,6 +398,7 @@ describe("ProjectOperationsService", () => {
       expect(rotations[0]?.token).toMatch(/^lw-revoked-/);
       await expect(operations.getLegacyKeyStatus({ projectId: "project_123" })).resolves.toEqual({
         present: false,
+        lastUsedAt: null,
       });
     });
   });

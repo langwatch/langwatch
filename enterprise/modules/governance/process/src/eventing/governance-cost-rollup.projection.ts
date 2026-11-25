@@ -66,8 +66,12 @@ export class GovernanceCostRollupFoldProjection
   readonly store: FoldProjectionStore<GovernanceCostRollupState>;
   protected readonly events = governanceCostRollupEvents;
 
-  /** A re-fold loads one pulled item's history, never the day-wide cell; the fold commutes instead. */
-  readonly options = { refoldOnOutOfOrder: false } as const;
+  /**
+   * One item's history cannot rebuild the day-wide cell, so the fold commutes and a missed hand-off
+   * re-sends its one event, safe because each item applies idempotently: governance-cost-rollup.feature,
+   * "A pulled item delivered twice is counted once".
+   */
+  readonly options = { refoldOnOutOfOrder: false, resendOnRedelivery: true } as const;
 
   /** The day x dimension cell, not the event's own aggregate; loud for an undeclared type. */
   readonly key = (event: { type: string }): string => {

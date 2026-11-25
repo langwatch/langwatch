@@ -9,6 +9,8 @@ import type React from "react";
 
 import { useTerminalReplay } from "../../behavior/use-terminal-replay.ts";
 import { type DetailPayload } from "../../model/pull-request-detail.ts";
+import { sessionDisplayName } from "../../model/session-display-name.ts";
+import { sessionIdentityKey } from "../../model/session-identity.ts";
 import { formatShortDate } from "../../model/short-date.ts";
 import { AgentLabel } from "../elements/agent-label.tsx";
 import { MISSING_VALUE } from "../elements/cells/missing-value.tsx";
@@ -57,26 +59,42 @@ export const SessionsSection: React.FC<{
             </ListTable.Row>
           </ListTable.Header>
           <ListTable.Body>
-            {sessions.map((session) => (
-              <SessionRow
-                key={session.sessionId}
-                session={session}
-                isOpening={replay.openingSessionId === session.sessionId}
-                // A row with no session named on it, and a drawer with no
-                // project to read one in, have nothing to open: they stay
-                // plain rows rather than controls that do nothing.
-                onOpenReplay={
-                  session.sessionId && projectId ? () => void replay.openReplay(session) : undefined
-                }
-                onPrefetch={
-                  session.sessionId && projectId ? () => replay.prefetch(session) : undefined
-                }
-              />
-            ))}
+            {sessions.map((session) => {
+              const identity = { tenantId: session.projectId, sessionId: session.sessionId };
+              return (
+                <SessionRow
+                  key={sessionIdentityKey(identity)}
+                  session={session}
+                  isOpening={replay.isOpening(identity)}
+                  // A row with no session named on it, and a drawer with no
+                  // project to read one in, have nothing to open: they stay
+                  // plain rows rather than controls that do nothing.
+                  onOpenReplay={
+                    session.sessionId && projectId
+                      ? () => void replay.openReplay(identity)
+                      : undefined
+                  }
+                  onPrefetch={
+                    session.sessionId && projectId ? () => replay.prefetch(identity) : undefined
+                  }
+                />
+              );
+            })}
           </ListTable.Body>
         </ListTable>
       )}
     </Section>
+  );
+};
+
+/** The session's name; one composed from its agent and day reads muted. */
+const SessionName: React.FC<{ session: DetailSession }> = ({ session }) => {
+  const name = sessionDisplayName(session);
+  if (!name.isFallback) return <>{name.text}</>;
+  return (
+    <Text as="span" color="fg.muted">
+      {name.text}
+    </Text>
   );
 };
 
@@ -94,21 +112,13 @@ const SessionRow: React.FC<{
             open renders the name and no control at all. */}
         {onOpenReplay ? (
           <ListTable.RowAction
-            label={`Open the terminal replay of ${session.title ?? "untitled session"}`}
+            label={`Open the terminal replay of ${sessionDisplayName(session).text}`}
             onActivate={onOpenReplay}
           >
-            {session.title ?? (
-              <Text as="span" color="fg.muted">
-                Untitled session
-              </Text>
-            )}
+            <SessionName session={session} />
           </ListTable.RowAction>
         ) : (
-          (session.title ?? (
-            <Text as="span" color="fg.muted">
-              Untitled session
-            </Text>
-          ))
+          <SessionName session={session} />
         )}
         {isOpening ? <Spinner size="xs" color="fg.muted" flexShrink={0} /> : null}
       </HStack>

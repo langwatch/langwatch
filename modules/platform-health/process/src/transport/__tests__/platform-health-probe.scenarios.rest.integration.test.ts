@@ -89,9 +89,20 @@ function probe() {
       },
     }),
     resolveCaller: async ({ token }) => {
-      if (token === KEY) return { projectId: "project-1", userId: null, apiKeyId: null };
+      if (token === KEY)
+        return {
+          projectId: "project-1",
+          userId: null,
+          apiKeyId: null,
+          legacyKeyOutsideScope: null,
+        };
       if (token === MEMBER_KEY)
-        return { projectId: "project-1", userId: "user-1", apiKeyId: "key-1" };
+        return {
+          projectId: "project-1",
+          userId: "user-1",
+          apiKeyId: "key-1",
+          legacyKeyOutsideScope: null,
+        };
       return null;
     },
     scenarioCanary,

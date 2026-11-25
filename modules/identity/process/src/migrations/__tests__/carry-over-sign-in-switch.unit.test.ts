@@ -32,6 +32,15 @@ async function bootIdentity() {
     .withConfig({
       identity: {
         ssoDomainProofDnsServers: [],
+        outboundProxy: {
+          HTTPS_PROXY: undefined,
+          https_proxy: undefined,
+          HTTP_PROXY: undefined,
+          http_proxy: undefined,
+          NO_PROXY: undefined,
+          no_proxy: undefined,
+        },
+        nodeEnvProxy: { NODE_USE_ENV_PROXY: false, NODE_OPTIONS: undefined },
         isSaas: false,
         publicBaseUrl: undefined,
         passkeysEnabled: false,
@@ -89,8 +98,20 @@ describe("identity's sign-in switch carry-over step", () => {
       signal: new AbortController().signal,
     };
     try {
-      expect(await step.run({ ...context, dryRun: false })).toEqual({ copied: 0 });
-      expect(await step.run({ ...context, dryRun: true })).toEqual({ wouldCopy: 0 });
+      expect(
+        await step.run({
+          log: { info: () => undefined, warn: () => undefined },
+          ...context,
+          dryRun: false,
+        }),
+      ).toEqual({ copied: 0 });
+      expect(
+        await step.run({
+          log: { info: () => undefined, warn: () => undefined },
+          ...context,
+          dryRun: true,
+        }),
+      ).toEqual({ wouldCopy: 0 });
     } finally {
       await runtime.stop();
     }

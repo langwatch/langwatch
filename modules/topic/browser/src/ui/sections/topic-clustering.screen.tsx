@@ -69,6 +69,11 @@ const CLUSTERING_FAILURE_GUIDANCE: Partial<
     description:
       "This usually means the account is out of quota or credit. Check your limits and billing with the provider, then run topic clustering again.",
   },
+  model_restricted: {
+    title: "This model can't run topic clustering",
+    description:
+      "It's licensed for coding-assistant features only. Choose a different model for topic clustering in Settings → Model Providers → Default Models, then run it again.",
+  },
 };
 
 const HISTORY_PAGE_SIZE = 20;
@@ -84,7 +89,7 @@ export default function TopicClusteringScreen() {
       <PageLayout.Header>
         <PageLayout.Heading>Topic Clustering</PageLayout.Heading>
       </PageLayout.Header>
-      <VStack gap={6} width="full" align="start" paddingTop={4}>
+      <VStack gap={6} width="full" align="start">
         <Text color="fg.muted">
           Groups your traces into topics and subtopics on a schedule, so you can see what your users
           talk about.

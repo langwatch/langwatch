@@ -2,16 +2,28 @@ import { useMemo } from "react";
 
 import { billingApi } from "../../behavior/billing-api.ts";
 import { classifyMemberType } from "../../model/member-classification.ts";
+import { heldSeatsOf, noHeldSeats } from "../../model/seat-purchase.ts";
 import type { SubscriptionUser } from "../../model/subscription-types.ts";
 
-/** The organization's members and pending invites, classified for seat counting. */
-export function useSubscriptionMembers(organizationId: string | undefined) {
+/** The organization's members, pending invites and held seats, classified for seat counting. */
+export function useSubscriptionMembers({
+  organizationId,
+  readsHeldSeats,
+}: {
+  organizationId: string | undefined;
+  /** Only `organization:manage` may list held seats; anyone else sees the bare count. */
+  readsHeldSeats: boolean;
+}) {
   const enabled = !!organizationId;
   const organizationWithMembers =
     billingApi.organization.getOrganizationWithMembersAndTheirTeams.useQuery(
       { organizationId: organizationId ?? "", includeDeactivated: false },
       { enabled },
     );
+  const heldSeatsQuery = billingApi.organization.listHeldSeats.useQuery(
+    { organizationId: organizationId ?? "" },
+    { enabled: enabled && readsHeldSeats },
+  );
   const pendingInvites = billingApi.invite.getOrganizationPendingInvites.useQuery(
     { organizationId: organizationId ?? "" },
     { enabled },
@@ -26,7 +38,9 @@ export function useSubscriptionMembers(organizationId: string | undefined) {
         email: member.user.email ?? "",
         role: member.role,
         // Simplified classification (EXTERNAL = LiteMember); custom-role permissions unread.
-        memberType: classifyMemberType(member.role, undefined),
+        memberType: classifyMemberType(member.role, undefined, {
+          billingOnly: member.billingOnly ?? false,
+        }),
       })),
     [organizationWithMembers.data],
   );
@@ -40,10 +54,31 @@ export function useSubscriptionMembers(organizationId: string | undefined) {
         .map((inv) => ({
           id: inv.id,
           email: inv.email,
-          memberType: classifyMemberType(inv.role, undefined),
+          memberType: classifyMemberType(inv.role, undefined, {
+            billingOnly: inv.billingOnly ?? false,
+          }),
         })),
     [pendingInvites.data],
   );
 
-  return { organizationWithMembers, pendingInvites, users, pendingInvitesWithMemberType };
+  const heldSeats = useMemo(() => {
+    if (!readsHeldSeats || !heldSeatsQuery.data) return noHeldSeats;
+    const full = <T extends { memberType: string }>(list: T[]) =>
+      list.filter((entry) => entry.memberType === "FullMember");
+    return heldSeatsOf({
+      holds: heldSeatsQuery.data.heldSeats,
+      fullMemberIds: new Set(full(users).map((user) => user.userId)),
+      fullInviteEmails: new Set(
+        full(pendingInvitesWithMemberType).map((i) => i.email.toLowerCase()),
+      ),
+    });
+  }, [readsHeldSeats, heldSeatsQuery.data, users, pendingInvitesWithMemberType]);
+
+  return {
+    organizationWithMembers,
+    pendingInvites,
+    users,
+    pendingInvitesWithMemberType,
+    heldSeats,
+  };
 }

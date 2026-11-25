@@ -30,6 +30,22 @@ import type {
 } from "@langwatch/project-contract";
 import type { Instant } from "@langwatch/time";
 
+/** A project as a slug change reads it: who it is, what it is called and its address. */
+export type ProjectSlugHolder = Readonly<{ id: string; name: string; slug: string }>;
+
+/** How a slug move ended: moved, the project no longer held `from`, or another holds `to`. */
+export type ProjectSlugMove = "moved" | "gone" | "taken";
+
+/** A live project whose legacy `apiKey` still authenticates; never the key itself. */
+export type LiveLegacyKey = Readonly<{
+  projectId: string;
+  /** The owning team, so a standing decision needs no lineage read of its own. */
+  teamId: string;
+  projectName: string;
+  projectSlug: string;
+  lastUsedAt: Instant | null;
+}>;
+
 export type TouchCodingAgentActivityInput = {
   projectId: string;
   at: Instant;
@@ -46,7 +62,10 @@ export interface ProjectWithOrgAdmin {
   organizationCreatedAt: Instant | null;
 }
 
-/** One stored project as the project facts step reads it, with its organization's oldest admin. */
+/**
+ * One stored project as the project data steps read it (the facts step and the history listing),
+ * with its organization's oldest admin.
+ */
 export type ProjectBackfillRow = Readonly<{
   id: string;
   createdAt: Instant;
@@ -57,7 +76,18 @@ export type ProjectBackfillRow = Readonly<{
   presenceEnabled: boolean;
   isArchived: boolean;
   adminUserId: string | null;
+  /** A personal project's owner; null for a shared project. */
+  ownerUserId: string | null;
+  firstMessage: boolean;
 }>;
+
+/**
+ * One row of the projects table for the data steps: a whole project, or an orphan whose team or
+ * organization is gone, so nothing can be recorded for it.
+ */
+export type ProjectBackfillEntry =
+  | Readonly<{ kind: "whole"; project: ProjectBackfillRow }>
+  | Readonly<{ kind: "orphan"; id: string }>;
 
 /** Persistence owned by the Project module. It never crosses into a caller. */
 export interface ProjectRepository {
@@ -76,6 +106,10 @@ export interface ProjectRepository {
     kind: InternalProjectKind;
   }): Promise<InternalProject | null>;
   findInternalBySlug(slug: string): Promise<InternalProject | null>;
+  /** The project holding exactly this slug, archived ones included; empty when none does. */
+  findSlugHolders(input: { slug: string }): Promise<ProjectSlugHolder[]>;
+  /** Moves a project from one slug to another, only while it still holds `from`. */
+  replaceSlug(input: { projectId: string; from: string; to: string }): Promise<ProjectSlugMove>;
   findLiveInternalIds(input: { kind: InternalProjectKind }): Promise<string[]>;
   createInternalOrFindWinner(input: {
     id: string;
@@ -97,8 +131,11 @@ export interface ProjectRepository {
   touchCodingAgentSessionSeen(input: TouchCodingAgentActivityInput): Promise<void>;
   touchCodingAgentPullRequestSeen(input: TouchCodingAgentActivityInput): Promise<void>;
   findWithOrgAdmin(id: string): Promise<ProjectWithOrgAdmin | null>;
-  /** Every project, archived ones included, in id order after `afterId`. */
-  findBackfillPage(input: { afterId: string | null; limit: number }): Promise<ProjectBackfillRow[]>;
+  /** Every project, archived ones included, in id order after `afterId`; empty at the end. */
+  findBackfillPage(input: {
+    afterId: string | null;
+    limit: number;
+  }): Promise<ProjectBackfillEntry[]>;
   findTraceSharingConfig(id: string): Promise<TraceSharingConfig | null>;
   searchByQuery(input: {
     query: string;
@@ -144,6 +181,11 @@ export interface ProjectRepository {
   findTraceDestinations(projectIds: string[]): Promise<TraceDestinationProject[]>;
   /** The live project the legacy `apiKey` column names, or nothing. */
   findIdByLegacyApiKey(input: { token: string }): Promise<string | null>;
+  markLegacyApiKeyUsed(input: { projectId: string; at: Instant }): Promise<void>;
+  /** When the legacy key last authenticated, or nothing when no use was stamped. */
+  findLegacyApiKeyLastUsedAt(input: { projectId: string }): Promise<Instant | null>;
+  /** Live legacy keys in the organisation, excluding UNMANAGED_PROJECT_KEY_KINDS. */
+  findLiveLegacyKeys(input: { organizationId: string }): Promise<LiveLegacyKey[]>;
   /** False when no live row took the write, which is how the caller learns nothing rotated. */
   rotateLegacyApiKey(input: { projectId: string; token: string }): Promise<boolean>;
   /** Creates a team's personal project once and answers its id; a second call creates nothing. */
@@ -179,7 +221,10 @@ export interface ProjectRepository {
   }): Promise<string[]>;
   /** Every project id, archived included, ordered by id and paged by cursor. */
   listAllIds(input?: ProjectIdPageInput): Promise<ProjectIdPage>;
-  /** Every project with its team's organisation, archived included, paged like `listAllIds`. */
+  /**
+   * Every project with its team's organisation, archived included, paged like `listAllIds`; a
+   * project whose team is gone is named in `orphanIds` instead.
+   */
   listAllWithOrganization(input?: ProjectIdPageInput): Promise<ProjectOrganizationPage>;
   listAllWithPrivateS3(input?: ProjectIdPageInput): Promise<ProjectPrivateS3Page>;
   listLwqlKeys(input?: ProjectIdPageInput): Promise<ProjectLwqlKeyPage>;

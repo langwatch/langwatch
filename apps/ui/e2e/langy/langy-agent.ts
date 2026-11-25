@@ -3,12 +3,15 @@
 // README.md "langy-agent.ts" for the wire format and how to point it at
 // a different stack.
 
+import { randomUUID } from "node:crypto";
+
 import type { AgentAdapter, AgentInput, AgentReturnTypes } from "@langwatch/scenario";
 import { AgentRole } from "@langwatch/scenario";
 import type { ModelMessage } from "ai";
 
 import { APP_BASE, CONFIG } from "./config";
 import { getSessionCookie, trpcMutate } from "./trpc";
+import { turnIdempotencyKey } from "./turn-idempotency-key";
 
 interface TurnPart {
   type: string;
@@ -43,6 +46,8 @@ export interface LangyToolEvent {
   /** The command the call ran, when it ran one. */
   command: string | null;
   input: unknown;
+  /** What the call printed, on an `end` frame. */
+  output?: string;
 }
 
 /** The tool event a stream entry describes, or null for any other entry. */
@@ -73,6 +78,7 @@ export function toolEventOf({
     name: typeof entry.name === "string" ? entry.name : "tool",
     command,
     input,
+    ...(phase === "end" && typeof entry.output === "string" ? { output: entry.output } : {}),
   };
 }
 
@@ -583,6 +589,22 @@ export type LangyAdapter = AgentAdapter & {
   queueNextTurn: (input: { parts: Record<string, unknown>[] }) => void;
 };
 
+/** Opt-in (LANGY_E2E_DEBUG) trace of each send's key and sizes; never message content. */
+const debugLogSend = ({
+  idempotencyKey,
+  historyLength,
+  messageCount,
+}: {
+  idempotencyKey: string;
+  historyLength: number;
+  messageCount: number;
+}): void => {
+  if (!process.env.LANGY_E2E_DEBUG) return;
+  console.debug(
+    `[langy-agent] send key=${idempotencyKey} historyLength=${historyLength} messages=${messageCount}`,
+  );
+};
+
 export function makeLangyAdapter(
   options: {
     /** The resource chips a real composer would carry (README.md "langy-agent.ts"). */
@@ -599,6 +621,9 @@ export function makeLangyAdapter(
     toolEvents: [],
   };
   let queuedParts: Record<string, unknown>[] | null = null;
+  // Renewed by resetSession so a replayed scenario never reuses the key of the
+  // attempt that failed.
+  let sessionNonce = randomUUID();
   const adapter: AgentAdapter = {
     role: AgentRole.AGENT,
     call: async (input: AgentInput): Promise<AgentReturnTypes> => {
@@ -618,10 +643,22 @@ export function makeLangyAdapter(
         ? [{ role: "user", parts: queuedParts }]
         : scriptedMessages;
       // The same wire shape the panel's transport sends. idempotencyKey is
-      // derived, not randomUUID()'d, so a replayed send stays deduplicated
-      // (see README.md "langy-agent.ts").
+      // derived, so a framework replay of the same send stays deduplicated.
+      // It counts the unfiltered history and hashes the sent messages: either
+      // alone can repeat across sends (see README.md "langy-agent.ts").
+      const idempotencyKey = turnIdempotencyKey({
+        threadId: input.threadId,
+        sessionNonce,
+        historyLength: input.messages.length,
+        messages,
+      });
+      debugLogSend({
+        idempotencyKey,
+        historyLength: input.messages.length,
+        messageCount: messages.length,
+      });
       const turnInput = {
-        idempotencyKey: `${input.threadId}#${messages.length}`,
+        idempotencyKey,
         trigger: "submit-message" as const,
         messages,
         projectId: CONFIG.PROJECT_ID,
@@ -676,6 +713,7 @@ export function makeLangyAdapter(
   const adapterWithState: LangyAdapter = Object.assign(adapter, {
     state,
     resetSession: () => {
+      sessionNonce = randomUUID();
       state.conversationId = null;
       state.currentTurnId = null;
       state.navigateHrefs.length = 0;

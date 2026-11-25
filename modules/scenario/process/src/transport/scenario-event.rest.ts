@@ -22,8 +22,9 @@ export const scenarioEventsRest = defineRestRouter(ScenarioApi)
   .withNamespace("scenario-events")
   .withVersion(MANAGEMENT_API_VERSION)
   .post("/", "reportScenarioEvent")
+  .keepsRecords()
   .withInput(scenarioEventSchema)
-  .withPermission("scenarios:create")
+  .withPermission("scenarios:create", { legacyKey: "legacy_project_key_scenarios" })
   .withoutAudit("ingestion")
   .withOutput(responseSchemas.success)
   .withStatus(201)
@@ -48,8 +49,9 @@ export const scenarioEventsRest = defineRestRouter(ScenarioApi)
     }),
   )
   .post("/browser-tab", "offerScenarioBrowserTab")
+  .keepsRecords()
   .withInput(scenarioEventBrowserTabBodySchema)
-  .withPermission("scenarios:create")
+  .withPermission("scenarios:create", { legacyKey: "legacy_project_key_scenarios" })
   .withoutAudit("ingestion")
   .withOutput(responseSchemas.browserTabHandoff)
   .withDocs({
@@ -70,6 +72,14 @@ export const scenarioEventsRest = defineRestRouter(ScenarioApi)
   .withQuery(scenarioEventArchiveQuerySchema)
   .withPermission("scenarios:manage")
   .withAudit("scenarios.archiveEvents")
+  // A card names one run, so a Langy key archives one run at a time; a whole set names no run
+  // and is refused for it outright rather than archived unconfirmed.
+  .withConfirmation({
+    resource: "scenario run",
+    action: "delete",
+    idParam: "scenarioRunId",
+    name: async () => null,
+  })
   .withOutput(scenarioEventArchiveOutputSchema)
   .withDocs({
     operationId: "deleteApiScenarioEvents",

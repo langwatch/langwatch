@@ -14,12 +14,14 @@ export interface InstanceIdentityRecord {
   readonly lastReportError: string | null;
   readonly optionalMetricsOptOut: boolean;
   readonly hostnameOptOut: boolean;
+  readonly upgradeDiagnosticsOptOut: boolean;
 }
 
 /** What a customer switched off. Absent means the switch is left alone. */
 export interface InstanceReportSwitches {
   readonly optionalMetricsOptOut?: boolean;
   readonly hostnameOptOut?: boolean;
+  readonly upgradeDiagnosticsOptOut?: boolean;
 }
 
 export interface InstanceIdentityRepository {

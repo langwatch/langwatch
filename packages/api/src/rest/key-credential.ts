@@ -65,7 +65,11 @@ export function keyCredentialOf(
     case "cliAccessToken":
       return { kind: "access_token", apiKeyId: null, ownerUserId: credential.userId };
     case "apiKey":
-      return { kind: "api_key", apiKeyId: credential.apiKeyId, ownerUserId: credential.userId };
+      return {
+        kind: credential.isLangySessionKey === true ? "langy_session_key" : "api_key",
+        apiKeyId: credential.apiKeyId,
+        ownerUserId: credential.userId,
+      };
   }
 }
 
@@ -78,7 +82,11 @@ function resolvedKeyOf(
     case "cliAccessToken":
       return { kind: "access_token", apiKeyId: null, ownerUserId: credential.userId };
     case "apiKey-org":
-      return { kind: "api_key", apiKeyId: credential.apiKeyId, ownerUserId: credential.userId };
+      return {
+        kind: credential.isLangySessionKey === true ? "langy_session_key" : "api_key",
+        apiKeyId: credential.apiKeyId,
+        ownerUserId: credential.userId,
+      };
     case "apiKey":
       return {
         kind: projectKeyKindOf(credential),
@@ -92,7 +100,8 @@ function projectKeyKindOf(
   credential: Extract<RestResolvedProjectCredential, { type: "apiKey" }>,
 ): RestKeyKind {
   if (credential.isLangySessionKey === true) return "langy_session_key";
-  if (credential.ingestionTemplateId !== null) return "ingestion_key";
+  // A source type is what makes a key an ingestion key; a template is optional on one.
+  if (credential.ingestSourceType) return "ingestion_key";
 
   return "api_key";
 }

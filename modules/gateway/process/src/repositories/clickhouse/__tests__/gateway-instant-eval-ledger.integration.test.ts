@@ -30,6 +30,7 @@ import {
   type GatewayInternalProtocolMembers,
 } from "../../../services/gateway-internal-protocol.service.ts";
 import { ClickHouseGatewaySpendEventsRepository } from "../clickhouse.gateway-spend-events.repository.ts";
+import { gatewayClickHouseOver } from "./support/clickhouse-endpoint.support.ts";
 import { startMigratedGatewayClickHouse } from "./support/migrated-clickhouse.harness.ts";
 
 const enabled = Boolean(
@@ -131,7 +132,7 @@ async function ledgerRowsFor(requestId: string) {
 describe.skipIf(!enabled)("the spend record of an Instant Eval outcome (real ClickHouse)", () => {
   beforeAll(async () => {
     ({ client } = await startMigratedGatewayClickHouse());
-    ledger = new ClickHouseGatewaySpendEventsRepository(async () => client);
+    ledger = new ClickHouseGatewaySpendEventsRepository(gatewayClickHouseOver(client));
     store = GatewaySpendStore.create(ledger);
     protocol = GatewayInternalProtocolService.create(
       suppliedMembers({
@@ -249,7 +250,7 @@ describe.skipIf(!enabled)("the spend record of an Instant Eval outcome (real Cli
         organizationId,
         projectId: judgedProject,
         requestId,
-        model: "langwatch/instant-evals",
+        model: "langwatch/instant-preview",
         rateVersion: "instant_eval@0.8x1.3",
         inputTokens: 900,
         priceNanoUsd,

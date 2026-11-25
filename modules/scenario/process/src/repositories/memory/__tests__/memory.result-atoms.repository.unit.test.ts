@@ -281,6 +281,37 @@ describe("MemoryResultAtomsRepository", () => {
       });
     });
 
+    /** @scenario "Server-side pass rates leave out a run whose setup failed" */
+    it("reads a run whose setup failed as not scored and leaves it out of the pass rate", async () => {
+      const setupFailed = JSON.stringify({
+        langwatch: { hooks: { setup: { status: "failed", durationMs: 5, error: "db down" } } },
+      });
+      const atoms = await given([
+        runState({ ScenarioRunId: "r-1" }),
+        runState({ ScenarioRunId: "r-2", ScenarioId: "s-2", Status: "FAILED" }),
+        runState({
+          ScenarioRunId: "r-3",
+          ScenarioId: "s-3",
+          Status: "ERROR",
+          Metadata: setupFailed,
+        }),
+      ]);
+
+      expect(await atoms.aggregateTotals(filter())).toMatchObject({
+        Atoms: "3",
+        Passed: "1",
+        Settled: "2",
+        FailingScenarios: "1",
+      });
+      const { atoms: notScored } = await atoms.listAtoms({
+        filter: filter({ outcome: "not_scored" }),
+        limit: 10,
+      });
+      expect(notScored.map((atom) => [atom.ScenarioRunId, atom.Outcome])).toEqual([
+        ["r-3", "not_scored"],
+      ]);
+    });
+
     it("counts nothing for an empty requested list", async () => {
       const atoms = await given([runState({ ScenarioRunId: "r-1" })]);
 

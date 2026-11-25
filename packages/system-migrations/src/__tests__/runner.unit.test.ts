@@ -938,14 +938,35 @@ describe("SystemMigrationRunnerService held tenants", () => {
     });
   });
 
+  describe("when the tenant waits on a person", () => {
+    /** @scenario "A tenant waiting on a person is held with reason person and counts as finished" */
+    it("holds the tenant with reason person and counts it finished", async () => {
+      const runner = runnerOver(() => ({ status: "migrated", report: null, heldReason: "person" }));
+      await runner.runPass();
+
+      expect(await acme()).toMatchObject({ status: "migrated", heldReason: "person" });
+      expect(await runner.hasUnfinishedTenant({ migrationName: "m1" })).toBe(false);
+    });
+  });
+
+  describe("when the tenant is held because its proof disagreed", () => {
+    /** @scenario "A tenant held because its proof disagreed still leaves the migration unfinished" */
+    it("counts the tenant unfinished", async () => {
+      const runner = runnerOver(() => ({ status: "migrated", report: { outstanding: 1 } }));
+      await runner.runPass();
+
+      expect(await runner.hasUnfinishedTenant({ migrationName: "m1" })).toBe(true);
+    });
+  });
+
   describe("when the hold is logged", () => {
-    /** @scenario "A first hold is logged at info and a hold that persists at warn" */
+    /** @scenario "A first hold is logged at info and a hold that persists at debug" */
     it("logs a first hold at info, since the next pass re-proves it", () => {
       expect(heldNoticeLevel({ existing: undefined })).toBe("info");
     });
 
-    /** @scenario "A first hold is logged at info and a hold that persists at warn" */
-    it("logs a tenant still held from an earlier pass at warn", () => {
+    /** @scenario "A first hold is logged at info and a hold that persists at debug" */
+    it("logs a tenant still held from an earlier pass at debug", () => {
       const held: TenantMigrationRecord = {
         migrationName: "m1",
         tenantId: "org_acme",
@@ -955,7 +976,21 @@ describe("SystemMigrationRunnerService held tenants", () => {
         heldSince: nowInstant(),
       };
 
-      expect(heldNoticeLevel({ existing: held })).toBe("warn");
+      expect(heldNoticeLevel({ existing: held })).toBe("debug");
+    });
+
+    /** @scenario "A tenant still waiting on a person is logged at info, not warn" */
+    it("logs a tenant still waiting on a person at info", () => {
+      const waiting: TenantMigrationRecord = {
+        migrationName: "m1",
+        tenantId: "org_acme",
+        status: "migrated",
+        report: null,
+        heldReason: "person",
+        heldSince: nowInstant(),
+      };
+
+      expect(heldNoticeLevel({ existing: waiting, heldReason: "person" })).toBe("info");
     });
   });
 
@@ -1060,6 +1095,15 @@ describe("isHeldTenantFailed", () => {
       const now = heldSince.add({ minutes: 1 });
 
       expect(isHeldTenantFailed({ record, now })).toBe(false);
+    });
+  });
+
+  describe("when the tenant has waited on a person past the threshold", () => {
+    /** @scenario "A tenant waiting on a person never reads as failed" */
+    it("does not read as failed", () => {
+      const now = heldSince.add(HELD_FAILED_AFTER).add({ hours: 48 });
+
+      expect(isHeldTenantFailed({ record: { ...record, heldReason: "person" }, now })).toBe(false);
     });
   });
 });

@@ -1,4 +1,4 @@
-import type { ClickHouseColumns } from "@langwatch/clickhouse-client";
+import type { ClickHouseColumns, IdBoundOptions } from "@langwatch/clickhouse-client";
 
 export type ExperimentEventingClickHouseResult = {
   json<T>(): Promise<T[]>;
@@ -25,6 +25,8 @@ export type ExperimentEventingClickHouseClient = {
     query: string;
     query_params?: Record<string, unknown>;
     format: "JSONEachRow";
+    /** For a statement carrying `{{idBound}}`: a time the caller has, and today's fallback. */
+    idBound?: IdBoundOptions;
   }): Promise<ExperimentEventingClickHouseResult>;
   /** Absent on a bare driver client (tests): every column is then named. */
   select?(input: Parameters<ClickHouseColumns["select"]>[0]): Promise<string>;

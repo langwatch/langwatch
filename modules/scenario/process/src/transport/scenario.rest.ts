@@ -70,6 +70,8 @@ function toScenarioResponse(scenario: Scenario): {
   parameters: ScenarioParameterDefinition[];
   simulatorModel: string | null;
   judgeModel: string | null;
+  traceQuietPeriodMs: number | null;
+  traceWaitTimeoutMs: number | null;
   maxTurns: number | null;
   minTurns: number | null;
   testSuiteId: string | null;
@@ -84,6 +86,8 @@ function toScenarioResponse(scenario: Scenario): {
     parameters: parseScenarioParameterDefinitions(scenario.parameters),
     simulatorModel: scenario.simulatorModel,
     judgeModel: scenario.judgeModel,
+    traceQuietPeriodMs: scenario.traceQuietPeriodMs ?? null,
+    traceWaitTimeoutMs: scenario.traceWaitTimeoutMs ?? null,
     maxTurns: scenario.maxTurns,
     minTurns: scenario.minTurns,
     testSuiteId: scenario.testSuiteId,
@@ -178,6 +182,7 @@ export function createScenarioRest(): Readonly<{
       // could create a scenario yesterday still can. What changes is that access
       // granted at the CREATE grain now works.
       .post("/", "postApiScenarios")
+      .keepsRecords()
       .withInput(scenarioRestCreateSchema)
       .withPermission("scenarios:create")
       .withAudit("scenarios.create")
@@ -204,10 +209,18 @@ export function createScenarioRest(): Readonly<{
             ...(body.parameters !== undefined && { parameters: body.parameters }),
             ...(body.simulatorModel !== undefined && { simulatorModel: body.simulatorModel }),
             ...(body.judgeModel !== undefined && { judgeModel: body.judgeModel }),
+            ...(body.traceQuietPeriodMs !== undefined && {
+              traceQuietPeriodMs: body.traceQuietPeriodMs,
+            }),
+            ...(body.traceWaitTimeoutMs !== undefined && {
+              traceWaitTimeoutMs: body.traceWaitTimeoutMs,
+            }),
             ...(body.maxTurns !== undefined && { maxTurns: body.maxTurns }),
             ...(body.minTurns !== undefined && { minTurns: body.minTurns }),
             ...(body.testSuiteId !== undefined && { testSuiteId: body.testSuiteId }),
             ...(body.fields !== undefined && { fields: body.fields }),
+            ...(body.kind !== undefined && { kind: body.kind }),
+            ...(body.redTeam !== undefined && { redTeam: body.redTeam }),
           },
           { id: project.actorId, label },
         );
@@ -225,6 +238,7 @@ export function createScenarioRest(): Readonly<{
        * same behavior instead of a 404 on one of them.
        */
       .put("/:id", "putApiScenariosById")
+      .keepsRecords()
       .withParams(scenarioRestIdParamsSchema)
       .withInput(scenarioRestUpdateSchema)
       .withPermission("scenarios:update")
@@ -256,6 +270,7 @@ export function createScenarioRest(): Readonly<{
       })
 
       .patch("/:id", "patchApiScenariosById")
+      .keepsRecords()
       .withParams(scenarioRestIdParamsSchema)
       .withInput(scenarioRestUpdateSchema)
       .withPermission("scenarios:update")
@@ -293,6 +308,15 @@ export function createScenarioRest(): Readonly<{
       .withParams(scenarioRestIdParamsSchema)
       .withPermission("scenarios:manage")
       .withAudit("scenarios.archive")
+      .withConfirmation({
+        resource: "scenario",
+        action: "delete",
+        idParam: "id",
+        name: async ({ app, projectId, id }) => {
+          const lookup = await app.readByIdIncludingArchived({ id, projectId });
+          return lookup.found ? lookup.scenario.name : undefined;
+        },
+      })
       .withOutput(scenarioRestArchivedSchema)
       .withDocs({
         description: "Archive (soft-delete) a scenario",

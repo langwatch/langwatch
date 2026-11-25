@@ -164,6 +164,7 @@ export class LangyTurnWarmService {
       projectId,
       organizationId: credentials.organizationId,
       ...(readOnly ? { ceiling: "unattended" as const } : {}),
+      conversation: { id: conversationId },
     });
     credentials.langwatchApiKey = minted.token;
     credentials.langwatchApiKeyId = minted.apiKeyId;

@@ -1,14 +1,16 @@
 import type { Authorization } from "@langwatch/authorization";
 import {
   type AuthorizedClickHouse,
-  DEFAULT_PARTITION_WINDOW_MS,
-  queryWindowed,
+  ClickHouseColumns,
+  type IdBoundOptions,
+  ownProjectIdOf,
   type TenantScopedReader,
   tenantScope,
   tenantScopeKey,
   tenantSet,
 } from "@langwatch/clickhouse-client";
 import { EventUtils } from "@langwatch/eventing";
+import { KSUID_LAYOUTS, type KsuidLayout } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
 import { nowInstant } from "@langwatch/time";
 import type { TraceSummaryData } from "@langwatch/trace-contract";
@@ -25,7 +27,6 @@ import {
   type TraceSummaryReadWindow,
 } from "../trace-summary-projection.repository.ts";
 import type {
-  FindByTraceIdOptions,
   FindByTraceIdParams,
   TraceSummaryRead,
   TraceSummaryRepository,
@@ -88,6 +89,9 @@ interface TraceSummaryFieldsBase {
 
 const TABLE_NAME = "trace_summaries" as const;
 
+/** Goose 00130's column, read as NULL ("v1-legacy") until the tenant's target has it (NO-HOLDS). */
+const ID_LAYOUT_COLUMN = { IdLayout: "CAST(NULL AS Nullable(String))" } as const;
+
 const logger = createLogger("langwatch:trace:trace-summary-repository");
 
 function validateBatchTenants<T extends { tenantId: string }>(
@@ -142,6 +146,8 @@ interface ClickHouseSummaryRecord extends TraceSummaryFieldsBase {
    * this too; ADR-087 split them. Absent pre-00072 (version gate handles it).
    */
   EarliestSpanStartMs?: number | string;
+  /** KSUID byte layout of ProjectionId; NULL on rows written before goose 00130. */
+  IdLayout: KsuidLayout | null;
   _retention_days: number;
 }
 
@@ -152,10 +158,10 @@ const summaryReadRowSchema = z.looseObject({
   TraceId: chString,
   Version: chString,
   Attributes: chStringMap,
-  OccurredAt: chNumber,
+  OccurredAtMs: chNumber,
   EarliestSpanStartMs: chNumber.optional(),
   CreatedAt: chNumber,
-  UpdatedAt: chNumber,
+  UpdatedAtMs: chNumber,
   LastEventOccurredAt: chNumber.optional(),
   ComputedIOSchemaVersion: chString,
   ComputedInput: chString.nullable(),
@@ -193,6 +199,7 @@ const summaryReadRowSchema = z.looseObject({
   AnnotationIds: z.array(chString),
   HasAnnotation: chBoolean.nullable(),
   TraceName: chString,
+  IdLayout: z.enum(KSUID_LAYOUTS).nullable().optional(),
 });
 
 const summaryReadRowsSchema = z.array(summaryReadRowSchema);
@@ -248,18 +255,11 @@ export class TraceSummaryClickHouseRepository implements TraceSummaryRepository 
   async upsert(data: TraceSummaryData, tenantId: string, retentionDays: number): Promise<void> {
     EventUtils.validateTenantId({ tenantId }, "TraceSummaryClickHouseRepository.upsert");
 
-    const projectionId = createTraceSummaryProjectionId({
-      tenantId,
-      traceId: data.traceId,
-      occurredAtMs: data.occurredAt,
-    });
-
     try {
       const client = await this.options.resolveClient(tenantId);
       const record = this.toClickHouseRecord({
         data,
         tenantId,
-        projectionId,
         version: TRACE_SUMMARY_PROJECTION_VERSION_LATEST,
         retentionDays,
       });
@@ -293,20 +293,14 @@ export class TraceSummaryClickHouseRepository implements TraceSummaryRepository 
 
     try {
       const client = await this.options.resolveClient(tenantId);
-      const records = entries.map(({ data, tenantId: tid, retentionDays: rd }) => {
-        const projectionId = createTraceSummaryProjectionId({
-          tenantId: tid,
-          traceId: data.traceId,
-          occurredAtMs: data.occurredAt,
-        });
-        return this.toClickHouseRecord({
+      const records = entries.map(({ data, tenantId: tid, retentionDays: rd }) =>
+        this.toClickHouseRecord({
           data,
           tenantId: tid,
-          projectionId,
           version: TRACE_SUMMARY_PROJECTION_VERSION_LATEST,
           retentionDays: rd,
-        });
-      });
+        }),
+      );
 
       await client.insert({
         table: TABLE_NAME,
@@ -324,126 +318,54 @@ export class TraceSummaryClickHouseRepository implements TraceSummaryRepository 
     }
   }
 
-  /**
-   * Fold read-back path (ADR-066): an explicit window applies verbatim with
-   * NO internal fallback — the fold executor owns the miss retry, so a
-   * second recovery ladder here would re-run a seek the executor redoes anyway.
-   */
-  async #findInExplicitWindow({
-    authorization,
-    traceId,
-    window: { fromMs, toMs },
-  }: {
-    authorization: Authorization;
-    traceId: string;
-    window: { fromMs: number; toMs: number };
-  }): Promise<TraceSummaryRead | null> {
-    try {
-      return await queryWindowed<TraceSummaryRead | null>({
-        table: TABLE_NAME,
-        hintMs: (fromMs + toMs) / 2,
-        windowMs: (toMs - fromMs) / 2,
-        fallback: "none",
-        isEmpty: (result) => result === null,
-        run: async (window) =>
-          // With a hint and `fallback: "none"` the fragment is always
-          // present; the null arm exists only to satisfy the contract.
-          window
-            ? this.queryByTraceId({
-                authorization,
-                traceId,
-                window: { fromMs: window.fromMs, toMs: window.toMs },
-              })
-            : null,
-      });
-    } catch (error) {
-      logSummaryReadFailure({ authorization, traceId, error });
-      throw error;
-    }
-  }
-
-  /**
-   * The fallback stage: the hint window missed, or there was none. Resolves
-   * OccurredAt from a cheap sort-key seek and bounds the heavy read instead
-   * of scanning every weekly partition. A genuinely absent trace returns null.
-   */
-  async #findByResolvedOccurredAt({
-    authorization,
-    traceId,
-    hasHint,
-    options,
-  }: {
-    authorization: Authorization;
-    traceId: string;
-    hasHint: boolean;
-    options: FindByTraceIdOptions;
-  }): Promise<TraceSummaryRead | null> {
-    if (hasHint) {
-      logger.debug(
-        { traceId, occurredAtMs: options.occurredAtMs },
-        "Trace summary not found in hint window — resolving OccurredAt to bound the retry",
-      );
-    }
-
-    const resolved = await this.resolveOccurredAtMs({ authorization, traceId });
-    if (!resolved.found) return null;
-
-    if (resolved.occurredAtMs === undefined) {
-      logger.debug(
-        { traceId },
-        "Trace summary resolved with sentinel OccurredAt — falling back to unbounded read",
-      );
-
-      return this.queryByTraceId({ authorization, traceId });
-    }
-
-    return this.queryByTraceId({
-      authorization,
-      traceId,
-      window: {
-        fromMs: resolved.occurredAtMs - DEFAULT_PARTITION_WINDOW_MS,
-        toMs: resolved.occurredAtMs + DEFAULT_PARTITION_WINDOW_MS,
-      },
-    });
-  }
-
   async findByTraceId({
     authorization,
     traceId,
     ...options
   }: FindByTraceIdParams): Promise<TraceSummaryRead | null> {
-    // Fold read-back path (ADR-066): an explicit window applies verbatim
-    // with NO internal fallback — the fold executor owns the miss retry, so
-    // a second recovery ladder here would re-run a seek it redoes anyway.
-    if (options.window) {
-      return this.#findInExplicitWindow({ authorization, traceId, window: options.window });
-    }
-
-    // Two-stage read: hinted window for partition pruning, fallback unbounded.
-    const hasHint = options.occurredAtMs !== undefined;
-
     try {
-      return await queryWindowed<TraceSummaryRead | null>({
-        table: TABLE_NAME,
-        hintMs: options.occurredAtMs ?? null,
-        fallback: "unbounded",
-        isEmpty: (result) => result === null,
-        run: async (window) => {
-          if (window) {
-            return this.queryByTraceId({
-              authorization,
-              traceId,
-              window: { fromMs: window.fromMs, toMs: window.toMs },
-            });
-          }
-
-          return this.#findByResolvedOccurredAt({ authorization, traceId, hasHint, options });
-        },
+      return await this.queryByTraceId({
+        authorization,
+        traceId,
+        idBound: this.summaryBound({ authorization, traceId, options }),
       });
     } catch (error) {
       logSummaryReadFailure({ authorization, traceId, error });
       throw error;
     }
+  }
+
+  /**
+   * A fold read-back's explicit window applies first and never widens: the fold executor owns
+   * the miss retry (ADR-066). Otherwise the hint, then the id index once ready; before that, the
+   * OccurredAt a sort-key seek resolves bounds the read instead of every weekly partition.
+   */
+  private summaryBound({
+    authorization,
+    traceId,
+    options,
+  }: {
+    authorization: Authorization;
+    traceId: string;
+    options: Omit<FindByTraceIdParams, "authorization" | "traceId">;
+  }): IdBoundOptions {
+    const { window } = options;
+    if (window) {
+      return {
+        occurredAtHint: (window.fromMs + window.toMs) / 2,
+        windowMs: (window.toMs - window.fromMs) / 2,
+        fallback: "none",
+      };
+    }
+    return {
+      occurredAtHint: options.occurredAtMs ?? null,
+      fallback: "none",
+      resolveOnHintMiss: true,
+      resolveHint: async () => {
+        const resolved = await this.resolveOccurredAtMs({ authorization, traceId });
+        return resolved.found ? resolved.occurredAtMs : null;
+      },
+    };
   }
 
   /**
@@ -458,17 +380,20 @@ export class TraceSummaryClickHouseRepository implements TraceSummaryRepository 
     authorization: Authorization;
     traceId: string;
   }): Promise<string[]> {
+    const reader = this.reader(authorization);
     try {
-      const result = await this.reader(authorization).query({
+      const result = await reader.query({
         query: `
           SELECT DISTINCT TenantId
           FROM ${TABLE_NAME}
           WHERE ${tenantScope("OccurredAt")}
             AND TraceId = {traceId:String}
+            {{idBound:trace_summaries.TraceId:traceId}}
           ORDER BY TenantId
         `,
         query_params: { traceId },
         format: "JSONEachRow",
+        idBound: { fallback: "unbounded" },
       });
       return tenantIdRowsSchema.parse(await result.json()).map((row) => row.TenantId);
     } catch (error) {
@@ -495,6 +420,7 @@ export class TraceSummaryClickHouseRepository implements TraceSummaryRepository 
     traceId: string;
   }): Promise<{ found: boolean; occurredAtMs?: number }> {
     const result = await this.reader(authorization).query({
+      // ID_BOUND_SKIP: the not-ready hint resolver; the index path never runs it.
       query: `
         SELECT
           count() AS rowCount,
@@ -531,42 +457,34 @@ export class TraceSummaryClickHouseRepository implements TraceSummaryRepository 
   private async queryByTraceId({
     authorization,
     traceId,
-    window,
+    idBound,
   }: {
     authorization: Authorization;
     traceId: string;
-    window?: { fromMs: number; toMs: number };
+    idBound: IdBoundOptions;
   }): Promise<TraceSummaryRead | null> {
-    const outerTimeFilter = window
-      ? "AND t.OccurredAt >= fromUnixTimestamp64Milli({fromMs:Int64}) " +
-        "AND t.OccurredAt <= fromUnixTimestamp64Milli({toMs:Int64})"
-      : "";
-    const innerTimeFilter = window
-      ? "AND OccurredAt >= fromUnixTimestamp64Milli({fromMs:Int64}) " +
-        "AND OccurredAt <= fromUnixTimestamp64Milli({toMs:Int64})"
-      : "";
-
     const client = this.reader(authorization);
+    const idLayout = await this.idLayoutColumn({ authorization });
     // IN-tuple dedup over the ReplacingMergeTree: the inner SELECT scans
     // only (TenantId, TraceId, UpdatedAt) — small, sparse — to find the
     // latest version, then the outer SELECT pulls the heavy columns
     // (ComputedInput, ComputedOutput, Attributes, etc.) for that one row.
     // See dev/docs/best_practices/clickhouse-queries.md.
 
-    // The windowed fence sits in the inner SELECT only: the outer `OccurredAt`
-    // is the projected integer, compared against a DateTime64 bound as seconds.
+    // The windowed fence sits in the inner SELECT only. No output takes a name
+    // the fence reads (ADR-201 §3), so those times leave as `OccurredAtMs` and `UpdatedAtMs`.
     const result = await client.query({
       query: `
         SELECT
           t.ProjectionId AS ProjectionId,
-          t.TenantId AS TenantId,
-          t.TraceId AS TraceId,
+          t.TenantId,
+          t.TraceId,
           t.Version AS Version,
           t.Attributes AS Attributes,
-          toUnixTimestamp64Milli(t.OccurredAt) AS OccurredAt,
+          toUnixTimestamp64Milli(t.OccurredAt) AS OccurredAtMs,
           t.EarliestSpanStartMs AS EarliestSpanStartMs,
           toUnixTimestamp64Milli(t.CreatedAt) AS CreatedAt,
-          toUnixTimestamp64Milli(t.UpdatedAt) AS UpdatedAt,
+          toUnixTimestamp64Milli(t.UpdatedAt) AS UpdatedAtMs,
           t.ComputedIOSchemaVersion AS ComputedIOSchemaVersion,
           t.ComputedInput AS ComputedInput,
           t.ComputedOutput AS ComputedOutput,
@@ -602,30 +520,45 @@ export class TraceSummaryClickHouseRepository implements TraceSummaryRepository 
           t.SubTopicId AS SubTopicId,
           t.AnnotationIds AS AnnotationIds,
           t.HasAnnotation AS HasAnnotation,
-          t.TraceName AS TraceName
+          t.TraceName AS TraceName,
+          ${idLayout}
         FROM ${TABLE_NAME} AS t
         WHERE ${tenantSet()}
           AND t.TraceId = {traceId:String}
-          ${outerTimeFilter}
+          {{idBound:trace_summaries.TraceId:traceId:t}}
           AND (t.TenantId, t.TraceId, t.UpdatedAt) IN (
             SELECT TenantId, TraceId, max(UpdatedAt)
             FROM ${TABLE_NAME}
             WHERE ${tenantScope("OccurredAt")}
               AND TraceId = {traceId:String}
-              ${innerTimeFilter}
+              {{idBound:trace_summaries.TraceId:traceId}}
             GROUP BY TenantId, TraceId
           )
         ORDER BY t.TenantId ASC
         LIMIT 1
       `,
-      query_params: window ? { traceId, fromMs: window.fromMs, toMs: window.toMs } : { traceId },
+      query_params: { traceId },
       format: "JSONEachRow",
+      idBound,
     });
 
     const rows = summaryReadRowsSchema.parse(await result.json());
     const row = rows[0];
     if (!row) return null;
     return { ...this.fromClickHouseRecord(row), tenantId: row.TenantId };
+  }
+
+  /** The IdLayout select for the proof's own target; a cross-owner proof names the column. */
+  private async idLayoutColumn({
+    authorization,
+  }: {
+    authorization: Authorization;
+  }): Promise<string> {
+    const input = { table: TABLE_NAME, alias: "t", columns: ID_LAYOUT_COLUMN };
+    const client = await Promise.resolve()
+      .then(() => this.options.resolveClient(ownProjectIdOf({ authorization, reads: "traces" })))
+      .catch(() => undefined);
+    return (await client?.select?.(input)) ?? ClickHouseColumns.named(input);
   }
 
   private fromClickHouseRecord(record: SummaryReadRow): TraceSummaryData {
@@ -671,31 +604,37 @@ export class TraceSummaryClickHouseRepository implements TraceSummaryRepository 
       traceName: record.TraceName ?? "",
       attributes: record.Attributes ?? {},
       // Anchor is frozen; occurrence time from separate column for span baseline.
-      storageAnchorMs: record.OccurredAt,
+      storageAnchorMs: record.OccurredAtMs,
       occurredAt: isStorageAnchoredVersion(record.Version)
         ? Number(record.EarliestSpanStartMs ?? 0)
-        : record.OccurredAt,
+        : record.OccurredAtMs,
       createdAt: record.CreatedAt,
-      updatedAt: record.UpdatedAt,
+      updatedAt: record.UpdatedAtMs,
       LastEventOccurredAt: Number(record.LastEventOccurredAt ?? 0),
+      idLayout: record.IdLayout ?? "v1-legacy",
     };
   }
 
+  /** The row's id keeps the layout it was stored with; a state without one is pre-00130. */
   private toClickHouseRecord({
     data,
     tenantId,
-    projectionId,
     version,
     retentionDays,
   }: {
     data: TraceSummaryData;
     tenantId: string;
-    projectionId: string;
     version: string;
     retentionDays: number;
   }): ClickHouseSummaryWriteRecord {
+    const idLayout = data.idLayout ?? "v1-legacy";
     return {
-      ProjectionId: projectionId,
+      ProjectionId: createTraceSummaryProjectionId({
+        tenantId,
+        traceId: data.traceId,
+        occurredAtMs: data.occurredAt,
+        layout: idLayout,
+      }),
       TenantId: tenantId,
       TraceId: data.traceId,
       Version: version,
@@ -747,6 +686,7 @@ export class TraceSummaryClickHouseRepository implements TraceSummaryRepository 
       AnnotationIds: data.annotationIds,
       HasAnnotation: data.annotationIds.length > 0 ? 1 : 0,
       TraceName: data.traceName,
+      IdLayout: idLayout,
       _retention_days: retentionDays,
     };
   }

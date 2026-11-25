@@ -4,6 +4,7 @@ import type {
   BatchedFacetResult,
   DiscreteFacetResult,
   FacetDescriptor,
+  SpanAnalyticsFloor,
   TraceListRead,
 } from "@langwatch/trace-contract";
 
@@ -15,6 +16,7 @@ import type {
   RangeFacetDef,
 } from "#features/facet/rules/trace-facet-registry.rules";
 
+import { batchedFacetSource } from "../features/facet/rules/trace-facet-light-twin.rules.ts";
 import type { TraceFacetDescriptorService } from "../features/facet/services/trace-facet-descriptor.service.ts";
 import type { TraceFilterWhere } from "../rules/trace-filter-hidden-origins.rules.ts";
 import type { DiscoverParams } from "../rules/trace-list-cache-key.rules.ts";
@@ -29,7 +31,15 @@ const DISCOVER_TOP_N = 50;
  */
 const DISCRETE_VALUE_LIMIT = 50;
 
-type TaskTimer = <T>(label: string, p: Promise<T>) => Promise<T>;
+/**
+ * One unit of a discovery pass, not started until the pass runs it: its label,
+ * how many ClickHouse statements it holds at once, and the read itself.
+ */
+export interface DiscoverTask {
+  label: string;
+  statements: number;
+  run: () => Promise<Outcome>;
+}
 
 /**
  * One batch slot is one table under one predicate. Facets that share both
@@ -59,51 +69,70 @@ export class TraceDiscoverTaskService {
   private readonly repository: TraceListRead;
   private readonly descriptors: TraceFacetDescriptorService;
   private readonly facets: FacetCatalog;
+  private readonly lightFloor: (() => Promise<SpanAnalyticsFloor>) | undefined;
 
   private constructor(deps: {
     repository: TraceListRead;
     descriptors: TraceFacetDescriptorService;
     facets: FacetCatalog;
+    lightFloor?: () => Promise<SpanAnalyticsFloor>;
   }) {
     this.repository = deps.repository;
     this.descriptors = deps.descriptors;
     this.facets = deps.facets;
+    this.lightFloor = deps.lightFloor;
   }
 
   static create(deps: {
     repository: TraceListRead;
     descriptors: TraceFacetDescriptorService;
     facets: FacetCatalog;
+    /** Where the light twin tables start; absent, batched reads stay on the facet tables. */
+    lightFloor?: () => Promise<SpanAnalyticsFloor>;
   }): TraceDiscoverTaskService {
     return new TraceDiscoverTaskService(deps);
   }
 
+  /** The light twin's floor, or null when unknown: a failed read keeps the facet table. */
+  private async readLightFloor(): Promise<SpanAnalyticsFloor | null> {
+    if (!this.lightFloor) return null;
+    return this.lightFloor().catch(() => null);
+  }
+
   /** Simple-expression facets per table share one batched ClickHouse scan. */
-  batchTasks(
-    params: DiscoverParams,
-    batched: BatchedRegistrySlots,
-    wrap: TaskTimer,
-  ): Promise<Outcome>[] {
-    return [...batched].map(([slotKey, slot]) =>
-      wrap(
-        `batch:${slotKey}`,
-        this.repository
-          .findBatchedFacets({
-            authorization: params.authorization,
-            timeRange: params.timeRange,
-            table: slot.table,
-            timeColumn: this.facets.timeColumns[slot.table],
-            categoricalSpecs: slot.categoricals.map((d) => ({
-              key: d.key,
-              expression: d.expression,
-            })),
-            rangeSpecs: slot.ranges.map((d) => ({ key: d.key, expression: d.expression })),
-            topN: DISCOVER_TOP_N,
-            ...(slot.filterWhere ? { filterWhere: slot.filterWhere } : {}),
-          })
-          .then((result): Outcome => ({ kind: "batch", slotKey, result })),
+  batchTasks(params: DiscoverParams, batched: BatchedRegistrySlots): DiscoverTask[] {
+    return [...batched].map(([slotKey, slot]) => ({
+      label: `batch:${slotKey}`,
+      // One statement for the categoricals and one for the ranges, run side by side.
+      statements: Math.max(
+        1,
+        Number(slot.categoricals.length > 0) + Number(slot.ranges.length > 0),
       ),
-    );
+      run: async (): Promise<Outcome> => {
+        const source = batchedFacetSource({
+          catalog: this.facets,
+          table: slot.table,
+          categoricals: slot.categoricals,
+          ranges: slot.ranges,
+          floor: this.facets.lightTwins?.[slot.table] ? await this.readLightFloor() : null,
+          fromMs: params.timeRange.from,
+        });
+        const result = await this.repository.findBatchedFacets({
+          authorization: params.authorization,
+          timeRange: params.timeRange,
+          table: source.table,
+          timeColumn: source.timeColumn,
+          categoricalSpecs: slot.categoricals.map((d) => ({
+            key: d.key,
+            expression: source.expressionOf(d),
+          })),
+          rangeSpecs: slot.ranges.map((d) => ({ key: d.key, expression: source.expressionOf(d) })),
+          topN: DISCOVER_TOP_N,
+          ...(slot.filterWhere ? { filterWhere: slot.filterWhere } : {}),
+        });
+        return { kind: "batch", slotKey, result };
+      },
+    }));
   }
 
   /** arrayJoin, queryBuilder and dynamic-keys facets cannot share a scan. */
@@ -111,64 +140,58 @@ export class TraceDiscoverTaskService {
     params,
     standalone,
     filters,
-    wrap,
   }: {
     params: DiscoverParams;
     standalone: FacetDefinition[];
     filters: FacetFilters;
-    wrap: TaskTimer;
-  }): Promise<Outcome>[] {
-    return standalone.map((def) =>
-      wrap(
-        `standalone:${def.kind}:${def.key}`,
-        (async (): Promise<Outcome> => {
-          const filterWhere = filters.of(def);
-          let descriptor: FacetDescriptor;
-          switch (def.kind) {
-            case "categorical":
-              descriptor = await this.descriptors.discoverCategorical({
-                def,
-                params,
-                limit: DISCOVER_TOP_N,
-                ...(filterWhere ? { filterWhere } : {}),
-              });
-              break;
-            case "range":
-              descriptor = await this.descriptors.discoverRange({
-                def,
-                params,
-                ...(filterWhere ? { filterWhere } : {}),
-              });
-              break;
-            case "dynamic_keys":
-              descriptor = await this.descriptors.discoverDynamicKeys({
-                def,
-                params,
-                limit: DISCOVER_TOP_N,
-              });
-              break;
-          }
+  }): DiscoverTask[] {
+    return standalone.map((def) => ({
+      label: `standalone:${def.kind}:${def.key}`,
+      statements: 1,
+      run: async (): Promise<Outcome> => {
+        const filterWhere = filters.of(def);
+        let descriptor: FacetDescriptor;
+        switch (def.kind) {
+          case "categorical":
+            descriptor = await this.descriptors.discoverCategorical({
+              def,
+              params,
+              limit: DISCOVER_TOP_N,
+              ...(filterWhere ? { filterWhere } : {}),
+            });
+            break;
+          case "range":
+            descriptor = await this.descriptors.discoverRange({
+              def,
+              params,
+              ...(filterWhere ? { filterWhere } : {}),
+            });
+            break;
+          case "dynamic_keys":
+            descriptor = await this.descriptors.discoverDynamicKeys({
+              def,
+              params,
+              limit: DISCOVER_TOP_N,
+            });
+            break;
+        }
 
-          return { kind: "standalone", key: def.key, descriptor };
-        })(),
-      ),
-    );
+        return { kind: "standalone", key: def.key, descriptor };
+      },
+    }));
   }
 
   /**
    * Distinct-value discovery for `isDiscrete`-flagged integer facets. Runs as its own GROUP BY per
    * facet, since the batched range pass only yields min and max.
    */
-  discreteTasks(
-    params: DiscoverParams,
-    filters: FacetFilters,
-    wrap: TaskTimer,
-  ): Promise<Outcome>[] {
+  discreteTasks(params: DiscoverParams, filters: FacetFilters): DiscoverTask[] {
     return this.facets.registry
       .filter((def): def is RangeFacetDef => def.kind === "range" && def.isDiscrete === true)
-      .map((def) =>
-        wrap(
-          `discrete:${def.key}`,
+      .map((def) => ({
+        label: `discrete:${def.key}`,
+        statements: 1,
+        run: () =>
           this.repository
             .findDiscreteValues({
               authorization: params.authorization,
@@ -180,7 +203,6 @@ export class TraceDiscoverTaskService {
               ...(filters.of(def) ? { filterWhere: filters.of(def) } : {}),
             })
             .then((result): Outcome => ({ kind: "discrete", key: def.key, result })),
-        ),
-      );
+      }));
   }
 }

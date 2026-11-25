@@ -44,6 +44,8 @@ const stepRowSchema = z.object({
   owner: nullable(z.string()),
   description: nullable(z.string()),
   finish_by: nullable(z.string()),
+  /** Absent on a ledger older than the column; a malformed tail reads as none. */
+  log_tail: z.array(z.string()).nullish().catch(null),
 });
 export type LedgerStepRow = z.infer<typeof stepRowSchema>;
 

@@ -27,6 +27,7 @@ function family(credential: RestDoorCredential) {
     .withOutput(z.object({ ok: z.boolean() }))
     .handle(({ app }) => app.read())
     .post("/api/budgets", "createBudget")
+    .keepsRecords()
     .withPermission("gatewayBudgets:create", { at: "organization" })
     .withOutput(z.object({ ok: z.boolean() }))
     .withoutAudit("test route")

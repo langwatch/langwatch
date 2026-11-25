@@ -215,7 +215,7 @@ describe("widgetExportFileName", () => {
 
   it("still names a file when a name has no letter or digit to keep", () => {
     expect(widgetExportFileName({ board: "???", widget: "!!!", results: {} })).toBe(
-      "board_widget_query-results.csv",
+      "dashboard_widget_query-results.csv",
     );
   });
 });

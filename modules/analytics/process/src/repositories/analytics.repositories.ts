@@ -3,9 +3,13 @@ import type { AnalyticsRateLimitRepository } from "./analytics-rate-limit.reposi
 import type { AnalyticsRecencyRepository } from "./analytics-recency.repository.ts";
 import type { AnalyticsSessionsRepository } from "./analytics-sessions.repository.ts";
 import type { AnalyticsRepository } from "./analytics.repository.ts";
+import type { FilterOptionsRepository } from "./filter-options.repository.ts";
+import type { LangWatchQLAccessModelAnswerRepository } from "./langwatch-ql-access-model-answer.repository.ts";
 import type { LangWatchQLAppFunctionStoreRepository } from "./langwatch-ql-app-function-store.repository.ts";
+import type { LangWatchQLPlacementRepository } from "./langwatch-ql-placement.repository.ts";
 import type { LwqlProvisioningDatabase } from "./langwatch-ql-postgres.repository.ts";
 import type { ClickHouseAdminStatements } from "./langwatch-ql-provisioning.repository.ts";
+import type { LwqlUnconfirmedSinceRepository } from "./langwatch-ql-unconfirmed-since.repository.ts";
 
 /**
  * Whether this deployment offers LangWatchQL (ADR-159): the credential-free ClickHouse target and
@@ -34,6 +38,8 @@ export type LangWatchQlSupply = Readonly<{
       }
   >;
   database: () => LwqlProvisioningDatabase;
+  /** The fleet's first failure to show the collection loaded, for the check's alert. */
+  unconfirmedSince: LwqlUnconfirmedSinceRepository;
 }>;
 
 /** What the analytics module reads and counts, chosen once at boot. */
@@ -42,6 +48,8 @@ export interface AnalyticsRepositories {
   readonly sessions: AnalyticsSessionsRepository;
   /** The timeseries and legacy reads over the analytics tables. */
   readonly analytics: AnalyticsRepository;
+  /** The values a filter picker offers; `null` where no ClickHouse holds them. */
+  readonly filterOptions: FilterOptionsRepository | null;
   /** The evaluation tables, opened with the retention peer's default, which no registry reads. */
   readonly evaluations: Readonly<{
     open(input: { defaultRetentionDays: () => number }): AnalyticsEvaluationRepository;
@@ -52,5 +60,9 @@ export interface AnalyticsRepositories {
   readonly recency: AnalyticsRecencyRepository;
   /** The per-project window every LangWatchQL execution is counted against. */
   readonly rateLimits: AnalyticsRateLimitRepository;
+  /** Whether a tenant's rows are on the shared server: the LangWatchQL gate asks first. */
+  readonly lwqlPlacement: LangWatchQLPlacementRepository;
+  /** The fleet's last answer to whether the access model is provisioned, kept for minutes. */
+  readonly lwqlAccessModelAnswer: LangWatchQLAccessModelAnswerRepository;
   readonly langWatchQl: LangWatchQlSupply;
 }

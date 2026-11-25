@@ -47,7 +47,7 @@ Create an agent adapter that calls your agent, then run a scenario against it. F
     import litellm
 
     # Configure the default model for simulations
-    scenario.configure(default_model="openai/gpt-5")
+    scenario.configure(default_model="openai/gpt-6-luna")
 
     @pytest.mark.agent_test
     @pytest.mark.asyncio
@@ -84,7 +84,7 @@ Create an agent adapter that calls your agent, then run a scenario against it. F
     @scenario.cache()
     def vegetarian_recipe_agent(messages) -> scenario.AgentReturnTypes:
         response = litellm.completion(
-            model="openai/gpt-5",
+            model="openai/gpt-6-luna",
             messages=[
                 {
                     "role": "system",
@@ -126,7 +126,7 @@ Create an agent adapter that calls your agent, then run a scenario against it. F
           role: AgentRole.AGENT,
           call: async (input) => {
             const response = await generateText({
-              model: openai("gpt-5"),
+              model: openai("gpt-6-luna"),
               system: `You are a helpful assistant that may help the user with weather information.`,
               messages: input.messages,
               tools: { get_current_weather: getCurrentWeather },
@@ -151,7 +151,7 @@ Create an agent adapter that calls your agent, then run a scenario against it. F
           description: "The user asks for the weather in a specific city, and the agent should use the weather tool to find it.",
           agents: [
             weatherAgent,
-            scenario.userSimulatorAgent({ model: openai("gpt-5") }),
+            scenario.userSimulatorAgent({ model: openai("gpt-6-luna") }),
           ],
           script: [
             scenario.user("What's the weather like in Barcelona?"),
@@ -224,7 +224,7 @@ Set stable identifiers for your scenarios, test suites and batches, so LangWatch
         batchId: process.env.GITHUB_RUN_ID ?? "local-run",
         agents: [
             weatherAgent,
-            scenario.userSimulatorAgent({ model: openai("gpt-5") }),
+            scenario.userSimulatorAgent({ model: openai("gpt-6-luna") }),
         ],
         script: [
             scenario.user("What's the weather like in Barcelona?"),
@@ -247,7 +247,7 @@ When your adapter calls an agent that runs as a separate service, the judge cann
   <Tab title="Python">
     ```python
     scenario.configure(
-        default_model="openai/gpt-5",
+        default_model="openai/gpt-6-luna",
         fetch_remote_traces=True,
         trace_wait_timeout=60.0,  # seconds to wait for traces before the verdict
     )

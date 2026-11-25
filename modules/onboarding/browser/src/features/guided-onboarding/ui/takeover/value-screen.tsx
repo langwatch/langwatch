@@ -9,7 +9,7 @@ import {
   GUIDED_PATHS,
   type GuidedPath,
 } from "@langwatch/onboarding-contract";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useAnalytics } from "react-contextual-analytics";
 
 import { valueSegments } from "../../model/copy.ts";
@@ -31,7 +31,8 @@ export function ValueScreen({
   fading,
   onNext,
 }: {
-  firstName: string;
+  /** Absent when the account has no name: the question then leaves it out. */
+  firstName: string | undefined;
   /** Who this is for: the organization name, or "you". */
   target: string;
   initialPicks?: GuidedPath[];
@@ -47,7 +48,7 @@ export function ValueScreen({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const segments = useMemo(() => valueSegments({ name: firstName, target }), [firstName, target]);
+  const segments = valueSegments({ name: firstName, target });
 
   const toggle = (id: GuidedPath) => {
     setPicks((current) => {

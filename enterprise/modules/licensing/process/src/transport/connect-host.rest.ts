@@ -14,7 +14,10 @@ import {
   connectSyncAnswerSchema,
   LicensingApi,
   licenseSyncBodySchema,
+  upgradeDiagnosticsReceiptSchema,
+  upgradeDiagnosticsSubmissionSchema,
 } from "@langwatch/enterprise-licensing-contract";
+import { UPGRADE_DIAGNOSTICS_MAX_BYTES } from "@langwatch/ops-contract";
 
 const CONNECT_HOST_ACCESS = anyAuthenticated({
   reason:
@@ -23,6 +26,7 @@ const CONNECT_HOST_ACCESS = anyAuthenticated({
 
 const SYNC_PATH = "/api/connect/v1/license/sync";
 const ACTIVATE_PATH = "/api/connect/v1/license/activate";
+const UPGRADE_DIAGNOSTICS_PATH = "/api/connect/v1/upgrade-diagnostics";
 
 /** A sync is a version and two seat counts; anything larger is not one. */
 const SYNC_MAX_BODY_BYTES = 4 * 1024;
@@ -30,16 +34,22 @@ const SYNC_MAX_BODY_BYTES = 4 * 1024;
 /** An activation carries its code in a header, so its body is empty. */
 const ACTIVATE_MAX_BODY_BYTES = 1024;
 
-/** An activation code on the activate path, else a licence token; the framework hands the bearer. */
+/**
+ * An activation code on the activate path, else a licence token; the framework hands the
+ * bearer. Only the sync path admits an expired licence, to collect its waiting renewal.
+ */
 export const connectHostDoor = defineRestDoor("licence_token", {
   needs: LicensingApi,
   identify: async ({ bearer, instanceId, path }, licensing) => {
     const presented = { bearer, instanceId: instanceId ?? undefined };
+    if (path === ACTIVATE_PATH) {
+      const caller = await licensing.verifyActivationCode(presented);
+      return { scope: { tier: "organization", id: caller.organizationId }, session: caller };
+    }
     const caller =
-      path === ACTIVATE_PATH
-        ? await licensing.verifyActivationCode(presented)
+      path === SYNC_PATH
+        ? await licensing.verifyLicenceTokenForSync(presented)
         : await licensing.verifyLicenceToken(presented);
-
     return { scope: { tier: "organization", id: caller.organizationId }, session: caller };
   },
 });
@@ -51,6 +61,7 @@ export const connectHostRest = defineRestRouter(LicensingApi)
   .withCredential("licence_token")
 
   .post(SYNC_PATH, "recordLicenseSync")
+  .keepsRecords()
   .withAudit("license.recordSync")
   .withCredential("licence_token", { session: connectLicenceCallerSchema })
   .withInput(licenseSyncBodySchema)
@@ -61,6 +72,7 @@ export const connectHostRest = defineRestRouter(LicensingApi)
   .handle(({ input, app, session }) => app.recordLicenseSync({ caller: session, body: input }))
 
   .post(ACTIVATE_PATH, "redeemActivationCode")
+  .keepsRecords()
   .withAudit("license.activate")
   .withCredential("licence_token", { session: connectActivationCallerSchema })
   .withInput(connectActivationRequestSchema)
@@ -69,4 +81,17 @@ export const connectHostRest = defineRestRouter(LicensingApi)
   .withOutput(connectActivationAnswerSchema)
   .withDocs({ hide: true })
   .handle(({ app, session }) => app.redeemActivationCode(session))
+
+  .post(UPGRADE_DIAGNOSTICS_PATH, "recordUpgradeDiagnostics")
+  .keepsRecords()
+  .withAudit("license.recordUpgradeDiagnostics")
+  .withCredential("licence_token", { session: connectLicenceCallerSchema })
+  .withInput(upgradeDiagnosticsSubmissionSchema)
+  .withBodyLimit({ maxBytes: UPGRADE_DIAGNOSTICS_MAX_BYTES })
+  .withAccess(CONNECT_HOST_ACCESS)
+  .withOutput(upgradeDiagnosticsReceiptSchema)
+  .withDocs({ hide: true })
+  .handle(({ input, app, session }) =>
+    app.recordUpgradeDiagnostics({ caller: session, submission: input }),
+  )
   .build();

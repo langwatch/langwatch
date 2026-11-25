@@ -1,4 +1,4 @@
-import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
+import type { ClickHouseQueryClient, IdBoundOptions } from "@langwatch/clickhouse-client";
 
 /**
  * The ClickHouse surface this feature uses, structurally, so the package
@@ -19,6 +19,8 @@ export type GatewayClickHouseClient = {
     tenantIds?: readonly string[];
     /** Abandons the read, retries included, once it aborts. */
     signal?: AbortSignal;
+    /** For a statement carrying `{{idBound}}`: a time the caller has, and today's fallback. */
+    idBound?: IdBoundOptions;
   }): Promise<{ json<T = unknown>(): Promise<T[]> }>;
   insert(input: {
     table: string;
@@ -65,6 +67,7 @@ export class ClickHouseGatewaySession implements GatewayClickHouseClient {
     SKIP_COLD_SCAN_CHECK?: true;
     tenantIds?: readonly string[];
     signal?: AbortSignal;
+    idBound?: IdBoundOptions;
   }): Promise<{ json<T = unknown>(): Promise<T[]> }> {
     const { rows } = await this.clickhouse.query<unknown>({
       tenantId: this.tenantId,
@@ -76,6 +79,7 @@ export class ClickHouseGatewaySession implements GatewayClickHouseClient {
       ...(input.SKIP_COLD_SCAN_CHECK === true ? { SKIP_COLD_SCAN_CHECK: true as const } : {}),
       ...(input.tenantIds ? { tenantIds: input.tenantIds } : {}),
       ...(input.signal ? { signal: input.signal } : {}),
+      ...(input.idBound === undefined ? {} : { idBound: input.idBound }),
     });
 
     return { json: <T = unknown>() => Promise.resolve(rows as T[]) };

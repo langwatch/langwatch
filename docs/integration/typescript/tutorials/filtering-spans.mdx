@@ -18,20 +18,19 @@ import { setupObservability } from "langwatch/observability/node";
 import { LangWatchTraceExporter } from "langwatch";
 
 setupObservability({
-// We are specifying a custom trace exporter, so we need to disable default
-// integration to prevent double exporting
-langwatch: "disabled",
-traceExporter: new LangWatchTraceExporter(),
+  // We are specifying a custom trace exporter, so we need to disable default
+  // integration to prevent double exporting
+  langwatch: "disabled",
+  traceExporter: new LangWatchTraceExporter(),
 });
-
-````
+```
 
 ```typescript Creating an exporter
 import { LangWatchTraceExporter } from "langwatch";
 
 // Default: excludes HTTP request spans
 const exporter = new LangWatchTraceExporter();
-````
+```
 
 </CodeGroup>
 

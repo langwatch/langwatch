@@ -206,11 +206,14 @@ type NodeHTTP struct {
 // cost figure; the consumer multiplies tokens by the model rate (the same path
 // the trace-ingest collector uses), keeping a single source of truth for cost.
 type NodeMetrics struct {
-	PromptTokens     int    `json:"prompt_tokens,omitempty"`
-	CompletionTokens int    `json:"completion_tokens,omitempty"`
-	TotalTokens      int    `json:"total_tokens,omitempty"`
-	ReasoningTokens  int    `json:"reasoning_tokens,omitempty"`
-	Model            string `json:"model,omitempty"`
+	PromptTokens     int `json:"prompt_tokens,omitempty"`
+	CompletionTokens int `json:"completion_tokens,omitempty"`
+	TotalTokens      int `json:"total_tokens,omitempty"`
+	ReasoningTokens  int `json:"reasoning_tokens,omitempty"`
+	// Subsets of PromptTokens; the consumer prices them at the cache rates.
+	CacheReadInputTokens     int    `json:"cache_read_input_tokens,omitempty"`
+	CacheCreationInputTokens int    `json:"cache_creation_input_tokens,omitempty"`
+	Model                    string `json:"model,omitempty"`
 }
 
 // NodeError is the structured error attached to a failed node.
@@ -301,7 +304,7 @@ func (e *Engine) runLayer(ctx context.Context, req ExecuteRequest, plan *planner
 			}
 			started := time.Now()
 			outputs, derr := e.dispatch(nodeCtx, req, node, inputs, ns)
-			ns.DurationMS = time.Since(started).Milliseconds()
+			ns.DurationMS = elapsedMS(started)
 			if derr != nil {
 				ns.Status = "error"
 				ns.Error = derr
@@ -706,6 +709,14 @@ func (e *Engine) runHTTP(ctx context.Context, node *dsl.Node, inputs map[string]
 		if errors.Is(err, httpblock.ErrSSRFBlocked) {
 			return nil, &NodeError{Type: "ssrf_blocked", Message: msg}
 		}
+		// The upstream answered; its reply has nothing at the output path.
+		if errors.Is(err, httpblock.ErrNoMatch) {
+			// The author fixes the path by reading the reply it missed.
+			if ns.HTTP != nil {
+				ns.HTTP.ResponseBody = redactSecrets(string(res.UpstreamBody), secrets)
+			}
+			return nil, &NodeError{Type: "jsonpath_no_match", Message: msg}
+		}
 		return nil, &NodeError{Type: "http_error", Message: msg}
 	}
 	out := make(map[string]any, 1)
@@ -828,14 +839,18 @@ func (e *Engine) runSignature(ctx context.Context, node *dsl.Node, inputs map[st
 	// consumer apply the model rate (the gateway returns no cost on this path).
 	// Use the provider/model form (matching the cost table keys + the LLM span
 	// name) so the consumer's model-cost lookup hits the right entry.
-	if u := resp.Usage; u.TotalTokens > 0 || u.PromptTokens > 0 || u.CompletionTokens > 0 {
+	if u := resp.Usage; u.TotalTokens > 0 || u.PromptTokens > 0 || u.CompletionTokens > 0 ||
+		u.CacheReadInputTokens > 0 || u.CacheCreationInputTokens > 0 {
 		metricsModel := modelID(model, provider)
 		ns.Metrics = &NodeMetrics{
 			PromptTokens:     u.PromptTokens,
 			CompletionTokens: u.CompletionTokens,
 			TotalTokens:      u.TotalTokens,
 			ReasoningTokens:  u.ReasoningTokens,
-			Model:            metricsModel,
+
+			CacheReadInputTokens:     u.CacheReadInputTokens,
+			CacheCreationInputTokens: u.CacheCreationInputTokens,
+			Model:                    metricsModel,
 		}
 	}
 	if useStructured {
@@ -1082,7 +1097,7 @@ func (e *Engine) runEvaluator(ctx context.Context, req ExecuteRequest, node *dsl
 		APIKey:             req.Workflow.APIKey,
 		EvaluatorSlug:      slug,
 		Name:               paramString(node.Data.Parameters, "name"),
-		Settings:           paramAnyMap(node.Data.Parameters, "settings"),
+		Settings:           evaluatorSettings(node.Data.Parameters),
 		Data:               inputs,
 		TraceID:            req.TraceID,
 		Origin:             req.Origin,
@@ -1537,7 +1552,7 @@ func finalize(state *runState, traceID string, started time.Time, ctxErr error) 
 		TraceID:    traceID,
 		Nodes:      state.states,
 		TotalCost:  state.totalCost,
-		DurationMS: time.Since(started).Milliseconds(),
+		DurationMS: elapsedMS(started),
 	}
 	if ctxErr != nil {
 		res.Status = "error"
@@ -1618,6 +1633,91 @@ func paramAnyMap(params []dsl.Field, name string) map[string]any {
 		}
 	}
 	return nil
+}
+
+// evaluatorReservedParams are the identifiers runEvaluator reads off an
+// evaluator node's parameters[] in its own right and that no evaluator
+// declares as a setting of its own. Nothing else on that list is ever
+// read, so everything else is one flattened setting.
+//
+// `name` is deliberately absent: runEvaluator reads it, but for two
+// evaluators it is also a setting, so evaluatorSettings decides per node
+// which of the two it is.
+var evaluatorReservedParams = map[string]struct{}{
+	"evaluator": {},
+	"settings":  {},
+}
+
+// hasEvaluatorParam reports whether an evaluator node carries a parameter
+// under this identifier, whatever its value decodes to.
+func hasEvaluatorParam(params []dsl.Field, identifier string) bool {
+	for _, p := range params {
+		if p.Identifier == identifier {
+			return true
+		}
+	}
+	return false
+}
+
+// evaluatorNonSettingParams returns the identifiers that are not settings on
+// this node: the reserved two always, plus `name` when a legacy `settings`
+// dict marks the node as untouched pre-Go-port DSL, where `name` is the
+// node's display name rather than a competitor evaluator's company.
+func evaluatorNonSettingParams(params []dsl.Field) map[string]struct{} {
+	skip := map[string]struct{}{}
+	for identifier := range evaluatorReservedParams {
+		skip[identifier] = struct{}{}
+	}
+	if hasEvaluatorParam(params, "settings") {
+		skip["name"] = struct{}{}
+	}
+	return skip
+}
+
+// evaluatorSettings assembles the settings dict for an evaluator node.
+// The Studio flattens its panel settings into one parameter per key, so
+// every parameter evaluatorNonSettingParams does not exclude is a
+// setting; a pre-Go-port workflow
+// instead carries them under one `settings` dict, which is the base the
+// flattened entries overlay. specs/studio/workflow-evaluator-inline-settings.feature
+//
+// `name` is the one identifier whose meaning depends on which producer
+// wrote the node, so it is read from whichever one did. Both Studio
+// shapes write one parameter per setting and never a `settings` dict
+// (modules/workflow/contract/src/merge-local-configs.ts for a saved
+// evaluator carrying panel edits, the inline panel's writeParameters for
+// a bare slug), and for the two competitor evaluators one of those
+// settings is the company being defended, so with no dict present a
+// `name` parameter is that company and travels as a setting. A dict
+// means the node is untouched pre-Go-port DSL, where the sibling `name`
+// parameter is the node's display name instead, so the dict's own `name`
+// stands and the parameter is left to the body field alone.
+func evaluatorSettings(params []dsl.Field) map[string]any {
+	skip := evaluatorNonSettingParams(params)
+	settings := map[string]any{}
+	for identifier, value := range paramAnyMap(params, "settings") {
+		settings[identifier] = value
+	}
+	for _, p := range params {
+		if _, skipped := skip[p.Identifier]; skipped {
+			continue
+		}
+		var value any
+		if err := jsonUnmarshalRaw(p.Value, &value); err != nil {
+			continue
+		}
+		// A null is absent too: no evaluator's settings schema accepts
+		// one, so forwarding it would refuse the whole call rather than
+		// leave the stored setting standing.
+		if value == nil {
+			continue
+		}
+		settings[p.Identifier] = value
+	}
+	if len(settings) == 0 {
+		return nil
+	}
+	return settings
 }
 
 // paramAny reads a parameter as an arbitrary JSON-decoded value.

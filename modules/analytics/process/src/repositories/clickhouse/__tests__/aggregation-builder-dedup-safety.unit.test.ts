@@ -1,6 +1,6 @@
 /**
- * Structural regression: `dedupedTraceSummaries` must use `max(UpdatedAt)
- * GROUP BY` for dedup, never bare `LIMIT 1 BY` (reads every heavy column/row).
+ * Structural regression: `dedupedTraceSummaries` must dedup by version (argMax or
+ * `latestTraceVersionOnly`), never bare `LIMIT 1 BY` (reads every heavy column/row).
  * @see dev/docs/best_practices/clickhouse-queries.md
  * @regression issue #3158
  */
@@ -33,9 +33,8 @@ describe("aggregation-builder dedup OOM safety", () => {
         expect(body).not.toContain("LIMIT 1 BY");
       });
 
-      it("uses max(UpdatedAt) GROUP BY for trace dedup", () => {
-        expect(body).toContain("max(UpdatedAt)");
-        expect(body).toMatch(/GROUP BY\s+TenantId,\s*TraceId/);
+      it("keeps the latest version by dropping the replaced ones, grouped per trace", () => {
+        expect(body).toContain("latestTraceVersionOnly(");
       });
 
       it("applies dateFilter in both inner and outer query paths", () => {

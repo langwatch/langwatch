@@ -34,6 +34,10 @@ export class TestModelProviderService implements ModelProviderApi {
     return this.cost;
   }
 
+  listForProjectWithServedModels(): Promise<[]> {
+    return Promise.resolve([]);
+  }
+
   listForProject(): Promise<[]> {
     return Promise.resolve([]);
   }
@@ -126,6 +130,18 @@ export class TestModelProviderService implements ModelProviderApi {
 
   resolveModelForFeature(): Promise<never> {
     throw new Error("Not used by Trace tests.");
+  }
+
+  resolveDecisionModel(): Promise<never> {
+    throw new Error("Not used by Trace tests.");
+  }
+
+  listDecisionModelsForProject(): Promise<[]> {
+    return Promise.resolve([]);
+  }
+
+  listDecisionModelsForScopes(): Promise<[]> {
+    return Promise.resolve([]);
   }
 
   findAlternateModel(): Promise<never> {

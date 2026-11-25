@@ -67,6 +67,8 @@ const AGENT_LABELS: Record<string, string> = {
   opencode: "OpenCode",
   cursor: "Cursor",
   gemini_cli: "Gemini CLI",
+  grok: "Grok",
+  pi: "pi",
 };
 
 /** A known agent identifier renders as its product name; an unknown one falls
@@ -109,6 +111,8 @@ const AGENT_ICONS: Record<string, string> = {
   cursor: "cursor.svg",
   gemini_cli: "gemini.svg",
   github_copilot: "github-copilot.svg",
+  grok: "grok-lighttheme.svg",
+  pi: "pi.svg",
 };
 
 /** A known agent renders with its product icon before the name; an unknown

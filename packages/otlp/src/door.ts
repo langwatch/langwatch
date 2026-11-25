@@ -5,8 +5,10 @@
  */
 import { HandledError } from "@langwatch/handled-error";
 import type { Named } from "@langwatch/module";
-import type { Logger } from "@langwatch/observability";
+import { createWarnThrottle, type Logger } from "@langwatch/observability";
+import { counter } from "@langwatch/observability/metrics";
 import { nowInstant } from "@langwatch/time";
+import { type Span, SpanStatusCode } from "@opentelemetry/api";
 import { z } from "zod";
 
 import { OtlpIngestSourceBillingUnavailableError } from "./errors.ts";
@@ -33,7 +35,14 @@ export type OtlpDoorRefusal =
   | Readonly<{ outcome: "parse-failed" }>
   | Readonly<{ outcome: "not-found" }>;
 
-export type OtlpDoorAnswer = Readonly<{ status: 200 | 400 | 401 | 403 | 404 | 503; body: object }>;
+export type OtlpDoorAnswer = Readonly<{
+  status: 200 | 400 | 401 | 403 | 404 | 503;
+  body: object;
+  headers?: Readonly<Record<string, string>>;
+}>;
+
+/** A retryable 503 names its wait, so an exporter resends after a draining pod left the pool. */
+const OTLP_RETRY_HEADERS = { "Retry-After": "5" } as const;
 
 /** The source billing an ingestion key resolved, per signal, or why it could not. */
 export const otlpSourcePolicySchema = z.discriminatedUnion("status", [
@@ -77,6 +86,24 @@ export const otlpIngestCredentialSchema: OtlpIngestCredentialSchema =
 /** A refusal is thrown, and the receiver renders it. */
 export type OtlpIngestCredential = Readonly<z.infer<typeof otlpIngestCredentialSchema>>;
 
+/** The key an OTLP bearer is, as a request's access record names it: id and kind only. */
+export type OtlpIngestKey = Readonly<{
+  kind: "legacy_project_key" | "api_key" | "ingestion_key";
+  apiKeyId: string | null;
+  ownerUserId: null;
+}>;
+
+/**
+ * The key behind an OTLP credential. No key id is the legacy project key; a source type is what
+ * makes a key an ingestion key, as the receiver's provenance reads it, with or without a template.
+ */
+export function otlpIngestKeyOf(identity: OtlpIngestCredential["identity"]): OtlpIngestKey {
+  if (!identity.apiKeyId) return { kind: "legacy_project_key", apiKeyId: null, ownerUserId: null };
+  const kind = identity.ingestSourceType ? "ingestion_key" : "api_key";
+
+  return { kind, apiKeyId: identity.apiKeyId, ownerUserId: null };
+}
+
 /** The credential refusals the ingestion doors answer in their own wire, and nothing else. */
 const DOOR_REFUSAL_CODES: ReadonlySet<string> = new Set([
   "missing_credentials",
@@ -87,6 +114,111 @@ const DOOR_REFUSAL_CODES: ReadonlySet<string> = new Set([
 /** A refusal the credential chain raised that an ingestion door renders itself. */
 export function isIngestDoorRefusal(error: unknown): error is HandledError {
   return HandledError.isHandled(error) && DOOR_REFUSAL_CODES.has(error.code);
+}
+
+/** One door-refusal line per caller per window; the counter below holds the full volume. */
+const REFUSAL_LOG_WINDOW_MS = 60_000;
+/** Callers the throttle remembers; the longest quiet one is forgotten first. */
+const REFUSAL_LOG_MAX_CALLERS = 1_000;
+
+const refusalLog = createWarnThrottle(REFUSAL_LOG_WINDOW_MS, { maxKeys: REFUSAL_LOG_MAX_CALLERS });
+
+/** Every refused ingest request, by signal, reason code and status: no tenant, key or token. */
+const ingestDoorRefusalsTotal = counter({
+  name: "langwatch_ingest_door_refusals_total",
+  description: "Ingest requests refused at the credential door, by signal, reason code and status.",
+});
+
+/** The slice of a span the client-fault guard writes and closes. */
+type FaultSpan = Pick<Span, "recordException" | "setAttributes" | "setStatus" | "end">;
+
+/**
+ * Runs `body` in a span `open` starts and leaves open (a tracer's `startActiveSpan`), then ends it.
+ * A resolved answer (a 400 for a bad body included) leaves the status UNSET, as does a thrown
+ * customer fault, which keeps its exception and code; anything else thrown is ERROR.
+ */
+export function withClientFaultSpan<S extends FaultSpan, T>(
+  open: (run: (span: S) => Promise<T>) => Promise<T>,
+  body: (span: S) => Promise<T>,
+): Promise<T> {
+  return open(async (span) => {
+    try {
+      return await body(span);
+    } catch (error) {
+      recordFailure({ span, error });
+      throw error;
+    } finally {
+      span.end();
+    }
+  });
+}
+
+function recordFailure({ span, error }: { span: FaultSpan; error: unknown }): void {
+  if (HandledError.isHandled(error) && error.fault === "customer") {
+    span.recordException(error);
+    span.setAttributes({ "langwatch.error.code": error.code, "langwatch.error.fault": "customer" });
+    return;
+  }
+  if (error instanceof Error) span.recordException(error);
+  span.setStatus({
+    code: SpanStatusCode.ERROR,
+    message: error instanceof Error ? error.message : String(error),
+  });
+}
+
+/** Clears the sampled-log state; tests only. */
+export function resetIngestDoorRefusalLog(): void {
+  refusalLog.reset();
+}
+
+/**
+ * Records a credential refusal at an ingestion door. The counter takes every refusal; the warn
+ * line is sampled per caller, since an exporter retries a refused batch many times a
+ * second. A suppressed refusal is still written, at debug.
+ */
+export function recordIngestDoorRefusal({
+  logger,
+  signal,
+  error,
+  diagnostics,
+  now = nowInstant().epochMilliseconds,
+}: {
+  logger: Pick<Logger, "warn" | "debug">;
+  signal: OtlpSignal;
+  error: HandledError;
+  diagnostics: Readonly<
+    {
+      hasEmptyAuthToken: boolean;
+      userAgent?: string | null;
+      clientAddress?: string | null;
+    } & Record<string, unknown>
+  >;
+  now?: number;
+}): void {
+  const refusalStatus = ingestDoorRefusalStatus(error);
+  ingestDoorRefusalsTotal.inc({ signal, code: error.code, status: refusalStatus });
+
+  const caller = `${diagnostics.clientAddress ?? ""}|${diagnostics.userAgent ?? ""}`;
+  const suppressed = refusalLog.claim({
+    key: `${signal}|${error.code}|${diagnostics.hasEmptyAuthToken}|${caller}`,
+    now,
+  });
+  const message = diagnostics.hasEmptyAuthToken
+    ? "Authentication failed: X-Auth-Token sent but empty"
+    : "Authentication failed";
+
+  if (suppressed === undefined) {
+    logger.debug({ ...diagnostics, refusalStatus }, message);
+    return;
+  }
+  logger.warn(
+    {
+      ...diagnostics,
+      refusalStatus,
+      ...(suppressed > 0 ? { suppressedRefusals: suppressed } : {}),
+    },
+    message,
+  );
 }
 
 /** Whether the refusal is "we do not know this credential", not a ceiling on a key we know. */
@@ -134,7 +266,7 @@ export function otlpDoorFailureAnswer({
     case "not-found":
       return { status: 404, body: { error: "Not Found" } };
     case "unavailable":
-      return { status: 503, body: { error: result.errorMessage } };
+      return { status: 503, body: { error: result.errorMessage }, headers: OTLP_RETRY_HEADERS };
   }
 }
 

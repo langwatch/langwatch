@@ -3,7 +3,20 @@
 import { defineTrpcContract, type Named } from "@langwatch/module";
 import { z } from "zod";
 
-import { governanceIngestionSourceTypeSchema } from "./ingestion-source.commands.ts";
+import {
+  securityLakeCallersSchema,
+  securityLakeConnectionTestInputSchema,
+  securityLakeConnectionTestSchema,
+  securityLakeSourceCreateInputSchema,
+  securityLakeSourceHealthSchema,
+  securityLakeSourceSchema,
+  securityLakeSourceUpdateInputSchema,
+} from "../ocsf/security-lake.ts";
+import {
+  governanceIngestionSourceTypeSchema,
+  INGESTION_SOURCE_DESCRIPTION_MAX,
+  INGESTION_SOURCE_NAME_MAX,
+} from "./ingestion-source.commands.ts";
 import {
   ingestionSourceDtoSchema,
   ingestionSourceWithSecretSchema,
@@ -18,8 +31,8 @@ const ingestionSourceCreateInputSchemaDefinition = z.object({
   ...organizationScope.shape,
   teamId: z.string().nullable().optional(),
   sourceType: governanceIngestionSourceTypeSchema,
-  name: z.string().min(1).max(128),
-  description: z.string().nullable().optional(),
+  name: z.string().min(1).max(INGESTION_SOURCE_NAME_MAX),
+  description: z.string().max(INGESTION_SOURCE_DESCRIPTION_MAX).nullable().optional(),
   parserConfig: z.record(z.string(), z.unknown()).optional(),
   pullConfig: z.record(z.string(), z.unknown()).nullable().optional(),
   pullSchedule: z.string().min(1).max(64).nullable().optional(),
@@ -34,8 +47,8 @@ export type IngestionSourceCreateInput = z.infer<typeof ingestionSourceCreateInp
 
 const ingestionSourceUpdateInputSchemaDefinition = z.object({
   ...sourceInOrganization.shape,
-  name: z.string().min(1).max(128).optional(),
-  description: z.string().nullable().optional(),
+  name: z.string().min(1).max(INGESTION_SOURCE_NAME_MAX).optional(),
+  description: z.string().max(INGESTION_SOURCE_DESCRIPTION_MAX).nullable().optional(),
   parserConfig: z.record(z.string(), z.unknown()).optional(),
   status: z.enum(["active", "disabled", "awaiting_first_event"]).optional(),
   teamId: z.string().nullable().optional(),
@@ -75,6 +88,34 @@ export const ingestionSourcesTrpc = defineTrpcContract("ingestionSources")
   .mutation("update")
   .withInput(ingestionSourceUpdateInputSchema)
   .withOutput(ingestionSourceDtoSchema)
+
+  .mutation("securityLakeCreate")
+  .withInput(z.object({ ...organizationScope.shape, ...securityLakeSourceCreateInputSchema.shape }))
+  .withOutput(securityLakeSourceSchema)
+
+  .mutation("securityLakeUpdate")
+  .withInput(
+    z.object({ ...sourceInOrganization.shape, ...securityLakeSourceUpdateInputSchema.shape }),
+  )
+  .withOutput(securityLakeSourceSchema)
+
+  .query("securityLakeGet")
+  .withInput(sourceInOrganization)
+  .withOutput(securityLakeSourceSchema)
+
+  .mutation("securityLakeTestConnection")
+  .withInput(
+    z.object({ ...sourceInOrganization.shape, ...securityLakeConnectionTestInputSchema.shape }),
+  )
+  .withOutput(securityLakeConnectionTestSchema)
+
+  .query("securityLakeHealth")
+  .withInput(sourceInOrganization)
+  .withOutput(securityLakeSourceHealthSchema)
+
+  .query("securityLakeCallersWithoutTraces")
+  .withInput(organizationScope)
+  .withOutput(securityLakeCallersSchema)
 
   .mutation("rotateSecret")
   .withInput(sourceInOrganization)

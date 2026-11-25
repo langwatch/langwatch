@@ -16,7 +16,9 @@ import type {
   opsQueueTrpc,
   opsUpgradeTrpc,
   selfHostedInstancesTrpc,
+  selfHostedNoticesTrpc,
 } from "@langwatch/ops-contract";
+import type { organizationSeatPeakTrpc } from "@langwatch/organization-contract";
 import type { promptTrpc } from "@langwatch/prompt-contract";
 import type { TimeInput } from "@langwatch/time";
 
@@ -74,8 +76,8 @@ type BorrowedProcedures = {
 };
 
 /**
- * The whole `ops.*`, `bugReports.*`, `prompts.*`, `ssoConnections.*`,
- * `identityLookup.*` and `organization.*` surface this package calls.
+ * The whole `ops.*`, `selfHostedNotices.*`, `bugReports.*`, `prompts.*`, `ssoConnections.*`,
+ * `identityLookup.*`, `organizationSeatPeak.*` and `organization.*` surface this package calls.
  */
 export type OpsApiMap = ContractApiMap<typeof opsDashboardTrpc> &
   ContractApiMap<typeof opsEventLogTrpc> &
@@ -86,9 +88,11 @@ export type OpsApiMap = ContractApiMap<typeof opsDashboardTrpc> &
   ContractApiMap<typeof opsUpgradeTrpc> &
   ContractApiMap<typeof licenseRegistryTrpc> &
   ContractApiMap<typeof selfHostedInstancesTrpc> &
+  ContractApiMap<typeof selfHostedNoticesTrpc> &
   ContractApiMap<typeof promptTrpc> &
   ContractApiMap<typeof ssoConnectionTrpc> &
   ContractApiMap<typeof identityLookupTrpc> &
+  ContractApiMap<typeof organizationSeatPeakTrpc> &
   BorrowedProcedures;
 
 /**

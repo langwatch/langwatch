@@ -77,6 +77,7 @@ async function parkCall(state: ConnectedAgentStateRepository, callId: string) {
     instanceId,
     replyTo: "pod_caller",
     envelope: {
+      kind: "turn",
       callId,
       agentId,
       threadId: "thread_1",

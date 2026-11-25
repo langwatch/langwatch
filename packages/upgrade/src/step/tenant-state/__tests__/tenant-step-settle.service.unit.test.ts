@@ -3,6 +3,7 @@
  * @see specs/upgrade/upgrade-stuck-states-locks.feature
  */
 import {
+  type HeldReason,
   type MigrationLeaseRepository,
   SystemMigrationRunnerService,
 } from "@langwatch/system-migrations";
@@ -48,13 +49,16 @@ function settling() {
   });
   const service = TenantStepSettleService.create({ state, ledger });
   const settle = () => service.settle({ buckets: [{ ids: [STEP], runner }] });
-  const record = (tenantId: string, fields: { status: "finalized" | "migrated" | "parked" }) =>
+  const record = (
+    tenantId: string,
+    fields: { status: "finalized" | "migrated" | "parked"; heldReason?: HeldReason },
+  ) =>
     state.upsertRecord({
       migrationName: STEP,
       tenantId,
       report: null,
-      ...fields,
       ...(fields.status === "migrated" ? { heldReason: "pending" as const } : {}),
+      ...fields,
     });
   return { runner, ledger, settle, record };
 }
@@ -86,6 +90,22 @@ describe("TenantStepSettleService", () => {
 
       await record("org-2", { status: "parked" });
       await settle();
+      expect(ledger.isSettled({ id: STEP })).toBe(false);
+    });
+  });
+
+  describe("when a tenant waits on a person", () => {
+    /** @scenario "A tenant waiting on a person does not keep a tenant step pending" */
+    it("settles the step, and a tenant held for its proof reopens it", async () => {
+      const { ledger, settle, record } = settling();
+      await record("org-1", { status: "finalized" });
+      await record("org-2", { status: "migrated", heldReason: "person" });
+
+      expect(await settle()).toEqual([]);
+      expect(ledger.isSettled({ id: STEP })).toBe(true);
+
+      await record("org-1", { status: "migrated", heldReason: "proof" });
+      expect(await settle()).toEqual([STEP]);
       expect(ledger.isSettled({ id: STEP })).toBe(false);
     });
   });

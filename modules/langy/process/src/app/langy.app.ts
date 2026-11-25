@@ -72,7 +72,7 @@ import {
   type LangyConversationListPageDto,
   type LangyConversationMessagesDto,
   type LangyPanelCall,
-  type LangyStreamEntry,
+  type LangyStreamFrame,
   type langyAnswerLocalPermissionInputSchema,
   type langyAnswerQuestionInputSchema,
   type langyClaimUiActionInputSchema,
@@ -128,6 +128,9 @@ import {
 import { buildLangyMaintenancePipeline } from "../eventing/langy-maintenance.pipeline.ts";
 import { LangyConversationEventLogService } from "../features/conversation/services/langy-conversation-event-log.service.ts";
 import { LangyConversationUpdateService } from "../features/conversation/services/langy-conversation-update.service.ts";
+import { LangyConfirmationAnswersService } from "../features/delete-confirmation/services/langy-confirmation-answers.service.ts";
+import { LangyDeleteConfirmationService } from "../features/delete-confirmation/services/langy-delete-confirmation.service.ts";
+import { LangyCiFollowUpService } from "../features/github/services/langy-ci-follow-up.service.ts";
 import { LangyGithubPrPermitService } from "../features/github/services/langy-github-pr-permit.service.ts";
 import {
   LANGY_GITHUB_PRS_PER_DAY,
@@ -152,6 +155,7 @@ import type { LangySessionKeyService } from "../features/session-key/services/la
 import { LangyVirtualKeyGatewayService } from "../features/session-key/services/langy-virtual-key-gateway.service.ts";
 import { LangyVirtualKeyProvisioningService } from "../features/session-key/services/langy-virtual-key-provisioning.service.ts";
 import { LangyTurnSettlementWaiterService } from "../features/turn/services/langy-turn-settlement-waiter.service.ts";
+import type { LangyTurnLocalWork } from "../features/turn/services/langy-turn-shared.service.ts";
 import { LangyTurnsBoundsService } from "../features/turn/services/langy-turns-bounds.service.ts";
 import { LangyUnattendedTurnService } from "../features/turn/services/langy-unattended-turn.service.ts";
 import { LangyUiActionBackendService } from "../features/ui-action/services/langy-ui-action-backend.service.ts";
@@ -190,6 +194,8 @@ const relayLogger = createLogger("langwatch:langy:relay");
 type LangyAppDependencies = {
   langy: LangyService;
   internalDoor: RestIdentity;
+  /** The gate every Langy key's delete passes: a click on its card, or a refusal. */
+  deleteConfirmations: LangyDeleteConfirmationService;
   /** The rows the module keeps outside its event log, chosen at boot. */
   repositories: LangyRepositories;
   /**
@@ -202,6 +208,8 @@ type LangyAppDependencies = {
   turnBounds: LangyTurnsBoundsService;
   /** Turns a module starts for a person who is not at the keyboard, read-only. */
   unattendedTurns: LangyUnattendedTurnService;
+  /** Turns CI starts on the pull requests Langy opened. */
+  ciFollowUps: LangyCiFollowUpService;
   virtualKeyProvisioning: LangyVirtualKeyProvisioningService;
   /** The rollout gate and key-owner bridge every key-authenticated door runs. */
   callers: LangyRestCallerService;
@@ -306,20 +314,10 @@ export class LangyModule implements LangyApiContract {
       apiKeys: setup.dependencies.apiKeys,
       authz: setup.dependencies.authz,
       metrics: LangySessionKeyMetricsOtelService.create(),
-    });
-    const built = LangyModule.#composeInfrastructure({
-      setup,
-      // Main's preset: no agent, no turn worker, so a send refuses "Agent not configured".
-      worker: configured ? channel : null,
-      sessionKeys,
+      bindings: setup.repositories.deleteConfirmations,
     });
     const commands = LangyConversationCommandSenders.create();
     const conversationEvents = LangyConversationEventLogService.create();
-    const langy = adapter.build({
-      ...built,
-      commands,
-      events: conversationEvents,
-    });
     const workspace = LangyLocalWorkspaceService.create({
       users: setup.dependencies.users,
       github: setup.dependencies.github,
@@ -332,6 +330,9 @@ export class LangyModule implements LangyApiContract {
       projects: setup.dependencies.projects,
     });
     const buffer = setup.repositories.tokenBuffer.open();
+    const confirmationAnswers = LangyConfirmationAnswersService.create({
+      confirmations: setup.repositories.deleteConfirmations,
+    });
     const runtime = LangyLocalControlRuntimeService.create({
       calls: setup.repositories.localCalls,
       userWaits: setup.repositories.localUserWaits,
@@ -342,6 +343,28 @@ export class LangyModule implements LangyApiContract {
       mintSessionKey: (input) => sessionKeys.mintForUser(input),
       events: commands,
       buffer,
+      onAnswered: (wait) => confirmationAnswers.recordAnswer(wait),
+      users: setup.dependencies.users,
+    });
+    const built = LangyModule.#composeInfrastructure({
+      setup,
+      // Main's preset: no agent, no turn worker, so a send refuses "Agent not configured".
+      worker: configured ? channel : null,
+      sessionKeys,
+      // Stop ends the cards and commands the turn left on the developer's machine.
+      localWork: runtime,
+    });
+    const langy = adapter.build({
+      ...built,
+      commands,
+      events: conversationEvents,
+    });
+    const deleteConfirmations = LangyDeleteConfirmationService.create({
+      confirmations: setup.repositories.deleteConfirmations,
+      answers: confirmationAnswers,
+      waits: runtime.waits,
+      localKeys: setup.repositories.localControlRequests,
+      conversations: langy,
     });
     const core = LocalControlSessionCoreService.create({
       apiKeys: setup.dependencies.apiKeys,
@@ -372,10 +395,17 @@ export class LangyModule implements LangyApiContract {
         }
         await guidedOnboardingSenders.commands.recordGuidedOnboardingTurnFailed.send(data);
       },
+      recordFirstMessageSeen: async (data) => {
+        if (!guidedOnboardingSenders.commands) {
+          throw new Error("langy_guided_onboarding pipeline senders are not connected yet");
+        }
+        await guidedOnboardingSenders.commands.recordLangyFirstMessageSeen.send(data);
+      },
     });
     const conversationProcessing = EventingLangyConversationAdapter.create({
       langyConversationProjectionStore: persistence.langyConversationState,
       langyConversationTurnProjectionStore: persistence.langyConversationTurnState,
+      langyPullRequestStore: persistence.langyPullRequests,
       langyMessageProjectionStore: persistence.langyMessageStorage,
       langyAnalyticsEventProjectionStore: LangyAnalyticsEventStorageService.create({
         sink: setup.repositories.analyticsEvents,
@@ -449,12 +479,22 @@ export class LangyModule implements LangyApiContract {
       langy,
       uiActionDoor,
       internalDoor: door,
+      deleteConfirmations,
       repositories: setup.repositories,
       presence: setup.dependencies.presence,
       turnBounds,
       unattendedTurns: LangyUnattendedTurnService.create({
         users: setup.dependencies.users,
         projects: setup.dependencies.projects,
+        featureFlags: setup.dependencies.featureFlags,
+        bounds: turnBounds,
+        turns: langy,
+      }),
+      ciFollowUps: LangyCiFollowUpService.create({
+        pullRequests: setup.repositories.pullRequests,
+        conversations: persistence.langyConversationState,
+        projects: setup.dependencies.projects,
+        users: setup.dependencies.users,
         featureFlags: setup.dependencies.featureFlags,
         bounds: turnBounds,
         turns: langy,
@@ -482,6 +522,7 @@ export class LangyModule implements LangyApiContract {
       panelConversations: LangyPanelConversationService.create({
         access,
         langy,
+        confirmations: deleteConfirmations,
         turnBounds,
         rateLimits: setup.repositories.rateLimits,
         presence: setup.dependencies.presence,
@@ -521,10 +562,12 @@ export class LangyModule implements LangyApiContract {
     setup,
     worker,
     sessionKeys,
+    localWork,
   }: {
     setup: LangySetup;
     worker: LangyWorker | null;
     sessionKeys: LangySessionKeyService;
+    localWork: LangyTurnLocalWork;
   }): Omit<LangyServiceCompositionOptions, "commands"> {
     const { config, dependencies, repositories } = setup;
     const { publicBaseUrl } = config;
@@ -550,7 +593,7 @@ export class LangyModule implements LangyApiContract {
         worker,
         tokenBuffer: repositories.tokenBuffer.open(),
         permits: LangyGithubPrPermitService.create(
-          LangyGithubPrQuotaService.create({ counts: repositories.githubPrCounts }),
+          LangyGithubPrQuotaService.create({ pullRequests: repositories.pullRequests }),
         ),
         perDayPrCap: LANGY_GITHUB_PRS_PER_DAY,
         sessionKeys,
@@ -562,6 +605,7 @@ export class LangyModule implements LangyApiContract {
         metrics: { count: () => undefined },
         accessStore: repositories.turnAccess,
         handoffStore: repositories.turnHandoff,
+        localWork,
       },
       credentials: {
         sessionKeys,
@@ -659,7 +703,13 @@ export class LangyModule implements LangyApiContract {
   maintenanceEventingPipeline(): StaticPipelineDefinition<never> {
     return buildLangyMaintenancePipeline({
       virtualKeyProvisioning: this.dependencies.virtualKeyProvisioning,
+      ciFollowUps: this.dependencies.ciFollowUps,
     });
+  }
+
+  /** The confirmation gate the process's REST host asks before a Langy key's delete runs. */
+  get deleteConfirmations(): LangyDeleteConfirmationService {
+    return this.dependencies.deleteConfirmations;
   }
 
   get internalDoor(): RestIdentity {
@@ -1089,7 +1139,7 @@ export class LangyModule implements LangyApiContract {
 
   watchTurnStream(
     input: LangyPanelCall<typeof langyTurnStreamInputSchema> & { signal?: AbortSignal },
-  ): AsyncIterable<LangyStreamEntry> {
+  ): AsyncIterable<LangyStreamFrame> {
     return this.dependencies.panelTurnStream.watchTurnStream(input);
   }
 

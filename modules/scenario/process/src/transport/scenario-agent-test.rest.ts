@@ -28,6 +28,7 @@ export const scenarioAgentTestRest = defineRestRouter(ScenarioApi)
   .withAddressing("literal", { v1Twin: false })
 
   .post("/api/v1/agents/:id/test", "testAgent")
+  .keepsRecords()
   .withSharedPath({
     owner: "agent",
     reason: "agent test door served by scenario while the cut lands (R10)",
@@ -44,12 +45,13 @@ export const scenarioAgentTestRest = defineRestRouter(ScenarioApi)
     app.testAgentRun({
       projectId: scope.id,
       agentId: input.id,
+      // A key that belongs to no person still names itself, so the run's key is minted under it.
       actor:
-        context.viewerUserId === null
+        context.viewerUserId === null && callerKey === null
           ? undefined
           : {
-              id: context.viewerUserId,
-              label: "user",
+              ...(context.viewerUserId === null ? {} : { id: context.viewerUserId }),
+              label: context.viewerUserId === null ? "api" : "user",
               ...(callerKey ? { apiKeyId: callerKey } : {}),
             },
     }),

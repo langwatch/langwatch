@@ -1,0 +1,54 @@
+/**
+ * Whether a query's SQL reads {dashboard_context_sources:Array(String)}, and whether it names a
+ * view that can follow it. A query that does not read the parameter counts every origin
+ * (dashboards-v2 AC204), and one that reads only origin-less views cannot follow sources (AC202f).
+ */
+
+import { LWQL_SOURCES_PARAMETER, lwqlExecutedText } from "@langwatch/analytics-contract";
+
+export const SOURCES_PLACEHOLDER = `{${LWQL_SOURCES_PARAMETER}:Array(String)}`;
+
+/** The presence query tells a quiet period from a source never set up: it reads every origin. */
+export const PRESENCE_QUERY = "present";
+
+/** Views with the normalised `Source` column. */
+export const SOURCE_VIEWS = ["trace_metrics", "evaluation_metrics"] as const;
+
+/**
+ * Views that keep both the evaluation's `Source` and its trace's `TraceSource`: the read they
+ * replace kept both `evaluation_metrics` and the joined `trace_metrics` to the sources.
+ */
+export const SOURCE_AND_TRACE_SOURCE_VIEWS = [
+  "trace_evaluation_metrics",
+  "trace_evaluation_checks",
+] as const;
+
+/** Views keyed by the trace that carries the origin, reached through `trace_metrics`. */
+export const TRACE_VIEWS = [
+  "traces",
+  "spans",
+  "span_metrics",
+  "evaluations",
+  "annotations",
+] as const;
+
+/** Views that keep an origin, or reach one through their trace. */
+export const VIEWS_WITH_ORIGIN: readonly string[] = [
+  ...SOURCE_VIEWS,
+  ...SOURCE_AND_TRACE_SOURCE_VIEWS,
+  ...TRACE_VIEWS,
+];
+
+/** The distinct views a query names after FROM or JOIN, with or without their database. */
+export function namedViews(sql: string): string[] {
+  const named = [
+    ...lwqlExecutedText(sql).matchAll(/\b(?:FROM|JOIN)\s+(?:[a-z_]+\.)?([a-z_]+)/gi),
+  ].map((match) => match[1] ?? "");
+
+  return [...new Set(named)];
+}
+
+/** Whether a query can follow sources at all: it names a view that keeps an origin. */
+export function canFollowSources(sql: string): boolean {
+  return namedViews(sql).some((view) => VIEWS_WITH_ORIGIN.includes(view));
+}

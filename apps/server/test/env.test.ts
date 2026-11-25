@@ -168,6 +168,46 @@ describe("reconcileEnvFile", () => {
     });
   });
 
+  describe("when the person runs their own Redis and ClickHouse on this machine", () => {
+    /** @scenario "A database they bring on this machine stays theirs on the next start" */
+    it("keeps their URLs on a port shift and moves only the bundled Postgres", async () => {
+      const { envPath } = await scaffoldAt(5560);
+      writeFileSync(
+        envPath,
+        readFileSync(envPath, "utf8")
+          .replace("REDIS_URL=redis://localhost:6561/0", "REDIS_URL=redis://localhost:6379/0")
+          .replace(
+            "CLICKHOUSE_URL=http://localhost:6562/langwatch",
+            "CLICKHOUSE_URL=http://localhost:8123/langwatch",
+          ),
+      );
+
+      const reconciled = reconcileEnvFile({ ports: allocatePorts(5580), path: envPath });
+
+      const body = readFileSync(envPath, "utf8");
+      expect(body).toContain("REDIS_URL=redis://localhost:6379/0");
+      expect(body).toContain("CLICKHOUSE_URL=http://localhost:8123/langwatch");
+      expect(body).toContain("DATABASE_URL=postgresql://langwatch@localhost:6580");
+      expect(reconciled).not.toContain("REDIS_URL");
+      expect(reconciled).not.toContain("CLICKHOUSE_URL");
+    });
+
+    /** @scenario "A database they bring on this machine stays theirs on the next start" */
+    it("leaves them alone on a start at the same ports", async () => {
+      const { envPath } = await scaffoldAt(5560);
+      writeFileSync(
+        envPath,
+        readFileSync(envPath, "utf8").replace(
+          "REDIS_URL=redis://localhost:6561/0",
+          "REDIS_URL=redis://localhost:6379/0",
+        ),
+      );
+
+      expect(reconcileEnvFile({ ports: allocatePorts(5560), path: envPath })).toEqual([]);
+      expect(readFileSync(envPath, "utf8")).toContain("REDIS_URL=redis://localhost:6379/0");
+    });
+  });
+
   describe("when scaffoldEnvFile runs over an existing file", () => {
     it("reconciles only when asked to (a default-port guess must not rewrite a shifted install)", async () => {
       const { envPath } = await scaffoldAt(5580);

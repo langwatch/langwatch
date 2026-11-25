@@ -339,13 +339,22 @@ var Prereqs = []Prereq{{
 	DarwinOnly:  true,
 	Detail: "One brew-managed server for the machine; worktrees never collide\n" +
 		"    because each gets its own database index. Without it the worker has no\n" +
-		"    queues, which reads as a stack that serves pages and runs no jobs.",
+		"    queues, which reads as a stack that serves pages and runs no jobs.\n" +
+		"    Valkey is a drop-in for Redis and haven's pick; an installed Redis still counts.",
+	// Valkey first: DefaultChoice installs it on a fresh machine. Either one
+	// installed satisfies the entry, so a machine with Redis keeps Redis.
 	Candidates: []Candidate{{
-		Key:                "redis",
-		Label:              DefaultRedisFormula,
-		Formula:            DefaultRedisFormula,
+		Key:                ValkeyFormula,
+		Label:              ValkeyFormula + " (drop-in for Redis)",
+		Formula:            ValkeyFormula,
 		FormulaIsAuthority: true,
-		Install:            "brew install " + DefaultRedisFormula,
+		Install:            "brew install " + ValkeyFormula,
+	}, {
+		Key:                RedisFormula,
+		Label:              RedisFormula,
+		Formula:            RedisFormula,
+		FormulaIsAuthority: true,
+		Install:            "brew install " + RedisFormula,
 	}},
 }, {
 	Key:         "observability",

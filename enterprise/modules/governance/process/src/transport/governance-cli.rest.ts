@@ -66,6 +66,7 @@ export const governanceCliRest = defineRestRouter(GovernanceRestApi)
   // The deleted project-key door answers 410 so old CLIs upgrade (Alex, 2026-10-01). Remove
   // after a few releases. Old CLIs print only `error_description`, so the body keeps their shape.
   .post("/api/auth/cli/project-key", "readCliProjectKey")
+  .keepsRecords()
   .withoutAudit("gone, writes nothing")
   .withRawBody("text", { mediaType: JSON_MEDIA_TYPE })
   .withAccess(CLI_DOOR)
@@ -79,6 +80,7 @@ export const governanceCliRest = defineRestRouter(GovernanceRestApi)
     },
   }))
   .post("/api/auth/cli/virtual-key", "issueCliVirtualKey")
+  .keepsRecords()
   .withAudit("governance.issueCliVirtualKey")
   .withRawBody("text", { mediaType: JSON_MEDIA_TYPE })
   .withAccess(CLI_DOOR)
@@ -115,10 +117,12 @@ export const governanceCliRest = defineRestRouter(GovernanceRestApi)
       beforeIso: input.before_iso,
     }),
   )
+  // A source's health is an activity-monitor read, like its events and the console's
+  // sourceHealthMetrics, so the plan refusal names the same feature as the permission.
   .get("/api/auth/cli/governance/ingest/sources/:sourceId/health", "readCliIngestionSourceHealth")
   .withParams(governanceCliSourceParamsSchema)
   .withPermission("activityMonitor:view")
-  .withEntitlement("enterprise", { feature: "INGESTION_SOURCES", before: "permission" })
+  .withEntitlement("enterprise", { feature: "ACTIVITY_MONITOR", before: "permission" })
   .responds(governanceCliIngestionSourceHealthAnswers)
   .handle(({ app, actor, session, scope, input }) =>
     app.cliIngestionSourceHealth({
@@ -142,6 +146,7 @@ export const governanceCliRest = defineRestRouter(GovernanceRestApi)
     app.cliIngestionTemplates({ actor, session, organizationId: scope.id }),
   )
   .post("/api/auth/cli/governance/ingestion-key", "mintCliIngestionKey")
+  .keepsRecords()
   .withAudit("governance.mintCliIngestionKey")
   .withRawBody("text", { mediaType: JSON_MEDIA_TYPE })
   .withAccess(CLI_DOOR)

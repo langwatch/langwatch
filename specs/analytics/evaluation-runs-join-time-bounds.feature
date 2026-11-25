@@ -38,12 +38,6 @@ Feature: The evaluation_runs JOIN is bounded below, and only below
     When the analytics layer counts that evaluator's runs
     Then both evaluations are counted
 
-  @integration
-  Scenario: A late-scheduled evaluator is still offered as a filter value
-    Given an evaluator whose only runs are scheduled after the queried window
-    When the filter values for evaluator id are read for that window
-    Then the evaluator appears among them
-
   # ---------------------------------------------------------------------------
   # Executed against ClickHouse: the dedup across weekly partitions
   # ---------------------------------------------------------------------------
@@ -75,14 +69,8 @@ Feature: The evaluation_runs JOIN is bounded below, and only below
     Then every joined table is bounded only on its own partition column
 
   @unit
-  Scenario: Filter-value queries bound evaluation_runs on its own partition column
-    Given a filter-values query over evaluation_runs
-    When the generated SQL is checked for bounds on non-prunable columns
-    Then evaluation_runs is bounded only on its own partition column
-
-  @unit
   Scenario: The guard is non-vacuous: stored_spans really is bounded, on StartTime
-    Given a query that joins stored_spans
+    Given a timeseries query filtered by a stored_spans subquery
     When the generated SQL is checked for bounds on non-prunable columns
     Then stored_spans is bounded on StartTime
 

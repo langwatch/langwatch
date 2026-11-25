@@ -94,6 +94,7 @@ family()
 
 family()
   .post("/nine", "nine")
+  .keepsRecords()
   .withAccess(publicRoute({ reason: REASON }))
   // @ts-expect-error a protocol answer names what it publishes and why
   .withResponse("protocol", { produces: "application/scim+json" });

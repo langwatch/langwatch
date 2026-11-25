@@ -4,6 +4,8 @@
  * @see specs/lwql/api.feature
  */
 
+import { scryptSync } from "node:crypto";
+
 import {
   clickHouseLiteral,
   postgresLiteral,
@@ -14,6 +16,7 @@ import {
 } from "../../../services/langwatch-ql-access-model.service.ts";
 import { LangWatchQLSqlTextService } from "../../../services/langwatch-ql-sql-text.service.ts";
 import type { PostgresApprovedViewJoin } from "../../lwql-catalogue/rules/lwql-tenant-paths.rules.ts";
+import { LWQL_SCOPED_READER_GROUP, lwqlOrgRoleName } from "../rules/lwql-scoped-view.rules.ts";
 
 const accessModel = LangWatchQLAccessModelService.create();
 
@@ -43,6 +46,12 @@ interface LangWatchQLColumn {
  */
 export const DEFAULT_POSTGRES_ENGINE_POOL_SIZE = 2;
 
+/** Starts the engine-table comment that names the collection values the table was built on. */
+const CREDENTIAL_COMMENT_PREFIX = "lwql-credentials=";
+
+/** Fixed, so the fingerprint is stable across processes; scrypt makes a guess costly. */
+const CREDENTIAL_FINGERPRINT_SALT = "lwql-postgres-named-collection";
+
 /**
  * Alias the approved view's body gives the base relation. Fixed rather than
  * derived, so the tenant-path hops and the column projection agree on how to
@@ -66,26 +75,57 @@ function assertNoDollarTagCollision({ view, body }: { view: string; body: string
   }
 }
 
+/** Where the per-reader row scope reads each row's owning project. */
+interface PostgresReaderRowScope {
+  /** Alias and column carrying the row's project id. */
+  tenant: { alias: string; column: string };
+}
+
 /**
- * The fallback branch's guarded re-grant, run only when the `DROP`+`CREATE` path
- * actually drops the view. Empty when the caller does not know the reader role.
+ * The predicate ANDed into every scoped copy: a login sees the projects of the organizations whose
+ * role it holds, and no login is exempt. Inner aliases are prefixed so they cannot shadow the view
+ * body's own.
  */
-function readerRegrantClause({
-  readerRole,
-  qualifiedView,
+function readerRowScopePredicate({
+  scope,
+  quotedSchema,
 }: {
-  readerRole: string | undefined;
-  qualifiedView: string;
+  scope: PostgresReaderRowScope;
+  quotedSchema: string;
 }): string {
-  if (!readerRole) {
-    return "";
-  }
+  const tenant = `${sqlText.postgresQuoted(scope.tenant.alias)}.${sqlText.postgresQuoted(scope.tenant.column)}`;
+  const orgRole = lwqlOrgRoleName({ organizationIdExpression: 'lwql_t."organizationId"' });
 
   return (
-    `\n    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = ${postgresLiteral(readerRole)}) THEN\n` +
-    `      GRANT SELECT ON ${qualifiedView} TO ${sqlText.postgresQuoted(readerRole)};\n` +
-    `    END IF;`
+    `EXISTS (SELECT 1 ` +
+    `FROM ${quotedSchema}."Project" lwql_p ` +
+    `JOIN ${quotedSchema}."Team" lwql_t ON lwql_t.id = lwql_p."teamId" ` +
+    `JOIN pg_roles lwql_g ON lwql_g.rolname = ${orgRole} ` +
+    `JOIN pg_auth_members lwql_m ON lwql_m.roleid = lwql_g.oid ` +
+    `JOIN pg_roles lwql_u ON lwql_u.oid = lwql_m.member AND lwql_u.rolname = current_user ` +
+    `WHERE lwql_p.id = ${tenant})`
   );
+}
+
+/**
+ * The fallback branch's guarded re-grants, run only when the `DROP`+`CREATE` path
+ * actually drops the view. Empty when there is no role to re-grant.
+ */
+function readerRegrantClause({
+  roles,
+  qualifiedView,
+}: {
+  roles: readonly string[];
+  qualifiedView: string;
+}): string {
+  return roles
+    .map(
+      (role) =>
+        `\n    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = ${postgresLiteral(role)}) THEN\n` +
+        `      GRANT SELECT ON ${qualifiedView} TO ${sqlText.postgresQuoted(role)};\n` +
+        `    END IF;`,
+    )
+    .join("");
 }
 
 /** A defined-but-blank `rowFilter` is refused rather than read as no filter. */
@@ -165,25 +205,27 @@ export class LangWatchQLPostgresMappingService {
   private constructor() {}
 
   /**
-   * Creates the named collection holding the PostgreSQL credentials server-side.
+   * A short, one-way digest of every value the named collection holds plus the schema the
+   * engine tables read, never the password itself. An engine table's pool keeps the values it
+   * was built with, so a changed digest means rebuild.
    */
-  namedCollectionStatements({ connection }: { connection: PostgresNamedCollection }): string[] {
-    sqlText.assertIdentifier(connection.collection, "named collection");
-    if (!Number.isInteger(connection.port)) {
-      throw new Error(
-        `lwql provisioning: named collection port must be an integer, got ${connection.port}`,
-      );
-    }
+  credentialFingerprint({
+    connection,
+    schema,
+  }: {
+    connection: Omit<PostgresNamedCollection, "collection">;
+    /** Part of the digest: a table built before the schema was pinned reads as stale. */
+    schema: string;
+  }): string {
+    const { host, port, database, user, password } = connection;
+    const material = JSON.stringify([host, port, database, user, password, schema]);
 
-    return [
-      `DROP NAMED COLLECTION IF EXISTS ${connection.collection}`,
-      `CREATE NAMED COLLECTION ${connection.collection} AS ` +
-        `host=${clickHouseLiteral(connection.host)}, ` +
-        `port=${connection.port}, ` +
-        `database=${clickHouseLiteral(connection.database)}, ` +
-        `user=${clickHouseLiteral(connection.user)}, ` +
-        `password=${clickHouseLiteral(connection.password)}`,
-    ];
+    return scryptSync(material, CREDENTIAL_FINGERPRINT_SALT, 8).toString("hex");
+  }
+
+  /** The comment an engine table built on these collection values carries. */
+  credentialComment({ fingerprint }: { fingerprint: string }): string {
+    return `${CREDENTIAL_COMMENT_PREFIX}${fingerprint}`;
   }
 
   /**
@@ -197,15 +239,21 @@ export class LangWatchQLPostgresMappingService {
     columns,
     collection,
     postgresRelation,
+    schema,
     connectionPoolSize = DEFAULT_POSTGRES_ENGINE_POOL_SIZE,
+    credentialFingerprint,
   }: {
     names: LangWatchQLNames;
     table: string;
     columns: LangWatchQLColumn[];
     collection: string;
     postgresRelation: string;
+    /** The app PostgreSQL schema; the role's search_path is never set, so it may omit it. */
+    schema: string;
     /** Connections this one mapped table may hold open. See the constant. */
     connectionPoolSize?: number;
+    /** Stamped once ClickHouse is shown to hold these values; absent reads as stale (#8858). */
+    credentialFingerprint?: string;
   }): string {
     accessModel.assertNames(names);
     sqlText.assertIdentifier(collection, "named collection");
@@ -225,11 +273,16 @@ export class LangWatchQLPostgresMappingService {
     const columnList = columns
       .map((column) => `${sqlText.assertIdentifier(column.name, "column")} ${column.type}`)
       .join(", ");
+    const comment =
+      credentialFingerprint === undefined
+        ? ""
+        : ` COMMENT ${clickHouseLiteral(this.credentialComment({ fingerprint: credentialFingerprint }))}`;
 
     return (
       `CREATE OR REPLACE TABLE ${accessModel.qualified(names, table)} (${columnList}) ` +
-      `ENGINE = PostgreSQL(${collection}, table=${clickHouseLiteral(postgresRelation)}) ` +
-      `SETTINGS postgresql_connection_pool_size = ${connectionPoolSize}`
+      `ENGINE = PostgreSQL(${collection}, table=${clickHouseLiteral(postgresRelation)}, schema=${clickHouseLiteral(schema)}) ` +
+      `SETTINGS postgresql_connection_pool_size = ${connectionPoolSize}` +
+      comment
     );
   }
 
@@ -245,7 +298,11 @@ export class LangWatchQLPostgresMappingService {
     joins = [],
     rowFilter,
     readerRole,
+    rowScope,
+    viewSchema = schema,
+    onlyWhen,
   }: {
+    /** The app schema: the base relation, the tenant-path hops and the row scope read it. */
     schema: string;
     /** Name of the view to create. */
     view: string;
@@ -274,10 +331,19 @@ export class LangWatchQLPostgresMappingService {
      * `CREATE OR REPLACE VIEW` never touches privileges.
      */
     readerRole?: string;
+    /**
+     * Per-reader row scoping. When set the view is `security_barrier` and its WHERE clause
+     * carries the scope predicate; the scoped-reader group is re-granted on the fallback path.
+     */
+    rowScope?: PostgresReaderRowScope;
+    /** The schema the view is created in; defaults to {@link schema}. */
+    viewSchema?: string;
+    /** SQL condition the whole statement runs under; absent, it always runs. */
+    onlyWhen?: string;
   }): string {
     const quotedSchema = sqlText.postgresQuoted(schema);
     const quotedView = sqlText.postgresQuoted(view);
-    const qualifiedView = `${quotedSchema}.${quotedView}`;
+    const qualifiedView = `${sqlText.postgresQuoted(viewSchema)}.${quotedView}`;
     if (columns.length === 0) {
       throw new Error(`lwql provisioning: approved view "${view}" needs at least one column`);
     }
@@ -307,7 +373,12 @@ export class LangWatchQLPostgresMappingService {
     // is known, so a filter naming a sibling relation cannot spell that schema
     // literally; `{{schema}}` defers it to this call's actual schema.
     const resolvedRowFilter = rowFilter?.replaceAll("{{schema}}", quotedSchema);
-    const whereClause = resolvedRowFilter ? `\nWHERE (${resolvedRowFilter})` : "";
+    const conditions = [
+      ...(resolvedRowFilter ? [`(${resolvedRowFilter})`] : []),
+      ...(rowScope ? [readerRowScopePredicate({ scope: rowScope, quotedSchema })] : []),
+    ];
+    const whereClause = conditions.length > 0 ? `\nWHERE ${conditions.join("\nAND ")}` : "";
+    const viewOptions = rowScope ? " WITH (security_barrier=true)" : "";
     const body =
       `SELECT\n${projection}\n` +
       `FROM ${quotedSchema}.${sqlText.postgresQuoted(baseRelation)} AS ${sqlText.postgresQuoted(POSTGRES_BASE_ALIAS)}` +
@@ -317,16 +388,27 @@ export class LangWatchQLPostgresMappingService {
     // `CREATE OR REPLACE VIEW` refuses a changed column list; the fallback drops
     // and recreates, which is the only path that loses the reader's grant, so
     // that branch — and only that branch — re-grants it.
-    const regrant = readerRegrantClause({ readerRole, qualifiedView });
+    const regrant = readerRegrantClause({
+      roles: [...(readerRole ? [readerRole] : []), ...(rowScope ? [LWQL_SCOPED_READER_GROUP] : [])],
+      qualifiedView,
+    });
+
+    const block =
+      `BEGIN\n` +
+      `  CREATE OR REPLACE VIEW ${qualifiedView}${viewOptions} AS\n${body};\n` +
+      `EXCEPTION\n` +
+      `  WHEN feature_not_supported OR invalid_table_definition THEN\n` +
+      `    DROP VIEW IF EXISTS ${qualifiedView};\n` +
+      `    CREATE VIEW ${qualifiedView}${viewOptions} AS\n${body};${regrant}\n` +
+      `END`;
+    if (onlyWhen === undefined) {
+      return `DO ${APPROVED_VIEW_DOLLAR_TAG}\n${block}\n${APPROVED_VIEW_DOLLAR_TAG}`;
+    }
 
     return (
       `DO ${APPROVED_VIEW_DOLLAR_TAG}\n` +
       `BEGIN\n` +
-      `  CREATE OR REPLACE VIEW ${qualifiedView} AS\n${body};\n` +
-      `EXCEPTION\n` +
-      `  WHEN feature_not_supported OR invalid_table_definition THEN\n` +
-      `    DROP VIEW IF EXISTS ${qualifiedView};\n` +
-      `    CREATE VIEW ${qualifiedView} AS\n${body};${regrant}\n` +
+      `  IF ${onlyWhen} THEN\n${block};\n  END IF;\n` +
       `END\n${APPROVED_VIEW_DOLLAR_TAG}`
     );
   }

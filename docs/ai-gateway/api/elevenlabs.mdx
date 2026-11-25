@@ -6,7 +6,7 @@ sidebarTitle: ElevenLabs
 
 ## Endpoints
 
-```
+```http
 POST /v1/text-to-speech/{voice_id}
 POST /v1/text-to-speech/{voice_id}/stream
 POST /v1/text-to-speech/{voice_id}/stream/with-timestamps
@@ -213,7 +213,7 @@ A relayed socket is closed by the gateway on an exhausted budget (`1008`), a rev
 
 ## Post-call webhook
 
-```
+```http
 POST /v1/convai/webhook/{model_provider_id}
 ElevenLabs-Signature: t=<timestamp>,v0=<hmac>
 ```

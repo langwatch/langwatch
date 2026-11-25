@@ -21,10 +21,20 @@ import (
 // Step is one entry in a job's `steps:` list. Only the fields the guards read
 // are modeled; everything else in a workflow is deliberately ignored.
 type Step struct {
+	ID   string            `yaml:"id"`
 	Name string            `yaml:"name"`
+	Run  string            `yaml:"run"`
+	If   string            `yaml:"if"`
 	Uses string            `yaml:"uses"`
 	With map[string]any    `yaml:"with"`
 	Env  map[string]string `yaml:"env"`
+
+	// ContinueOnError is a bool or an expression string; a guard that needs a
+	// step to fail the job treats anything but a literal false as set.
+	ContinueOnError any `yaml:"continue-on-error"`
+
+	// TimeoutMinutes is a number or an expression string; nil when unset.
+	TimeoutMinutes any `yaml:"timeout-minutes"`
 
 	// UsesComment is the trailing `# <version>` comment on the `uses:` line.
 	// yaml keeps it on the node but drops it from Uses, and the pin guard needs
@@ -33,6 +43,14 @@ type Step struct {
 	// node, so — unlike a raw text scan — it is immune to a quoted value and to
 	// `uses:` text that appears inside a run: script rather than as a real step.
 	UsesComment string `yaml:"-"`
+
+	// Line and EndLine are the 1-based source lines the step's mapping starts
+	// and ends on, so a guard can attribute raw-text findings to the step that
+	// holds them. EndLine is the last line any of the step's nodes starts on,
+	// which undercounts a trailing multi-line block scalar; a guard reading it
+	// to permit lines therefore errs towards reporting, never towards hiding.
+	Line    int `yaml:"-"`
+	EndLine int `yaml:"-"`
 }
 
 // UnmarshalYAML decodes the modeled step fields, then separately recovers the
@@ -45,8 +63,44 @@ func (s *Step) UnmarshalYAML(node *yaml.Node) error {
 	}
 	*s = Step(plain)
 	s.UsesComment = usesLineComment(node)
+	s.Line = node.Line
+	s.EndLine = lastLine(node)
 
 	return nil
+}
+
+// lastLine returns the greatest start line of node and its descendants.
+func lastLine(node *yaml.Node) int {
+	last := node.Line
+	for _, child := range node.Content {
+		if line := lastLine(child); line > last {
+			last = line
+		}
+	}
+
+	return last
+}
+
+// GrantsWrite reports whether the block grants write on scope, counting the
+// write-all shorthand.
+func (p Permissions) GrantsWrite(scope string) bool {
+	return p.Shorthand == "write-all" || p.Scopes[scope] == "write"
+}
+
+// Declared reports whether a permissions block was written at all.
+func (p Permissions) Declared() bool {
+	return p.Scopes != nil || p.Shorthand != ""
+}
+
+// EffectivePermissions returns the job's own permissions block when it
+// declares one, else the workflow-level block: GitHub replaces, never merges,
+// the workflow block with a job-level one.
+func (w *Workflow) EffectivePermissions(jobName string) Permissions {
+	if job, ok := w.Jobs[jobName]; ok && job.Permissions.Declared() {
+		return job.Permissions
+	}
+
+	return w.Permissions
 }
 
 // usesLineComment returns the trailing comment on the mapping's `uses:` entry,
@@ -76,12 +130,17 @@ func usesLineComment(mapping *yaml.Node) string {
 // literal text rather than evaluated — a guard's job is to notice a gate
 // clause disappearing, not to re-implement GitHub's expression language.
 // Permissions is the job's own `permissions:` block, which GitHub uses to
-// replace (not merge with) the workflow-level block when present.
+// replace (not merge with) the workflow-level block when present. Needs stays
+// a yaml.Node because GitHub accepts a scalar or a list.
 type Job struct {
-	Name        string      `yaml:"name"`
-	If          string      `yaml:"if"`
-	Permissions Permissions `yaml:"permissions"`
-	Steps       []Step      `yaml:"steps"`
+	Name  string    `yaml:"name"`
+	Needs yaml.Node `yaml:"needs"`
+	If    string    `yaml:"if"`
+	// TimeoutMinutes is a number or an expression string; nil when unset.
+	TimeoutMinutes any               `yaml:"timeout-minutes"`
+	Permissions    Permissions       `yaml:"permissions"`
+	Env            map[string]string `yaml:"env"`
+	Steps          []Step            `yaml:"steps"`
 }
 
 // PullRequest is the `on.pull_request` trigger and the event types that fire
@@ -267,9 +326,10 @@ type CheckoutStep struct {
 func (w *Workflow) CheckoutSteps() []CheckoutStep {
 	var found []CheckoutStep
 	for _, job := range w.JobNames() {
-		for _, step := range w.Jobs[job].Steps {
-			if strings.HasPrefix(step.Uses, "actions/checkout@") {
-				found = append(found, CheckoutStep{Workflow: w.Path, Job: job, Step: step})
+		steps := w.Jobs[job].Steps
+		for i := range steps {
+			if strings.HasPrefix(steps[i].Uses, "actions/checkout@") {
+				found = append(found, CheckoutStep{Workflow: w.Path, Job: job, Step: steps[i]})
 			}
 		}
 	}

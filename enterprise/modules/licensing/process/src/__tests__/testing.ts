@@ -35,6 +35,7 @@ export const TEST_LICENSING_CONFIG: LicensingServerConfig = {
   isSaas: false,
   serviceVersion: "test",
   otelResourceAttributes: void 0,
+  publicBaseUrl: "https://app.langwatch.test",
   outboundProxy: {
     HTTPS_PROXY: void 0,
     https_proxy: void 0,
@@ -221,6 +222,10 @@ export class MemoryLicenseStorage implements LicenseStorage {
 
   async getMembersLiteCount(): Promise<number> {
     return this.membersLiteCount;
+  }
+
+  async getMembersDeveloperCount(): Promise<number> {
+    return 0;
   }
 }
 

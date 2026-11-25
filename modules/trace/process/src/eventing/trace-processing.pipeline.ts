@@ -15,10 +15,13 @@ import { z } from "zod";
 
 import type { TraceModule } from "../app/trace.app.ts";
 import {
+  compactDeferredOriginJobSchema,
   DEFERRED_ORIGIN_DEDUP,
   DEFERRED_ORIGIN_DELAY_MS,
   DEFERRED_ORIGIN_SUBSCRIBER_NAME,
+  isDeferredOriginJobStale,
   needsOriginResolution,
+  stageDeferredOriginJob,
 } from "./deferred-origin.subscriber.ts";
 import {
   PROJECT_METADATA_WINDOW_MS,
@@ -26,6 +29,7 @@ import {
   projectMetadataGroupKey,
 } from "./project-metadata.subscriber.ts";
 import { SPAN_STORAGE_BROADCAST_DEDUP_TTL_MS } from "./span-storage-broadcast.subscriber.ts";
+import { isNewlyFailedTrace, TRACE_FAILED_DEDUP } from "./trace-failed.subscriber.ts";
 import type {
   TraceProcessingPipelineDefinition,
   EventingTracePipelineAdapter,
@@ -53,11 +57,14 @@ interface TraceProcessingReactions {
   trackedEventSync: SummaryHandler;
   traceUpdateBroadcast: SummaryHandler;
   projectMetadata: SummaryHandler;
+  traceFailed: SummaryHandler;
   spanStorageBroadcast: (
     event: TraceProcessingEvent,
     context: TriggerContext<unknown>,
   ) => Promise<void>;
   broadcastDisabled: boolean;
+  /** `WRITE_COMPACT_ORIGIN_JOBS` in production: false queues main's full-event body. */
+  writeCompactOriginJobs: boolean;
 }
 
 const deferredOriginJobSchema = z.object({ tenantId: z.string(), traceId: z.string() });
@@ -99,12 +106,20 @@ export function buildTraceProcessingConsumer(
       when: (event, context) => needsOriginResolution({ event, foldState: context.state }),
       delay: DEFERRED_ORIGIN_DELAY_MS,
       dedup: DEFERRED_ORIGIN_DEDUP,
-      handler: (event, context) =>
-        reactions.resolveDeferredOrigin({
-          tenantId: context.tenantId,
-          traceId: context.aggregateId,
-          occurredAtMs: event.occurredAt,
-        }),
+      job: {
+        schema: compactDeferredOriginJobSchema,
+        stage: (event, context) =>
+          stageDeferredOriginJob({
+            event,
+            tenantId: context.tenantId,
+            traceId: context.aggregateId,
+          }),
+        stageOnSend: reactions.writeCompactOriginJobs,
+        handler: async (job) => {
+          if (isDeferredOriginJobStale(job)) return;
+          await reactions.resolveDeferredOrigin(job);
+        },
+      },
     })
     .withProjectionSubscriber("trackedEventSync", {
       fold: "traceSummary",
@@ -135,6 +150,15 @@ export function buildTraceProcessingConsumer(
         windowMs: PROJECT_METADATA_WINDOW_MS,
       }),
       handler: (event, context) => reactions.projectMetadata(event, context),
+    })
+    .withProjectionSubscriber("traceFailed", {
+      fold: "traceSummary",
+      events: [SPAN_RECEIVED_EVENT_TYPE],
+      runIn: ["worker"],
+      when: (event, context) =>
+        isNewlyFailedTrace({ event, state: context.state, now: nowInstant().epochMilliseconds }),
+      dedup: TRACE_FAILED_DEDUP,
+      handler: (event, context) => reactions.traceFailed(event, context),
     })
     .withProjectionSubscriber("spanStorageBroadcast", {
       map: "spanStorage",

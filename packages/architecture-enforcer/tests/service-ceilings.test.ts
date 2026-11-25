@@ -1,11 +1,12 @@
 import { execFileSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { join, relative, resolve } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { lintServiceCeilingsFile } from "../src/index.ts";
+import { lintServiceCeilings, lintServiceCeilingsFile } from "../src/index.ts";
+import { snapshotOf } from "./workspace.ts";
 
 const root = resolve(import.meta.dirname, "../../..");
 const apiKeyService = "modules/api-key/process/src/services/api-key.service.ts";
@@ -41,5 +42,34 @@ describe("service ceilings", () => {
     writeFileSync(service, "export class ExampleService {}\n");
 
     expect(lintServiceCeilingsFile(fixtureRoot, service)).toEqual([]);
+  });
+
+  describe("when a framework package opts into the feature layout", () => {
+    /** @scenario "An opted-in framework package's services are held to the same ceiling" */
+    it("measures its services and leaves a framework package that has not opted in alone", () => {
+      const fixtureRoot = mkdtempSync(join(tmpdir(), "service-ceilings-framework-"));
+      const packages = [
+        { name: "opted-in", layout: "features" },
+        { name: "plain", layout: undefined },
+      ];
+      for (const { name, layout } of packages) {
+        const services = join(fixtureRoot, `packages/${name}/src/features/claim/services`);
+        mkdirSync(services, { recursive: true });
+        writeFileSync(
+          join(fixtureRoot, `packages/${name}/package.json`),
+          JSON.stringify({ name: `@langwatch/${name}`, langwatch: { group: "framework", layout } }),
+        );
+        writeFileSync(
+          join(services, "claimed-job.service.ts"),
+          `${"\n".repeat(500)}export class ClaimedJobService {}\n`,
+        );
+      }
+
+      const findings = lintServiceCeilings(snapshotOf({ root: fixtureRoot }));
+
+      expect(findings.map((finding) => relative(fixtureRoot, finding.file))).toEqual([
+        "packages/opted-in/src/features/claim/services/claimed-job.service.ts",
+      ]);
+    });
   });
 });

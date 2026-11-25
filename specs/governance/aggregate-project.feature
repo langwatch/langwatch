@@ -38,13 +38,17 @@ Feature: An aggregate project reads its member projects
     When a project-reader grant carries a condition with a non-empty where clause
     Then the grant is refused
     # The slot is kept for the OTTL compiler. Nothing is compiled in v1.
+    # ADR-201 (Braids) compiles a where on a span condition only; a trace
+    # condition, which every aggregate grant carries, keeps refusing one.
 
   @unit
   Scenario: A project-reader grant never escalates
     Given a project-reader grant from an aggregate to a member project
     When the grant is asked for traces manage, project manage or prompts view
     Then each is denied
-    And traces view and analytics view are allowed
+    And traces view, analytics view and cost view are allowed
+    # Cost view lets a cost read reach the members. Whether the viewer sees cost
+    # is still their own cost view on the aggregate.
 
   @integration
   Scenario: Revoking a shared grant keeps its row
@@ -141,6 +145,40 @@ Feature: An aggregate project reads its member projects
     And a repository that filters on it fails the lint gate
     # Naming the column as a projected value or a dedup tuple member is
     # fine; only a predicate picks tenants, and only the client writes one.
+
+  @unit
+  Scenario: A tenant marker is only ever a top-level AND conjunct of its WHERE
+    Given a statement whose tenant marker sits under OR, XOR or NOT, inside a bracket holding an OR, or outside the WHERE of its select
+    When the store client expands it
+    Then the client refuses it and the refusal says to write the marker AND-ed into that WHERE
+    And no query runs
+    And a marker AND-ed into the WHERE of its own select or subquery renders as before
+    # Checked on the caller's text before expansion, so the fence's own OR
+    # between own projects and braid clauses is never seen.
+
+  @unit
+  Scenario: Every select that reads a table carries a tenant marker of its own
+    Given a statement with a UNION arm, a scalar subquery or a nested select reading a table with no tenant marker in its own WHERE
+    And a statement with a JOIN or comma to a table, a table function, or an IN over a table by name
+    When the store client expands it
+    Then the client refuses it as an unfenced select and no query runs
+    And a select reading a fenced subquery or the statement's own CTE, or joining a fenced subquery, renders as before
+    # {{idBound}} bounds time only, so it never counts as a select's tenant marker.
+
+  @unit
+  Scenario: No alias takes a name the fence reads
+    Given a statement naming an alias TenantId, SpanAttributes, a time column or another name the fence reads
+    And the alias is written with or without AS, quoted, in any case, in a WITH or an ARRAY JOIN
+    When the store client expands it
+    Then the client refuses it and no query runs
+
+  @integration
+  Scenario: A column always wins over an alias of its name
+    Given two tenants' spans and a statement whose alias shadows a column the fence reads
+    When the statement runs with ClickHouse's default settings
+    Then the other tenant's span passes the fence
+    And with the settings the reader pins on every statement only the fenced span passes
+    And neither the statement nor its caller can change those settings
 
   @integration
   Scenario: A plain project reads the same rows as before
@@ -322,9 +360,8 @@ Feature: An aggregate project reads its member projects
   @integration
   Scenario: Test, Build and Online Evals are hidden on the aggregate
     When ana opens the aggregate project
-    Then the navigation shows Traces
-    And Analytics, Prompts, Experiments and Online Evaluations are absent
-    # Analytics leaves the navigation until analytics across members ships.
+    Then the navigation shows Traces and Analytics
+    And Dashboards, Prompts, Experiments and Online Evaluations are absent
     And Quick Search offers the same pages as the navigation and no action that creates data
     And no monitor can be created on the aggregate
 
@@ -345,6 +382,36 @@ Feature: An aggregate project reads its member projects
     When ana opens the aggregate's Sessions page
     Then the sessions of both members show, newest first
     And the sessions before that grant's start are absent
+
+  # A session id is unique only within the project that recorded it, so every
+  # row carries its member project and the replay reads under that member.
+
+  @unit
+  Scenario: Two member projects' sessions that share an id stay two rows on the aggregate's Sessions page
+    Given an aggregate reading two members through shared grants
+    And each member recorded a session with the same id, in its own repository, pull request and cost
+    When ana opens the aggregate's Sessions page
+    Then two rows show, each carrying its own member project, project name, cost and pull requests
+    And the member project names are looked up once for the page
+
+  @unit
+  Scenario: A member project the name lookup cannot find is named by its id
+    Given an aggregate whose member project has no name the lookup can find
+    When ana opens the aggregate's Sessions page
+    Then that member's rows are named by the member project's id
+
+  @integration
+  Scenario: The group project's Sessions page names the member project on each row
+    Given the aggregate's Sessions page lists sessions from two member projects
+    Then each row names the member project that recorded it
+    And a page whose rows all come from one project names none
+
+  @integration
+  Scenario: Opening a member project's session replays that member's conversation
+    Given the aggregate's Sessions page lists two sessions that share an id, from member A and member B
+    When ana opens member B's session
+    Then the replay reads member B's conversation and opens the trace drawer on member B
+    And member A's row is not marked as opening
 
   @unit
   Scenario: A sessions read through the proof names no tenant of its own
@@ -498,6 +565,15 @@ Feature: An aggregate project reads its member projects
     # half it is. The proof is narrowed to one of its own tenants; a tenant
     # outside the proof is refused rather than read.
 
+  # Shares do not chain (ADR-201): the aggregate's proof carries its own
+  # grants only, never the braids its members receive.
+  @integration @unimplemented
+  Scenario: A member trace shows none of the spans braided into that member
+    Given a member project that receives a braid from another project
+    And a member trace holding spans braided into it
+    When ana opens that trace from the aggregate
+    Then only the member's own spans are shown
+
   @integration
   Scenario: Two members with the same trace id each list their own events
     Given an aggregate project whose two members each hold a trace with the same id
@@ -526,14 +602,113 @@ Feature: An aggregate project reads its member projects
     When ana opens that span in the prompt playground, with or without the link naming its trace
     Then the playground loads the span's messages and model either way
 
-  # Unimplemented: analytics read through raw clients and the rollup windows
-  # on BucketStart, a time column the fence does not admit yet; the fifth
-  # time column awaits a decision (ADR-144 open questions).
-  @integration @unimplemented
+  @unit
+  Scenario: A rollup bucket a grant's edge cuts through is left out
+    Given a shared grant that starts or ends part way through a minute
+    When a read on a minute rollup is fenced on BucketStart
+    Then only the minute buckets wholly inside the window are admitted
+    And an open grant admits every bucket from its start
+
+  @integration
+  Scenario: The aggregate's analytics rollup counts members inside their windows
+    Given an aggregate project with one member shared from a point in time
+    And another project in the organisation that is not a member and holds spans
+    When the aggregate's trace cost is read from the trace analytics rollup under its proof
+    Then the member's spans inside the window are counted
+    And the member's spans before the window and the non-member's spans are not
+
+  @integration
+  Scenario: The aggregate's slim analytics counts members inside their windows
+    Given an aggregate project with one member shared for a window of time
+    And another project in the organisation that is not a member and holds traces
+    When the aggregate's trace cost is read from the slim trace analytics table under its proof
+    Then the member's traces inside the window are counted
+    And the member's traces outside the window and the non-member's traces are not
+
+  @integration
+  Scenario: The aggregate counts a member's evaluations by when their trace occurred
+    Given an aggregate project with one member shared from a date
+    And a member trace from before that date, evaluated after it
+    And a member trace from after that date, evaluated after it
+    When the aggregate's evaluation runs are counted under its proof
+    Then only the evaluation of the trace from after the date is counted
+    And the member's own read still counts both evaluations
+
+  @integration
+  Scenario: The aggregate's trace summaries count members inside their windows
+    Given an aggregate project with one member shared for its whole history
+    And a second member shared only from a point in time
+    And another project in the organisation that is not a member and holds traces
+    When the aggregate's trace cost is read from the trace summaries under its proof
+    Then every trace of the first member is counted
+    And the second member's traces are counted only from the point its grant starts
+    And the non-member's traces are not
+
+  @integration
+  Scenario: The aggregate's evaluation chart counts members inside their windows
+    Given an aggregate project with one member shared for its whole history
+    And a second member shared only from a point in time
+    And another project in the organisation that is not a member and holds evaluation runs
+    When the aggregate's score for one check is read from the evaluation runs under its proof
+    Then the check's runs on the members' traces inside their windows are counted
+    And the runs of another check and the non-member's runs are not
+
+  @integration
   Scenario: Analytics aggregate across members
     Given an aggregate project with two members each holding traces
     When ana opens the aggregate's analytics
     Then the counts cover both members' traces
+
+  @integration
+  Scenario: The aggregate's filter pickers offer member values inside their windows
+    Given an aggregate project with one member shared for its whole history
+    And a second member shared only from a point in time
+    And another project in the organisation that is not a member
+    When the aggregate's filter picker lists trace, span and evaluator values under its proof
+    Then it offers the first member's values and the second member's from the point its grant starts
+    And it offers none of the non-member's values
+
+  @integration
+  Scenario: The aggregate's top documents and feedbacks read members inside their windows
+    Given an aggregate project with one member shared for its whole history
+    And a second member shared only from a point in time
+    And another project in the organisation that is not a member
+    When the aggregate's top documents and feedbacks are read under its cost view proof
+    Then they cover the first member and the second member from the point its grant starts
+    And none of the non-member's documents or feedbacks
+
+  @integration
+  Scenario: The aggregate hides the views that only make sense inside one project
+    Given an aggregate project
+    When ana opens its analytics
+    Then the Topics view is not offered
+    And opening the Topics address leads back to the analytics overview
+    And the evaluations page shows the overall health and pass or fail trend cards
+    And no card for a single monitor, since no monitor runs on member traces
+    And an ordinary project still shows its topics and per-monitor cards
+
+  @unit
+  Scenario: A scheduled report or a graph alert on an aggregate is refused by name
+    Given an aggregate project
+    When a scheduled report or a graph alert reads a series with no viewer
+    Then it is refused because the project is an aggregate
+    And no series is read
+    # Allowing them needs a decision on whose permission the read runs under.
+    # Until then the refusal stops a report that would say zero.
+
+  @unit
+  Scenario: A chart on the aggregate waits for each member's share
+    Given an aggregate project reading two members
+    When a chart on the aggregate runs
+    Then it holds one slot of the aggregate's bound and one of each member's
+    And it takes them in one sorted order, so two charts never wait on each other
+    And a plain project's chart holds only its own slot
+
+  @unit
+  Scenario: A chart on an aggregate with too many members is refused before any read
+    Given an aggregate project reading more members than the LangWatchQL member cap
+    When a chart on the aggregate runs
+    Then it is refused by name before any read
 
   @integration
   Scenario: The owner's existing evaluation results show on a member trace
@@ -550,6 +725,8 @@ Feature: An aggregate project reads its member projects
     # Twenty call sites in the trace router today pass the project id by
     # hand. After this block none do, and the gate keeps it so. A route left
     # behind the baseline is listed by name with its owner and reason.
+    # ADR-201 extends the gate below the route: modules/trace/specs/braided-spans.feature,
+    # "A trace content read cannot swap the route's proof for an own-only one".
 
   @integration
   Scenario: Neither an aggregate nor the governance project is ever the project the app lands on
@@ -750,11 +927,10 @@ Feature: An aggregate project reads its member projects
     And managing the aggregate itself stays available
 
   @integration
-  Scenario: A direct link to the aggregate's analytics says it is not available yet
+  Scenario: A direct link to the aggregate's analytics opens the page
     Given an aggregate project
-    When ana opens a link to its analytics, LLM metrics, topics, users, online evaluations, reports or custom graph page
-    Then the page shows its heading and says "Analytics across member projects is not available yet. Open Trace Explorer to see member traces."
-    And it draws no chart and runs no analytics query
+    When ana opens a link to its analytics, LLM metrics, users, online evaluations, reports or custom graph page
+    Then the page draws its charts over the members
     And it shows no saved views bar, so no view can be edited, renamed or deleted from it, and reads no saved views
     And an ordinary project's analytics still show the saved views bar
 

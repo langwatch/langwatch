@@ -1,6 +1,9 @@
 import type { ExhaustedOutcome } from "@langwatch/group-queue";
 
 import type { Event } from "../domain/types.ts";
+import type { EventLogPageCursor } from "../stores/event-log-page-order.ts";
+import type { EventLogProbe } from "../stores/repositories/eventRepository.types.ts";
+import type { EnqueueDispatchOptions } from "../subscribers/eventSubscriber.types.ts";
 import type { ProjectionStoreContext } from "./projectionStoreContext.ts";
 
 // Stateful projection folding events into accumulated state via pure functions:
@@ -35,7 +38,7 @@ export interface FoldProjectionDefinition<State, E extends Event = Event> {
   key?: (event: E) => string;
 
   /** Optional processing behavior configuration. */
-  options?: FoldProjectionOptions;
+  options?: FoldProjectionOptions<E>;
 
   /**
    * Key name for the LastEventOccurredAt field on the state.
@@ -65,20 +68,40 @@ export interface FoldProjectionDefinition<State, E extends Event = Event> {
   }) => Promise<Event[]>;
 
   // Paginated variant of eventLoaderUpTo for streaming store-miss re-folds of
-  // huge aggregates; auto-wired when event store supports paginated reads.
+  // huge aggregates; auto-wired when event store supports paginated reads. Pages come in
+  // key order, not time order, so only an order-insensitive fold may use it.
   eventLoaderUpToPaged?: (context: {
     tenantId: string;
     aggregateId: string;
     upToEvent: Event;
-    after: { timestamp: number; eventId: string } | undefined;
+    after: EventLogPageCursor | undefined;
     limit: number;
   }) => Promise<Event[]>;
+
+  // Whether the log holds `event` and anything accepted before it, for a store miss under
+  // refoldOnStoreMiss to tell a new aggregate from a saved state not visible yet. Auto-wired.
+  eventLogProbe?: (context: {
+    tenantId: string;
+    aggregateId: string;
+    event: Event;
+    ignoreEventIds?: readonly string[];
+  }) => Promise<EventLogProbe>;
 }
 
 /**
- * Options for configuring fold projection processing behavior.
+ * Fold enqueue-time filter seam, mirroring the map's: filter must never reject what apply()
+ * would change (superset safe, subset is silent data loss). Derive both from one declaration.
  */
-export interface FoldProjectionOptions {
+export type FoldEnqueueDispatchOptions<E extends Event = Event> = Pick<
+  EnqueueDispatchOptions<E>,
+  "filter"
+>;
+
+/**
+ * Options for configuring fold projection processing behavior. Generic in the
+ * projection's own event type for typed filters.
+ */
+export interface FoldProjectionOptions<E extends Event = Event> {
   /** Disable this projection in the assembled runtime. */
   disabled?: boolean;
   // `occurredAt` (default) follows business time; `acceptedAt` follows
@@ -101,8 +124,18 @@ export interface FoldProjectionOptions {
   // Re-fold aggregate history for out-of-order events; set false when apply
   // is order-insensitive (sum, counter) and commutes on event data not arrival order.
   refoldOnOutOfOrder?: boolean;
+  // Keyed folds can't rebuild from one aggregate, so a missed hand-off retires dead.
+  // True re-sends the single event onto the live lane instead: only safe when applying
+  // an event twice changes nothing. Ignored for unkeyed folds, which always rebuild.
+  resendOnRedelivery?: boolean;
   // A spent fold job blocks its group (default) or is dead-lettered; order-tolerant folds only.
   onExhausted?: ExhaustedOutcome;
+  /**
+   * Enqueue-time gate: an event this fold would leave unchanged never mints a job.
+   * Evaluated at fan-out after the event-type match; a replay or re-fold still hands
+   * apply() every event, so apply() must ignore what the filter declines.
+   */
+  enqueue?: FoldEnqueueDispatchOptions<E>;
 }
 
 // ADR-146: `empty` until the first event is folded.
@@ -113,8 +146,12 @@ export type FoldStateRead<State> = { kind: "folded"; state: State } | { kind: "e
  * Handles persistence and retrieval of fold state.
  */
 export interface FoldProjectionStore<State> {
-  /** Persists the current fold state for an aggregate. */
-  store: (state: State, context: ProjectionStoreContext) => Promise<void>;
+  /**
+   * Persists the current fold state for an aggregate. A store that stamps columns of its own
+   * onto the state answers the state as persisted, so a cache in front holds what a read-back
+   * would decode; answering nothing means the state handed in was persisted as is.
+   */
+  store: (state: State, context: ProjectionStoreContext) => Promise<State | void>;
 
   /** Optional batch store for persisting multiple fold states at once. */
   storeBatch?: (entries: { state: State; context: ProjectionStoreContext }[]) => Promise<void>;

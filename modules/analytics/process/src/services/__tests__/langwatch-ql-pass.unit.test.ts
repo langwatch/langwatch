@@ -12,16 +12,30 @@ import { HandledError } from "@langwatch/handled-error";
 import { describe, expect, it } from "vitest";
 
 import {
+  ADMIT_EVERY_PLACEMENT,
+  TEST_RUN_TELEMETRY,
+} from "../../app/__tests__/analytics.fixture.ts";
+import {
   LangWatchQLExecutorRepository,
   type LangWatchQLExecutionRequest,
   type LangWatchQLExecutionResult,
 } from "../../repositories/langwatch-ql-executor.repository.ts";
-import { langWatchQLPassSql } from "../../rules/langwatch-ql-pass-sql.rules.ts";
+import {
+  langWatchQLPassKeysOfTracesSql,
+  langWatchQLPassRowIdsSql,
+  langWatchQLPassSql,
+  LWQL_HYDRATION_TRACE_IDS_ARGUMENT,
+  LWQL_PASS_TRACE_IDS_ARGUMENT,
+} from "../../rules/langwatch-ql-pass-sql.rules.ts";
+import { LWQL_VIEW_CATALOG } from "../../rules/lwql-view-catalog.rules.ts";
 import { LangWatchQLCapabilityService } from "../langwatch-ql-capability.service.ts";
+import { LangWatchQLCatalogShapesService } from "../langwatch-ql-catalog-shapes.service.ts";
 import { LangWatchQLService } from "../langwatch-ql.service.ts";
 import { EVERY_CATALOGUE_PERMISSION } from "./lwql-catalogue-access.fixture.ts";
 
 const PROJECT = { id: "project-1", lwqlKey: "key-1" };
+const [POSTGRES_VIEW] = LangWatchQLCatalogShapesService.create().postgresViews(LWQL_VIEW_CATALOG);
+if (!POSTGRES_VIEW) throw new Error("the catalogue has no PostgreSQL-resident view");
 const STATEMENT =
   "SELECT TraceId, eval(TraceName, 'Is the name a greeting?') AS named FROM analytics.traces";
 const CAPABILITY = LangWatchQLCapabilityService.create().tenantCapability({
@@ -55,6 +69,8 @@ class RecordingExecutor extends LangWatchQLExecutorRepository {
 
 function serviceOver(executor: RecordingExecutor | null) {
   return LangWatchQLService.create({
+    runTelemetry: TEST_RUN_TELEMETRY,
+    placement: ADMIT_EVERY_PLACEMENT,
     executor,
     database: "analytics",
     limits: { maxRows: 100, maxResultBytes: 8_000_000 },
@@ -89,18 +105,37 @@ describe("LangWatchQLService.executePass", () => {
         });
       }
 
+      const [probe, count, spanKeys, sample, page] = EVERY_PASS;
+      const isEveryKindListed = !!probe && !!count && !!spanKeys;
+      if (!isEveryKindListed || sample?.kind !== "sample" || page?.kind !== "page") {
+        throw new Error("EVERY_PASS lists the five pass kinds in order");
+      }
+      const cutBy = (traceIds: string) =>
+        STATEMENT.replace(
+          "FROM analytics.traces",
+          `FROM analytics.traces__ids(lwql_trace_ids = ${traceIds}) AS traces`,
+        );
       expect(executor.requests).toEqual(
-        EVERY_PASS.map((pass) => {
-          const composed = langWatchQLPassSql({ sql: STATEMENT, pass });
-
-          return {
-            sql: composed.sql,
-            ...(Object.keys(composed.parameters).length > 0
-              ? { parameters: composed.parameters }
-              : {}),
-            tenantCapability: CAPABILITY,
-          };
-        }),
+        [
+          langWatchQLPassSql({ sql: STATEMENT, pass: probe }),
+          langWatchQLPassSql({ sql: STATEMENT, pass: count }),
+          langWatchQLPassSql({ sql: STATEMENT, pass: spanKeys }),
+          // The sample projects the thread id: its row ids, then its keys over the twin.
+          langWatchQLPassRowIdsSql({ sql: STATEMENT, pass: sample }),
+          langWatchQLPassKeysOfTracesSql({
+            sql: cutBy(LWQL_PASS_TRACE_IDS_ARGUMENT),
+            pass: sample,
+            traceIds: [],
+          }),
+          langWatchQLPassSql({ sql: cutBy(LWQL_HYDRATION_TRACE_IDS_ARGUMENT), pass: page }),
+        ].map((composed) => ({
+          sql: composed.sql,
+          ...(Object.keys(composed.parameters).length > 0
+            ? { parameters: composed.parameters }
+            : {}),
+          tenantCapability: CAPABILITY,
+          projectIds: [PROJECT.id],
+        })),
       );
     });
 
@@ -124,6 +159,42 @@ describe("LangWatchQLService.executePass", () => {
   });
 
   describe("given a statement the policy refuses", () => {
+    /** @scenario "A pass over a PostgreSQL-resident view with FINAL is refused too" */
+    it("refuses FINAL on a PostgreSQL-resident view, reaching no database", async () => {
+      const executor = new RecordingExecutor();
+
+      const refusal = await refusalOf(
+        serviceOver(executor).executePass({
+          project: PROJECT,
+          protections: { catalogue: EVERY_CATALOGUE_PERMISSION },
+          sql: `SELECT count() FROM analytics.${POSTGRES_VIEW.name} FINAL`,
+          pass: { kind: "count", limit: 10 },
+          isInstantEvalsEnabled: true,
+        }),
+      );
+
+      expect(codeOf(refusal)).toBe("lwql_table_modifier_unsupported");
+      expect(executor.requests).toEqual([]);
+    });
+
+    /** @scenario "FINAL or SAMPLE on a subquery is refused with a clear message" */
+    it("refuses FINAL on a subquery, reaching no database", async () => {
+      const executor = new RecordingExecutor();
+
+      const refusal = await refusalOf(
+        serviceOver(executor).executePass({
+          project: PROJECT,
+          protections: { catalogue: EVERY_CATALOGUE_PERMISSION },
+          sql: "SELECT count() FROM (SELECT TraceId FROM analytics.traces) FINAL",
+          pass: { kind: "count", limit: 10 },
+          isInstantEvalsEnabled: true,
+        }),
+      );
+
+      expect(codeOf(refusal)).toBe("lwql_table_modifier_unsupported");
+      expect(executor.requests).toEqual([]);
+    });
+
     /** @scenario "A pass re-validates its statement with the full policy" */
     it("refuses a caller's own wrapper holding eval in a subquery, reaching no database", async () => {
       const executor = new RecordingExecutor();

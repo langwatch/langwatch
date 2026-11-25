@@ -13,6 +13,7 @@ import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
 import { authorizationPort } from "../../__tests__/api-double.ts";
+import { permissionBy } from "../../access/input-permission.ts";
 import {
   KeyKindRefusedError,
   OrganizationInvalidCredentialsError,
@@ -105,6 +106,7 @@ describe("a platform route", () => {
       .withVersion(VERSION)
       .withCredential("browser")
       .post("/impersonate", "run")
+      .keepsRecords()
       .withPermission(permission, { at: "platform", refusal })
       .withInput(z.object({ userId: z.string() }))
       .withBodyLimit({ maxBytes: 64 })
@@ -226,6 +228,7 @@ describe("a platform route", () => {
         .withVersion(VERSION)
         .withCredential("browser")
         .post("/impersonate", "run")
+        .keepsRecords()
         .withPermission("ops:manage", { at: "platform", hiddenWithout: "ops:view" })
         .withInput(z.object({ userId: z.string() }))
         .withBodyLimit({ maxBytes: 64 })
@@ -283,7 +286,8 @@ describe("a platform route", () => {
           .withNamespace("e4-staff-declared")
           .withVersion(VERSION)
           .withCredential("browser")
-          .post("/run", "run");
+          .post("/run", "run")
+          .keepsRecords();
 
       expect(() =>
         route().withPermission("ops:manage", {
@@ -307,7 +311,8 @@ describe("a platform route", () => {
         .withNamespace("e4-declared")
         .withVersion(VERSION)
         .withCredential("browser")
-        .post("/run", "run");
+        .post("/run", "run")
+        .keepsRecords();
     }
 
     /** @scenario "A platform route asks the operator's platform grant at its door" */
@@ -325,6 +330,7 @@ describe("a platform route", () => {
         .withVersion(VERSION)
         .withCredential("browser")
         .post("/run", "run")
+        .keepsRecords()
         .withPermission("ops:view", { at: "platform" })
         .withOutput(z.object({}))
         .withoutAudit("test route")
@@ -420,12 +426,14 @@ describe("a route that reads the key its door resolved", () => {
     .withNamespace("e5-keys")
     .withVersion(VERSION)
     .post("/read", "run")
+    .keepsRecords()
     .withCredential("project", { key: true })
     .withPermission("traces:create")
     .withOutput(z.object({ key: z.unknown() }))
     .withoutAudit("test route")
     .handle(({ key }) => ({ key }))
     .post("/plain", "plain")
+    .keepsRecords()
     .withPermission("traces:create")
     .withOutput(z.object({ handed: z.boolean() }))
     .withoutAudit("test route")
@@ -532,11 +540,141 @@ describe("a route that reads the key its door resolved", () => {
   });
 });
 
+describe("a route that names legacy key scopes", () => {
+  function base() {
+    return defineRestRouter(DoorsApi)
+      .withNamespace("legacy-scopes")
+      .withVersion(VERSION)
+      .post("/connect", "run")
+      .keepsRecords();
+  }
+  const told: (readonly string[] | undefined)[] = [];
+  const door: RestIdentity = {
+    authenticate: ({ request, legacyKeyScopes }) => {
+      told.push(legacyKeyScopes);
+      recordProjectCredential(request, {
+        type: "legacyProjectKey",
+        project: {
+          id: "project-1",
+          name: "Project",
+          slug: "project",
+          teamId: "team-1",
+          organizationId: "org-1",
+          isPersonal: false,
+          ownerUserId: null,
+          kind: "application",
+        },
+      });
+      return { actor: null, scope: { tier: "project", id: "project-1" } };
+    },
+    identify: () => ({ actor: null, scope: { tier: "project", id: "project-1" } }),
+    authorize: () => ({ permitted: true, organizationRole: null }),
+    legacyKeyScopes: ["scope_a", "scope_b"],
+  };
+
+  /** @scenario "A route tells the project door the legacy key scopes it names" */
+  it("tells the door the scopes it names and refuses misplaced or unknown ones at mount", async () => {
+    const router = base()
+      .withPermission("scenarios:manage", { legacyKey: ["scope_a", "scope_b"] })
+      .withOutput(z.object({ ran: z.boolean() }))
+      .withoutAudit("test route")
+      .handle(() => ({ ran: true }))
+      .build()
+      .router();
+
+    const answer = await mount(router, door).request(`/api/legacy-scopes/${VERSION}/connect`, {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-auth-token": "legacy" },
+      body: "{}",
+    });
+
+    expect(answer.status).toBe(200);
+    expect(told.at(-1)).toEqual(["scope_a", "scope_b"]);
+
+    const unknown = base()
+      .withPermission("scenarios:manage", { legacyKey: "scope_c" })
+      .withOutput(z.object({ ran: z.boolean() }))
+      .withoutAudit("test route")
+      .handle(() => ({ ran: true }))
+      .build()
+      .router();
+    expect(() => mount(unknown, door)).toThrow(/unknown legacy key scopes: scope_c/);
+
+    const otherDoor = base()
+      .withCredential("organization")
+      .withPermission("scenarios:manage", { legacyKey: "scope_a" })
+      .withOutput(z.object({ ran: z.boolean() }))
+      .withoutAudit("test route")
+      .handle(() => ({ ran: true }))
+      .build()
+      .router();
+    expect(() =>
+      createRestRuntime({
+        authorization: authorizationPort,
+        identity: door,
+        doors: { project: door, organization: door },
+      }).mount(otherDoor, { app: () => doorsApp, onError: createErrorHandler() }),
+    ).toThrow(/names a legacy key scope/);
+  });
+
+  /** @scenario "A route tells the project door the legacy key scopes it names" */
+  it("tells the door the scopes named beside a target, and keeps them off the target", async () => {
+    const router = defineRestRouter(DoorsApi)
+      .withNamespace("legacy-scopes")
+      .withVersion(VERSION)
+      .post("/:projectId/connect", "run")
+      .keepsRecords()
+      .withParams(z.object({ projectId: z.string() }))
+      .withPermission("scenarios:manage", { at: "route", param: "projectId", legacyKey: "scope_a" })
+      .withOutput(z.object({ ran: z.boolean() }))
+      .withoutAudit("test route")
+      .handle(() => ({ ran: true }))
+      .build()
+      .router();
+
+    expect(router.routes[0]).toMatchObject({
+      permissionTarget: { at: "route", param: "projectId" },
+      legacyKeyScopes: ["scope_a"],
+    });
+    expect(router.routes[0]?.permissionTarget).not.toHaveProperty("legacyKey");
+
+    const answer = await mount(router, door).request(
+      `/api/legacy-scopes/${VERSION}/project-1/connect`,
+      {
+        method: "POST",
+        headers: { "content-type": "application/json", "x-auth-token": "legacy" },
+        body: "{}",
+      },
+    );
+
+    expect(answer.status).toBe(200);
+    expect(told.at(-1)).toEqual(["scope_a"]);
+  });
+
+  /** @scenario "A route tells the project door the legacy key scopes it names" */
+  it("leaves a route whose input chooses its permission nowhere to name a flag", () => {
+    const choice = permissionBy({ field: "kind", map: { a: "scenarios:manage" } });
+    const scopes = { legacyKey: "scope_a" } as const;
+    const chosen = base()
+      .withInput(z.object({ kind: z.enum(["a"]) }))
+      // @ts-expect-error the input chooses the permission after the body, too late for a scope
+      .withPermission(choice, scopes)
+      .withOutput(z.object({ ran: z.boolean() }))
+      .withoutAudit("test route")
+      .handle(() => ({ ran: true }))
+      .build()
+      .router();
+
+    expect(() => mount(chosen, door)).toThrow(/names a legacy key scope/);
+  });
+});
+
 describe("a route that admits only the key kinds it names", () => {
   const router = defineRestRouter(DoorsApi)
     .withNamespace("e7-kinds")
     .withVersion(VERSION)
     .post("/connect", "run")
+    .keepsRecords()
     .withCredential("project", { keyKinds: ["api_key", "access_token", "legacy_project_key"] })
     .withPermission("scenarios:manage")
     .withInput(z.object({ name: z.string() }))
@@ -634,6 +772,7 @@ describe("a permission behind the CLI token door", () => {
       .withVersion(VERSION)
       .withCredential("cli_token")
       .post("/keys", "run")
+      .keepsRecords()
       .withPermission("organization:manage")
       .withInput(z.object({ name: z.string() }))
       .withOutput(z.object({ ran: z.boolean() }))

@@ -25,12 +25,12 @@ export type FailedModelCall = {
 };
 
 /**
- * Plan limits and billing: deterministic until a window or an invoice resets,
- * so a retry would be answered the same way. The codes match the relay's
- * hardLimitReasonCodes (llmproxy.go).
+ * Plan limits and billing never pass on a retry: provider plan and quota codes,
+ * the AI gateway's provider_account_exhausted code (providererr.go), and the
+ * wording of each when only the message reaches pi.
  */
 const PLAN_LIMIT_PATTERN =
-  /usage_limit_reached|codex_plan_limit|insufficient_quota|billing_hard_limit_reached|quota exceeded|out of budget|credit balance/i;
+  /usage_limit_reached|codex_plan_limit|insufficient_quota|billing_hard_limit_reached|provider_account_exhausted|quota exceeded|out of budget|credit balance|gateway access is exhausted/i;
 
 /** The wording providers, SDKs and transports use for a failure worth another try. */
 const TRANSIENT_PATTERN = new RegExp(

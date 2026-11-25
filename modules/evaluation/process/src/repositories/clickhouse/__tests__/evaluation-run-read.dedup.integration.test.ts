@@ -29,7 +29,10 @@ const CREATE_TABLE = `
     ArchivedAt Nullable(DateTime64(3)),
     ScheduledAt DateTime64(3) DEFAULT now64(3), StartedAt Nullable(DateTime64(3)),
     CompletedAt Nullable(DateTime64(3)), CostId Nullable(String),
-    LastProcessedEventId String, LastEventOccurredAt Nullable(DateTime64(3))
+    Attempts UInt16 DEFAULT 0, LastAttemptAt Nullable(DateTime64(3)),
+    LastAttemptError Nullable(String), NextAttemptAt Nullable(DateTime64(3)),
+    LastProcessedEventId String, LastEventOccurredAt Nullable(DateTime64(3)),
+    IdLayout LowCardinality(Nullable(String)) DEFAULT NULL
   ) ENGINE = ReplacingMergeTree(UpdatedAt)
   PARTITION BY toYearWeek(ScheduledAt)
   ORDER BY (TenantId, EvaluationId)

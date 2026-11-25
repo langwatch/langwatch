@@ -10,7 +10,7 @@
 # from a previous session (or a zsh helper) wins over the dynamic port,
 # and login then 403s because the cookie/CSRF origin is wrong.
 #
-# Real overrides (boxd proxy, ngrok, prod-style hostname) are NOT
+# Real overrides (https proxy, ngrok, prod-style hostname) are NOT
 # touched — only stale `http://localhost:<port>` values get rewritten.
 #
 # Usage from the dev launcher (after APP_PORT is exported):

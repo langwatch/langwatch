@@ -1,8 +1,10 @@
+import type { LedgerActor } from "@langwatch/authorization";
 import {
   AUTHZ_GRANTS_EVENT_VERSION_LATEST,
   GRANT_ATTACHED_EVENT_TYPE,
   GRANT_REVOKED_EVENT_TYPE,
   GRANT_ROLE_CHANGED_EVENT_TYPE,
+  GRANT_SOURCE_BRAID,
   ROLE_DEFINED_EVENT_TYPE,
   ROLE_DELETED_EVENT_TYPE,
   ROLE_PERMISSIONS_CHANGED_EVENT_TYPE,
@@ -385,5 +387,77 @@ describe("AuthzGrantProjection", () => {
 
     expect(shared).toMatchObject({ kind: "grant.upsert", row: { condition } });
     expect(own.kind === "grant.upsert" && "condition" in own.row).toBe(false);
+  });
+
+  describe("when a braid's attach arrives on a build that does not write braids", () => {
+    const condition = {
+      type: "span" as const,
+      where: 'name == "payments_agent"',
+      compiledWhere: { version: 1, tree: { kind: "nameEquals" as const, value: "payments_agent" } },
+      from: "2026-10-01T00:00:00.000Z",
+    };
+    const braid = (actor: LedgerActor, replacesGrantId?: string) =>
+      projection.map(
+        event(
+          {
+            type: GRANT_ATTACHED_EVENT_TYPE,
+            data: {
+              grantId: "grant_braid",
+              principal: { type: "project", id: "proj_orchestrator" },
+              roleKey: "project-reader",
+              scope: { type: "PROJECT", id: "proj_specialists" },
+              condition,
+              source: GRANT_SOURCE_BRAID,
+              actor,
+              ...(replacesGrantId === undefined ? {} : { replacesGrantId }),
+            },
+          },
+          "grant_braid",
+          1,
+        ),
+      );
+
+    /** @scenario "The fold writes a braid's row as the release that writes braids does" */
+    it("writes its creator, the braid it replaces and its compiled condition", () => {
+      expect(braid(ACTOR, "grant_replaced")).toMatchObject({
+        kind: "grant.upsert",
+        row: {
+          source: "braid",
+          createdByUserId: "user_admin",
+          replacesGrantId: "grant_replaced",
+          condition,
+        },
+      });
+    });
+
+    it("names no creator when no person made it, and no replaced braid when it replaces none", () => {
+      const write = braid({ type: "system", id: "apikey:key_1" });
+
+      expect(write).toMatchObject({ row: { createdByUserId: null } });
+      expect(write.kind === "grant.upsert" && "replacesGrantId" in write.row).toBe(false);
+    });
+
+    it("leaves the creator empty on a shared read no braid made", () => {
+      const write = projection.map(
+        event(
+          {
+            type: GRANT_ATTACHED_EVENT_TYPE,
+            data: {
+              grantId: "grant_shared",
+              principal: { type: "project", id: "proj_aggregate" },
+              roleKey: "project-reader",
+              scope: { type: "PROJECT", id: "proj_member" },
+              condition: { type: "trace", from: "2026-10-01T00:00:00.000Z" },
+              source: "aggregate-reconciler",
+              actor: ACTOR,
+            },
+          },
+          "grant_shared",
+          1,
+        ),
+      );
+
+      expect(write).toMatchObject({ row: { createdByUserId: null } });
+    });
   });
 });

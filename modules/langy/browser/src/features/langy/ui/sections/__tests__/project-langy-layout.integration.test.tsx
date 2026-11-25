@@ -29,9 +29,12 @@ const setGateProject = (project: GateProject) => {
   for (const notify of gateListeners) notify();
 };
 
-const drawerState = { current: null as string | null };
+const drawerState = { current: null as string | null, inPlace: false };
 vi.mock("@langwatch/browser-host/drawer", () => ({
-  useDrawer: () => ({ currentDrawer: drawerState.current }),
+  useDrawer: () => ({
+    currentDrawer: drawerState.current,
+    inPlaceDrawerOpen: drawerState.inPlace,
+  }),
 }));
 
 // Stub the heavy chat surface. Open state genuinely lives in the zustand
@@ -236,6 +239,7 @@ beforeEach(() => {
   gate.project = { id: "project-demo", slug: "demo", name: "demo" };
   gate.isDemoProject = false;
   drawerState.current = null;
+  drawerState.inPlace = false;
   // The store is a module singleton — start every test closed and uncounted.
   useLangyStore.setState({
     isOpen: false,
@@ -476,6 +480,17 @@ describe("ProjectLangyLayout", () => {
       await openLangy();
       // The panel rides beside the drawer as an overlay; the page keeps its
       // full width underneath the pair.
+      expect(dockWrapper()?.getAttribute("data-langy-dock")).toBe("none");
+    });
+
+    /** @scenario "A drawer turns the DOCKED panel into its floating companion" */
+    it("releases the reservation for a drawer opened in place, not from the address", async () => {
+      drawerState.inPlace = true;
+      renderAt("/demo/traces");
+      act(() => {
+        useLangyStore.setState({ panelMode: "sidebar" });
+      });
+      await openLangy();
       expect(dockWrapper()?.getAttribute("data-langy-dock")).toBe("none");
     });
 

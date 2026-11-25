@@ -55,6 +55,25 @@ describe("given the stores' DATAPLANE_S3__ family", () => {
     });
   });
 
+  describe("when an entry names its own region", () => {
+    /** @scenario "A private S3 config may name its own region" */
+    it("uses that region over the shared S3_REGION, and entries without one keep the shared", () => {
+      const own = JSON.stringify({ ...JSON.parse(ACME), region: "eu-north1" });
+      const accounts = objectStoragePrivateAccountsOf({
+        family: new Map([
+          ["DATAPLANE_S3__acme__org123", own],
+          ["DATAPLANE_S3__beta__org456", ACME],
+        ]),
+        region: "eu-west-1",
+      });
+
+      expect(accounts).toEqual([
+        expect.objectContaining({ organizationId: "org123", region: "eu-north1" }),
+        expect.objectContaining({ organizationId: "org456", region: "eu-west-1" }),
+      ]);
+    });
+  });
+
   describe("when an entry is not JSON", () => {
     /** @scenario "Invalid JSON in S3 env var is logged and skipped" */
     it("skips it and warns by the variable's name, never its value", () => {
@@ -80,6 +99,76 @@ describe("given the stores' DATAPLANE_S3__ family", () => {
       expect(lines.findLine("warn", "invalid fields")).toMatchObject({
         envVar: "DATAPLANE_S3__partial__org888",
         fields: ["accessKeyId", "secretAccessKey"],
+      });
+    });
+  });
+
+  describe("when an entry names a role and no key pair", () => {
+    /** @scenario "A private S3 config naming a role is read through the web identity" */
+    it("maps the organisation to an account that assumes that role", () => {
+      const roleOnly = JSON.stringify({
+        endpoint: "https://s3.eu-west-1.amazonaws.com",
+        bucket: "acme-dataplane",
+        roleArn: "arn:aws:iam::1:role/acme-dataplane",
+      });
+      const { accounts } = parse({ DATAPLANE_S3__acme__org123: roleOnly });
+
+      expect(accounts).toEqual([
+        {
+          organizationId: "org123",
+          label: "acme",
+          variable: "DATAPLANE_S3__acme__org123",
+          bucket: "acme-dataplane",
+          endpoint: "https://s3.eu-west-1.amazonaws.com",
+          roleArn: "arn:aws:iam::1:role/acme-dataplane",
+          forcePathStyle: true,
+        },
+      ]);
+    });
+  });
+
+  describe("when an entry names both a role and a key pair", () => {
+    /** @scenario "A private S3 config naming a role is read through the web identity" */
+    it("keeps the role and drops the keys", () => {
+      const both = JSON.stringify({
+        ...JSON.parse(ACME),
+        roleArn: "arn:aws:iam::1:role/acme-dataplane",
+      });
+      const [account] = parse({ DATAPLANE_S3__acme__org123: both }).accounts;
+
+      expect(account).toMatchObject({ roleArn: "arn:aws:iam::1:role/acme-dataplane" });
+      expect(account).not.toHaveProperty("credentials");
+    });
+  });
+
+  describe("when an entry's role is only whitespace", () => {
+    /** @scenario "S3 env var missing a field is logged and skipped" */
+    it("skips it and warns naming the role, rather than assuming a blank role over the keys", () => {
+      const blankRole = JSON.stringify({ ...JSON.parse(ACME), roleArn: "   " });
+      const { accounts, lines } = parse({ DATAPLANE_S3__blank__org666: blankRole });
+
+      expect(accounts).toEqual([]);
+      expect(lines.findLine("warn", "invalid fields")).toMatchObject({
+        envVar: "DATAPLANE_S3__blank__org666",
+        fields: ["roleArn"],
+      });
+    });
+  });
+
+  describe("when an entry names no role and only half a key pair", () => {
+    /** @scenario "S3 env var missing a field is logged and skipped" */
+    it("skips it and warns naming the missing key", () => {
+      const half = JSON.stringify({
+        endpoint: "https://s3.invalid",
+        bucket: "half",
+        accessKeyId: "k",
+      });
+      const { accounts, lines } = parse({ DATAPLANE_S3__half__org777: half });
+
+      expect(accounts).toEqual([]);
+      expect(lines.findLine("warn", "invalid fields")).toMatchObject({
+        envVar: "DATAPLANE_S3__half__org777",
+        fields: ["secretAccessKey"],
       });
     });
   });

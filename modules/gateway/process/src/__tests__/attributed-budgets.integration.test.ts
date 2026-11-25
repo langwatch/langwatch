@@ -20,6 +20,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { createGatewayTestPrismaConnection } from "../app/__tests__/gateway-prisma.fixture.ts";
 import {
   createTestClickHouseClient,
+  gatewayClickHouseOver,
   testClickHouseUrl,
 } from "../repositories/clickhouse/__tests__/support/clickhouse-endpoint.support.ts";
 import { GatewayBudgetClickHouseRepository } from "../repositories/clickhouse/clickhouse.gateway-budget.repository.ts";
@@ -99,9 +100,11 @@ function toBudgetPeriod(row: {
   currentPeriodStartedAt: Date;
   lastResetAt: Date | null;
   cycleAnchorAt: Date | null;
+  timezone: string | null;
 }) {
   return {
     window: row.window,
+    timezone: row.timezone,
     currentPeriodStartedAt: fromDate(row.currentPeriodStartedAt),
     lastResetAt: row.lastResetAt ? fromDate(row.lastResetAt) : null,
     cycleAnchorAt: row.cycleAnchorAt ? fromDate(row.cycleAnchorAt) : null,
@@ -147,7 +150,9 @@ describe.skipIf(!databaseUrl || !chUrl)("attributed budgets and resets (real PG 
         scopes: { create: [{ scopeType: "PROJECT", scopeId: PROJECT_ID }] },
       },
     });
-    chRepo = new GatewayBudgetClickHouseRepository(async () => createTestClickHouseClient(chUrl!));
+    chRepo = new GatewayBudgetClickHouseRepository(
+      gatewayClickHouseOver(createTestClickHouseClient(chUrl!)),
+    );
     service = PrismaGatewayAdapter.create({
       database: prisma,
       organizations: organizationApiOver(prisma),

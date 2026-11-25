@@ -5,9 +5,12 @@
  */
 
 import type { FilterField } from "@langwatch/analytics-contract";
+import { tenantSet } from "@langwatch/clickhouse-client";
 import {
   customMetadataKeyCondition,
   customMetadataValueCondition,
+  STORED_SPANS_SOURCE,
+  type SpanAnalyticsSource,
 } from "@langwatch/trace-contract";
 
 import { type CHTable, tableAliases } from "./clickhouse.field-mappings.mapper.ts";
@@ -27,16 +30,29 @@ export interface FilterTranslation {
 }
 
 /**
- * Handler function type for filter translation. `spanTimePredicate` is an
- * optional SQL fragment that handlers reading `stored_spans` inject into
- * their subquery WHERE, pruning the scan to the dashboard's date range.
+ * Handler for one filter. `spanTimePredicate` prunes a `stored_spans` subquery to the
+ * dashboard's date range; `spanAnalytics` picks the table a span type is read from.
  */
 type FilterHandler = (input: {
   values: string[];
   key?: string;
   subkey?: string;
   spanTimePredicate?: string;
+  spanAnalytics?: SpanAnalyticsSource;
 }) => FilterTranslation;
+
+/** What every side-table subquery handler is handed. */
+type SubqueryFilterInput = {
+  values: string[];
+  spanTimePredicate?: string;
+  spanAnalytics?: SpanAnalyticsSource;
+};
+
+/** An evaluation_runs subquery handler's input, optionally narrowed to one evaluator. */
+type EvaluationFilterInput = {
+  values: string[];
+  evaluatorId?: string;
+};
 
 /**
  * Parameter counter for generating unique parameter names
@@ -83,42 +99,48 @@ const filterHandlers: Record<FilterField, FilterHandler | null> = {
   "traces.name": ({ values }) => translateTraceNameFilter(values),
 
   // Span Filters
-  "spans.type": ({ values, spanTimePredicate: spanTime }) =>
-    translateSpanTypeFilter(values, spanTime),
-  "spans.model": ({ values, spanTimePredicate: spanTime }) =>
-    translateSpanModelFilter(values, spanTime),
+  "spans.type": ({ values, spanTimePredicate, spanAnalytics }) =>
+    translateSpanTypeFilter({ values, spanTimePredicate, spanAnalytics }),
+  "spans.model": ({ values, spanTimePredicate }) =>
+    translateSpanModelFilter({ values, spanTimePredicate }),
 
   // Evaluation Filters
-  "evaluations.evaluator_id": ({ values }) => translateEvaluatorIdFilter(values),
-  "evaluations.evaluator_id.guardrails_only": ({ values }) => translateEvaluatorIdFilter(values),
+  "evaluations.evaluator_id": ({ values }) => translateEvaluatorIdFilter({ values }),
+  "evaluations.evaluator_id.guardrails_only": ({ values }) =>
+    translateEvaluatorIdFilter({ values }),
   "evaluations.evaluator_id.has_passed": ({ values }) =>
-    translateEvaluatorIdFilter(values, "AND Passed IS NOT NULL"),
+    translateEvaluatorIdFilter({ values, additionalWhere: "AND Passed IS NOT NULL" }),
   "evaluations.evaluator_id.has_score": ({ values }) =>
-    translateEvaluatorIdFilter(values, "AND Score IS NOT NULL"),
+    translateEvaluatorIdFilter({ values, additionalWhere: "AND Score IS NOT NULL" }),
   "evaluations.evaluator_id.has_label": ({ values }) =>
-    translateEvaluatorIdFilter(
+    translateEvaluatorIdFilter({
       values,
-      "AND Label IS NOT NULL AND Label != '' AND Label NOT IN ('succeeded', 'failed')",
-    ),
-  "evaluations.passed": ({ values, key }) => translateEvaluationPassedFilter(values, key),
-  "evaluations.score": ({ values, key }) => translateEvaluationScoreFilter(values, key),
-  "evaluations.label": ({ values, key }) => translateEvaluationLabelFilter(values, key),
-  "evaluations.state": ({ values, key }) => translateEvaluationStateFilter(values, key),
+      additionalWhere:
+        "AND Label IS NOT NULL AND Label != '' AND Label NOT IN ('succeeded', 'failed')",
+    }),
+  "evaluations.passed": ({ values, key }) =>
+    translateEvaluationPassedFilter({ values, evaluatorId: key }),
+  "evaluations.score": ({ values, key }) =>
+    translateEvaluationScoreFilter({ values, evaluatorId: key }),
+  "evaluations.label": ({ values, key }) =>
+    translateEvaluationLabelFilter({ values, evaluatorId: key }),
+  "evaluations.state": ({ values, key }) =>
+    translateEvaluationStateFilter({ values, evaluatorId: key }),
 
   // Event Filters
-  "events.event_type": ({ values, spanTimePredicate: spanTime }) =>
-    translateEventTypeFilter(values, spanTime),
-  "events.metrics.key": ({ values, key, spanTimePredicate: spanTime }) =>
-    translateEventMetricKeyFilter(values, key, spanTime),
-  "events.metrics.value": ({ values, key, subkey, spanTimePredicate: spanTime }) =>
+  "events.event_type": ({ values, spanTimePredicate }) =>
+    translateEventTypeFilter({ values, spanTimePredicate }),
+  "events.metrics.key": ({ values, key, spanTimePredicate }) =>
+    translateEventMetricKeyFilter({ values, eventType: key, spanTimePredicate }),
+  "events.metrics.value": ({ values, key, subkey, spanTimePredicate }) =>
     translateEventMetricValueFilter({
       values,
       eventType: key,
       metricKey: subkey,
-      spanTimePredicate: spanTime,
+      spanTimePredicate,
     }),
-  "events.event_details.key": ({ values, key, spanTimePredicate: spanTime }) =>
-    translateEventDetailKeyFilter(values, key, spanTime),
+  "events.event_details.key": ({ values, key, spanTimePredicate }) =>
+    translateEventDetailKeyFilter({ values, eventType: key, spanTimePredicate }),
 
   // Annotation Filters
   "annotations.hasAnnotation": ({ values }) => translateAnnotationFilter(values),
@@ -144,19 +166,21 @@ export function translateFilter({
   key,
   subkey,
   spanTimePredicate,
+  spanAnalytics,
 }: {
   field: FilterField;
   values: string[];
   key?: string;
   subkey?: string;
   spanTimePredicate?: string;
+  spanAnalytics?: SpanAnalyticsSource;
 }): FilterTranslation {
   if (values.length === 0) {
     return noOpFilter;
   }
 
   const handler = filterHandlers[field];
-  return handler ? handler({ values, key, subkey, spanTimePredicate }) : noOpFilter;
+  return handler ? handler({ values, key, subkey, spanTimePredicate, spanAnalytics }) : noOpFilter;
 }
 
 /**
@@ -331,37 +355,56 @@ function translateTraceNameFilter(values: string[]): FilterTranslation {
 }
 
 /**
- * Translate span type filter (requires JOIN). Uses an IN subquery rather than
- * a direct JOIN: a trace with multiple matching spans would be duplicated by
- * a JOIN, inflating count metrics — IN returns true once, once is enough.
+ * Span type filter: an IN subquery on tenant and trace id together (a JOIN repeats a trace per
+ * matching span; ADR-177). The type comes from span_analytics where it is complete, and from
+ * the stored_spans map elsewhere.
  */
-function translateSpanTypeFilter(values: string[], spanTimePredicate = ""): FilterTranslation {
+function translateSpanTypeFilter({
+  values,
+  spanTimePredicate = "",
+  spanAnalytics = STORED_SPANS_SOURCE,
+}: SubqueryFilterInput): FilterTranslation {
   const ts = tableAliases.trace_summaries;
   const paramName = genParamName("spanTypes");
+  const branch = ({ light, bound }: { light: boolean; bound: string }) => `
+      SELECT TenantId, TraceId FROM ${light ? "span_analytics" : "stored_spans"}
+      WHERE ${tenantSet()}
+        ${spanTimePredicate}${bound}
+        AND ${light ? "SpanType" : "SpanAttributes['langwatch.span.type']"} IN ({${paramName}:Array(String)})`;
+  const params: Record<string, unknown> = { [paramName]: values };
+  let subquery: string;
+  if (spanAnalytics.kind === "split") {
+    const fromParam = genParamName("spanAnalyticsFrom");
+    params[fromParam] = spanAnalytics.fromMs;
+    const from = `fromUnixTimestamp64Milli({${fromParam}:Int64})`;
+    subquery = `${branch({ light: true, bound: ` AND StartTime >= ${from}` })}
+      UNION ALL${branch({ light: false, bound: ` AND StartTime < ${from}` })}`;
+  } else {
+    subquery = branch({ light: spanAnalytics.kind === "span_analytics", bound: "" });
+  }
 
   return {
-    whereClause: `${ts}.TraceId IN (
-      SELECT TraceId FROM stored_spans
-      WHERE TenantId = {tenantId:String}
-        ${spanTimePredicate}
-        AND SpanAttributes['langwatch.span.type'] IN ({${paramName}:Array(String)})
+    whereClause: `(${ts}.TenantId, ${ts}.TraceId) IN (${subquery}
     )`,
     requiredJoins: [],
-    params: { [paramName]: values },
+    params,
   };
 }
 
 /**
  * Translate span model filter (requires JOIN)
  */
-function translateSpanModelFilter(values: string[], spanTimePredicate = ""): FilterTranslation {
+function translateSpanModelFilter({
+  values,
+  spanTimePredicate = "",
+}: SubqueryFilterInput): FilterTranslation {
   const ts = tableAliases.trace_summaries;
   const paramName = genParamName("models");
 
   return {
-    whereClause: `${ts}.TraceId IN (
-      SELECT TraceId FROM stored_spans
-      WHERE TenantId = {tenantId:String}
+    whereClause: `(${ts}.TenantId, ${ts}.TraceId) IN (
+      SELECT TenantId, TraceId FROM stored_spans
+      WHERE ${tenantSet()}
         ${spanTimePredicate}
         AND SpanAttributes['gen_ai.request.model'] IN ({${paramName}:Array(String)})
     )`,
@@ -375,14 +418,20 @@ function translateSpanModelFilter(values: string[], spanTimePredicate = ""): Fil
  * @param additionalWhere - Extra WHERE appended inside the subquery, used
  *   by has_passed/has_score/has_label to filter by result-type.
  */
-function translateEvaluatorIdFilter(values: string[], additionalWhere = ""): FilterTranslation {
+function translateEvaluatorIdFilter({
+  values,
+  additionalWhere = "",
+}: {
+  values: string[];
+  additionalWhere?: string;
+}): FilterTranslation {
   const ts = tableAliases.trace_summaries;
   const paramName = genParamName("evaluatorIds");
 
   return {
-    whereClause: `${ts}.TraceId IN (
-      SELECT TraceId FROM evaluation_runs
-      WHERE TenantId = {tenantId:String}
+    whereClause: `(${ts}.TenantId, ${ts}.TraceId) IN (
+      SELECT TenantId, TraceId FROM evaluation_runs
+      WHERE ${tenantSet()}
         AND EvaluatorId IN ({${paramName}:Array(String)})
         ${additionalWhere}
     )`,
@@ -394,10 +443,10 @@ function translateEvaluatorIdFilter(values: string[], additionalWhere = ""): Fil
 /**
  * Translate evaluation passed filter
  */
-function translateEvaluationPassedFilter(
-  values: string[],
-  evaluatorId?: string,
-): FilterTranslation {
+function translateEvaluationPassedFilter({
+  values,
+  evaluatorId,
+}: EvaluationFilterInput): FilterTranslation {
   const ts = tableAliases.trace_summaries;
   const paramName = genParamName("evalPassed");
 
@@ -414,9 +463,9 @@ function translateEvaluationPassedFilter(
   }
 
   return {
-    whereClause: `${ts}.TraceId IN (
-      SELECT TraceId FROM evaluation_runs
-      WHERE TenantId = {tenantId:String}
+    whereClause: `(${ts}.TenantId, ${ts}.TraceId) IN (
+      SELECT TenantId, TraceId FROM evaluation_runs
+      WHERE ${tenantSet()}
         ${evaluatorCondition}
         AND Passed IN ({${paramName}:Array(UInt8)})
     )`,
@@ -428,7 +477,10 @@ function translateEvaluationPassedFilter(
 /**
  * Translate evaluation score filter (numeric range)
  */
-function translateEvaluationScoreFilter(values: string[], evaluatorId?: string): FilterTranslation {
+function translateEvaluationScoreFilter({
+  values,
+  evaluatorId,
+}: EvaluationFilterInput): FilterTranslation {
   const ts = tableAliases.trace_summaries;
   const minParam = genParamName("scoreMin");
   const maxParam = genParamName("scoreMax");
@@ -450,9 +502,9 @@ function translateEvaluationScoreFilter(values: string[], evaluatorId?: string):
   }
 
   return {
-    whereClause: `${ts}.TraceId IN (
-      SELECT TraceId FROM evaluation_runs
-      WHERE TenantId = {tenantId:String}
+    whereClause: `(${ts}.TenantId, ${ts}.TraceId) IN (
+      SELECT TenantId, TraceId FROM evaluation_runs
+      WHERE ${tenantSet()}
         ${evaluatorCondition}
         AND Score >= {${minParam}:Float64}
         AND Score <= {${maxParam}:Float64}
@@ -465,7 +517,10 @@ function translateEvaluationScoreFilter(values: string[], evaluatorId?: string):
 /**
  * Translate evaluation label filter
  */
-function translateEvaluationLabelFilter(values: string[], evaluatorId?: string): FilterTranslation {
+function translateEvaluationLabelFilter({
+  values,
+  evaluatorId,
+}: EvaluationFilterInput): FilterTranslation {
   const ts = tableAliases.trace_summaries;
   const paramName = genParamName("evalLabels");
 
@@ -479,9 +534,9 @@ function translateEvaluationLabelFilter(values: string[], evaluatorId?: string):
   }
 
   return {
-    whereClause: `${ts}.TraceId IN (
-      SELECT TraceId FROM evaluation_runs
-      WHERE TenantId = {tenantId:String}
+    whereClause: `(${ts}.TenantId, ${ts}.TraceId) IN (
+      SELECT TenantId, TraceId FROM evaluation_runs
+      WHERE ${tenantSet()}
         ${evaluatorCondition}
         AND Label IN ({${paramName}:Array(String)})
     )`,
@@ -493,7 +548,10 @@ function translateEvaluationLabelFilter(values: string[], evaluatorId?: string):
 /**
  * Translate evaluation state filter
  */
-function translateEvaluationStateFilter(values: string[], evaluatorId?: string): FilterTranslation {
+function translateEvaluationStateFilter({
+  values,
+  evaluatorId,
+}: EvaluationFilterInput): FilterTranslation {
   const ts = tableAliases.trace_summaries;
   const paramName = genParamName("evalStates");
 
@@ -507,9 +565,9 @@ function translateEvaluationStateFilter(values: string[], evaluatorId?: string):
   }
 
   return {
-    whereClause: `${ts}.TraceId IN (
-      SELECT TraceId FROM evaluation_runs
-      WHERE TenantId = {tenantId:String}
+    whereClause: `(${ts}.TenantId, ${ts}.TraceId) IN (
+      SELECT TenantId, TraceId FROM evaluation_runs
+      WHERE ${tenantSet()}
         ${evaluatorCondition}
         AND Status IN ({${paramName}:Array(String)})
     )`,
@@ -521,14 +579,17 @@ function translateEvaluationStateFilter(values: string[], evaluatorId?: string):
 /**
  * Translate event type filter
  */
-function translateEventTypeFilter(values: string[], spanTimePredicate = ""): FilterTranslation {
+function translateEventTypeFilter({
+  values,
+  spanTimePredicate = "",
+}: SubqueryFilterInput): FilterTranslation {
   const ts = tableAliases.trace_summaries;
   const paramName = genParamName("eventTypes");
 
   return {
-    whereClause: `${ts}.TraceId IN (
-      SELECT TraceId FROM stored_spans
-      WHERE TenantId = {tenantId:String}
+    whereClause: `(${ts}.TenantId, ${ts}.TraceId) IN (
+      SELECT TenantId, TraceId FROM stored_spans
+      WHERE ${tenantSet()}
         ${spanTimePredicate}
         AND hasAny("Events.Name", {${paramName}:Array(String)})
     )`,
@@ -538,15 +599,14 @@ function translateEventTypeFilter(values: string[], spanTimePredicate = ""): Fil
 }
 
 /**
- * Translate event metric key filter. Uses paired arrayExists to correlate
- * Events.Name with Events.Attributes at the same index — this prevents false
- * positives where event type matches at one index but key matches at another.
+ * Event metric key filter: paired arrayExists keeps name and attributes at one index. Keys
+ * match by `hasAny(mapKeys(...))`; a lambda over them copies each event's map once per key.
  */
-function translateEventMetricKeyFilter(
-  values: string[],
-  eventType?: string,
+function translateEventMetricKeyFilter({
+  values,
+  eventType,
   spanTimePredicate = "",
-): FilterTranslation {
+}: SubqueryFilterInput & { eventType?: string }): FilterTranslation {
   const ts = tableAliases.trace_summaries;
   const keysParam = genParamName("metricKeys");
 
@@ -561,22 +621,22 @@ function translateEventMetricKeyFilter(
     // Correlate event name and attributes at the same array index
     metricKeyCondition = `arrayExists(
       (name, attrs) -> name = {${eventTypeParam}:String}
-        AND arrayExists(k -> mapContains(attrs, k), {${keysParam}:Array(String)}),
+        AND hasAny(mapKeys(attrs), {${keysParam}:Array(String)}),
       "Events.Name",
       "Events.Attributes"
     )`;
   } else {
     // No event type filter, just check attributes
     metricKeyCondition = `arrayExists(
-      x -> arrayExists(k -> mapContains(x, k), {${keysParam}:Array(String)}),
+      x -> hasAny(mapKeys(x), {${keysParam}:Array(String)}),
       "Events.Attributes"
     )`;
   }
 
   return {
-    whereClause: `${ts}.TraceId IN (
-      SELECT TraceId FROM stored_spans
-      WHERE TenantId = {tenantId:String}
+    whereClause: `(${ts}.TenantId, ${ts}.TraceId) IN (
+      SELECT TenantId, TraceId FROM stored_spans
+      WHERE ${tenantSet()}
         ${spanTimePredicate}
         AND ${metricKeyCondition}
     )`,
@@ -595,12 +655,7 @@ function translateEventMetricValueFilter({
   eventType,
   metricKey,
   spanTimePredicate = "",
-}: {
-  values: string[];
-  eventType?: string;
-  metricKey?: string;
-  spanTimePredicate?: string;
-}): FilterTranslation {
+}: SubqueryFilterInput & { eventType?: string; metricKey?: string }): FilterTranslation {
   const ts = tableAliases.trace_summaries;
 
   if (!metricKey) {
@@ -644,9 +699,9 @@ function translateEventMetricValueFilter({
   }
 
   return {
-    whereClause: `${ts}.TraceId IN (
-      SELECT TraceId FROM stored_spans
-      WHERE TenantId = {tenantId:String}
+    whereClause: `(${ts}.TenantId, ${ts}.TraceId) IN (
+      SELECT TenantId, TraceId FROM stored_spans
+      WHERE ${tenantSet()}
         ${spanTimePredicate}
         AND ${valueCondition}
     )`,
@@ -659,12 +714,10 @@ function translateEventMetricValueFilter({
  * Translate event detail key filter
  */
 function translateEventDetailKeyFilter(
-  values: string[],
-  eventType?: string,
-  spanTimePredicate = "",
+  input: SubqueryFilterInput & { eventType?: string },
 ): FilterTranslation {
   // Same as metric key filter - event details are stored in Events.Attributes
-  return translateEventMetricKeyFilter(values, eventType, spanTimePredicate);
+  return translateEventMetricKeyFilter(input);
 }
 
 /**
@@ -731,10 +784,10 @@ function negatedConjunction(whereClauses: string[]): string {
   return negated.length === 1 ? negated[0]! : `(${negated.join(" OR ")})`;
 }
 
-const SPAN_SUBQUERY_FILTER = /^(\w+\.TraceId) IN (\(.*\))$/s;
+const SPAN_SUBQUERY_FILTER = /^(\(\w+\.TenantId, \w+\.TraceId\)) IN (\(.*\))$/s;
 
 /**
- * One filter inverted. A trace-id subquery becomes `NOT IN`: its subquery carries its own
+ * One filter inverted. A side-table subquery becomes `NOT IN`: its subquery carries its own
  * tenant predicate, which a `NOT (…)` bracket would appear to negate to the tenant guard
  * (WEB-17801).
  */
@@ -761,16 +814,20 @@ function translateNestedFilter({
   field,
   value,
   spanTimePredicate,
+  spanAnalytics,
 }: {
   field: FilterField;
   value: Record<string, string[]> | Record<string, Record<string, string[]>>;
   spanTimePredicate?: string;
+  spanAnalytics?: SpanAnalyticsSource;
 }): FilterTranslation[] {
   const translations: FilterTranslation[] = [];
 
   for (const [key, subValue] of Object.entries(value)) {
     if (Array.isArray(subValue)) {
-      translations.push(translateFilter({ field, values: subValue, key, spanTimePredicate }));
+      translations.push(
+        translateFilter({ field, values: subValue, key, spanTimePredicate, spanAnalytics }),
+      );
       continue;
     }
     if (typeof subValue !== "object") continue;
@@ -778,7 +835,14 @@ function translateNestedFilter({
     for (const [subkey, subSubValue] of Object.entries(subValue)) {
       if (Array.isArray(subSubValue)) {
         translations.push(
-          translateFilter({ field, values: subSubValue, key, subkey, spanTimePredicate }),
+          translateFilter({
+            field,
+            values: subSubValue,
+            key,
+            subkey,
+            spanTimePredicate,
+            spanAnalytics,
+          }),
         );
       }
     }
@@ -788,13 +852,16 @@ function translateNestedFilter({
 }
 
 /**
- * Translate all filters from a filter object
+ * Translate all filters from a filter object.
  */
 export function translateAllFilters(
   filters: Partial<
     Record<string, string[] | Record<string, string[]> | Record<string, Record<string, string[]>>>
   >,
-  spanTimePredicate?: string,
+  {
+    spanTimePredicate,
+    spanAnalytics,
+  }: { spanTimePredicate?: string; spanAnalytics?: SpanAnalyticsSource } = {},
 ): FilterTranslation {
   const translations: FilterTranslation[] = [];
 
@@ -806,11 +873,21 @@ export function translateAllFilters(
     if (Array.isArray(value)) {
       // Simple array filter
       translations.push(
-        translateFilter({ field: field as FilterField, values: value, spanTimePredicate }),
+        translateFilter({
+          field: field as FilterField,
+          values: value,
+          spanTimePredicate,
+          spanAnalytics,
+        }),
       );
     } else if (typeof value === "object") {
       translations.push(
-        ...translateNestedFilter({ field: field as FilterField, value, spanTimePredicate }),
+        ...translateNestedFilter({
+          field: field as FilterField,
+          value,
+          spanTimePredicate,
+          spanAnalytics,
+        }),
       );
     }
   }

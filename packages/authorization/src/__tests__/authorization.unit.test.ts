@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  AccessNotGrantedError,
   type Authorization,
   AuthorizationExpiredError,
   type AuthorizationInput,
@@ -8,7 +9,9 @@ import {
   ForgedAuthorizationError,
   isSealedAuthorization,
   narrowAuthorization,
+  narrowAuthorizationOrNotFound,
   sealAuthorization,
+  sharedWindowsReadBy,
 } from "../index";
 
 /**
@@ -197,22 +200,24 @@ describe("the authorization proof", () => {
         projectId: "proj_member",
       });
 
-      expect(narrowed).not.toBeNull();
       expect(isSealedAuthorization(narrowed)).toBe(true);
-      expect(narrowed?.narrowedTo).toBe("proj_member");
+      expect(narrowed.narrowedTo).toBe("proj_member");
       // A structural cut: a later reader of the grants cannot widen the
       // narrowed proof back to the member it was cut away from.
-      expect(narrowed?.grants).toEqual([own, member]);
-      expect(narrowed?.expiresAt).toBe(authorization.expiresAt);
-      expect(narrowed?.purpose).toEqual(authorization.purpose);
+      expect(narrowed.grants).toEqual([own, member]);
+      expect(narrowed.expiresAt).toBe(authorization.expiresAt);
+      expect(narrowed.purpose).toEqual(authorization.purpose);
       expect(authorization.narrowedTo).toBeUndefined();
       expect(authorization.grants).toHaveLength(3);
     });
 
-    it("returns null for a project the proof does not name", () => {
+    /** @scenario "A proof that cannot be narrowed to a project is refused, never read whole" */
+    it("refuses a project the proof does not name", () => {
       const authorization = sealAuthorization(proof());
 
-      expect(narrowAuthorization({ authorization, projectId: "proj_outsider" })).toBeNull();
+      expect(() => narrowAuthorization({ authorization, projectId: "proj_outsider" })).toThrow(
+        AccessNotGrantedError,
+      );
     });
 
     it("never moves a narrowed proof onto another project", () => {
@@ -220,14 +225,39 @@ describe("the authorization proof", () => {
         authorization: sealAuthorization(proof()),
         projectId: "proj_member",
       });
-      if (!narrowed) throw new Error("expected a narrowed proof");
-
-      expect(
+      expect(() =>
         narrowAuthorization({ authorization: narrowed, projectId: "proj_aggregate" }),
-      ).toBeNull();
+      ).toThrow(AccessNotGrantedError);
       expect(narrowAuthorization({ authorization: narrowed, projectId: "proj_member" })).toBe(
         narrowed,
       );
+    });
+
+    it("throws the caller's not-found error for a named project it cannot narrow to", () => {
+      const authorization = sealAuthorization(proof());
+      class GoneError extends Error {}
+
+      expect(() =>
+        narrowAuthorizationOrNotFound({
+          authorization,
+          tenantId: "proj_outsider",
+          notFound: () => new GoneError(),
+        }),
+      ).toThrow(GoneError);
+      expect(
+        narrowAuthorizationOrNotFound({
+          authorization,
+          tenantId: "proj_member",
+          notFound: () => new GoneError(),
+        }).narrowedTo,
+      ).toBe("proj_member");
+      expect(
+        narrowAuthorizationOrNotFound({
+          authorization,
+          tenantId: undefined,
+          notFound: () => new GoneError(),
+        }),
+      ).toBe(authorization);
     });
 
     it("refuses to narrow a proof assembled by hand", () => {
@@ -242,6 +272,39 @@ describe("the authorization proof", () => {
       expect(() => sealAuthorization({ ...proof(), narrowedTo: "proj_outsider" })).toThrow(
         /a narrowed proof names a project/,
       );
+    });
+  });
+
+  describe("when a reader asks for the windows its shared grants open", () => {
+    const read = (authorization: Authorization, permission: "traces:view" | "analytics:view") =>
+      sharedWindowsReadBy({ authorization, permission, condition: "trace" });
+
+    it("lists each shared grant carrying the permission, with its bounds", () => {
+      const authorization = sealAuthorization(proof());
+
+      expect(read(authorization, "traces:view")).toEqual([
+        { projectId: "proj_member", from: NOW - 1_000, until: null },
+      ]);
+    });
+
+    it("leaves out a shared grant that does not carry the permission", () => {
+      expect(read(sealAuthorization(proof()), "analytics:view")).toEqual([]);
+    });
+
+    it("lists none for a proof whose only grant is its own", () => {
+      const [own] = proof().grants;
+      if (!own) throw new Error("the fixture proof has an own grant");
+
+      expect(read(sealAuthorization(proof({ grants: [own] })), "traces:view")).toEqual([]);
+    });
+
+    it("keeps only the project a narrowed proof is cut to", () => {
+      const narrowed = narrowAuthorization({
+        authorization: sealAuthorization(proof()),
+        projectId: "proj_aggregate",
+      });
+
+      expect(read(narrowed, "traces:view")).toEqual([]);
     });
   });
 });

@@ -12,7 +12,6 @@ vi.mock("@/internal/http/langwatchFetch", () => ({
 }));
 
 import { ChartsApiService } from "@/client-sdk/services/charts/charts-api.service";
-import { DashboardWidgetsApiService } from "@/client-sdk/services/dashboard-widgets/dashboard-widgets-api.service";
 import { SecretsApiService } from "@/client-sdk/services/secrets/secrets-api.service";
 import type { LangwatchApiClient } from "@/internal/api/client";
 
@@ -55,14 +54,10 @@ afterEach(() => {
 describe("given LANGWATCH_API_KEY is a project key", () => {
   describe("when no --project or LANGWATCH_PROJECT_ID names one", () => {
     /** @scenario "a project key reaches the commands whose route names a project" */
-    it("runs chart, dashboard widget and secret calls against the key's own project", async () => {
+    it("runs chart and secret calls against the key's own project", async () => {
       const charts = recordingClient();
       await new ChartsApiService({ langwatchApiClient: charts.client }).list();
       expect(pathProjectOf(charts.GET)).toBe(OWN_PROJECT);
-
-      const widgets = recordingClient();
-      await new DashboardWidgetsApiService({ langwatchApiClient: widgets.client }).list();
-      expect(pathProjectOf(widgets.GET)).toBe(OWN_PROJECT);
 
       await new SecretsApiService().getAll();
       const secretsUrl = langwatchFetchMock.mock.calls
@@ -127,10 +122,10 @@ describe("given the key project lookup fails", () => {
         throw new Error("connect ECONNREFUSED");
       });
       const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
-      const widgets = recordingClient();
+      const charts = recordingClient();
 
       await expect(
-        new DashboardWidgetsApiService({ langwatchApiClient: widgets.client }).list(),
+        new ChartsApiService({ langwatchApiClient: charts.client }).list(),
       ).rejects.toThrow(/No project is in scope/);
 
       expect(warn).toHaveBeenCalledWith(expect.stringContaining("connect ECONNREFUSED"));

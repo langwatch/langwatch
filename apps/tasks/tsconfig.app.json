@@ -217,6 +217,9 @@
       "path": "../../modules/data-retention/process/tsconfig.build.json"
     },
     {
+      "path": "../../modules/data-retention/contract/tsconfig.build.json"
+    },
+    {
       "path": "../../modules/data-privacy/process/tsconfig.build.json"
     },
     {
@@ -272,6 +275,9 @@
     },
     {
       "path": "../../modules/prompt/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../enterprise/modules/digest/process/tsconfig.build.json"
     }
   ]
 }

@@ -25,7 +25,6 @@ function handoff(overrides: Partial<LangyTurnHandoff> = {}): LangyTurnHandoff {
       organizationId: "organization-1",
     },
     runToken: "run-token",
-    permitReserved: false,
     ...overrides,
   };
 }
@@ -183,6 +182,7 @@ describe("RedisLangyEffectRepository", () => {
       userId: "user-1",
       projectId: PROJECT,
       organizationId: "organization-1",
+      conversation: { id: CONVERSATION, turnId: TURN },
     });
     expect(deps.handoffStore.stash).toHaveBeenCalledWith(
       expect.objectContaining({

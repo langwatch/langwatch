@@ -84,6 +84,23 @@ describe("rateSpendNanoUsd", () => {
       }).costNanoUsd;
       expect(hourLong).toBeGreaterThan(short);
     });
+
+    it.each([
+      "bedrock/anthropic.claude-sonnet-5-5",
+      "bedrock/eu.anthropic.claude-sonnet-5-5",
+      "bedrock/global.anthropic.claude-sonnet-5-5",
+      "eu.anthropic.claude-sonnet-5-5",
+      "anthropic/claude-sonnet-5-5",
+    ])("rates writes on %s at 4 USD per million for an hour", (model) => {
+      const { costNanoUsd } = spendRating.rateSpendNanoUsd({
+        model,
+        usage: usage({
+          cache_creation_input_tokens: 1_000_000,
+          cache_creation_1h_tokens: 1_000_000,
+        }),
+      });
+      expect(costNanoUsd).toBe(4_000_000_000);
+    });
   });
 
   describe("given a realtime call with an audio token split", () => {

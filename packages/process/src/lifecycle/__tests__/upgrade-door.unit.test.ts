@@ -10,6 +10,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   startHeartbeat,
+  PUBLIC_LISTENER_TIMEOUTS,
   startLivenessThread,
   type Heartbeat,
   type LivenessThread,
@@ -53,6 +54,7 @@ async function bootThread({ onProxied }: { onProxied: () => void }): Promise<Liv
   const heartbeat = startHeartbeat({ intervalMs: 5 });
   heartbeats.push(heartbeat);
   const thread = await startLivenessThread({
+    requestTimeoutMs: PUBLIC_LISTENER_TIMEOUTS.requestTimeout,
     port: 0,
     heartbeat: heartbeat.buffer,
     proxyPort: address.port,
@@ -62,11 +64,11 @@ async function bootThread({ onProxied }: { onProxied: () => void }): Promise<Liv
   return thread;
 }
 
-const urlOf = ({ port }: AddressInfo, path: string): string => `http://127.0.0.1:${port}${path}`;
+const urlOf = ({ port }: AddressInfo, path: string): string => `http://localhost:${port}${path}`;
 
 function askWebSocket(thread: LivenessThread): Promise<string> {
   return new Promise<string>((resolve, reject) => {
-    const socket = net.connect({ host: "127.0.0.1", port: thread.address.port }, () =>
+    const socket = net.connect({ host: "localhost", port: thread.address.port }, () =>
       socket.write(
         "GET /api/stream HTTP/1.1\r\nHost: localhost\r\nConnection: Upgrade\r\n" +
           "Upgrade: websocket\r\nSec-WebSocket-Version: 13\r\n" +
@@ -92,6 +94,36 @@ describe("the liveness door while an upgrade runs", () => {
 
         expect(reply.startsWith("HTTP/1.1 101")).toBe(true);
         expect(onProxied).toHaveBeenCalledOnce();
+      });
+    });
+  });
+
+  describe("given the door is told to forward to another loopback port", () => {
+    describe("when a request and a WebSocket upgrade arrive after the hand-over", () => {
+      /** @scenario "The door forwards to a new loopback port once told" */
+      it("sends both to the new listener and nothing more to the first", async () => {
+        const first = vi.fn();
+        const thread = await bootThread({ onProxied: first });
+        const second = vi.fn();
+        const next = http.createServer((_req, res) => {
+          second();
+          res.writeHead(200, { "Content-Type": "text/plain" }).end("next");
+        });
+        next.on("upgrade", (_req, socket) => {
+          second();
+          socket.end("HTTP/1.1 101 Switching Protocols\r\nConnection: close\r\n\r\n");
+        });
+        listeners.push(next);
+        await new Promise<void>((resolve) => next.listen(0, "127.0.0.1", resolve));
+
+        await thread.proxyTo({ port: (next.address() as AddressInfo).port });
+        const response = await fetch(urlOf(thread.address, "/settings"));
+        const reply = await askWebSocket(thread);
+
+        expect(await response.text()).toBe("next");
+        expect(reply.startsWith("HTTP/1.1 101")).toBe(true);
+        expect(second).toHaveBeenCalledTimes(2);
+        expect(first).not.toHaveBeenCalled();
       });
     });
   });

@@ -76,6 +76,14 @@ Rule: Branches map to their pull requests through the organization connection
     When the periodic recheck selects branches
     Then that branch is not rechecked
 
+  @unit
+  Scenario: Two first writes of the same branch's check both land
+    Given no check row for a branch yet
+    And a webhook and a branch listing write that branch's first check at the same time
+    When the slower insert fails on the branch's unique key
+    Then it retries once as an update and the check is recorded
+    And any other write failure is raised, not retried
+
   # The sweep is the one read in this feature with no organization to name, so
   # every replica running its own timer meant the whole fleet scanning the same
   # branches and asking GitHub about them N times.
@@ -425,6 +433,16 @@ Rule: A session's cost splits across the pull requests it drove, by the work sta
     When each pull request's usage is read
     Then each reports the share the row recorded under its branch
 
+  # Each counter and the cost take their ratio from the record's own figure for
+  # that counter, so a pull request priced at another rate than the session's
+  # other work reports what was recorded, as its model breakdown does.
+  @unit
+  Scenario: A session that worked on two repositories at different rates reports the recorded figures
+    Given a session whose row records work on another repository at one rate and on the pull request's branch at another
+    When the pull request's usage is read
+    Then its cost and each token count are exactly what the row recorded under that branch
+    And the pull request totals match its model breakdown
+
   @unit
   Scenario: Usage from before the session declared anything follows its first declared branch
     Given a session that spent most of its tokens before its first declaration
@@ -688,6 +706,14 @@ Rule: Each pull request reports what every model consumed
     When the pull request usage is read
     Then the row reports each model's tokens rather than names alone
 
+  @unit
+  Scenario: A session without per-call data still names its models beside one that has them
+    Given a pull request with one session that logged model calls and one that only recorded its models
+    When the pull request usage is read
+    Then the second session's models are listed by name with unknown tokens
+    And the pull request totals are unchanged
+    And the model with per-call data stays first
+
   @integration
   Scenario: The detail names the models even without per-call data
     Given a pull request whose sessions recorded their models but logged no model calls
@@ -752,7 +778,7 @@ Rule: The pull request detail answers with facts, and names its sessions
     Given a pull request whose sessions include one with a title and one without
     When the detail is read
     Then the titled session is named by its title
-    And the untitled one is named as an untitled session
+    And the untitled one is named by its agent and the day it started
 
   # A reader knows their assistants by the names their makers gave them, not by
   # the spelling that happened to arrive on the wire.

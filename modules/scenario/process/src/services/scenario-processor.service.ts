@@ -1,9 +1,10 @@
 import { createLogger, type Logger } from "@langwatch/observability";
 import { createContextFromJobData, runWithContext } from "@langwatch/observability/context";
-import type {
-  ScenarioExecutionPrefetchResult,
-  ScenarioExecutionService,
-  ScenarioExecutionResult,
+import {
+  isRunNotScored,
+  type ScenarioExecutionPrefetchResult,
+  type ScenarioExecutionService,
+  type ScenarioExecutionResult,
 } from "@langwatch/scenario-contract";
 import { nowInstant } from "@langwatch/time";
 
@@ -14,7 +15,17 @@ import {
   type ScenarioChildBootstrap,
   type ScenarioChildExecutionSession,
 } from "../app/scenario.app.ts";
+import {
+  RedTeamReportWriterService,
+  type RedTeamReportRecord,
+} from "../features/red-team/services/red-team-report-writer.service.ts";
+import { redTeamRunEnvironment } from "../rules/red-team-job.rules.ts";
 import { isCustomerActionablePrefetchFailure } from "../rules/scenario-prefetch-failure.rules.ts";
+import {
+  capRunHooks,
+  hasHookResults,
+  hookCallsEnvironment,
+} from "../rules/scenario-run-hooks.rules.ts";
 import type {
   ExecutionJobData,
   ScenarioExecutionPoolService,
@@ -119,7 +130,10 @@ export class ScenarioProcessorService implements ScenarioExecutionRunner {
         return;
       }
 
-      await this.handleFailed(jobData, error instanceof Error ? error.message : String(error));
+      await this.handleFailed({
+        jobData,
+        error: error instanceof Error ? error.message : String(error),
+      });
     } catch (finishError) {
       logger.error(
         { error: finishError, scenarioRunId: jobData.scenarioRunId },
@@ -159,10 +173,10 @@ export class ScenarioProcessorService implements ScenarioExecutionRunner {
               return;
             }
 
-            await this.handleFailed(
+            await this.handleFailed({
               jobData,
-              "Worker restarting — scenario run terminated before completion",
-            );
+              error: "Worker restarting — scenario run terminated before completion",
+            });
           } catch (error) {
             logger.warn(
               { error, scenarioRunId: jobData.scenarioRunId },
@@ -176,7 +190,16 @@ export class ScenarioProcessorService implements ScenarioExecutionRunner {
     this.options.pool.drain();
   }
 
-  async handleFailed(jobData: ExecutionJobData, error: string | undefined): Promise<void> {
+  async handleFailed({
+    jobData,
+    error,
+    notScored = false,
+  }: {
+    jobData: ExecutionJobData;
+    error: string | undefined;
+    /** The run's setup failed: it finishes without a verdict (ADR-180). */
+    notScored?: boolean;
+  }): Promise<void> {
     await this.options.execution.finishUnsuccessfulRun({
       projectId: jobData.projectId,
       scenarioId: jobData.scenarioId,
@@ -185,6 +208,7 @@ export class ScenarioProcessorService implements ScenarioExecutionRunner {
       scenarioRunId: jobData.scenarioRunId,
       error,
       target: jobData.target,
+      ...(notScored ? { notScored: true } : {}),
     });
   }
 
@@ -218,6 +242,8 @@ export class ScenarioProcessorService implements ScenarioExecutionRunner {
           ...(prefetch.data.adapterData.type === "voice"
             ? { callerEnv: prefetch.data.adapterData.callerEnv }
             : {}),
+          ...hookCallsEnvironment(prefetch.data.adapterData),
+          ...redTeamRunEnvironment(prefetch.data.scenario),
         },
       });
     }
@@ -225,6 +251,7 @@ export class ScenarioProcessorService implements ScenarioExecutionRunner {
     const result = await childSession.execute({
       ...prefetch.data,
       scenarioRunId: jobData.scenarioRunId,
+      ...(jobData.keepData ? { keepData: true } : {}),
     });
     await this.finishExecution({
       jobData,
@@ -295,7 +322,7 @@ export class ScenarioProcessorService implements ScenarioExecutionRunner {
     if (!prefetch.success) {
       await this.releaseChild({ childSession, scenarioRunId: jobData.scenarioRunId });
       ScenarioProcessorService.logPrefetchFailure({ jobLogger, prefetchResult: prefetch });
-      await this.handleFailed(jobData, prefetch.error);
+      await this.handleFailed({ jobData, error: prefetch.error });
 
       return null;
     }
@@ -335,8 +362,9 @@ export class ScenarioProcessorService implements ScenarioExecutionRunner {
     const childDurationMs = nowInstant().epochMilliseconds - childStartedAt;
 
     if (result.success) {
-      this.options.metrics.completed(durationMs);
+      await this.recordHooks({ jobData, result, jobLogger });
       await this.handleSucceeded({ jobData, result, jobLogger });
+      this.options.metrics.completed(durationMs);
       jobLogger.info({ success: true, durationMs, childDurationMs }, "Scenario job completed");
 
       return;
@@ -353,13 +381,53 @@ export class ScenarioProcessorService implements ScenarioExecutionRunner {
       { success: false, error: result.error, durationMs, childDurationMs },
       "Scenario job completed with failure",
     );
-    await this.handleFailed(jobData, result.error);
+    await this.handleFailed({
+      jobData,
+      error: result.error,
+      notScored: isRunNotScored(result.hooks),
+    });
+    await this.recordHooks({ jobData, result, jobLogger });
+  }
+
+  /**
+   * Records the setup and teardown results the child reported, on a passing and a failing run
+   * alike. A run without hooks records nothing, and a record that cannot be written never fails
+   * the job.
+   */
+  async recordHooks(input: {
+    jobData: ExecutionJobData;
+    result: ScenarioExecutionResult;
+    jobLogger?: Logger;
+  }): Promise<void> {
+    const { projectId, scenarioRunId } = input.jobData;
+    if (!hasHookResults(input.result.hooks)) return;
+    try {
+      await this.options.execution.recordHooks({
+        projectId,
+        scenarioRunId,
+        hooks: capRunHooks(input.result.hooks),
+      });
+    } catch (error) {
+      const runLogger = input.jobLogger ?? logger;
+      // The run already finished without a verdict, but no reader can tell why without this record.
+      if (isRunNotScored(input.result.hooks)) {
+        runLogger.error(
+          { err: error, scenarioRunId },
+          "Could not record a failed setup: the unscored run reads as an ERROR",
+        );
+        return;
+      }
+      runLogger.warn(
+        { err: error, scenarioRunId },
+        "Could not record the run's setup and teardown results",
+      );
+    }
   }
 
   /**
    * What a job that ran to the end records: the connected agent instance the child named, and
-   * whether the call was cut at the maximum duration. Each is independent, and a record that
-   * cannot be written never fails a job that already succeeded.
+   * whether the call was cut at the maximum duration. Each is independent; only a red team break
+   * that cannot be written at all fails the job, after the other records were tried.
    */
   async handleSucceeded(input: {
     jobData: ExecutionJobData;
@@ -384,6 +452,16 @@ export class ScenarioProcessorService implements ScenarioExecutionRunner {
       }
     }
 
+    let redTeamReport: RedTeamReportRecord = { outcome: "recorded" };
+    if (input.result.redTeam) {
+      redTeamReport = await RedTeamReportWriterService.create(this.options.execution).record({
+        projectId,
+        scenarioRunId,
+        report: input.result.redTeam,
+        jobLogger,
+      });
+    }
+
     if (input.result.isCutAtLimit) {
       try {
         await this.options.execution.recordCutAtLimit({ projectId, scenarioRunId });
@@ -394,6 +472,7 @@ export class ScenarioProcessorService implements ScenarioExecutionRunner {
         );
       }
     }
+    if (redTeamReport.outcome === "break_not_recorded") throw redTeamReport.error;
   }
 
   private async handleCancelled(

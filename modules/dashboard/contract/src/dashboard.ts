@@ -56,6 +56,17 @@ export type DashboardScope = z.infer<typeof dashboardScopeSchema>;
 /** Where every board starts, a member's My dashboard aside. */
 export const DEFAULT_DASHBOARD_SCOPE: DashboardScope = "PROJECT";
 
+/**
+ * The product whose sidebar lists a board (ADR-002, decision 8); the library orders its groups
+ * itself. A board stored before homes existed is LLM Ops; only an LLM Ops board can be Project.
+ */
+export const DASHBOARD_HOME_PRODUCTS = ["llm-ops", "me", "gateway", "governance"] as const;
+export const dashboardHomeProductSchema = z.enum(DASHBOARD_HOME_PRODUCTS);
+export type DashboardHomeProduct = z.infer<typeof dashboardHomeProductSchema>;
+
+/** Where a board is homed when nobody says, and every board made before homes existed. */
+export const DEFAULT_DASHBOARD_HOME_PRODUCT: DashboardHomeProduct = "llm-ops";
+
 const dashboardSchemaDefinition = z
   .object({
     id: dashboardIdSchema,
@@ -75,6 +86,14 @@ const dashboardSchemaDefinition = z
 export interface DashboardSchema extends Named<typeof dashboardSchemaDefinition> {}
 export const dashboardSchema: DashboardSchema = dashboardSchemaDefinition;
 export type Dashboard = z.infer<typeof dashboardSchema>;
+
+/** A Dashboards board (DashboardsV2): the stored row with the product it is homed in. */
+const boardSchemaDefinition = z
+  .object({ ...dashboardSchema.shape, homeProduct: dashboardHomeProductSchema })
+  .strict();
+export interface BoardSchema extends Named<typeof boardSchemaDefinition> {}
+export const boardSchema: BoardSchema = boardSchemaDefinition;
+export type Board = z.infer<typeof boardSchema>;
 
 /** A project as a board names it: who owns the board, or whose data it can show. */
 const dashboardProjectSchemaDefinition = z
@@ -96,6 +115,7 @@ export type DashboardSummary = z.infer<typeof dashboardSummarySchema>;
 const boardSummarySchemaDefinition = z
   .object({
     ...dashboardSummarySchema.shape,
+    homeProduct: dashboardHomeProductSchema,
     /** Whether the member reading the list has starred this board. */
     isStarred: z.boolean(),
     /** The project that owns an Organization board listed in another project; null at home. */
@@ -105,6 +125,29 @@ const boardSummarySchemaDefinition = z
 export interface BoardSummarySchema extends Named<typeof boardSummarySchemaDefinition> {}
 export const boardSummarySchema: BoardSummarySchema = boardSummarySchemaDefinition;
 export type BoardSummary = z.infer<typeof boardSummarySchema>;
+
+/**
+ * A board in the organization's Dashboards library (ADR-002). `project` is the owner, named only
+ * where the reader may read it; `openProject` is where the board opens, null when nowhere.
+ */
+const organizationBoardSchemaDefinition = z
+  .object({
+    id: dashboardIdSchema,
+    name: dashboardNameSchema,
+    description: z.string().nullable(),
+    createdById: z.string().nullable(),
+    scope: dashboardScopeSchema,
+    homeProduct: dashboardHomeProductSchema,
+    updatedAt: z.date(),
+    project: dashboardProjectSchema.nullable(),
+    openProject: dashboardProjectSchema.nullable(),
+    /** The author's display name; null when the board has no author or the author no name. */
+    ownerName: z.string().nullable(),
+  })
+  .strict();
+export interface OrganizationBoardSchema extends Named<typeof organizationBoardSchemaDefinition> {}
+export const organizationBoardSchema: OrganizationBoardSchema = organizationBoardSchemaDefinition;
+export type OrganizationBoard = z.infer<typeof organizationBoardSchema>;
 
 /** What a narrower scope takes from other members, for the confirmation that asks first. */
 const dashboardScopeImpactSchemaDefinition = z
@@ -206,7 +249,7 @@ export const dashboardSourcePresenceSchema: DashboardSourcePresenceSchema =
   dashboardSourcePresenceSchemaDefinition;
 export type DashboardSourcePresence = z.infer<typeof dashboardSourcePresenceSchema>;
 
-// -- what `/api/dashboards` accepts ------------------------------------------
+// -- what `/api/v1/analytics/reports` accepts ------------------------------
 
 const dashboardRestNameSchemaDefinition = z.object({
   name: z.string().min(1, "name is required").max(255),
@@ -229,3 +272,8 @@ export interface DashboardRestParamsSchema extends Named<
 > {}
 export const dashboardRestParamsSchema: DashboardRestParamsSchema =
   dashboardRestParamsSchemaDefinition;
+
+/** `/api/v1/analytics/reports/:reportId`: a Reports dashboard named for what it is there. */
+const reportRestParamsSchemaDefinition = z.object({ reportId: z.string().min(1) });
+export interface ReportRestParamsSchema extends Named<typeof reportRestParamsSchemaDefinition> {}
+export const reportRestParamsSchema: ReportRestParamsSchema = reportRestParamsSchemaDefinition;

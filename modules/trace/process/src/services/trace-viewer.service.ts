@@ -17,6 +17,7 @@ import {
   type PromptStudioSpanResult,
 } from "@langwatch/trace-contract";
 
+import type { TraceByIdRead } from "../features/legacy/rules/trace-id-lookup.rules.ts";
 import type { TraceViewerProtectionService } from "./trace-viewer-protection.service.ts";
 
 /** The legacy trace read, as tRPC transports use it. Declared here to let
@@ -31,7 +32,7 @@ export interface TraceLegacyRead {
     traceId: string;
     protections: unknown;
     opts?: { full?: boolean; withEditOverlay?: boolean };
-  }): Promise<Trace | undefined>;
+  }): Promise<TraceByIdRead | undefined>;
 
   /** The project's list/search read, keyset-paged by `scrollId`. */
   getAllTracesForProject(
@@ -58,9 +59,8 @@ export interface TraceLegacyRead {
   ): Promise<TraceSummaryPage>;
 
   /**
-   * Named traces with their spans. `occurredAt` is the partition-pruning hint:
-   * dropping it turns a bounded read into a scan of every partition, cold
-   * storage included.
+   * Named traces with their spans. `occurredAt` is the partition-pruning hint;
+   * without it the trace id index bounds the read server-side.
    */
   getTracesWithSpans(params: {
     /** The own-only proof the store read goes through. */

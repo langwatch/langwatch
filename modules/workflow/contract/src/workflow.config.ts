@@ -12,13 +12,21 @@ import { z } from "zod";
 
 /**
  * AWS account for per-project NLP Lambda functions; refuses invalid config to ensure correct fleet.
+ * `role_arn` is the functions' execution role; `credentials_role_arn` is the role this process
+ * assumes through its web-identity token, an alternative to the static key pair.
  */
 const nlpLambdaFleetSchemaDefinition = z.object({
   AWS_REGION: z.string().min(1),
-  AWS_ACCESS_KEY_ID: z.string().min(1),
-  AWS_SECRET_ACCESS_KEY: z.string().min(1),
+  AWS_ACCESS_KEY_ID: z.string().min(1).optional(),
+  AWS_SECRET_ACCESS_KEY: z.string().min(1).optional(),
+  credentials_role_arn: z.string().trim().min(1).optional(),
   role_arn: z.string().min(1),
   image_uri: z.string().min(1),
+  /**
+   * Grows with every new image (unix seconds of its rollout). A pod never moves a function to an
+   * image with a lower order, so a rollout's old pods cannot revert it.
+   */
+  image_order: z.number().int().nonnegative().optional(),
   cache_bucket: z.string().min(1),
   subnet_ids: z.array(z.string().min(1)),
   security_group_ids: z.array(z.string().min(1)),
@@ -27,6 +35,21 @@ export interface NlpLambdaFleetSchema extends Named<typeof nlpLambdaFleetSchemaD
 export const nlpLambdaFleetSchema: NlpLambdaFleetSchema = nlpLambdaFleetSchemaDefinition;
 
 export type NlpLambdaFleetFields = z.infer<typeof nlpLambdaFleetSchema>;
+
+/** How this process signs its fleet calls: a web-identity role wins over a static key pair. */
+export type NlpLambdaFleetCredentials =
+  | { readonly kind: "web-identity"; readonly roleArn: string }
+  | { readonly kind: "static"; readonly accessKeyId: string; readonly secretAccessKey: string };
+
+function fleetCredentialsNamedBy(
+  fields: NlpLambdaFleetFields,
+): NlpLambdaFleetCredentials | { readonly kind: "none" } {
+  const { credentials_role_arn: roleArn, AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY } = fields;
+  if (roleArn) return { kind: "web-identity", roleArn };
+  if (!AWS_ACCESS_KEY_ID || !AWS_SECRET_ACCESS_KEY) return { kind: "none" };
+
+  return { kind: "static", accessKeyId: AWS_ACCESS_KEY_ID, secretAccessKey: AWS_SECRET_ACCESS_KEY };
+}
 
 /**
  * Parses the raw `LANGWATCH_NLP_LAMBDA_CONFIG` secret string (a
@@ -60,8 +83,26 @@ export const nlpLambdaFleetFromSecret = z
       });
       return z.NEVER;
     }
-    return fields.data;
+    const credentials = fleetCredentialsNamedBy(fields.data);
+    if (credentials.kind === "none") {
+      ctx.addIssue({
+        code: "custom",
+        message:
+          "The NLP Lambda fleet configuration names no credentials. Set credentials_role_arn, or both AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY.",
+      });
+      return z.NEVER;
+    }
+    const {
+      AWS_ACCESS_KEY_ID: _accessKeyId,
+      AWS_SECRET_ACCESS_KEY: _secretAccessKey,
+      credentials_role_arn: _roleArn,
+      ...fleet
+    } = fields.data;
+
+    return { ...fleet, credentials };
   });
+
+export type NlpLambdaFleet = NonNullable<z.infer<typeof nlpLambdaFleetFromSecret>>;
 
 /**
  * The platform's maximum for one scenario turn on the engine, in milliseconds. Workflow owns the

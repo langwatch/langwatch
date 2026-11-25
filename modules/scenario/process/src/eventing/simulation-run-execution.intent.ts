@@ -44,6 +44,7 @@ export function createExecuteRunHandler(
       ...(payload.startedByApiKeyId !== undefined
         ? { startedByApiKeyId: payload.startedByApiKeyId }
         : {}),
+      ...(payload.keepData ? { keepData: true } : {}),
     });
     logger.info(
       { scenarioRunId: payload.scenarioRunId },
@@ -82,7 +83,7 @@ export function createFinishRunHandler(
       scenarioRunId: payload.scenarioRunId,
       status: payload.status,
       ...(payload.error !== undefined ? { error: payload.error } : {}),
-      occurredAt: nowInstant().epochMilliseconds,
+      occurredAt: payload.outcomeAtMs ?? nowInstant().epochMilliseconds,
     });
   };
 }

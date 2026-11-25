@@ -18,6 +18,9 @@ export const RESOLVER_RECENT_WINDOW_MS = 35 * 24 * 60 * 60 * 1000;
 export type WindowedReadOutcome =
   | "error"
   | "hit"
+  | "index_hit"
+  | "index_miss"
+  | "index_miss_found"
   | "unbounded_empty"
   | "unbounded_hit"
   | "unwindowed"
@@ -82,11 +85,13 @@ export function setWindowedReadMetrics(port: WindowedReadMetrics): void {
   windowedReadMetrics = port;
 }
 
-function incrementWindowedReadCount(table: string, outcome: WindowedReadOutcome): void {
+/** Counts one outcome on the process's sink; `indexedRead` shares it with `queryWindowed`. */
+export function incrementWindowedReadCount(table: string, outcome: WindowedReadOutcome): void {
   windowedReadMetrics?.record({ table, outcome });
 }
 
-function windowFragment(fromMs: number, toMs: number): WindowFragment {
+/** The inclusive `[fromMs, toMs]` time predicate one read attempt runs with. */
+export function windowFragment({ fromMs, toMs }: { fromMs: number; toMs: number }): WindowFragment {
   return {
     fromMs,
     toMs,
@@ -102,11 +107,14 @@ function windowFragment(fromMs: number, toMs: number): WindowFragment {
  * for `{ lookbackMs }`. The frame's upper bound carries the same clock-skew headroom as the hinted
  * path, so a client clock running slightly fast cannot push a just-written row past the ceiling.
  */
-function fallbackFragment(fallback: WindowFallback, windowMs: number): WindowFragment | null {
+export function fallbackFragment(
+  fallback: WindowFallback,
+  windowMs: number,
+): WindowFragment | null {
   if (typeof fallback === "object") {
     const now = nowInstant().epochMilliseconds;
 
-    return windowFragment(now - fallback.lookbackMs, now + windowMs);
+    return windowFragment({ fromMs: now - fallback.lookbackMs, toMs: now + windowMs });
   }
 
   return null;
@@ -129,7 +137,9 @@ export async function queryWindowed<T>(opts: QueryWindowedOptions<T>): Promise<T
       return result;
     }
 
-    const hinted = await run(windowFragment(hintMs - windowMs, hintMs + windowMs));
+    const hinted = await run(
+      windowFragment({ fromMs: hintMs - windowMs, toMs: hintMs + windowMs }),
+    );
 
     // `none` treats the hinted window as authoritative (empty means genuinely
     // absent within the window), so it never widens — which also means an empty

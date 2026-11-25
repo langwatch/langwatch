@@ -16,7 +16,7 @@ packs, so a new project gets a useful dashboard without opening the UI.
 
 ```
 LW_ENDPOINT=https://app.langwatch.ai LW_API_KEY=sk-... PROJECT_ID=proj_... \
-  node platform/app/scripts/starter-dashboard/seed.mjs
+  node dev/scripts/starter-dashboard/seed.mjs
 ```
 
 ## Manifest (order = layout)
@@ -38,7 +38,7 @@ order below is literally the widget's top-to-bottom order on the dashboard.
 **Prototype note:** this is single-column only. Every widget gets
 `gridColumn = 0`, so widgets share the gridRow numbering line and just
 stack vertically — no side-by-side layout. Good enough for a one-shot
-starter board, not a real layout tool.
+starter dashboard, not a real layout tool.
 
 ## Idempotency
 
@@ -68,5 +68,5 @@ exists) — you'd need to rename or delete first.
 ## Verify
 
 Open the dashboard's `platformUrl` (printed at the end of the run, or from
-`GET /api/dashboards`) and confirm it shows 8 populated widgets in the
+`GET /api/v1/dashboards`) and confirm it shows 8 populated widgets in the
 manifest order above.

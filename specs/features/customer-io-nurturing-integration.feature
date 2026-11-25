@@ -158,11 +158,19 @@ Feature: Customer.io nurturing integration
     And a "workflow_created" event is tracked with workflow_id and project_id
 
   @integration
-  Scenario: Scenario creation updates scenario count and fires event
+  Scenario: Scenario creation fires its event; its count comes from the organization's usage traits
     Given a user creates a scenario in a project
     When the scenario is saved
-    Then the user is identified in Customer.io with updated scenario_count
+    Then no scenario_count is sent with it: the organization's usage traits carry scenario_count
     And a "scenario_created" event is tracked with scenario_id and project_id
+
+  @unit
+  Scenario: A project's first run of a simulation set records the set once
+    Given a project starts a run in a simulation set it never ran before
+    When scenario records the set on its own lifecycle pipeline
+    Then one simulation_set_created event names the project and the set
+    And later runs of the same set record no second one
+    And a platform-owned set (internal suite, agent test, voice call) is not recorded
 
   @integration
   Scenario: Experiment run fires event
@@ -216,6 +224,25 @@ Feature: Customer.io nurturing integration
     And the error is captured without resetting the debounce
 
   # ---------------------------------------------------------------------------
+  # Date attributes: Customer.io timestamp conditions only match Unix seconds
+  # ---------------------------------------------------------------------------
+
+  @unit
+  Scenario: Customer.io date attributes are sent as Unix seconds
+    Given a signal that happened at 1792664000123 milliseconds since the epoch
+    When nurturing sends a date attribute for it to Customer.io
+    Then the attribute is the integer 1792664000
+    And this holds for createdAt, last_active_at, first_trace_at, last_trace_at, first_simulation_at, last_simulation_at, first_evaluation_at, last_evaluation_at, guided_onboarding_completed_at and the self-hosted report dates
+    And PostHog still receives the same date as an ISO-8601 string
+
+  @unit
+  Scenario: A malformed self-hosted report date is left out and the rest is still sent
+    Given a self-hosted report whose last report date is not a valid date and whose first-seen date is valid
+    When nurturing sends it to Customer.io
+    Then the organization is grouped with the first-seen date in Unix seconds and without the last report date
+    And the install events are still tracked
+
+  # ---------------------------------------------------------------------------
   # Journey traits and hooks
   # ---------------------------------------------------------------------------
 
@@ -267,14 +294,14 @@ Feature: Customer.io nurturing integration
   #
   # Prompts can be created via the platform UI (tRPC) or the REST API
   # (/api/prompts). The hook must fire regardless of origin. prompt_count
-  # is org-wide (aggregated across all projects in the organization).
+  # is not sent here: the organization's usage traits carry it to each member.
   # ---------------------------------------------------------------------------
 
   @integration
   Scenario: First prompt creation identifies user with has_prompts true
     Given an organization with no prompts across any project
     When a user creates their first prompt
-    Then the user is identified in Customer.io with has_prompts true and org-wide prompt_count 1
+    Then the user is identified in Customer.io with has_prompts true and no prompt_count
 
   @integration
   Scenario: First prompt creation fires first_prompt_created event
@@ -283,10 +310,10 @@ Feature: Customer.io nurturing integration
     Then a "first_prompt_created" event is tracked with project_id
 
   @integration
-  Scenario: Subsequent prompt creation updates org-wide prompt_count without firing first event
+  Scenario: Subsequent prompt creation keeps has_prompts without firing first event
     Given an organization that already has prompts
     When a user creates another prompt in any project
-    Then the user is identified in Customer.io with updated org-wide prompt_count
+    Then the user is identified in Customer.io with has_prompts true and no prompt_count
     And no "first_prompt_created" event is tracked
 
   @integration

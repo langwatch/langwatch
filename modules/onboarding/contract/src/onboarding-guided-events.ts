@@ -20,6 +20,7 @@ export const guidedOnboardingRecordedEventNameSchema = z.enum([
   "tour_skipped",
   "tour_replayed",
   "path_completed",
+  "start_chosen",
 ]);
 export type GuidedOnboardingRecordedEventName = z.infer<
   typeof guidedOnboardingRecordedEventNameSchema
@@ -33,6 +34,7 @@ const guidedOnboardingRecordedStateSchemaDefinition = guidedOnboardingStateSchem
   provider: true,
   tourCompletedAt: true,
   tourSkippedAt: true,
+  langyStart: true,
 });
 export interface GuidedOnboardingRecordedStateSchema extends Named<
   typeof guidedOnboardingRecordedStateSchemaDefinition

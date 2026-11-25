@@ -13,6 +13,8 @@ import { composeHttpBillingStripe } from "./channels/http/http.billing-stripe.ch
 import { billingLifecycleEventing } from "./eventing/billing-lifecycle.pipeline.ts";
 import { billingReportingEventing } from "./eventing/billing-reporting.pipeline.ts";
 import { connectedBillingEventing } from "./eventing/connected-billing.pipeline.ts";
+import { paymentRecoveryEventing } from "./eventing/payment-recovery.pipeline.ts";
+import { seatLineRepairEventing } from "./eventing/seat-line-repair.pipeline.ts";
 import { SeatChangeOrganizationBackfillService } from "./features/connected-billing/services/seat-change-organization-backfill.service.ts";
 import type { BillingOrganizationCacheRepository } from "./repositories/billing-organization-cache.repository.ts";
 import { billingRepositories } from "./repositories/billing-repositories.registry.ts";
@@ -25,6 +27,7 @@ import {
   StripeUsageReportingBuilder,
   type UsageReportingService,
 } from "./services/usage-reporting.service.ts";
+import { CustomerIoPlanResyncTask } from "./tasks/customer-io-plan-resync.task.ts";
 import { detectEnvironment, StripePricesSyncTask } from "./tasks/stripe-prices-sync.task.ts";
 import { TieredFreeToSeatEventMigrateTask } from "./tasks/tiered-free-to-seat-event.task.ts";
 import { billingStripeWebhookRest } from "./transport/billing-stripe-webhook.rest.ts";
@@ -53,6 +56,8 @@ export const billingProcessModule: PublishedProcessModule<
   .withEventing(connectedBillingEventing)
   .withEventing(billingReportingEventing)
   .withEventing(billingLifecycleEventing)
+  .withEventing(seatLineRepairEventing)
+  .withEventing(paymentRecoveryEventing)
   // Background, after old writers are gone: an older image records no usage-billed fact.
   .withMigrations(({ app, repositories }) => [
     defineMigrationStep({
@@ -108,6 +113,13 @@ export const billingProcessModule: PublishedProcessModule<
         subscriptions: repositories.subscriptions,
       },
       facts: { pricingModelChanged: (input) => app.pricingModelChanged(input) },
+    }),
+    // Hand-run after the rollout, dry run unless --execute (tasks#1196).
+    CustomerIoPlanResyncTask.create({
+      peers: {
+        organizations: repositories.organizations,
+        catchUp: (input) => app.catchUpCustomerIoPlan(input),
+      },
     }),
     await secrets.into(BillingModule.secrets.stripeSecretKey, (secretKey) =>
       StripePricesSyncTask.create({

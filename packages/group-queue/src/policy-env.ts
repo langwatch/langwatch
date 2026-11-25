@@ -13,6 +13,7 @@ export interface GroupQueuePolicyEnvInputs {
   globalConcurrency?: string;
   tenantConcurrencyCap?: string;
   globalConcurrencyBudget?: string;
+  settleWindowMs?: string;
   zstdWritesEnabled?: string;
   msgpackWritesEnabled?: string;
 }
@@ -29,6 +30,7 @@ export function resolveGroupQueuePolicyFromEnv(
     globalConcurrency: positiveSafeIntegerOrUndefined(inputs.globalConcurrency),
     tenantConcurrencyCap: nonNegativeSafeIntegerOrUndefined(inputs.tenantConcurrencyCap),
     globalConcurrencyBudget: nonNegativeSafeIntegerOrUndefined(inputs.globalConcurrencyBudget),
+    settleWindowMs: nonNegativeSafeIntegerOrUndefined(inputs.settleWindowMs),
     compression: inputs.zstdWritesEnabled === "true" ? "zstd" : "gzip",
     payloadCodec: inputs.msgpackWritesEnabled === "true" ? "msgpack" : "json",
   };

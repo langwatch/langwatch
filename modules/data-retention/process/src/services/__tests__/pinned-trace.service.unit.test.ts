@@ -35,6 +35,24 @@ class RecordingRetroactive implements RetroactiveRetentionRepository {
     return { tables: [] };
   }
 
+  async raiseRetention(): Promise<{ tables: string[] }> {
+    this.calls.push("raiseRetention");
+
+    return { tables: [] };
+  }
+
+  async countPastRetention(): Promise<number> {
+    this.calls.push("countPastRetention");
+
+    return 0;
+  }
+
+  async sampleStoredRetention(): Promise<never[]> {
+    this.calls.push("sampleStoredRetention");
+
+    return [];
+  }
+
   async findMutationProgress(): Promise<never[]> {
     this.calls.push("getMutationProgress");
 
@@ -55,6 +73,21 @@ class RecordingRetroactive implements RetroactiveRetentionRepository {
 
   async startKeepForeverRewrite(): Promise<void> {
     this.calls.push("startKeepForeverRewrite");
+  }
+
+  async findHeldIdIndexes(): Promise<string[]> {
+    this.calls.push("findHeldIdIndexes");
+    return [];
+  }
+
+  async findIdIndexTenantIds(): Promise<string[]> {
+    this.calls.push("findIdIndexTenantIds");
+    return [];
+  }
+
+  async raiseIdIndexRetention(): Promise<string[]> {
+    this.calls.push("raiseIdIndexRetention");
+    return [];
   }
 }
 

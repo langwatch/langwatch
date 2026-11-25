@@ -93,6 +93,7 @@ const SPECS_ROOTS = [
   ...discoverPackageSpecRoots(resolve(REPO_ROOT, "packages")),
   ...discoverPackageSpecRoots(resolve(REPO_ROOT, "modules")),
   ...discoverPackageSpecRoots(resolve(REPO_ROOT, "enterprise")),
+  ...discoverPackageSpecRoots(resolve(REPO_ROOT, "apps")),
   resolve(REPO_ROOT, "sdks/typescript/specs"),
 ] as const;
 
@@ -165,7 +166,7 @@ const DEFAULT_TEST_ROOTS: string[] = [
 
 /**
  * Roots scanned for `.bats` shell tests. Shell-driven dev-environment
- * behavior (compose overrides, boxd fork orchestration) is tested with
+ * behavior (compose overrides, worktree setup) is tested with
  * bats, not vitest — without this scan path, scenarios that describe
  * shell behavior would have no way to satisfy parity and would be stuck
  * on `@unimplemented` forever. Bats bindings use the same `@scenario`
@@ -260,13 +261,42 @@ const DEFAULT_GO_TEST_ROOTS: string[] = [
   // asserts it, so scenarios under specs/ci/ can only bind from this root.
   // Without it those feature files report "all bound" while binding nothing.
   "tools/ciguard",
+  // The review job's wait for the other checks (specs/ci/pr-review-bot.feature).
+  "tools/waitforchecks",
+  "tools/deployimpact",
+  "tools/operatornotes",
+  "tools/cachesweep",
   "tools/migrationorder",
   // The README link checker, for the same reason: specs/ci/readme-link-check.feature
   // describes what CI asserts about the README, and only these Go tests assert it.
   "tools/linkcheck",
+  // The ECR chart push: which package it pushes and which digest it reports
+  // for the deploy to pin (specs/ci/publish-prerelease-charts-to-ecr.feature).
+  "tools/chartpush",
+  // The main-red Slack post (specs/ci/package-suite-integration-lane.feature).
+  "tools/slacknotify",
+  // Whether an immutable ECR tag may be skipped, and the Lambda re-tag
+  // (specs/ci/publish-ecr-images.feature).
+  "tools/ecrtag",
+  // The docs deploy's redirect store and its job (specs/ci/docs-deploy.feature).
+  "tools/docsdeploy",
+  "tools/chartheap",
+  "tools/charts3region",
+  // The PII model image a release copies (specs/ci/pii-redaction-model-release.feature).
+  "tools/newestimage",
+  // How the package-suites weights are measured from main's job logs
+  // (specs/ci/package-suites-weights.feature).
+  "tools/suiteweights",
+  // The gateway-matrix seed: which providers it seeds from which credentials,
+  // and that Bedrock stays keyless (specs/ci/gateway-matrix-seed.feature).
+  "tools/matrixseed",
+  // Its command writes the bootstrapped step output the later steps gate on.
+  "cmd/matrixseed",
   // The CLI half of the same tool: the verdict-to-exit-code step is the part
   // CI gates on, so the "check fails" / "check passes" scenarios bind here.
   "cmd/linkcheck",
+  // The docs structure check loads pages from disk; which files count as pages binds here.
+  "tools/docscheck",
   // The mono-binary's own dispatch, including the combined Go development
   // process (`service combined`). Which services it hosts, what telemetry
   // identity each keeps and which address variable each binds are asserted
@@ -334,9 +364,6 @@ const LEGACY_UNBOUND: string[] = [
  * spot.
  */
 const LEGACY_INERT: string[] = [
-  // 2026-10-12: the id index (dev/docs/plans/id-index-2026-10-10.md) is planned,
-  // not built; every scenario is @unimplemented. Remove with its first binding.
-  "specs/clickhouse/id-index-reads.feature",
   // 2026-09-30 port of #7532: design-only specs for ADRs 161-163, every
   // scenario @unimplemented until the ADR is accepted and built.
   "modules/authz/specs/access-reviews.feature",
@@ -399,7 +426,6 @@ const LEGACY_INERT: string[] = [
   "specs/ai-gateway/wrapper-e2e/gemini.feature",
   "specs/ai-gateway/wrapper-e2e/opencode.feature",
   "specs/ai-governance/cli-wrappers/request-increase.feature",
-  "specs/ai-governance/cli-wrappers/wrap-login-routing.feature",
   "specs/ai-governance/dogfood-seed/scope-runner.feature",
   "specs/ai-governance/ingestion-sources/claude-code-otlp.feature",
   "specs/ai-governance/ingestion-sources/native-receiver-lift.feature",
@@ -439,7 +465,6 @@ const LEGACY_INERT: string[] = [
   "specs/dependencies/supply-chain-age-gates.feature",
   "specs/evaluations/experiments-online-evaluations-separation.feature",
   "specs/evaluators/create-workflow-evaluator.feature",
-  "specs/evaluators/evaluator-cli.feature",
   "specs/evaluators/evaluator-error-propagation.feature",
   "specs/evaluators/satisfaction-score-migration.feature",
   "specs/evaluators/thread-eval-skips-without-thread-id.feature",
@@ -465,7 +490,7 @@ const LEGACY_INERT: string[] = [
   "specs/experiments-v3/undo-redo.feature",
   "specs/features/agent-cli.feature",
   "specs/features/annotation-cli.feature",
-  "specs/features/dashboard-cli.feature",
+  "specs/features/analytics-report-cli.feature",
   "specs/features/dataset-python-sdk.feature",
   "specs/features/devtools/issue-creation-skill.feature",
   "specs/features/devtools/orchestrator-bug-fix-workflow.feature",
@@ -473,7 +498,6 @@ const LEGACY_INERT: string[] = [
   "specs/features/evaluation-cli.feature",
   "specs/features/graph-cli.feature",
   "specs/features/model-provider-cli.feature",
-  "specs/features/monitor-cli.feature",
   "specs/features/onboarding/primary-use-setting.feature",
   "specs/features/prompt-versions-cli.feature",
   "specs/features/secret-cli.feature",
@@ -493,7 +517,6 @@ const LEGACY_INERT: string[] = [
   "specs/features/trigger-cli.feature",
   "specs/features/workflow-cli.feature",
   "specs/home/onboarding-progress-ui.feature",
-  "specs/home/voice-agents-home-banner.feature",
   // Wave 3's specs, every scenario @unimplemented on purpose: each deliverable's
   // specs ship ahead of the code, and the PR that builds each surface binds its
   // file as it lands. Remove each entry with its first binding.
@@ -512,7 +535,6 @@ const LEGACY_INERT: string[] = [
   "specs/langy/langy-empty-state-suggestions.feature",
   "specs/langy/langy-panel-fold-motion.feature",
   "specs/langy/langy-selfhost-install.feature",
-  "specs/langy/langy-session-key-lifecycle.feature",
   "specs/langy/langy-shutdown-handoff.feature",
   "specs/langy/langy-workbench-sidebar.feature",
   "specs/langy/langy-worker-isolation.feature",
@@ -530,11 +552,9 @@ const LEGACY_INERT: string[] = [
   "specs/model-config/anthropic-empty-content.feature",
   "specs/model-config/litellm-reasoning-params.feature",
   "specs/model-config/model-parameter-display.feature",
-  "specs/model-config/model-selector-ux.feature",
   "specs/model-config/unified-reasoning-ui.feature",
   "specs/model-providers/custom-model-max-tokens.feature",
   "specs/model-providers/default-provider.feature",
-  "specs/model-providers/provider-list.feature",
   "specs/monitors/evaluation-trigger-skips-derived-and-stale-traces.feature",
   "specs/monitors/guardrails-api-compatibility.feature",
   "specs/monitors/monitor-execution-backend.feature",
@@ -544,11 +564,9 @@ const LEGACY_INERT: string[] = [
   "specs/monitors/workflow-evaluator-checktype.feature",
   "specs/monitors/workflow-evaluator-mappings.feature",
   "specs/nlp-go/dataset-block.feature",
-  "specs/nlp-go/http-block.feature",
   "specs/nlp-go/proxy.feature",
   "specs/nlp-go/python-removal.feature",
   "specs/nlp-go/remove-execute-evaluation.feature",
-  "specs/nlp-go/topic-clustering.feature",
   "specs/nlp-go/tracing-parity.feature",
   "specs/npx-installer/01-bootstrap.feature",
   "specs/npx-installer/02-predeps.feature",
@@ -666,6 +684,16 @@ const LEGACY_INERT: string[] = [
 
 /** Feature files with mixed tagged/untagged scenarios (legacy tolerance; new files fail) */
 const LEGACY_PARTIAL: string[] = [
+  // Reason: left LEGACY_INERT when the not-found scenarios were bound: a tool
+  // that cannot start exits 127 with a docs link and no setup written. The
+  // login, env and routing scenarios stay untagged.
+  "specs/ai-governance/cli-wrappers/wrap-login-routing.feature",
+  // Reason: left LEGACY_INERT when evaluator get gained name resolution; its
+  // scenarios are enforced. The other CLI scenarios stay untagged.
+  "specs/evaluators/evaluator-cli.feature",
+  // Reason: left LEGACY_INERT when monitor get gained name resolution; its
+  // scenarios are enforced. The other CLI scenarios stay untagged.
+  "specs/features/monitor-cli.feature",
   // Reason: left LEGACY_INERT when the launcher's place beside an open drawer
   // was bound (#8588). The peek scenarios are still planned and stay untagged.
   "specs/langy/langy-peek-dock.feature",
@@ -676,6 +704,10 @@ const LEGACY_PARTIAL: string[] = [
   // the "Cost formatting" rule is enforced. The pills, duration, token and
   // span tab rules are described here and stay untagged.
   "specs/traces-v2/metrics.feature",
+  // Reason: left LEGACY_INERT when the blank-key refusal and the worker age
+  // cap were bound to Go tests. The older mint and revoke scenarios describe
+  // control-plane behaviour and stay untagged.
+  "specs/langy/langy-session-key-lifecycle.feature",
   // Reason: left LEGACY_INERT when the CLI gained the traces.count alias
   // and the unknown-metric refusal, which its three new scenarios enforce.
   // The six older scenarios describe the query presets and stay untagged.
@@ -803,6 +835,9 @@ const LEGACY_PARTIAL: string[] = [
   "specs/model-providers/onboarding-flow.feature",
   "specs/model-providers/provider-configuration.feature",
   "specs/model-providers/provider-deletion.feature",
+  // Reason: left LEGACY_INERT when the providers table's page width was bound
+  // (langwatch/tasks#963). The @visual and @unimplemented scenarios stay as they were.
+  "specs/model-providers/provider-list.feature",
   "specs/model-providers/scope-and-multi-instance.feature",
   "specs/monitors/online-evaluator-loop-prevention.feature",
   "specs/navigation/shared-section-navigation-layout.feature",
@@ -1243,8 +1278,8 @@ function collectAllBindings(testRoots: string[]): CollectedBinding[] {
 /**
  * Bats binding form (line-oriented, comment-prefixed):
  *
- *   # @scenario "Stale localhost NEXTAUTH_URL is rewritten to the fork's proxy URL"
- *   @test "boxd_rewrite_env: rewrites NEXTAUTH_URL allowlist key" {
+ *   # @scenario "all-local overrides only DATABASE_URL, REDIS_URL, CLICKHOUSE_URL"
+ *   @test "all-local rewrites DATABASE_URL, REDIS_URL, CLICKHOUSE_URL only" {
  *     ...
  *   }
  *

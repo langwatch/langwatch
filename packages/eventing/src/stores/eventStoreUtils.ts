@@ -1,4 +1,4 @@
-import { nowInstant, toEpochMs } from "@langwatch/time";
+import { nowEpochMs, toEpochMs } from "@langwatch/time";
 
 import type { AggregateType } from "../domain/aggregateType.ts";
 import { createTenantId } from "../domain/tenantId.ts";
@@ -24,9 +24,9 @@ export function recordToEvent<EventType extends Event>(
     timestampMs = record.EventTimestamp;
   } else if (typeof record.EventTimestamp === "string") {
     const parsed = toEpochMs(record.EventTimestamp);
-    timestampMs = Number.isNaN(parsed) ? nowInstant().epochMilliseconds : parsed;
+    timestampMs = Number.isNaN(parsed) ? nowEpochMs() : parsed;
   } else {
-    timestampMs = nowInstant().epochMilliseconds;
+    timestampMs = nowEpochMs();
   }
 
   const payload = parseEventPayload(record.EventPayload);
@@ -126,6 +126,27 @@ export function deduplicateEvents<EventType extends Event>(events: EventType[]):
     seenEventIds.add(event.id);
     return true;
   });
+}
+
+/**
+ * A page read's records as events, grouped per tenant stream and each stream deduplicated after
+ * `prepare` (a store's post-processing; none by default).
+ */
+export function streamEventsOfRecords<EventType extends Event>({
+  records,
+  prepare = (events) => events,
+}: {
+  records: readonly EventRecord[];
+  prepare?: (events: EventType[]) => EventType[];
+}): EventType[] {
+  const byStream = new Map<string, EventType[]>();
+  for (const record of records) {
+    const key = `${record.TenantId}\n${record.AggregateId}`;
+    const events = byStream.get(key) ?? [];
+    events.push(recordToEvent<EventType>(record, record.AggregateId));
+    byStream.set(key, events);
+  }
+  return [...byStream.values()].flatMap((events) => deduplicateEvents(prepare(events)));
 }
 
 /**

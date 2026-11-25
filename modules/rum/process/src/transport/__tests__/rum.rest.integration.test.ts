@@ -2,7 +2,12 @@
  * @vitest-environment node
  * `POST /api/rum/v1/traces` over the installed app, the collector stubbed at `fetch`.
  */
-import { canonicalErrorResponse, createRestRuntime } from "@langwatch/api/rest";
+import {
+  bindMiddlewareContext,
+  callerAddressContext,
+  canonicalErrorResponse,
+  createRestRuntime,
+} from "@langwatch/api/rest";
 import { RUM_MAX_BODY_BYTES, RUM_SERVICE_NAME } from "@langwatch/react-rum/constants";
 import { RumApi } from "@langwatch/rum-contract";
 import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
@@ -13,12 +18,18 @@ import {
   exportWith,
   rumInstallation,
 } from "../../app/__tests__/rum.fixture.ts";
+import { RUM_PER_CALLER_PER_MINUTE } from "../../rules/rum-ingest.rules.ts";
 import { rumRest } from "../rum.rest.ts";
 
 async function door({
   hasCollector = true,
   collectorHeaders,
-}: Readonly<{ hasCollector?: boolean; collectorHeaders?: string }> = {}) {
+  callerAddress = null,
+}: Readonly<{
+  hasCollector?: boolean;
+  collectorHeaders?: string;
+  callerAddress?: string | null;
+}> = {}) {
   const collector = vi.fn(
     async (_input: RequestInfo | URL, _init?: RequestInit) => new Response(null, { status: 200 }),
   );
@@ -36,7 +47,11 @@ async function door({
       },
       identify: () => ({ actor: null, scope: null }),
     },
-  }).mount(rumRest.router(), { app: () => api, onError: canonicalErrorResponse });
+  }).mount(rumRest.router(), {
+    app: () => api,
+    onError: canonicalErrorResponse,
+    middlewareContext: [bindMiddlewareContext(callerAddressContext, () => callerAddress)],
+  });
 
   return {
     collector,
@@ -125,6 +140,23 @@ describe("POST /api/rum/v1/traces", () => {
     });
   });
 
+  describe("when callers with no session forge a different forwarded-for chain each time", () => {
+    /** @scenario "Browser telemetry ingest counts the resolved address" */
+    /** @scenario "A caller with no session is named by its resolved address" */
+    it("counts every report against the one resolved address", async () => {
+      const { post } = await door({ callerAddress: "203.0.113.9" });
+      const forged = (index: number) => ({ "x-forwarded-for": `198.51.100.${index % 250}` });
+
+      for (let index = 0; index < RUM_PER_CALLER_PER_MINUTE; index++) {
+        expect((await post(exportWith(1), forged(index))).status).toBe(202);
+      }
+      const refused = await post(exportWith(1), forged(RUM_PER_CALLER_PER_MINUTE));
+
+      expect(refused.status).toBe(429);
+      expect(await refused.json()).toMatchObject({ code: "rum_rate_limited" });
+    });
+  });
+
   describe("when the body is not an OTLP export", () => {
     it("answers 400 rum_payload_invalid", async () => {
       const { post } = await door();
@@ -133,6 +165,49 @@ describe("POST /api/rum/v1/traces", () => {
 
       expect(response.status).toBe(400);
       expect(await response.json()).toMatchObject({ code: "rum_payload_invalid" });
+    });
+  });
+  describe("when the loading screen's boot report arrives as a beacon", () => {
+    /** @scenario "A boot report sent as plain text is accepted" */
+    it("accepts a text/plain body without a session header and forwards the boot span", async () => {
+      const { collector, post } = await door({ callerAddress: "203.0.113.9" });
+      const bootReport = JSON.stringify({
+        resourceSpans: [
+          {
+            resource: { attributes: [] },
+            scopeSpans: [
+              {
+                scope: { name: "@langwatch/boot-report" },
+                spans: [
+                  {
+                    traceId: "46c1a37d1eba313ce84da784108d3881",
+                    spanId: "ac69be760518574e",
+                    name: "boot",
+                    kind: 1,
+                    startTimeUnixNano: "1795023586913000000",
+                    endTimeUnixNano: "1795023594913000000",
+                    attributes: [
+                      { key: "langwatch.boot.outcome", value: { stringValue: "stalled" } },
+                    ],
+                    status: { code: 2 },
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      });
+
+      const response = await post(bootReport, { "content-type": "text/plain;charset=UTF-8" });
+
+      expect(response.status).toBe(202);
+      await vi.waitFor(() => expect(collector).toHaveBeenCalledOnce());
+      const sent = forwarded(collector);
+      expect(sent.body.resourceSpans[0].scopeSpans[0].spans[0].name).toBe("boot");
+      expect(sent.body.resourceSpans[0].resource.attributes).toContainEqual({
+        key: "service.name",
+        value: { stringValue: RUM_SERVICE_NAME },
+      });
     });
   });
 });

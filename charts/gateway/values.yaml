@@ -63,6 +63,12 @@ service:
 # your own Ingress). Paths, timeouts and body size:
 # docs/self-hosting/deployment/routing.
 
+# The gateway's externally reachable origin (https://gateway.your-corp.com),
+# rendered as A2A_PUBLIC_BASE_URL: the base of the /a2a URLs in the Agent
+# Cards the gateway proxies. Empty refuses Agent Card calls. Installed from
+# the langwatch chart, its gateway.publicUrl lands here.
+publicUrl: ""
+
 # Control-plane connection (LangWatch app). Left empty, this resolves to the
 # app Service of the install the gateway is part of, `<release>-app:5560` —
 # the cluster names that Service after the release, so a fixed address would
@@ -279,9 +285,15 @@ security:
   # Hosted-cloud transport policy. Independent of address-space blocking and
   # disabled by default so self-hosted HTTP endpoints remain compatible.
   requireHTTPSCustomEndpoints: false
-  # Exact, case-insensitive hostnames allowed to use private egress while the
-  # guard is enabled. Cloud metadata/link-local destinations remain blocked.
+  # Exact, case-insensitive hostnames that pass the endpoint check on a private
+  # address while the guard is enabled. Chat dispatch still refuses private
+  # addresses with the guard on; set it false to reach a private model server.
+  # Cloud metadata/link-local destinations remain blocked.
   allowedProxyHosts: []
+  # Name of a ConfigMap holding extra CA certificates (PEM, one or more keys)
+  # to trust beside the public roots, for provider endpoints serving TLS
+  # from a private CA. Mounted at /etc/langwatch/ca and named in SSL_CERT_DIR.
+  extraCACertsConfigMap: ""
   # Browser origins allowed to call /v1 directly (CORS). Exact origins such
   # as https://app.example.com, or a single "*" for any origin. Empty sends
   # no CORS headers. The gateway refuses to start on a malformed origin.

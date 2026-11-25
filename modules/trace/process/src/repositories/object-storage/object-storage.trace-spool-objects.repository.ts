@@ -1,6 +1,7 @@
-import { Readable } from "node:stream";
+import type { Readable } from "node:stream";
 
 import type { ObjectStorage } from "@langwatch/process-stores";
+import { readableBody } from "@langwatch/process-stores/members";
 
 import {
   type TraceSpoolDestinationKind,
@@ -39,7 +40,8 @@ export class ObjectStorageTraceSpoolObjectsRepository extends TraceSpoolObjectsR
   }
 
   async read(at: TraceSpoolObjectAddress): Promise<Readable> {
-    return Readable.from(await this.objects.read(at));
+    const body = await this.objects.read(at);
+    return readableBody(body);
   }
 
   async remove(at: TraceSpoolObjectAddress): Promise<void> {

@@ -46,12 +46,14 @@ export class ClickHouseSuiteRunRepository implements ProjectionStore<
   ): Promise<Projection<SuiteRunStateData> | null> {
     EventUtils.validateTenantId(context, "SuiteRunStateRepositoryClickHouse.findProjection");
     try {
+      const tenantId = String(context.tenantId);
       const { rows } = await this.options.clickhouse.query<Record<string, unknown>>({
-        tenantId: String(context.tenantId),
+        tenantId,
         sql: ClickHouseSuiteRunRepository.projectionQuery(),
-        params: { tenantId: String(context.tenantId), batchRunId: aggregateId },
+        params: { tenantId, batchRunId: aggregateId },
         table: TABLE_NAME,
         kind: "read",
+        idBound: { fallback: "unbounded" },
       });
       const row = rows[0];
       if (!row) return null;
@@ -222,6 +224,7 @@ export class ClickHouseSuiteRunRepository implements ProjectionStore<
     });
   }
 
+  /** The latest run row by batch id, bounded by the run id index once ready. */
   private static projectionQuery(): string {
     return `
       SELECT
@@ -241,11 +244,13 @@ export class ClickHouseSuiteRunRepository implements ProjectionStore<
       FROM suite_runs AS t
       WHERE t.TenantId = {tenantId:String}
         AND t.BatchRunId = {batchRunId:String}
+        {{idBound:suite_runs.BatchRunId:batchRunId:t}}
         AND (t.TenantId, t.BatchRunId, t.UpdatedAt) IN (
           SELECT TenantId, BatchRunId, max(UpdatedAt)
           FROM suite_runs
           WHERE TenantId = {tenantId:String}
             AND BatchRunId = {batchRunId:String}
+            {{idBound:suite_runs.BatchRunId:batchRunId}}
           GROUP BY TenantId, BatchRunId
         )
       LIMIT 1

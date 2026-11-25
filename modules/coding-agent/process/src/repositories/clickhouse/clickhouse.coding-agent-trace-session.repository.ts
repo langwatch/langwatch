@@ -13,6 +13,19 @@ import {
 
 const TABLE_NAME = "coding_agent_trace_sessions" as const;
 
+/** The columns the by-trace read selects. */
+interface TraceSessionReadRow {
+  TraceId: string;
+  SessionId: string;
+  OccurredAt: string;
+}
+
+/** The columns the by-session read selects. */
+interface RecentTraceSessionReadRow {
+  TraceId: string;
+  LastOccurredAt: string;
+}
+
 const logger = createLogger("langwatch:app-layer:coding-agent:trace-session-repository");
 
 interface ClickHouseWriteRecord {
@@ -87,7 +100,8 @@ export class CodingAgentTraceSessionClickHouseRepository implements TraceSession
 
   /**
    * The mapping row for one trace. IN-tuple dedup (max(UpdatedAt) per key), never FINAL.
-   * The closing `ORDER BY` is not decoration (ADR-071 sequencing step 4). A
+   * The closing `ORDER BY` is not decoration (ADR-071 sequencing step 4). With the id index
+   * on, both the scan and its dedup subquery read only the range the trace's rows span.
    */
   async findByTraceId({
     tenantId,
@@ -100,11 +114,7 @@ export class CodingAgentTraceSessionClickHouseRepository implements TraceSession
       { tenantId },
       "CodingAgentTraceSessionClickHouseRepository.findByTraceId",
     );
-    const { rows } = await this.clickhouse.query<{
-      TraceId: string;
-      SessionId: string;
-      OccurredAt: string;
-    }>({
+    const { rows } = await this.clickhouse.query<TraceSessionReadRow>({
       tenantId,
       table: TABLE_NAME,
       kind: "read",
@@ -113,17 +123,20 @@ export class CodingAgentTraceSessionClickHouseRepository implements TraceSession
         FROM ${TABLE_NAME}
         WHERE TenantId = {tenantId:String}
           AND TraceId = {traceId:String}
+          {{idBound:coding_agent_trace_sessions.TraceId:traceId}}
           AND (TenantId, TraceId, UpdatedAt) IN (
             SELECT TenantId, TraceId, max(UpdatedAt)
             FROM ${TABLE_NAME}
             WHERE TenantId = {tenantId:String}
               AND TraceId = {traceId:String}
+              {{idBound:coding_agent_trace_sessions.TraceId:traceId}}
             GROUP BY TenantId, TraceId
           )
         ORDER BY SessionId != TraceId DESC, OccurredAt DESC, SessionId ASC
         LIMIT 1
       `,
       params: { tenantId, traceId },
+      idBound: { fallback: "unbounded" },
     });
 
     const first = rows[0];
@@ -134,5 +147,66 @@ export class CodingAgentTraceSessionClickHouseRepository implements TraceSession
       sessionId: first.SessionId,
       occurredAtMs: parseClickHouseDateTimeMs(first.OccurredAt),
     };
+  }
+
+  /**
+   * The session's traces, newest first, counting only each trace's current version. The table is
+   * keyed by trace, so the read is a tenant range bounded by the session's window.
+   */
+  async findRecentBySessionId({
+    tenantId,
+    sessionId,
+    fromMs,
+    toMs,
+    limit,
+  }: {
+    tenantId: string;
+    sessionId: string;
+    fromMs: number;
+    toMs: number;
+    limit: number;
+  }): Promise<CodingAgentTraceSessionRecord[]> {
+    EventUtils.validateTenantId(
+      { tenantId },
+      "CodingAgentTraceSessionClickHouseRepository.findRecentBySessionId",
+    );
+    const { rows } = await this.clickhouse.query<RecentTraceSessionReadRow>({
+      tenantId,
+      table: TABLE_NAME,
+      kind: "read",
+      sql: `
+        SELECT TraceId, max(OccurredAt) AS LastOccurredAt
+        FROM ${TABLE_NAME}
+        WHERE TenantId = {tenantId:String}
+          AND SessionId = {sessionId:String}
+          AND OccurredAt >= fromUnixTimestamp64Milli({fromMs:Int64})
+          AND OccurredAt <= fromUnixTimestamp64Milli({toMs:Int64})
+          AND (TenantId, TraceId, UpdatedAt) IN (
+            SELECT TenantId, TraceId, max(UpdatedAt)
+            FROM ${TABLE_NAME}
+            WHERE TenantId = {tenantId:String}
+              AND TraceId IN (
+                SELECT TraceId
+                FROM ${TABLE_NAME}
+                WHERE TenantId = {tenantId:String}
+                  AND SessionId = {sessionId:String}
+                  AND OccurredAt >= fromUnixTimestamp64Milli({fromMs:Int64})
+                  AND OccurredAt <= fromUnixTimestamp64Milli({toMs:Int64})
+              )
+            GROUP BY TenantId, TraceId
+          )
+        GROUP BY TraceId
+        ORDER BY LastOccurredAt DESC, TraceId ASC
+        LIMIT {limit:UInt32}
+      `,
+      params: { tenantId, sessionId, fromMs, toMs, limit },
+    });
+
+    return rows.map((row) => ({
+      tenantId,
+      traceId: row.TraceId,
+      sessionId,
+      occurredAtMs: parseClickHouseDateTimeMs(row.LastOccurredAt),
+    }));
   }
 }

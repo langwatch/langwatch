@@ -1,6 +1,14 @@
 import IORedis, { type Redis } from "ioredis";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { CachedLuaScript } from "../cachedLuaScript.ts";
+import {
+  DLQ_TTL_SECONDS,
+  dlqGroupKeys,
+  dlqIndexKey,
+  MOVE_TO_DLQ_LUA,
+  REPLAY_FROM_DLQ_LUA,
+} from "../deadLetter.ts";
 import { GroupQueueProcessor } from "../groupQueue.ts";
 import { GroupStagingScripts } from "../scripts.ts";
 
@@ -242,6 +250,236 @@ describe("GroupStagingScripts — pending counter conservation", () => {
       await scripts.drainGroupReady({ groupId: "group-a", nowMs: 10_000, maxJobs: 2 });
 
       expect(await inspectTotalPending()).toBe(1);
+    });
+  });
+});
+
+const moveToDlqScript = new CachedLuaScript(MOVE_TO_DLQ_LUA);
+const replayFromDlqScript = new CachedLuaScript(REPLAY_FROM_DLQ_LUA);
+
+/** The operator's whole-group move, with the keys the ops repository passes. */
+async function moveGroupToDlq(groupId: string): Promise<number> {
+  const prefix = keyPrefix();
+  const group = (suffix: string) => `${prefix}group:${groupId}:${suffix}`;
+  const dlq = dlqGroupKeys({ keyPrefix: prefix, groupId });
+  return Number(
+    await moveToDlqScript.run(
+      redis,
+      15,
+      group("jobs"),
+      group("data"),
+      group("active"),
+      `${prefix}ready`,
+      `${prefix}blocked`,
+      `${prefix}signal`,
+      group("error"),
+      dlq.jobs,
+      dlq.data,
+      dlq.error,
+      dlqIndexKey(prefix),
+      group("strikes"),
+      group("attempt"),
+      group("failstreak"),
+      `${prefix}stats:total-pending`,
+      groupId,
+      String(DLQ_TTL_SECONDS),
+    ),
+  );
+}
+
+/** The operator's redrive, with the keys the ops repository passes. */
+async function replayGroupFromDlq(groupId: string): Promise<number> {
+  const prefix = keyPrefix();
+  const dlq = dlqGroupKeys({ keyPrefix: prefix, groupId });
+  return Number(
+    await replayFromDlqScript.run(
+      redis,
+      9,
+      dlq.jobs,
+      dlq.data,
+      dlq.error,
+      `${prefix}group:${groupId}:jobs`,
+      `${prefix}group:${groupId}:data`,
+      `${prefix}ready`,
+      `${prefix}signal`,
+      dlqIndexKey(prefix),
+      `${prefix}stats:total-pending`,
+      groupId,
+      String(Date.now()),
+    ),
+  );
+}
+
+async function liveJobsIn(groupIds: string[]): Promise<number> {
+  let total = 0;
+  for (const groupId of groupIds) {
+    total += await redis.zcard(`${keyPrefix()}group:${groupId}:jobs`);
+  }
+  return total;
+}
+
+describe("operator dead-letter moves and replays — pending counter conservation", () => {
+  describe("given a group holding staged jobs", () => {
+    describe("when an operator moves it to the dead-letter queue", () => {
+      /** @scenario Moving a group to the dead-letter queue takes its live jobs off the counter */
+      it("subtracts every live job it carried off", async () => {
+        for (const stagedJobId of ["m1", "m2", "m3"]) {
+          await scripts.stage(makeJob({ stagedJobId, groupId: "g-move", dispatchAfterMs: 100 }));
+        }
+        expect(await inspectTotalPending()).toBe(3);
+
+        expect(await moveGroupToDlq("g-move")).toBe(3);
+
+        expect(await inspectTotalPending()).toBe(0);
+        expect(
+          await redis.zcard(dlqGroupKeys({ keyPrefix: keyPrefix(), groupId: "g-move" }).jobs),
+        ).toBe(3);
+      });
+
+      /** @scenario Repeating a dead-letter move or replay changes the counter only once */
+      it("leaves the counter alone when the move is repeated", async () => {
+        await scripts.stage(
+          makeJob({ stagedJobId: "m1", groupId: "g-again", dispatchAfterMs: 100 }),
+        );
+        await moveGroupToDlq("g-again");
+
+        await moveGroupToDlq("g-again");
+
+        expect(await inspectTotalPending()).toBe(0);
+      });
+    });
+  });
+
+  describe("given a group whose worker died holding a claimed job", () => {
+    describe("when an operator moves it to the dead-letter queue", () => {
+      /** @scenario A dead worker's claimed job moves to the dead-letter queue without being subtracted twice */
+      it("subtracts only the jobs still in the live group", async () => {
+        for (const stagedJobId of ["d1", "d2", "d3"]) {
+          await scripts.stage(makeJob({ stagedJobId, groupId: "g-dead", dispatchAfterMs: 100 }));
+        }
+        await scripts.dispatch({ nowMs: 200, activeTtlSec: 60 });
+        expect(await inspectTotalPending()).toBe(2);
+        await redis.del(`${keyPrefix()}group:g-dead:active`);
+
+        expect(await moveGroupToDlq("g-dead")).toBe(3);
+
+        expect(await inspectTotalPending()).toBe(0);
+      });
+    });
+  });
+
+  describe("given a dead-lettered group", () => {
+    describe("when an operator replays it", () => {
+      /** @scenario Replaying a dead-lettered group adds only new live jobs to the counter */
+      it("adds every job it put back on the live group", async () => {
+        for (const stagedJobId of ["r1", "r2"]) {
+          await scripts.stage(makeJob({ stagedJobId, groupId: "g-replay", dispatchAfterMs: 100 }));
+        }
+        await moveGroupToDlq("g-replay");
+
+        expect(await replayGroupFromDlq("g-replay")).toBe(2);
+
+        expect(await inspectTotalPending()).toBe(2);
+        expect(await inspectTotalPending()).toBe(await liveJobsIn(["g-replay"]));
+      });
+
+      /** @scenario Repeating a dead-letter move or replay changes the counter only once */
+      it("leaves the counter alone when the replay is repeated", async () => {
+        await scripts.stage(
+          makeJob({ stagedJobId: "r1", groupId: "g-twice", dispatchAfterMs: 100 }),
+        );
+        await moveGroupToDlq("g-twice");
+        await replayGroupFromDlq("g-twice");
+
+        expect(await replayGroupFromDlq("g-twice")).toBe(0);
+
+        expect(await inspectTotalPending()).toBe(1);
+      });
+    });
+
+    describe("when an operator has blocked the live group again", () => {
+      /** @scenario Replaying dead-lettered jobs into a blocked group keeps it held */
+      it("puts the jobs back with no expiry and keeps the group out of ready", async () => {
+        const prefix = keyPrefix();
+        await scripts.stage(
+          makeJob({ stagedJobId: "b1", groupId: "g-reblocked", dispatchAfterMs: 100 }),
+        );
+        await moveGroupToDlq("g-reblocked");
+        await redis.sadd(`${prefix}blocked`, "g-reblocked");
+
+        expect(await replayGroupFromDlq("g-reblocked")).toBe(1);
+
+        expect(await redis.zscore(`${prefix}ready`, "g-reblocked")).toBeNull();
+        expect(await redis.pttl(`${prefix}group:g-reblocked:jobs`)).toBe(-1);
+        expect(await redis.pttl(`${prefix}group:g-reblocked:data`)).toBe(-1);
+        expect(await inspectTotalPending()).toBe(1);
+      });
+    });
+
+    describe("when the live group already holds one of its job ids", () => {
+      /** @scenario Replaying a dead-lettered group adds only new live jobs to the counter */
+      it("counts only the new job and keeps the live copy's score and value", async () => {
+        const prefix = keyPrefix();
+        const dlq = dlqGroupKeys({ keyPrefix: prefix, groupId: "g-collide" });
+        await redis.zadd(dlq.jobs, 50, "c1", 60, "c2");
+        await redis.hset(
+          dlq.data,
+          "c1",
+          '{"copy":"dead-lettered"}',
+          "c2",
+          '{"copy":"dead-lettered"}',
+        );
+        await redis.sadd(dlqIndexKey(prefix), "g-collide");
+        await scripts.stage(
+          makeJob({
+            stagedJobId: "c1",
+            groupId: "g-collide",
+            dispatchAfterMs: 500,
+            jobDataJson: '{"copy":"live"}',
+          }),
+        );
+        const liveScore = await redis.zscore(`${prefix}group:g-collide:jobs`, "c1");
+
+        await replayGroupFromDlq("g-collide");
+
+        expect(await inspectTotalPending()).toBe(2);
+        expect(await liveJobsIn(["g-collide"])).toBe(2);
+        expect(await redis.zscore(`${prefix}group:g-collide:jobs`, "c1")).toBe(liveScore);
+        expect(await redis.hget(`${prefix}group:g-collide:data`, "c1")).toBe('{"copy":"live"}');
+        expect(await redis.hget(`${prefix}group:g-collide:data`, "c2")).toBe(
+          '{"copy":"dead-lettered"}',
+        );
+      });
+    });
+  });
+
+  describe("given a replayed group whose worker dies mid-job", () => {
+    describe("when the operator moves it to the dead-letter queue again", () => {
+      /** @scenario The counter equals the live jobs through repeated dead-letter moves, replays and a worker death */
+      it("keeps the counter equal to the live jobs at every step", async () => {
+        for (const stagedJobId of ["w1", "w2"]) {
+          await scripts.stage(makeJob({ stagedJobId, groupId: "g-cycle", dispatchAfterMs: 100 }));
+        }
+        await scripts.stage(
+          makeJob({ stagedJobId: "o1", groupId: "g-other", dispatchAfterMs: 100 }),
+        );
+        const groups = ["g-cycle", "g-other"];
+
+        await moveGroupToDlq("g-cycle");
+        expect(await inspectTotalPending()).toBe(await liveJobsIn(groups));
+        await replayGroupFromDlq("g-cycle");
+        expect(await inspectTotalPending()).toBe(await liveJobsIn(groups));
+
+        await scripts.dispatchBatch({ nowMs: 300, activeTtlSec: 60, maxJobs: 2 });
+        expect(await inspectTotalPending()).toBe(await liveJobsIn(groups));
+        await redis.del(`${keyPrefix()}group:g-cycle:active`);
+
+        await moveGroupToDlq("g-cycle");
+        expect(await inspectTotalPending()).toBe(await liveJobsIn(groups));
+        await replayGroupFromDlq("g-cycle");
+        expect(await inspectTotalPending()).toBe(await liveJobsIn(groups));
+        expect(await liveJobsIn(["g-cycle"])).toBe(2);
+      });
     });
   });
 });

@@ -1,7 +1,21 @@
 /** Model roles per platform surface; keys stable forever (never rename). */
 
-export const MODEL_ROLES = ["DEFAULT", "FAST", "LANGY", "EMBEDDINGS"] as const;
+export const MODEL_ROLES = [
+  "DEFAULT",
+  "FAST",
+  "LANGY",
+  "EMBEDDINGS",
+  "INSTANT_EVALS",
+  "JUDGE",
+] as const;
 export type ModelRole = (typeof MODEL_ROLES)[number];
+
+/**
+ * The role an unset role answers with once its own scope chain is empty.
+ * JUDGE reads DEFAULT until LangWatch hosts a scenario judge model; that
+ * hosted model replaces this entry, as INSTANT_EVALS reads its hosted model.
+ */
+export const UNSET_ROLE_FALLBACK: Partial<Record<ModelRole, ModelRole>> = { JUDGE: "DEFAULT" };
 
 export function isModelRole(value: string): value is ModelRole {
   return MODEL_ROLES.some((role) => role === value);
@@ -50,12 +64,6 @@ const REGISTRY: FeatureDescriptor[] = [
     role: "DEFAULT",
     displayName: "Scenario user simulator",
     description: "Model that role-plays the user in scenario simulations.",
-  },
-  {
-    key: "scenarios.judge",
-    role: "DEFAULT",
-    displayName: "Scenario judge",
-    description: "Model that judges whether a scenario met its success criteria.",
   },
   {
     // DEFAULT-role (never codex-eligible) so a project whose FAST/coding
@@ -136,6 +144,22 @@ const REGISTRY: FeatureDescriptor[] = [
     // this is without parenthetical clutter.
     displayName: "Topic clustering",
     description: "Vectors used to group similar traces in Analytics → Topics.",
+  },
+
+  // INSTANT_EVALS — the decision model Instant Evals classify with (ADR-182).
+  {
+    key: "instant_eval.judge",
+    role: "INSTANT_EVALS",
+    displayName: "Instant Evals",
+    description: "The decision model Instant Evals and their judged columns run on.",
+  },
+
+  // JUDGE — the model scenario runs judge with; unset, it reads DEFAULT (UNSET_ROLE_FALLBACK).
+  {
+    key: "scenarios.judge",
+    role: "JUDGE",
+    displayName: "Scenario judge",
+    description: "Model that judges whether a scenario met its success criteria.",
   },
 ];
 

@@ -9,12 +9,17 @@ describe("local orchestrator configuration", () => {
       CI: "true",
       LANGWATCH_AIGATEWAY_DEV_BUILD: "1",
       LANGWATCH_FORCE_BUNDLED_POSTGRES: "1",
+      LANGWATCH_APP_ARCHIVE: "/tmp/langwatch-app-darwin-arm64.tar.gz",
       OPENAI_API_KEY: "must-not-cross-the-launcher-config-boundary",
     });
 
     expect(config).toEqual({
       browser: { openEnabled: false, continuousIntegration: true },
-      development: { aiGatewayDevBuild: true, forceBundledPostgres: true },
+      development: {
+        aiGatewayDevBuild: true,
+        forceBundledPostgres: true,
+        appArchive: "/tmp/langwatch-app-darwin-arm64.tar.gz",
+      },
     });
     expect(config).not.toHaveProperty("OPENAI_API_KEY");
   });

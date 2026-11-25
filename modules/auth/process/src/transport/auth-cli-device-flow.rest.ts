@@ -55,8 +55,8 @@ function protocolAnswer(
 }
 
 /**
- * Every refusal on the family, the handler's and the runtime's alike, in the
- * two-field body RFC 8628 clients parse; a shape they cannot parse reads as an outage.
+ * Every refusal on the family in the `{ error, error_description }` body RFC 8628 clients
+ * parse (an expired lookup may add `client`); a shape they cannot parse reads as an outage.
  */
 const cliDeviceFlowRefusal: RestProtocolRefusal = ({ failure, response }) => {
   const { status, refusal } = cliDeviceFlowRefusalDocument(failure);
@@ -91,6 +91,7 @@ export const authCliDeviceFlowRest = defineRestRouter(AuthCliDeviceFlowApi)
   .withAddressing("literal", { v1Twin: true })
 
   .post("/api/auth/cli/device-code", "startCliDeviceCode")
+  .keepsRecords()
   .withAudit("auth.startCliDeviceCode")
   .withRawBody("text", { mediaType: JSON_MEDIA_TYPE })
   .withBodyLimit({ maxBytes: BODY_LIMIT_JSON_BYTES })
@@ -101,6 +102,7 @@ export const authCliDeviceFlowRest = defineRestRouter(AuthCliDeviceFlowApi)
   )
 
   .post("/api/auth/cli/exchange", "exchangeCliDeviceCode")
+  .keepsRecords()
   .withAudit("auth.exchangeCliDeviceCode")
   .withRawBody("text", { mediaType: JSON_MEDIA_TYPE })
   .withBodyLimit({ maxBytes: BODY_LIMIT_JSON_BYTES })
@@ -111,6 +113,7 @@ export const authCliDeviceFlowRest = defineRestRouter(AuthCliDeviceFlowApi)
   )
 
   .post("/api/auth/cli/refresh", "refreshCliDeviceSession")
+  .keepsRecords()
   .withAudit("auth.refreshCliDeviceSession")
   .withRawBody("text", { mediaType: JSON_MEDIA_TYPE })
   .withBodyLimit({ maxBytes: BODY_LIMIT_JSON_BYTES })
@@ -134,6 +137,7 @@ export const authCliDeviceFlowRest = defineRestRouter(AuthCliDeviceFlowApi)
   )
 
   .post("/api/auth/cli/approve", "approveCliDeviceCode")
+  .keepsRecords()
   .withAudit("auth.approveCliDeviceCode")
   .withRawBody("text", { mediaType: JSON_MEDIA_TYPE })
   .withBodyLimit({ maxBytes: BODY_LIMIT_JSON_BYTES })
@@ -144,6 +148,7 @@ export const authCliDeviceFlowRest = defineRestRouter(AuthCliDeviceFlowApi)
   )
 
   .post("/api/auth/cli/deny", "denyCliDeviceCode")
+  .keepsRecords()
   .withAudit("auth.denyCliDeviceCode")
   .withRawBody("text", { mediaType: JSON_MEDIA_TYPE })
   .withBodyLimit({ maxBytes: BODY_LIMIT_JSON_BYTES })
@@ -159,6 +164,7 @@ export const authCliDeviceFlowRest = defineRestRouter(AuthCliDeviceFlowApi)
    * if stolen. The session's user-scoped key is revoked alongside.
    */
   .post("/api/auth/cli/logout", "endCliDeviceSession")
+  .keepsRecords()
   .withAudit("auth.endCliDeviceSession")
   .withRawBody("text", { mediaType: JSON_MEDIA_TYPE })
   .withBodyLimit({ maxBytes: BODY_LIMIT_JSON_BYTES })

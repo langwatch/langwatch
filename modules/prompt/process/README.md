@@ -363,7 +363,7 @@ Answers at `/api/prompt-playground/2026-08-20/prompt.execute`.
 
 ```typescript
 type Body = z.infer<typeof executeRequestSchema>; // ../contract/src/prompt.playground-execute.ts:43
-// Response: inline, src/transport/prompt-execute.rest.ts:22
+// Response: inline, src/transport/prompt-execute.rest.ts:23
 type Response = unknown;
 ```
 
@@ -397,16 +397,16 @@ Permission `prompts:manage`. Declared at `src/transport/prompt.rest.ts:104`.
 Answers at `/api/prompts/:id{.+?}/tags/:tag`, `/api/v1/prompts/:id{.+?}/tags/:tag`.
 
 ```typescript
-// Params: idTagParamsSchema, ../contract/src/prompt-rest.schemas.ts:191
+// Params: idTagParamsSchema, ../contract/src/prompt-rest.schemas.ts:193
 interface Params {
   id: string;
   tag: string;
 }
-// Body: assignTagInputSchema, ../contract/src/prompt-rest.schemas.ts:143
+// Body: assignTagInputSchema, ../contract/src/prompt-rest.schemas.ts:145
 interface Body {
   versionId: string;
 }
-// Response: assignTagResponseSchema, ../contract/src/prompt-rest.schemas.ts:140
+// Response: assignTagResponseSchema, ../contract/src/prompt-rest.schemas.ts:142
 interface Response {
   configId: string;
   versionId: string;
@@ -419,12 +419,12 @@ interface Response {
 
 List all prompt tag definitions for the organization
 
-Permission `prompts:view`. Declared at `src/transport/prompt.rest.ts:142`.
+Permission `prompts:view`. Declared at `src/transport/prompt.rest.ts:143`.
 
 Answers at `/api/prompts/tags`, `/api/v1/prompts/tags`.
 
 ```typescript
-// Response: inline, src/transport/prompt.rest.ts:144
+// Response: inline, src/transport/prompt.rest.ts:145
 type Response = {
   id: string;
   name: string;
@@ -436,16 +436,16 @@ type Response = {
 
 Create a custom prompt tag definition for the organization
 
-Permission `prompts:manage`. Declared at `src/transport/prompt.rest.ts:159`.
+Permission `prompts:manage`. Declared at `src/transport/prompt.rest.ts:160`.
 
 Answers at `/api/prompts/tags`, `/api/v1/prompts/tags`.
 
 ```typescript
-// Body: createTagInputSchema, ../contract/src/prompt-rest.schemas.ts:153
+// Body: createTagInputSchema, ../contract/src/prompt-rest.schemas.ts:155
 interface Body {
   name: string;
 }
-// Response: tagDefinitionSchema, ../contract/src/prompt-rest.schemas.ts:150
+// Response: tagDefinitionSchema, ../contract/src/prompt-rest.schemas.ts:152
 interface Response {
   id: string;
   name: string;
@@ -457,33 +457,33 @@ interface Response {
 
 Rename a prompt tag definition
 
-Permission `prompts:manage`. Declared at `src/transport/prompt.rest.ts:182`.
+Permission `prompts:manage`. Declared at `src/transport/prompt.rest.ts:184`.
 
 Answers at `/api/prompts/tags/:tag`, `/api/v1/prompts/tags/:tag`.
 
 ```typescript
-// Params: tagParamsSchema, ../contract/src/prompt-rest.schemas.ts:194
+// Params: tagParamsSchema, ../contract/src/prompt-rest.schemas.ts:196
 interface Params {
   tag: string;
 }
-// Body: renameTagInputSchema, ../contract/src/prompt-rest.schemas.ts:156
+// Body: renameTagInputSchema, ../contract/src/prompt-rest.schemas.ts:158
 interface Body {
   name: string;
 }
-type Response = z.infer<typeof tagDefinitionSchema>; // ../contract/src/prompt-rest.schemas.ts:150
+type Response = z.infer<typeof tagDefinitionSchema>; // ../contract/src/prompt-rest.schemas.ts:152
 ```
 
 #### `DELETE /api/prompts/tags/:tag` · `deleteApiPromptsTagsByTag`
 
 Delete a prompt tag definition and cascade to assignments
 
-Permission `prompts:manage`. Declared at `src/transport/prompt.rest.ts:206`.
+Permission `prompts:manage`. Declared at `src/transport/prompt.rest.ts:209`.
 
 Answers at `/api/prompts/tags/:tag`, `/api/v1/prompts/tags/:tag`.
 
 ```typescript
-type Params = z.infer<typeof tagParamsSchema>; // ../contract/src/prompt-rest.schemas.ts:194
-// Response: inline, src/transport/prompt.rest.ts:210
+type Params = z.infer<typeof tagParamsSchema>; // ../contract/src/prompt-rest.schemas.ts:196
+// Response: inline, src/transport/prompt.rest.ts:219
 type Response = unknown;
 ```
 
@@ -491,79 +491,79 @@ type Response = unknown;
 
 Get all versions for a prompt. Does not include base prompt data, only versioned data.
 
-Permission `prompts:view`. Declared at `src/transport/prompt.rest.ts:220`.
+Permission `prompts:view`. Declared at `src/transport/prompt.rest.ts:229`.
 
 Answers at `/api/prompts/:id{.+?}/versions`, `/api/v1/prompts/:id{.+?}/versions`.
 
 ```typescript
-// Params: idParamsSchema, ../contract/src/prompt-rest.schemas.ts:185
+// Params: idParamsSchema, ../contract/src/prompt-rest.schemas.ts:187
 interface Params {
   id: string;
 }
-// Response: z.array(promptWireSchema) (inline, src/transport/prompt.rest.ts:223)
+// Response: z.array(promptWireSchema) (inline, src/transport/prompt.rest.ts:232)
 ```
 
 #### `POST /api/prompts/:id{.+?}/versions/:versionId/restore` · `postApiPromptsByIdVersionsByVersionIdRestore`
 
 Restore a prompt to a previous version. Creates a new version with the same config data as the specified version.
 
-Permission `prompts:update`. Declared at `src/transport/prompt.rest.ts:256`.
+Permission `prompts:update`. Declared at `src/transport/prompt.rest.ts:265`.
 
 Answers at `/api/prompts/:id{.+?}/versions/:versionId/restore`, `/api/v1/prompts/:id{.+?}/versions/:versionId/restore`.
 
 ```typescript
-// Params: idVersionParamsSchema, ../contract/src/prompt-rest.schemas.ts:200
+// Params: idVersionParamsSchema, ../contract/src/prompt-rest.schemas.ts:202
 interface Params {
   id: string;
   versionId: string;
 }
-// Body: restorePromptVersionBodySchema, ../contract/src/prompt-rest.schemas.ts:208
+// Body: restorePromptVersionBodySchema, ../contract/src/prompt-rest.schemas.ts:210
 type Body = Record<string, unknown>;
-type Response = z.infer<typeof promptWireSchema>; // ../contract/src/prompt-rest.schemas.ts:131
+type Response = z.infer<typeof promptWireSchema>; // ../contract/src/prompt-rest.schemas.ts:133
 ```
 
 #### `GET /api/prompts/:id{.+}` · `getApiPromptsById`
 
 Get a specific prompt by slug, with optional shorthand syntax for tags and versions. Pass a bare slug like "pizza-prompt" to get the latest version, "pizza-prompt:production" to resolve a tagged version, or "pizza-prompt:2" to fetch version 2. Alternatively, use the tag or version query parameters with a bare slug.
 
-Permission `prompts:view`. Declared at `src/transport/prompt.rest.ts:304`.
+Permission `prompts:view`. Declared at `src/transport/prompt.rest.ts:314`.
 
 Answers at `/api/prompts/:id{.+}`, `/api/v1/prompts/:id{.+}`.
 
 ```typescript
-type Params = z.infer<typeof idParamsSchema>; // ../contract/src/prompt-rest.schemas.ts:185
-// Query: promptWindowQuerySchema, ../contract/src/prompt-rest.schemas.ts:214
+type Params = z.infer<typeof idParamsSchema>; // ../contract/src/prompt-rest.schemas.ts:187
+// Query: promptWindowQuerySchema, ../contract/src/prompt-rest.schemas.ts:216
 interface Query {
   version?: number;
   tag?: string;
 }
-type Response = z.infer<typeof promptWireSchema>; // ../contract/src/prompt-rest.schemas.ts:131
+type Response = z.infer<typeof promptWireSchema>; // ../contract/src/prompt-rest.schemas.ts:133
 ```
 
 #### `POST /api/prompts` · `postApiPrompts`
 
 Create a new prompt with default initial version
 
-Permission `prompts:create`. Declared at `src/transport/prompt.rest.ts:343`.
+Permission `prompts:create`. Declared at `src/transport/prompt.rest.ts:353`.
 
 Answers at `/api/prompts`, `/api/v1/prompts`.
 
 ```typescript
-type Body = z.infer<typeof createPromptInputSchema>; // ../contract/src/prompt-rest.schemas.ts:48
-type Response = z.infer<typeof promptWireSchema>; // ../contract/src/prompt-rest.schemas.ts:131
+type Body = z.infer<typeof createPromptInputSchema>; // ../contract/src/prompt-rest.schemas.ts:49
+type Response = z.infer<typeof promptWireSchema>; // ../contract/src/prompt-rest.schemas.ts:133
 ```
 
 #### `POST /api/prompts/:id{.+?}/sync` · `postApiPromptsByIdSync`
 
 Sync/upsert a prompt with local content
 
-Permission `prompts:manage`. Declared at `src/transport/prompt.rest.ts:370`.
+Permission `prompts:manage`. Declared at `src/transport/prompt.rest.ts:381`.
 
 Answers at `/api/prompts/:id{.+?}/sync`, `/api/v1/prompts/:id{.+?}/sync`.
 
 ```typescript
-type Params = z.infer<typeof idParamsSchema>; // ../contract/src/prompt-rest.schemas.ts:185
-type Body = z.infer<typeof syncInputSchema>; // ../contract/src/prompt-rest.schemas.ts:164
+type Params = z.infer<typeof idParamsSchema>; // ../contract/src/prompt-rest.schemas.ts:187
+type Body = z.infer<typeof syncInputSchema>; // ../contract/src/prompt-rest.schemas.ts:166
 type Response = z.infer<typeof promptSyncResultSchema>; // ../contract/src/prompt.ts:241
 ```
 
@@ -571,27 +571,27 @@ type Response = z.infer<typeof promptSyncResultSchema>; // ../contract/src/promp
 
 Update a prompt
 
-Permission `prompts:update`. Declared at `src/transport/prompt.rest.ts:399`.
+Permission `prompts:update`. Declared at `src/transport/prompt.rest.ts:411`.
 
 Answers at `/api/prompts/:id{.+}`, `/api/v1/prompts/:id{.+}`.
 
 ```typescript
-type Params = z.infer<typeof idParamsSchema>; // ../contract/src/prompt-rest.schemas.ts:185
-type Body = z.infer<typeof updatePromptInputSchema>; // ../contract/src/prompt-rest.schemas.ts:57
-type Response = z.infer<typeof promptWireSchema>; // ../contract/src/prompt-rest.schemas.ts:131
+type Params = z.infer<typeof idParamsSchema>; // ../contract/src/prompt-rest.schemas.ts:187
+type Body = z.infer<typeof updatePromptInputSchema>; // ../contract/src/prompt-rest.schemas.ts:59
+type Response = z.infer<typeof promptWireSchema>; // ../contract/src/prompt-rest.schemas.ts:133
 ```
 
 #### `DELETE /api/prompts/:id{.+}` · `deleteApiPromptsById`
 
 Delete a prompt
 
-Permission `prompts:manage`. Declared at `src/transport/prompt.rest.ts:435`.
+Permission `prompts:manage`. Declared at `src/transport/prompt.rest.ts:448`.
 
 Answers at `/api/prompts/:id{.+}`, `/api/v1/prompts/:id{.+}`.
 
 ```typescript
-type Params = z.infer<typeof idParamsSchema>; // ../contract/src/prompt-rest.schemas.ts:185
-// Response: successSchema, ../../../packages/api/src/rest/response.ts:249
+type Params = z.infer<typeof idParamsSchema>; // ../contract/src/prompt-rest.schemas.ts:187
+// Response: successSchema, ../../../packages/api/src/rest/response.ts:252
 interface Response {
   success: boolean;
 }
@@ -829,12 +829,14 @@ None: this module declares no websocket, rawsocket or rawhttp door.
 
 ### Pipeline `prompt_lifecycle` (aggregate `prompt`)
 
-Declared at `src/eventing/prompt-lifecycle.pipeline.ts:51`. Events: `promptCreatedEventSchema`.
+Declared at `src/eventing/prompt-lifecycle.pipeline.ts:59`. Events: `promptCreatedEventSchema`, `promptVersionSavedEventSchema`, `promptDeletedEventSchema`.
 
 | Kind            | Name                         | Handles                                                                     | Declared at                                    |
 | --------------- | ---------------------------- | --------------------------------------------------------------------------- | ---------------------------------------------- |
-| command         | `recordPromptCreated`        | –                                                                           | `src/eventing/prompt-lifecycle.pipeline.ts:56` |
-| peer subscriber | `seedOrganizationPromptTags` | `lw.organization.created` from [organization](../../organization/README.md) | `src/eventing/prompt-lifecycle.pipeline.ts:57` |
+| command         | `recordPromptCreated`        | –                                                                           | `src/eventing/prompt-lifecycle.pipeline.ts:64` |
+| command         | `recordPromptVersionSaved`   | –                                                                           | `src/eventing/prompt-lifecycle.pipeline.ts:65` |
+| command         | `recordPromptDeleted`        | –                                                                           | `src/eventing/prompt-lifecycle.pipeline.ts:66` |
+| peer subscriber | `seedOrganizationPromptTags` | `lw.organization.created` from [organization](../../organization/README.md) | `src/eventing/prompt-lifecycle.pipeline.ts:67` |
 
 ## Configuration
 

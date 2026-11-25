@@ -116,6 +116,16 @@ Set up SDK export to nest the Claude API spans under your own spans, next to the
 The Python SDK needs `anthropic` 1.14.0 or later. In TypeScript, use the latest `@anthropic-ai/sdk`. The Claude SDK records prompts and responses only in content mode, which you turn on separately from the destination's content mode.
 
 <CodeGroup>
+```bash Python
+pip install langwatch "anthropic>=1.14.0"
+```
+
+```bash TypeScript
+npm install langwatch @anthropic-ai/sdk
+```
+</CodeGroup>
+
+<CodeGroup>
 ```python Python
 import langwatch
 from anthropic import Anthropic

@@ -17,6 +17,7 @@ import type {
   OpsUpgradeStepPage,
   OpsUpgradeTarget,
   OpsUpgradeTargetSummary,
+  SelfHostedNotice,
 } from "@langwatch/ops-contract";
 import { UpgradeStepNotFailedError } from "@langwatch/ops-contract";
 import type { Deprecation } from "@langwatch/upgrade/manifest";
@@ -54,7 +55,7 @@ function deprecationOf(entry: Deprecation): OpsUpgradeDeprecation {
 
 function statusOf(
   status: UpgradeStatus,
-): Omit<OpsUpgradeStatus, "deprecations" | "version" | "latestRelease"> {
+): Omit<OpsUpgradeStatus, "deprecations" | "version" | "latestRelease" | "notices"> {
   const { lease, lastRun } = status;
   return {
     state: status.state,
@@ -121,7 +122,7 @@ function phaseOf(phase: UpgradeRunPhaseView): OpsUpgradeRunPhase {
 }
 
 function stepDetailOf(step: UpgradeStepDetail): OpsUpgradeStepDetail {
-  return { ...stepOf(step), targets: step.targets.map(targetOf) };
+  return { ...stepOf(step), logTail: [...step.logTail], targets: step.targets.map(targetOf) };
 }
 
 function runOf(run: UpgradeRunDetail): OpsUpgradeRun {
@@ -154,6 +155,32 @@ function newerReleasesOf({
         running === null || orderReleases({ left: latest.release, right: running }) === "newer",
     )
     .map(({ release }) => ({ release, notesUrl: releaseNotesUrl({ release }) }));
+}
+
+/** Security first, then warning, then info; the newest first within each. */
+const NOTICE_SEVERITY_ORDER = ["security", "warning", "info"] as const;
+
+/** Cloud's notices this image does not fix: hidden only when `fixed_in` is known not newer. */
+function unfixedNoticesOf({
+  version,
+  held,
+}: {
+  version: UpgradeImageVersion;
+  held: readonly SelfHostedNotice[];
+}): SelfHostedNotice[] {
+  const running = version.kind === "release" ? version.release : version.containsRelease;
+  return held
+    .filter(({ fixed_in }) => {
+      if (fixed_in === null || running === null) return true;
+      const order = orderReleases({ left: fixed_in, right: running });
+      return order !== "older" && order !== "same";
+    })
+    .toSorted(
+      (left, right) =>
+        NOTICE_SEVERITY_ORDER.indexOf(left.severity) -
+          NOTICE_SEVERITY_ORDER.indexOf(right.severity) ||
+        right.published_at.localeCompare(left.published_at),
+    );
 }
 
 /** The ledger's prefix for a private ClickHouse target: `private:<organizationId>`. */
@@ -210,20 +237,22 @@ export class OpsUpgradeService {
     routes?: TargetRoutes;
     /** Cloud tells no member about its upgrades; only ops:view holders see them. */
     isSaas: boolean;
-    /** The usage report's held reply; a process without one names no latest release. */
-    cloudReleases?: Pick<UsageReportService, "findLatestRelease">;
+    /** The usage report's held reply; a process without one names no latest release or notice. */
+    cloudReleases?: Pick<UsageReportService, "findLatestRelease" | "findNotices">;
   }): OpsUpgradeService {
     return new OpsUpgradeService({ ledger, cloudReleases, isSaas, routes });
   }
 
   private readonly ledger: UpgradeLedgerRepository;
-  private readonly cloudReleases: Pick<UsageReportService, "findLatestRelease"> | undefined;
+  private readonly cloudReleases:
+    | Pick<UsageReportService, "findLatestRelease" | "findNotices">
+    | undefined;
   private readonly isSaas: boolean;
   private readonly routes: TargetRoutes | undefined;
 
   private constructor(parts: {
     ledger: UpgradeLedgerRepository;
-    cloudReleases: Pick<UsageReportService, "findLatestRelease"> | undefined;
+    cloudReleases: Pick<UsageReportService, "findLatestRelease" | "findNotices"> | undefined;
     isSaas: boolean;
     routes: TargetRoutes | undefined;
   }) {
@@ -243,12 +272,14 @@ export class OpsUpgradeService {
   async getStatus(): Promise<OpsUpgradeStatus> {
     const deprecations = this.ledger.findDeprecations().map(deprecationOf);
     const version = this.ledger.findImageVersion();
-    const [status, held] = await Promise.all([
+    const [status, held, heldNotices] = await Promise.all([
       this.ledger.findStatus(),
       this.cloudReleases?.findLatestRelease() ?? [],
+      this.cloudReleases?.findNotices() ?? [],
     ]);
     const [latestRelease = null] = newerReleasesOf({ version, held });
-    return { ...statusOf(status), deprecations, version: { ...version }, latestRelease };
+    const notices = unfixedNoticesOf({ version, held: heldNotices });
+    return { ...statusOf(status), deprecations, version: { ...version }, latestRelease, notices };
   }
 
   async listReleases(): Promise<OpsUpgradeReleasePage> {

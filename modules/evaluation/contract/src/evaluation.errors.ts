@@ -42,3 +42,21 @@ export class EvaluationLogResultsTooLargeError extends HandledError {
     this.name = "EvaluationLogResultsTooLargeError";
   }
 }
+
+/**
+ * The verdict was computed but could not be recorded (the event pipeline refused it, for
+ * example while a deploy drains its queues). Retrying is safe and is what recovers it.
+ * Spec: modules/evaluation/specs/evaluation-service.feature
+ */
+export class EvaluationReportUnavailableError extends HandledError {
+  declare readonly code: "evaluation_report_unavailable";
+
+  constructor() {
+    super(
+      "evaluation_report_unavailable",
+      "The evaluation result could not be recorded. Retry the request.",
+      { httpStatus: 503, fault: "platform", retryable: true },
+    );
+    this.name = "EvaluationReportUnavailableError";
+  }
+}

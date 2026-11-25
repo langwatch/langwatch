@@ -43,6 +43,14 @@ function builtinErrorType(error: unknown): string {
 }
 
 /**
+ * True when {@link toSafeFailureDiagnostic} replaces the error's message with the generic
+ * sentence, so the caller knows the real cause must be logged server-side or it is lost.
+ */
+export function diagnosticIsRedacted(error: unknown): boolean {
+  return !messageIsOurs(error);
+}
+
+/**
  * A bounded diagnostic safe for logs and exported telemetry. A foreign message can copy
  * customer content or credentials, so it becomes a fixed sentence; one we wrote is quoted,
  * since redacting our own words leaves the operator reading "Operation failed" on every attempt.

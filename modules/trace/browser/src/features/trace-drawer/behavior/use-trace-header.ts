@@ -30,8 +30,8 @@ export function useTraceHeaderCanonical() {
   );
 
   // When the drawer opened without a partition hint (deep link / refresh whose URL
-  // carried no `t`), the header itself runs an unconstrained by-id scan — but its
-  // result carries the trace's real timestamp.
+  // carried no `t`), the header reads by id alone; its result carries the trace's
+  // real timestamp, which feeds isLive and the URL but never a read's key.
   const resolvedTimestamp = deriveOccurredAtBackfill({
     occurredAtMs,
     header: query.data,

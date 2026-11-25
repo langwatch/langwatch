@@ -24,8 +24,6 @@ import { nowInstant } from "@langwatch/time";
 
 import { LANGY_ID_RESOURCES } from "../../../eventing/langy-conversation-process.schemas.ts";
 import type { LangyLocalUserWaitRepository } from "../../../repositories/langy-local-user-wait.repository.ts";
-
-const logger = createLogger("langwatch:langy:local-control:waits");
 import {
   blankUserWait,
   given,
@@ -33,10 +31,15 @@ import {
   toPollResponse,
   type StoredUserWait,
   type UserWaitBuffer,
+  type UserWaitConfirm,
   type UserWaitEvents,
   type UserWaitQuestion,
 } from "../../../rules/langy-local-user-wait-record.rules.ts";
 import { UserWaitCardsService } from "./langy-local-user-wait-cards.service.ts";
+
+type CancelStep = { step: string; run: () => Promise<void> };
+
+const logger = createLogger("langwatch:langy:local-control:waits");
 
 interface UserWaitServiceOptions {
   waits: LangyLocalUserWaitRepository;
@@ -52,6 +55,8 @@ interface UserWaitServiceOptions {
     callId: string;
     decision: "allow_once" | "allow_pattern" | "deny" | "expired";
   }) => Promise<void>;
+  /** Told every card's answer once it is stored, so a confirmation card can record its click. */
+  onAnswered?: (wait: StoredUserWait) => Promise<void>;
   now?: () => number;
   pollIntervalMs?: number;
   keepaliveMs?: number;
@@ -64,6 +69,7 @@ export class UserWaitService {
   private readonly events: UserWaitEvents;
   private readonly cards: UserWaitCardsService;
   private readonly sendPermission: NonNullable<UserWaitServiceOptions["sendPermission"]>;
+  private readonly onAnswered: NonNullable<UserWaitServiceOptions["onAnswered"]>;
   private readonly pollIntervalMs: number;
   private readonly keepaliveMs: number;
   readonly now: () => number;
@@ -76,6 +82,7 @@ export class UserWaitService {
     this.waits = options.waits;
     this.events = options.events;
     this.sendPermission = options.sendPermission ?? (async () => undefined);
+    this.onAnswered = options.onAnswered ?? (async () => undefined);
     this.now = options.now ?? (() => nowInstant().epochMilliseconds);
     this.pollIntervalMs = options.pollIntervalMs ?? POLL_INTERVAL_MS;
     this.keepaliveMs = options.keepaliveMs ?? LIVE_STREAM_KEEPALIVE_MS;
@@ -134,13 +141,17 @@ export class UserWaitService {
     return wait;
   }
 
-  /** Raises a question card for the worker's `question` tool. */
+  /**
+   * Raises a question card for the worker's `question` tool, or, with `confirm` and no tool
+   * call, a confirmation card the platform asks itself.
+   */
   async startQuestion(params: {
     projectId: string;
     conversationId: string;
     turnId: string;
     toolCallId?: string;
     questions: UserWaitQuestion[];
+    confirm?: UserWaitConfirm;
   }): Promise<StoredUserWait> {
     const wait = blankUserWait({
       waitId: generate(LANGY_ID_RESOURCES.wait).toString(),
@@ -238,6 +249,7 @@ export class UserWaitService {
     };
     await this.persist(answered);
     await this.end(answered, "answered");
+    await this.onAnswered(answered);
     if (answered.kind === "permission" && answered.callId) {
       await this.sendPermission({
         conversationId: answered.conversationId,
@@ -250,8 +262,9 @@ export class UserWaitService {
   }
 
   /**
-   * Ends every card still waiting on one turn. The turn's Stop path and the
-   * worker's own cancel both call this, so it has to be idempotent.
+   * Ends every card still waiting on one turn. The turn's Stop path and the worker's own cancel
+   * both call this, so it is idempotent. A confirmation card the platform raised is left
+   * waiting: its click is read in a later turn, so it stays answerable after this one ends.
    */
   async cancelTurn({
     conversationId,
@@ -262,21 +275,55 @@ export class UserWaitService {
   }): Promise<StoredUserWait[]> {
     const cancelled: StoredUserWait[] = [];
     for (const wait of await this.listPending({ conversationId, turnId })) {
+      if (wait.confirm) continue;
       const next: StoredUserWait = { ...wait, state: "cancelled" };
-      await this.persist(next);
-      await this.end(next, "cancelled");
-      if (next.kind === "permission" && next.callId) {
-        await this.sendPermission({
-          conversationId: next.conversationId,
-          callId: next.callId,
-          decision: "expired",
-        });
-      }
-
-      cancelled.push(next);
+      if (await this.cancelOne({ wait: next })) cancelled.push(next);
     }
 
     return cancelled;
+  }
+
+  /**
+   * Ends one card of a stopped turn. A failed step is logged, never thrown, so the other cards
+   * still end; only a failed save keeps it waiting. Once saved it reads cancelled, and a
+   * waiting command still gets its expired answer.
+   */
+  private async cancelOne({ wait }: { wait: StoredUserWait }): Promise<boolean> {
+    const attempt = async ({ step, run }: CancelStep): Promise<boolean> => {
+      try {
+        await run();
+        return true;
+      } catch (error) {
+        logger.warn(
+          {
+            waitId: wait.waitId,
+            conversationId: wait.conversationId,
+            turnId: wait.turnId,
+            step,
+            error,
+          },
+          "ending a card of a stopped turn failed; ending the rest of the turn's cards anyway",
+        );
+        return false;
+      }
+    };
+    if (!(await attempt({ step: "persist", run: () => this.persist(wait) }))) return false;
+
+    await attempt({ step: "end", run: () => this.end(wait, "cancelled") });
+    if (wait.kind === "permission" && wait.callId) {
+      const { callId } = wait;
+      await attempt({
+        step: "sendPermission",
+        run: () =>
+          this.sendPermission({
+            conversationId: wait.conversationId,
+            callId,
+            decision: "expired",
+          }),
+      });
+    }
+
+    return true;
   }
 
   /** Every card still waiting on one turn. */

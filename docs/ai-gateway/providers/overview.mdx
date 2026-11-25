@@ -42,6 +42,7 @@ Model names are `provider/model`. The provider segment is the id in the first co
 | [Groq](/ai-gateway/providers/groq)                                         | `groq`         | API key                                       | Chat, Messages, models                                                                 |
 | [Cerebras](/ai-gateway/providers/cerebras)                                 | `cerebras`     | API key                                       | Chat, Messages, models                                                                 |
 | [DeepSeek](/ai-gateway/providers/deepseek)                                 | `deepseek`     | API key                                       | Chat, Messages, models                                                                 |
+| [Doubleword](/ai-gateway/providers/doubleword)                             | `doubleword`   | API key                                       | Chat, Messages, embeddings, models                                                     |
 | [Voyage AI](/ai-gateway/providers/voyage)                                  | `voyage`       | API key                                       | Embeddings only                                                                        |
 | [ElevenLabs](/ai-gateway/providers/elevenlabs)                             | `elevenlabs`   | API key, optional base URL and webhook secret | Speech, transcription, ElevenLabs native                                               |
 | [OpenAI account](/ai-gateway/providers/openai-account)                     | `openai_codex` | Sign in with a ChatGPT account                | Responses, Messages                                                                    |
@@ -68,7 +69,7 @@ A request to an endpoint the provider does not serve gets the provider's own err
 
 ## More than one row of the same provider
 
-Create one row per account, region or endpoint, for example an Azure OpenAI row per Azure resource. Give each row a **Routing handle**, for example `eu`, and pin a request to that row with `eu/gpt-5-mini`. A routing policy orders the rows a key tries. See [Routing policies](/ai-gateway/governance/routing-policies).
+Create one row per account, region or endpoint, for example an Azure OpenAI row per Azure resource. Give each row a **Routing handle**, for example `eu`, and pin a request to that row with `eu/gpt-6-luna`. A routing policy orders the rows a key tries. See [Routing policies](/ai-gateway/governance/routing-policies).
 
 <Note>
   **Also check:** [Model naming](/ai-gateway/model-naming) for how a model name selects a provider,

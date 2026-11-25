@@ -109,7 +109,8 @@ function targetFactsOf(run: ScenarioRunData): {
   if (!langwatch?.targetReferenceId) return null;
   const parameters = langwatch.targetParameters;
   return {
-    type: langwatch.targetType,
+    // A legacy run whose stored type this version does not know still groups under its target.
+    type: langwatch.targetType ?? "",
     referenceId: langwatch.targetReferenceId,
     parameters: parameters && Object.keys(parameters).length > 0 ? parameters : null,
   };

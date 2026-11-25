@@ -29,6 +29,7 @@ from langevals_core.litellm_patch import (
     patch_litellm,
 )
 from langevals_core.request_env import bind_request_env, request_env
+from langevals_core.usage_ledger import ModelUsage, collect_usage
 
 import time
 import warnings
@@ -61,9 +62,9 @@ class LLMEvaluatorSettings(EvaluatorSettings):
         default="openai/gpt-5-mini",
         description="The model to use for evaluation",
     )
-    max_tokens: int = Field(
-        default=DEFAULT_MAX_TOKENS,
-        description="Max tokens allowed for evaluation",
+    max_tokens: Optional[int] = Field(
+        default=None,
+        description="Max tokens allowed for evaluation; unset reads as 128000",
     )
 
 
@@ -157,6 +158,10 @@ class EvaluationResult(BaseModel):
         default=None, description="Short human-readable description of the result"
     )
     cost: Optional[Money] = None
+    usage: Optional[List[ModelUsage]] = Field(
+        default=None,
+        description="Provider usage of the model calls this entry made, summed per model, for the spend ledger",
+    )
 
 
 class EvaluationResultSkipped(BaseModel):
@@ -172,6 +177,10 @@ class EvaluationResultSkipped(BaseModel):
     status: Literal["skipped"] = "skipped"
     details: Optional[str] = None
     cost: Optional[Money] = None
+    usage: Optional[List[ModelUsage]] = Field(
+        default=None,
+        description="Provider usage of the model calls this entry made, summed per model, for the spend ledger",
+    )
 
 
 class EvaluationResultError(BaseModel):
@@ -183,6 +192,10 @@ class EvaluationResultError(BaseModel):
     error_type: str = Field(description="The type of the exception")
     details: str = Field(description="Error message")
     traceback: List[str] = Field(description="Traceback information for debugging")
+    usage: Optional[List[ModelUsage]] = Field(
+        default=None,
+        description="Provider usage of the model calls this entry made, summed per model, for the spend ledger",
+    )
 
 
 # The retry shape one entry spends on its model call.
@@ -320,8 +333,14 @@ class BaseEvaluator(BaseModel, Generic[TEntry, TSettings, TResult], ABC):
         # executor picked, so this is the one place that binds the request env
         # for the model call underneath. Scoped, because executor threads are
         # reused and must not carry one request's credentials into the next.
-        with request_env(self.env):
-            return self.__evaluate_entry_bound(entry, retries, restore_tqdm)
+        # The usage collection is scoped the same way, and covers every retry:
+        # each attempt that reached a model was billed.
+        with request_env(self.env), collect_usage() as usage:
+            result = self.__evaluate_entry_bound(entry, retries, restore_tqdm)
+        models = usage.models()
+        if models and hasattr(result, "usage"):
+            result.usage = models
+        return result
 
     def __evaluate_entry_bound(self, entry, retries, restore_tqdm):
         try:

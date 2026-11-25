@@ -32,7 +32,7 @@ export const modelProviderRest = defineRestRouter(ModelProviderApi)
 
   // Read scope, mirroring the tRPC modelProvider getAllForProject.
   .get("/", "getApiModelProviders")
-  .withPermission("project:view")
+  .withPermission("project:view", { legacyKey: "legacy_project_key_connected_agents" })
   .withOutput(apiResponseModelProvidersSchema)
   .withDocs({
     tags: ["Model Providers"],
@@ -47,6 +47,7 @@ export const modelProviderRest = defineRestRouter(ModelProviderApi)
 
   // Write scope, mirroring the tRPC modelProvider update.
   .put("/:provider", "putApiModelProvidersByProvider")
+  .keepsRecords()
   .withParams(modelProviderRestParamsSchema)
   .withInput(updateModelProviderInputSchema)
   .withPermission("project:update")

@@ -1,13 +1,11 @@
-import { createHash } from "node:crypto";
-import { chmodSync, createReadStream, existsSync, mkdirSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
-import { pipeline } from "node:stream/promises";
 
 import { execa } from "execa";
 import * as tar from "tar";
 
 import embedsVersions from "../../embeds.versions.json" with { type: "json" };
-import { downloadWithProgress } from "./_download.ts";
+import { downloadWithProgress, sha256OfFile } from "./_download.ts";
 import type { Predep } from "./types.ts";
 
 // Embedded redis-server. Pinned to 7.4.x (BSD-3-Clause).
@@ -25,12 +23,6 @@ async function resolveVersion(bin: string): Promise<string | null> {
   } catch {
     return null;
   }
-}
-
-async function sha256OfFile(path: string): Promise<string> {
-  const hash = createHash("sha256");
-  await pipeline(createReadStream(path), hash);
-  return hash.digest("hex");
 }
 
 export const redisPredep: Predep = {

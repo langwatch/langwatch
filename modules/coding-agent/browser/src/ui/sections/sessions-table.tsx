@@ -14,6 +14,7 @@ import {
   type SessionsSortState,
   useSessionsSort,
 } from "../../behavior/session-sort.ts";
+import { useSessionLink } from "../../behavior/use-session-link.ts";
 import { useTerminalReplay } from "../../behavior/use-terminal-replay.ts";
 import {
   decodePullRequestRef,
@@ -25,6 +26,7 @@ import {
   matchesSessionSearch,
   type PeriodSelection,
 } from "../../model/session-filters.ts";
+import { sessionIdentityKey, spansSeveralProjects } from "../../model/session-identity.ts";
 import { SessionRow } from "../blocks/session-row.tsx";
 import { SessionsTableHeader } from "../blocks/sessions-table-header.tsx";
 import { SessionsToolbar } from "../blocks/sessions-toolbar.tsx";
@@ -58,6 +60,7 @@ export function SessionsTable({
     () => (sessionsQuery.data ?? []).map(toListRow),
     [sessionsQuery.data],
   );
+  useSessionLink({ projectId, rows, isLoaded: sessionsQuery.data !== undefined });
 
   if (sessionsQuery.isLoading) {
     return <Skeleton height="180px" borderRadius="md" />;
@@ -108,6 +111,8 @@ const ListedSessions: React.FC<{
       ),
     [rows, search, periodSelection],
   );
+  // Decided over every listed row, not one page, so the project line stays put while paging.
+  const showProject = spansSeveralProjects(rows);
   const { sorted, sort, onSort } = useSessionsSort({ rows: filteredRows });
 
   // A refetch, a search or a narrower period can leave fewer rows than the page
@@ -155,6 +160,7 @@ const ListedSessions: React.FC<{
           projectId={projectId}
           projectSlug={projectSlug}
           rows={visibleRows}
+          showProject={showProject}
           totalCount={sorted.length}
           page={currentPage}
           pageSize={pageSize}
@@ -183,6 +189,8 @@ const OnePageOfSessions: React.FC<{
   projectId: string;
   projectSlug: string | null;
   rows: SessionListRow[];
+  /** Whether each row names its member project: only when the rows span several. */
+  showProject: boolean;
   totalCount: number;
   page: number;
   pageSize: number;
@@ -194,6 +202,7 @@ const OnePageOfSessions: React.FC<{
   projectId,
   projectSlug,
   rows,
+  showProject,
   totalCount,
   page,
   pageSize,
@@ -217,11 +226,12 @@ const OnePageOfSessions: React.FC<{
         <ListTable.Body>
           {rows.map((row) => (
             <SessionRow
-              key={row.sessionId}
+              key={sessionIdentityKey(row)}
               row={row}
+              showProject={showProject}
               largestTotal={largestTotal}
               largestCost={largestCost}
-              isOpening={replay.openingSessionId === row.sessionId}
+              isOpening={replay.isOpening(row)}
               onOpenReplay={() => void replay.openReplay(row)}
               onOpenInExplorer={projectSlug ? () => void replay.openInExplorer(row) : undefined}
               onOpenPullRequest={(pullRequest) =>

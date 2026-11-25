@@ -107,4 +107,20 @@ describe("given a procedure dispatched by name", () => {
       ]);
     });
   });
+
+  describe("when it records a write no read shows", () => {
+    /** @scenario "Recording a last-seen stamp refetches nothing on the page" */
+    it("sends the mutation and leaves every cached read fresh", async () => {
+      const queryClient = new QueryClient();
+      const { transport, sent } = transportAnswering({ ok: true });
+      const rpc = BrowserUiRpc.create({ transport, queryClient });
+      const applicationKey = keyFor("authz.effectivePermissions", { projectId: "project_1" });
+      queryClient.setQueryData(applicationKey, { permissions: [] });
+
+      await rpc.record("user.updateLastLogin", {});
+
+      expect(sent).toEqual([{ type: "mutation", path: "user.updateLastLogin", input: {} }]);
+      expect(queryClient.getQueryState(applicationKey)?.isInvalidated).toBe(false);
+    });
+  });
 });

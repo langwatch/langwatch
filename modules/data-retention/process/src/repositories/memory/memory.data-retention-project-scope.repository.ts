@@ -42,6 +42,17 @@ export class MemoryDataRetentionProjectScopeRepository implements DataRetentionP
     return this.#projects.get(projectId) ?? null;
   }
 
+  async findProjectPlacements({
+    projectIds,
+  }: {
+    projectIds: readonly string[];
+  }): Promise<DataRetentionProjectPlacement[]> {
+    return projectIds.flatMap((projectId) => {
+      const placement = this.#projects.get(projectId);
+      return placement === undefined ? [] : [placement];
+    });
+  }
+
   async findTeamOrganizationId({ teamId }: { teamId: string }): Promise<string | null> {
     return this.#teams.get(teamId) ?? null;
   }

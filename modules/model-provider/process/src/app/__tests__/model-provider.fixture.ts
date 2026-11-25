@@ -6,6 +6,7 @@
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { DataPrivacyApi } from "@langwatch/data-privacy-contract";
 import type { ManagedProviderApi } from "@langwatch/enterprise-managed-provider-contract";
+import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import { projectWithTeamSchema, type ProjectApi } from "@langwatch/project-contract";
 import type { SecretApi } from "@langwatch/secret-contract";
@@ -145,6 +146,7 @@ export function createModelProviderTestApp(
       dataPrivacy: DataPrivacyApi;
       managed: ManagedProviderApi;
       secrets: SecretApi;
+      featureFlags: FeatureFlagApi;
     }>;
   }> = {},
 ): ModelProviderModule {
@@ -160,6 +162,9 @@ export function createModelProviderTestApp(
       dataPrivacy: input.dependencies?.dataPrivacy ?? createModelProviderTestDataPrivacy(),
       managed: input.dependencies?.managed ?? createModelProviderTestManagedProviders(),
       secrets: input.dependencies?.secrets ?? createModelProviderTestSecrets(),
+      featureFlags:
+        input.dependencies?.featureFlags ??
+        createApiFixture<FeatureFlagApi>({ isEnabled: async () => false }),
     },
   });
 }

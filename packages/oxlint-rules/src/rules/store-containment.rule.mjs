@@ -58,7 +58,7 @@ const REPOSITORY_REGISTRY = new RegExp(`^${FEATURE_PREFIX}repositories/[^/]+\\.r
 function isGoverned(file) {
   if (file.isTest) return false;
 
-  return MODULE_ROLES.has(file.role) || file.kind === "application";
+  return MODULE_ROLES.has(file.role) || file.kind === "application" || file.kind === "framework";
 }
 
 function sourceOf(node) {
@@ -96,8 +96,15 @@ function isSeam({ row, sourcePath }) {
   return Boolean(row.channelTier) && layerPath.startsWith(`channels/${row.channelTier}/`);
 }
 
+// An opted-in framework's app/ composes the tiers, so it may hand a client in (ADR-181).
+function isFrameworkSeam({ file, row }) {
+  return file.sourcePath.startsWith("app/") || isSeam({ row, sourcePath: file.sourcePath });
+}
+
 function isProcessSeam({ file, row, values }) {
-  if (file.role !== "process" || !file.sourcePath) return false;
+  if (!file.sourcePath) return false;
+  if (file.kind === "framework") return isFrameworkSeam({ file, row });
+  if (file.role !== "process") return false;
   if (isSeam({ row, sourcePath: file.sourcePath })) return true;
 
   return (

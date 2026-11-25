@@ -155,6 +155,7 @@ const apiResponseModelDefaultsSchemaDefinition = z.object({
     DEFAULT: effectiveResolutionSchema,
     FAST: effectiveResolutionSchema,
     EMBEDDINGS: effectiveResolutionSchema,
+    INSTANT_EVALS: effectiveResolutionSchema,
   }),
   configs: z.array(configRowSchema),
 });

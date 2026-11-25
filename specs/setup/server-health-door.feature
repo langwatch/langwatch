@@ -75,6 +75,51 @@ Feature: The process boundary's built-in health door
       When a caller requests a path no route was contributed for
       Then the response is 404
 
+  Rule: Requests in flight at shutdown finish before anything they call into closes
+
+    # The health door is hosted first so it stops last, and it is also the listener that
+    # carries the application's requests. Draining it last let in-flight requests run
+    # against stores that had already closed ("Cannot use a pool after calling end on the
+    # pool"). The application's requests drain right after the door refuses new work.
+
+    @unit
+    Scenario: A request in flight at shutdown finishes before any hosted component stops
+      Given an application request is still running when the server closes
+      When the request finishes
+      Then no hosted component has heard shutdown begin or stopped before it finished
+      And the components stop afterwards, in reverse order
+
+    @unit
+    Scenario: A product request arriving while the application drains is refused by name
+      Given an application request is still running when the server closes
+      When a new product request arrives during the drain
+      Then the response is 503 saying the process is shutting down
+      And it carries "Retry-After: 5", so the client resends to a pod still serving
+      And "/healthz" still answers 200
+
+    @unit
+    Scenario: A request whose client went away still holds the drain until its handler finishes
+      Given an application request is still running when the server closes
+      And its client has disconnected, so its response is already closed
+      When its handler finishes afterwards
+      Then no hosted component has heard shutdown begin or stopped before it finished
+      # A closed response is not a finished handler: an OTLP handler still sending spans
+      # met closed queue staging and logged an error per span.
+
+    @unit
+    Scenario: A handler cut at the drain grace gets a short unwind before the stores close
+      Given an application request outlives the drain grace
+      When the server cuts its response
+      Then the handler sees its response closed
+      And the components stop only once the handler settles, or the unwind budget runs out
+
+    @unit
+    Scenario: An open event stream is closed at shutdown rather than waited on
+      Given a client holds an event stream open when the server closes
+      When the application drains
+      Then the stream is closed straight away
+      And the components stop without waiting out the drain grace
+
   Rule: The health door outlives every drain
 
     @unit

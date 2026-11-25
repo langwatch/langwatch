@@ -11,6 +11,7 @@ import {
   type DashboardWidgetDefinitionInput,
   type LangWatchQLBudgetOverflowMode,
   type LangWatchQLCaller,
+  type LangWatchQLKeyReach,
   type LangWatchQLProtections,
   type LangWatchQLQueryResult,
   type LangWatchQLTimeWindow,
@@ -27,7 +28,10 @@ import {
   DashboardsNotEnabledError,
   dashboardConfig,
   type Dashboard,
+  type Board,
   type BoardSummary,
+  type DashboardHomeProduct,
+  type DashboardProject,
   type DashboardScope,
   type DashboardScopeImpact,
   type DashboardScopeProjects,
@@ -38,6 +42,7 @@ import {
   type DashboardSummary,
   type DashboardViewer,
   type Graph,
+  type OrganizationBoard,
   type GraphLayout,
   type SavedView,
   type SavedViewJson,
@@ -53,6 +58,7 @@ import {
   ProjectApi,
   type ProjectApi as ProjectApiContract,
 } from "@langwatch/project-contract";
+import { UserApi } from "@langwatch/user-contract";
 
 import type { DashboardRepositories } from "../repositories/dashboard.repositories.ts";
 import { dashboardPlatformUrl } from "../rules/dashboard-platform-url.rules.ts";
@@ -65,6 +71,7 @@ import { DashboardScopeService } from "../services/dashboard-scope.service.ts";
 import { DashboardStarService } from "../services/dashboard-star.service.ts";
 import { DashboardWidgetService } from "../services/dashboard-widget.service.ts";
 import { DashboardService, type WorkbenchAccess } from "../services/dashboard.service.ts";
+import { OrganizationBoardService } from "../services/organization-board.service.ts";
 import { SavedViewService } from "../services/saved-view.service.ts";
 import { SavedWorkbenchChartPolicyService } from "../services/saved-workbench-chart-policy.service.ts";
 import { SavedWorkbenchChartService } from "../services/saved-workbench-chart.service.ts";
@@ -75,6 +82,7 @@ type DashboardDependencies = Readonly<{
   authz: typeof AuthzApi;
   automation: typeof AutomationApi;
   projects: typeof ProjectApi;
+  users: typeof UserApi;
 }>;
 
 type DashboardSetup = FeatureSetup<
@@ -144,12 +152,14 @@ export class DashboardModule implements DashboardApi {
     authz: AuthzApi,
     automation: AutomationApi,
     projects: ProjectApi,
+    users: UserApi,
   };
   /** The shared deployment origin, absent where the deployment named no `BASE_HOST`. */
   static readonly config = dashboardConfig;
 
   #dashboards: DashboardService;
   #boards: BoardService;
+  #organizationBoards: OrganizationBoardService;
   #stars: DashboardStarService;
   #scopes: DashboardScopeService;
   #charts: SavedWorkbenchChartService;
@@ -174,6 +184,7 @@ export class DashboardModule implements DashboardApi {
     services: Readonly<{
       dashboards: DashboardService;
       boards: BoardService;
+      organizationBoards: OrganizationBoardService;
       stars: DashboardStarService;
       scopes: DashboardScopeService;
       charts: SavedWorkbenchChartService;
@@ -192,6 +203,7 @@ export class DashboardModule implements DashboardApi {
   }>) {
     this.#dashboards = services.dashboards;
     this.#boards = services.boards;
+    this.#organizationBoards = services.organizationBoards;
     this.#stars = services.stars;
     this.#scopes = services.scopes;
     this.#charts = services.charts;
@@ -221,6 +233,12 @@ export class DashboardModule implements DashboardApi {
       services: {
         dashboards: DashboardService.create({ repository, workbenchAccess }),
         boards: BoardService.create({ repository: boards, access }),
+        organizationBoards: OrganizationBoardService.create({
+          repository: boards,
+          access,
+          projects,
+          users: setup.dependencies.users,
+        }),
         stars: DashboardStarService.create({ repository: boards, access }),
         scopes: DashboardScopeService.create({ repository: boards, access, projects, authz }),
         charts: SavedWorkbenchChartService.create({
@@ -417,12 +435,37 @@ export class DashboardModule implements DashboardApi {
     return this.#boards.findBoards(input);
   }
 
+  /** Every board the member may see across the organization: the `/dashboards` library. */
+  findBoardsInOrganization(input: {
+    organizationId: string;
+    viewer: DashboardViewer;
+  }): Promise<OrganizationBoard[]> {
+    return this.#organizationBoards.findBoards(input);
+  }
+
+  /** One board of the organization by id, as the library would list it. */
+  getBoardInOrganization(input: {
+    organizationId: string;
+    viewer: DashboardViewer;
+    dashboardId: string;
+  }): Promise<OrganizationBoard> {
+    return this.#organizationBoards.getBoard(input);
+  }
+
+  /** Where the member may store a board made outside a project view, by name. */
+  findStoreProjects(input: {
+    organizationId: string;
+    viewer: DashboardViewer;
+  }): Promise<DashboardProject[]> {
+    return this.#organizationBoards.findStoreProjects(input);
+  }
+
   /** One board the viewer may open here. */
   getBoard(input: {
     projectId: string;
     dashboardId: string;
     viewer?: DashboardViewer;
-  }): Promise<Dashboard> {
+  }): Promise<Board> {
     return this.#boards.getBoard(input);
   }
 
@@ -431,7 +474,10 @@ export class DashboardModule implements DashboardApi {
     projectId: string;
     name: string;
     createdById?: string;
-  }): Promise<Dashboard> {
+    /** Made at this scope in the same write; the door asked what setting it later would. */
+    scope?: DashboardScope;
+    homeProduct?: DashboardHomeProduct;
+  }): Promise<Board> {
     await this.#requireDashboardsEnabled(input.projectId);
     return this.#boards.createBoard(input);
   }
@@ -443,7 +489,7 @@ export class DashboardModule implements DashboardApi {
     viewer?: DashboardViewer;
     name?: string;
     description?: string | null;
-  }): Promise<Dashboard> {
+  }): Promise<Board> {
     await this.#requireDashboardsEnabled(input.projectId);
     return this.#boards.updateBoard(input);
   }
@@ -453,9 +499,26 @@ export class DashboardModule implements DashboardApi {
     projectId: string;
     dashboardId: string;
     viewer?: DashboardViewer;
-  }): Promise<Dashboard> {
+  }): Promise<Board> {
     await this.#requireDashboardsEnabled(input.projectId);
     return this.#boards.deleteBoard(input);
+  }
+
+  /** Rehomes a board in the project that owns it; answers it as the library now lists it. */
+  async moveBoard(input: {
+    projectId: string;
+    dashboardId: string;
+    homeProduct: DashboardHomeProduct;
+    viewer: DashboardViewer;
+  }): Promise<OrganizationBoard> {
+    await this.#requireDashboardsEnabled(input.projectId);
+    const moved = await this.#scopes.move(input);
+    const organizationId = await this.#projects.getOrganizationId(moved.projectId);
+    return this.#organizationBoards.getBoard({
+      organizationId,
+      viewer: input.viewer,
+      dashboardId: moved.id,
+    });
   }
 
   /** Who sees a board: the author's call alone, made in the project that owns it. */
@@ -464,7 +527,7 @@ export class DashboardModule implements DashboardApi {
     dashboardId: string;
     scope: DashboardScope;
     viewer: DashboardViewer;
-  }): Promise<Dashboard> {
+  }): Promise<Board> {
     await this.#requireDashboardsEnabled(input.projectId);
     return this.#scopes.setScope(input);
   }
@@ -599,10 +662,11 @@ export class DashboardModule implements DashboardApi {
     return this.#widgets.getAll(input);
   }
 
-  /** One custom chart widget. */
+  /** One custom chart widget; with `onDashboardId`, only if it is on that board. */
   getDashboardWidget(input: {
     projectId: string;
     id: string;
+    onDashboardId?: string;
     viewer?: DashboardViewer;
   }): Promise<DashboardWidget> {
     return this.#widgets.getById(input);
@@ -615,6 +679,7 @@ export class DashboardModule implements DashboardApi {
       dashboardId?: string;
       name: string;
       viewer?: DashboardViewer;
+      keyReach?: LangWatchQLKeyReach;
     } & DashboardWidgetDefinitionInput,
   ): Promise<DashboardWidget> {
     return this.#widgets.createWidget({
@@ -629,6 +694,7 @@ export class DashboardModule implements DashboardApi {
         ...(input.source === undefined ? {} : { source: input.source }),
       },
       viewer: input.viewer,
+      keyReach: input.keyReach,
     });
   }
 
@@ -637,14 +703,18 @@ export class DashboardModule implements DashboardApi {
     input: {
       projectId: string;
       id: string;
+      onDashboardId?: string;
       name?: string;
       viewer?: DashboardViewer;
+      keyReach?: LangWatchQLKeyReach;
     } & Partial<DashboardWidgetDefinitionInput>,
   ): Promise<DashboardWidget> {
     return this.#widgets.updateWidget({
       projectId: input.projectId,
       id: input.id,
       viewer: input.viewer,
+      keyReach: input.keyReach,
+      ...(input.onDashboardId === undefined ? {} : { onDashboardId: input.onDashboardId }),
       input: {
         ...(input.name === undefined ? {} : { name: input.name }),
         ...(input.code === undefined ? {} : { code: input.code }),
@@ -666,10 +736,11 @@ export class DashboardModule implements DashboardApi {
     return this.#widgets.assignToDashboard(input);
   }
 
-  /** Removes one widget. */
+  /** Removes one widget; with `onDashboardId`, only if it is on that board. */
   deleteDashboardWidget(input: {
     projectId: string;
     id: string;
+    onDashboardId?: string;
     viewer?: DashboardViewer;
   }): Promise<void> {
     return this.#widgets.deleteWidget(input);
@@ -700,12 +771,12 @@ export class DashboardModule implements DashboardApi {
     return { success: true };
   }
 
-  /** Where a reader opens the dashboards list a widget lands on. */
+  /** Where a reader opens the Dashboards list; a placed widget links to its board beneath it. */
   dashboardWidgetPlatformUrl(input: { projectSlug: string }): string {
     return dashboardPlatformUrl({
       publicBaseUrl: this.#publicBaseUrl,
       projectSlug: input.projectSlug,
-      path: "/analytics/reports",
+      path: "/dashboards",
     });
   }
 

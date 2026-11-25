@@ -3,10 +3,12 @@
 /** Spec: specs/webhooks/webhook-endpoints.feature (webhook's listing, answered by gateway) */
 import { type ClickHouseClient, createClient } from "@clickhouse/client";
 import { startTestClickHouseEndpoints } from "@langwatch/clickhouse-client/testing";
+import { Temporal, toDate } from "@langwatch/time";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import type { GatewayClickHouseResolver } from "../clickhouse.gateway-session.store.ts";
 import { ClickHouseGatewaySpendEventsRepository } from "../clickhouse.gateway-spend-events.repository.ts";
+import { gatewayClickHouseOver } from "./support/clickhouse-endpoint.support.ts";
 
 const tenantId = `test-webhook-events-${Math.random().toString(36).slice(2, 10)}`;
 const baseTime = Date.UTC(2026, 6, 20, 12, 0, 0);
@@ -76,7 +78,8 @@ function spendRow(input: {
     PodId: "pod-1",
     PodSeq: 1,
     DurationMS: 500,
-    OccurredAt: input.occurredAtMs,
+    // A Date, as the fold writes it: 26.8 reads an unquoted integer here as seconds (#108091).
+    OccurredAt: toDate(Temporal.Instant.fromEpochMilliseconds(input.occurredAtMs)),
     CreatedAt: input.occurredAtMs,
     LastEventOccurredAt: input.occurredAtMs,
     EventTimestamp: input.occurredAtMs,
@@ -85,15 +88,19 @@ function spendRow(input: {
 
 /** The routed member's contract: one statement reads the one tenant it is routed by. */
 function tenantRoutedClickHouse(raw: () => ClickHouseClient): GatewayClickHouseResolver {
-  return async (routed) => ({
-    async query({ query, query_params }) {
-      if (!/TenantId = \{tenantId:String\}/.test(query) || query_params?.tenantId !== routed) {
-        throw new Error(`statement is not scoped to its routed tenant ${routed}`);
-      }
-      return raw().query({ query, query_params, format: "JSONEachRow" });
-    },
-    insert: async () => undefined,
-  });
+  return async (routed) => {
+    const session = await gatewayClickHouseOver(raw())(routed);
+    return {
+      async query(input) {
+        const { query, query_params } = input;
+        if (!/TenantId = \{tenantId:String\}/.test(query) || query_params?.tenantId !== routed) {
+          throw new Error(`statement is not scoped to its routed tenant ${routed}`);
+        }
+        return session.query(input);
+      },
+      insert: async () => undefined,
+    };
+  };
 }
 
 let client: ClickHouseClient;
@@ -105,11 +112,15 @@ beforeAll(async () => {
     names: ["shared"],
     environment: process.env,
   });
-  client = createClient({ url: endpoint!.url });
+  // The managed client's input format: 26.5 defaults to it, earlier servers need it asked.
+  client = createClient({
+    url: endpoint!.url,
+    clickhouse_settings: { date_time_input_format: "best_effort" },
+  });
   // The endpoint is reused across runs, so start from an empty table.
   await client.command({ query: "DROP TABLE IF EXISTS gateway_spend SYNC" });
   await client.command({ query: CREATE_TABLE });
-  eventsRepo = ClickHouseGatewaySpendEventsRepository.create(async () => client as never);
+  eventsRepo = ClickHouseGatewaySpendEventsRepository.create(gatewayClickHouseOver(client));
 }, 120_000);
 
 afterAll(async () => {

@@ -96,6 +96,8 @@ export const upgradeStepViewSchema = z.object({
   attempt: z.number().int(),
   lastError: z.string().nullable(),
   report: z.record(z.string(), z.unknown()).nullable(),
+  /** The last attempt's log lines, redacted when written; empty before the first attempt. */
+  logTail: z.array(z.string()),
   progress: upgradeStepProgressSchema.nullable(),
   waitingOn: z.array(upgradeWaitingWriterSchema),
   runId: z.string().nullable(),

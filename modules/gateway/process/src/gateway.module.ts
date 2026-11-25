@@ -17,6 +17,7 @@ import { gatewayChannels } from "./channels/gateway-channels.registry.ts";
 import { gatewayConnectManagedKeyEventing } from "./eventing/gateway-connect-managed-key.pipeline.ts";
 import { gatewayGovernanceEventsEventing } from "./eventing/gateway-governance-events.pipeline.ts";
 import { gatewayInstantEvalJudgeSpendEventing } from "./eventing/gateway-instant-eval-judge-spend.pipeline.ts";
+import { gatewayPiiRedactionSpendEventing } from "./eventing/gateway-pii-redaction-spend.pipeline.ts";
 import { gatewayPulledUsageLedgerEventing } from "./eventing/gateway-pulled-usage-ledger.pipeline.ts";
 import { gatewayRealtimeSessionEventing } from "./eventing/gateway-realtime-session.pipeline.ts";
 import { gatewaySpendEventing } from "./eventing/gateway-spend.pipeline.ts";
@@ -24,11 +25,13 @@ import {
   GatewayBudgetChangeDedupeService,
   type BudgetChangeEventDedupeService,
 } from "./features/budget/services/gateway-budget-change-dedupe.service.ts";
+import { GATEWAY_ID_INDEXES } from "./repositories/clickhouse/clickhouse.gateway-id-indexes.database.ts";
 import { gatewayRepositories } from "./repositories/gateway-repositories.registry.ts";
 import { RedisGatewayBudgetChangeDedupeRepository } from "./repositories/redis/redis.gateway-budget-change-dedupe.repository.ts";
 import { TraceDestinationReportTask } from "./tasks/trace-destination-report.task.ts";
 import { agentCacheRest } from "./transport/agent-cache.rest.ts";
 import { elevenLabsWebhookRest } from "./transport/elevenlabs-webhook.rest.ts";
+import { gatewayA2aTargetTrpcTransport } from "./transport/gateway-a2a-target.trpc.ts";
 import { gatewayBudgetTrpcTransport } from "./transport/gateway-budget.trpc.ts";
 import { gatewayCacheRuleTrpcTransport } from "./transport/gateway-cache-rule.trpc.ts";
 import { gatewayGuardrailTrpcTransport } from "./transport/gateway-guardrail.trpc.ts";
@@ -52,6 +55,7 @@ export const gatewayProcessModule: PublishedProcessModule<
     elevenLabsWebhookRest,
     gatewayInternalRest,
     gatewayBudgetTrpcTransport,
+    gatewayA2aTargetTrpcTransport,
     gatewayCacheRuleTrpcTransport,
     gatewayGuardrailTrpcTransport,
     gatewayPlatformRest,
@@ -65,6 +69,7 @@ export const gatewayProcessModule: PublishedProcessModule<
   .withEventing(gatewayRealtimeSessionEventing)
   .withEventing(gatewayPulledUsageLedgerEventing)
   .withEventing(gatewayInstantEvalJudgeSpendEventing)
+  .withEventing(gatewayPiiRedactionSpendEventing)
   .withEventing(gatewayConnectManagedKeyEventing)
   .withTasks(({ repositories }) => [
     TraceDestinationReportTask.create({ repository: () => repositories.traceDestinationReport }),
@@ -103,6 +108,11 @@ export const gatewayProcessModule: PublishedProcessModule<
     elevenLabsSignature: (request) => ({
       signature: request.headers.get("elevenlabs-signature") ?? undefined,
     }),
+  })
+  .withIdIndexes(GATEWAY_ID_INDEXES, {
+    after: ["coding-agent:fill-id-indexes"],
+    description:
+      "Fills the id indexes of gateway spend and the budget ledger from older rows, then marks them ready on each ClickHouse target.",
   });
 
 /**

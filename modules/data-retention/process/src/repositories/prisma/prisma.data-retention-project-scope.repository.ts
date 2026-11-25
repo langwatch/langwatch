@@ -37,6 +37,26 @@ export class PrismaDataRetentionProjectScopeRepository implements DataRetentionP
     };
   }
 
+  async findProjectPlacements({
+    projectIds,
+  }: {
+    projectIds: readonly string[];
+  }): Promise<DataRetentionProjectPlacement[]> {
+    if (projectIds.length === 0) return [];
+    const projects = await this.prisma.project.findMany({
+      where: { id: { in: [...projectIds] } },
+      select: { id: true, teamId: true, kind: true, team: { select: { organizationId: true } } },
+    });
+
+    return projects.flatMap((project) => {
+      if (!project.team) return [];
+      const { organizationId } = project.team;
+      return [
+        { projectId: project.id, organizationId, teamId: project.teamId, kind: project.kind },
+      ];
+    });
+  }
+
   async findTeamOrganizationId({ teamId }: { teamId: string }): Promise<string | null> {
     const team = await this.prisma.team.findUnique({
       where: { id: teamId },

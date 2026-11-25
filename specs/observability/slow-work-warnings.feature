@@ -88,6 +88,13 @@ Feature: A slow database query or a slow API call names itself in the log
       When two different models each run slowly once inside one interval
       Then two warnings are logged
 
+    @unit
+    Scenario: A throttle remembers a bounded number of identities
+      Given a throttle that remembers at most two identities
+      When three identities each warn in turn inside one interval
+      Then the identity that warned longest ago is forgotten and may warn again
+      And the two that warned since stay quiet until their interval elapses
+
   # ---------------------------------------------------------------------------
   # API calls
   #

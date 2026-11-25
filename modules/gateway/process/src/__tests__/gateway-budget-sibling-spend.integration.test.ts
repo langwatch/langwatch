@@ -38,6 +38,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createGatewayTestPrismaConnection } from "../app/__tests__/gateway-prisma.fixture.ts";
 import {
   createTestClickHouseClient,
+  gatewayClickHouseOver,
   testClickHouseUrl,
 } from "../repositories/clickhouse/__tests__/support/clickhouse-endpoint.support.ts";
 import { GatewayBudgetClickHouseRepository } from "../repositories/clickhouse/clickhouse.gateway-budget.repository.ts";
@@ -220,7 +221,9 @@ async function listedSpentUsdFor(budgetIds: string[]): Promise<string[]> {
 
 describe.skipIf(!databaseUrl || !chUrl)("sibling budgets on one virtual key", () => {
   beforeAll(async () => {
-    chRepo = new GatewayBudgetClickHouseRepository(async () => createTestClickHouseClient(chUrl!));
+    chRepo = new GatewayBudgetClickHouseRepository(
+      gatewayClickHouseOver(createTestClickHouseClient(chUrl!)),
+    );
     service = PrismaGatewayAdapter.create({
       database: prisma,
       organizations: organizationApiOver(prisma),

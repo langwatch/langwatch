@@ -43,7 +43,7 @@ export class PrismaInstanceIdentityRepository implements InstanceIdentityReposit
   }
 
   async setReportSwitches({
-    switches: { optionalMetricsOptOut, hostnameOptOut },
+    switches: { optionalMetricsOptOut, hostnameOptOut, upgradeDiagnosticsOptOut },
     instanceIdIfMissing,
   }: {
     switches: InstanceReportSwitches;
@@ -52,6 +52,7 @@ export class PrismaInstanceIdentityRepository implements InstanceIdentityReposit
     const data = {
       ...(optionalMetricsOptOut === undefined ? {} : { optionalMetricsOptOut }),
       ...(hostnameOptOut === undefined ? {} : { hostnameOptOut }),
+      ...(upgradeDiagnosticsOptOut === undefined ? {} : { upgradeDiagnosticsOptOut }),
     };
     if (Object.keys(data).length === 0) return;
     await this.upsertRow({ instanceIdIfMissing, data });
@@ -96,7 +97,11 @@ export class PrismaInstanceIdentityRepository implements InstanceIdentityReposit
 type RowWrite = Partial<
   Pick<
     InstanceIdentity,
-    "optionalMetricsOptOut" | "hostnameOptOut" | "lastReportAt" | "lastReportError"
+    | "optionalMetricsOptOut"
+    | "hostnameOptOut"
+    | "upgradeDiagnosticsOptOut"
+    | "lastReportAt"
+    | "lastReportError"
   >
 >;
 
@@ -108,5 +113,6 @@ function rowOf(row: InstanceIdentity): InstanceIdentityRecord {
     lastReportError: row.lastReportError,
     optionalMetricsOptOut: row.optionalMetricsOptOut,
     hostnameOptOut: row.hostnameOptOut,
+    upgradeDiagnosticsOptOut: row.upgradeDiagnosticsOptOut,
   };
 }

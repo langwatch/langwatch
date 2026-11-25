@@ -5,20 +5,44 @@ import type { CodingAgentRouter } from "../behavior/coding-agent-router.ts";
 /** The one turn a replay opens on: the last thing the session did. */
 export type ConversationTurn = { traceId: string; timestamp: number };
 
-/** The session's last stored turn, or null when none of them was stored. */
+/** The conversation read for a session; a group project's names the member that recorded it. */
+function conversationContextInput({
+  projectId,
+  sessionId,
+  tenantId,
+}: {
+  projectId: string;
+  sessionId: string;
+  tenantId: string | undefined;
+}): { projectId: string; conversationId: string; tenantId?: string } {
+  return { projectId, conversationId: sessionId, ...(tenantId ? { tenantId } : {}) };
+}
+
+/**
+ * The session's newest stored turn, or null when none was stored. The session's own trace map
+ * answers first (newest stored trace); the conversation read, which pages from the oldest turn,
+ * is the fallback for a session the map does not hold.
+ */
 export async function lastTurnOfSession({
   utils,
   projectId,
   sessionId,
+  tenantId,
 }: {
   utils: ReturnType<typeof codingAgentApi.useUtils>;
   projectId: string;
   sessionId: string;
+  tenantId: string | undefined;
 }): Promise<ConversationTurn | null> {
-  const context = await utils.traces.conversationContext.fetch({
-    projectId,
-    conversationId: sessionId,
+  const mapped = await utils.codingAgents.lastTurn.fetch({
+    projectId: tenantId ?? projectId,
+    sessionId,
   });
+  if (mapped) return { traceId: mapped.traceId, timestamp: mapped.occurredAtMs };
+
+  const context = await utils.traces.conversationContext.fetch(
+    conversationContextInput({ projectId, sessionId, tenantId }),
+  );
   return context?.turns[context.turns.length - 1] ?? null;
 }
 
@@ -43,11 +67,17 @@ export function sayNothingWasStored(toaster: CodingAgentToaster): void {
 export function openReplayHere({
   turn,
   projectId,
+  tenantId,
   router,
+  alsoRemove = {},
 }: {
   turn: ConversationTurn;
   projectId: string;
+  /** The member project that owns the trace, on a group project. */
+  tenantId: string | undefined;
   router: CodingAgentRouter;
+  /** Other address keys dropped in the same write, such as the link that asked for the replay. */
+  alsoRemove?: Readonly<Record<string, undefined>>;
 }): void {
   // The project travels with the trace, since the chrome is still sitting in
   // whichever project was last visited, and a drawer resolving its own
@@ -59,11 +89,13 @@ export function openReplayHere({
   }
   router.setQueryParams({
     ...cleared,
+    ...alsoRemove,
     "drawer.open": "traceV2Details",
     "drawer.traceId": turn.traceId,
     "drawer.t": String(turn.timestamp),
     "drawer.mode": "terminal",
     "drawer.projectId": projectId,
+    ...(tenantId ? { "drawer.tenantId": tenantId } : {}),
   });
 }
 
@@ -71,10 +103,12 @@ export function openReplayHere({
 export function openReplayInExplorer({
   turn,
   projectSlug,
+  tenantId,
   router,
 }: {
   turn: ConversationTurn;
   projectSlug: string;
+  tenantId: string | undefined;
   router: CodingAgentRouter;
 }): void {
   const params = new URLSearchParams({
@@ -82,6 +116,7 @@ export function openReplayInExplorer({
     "drawer.traceId": turn.traceId,
     "drawer.t": String(turn.timestamp),
     "drawer.mode": "terminal",
+    ...(tenantId ? { "drawer.tenantId": tenantId } : {}),
   });
   router.push(`/${projectSlug}/traces?${params.toString()}`);
 }

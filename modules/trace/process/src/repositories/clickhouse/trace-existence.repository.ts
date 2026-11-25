@@ -1,6 +1,7 @@
 /**
  * Set membership over trace_summaries without dedup via TenantId-first predicate.
  */
+import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import { createLogger, type Logger } from "@langwatch/observability";
 import type { TraceCost, TraceUsageCount } from "@langwatch/trace-contract";
 import { z } from "zod";
@@ -10,21 +11,27 @@ import type { TraceClickHouseResolver } from "./clickhouse.trace-member-client.r
 import { chNumber, chString } from "./stored-span-row.mapper.ts";
 
 const traceIdRowsSchema = z.array(z.looseObject({ TraceId: chString }));
+const tenantIdRowsSchema = z.array(z.looseObject({ TenantId: chString }));
 const totalRowsSchema = z.array(z.looseObject({ Total: chString }));
 const traceCostRowsSchema = z.array(
   z.looseObject({ TraceId: chString, TotalCost: chNumber.nullable() }),
 );
 
 export class ClickHouseTraceExistenceRepository extends TraceExistenceRepository {
+  /** `clickhouse` serves the reads over a declared tenant set; absent, those refuse by name. */
   static create(options: {
     resolveClient: TraceClickHouseResolver;
+    clickhouse?: ClickHouseQueryClient;
   }): ClickHouseTraceExistenceRepository {
-    return new ClickHouseTraceExistenceRepository(options.resolveClient);
+    return new ClickHouseTraceExistenceRepository(options.resolveClient, options.clickhouse);
   }
 
   private readonly logger: Pick<Logger, "warn"> = createLogger("langwatch:trace:existence");
 
-  private constructor(private readonly resolveClient: TraceClickHouseResolver) {
+  private constructor(
+    private readonly resolveClient: TraceClickHouseResolver,
+    private readonly clickhouse: ClickHouseQueryClient | undefined,
+  ) {
     super();
   }
 
@@ -44,9 +51,12 @@ export class ClickHouseTraceExistenceRepository extends TraceExistenceRepository
               FROM trace_summaries
               WHERE TenantId = {tenantId:String}
                 AND TraceId IN ({traceIds:Array(String)})
+                {{idBound:trace_summaries.TraceId:traceIds}}
             `,
         query_params: { tenantId: projectId, traceIds: [...traceIds] },
         format: "JSONEachRow",
+        // A ready index's miss means absent; a hit is still confirmed on the source.
+        idBound: { onMiss: "none" },
       });
       const rows = traceIdRowsSchema.parse(await result.json());
       return rows.map((row) => row.TraceId);
@@ -63,6 +73,45 @@ export class ClickHouseTraceExistenceRepository extends TraceExistenceRepository
     }
   }
 
+  /**
+   * One statement per table over the whole set (`TenantId IN` plus `TraceId`, the sorting key's
+   * prefix, so it prunes), each bounded by the id index: a miss the ready index has never seen
+   * reads only the index. One organisation's projects, which the router requires of a set.
+   */
+  async findProjectsHoldingTrace({
+    projectIds,
+    traceId,
+  }: {
+    projectIds: readonly string[];
+    traceId: string;
+  }): Promise<string[]> {
+    const tenantIds = [...new Set(projectIds)];
+    const [firstTenantId] = tenantIds;
+    if (firstTenantId === undefined) return [];
+    const clickhouse = this.clickhouse;
+    if (clickhouse === undefined) {
+      throw new Error("No ClickHouse member was composed for a read over a tenant set");
+    }
+    const holdersIn = async (table: "trace_summaries" | "stored_spans") => {
+      const result = await clickhouse.query({
+        tenantId: firstTenantId,
+        tenantIds,
+        table,
+        sql: `
+          SELECT DISTINCT TenantId FROM ${table}
+          WHERE TenantId IN ({tenantIds:Array(String)})
+            AND TraceId = {traceId:String}
+            {{idBound:${table}.TraceId:traceId}}`,
+        params: { tenantIds, traceId },
+        // A ready index's miss means absent; a hit is still confirmed on the source.
+        idBound: { onMiss: "none" },
+      });
+      return tenantIdRowsSchema.parse(result.rows).map((row) => row.TenantId);
+    };
+    const holders = await Promise.all([holdersIn("trace_summaries"), holdersIn("stored_spans")]);
+    return [...new Set(holders.flat())];
+  }
+
   async findTraceCosts({
     projectId,
     traceIds,
@@ -75,6 +124,7 @@ export class ClickHouseTraceExistenceRepository extends TraceExistenceRepository
     if (traceIds.length === 0) return [];
     const client = await this.resolveClient(projectId);
     const result = await client.query({
+      // ID_BOUND_SKIP: bounded by the caller's own occurred-time range, not by id.
       query: `
           SELECT TraceId, TotalCost
           FROM trace_summaries

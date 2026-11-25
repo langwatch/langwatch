@@ -16,8 +16,10 @@ import {
   LangyTurnService,
   type LangyTurnTechnicalMembers,
 } from "../features/turn/services/langy-turn.service.ts";
+import type { LangyDeleteConfirmationRepository } from "../repositories/langy-delete-confirmation.repository.ts";
 import type { LangyFeedbackPromptRepository } from "../repositories/langy-feedback-prompt.repository.ts";
 import type { LangyDatabaseRepositories } from "../repositories/langy-repositories.registry.ts";
+import type { LangyPullRequestsOpenedRecord } from "../rules/langy-ci-follow-up.rules.ts";
 import type { LangyBlockMetrics } from "./langy-block-metrics-otel.service.ts";
 import {
   LangyCredentialService,
@@ -60,6 +62,7 @@ type LangyCredentialComposition = {
 export class LangyEventingMembers {
   readonly langyConversationState: StateProjectionStore<LangyConversationStateData>;
   readonly langyConversationTurnState: StateProjectionStore<LangyConversationTurnData>;
+  readonly langyPullRequests: AppendStore<LangyPullRequestsOpenedRecord>;
   readonly langyMessageStorage: AppendStore<LangyMessageProjectionRecord>;
   readonly langyTurnAdmission: LangyTurnAdmissionCapability;
   readonly trustedMessages: LangyTrustedMessage;
@@ -67,12 +70,14 @@ export class LangyEventingMembers {
   constructor(input: {
     langyConversationState: StateProjectionStore<LangyConversationStateData>;
     langyConversationTurnState: StateProjectionStore<LangyConversationTurnData>;
+    langyPullRequests: AppendStore<LangyPullRequestsOpenedRecord>;
     langyMessageStorage: AppendStore<LangyMessageProjectionRecord>;
     langyTurnAdmission: LangyTurnAdmissionCapability;
     trustedMessages: LangyTrustedMessage;
   }) {
     this.langyConversationState = input.langyConversationState;
     this.langyConversationTurnState = input.langyConversationTurnState;
+    this.langyPullRequests = input.langyPullRequests;
     this.langyMessageStorage = input.langyMessageStorage;
     this.langyTurnAdmission = input.langyTurnAdmission;
     this.trustedMessages = input.trustedMessages;
@@ -107,6 +112,7 @@ export class LangyPostgresService {
     this.eventingCapabilities = new LangyEventingMembers({
       langyConversationState: this.repositories.conversationState,
       langyConversationTurnState: this.repositories.conversationTurnState,
+      langyPullRequests: this.repositories.pullRequests,
       langyMessageStorage: this.repositories.messageStorage,
       langyTurnAdmission: this.repositories.admission,
       trustedMessages: LangyMessageService.createTrustedMessageReader(this.repositories.messages),
@@ -129,6 +135,8 @@ export class LangyPostgresService {
     apiKeys: ApiKeyApi;
     authz: Pick<AuthzApi, "effectivePermissions">;
     metrics: LangySessionKeyMetrics;
+    /** Where each key's conversation is written, for the delete confirmation. */
+    bindings?: Pick<LangyDeleteConfirmationRepository, "saveKeyBinding">;
   }): LangySessionKeyService {
     if (!this.sessionKeys) {
       this.sessionKeys = LangySessionKeyService.create({

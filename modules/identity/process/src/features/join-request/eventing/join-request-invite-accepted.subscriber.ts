@@ -3,7 +3,7 @@
  * R7): organization records the acceptance and holds no identity peer for it.
  * Spec: specs/identity/join-requests.feature
  */
-import type { PeerSubscriberDefinition } from "@langwatch/eventing";
+import type { PeerEventSubscriberDefinition } from "@langwatch/eventing";
 import type { JoinRequestsApi } from "@langwatch/identity-contract";
 import {
   INVITE_ACCEPTED_EVENT_TYPE,
@@ -20,7 +20,7 @@ export function joinRequestInviteAcceptedSubscriber({
   joinRequests,
 }: {
   joinRequests: () => Pick<JoinRequestsApi, "withdrawOnInvitationAccepted">;
-}): PeerSubscriberDefinition<typeof inviteAcceptedEventDataSchema> {
+}): PeerEventSubscriberDefinition<typeof inviteAcceptedEventDataSchema> {
   return {
     eventType: INVITE_ACCEPTED_EVENT_TYPE,
     data: inviteAcceptedEventDataSchema,

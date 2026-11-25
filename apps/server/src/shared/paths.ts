@@ -8,9 +8,7 @@ const root = process.env.LANGWATCH_HOME?.length
 export const paths = {
   root,
   bin: join(root, "bin"),
-  // Relocated here on first run: tsx 4.x won't resolve tsconfig path
-  // aliases for source under "/node_modules/" (its 3rd-party guard), and
-  // npx unpacks there — so pnpm scripts using `~/...` aliases need this.
+  // One prebuilt app per release, at app/<version> (ADR-180).
   app: join(root, "app"),
   data: join(root, "data"),
   redisData: join(root, "data", "redis"),

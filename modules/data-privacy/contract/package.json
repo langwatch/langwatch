@@ -13,11 +13,15 @@
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./src/index.ts"
+    },
+    "./pii-redaction-spend": {
+      "types": "./dist/data-privacy.pii-redaction-spend.d.ts",
+      "default": "./src/data-privacy.pii-redaction-spend.ts"
     }
   },
   "scripts": {
     "typecheck": "GOMAXPROCS=2 GOMEMLIMIT=2GiB tsc -b",
-    "test": "vitest run"
+    "test": "vitest run --fsModuleCache"
   },
   "dependencies": {
     "@langwatch/config": "workspace:*",

@@ -1,8 +1,10 @@
 import { Card } from "@langwatch/design-system/card";
 import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { Box, Grid, GridItem, Tabs } from "@langwatch/design-system/primitives";
+import { isAggregateProjectKind } from "@langwatch/project-contract";
 import { Users } from "lucide-react";
 
+import { useAnalyticsHost } from "../../model/analytics-host.ts";
 import { analyticsMetrics } from "../../model/analytics-registry.ts";
 import { CustomGraph, type CustomGraphInput } from "./custom-graph.tsx";
 import { TopicsSelector } from "./topics-selector.tsx";
@@ -53,6 +55,8 @@ const userEmptyState = (
 );
 
 export function UserMetrics() {
+  // Topics are clustered inside one project, so an aggregate offers none (ADR-177 v4.15).
+  const offersTopics = !isAggregateProjectKind(useAnalyticsHost().project()?.kind);
   const messagesGraph: CustomGraphInput = {
     graphId: "messagesCountGraph",
     graphType: "line",
@@ -168,13 +172,15 @@ export function UserMetrics() {
           </Box>
         </Card>
       </GridItem>
-      <GridItem rowSpan={2}>
-        <Card variant="panel-fill" padding="lg" title="Top topics">
-          <Box overflowY="auto" flex={1} minHeight={0}>
-            <TopicsSelector showTitle={false} />
-          </Box>
-        </Card>
-      </GridItem>
+      {offersTopics && (
+        <GridItem rowSpan={2}>
+          <Card variant="panel-fill" padding="lg" title="Top topics">
+            <Box overflowY="auto" flex={1} minHeight={0}>
+              <TopicsSelector showTitle={false} />
+            </Box>
+          </Card>
+        </GridItem>
+      )}
       <GridItem>
         <Card padding="lg" title="Thread metrics">
           <CustomGraph input={threadMetrics} />

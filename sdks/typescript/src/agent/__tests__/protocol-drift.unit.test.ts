@@ -149,7 +149,9 @@ describe.skipIf(!existsSync(PLATFORM_PROTOCOL))(
         const resultKeys = withoutType(
           platformKeys({ source: platform, schema: "resultFrameSchema" }),
         );
-        expect(sorted(resultKeys)).toEqual(sorted(["callId", "output", "session", "error"]));
+        expect(sorted(resultKeys)).toEqual(
+          sorted(["callId", "output", "session", "state", "error"]),
+        );
         expect(sorted(sdkKeys({ source: sdk, name: "CallError" }))).toEqual(
           sorted(platformKeys({ source: platform, schema: "resultErrorSchema" })),
         );

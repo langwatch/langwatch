@@ -45,7 +45,12 @@ function contractCases(backend: Backend): void {
 
     await expect(
       repository.findProjectPlacement({ projectId: seeded.liveProjectId }),
-    ).resolves.toEqual({ projectId: seeded.liveProjectId, organizationId, teamId });
+    ).resolves.toEqual({
+      projectId: seeded.liveProjectId,
+      organizationId,
+      teamId,
+      kind: "application",
+    });
     await expect(repository.findTeamOrganizationId({ teamId: seeded.emptyTeamId })).resolves.toBe(
       organizationId,
     );
@@ -63,6 +68,20 @@ function contractCases(backend: Backend): void {
     ).resolves.toBeNull();
   });
 
+  /** @scenario "The memory and Postgres placement readers answer alike" */
+  it("answers many projects' placements in one read, leaving out a project with no row", async () => {
+    const seeded = backend.seeded();
+    const { organizationId, teamId } = seeded;
+
+    const placements = await backend.repository().findProjectPlacements({
+      projectIds: [seeded.liveProjectId, `project-without-row-${randomUUID()}`],
+    });
+
+    expect(placements).toEqual([
+      expect.objectContaining({ projectId: seeded.liveProjectId, organizationId, teamId }),
+    ]);
+  });
+
   /** @scenario "An archived project keeps its place, so its stored data still expires" */
   it("places an archived project under its team and organisation", async () => {
     const seeded = backend.seeded();
@@ -73,6 +92,7 @@ function contractCases(backend: Backend): void {
       projectId: seeded.archivedProjectId,
       organizationId: seeded.organizationId,
       teamId: seeded.teamId,
+      kind: "application",
     });
   });
 }
@@ -90,6 +110,7 @@ describe("given the memory placement reader", () => {
       projectId,
       organizationId: seeded.organizationId,
       teamId: seeded.teamId,
+      kind: "application",
     })),
     teams: [{ teamId: seeded.emptyTeamId, organizationId: seeded.organizationId }],
   });

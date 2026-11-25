@@ -29,6 +29,7 @@ function stepsApp() {
     .withVersion(VERSION)
     .withCredential("project")
     .post("/:runId", "logSteps")
+    .keepsRecords()
     .withParams(z.object({ runId: z.string() }))
     .withQuery(z.object({ dryRun: z.enum(["yes", "no"]).optional() }))
     .withInput(z.array(z.object({ index: z.number(), label: z.string() })), { as: "steps" })

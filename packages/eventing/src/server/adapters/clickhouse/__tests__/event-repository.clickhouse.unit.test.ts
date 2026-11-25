@@ -4,7 +4,11 @@ import {
   EventingClickHouseEventRepository,
   type EventingClickHouseClient,
 } from "@langwatch/eventing/server";
+import { generate } from "@langwatch/ksuid";
 import { describe, expect, it, vi } from "vitest";
+
+import { EventNotFoundError } from "../../../../services/errorHandling.ts";
+import { readEventRecord } from "../../../../stores/eventReadSeat.ts";
 
 const retention = createEventingRetentionConfiguration({ defaultRetentionDays: 49 });
 
@@ -246,6 +250,69 @@ describe("EventRepositoryClickHouse read projections", () => {
   });
 });
 
+/**
+ * event_log is ORDER BY (TenantId, AggregateType, AggregateId, IdempotencyKey). A page ordered
+ * by EventTimestamp cannot seek, so every page of a long session read the whole session.
+ */
+describe("EventRepositoryClickHouse paged history read", () => {
+  const upTo = {
+    tenantId: "tenant",
+    aggregateType: "coding_agent_session",
+    aggregateId: "session-1",
+    upToTimestamp: 1700000000001,
+    upToEventId: "evt",
+  };
+
+  function pagedCall(client: EventingClickHouseClient): {
+    query: string;
+    query_params: Record<string, unknown>;
+  } {
+    return (client.query as ReturnType<typeof vi.fn>).mock.calls[0]![0];
+  }
+
+  describe("given the first page", () => {
+    /** @scenario "A paged history read seeks through the event log's sort key" */
+    it("orders by the sort key's last column and keeps the upper bound as a filter", async () => {
+      const client = createMockClient({});
+
+      await repositoryFor(client).getEventRecordsUpToPaged({
+        ...upTo,
+        after: undefined,
+        limit: 10,
+      });
+
+      const { query } = pagedCall(client);
+      expect(query).toContain("ORDER BY IdempotencyKey ASC, EventTimestamp ASC, EventId ASC");
+      expect(query).not.toContain("ORDER BY EventTimestamp");
+      expect(query).toContain("EventTimestamp < {upToTimestamp:UInt64}");
+      expect(query).not.toContain("afterKey");
+    });
+  });
+
+  describe("given a later page", () => {
+    /** @scenario "A paged history read seeks through the event log's sort key" */
+    it("resumes from the cursor's key, with a conjunct the primary index can seek on", async () => {
+      const client = createMockClient({});
+
+      await repositoryFor(client).getEventRecordsUpToPaged({
+        ...upTo,
+        after: { idempotencyKey: "key-7", timestamp: 1700000000000, eventId: "evt-7" },
+        limit: 10,
+      });
+
+      const { query, query_params } = pagedCall(client);
+      expect(query).toContain("AND IdempotencyKey >= {afterKey:String}");
+      expect(query).toContain("IdempotencyKey > {afterKey:String}");
+      expect(query_params).toMatchObject({
+        afterKey: "key-7",
+        afterTimestamp: 1700000000000,
+        afterEventId: "evt-7",
+        limit: 10,
+      });
+    });
+  });
+});
+
 describe("EventRepositoryClickHouse full-scan declarations", () => {
   const history = { tenantId: "tenant", aggregateType: "user", aggregateId: "id" };
   const upTo = { ...history, upToTimestamp: 1700000000001, upToEventId: "evt" };
@@ -276,6 +343,69 @@ describe("EventRepositoryClickHouse full-scan declarations", () => {
       const query = await readAllThree({ occurredAtFromMs: 1700000000000 });
       expect(query).toHaveBeenCalledTimes(3);
       expect(query).not.toHaveBeenCalledWith(declared);
+    });
+  });
+});
+
+describe("EventRepositoryClickHouse over a ready event log index", () => {
+  /** An index ready on every target, answering one range for every aggregate it is asked. */
+  function indexedRepository({ rows }: { rows: unknown[] }) {
+    const query = vi.fn(async () => ({ json: vi.fn().mockResolvedValue(rows) }));
+    const client: EventingClickHouseClient = { query, insert: vi.fn() };
+    const indexBounds = vi.fn(async () => ({
+      n: 1,
+      fromMs: 1_600_000_000_000,
+      toMs: 1_700_000_000_000,
+    }));
+    const repository = EventingClickHouseEventRepository.create({
+      resolveClient: async () => client,
+      retention,
+      eventLogIndex: {
+        reader: { targetOf: async () => "shared", indexBounds },
+        readiness: { isReady: () => true },
+      },
+    });
+    return { repository, query, indexBounds };
+  }
+
+  describe("given a read that names its own lower bound", () => {
+    /** @scenario "a read that already has a lower bound skips the index" */
+    it("reads with that bound and never asks the index", async () => {
+      const { repository, query, indexBounds } = indexedRepository({ rows: [] });
+
+      await repository.getEventRecords({
+        tenantId: "tenant",
+        aggregateType: "trace",
+        aggregateId: "trace-1",
+        occurredAtFromMs: 1_650_000_000_000,
+      });
+
+      expect(indexBounds).not.toHaveBeenCalled();
+      expect(query).toHaveBeenCalledWith(
+        expect.objectContaining({
+          query_params: expect.objectContaining({ occurredAtFromMs: 1_650_000_000_000 }),
+        }),
+      );
+    });
+  });
+
+  describe("given an event the indexed stream does not hold", () => {
+    /** @scenario "an event missing from its aggregate's indexed stream is read for once" */
+    it("answers not found from one index read and one source read, with no fallback", async () => {
+      const { repository, query, indexBounds } = indexedRepository({ rows: [] });
+
+      await expect(
+        readEventRecord({
+          repository,
+          tenantId: "tenant",
+          aggregateType: "trace",
+          aggregateId: "trace-1",
+          eventId: generate("event").toString(),
+        }),
+      ).rejects.toBeInstanceOf(EventNotFoundError);
+
+      expect(indexBounds).toHaveBeenCalledTimes(1);
+      expect(query).toHaveBeenCalledTimes(1);
     });
   });
 });

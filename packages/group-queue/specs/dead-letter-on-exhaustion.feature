@@ -35,6 +35,16 @@ Feature: A spent job can be dead-lettered instead of blocking its group
     And the rest of the batch runs
 
   @integration
+  # Dead-letter entries expire after seven days but their index member does not.
+  # A member leaves the index only when, at that moment, none of its jobs, values
+  # or error remain, so an entry written since it was read keeps its group listed.
+  Scenario: An expired dead-letter entry leaves the index only once nothing of it remains
+    Given a dead-letter index holding a group whose entries expired
+    And groups that still hold jobs, values or an error
+    When the index is pruned
+    Then only the expired group leaves the index
+
+  @integration
   Scenario: A dead-lettered job is redriven by the operator
     Given a job the queue dead-lettered
     And its cause has since been fixed

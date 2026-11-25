@@ -68,6 +68,7 @@ export class InstanceIdentityService {
       ...(row.lastReportError ? { lastReportError: row.lastReportError } : {}),
       optionalMetricsOptOut: row.optionalMetricsOptOut,
       hostnameOptOut: row.hostnameOptOut,
+      upgradeDiagnosticsOptOut: row.upgradeDiagnosticsOptOut,
     }));
   }
 

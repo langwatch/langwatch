@@ -3,6 +3,7 @@
  * here can fail; sample mode swaps in invented rows from
  * `../../model/sample-home-rows.ts`. Ported from `.../GovernanceHomeSections.tsx` (main).
  */
+import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import {
   Badge,
   Box,
@@ -15,6 +16,7 @@ import {
 } from "@langwatch/design-system/primitives";
 import type React from "react";
 
+import { useGovernanceHost } from "../../../../model/governance-host.ts";
 import { Link } from "../../../../ui/elements/governance-link.tsx";
 import type { SampleActivityRow, SampleInsight } from "../../model/sample-home-rows.ts";
 import {
@@ -23,19 +25,25 @@ import {
   SAMPLE_INSIGHTS,
   SEVERITIES,
 } from "../../model/sample-home-rows.ts";
+import { INVENTORY_SOURCES_HREF } from "./governance-hero.tsx";
 
 /** Wide enough for the longest of the three labels, so headlines line up. */
 const SEVERITY_COLUMN = "104px";
 
 export function GovernanceHomeSections({
   canSetUpInsights,
+  canManageSources,
   sample,
 }: {
   /** Whether Insights is offered; also filters which sample rows draw. */
   canSetUpInsights: boolean;
+  /** Holds `ingestionSources:manage`, so the empty Insights line may offer connecting one. */
+  canManageSources: boolean;
   /** Whether the two lists carry invented rows rather than empty lines. */
   sample: boolean;
 }) {
+  const host = useGovernanceHost();
+  const onNavigate = ({ href }: { href: string }) => host.navigate(href);
   const activity = SAMPLE_ACTIVITY.filter((row) => canSetUpInsights || !row.ridesInsightsFlag);
 
   return (
@@ -48,7 +56,20 @@ export function GovernanceHomeSections({
             ))}
           </RowList>
         ) : (
-          <EmptyLine text="Nothing to report yet. Insights appear here once sources are pulling." />
+          <NoDataInfoBlock
+            size="line"
+            title="Nothing to report yet. Insights appear here once sources are pulling."
+            {...(canManageSources && {
+              next: [
+                {
+                  kind: "setting",
+                  label: "Connect a source",
+                  href: INVENTORY_SOURCES_HREF,
+                  onNavigate,
+                },
+              ],
+            })}
+          />
         )}
         {canSetUpInsights && (
           <Box paddingTop={4}>
@@ -67,7 +88,8 @@ export function GovernanceHomeSections({
             ))}
           </RowList>
         ) : (
-          <EmptyLine text="Your recent screens will show up here." />
+          // Points nowhere: the list fills as the reader works, so there is nothing to start.
+          <NoDataInfoBlock size="line" title="Your recent screens will show up here." />
         )}
       </HomeSection>
     </Grid>
@@ -219,14 +241,5 @@ function HomeSection({
         {children}
       </Box>
     </VStack>
-  );
-}
-
-/** The line an empty list carries instead of rows. */
-function EmptyLine({ text }: { text: string }) {
-  return (
-    <Text fontSize="sm" color="fg.muted" maxWidth="52ch" paddingTop={2}>
-      {text}
-    </Text>
   );
 }

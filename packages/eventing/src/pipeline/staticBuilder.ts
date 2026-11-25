@@ -36,6 +36,7 @@ import type {
 import {
   type PeerEventSchema,
   type PeerFoldProjectionDeclaration,
+  type PeerFoldSubscriberSpec,
   type PeerMapProjectionDeclaration,
   peerFoldProjection,
   peerMapProjection,
@@ -56,11 +57,13 @@ import {
   ValidationError,
 } from "../services/errorHandling.ts";
 import type {
+  EventSubscriberContext,
   EventSubscriberDefinition,
   EventSubscriberOptions,
   PeerSubscriberDefinition,
 } from "../subscribers/eventSubscriber.types.ts";
 import type {
+  SubscriberDispatchContext,
   SubscriberDispatchDefinition,
   SubscriberDispatchOptions,
 } from "../subscribers/subscriber.types.ts";
@@ -72,9 +75,11 @@ import {
 import { assertLaneAliasesDeclarable, type LaneAlias } from "../upcast/laneAlias.ts";
 import { buildProcessManager, type ProcessManagerApplier } from "./processBuilder.ts";
 import type {
+  JobSubscriberSpec,
   ProcessManagerDefinition,
   SubscriberSpec,
   TriggerContext,
+  TriggerOptions,
 } from "./processManagerDefinition.ts";
 import type { GlobalProjection } from "./staticBuilder.types.ts";
 
@@ -223,20 +228,21 @@ export class PipelineBuilder<
     if (this.globalProjections.some((declared) => declared.name === lane)) {
       this.throwDuplicateProjectionName(lane);
     }
+    const coalesceMaxBatch = subscriber.options?.coalesceMaxBatch ?? 1;
+    if (!subscriber.handleBatch && coalesceMaxBatch > 1) {
+      throw new ConfigurationError(
+        "PipelineBuilder",
+        `Peer subscriber "${lane}" coalesces up to ${coalesceMaxBatch} events but handles one at a time: declare handleBatch to coalesce`,
+        { subscriberName: lane, coalesceMaxBatch },
+      );
+    }
     this.globalProjections.push({
       name: lane,
       register: (registry) =>
         registry.registerEventSubscriber({
           name: lane,
           eventTypes: [subscriber.eventType],
-          handle: (event, context) =>
-            subscriber.handle(subscriber.data.parse(event.data), {
-              ...context,
-              occurredAt: event.occurredAt,
-              createdAt: event.createdAt,
-              eventId: event.id,
-              ...(event.idempotencyKey && { idempotencyKey: event.idempotencyKey }),
-            }),
+          ...peerSubscriberHandlers(subscriber),
           options: peerSubscriberOptions(subscriber),
         }),
     });
@@ -244,19 +250,29 @@ export class PipelineBuilder<
   }
 
   /**
-   * This module's fold over a peer pipeline's events (§9), on the global registry: lane
-   * `<this pipeline>.<fold name>`, ordered per source aggregate, deduped by event id, re-folded
-   * and replayed from the owner's event log. Spec: packages/eventing/specs/peer-projection.feature.
+   * This module's fold over peer events (§9), lane `<this pipeline>.<fold name>`: ordered per
+   * source aggregate, deduped by event id, replayed from the owner's log; each subscriber gets
+   * committed state on `<fold lane>.<name>`. Spec: packages/eventing/specs/peer-projection.feature.
    */
   withPeerFoldProjection<State, const Events extends readonly PeerEventSchema[]>(
     declaration: PeerFoldProjectionDeclaration<State, Events>,
+    subscribers: readonly PeerFoldSubscriberSpec<State>[] = [],
   ): this {
     const lane = `${this.name}.${declaration.fold.name}`;
     this.assertGlobalLaneFree(lane);
     const fold = peerFoldProjection({ lane, declaration });
+    const definitions = subscribers.map(({ name, ...spec }) =>
+      buildProjectionSubscriberDefinition<Event>(`${lane}.${name}`, {
+        ...spec,
+        fold: lane,
+      } as SubscriberSpec<Event>),
+    );
     this.globalProjections.push({
       name: lane,
-      register: (registry, host) => registry.registerPeerFoldProjection(fold, host),
+      register: (registry, host) => {
+        registry.registerPeerFoldProjection(fold, host);
+        for (const definition of definitions) registry.registerSubscriber(lane, definition);
+      },
       peer: { kind: "fold", projection: sealFoldProjection(fold) },
     });
     return this;
@@ -515,6 +531,16 @@ export class PipelineBuilder<
     subscriberName: string,
     spec: SubscriberSpec<EventType, RegisteredFoldStates[Name]> & { fold: Name; map?: never },
   ): this;
+  withProjectionSubscriber<
+    Name extends FoldNames & keyof RegisteredFoldStates & string,
+    Job extends ParsingSchema,
+  >(
+    subscriberName: string,
+    spec: JobSubscriberSpec<EventType, RegisteredFoldStates[Name], Job> & {
+      fold: Name;
+      map?: never;
+    },
+  ): this;
   withProjectionSubscriber(
     subscriberName: string,
     spec: SubscriberSpec<EventType> & { map: MapNames & string; fold?: never },
@@ -522,7 +548,7 @@ export class PipelineBuilder<
   withProjectionSubscriber(
     subscriberName: string,
     // oxlint-disable-next-line typescript/no-explicit-any -- state crosses the fold-name lookup
-    spec: SubscriberSpec<EventType, any> &
+    spec: (SubscriberSpec<EventType, any> | JobSubscriberSpec<EventType, any>) &
       ({ fold: FoldNames & string; map?: never } | { map: MapNames & string; fold?: never }),
   ): this {
     this.assertSubscriberNameAvailable(subscriberName);
@@ -533,7 +559,7 @@ export class PipelineBuilder<
   /** Compile a projection subscriber and validate its parent projection. */
   private registerProjectionSubscriber(
     subscriberName: string,
-    spec: SubscriberSpec<EventType>,
+    spec: SubscriberSpec<EventType> | JobSubscriberSpec<EventType>,
   ): void {
     const projectionName = (spec.fold ?? spec.map)!;
     const isFold = spec.fold !== undefined;
@@ -773,6 +799,41 @@ export class PipelineDeclaration {
   }
 }
 
+/**
+ * A peer subscriber's handlers on its lane: each event's data parsed with the contract's schema
+ * (a refusal throws, failing the delivery) beside its instant, id and idempotency key. A batch
+ * subscriber takes a single delivery as a batch of one.
+ */
+function peerSubscriberHandlers<Data extends ParsingSchema>(
+  subscriber: PeerSubscriberDefinition<Data>,
+): Pick<EventSubscriberDefinition, "handle" | "handleBatch"> {
+  const itemOf = (event: Event, context: EventSubscriberContext) => ({
+    data: subscriber.data.parse(event.data),
+    context: {
+      ...context,
+      occurredAt: event.occurredAt,
+      createdAt: event.createdAt,
+      eventId: event.id,
+      ...(event.idempotencyKey && { idempotencyKey: event.idempotencyKey }),
+    },
+  });
+  if (!subscriber.handleBatch) {
+    const handle = subscriber.handle;
+    return {
+      handle: (event, context) => {
+        const { data, context: peerContext } = itemOf(event, context);
+        return handle(data, peerContext);
+      },
+    };
+  }
+  const handleBatch = subscriber.handleBatch;
+  return {
+    handle: async (event, context) => handleBatch([itemOf(event, context)]),
+    handleBatch: async (events, contexts) =>
+      handleBatch(events.map((event, index) => itemOf(event, contexts[index]!))),
+  };
+}
+
 /** A peer subscriber's options on its lane, its data filter lifted to the staged event. */
 function peerSubscriberOptions<Data extends ParsingSchema>(
   subscriber: PeerSubscriberDefinition<Data>,
@@ -826,7 +887,7 @@ function toTriggerContext(subscriberDispatchContext: {
  */
 function buildProjectionSubscriberDedup<E extends Event>(
   subscriberName: string,
-  spec: SubscriberSpec<E>,
+  spec: TriggerOptions<E>,
 ): (SubscriberDispatchOptions["deduplication"] & object) | undefined {
   const wantsDedup =
     spec.dedup !== undefined || spec.dedupId !== undefined || spec.ttl !== undefined;
@@ -852,10 +913,29 @@ function buildProjectionSubscriberDedup<E extends Event>(
   };
 }
 
+/** A compact job's dispatch: one handler, whether its body was queued compact or staged later. */
+function compactJobDispatch<E extends Event>(
+  job: JobSubscriberSpec<E>["job"],
+): NonNullable<SubscriberDispatchDefinition<E>["compactJob"]> {
+  return {
+    stageOnSend: job.stageOnSend ?? false,
+    stage: (event, context) => job.stage(event, toTriggerContext(context)),
+    handle: async (body, context) => job.handler(job.schema.parse(body), context),
+  };
+}
+
 function buildProjectionSubscriberDefinition<E extends Event>(
   subscriberName: string,
-  spec: SubscriberSpec<E>,
+  spec: SubscriberSpec<E> | JobSubscriberSpec<E>,
 ): SubscriberDispatchDefinition<E> {
+  const compactJob = "job" in spec ? compactJobDispatch(spec.job) : undefined;
+  const run = async (event: E, context: SubscriberDispatchContext): Promise<void> => {
+    if (compactJob) {
+      const { tenantId, aggregateId } = context;
+      return compactJob.handle(compactJob.stage(event, context), { tenantId, aggregateId });
+    }
+    if ("handler" in spec) await spec.handler(event, toTriggerContext(context));
+  };
   const eventFilter = spec.events !== undefined ? new Set<string>(spec.events) : null;
   const passes = (event: E, context: TriggerContext<unknown>): boolean => {
     if (eventFilter && !eventFilter.has(event.type)) return false;
@@ -887,9 +967,9 @@ function buildProjectionSubscriberDefinition<E extends Event>(
     // state-dependent `when` guards reject before enqueue too.
     shouldDispatch: (event, context) => passes(event, toTriggerContext(context)),
     handle: async (event, context) => {
-      const triggerContext = toTriggerContext(context);
-      if (!passes(event, triggerContext)) return;
-      await spec.handler(event, triggerContext);
+      if (!passes(event, toTriggerContext(context))) return;
+      await run(event, context);
     },
+    ...(compactJob ? { compactJob } : {}),
   };
 }

@@ -53,9 +53,11 @@ export class TraceTopicClusteringReadService {
 
   async readPage(input: TraceTopicClusteringPageInput): Promise<TraceTopicClusteringPage> {
     const { topicIds, subtopicIds } = input;
+    const hotTierStartMs = this.now() - CLUSTERING_FETCH_WINDOW_DAYS * DAY_MS;
     const rawRows = await this.repository.findPageRows({
       tenantId: input.projectId,
-      windowStartMs: this.now() - CLUSTERING_FETCH_WINDOW_DAYS * DAY_MS,
+      windowStartMs: Math.max(hotTierStartMs, input.occurredSinceMs ?? hotTierStartMs),
+      ...(input.occurredBeforeMs === undefined ? {} : { windowEndMs: input.occurredBeforeMs }),
       ...(input.isIncrementalProcessing && (topicIds.length > 0 || subtopicIds.length > 0)
         ? { unassignedFrom: { topicIds, subtopicIds } }
         : {}),
@@ -86,6 +88,7 @@ export class TraceTopicClusteringReadService {
       traces,
       lastSort: lastRow ? [lastRow.occurredAtMs, lastRow.traceId] : undefined,
       returnedCount: rows.length,
+      occurredAtMsByTraceId: Object.fromEntries(rows.map((row) => [row.traceId, row.occurredAtMs])),
     };
   }
 

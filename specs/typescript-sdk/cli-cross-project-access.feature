@@ -201,7 +201,7 @@ Feature: CLI cross-project access with the user-scoped login key
     Scenario: a project key reaches the commands whose route names a project
       Given LANGWATCH_API_KEY is a project key, which carries its own project
       And neither --project nor LANGWATCH_PROJECT_ID names a project
-      When the user runs a chart, dashboard-widget or secrets command
+      When the user runs a chart or secrets command
       Then the request names the key's own project, read from the platform
       And the command does not ask for --project or LANGWATCH_PROJECT_ID
 
@@ -303,7 +303,9 @@ Feature: CLI cross-project access with the user-scoped login key
       Given the user is logged in with a working API key
       When the user runs `langwatch query "SELECT 1" -o json`
       Then the query runs against the configured API key with no project header
-      And stdout is exactly one JSON array of the returned rows
+      # Changed (owner, 2026-10-29: params come back "as part of the success or final state object"): the
+      # earlier text was exactly one JSON array of the returned rows.
+      And stdout is exactly one JSON object holding the returned rows, the run's params and its diagnostics
       And the command exits 0
 
     @unit

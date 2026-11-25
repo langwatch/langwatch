@@ -1,5 +1,7 @@
 import type { CioBatchCall } from "@langwatch/enterprise-nurturing-contract";
-import { nowInstant, Temporal } from "@langwatch/time";
+import { nowInstant } from "@langwatch/time";
+
+import { unixSecondsOf } from "./nurturing-customer-io-timestamp.rules.ts";
 
 const ONE_HOUR_MS = 60 * 60 * 1000;
 
@@ -77,11 +79,7 @@ function identifyLastActive({ userId, now }: { userId: string; now: number }): C
     {
       type: "identify",
       userId,
-      traits: {
-        last_active_at: Temporal.Instant.fromEpochMilliseconds(now).toString({
-          fractionalSecondDigits: 3,
-        }),
-      },
+      traits: { last_active_at: unixSecondsOf(now) },
     },
   ];
 }

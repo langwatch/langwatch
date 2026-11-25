@@ -24,6 +24,8 @@ import {
   type ArchivedProject,
   type Project,
   type ProjectIdentity,
+  type ProjectLegacyKey,
+  type ProjectLegacyKeyStatus,
   type ProjectWithTeam,
   type PaginatedProjects,
   type TraceDestinationDecision,
@@ -60,8 +62,18 @@ import {
   type ProjectFactsBackfillReport,
   type ProjectFactsBackfillRun,
 } from "../services/project-facts-backfill.service.ts";
+import {
+  ProjectHistoryListingService,
+  type ProjectHistoryListingReport,
+  type ProjectHistoryListingRun,
+  type ProjectHistoryListingSenders,
+} from "../services/project-history-listing.service.ts";
 import { ProjectOperationsService } from "../services/project-operations.service.ts";
 import { ProjectRequestService } from "../services/project-request.service.ts";
+import {
+  ProjectReservedSlugService,
+  type ReservedSlugReport,
+} from "../services/project-reserved-slug.service.ts";
 import { ProjectService as ProjectApplicationService } from "../services/project.service.ts";
 import type { ProjectManagementApi } from "../transport/project.rest.ts";
 import type { ProjectBrowserApi, ProjectPermissionScope } from "../transport/project.trpc.ts";
@@ -121,6 +133,8 @@ export class ProjectModule implements ProjectApiContract, ProjectManagementApi, 
   readonly #operations: ProjectOperationsService;
   readonly #lifecycle: ProjectCreatedNoticeService;
   readonly #factsBackfill: ProjectFactsBackfillService;
+  readonly #historyListing: ProjectHistoryListingService;
+  readonly #reservedSlugs: ProjectReservedSlugService;
   readonly #authorization: AuthzApi;
   readonly #dataPrivacy: DataPrivacyApi;
   readonly #organizations: Pick<OrganizationApi, "isMember" | "getMember">;
@@ -130,6 +144,8 @@ export class ProjectModule implements ProjectApiContract, ProjectManagementApi, 
   readonly #aggregateReads: ProjectRepository;
   readonly #requests = ProjectRequestService.create({
     projects: this,
+    findLegacyKeys: (input) => this.#operations.findLegacyKeys(input),
+    decideManageable: (input) => this.#decideManageable(input),
     probePermission: (input) => this.probePermission(input),
   });
   private constructor({
@@ -137,6 +153,8 @@ export class ProjectModule implements ProjectApiContract, ProjectManagementApi, 
     operations,
     lifecycle,
     factsBackfill,
+    historyListing,
+    reservedSlugs,
     authorization,
     dataPrivacy,
     organizations,
@@ -148,6 +166,8 @@ export class ProjectModule implements ProjectApiContract, ProjectManagementApi, 
     operations: ProjectOperationsService;
     lifecycle: ProjectCreatedNoticeService;
     factsBackfill: ProjectFactsBackfillService;
+    historyListing: ProjectHistoryListingService;
+    reservedSlugs: ProjectReservedSlugService;
     authorization: AuthzApi;
     dataPrivacy: DataPrivacyApi;
     organizations: Pick<OrganizationApi, "isMember" | "getMember">;
@@ -159,6 +179,8 @@ export class ProjectModule implements ProjectApiContract, ProjectManagementApi, 
     this.#operations = operations;
     this.#lifecycle = lifecycle;
     this.#factsBackfill = factsBackfill;
+    this.#historyListing = historyListing;
+    this.#reservedSlugs = reservedSlugs;
     this.#authorization = authorization;
     this.#dataPrivacy = dataPrivacy;
     this.#organizations = organizations;
@@ -198,7 +220,13 @@ export class ProjectModule implements ProjectApiContract, ProjectManagementApi, 
       factsBackfill: ProjectFactsBackfillService.create({
         projects: repositories.projects,
         lifecycle,
+        logger: createLogger("langwatch:project:facts-backfill"),
       }),
+      historyListing: ProjectHistoryListingService.create({
+        projects: repositories.projects,
+        logger: createLogger("langwatch:project:history-listing"),
+      }),
+      reservedSlugs: ProjectReservedSlugService.create({ projects: repositories.projects }),
       authorization: dependencies.authorization,
       dataPrivacy: dependencies.dataPrivacy,
       organizations: dependencies.organizations,
@@ -230,6 +258,11 @@ export class ProjectModule implements ProjectApiContract, ProjectManagementApi, 
     this.#lifecycle.connect(senders);
   }
 
+  /** The history listing's senders, from the same pipeline. */
+  connectHistoryListing(senders: ProjectHistoryListingSenders): void {
+    this.#historyListing.connect(senders);
+  }
+
   /** Records a project organization created (a personal one, §9); throws so the queue retries. */
   recordProjectCreated(
     input: Readonly<{ projectId: string; organizationId: string }>,
@@ -245,6 +278,19 @@ export class ProjectModule implements ProjectApiContract, ProjectManagementApi, 
   /** The `project:record-created-facts` step's body: every project's facts, one pass. */
   recordExistingFacts(input: ProjectFactsBackfillRun): Promise<ProjectFactsBackfillReport> {
     return this.#factsBackfill.recordExisting(input);
+  }
+
+  /** The `project:list-personal-owner-and-first-message-facts` step's body, one pass. */
+  sendHistoryFacts(input: ProjectHistoryListingRun): Promise<ProjectHistoryListingReport> {
+    return this.#historyListing.sendHistory(input);
+  }
+
+  /** The `project:reslug-reserved-dashboards` step's body: moves projects off a reserved slug. */
+  reslugReservedProjects(input: {
+    dryRun: boolean;
+    signal: AbortSignal;
+  }): Promise<ReservedSlugReport> {
+    return this.#reservedSlugs.reslugReserved(input);
   }
 
   /**
@@ -285,7 +331,35 @@ export class ProjectModule implements ProjectApiContract, ProjectManagementApi, 
     return this.#requests.archiveOtherProject(input);
   }
 
-  getLegacyKeyStatus(input: { projectId: string }): Promise<{ present: boolean }> {
+  legacyKeys(input: {
+    organizationId: string;
+    by: Readonly<{ id: string }>;
+  }): Promise<ProjectLegacyKey[]> {
+    return this.#requests.findLegacyKeys(input);
+  }
+
+  /** `project:manage` for every project read, in one decision off one grant snapshot. */
+  async #decideManageable({
+    organizationId,
+    projects,
+    by,
+  }: {
+    organizationId: string;
+    projects: readonly Readonly<{ projectId: string; teamId: string }>[];
+    by: Readonly<{ id: string }>;
+  }): Promise<ReadonlyMap<string, boolean>> {
+    const decision = await this.#authorization.canBatchByIds({
+      principal: { type: "user", id: by.id },
+      permission: "project:manage",
+      organizationId,
+      teams: [],
+      projects,
+    });
+
+    return decision.projects;
+  }
+
+  getLegacyKeyStatus(input: { projectId: string }): Promise<ProjectLegacyKeyStatus> {
     return this.#operations.getLegacyKeyStatus(input);
   }
 
@@ -593,6 +667,10 @@ export class ProjectModule implements ProjectApiContract, ProjectManagementApi, 
 
   findIdByLegacyApiKey(input: Readonly<{ token: string }>): Promise<string | null> {
     return this.#projectService.findIdByLegacyApiKey(input);
+  }
+
+  markLegacyApiKeyUsed(input: Readonly<{ projectId: string }>): Promise<void> {
+    return this.#projectService.markLegacyApiKeyUsed(input);
   }
 
   /** Both kill switches a trace share is minted under, read off this module's rows. */

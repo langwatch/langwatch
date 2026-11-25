@@ -46,7 +46,7 @@ ingress:
   className: nginx
   # ...your app hosts, tls and annotations
   gateway:
-    host: gateway.acme.com        # publishes /v1 and /health on this host
+    host: gateway.acme.com        # publishes /v1, /a2a and /health on this host
     tls:
       secretName: gateway-tls
   # className nginx adds the streaming, timeout and body-size annotations
@@ -56,8 +56,9 @@ gateway:
   chartManaged: true
 
   # Externally reachable URL the control plane hands to CLI users at login.
-  # Leave empty to derive https://<ingress.gateway.host> from the ingress below.
-  publicUrl: ""
+  # The gateway also builds A2A Agent Card URLs from it and refuses Agent
+  # Card calls while it is empty, so set it to https://<ingress.gateway.host>.
+  publicUrl: https://gateway.acme.com
 
   # Where the gateway reaches the control plane. Empty resolves to
   # http://<release>-app:5560, the app Service of this install.
@@ -75,6 +76,7 @@ gateway:
     blockLocalHTTPCalls: false
     requireHTTPSCustomEndpoints: false
     allowedProxyHosts: []
+    extraCACertsConfigMap: "" # ConfigMap of PEM CA certificates to trust
     corsAllowedOrigins: [] # browser origins allowed to call /v1
 
   # OTLP/HTTP endpoint for the gateway's own spans. Empty disables export.
@@ -146,6 +148,7 @@ The chart passes these environment variables to the container. Every other key i
 | `BLOCK_LOCAL_HTTP_CALLS`                               | `security.blockLocalHTTPCalls`                                       | Refuse provider endpoints on private addresses |
 | `REQUIRE_HTTPS_CUSTOM_ENDPOINTS`                       | `security.requireHTTPSCustomEndpoints`                               | Refuse `http://` provider endpoints            |
 | `ALLOWED_PROXY_HOSTS`                                  | `security.allowedProxyHosts`, comma-joined                           | Private hostnames exempt from the block        |
+| `SSL_CERT_DIR`                                         | set to `/etc/langwatch/ca` when `security.extraCACertsConfigMap` is set | Extra CA certificates to trust              |
 | `LW_GATEWAY_CORS_ALLOWED_ORIGINS`                      | `security.corsAllowedOrigins`, comma-joined                          | Browser origins allowed to call `/v1`          |
 | `LW_GATEWAY_INTERNAL_SECRET`                           | Secret `secrets.existingSecretName`, key `secrets.internalSecretKey` | HMAC secret for control plane calls            |
 | `LW_GATEWAY_JWT_SECRET`                                | Secret `secrets.existingSecretName`, key `secrets.jwtSecretKey`      | JWT verification secret                        |

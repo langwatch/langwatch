@@ -26,7 +26,7 @@ import { type DrawerChromeState, useDrawerChrome } from "./drawer-chrome.store.t
 export interface TraceHistoryEntry {
   traceId: string;
   viewMode: DrawerViewMode;
-  /** The trace's `occurredAt` (ms since epoch), the partition-pruning hint its reads need. */
+  /** The trace's `occurredAt` (ms since epoch), the partition-pruning hint its reads may send. */
   occurredAtMs?: number;
   /** The member that owns the trace on an aggregate, so going back reopens that member's trace. */
   tenantId?: string;
@@ -145,9 +145,13 @@ const addressActions: TraceDrawerAddressActions = {
   },
   clearPinnedSpans: () => writeAddress({ pinnedSpans: undefined }),
   backfillOccurredAtMs: (occurredAtMs) => {
-    if (addressNow().occurredAtMs !== null) return;
+    const { isOpen, traceId, occurredAtMs: addressed } = addressNow();
+    if (!isOpen || traceId === null || addressed !== null) return;
     if (!Number.isFinite(occurredAtMs) || occurredAtMs <= 0) return;
-    writeAddress({ t: String(Math.trunc(occurredAtMs)) });
+    const t = Math.trunc(occurredAtMs);
+    // Noted before the address changes, so no reader ever sees the time without the note.
+    useDrawerChrome.getState().noteBackfilledOccurredAt({ traceId, occurredAtMs: t });
+    writeAddress({ t: String(t) });
   },
   backfillTenantId: (tenantId) => {
     if (addressNow().tenantId !== null || tenantId === "") return;

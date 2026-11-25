@@ -244,7 +244,7 @@ describe("the product sidebar", () => {
   describe("when on a Me page", () => {
     /** @scenario The Me sidebar keeps the personal pages without the Govern group */
     it("shows the personal pages and no Govern group", () => {
-      renderSidebar({ surface: "me", pathname: "/me" });
+      renderSidebar({ surface: "me", pathname: "/coding-agents" });
 
       expect(screen.getByText("My Usage")).toBeInTheDocument();
       expect(screen.getByText("Sessions")).toBeInTheDocument();
@@ -382,6 +382,18 @@ describe("the product sidebar", () => {
 
       await waitFor(() => {
         expect(screen.getByTestId("sidebar-scroll-region").scrollTop).toBe(300);
+      });
+    });
+
+    /** @scenario "Opening a page below the fold reveals its sidebar entry" */
+    it("reveals an entry that sits under the menu's bottom fade", async () => {
+      // Inside the menu's 200px box, but its last pixels are where the fade hides entries.
+      stubMenuLayout({ entryOffsets: { "Virtual keys": 150 }, menuHeight: 200 });
+
+      renderSidebar({ surface: "gateway", pathname: "/gateway/virtual-keys" });
+
+      await waitFor(() => {
+        expect(screen.getByTestId("sidebar-scroll-region").scrollTop).toBe(150);
       });
     });
 

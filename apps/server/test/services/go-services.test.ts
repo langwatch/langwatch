@@ -24,6 +24,7 @@ vi.mock("execa", () => ({
   execa: vi.fn(async () => ({ stdout: "", stderr: binary.usage })),
 }));
 vi.mock("../../src/services/spawn.ts", () => ({ supervise }));
+vi.mock("../../src/services/app-dir.ts", () => ({ appRoot: () => "/tmp/.langwatch-test/app" }));
 vi.mock("../../src/services/nlpgo.ts", () => ({ startNlpgo: separate.nlpgo }));
 vi.mock("../../src/services/aigateway.ts", () => ({ startAigateway: separate.aigateway }));
 vi.mock("../../src/services/health.ts", () => ({
@@ -48,6 +49,7 @@ function fakeCtx(): RuntimeContext {
       aigateway: 5563,
       langyagent: 5564,
       workerHealth: 5565,
+      backend: 5566,
       postgres: 6560,
       redis: 6561,
       clickhouseHttp: 6562,
@@ -75,7 +77,7 @@ function fakeCtx(): RuntimeContext {
     userEnv: {},
     orchestrator: {
       browser: { openEnabled: true, continuousIntegration: false },
-      development: { aiGatewayDevBuild: false, forceBundledPostgres: false },
+      development: { aiGatewayDevBuild: false, forceBundledPostgres: false, appArchive: undefined },
     },
   };
 }
@@ -111,10 +113,19 @@ describe("startGoServices", () => {
       expect(supervise.mock.calls[0]![0].spec.env).toMatchObject({
         LANGWATCH_GO_NLPGO_ADDR: ":5561",
         LANGWATCH_GO_AIGATEWAY_ADDR: ":5563",
-        NLPGO_ENGINE_LANGWATCH_BASE_URL: "http://127.0.0.1:5560",
-        LW_GATEWAY_BASE_URL: "http://127.0.0.1:5560",
+        NLPGO_ENGINE_LANGWATCH_BASE_URL: "http://127.0.0.1:5566",
+        LW_GATEWAY_BASE_URL: "http://127.0.0.1:5566",
         OPENAI_API_KEY: "sk-user",
       });
+    });
+
+    /** @scenario "nlpgo reads the model catalog the app ships with" */
+    it("points the combined process's nlpgo at the app's model catalog", async () => {
+      await startGoServices(fakeCtx(), new EventBus(), {});
+
+      expect(supervise.mock.calls[0]![0].spec.env.LANGWATCH_MODEL_CATALOG_DIR).toBe(
+        "/tmp/.langwatch-test/app/modules/model-provider/contract/src/catalog",
+      );
     });
 
     /** @scenario "nlpgo and the ai-gateway run as one Go process when the binary has combined mode" */

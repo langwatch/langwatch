@@ -7,6 +7,7 @@ import type { Prisma, PrismaClient } from "@langwatch/prisma-client/generated";
 import { fromDate, toDate, type Instant } from "@langwatch/time";
 import {
   EmailAlreadyRegisteredError,
+  UserNotFoundError,
   userAccountInfoSchema,
   userFullProfileSchema,
   userProfileSchema,
@@ -37,6 +38,7 @@ import type {
   CreateCredentialUserRow,
   CreatedCredentialUser,
   CreatePasskeyUserRow,
+  PasswordHolderRow,
   SetFirstUserPasswordRow,
   UserAddressReplacement,
   UserAddressRow,
@@ -67,10 +69,10 @@ function storedPreferenceMap(value: Prisma.JsonValue): Prisma.JsonObject {
   return value;
 }
 
-/** The three models, the transaction runner, and the raw read of the database's clock. */
+/** The four models, the transaction runner, and the raw read of the database's clock. */
 export type UserDatabase = Pick<
   PrismaClient,
-  "user" | "account" | "passkey" | "$transaction" | "$queryRaw"
+  "user" | "account" | "passkey" | "userErasure" | "$transaction" | "$queryRaw"
 >;
 
 const userProfileSelect = {
@@ -100,7 +102,7 @@ const userFullProfileSelect = {
 const createdUserSelect = { id: true } satisfies Prisma.UserSelect;
 
 export class PrismaUserRepository
-  extends PrismaRepository.transactionalFor("User", "Account", "Passkey")
+  extends PrismaRepository.transactionalFor("User", "Account", "Passkey", "UserErasure")
   implements UserRepository
 {
   static create({ prisma }: { prisma: UserDatabase }): PrismaUserRepository {
@@ -179,6 +181,21 @@ export class PrismaUserRepository
     return { emailDomains: domainCounts(rows.map((row) => row.email ?? "")) };
   }
 
+  async findSignedInSince({
+    userIds,
+    since,
+  }: {
+    userIds: readonly string[];
+    since: number;
+  }): Promise<string[]> {
+    if (userIds.length === 0) return [];
+    const rows = await this.prisma.user.findMany({
+      where: { id: { in: [...userIds] }, lastLoginAt: { gte: new Date(since) } },
+      select: { id: true },
+    });
+    return rows.map((row) => row.id);
+  }
+
   /** Install-wide on purpose, like the report: one row at most, and only a yes or no leaves. */
   async hasAccountOnDomain(domain: string): Promise<boolean> {
     const row = await this.prisma.user.findFirst({
@@ -191,6 +208,22 @@ export class PrismaUserRepository
   async hasAnyAccount(): Promise<boolean> {
     const row = await this.prisma.user.findFirst({ select: { id: true } });
     return row !== null;
+  }
+
+  async findFirstCreatedId(): Promise<string | null> {
+    const [row, erased] = await Promise.all([
+      this.prisma.user.findFirst({
+        orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+        select: { id: true, createdAt: true },
+      }),
+      this.prisma.userErasure.findFirst({
+        orderBy: { accountCreatedAt: "asc" },
+        select: { accountCreatedAt: true },
+      }),
+    ]);
+    if (!row) return null;
+    if (erased && erased.accountCreatedAt.getTime() <= row.createdAt.getTime()) return null;
+    return row.id;
   }
 
   async findBackfillPage({
@@ -272,6 +305,21 @@ export class PrismaUserRepository
     return row ? userProfileSchema.parse(row) : null;
   }
 
+  async searchProfiles({ query, limit }: { query: string; limit: number }): Promise<UserProfile[]> {
+    const rows = await this.prisma.user.findMany({
+      where: {
+        OR: (["id", "name", "email"] as const).map((field) => ({
+          [field]: { contains: literalSubstring(query), mode: "insensitive" as const },
+        })),
+      },
+      select: userProfileSelect,
+      orderBy: [{ email: "asc" }, { id: "asc" }],
+      take: limit,
+    });
+
+    return rows.map((row) => userProfileSchema.parse(row));
+  }
+
   async findByEmailAnyCase(email: string): Promise<UserProfile[]> {
     const rows = await this.prisma.user.findMany({
       where: { email: { equals: email, mode: "insensitive" } },
@@ -305,6 +353,14 @@ export class PrismaUserRepository
       if (isUniqueConstraintError(error)) throw new EmailAlreadyRegisteredError();
       throw error;
     }
+  }
+
+  async appendCreatedFact(id: string): Promise<void> {
+    await this.transaction(async (transaction) => {
+      const row = await transaction.user.findUnique({ where: { id }, select: { createdAt: true } });
+      if (!row) throw new UserNotFoundError(id);
+      await this.#appendMintFacts({ transaction, userId: id, createdAt: row.createdAt });
+    });
   }
 
   async createCredentialUser(input: CreateCredentialUserRow): Promise<CreatedCredentialUser> {
@@ -374,6 +430,42 @@ export class PrismaUserRepository
     });
 
     return row ? userCredentialAccountRowSchema.parse(row).password !== null : false;
+  }
+
+  async findPasswordHolders({
+    emails,
+  }: {
+    emails: readonly string[] | null;
+  }): Promise<PasswordHolderRow[]> {
+    const rows = await this.prisma.user.findMany({
+      where: {
+        accounts: { some: { provider: CREDENTIAL_PROVIDER, password: { not: null } } },
+        ...(emails === null ? {} : { email: { in: [...emails], mode: "insensitive" as const } }),
+      },
+      select: { id: true, email: true, passwordResetRequiredAt: true },
+      orderBy: { id: "asc" },
+    });
+    return rows.map((row) => ({
+      id: row.id,
+      email: row.email,
+      passwordResetRequiredAt:
+        row.passwordResetRequiredAt === null ? null : fromDate(row.passwordResetRequiredAt),
+    }));
+  }
+
+  async markPasswordResetRequired({
+    ids,
+    at,
+  }: {
+    ids: readonly string[];
+    at: Instant;
+  }): Promise<number> {
+    if (ids.length === 0) return 0;
+    const { count } = await this.prisma.user.updateMany({
+      where: { id: { in: [...ids] }, passwordResetRequiredAt: null },
+      data: { passwordResetRequiredAt: toDate(at) },
+    });
+    return count;
   }
 
   async setFirstPassword(input: SetFirstUserPasswordRow): Promise<SetFirstUserPasswordResult> {
@@ -663,4 +755,9 @@ function domainCounts(emails: readonly string[]): Record<string, number> {
     if (domain) counts[domain] = (counts[domain] ?? 0) + 1;
   }
   return counts;
+}
+
+/** The query as a literal substring: LIKE reads `%`, `_` and `\\` as patterns otherwise. */
+function literalSubstring(query: string): string {
+  return query.replace(/[\\%_]/g, (character) => `\\${character}`);
 }

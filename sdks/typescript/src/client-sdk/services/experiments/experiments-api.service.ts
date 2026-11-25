@@ -23,8 +23,13 @@ export interface ExperimentRunStartResponse {
 export interface ExperimentRunStartRequest {
   data?: Record<string, unknown>[];
   dataset_id?: string;
+  /** Version of the saved dataset to run; overrides the version the experiment pins. */
+  dataset_version?: number;
   parameters?: Record<string, string | number | boolean>;
   row_indices?: number[];
+  concurrency?: number;
+  /** How many times every dataset row runs against every target, 1 to 5. */
+  repeat?: number;
 }
 
 /**
@@ -33,19 +38,28 @@ export interface ExperimentRunStartRequest {
 export const toRunStartRequest = ({
   data,
   datasetId,
+  datasetVersion,
   parameters,
   rowIndices,
+  concurrency,
+  repeat,
 }: {
   data?: Record<string, unknown>[];
   datasetId?: string;
+  datasetVersion?: number;
   parameters?: Record<string, string | number | boolean>;
   rowIndices?: number[];
+  concurrency?: number;
+  repeat?: number;
 }): ExperimentRunStartRequest | undefined => {
   const body: ExperimentRunStartRequest = {};
   if (data !== undefined) body.data = data;
   if (datasetId !== undefined) body.dataset_id = datasetId;
+  if (datasetVersion !== undefined) body.dataset_version = datasetVersion;
   if (parameters !== undefined) body.parameters = parameters;
   if (rowIndices !== undefined) body.row_indices = rowIndices;
+  if (concurrency !== undefined) body.concurrency = concurrency;
+  if (repeat !== undefined) body.repeat = repeat;
   return Object.keys(body).length > 0 ? body : undefined;
 };
 
@@ -224,6 +238,10 @@ export interface ExperimentRunResultsResponse {
   workflowVersionId?: string | null;
   progress?: number | null;
   total?: number | null;
+  /** How many times the run repeated every dataset row; absent or null ran each once. */
+  repeat?: number | null;
+  /** Resolves the targetId each dataset row and evaluation carries. */
+  targets?: { id: string; name: string }[] | null;
   dataset: ExperimentRunDatasetEntry[];
   evaluations: ExperimentRunEvaluation[];
   timestamps: {
@@ -423,9 +441,17 @@ export class ExperimentsApiService {
     slug: string,
     options: {
       parameters?: Record<string, string | number | boolean>;
+      concurrency?: number;
+      datasetVersion?: number;
+      repeat?: number;
     } = {},
   ): Promise<ExperimentRunStartResponse> {
-    const body = toRunStartRequest({ parameters: options.parameters });
+    const body = toRunStartRequest({
+      parameters: options.parameters,
+      concurrency: options.concurrency,
+      datasetVersion: options.datasetVersion,
+      repeat: options.repeat,
+    });
     const { data, error, response } = await this.apiClient.POST("/api/v1/experiments/{slug}/run", {
       params: { path: { slug } },
       ...(body !== undefined ? { body } : {}),

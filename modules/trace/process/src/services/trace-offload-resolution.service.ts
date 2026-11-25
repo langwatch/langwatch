@@ -1,4 +1,3 @@
-import { EventNotFoundError } from "@langwatch/eventing";
 import { createLogger, type Logger as PinoLogger } from "@langwatch/observability";
 import type { NormalizedSpan } from "@langwatch/trace-contract";
 
@@ -13,12 +12,8 @@ import type { TraceIOExtractionService } from "#features/derivation/services/tra
 import type { ResolveTraceSpansFn } from "../features/legacy/repositories/trace-legacy-read.repository.ts";
 import type { BlobResolutionDeps } from "../features/legacy/services/trace-legacy-read.service.ts";
 import type { TraceBlobStoreService } from "../features/media/services/trace-blob-store.service.ts";
-import {
-  BlobFieldNotFoundError,
-  BlobNotFoundError,
-} from "../features/media/services/trace-blob-store.service.ts";
-import { TraceEventPayloadFieldNotFoundError } from "../repositories/trace-payload-reader.repository.ts";
-import { hasEventRefs, parseSpanEventRefs } from "../rules/trace-event-ref-parsing.rules.ts";
+import { hasEventRefs } from "../rules/trace-event-ref-parsing.rules.ts";
+import { TraceOffloadResolutionBatchService } from "./trace-offload-resolution-batch.service.ts";
 
 const offloadResolutionLogger = createLogger("langwatch:traces:clickhouse-legacy-read");
 
@@ -70,8 +65,8 @@ export class TraceOffloadResolutionService {
 
   /**
    * Resolves offloaded event refs for one trace's normalized spans, replacing spanAttributes with
-   * the resolved map and re-running IO extraction when any span resolved. A missing event_log row
-   * leaves that span's preview intact and is logged at warn, never propagated.
+   * the resolved map and re-running IO extraction when any span resolved. A field that cannot be
+   * recalled keeps its preview and is logged at warn, never propagated.
    */
   async resolveOffloadedTraces({
     projectId,
@@ -97,160 +92,16 @@ export class TraceOffloadResolutionService {
       };
     }
 
-    // Each span resolves on its own so one failing does not block the others, and settlements
-    // keep the successes even when a span's resolver throws something unexpected.
-    const spanSettlements = await Promise.allSettled(
-      normalizedSpans.map((span) =>
-        this.resolveSpan({
-          span,
-          projectId,
-          blobStore,
-          logger,
-        }),
-      ),
-    );
-
-    let anyResolved = false;
-    const resolvedSpans: NormalizedSpan[] = spanSettlements.map((settlement, i) => {
-      if (settlement.status === "fulfilled") {
-        if (settlement.value.resolvedCount > 0) {
-          anyResolved = true;
-        }
-
-        return settlement.value.span;
-      }
-
-      logger.warn(
-        {
-          projectId,
-          spanId: normalizedSpans[i]?.spanId,
-          traceId: normalizedSpans[i]?.traceId,
-          error:
-            settlement.reason instanceof Error
-              ? settlement.reason.message
-              : String(settlement.reason),
-        },
-        "Failed to resolve offloaded event refs for span — keeping preview value",
-      );
-
-      return normalizedSpans[i]!;
-    });
-
-    if (!anyResolved) {
-      return {
-        resolvedSpans,
-        recomputedInput: null,
-        recomputedOutput: null,
-        anyResolved: false,
-      };
-    }
-
-    return {
-      resolvedSpans,
-      recomputedInput: ioExtractionService.extractFirstInput(resolvedSpans),
-      recomputedOutput: ioExtractionService.extractLastOutput(resolvedSpans),
-      anyResolved: true,
-    };
-  }
-
-  /**
-   * One span's attributes with its offloaded fields fetched back. Reserved keys are stripped
-   * whatever happens, so the namespace never reaches the UI, and a field that cannot be fetched
-   * keeps the preview already sitting under its plain IO key.
-   */
-  private async resolveSpan({
-    span,
-    projectId,
-    blobStore,
-    logger,
-  }: {
-    span: NormalizedSpan;
-    projectId: string;
-    blobStore: TraceBlobStoreService;
-    logger: WarnLogger;
-  }): Promise<{ span: NormalizedSpan; resolvedCount: number }> {
-    const attrs = span.spanAttributes;
-    if (!hasEventRefs(attrs)) {
-      return { span, resolvedCount: 0 };
-    }
-
-    const { cleanedAttrs, eventrefEntries, missingEventIdKeys } = parseSpanEventRefs(attrs);
-    for (const attrKey of missingEventIdKeys) {
-      logger.warn(
-        { projectId, spanId: span.spanId, traceId: span.traceId, attrKey },
-        "eventref missing eventId — keeping preview value",
-      );
-    }
-
-    if (eventrefEntries.length === 0) {
-      return { span: { ...span, spanAttributes: cleanedAttrs }, resolvedCount: 0 };
-    }
-
-    // ADR-022: the aggregate id for the trace-processing pipeline is the traceId, and the
-    // eventref carries the eventId the lean wrote at projection time.
-    const resolvedAttrs = { ...cleanedAttrs };
-    const fieldResults = await Promise.allSettled(
-      eventrefEntries.map(async ({ attrKey, field, eventId }) => ({
-        attrKey,
-        fullValue: await blobStore.getFromEventLog({
-          eventId,
-          field,
-          tenantId: projectId,
-          aggregateId: span.traceId,
-        }),
-      })),
-    );
-
-    let resolvedCount = 0;
-    for (const [idx, result] of fieldResults.entries()) {
-      if (result.status === "fulfilled") {
-        resolvedAttrs[result.value.attrKey] = result.value.fullValue;
-        resolvedCount++;
-        continue;
-      }
-
-      this.warnFieldUnresolved({
-        error: result.reason,
+    // One trace is a result set of one: the same single recall per event, bounded pool and
+    // per-trace budget, rather than a fetch per field with every span in flight at once.
+    const [resolved] =
+      await TraceOffloadResolutionBatchService.create().resolveOffloadedTracesBatch({
         projectId,
-        span,
-        attrKey: eventrefEntries[idx]?.attrKey ?? "unknown",
+        spansPerTrace: [normalizedSpans],
+        blobStore,
+        ioExtractionService,
         logger,
       });
-    }
-
-    return { span: { ...span, spanAttributes: resolvedAttrs }, resolvedCount };
-  }
-
-  /** One field kept at its preview, said differently for a missing row than for a failed read. */
-  private warnFieldUnresolved({
-    error,
-    projectId,
-    span,
-    attrKey,
-    logger,
-  }: {
-    error: unknown;
-    projectId: string;
-    span: NormalizedSpan;
-    attrKey: string;
-    logger: WarnLogger;
-  }): void {
-    const missing =
-      error instanceof EventNotFoundError ||
-      error instanceof TraceEventPayloadFieldNotFoundError ||
-      error instanceof BlobNotFoundError ||
-      error instanceof BlobFieldNotFoundError;
-    logger.warn(
-      {
-        projectId,
-        spanId: span.spanId,
-        traceId: span.traceId,
-        attrKey,
-        error: error instanceof Error ? error.message : String(error),
-      },
-      missing
-        ? "event_log row not found for eventref — keeping preview value"
-        : "Failed to resolve eventref from event_log — keeping preview value",
-    );
+    return resolved!;
   }
 }

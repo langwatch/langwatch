@@ -1,5 +1,77 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
+exports[`given the Slack notice registry > when account-payment-failed / a declined card is rendered > matches its stored rendering 1`] = `
+{
+  "blocks": [
+    {
+      "text": {
+        "emoji": true,
+        "text": "🚨 Enterprise payment failed",
+        "type": "plain_text",
+      },
+      "type": "header",
+    },
+    {
+      "fields": [
+        {
+          "text": "*Organization*
+ACME",
+          "type": "mrkdwn",
+        },
+        {
+          "text": "*Organization id*
+\`organization_KAXYxPR8MU\`",
+          "type": "mrkdwn",
+        },
+        {
+          "text": "*Amount*
+€4,235.00",
+          "type": "mrkdwn",
+        },
+        {
+          "text": "*Stripe invoice*
+\`in_1QxAcmeExample\`",
+          "type": "mrkdwn",
+        },
+      ],
+      "type": "section",
+    },
+    {
+      "text": {
+        "text": ">Enterprise organizations are never paused. Follow up with the account.",
+        "type": "mrkdwn",
+      },
+      "type": "section",
+    },
+    {
+      "elements": [
+        {
+          "action_id": "account-payment-failed_0",
+          "style": "primary",
+          "text": {
+            "text": "Open in Stripe",
+            "type": "plain_text",
+          },
+          "type": "button",
+          "url": "https://dashboard.stripe.com/invoices/in_1QxAcmeExample",
+        },
+      ],
+      "type": "actions",
+    },
+    {
+      "elements": [
+        {
+          "text": "app.langwatch.ai · <!date^1790000000^{date_short_pretty} at {time}|2026-09-21T14:13Z>",
+          "type": "mrkdwn",
+        },
+      ],
+      "type": "context",
+    },
+  ],
+  "text": "🚨 Enterprise payment failed · Organization: ACME · Organization id: organization_KAXYxPR8MU · Amount: €4,235.00 · Stripe invoice: in_1QxAcmeExample",
+}
+`;
+
 exports[`given the Slack notice registry > when billing-threshold-failure / a Stripe re… is rendered > matches its stored rendering 1`] = `
 {
   "blocks": [
@@ -702,6 +774,68 @@ exports[`given the Slack notice registry > when scim-sync-summary / only deactiv
 }
 `;
 
+exports[`given the Slack notice registry > when seat-requested / an enterprise licence … is rendered > matches its stored rendering 1`] = `
+{
+  "blocks": [
+    {
+      "text": {
+        "emoji": true,
+        "text": "🌱 Seat requested",
+        "type": "plain_text",
+      },
+      "type": "header",
+    },
+    {
+      "text": {
+        "text": "*Acme Robotics* has someone waiting for a seat on *ENTERPRISE*.",
+        "type": "mrkdwn",
+      },
+      "type": "section",
+    },
+    {
+      "fields": [
+        {
+          "text": "*Seats now*
+25",
+          "type": "mrkdwn",
+        },
+        {
+          "text": "*Seats needed*
+26",
+          "type": "mrkdwn",
+        },
+      ],
+      "type": "section",
+    },
+    {
+      "elements": [
+        {
+          "action_id": "seat-requested_0",
+          "style": "primary",
+          "text": {
+            "text": "Open org in admin",
+            "type": "plain_text",
+          },
+          "type": "button",
+          "url": "https://app.langwatch.ai/admin#/organizations/organization_acme",
+        },
+      ],
+      "type": "actions",
+    },
+    {
+      "elements": [
+        {
+          "text": "app.langwatch.ai · <!date^1790000000^{date_short_pretty} at {time}|2026-09-21T14:13Z>",
+          "type": "mrkdwn",
+        },
+      ],
+      "type": "context",
+    },
+  ],
+  "text": "🌱 Seat requested · Acme Robotics has someone waiting for a seat on ENTERPRISE. · Seats now: 25 · Seats needed: 26",
+}
+`;
+
 exports[`given the Slack notice registry > when self-hosted-signal / a known company is rendered > matches its stored rendering 1`] = `
 {
   "blocks": [
@@ -1183,5 +1317,182 @@ Morgan Ellis",
     },
   ],
   "text": "🌱 Prospective subscription interest · Triggered by Morgan Ellis · Organization: Acme Robotics · Plan: GROWTH_SEAT_EVENT · Customer: Morgan Ellis",
+}
+`;
+
+exports[`given the Slack notice registry > when upgrade-diagnostics / an automatic repo… is rendered > matches its stored rendering 1`] = `
+{
+  "blocks": [
+    {
+      "text": {
+        "emoji": true,
+        "text": "🚨 Upgrade step trace:backfill-span-costs failed on 3.23.0",
+        "type": "plain_text",
+      },
+      "type": "header",
+    },
+    {
+      "text": {
+        "text": "Fills the cost of every span stored before costs were recorded.",
+        "type": "mrkdwn",
+      },
+      "type": "section",
+    },
+    {
+      "fields": [
+        {
+          "text": "*Company*
+Acme Robotics",
+          "type": "mrkdwn",
+        },
+        {
+          "text": "*Release*
+3.23.0",
+          "type": "mrkdwn",
+        },
+        {
+          "text": "*Step*
+\`trace:backfill-span-costs\`",
+          "type": "mrkdwn",
+        },
+        {
+          "text": "*Attempt*
+2",
+          "type": "mrkdwn",
+        },
+        {
+          "text": "*Sent*
+automatically",
+          "type": "mrkdwn",
+        },
+        {
+          "text": "*First report*
+<!date^1792400000^{date_short_pretty} at {time}|2026-10-19T08:53Z>",
+          "type": "mrkdwn",
+        },
+        {
+          "text": "*Latest report*
+<!date^1792403600^{date_short_pretty} at {time}|2026-10-19T09:53Z>",
+          "type": "mrkdwn",
+        },
+        {
+          "text": "*Instance*
+\`instance_7c1f0e\`",
+          "type": "mrkdwn",
+        },
+      ],
+      "type": "section",
+    },
+    {
+      "elements": [
+        {
+          "action_id": "upgrade-diagnostics_0",
+          "style": "primary",
+          "text": {
+            "text": "Open in Admin",
+            "type": "plain_text",
+          },
+          "type": "button",
+          "url": "https://app.langwatch.ai/ops/cloud/self-hosted-instances?instance=shi_1",
+        },
+      ],
+      "type": "actions",
+    },
+    {
+      "elements": [
+        {
+          "text": "app.langwatch.ai · <!date^1790000000^{date_short_pretty} at {time}|2026-09-21T14:13Z>",
+          "type": "mrkdwn",
+        },
+      ],
+      "type": "context",
+    },
+  ],
+  "text": "🚨 Upgrade step trace:backfill-span-costs failed on 3.23.0 · Fills the cost of every span stored before costs were recorded. · Company: Acme Robotics · Release: 3.23.0 · Step: trace:backfill-span-costs · Attempt: 2 · Sent: automatically · First report: 2026-10-19T08:53Z · Latest report: 2026-10-19T09:53Z · Instance: instance_7c1f0e",
+}
+`;
+
+exports[`given the Slack notice registry > when upgrade-diagnostics / an unlicensed nam… is rendered > matches its stored rendering 1`] = `
+{
+  "blocks": [
+    {
+      "text": {
+        "emoji": true,
+        "text": "🚨 Upgrade step licensing:copy-organization-licenses failed on an unknown release",
+        "type": "plain_text",
+      },
+      "type": "header",
+    },
+    {
+      "fields": [
+        {
+          "text": "*Company*
+Unknown",
+          "type": "mrkdwn",
+        },
+        {
+          "text": "*Release*
+unknown",
+          "type": "mrkdwn",
+        },
+        {
+          "text": "*Step*
+\`licensing:copy-organization-licenses\`",
+          "type": "mrkdwn",
+        },
+        {
+          "text": "*Attempt*
+1",
+          "type": "mrkdwn",
+        },
+        {
+          "text": "*Sent*
+by the operator",
+          "type": "mrkdwn",
+        },
+        {
+          "text": "*First report*
+<!date^1792400000^{date_short_pretty} at {time}|2026-10-19T08:53Z>",
+          "type": "mrkdwn",
+        },
+        {
+          "text": "*Latest report*
+<!date^1792400000^{date_short_pretty} at {time}|2026-10-19T08:53Z>",
+          "type": "mrkdwn",
+        },
+        {
+          "text": "*Instance*
+\`instance_7c1f0e\`",
+          "type": "mrkdwn",
+        },
+      ],
+      "type": "section",
+    },
+    {
+      "elements": [
+        {
+          "action_id": "upgrade-diagnostics_0",
+          "style": "primary",
+          "text": {
+            "text": "Open in Admin",
+            "type": "plain_text",
+          },
+          "type": "button",
+          "url": "https://app.langwatch.ai/ops/cloud/self-hosted-instances",
+        },
+      ],
+      "type": "actions",
+    },
+    {
+      "elements": [
+        {
+          "text": "app.langwatch.ai · <!date^1790000000^{date_short_pretty} at {time}|2026-09-21T14:13Z>",
+          "type": "mrkdwn",
+        },
+      ],
+      "type": "context",
+    },
+  ],
+  "text": "🚨 Upgrade step licensing:copy-organization-licenses failed on an unknown release · Company: Unknown · Release: unknown · Step: licensing:copy-organization-licenses · Attempt: 1 · Sent: by the operator · First report: 2026-10-19T08:53Z · Latest report: 2026-10-19T08:53Z · Instance: instance_7c1f0e",
 }
 `;

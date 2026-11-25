@@ -269,6 +269,14 @@ Feature: GroupQueue content-addressed tiered payload store
     And the grace window is withheld while any lease is live
 
   @integration
+  # A pod from a release that predates leases writes its holder without the
+  # sentinel, so a set holding one member may be a real reader, not the guard.
+  Scenario: The grace window is withheld while an old release still holds the blob
+    Given a Redis-tier blob an old release still lists as a holder
+    When a lease on it is released
+    Then the blob keeps its four-day backstop
+
+  @integration
   # Staging re-arms the backstop before a new holder reads the body, so a
   # concurrent final release can shorten the deadline without creating a hole.
   Scenario: A job staged after the grace window began restores the full backstop
@@ -295,26 +303,55 @@ Feature: GroupQueue content-addressed tiered payload store
   # ===========================================================================
   # Active blob reclaim
   # ===========================================================================
-  # A worker can disappear without releasing its lease, leaving an expired
-  # holder token that prevents the release path from shortening the blob's
-  # deadline. The scheduled reclaim runner judges each blob from its current
-  # lease state. Its two passes are deliberately asymmetric:
+  # The scheduled reclaim runner judges each blob from its current lease state
+  # and its holder set, by the same rule the release grace window uses: any
+  # holder other than the migration sentinel may be a reader no lease measures
+  # (a pod from a release that predates leases, or a token whose lease lapsed),
+  # so nothing is shortened or deleted under it. Its two passes stay asymmetric:
   #
   #   - Repair only shortens a deadline. The bytes stay readable and any take
-  #     re-arms them, so repair may ignore expired holder tokens.
+  #     re-arms them.
   #   - Reclaim is the only pass that destroys bytes, so it demands proof the
-  #     grace window has already been running for a margin — which a blob written
+  #     grace window has already been running for a margin, which a blob written
   #     but not yet staged can never show.
   #
-  # Bound by blobSweeper.integration.test.ts.
+  # A token left behind by a dead worker keeps its blob on the four-day backstop
+  # until it is released or expires. Bound by blob-sweeper.integration.test.ts.
 
   @integration
-  Scenario: An unreferenced blob is put on the grace window even though a stale holder token withheld it
-    Given a Redis-tier blob with no live lease
-    And a holder token left behind by a worker that died before releasing
+  Scenario: A holder token outliving its expired lease withholds the sweep until it is released
+    Given a Redis-tier blob whose only lease has expired
+    And that lease's holder token is still in the holder set
     When the reclaim runner runs
-    Then the blob is still readable
-    And its expiry is shortened to the release grace window
+    Then the blob keeps its four-day backstop
+    And the runner reports it as still referenced
+    When the token is released and the runner runs again
+    Then its expiry is shortened to the release grace window
+
+  @integration
+  Scenario: A blob an old release still holds keeps its backstop
+    Given a Redis-tier blob with no live lease
+    And a holder set written by an old release, with one holder and no sentinel
+    When the reclaim runner runs
+    Then the blob is neither shortened nor deleted
+    And the holder set is left as it was
+    When the old release lets go and the runner runs again
+    Then a blob past the reclaim margin is deleted
+
+  @integration
+  Scenario: The migration sentinel alone does not hold a blob
+    Given a Redis-tier blob with no live lease
+    And a holder set holding only the migration sentinel
+    When its last lease is released or the reclaim runner runs
+    Then its expiry is shortened to the release grace window
+
+  @integration
+  Scenario: A shared blob is swept only after its last holder retires
+    Given a Redis-tier blob leased by two staged jobs
+    When one releases and the reclaim runner runs
+    Then the runner reports it as still referenced
+    When the other releases and the runner runs again
+    Then the blob is on the release grace window
 
   @integration
   Scenario: A blob a live lease still references is left alone
@@ -365,6 +402,15 @@ Feature: GroupQueue content-addressed tiered payload store
     Given the reclaim runner has judged every blob it can see
     When a new unreferenced blob is written and the runner sweeps again
     Then the new blob is put on the grace window
+
+  @integration
+  # A dry run is an operator asking what would happen, so it must leave the
+  # store exactly as it found it: expired lease members included.
+  Scenario: A dry run changes no lease, holder or expiry
+    Given a Redis-tier blob eligible for reclaim with an expired lease member
+    When the reclaim runner sweeps in dry-run mode
+    Then the lease members, holder members and every expiry are unchanged
+    And the runner still reports the verdict it would have reached
 
   @integration
   # A dry run is an operator asking what would happen. If it counted the blobs it

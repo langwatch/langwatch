@@ -3,21 +3,21 @@ import path from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-const DOCKERFILE = readFileSync(
-  path.join(
-    import.meta.dirname,
-    "..",
-    "..",
-    "..",
-    "..",
-    "..",
-    "..",
-    "infra",
-    "docker",
-    "Dockerfile",
-  ),
-  "utf8",
+const INFRA_DOCKER = path.join(
+  import.meta.dirname,
+  "..",
+  "..",
+  "..",
+  "..",
+  "..",
+  "..",
+  "infra",
+  "docker",
 );
+const DOCKERFILE = readFileSync(path.join(INFRA_DOCKER, "Dockerfile"), "utf8");
+// The production install lives in the prune script the image and the npx app archive share
+// (ADR-180).
+const PRUNE_SCRIPT = readFileSync(path.join(INFRA_DOCKER, "prune-runtime-tree.sh"), "utf8");
 
 describe("infra/docker/Dockerfile scenario child", () => {
   // The worker does not depend on @langwatch/scenario-child, so the worker filter never builds it.
@@ -33,6 +33,6 @@ describe("infra/docker/Dockerfile scenario child", () => {
   });
 
   it("installs @langwatch/scenario-child's production dependencies for the bundle's external requires", () => {
-    expect(DOCKERFILE).toContain('--filter-prod "@langwatch/scenario-child..."');
+    expect(PRUNE_SCRIPT).toContain('--filter-prod "@langwatch/scenario-child..."');
   });
 });

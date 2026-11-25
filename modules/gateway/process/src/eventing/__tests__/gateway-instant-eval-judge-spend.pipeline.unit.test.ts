@@ -31,6 +31,7 @@ import { z } from "zod";
 import { GatewayInstantEvalJudgeSpendService } from "../../features/spend/services/gateway-instant-eval-judge-spend.service.ts";
 import { pricedSpendCommandData } from "../../rules/gateway-spend-command.rules.ts";
 import { buildGatewayInstantEvalJudgeSpendPipeline } from "../gateway-instant-eval-judge-spend.pipeline.ts";
+import { confirmSpendCommandDataSchema } from "../gateway-spend-commands.process.ts";
 import { ConfirmSpendCommand } from "../gateway-spend.intent.ts";
 
 const ORGANIZATION_ID = "organization-1";
@@ -188,6 +189,30 @@ describe("given gateway's Instant Evals judge spend pipeline beside the judge's 
       expect(JSON.parse(recorded[0]?.metadata ?? "{}")).toEqual({
         instant_eval: { cost_usd: 0.076923077, requests: 40, run_id: "run-1" },
       });
+      await eventing.close();
+    });
+  });
+
+  describe("when the judge records a routed cost that came with no input tokens", () => {
+    /** @scenario "A routed cost with no input tokens is still billed" */
+    it("writes the ledger row at its price with zero input tokens, which the spend spine accepts", async () => {
+      const { eventing, append, recorded } = harness();
+      const outputOnly = {
+        ...pricedFact(),
+        inputTokens: 0,
+        costNanoUsd: 5_000,
+        priceNanoUsd: 6_500,
+      };
+
+      await append(outputOnly, "evt-output-only");
+      await vi.waitFor(() => expect(recorded).toHaveLength(1));
+
+      expect(recorded[0]).toMatchObject({ inputTokens: 0, costNanoUsd: 6_500 });
+      const confirm = confirmSpendCommandDataSchema.safeParse(
+        pricedSpendCommandData(recorded[0] as GatewayPricedSpend),
+      );
+      expect(confirm.success).toBe(true);
+      expect(confirm.data).toMatchObject({ cost_nano_usd: 6_500, usage: { input_tokens: 0 } });
       await eventing.close();
     });
   });

@@ -9,6 +9,7 @@ import type { AgentApi } from "@langwatch/agent-contract";
 import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { DatasetApi } from "@langwatch/dataset-contract";
+import type { GatewayApi } from "@langwatch/gateway-contract";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { SecretApi } from "@langwatch/secret-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
@@ -106,7 +107,11 @@ async function appWith({
     config,
     resources: { own: () => void 0, ownService: () => void 0 },
     secrets,
-    channels: await HttpWorkflowChannels.create({ config, secrets }),
+    channels: await HttpWorkflowChannels.create({
+      config,
+      secrets,
+      bound: { spend: createApiFixture<GatewayApi>() },
+    }),
     repositories,
   });
 }
@@ -117,8 +122,11 @@ function fleetFingerprint(): string {
     buildStudioLambdaConfig({
       fields: {
         region: fleet.AWS_REGION,
-        accessKeyId: fleet.AWS_ACCESS_KEY_ID,
-        secretAccessKey: fleet.AWS_SECRET_ACCESS_KEY,
+        credentials: {
+          kind: "static",
+          accessKeyId: fleet.AWS_ACCESS_KEY_ID,
+          secretAccessKey: fleet.AWS_SECRET_ACCESS_KEY,
+        },
         roleArn: fleet.role_arn,
         imageUri: fleet.image_uri,
         cacheBucket: fleet.cache_bucket,

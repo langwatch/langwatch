@@ -1,5 +1,10 @@
 import type { AuthzApi } from "@langwatch/authz-contract";
 import { DataPrivacyApi } from "@langwatch/data-privacy-contract";
+import {
+  PII_REDACTION_SPEND_AGGREGATE_TYPE,
+  PII_REDACTION_SPEND_PIPELINE_NAME,
+} from "@langwatch/data-privacy-contract/pii-redaction-spend";
+import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { createApp } from "@langwatch/process";
 import { memoryStores } from "@langwatch/process-stores";
@@ -22,12 +27,15 @@ function process(role: "api" | "worker", googleCredentials?: string) {
         googleDlpDisabled: undefined,
         enforcement: undefined,
         nodeEnvironment: undefined,
+        isSaas: true,
         langevalsEndpoint: undefined,
+        piiRedactionModelEndpoint: undefined,
       },
     })
     .provide({
       authz: createApiFixture<AuthzApi>(),
       "feature-flag": createApiFixture<FeatureFlagApi>(),
+      entitlement: createApiFixture<EntitlementApi>(),
     });
 }
 
@@ -58,7 +66,9 @@ describe("data privacy app installation", () => {
       const app = runtime.service(DataPrivacyApi);
 
       expect(Object.keys(DataPrivacyModule.dependencies)).not.toContain("projects");
-      expect(dataPrivacyProcessModule.eventing).toBeUndefined();
+      // Its one pipeline is the PII redaction spend's, keyed by organization (ADR-201).
+      expect(dataPrivacyProcessModule.eventing?.pipeline).toBe(PII_REDACTION_SPEND_PIPELINE_NAME);
+      expect(PII_REDACTION_SPEND_AGGREGATE_TYPE).not.toContain("project");
       await expect(app.getResolvedForProject({ projectId: PROJECT_ID })).rejects.toMatchObject({
         code: "project_not_found",
       });

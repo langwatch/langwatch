@@ -49,6 +49,7 @@ const license: IssuedLicenseView = {
   maxMembers: 10,
   maxMembersLite: 0,
   liteSeatsUnlimited: false,
+  maxMembersDeveloper: null,
   issuedAt: "2026-09-01T00:00:00.000Z",
   expiresAt: "2027-09-01T00:00:00.000Z",
   source: "BACKOFFICE",
@@ -89,7 +90,11 @@ async function build(registry: Partial<Registry> = {}) {
   const licensing = createApiFixture<Registry>({
     listIssuedLicenses: async () => {
       commanded.push("list");
-      return { licenses: [], total: 0 };
+      return {
+        licenses: [],
+        total: 0,
+        counts: { active: 0, inactive: 0, customer: 0, internal: 0, all: 0 },
+      };
     },
     issueLicense: async () => {
       commanded.push("issue");
@@ -163,7 +168,7 @@ describe("the Cloud admin license registry", () => {
         page: 0,
         pageSize: 25,
         search: "acme",
-        onlyActive: true,
+        status: "active",
         operator,
       });
 
@@ -171,7 +176,7 @@ describe("the Cloud admin license registry", () => {
         expect.objectContaining({
           userId: "user_olive",
           action: "licenseRegistry.getAll",
-          args: { page: 0, pageSize: 25, hasSearch: true, onlyActive: true, hideInternal: false },
+          args: { page: 0, pageSize: 25, hasSearch: true, status: "active", audience: "all" },
           targetKind: "issuedLicense",
         }),
       ]);

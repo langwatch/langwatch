@@ -64,6 +64,7 @@ function storedCallFor(agentId: string): StoredCall {
     instanceId,
     replyTo: "pod_caller",
     envelope: {
+      kind: "turn",
       callId,
       agentId,
       threadId: "thread_1",

@@ -4,10 +4,13 @@
 // index on the one server (see domain/slug.go) — so this adapter's only job is
 // making sure a server exists to point REDIS_URL at.
 //
+// The server is Valkey or Redis, whichever the machine has (domain.RedisFormulas);
+// Valkey is a drop-in, so everything below speaks to either.
+//
 // Same philosophy as Postgres: a brew-managed Redis is a machine-wide resource
-// other local work may already depend on, so an already-running redis service
-// (any) is adopted rather than restarted — though Ensure still applies (or
-// clears) the maxmemory ceiling on it — and Stop is a no-op.
+// other local work may already depend on, so an already-running redis or
+// valkey service is adopted rather than restarted — though Ensure still applies
+// (or clears) the maxmemory ceiling on it — and Stop is a no-op.
 package redisbrew
 
 import (
@@ -16,51 +19,100 @@ import (
 	"os/exec"
 	"strings"
 	"time"
+
+	"github.com/langwatch/langwatch/tools/thuishaven/domain"
 )
 
 // Server is the brew-services-backed implementation of app.Redis.
 type Server struct {
+	// formula is the one HAVEN_REDIS_FORMULA names; "" means haven picks
+	// between valkey and redis by what the machine has (domain.ChooseRedisFormula).
 	formula     string
 	port        int
 	maxMemoryMB int
 }
 
 // New builds a Server for the given formula/port/cap as-is; defaulting to
-// domain.DefaultRedisFormula / domain.DefaultRedisPort /
-// domain.DefaultRedisMaxMemoryMB happens at the composition root
-// (cmd/root.go), not here. maxMemoryMB 0 means no cap.
+// domain.DefaultRedisPort / domain.DefaultRedisMaxMemoryMB happens at the
+// composition root (cmd/root.go), not here. An empty formula picks valkey or
+// redis by what is installed. maxMemoryMB 0 means no cap.
 func New(formula string, port, maxMemoryMB int) *Server {
 	return &Server{formula: formula, port: port, maxMemoryMB: maxMemoryMB}
 }
 
-// Ensure starts the configured formula via `brew services start` unless a
-// redis is already running on the configured port, applies the maxmemory
-// ceiling, then returns that port.
+// Ensure starts the formula via `brew services start` unless a server is
+// already answering on the configured port, applies the maxmemory ceiling,
+// then returns that port.
 func (s *Server) Ensure(ctx context.Context) (int, error) {
 	if _, err := exec.LookPath("brew"); err != nil {
 		return 0, fmt.Errorf("brew is not installed — haven manages Redis via `brew services` (install: https://brew.sh)")
 	}
+	formula := s.formula
 	if !s.ping(ctx) {
-		if err := exec.CommandContext(ctx, "brew", "list", "--formula", s.formula).Run(); err != nil {
+		var installed bool
+		if formula == "" {
+			formula, installed = chooseFormula(ctx)
+		} else {
+			installed = isInstalled(ctx, formula)
+		}
+		if !installed {
 			// A cancelled context kills the probe too, so a failed `brew list`
 			// only means "not installed" when the context is still alive —
 			// otherwise the honest answer is that we never got to look.
 			if ctxErr := ctx.Err(); ctxErr != nil {
-				return 0, fmt.Errorf("could not check whether %s is installed: %w", s.formula, ctxErr)
+				return 0, fmt.Errorf("could not check whether %s is installed: %w", formula, ctxErr)
 			}
-			return 0, fmt.Errorf("%s is not installed — `brew install %s` (or set HAVEN_REDIS_FORMULA to a formula you already have)", s.formula, s.formula)
+			return 0, fmt.Errorf("%s is not installed — `brew install %s` (or set HAVEN_REDIS_FORMULA to a formula you already have)", formula, formula)
 		}
-		if err := exec.CommandContext(ctx, "brew", "services", "start", s.formula).Run(); err != nil {
-			return 0, fmt.Errorf("brew services start %s: %w", s.formula, err)
+		if err := exec.CommandContext(ctx, "brew", "services", "start", formula).Run(); err != nil {
+			return 0, fmt.Errorf("brew services start %s: %w", formula, err)
 		}
 	}
-	if err := s.waitReady(ctx, 15*time.Second); err != nil {
+	if err := s.waitReady(ctx, formula, 15*time.Second); err != nil {
 		return 0, err
 	}
 	if err := s.applyMemoryCap(ctx); err != nil {
 		return 0, err
 	}
 	return s.port, nil
+}
+
+// chooseFormula asks brew which of valkey and redis is installed and which
+// service it already reports started. A probe that fails reads as "no", so
+// the worst case is the default formula and Ensure's "not installed".
+// It also reports whether the chosen formula is installed.
+func chooseFormula(ctx context.Context) (string, bool) {
+	installed := map[string]bool{}
+	for _, formula := range domain.RedisFormulas {
+		installed[formula] = isInstalled(ctx, formula)
+	}
+	started := ""
+	if out, err := exec.CommandContext(ctx, "brew", "services", "list").Output(); err == nil {
+		started = domain.StartedRedisFormula(string(out))
+	}
+	chosen := domain.ChooseRedisFormula(installed, started)
+	return chosen, installed[chosen] || chosen == started
+}
+
+func isInstalled(ctx context.Context, formula string) bool {
+	return exec.CommandContext(ctx, "brew", "list", "--formula", formula).Run() == nil
+}
+
+// CLI is the client binary haven talks to the server with: valkey-cli or
+// redis-cli, whichever is on PATH. Either speaks to either server.
+func CLI() string {
+	for _, name := range domain.RedisCLIs {
+		if _, err := exec.LookPath(name); err == nil {
+			return name
+		}
+	}
+	return domain.RedisCLIs[len(domain.RedisCLIs)-1]
+}
+
+// command runs one client command against the configured port.
+func (s *Server) command(ctx context.Context, args ...string) *exec.Cmd {
+	//nolint:gosec // every argument is a constant or a number from haven's own config
+	return exec.CommandContext(ctx, CLI(), append([]string{"-h", "127.0.0.1", "-p", fmt.Sprint(s.port)}, args...)...)
 }
 
 // applyMemoryCap sets maxmemory on the running server so a leaky stack fails
@@ -76,8 +128,7 @@ func (s *Server) applyMemoryCap(ctx context.Context) error {
 	if s.maxMemoryMB <= 0 {
 		target = "0"
 	}
-	out, err := exec.CommandContext(ctx, "redis-cli", "-h", "127.0.0.1", "-p", fmt.Sprint(s.port),
-		"config", "set", "maxmemory", target).CombinedOutput()
+	out, err := s.command(ctx, "config", "set", "maxmemory", target).CombinedOutput()
 	reply := strings.TrimSpace(string(out))
 	if err == nil && strings.HasPrefix(reply, "OK") {
 		return nil
@@ -92,7 +143,9 @@ func (s *Server) applyMemoryCap(ctx context.Context) error {
 	return fmt.Errorf("redis on :%d refused the %s memory ceiling (`config set maxmemory`): %s — set HAVEN_REDIS_MAXMEMORY_MB=0 to run without a cap", s.port, target, detail)
 }
 
-func (s *Server) waitReady(ctx context.Context, timeout time.Duration) error {
+// waitReady polls until the server answers. formula is the one Ensure
+// started, or "" when it adopted a server already answering.
+func (s *Server) waitReady(ctx context.Context, formula string, timeout time.Duration) error {
 	deadline := time.Now().Add(timeout)
 	for time.Now().Before(deadline) {
 		if ctx.Err() != nil {
@@ -103,19 +156,21 @@ func (s *Server) waitReady(ctx context.Context, timeout time.Duration) error {
 		}
 		time.Sleep(200 * time.Millisecond)
 	}
+	if formula == "" {
+		formula = domain.DefaultRedisFormula
+	}
 	return fmt.Errorf("redis (%s) did not become ready on :%d within %s — check `brew services info %s`",
-		s.formula, s.port, timeout, s.formula)
+		formula, s.port, timeout, formula)
 }
 
 func (s *Server) ping(ctx context.Context) bool {
-	out, err := exec.CommandContext(ctx, "redis-cli", "-h", "127.0.0.1", "-p", fmt.Sprint(s.port), "ping").Output()
+	out, err := s.command(ctx, "ping").Output()
 	return err == nil && len(out) >= 4 && string(out[:4]) == "PONG"
 }
 
 // FlushDB empties one logical database with FLUSHDB; other databases are untouched.
 func (s *Server) FlushDB(ctx context.Context, db int) error {
-	out, err := exec.CommandContext(ctx, "redis-cli", "-h", "127.0.0.1", "-p", fmt.Sprint(s.port),
-		"-n", fmt.Sprint(db), "flushdb").CombinedOutput()
+	out, err := s.command(ctx, "-n", fmt.Sprint(db), "flushdb").CombinedOutput()
 	if reply := strings.TrimSpace(string(out)); err != nil || !strings.HasPrefix(reply, "OK") {
 		return fmt.Errorf("redis flushdb on db %d: %v: %s", db, err, reply)
 	}
@@ -132,25 +187,43 @@ func (s *Server) Running() bool {
 	return s.ping(ctx)
 }
 
-// Health pings the server and returns a one-line status including its memory
-// footprint against the applied ceiling.
+// healthFormula names the formula for a health line: the configured one, else
+// the one brew has, since cmd/root.go leaves the configured formula empty.
+func (s *Server) healthFormula(ctx context.Context) string {
+	if s.formula != "" {
+		return s.formula
+	}
+	formula, _ := chooseFormula(ctx)
+	return formula
+}
+
+// Health pings the server and returns a one-line status naming which server
+// answered (valkey or redis) and its memory footprint against the ceiling.
 func (s *Server) Health(ctx context.Context) (bool, string) {
 	if !s.ping(ctx) {
-		return false, fmt.Sprintf("not answering on :%d (brew services info %s)", s.port, s.formula)
+		return false, fmt.Sprintf("not answering on :%d (brew services info %s)", s.port, s.healthFormula(ctx))
 	}
-	detail := fmt.Sprintf("up on :%d (%s)", s.port, s.formula)
-	if mem := s.memoryUse(ctx); mem != "" {
+	name, mem := s.serverInfo(ctx)
+	if name == "" {
+		name = s.healthFormula(ctx)
+	}
+	detail := fmt.Sprintf("up on :%d", s.port)
+	if name != "" {
+		detail += " (" + name + ")"
+	}
+	if mem != "" {
 		detail += ", " + mem
 	}
 	return true, detail
 }
 
-// memoryUse reports "used_memory / maxmemory" from INFO memory ("" if it
-// cannot be read). maxmemory 0 renders as "no cap".
-func (s *Server) memoryUse(ctx context.Context) string {
-	out, err := exec.CommandContext(ctx, "redis-cli", "-h", "127.0.0.1", "-p", fmt.Sprint(s.port), "info", "memory").Output()
+// serverInfo reads INFO once and returns which server answered ("valkey
+// 9.1.2", "redis 8.2.1") and "used_memory of maxmemory"; either is "" when
+// it cannot be read.
+func (s *Server) serverInfo(ctx context.Context) (name, memory string) {
+	out, err := s.command(ctx, "info").Output()
 	if err != nil {
-		return ""
+		return "", ""
 	}
 	fields := map[string]string{}
 	for _, line := range strings.Split(string(out), "\n") {
@@ -158,6 +231,11 @@ func (s *Server) memoryUse(ctx context.Context) string {
 			fields[k] = v
 		}
 	}
+	return domain.RedisServerName(fields), memoryUse(fields)
+}
+
+// memoryUse renders used_memory against maxmemory; maxmemory 0 is "no cap".
+func memoryUse(fields map[string]string) string {
 	used := fields["used_memory_human"]
 	if used == "" {
 		return ""

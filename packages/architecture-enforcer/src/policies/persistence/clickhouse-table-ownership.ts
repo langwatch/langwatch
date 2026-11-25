@@ -88,6 +88,12 @@ export const DECLARED_OWNERSHIP: DeclaredOwnership = {
         "the event store appends every pipeline's events; modules reach it through eventing (§7)",
     },
     {
+      table: "event_log_id_index",
+      owner: "framework",
+      writer: "packages/eventing",
+      reason: "the view event_log_id_index_mv on event_log fills it; eventing reads and fills it",
+    },
+    {
       table: "stored_log_records",
       owner: "legacy",
       writer: LEGACY,
@@ -146,6 +152,13 @@ export const DECLARED_OWNERSHIP: DeclaredOwnership = {
       owner: "trace",
       readers: ["analytics"],
       reason: "trace folds it from its facts for analytics' dashboards to read (EF-5, 2026-10-07)",
+    },
+    {
+      table: "trace_evaluation_analytics",
+      owner: "trace",
+      readers: ["analytics"],
+      reason:
+        "trace folds each evaluation beside its trace's columns for analytics' stock widgets (trace ADR-003)",
     },
     {
       table: "trace_analytics_rollup",

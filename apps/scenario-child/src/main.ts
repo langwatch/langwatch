@@ -38,7 +38,7 @@ import { runAgentTestTurn } from "./services/agent-test-turn.service.ts";
 import {
   executeScenarioChild,
   flushScenarioOtelTraces,
-  formatScenarioChildError,
+  scenarioChildFailureLine,
   type ScenarioChildRuntime,
 } from "./services/scenario-child-execution.service.ts";
 
@@ -149,9 +149,9 @@ async function main(): Promise<void> {
 }
 
 main().catch(async (error: unknown) => {
-  const message = formatScenarioChildError(error);
-  logger.error({ err: message }, "scenario execution failed");
+  const line = scenarioChildFailureLine(error);
+  logger.error({ err: line.error }, "scenario execution failed");
   await flushScenarioOtelTraces(logger);
-  process.stdout.write(`${JSON.stringify({ success: false, error: message })}\n`);
+  process.stdout.write(`${JSON.stringify(line)}\n`);
   process.exit(1);
 });

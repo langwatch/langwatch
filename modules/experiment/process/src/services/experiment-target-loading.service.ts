@@ -4,15 +4,23 @@
  * has been deleted is reported, never skipped, so a run stops instead of reporting an empty column.
  */
 
-import { AgentNotFoundError, type Agent } from "@langwatch/agent-contract";
+import { AgentNotFoundError, AgentVersionNotFoundError } from "@langwatch/agent-contract";
 import type { Evaluator } from "@langwatch/evaluator-contract";
 import { ExperimentEvaluationInputError } from "@langwatch/experiment-contract";
 import { createLogger } from "@langwatch/observability";
 import type { VersionedPrompt } from "@langwatch/prompt-contract";
 import { parseStudioWorkflow } from "@langwatch/workflow-contract";
 
-import { promptLoadKey, workflowLoadKey } from "../rules/experiment-execution-data.rules.ts";
-import type { ExecutionDataServices, LoadedWorkflow } from "./experiment-execution-data.service.ts";
+import {
+  agentLoadKey,
+  promptLoadKey,
+  workflowLoadKey,
+} from "../rules/experiment-execution-data.rules.ts";
+import type {
+  ExecutionDataServices,
+  LoadedAgent,
+  LoadedWorkflow,
+} from "./experiment-execution-data.service.ts";
 
 const logger = createLogger("langwatch:experiment:target-loading");
 
@@ -21,6 +29,8 @@ interface TargetForLoading {
   promptId?: string;
   promptVersionNumber?: number;
   dbAgentId?: string;
+  /** The agent deploy label the target pins; absent loads the latest. */
+  agentLabel?: string;
   targetEvaluatorId?: string;
   workflowId?: string;
   workflowVersionId?: string;
@@ -96,23 +106,34 @@ export class ExperimentTargetLoadingService {
    * Every agent an agent target names. `getById` throws rather than returning a nullable, so a
    * deleted agent is refused the same way the other loaders refuse a missing target.
    */
-  async loadAgents({ projectId, targets, services }: LoadArgs): Promise<Map<string, Agent>> {
-    const loaded = new Map<string, Agent>();
+  async loadAgents({ projectId, targets, services }: LoadArgs): Promise<Map<string, LoadedAgent>> {
+    const loaded = new Map<string, LoadedAgent>();
     for (const target of targets) {
       if (target.type !== "agent" || !target.dbAgentId) {
         continue;
       }
 
+      const label = target.agentLabel;
       try {
         loaded.set(
-          target.dbAgentId,
-          await services.agents.getById({ id: target.dbAgentId, projectId }),
+          agentLoadKey(target),
+          await services.agents.getById({
+            id: target.dbAgentId,
+            projectId,
+            ...(label ? { label } : {}),
+          }),
         );
       } catch (error) {
         if (error instanceof AgentNotFoundError) {
           throw new ExperimentEvaluationInputError({
             status: 404,
             reason: `Agent "${target.dbAgentId}" not found`,
+          });
+        }
+        if (error instanceof AgentVersionNotFoundError) {
+          throw new ExperimentEvaluationInputError({
+            status: 404,
+            reason: `Agent "${target.dbAgentId}" has no "${label}" label`,
           });
         }
 
@@ -134,7 +155,7 @@ export class ExperimentTargetLoadingService {
     services,
     loadedAgents,
   }: LoadArgs & {
-    loadedAgents: Map<string, Agent>;
+    loadedAgents: Map<string, LoadedAgent>;
   }): Promise<Map<string, LoadedWorkflow>> {
     const loaded = new Map<string, LoadedWorkflow>();
     for (const request of this.workflowRequests({
@@ -163,7 +184,7 @@ export class ExperimentTargetLoadingService {
     loadedAgents,
   }: {
     targets: TargetForLoading[];
-    loadedAgents: Map<string, Agent>;
+    loadedAgents: Map<string, LoadedAgent>;
   }): { workflowId: string; workflowVersionId?: string }[] {
     const direct = targets.flatMap((target) =>
       target.type === "workflow" && target.workflowId
@@ -178,7 +199,7 @@ export class ExperimentTargetLoadingService {
     const linked = targets.flatMap((target) => {
       const agent =
         target.type === "agent" && target.dbAgentId
-          ? loadedAgents.get(target.dbAgentId)
+          ? loadedAgents.get(agentLoadKey(target))
           : undefined;
       if (agent?.type !== "workflow") {
         return [];

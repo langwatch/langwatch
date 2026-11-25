@@ -101,6 +101,51 @@ describe("SerializedConnectedAgentAdapter", () => {
     });
   });
 
+  describe("when a hook is called with no active span", () => {
+    it("sends no traceparent key, which the call schema rejects as null", async () => {
+      const relay = fakeRelay([okReply(), okReply()]);
+      const adapter = adapterWith(relay);
+
+      await adapter.callHook({ kind: "setup", timeoutMs: 1_000 });
+      await adapter.callHook({ kind: "teardown", timeoutMs: 1_000 });
+
+      for (const sent of relay.sent) {
+        expect(sent.body).toMatchObject({ kind: expect.any(String) });
+        expect(sent.body).not.toHaveProperty("traceparent");
+        expect(sent.headers).not.toHaveProperty("traceparent");
+      }
+    });
+  });
+
+  describe("when a hook is called with its budget", () => {
+    /** @scenario "A hook call runs under the hook's budget, not the agent's turn timeout" */
+    it("sends the budget to the relay for a hook and none for a turn", async () => {
+      const relay = fakeRelay([okReply(), okReply()]);
+      const adapter = adapterWith(relay);
+
+      await adapter.callHook({ kind: "setup", timeoutMs: 45_000 });
+      await adapter.call(turn("thread_a", "hi"));
+
+      expect(relay.sent[0]?.body).toMatchObject({ kind: "setup", timeoutMs: 45_000 });
+      expect(relay.sent[1]?.body).not.toHaveProperty("timeoutMs");
+    });
+  });
+
+  describe("when teardown is answered by another instance than the turns", () => {
+    it("keeps the instance that served the turns", async () => {
+      const relay = fakeRelay([
+        okReply({ hostname: "laptop", label: null }),
+        okReply({ hostname: "other", label: null }),
+      ]);
+      const adapter = adapterWith(relay);
+
+      await adapter.call(turn("thread_a", "hi"));
+      await adapter.callHook({ kind: "teardown", timeoutMs: 1_000 });
+
+      expect(adapter.servedInstance).toEqual({ hostname: "laptop", label: null });
+    });
+  });
+
   describe("when the relay refuses a call with a body that carries the code and the status text", () => {
     /** @scenario "The child names a refused call by the code the relay wrote" */
     it("names the failure by the code, not by the status text beside it", async () => {

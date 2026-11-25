@@ -20,9 +20,9 @@ const params: LangevalsEvaluateParams = {
   env: {},
 };
 
-function httpService(): LangevalsEvaluatorService {
+function httpService({ maxRetries = 0 }: { maxRetries?: number } = {}): LangevalsEvaluatorService {
   return LangevalsEvaluatorService.create({
-    config: { endpoint: ENDPOINT, maxRetries: 0, timeoutMs: 10 },
+    config: { endpoint: ENDPOINT, maxRetries, timeoutMs: 10 },
     langevals: HttpLangevalsChannel.create({
       config: {
         stagingThresholdBytes: undefined,
@@ -35,8 +35,8 @@ function httpService(): LangevalsEvaluatorService {
   });
 }
 
-async function evaluationFailure(): Promise<EvaluatorExecutionError> {
-  const thrown = await httpService()
+async function evaluationFailure({ maxRetries = 0 }: { maxRetries?: number } = {}) {
+  const thrown = await httpService({ maxRetries })
     .evaluate(params)
     .catch((error: unknown) => error);
   if (!(thrown instanceof EvaluatorExecutionError)) {
@@ -52,11 +52,16 @@ function answerWith(body: unknown) {
   );
 }
 
+function answerStatus(status: number, body: string) {
+  const fetchMock = vi.fn(() => Promise.resolve(new Response(body, { status })));
+  vi.stubGlobal("fetch", fetchMock);
+  return fetchMock;
+}
+
 function failFetchWith(error: Error) {
-  vi.stubGlobal(
-    "fetch",
-    vi.fn(() => Promise.reject(error)),
-  );
+  const fetchMock = vi.fn(() => Promise.reject(error));
+  vi.stubGlobal("fetch", fetchMock);
+  return fetchMock;
 }
 
 afterEach(() => {
@@ -93,8 +98,114 @@ describe("LangevalsEvaluatorService", () => {
 
         expect(error.meta).toEqual({
           evaluatorType: "langevals/llm_boolean",
+          retryAfterMs: 5_000,
         });
         expect(JSON.stringify(error)).not.toContain("cluster.local");
+      });
+    });
+  });
+
+  describe("given the evaluator service is not up yet", () => {
+    describe("when it cannot be reached", () => {
+      /** @scenario "An evaluator called before the evaluator service is up is retried, not recorded as a failure" */
+      it("fails retryable with 503 and the evaluator execution code", async () => {
+        failFetchWith(new Error("fetch failed"));
+
+        const error = await evaluationFailure();
+
+        expect(error).toMatchObject({
+          code: "evaluator_execution_error",
+          httpStatus: 503,
+          retryable: true,
+          meta: { retryAfterMs: 5_000 },
+        });
+      });
+    });
+
+    describe("when it answers 503 while it starts", () => {
+      /** @scenario "An evaluator called before the evaluator service is up is retried, not recorded as a failure" */
+      it("fails retryable with 503, while another 5xx stays a recorded failure", async () => {
+        vi.stubGlobal(
+          "fetch",
+          vi.fn(() => Promise.resolve(new Response("starting", { status: 503 }))),
+        );
+        const starting = await evaluationFailure();
+        vi.stubGlobal(
+          "fetch",
+          vi.fn(() => Promise.resolve(new Response("boom", { status: 500 }))),
+        );
+        const broken = await evaluationFailure();
+
+        expect(starting).toMatchObject({
+          code: "evaluator_execution_error",
+          httpStatus: 503,
+          retryable: true,
+        });
+        expect(broken).toMatchObject({ httpStatus: 502, retryable: false });
+      });
+    });
+  });
+
+  describe("given the evaluator service timed out", () => {
+    describe("when the gateway in front of it answers 504", () => {
+      /** @scenario "An evaluator service that timed out is recorded as an error and not called again" */
+      it("calls it once and fails not retryable, saying the evaluator timed out", async () => {
+        const fetchMock = answerStatus(504, "Endpoint request timed out");
+
+        const error = await evaluationFailure({ maxRetries: 3 });
+
+        expect(fetchMock).toHaveBeenCalledTimes(1);
+        expect(error).toMatchObject({
+          code: "evaluator_execution_error",
+          retryable: false,
+          meta: { evaluatorType: "langevals/llm_boolean", httpStatus: 504 },
+        });
+        expect(error.message).toMatch(/^Evaluator timed out: 504/);
+      });
+    });
+
+    describe("when our own call to it times out", () => {
+      /** @scenario "An evaluator service that timed out is recorded as an error and not called again" */
+      it("calls it once and fails not retryable, saying the evaluator timed out", async () => {
+        const fetchMock = failFetchWith(
+          Object.assign(new Error("The operation was aborted"), { name: "AbortError" }),
+        );
+
+        const error = await evaluationFailure({ maxRetries: 3 });
+
+        expect(fetchMock).toHaveBeenCalledTimes(1);
+        expect(error).toMatchObject({ code: "evaluator_execution_error", retryable: false });
+        expect(error.message).toBe("Evaluator timed out after 10ms");
+      });
+    });
+  });
+
+  describe("given the evaluator service is briefly unavailable", () => {
+    describe("when it answers 503 because its queue is full", () => {
+      /** @scenario "An evaluator service that is briefly unavailable is called again a bounded number of times" */
+      it("calls it again up to the retry bound, then fails retryable for the queue", async () => {
+        const fetchMock = answerStatus(503, "Evaluation queue is full");
+
+        const error = await evaluationFailure({ maxRetries: 1 });
+
+        expect(fetchMock).toHaveBeenCalledTimes(2);
+        expect(error).toMatchObject({ httpStatus: 503, retryable: true });
+      });
+    });
+
+    describe("when it answers 502 and then the result", () => {
+      /** @scenario "An evaluator service that is briefly unavailable is called again a bounded number of times" */
+      it("calls it again and answers the result", async () => {
+        const fetchMock = vi
+          .fn()
+          .mockResolvedValueOnce(new Response("bad gateway", { status: 502 }))
+          .mockResolvedValueOnce(Response.json([{ status: "processed", score: 1, passed: true }]));
+        vi.stubGlobal("fetch", fetchMock);
+
+        const result = await httpService({ maxRetries: 1 }).evaluate(params);
+
+        expect(fetchMock).toHaveBeenCalledTimes(2);
+        expect(result).toMatchObject({ status: "processed", passed: true });
       });
     });
   });

@@ -1,6 +1,7 @@
 from typing import Any, Optional
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI
 from pydantic import BaseModel
+from langevals_topic_clustering.usage import with_usage
 from langevals_topic_clustering.build_response import build_response
 from langevals_topic_clustering.topic_naming import (
     generate_topic_and_subtopic_names,
@@ -21,6 +22,7 @@ from langevals_topic_clustering.types import (
     TraceWithEmbeddings,
 )
 from scipy.cluster.hierarchy import linkage, fcluster
+from langevals_topic_clustering.failures import configured_model, failure_answer
 from langevals_topic_clustering._logger import get_logger, set_log_context, clear_log_context
 
 logger = get_logger("topic_clustering.batch")
@@ -93,6 +95,7 @@ class BatchClusteringParams(BaseModel):
 
 def setup_endpoints(app: FastAPI):
     @app.post("/topics/batch_clustering")
+    @with_usage
     def topics_batch_clustering(
         params: BatchClusteringParams,
     ) -> TopicClusteringResponse:
@@ -100,9 +103,7 @@ def setup_endpoints(app: FastAPI):
             set_log_context(project_id=params.project_id)
             logger.info("Starting batch clustering", trace_count=len(params.traces))
 
-            model = params.litellm_params["model"]
-            if model.startswith("azure/") and params.deployment_name:
-                model = f"azure/{params.deployment_name}"
+            model = configured_model(params.litellm_params, params.deployment_name)
 
             logger.info("Generating embeddings for traces", step="1/4")
             traces_with_embeddings = fill_embeddings(
@@ -147,7 +148,9 @@ def setup_endpoints(app: FastAPI):
                 "cost": cost,
             }
         except Exception as e:
-            logger.error("Batch clustering failed", error=str(e), error_type=type(e).__name__)
-            raise HTTPException(status_code=500, detail="Batch clustering failed") from e
+            answer = failure_answer(e, logger, "Batch")
+            if answer is e:
+                raise
+            raise answer from e
         finally:
             clear_log_context()

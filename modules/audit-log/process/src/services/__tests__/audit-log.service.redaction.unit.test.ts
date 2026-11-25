@@ -12,6 +12,7 @@ function serviceWithRecordingRepository() {
       hasRecordedSince: async () => false,
       findEntityHistory: async () => [],
       findByTargetKind: async () => [],
+      findForOrganization: async () => [],
     },
     maxArgsBytes: 64 * 1024,
   });

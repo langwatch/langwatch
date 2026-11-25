@@ -16,13 +16,16 @@ import type { EvaluationModule } from "../app/evaluation.app.ts";
 import {
   RecordEvaluationLifecycleCompletedCommand,
   RecordEvaluationRanCommand,
+  RecordMonitorErrorRateExceededCommand,
 } from "./evaluation-lifecycle.commands.ts";
 import {
   evaluationLifecycleCompletedEventSchema,
+  evaluationMonitorErrorRateExceededEventSchema,
   evaluationRanEventSchema,
   type EvaluationLifecycleEvent,
   type RecordEvaluationLifecycleCompletedCommandData,
   type RecordEvaluationRanCommandData,
+  type RecordMonitorErrorRateExceededCommandData,
 } from "./evaluation-lifecycle.events.ts";
 
 export type EvaluationLifecyclePipeline = StaticPipelineDefinition<
@@ -32,6 +35,10 @@ export type EvaluationLifecyclePipeline = StaticPipelineDefinition<
   | {
       name: "recordEvaluationLifecycleCompleted";
       payload: RecordEvaluationLifecycleCompletedCommandData;
+    }
+  | {
+      name: "recordMonitorErrorRateExceeded";
+      payload: RecordMonitorErrorRateExceededCommandData;
     }
 >;
 
@@ -43,9 +50,14 @@ export function buildEvaluationLifecyclePipeline(
     name: EVALUATION_LIFECYCLE_PIPELINE_NAME,
     aggregate: defineAggregate({ type: EVALUATION_LIFECYCLE_AGGREGATE_TYPE }),
   })
-    .withEvents([evaluationRanEventSchema, evaluationLifecycleCompletedEventSchema])
+    .withEvents([
+      evaluationRanEventSchema,
+      evaluationLifecycleCompletedEventSchema,
+      evaluationMonitorErrorRateExceededEventSchema,
+    ])
     .withCommand("recordEvaluationRan", RecordEvaluationRanCommand)
-    .withCommand("recordEvaluationLifecycleCompleted", RecordEvaluationLifecycleCompletedCommand);
+    .withCommand("recordEvaluationLifecycleCompleted", RecordEvaluationLifecycleCompletedCommand)
+    .withCommand("recordMonitorErrorRateExceeded", RecordMonitorErrorRateExceededCommand);
   return (retention === undefined ? pipeline : pipeline.withRetention(retention)).build();
 }
 

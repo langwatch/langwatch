@@ -27,6 +27,10 @@
     "./console-guard": {
       "types": "./dist/console-guard.d.ts",
       "default": "./src/console-guard.ts"
+    },
+    "./mocks-modules": {
+      "types": "./dist/mocks-modules.d.ts",
+      "default": "./src/mocks-modules.ts"
     }
   },
   "scripts": {
@@ -46,9 +50,9 @@
     "vitest": "catalog:"
   },
   "peerDependencies": {
-    "@vitest/browser-playwright": "^5.0.1",
+    "@vitest/browser-playwright": "^5.0.5",
     "playwright": "*",
-    "vitest": "^5.0.1"
+    "vitest": "^5.0.5"
   },
   "peerDependenciesMeta": {
     "@vitest/browser-playwright": {

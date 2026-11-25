@@ -368,7 +368,40 @@ export const reservedSpanParamsSchema: ReservedSpanParamsSchema =
 
 export type ReservedSpanParams = z.infer<typeof reservedSpanParamsSchema>;
 
-const spanParamsSchemaDefinition = reservedSpanParamsSchema.and(z.record(z.string(), z.any()));
+type AnyValueAlso<Shape extends z.ZodRawShape> = {
+  [Key in keyof Shape]: z.ZodOptional<z.ZodUnion<[z.ZodType, z.ZodNull, z.ZodUnknown]>>;
+};
+
+/**
+ * Each param keeps its declared type, for the docs and the generated clients, and also takes any
+ * value. The declared type stays the union's first arm and `null` its second, as the plain
+ * nullable had them, so the clients' generated names for the param's models do not move.
+ */
+function anyValueAlso<Shape extends z.ZodRawShape>(shape: Shape): AnyValueAlso<Shape> {
+  return Object.fromEntries(
+    Object.entries(shape).map(([key, schema]) => {
+      let declared = schema as z.ZodType;
+      while (declared instanceof z.ZodOptional || declared instanceof z.ZodNullable) {
+        declared = declared.unwrap() as z.ZodType;
+      }
+      return [key, orAnyValue(declared)];
+    }),
+  ) as AnyValueAlso<Shape>;
+}
+
+/** One param's schema: its declared type first, `null` second, then any value. */
+function orAnyValue(declared: z.ZodType) {
+  return z.union([declared, z.null(), z.unknown()]).optional();
+}
+
+/**
+ * A span's attributes, unflattened by dot. A sender's own namespace can share a name with a
+ * {@link reservedSpanParamsSchema} param (`user.id`: OTel semconv) at another type, so the
+ * reserved types are documented but not enforced: a span read never fails on its own attributes.
+ */
+const spanParamsSchemaDefinition = z
+  .object(anyValueAlso(reservedSpanParamsSchemaDefinition.shape))
+  .catchall(z.any());
 export interface SpanParamsSchema extends Named<typeof spanParamsSchemaDefinition> {}
 export const spanParamsSchema: SpanParamsSchema = spanParamsSchemaDefinition;
 
@@ -712,12 +745,16 @@ const evaluationSchemaDefinition = z.object({
   inputs: z.record(z.string(), z.any()).optional().nullable(),
   error: errorCaptureSchema.optional().nullable(),
   retries: z.number().optional().nullable(),
+  attempts: z.number().int().nonnegative().optional(),
+  last_attempt_error: z.string().optional().nullable(),
   timestamps: z.object({
     ignore_timestamps_on_write: z.boolean().optional().nullable(),
     inserted_at: z.number().optional().nullable(),
     started_at: z.number().optional().nullable(),
     finished_at: z.number().optional().nullable(),
     updated_at: z.number().optional().nullable(),
+    last_attempt_at: z.number().int().optional().nullable(),
+    next_attempt_at: z.number().int().optional().nullable(),
   }),
 });
 export interface EvaluationSchema extends Named<typeof evaluationSchemaDefinition> {}
@@ -736,6 +773,8 @@ const rESTEvaluationSchemaDefinition = z.object({
     status: true,
     timestamps: true,
     retries: true,
+    attempts: true,
+    last_attempt_error: true,
   }).shape,
   evaluation_id: z.string().optional().nullable(),
   evaluator_id: z.string().optional().nullable(),

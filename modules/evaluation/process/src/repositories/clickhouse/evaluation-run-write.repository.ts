@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 
 import type { EvaluationRunData } from "@langwatch/evaluation-contract";
 import { EventUtils } from "@langwatch/eventing";
-import { getEnvironment, Instance, Ksuid } from "@langwatch/ksuid";
+import { getEnvironment, Instance, Ksuid, type KsuidLayout } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
 import { Temporal, toDate } from "@langwatch/time";
 
@@ -47,8 +47,14 @@ export interface ClickHouseEvaluationRunRecord {
   StartedAt: number | string | null;
   CompletedAt: number | string | null;
   CostId: string | null;
+  Attempts: number;
+  LastAttemptAt: number | string | null;
+  LastAttemptError: string | null;
+  NextAttemptAt: number | string | null;
   LastProcessedEventId: string;
   LastEventOccurredAt: number | string;
+  /** KSUID byte layout of ProjectionId; NULL on rows written before goose 00131. */
+  IdLayout: KsuidLayout | null;
   _retention_days: number;
 }
 
@@ -60,6 +66,8 @@ type ClickHouseWriteRecord = Omit<
   | "ScheduledAt"
   | "StartedAt"
   | "CompletedAt"
+  | "LastAttemptAt"
+  | "NextAttemptAt"
   | "LastEventOccurredAt"
 > & {
   CreatedAt: ClickHouseMoment;
@@ -68,6 +76,8 @@ type ClickHouseWriteRecord = Omit<
   ScheduledAt: ClickHouseMoment;
   StartedAt: ClickHouseMoment | null;
   CompletedAt: ClickHouseMoment | null;
+  LastAttemptAt: ClickHouseMoment | null;
+  NextAttemptAt: ClickHouseMoment | null;
   LastEventOccurredAt: ClickHouseMoment;
 };
 
@@ -121,21 +131,30 @@ function validateBatchTenants(entries: readonly { tenantId: string }[], operatio
   return tenantId;
 }
 
-function deterministicProjectionId(
-  tenantId: string,
-  evaluationId: string,
-  scheduledAtMs: number | null,
-): string {
+/** The row's deterministic id, in the byte layout the stored row was written with (#9575). */
+function deterministicProjectionId({
+  tenantId,
+  evaluationId,
+  scheduledAtMs,
+  layout,
+}: {
+  tenantId: string;
+  evaluationId: string;
+  scheduledAtMs: number | null;
+  layout: KsuidLayout;
+}): string {
   if (scheduledAtMs === null) return evaluationId;
 
   const hash = createHash("sha256").update(`${tenantId}:${evaluationId}`).digest();
   const instance = new Instance(Instance.schemes.RANDOM, new Uint8Array(hash.subarray(0, 8)));
+  const timestamp = Math.floor(scheduledAtMs / 1000);
   return new Ksuid({
     environment: getEnvironment(),
     resource: EVALUATION_RESOURCE,
-    timestamp: Math.floor(scheduledAtMs / 1000),
+    timestamp,
     instance,
     sequenceId: 0,
+    layout,
   }).toString();
 }
 
@@ -209,11 +228,19 @@ export class EvaluationRunClickHouseWriteRepository {
     tenantId: string,
     retentionDays?: number,
   ): ClickHouseWriteRecord {
-    const projectionId = deterministicProjectionId(tenantId, data.evaluationId, data.scheduledAt);
+    // A state without a layout is a row stored before goose 00131: keep its id.
+    const idLayout = data.idLayout ?? "v1-legacy";
+    const projectionId = deterministicProjectionId({
+      tenantId,
+      evaluationId: data.evaluationId,
+      scheduledAtMs: data.scheduledAt,
+      layout: idLayout,
+    });
     const inputs = capInputs(data.inputs ? JSON.stringify(data.inputs) : null);
     const details = capText(data.details);
     const error = capText(data.error);
     const errorDetails = capText(data.errorDetails);
+    const lastAttemptError = capText(data.lastAttemptError ?? null);
     if (inputs.truncated || details.truncated || error.truncated || errorDetails.truncated) {
       logger.warn(
         {
@@ -257,8 +284,13 @@ export class EvaluationRunClickHouseWriteRepository {
       StartedAt: data.startedAt === null ? null : clickHouseMomentOf(data.startedAt),
       CompletedAt: data.completedAt === null ? null : clickHouseMomentOf(data.completedAt),
       CostId: data.costId,
+      Attempts: data.attempts ?? 0,
+      LastAttemptAt: data.lastAttemptAt == null ? null : clickHouseMomentOf(data.lastAttemptAt),
+      LastAttemptError: lastAttemptError.value,
+      NextAttemptAt: data.nextAttemptAt == null ? null : clickHouseMomentOf(data.nextAttemptAt),
       LastProcessedEventId: projectionId,
       LastEventOccurredAt: clickHouseMomentOf(data.LastEventOccurredAt || 0),
+      IdLayout: idLayout,
       _retention_days: retentionDays ?? DEFAULT_RETENTION_DAYS,
     };
   }

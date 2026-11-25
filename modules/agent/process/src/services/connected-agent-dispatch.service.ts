@@ -25,8 +25,9 @@ import type {
   ThreadPinLookup,
 } from "../repositories/connected-agent-state.repository.ts";
 import {
-  pinnedInstance,
   chooseInstance,
+  instancesForCall,
+  pinnedInstance,
 } from "../rules/connected-agent-instance-selection.rules.ts";
 import { ConnectedAgentAnswerService } from "./connected-agent-answer.service.ts";
 import type { ConnectedAgentRegistryService } from "./connected-agent-registry.service.ts";
@@ -98,9 +99,10 @@ export class ConnectedAgentDispatchService {
     await this.start();
     const now = params.now ?? (() => nowInstant().epochMilliseconds);
     const startedAt = now();
-    const deadlineAt = startedAt + params.agent.timeoutMs;
+    const timeoutMs = callTimeoutMs(params);
+    const deadlineAt = startedAt + timeoutMs;
 
-    const first = await this.#attempt({ params, excluded: [], now, deadlineAt });
+    const first = await this.#attempt({ params, excluded: [], now, deadlineAt, timeoutMs });
     let last = first;
     // The instance left before the function started, and the call was
     // never acknowledged: it is safe to try once on another instance.
@@ -114,6 +116,7 @@ export class ConnectedAgentDispatchService {
         excluded: [first.instance.instanceId],
         now,
         deadlineAt,
+        timeoutMs,
       });
     }
     if (last.outcome.kind !== "answered") {
@@ -130,16 +133,19 @@ export class ConnectedAgentDispatchService {
     excluded,
     now,
     deadlineAt,
+    timeoutMs,
   }: {
     params: DispatchParams;
     excluded: string[];
     now: () => number;
     deadlineAt: number;
+    timeoutMs: number;
   }) {
     throwIfAborted(params.signal);
     const instance = await this.#pickInstance({ ...params, excluded, now });
     const callId = generate(CALL_KSUID_RESOURCE).toString();
     const envelope = buildCallEnvelope({
+      kind: params.call.kind,
       callId,
       agentId: params.agent.id,
       threadId: params.call.threadId,
@@ -147,6 +153,7 @@ export class ConnectedAgentDispatchService {
       newMessages: params.call.newMessages,
       params: params.call.params,
       session: params.call.session,
+      state: params.call.state,
       traceparent: params.call.traceparent,
       deadlineAt,
       run: params.call.run,
@@ -158,7 +165,7 @@ export class ConnectedAgentDispatchService {
       signal: params.signal,
       now,
       isSticky: params.agent.isSticky,
-      timeoutMs: params.agent.timeoutMs,
+      timeoutMs,
     });
     return { instance, callId, outcome };
   }
@@ -193,6 +200,7 @@ export class ConnectedAgentDispatchService {
       live = await findLive();
     }
 
+    live = instancesForCall({ live, agentId: agent.id, kind: call.kind });
     if (pin.kind === "pinned") return pinnedInstance(live, pin.instanceId);
     if (live.length === 0) {
       throw new AgentOfflineError({
@@ -390,6 +398,12 @@ export class ConnectedAgentDispatchService {
       agentIds: [agentId],
     });
   }
+}
+
+/** A hook call runs under its own budget; a turn, or a hook sent without one, under the agent's. */
+function callTimeoutMs({ agent, call }: DispatchParams): number {
+  const isHook = call.kind === "setup" || call.kind === "teardown";
+  return isHook && call.timeoutMs !== undefined ? call.timeoutMs : agent.timeoutMs;
 }
 
 function throwIfAborted(signal: AgentCallSignal | undefined): void {

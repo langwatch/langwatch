@@ -23,6 +23,7 @@ export const analyticsRest = defineRestRouter(AnalyticsApi)
   .withVersion(MANAGEMENT_API_VERSION)
 
   .post("/timeseries", "postApiAnalyticsTimeseries")
+  .keepsRecords()
   .withoutAudit("read sent as a POST")
   .withInput(analyticsTimeseriesRestBodySchema)
   .withPermission("analytics:view")
@@ -32,12 +33,15 @@ export const analyticsRest = defineRestRouter(AnalyticsApi)
     description: "Query analytics timeseries data with metrics, aggregations, and filters",
     responses: baseResponses,
   })
-  .handle(async ({ app, input, scope }) =>
-    app.getTimeseries({
-      ...input,
-      projectId: scope.id,
-      startDate: coerceToEpoch(input.startDate),
-      endDate: coerceToEpoch(input.endDate),
-    }),
+  .handle(async ({ app, input, scope, authorization }) =>
+    app.getTimeseries(
+      {
+        ...input,
+        projectId: scope.id,
+        startDate: coerceToEpoch(input.startDate),
+        endDate: coerceToEpoch(input.endDate),
+      },
+      { authorization },
+    ),
   )
   .build();

@@ -5,7 +5,7 @@
  */
 import { isUpgradeInProgress } from "@langwatch/api";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
-import { HandledError, isTransientRefusal } from "@langwatch/handled-error";
+import { HandledError, isHandledTransientRefusal } from "@langwatch/handled-error";
 import { createLogger, type Logger } from "@langwatch/observability";
 
 /** Main's `PlanLimitExceededError` code, the one refusal a door lets through to the caller. */
@@ -65,5 +65,5 @@ export class TraceIngestAllowanceService {
 
 /** An upgrade in progress or a busy or unreachable ClickHouse: retryable, so it warns. */
 function isExpectedRefusal(error: unknown): boolean {
-  return isUpgradeInProgress(error) || (HandledError.isHandled(error) && isTransientRefusal(error));
+  return isUpgradeInProgress(error) || isHandledTransientRefusal(error);
 }

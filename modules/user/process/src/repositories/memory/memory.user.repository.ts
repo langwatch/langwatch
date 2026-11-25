@@ -30,6 +30,7 @@ import type {
   CreateCredentialUserRow,
   CreatedCredentialUser,
   CreatePasskeyUserRow,
+  PasswordHolderRow,
   SetFirstUserPasswordRow,
   UserAddressReplacement,
   UserAddressRow,
@@ -68,6 +69,25 @@ export class MemoryUserRepository implements UserRepository {
     return { emailDomains: domainCounts(this.#database.rows().filter((row) => among.has(row.id))) };
   }
 
+  async findSignedInSince({
+    userIds,
+    since,
+  }: {
+    userIds: readonly string[];
+    since: number;
+  }): Promise<string[]> {
+    const among = new Set(userIds);
+    return this.#database
+      .rows()
+      .filter(
+        (row) =>
+          among.has(row.id) &&
+          row.lastLoginAt !== null &&
+          row.lastLoginAt.epochMilliseconds >= since,
+      )
+      .map((row) => row.id);
+  }
+
   async hasAccountOnDomain(domain: string): Promise<boolean> {
     return this.#database
       .rows()
@@ -76,6 +96,21 @@ export class MemoryUserRepository implements UserRepository {
 
   async hasAnyAccount(): Promise<boolean> {
     return this.#database.rows().length > 0;
+  }
+
+  async findFirstCreatedId(): Promise<string | null> {
+    const [oldest] = this.#database
+      .rows()
+      .toSorted(
+        (a, b) =>
+          a.createdAt.epochMilliseconds - b.createdAt.epochMilliseconds ||
+          Number(a.id > b.id) - Number(a.id < b.id),
+      );
+    if (!oldest) return null;
+    const erasedFirst = this.#database
+      .erasedAccountsCreatedAt()
+      .some((createdAt) => createdAt.epochMilliseconds <= oldest.createdAt.epochMilliseconds);
+    return erasedFirst ? null : oldest.id;
   }
 
   async findBackfillPage({
@@ -138,6 +173,22 @@ export class MemoryUserRepository implements UserRepository {
     return row ? userProfileSchema.parse(profileOf(row)) : null;
   }
 
+  async searchProfiles({ query, limit }: { query: string; limit: number }): Promise<UserProfile[]> {
+    const needle = query.toLowerCase();
+
+    return this.#database
+      .rows()
+      .filter((row) =>
+        [row.id, row.name, row.email].some((value) => value?.toLowerCase().includes(needle)),
+      )
+      .toSorted(
+        (left, right) =>
+          (left.email ?? "").localeCompare(right.email ?? "") || left.id.localeCompare(right.id),
+      )
+      .slice(0, limit)
+      .map((row) => userProfileSchema.parse(profileOf(row)));
+  }
+
   async findByEmail(email: string): Promise<UserProfile[]> {
     return this.#database
       .usersWithEmail(email)
@@ -162,6 +213,10 @@ export class MemoryUserRepository implements UserRepository {
     await this.#appendMintFacts({ row });
 
     return userProfileSchema.parse(profileOf(row));
+  }
+
+  async appendCreatedFact(id: string): Promise<void> {
+    await this.#appendMintFacts({ row: this.#require(id) });
   }
 
   async createCredentialUser(input: CreateCredentialUserRow): Promise<CreatedCredentialUser> {
@@ -202,6 +257,38 @@ export class MemoryUserRepository implements UserRepository {
     const account = this.#credentialAccount(id);
 
     return account ? account.password !== null : false;
+  }
+
+  async findPasswordHolders({
+    emails,
+  }: {
+    emails: readonly string[] | null;
+  }): Promise<PasswordHolderRow[]> {
+    const wanted = emails === null ? null : new Set(emails.map((email) => email.toLowerCase()));
+    return this.#database
+      .rows()
+      .filter((row) =>
+        wanted === null ? true : row.email !== null && wanted.has(row.email.toLowerCase()),
+      )
+      .filter((row) => Boolean(this.#credentialAccount(row.id)?.password))
+      .map((row) => ({
+        id: row.id,
+        email: row.email,
+        passwordResetRequiredAt: row.passwordResetRequiredAt ?? null,
+      }))
+      .toSorted((a, b) => a.id.localeCompare(b.id));
+  }
+
+  async markPasswordResetRequired({
+    ids,
+    at,
+  }: {
+    ids: readonly string[];
+    at: Instant;
+  }): Promise<number> {
+    const unmarked = this.#database.usersById(ids).filter((row) => !row.passwordResetRequiredAt);
+    for (const row of unmarked) this.#database.writeUser({ ...row, passwordResetRequiredAt: at });
+    return unmarked.length;
   }
 
   async setFirstPassword(input: SetFirstUserPasswordRow): Promise<SetFirstUserPasswordResult> {

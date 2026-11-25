@@ -1,12 +1,10 @@
 import { Link } from "@langwatch/browser-host/link";
 import { Button, Input, Text, VStack } from "@langwatch/design-system/primitives";
+import type { FacetDisplayState } from "@langwatch/trace-contract";
 import type React from "react";
 import { memo, useEffect, useMemo, useRef, useState } from "react";
 
-import {
-  type AttributeKey,
-  type FacetValueState,
-} from "../../../../behavior/explorer/filter-sidebar/types.ts";
+import { type AttributeKey } from "../../../../behavior/explorer/filter-sidebar/types.ts";
 import { MAX_VISIBLE_ATTRIBUTE_KEYS } from "../../../../features/facet/behavior/facet-constants.ts";
 import { SidebarSection } from "../../../elements/explorer/filter-sidebar/sidebar-section.tsx";
 import { AttributeKeyRow } from "./attribute-key-row.tsx";
@@ -26,7 +24,7 @@ interface AttributesSectionProps {
    */
   filterPrefix?: string;
   /** Active filter state per `<prefix>.<key>:<value>` */
-  getValueState: (attrKey: string, value: string) => FacetValueState;
+  getValueState: (attrKey: string, value: string) => FacetDisplayState;
   /** Active state for `none:<prefix>.<key>` */
   getNoneActive: (attrKey: string) => boolean;
   onToggleValue: (attrKey: string, value: string) => void;

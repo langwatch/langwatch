@@ -3,20 +3,23 @@ import { Ksuid } from "@langwatch/ksuid";
 import type { AggregateType } from "../domain/aggregateType.ts";
 import type { TenantId } from "../domain/tenantId.ts";
 import type { Event } from "../domain/types.ts";
-import { ValidationError } from "../services/errorHandling.ts";
+import { incrementEventLogIndexRead } from "../metrics.ts";
+import { EventNotFoundError, ValidationError } from "../services/errorHandling.ts";
 import { EventUtils } from "../utils/event.utils.ts";
 import type { EventStoreEventReadInput } from "./eventStore.types.ts";
-import { deduplicateEvents, recordToEvent } from "./eventStoreUtils.ts";
+import { deduplicateEvents, recordToEvent, streamEventsOfRecords } from "./eventStoreUtils.ts";
 import type {
   EventOccurredAtWindow,
+  EventRecord,
   EventRepository,
 } from "./repositories/eventRepository.types.ts";
 
 /**
- * Half-width of the read's EventOccurredAt window, main's two days: a KSUID's time and the row's
- * occurred time come from the same ingestion clock, within queue lag of each other.
+ * Half-width of the first read's EventOccurredAt window, seven days: a KSUID's time and the row's
+ * occurred time usually sit within queue lag of each other; a miss falls back to the whole stream
+ * (dev/docs/plans/id-index-2026-10-10.md §4).
  */
-export const EVENT_READ_WINDOW_MS = 2 * 24 * 60 * 60 * 1000;
+export const EVENT_READ_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
 
 /** One tenant's aggregate stream, named whole. */
 export interface AggregateEventsReadInput {
@@ -25,18 +28,29 @@ export interface AggregateEventsReadInput {
   aggregateId: string;
 }
 
+/** Many streams of one aggregate type, each named by its tenant and id. */
+export interface AggregatesEventsReadInput {
+  aggregates: readonly { tenantId: TenantId; aggregateId: string }[];
+  aggregateType: AggregateType;
+}
+
 /**
  * Reads beside a store that may refuse every read (Q209, 2026-10-06): one event by id, and one
- * aggregate's stream for identity's history panels and SCIM's sync activity (WEB-9103, 2026-10-10).
+ * aggregate's stream (or a page of them) for history panels and upgrade steps (WEB-9103).
  * Spec: packages/eventing/specs/event-read-seat.feature.
  */
 export interface EventReadSeat<EventType extends Event = Event> {
   getEvent(input: EventStoreEventReadInput): Promise<EventType>;
   /** The stream oldest first; an empty aggregate id answers none rather than scanning. */
   findAggregateEvents(input: AggregateEventsReadInput): Promise<readonly EventType[]>;
+  /** Every asked stream in one read, each oldest first; empty aggregate ids are skipped. */
+  findEventsOfAggregates(input: AggregatesEventsReadInput): Promise<readonly EventType[]>;
 }
 
-type SeatRepository = Pick<EventRepository, "getEventRecord" | "getEventRecords">;
+type SeatRepository = Pick<
+  EventRepository,
+  "getEventRecord" | "getEventRecords" | "findEventRecordsOfAggregates"
+>;
 
 /** The seat over an event repository, bounded to the window around the id's KSUID time. */
 export class EventLogReadSeat<EventType extends Event = Event> implements EventReadSeat<EventType> {
@@ -61,13 +75,12 @@ export class EventLogReadSeat<EventType extends Event = Event> implements EventR
       });
     }
 
-    const occurredAt = eventReadWindow({ eventId });
-    const record = await this.repository.getEventRecord({
+    const record = await readEventRecord({
+      repository: this.repository,
       tenantId,
       aggregateType,
       aggregateId,
       eventId,
-      ...(occurredAt === null ? {} : { occurredAt }),
     });
     return recordToEvent<EventType>(record, aggregateId);
   }
@@ -81,9 +94,60 @@ export class EventLogReadSeat<EventType extends Event = Event> implements EventR
       records.map((record) => recordToEvent<EventType>(record, aggregateId)),
     );
   }
+
+  async findEventsOfAggregates(input: AggregatesEventsReadInput): Promise<readonly EventType[]> {
+    const { aggregateType } = input;
+    for (const { tenantId } of input.aggregates) {
+      EventUtils.validateTenantId({ tenantId }, "EventLogReadSeat.findEventsOfAggregates");
+    }
+    const aggregates = input.aggregates.filter(
+      ({ aggregateId }) => String(aggregateId).trim().length > 0,
+    );
+    if (aggregates.length === 0) return [];
+    const records = await this.repository.findEventRecordsOfAggregates({
+      aggregates,
+      aggregateType,
+    });
+    return streamEventsOfRecords<EventType>({ records });
+  }
 }
 
-/** Two days either side of the time a KSUID id carries; null when the id carries none. */
+/**
+ * One event by id: first within the window its KSUID's time names, then, on a miss, today's read
+ * of the whole stream, counted as a fallback, unless the first read already covered the stream.
+ * An id carrying no time takes today's read at once.
+ */
+export async function readEventRecord({
+  repository,
+  tenantId,
+  aggregateType,
+  aggregateId,
+  eventId,
+}: {
+  repository: Pick<EventRepository, "getEventRecord">;
+  tenantId: string;
+  aggregateType: string;
+  aggregateId: string;
+  eventId: string;
+}): Promise<EventRecord> {
+  const stream = { tenantId, aggregateType, aggregateId, eventId };
+  const occurredAt = eventReadWindow({ eventId });
+  if (occurredAt === null) {
+    incrementEventLogIndexRead({ read: "event", outcome: "not_ksuid" });
+    return repository.getEventRecord(stream);
+  }
+  try {
+    const record = await repository.getEventRecord({ ...stream, occurredAt });
+    incrementEventLogIndexRead({ read: "event", outcome: "window_hit" });
+    return record;
+  } catch (error) {
+    if (!(error instanceof EventNotFoundError) || error.wholeStream) throw error;
+    incrementEventLogIndexRead({ read: "event", outcome: "window_fallback" });
+    return repository.getEventRecord(stream);
+  }
+}
+
+/** Seven days either side of the time a KSUID id carries; null when the id carries none. */
 export function eventReadWindow({ eventId }: { eventId: string }): EventOccurredAtWindow | null {
   let createdAtMs: number;
   try {

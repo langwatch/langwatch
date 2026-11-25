@@ -20,7 +20,7 @@ const __dirname = path.dirname(__filename);
 dotenv.config({ path: path.resolve(__dirname, "../.env") });
 
 const isCI = !!process.env.CI;
-const judgeModel = openai("gpt-5-mini");
+const judgeModel = openai("gpt-6-luna");
 
 const gatewayEnv = `LANGWATCH_API_KEY=${process.env.LANGWATCH_API_KEY}\n${process.env.LANGWATCH_ENDPOINT ? `LANGWATCH_ENDPOINT=${process.env.LANGWATCH_ENDPOINT}\n` : ""}`;
 

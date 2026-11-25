@@ -17,7 +17,9 @@ import type {
   Protections,
   ContentPrivacy,
   DerivedTraceEvent,
+  OwnedSpan,
   Span,
+  SpanBraid,
   SpanDetail,
   LegacySpanInputOutput,
   SpanTreeNode,
@@ -37,8 +39,12 @@ import {
   traceTotalTokensOf,
 } from "@langwatch/trace-contract";
 
+import { protectByOwner } from "../features/braid/rules/braided-span-owner.rules.ts";
 import { readTruncatedAttributes } from "./trace-attribute-cap.rules.ts";
-import { createAttributeRedactor } from "./trace-attribute-redaction.rules.ts";
+import {
+  createAttributeRedactor,
+  hiddenContentCategoryRules,
+} from "./trace-attribute-redaction.rules.ts";
 
 // ---------------------------------------------------------------------------
 // Ports
@@ -133,6 +139,9 @@ export function mapLegacySpanSummaryToTreeNode(row: SpanSummaryRow): SpanTreeNod
     cacheReadTokens: row.cacheReadTokens,
     cacheCreationTokens: row.cacheCreationTokens,
     updatedAtMs: row.updatedAtMs,
+    agentName: row.agentName ?? null,
+    isA2aCall: row.isA2aCall ?? false,
+    ...(row.ownerProjectId === undefined ? {} : { ownerProjectId: row.ownerProjectId }),
   };
 }
 
@@ -292,6 +301,46 @@ export function buildSpanContentRedactions(
   ]);
 }
 
+/** Every span's detail under its owner's protections; a braided span carries its `braid`. */
+export function mapSpanDetailsByOwner({
+  spans,
+  protections,
+  owners,
+  braids,
+  ports,
+}: {
+  spans: OwnedSpan[];
+  protections: Protections;
+  owners: ReadonlyMap<string, Protections>;
+  braids: readonly (SpanBraid | null)[];
+  ports: TraceReadMapperMembers;
+}): SpanDetail[] {
+  const details = protectByOwner({
+    items: spans,
+    reader: protections,
+    owners,
+    protect: (group, groupProtections) => mapSpansToDetailDtos(group, groupProtections, ports),
+  });
+  return details.map((detail, index) => {
+    const braid = braids[index];
+    return braid ? { ...detail, braid } : detail;
+  });
+}
+
+/** One project's spans under its protections, hidden content scrubbed wherever it rides along. */
+export function protectSpans({
+  spans,
+  protections,
+  spanProtection,
+}: {
+  spans: Span[];
+  protections: Protections;
+  spanProtection: TraceSpanProtection;
+}): Span[] {
+  const redactions = buildSpanContentRedactions(spans, protections, spanProtection);
+  return spans.map((span) => spanProtection.applySpanProtections(span, protections, redactions));
+}
+
 /**
  * Full per-span redaction pipeline: protections, DTO mapping, content redaction,
  * privacy annotations. Single shared implementation prevents drift. Per-span
@@ -409,7 +458,10 @@ export function hiddenAttributeKeyMatcher({
 }): (key: string) => boolean {
   const patterns = [
     ...(protections.hiddenAttributes ?? []),
-    ...hiddenCategoryAttributeRules(protections, contentPrivacy),
+    ...hiddenContentCategoryRules({
+      protections,
+      contentKeyCatalog: contentPrivacy.contentKeyCatalog,
+    }),
   ].map((rule) => rule.pattern);
   for (const side of ["input", "output"] as const) {
     const canSee =
@@ -421,30 +473,6 @@ export function hiddenAttributeKeyMatcher({
   if (patterns.length === 0) return () => false;
   const matchers = compileAttributePatterns(patterns);
   return (key) => matchesAnyAttributePattern(key, matchers);
-}
-
-/**
- * Synthetic hidden-attribute rules for system/tools attribute keys when
- * categories are hidden, replacing values with audience-naming placeholders.
- */
-function hiddenCategoryAttributeRules(
-  protections: V2Protections,
-  contentPrivacy: TraceContentPrivacy,
-): { pattern: string; visibleTo: string }[] {
-  const cats = protections.contentCategories;
-  if (!cats) return [];
-  const rules: { pattern: string; visibleTo: string }[] = [];
-  for (const category of ["system", "tools"] as const) {
-    if (!cats[category].canSee) {
-      for (const key of contentPrivacy.contentKeyCatalog[category]) {
-        rules.push({
-          pattern: key,
-          visibleTo: cats[category].restrictVisibleTo ?? "no one",
-        });
-      }
-    }
-  }
-  return rules;
 }
 
 /**
@@ -553,9 +581,9 @@ function dropRedactedMediaRefs<T extends RedactableV2Dto>(
 }
 
 /**
- * Custom attribute rules with a restrict disposition, plus the standalone system/tools attribute
- * keys when those categories are hidden: replace the matched attribute values (header
- * attributes, span params, span-event attributes) with the placeholder naming who can see them.
+ * Custom attribute rules with a restrict disposition, plus the attribute keys of every content
+ * category hidden from the viewer: replace the matched attribute values (header attributes, span
+ * params, span-event attributes) with the placeholder naming who can see them.
  */
 function redactHiddenAttributes<T extends RedactableV2Dto>({
   redacted,
@@ -570,16 +598,21 @@ function redactHiddenAttributes<T extends RedactableV2Dto>({
 }): void {
   const hidden = [
     ...(protections.hiddenAttributes ?? []),
-    ...hiddenCategoryAttributeRules(protections, contentPrivacy),
+    ...hiddenContentCategoryRules({
+      protections,
+      contentKeyCatalog: contentPrivacy.contentKeyCatalog,
+    }),
   ];
   if (hidden.length === 0) return;
 
   const redactor = createAttributeRedactor({ hidden });
-  if (dto.attributes) {
-    redacted.attributes = redactor(dto.attributes);
+  // Build on the already-redacted records: starting again from `dto` would put back the
+  // media-ref attributes dropped above.
+  if (redacted.attributes) {
+    redacted.attributes = redactor(redacted.attributes);
   }
-  if (dto.params) {
-    redacted.params = redactor(dto.params);
+  if (redacted.params) {
+    redacted.params = redactor(redacted.params);
   }
 
   // Span-detail events carry their own attribute records (list-item events

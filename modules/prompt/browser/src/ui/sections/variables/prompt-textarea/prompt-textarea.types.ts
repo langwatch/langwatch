@@ -1,6 +1,6 @@
 import type { BoxProps } from "@langwatch/design-system/primitives";
+import type { AvailableSource, RenderSourceIcon } from "@langwatch/design-system/variable-mapping";
 
-import type { AvailableSource, RenderSourceIcon } from "../variable-mapping-input.tsx";
 import type { Variable } from "../variables-section.tsx";
 
 export type PromptTextAreaOnAddMention = {

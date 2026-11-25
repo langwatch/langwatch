@@ -89,6 +89,8 @@ describe("PrismaMonitorRepository", () => {
           sample: 0.5,
           enabled: true,
           executionMode: "ON_MESSAGE",
+          autoPausedAt: null,
+          autoPausedReason: null,
         };
         expect(calls[0]?.update).toEqual(configuration);
         expect(calls[0]?.create).toEqual({

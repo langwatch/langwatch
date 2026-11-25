@@ -3,6 +3,8 @@ import type {
   ConnectCredential,
   LicenseSeatCounts,
   LicenseSyncAnswer,
+  UpgradeDiagnosticsReceipt,
+  UpgradeDiagnosticsSubmission,
 } from "@langwatch/enterprise-licensing-contract";
 
 import { ConnectLicenseChannel } from "../connect-license.channel.ts";
@@ -20,6 +22,8 @@ interface MemoryConnectLicenseChannelOptions {
   readonly syncAnswer?: LicenseSyncAnswer | Error;
   /** What an activation code redeems to. */
   readonly activationAnswer?: ActivationAnswer | Error;
+  /** What a diagnostics send answers. A thrown value is thrown instead. */
+  readonly diagnosticsAnswer?: UpgradeDiagnosticsReceipt | Error;
 }
 
 /**
@@ -29,6 +33,11 @@ interface MemoryConnectLicenseChannelOptions {
 export class MemoryConnectLicenseChannel extends ConnectLicenseChannel {
   readonly syncs: RecordedLicenseSync[] = [];
   readonly activations: { code: string; instanceId: string }[] = [];
+  readonly diagnostics: {
+    token: string;
+    instanceId: string;
+    submission: UpgradeDiagnosticsSubmission;
+  }[] = [];
 
   private constructor(private readonly options: MemoryConnectLicenseChannelOptions) {
     super();
@@ -72,5 +81,28 @@ export class MemoryConnectLicenseChannel extends ConnectLicenseChannel {
     const answer = this.options.syncAnswer;
     if (answer instanceof Error) throw answer;
     return answer ?? { services: [] };
+  }
+
+  async sendUpgradeDiagnostics({
+    credential,
+    submission,
+  }: {
+    credential: ConnectCredential;
+    submission: UpgradeDiagnosticsSubmission;
+    signal?: AbortSignal;
+  }): Promise<UpgradeDiagnosticsReceipt> {
+    this.diagnostics.push({
+      token: credential.token,
+      instanceId: credential.instanceId,
+      submission,
+    });
+    const answer = this.options.diagnosticsAnswer;
+    if (answer instanceof Error) throw answer;
+    return (
+      answer ?? {
+        reportId: `report_${this.diagnostics.length}`,
+        receivedAt: "1970-01-01T00:00:00Z",
+      }
+    );
   }
 }

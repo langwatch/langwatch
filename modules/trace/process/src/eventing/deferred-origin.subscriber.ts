@@ -7,6 +7,40 @@ import {
   type TraceProcessingEvent,
   type TraceSummaryData,
 } from "@langwatch/trace-contract";
+import { z } from "zod";
+
+/**
+ * The compact job the deferred check queues: whose trace, and when its first unresolved span
+ * happened (the summary lookup's anchor). Never span content (plan origin-compact-job).
+ */
+export const compactDeferredOriginJobSchema = z.object({
+  tenantId: z.string(),
+  traceId: z.string(),
+  occurredAtMs: z.number(),
+});
+
+export type CompactDeferredOriginJob = z.infer<typeof compactDeferredOriginJobSchema>;
+
+/** The compact job for the span that armed the check, read off the delivery's identity. */
+export function stageDeferredOriginJob({
+  event,
+  tenantId,
+  traceId,
+}: {
+  event: Pick<TraceProcessingEvent, "occurredAt">;
+  tenantId: string;
+  traceId: string;
+}): CompactDeferredOriginJob {
+  return { tenantId, traceId, occurredAtMs: event.occurredAt };
+}
+
+/**
+ * A full job is re-guarded by `needsOriginResolution` when it runs, so a span that went stale
+ * while queued resolves nothing; a compact job keeps that answer by checking its own instant.
+ */
+export function isDeferredOriginJobStale(job: CompactDeferredOriginJob): boolean {
+  return job.occurredAtMs < nowInstant().epochMilliseconds - STALE_TRACE_THRESHOLD_MS;
+}
 
 export type DeferredOriginPayload = {
   id: string;
@@ -20,6 +54,9 @@ const logger = createLogger("langwatch:trace-processing:origin-gate");
 export const DEFERRED_ORIGIN_SUBSCRIBER_NAME = "deferredOriginResolution" as const;
 
 export const DEFERRED_ORIGIN_DELAY_MS = 5 * 60 * 1000;
+
+/** The next release flips this once every worker reads compact bodies (Alex, 2026-10-20). */
+export const WRITE_COMPACT_ORIGIN_JOBS = false;
 
 /**
  * Main's dedup, one job per trace: the first unresolved span sets the deadline

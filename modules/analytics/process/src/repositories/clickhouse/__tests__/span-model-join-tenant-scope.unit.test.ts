@@ -4,12 +4,23 @@
  * guard refused the whole statement and every analytics graph 500'd.
  * @see dev/docs/best_practices/clickhouse-queries.md
  */
-import { checkTenantScope } from "@langwatch/clickhouse-client";
+import { checkTenantScope, expandStatement, fenceFor } from "@langwatch/clickhouse-client";
 import { describe, expect, it } from "vitest";
 
+import { analyticsProof } from "../../__tests__/analytics-proof.fixture.ts";
 import { buildTimeseriesQuery } from "../clickhouse.aggregation-builder.mapper.ts";
 
 const TENANT = "local-dev-project";
+const MEMBER = "local-dev-member";
+
+/** An aggregate's fence: the project outright, one member inside its grant's window. */
+const AGGREGATE_FENCE = fenceFor({
+  authorization: analyticsProof({
+    projectId: TENANT,
+    shared: [{ projectId: MEMBER, from: 1786000000000 }],
+  }),
+  reads: "analytics",
+});
 
 /** What the analytics home asks for when it breaks a metric down by model. */
 function modelBreakdownQuery() {
@@ -30,11 +41,17 @@ describe("given a timeseries grouped by model, which joins the span-model rollup
   describe("when the tenant guard reads the statement it built", () => {
     it("accepts it, because no disjunction sits at the tenant predicate's depth", () => {
       const built = modelBreakdownQuery();
+      const expanded = expandStatement({
+        query: built.sql,
+        queryParams: built.params,
+        fence: AGGREGATE_FENCE,
+      });
 
       const verdict = checkTenantScope({
-        sql: built.sql,
-        params: built.params as Record<string, unknown>,
+        sql: expanded.query,
+        params: expanded.queryParams,
         tenantId: TENANT,
+        tenantIds: [TENANT, MEMBER],
       });
 
       expect(verdict).toBeNull();

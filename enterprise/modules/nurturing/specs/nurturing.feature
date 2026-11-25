@@ -1,8 +1,8 @@
 Feature: Nurturing sends the signals its owners record
-  Each owner tells nurturing through a subscriber on its own pipeline, with ids
-  plus what the owner's event holds. The signal lands as an event on nurturing's
-  pipeline, and nurturing's subscriber sends Customer.io and PostHog what main
-  sent. Nurturing names no peer and fetches nothing.
+  Nurturing's own subscribers hear the owners' events and send Customer.io and
+  PostHog what main sent. An owner may also record a signal: it lands as an
+  event on nurturing's pipeline, and nurturing's subscriber sends it once. Who
+  hears an organization's fact: see organization-member-facts.feature.
 
   @unit
   Scenario: An owner's signal lands on nurturing's pipeline keyed by its source event
@@ -15,7 +15,7 @@ Feature: Nurturing sends the signals its owners record
     Given a person created a scenario in a project
     When its signal is delivered
     Then PostHog receives scenario_created with the project
-    And Customer.io is told the project's scenario count and receives scenario_created
+    And Customer.io receives scenario_created and no scenario count
 
   @unit
   Scenario: A first trace reaches PostHog and Customer.io, against the organization's admin
@@ -89,16 +89,102 @@ Feature: Nurturing sends the signals its owners record
     When an evaluation in that project settles
     Then Customer.io is told about it against that admin, with nurturing's own count of the organization's evaluations
 
+  # Batched (Alex, 2026-10-20): a busy project can settle evaluations far faster than
+  # nurturing's work for each one (a queue hop, three Postgres reads and writes, Customer.io)
+  # can keep up with, and they queued behind each other. Nurturing's busy lanes now queue per project and drain a
+  # backed-up project's facts together, up to 200 at a time; an idle project's fact is a batch
+  # of one, so nothing waits on a timer.
+  @unit
+  Scenario: A backed-up project's settled evaluations are counted in one step and send one update
+    Given three evaluations in a project settled while its lane was busy
+    When nurturing takes them as one batch
+    Then the organization's evaluation count rises by three in one step
+    And Customer.io is told the new count once
+    And PostHog receives evaluations_completed once, with a count of three and the project
+
+  @unit
+  Scenario: The batch that counts an organization's first evaluations sends its milestone once
+    Given an unseeded organization with no evaluation counted yet
+    When two of its evaluations settle and one batch counts them
+    Then first_evaluation_created is sent once, against the admin
+
+  @unit
+  Scenario: A counted evaluation tells the organization's Company it has evaluation results and its count
+    Given an evaluation_completed signal naming its organization
+    When the signal is delivered
+    Then Customer.io groups the admin into that organization with has_evaluation_results true and the evaluation_count
+
+  @unit
+  Scenario: The organization's first counted evaluations set first_evaluation_at on its Company
+    Given an evaluation_completed signal naming its organization, marked first
+    When the signal is delivered
+    Then the Company is sent first_evaluation_at as well
+
+  @unit
+  Scenario: A debounced evaluation batch still updates the organization's Company
+    Given an evaluation_completed signal naming its organization was delivered, and its tenant is debounced
+    When a second signal for the same tenant is delivered within the debounce window
+    Then Customer.io receives both Company group updates and the admin's identify and track once
+
+  @unit
+  Scenario: An evaluation signal recorded before it named its organization updates no Company
+    Given an evaluation_completed signal with no organization
+    When the signal is delivered
+    Then Customer.io receives no group call for it
+
+  @unit
+  Scenario: A redelivered settled evaluation is counted once
+    Given an evaluation settled and was counted
+    When the same settled evaluation is delivered again, in the same batch or a later one
+    Then it is not counted again
+
+  @unit
+  Scenario: A batch that fails counting is retried without counting twice
+    Given a batch of settled evaluations is being counted
+    When counting it fails
+    Then the batch fails and the queue retries it
+    And no evaluation in it is counted a second time
+
+  @unit
+  Scenario: A batch whose claims cannot all be taken is retried whole
+    Given a batch of settled evaluations is being claimed
+    When taking one of its claims fails
+    Then the batch gives back the claims it took and fails
+    And the queue's retry counts every evaluation in it once
+
+  @unit
+  Scenario: A failed delivery does not hold back the rest of the batch
+    Given a batch of settled evaluations spans two projects
+    When sending the first project's signal fails
+    Then the second project is still counted and its signal sent
+    And the batch fails, but the retry counts neither project a second time
+
+  @unit
+  Scenario: A backed-up project's finished runs are counted in one step
+    Given two runs in a project finished while its lane was busy, one delivered twice
+    When nurturing takes them as one batch
+    Then the organization's run count rises by two, told once under the latest run
+
+  @unit
+  Scenario: A backed-up project's traces tell Customer.io once
+    Given several traces in a project were received while its lane was busy
+    When nurturing takes them as one batch
+    Then trace_received is sent once, for the latest trace
+    And the project's active day is sent once per day the traces fell on
+
   @unit
   Scenario: A seeded organization's first counted evaluation is not its first milestone
     Given nurturing learned an organization from project's backfill
     When the first evaluation nurturing counts for it settles
     Then no first_evaluation_created is sent and the traits carry the count since the cutover
 
+  # Project's backfill records no creation for a project that has one: one created fact per
+  # project, keyed "<project>:created". A backfilled fact of another of its projects does seed the
+  # organization, whichever lands first (seeded is known OR new, row 5a below).
   @unit
-  Scenario: Project's backfill is idempotent for nurturing
+  Scenario: A redelivered project creation leaves a live organization unseeded
     Given nurturing learned an organization from a live project creation
-    When project's backfill records that project again, once or many times
+    When the same creation fact is delivered again, once or many times
     Then the organization stays unseeded and its first evaluation still raises the milestone
 
   # Migration plan D.1 (DATA-NURTURING-GUARD): seeded is computed at read, so it also covers
@@ -142,6 +228,24 @@ Feature: Nurturing sends the signals its owners record
     Given several events record the same organization at once
     When they all settle
     Then every one succeeds and the organization has one row
+
+  # Admin map (projections build plan, row 5a): the admin and seeded flag are folded order-free
+  # from project's created facts, so a late, redelivered or replayed fact leaves the row as live
+  # delivery would. The admin is the latest-stamped one, no longer the latest delivered; seeded
+  # turns on for any backfilled fact, no longer only the first delivered.
+  @unit @integration
+  Scenario: The organization's admin is the latest-stamped one whatever order the facts land in
+    Given project's created facts for one organization naming admins at different stamps
+    And a later fact naming no admin, from project's backfill
+    When they land in one order, or in its reverse
+    Then the organization's admin is the one the latest-stamped fact naming an admin names
+    And the organization is seeded
+
+  @integration
+  Scenario: A redelivered project-created fact leaves the organization's row as it was
+    Given nurturing folded a project's created fact into its organization's row
+    When the same fact is delivered again
+    Then the row is unchanged, its update time included
 
   @unit
   Scenario: An evaluation in an organization nurturing never learned raises nothing

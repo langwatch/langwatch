@@ -32,6 +32,7 @@ defineRestRouter(restApi)
   .withNamespace("local")
   .withVersion("2026-10-05")
   .post("/calls", "startCall")
+  .keepsRecords()
   .withInput(startCall)
   .withPermission("project:view")
   .withOutput(z.object({ callId: z.string() }))
@@ -42,6 +43,7 @@ defineRestRouter(restApi)
   })
 
   .post("/steps", "startCall")
+  .keepsRecords()
   .withInput(z.array(z.object({ index: z.number() })), { as: "steps" })
   .withPermission("project:view")
   .withOutput(z.object({ callId: z.string() }))
@@ -52,6 +54,7 @@ defineRestRouter(restApi)
   })
 
   .post("/choice", "startCall")
+  .keepsRecords()
   .withInput(z.object({ kind: z.enum(["read", "write"]) }))
   .withPermission(
     permissionBy({ field: "kind", map: { read: "project:view", write: "project:update" } }),
@@ -60,6 +63,7 @@ defineRestRouter(restApi)
   .handle(() => ({ callId: "choice" }))
 
   .post("/missing", "startCall")
+  .keepsRecords()
   .withInput(z.object({ kind: z.enum(["read", "write"]) }))
   // @ts-expect-error a value of the field has no permission
   .withPermission(permissionBy({ field: "kind", map: { read: "project:view" } }));

@@ -8,11 +8,27 @@
     "needsOldWritersGone": true
   },
   {
+    "id": "agent:backfill-versions",
+    "kind": "data",
+    "mode": "background",
+    "owner": "agent",
+    "description": "Records version 1 of every agent written before versions existed, with its creator from the audit log.",
+    "needsOldWritersGone": true
+  },
+  {
     "id": "analytics:fill-lwql-project-keys",
     "kind": "data",
     "mode": "background",
     "owner": "analytics",
     "description": "Fills LangWatchQL's key map with every project's key that it lacks."
+  },
+  {
+    "id": "analytics:fill-id-indexes",
+    "kind": "data",
+    "mode": "background",
+    "owner": "analytics",
+    "description": "Fills the evaluation analytics id index from rows older than its view, then turns the lookup on per ClickHouse target.",
+    "needsOldWritersGone": false
   },
   {
     "id": "annotation:record-trace-annotations",
@@ -93,6 +109,14 @@
     "needsOldWritersGone": true
   },
   {
+    "id": "coding-agent:fill-id-indexes",
+    "kind": "data",
+    "mode": "background",
+    "owner": "coding-agent",
+    "description": "Fills the id indexes of coding-agent sessions, events and trace mappings from older rows, then marks them ready on each ClickHouse target.",
+    "needsOldWritersGone": false
+  },
+  {
     "id": "data-retention:keep-control-plane-events-forever",
     "kind": "data",
     "mode": "background",
@@ -109,11 +133,81 @@
     "needsOldWritersGone": true
   },
   {
+    "id": "dataset:fill-empty-slugs",
+    "kind": "data",
+    "mode": "background",
+    "owner": "dataset",
+    "description": "Gives each dataset stored without a slug one made from its name."
+  },
+  {
+    "id": "dataset:create-first-versions",
+    "kind": "data",
+    "mode": "background",
+    "owner": "dataset",
+    "description": "Saves version 1 of every dataset that has rows and no version history yet."
+  },
+  {
+    "id": "evaluation:fill-id-indexes",
+    "kind": "data",
+    "mode": "background",
+    "owner": "evaluation",
+    "description": "Fills the evaluation run id index from rows older than its view, then turns the lookup on per ClickHouse target.",
+    "needsOldWritersGone": false
+  },
+  {
+    "id": "evaluation:fill-second-id-indexes",
+    "kind": "data",
+    "mode": "background",
+    "owner": "evaluation",
+    "description": "Fills the second id index of evaluation runs (by trace id) from older rows, then marks it ready on each ClickHouse target.",
+    "needsOldWritersGone": false
+  },
+  {
+    "id": "evaluator:backfill-versions",
+    "kind": "data",
+    "mode": "background",
+    "owner": "evaluator",
+    "description": "Records version 1 of every evaluator written before versions existed, with its creator from the audit log.",
+    "needsOldWritersGone": true
+  },
+  {
+    "id": "experiment:fill-id-indexes",
+    "kind": "data",
+    "mode": "background",
+    "owner": "experiment",
+    "description": "Fills the id indexes of experiment runs and DSPy steps from older rows, then marks them ready on each ClickHouse target.",
+    "needsOldWritersGone": false
+  },
+  {
+    "id": "experiment:fill-second-id-indexes",
+    "kind": "data",
+    "mode": "background",
+    "owner": "experiment",
+    "description": "Fills the second id index of experiment runs (by experiment id) from older rows, then marks it ready on each ClickHouse target.",
+    "needsOldWritersGone": false
+  },
+  {
+    "id": "gateway:fill-id-indexes",
+    "kind": "data",
+    "mode": "background",
+    "owner": "gateway",
+    "description": "Fills the id indexes of gateway spend and the budget ledger from older rows, then marks them ready on each ClickHouse target.",
+    "needsOldWritersGone": false
+  },
+  {
     "id": "governance:record-coding-assistant-billing",
     "kind": "data",
     "mode": "background",
     "owner": "governance",
     "description": "Records each organisation's coding-assistant billed facts, which trace folds at ingest.",
+    "needsOldWritersGone": true
+  },
+  {
+    "id": "governance:record-coding-assistant-ingest-source-billing",
+    "kind": "data",
+    "mode": "background",
+    "owner": "governance",
+    "description": "Records each organisation's billed facts again, so every ingest source type has one.",
     "needsOldWritersGone": true
   },
   {
@@ -123,6 +217,14 @@
     "owner": "governance",
     "description": "Annotates each inline anomaly webhook destination with a legacy-scheme endpoint.",
     "needsOldWritersGone": true
+  },
+  {
+    "id": "governance:seed-agent-registry",
+    "kind": "data",
+    "mode": "background",
+    "owner": "governance",
+    "description": "Builds each organisation's agent registry from its agents, sources and traffic.",
+    "needsOldWritersGone": false
   },
   {
     "id": "governance:replay-cost-charges",
@@ -205,6 +307,142 @@
     "needsOldWritersGone": true
   },
   {
+    "id": "nurturing:replay-user-erasure-marks",
+    "kind": "data",
+    "mode": "background",
+    "owner": "nurturing",
+    "description": "Marks every person erased in user's log, before the keys copy.",
+    "needsOldWritersGone": true
+  },
+  {
+    "id": "nurturing:replay-identity-erasure-marks",
+    "kind": "data",
+    "mode": "background",
+    "owner": "nurturing",
+    "description": "Marks every person erased in identity's log, before the keys copy.",
+    "needsOldWritersGone": true
+  },
+  {
+    "id": "nurturing:replay-virtual-keys",
+    "kind": "data",
+    "mode": "background",
+    "owner": "nurturing",
+    "description": "Fills nurturing's key copy from gateway's key lifecycle log at deploy.",
+    "needsOldWritersGone": true
+  },
+  {
+    "id": "nurturing:replay-evaluation-days",
+    "kind": "data",
+    "mode": "background",
+    "owner": "nurturing",
+    "description": "Fills nurturing's evaluation days from evaluation's log since 2026-10-19.",
+    "needsOldWritersGone": true
+  },
+  {
+    "id": "nurturing:replay-organization-plans",
+    "kind": "data",
+    "mode": "background",
+    "owner": "nurturing",
+    "description": "Fills nurturing's plan copy from billing's subscription log; sends nothing.",
+    "needsOldWritersGone": true
+  },
+  {
+    "id": "nurturing:replay-project-placements",
+    "kind": "data",
+    "mode": "background",
+    "owner": "nurturing",
+    "description": "Fills nurturing's project placement copy from project's created facts at deploy.",
+    "needsOldWritersGone": true
+  },
+  {
+    "id": "nurturing:replay-organizations-created",
+    "kind": "data",
+    "mode": "background",
+    "owner": "nurturing",
+    "description": "Fills nurturing's organization creation copy from organization's log at deploy.",
+    "needsOldWritersGone": true
+  },
+  {
+    "id": "nurturing:replay-organization-admins",
+    "kind": "data",
+    "mode": "background",
+    "owner": "nurturing",
+    "description": "Fills each organization's admin and seeded flag from project's created facts at deploy.",
+    "needsOldWritersGone": true
+  },
+  {
+    "id": "nurturing:replay-organization-members",
+    "kind": "data",
+    "mode": "background",
+    "owner": "nurturing",
+    "description": "Fills nurturing's member copy from organization's member facts at deploy.",
+    "needsOldWritersGone": true
+  },
+  {
+    "id": "nurturing:replay-auth-members",
+    "kind": "data",
+    "mode": "background",
+    "owner": "nurturing",
+    "description": "Fills nurturing's member copy from auth's single sign-on joins at deploy.",
+    "needsOldWritersGone": true
+  },
+  {
+    "id": "nurturing:replay-personal-owners-from-organization",
+    "kind": "data",
+    "mode": "background",
+    "owner": "nurturing",
+    "description": "Fills nurturing's personal-project owners from organization's personal-workspace log at deploy.",
+    "needsOldWritersGone": true
+  },
+  {
+    "id": "nurturing:replay-personal-owners-from-project",
+    "kind": "data",
+    "mode": "background",
+    "owner": "nurturing",
+    "description": "Fills nurturing's personal-project owners from the owners project listed at deploy.",
+    "needsOldWritersGone": true
+  },
+  {
+    "id": "nurturing:replay-traced-projects-from-trace",
+    "kind": "data",
+    "mode": "background",
+    "owner": "nurturing",
+    "description": "Fills nurturing's traced projects from trace's project_traced log at deploy.",
+    "needsOldWritersGone": true
+  },
+  {
+    "id": "nurturing:replay-traced-projects-from-project",
+    "kind": "data",
+    "mode": "background",
+    "owner": "nurturing",
+    "description": "Fills nurturing's traced projects from the first messages project listed at deploy.",
+    "needsOldWritersGone": true
+  },
+  {
+    "id": "nurturing:replay-last-traces",
+    "kind": "data",
+    "mode": "background",
+    "owner": "nurturing",
+    "description": "Fills each organization's latest trace time from trace's facts since the day before the release.",
+    "needsOldWritersGone": true
+  },
+  {
+    "id": "nurturing:replay-trace-day-spans",
+    "kind": "data",
+    "mode": "background",
+    "owner": "nurturing",
+    "description": "Fills nurturing's trace days from trace's span log, one counting window back.",
+    "needsOldWritersGone": true
+  },
+  {
+    "id": "nurturing:replay-trace-day-failures",
+    "kind": "data",
+    "mode": "background",
+    "owner": "nurturing",
+    "description": "Fills nurturing's failed-trace days from trace's trace_failed log, one counting window back.",
+    "needsOldWritersGone": true
+  },
+  {
     "id": "ops:copy-automation-migration-state",
     "kind": "data",
     "mode": "blocking",
@@ -241,6 +479,14 @@
     "description": "Grants the platform-operator role to the verified users a still-set ADMIN_EMAILS names, while nobody holds it."
   },
   {
+    "id": "ops:fill-event-log-id-index",
+    "kind": "data",
+    "mode": "background",
+    "owner": "ops",
+    "description": "Fills the event log's aggregate index from older events, then marks it ready on each ClickHouse target.",
+    "needsOldWritersGone": false
+  },
+  {
     "id": "organization:record-presence-settings",
     "kind": "data",
     "mode": "background",
@@ -249,11 +495,43 @@
     "needsOldWritersGone": true
   },
   {
+    "id": "organization:record-seat-peak-opening-snapshots",
+    "kind": "data",
+    "mode": "background",
+    "owner": "organization",
+    "description": "Records every organization's seat holders as they stand, to open its seat peak.",
+    "needsOldWritersGone": true
+  },
+  {
+    "id": "organization:list-member-facts",
+    "kind": "data",
+    "mode": "background",
+    "owner": "organization",
+    "description": "Lists every organization's active members, neither disabled nor deactivated, with when each joined.",
+    "needsOldWritersGone": true
+  },
+  {
     "id": "project:record-created-facts",
     "kind": "data",
     "mode": "background",
     "owner": "project",
     "description": "Records every existing project as created, and each live project's department and presence setting.",
+    "needsOldWritersGone": true
+  },
+  {
+    "id": "project:list-personal-owner-and-first-message-facts",
+    "kind": "data",
+    "mode": "background",
+    "owner": "project",
+    "description": "Lists every personal project's owner and every project that already received its first message, archived ones included.",
+    "needsOldWritersGone": true
+  },
+  {
+    "id": "project:reslug-reserved-dashboards",
+    "kind": "data",
+    "mode": "background",
+    "owner": "project",
+    "description": "Gives a project whose address is exactly /dashboards the usual name-and-id address instead.",
     "needsOldWritersGone": true
   },
   {
@@ -270,6 +548,22 @@
     "owner": "scenario",
     "description": "Closes historical simulation runs that never received a terminal event.",
     "needsOldWritersGone": true
+  },
+  {
+    "id": "scenario:fill-id-indexes",
+    "kind": "data",
+    "mode": "background",
+    "owner": "scenario",
+    "description": "Fills the id index of simulation runs from older rows, then marks them ready on each ClickHouse target.",
+    "needsOldWritersGone": false
+  },
+  {
+    "id": "scenario:fill-second-id-indexes",
+    "kind": "data",
+    "mode": "background",
+    "owner": "scenario",
+    "description": "Fills the second id indexes of simulation runs (by batch run id, by scenario set id) from older rows, then marks them ready on each ClickHouse target.",
+    "needsOldWritersGone": false
   },
   {
     "id": "scim:replay-sso-connection-view",
@@ -296,6 +590,14 @@
     "needsOldWritersGone": true
   },
   {
+    "id": "suite:fill-id-indexes",
+    "kind": "data",
+    "mode": "background",
+    "owner": "suite",
+    "description": "Fills the id index of suite runs from older rows, then marks them ready on each ClickHouse target.",
+    "needsOldWritersGone": false
+  },
+  {
     "id": "topic:seed-topic-model-history",
     "kind": "data",
     "mode": "background",
@@ -320,12 +622,68 @@
     "needsOldWritersGone": false
   },
   {
+    "id": "trace:track-analytics-metadata-columns-materialisation",
+    "kind": "data",
+    "mode": "background",
+    "owner": "trace",
+    "description": "Waits for ClickHouse to store the trace analytics metadata columns in existing rows.",
+    "needsOldWritersGone": false
+  },
+  {
+    "id": "trace:replay-trace-analytics-widget-columns",
+    "kind": "data",
+    "mode": "background",
+    "owner": "trace",
+    "description": "Refolds the last 62 days of trace analytics rows so they carry the stock widgets' metadata columns.",
+    "needsOldWritersGone": true
+  },
+  {
+    "id": "trace:replay-span-analytics",
+    "kind": "data",
+    "mode": "background",
+    "owner": "trace",
+    "description": "Fills span_analytics with the last 62 days of spans, the history the stock span widgets read.",
+    "needsOldWritersGone": true
+  },
+  {
     "id": "trace:send-month-trace-ids",
     "kind": "data",
     "mode": "background",
     "owner": "trace",
     "description": "Sends each project's trace ids seen so far this month, so plan trace limits count from a complete month.",
     "needsOldWritersGone": true
+  },
+  {
+    "id": "trace:record-evaluation-outcomes",
+    "kind": "data",
+    "mode": "background",
+    "owner": "trace",
+    "description": "Records each evaluation of the last 62 days on its trace, so the trace's evaluation rows can be written.",
+    "needsOldWritersGone": true
+  },
+  {
+    "id": "trace:replay-trace-evaluation-analytics",
+    "kind": "data",
+    "mode": "background",
+    "owner": "trace",
+    "description": "Refolds the last 62 days of traces so each carries its evaluation rows for the stock widgets.",
+    "needsOldWritersGone": true
+  },
+  {
+    "id": "trace:replay-trace-analytics-managed-prompt-version",
+    "kind": "data",
+    "mode": "background",
+    "owner": "trace",
+    "description": "Refolds the last 122 days of trace analytics rows so they carry the managed prompt version each trace last used.",
+    "needsOldWritersGone": true
+  },
+  {
+    "id": "trace:fill-id-indexes",
+    "kind": "data",
+    "mode": "background",
+    "owner": "trace",
+    "description": "Fills the trace id indexes from rows older than their views, then marks them ready.",
+    "needsOldWritersGone": false
   },
   {
     "id": "user:record-created-facts",

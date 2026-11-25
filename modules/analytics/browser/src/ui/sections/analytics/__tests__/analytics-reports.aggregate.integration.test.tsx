@@ -69,7 +69,7 @@ vi.mock("../../report-grid.tsx", () => ({
 vi.mock("../../filter-sidebar.tsx", () => ({ FilterSidebar: () => null }));
 vi.mock("../../dashboard-auto-refresh-menu.tsx", () => ({ DashboardAutoRefreshMenu: () => null }));
 
-import { ReportsContent } from "../analytics-reports.screen.tsx";
+import ReportsContent from "../analytics-reports.screen.tsx";
 
 const renderReports = () =>
   render(

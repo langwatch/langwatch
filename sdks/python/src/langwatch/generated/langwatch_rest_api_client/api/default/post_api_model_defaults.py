@@ -105,7 +105,8 @@ def sync_detailed(
     | PostApiModelDefaultsResponse500
 ]:
     """Create a default-model config attached to one or more scopes. JSON keys may be roles (DEFAULT, FAST,
-    LANGY, EMBEDDINGS) or registered feature keys; missing keys inherit from a higher scope.
+    LANGY, EMBEDDINGS, INSTANT_EVALS) or registered feature keys; missing keys inherit from a higher
+    scope.
 
     Args:
         body (PostApiModelDefaultsBody):
@@ -142,7 +143,8 @@ def sync(
     | None
 ):
     """Create a default-model config attached to one or more scopes. JSON keys may be roles (DEFAULT, FAST,
-    LANGY, EMBEDDINGS) or registered feature keys; missing keys inherit from a higher scope.
+    LANGY, EMBEDDINGS, INSTANT_EVALS) or registered feature keys; missing keys inherit from a higher
+    scope.
 
     Args:
         body (PostApiModelDefaultsBody):
@@ -173,7 +175,8 @@ async def asyncio_detailed(
     | PostApiModelDefaultsResponse500
 ]:
     """Create a default-model config attached to one or more scopes. JSON keys may be roles (DEFAULT, FAST,
-    LANGY, EMBEDDINGS) or registered feature keys; missing keys inherit from a higher scope.
+    LANGY, EMBEDDINGS, INSTANT_EVALS) or registered feature keys; missing keys inherit from a higher
+    scope.
 
     Args:
         body (PostApiModelDefaultsBody):
@@ -208,7 +211,8 @@ async def asyncio(
     | None
 ):
     """Create a default-model config attached to one or more scopes. JSON keys may be roles (DEFAULT, FAST,
-    LANGY, EMBEDDINGS) or registered feature keys; missing keys inherit from a higher scope.
+    LANGY, EMBEDDINGS, INSTANT_EVALS) or registered feature keys; missing keys inherit from a higher
+    scope.
 
     Args:
         body (PostApiModelDefaultsBody):

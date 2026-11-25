@@ -2,8 +2,14 @@
 import type { NurturingSignalOf } from "@langwatch/enterprise-nurturing-contract";
 import { onboardingExperimentProperties } from "@langwatch/onboarding-contract";
 
+import { insightActedEvent } from "./nurturing-insight-signals.rules.ts";
+
 type ActivationSignal = NurturingSignalOf<
-  "scenario_created" | "scenario_run_succeeded" | "first_trace_integrated" | "project_active_day"
+  | "scenario_created"
+  | "scenario_run_succeeded"
+  | "first_trace_integrated"
+  | "project_active_day"
+  | "insight_acted"
 >;
 
 type ActivationTrackInput = {
@@ -15,6 +21,8 @@ type ActivationTrackInput = {
 /** The PostHog event an activation milestone is tracked as. */
 export function activationTrackInput(signal: ActivationSignal): ActivationTrackInput {
   switch (signal.kind) {
+    case "insight_acted":
+      return insightActedEvent(signal);
     case "scenario_created": {
       const variant = signal.onboardingVariant;
       return {
@@ -53,4 +61,15 @@ export function activationTrackInput(signal: ActivationSignal): ActivationTrackI
         },
       };
   }
+}
+
+/** One PostHog event for a batch of settled evaluations, carrying how many it counted. */
+export function evaluationsCompletedEvent(
+  signal: NurturingSignalOf<"evaluation_completed">,
+): ActivationTrackInput {
+  return {
+    userId: signal.userId,
+    event: "evaluations_completed",
+    properties: { count: signal.evaluationsCounted ?? 1 },
+  };
 }

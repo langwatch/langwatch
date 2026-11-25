@@ -7,7 +7,7 @@ Feature: Shared Dataset service
     When a caller creates a dataset for a project with columns and records
     Then the service validates the input with the Dataset contract
     And it returns a portable Dataset value
-    And the records are written through the Dataset record repository
+    And the records are written to object storage
 
   @unit
   Scenario: Dataset names remain unique within a project
@@ -32,8 +32,8 @@ Feature: Shared Dataset service
   @unit
   Scenario: Dataset copy remains a Dataset operation
     When a caller copies a dataset to another project
-    Then the service creates the target through its own repository
-    And it copies records through the Dataset record repository
+    Then the service creates the target in object storage
+    And it reads the source records through the Dataset record repository
     And it does not construct a Dataset Record feature
 
   @unit
@@ -74,6 +74,30 @@ Feature: Shared Dataset service
     When the same reads, archives, pages and deletes run against every backend
     Then each answers the same rows, the same absences and the same totals
     And neither answers with a dataset belonging to another project
+
+  @integration
+  Scenario: Entries written together list in the byte order of their ids
+    Given entries written in one batch, so they share a creation time, under ids that differ only in letter case
+    When each backend lists them, page by page or after a cursor
+    Then every backend lists them in the byte order of their ids, capital letters before lowercase
+
+  @integration
+  Scenario: A cursor naming no entry of the dataset answers an empty page
+    Given a dataset with entries
+    When a backend is asked for the page after an id that is no entry of that dataset, or an entry of another dataset
+    Then every backend answers an empty page rather than starting again from the first entry
+
+  @integration
+  Scenario: A content migration writes entries in the order the dataset lists them
+    Given entries written in one batch under ids that differ only in letter case
+    When the content migration reads them page by page into storage
+    Then it reads them in the byte order of their ids, the order the dataset lists them
+
+  @unit
+  Scenario: A copied dataset lists its entries in the order of its source
+    Given a dataset of several hundred entries
+    When I copy it
+    Then the copy lists its entries in the order the source lists them
 
   @unit
   Scenario: The dataset transports move without changing who may call them
@@ -140,6 +164,13 @@ Feature: Shared Dataset service
     Given a dataset whose stored columns still carry the upload's source header, as main stores them
     When the project's datasets are read
     Then the columns read as name and type and the dataset lists, never a 422 for the whole project
+
+  @unit @regression
+  Scenario: An import refused before its file is read gives the file's connection back
+    Given a dataset import from a stored file
+    When the import is refused before the first byte of the file is read
+    Then the file's byte stream is ended, so it holds no storage connection
+    And the file is opened only once the organization's limits have been read
 
   @integration
   Scenario: A storage migration pages one project's datasets by id, archived ones included

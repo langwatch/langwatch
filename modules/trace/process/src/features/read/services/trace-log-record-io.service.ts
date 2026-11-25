@@ -4,6 +4,7 @@
  * here and hands the result to `TraceIOAccumulationService` alongside what the spans said.
  */
 
+import { unwrapUserQuery } from "@langwatch/coding-agent-contract";
 import { CLAUDE_CODE_SCOPE_NAMES, SPRING_AI_SCOPE_NAMES } from "@langwatch/span-normalisation";
 import type {
   LogRecordReceivedEventData,
@@ -15,7 +16,12 @@ import type {
  * the only collaborator and never varies per record, so it is held rather than threaded through
  * every call.
  */
-type TraceLogIO = { input: string | null; output: string | null };
+type TraceLogIO = {
+  input: string | null;
+  output: string | null;
+  /** The record declared its output (`langwatch.output`), so a later inferred one keeps off it. */
+  outputDeclared?: boolean;
+};
 
 const NO_IO: TraceLogIO = { input: null, output: null };
 
@@ -27,12 +33,18 @@ export class TraceLogRecordIOService {
   }
 
   /**
-   * Spring AI, Claude Code and Codex each report the conversation as logs rather than span
+   * Spring AI, Claude Code, Codex and Grok each report the conversation as logs rather than span
    * attributes, each in its own shape. A vendor returning `null` means not mine, or nothing here,
    * and the next one gets a look — Spring AI is the one exception, and says so.
    */
   extractIO(data: LogRecordReceivedEventData): TraceLogIO {
-    return this.fromSpringAI(data) ?? this.fromClaudeCode(data) ?? this.fromCodex(data) ?? NO_IO;
+    return (
+      this.fromSpringAI(data) ??
+      this.fromClaudeCode(data) ??
+      this.fromCodex(data) ??
+      this.fromGrok(data) ??
+      NO_IO
+    );
   }
 
   /**
@@ -67,6 +79,20 @@ export class TraceLogRecordIOService {
       return null;
     }
 
+    // A launcher that wraps the request, or answers through a tool, declares the real text. Each
+    // declared side replaces only its own native counterpart.
+    const [native] = this.nativeClaudeCodeIO(data);
+    const [declared] = declaredIO(data.attributes);
+    if (!declared) return native ?? null;
+    return {
+      input: declared.input ?? native?.input ?? null,
+      output: declared.output ?? native?.output ?? null,
+      ...(declared.outputDeclared ? { outputDeclared: true } : {}),
+    };
+  }
+
+  /** What Claude Code itself put on the record: one item, or none when it carries no text. */
+  private nativeClaudeCodeIO(data: LogRecordReceivedEventData): TraceLogIO[] {
     // Gated on `user_prompt` specifically. Any claude_code record with a
     // `prompt` attribute would otherwise win, including internal subagent calls
     // — a Bash tool subagent emitting `prompt:"env"` would put the shell
@@ -74,7 +100,7 @@ export class TraceLogRecordIOService {
     if (data.attributes["event.name"] === "user_prompt") {
       const prompt = data.attributes.prompt;
       if (typeof prompt === "string" && prompt) {
-        return { input: prompt, output: null };
+        return [{ input: prompt, output: null }];
       }
     }
 
@@ -87,18 +113,18 @@ export class TraceLogRecordIOService {
         body: data.attributes.body,
       }).assistantText;
       if (responseText !== null) {
-        return { input: null, output: responseText };
+        return [{ input: null, output: responseText }];
       }
     }
 
     if (this.isConversationalTurn(data, "assistant_response")) {
       const response = data.attributes.response;
       if (typeof response === "string" && response.length > 0) {
-        return { input: null, output: response };
+        return [{ input: null, output: response }];
       }
     }
 
-    return null;
+    return [];
   }
 
   /**
@@ -130,4 +156,33 @@ export class TraceLogRecordIOService {
 
     return typeof prompt === "string" && prompt.length > 0 ? { input: prompt, output: null } : null;
   }
+
+  /** Grok wraps the prompt in `<user_query>` and sends the reply on its own event. */
+  private fromGrok(data: LogRecordReceivedEventData): TraceLogIO | null {
+    const eventName = data.attributes["event.name"];
+    if (eventName === "grok_code.user_prompt") {
+      const prompt = unwrapUserQuery(data.attributes.prompt ?? "");
+      return prompt.length > 0 ? { input: prompt, output: null } : null;
+    }
+    if (eventName === "grok_code.assistant_response") {
+      const response = data.attributes.response ?? "";
+      return response.length > 0 ? { input: null, output: response } : null;
+    }
+    return null;
+  }
+}
+
+/**
+ * The input and output a launcher declared on the record: the request it wrapped, the reply its
+ * agent posted through a tool. One item when it declared either, none when it declared neither.
+ */
+function declaredIO(attributes: LogRecordReceivedEventData["attributes"]): TraceLogIO[] {
+  const text = (key: string): string | null => {
+    const value = attributes[key];
+    return typeof value === "string" && value.length > 0 ? value : null;
+  };
+  const input = text("langwatch.input");
+  const output = text("langwatch.output");
+  if (input === null && output === null) return [];
+  return [{ input, output, ...(output === null ? {} : { outputDeclared: true }) }];
 }

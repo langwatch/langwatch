@@ -3,6 +3,7 @@ import type { MonitorApi, MonitorServerConfig } from "@langwatch/monitor-contrac
 import { defineProcessModule, type PublishedProcessModule } from "@langwatch/process";
 
 import { MonitorModule } from "./app/monitor.app.ts";
+import { monitorAutoPauseEventing } from "./eventing/monitor-auto-pause.pipeline.ts";
 import { monitorEvaluatorCleanupEventing } from "./eventing/monitor-evaluator-cleanup.pipeline.ts";
 import { monitorRepositories } from "./repositories/monitor-repositories.registry.ts";
 import { createMonitorsRest } from "./transport/monitor.rest.ts";
@@ -17,4 +18,5 @@ export const monitorProcessModule: PublishedProcessModule<
   .withApi(MonitorModule)
   .withTransports(createMonitorsRest(), monitorTrpcTransport)
   .provideMiddlewareContext({ projectRequestContext: projectRequestContextOf })
-  .withEventing(monitorEvaluatorCleanupEventing);
+  .withEventing(monitorEvaluatorCleanupEventing)
+  .withEventing(monitorAutoPauseEventing);

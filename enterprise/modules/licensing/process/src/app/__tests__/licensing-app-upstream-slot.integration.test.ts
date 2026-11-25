@@ -1,6 +1,6 @@
 import type { EventingCommands } from "@langwatch/eventing";
 import { ResourceScope } from "@langwatch/process";
-import type { RateLimiter } from "@langwatch/process-stores";
+import type { ObjectStorage, RateLimiter } from "@langwatch/process-stores";
 import { ScopedSecrets } from "@langwatch/secrets";
 /**
  * @vitest-environment node
@@ -43,6 +43,7 @@ describe.skipIf(!TEST_DATABASE_URL)("the install's hosted provider slot in produ
           prisma,
           encryption: createApiFixture<IssuedLicenseCipher>(),
           rateLimiter: createApiFixture<RateLimiter>(),
+          objectStorage: createApiFixture<ObjectStorage>(),
         }),
         config: { ...TEST_LICENSING_CONFIG, isSaas: false },
         resources: new ResourceScope(),

@@ -29,9 +29,11 @@ export type UsageRecordRef = {
  * is held by the first span that claims it, and that same span claiming again acquires it.
  */
 export abstract class TraceSpanDedupRepository {
-  abstract claimProcessing(span: SpanDedupRef): Promise<SpanDedupClaim>;
+  /** Claims a batch of spans in one round trip; the answers follow the order asked. */
+  abstract claimProcessing(spans: readonly SpanDedupRef[]): Promise<SpanDedupClaim[]>;
 
-  abstract confirmProcessed(span: SpanDedupRef): Promise<void>;
+  /** Marks a batch of ingested spans processed, in one round trip. */
+  abstract confirmProcessed(spans: readonly SpanDedupRef[]): Promise<void>;
 
   abstract releaseOnFailure(span: SpanDedupRef): Promise<void>;
 

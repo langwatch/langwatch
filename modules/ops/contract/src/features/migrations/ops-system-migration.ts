@@ -1,5 +1,8 @@
 import type { Named } from "@langwatch/module";
-import type { TenantMigrationRecord, TenantMigrationStatus } from "@langwatch/system-migrations";
+import type {
+  TenantMigrationRecord,
+  TenantMigrationStatus,
+} from "@langwatch/system-migrations/types";
 /**
  * The input shapes the operator system-migrations surface parses. The
  * confirmations are typed strings, optional, because only migrations that
@@ -199,6 +202,11 @@ const opsMigrationOverviewSchemaDefinition = z.object({
   /** Its `migrated` tenants are kept in step by design, never held or needing attention. */
   migratedIsSteady: z.boolean(),
   counts: opsMigrationStatusCountsSchema,
+  /**
+   * Of `counts.migrated`, the tenants held until a person acts (the user proves the account, or an
+   * operator lifts a pin). Expected, not a failure, so never listed in `attention`.
+   */
+  waitingOnPerson: z.number(),
   /**
    * The rollout gauge. Null when there is nothing to enroll — off cloud, and
    * for a migration that admits every organization automatically.

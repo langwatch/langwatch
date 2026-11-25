@@ -1,6 +1,8 @@
 import type { FilterField } from "@langwatch/analytics-contract";
-import { HandledError } from "@langwatch/handled-error";
-import { createLogger } from "@langwatch/observability";
+import { type Authorization, projectIdsReadBy } from "@langwatch/authorization";
+import { HandledError, isHandledTransientRefusal } from "@langwatch/handled-error";
+import { createLogger, type Logger } from "@langwatch/observability";
+import type { SpanAnalyticsFloor } from "@langwatch/trace-contract";
 import { getLangWatchTracer } from "langwatch";
 
 import type {
@@ -18,13 +20,15 @@ type GetFilterOptionsInput = {
   startDate: number;
   endDate: number;
   scope?: FindFilterOptionsInput["scope"];
+  authorization: Authorization;
+  /** Where span_analytics is complete; absent or null, span types come from stored_spans. */
+  spanAnalyticsFloor?: SpanAnalyticsFloor | undefined;
 };
 
 /**
  * Service for fetching filter options from ClickHouse.
  */
 export class FilterService {
-  private readonly logger = createLogger("langwatch:filters:service");
   private readonly tracer = getLangWatchTracer("langwatch.filters.service");
 
   /**
@@ -32,10 +36,19 @@ export class FilterService {
    * rather than a fault - it fails at the call, with the same message it
    * always did, instead of at boot.
    */
-  private constructor(private readonly repository: FilterOptionsRepository | null) {}
+  private constructor(
+    private readonly repository: FilterOptionsRepository | null,
+    private readonly logger: Pick<Logger, "error" | "warn">,
+  ) {}
 
-  static create(options: { repository: FilterOptionsRepository | null }): FilterService {
-    return new FilterService(options.repository);
+  static create(options: {
+    repository: FilterOptionsRepository | null;
+    logger?: Pick<Logger, "error" | "warn"> | undefined;
+  }): FilterService {
+    return new FilterService(
+      options.repository,
+      options.logger ?? createLogger("langwatch:filters:service"),
+    );
   }
 
   async getFilterOptions(input: GetFilterOptionsInput): Promise<FilterOption[]> {
@@ -67,24 +80,31 @@ export class FilterService {
         try {
           const filterOptions = await this.repository.findOptions({
             field: input.field,
-            tenantId: input.projectId,
+            authorization: input.authorization,
             query: input.query,
             key: input.key,
             subkey: input.subkey,
             startDate: input.startDate,
             endDate: input.endDate,
             ...(input.scope ? { scope: input.scope } : {}),
+            spanAnalyticsFloor: input.spanAnalyticsFloor,
+            // A proof spanning members holds each evaluation to its trace's window.
+            readsMembers: projectIdsReadBy(input.authorization, "analytics:view").length > 1,
           });
 
           span.setAttribute("clickhouse.result_count", filterOptions.length);
 
           return filterOptions;
         } catch (error) {
-          this.logger.error(
+          // The whole error, not its message: the logger records its type, code, stack and
+          // cause chain, which the generic error thrown below deliberately does not carry.
+          // A busy ClickHouse is a retryable refusal, so it warns rather than errors.
+          const level = isHandledTransientRefusal(error) ? "warn" : "error";
+          this.logger[level](
             {
               projectId: input.projectId,
               field: input.field,
-              error: error instanceof Error ? error.message : error,
+              error,
             },
             "Failed to fetch filter options from ClickHouse",
           );
@@ -93,7 +113,7 @@ export class FilterService {
           // code the client renders guidance from - overload in particular,
           // which is a retry-in-a-moment, not a broken filter. Flattening it
           // here would throw away the very thing the typed error exists for.
-          if (error instanceof HandledError) {
+          if (HandledError.isHandled(error)) {
             throw error;
           }
 

@@ -125,11 +125,11 @@ Permission `organization:manage`. Entitlement `enterprise` (feature `RBAC`). Dec
 Answers at `/api/roles`, `/api/v1/roles`; also, undocumented, `/api/roles/2026-08-07`, `/api/v1/roles/2026-08-07`, `/api/roles/latest`, `/api/v1/roles/latest`.
 
 ```typescript
-// Query: roleRestListQuerySchema, ../contract/src/role-rest.schemas.ts:68
+// Query: roleRestListQuerySchema, ../contract/src/role-rest.schemas.ts:78
 interface Query {
   builtIn?: "true" | "false";
 }
-// Response: roleRestListSchema, ../contract/src/role-rest.schemas.ts:72
+// Response: roleRestListSchema, ../contract/src/role-rest.schemas.ts:82
 interface Response {
   roles: {
     id: string;
@@ -152,13 +152,13 @@ Permission `organization:manage`. Entitlement `enterprise` (feature `RBAC`). Dec
 Answers at `/api/roles`, `/api/v1/roles`; also, undocumented, `/api/roles/2026-08-07`, `/api/v1/roles/2026-08-07`, `/api/roles/latest`, `/api/v1/roles/latest`.
 
 ```typescript
-// Body: roleRestCreateSchema, ../contract/src/role-rest.schemas.ts:84
+// Body: roleRestCreateSchema, ../contract/src/role-rest.schemas.ts:94
 interface Body {
   name: string;
   description?: string;
   permissions: string[];
 }
-// Response: roleRestSchema, ../contract/src/role-rest.schemas.ts:54
+// Response: roleRestSchema, ../contract/src/role-rest.schemas.ts:64
 interface Response {
   id: string;
   name: string;
@@ -174,12 +174,12 @@ interface Response {
 
 The permission catalog custom roles are built from: every resource with its actions, annotated with whether the resource only takes effect at organization scope (such a permission cannot be granted by a team- or project-scoped binding).
 
-Permission `organization:manage`. Entitlement `enterprise` (feature `RBAC`). Declared at `src/transport/role.rest.ts:109`.
+Permission `organization:manage`. Entitlement `enterprise` (feature `RBAC`). Declared at `src/transport/role.rest.ts:110`.
 
 Answers at `/api/roles/permissions`, `/api/v1/roles/permissions`; also, undocumented, `/api/roles/2026-08-07/permissions`, `/api/v1/roles/2026-08-07/permissions`, `/api/roles/latest/permissions`, `/api/v1/roles/latest/permissions`.
 
 ```typescript
-// Response: rolePermissionCatalogSchema, ../contract/src/role-rest.schemas.ts:118
+// Response: rolePermissionCatalogSchema, ../contract/src/role-rest.schemas.ts:128
 interface Response {
   resources: {
     resource: string;
@@ -195,48 +195,48 @@ interface Response {
 
 Read one role: `admin`, `member` or `viewer`, or a custom role's id. A custom id from another organization answers 404 custom_role_not_found.
 
-Permission `organization:manage`. Entitlement `enterprise` (feature `RBAC`). Declared at `src/transport/role.rest.ts:120`.
+Permission `organization:manage`. Entitlement `enterprise` (feature `RBAC`). Declared at `src/transport/role.rest.ts:121`.
 
 Answers at `/api/roles/:id`, `/api/v1/roles/:id`; also, undocumented, `/api/roles/2026-08-07/:id`, `/api/v1/roles/2026-08-07/:id`, `/api/roles/latest/:id`, `/api/v1/roles/latest/:id`.
 
 ```typescript
-// Params: roleRestParamsSchema, ../contract/src/role-rest.schemas.ts:76
+// Params: roleRestParamsSchema, ../contract/src/role-rest.schemas.ts:86
 interface Params {
   id: string;
 }
-type Response = z.infer<typeof roleRestSchema>; // ../contract/src/role-rest.schemas.ts:54
+type Response = z.infer<typeof roleRestSchema>; // ../contract/src/role-rest.schemas.ts:64
 ```
 
 #### `PATCH /:id` · `updateRole`
 
 Update a custom role. Partial: only the fields present are written; a permissions list replaces the set outright. A built-in role answers 409 role_is_built_in; adding a permission the caller does not hold on the organization answers 403 role_exceeds_caller_permissions.
 
-Permission `organization:manage`. Entitlement `enterprise` (feature `RBAC`). Declared at `src/transport/role.rest.ts:140`.
+Permission `organization:manage`. Entitlement `enterprise` (feature `RBAC`). Declared at `src/transport/role.rest.ts:141`.
 
 Answers at `/api/roles/:id`, `/api/v1/roles/:id`; also, undocumented, `/api/roles/2026-08-07/:id`, `/api/v1/roles/2026-08-07/:id`, `/api/roles/latest/:id`, `/api/v1/roles/latest/:id`.
 
 ```typescript
-type Params = z.infer<typeof roleRestParamsSchema>; // ../contract/src/role-rest.schemas.ts:76
-// Body: roleRestUpdateSchema, ../contract/src/role-rest.schemas.ts:93
+type Params = z.infer<typeof roleRestParamsSchema>; // ../contract/src/role-rest.schemas.ts:86
+// Body: roleRestUpdateSchema, ../contract/src/role-rest.schemas.ts:103
 interface Body {
   name?: string;
   description?: string | null;
   permissions?: string[];
 }
-type Response = z.infer<typeof roleRestSchema>; // ../contract/src/role-rest.schemas.ts:54
+type Response = z.infer<typeof roleRestSchema>; // ../contract/src/role-rest.schemas.ts:64
 ```
 
 #### `DELETE /:id` · `deleteRole`
 
 Delete a custom role. A role that anything still holds, a legacy team assignment or a role binding, answers 409 custom_role_in_use with the counts in meta. A built-in role answers 409 role_is_built_in.
 
-Permission `organization:manage`. Entitlement `enterprise` (feature `RBAC`). Declared at `src/transport/role.rest.ts:170`.
+Permission `organization:manage`. Entitlement `enterprise` (feature `RBAC`). Declared at `src/transport/role.rest.ts:172`.
 
 Answers at `/api/roles/:id`, `/api/v1/roles/:id`; also, undocumented, `/api/roles/2026-08-07/:id`, `/api/v1/roles/2026-08-07/:id`, `/api/roles/latest/:id`, `/api/v1/roles/latest/:id`.
 
 ```typescript
-type Params = z.infer<typeof roleRestParamsSchema>; // ../contract/src/role-rest.schemas.ts:76
-// Response: roleRestDeletedSchema, ../contract/src/role-rest.schemas.ts:97
+type Params = z.infer<typeof roleRestParamsSchema>; // ../contract/src/role-rest.schemas.ts:86
+// Response: roleRestDeletedSchema, ../contract/src/role-rest.schemas.ts:107
 interface Response {
   success: true;
 }
@@ -250,7 +250,7 @@ Contract `../contract/src/role.trpc.ts:17`, router `src/transport/role.trpc.ts:1
 
 | Procedure             | Kind     | Gate                                                                                                                               | Input                                  | Output                        |
 | --------------------- | -------- | ---------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------- | ----------------------------- |
-| `role.getAll`         | query    | Permission `organization:manage`                                                                                                   | `roleApiOrganizationInputSchema`       | inline                        |
+| `role.getAll`         | query    | Permission `members:view`                                                                                                          | `roleApiOrganizationInputSchema`       | inline                        |
 | `role.getById`        | query    | Service-authorized: organization:view; the role's organization is loaded by its id, so the check runs there rather than on input   | `roleApiRoleInputSchema`               | `roleSchema`                  |
 | `role.create`         | mutation | Permission `organization:manage`; Entitlement `enterprise` (feature `RBAC`)                                                        | `roleApiCreateInputSchema`             | `roleSchema`                  |
 | `role.update`         | mutation | Service-authorized: organization:manage; the role's organization is loaded by its id, so the check runs there rather than on input | `roleApiUpdateInputSchema`             | `roleSchema`                  |

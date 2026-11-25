@@ -10,6 +10,11 @@ import { Link as ChakraLink, Text } from "@langwatch/design-system/primitives";
 
 import { analyticsApi } from "../../../../behavior/analytics-api.ts";
 import { useAnalyticsHost } from "../../../../model/analytics-host.ts";
+import {
+  DASHBOARDS_FLAG,
+  DASHBOARDS_PERMISSION,
+  dashboardsAccess,
+} from "../../../../model/dashboards-access.ts";
 import { opensElsewhere } from "../../../../ui/elements/analytics-link.tsx";
 import { CURATED_BOARDS } from "../../model/curated-boards.ts";
 import {
@@ -17,11 +22,6 @@ import {
   type PointerPart,
   resolveDashboardPointer,
 } from "../../model/dashboard-pointer.ts";
-import {
-  DASHBOARDS_FLAG,
-  DASHBOARDS_PERMISSION,
-  dashboardsAccess,
-} from "../../model/dashboards-access.ts";
 
 export function DashboardPointer({ boardId, boardName, widget }: DashboardPointerProps) {
   const host = useAnalyticsHost();

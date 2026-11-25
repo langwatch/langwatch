@@ -6,6 +6,7 @@
  */
 import {
   CreateFunctionCommand,
+  TagResourceCommand,
   UpdateFunctionCodeCommand,
   UpdateFunctionConfigurationCommand,
 } from "@aws-sdk/client-lambda";
@@ -21,8 +22,7 @@ const ARN = "arn:aws:lambda:eu-central-1:123:function:langwatch_nlp-project-1";
 
 const CONFIG: StudioLambdaConfig = {
   region: "eu-central-1",
-  accessKeyId: "key",
-  secretAccessKey: "secret",
+  credentials: { kind: "static", accessKeyId: "key", secretAccessKey: "secret" },
   roleArn: "arn:aws:iam::123:role/nlp",
   imageUri: "registry/nlp:v9",
   cacheBucket: "langwatch-nlp-cache",
@@ -53,6 +53,9 @@ function resolver(options: {
   reads: readonly unknown[];
   /** What UpdateFunctionConfiguration rejects with, when AWS refuses it. */
   rejectUpdateWith?: Error;
+  /** What TagResource rejects with, when AWS refuses it. */
+  rejectTagWith?: Error;
+  config?: StudioLambdaConfig;
 }) {
   const sent: Sent[] = [];
   let read = 0;
@@ -61,6 +64,9 @@ function resolver(options: {
       sent.push({ name: command.constructor.name, input: command.input });
       if (command instanceof CreateFunctionCommand) return Promise.resolve(READY);
       if (command instanceof UpdateFunctionCodeCommand) return Promise.resolve(READY);
+      if (command instanceof TagResourceCommand) {
+        return options.rejectTagWith ? Promise.reject(options.rejectTagWith) : Promise.resolve({});
+      }
       if (command instanceof UpdateFunctionConfigurationCommand) {
         return options.rejectUpdateWith
           ? Promise.reject(options.rejectUpdateWith)
@@ -81,7 +87,7 @@ function resolver(options: {
     subject: AwsNlpLambdaArnResolverChannel.create({
       lambda,
       logs,
-      config: CONFIG,
+      config: options.config ?? CONFIG,
       wait: () => Promise.resolve(),
     }),
   };
@@ -97,7 +103,7 @@ describe("given a project whose studio engine needs a function", () => {
 
       const arn = await subject.resolve({ projectId: "project-1" });
 
-      expect(arn).toBe(ARN);
+      expect(arn.arn).toBe(ARN);
       const created = sent.find((call) => call.name === "CreateFunctionCommand");
       if (!created) throw new Error("expected CreateFunctionCommand");
       expect(created.input).toMatchObject({
@@ -212,7 +218,7 @@ describe("given a project whose studio engine needs a function", () => {
 
       const arn = await subject.resolve({ projectId: "project-1" });
 
-      expect(arn).toBe(ARN);
+      expect(arn.arn).toBe(ARN);
       expect(updates(sent)).toHaveLength(0);
       expect(sent.some((call) => call.name === "CreateFunctionCommand")).toBe(false);
       expect(sent.some((call) => call.name === "UpdateFunctionCodeCommand")).toBe(false);
@@ -259,7 +265,7 @@ describe("given a project whose studio engine needs a function", () => {
 
       const arn = await subject.resolve({ projectId: "project-1" });
 
-      expect(arn).toBe(ARN);
+      expect(arn.arn).toBe(ARN);
       expect(updates(sent)).toHaveLength(1);
     });
 
@@ -273,7 +279,9 @@ describe("given a project whose studio engine needs a function", () => {
         rejectUpdateWith: new Conflict("the message is not the point"),
       });
 
-      await expect(subject.resolve({ projectId: "project-1" })).resolves.toBe(ARN);
+      await expect(subject.resolve({ projectId: "project-1" })).resolves.toMatchObject({
+        arn: ARN,
+      });
     });
 
     /** @scenario "AWS errors are matched by exception name, not message text" */
@@ -283,7 +291,9 @@ describe("given a project whose studio engine needs a function", () => {
         rejectUpdateWith: new Error("An update is in progress"),
       });
 
-      await expect(subject.resolve({ projectId: "project-1" })).resolves.toBe(ARN);
+      await expect(subject.resolve({ projectId: "project-1" })).resolves.toMatchObject({
+        arn: ARN,
+      });
     });
 
     /** @scenario "AWS errors are matched by exception name, not message text" */
@@ -294,6 +304,174 @@ describe("given a project whose studio engine needs a function", () => {
       });
 
       await expect(subject.resolve({ projectId: "project-1" })).rejects.toThrow("Access denied");
+    });
+  });
+});
+
+describe("given pods of two releases serving the same project during a rollout", () => {
+  const ORDERED: StudioLambdaConfig = { ...CONFIG, imageOrder: 1_700_000_200 };
+  const desired = buildStudioLambdaEnvironment(ORDERED);
+  const onImage = (input: {
+    image: string;
+    tags?: Record<string, string>;
+    tagsError?: { ErrorCode: string; Message: string };
+    memory?: number;
+  }) => {
+    const configuration = {
+      ...READY,
+      MemorySize: input.memory ?? 2048,
+      Environment: { Variables: desired },
+    };
+
+    return [
+      { Configuration: configuration },
+      {
+        Code: { ImageUri: input.image },
+        Configuration: configuration,
+        Tags: input.tags,
+        TagsError: input.tagsError,
+      },
+      { Configuration: READY },
+    ];
+  };
+  const names = (sent: Sent[]) => sent.map((call) => call.name);
+  const writes = (sent: Sent[]) => names(sent).filter((name) => name !== "GetFunctionCommand");
+
+  describe("when the function was moved by a newer release", () => {
+    /** @scenario "A pod on an older release leaves a function a newer release moved" */
+    it("answers with the ARN and writes nothing to the function", async () => {
+      const { sent, subject } = resolver({
+        config: ORDERED,
+        reads: onImage({
+          image: "registry/nlp:v10",
+          tags: { ImageOrder: "1700000300" },
+          memory: 1024,
+        }),
+      });
+
+      const resolution = await subject.resolve({ projectId: "project-1" });
+
+      expect(resolution).toEqual({
+        arn: ARN,
+        imageUri: "registry/nlp:v10",
+        imageOrder: 1700000300,
+      });
+      expect(writes(sent)).toEqual([]);
+    });
+  });
+
+  describe("when Lambda cannot return the function's tags", () => {
+    /** @scenario "A pod that cannot read the function's order leaves it alone" */
+    it("writes nothing and marks the resolution unprotected", async () => {
+      const { sent, subject } = resolver({
+        config: ORDERED,
+        reads: onImage({
+          image: "registry/nlp:v10",
+          tagsError: { ErrorCode: "AccessDeniedException", Message: "lambda:ListTags" },
+        }),
+      });
+
+      const resolution = await subject.resolve({ projectId: "project-1" });
+
+      expect(resolution).toEqual({
+        arn: ARN,
+        imageUri: CONFIG.imageUri,
+        imageOrder: 1700000200,
+        unprotected: true,
+      });
+      expect(writes(sent)).toEqual([]);
+    });
+  });
+
+  describe("when Lambda refuses to record the pod's order", () => {
+    /** @scenario "A pod that cannot record its order does not move the image" */
+    it("leaves the image and configuration as they are", async () => {
+      const { sent, subject } = resolver({
+        config: ORDERED,
+        reads: onImage({ image: "registry/nlp:v8", memory: 1024 }),
+        rejectTagWith: new Error("not authorized to perform lambda:TagResource"),
+      });
+
+      const resolution = await subject.resolve({ projectId: "project-1" });
+
+      expect(resolution).toMatchObject({ arn: ARN, imageUri: CONFIG.imageUri, unprotected: true });
+      expect(writes(sent)).toEqual(["TagResourceCommand"]);
+    });
+  });
+
+  describe("when the function runs an older release's image", () => {
+    /** @scenario "A pod on a newer release upgrades an older or untagged function" */
+    it("tags its own order before it moves the image", async () => {
+      const { sent, subject } = resolver({
+        config: ORDERED,
+        reads: onImage({ image: "registry/nlp:v8", tags: { ImageOrder: "1700000100" } }),
+      });
+
+      await subject.resolve({ projectId: "project-1" });
+
+      expect(writes(sent)).toEqual(["TagResourceCommand", "UpdateFunctionCodeCommand"]);
+      const tagged = sent.find((call) => call.name === "TagResourceCommand");
+      expect(tagged?.input).toEqual({ Resource: ARN, Tags: { ImageOrder: "1700000200" } });
+      const updated = sent.find((call) => call.name === "UpdateFunctionCodeCommand");
+      expect(updated?.input).toMatchObject({ ImageUri: CONFIG.imageUri });
+    });
+
+    /** @scenario "A pod on a newer release upgrades an older or untagged function" */
+    it("treats a function with no recorded order as older", async () => {
+      const { sent, subject } = resolver({
+        config: ORDERED,
+        reads: onImage({ image: "registry/nlp:v8" }),
+      });
+
+      await subject.resolve({ projectId: "project-1" });
+
+      expect(writes(sent)).toEqual(["TagResourceCommand", "UpdateFunctionCodeCommand"]);
+    });
+  });
+
+  describe("when the function carries this pod's own order on another image", () => {
+    /** @scenario "A pod on the same release converges the function as before" */
+    it("moves the image without retagging", async () => {
+      const { sent, subject } = resolver({
+        config: ORDERED,
+        reads: onImage({ image: "registry/nlp:v8", tags: { ImageOrder: "1700000200" } }),
+      });
+
+      await subject.resolve({ projectId: "project-1" });
+
+      expect(writes(sent)).toEqual(["UpdateFunctionCodeCommand"]);
+    });
+  });
+
+  describe("when the fleet names no image order", () => {
+    /** @scenario "A fleet that names no image order converges as before" */
+    it("moves the image whatever the function records, and tags nothing", async () => {
+      const { sent, subject } = resolver({
+        reads: onImage({ image: "registry/nlp:v10", tags: { ImageOrder: "1700000300" } }),
+      });
+
+      await subject.resolve({ projectId: "project-1" });
+
+      expect(writes(sent)).toEqual(["UpdateFunctionCodeCommand"]);
+    });
+  });
+
+  describe("when the project has no function yet", () => {
+    /** @scenario "A newly created function records the pod's image order" */
+    it("creates it tagged with the pod's order", async () => {
+      const { sent, subject } = resolver({
+        config: ORDERED,
+        reads: [new NotFound(), { Configuration: READY }],
+      });
+
+      await subject.resolve({ projectId: "project-1" });
+
+      const created = sent.find((call) => call.name === "CreateFunctionCommand");
+      expect(created?.input.Tags).toEqual({
+        Project: "langwatch",
+        Type: "optimization-studio",
+        ImageOrder: "1700000200",
+      });
     });
   });
 });
