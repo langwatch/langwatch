@@ -18,6 +18,12 @@ Feature: LangWatchQL works on a default install with no LangWatchQL settings
   passwords when `lwql.enabled` is on, and leaving them out is how an operator
   turns LangWatchQL off.
 
+  Under derived passwords the operator never asked for LangWatchQL, so a
+  ClickHouse or PostgreSQL that cannot host it (no access management, no
+  custom_ settings prefix, as on managed ClickHouse services) must not stop the
+  upgrade. Explicit passwords are the operator asking for it, so a failure
+  there stays fatal.
+
   @unit
   Scenario: With no LangWatchQL passwords set, both are derived from the key pepper in SQL mode
     Given LWQL_CLICKHOUSE_PASSWORD and LWQL_POSTGRES_READER_PASSWORD are unset
@@ -93,12 +99,6 @@ Feature: LangWatchQL works on a default install with no LangWatchQL settings
     When the LangWatchQL provisioning task runs
     Then the passwords are derived from API_KEY_PEPPER, as the api and worker derive them
     And a password derived from CREDENTIALS_SECRET is refused
-
-  Under derived passwords the operator never asked for LangWatchQL, so a
-  ClickHouse or PostgreSQL that cannot host it (no access management, no
-  custom_ settings prefix, as on managed ClickHouse services) must not stop the
-  upgrade. Explicit passwords are the operator asking for it, so a failure
-  there stays fatal.
 
   @integration
   Scenario: A ClickHouse user without access management does not block the upgrade under derived passwords
