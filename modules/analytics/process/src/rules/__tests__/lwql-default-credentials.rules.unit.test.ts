@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   findKeyPeppers,
+  classifyLwqlSetupFailure,
   resolveLwqlCredentials,
   withLwqlDefaultCredentials,
 } from "../lwql-default-credentials.rules.ts";
@@ -144,6 +145,47 @@ describe("resolveLwqlCredentials", () => {
       postgresReaderPassword: undefined,
       accessModelMode: undefined,
       isDerived: false,
+    });
+  });
+});
+
+describe("classifyLwqlSetupFailure", () => {
+  const classify = (error: unknown) => classifyLwqlSetupFailure({ error, summary: "code 1, X" });
+
+  /** @scenario "A provisioning failure is explained by the server setup it lacks" */
+  it("names the grant or the settings prefix the server lacks, and reports anything else by code", () => {
+    const missingGrant = Object.assign(
+      new Error(
+        "default: Not enough privileges. To execute this query, it's necessary to have the grant CREATE NAMED COLLECTION ON lwql_postgres_x. ",
+      ),
+      { code: "497", type: "ACCESS_DENIED" },
+    );
+    const unprefixed = Object.assign(
+      new Error(
+        "Setting custom_api_key_hash is neither a builtin setting nor started with the prefix 'SQL_' registered for user-defined settings.",
+      ),
+      { code: "115", type: "UNKNOWN_SETTING" },
+    );
+    const postgres = Object.assign(new Error("permission denied to create role"), {
+      code: "P2010",
+      meta: { code: "42501" },
+    });
+    const network = Object.assign(new Error("connect ECONNREFUSED"), { code: "ECONNREFUSED" });
+
+    expect(classify(missingGrant)).toMatchObject({ kind: "missing_grant", store: "clickhouse" });
+    expect(classify(missingGrant).reason).toContain("CREATE NAMED COLLECTION ON lwql_postgres_x");
+    expect(classify(new Error("wrapped", { cause: missingGrant })).kind).toBe("missing_grant");
+    expect(classify(unprefixed)).toMatchObject({
+      kind: "custom_settings_prefix",
+      store: "clickhouse",
+    });
+    expect(classify(unprefixed).reason).toContain("custom_settings_prefixes");
+    expect(classify(postgres)).toMatchObject({ kind: "missing_grant", store: "postgres" });
+    expect(classify(postgres).reason).toContain("CREATEROLE");
+    expect(classify(network)).toEqual({
+      kind: "other",
+      store: "unknown",
+      reason: "provisioning failed (code 1, X)",
     });
   });
 });

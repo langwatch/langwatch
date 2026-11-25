@@ -54,8 +54,9 @@ import {
   statementKind,
 } from "../rules/langwatch-ql-config-store.rules.ts";
 import {
+  classifyLwqlSetupFailure,
   LWQL_CREDENTIAL_SECRETS,
-  withLwqlDefaultCredentials,
+  resolveLwqlSource,
 } from "../rules/lwql-default-credentials.rules.ts";
 import type { LangWatchQLNames } from "../services/langwatch-ql-access-model.service.ts";
 import { LangWatchQLSqlModeClusterGuardService } from "../services/langwatch-ql-sql-mode-cluster-guard.service.ts";
@@ -707,19 +708,38 @@ async function convergeLocked({
 }
 
 /**
+ * Derived passwords mean the operator never asked for LangWatchQL, so a failure says why and
+ * never fails the upgrade (analytics-lwql-default-credentials.feature).
+ */
+function warnDerivedSetupFailure({ error }: { error: unknown }): void {
+  const summary = clickHouseErrorSummary(error);
+  const failure = classifyLwqlSetupFailure({
+    error,
+    summary: `code ${summary.code ?? "none"}, ${summary.type}`,
+  });
+  logger.warn(
+    { kind: failure.kind, store: failure.store, error: summary },
+    `LangWatchQL could not provision its restricted identity: ${failure.reason}. Dashboards, the SQL workbench and Instant Evals stay unavailable until that is fixed, or until LWQL_CLICKHOUSE_PASSWORD and LWQL_POSTGRES_READER_PASSWORD are set with an identity provisioned as the self-hosting docs describe. Continuing.`,
+  );
+}
+
+/**
  * Converges the whole model and never throws: a refusal is a loud log and a fail-closed endpoint
- * (ADR-159). `failOnError` rethrows so the upgrade run fails (Alex, 2026-10-09); `only`, the
- * reconvergence check's drift, converges just the objects it names and logs at warn.
+ * (ADR-159). `failOnError` rethrows so the upgrade run fails (Alex, 2026-10-09), except under
+ * derived passwords, which only warn; `only`, the reconvergence check's drift, logs at warn.
  */
 export async function convergeLwqlAccessModel({
   database,
   plan,
   failOnError = false,
+  isDerived = false,
   only,
 }: {
   database: LwqlProvisioningDatabase;
   plan: LwqlConvergencePlan;
   failOnError?: boolean;
+  /** The passwords came from the key pepper, not from the operator: a failure only warns. */
+  isDerived?: boolean;
   only?: LwqlAppOwnedDrift;
 }): Promise<void> {
   const { names } = plan;
@@ -736,6 +756,10 @@ export async function convergeLwqlAccessModel({
     });
     logger.info("LangWatchQL self-provisioning complete");
   } catch (error) {
+    if (isDerived) {
+      warnDerivedSetupFailure({ error });
+      return;
+    }
     if (only) {
       logger.warn(
         { error: clickHouseErrorSummary(error) },
@@ -877,7 +901,9 @@ async function runLwqlProvisioningTask({
   source: Record<string, string | undefined>;
   lookup: LwqlSecretLookup | undefined;
 }): Promise<void> {
-  const source = withLwqlDefaultCredentials(await withChainedSecrets({ environment, lookup }));
+  const { source, isDerived } = resolveLwqlSource(
+    await withChainedSecrets({ environment, lookup }),
+  );
   const selfProvision = selfProvisioning.request({ source });
   if (!selfProvision.requested) {
     logger.info("LWQL not configured, skipping");
@@ -894,6 +920,7 @@ async function runLwqlProvisioningTask({
   await convergeLwqlAccessModel({
     database,
     failOnError,
+    isDerived,
     plan: {
       request: selfProvision,
       names: lwqlProvisioning.names({ connection: selfProvision.connection }),
