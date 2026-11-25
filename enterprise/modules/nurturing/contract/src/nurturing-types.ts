@@ -1,6 +1,10 @@
 import { moduleApi } from "@langwatch/module";
 
 import type { NurturingSignal } from "./nurturing-signals.ts";
+import type {
+  TransactionalEmail,
+  TransactionalEmailOutcome,
+} from "./nurturing-transactional-email.ts";
 /**
  * The complete data model nurturing pushes to Customer.io. Every date is Unix
  * seconds: Customer.io's timestamp conditions match nothing else.
@@ -161,6 +165,9 @@ export interface CioPersonTraits extends CioOrganizationUsageTraits {
   // Comma list of the paths whose setup completed.
   guided_onboarding_completed_paths?: string;
   guided_onboarding_completed_at?: number;
+  // "coding" | "call": the start picked on Langy's governance opener. "call" is the choice
+  // the person made, never a booked call.
+  langy_start?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -234,6 +241,8 @@ export type CioEventName =
   | "onboarding_path_gateway"
   | "onboarding_path_governance"
   | "guided_onboarding_path_completed"
+  /** Langy's governance opener was answered: `start` is "coding" or "call", never a booking. */
+  | "langy_start_chosen"
   /** Any signed-in usage, at most once per hour per person. */
   | "app_active"
   | "self_hosted_seats_crossed_threshold"
@@ -286,6 +295,12 @@ export type CioBatchCall =
 export interface NurturingApi {
   /** Records the signal on nurturing's pipeline; its subscriber sends what main sent, once. */
   recordSignal(signal: NurturingSignal): Promise<void>;
+
+  /**
+   * Hands one rendered email to Customer.io's transactional API and says what became of it. A
+   * refusal is an answer, not a throw: the caller falls back to its own mailer.
+   */
+  sendTransactionalEmail(email: TransactionalEmail): Promise<TransactionalEmailOutcome>;
 }
 
 export const NurturingApi = moduleApi<NurturingApi>()("nurturing");

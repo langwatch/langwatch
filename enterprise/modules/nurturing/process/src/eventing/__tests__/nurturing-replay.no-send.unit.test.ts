@@ -311,13 +311,14 @@ async function deploy(events: ReplayEvent[]) {
     config: {
       customerIoRegion: void 0,
       customerIoBaseUrl: void 0,
+      customerIoAppApiBaseUrl: void 0,
       posthogKey: void 0,
       posthogHost: void 0,
     },
     resources: { own: () => void 0, ownService: () => void 0 },
     secrets: new ScopedSecrets(async (_handle, build) => build(undefined)),
     repositories,
-    channels: { customerIo, posthog },
+    channels: { customerIo, customerIoTransactional: void 0, posthog },
   });
   const pipeline = buildNurturingProjectUsagePipeline({
     store: repositories.projectUsage,

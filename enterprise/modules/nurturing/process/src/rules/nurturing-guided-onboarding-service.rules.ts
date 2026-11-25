@@ -8,6 +8,7 @@ import type {
 } from "@langwatch/enterprise-nurturing-contract";
 import type { GuidedOnboardingTurnFailedEventData } from "@langwatch/langy-contract";
 import {
+  langyStartSchema,
   onboardingExperimentProperties,
   type GuidedOnboardingState,
   type GuidedPath,
@@ -54,6 +55,7 @@ export function guidedOnboardingPersonTraits({
     ...(state.donePaths.length > 0
       ? { guided_onboarding_completed_paths: state.donePaths.join(",") }
       : {}),
+    ...(state.langyStart ? { langy_start: state.langyStart } : {}),
   };
 }
 
@@ -74,6 +76,50 @@ export function guidedOnboardingOrgTraits({
       ? { guided_onboarding_completed_paths: state.donePaths.join(",") }
       : {}),
   };
+}
+
+/**
+ * A person's first login after picking paths: the state's traits on the person and the
+ * organization. Nothing for an organization with no picks or no variant, so no trait is invented.
+ */
+export function fireGuidedOnboardingBackfill({
+  userId,
+  organizationId,
+  variant,
+  state,
+}: {
+  userId: string;
+  organizationId: string;
+  variant: OnboardingVariant | null;
+  state: GuidedOnboardingState;
+}): CioBatchCall[] {
+  if (!variant || state.paths.length === 0) return [];
+  return [
+    { type: "identify", userId, traits: guidedOnboardingPersonTraits({ variant, state }) },
+    {
+      type: "group",
+      userId,
+      groupId: organizationId,
+      traits: guidedOnboardingOrgTraits({ variant, state }),
+    },
+  ];
+}
+
+/** The experiment variant an organization was created with, on its creator and the organization. */
+export function fireOnboardingVariantAssigned({
+  userId,
+  organizationId,
+  variant,
+}: {
+  userId: string;
+  organizationId: string;
+  variant: OnboardingVariant;
+}): CioBatchCall[] {
+  const traits = { onboarding_variant: variant };
+  return [
+    { type: "identify", userId, traits },
+    { type: "group", userId, groupId: organizationId, traits },
+  ];
 }
 
 /**
@@ -143,7 +189,8 @@ export function fireGuidedOnboardingProgress({
     | "tour_completed"
     | "tour_skipped"
     | "tour_replayed"
-    | "path_completed";
+    | "path_completed"
+    | "start_chosen";
   payload: Record<string, string | string[] | number | undefined>;
   state: GuidedOnboardingState;
 }): CioBatchCall[] {
@@ -188,6 +235,14 @@ export function fireGuidedOnboardingProgress({
         },
       ];
     }
+    case "start_chosen": {
+      const start = langyStartSchema.safeParse(payload.start);
+      if (!start.success) return [];
+      return [
+        { type: "identify", userId, traits: { langy_start: start.data } },
+        { type: "track", userId, event: "langy_start_chosen", properties: { start: start.data } },
+      ];
+    }
     case "provider_skipped":
     case "tour_replayed":
       return [];
@@ -202,7 +257,8 @@ type GuidedPostHogEventName =
   | "tour_completed"
   | "tour_skipped"
   | "tour_replayed"
-  | "path_completed";
+  | "path_completed"
+  | "start_chosen";
 
 const POSTHOG_EVENT: Record<GuidedPostHogEventName, string> = {
   paths_selected: "guided_onboarding_paths_selected",
@@ -213,6 +269,7 @@ const POSTHOG_EVENT: Record<GuidedPostHogEventName, string> = {
   tour_skipped: "guided_onboarding_tour_skipped",
   tour_replayed: "guided_onboarding_tour_replayed",
   path_completed: "guided_onboarding_path_completed",
+  start_chosen: "guided_onboarding_start_chosen",
 };
 
 /**
@@ -242,6 +299,8 @@ function guidedPostHogProperties({
     case "path_begun":
     case "path_completed":
       return { path: payload.path };
+    case "start_chosen":
+      return { start: payload.start };
     case "provider_skipped":
       return {};
   }

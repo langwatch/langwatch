@@ -74,6 +74,7 @@ export function guidedOnboardingSignal({
     case "tour_skipped":
     case "tour_replayed":
     case "path_completed":
+    case "start_chosen":
       return {
         kind: "guided_onboarding_progress",
         ...source,
