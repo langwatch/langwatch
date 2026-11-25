@@ -860,7 +860,7 @@ describe("given a member changes a query's projects in the editor", () => {
 
 describe("given a card whose query names projects", () => {
   /** @scenario "AC206 Project: a card reads the board's project unless its query names others" */
-  /** @scenario "A board in a project's own Dashboards names no project on its cards" */
+  /** @scenario "A board in a project's own Dashboards names only other projects on its cards" */
   it("names no project while the query stores none", async () => {
     openBoard();
     await screen.findByTestId("sandboxed-frame");
@@ -877,7 +877,10 @@ describe("given a card whose query names projects", () => {
     expect(screen.queryByTestId("widget-card-footer")).toBeNull();
   });
 
-  /** @scenario "A widget's card names its projects only where they differ from the board's" */
+  /**
+   * @scenario "A widget's card names its projects only where they differ from the board's"
+   * @scenario "A board in a project's own Dashboards names only other projects on its cards"
+   */
   it("names another project a query stores", async () => {
     const other = { ...GRAPH.queries[0]!, projects: ["proj-a"] };
     openBoard({ widgets: [{ ...WIDGET, graph: { ...GRAPH, queries: [other] } }] });

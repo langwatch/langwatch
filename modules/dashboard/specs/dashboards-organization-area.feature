@@ -411,9 +411,11 @@ Feature: Organization-wide Dashboards area
     # line, and of a board at "/dashboards/<id>" where only the widget reading "Ops" names it
 
   @integration
-  Scenario: A board in a project's own Dashboards names no project on its cards
+  Scenario: A board in a project's own Dashboards names only other projects on its cards
     Given a board opened at "/shop/dashboards/<id>" whose widgets store no projects
     Then no card line names "Shop"
+    When a widget there stores "Ops" in its query's projects
+    Then that card alone reads "Project: Ops"
     # Evidence: a haven browser screenshot of the board's cards
 
   @unit @integration @unimplemented
