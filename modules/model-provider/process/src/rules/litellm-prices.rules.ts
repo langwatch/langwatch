@@ -81,6 +81,25 @@ const SIZED_VARIANT = /\d+-x-\d+\//;
 const pickPositive = (value: number | undefined): number | undefined =>
   typeof value === "number" && value > 0 ? value : undefined;
 
+/** litellm token rates. Any one of them makes the model token-priced. */
+const TOKEN_FIELDS = [
+  "input_cost_per_token",
+  "output_cost_per_token",
+  "input_cost_per_audio_token",
+  "output_cost_per_audio_token",
+  "input_cost_per_image_token",
+  "output_cost_per_image_token",
+  "cache_read_input_token_cost",
+  "cache_creation_input_token_cost",
+] as const;
+
+/**
+ * A catalogue entry prices one unit, or a span reporting tokens and a duration is charged
+ * twice. Tokens win, then characters, then seconds.
+ */
+const isTokenPriced = (price: LitellmPriceEntry): boolean =>
+  TOKEN_FIELDS.some((field) => pickPositive(price[field]) !== undefined);
+
 /**
  * litellm rates that would change the bill and have no `LLMModelPricing`
  * field. An output rate equal to its input counterpart needs no separate
@@ -117,11 +136,15 @@ function toPricing(price: LitellmPriceEntry): LLMModelPricing | null {
     outputCostPerToken: pickPositive(price.output_cost_per_token) ?? 0,
   };
 
-  const perCharacter = pickPositive(price.input_cost_per_character);
-  if (perCharacter !== undefined) pricing.inputCostPerCharacter = perCharacter;
+  if (!isTokenPriced(price)) {
+    const perCharacter = pickPositive(price.input_cost_per_character);
+    if (perCharacter !== undefined) pricing.inputCostPerCharacter = perCharacter;
 
-  const perSecond = pickPositive(price.input_cost_per_second);
-  if (perSecond !== undefined) pricing.inputCostPerSecond = perSecond;
+    const perSecond = pickPositive(price.input_cost_per_second);
+    if (perSecond !== undefined && perCharacter === undefined) {
+      pricing.inputCostPerSecond = perSecond;
+    }
+  }
 
   const perAudioToken = pickPositive(price.input_cost_per_audio_token);
   if (perAudioToken !== undefined) pricing.audioCostPerToken = perAudioToken;
@@ -149,7 +172,11 @@ function toPricing(price: LitellmPriceEntry): LLMModelPricing | null {
     pricing.inputCostPerCharacter !== undefined ||
     pricing.inputCostPerSecond !== undefined ||
     pricing.imageCostPerToken !== undefined ||
-    pricing.imageOutputCostPerToken !== undefined;
+    pricing.imageOutputCostPerToken !== undefined ||
+    pricing.audioCostPerToken !== undefined ||
+    pricing.audioOutputCostPerToken !== undefined ||
+    pricing.inputCacheReadPerToken !== undefined ||
+    pricing.inputCacheWritePerToken !== undefined;
 
   return priced ? pricing : null;
 }

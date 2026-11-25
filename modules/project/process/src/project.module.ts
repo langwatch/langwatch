@@ -78,4 +78,19 @@ export const projectProcessModule: PublishedProcessModule<"project", ProjectApi>
           return { ...report, dryRun };
         },
       }),
+      // `/dashboards` became a top-level address (ADR-002 in modules/dashboard). No release
+      // since slugs gained their id suffix can mint it; the step waits for old writers as every
+      // step does.
+      defineMigrationStep({
+        id: "project:reslug-reserved-dashboards",
+        kind: "data",
+        mode: "background",
+        needsOldWritersGone: true,
+        description:
+          "Gives a project whose address is exactly /dashboards the usual name-and-id address instead.",
+        run: async ({ dryRun, signal }) => {
+          const report = await app.reslugReservedProjects({ dryRun, signal });
+          return { ...report, dryRun };
+        },
+      }),
     ]);

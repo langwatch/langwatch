@@ -21,7 +21,7 @@ func seedServedKey(t *testing.T, svc *Service, rawKey, vkID string) [64]byte {
 	b := bundleWithCreds(vkID, time.Now().Add(10*time.Minute), "cred-known-good")
 	b.OrganizationID = "org-1"
 	b.ProjectID = "proj-1"
-	svc.storeL1(h, b, "etag-1")
+	seedL1(svc, h, b, "etag-1")
 	return h
 }
 
@@ -52,6 +52,7 @@ func TestResolve_EvictedByBudgetChange_ConfigTimeout_ServesLastKnown(t *testing.
 	warns := logs.FilterMessage("auth_cache_serve_last_known").All()
 	require.Len(t, warns, 1)
 	assert.Equal(t, "vk_busy", warns[0].ContextMap()["vk_id"])
+	assert.Nil(t, svc.lastKnownFor(h), "the fallback moves into L1, so it cannot serve again after L1 ends")
 
 	callsBefore := fetcher.calls.Load()
 	fetchesBefore := fetcher.fetches.Load()
@@ -137,6 +138,33 @@ func TestResolve_RevokingChange_LeavesNoFallback(t *testing.T) {
 			})
 		}
 	}
+}
+
+// @scenario "the fallback never serves a rotated old secret past its grace"
+func TestResolve_LastKnown_OldSecretPastItsGrace_IsNotServed(t *testing.T) {
+	fetcher := &fakeConfigFetcher{}
+	fetcher.returns = []resolverReturn{{err: herr.New(context.Background(), domain.ErrAuthUpstream, nil)}}
+	svc, _ := newService(t, Options{Resolver: &fetcher.fakeResolver, ConfigFetcher: fetcher})
+	rawKey := "vk-lw-old-secret"
+	h := hashKey(domain.PresentedKey{Token: rawKey})
+	b := bundleWithCreds("vk_rotated", time.Now().Add(10*time.Minute), "cred-known-good")
+	b.OrganizationID = "org-1"
+	b.ProjectID = "proj-1"
+	b.SecretValidUntil = time.Now().Add(10 * time.Minute)
+	seedL1(svc, h, b, "etag-1")
+	budgetCreated(svc)
+
+	e, ok := svc.lastKnown.Peek(h)
+	require.True(t, ok)
+	e.mu.Lock()
+	e.bundle.SecretValidUntil = time.Now().Add(-time.Second)
+	hard := e.hardExpiresAt
+	e.mu.Unlock()
+	require.True(t, hard.After(time.Now()), "only the secret's grace has ended, not the entry's hard cap")
+
+	_, err := svc.Resolve(context.Background(), domain.PresentedKey{Token: rawKey})
+	require.Error(t, err, "an old secret past its grace must not come back as a fallback")
+	assert.Zero(t, svc.lastKnown.Len(), "and its last known entry is dropped")
 }
 
 // @scenario "a definitive rejection from the control plane is never overridden by the fallback"
@@ -276,7 +304,7 @@ func TestRefresh_ConfigFetchFindsKeyDeleted_EvictsAtOnce(t *testing.T) {
 		fetcher.returns = []resolverReturn{{bundle: freshBundle("vk_gone", time.Now().Add(10*time.Minute))}}
 		svc, _ := newService(t, Options{Resolver: &fetcher.fakeResolver, ConfigFetcher: fetcher})
 		rawKey := "vk-lw-gone-fg"
-		svc.storeL1(hashKey(domain.PresentedKey{Token: rawKey}), bundleWithCreds("vk_gone", time.Now().Add(-30*time.Second), "cred-old"), "")
+		seedL1(svc, hashKey(domain.PresentedKey{Token: rawKey}), bundleWithCreds("vk_gone", time.Now().Add(-30*time.Second), "cred-old"), "")
 
 		_, err := svc.Resolve(context.Background(), domain.PresentedKey{Token: rawKey})
 
@@ -289,11 +317,96 @@ func TestRefresh_ConfigFetchFindsKeyDeleted_EvictsAtOnce(t *testing.T) {
 		svc, _ := newService(t, Options{Resolver: &fetcher.fakeResolver, ConfigFetcher: fetcher})
 		rawKey := "vk-lw-gone-bg"
 		h := hashKey(domain.PresentedKey{Token: rawKey})
-		svc.storeL1(h, bundleWithCreds("vk_gone", time.Now().Add(2*time.Minute), "cred-old"), "")
+		seedL1(svc, h, bundleWithCreds("vk_gone", time.Now().Add(2*time.Minute), "cred-old"), "")
 
 		refreshCurrent(svc, domain.PresentedKey{Token: rawKey}, h)
 
 		_, ok := svc.l1.Peek(h)
 		assert.False(t, ok, "a deleted key is evicted by the background refresh too")
 	})
+}
+
+// refetchAcrossChange returns a key's last known entry and the generation a
+// refetch captured before kind landed for that key.
+func refetchAcrossChange(t *testing.T, svc *Service, h [64]byte, vkID, kind string) (*entry, uint64) {
+	t.Helper()
+	budgetCreated(svc)
+	old := svc.lastKnownFor(h)
+	require.NotNil(t, old)
+	since := svc.fetchGeneration()
+	svc.applyChange("org-1", CacheChange{Kind: kind, VirtualKeyID: vkID})
+	return old, since
+}
+
+// @scenario "a change during an outage refetch keeps the last known fallback"
+func TestServeLastKnown_ChangeMidRefetchKeepsTheFallback(t *testing.T) {
+	fetcher := &fakeConfigFetcher{}
+	svc, _ := newService(t, Options{Resolver: &fetcher.fakeResolver, ConfigFetcher: fetcher})
+	h := seedServedKey(t, svc, "vk-lw-midchange", "vk_midchange")
+	old, since := refetchAcrossChange(t, svc, h, "vk_midchange", ChangeKindVirtualKeyConfigUpdate)
+
+	got := svc.serveLastKnown(h, lastKnownServe{old: old, cause: context.DeadlineExceeded, since: since})
+	require.NotNil(t, got, "a config change does not end the outage fallback")
+	assert.Equal(t, "cred-known-good", got.bundle.Credentials[0].ID)
+	assert.NotNil(t, svc.lastKnownFor(h), "the fallback stays for the next request")
+	_, inL1 := svc.l1.Peek(h)
+	assert.False(t, inL1, "the copy read before the change is not cached")
+}
+
+// @scenario "a rotation during an outage refetch drops the last known fallback"
+func TestServeLastKnown_RotationMidRefetchDropsTheFallback(t *testing.T) {
+	fetcher := &fakeConfigFetcher{}
+	svc, _ := newService(t, Options{Resolver: &fetcher.fakeResolver, ConfigFetcher: fetcher})
+	h := seedServedKey(t, svc, "vk-lw-midrotate", "vk_midrotate")
+	old, since := refetchAcrossChange(t, svc, h, "vk_midrotate", ChangeKindVirtualKeyRotated)
+
+	assert.Nil(t, svc.serveLastKnown(h, lastKnownServe{old: old, cause: context.DeadlineExceeded, since: since}))
+	assert.Nil(t, svc.lastKnownFor(h))
+}
+
+// @scenario "an outage fallback after a fresh key check passes fail closed"
+func TestResolve_LastKnownAfterFreshKeyCheck_PassesFailClosed(t *testing.T) {
+	fetcher := &fakeConfigFetcher{cfgErr: context.DeadlineExceeded}
+	fetcher.returns = []resolverReturn{{bundle: freshBundle("vk_checked", time.Now().Add(10*time.Minute))}}
+	svc, _ := newService(t, Options{
+		Resolver: &fetcher.fakeResolver, ConfigFetcher: fetcher, FailClosedAfter: time.Minute,
+	})
+	rawKey := "vk-lw-checked"
+	h := seedServedKey(t, svc, rawKey, "vk_checked")
+	seeded, ok := svc.l1.Peek(h)
+	require.True(t, ok)
+	seeded.mu.Lock()
+	seeded.authStartedAt = time.Now().Add(-2 * time.Minute)
+	seeded.mu.Unlock()
+	budgetCreated(svc)
+
+	before := time.Now()
+	b, err := svc.Resolve(context.Background(), domain.PresentedKey{Token: rawKey})
+
+	require.NoError(t, err, "resolve-key just confirmed the key, so fail closed lets the fallback through")
+	assert.Equal(t, "cred-known-good", b.Credentials[0].ID)
+	assert.Equal(t, int64(1), fetcher.calls.Load(), "no second key check for an answer seconds old")
+	restored, ok := svc.l1.Peek(h)
+	require.True(t, ok)
+	assert.False(t, restored.authStart().Before(before.Add(-time.Second)), "the restored entry carries the fresh key check time")
+}
+
+// @scenario "a config refresh that finds the key inactive evicts it"
+func TestRefreshConfigBackground_KeyInactive_EvictsEveryCopy(t *testing.T) {
+	fetcher := &fakeConfigFetcher{inactive: true}
+	svc, logs := newService(t, Options{Resolver: &fetcher.fakeResolver, ConfigFetcher: fetcher})
+	rawKey := "vk-lw-disabled"
+	h := seedServedKey(t, svc, rawKey, "vk_disabled")
+	e, ok := svc.l1.Peek(h)
+	require.True(t, ok)
+	require.True(t, e.tryBeginConfigRefresh())
+
+	svc.refreshConfigBackground(h, e)
+
+	_, inL1 := svc.l1.Peek(h)
+	assert.False(t, inL1, "a key the control plane reports inactive must not keep serving from the cache")
+	assert.Nil(t, svc.lastKnownFor(h), "nor fall back to its last known config")
+	evicts := logs.FilterMessage("auth_cache_hard_evict").All()
+	require.Len(t, evicts, 1)
+	assert.Equal(t, "config_key_inactive", evicts[0].ContextMap()["reason"])
 }

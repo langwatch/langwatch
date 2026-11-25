@@ -1030,14 +1030,26 @@ Feature: Langy guides the first setup after sign-up
       And no message carries the secret
 
     # The governance tour walks Costs, Agents, People and Inventory and ends
-    # on the Add source menu, so Langy has no page to open and nothing to ask.
+    # on the Add source menu, so Langy has no page to open. It asks one
+    # question, how the person wants to start, records the answer, and closes.
     @e2e @unit
-    Scenario: The governance path ends with one line
+    Scenario: The governance path asks how to start, records it, and ends with one line
       Given the kickoff for the governance path
       When Langy starts
-      Then the governance path is recorded as complete
+      Then Langy asks one question with the replies "Track my coding agent" and "Book a call for the company setup"
+      And the answer is recorded with "langwatch onboarding start coding" or "langwatch onboarding start call"
+      And the governance path is recorded as complete
       And Langy says "Let me know if I can help you with anything! You can ask here"
-      And nothing else: no question, no page opened, no command on the pages
+      And no page is opened and no command runs on the pages
+
+    # Nothing books the call: "call" is what the person chose, so Langy offers
+    # the booking link and never says the call is booked.
+    @unit
+    Scenario: The governance call start is a choice, never a booking
+      When the compiled guided-onboarding skill is read
+      Then the call answer is recorded as the choice of a call
+      And the skill forbids saying a call is booked, scheduled or confirmed
+      And the person is given the booking link to book it themselves
 
     @e2e
     Scenario: The coding path hands over the one command

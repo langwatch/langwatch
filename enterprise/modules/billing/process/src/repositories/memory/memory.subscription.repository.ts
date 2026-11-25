@@ -149,6 +149,9 @@ export class MemoryBillingSubscriptionRepository extends BillingSubscriptionRepo
       maxMembersLite: null,
       maxMembersDeveloper: null,
       maxMessagesPerMonth: null,
+      paymentRecoveryInvoiceId: null,
+      paymentRecoveryStartedAt: null,
+      paymentRecoveryNoticeDay: null,
     }));
   }
 

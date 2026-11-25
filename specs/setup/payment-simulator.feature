@@ -29,6 +29,13 @@ Feature: paymentsim, a local stand-in for Stripe
       And the billable-events meter under its catalog id
 
     @unit
+    Scenario: Each dollar usage price is metered on its own meter
+      Given a catalog mapping the Instant Evals and PII redaction prices at 100 cents per dollar, and their meters
+      When paymentsim seeds it
+      Then the Instant Evals price is metered on the Instant Evals meter
+      And the PII redaction price is metered on the PII redaction meter
+
+    @unit
     Scenario: An unknown id answers Stripe's resource_missing error
       When billing retrieves a subscription paymentsim does not hold
       Then paymentsim answers 404 with code resource_missing

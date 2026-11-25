@@ -26,6 +26,10 @@ export type BillingSubscriptionItem = Readonly<{
   interval: string | null;
   /** Units billed on this line; absent where a caller did not read it. */
   quantity?: number | null;
+  /** The price's lookup key, which Stripe moves to a replacement price on a re-price. */
+  lookupKey?: string | null;
+  /** The catalogue name in the price's `langwatch_key` metadata, which stays on the old price. */
+  langwatchKey?: string | null;
 }>;
 
 /** The accrued amount at which the provider invoices mid-cycle, and whether that moves the anchor. */
@@ -45,6 +49,8 @@ export type BillingSubscription = Readonly<{
   currentPeriodEnd?: number | null;
   /** Lower-case ISO code the subscription bills in. */
   currency?: string | null;
+  /** The customer the subscription bills; absent where a caller did not read it. */
+  customerId?: string | null;
 }>;
 
 /** A line change: an existing line by `id`, or a new one by `price`; these keys are the provider's. */

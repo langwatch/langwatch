@@ -18,6 +18,7 @@ import { MockAgent } from "undici";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { MemoryInstantEvalRateLimiter } from "../../__tests__/support/instant-eval-rate-limiter.test-fakes.ts";
+import { INSTANT_EVAL_CLASSIFIER_BREAKER } from "../../rules/instant-eval-classifier-breaker.rules.ts";
 import {
   HttpInstantEvalClassifierChannel,
   JEV_DEFAULT_BASE_URL,
@@ -45,13 +46,17 @@ const TOO_LARGE = { detail: { error_type: "max_tokens_exceeded" } };
 let agent: MockAgent;
 let waits: number[];
 
-function judge(limiter: InstantEvalRateLimiter = MemoryInstantEvalRateLimiter.create()) {
+function judge(
+  limiter: InstantEvalRateLimiter = MemoryInstantEvalRateLimiter.create(),
+  now?: () => number,
+) {
   const channel = HttpInstantEvalClassifierChannel.create({
     apiKey: "test-key",
     dispatcher: agent,
     sleep: async (ms: number) => {
       waits.push(ms);
     },
+    ...(now ? { now } : {}),
   });
   return {
     classify: (request: Omit<InstantEvalClassifyRequest, "limiter">, signal?: AbortSignal) =>
@@ -194,6 +199,300 @@ describe("given a judge that keeps failing with no Retry-After", () => {
 
       expect(waits).toEqual([1_000, 2_000, 4_000, 8_000]);
       expect(judgement.skippedReason).toBe("classifier_failed");
+    });
+  });
+});
+
+describe("given a judge that is down for every send", () => {
+  const TEXTS = 5;
+
+  function judgeAt(clock: { now: number }) {
+    const { classify } = judge(undefined, () => clock.now);
+    return (text: string, signal?: AbortSignal) =>
+      classify({ projectId: "project-1", text, questions: [QUESTION] }, signal);
+  }
+
+  describe("when texts are classified one after another", () => {
+    /** @scenario "A classifier failing on every send stops being sent to until a probe is answered" */
+    it("stops sending after sixteen failed sends, still waiting and skipping", async () => {
+      let sends = 0;
+      endpoint()
+        .intercept({ path: "/v1/systemone", method: "POST" })
+        .reply(500, () => {
+          sends += 1;
+          return "upstream down";
+        })
+        .persist();
+      const classify = judgeAt({ now: 0 });
+
+      const judgements = [];
+      for (let i = 0; i < TEXTS; i++) {
+        waits = [];
+        judgements.push(await classify(`text ${i}`));
+      }
+
+      expect(sends).toBe(16);
+      expect(judgements.map((judgement) => judgement.skippedReason)).toEqual(
+        Array.from({ length: TEXTS }, () => "classifier_failed"),
+      );
+      expect(waits).toEqual([1_000, 2_000, 4_000, 8_000]);
+    });
+  });
+
+  describe("when a probe is answered after the interval", () => {
+    /** @scenario "An answered probe lets every text be sent again" */
+    it("sends one probe, then sends every text normally again", async () => {
+      endpoint()
+        .intercept({ path: "/v1/systemone", method: "POST" })
+        .reply(500, "upstream down")
+        .times(16);
+      const clock = { now: 0 };
+      const classify = judgeAt(clock);
+      for (let i = 0; i < 4; i++) await classify(`text ${i}`);
+
+      clock.now = 10_000;
+      let sends = 0;
+      endpoint()
+        .intercept({ path: "/v1/systemone", method: "POST" })
+        .reply(200, () => {
+          sends += 1;
+          return ANSWER;
+        })
+        .times(2);
+
+      const probe = await classify("probe");
+      const next = await classify("next");
+
+      expect(sends).toBe(2);
+      expect(probe.verdicts).toHaveLength(1);
+      expect(next.verdicts).toHaveLength(1);
+    });
+  });
+
+  describe("when the probe is refused as too large", () => {
+    /** @scenario "A probe refused as too large lets every text be sent again" */
+    it("sends the cut text, then every text normally again", async () => {
+      endpoint()
+        .intercept({ path: "/v1/systemone", method: "POST" })
+        .reply(500, "upstream down")
+        .times(16);
+      const clock = { now: 0 };
+      const classify = judgeAt(clock);
+      for (let i = 0; i < 4; i++) await classify(`text ${i}`);
+
+      clock.now = 10_000;
+      let sends = 0;
+      endpoint()
+        .intercept({ path: "/v1/systemone", method: "POST" })
+        .reply(400, () => {
+          sends += 1;
+          return TOO_LARGE;
+        });
+      endpoint()
+        .intercept({ path: "/v1/systemone", method: "POST" })
+        .reply(200, () => {
+          sends += 1;
+          return ANSWER;
+        })
+        .times(2);
+
+      const probe = await classify("probe ".repeat(100));
+      const next = await classify("next");
+
+      expect(sends).toBe(3);
+      expect(probe.verdicts).toHaveLength(1);
+      expect(next.verdicts).toHaveLength(1);
+    });
+  });
+
+  describe("when the probe is cancelled", () => {
+    /** @scenario "A cancelled probe does not stop the next one" */
+    it("sends the next probe once the interval has passed again", async () => {
+      endpoint()
+        .intercept({ path: "/v1/systemone", method: "POST" })
+        .reply(500, "upstream down")
+        .times(16);
+      const clock = { now: 0 };
+      const classify = judgeAt(clock);
+      for (let i = 0; i < 4; i++) await classify(`text ${i}`);
+
+      clock.now = 10_000;
+      await expect(classify("probe", AbortSignal.abort())).rejects.toMatchObject({
+        name: "AbortError",
+      });
+
+      clock.now = 20_000;
+      let sends = 0;
+      endpoint()
+        .intercept({ path: "/v1/systemone", method: "POST" })
+        .reply(200, () => {
+          sends += 1;
+          return ANSWER;
+        });
+      const next = await classify("next probe");
+
+      expect(sends).toBe(1);
+      expect(next.verdicts).toHaveLength(1);
+    });
+  });
+
+  describe("when a text is held back while a slow probe is unanswered", () => {
+    /** @scenario "A text held behind a slow probe is sent once the probe is answered" */
+    it("keeps its attempts and is sent once the probe is answered", async () => {
+      const clock = { now: 0 };
+      const channel = HttpInstantEvalClassifierChannel.create({
+        apiKey: "test-key",
+        dispatcher: agent,
+        // Yields to the timers, so the slow probe can answer while the held text waits.
+        sleep: (ms: number) => {
+          waits.push(ms);
+          return new Promise((resolve) => setTimeout(resolve, 1));
+        },
+        now: () => clock.now,
+      });
+      const classify = (text: string) =>
+        channel.classify({
+          projectId: "project-1",
+          text,
+          questions: [QUESTION],
+          limiter: MemoryInstantEvalRateLimiter.create(),
+        });
+      endpoint()
+        .intercept({ path: "/v1/systemone", method: "POST" })
+        .reply(500, "upstream down")
+        .times(16);
+      for (let i = 0; i < 4; i++) await classify(`text ${i}`);
+
+      clock.now = 10_000;
+      waits = [];
+      let sends = 0;
+      endpoint()
+        .intercept({ path: "/v1/systemone", method: "POST" })
+        .reply(200, () => {
+          sends += 1;
+          return ANSWER;
+        })
+        .delay(50)
+        .times(2);
+
+      const probe = classify("probe");
+      const held = await classify("held");
+
+      expect((await probe).verdicts).toHaveLength(1);
+      expect(held.verdicts).toHaveLength(1);
+      expect(sends).toBe(2);
+      expect(waits.length).toBeGreaterThan(4);
+    });
+  });
+
+  describe("when a text is held back behind a probe that never settles", () => {
+    /** @scenario "A text held behind a probe that never settles still gives up" */
+    it("spends an attempt on each held-back turn and skips the text", async () => {
+      const clock = { now: 0 };
+      let isProbeStuck = false;
+      const limiter: InstantEvalRateLimiter = {
+        acquire: () => (isProbeStuck ? new Promise<void>(() => {}) : Promise.resolve()),
+      };
+      const channel = HttpInstantEvalClassifierChannel.create({
+        apiKey: "test-key",
+        dispatcher: agent,
+        sleep: async (ms: number) => {
+          waits.push(ms);
+          if (waits.length > 20) throw new Error("held back forever");
+        },
+        now: () => clock.now,
+      });
+      const classify = (text: string) =>
+        channel.classify({ projectId: "project-1", text, questions: [QUESTION], limiter });
+      let sends = 0;
+      endpoint()
+        .intercept({ path: "/v1/systemone", method: "POST" })
+        .reply(500, () => {
+          sends += 1;
+          return "upstream down";
+        })
+        .persist();
+      for (let i = 0; i < 4; i++) await classify(`text ${i}`);
+
+      clock.now = 10_000;
+      isProbeStuck = true;
+      void classify("probe");
+      const { probeAnsweredWithinMs } = INSTANT_EVAL_CLASSIFIER_BREAKER;
+      clock.now = 10_000 + probeAnsweredWithinMs;
+      waits = [];
+
+      const held = await classify("held");
+
+      expect(held.skippedReason).toBe("classifier_failed");
+      expect(waits).toEqual([1_000, 2_000, 4_000, 8_000]);
+      expect(sends).toBe(16);
+    });
+  });
+
+  describe("when one text fails all five of its sends", () => {
+    /** @scenario "One text failing on every attempt does not stop the others" */
+    it("still sends the next text", async () => {
+      endpoint()
+        .intercept({ path: "/v1/systemone", method: "POST" })
+        .reply(500, "upstream down")
+        .times(5);
+      endpoint().intercept({ path: "/v1/systemone", method: "POST" }).reply(200, ANSWER);
+      const classify = judgeAt({ now: 0 });
+
+      const failed = await classify("text 1");
+      const answered = await classify("text 2");
+
+      expect(failed.skippedReason).toBe("classifier_failed");
+      expect(answered.verdicts).toHaveLength(1);
+    });
+  });
+});
+
+describe("given a judge that rate limits or refuses every send", () => {
+  function judgeAtZero() {
+    const { classify } = judge(undefined, () => 0);
+    return (text: string) => classify({ projectId: "project-1", text, questions: [QUESTION] });
+  }
+
+  describe.each([429, 529])("when every send is answered %i", (status) => {
+    /** @scenario "Rate limits and permanent refusals never stop sends" */
+    it("keeps sending every attempt of every text", async () => {
+      let sends = 0;
+      endpoint()
+        .intercept({ path: "/v1/systemone", method: "POST" })
+        .reply(status, () => {
+          sends += 1;
+          return "";
+        })
+        .persist();
+      const classify = judgeAtZero();
+
+      for (let i = 0; i < 5; i++) await classify(`text ${i}`);
+
+      expect(sends).toBe(25);
+    });
+  });
+
+  describe("when every send is refused with 401", () => {
+    /** @scenario "Rate limits and permanent refusals never stop sends" */
+    it("keeps sending every text", async () => {
+      let sends = 0;
+      endpoint()
+        .intercept({ path: "/v1/systemone", method: "POST" })
+        .reply(401, () => {
+          sends += 1;
+          return { detail: "unauthorized" };
+        })
+        .persist();
+      const classify = judgeAtZero();
+
+      for (let i = 0; i < 20; i++) {
+        await expect(classify(`text ${i}`)).rejects.toBeInstanceOf(
+          InstantEvalClassifierUnavailableError,
+        );
+      }
+
+      expect(sends).toBe(20);
     });
   });
 });

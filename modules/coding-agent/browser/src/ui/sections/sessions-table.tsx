@@ -14,6 +14,7 @@ import {
   type SessionsSortState,
   useSessionsSort,
 } from "../../behavior/session-sort.ts";
+import { useSessionLink } from "../../behavior/use-session-link.ts";
 import { useTerminalReplay } from "../../behavior/use-terminal-replay.ts";
 import {
   decodePullRequestRef,
@@ -59,6 +60,7 @@ export function SessionsTable({
     () => (sessionsQuery.data ?? []).map(toListRow),
     [sessionsQuery.data],
   );
+  useSessionLink({ projectId, rows, isLoaded: sessionsQuery.data !== undefined });
 
   if (sessionsQuery.isLoading) {
     return <Skeleton height="180px" borderRadius="md" />;

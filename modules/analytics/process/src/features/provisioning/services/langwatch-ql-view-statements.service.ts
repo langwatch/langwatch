@@ -4,12 +4,9 @@
  * @see specs/lwql/api.feature
  */
 
-import { flooredViewName, LWQL_FLOOR_PARAMETER } from "../../../rules/lwql-dedup-floor.rules.ts";
+import { twinViewName } from "../../../rules/lwql-dedup-trace-ids.rules.ts";
 import { TENANT_COLUMN } from "../../../rules/lwql-view-catalog.rules.ts";
-import {
-  FLOORED_DEDUP_STRATEGIES,
-  type LangWatchQLDedupStrategy,
-} from "../../../rules/lwql-view-dedup-shape.rules.ts";
+import { type LangWatchQLDedupStrategy } from "../../../rules/lwql-view-dedup-shape.rules.ts";
 import {
   KEY_MAP_COLUMNS,
   type LangWatchQLNames,
@@ -107,6 +104,18 @@ function postgresTenantPredicate({
     `WHERE ${sourceColumn(TENANT_COLUMN)} >= ${bound("min")}\n` +
     `  AND ${sourceColumn(TENANT_COLUMN)} <= ${bound("max")}`
   );
+}
+
+/**
+ * Keeps one copy of a row the view repeats per project (tasks#1212); the row policy has already
+ * dropped copies outside the caller's key set. The lowest project wins, so `TenantId` is stable
+ * across reads. "" for a view with no fan-out.
+ */
+function postgresFanOutCollapse(view: LangWatchQLViewDefinition): string {
+  const keys = view.postgres?.entityKeyColumns ?? [];
+  if (keys.length === 0) return "";
+  const byEntity = keys.map(sourceColumn).join(", ");
+  return `\nORDER BY ${byEntity}, ${sourceColumn(TENANT_COLUMN)}\nLIMIT 1 BY ${byEntity}`;
 }
 
 /**
@@ -315,6 +324,7 @@ export class LangWatchQLViewStatementsService {
     view,
     dedup,
     floor,
+    traceIds,
   }: {
     names: LangWatchQLNames;
     sourceDatabase: string;
@@ -322,6 +332,8 @@ export class LangWatchQLViewStatementsService {
     dedup: LangWatchQLDedupStrategy;
     /** Renders the floored twin, whose dedup reads only versions from this bound. */
     floor?: string;
+    /** Renders the trace-ids twin, whose dedup reads only these traces. */
+    traceIds?: string;
   }): string {
     const relation = sourceRelation({ names, sourceDatabase, view });
     // A PostgreSQL-resident source keeps one row per key, so there is no version
@@ -357,7 +369,14 @@ export class LangWatchQLViewStatementsService {
     const floored = floor === undefined ? {} : { floor };
     const from = settled
       ? viewDedup.settledRelation({ view, relation, ...floored })
-      : viewDedup.relation({ view, relation, strategy, engineDedup: !postgres && !grouped });
+      : viewDedup.relation({
+          view,
+          relation,
+          strategy,
+          engineDedup: !postgres && !grouped,
+          ...floored,
+          ...(traceIds === undefined ? {} : { traceIds }),
+        });
     const joinClause = joinRelationClause(view, sourceDatabase);
     const enginePredicate =
       strategy === "in-tuple" ? `\n${viewDedup.predicate({ view, relation, ...floored })}` : "";
@@ -366,45 +385,15 @@ export class LangWatchQLViewStatementsService {
       : enginePredicate;
     const preFilter = preFilterClause(view, where);
     const grouping = groupingClause({ view, grouped, settled });
+    const collapse = postgres ? postgresFanOutCollapse(view) : "";
 
-    const viewName = floor === undefined ? view.name : flooredViewName(view.name);
+    const viewName = twinViewName({ view: view.name, floor, traceIds });
     return (
       `CREATE OR REPLACE VIEW ` +
       `${sqlText.assertIdentifier(names.database, "database")}.${sqlText.assertIdentifier(viewName, "view")}\n` +
       `SQL SECURITY INVOKER\n` +
       `AS SELECT\n${projection}\n` +
-      `FROM ${from}${joinClause}${where}${preFilter}${grouping}`
-    );
-  }
-
-  /**
-   * `CREATE OR REPLACE VIEW` for a view's floored twin (analytics ADR-005): a parameterised view
-   * the executor reads in place of the view when the statement bounds the floor column below.
-   * None for a view whose dedup declares no floor column.
-   */
-  flooredViewStatements({
-    names,
-    sourceDatabase,
-    view,
-    dedup,
-  }: {
-    names: LangWatchQLNames;
-    sourceDatabase: string;
-    view: LangWatchQLViewDefinition;
-    dedup: LangWatchQLDedupStrategy;
-  }): string[] {
-    const { floorColumn } = view.dedup;
-    const columns = view.columns.filter((column) => column.name === floorColumn);
-    if (!FLOORED_DEDUP_STRATEGIES.has(viewDedup.strategyFor({ view, dedup }))) return [];
-    // The twin reads its bound from a parameter typed like the floor column.
-    return columns.map((column) =>
-      this.viewStatement({
-        names,
-        sourceDatabase,
-        view,
-        dedup,
-        floor: `{${LWQL_FLOOR_PARAMETER}:${column.type}}`,
-      }),
+      `FROM ${from}${joinClause}${where}${preFilter}${grouping}${collapse}`
     );
   }
 

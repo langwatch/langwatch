@@ -188,6 +188,7 @@ function forwarded(app: ModelProviderModule): ModelProviderApi {
     findProviderForProject: (...args) => app.findProviderForProject(...args),
     findRowServingModel: (...args) => app.findRowServingModel(...args),
     getExecutionProviders: (...args) => app.getExecutionProviders(...args),
+    listForProjectWithServedModels: (...args) => app.listForProjectWithServedModels(...args),
     prepareExecution: (...args) => app.prepareExecution(...args),
     prepareEvaluatorModelEnv: (...args) => app.prepareEvaluatorModelEnv(...args),
     generateStructured: (...args) => app.generateStructured(...args),

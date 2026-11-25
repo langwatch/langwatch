@@ -222,6 +222,7 @@ describe("an alias", () => {
         "TenantId",
         "TraceId",
         "SpanId",
+        "ParentSpanId",
         "UpdatedAt",
         "SpanName",
         "SpanAttributes",

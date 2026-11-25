@@ -165,3 +165,16 @@ export function starredLinks({
     return [{ key: `template-${board.templateId}`, name: board.name, href, star: starRefOf(star) }];
   });
 }
+
+/** Whether a star is the board, or From LangWatch board, the page's route opens. */
+export function isOpenStar({
+  star,
+  params,
+}: {
+  star: DashboardStar;
+  /** The page's route params: `dashboardId` on a board, `templateId` on a From LangWatch one. */
+  params: Readonly<Record<string, string | undefined>>;
+}): boolean {
+  if (star.kind === "board") return star.dashboardId === params.dashboardId;
+  return star.templateId === params.templateId;
+}

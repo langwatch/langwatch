@@ -15,6 +15,7 @@ const PROJECT_CREATED_STEP = "project:record-created-facts";
 const PROJECT_FACT_STEPS = [PROJECT_CREATED_STEP];
 const PROJECT_HISTORY_STEP = "project:list-personal-owner-and-first-message-facts";
 const ORGANIZATION_PRESENCE_STEP = "organization:record-presence-settings";
+const ORGANIZATION_MEMBER_LISTING_STEP = "organization:list-member-facts";
 const ANNOTATION_TRACE_STEP = "annotation:record-trace-annotations";
 const BACKGROUND_AFTER_OLD_WRITERS = {
   kind: "data",
@@ -87,6 +88,13 @@ describe("given the worker's installed modules", () => {
     /** @scenario "The organization presence step is a background step that waits for old writers to go" */
     it("declares the organization presence step as a background data step after old writers", () => {
       expect(steps.find((step) => step.id === ORGANIZATION_PRESENCE_STEP)).toMatchObject(
+        BACKGROUND_AFTER_OLD_WRITERS,
+      );
+    });
+
+    /** @scenario "The organization member listing step is a background step that waits for old writers to go" */
+    it("declares the organization member listing as a background data step after old writers", () => {
+      expect(steps.find((step) => step.id === ORGANIZATION_MEMBER_LISTING_STEP)).toMatchObject(
         BACKGROUND_AFTER_OLD_WRITERS,
       );
     });

@@ -16,13 +16,13 @@ Data privacy: per-scope rules and the PII redaction level a project runs at.
 
 ## What data-privacy owns
 
-| Kind                           | Name                                                                                                                                                                                                                                       | Declared at                                                                      |
-| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------- |
-| Postgres table                 | `DataPrivacyPolicy`                                                                                                                                                                                                                        | `process/src/repositories/prisma/prisma.data-privacy.repository.ts:15`           |
-| Postgres, accessed not claimed | `Department`, `Group`, `Organization`, `OrganizationUser`, `Project`, `Team`                                                                                                                                                               | `process/src/repositories/prisma/prisma.data-privacy-directory.repository.ts:17` |
-| Stores required                |                                                                                                                                                                                                                                            | `process/src/channels/http/http.data-privacy.channels.ts:18`                     |
-| Secrets                        | `googleApplicationCredentials` (GOOGLE_APPLICATION_CREDENTIALS), `requestIdKey` (API_KEY_PEPPER), `requestIdKeyFallback` (CREDENTIALS_SECRET), `requestIdKeyLastFallback` (NEXTAUTH_SECRET)                                                | `process/src/app/data-privacy.app.ts:140`                                        |
-| Config                         | `googleDlpDisabled` (LANGWATCH_DISABLE_GOOGLE_DLP), `enforcement` (LANGWATCH_DATA_PRIVACY_ENFORCEMENT), `nodeEnvironment` (NODE_ENV), `langevalsEndpoint` (LANGEVALS_ENDPOINT), `piiRedactionModelEndpoint` (PII_REDACTION_MODEL_ENDPOINT) | `contract/src/data-privacy.config.ts:11`                                         |
+| Kind                           | Name                                                                                                                                                                                                                                                           | Declared at                                                                      |
+| ------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
+| Postgres table                 | `DataPrivacyPolicy`                                                                                                                                                                                                                                            | `process/src/repositories/prisma/prisma.data-privacy.repository.ts:15`           |
+| Postgres, accessed not claimed | `Department`, `Group`, `Organization`, `OrganizationUser`, `Project`, `Team`                                                                                                                                                                                   | `process/src/repositories/prisma/prisma.data-privacy-directory.repository.ts:17` |
+| Stores required                |                                                                                                                                                                                                                                                                | `process/src/channels/http/http.data-privacy.channels.ts:18`                     |
+| Secrets                        | `googleApplicationCredentials` (GOOGLE_APPLICATION_CREDENTIALS), `requestIdKey` (API_KEY_PEPPER), `requestIdKeyFallback` (CREDENTIALS_SECRET), `requestIdKeyLastFallback` (NEXTAUTH_SECRET)                                                                    | `process/src/app/data-privacy.app.ts:142`                                        |
+| Config                         | `googleDlpDisabled` (LANGWATCH_DISABLE_GOOGLE_DLP), `enforcement` (LANGWATCH_DATA_PRIVACY_ENFORCEMENT), `nodeEnvironment` (NODE_ENV), `langevalsEndpoint` (LANGEVALS_ENDPOINT), `piiRedactionModelEndpoint` (PII_REDACTION_MODEL_ENDPOINT), `isSaas` (IS_SAAS) | `contract/src/data-privacy.config.ts:11`                                         |
 
 Anything else data-privacy needs belongs to another module and is reached through its `*Api`.
 
@@ -30,6 +30,7 @@ Anything else data-privacy needs belongs to another module and is reached throug
 
 | Name           | Token            | Module                                    |
 | -------------- | ---------------- | ----------------------------------------- |
+| `entitlements` | `EntitlementApi` | [entitlement](../entitlement/README.md)   |
 | `featureFlags` | `FeatureFlagApi` | [feature-flag](../feature-flag/README.md) |
 | `permissions`  | `AuthzApi`       | [authz](../authz/README.md)               |
 
@@ -49,22 +50,36 @@ organization.
 
 - **Billing.** Every batch the model answers is priced at 0.00005 dollars per 100 characters and
   recorded once, as a `gateway_spend` row of request type `pii_redaction`; a fallback is never
-  priced. Organizations with `release_pii_redaction_model_free` are recorded at zero. Billing
+  priced. Organizations with `release_pii_redaction_model_free`, and every call on a self-hosted install
+  (`IS_SAAS` unset, which runs the model itself), are recorded at zero. Billing
   reports the month on `langwatch_pii_redaction_usd` only once Stripe holds that meter
   ([ADR-201](../../dev/docs/adr/201-pii-redaction-model-call-is-metered.md),
   `specs/pii-redaction-billing.feature`).
 
-- **Strict only.** Only a batch whose project's resolved privacy policy is `strict` can reach the
-  model. A custom level, even one that selects every analysis-service entity, and a batch whose
-  policy could not be loaded stay on Presidio exactly as today, without reading the flag. The
-  request's own level is not enough: both of those send `STRICT` batches too.
+- **Settings page.** On LangWatch Cloud with the same flag, the Data Privacy page offers the
+  organization Essential (included) or Strict (the model, with its price derived from the billed
+  rate, or "Included for your organization" with `release_pii_redaction_model_free`), and the rule
+  drawer shows what a level runs and stores. A pick writes only the PII level of the organization
+  rule through `setForScope`; Strict at a price and replacing Custom ask first. The browser cannot
+  see `PII_REDACTION_MODEL_ENDPOINT`, so the flag is the gate: on self-hosted the Helm chart forces
+  it exactly when it sets the endpoint. Self-hosted, the model needs an Enterprise license as well:
+  licensed with the flag, the page offers it as included with the license, as the ledger records
+  it; licensed without the flag, the drawer says to ask for it to be turned on; unlicensed, the
+  server keeps Strict on Presidio and the drawer advertises the license
+  (`specs/pii-redaction-level-picker.feature`, `specs/span-pii-redaction.feature`).
+
+- **Strict only.** Only a batch whose effective PII level is `strict` can reach the model: the
+  project's policy is `strict`, or it is `essential` and the request asks for `STRICT`. A custom
+  level, even one that selects every analysis-service entity, and a batch whose policy could not
+  be loaded stay on Presidio exactly as today, without reading the flag. The request's own level
+  is not enough on its own: both of those send `STRICT` batches too.
 
 - **Time cap.** A model call is aborted after 50 s (`PII_REDACTION_MODEL_TIMEOUT_MS`) and the batch
   goes to Presidio. Presidio then gets its own 60 s timeout: the two timers are separate, so a
   batch can wait up to 110 s (50 + 60) before it reaches Google DLP.
   The abort cancels the invoke request; the function itself may run on until its own timeout.
 - **Usage log.** Each batch routed to the model leaves one `PII redaction model call` log line
-  with `organizationId`, `projectId`, `texts`, `characters`, `spansFound`, `outcome` (`ok`, or the
+  with `organizationId`, `projectId`, `texts`, `characters`, `findings`, `outcome` (`ok`, or the
   fallback reason) and `durationMs`; an error adds its class name only. It never holds a text, a
   finding's value or an error message. Fallbacks are also counted by `reason` on
   `pii_redaction_model_fallbacks` (`too_long`, `timeout`, `throttled`, `error`, `breaker_open`,

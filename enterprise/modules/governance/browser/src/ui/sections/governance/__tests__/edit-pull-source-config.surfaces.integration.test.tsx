@@ -17,8 +17,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { fakeGovernanceHost, renderWithGovernanceHost } from "../../../../testing.tsx";
 import IngestionSourceDetailPage from "../governance-ingestion-source.screen.tsx";
-import { SourceEditDrawer } from "../governance-inventory.screen.tsx";
 import type { Source } from "../ingestion-source-forms.ts";
+import { SourceEditDrawer } from "../inventory/source-edit-drawer.tsx";
 
 const harness = vi.hoisted(() => ({ row: undefined as unknown }));
 

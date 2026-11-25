@@ -1,11 +1,16 @@
 import {
+  BillingOnlyNoTeamAccessError,
   DeveloperSeatNoSharedAccessError,
   LiteMemberViewerOnlyError,
   OrganizationUserRole,
   TeamUserRole,
 } from "@langwatch/organization-contract";
 
-import type { TeamAssignmentInput } from "./invite-contracts.rules.ts";
+import type {
+  CreateAdminInviteInput,
+  CreateInvitesInviteInput,
+  TeamAssignmentInput,
+} from "./invite-contracts.rules.ts";
 import {
   holdsSharedAccess,
   ORGANIZATION_TO_TEAM_ROLE_MAP,
@@ -145,4 +150,26 @@ export function assertAssignmentsWithinInvitedSeat({
       throw new LiteMemberViewerOnlyError();
     }
   }
+}
+
+/** Billing only: role EXTERNAL, no team, no seat (ADR-205). A team asked for is refused. */
+export function billingOnlyInviteOf({
+  organizationId,
+  email,
+  invite,
+}: {
+  organizationId: string;
+  email: string;
+  invite: CreateInvitesInviteInput;
+}): CreateAdminInviteInput {
+  if ((invite.teams?.length ?? 0) > 0 || invite.teamIds?.trim()) {
+    throw new BillingOnlyNoTeamAccessError();
+  }
+  return {
+    email,
+    role: OrganizationUserRole.EXTERNAL,
+    organizationId,
+    teamIds: "",
+    billingOnly: true,
+  };
 }

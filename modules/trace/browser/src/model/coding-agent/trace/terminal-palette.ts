@@ -10,19 +10,22 @@ export function ansiColorToken(color: AnsiColor): string {
   return color.hex;
 }
 
-/** Terminal chrome follows the drawer colour mode. */
+/**
+ * Terminal chrome: a fixed dark screen in both colour modes, because the tab
+ * recreates a real terminal rather than themeable app UI.
+ */
 export const TERMINAL_TOKENS = {
   screenBg: "terminal.bg",
   screenFg: "terminal.fg",
-  frameBg: "bg.raised",
-  border: "border.strong",
-  faint: "fg.subtle",
-  accent: "accent.fg",
-  accentStrong: "accent.fg",
-  red: "fg.error",
-  green: "fg.success",
-  blue: "fg.info",
-  yellow: "fg.warning",
+  frameBg: "terminal.frame",
+  border: "terminal.border",
+  faint: "terminal.faint",
+  accent: "terminal.accent",
+  selection: "terminal.blue/33",
+  red: "terminal.red",
+  green: "terminal.green",
+  blue: "terminal.blue",
+  yellow: "terminal.yellow",
 } as const;
 
 /**
@@ -34,8 +37,8 @@ export const TERMINAL_FONT_STACK =
 
 /** Full-width, saturated — not a subtle tint. Matches a real diff pager. */
 export const DIFF_TOKENS = {
-  addBg: "bg.success",
-  addFg: "fg.success",
-  removeBg: "bg.error",
-  removeFg: "fg.error",
+  addBg: "terminal.diffAddBg",
+  addFg: "terminal.green",
+  removeBg: "terminal.diffRemoveBg",
+  removeFg: "terminal.red",
 } as const;

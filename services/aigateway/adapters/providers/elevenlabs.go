@@ -50,7 +50,7 @@ const (
 // because synthesis and transcription are real work rather than a mint.
 func newElevenLabsAudioClient(policy customerEndpointPolicy) *http.Client {
 	timeout := ProviderRequestTimeoutSeconds * time.Second
-	dialer := policyDialer(policy, timeout)
+	dialer := policy.egress.Dialer(timeout)
 	return &http.Client{
 		Timeout: timeout,
 		// Kept-alive connections are what keep a streamed call's first byte

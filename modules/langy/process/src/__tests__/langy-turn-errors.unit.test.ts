@@ -136,6 +136,60 @@ describe("LangyTurnErrors.fromFrame", () => {
         ]);
       });
 
+      describe("when the agent_error carries no reasons", () => {
+        /** @scenario "A failed reply with no recorded cause does not claim an upstream rejection" */
+        it("is retryable and its tips claim no upstream rejection", () => {
+          const cause = handledErrorFromHerr({
+            type: "agent_error",
+            message: "the agent hit an error before finishing",
+            reasons: [],
+          });
+
+          const error = LangyTurnErrors.fromErrorFrame({ code: "agent_error", cause });
+
+          expect(error).toBeInstanceOf(LangyAgentErroredError);
+          const serialized = JSON.parse(LangyTurnErrors.serialize(error)) as {
+            retryable: boolean;
+            fault: string;
+            tips: string[];
+            reasons: unknown[];
+          };
+          expect(serialized.retryable).toBe(true);
+          expect(serialized.fault).not.toBe("provider");
+          expect(serialized.reasons).toEqual([]);
+          expect(serialized.tips.join(" ")).not.toMatch(/upstream|rejected/i);
+        });
+      });
+
+      it("is retryable when a captured cause is retryable", () => {
+        const cause = handledErrorFromHerr({
+          type: "agent_error",
+          message: "the agent hit an error before finishing",
+          reasons: [
+            { type: "upstream_rate_limited", message: "rate limited", meta: {}, retryable: true },
+          ],
+        });
+
+        const serialized = JSON.parse(
+          LangyTurnErrors.serialize(LangyTurnErrors.fromErrorFrame({ code: "agent_error", cause })),
+        ) as { retryable: boolean };
+        expect(serialized.retryable).toBe(true);
+      });
+
+      it("keeps a captured cause non-retryable unless the frame says otherwise", () => {
+        const cause = handledErrorFromHerr({
+          type: "agent_error",
+          message: "the agent hit an error before finishing",
+          reasons: [{ type: "upstream_bad_request", message: "bad request", meta: {} }],
+        });
+
+        const serialized = JSON.parse(
+          LangyTurnErrors.serialize(LangyTurnErrors.fromErrorFrame({ code: "agent_error", cause })),
+        ) as { retryable: boolean; fault: string };
+        expect(serialized.retryable).toBe(false);
+        expect(serialized.fault).toBe("provider");
+      });
+
       it("falls back to the bare-code mapping without a cause", () => {
         expect(LangyTurnErrors.fromErrorFrame({ code: "worker_stopped" })).toBeInstanceOf(
           LangyWorkerStoppedError,

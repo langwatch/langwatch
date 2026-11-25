@@ -31,5 +31,6 @@ export function useSettingsMenu(): SettingsMenuGroup[] {
     isPlatformAdmin: opsAccess.isAdmin,
     // Hidden while the flag is still loading: an entry must not appear and then vanish.
     braidsEnabled: braids.enabled && !braids.isLoading,
+    braidsPresent: host.braidsPresent(),
   });
 }

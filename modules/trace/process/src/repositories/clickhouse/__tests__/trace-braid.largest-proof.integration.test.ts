@@ -118,17 +118,19 @@ function spanRow({
   tenantId,
   spanId,
   resource = {},
+  parentSpanId = null,
 }: {
   tenantId: string;
   spanId: string;
   resource?: Record<string, string>;
+  parentSpanId?: string | null;
 }) {
   return {
     ProjectionId: `proj-${nanoid()}`,
     TenantId: tenantId,
     TraceId: traceId,
     SpanId: spanId,
-    ParentSpanId: null,
+    ParentSpanId: parentSpanId,
     ParentTraceId: null,
     ParentIsRemote: null,
     Sampled: 1,
@@ -192,7 +194,12 @@ beforeAll(async () => {
       ...owners.flatMap((owner, index) => {
         const resource = matchingResource(conditions[index] as CompiledWhere);
         return [
-          spanRow({ tenantId: owner, spanId: `match-${index}`, resource }),
+          spanRow({
+            tenantId: owner,
+            spanId: `match-${index}`,
+            resource,
+            parentSpanId: "reader-root",
+          }),
           spanRow({ tenantId: owner, spanId: `miss-${index}`, resource: lastTermMissed(resource) }),
         ];
       }),

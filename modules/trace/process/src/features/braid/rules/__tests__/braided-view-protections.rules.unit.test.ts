@@ -10,6 +10,7 @@ import { mapLegacySpanSummaryToTreeNode } from "../../../../rules/trace-read-map
 import { gateResources, resourceInfoOf } from "../../../../rules/trace-view-gates.rules.ts";
 import {
   braidConditionsShownFor,
+  ownerAudienceNamed,
   protectByOwner,
   verifiedMarksOf,
 } from "../braided-span-owner.rules.ts";
@@ -233,5 +234,44 @@ describe("mapLegacySpanSummaryToTreeNode", () => {
 
   it("adds no owner to the reader's own span", () => {
     expect(mapLegacySpanSummaryToTreeNode(row)).not.toHaveProperty("ownerProjectId");
+  });
+});
+
+describe("ownerAudienceNamed", () => {
+  describe("given an owner's protections hiding content from the viewer", () => {
+    /** @scenario "A braided span's redaction names the owner project" */
+    it("names the owner wherever the redaction would say this project", () => {
+      const named = ownerAudienceNamed({
+        protections: {
+          ...strict,
+          canSeeCapturedOutput: false,
+          capturedOutputVisibleTo: "Admins",
+          restrictedAttributes: [
+            { pattern: "x", visibleTo: "members of this project", canSee: false },
+          ],
+          contentCategories: {
+            input: { canSee: false, restrictVisibleTo: null },
+            output: { canSee: false, restrictVisibleTo: "Admins" },
+            system: { canSee: true, restrictVisibleTo: null },
+            tools: { canSee: false, restrictVisibleTo: null },
+          },
+        },
+        ownerName: "specialists",
+      });
+
+      expect(named).toMatchObject({
+        capturedInputVisibleTo: "members of specialists",
+        capturedOutputVisibleTo: "Admins",
+        hiddenAttributes: [{ pattern: "*", visibleTo: "members of specialists" }],
+        restrictedAttributes: [{ pattern: "x", visibleTo: "members of specialists" }],
+        contentCategories: {
+          input: { canSee: false, restrictVisibleTo: "members of specialists" },
+          output: { canSee: false, restrictVisibleTo: "Admins" },
+          system: { canSee: true, restrictVisibleTo: null },
+          tools: { canSee: false, restrictVisibleTo: "members of specialists" },
+        },
+      });
+      expect(JSON.stringify(named)).not.toContain("this project");
+    });
   });
 });

@@ -35,6 +35,10 @@ class InMemoryLicenseStorage implements LicenseStorage {
   async getMembersLiteCount(): Promise<number> {
     return 0;
   }
+
+  async getMembersDeveloperCount(): Promise<number> {
+    return 0;
+  }
 }
 
 describe("given an organization with 25 active members and no license yet", () => {

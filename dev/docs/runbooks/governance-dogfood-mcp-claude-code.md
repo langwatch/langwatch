@@ -47,14 +47,20 @@ the next conversation.
 In a fresh `claude` session:
 
 > "Use the LangWatch governance MCP tools to list the ingestion templates
-> on my org, then dump the platform OTTL for the claude_code template."
+> on my org, then show me one of them."
 
 Claude Code should call:
 
-1. `mcp__langwatch__governance_ingestion_templates_admin_list` (returns 3 platform
-   rows with `ottlRules` populated)
-2. `mcp__langwatch__governance_ingestion_templates_get` with `id: <claude_code-id>`
-   (returns a single row)
+1. `mcp__langwatch__governance_ingestion_templates_list` (returns the org's
+   templates with `ottlRules` empty)
+2. `mcp__langwatch__governance_ingestion_templates_get` with `id: <template-id>`
+   (returns a single row, `ottlRules` empty as well)
+
+A template's OTTL rules are organization configuration: only `aiTools:manage`
+reads them, through the console's admin catalogue or
+`GET /api/v1/governance/ingestion-templates/:id`. A project-apiKey session asking
+`mcp__langwatch__governance_ingestion_templates_admin_list` is refused with
+`AUTH_REQUIRED`.
 
 **Verify** — query Postgres:
 
