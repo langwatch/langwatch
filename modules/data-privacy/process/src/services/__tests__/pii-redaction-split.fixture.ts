@@ -26,7 +26,7 @@ export function isPythonSpace(char: string | undefined): boolean {
 }
 
 function pythonStrip(text: string): string {
-  const chars = [...text];
+  const chars = Array.from(text);
   let start = 0;
   let end = chars.length;
   while (start < end && isPythonSpace(chars[start])) start++;
@@ -64,7 +64,7 @@ function findingsIn(content: string, planted: readonly PlantedValue[]): Finding[
     let from = content.indexOf(value);
     while (from >= 0) {
       const start = Array.from(content.slice(0, from)).length;
-      const finding = { entity_type: entity, start, end: start + [...value].length, score };
+      const finding = { entity_type: entity, start, end: start + Array.from(value).length, score };
       const key = `${finding.entity_type}:${finding.start}:${finding.end}`;
       if (!seen.has(key)) findings.push(finding);
       seen.add(key);
@@ -76,7 +76,7 @@ function findingsIn(content: string, planted: readonly PlantedValue[]): Finding[
 
 /** The model's own masked text: overlaps merged, the higher score's label, `<ENTITY>`. */
 function anonymize(content: string, findings: readonly Finding[]): string {
-  const chars = [...content];
+  const chars = Array.from(content);
   const merged: Finding[] = [];
   for (const finding of findings.toSorted((a, b) => a.start - b.start)) {
     const last = merged.at(-1);

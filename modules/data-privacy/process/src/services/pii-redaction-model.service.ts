@@ -540,9 +540,12 @@ async function runSplitCall({
   try {
     const answered = await run.answer(splitCall);
     run.callDurationsMs.push(run.now() - startedAt);
-    splitCall.pieces.forEach((piece, i) =>
-      run.answers.push({ piece, ...(answered[i] ?? { findings: [], anonymized: null }) }),
-    );
+    for (const [i, piece] of splitCall.pieces.entries()) {
+      const answer = answered[i];
+      // A missing answer fails the span: a default of no findings would store the piece raw.
+      if (!answer) throw new Error("PII redaction split model left a piece unanswered");
+      run.answers.push({ piece, ...answer });
+    }
     if (run.callDurationsMs.length === run.calls.length) {
       run.end({ kind: "answered", answers: run.answers, callDurationsMs: run.callDurationsMs });
     }

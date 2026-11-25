@@ -105,9 +105,9 @@ export function planSpan({
 }
 
 /**
- * A long text cut at whitespace: a piece ends before the last whitespace run within 4,000 of
- * its start, and the next starts at the word holding the character 200 before that end. No piece
- * starts or ends on a character the model trims, so its offsets index the raw piece.
+ * A long text cut at whitespace; the next piece starts at the word holding the character 200
+ * before the cut, or at that character inside one long word. Every cut overlaps by 200 or more,
+ * and no piece starts or ends on a character the model trims (ADR-207 decision 3).
  */
 function cutText({ text, index }: { text: string; index: number }): SplitPiece[] {
   const pieces: SplitPiece[] = [];
@@ -122,23 +122,36 @@ function cutText({ text, index }: { text: string; index: number }): SplitPiece[]
     }
     end = cutBefore({ text, start });
     pieces.push({ text: index, start, end, whole: false });
-    let next = end - PII_REDACTION_MODEL_PIECE_OVERLAP;
-    while (next > start && !isPythonSpace(text[next - 1])) next--;
-    next = skipSpaces({ text, from: next });
-    start = next > pieces.at(-1)!.start ? next : end;
+    const overlapAt = end - PII_REDACTION_MODEL_PIECE_OVERLAP;
+    let word = overlapAt;
+    while (word > start && !isPythonSpace(text[word - 1])) word--;
+    start = skipSpaces({
+      text,
+      from: word > start ? word : offLowSurrogate({ text, at: overlapAt }),
+    });
   }
   return pieces;
 }
 
-/** Where a piece from `start` ends: before a whitespace run, or a hard cut in a 4,000-long word. */
+/**
+ * Where a piece from `start` ends: before the last whitespace run within 4,000, unless that
+ * leaves under 2,000; then a hard cut at 4,000, inside a long word, which the overlap covers.
+ */
 function cutBefore({ text, start }: { text: string; start: number }): number {
   const limit = start + PII_REDACTION_MODEL_PIECE_CHARACTERS;
   let end = limit;
   while (end > start && !isPythonSpace(text[end])) end--;
   while (end > start && isPythonSpace(text[end - 1])) end--;
-  if (end > start) return end;
-  const code = text.charCodeAt(limit - 1);
-  return code >= 0xd800 && code <= 0xdbff ? limit - 1 : limit;
+  if (end - start >= PII_REDACTION_MODEL_PIECE_CHARACTERS / 2) return end;
+  end = offLowSurrogate({ text, at: limit });
+  while (end > start && isPythonSpace(text[end - 1])) end--;
+  return end;
+}
+
+/** `at`, or one back when it would split a surrogate pair, so no piece holds half a character. */
+function offLowSurrogate({ text, at }: { text: string; at: number }): number {
+  const code = text.charCodeAt(at);
+  return code >= 0xdc00 && code <= 0xdfff ? at - 1 : at;
 }
 
 function skipSpaces({ text, from }: { text: string; from: number }): number {

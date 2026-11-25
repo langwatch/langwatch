@@ -1,5 +1,3 @@
-import { PII_REDACTION_MODEL_MAX_BATCH_CHARACTERS } from "@langwatch/data-privacy-contract/pii-redaction-spend";
-
 /** The per-organization switch that routes strict PII analysis to the model. */
 export const PII_REDACTION_MODEL_FLAG = "release_pii_redaction_model_enabled";
 
@@ -56,13 +54,4 @@ export function piiRedactionModelTargetOf(setting: string | undefined): PiiRedac
 /** All the characters one batch would send. */
 export function batchCharactersOf(texts: readonly string[]): number {
   return texts.reduce((total, text) => total + text.length, 0);
-}
-
-/**
- * Whether a batch is too long for the model to answer inside its time cap. A long batch goes to
- * Presidio, never split: time grows with every character (4 s for 2k, 40 to 56 s for 20k). The
- * limit also keeps each invoke far under Lambda's 6 MB synchronous limit.
- */
-export function isBatchTooLongForModel(texts: readonly string[]): boolean {
-  return batchCharactersOf(texts) > PII_REDACTION_MODEL_MAX_BATCH_CHARACTERS;
 }

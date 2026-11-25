@@ -1,11 +1,8 @@
 import { PII_REDACTION_MODEL_MAX_BATCH_CHARACTERS } from "@langwatch/data-privacy-contract/pii-redaction-spend";
 import { describe, expect, it } from "vitest";
 
-import {
-  batchCharactersOf,
-  isBatchTooLongForModel,
-  piiRedactionModelTargetOf,
-} from "../pii-redaction-model.rules.ts";
+import { batchCharactersOf, piiRedactionModelTargetOf } from "../pii-redaction-model.rules.ts";
+import { planSpan } from "../pii-redaction-split.rules.ts";
 
 const ARN =
   "arn:aws:lambda:eu-central-1:123456789012:function:langwatch-pii-redaction-model-all:live";
@@ -41,16 +38,16 @@ describe("piiRedactionModelTargetOf", () => {
     );
   });
 });
-describe("isBatchTooLongForModel", () => {
+describe("planSpan with no split model set", () => {
   /** @scenario "A long batch skips the model and goes to Presidio" */
   it("keeps a batch of exactly 8,000 characters on the model", () => {
     expect(PII_REDACTION_MODEL_MAX_BATCH_CHARACTERS).toBe(8_000);
-    expect(isBatchTooLongForModel(["a".repeat(8_000)])).toBe(false);
+    expect(planSpan({ texts: ["a".repeat(8_000)], splitting: false }).kind).toBe("single");
   });
 
   /** @scenario "A long batch skips the model and goes to Presidio" */
   it("sends one text over 8,000 characters to Presidio", () => {
-    expect(isBatchTooLongForModel(["a".repeat(8_001)])).toBe(true);
+    expect(planSpan({ texts: ["a".repeat(8_001)], splitting: false }).kind).toBe("too_long");
   });
 
   /** @scenario "A long batch skips the model and goes to Presidio" */
@@ -58,6 +55,6 @@ describe("isBatchTooLongForModel", () => {
     const texts = Array.from({ length: 5 }, () => "a".repeat(2_000));
 
     expect(batchCharactersOf(texts)).toBe(10_000);
-    expect(isBatchTooLongForModel(texts)).toBe(true);
+    expect(planSpan({ texts, splitting: false }).kind).toBe("too_long");
   });
 });

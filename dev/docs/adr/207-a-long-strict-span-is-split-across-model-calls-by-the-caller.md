@@ -138,7 +138,7 @@ and 12) so a split span stays one priced fact.
 | billing of split spans (ADR-201 rev)             | no: money                              | large                                  | human review; unit test of the fact; the Cloud price ADR stays as is                                                               |
 | concurrency, budget, breaker (8, 9, 11)          | yes                                    | large (every Strict org on a pod)      | automated: unit tests with a fake clock; R3 load test on the dev Lambda before the flag widens                                     |
 | split function in langwatch-saas                 | yes                                    | small (a cost line)                    | saas infra PR, plan reviewed; the app splits only once its ARN is set                                                              |
-| new setting `PII_REDACTION_MODEL_SPLIT_ENDPOINT` | yes                                    | small (a config key operators may set) | documented in the self-hosting config page; unset is today's behaviour                                                             |
+| new setting `PII_REDACTION_MODEL_SPLIT_ENDPOINT` | yes                                    | small (a config key operators may set) | documented in the data-privacy README; unset is today's behaviour; Cloud docs with R6                                              |
 | docs, picker note                                | yes                                    | small                                  | none beyond the PR                                                                                                                 |
 
 ## Rejected alternatives

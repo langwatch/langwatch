@@ -80,7 +80,7 @@ describe("planSpan", () => {
     const calls = splitCalls(texts);
     const wholes = calls.flatMap((call) => call.pieces).filter((piece) => piece.whole);
 
-    expect(wholes.map((piece) => piece.text).toSorted()).toEqual([1, 2, 3]);
+    expect(wholes.map((piece) => piece.text).toSorted((a, b) => a - b)).toEqual([1, 2, 3]);
     expect(calls.some((call) => call.pieces.filter((piece) => piece.whole).length === 2)).toBe(
       true,
     );
@@ -92,6 +92,29 @@ describe("planSpan", () => {
     }
     for (const call of calls) {
       expect(callCharacters({ call })).toBeLessThanOrEqual(PII_REDACTION_MODEL_PIECE_CHARACTERS);
+    }
+  });
+
+  /** @scenario "A name, an address or an IBAN across a cut is masked whole and nothing found is left unmasked" */
+  it("overlaps a cut inside a word of 4,000 or more by 200, so a value across it is whole", () => {
+    const value = "MariavanderBerg_NL91ABNA04";
+    const text = `${"x".repeat(3_990)}${value}${"y".repeat(6_000)}`;
+    const pieces = splitCalls([text]).flatMap((call) => call.pieces);
+    const slices = pieces.map((piece) => text.slice(piece.start, piece.end));
+
+    expect(slices.some((slice) => slice.includes(value))).toBe(true);
+    for (const [i, piece] of pieces.slice(1).entries()) {
+      expect(pieces[i]!.end - piece.start).toBeGreaterThanOrEqual(200);
+    }
+  });
+
+  /** @scenario "A piece the model could reshape sends the whole span to Presidio" */
+  it("starts no piece on a space after a piece that is mostly one long word", () => {
+    const text = `${"w".repeat(3_900)} ${"ab ".repeat(3_000)}`;
+    const pieces = splitCalls([text]).flatMap((call) => call.pieces);
+
+    for (const piece of pieces) {
+      expect(isPlaceablePiece(text.slice(piece.start, piece.end))).toBe(true);
     }
   });
 
