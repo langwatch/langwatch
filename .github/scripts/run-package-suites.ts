@@ -857,9 +857,11 @@ if (isEntrypoint()) {
   const failed = outcomes.filter((o) => o.outcome === "failed");
   if (failed.length > 0) {
     console.error(`::error::${failed.length} package suite(s) failed and are not registered.`);
-    process.exit(1);
+    // Not process.exit: on a pipe it drops whatever of a suite's output is still past 64 KiB.
+    process.exitCode = 1;
+  } else {
+    console.log(
+      `All ${outcomes.filter((o) => o.outcome === "passed").length} package suites passed.`,
+    );
   }
-  console.log(
-    `All ${outcomes.filter((o) => o.outcome === "passed").length} package suites passed.`,
-  );
 }

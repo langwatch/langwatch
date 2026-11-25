@@ -1660,6 +1660,36 @@ Rule: Enter routes a sentence
     Then the query is `service:api AND "cannot connect to database"`
     And no model is called
 
+  # A question is never a literal string to look for: nobody types "Was the
+  # customer frustrated?" hoping a trace contains those words.
+  @unit
+  Scenario: A question the classifier or the model calls a phrase is judged instead
+    Given Instant Evals are available for the project
+    And the classifier, or the model without one, answers "free_text" for "Was the customer frustrated?"
+    When the router runs
+    Then the result is an Instant Eval on that question, rewritten by the FAST model like any judgement
+    And a sentence that is not a question, such as "cannot connect to database", is still searched as one phrase
+
+  @unit
+  Scenario: A question no model could route is judged as typed
+    Given Instant Evals are available for the project
+    And no classifier answered and the FAST model fails or is not configured
+    When the user submits "Was the customer frustrated?"
+    Then the result is an Instant Eval whose question is "Was the customer frustrated?"
+    And it says the model failed, as a judgement without a model does
+
+  @unit
+  Scenario: A question stays a phrase search while Instant Evals are unavailable
+    Given Instant Evals are not available for the project
+    And the classifier answers "free_text" for "Was the customer frustrated?"
+    When the router runs
+    Then the sentence is searched as one quoted phrase
+
+  @unit
+  Scenario: A sentence reads as a question when it asks one
+    Then "Was the customer frustrated?" and "did the agent call the refund tool" read as questions
+    And "cannot connect to database", "how", "is" and "?" do not
+
   @unit
   Scenario: A question for the assistant goes to Langy with the view attached
     Given the classifier answers "langy" for "why did errors spike this morning"

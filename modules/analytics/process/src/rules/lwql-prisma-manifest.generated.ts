@@ -2058,6 +2058,33 @@ export interface LwqlPrismaRows {
     readonly organizationId: "String";
     readonly createdAt: "DateTime";
   };
+  readonly NurturingOrganizationPlan: {
+    readonly organizationId: "String";
+    readonly plan: "String?";
+    readonly occurredAt: "DateTime";
+    readonly fromCatchUp: "Boolean";
+    readonly appliedEventIds: "String[]";
+    readonly winnerEventId: "String?";
+  };
+  readonly NurturingVirtualKey: {
+    readonly virtualKeyId: "String";
+    readonly organizationId: "String";
+    readonly name: "String";
+    readonly occurredAt: "DateTime";
+    readonly keyCreatedAt: "DateTime?";
+    readonly creatorUserId: "String?";
+    readonly principalUserId: "String?";
+    readonly principalUserIdAt: "DateTime?";
+    readonly purpose: "String?";
+    readonly purposeAt: "DateTime?";
+    readonly disabledAt: "DateTime?";
+    readonly enabledAt: "DateTime?";
+    readonly revokedAt: "DateTime?";
+  };
+  readonly NurturingErasedUser: {
+    readonly userIdHash: "String";
+    readonly erasedAt: "DateTime";
+  };
   readonly NurturingOrganization: {
     readonly organizationId: "String";
     readonly adminUserId: "String?";
@@ -2072,6 +2099,7 @@ export interface LwqlPrismaRows {
     readonly codingRepositoryKeys: "String[]";
     readonly codingFirstDays: "Int[]";
     readonly lastTraceAt: "DateTime?";
+    readonly adminAt: "DateTime?";
     readonly updatedAt: "DateTime";
   };
   readonly NurturingProjectUsageView: {
@@ -2089,6 +2117,21 @@ export interface LwqlPrismaRows {
     readonly errorCount: "Int";
     readonly lastTraceAt: "DateTime?";
     readonly lastFailedTraceAt: "DateTime?";
+  };
+  readonly NurturingProjectTraceDayCount: {
+    readonly projectId: "String";
+    readonly day: "String";
+    readonly source: "String";
+    readonly traceCount: "Int";
+    readonly errorCount: "Int";
+    readonly lastTraceAt: "DateTime?";
+    readonly lastFailedTraceAt: "DateTime?";
+    readonly appliedEventIds: "String[]";
+    readonly projectionVersion: "String";
+  };
+  readonly NurturingProjectEvaluationDay: {
+    readonly projectId: "String";
+    readonly day: "String";
   };
   readonly NurturingPersonalProject: {
     readonly projectId: "String";

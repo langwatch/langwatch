@@ -319,6 +319,7 @@ function WidgetFrameOverWindow({
   // shown on the card, never restarted.
   const { diagnostic, fatal, onLog } = useFrameDiagnostic({
     resetKey: `${definition.code}:${attempt}`,
+    crashContext: { widgetId: id, ...(dashboardId === undefined ? {} : { dashboardId }) },
   });
   // Until a query answers the frame has nothing to draw; code that crashed never will.
   const loading = hasQueries && !fatal && !frameIdle && awaitsFirstAnswer(records);

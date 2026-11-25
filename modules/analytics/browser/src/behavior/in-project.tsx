@@ -7,7 +7,7 @@ import {
   UiHostServicesContextProvider,
   useOptionalUiHostServices,
 } from "@langwatch/browser-host/capabilities";
-import type { ReactNode } from "react";
+import { type ReactNode, useMemo } from "react";
 
 import {
   analyticsHostInProject,
@@ -30,17 +30,27 @@ export function InProject({
   const host = useAnalyticsHost();
   const pageProjectId = host.project()?.id;
   const services = useOptionalUiHostServices();
-  const scoped = analyticsHostInProject({ host, project: { id, slug, name } });
+  const scoped = useMemo(
+    () => analyticsHostInProject({ host, project: { id, slug, name } }),
+    [host, id, slug, name],
+  );
+  const scopedServices = useMemo(
+    () =>
+      services?.analytics
+        ? {
+            ...services,
+            analytics: uiAnalyticsInProject({
+              analytics: services.analytics,
+              projectId: id,
+              pageProjectId,
+            }),
+          }
+        : void 0,
+    [services, id, pageProjectId],
+  );
   const section = <AnalyticsHostProvider value={scoped}>{children}</AnalyticsHostProvider>;
-  if (!services?.analytics) return section;
-  const analytics = uiAnalyticsInProject({
-    analytics: services.analytics,
-    projectId: id,
-    pageProjectId,
-  });
+  if (!scopedServices) return section;
   return (
-    <UiHostServicesContextProvider value={{ ...services, analytics }}>
-      {section}
-    </UiHostServicesContextProvider>
+    <UiHostServicesContextProvider value={scopedServices}>{section}</UiHostServicesContextProvider>
   );
 }
