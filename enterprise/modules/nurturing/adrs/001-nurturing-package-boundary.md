@@ -1,6 +1,6 @@
 # ADR-001: Nurturing learns from events and keeps its own copies
 
-**Status:** Accepted (2026-09-29; amended 2026-11-11, 2026-11-17 (twice), 2026-11-19 and 2026-11-24)
+**Status:** Accepted (2026-09-29; amended 2026-11-11, 2026-11-17 (twice), 2026-11-19, 2026-11-20 and 2026-11-24)
 
 **Behavioural contract:** [Nurturing](../specs/nurturing.feature)
 
@@ -89,13 +89,18 @@ https://github.com/langwatch/tasks/issues/1131:
 ## Public surfaces and transports
 
 Each package has one root export. Nurturing serves no route: the contract's
-`NurturingApi` carries only `recordSignal`.
+`NurturingApi` carries `recordSignal` and `sendTransactionalEmail`. The second
+sends one transactional email for another module through Customer.io and
+answers `queued`, `refused` or `off`; it never throws on a Customer.io refusal,
+so the caller can send the email another way. Nurturing files the send under the
+user's id when the address belongs to a user, else by address.
 
 ## Dependencies
 
 The contract holds the signal union, the Customer.io vocabulary, the Api token,
 the config (`CUSTOMER_IO_REGION`, the shared `POSTHOG_KEY`/`POSTHOG_HOST`
-leaves) and the `CUSTOMER_IO_API_KEY` secret. The process imports the event
+leaves) and the `CUSTOMER_IO_API_KEY` and `CUSTOMER_IO_APP_API_KEY` secrets.
+The process imports the event
 schemas of the owners it listens to, and the `UserApi` and `OrganizationApi`
 contracts only for the exceptions above. Gateway's contract
 (`@langwatch/gateway-contract`) is one of those owners: its
@@ -108,8 +113,9 @@ by name and spend, so nurturing never reads gateway's tables
 (`@langwatch/enterprise-governance-contract`) is another: its
 `lw.governance.ingestion_source_created` and `lw.governance.ingestion_source_went_live`
 facts name an ingestion source's organization, id, type and creator, so nurturing
-never reads governance's tables. No feature module depends on
-nurturing's process, so no peer cycle can pass through it.
+never reads governance's tables. The notification module reaches nurturing
+only through a channel bound to the `NurturingApi` token, so no feature module
+depends on nurturing's process and no peer cycle can pass through it.
 
 ## Persistence
 
@@ -189,8 +195,9 @@ personal-project copy and the admin write also write and re-check the erasure ma
 
 ## Runtime and registration
 
-The Customer.io service and the PostHog client are built in `NurturingModule.create`
-only when their key is set; the PostHog client is closed with the process. The
+The Customer.io service, the Customer.io transactional client (built only when
+`CUSTOMER_IO_APP_API_KEY` is set) and the PostHog client are built in
+`NurturingModule.create` only when their key is set; the PostHog client is closed with the process. The
 copies' maps and the plan fold always register. The per-project
 usage folds, the trace counting, the usage sync and the founder's group call on an organization's
 creation register only with a Customer.io channel. Owners
@@ -202,7 +209,7 @@ brand-new organization, which has no paid plan yet; that call is claimed once pe
 
 ## Environment and configuration
 
-Nurturing reads no ambient environment: its config and secret are declared in
+Nurturing reads no ambient environment: its config and secrets are declared in
 the contract and composed by the apps.
 
 ## Errors
@@ -229,3 +236,10 @@ table of nurturing's own. A copy is complete for everything its owner's log name
 organization created before organization recorded `created` stays absent from
 `NurturingOrganizationCreated`, and every window that reads it had already
 ended.
+
+## Amendments
+
+- 2026-11-20: `NurturingApi` gains `sendTransactionalEmail` so non-security app
+  emails can go through Customer.io on Cloud, from the owner's ask of 19 Nov
+  2026 ("all emails from the app on Customer.io"). Nurturing stays the only
+  Customer.io client.

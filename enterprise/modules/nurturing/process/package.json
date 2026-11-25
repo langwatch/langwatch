@@ -59,6 +59,7 @@
     "@langwatch/test-harness": "workspace:*",
     "@langwatch/vitest-config": "workspace:*",
     "@types/node": "catalog:",
+    "liquidjs": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
   }
