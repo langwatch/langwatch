@@ -31,7 +31,7 @@ vi.mock("@clickhouse/client", () => ({
 import { reconcileTTL, TIERED_STORAGE_POLICY } from "../ttl.reconciler.ts";
 
 const migration = readFileSync(
-  resolve(import.meta.dirname, "../../migrations", "00132_billable_events_delete_ttl.sql"),
+  resolve(import.meta.dirname, "../../migrations", "00134_billable_events_delete_ttl.sql"),
   "utf8",
 );
 
@@ -74,7 +74,7 @@ describe("billable_events retention", () => {
     clickhouseMocks.client.close.mockResolvedValue(undefined);
   });
 
-  describe("given migration 00132", () => {
+  describe("given migration 00134", () => {
     /** @scenario "A migration adds the thirteen-month DELETE to billable_events" */
     it("sets a thirteen-month DELETE on EventTimestamp without materialising it", () => {
       expect(migration).toContain(

@@ -21,7 +21,7 @@ export const ttlProgressSchema = z.object({
 export type TtlProgress = Readonly<z.infer<typeof ttlProgressSchema>>;
 
 /**
- * Applies goose 00132's delete TTL to `billable_events` parts written before it: starts
+ * Applies goose 00134's delete TTL to `billable_events` parts written before it: starts
  * `MATERIALIZE TTL` until ClickHouse confirms one, then waits on it so its progress and failure
  * reach the upgrade ledger. Spec: modules/entitlement/specs/billable-events-retention-step.feature.
  */
