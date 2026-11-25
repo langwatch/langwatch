@@ -7,7 +7,7 @@ export type UserSort = { field: AdminUserSortField; direction: UserSortDirection
 
 const DEFAULT_ORDER = { field: "createdAt", order: "DESC" } as const;
 
-/** The order the address states (`?sort=name&order=desc`), or null when it states none or nonsense. */
+/** The order the address states (`?sort=name&order=desc`); null when none or nonsense. */
 export function readUserSort(query: Readonly<Record<string, string | undefined>>): UserSort {
   const field = adminUserSortFieldSchema.safeParse(query.sort);
   if (!field.success) return null;

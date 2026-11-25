@@ -158,24 +158,32 @@ function messageOf(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
-function setupFailureOf(error: unknown): LwqlSetupFailure | undefined {
+type SetupFailureReading = { recognised: true; failure: LwqlSetupFailure } | { recognised: false };
+
+function readSetupFailure(error: unknown): SetupFailureReading {
   const failure = error as { code?: unknown; meta?: { code?: unknown } } | null;
   const message = messageOf(error);
   const clickHouseCode = Number(failure?.code);
   if (clickHouseCode === CLICKHOUSE_ACCESS_DENIED || /Not enough privileges/.test(message)) {
     const grant = CLICKHOUSE_MISSING_GRANT.exec(message)?.[1] ?? "access management";
     return {
-      kind: "missing_grant",
-      store: "clickhouse",
-      reason: `the ClickHouse user lacks the grant ${grant}`,
+      recognised: true,
+      failure: {
+        kind: "missing_grant",
+        store: "clickhouse",
+        reason: `the ClickHouse user lacks the grant ${grant}`,
+      },
     };
   }
   const setting = CLICKHOUSE_UNPREFIXED_SETTING.exec(message)?.[1];
   if (clickHouseCode === CLICKHOUSE_UNKNOWN_SETTING || setting !== undefined) {
     return {
-      kind: "custom_settings_prefix",
-      store: "clickhouse",
-      reason: `the ClickHouse server does not accept the setting ${setting ?? "custom_api_key_hash"}: add custom_ to custom_settings_prefixes in its config and restart it`,
+      recognised: true,
+      failure: {
+        kind: "custom_settings_prefix",
+        store: "clickhouse",
+        reason: `the ClickHouse server does not accept the setting ${setting ?? "custom_api_key_hash"}: add custom_ to custom_settings_prefixes in its config and restart it`,
+      },
     };
   }
   if (
@@ -184,12 +192,15 @@ function setupFailureOf(error: unknown): LwqlSetupFailure | undefined {
   ) {
     const grant = POSTGRES_MISSING_GRANT.exec(message)?.[1]?.trim() ?? "create role";
     return {
-      kind: "missing_grant",
-      store: "postgres",
-      reason: `the PostgreSQL user has no permission to ${grant} (CREATEROLE)`,
+      recognised: true,
+      failure: {
+        kind: "missing_grant",
+        store: "postgres",
+        reason: `the PostgreSQL user has no permission to ${grant} (CREATEROLE)`,
+      },
     };
   }
-  return undefined;
+  return { recognised: false };
 }
 
 /** Classifies a provisioning failure: a missing grant, a missing settings prefix, or other. */
@@ -202,8 +213,8 @@ export function classifyLwqlSetupFailure({
   summary: string;
 }): LwqlSetupFailure {
   for (const link of errorChain(error)) {
-    const failure = setupFailureOf(link);
-    if (failure) return failure;
+    const reading = readSetupFailure(link);
+    if (reading.recognised) return reading.failure;
   }
   return { kind: "other", store: "unknown", reason: `provisioning failed (${summary})` };
 }
