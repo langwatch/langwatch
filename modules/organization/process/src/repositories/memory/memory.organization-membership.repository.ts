@@ -622,6 +622,7 @@ export class MemoryOrganizationMembershipRepository implements OrganizationMembe
         seatPendingSince: row.seatPendingSince ?? null,
         email: user?.email ?? null,
         name: user?.name ?? null,
+        billingOnly: row.billingOnly ?? false,
       },
     ];
   }
@@ -810,6 +811,7 @@ export class MemoryOrganizationMembershipRepository implements OrganizationMembe
     const row = this.membershipRow(input);
     if (!row || row.disabledAt === null || row.seatPendingSince == null) return false;
     row.role = OrganizationUserRole.MEMBER;
+    row.billingOnly = false;
     row.disabledAt = null;
     row.seatPendingSince = null;
     row.pendingSsoGrantId = input.pendingAdmissionId;
@@ -930,6 +932,7 @@ export class MemoryOrganizationMembershipRepository implements OrganizationMembe
     }
     this.assertCustomRolesAssignable({ organizationId, updates: effectiveTeamRoleUpdates });
     row.role = role;
+    row.billingOnly = false;
     row.updatedAt = nowInstant();
     this.applySeatTransition({ row, seat: input.seat });
     this.applyDeveloperSeat({ organizationId, userId, role });
@@ -1063,12 +1066,14 @@ export class MemoryOrganizationMembershipRepository implements OrganizationMembe
     disabledAt: Instant | null;
     createdAt: Instant;
     updatedAt: Instant;
+    billingOnly?: boolean;
   }): OrganizationMemberSummary {
     const user = this.userRow(row.userId);
     return {
       userId: row.userId,
       organizationId: row.organizationId,
       role: row.role,
+      ...(row.billingOnly ? { billingOnly: true } : {}),
       disabledAt: row.disabledAt,
       createdAt: row.createdAt,
       updatedAt: row.updatedAt,
@@ -1084,6 +1089,7 @@ export class MemoryOrganizationMembershipRepository implements OrganizationMembe
     seatPendingSince?: Instant | null;
     createdAt: Instant;
     updatedAt: Instant;
+    billingOnly?: boolean;
   }): OrganizationMemberWithUser {
     const user = toUser(this.userRow(row.userId));
     const teamMemberships = this.memory.teamUsers
@@ -1114,6 +1120,7 @@ export class MemoryOrganizationMembershipRepository implements OrganizationMembe
       createdAt: row.createdAt,
       updatedAt: row.updatedAt,
       departmentId: null,
+      ...(row.billingOnly ? { billingOnly: true } : {}),
       user: { ...user, teamMemberships },
     };
   }

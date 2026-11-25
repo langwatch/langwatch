@@ -352,6 +352,33 @@ describe("MCP server platform_get_prompt tool registration", () => {
   });
 });
 
+describe("MCP server platform_update_prompt tool registration", () => {
+  describe("when inspecting the registered tool's input schema and description", () => {
+    /** @scenario "Documenting that platform_update_prompt carries unnamed fields forward" */
+    it("exposes the prompt's fields and says the ones left out are carried over", async () => {
+      const { createMcpServer } = await import("../create-mcp-server.ts");
+      const server = createMcpServer();
+      const registeredTools = (
+        server as unknown as {
+          _registeredTools: Record<
+            string,
+            { description?: string; inputSchema?: { shape?: Record<string, unknown> } }
+          >;
+        }
+      )._registeredTools;
+
+      const tool = registeredTools["platform_update_prompt"];
+      expect(tool).toBeDefined();
+
+      const shapeKeys = Object.keys(tool?.inputSchema?.shape ?? {});
+      for (const field of ["inputs", "outputs", "parameters", "temperature", "maxTokens"]) {
+        expect(shapeKeys).toContain(field);
+      }
+      expect(tool?.description ?? "").toMatch(/carried over from the current version/);
+    });
+  });
+});
+
 /**
  * Write-path spec (issue #5666 AC5-9). After updatePrompt succeeds, the tool re-fetches the
  * prompt via getPrompt to derive authoritative state (the mutation response alone does not

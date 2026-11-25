@@ -137,8 +137,9 @@ def sync_detailed(
      The organisation's audit log as OCSF 1.9.0 API Activity events, oldest first: who did what, on which
     target, from which address, and whether it failed. Pass `next_cursor` back as `cursor` to read on;
     it is always set, so a puller stores it between runs. `has_more` is true when more events are
-    already waiting. `since` (ISO 8601) starts the first read and a cursor carries its own position.
-    `until` (ISO 8601) is not in the cursor: send it with every page.
+    already waiting. `since` (ISO 8601 with an offset, 1970-01-01T00:00:00Z or later) starts the first
+    read and a cursor carries its own position. `until` (same format and lower bound) is not in the
+    cursor: send it with every page.
 
     Args:
         limit (int | Unset):  Default: 500.
@@ -189,8 +190,9 @@ def sync(
      The organisation's audit log as OCSF 1.9.0 API Activity events, oldest first: who did what, on which
     target, from which address, and whether it failed. Pass `next_cursor` back as `cursor` to read on;
     it is always set, so a puller stores it between runs. `has_more` is true when more events are
-    already waiting. `since` (ISO 8601) starts the first read and a cursor carries its own position.
-    `until` (ISO 8601) is not in the cursor: send it with every page.
+    already waiting. `since` (ISO 8601 with an offset, 1970-01-01T00:00:00Z or later) starts the first
+    read and a cursor carries its own position. `until` (same format and lower bound) is not in the
+    cursor: send it with every page.
 
     Args:
         limit (int | Unset):  Default: 500.
@@ -235,8 +237,9 @@ async def asyncio_detailed(
      The organisation's audit log as OCSF 1.9.0 API Activity events, oldest first: who did what, on which
     target, from which address, and whether it failed. Pass `next_cursor` back as `cursor` to read on;
     it is always set, so a puller stores it between runs. `has_more` is true when more events are
-    already waiting. `since` (ISO 8601) starts the first read and a cursor carries its own position.
-    `until` (ISO 8601) is not in the cursor: send it with every page.
+    already waiting. `since` (ISO 8601 with an offset, 1970-01-01T00:00:00Z or later) starts the first
+    read and a cursor carries its own position. `until` (same format and lower bound) is not in the
+    cursor: send it with every page.
 
     Args:
         limit (int | Unset):  Default: 500.
@@ -285,8 +288,9 @@ async def asyncio(
      The organisation's audit log as OCSF 1.9.0 API Activity events, oldest first: who did what, on which
     target, from which address, and whether it failed. Pass `next_cursor` back as `cursor` to read on;
     it is always set, so a puller stores it between runs. `has_more` is true when more events are
-    already waiting. `since` (ISO 8601) starts the first read and a cursor carries its own position.
-    `until` (ISO 8601) is not in the cursor: send it with every page.
+    already waiting. `since` (ISO 8601 with an offset, 1970-01-01T00:00:00Z or later) starts the first
+    read and a cursor carries its own position. `until` (same format and lower bound) is not in the
+    cursor: send it with every page.
 
     Args:
         limit (int | Unset):  Default: 500.

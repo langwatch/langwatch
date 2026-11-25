@@ -27,6 +27,7 @@
 /agent-testing/test-suites
 /agent-testing/voice-agents
 /ai-gateway
+/ai-gateway/a2a-proxy
 /ai-gateway/api
 /ai-gateway/api/audio
 /ai-gateway/api/chat-completions
@@ -358,6 +359,12 @@
 /api-reference/governance-kill-switch/restore-a-stopped-agent
 /api-reference/governance-kill-switch/retry-a-stop
 /api-reference/governance-kill-switch/stop-an-agent
+/api-reference/governance-security-lake/add-an-aws-security-lake-source
+/api-reference/governance-security-lake/edit-an-aws-security-lake-source
+/api-reference/governance-security-lake/overview
+/api-reference/governance-security-lake/read-a-security-lake-source
+/api-reference/governance-security-lake/read-a-security-lake-source-s-health
+/api-reference/governance-security-lake/test-a-security-lake-source-s-connection
 /api-reference/grants
 /api-reference/grants/change-a-grant-s-role
 /api-reference/grants/get-a-grant
@@ -587,6 +594,7 @@
 /api-reference/traces/get-transcript
 /api-reference/traces/overview
 /api-reference/traces/projection-dsl
+/api-reference/traces/recommended-trace-wait-for-a-scenario-judge
 /api-reference/traces/search
 /api-reference/traces/update-trace-metadata
 /api-reference/triggers

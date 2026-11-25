@@ -9,11 +9,12 @@ export abstract class CodingAgentTraceSessionRepository {
     traceId: string;
   }): Promise<CodingAgentTraceSessionRecord | null>;
 
-  /** The session's most recently occurred trace mapping inside the window, or null. */
-  abstract findLatestBySessionId(input: {
+  /** The session's traces inside the window, newest first, one per trace, at most `limit`. */
+  abstract findRecentBySessionId(input: {
     tenantId: string;
     sessionId: string;
     fromMs: number;
     toMs: number;
-  }): Promise<CodingAgentTraceSessionRecord | null>;
+    limit: number;
+  }): Promise<CodingAgentTraceSessionRecord[]>;
 }

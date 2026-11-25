@@ -17094,7 +17094,9 @@
                                           "seatRequests:manage",
                                           "members:view",
                                           "braids:manage",
-                                          "spans:braided"
+                                          "spans:braided",
+                                          "gatewayA2aTargets:view",
+                                          "gatewayA2aTargets:manage"
                                         ]
                                       }
                                     ]
@@ -17324,7 +17326,9 @@
                                     "seatRequests:manage",
                                     "members:view",
                                     "braids:manage",
-                                    "spans:braided"
+                                    "spans:braided",
+                                    "gatewayA2aTargets:view",
+                                    "gatewayA2aTargets:manage"
                                   ]
                                 }
                               ]
@@ -17954,7 +17958,9 @@
                                                   "seatRequests:manage",
                                                   "members:view",
                                                   "braids:manage",
-                                                  "spans:braided"
+                                                  "spans:braided",
+                                                  "gatewayA2aTargets:view",
+                                                  "gatewayA2aTargets:manage"
                                                 ]
                                               }
                                             ]
@@ -18184,7 +18190,9 @@
                                             "seatRequests:manage",
                                             "members:view",
                                             "braids:manage",
-                                            "spans:braided"
+                                            "spans:braided",
+                                            "gatewayA2aTargets:view",
+                                            "gatewayA2aTargets:manage"
                                           ]
                                         }
                                       ]
@@ -18635,7 +18643,9 @@
                                         "seatRequests:manage",
                                         "members:view",
                                         "braids:manage",
-                                        "spans:braided"
+                                        "spans:braided",
+                                        "gatewayA2aTargets:view",
+                                        "gatewayA2aTargets:manage"
                                       ]
                                     }
                                   ]
@@ -43628,23 +43638,24 @@
                     "additionalProperties": {}
                   },
                   "gridColumn": {
-                    "type": "number",
+                    "type": "integer",
                     "minimum": 0,
-                    "maximum": 1
+                    "maximum": 7
                   },
                   "gridRow": {
-                    "type": "number",
-                    "minimum": 0
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 2000000000
                   },
                   "colSpan": {
-                    "type": "number",
+                    "type": "integer",
                     "minimum": 1,
-                    "maximum": 2
+                    "maximum": 8
                   },
                   "rowSpan": {
-                    "type": "number",
+                    "type": "integer",
                     "minimum": 1,
-                    "maximum": 2
+                    "maximum": 20
                   }
                 },
                 "required": [
@@ -53596,6 +53607,11 @@
                     "type": "integer",
                     "minimum": 1,
                     "maximum": 24
+                  },
+                  "repeat": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 5
                   }
                 }
               }
@@ -53757,6 +53773,19 @@
                           },
                           "concurrency": {
                             "description": "Cells the run executed at once. Null for a run that recorded none.",
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "exclusiveMinimum": 0,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "repeat": {
+                            "description": "How many times the run repeated every dataset row. Run row `r * repeat + k` is repetition `k` of dataset row `r`. Null for a run that ran each row once.",
                             "anyOf": [
                               {
                                 "type": "integer",
@@ -54091,8 +54120,13 @@
                               "failed": {
                                 "type": "number"
                               },
-                              "passRate": {
+                              "errored": {
+                                "description": "Cells where the evaluator crashed and gave no verdict",
                                 "type": "number"
+                              },
+                              "passRate": {
+                                "type": "number",
+                                "description": "Percentage of verdicts that passed; 0 when passed and failed are both 0"
                               },
                               "avgScore": {
                                 "type": "number"
@@ -54298,6 +54332,19 @@
                     },
                     "concurrency": {
                       "description": "Cells the run executed at once. Null for a run that recorded none.",
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "exclusiveMinimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "repeat": {
+                      "description": "How many times the run repeated every dataset row. Run row `r * repeat + k` is repetition `k` of dataset row `r`. Null for a run that ran each row once.",
                       "anyOf": [
                         {
                           "type": "integer",
@@ -60001,7 +60048,6 @@
                     "type": "object",
                     "properties": {
                       "modelsAllowed": {
-                        "default": null,
                         "anyOf": [
                           {
                             "type": "array",
@@ -60015,7 +60061,6 @@
                         ]
                       },
                       "providersAllowed": {
-                        "default": null,
                         "anyOf": [
                           {
                             "type": "array",
@@ -60029,10 +60074,6 @@
                         ]
                       },
                       "cache": {
-                        "default": {
-                          "mode": "respect",
-                          "ttlS": 3600
-                        },
                         "type": "object",
                         "properties": {
                           "mode": {
@@ -60053,9 +60094,6 @@
                         }
                       },
                       "fallback": {
-                        "default": {
-                          "maxAttempts": 3
-                        },
                         "type": "object",
                         "properties": {
                           "maxAttempts": {
@@ -60067,7 +60105,6 @@
                         }
                       },
                       "guardrailAttachments": {
-                        "default": [],
                         "type": "array",
                         "items": {
                           "type": "object",
@@ -60094,11 +60131,6 @@
                         }
                       },
                       "rateLimits": {
-                        "default": {
-                          "rpm": null,
-                          "tpm": null,
-                          "rpd": null
-                        },
                         "type": "object",
                         "properties": {
                           "rpm": {
@@ -60143,9 +60175,6 @@
                         }
                       },
                       "realtime": {
-                        "default": {
-                          "maxOpenSessions": null
-                        },
                         "type": "object",
                         "properties": {
                           "maxOpenSessions": {
@@ -61435,7 +61464,6 @@
                     "type": "object",
                     "properties": {
                       "modelsAllowed": {
-                        "default": null,
                         "anyOf": [
                           {
                             "type": "array",
@@ -61449,7 +61477,6 @@
                         ]
                       },
                       "providersAllowed": {
-                        "default": null,
                         "anyOf": [
                           {
                             "type": "array",
@@ -61463,10 +61490,6 @@
                         ]
                       },
                       "cache": {
-                        "default": {
-                          "mode": "respect",
-                          "ttlS": 3600
-                        },
                         "type": "object",
                         "properties": {
                           "mode": {
@@ -61487,9 +61510,6 @@
                         }
                       },
                       "fallback": {
-                        "default": {
-                          "maxAttempts": 3
-                        },
                         "type": "object",
                         "properties": {
                           "maxAttempts": {
@@ -61501,7 +61521,6 @@
                         }
                       },
                       "guardrailAttachments": {
-                        "default": [],
                         "type": "array",
                         "items": {
                           "type": "object",
@@ -61528,11 +61547,6 @@
                         }
                       },
                       "rateLimits": {
-                        "default": {
-                          "rpm": null,
-                          "tpm": null,
-                          "rpd": null
-                        },
                         "type": "object",
                         "properties": {
                           "rpm": {
@@ -61577,9 +61591,6 @@
                         }
                       },
                       "realtime": {
-                        "default": {
-                          "maxOpenSessions": null
-                        },
                         "type": "object",
                         "properties": {
                           "maxOpenSessions": {
@@ -90039,7 +90050,7 @@
             }
           }
         },
-        "description": "The organisation's governance events as OCSF 1.9.0 API Activity (6003) events, oldest first: traces from ingestion sources, events pulled from provider audit APIs, admin workspace views and OCSF events pushed in from other sources (`source_type` `ocsf_push`, returned as received). Each LangWatch event carries `ai_model`, `ai_agent` and `message_context` token counts when known, and the cost under `unmapped.langwatch`. Filter with `source_type` and `source_id`. Pass `next_cursor` back as `cursor` to read on; it is always set, so a puller stores it between runs. `has_more` is true when more events are already waiting. `since` (ISO 8601) starts the first read and a cursor carries its own position. `until` (ISO 8601) is not in the cursor: send it with every page.",
+        "description": "The organisation's governance events as OCSF 1.9.0 API Activity (6003) events, oldest first: traces from ingestion sources, events pulled from provider audit APIs, admin workspace views and OCSF events pushed in from other sources (`source_type` `ocsf_push`, returned as received). Each LangWatch event carries `ai_model`, `ai_agent` and `message_context` token counts when known, and the cost under `unmapped.langwatch`. Filter with `source_type` and `source_id`. Pass `next_cursor` back as `cursor` to read on; it is always set, so a puller stores it between runs. `has_more` is true when more events are already waiting. `since` (ISO 8601 with an offset, 1970-01-01T00:00:00Z or later) starts the first read and a cursor carries its own position. `until` (same format and lower bound) is not in the cursor: send it with every page.",
         "summary": "Export governance events as OCSF 1.9.0",
         "tags": [
           "Governance / OCSF SIEM"
@@ -90570,7 +90581,7 @@
             }
           }
         },
-        "description": "The traces of the organisation's projects as OCSF 1.9.0 API Activity events, one per trace, with `ai_model`, `ai_agent`, token counts and cost. A trace updated again is exported again under the same `metadata.uid`; deduplicate on it. `project_id` limits the read to one project of the organisation. Pass `next_cursor` back as `cursor` to read on; it is always set, so a puller stores it between runs. `has_more` is true when more events are already waiting. `since` (ISO 8601) starts the first read and a cursor carries its own position. `until` (ISO 8601) is not in the cursor: send it with every page.",
+        "description": "The traces of the organisation's projects as OCSF 1.9.0 API Activity events, one per trace, with `ai_model`, `ai_agent`, token counts and cost. A trace updated again is exported again under the same `metadata.uid`; deduplicate on it. `project_id` limits the read to one project of the organisation. Pass `next_cursor` back as `cursor` to read on; it is always set, so a puller stores it between runs. `has_more` is true when more events are already waiting. `since` (ISO 8601 with an offset, 1970-01-01T00:00:00Z or later) starts the first read and a cursor carries its own position. `until` (same format and lower bound) is not in the cursor: send it with every page.",
         "summary": "Export project traces as OCSF 1.9.0",
         "tags": [
           "Governance / OCSF SIEM"
@@ -91092,7 +91103,7 @@
             }
           }
         },
-        "description": "The organisation's audit log as OCSF 1.9.0 API Activity events, oldest first: who did what, on which target, from which address, and whether it failed. Pass `next_cursor` back as `cursor` to read on; it is always set, so a puller stores it between runs. `has_more` is true when more events are already waiting. `since` (ISO 8601) starts the first read and a cursor carries its own position. `until` (ISO 8601) is not in the cursor: send it with every page.",
+        "description": "The organisation's audit log as OCSF 1.9.0 API Activity events, oldest first: who did what, on which target, from which address, and whether it failed. Pass `next_cursor` back as `cursor` to read on; it is always set, so a puller stores it between runs. `has_more` is true when more events are already waiting. `since` (ISO 8601 with an offset, 1970-01-01T00:00:00Z or later) starts the first read and a cursor carries its own position. `until` (same format and lower bound) is not in the cursor: send it with every page.",
         "summary": "Export the audit log as OCSF 1.9.0",
         "tags": [
           "Governance / OCSF SIEM"
@@ -91694,6 +91705,2691 @@
             }
           }
         }
+      }
+    },
+    "/api/v1/governance/security-lake/sources": {
+      "post": {
+        "operationId": "postApiGovernanceSecurityLakeSources",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "string"
+                    },
+                    "region": {
+                      "type": "string"
+                    },
+                    "queueUrl": {
+                      "type": "string"
+                    },
+                    "subscriberRoleArn": {
+                      "type": "string"
+                    },
+                    "externalId": {
+                      "type": "string"
+                    },
+                    "sources": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "enum": [
+                          "CLOUD_TRAIL_MGMT",
+                          "S3_DATA",
+                          "LAMBDA_EXECUTION"
+                        ]
+                      }
+                    },
+                    "schedule": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name",
+                    "status",
+                    "region",
+                    "queueUrl",
+                    "subscriberRoleArn",
+                    "externalId",
+                    "sources",
+                    "schedule"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "retryable": {
+                      "type": "boolean"
+                    },
+                    "meta": {
+                      "type": "object",
+                      "propertyNames": {
+                        "type": "string"
+                      },
+                      "additionalProperties": {}
+                    },
+                    "trace_id": {
+                      "type": "string"
+                    },
+                    "span_id": {
+                      "type": "string"
+                    },
+                    "trace": {
+                      "type": "object",
+                      "properties": {
+                        "traceId": {
+                          "type": "string"
+                        },
+                        "spanId": {
+                          "type": "string"
+                        },
+                        "traceUrl": {
+                          "type": "string"
+                        },
+                        "logsUrl": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "tips": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "docs_url": {
+                      "type": "string"
+                    },
+                    "fault": {
+                      "type": "string",
+                      "enum": [
+                        "customer",
+                        "platform",
+                        "provider",
+                        "presumed_platform"
+                      ]
+                    },
+                    "reasons": {
+                      "type": "array",
+                      "items": {}
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "code",
+                    "message",
+                    "retryable"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "retryable": {
+                      "type": "boolean"
+                    },
+                    "meta": {
+                      "type": "object",
+                      "propertyNames": {
+                        "type": "string"
+                      },
+                      "additionalProperties": {}
+                    },
+                    "trace_id": {
+                      "type": "string"
+                    },
+                    "span_id": {
+                      "type": "string"
+                    },
+                    "trace": {
+                      "type": "object",
+                      "properties": {
+                        "traceId": {
+                          "type": "string"
+                        },
+                        "spanId": {
+                          "type": "string"
+                        },
+                        "traceUrl": {
+                          "type": "string"
+                        },
+                        "logsUrl": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "tips": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "docs_url": {
+                      "type": "string"
+                    },
+                    "fault": {
+                      "type": "string",
+                      "enum": [
+                        "customer",
+                        "platform",
+                        "provider",
+                        "presumed_platform"
+                      ]
+                    },
+                    "reasons": {
+                      "type": "array",
+                      "items": {}
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "code",
+                    "message",
+                    "retryable"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "retryable": {
+                      "type": "boolean"
+                    },
+                    "meta": {
+                      "type": "object",
+                      "propertyNames": {
+                        "type": "string"
+                      },
+                      "additionalProperties": {}
+                    },
+                    "trace_id": {
+                      "type": "string"
+                    },
+                    "span_id": {
+                      "type": "string"
+                    },
+                    "trace": {
+                      "type": "object",
+                      "properties": {
+                        "traceId": {
+                          "type": "string"
+                        },
+                        "spanId": {
+                          "type": "string"
+                        },
+                        "traceUrl": {
+                          "type": "string"
+                        },
+                        "logsUrl": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "tips": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "docs_url": {
+                      "type": "string"
+                    },
+                    "fault": {
+                      "type": "string",
+                      "enum": [
+                        "customer",
+                        "platform",
+                        "provider",
+                        "presumed_platform"
+                      ]
+                    },
+                    "reasons": {
+                      "type": "array",
+                      "items": {}
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "code",
+                    "message",
+                    "retryable"
+                  ]
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "retryable": {
+                      "type": "boolean"
+                    },
+                    "meta": {
+                      "type": "object",
+                      "propertyNames": {
+                        "type": "string"
+                      },
+                      "additionalProperties": {}
+                    },
+                    "trace_id": {
+                      "type": "string"
+                    },
+                    "span_id": {
+                      "type": "string"
+                    },
+                    "trace": {
+                      "type": "object",
+                      "properties": {
+                        "traceId": {
+                          "type": "string"
+                        },
+                        "spanId": {
+                          "type": "string"
+                        },
+                        "traceUrl": {
+                          "type": "string"
+                        },
+                        "logsUrl": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "tips": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "docs_url": {
+                      "type": "string"
+                    },
+                    "fault": {
+                      "type": "string",
+                      "enum": [
+                        "customer",
+                        "platform",
+                        "provider",
+                        "presumed_platform"
+                      ]
+                    },
+                    "reasons": {
+                      "type": "array",
+                      "items": {}
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "code",
+                    "message",
+                    "retryable"
+                  ]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "retryable": {
+                      "type": "boolean"
+                    },
+                    "meta": {
+                      "type": "object",
+                      "propertyNames": {
+                        "type": "string"
+                      },
+                      "additionalProperties": {}
+                    },
+                    "trace_id": {
+                      "type": "string"
+                    },
+                    "span_id": {
+                      "type": "string"
+                    },
+                    "trace": {
+                      "type": "object",
+                      "properties": {
+                        "traceId": {
+                          "type": "string"
+                        },
+                        "spanId": {
+                          "type": "string"
+                        },
+                        "traceUrl": {
+                          "type": "string"
+                        },
+                        "logsUrl": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "tips": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "docs_url": {
+                      "type": "string"
+                    },
+                    "fault": {
+                      "type": "string",
+                      "enum": [
+                        "customer",
+                        "platform",
+                        "provider",
+                        "presumed_platform"
+                      ]
+                    },
+                    "reasons": {
+                      "type": "array",
+                      "items": {}
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "code",
+                    "message",
+                    "retryable"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "description": "Adds a Security Lake subscriber as an ingestion source. LangWatch reads the subscriber's SQS queue on `config.schedule` (every 5 minutes by default), decodes each Parquet object, keeps the AI activity (Bedrock, SageMaker endpoints, Bedrock agents) and stores it as OCSF events with `source_type` `security_lake`. The access keys are stored sealed and never returned. LangWatch generates the source's `externalId` and returns it; the subscriber role's trust policy must require it as the `sts:ExternalId` condition.",
+        "summary": "Add an AWS Security Lake source",
+        "tags": [
+          "Governance / Security Lake"
+        ],
+        "security": [
+          {
+            "admin_api_key": []
+          }
+        ],
+        "x-access-policy": {
+          "kind": "handlerManaged",
+          "credential": [
+            "organization_api_key"
+          ],
+          "permissions": [
+            "ingestionSources:manage"
+          ]
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 128
+                  },
+                  "description": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "maxLength": 2000
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "config": {
+                    "type": "object",
+                    "properties": {
+                      "region": {
+                        "type": "string",
+                        "pattern": "^[a-z]{2}(-[a-z]+)+-\\d$"
+                      },
+                      "subscriberRoleArn": {
+                        "type": "string",
+                        "pattern": "^arn:aws[a-z-]*:iam::\\d{12}:role\\/.+$"
+                      },
+                      "queueUrl": {
+                        "type": "string",
+                        "format": "uri"
+                      },
+                      "sources": {
+                        "default": [
+                          "CLOUD_TRAIL_MGMT",
+                          "S3_DATA",
+                          "LAMBDA_EXECUTION"
+                        ],
+                        "minItems": 1,
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "enum": [
+                            "CLOUD_TRAIL_MGMT",
+                            "S3_DATA",
+                            "LAMBDA_EXECUTION"
+                          ]
+                        }
+                      },
+                      "maxMessagesPerRun": {
+                        "default": 100,
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 1000
+                      },
+                      "maxReceives": {
+                        "default": 3,
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 20
+                      },
+                      "s3Endpoint": {
+                        "type": "string",
+                        "format": "uri"
+                      },
+                      "sqsEndpoint": {
+                        "type": "string",
+                        "format": "uri"
+                      },
+                      "schedule": {
+                        "default": "*/5 * * * *",
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "region",
+                      "subscriberRoleArn",
+                      "queueUrl"
+                    ]
+                  },
+                  "credentials": {
+                    "type": "object",
+                    "properties": {
+                      "aws_access_key_id": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "aws_secret_access_key": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "aws_session_token": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
+                    "required": [
+                      "aws_access_key_id",
+                      "aws_secret_access_key"
+                    ]
+                  }
+                },
+                "required": [
+                  "name",
+                  "config",
+                  "credentials"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/governance/security-lake/sources/{sourceId}": {
+      "patch": {
+        "operationId": "patchApiGovernanceSecurityLakeSourcesById",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "string"
+                    },
+                    "region": {
+                      "type": "string"
+                    },
+                    "queueUrl": {
+                      "type": "string"
+                    },
+                    "subscriberRoleArn": {
+                      "type": "string"
+                    },
+                    "externalId": {
+                      "type": "string"
+                    },
+                    "sources": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "enum": [
+                          "CLOUD_TRAIL_MGMT",
+                          "S3_DATA",
+                          "LAMBDA_EXECUTION"
+                        ]
+                      }
+                    },
+                    "schedule": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name",
+                    "status",
+                    "region",
+                    "queueUrl",
+                    "subscriberRoleArn",
+                    "externalId",
+                    "sources",
+                    "schedule"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "retryable": {
+                      "type": "boolean"
+                    },
+                    "meta": {
+                      "type": "object",
+                      "propertyNames": {
+                        "type": "string"
+                      },
+                      "additionalProperties": {}
+                    },
+                    "trace_id": {
+                      "type": "string"
+                    },
+                    "span_id": {
+                      "type": "string"
+                    },
+                    "trace": {
+                      "type": "object",
+                      "properties": {
+                        "traceId": {
+                          "type": "string"
+                        },
+                        "spanId": {
+                          "type": "string"
+                        },
+                        "traceUrl": {
+                          "type": "string"
+                        },
+                        "logsUrl": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "tips": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "docs_url": {
+                      "type": "string"
+                    },
+                    "fault": {
+                      "type": "string",
+                      "enum": [
+                        "customer",
+                        "platform",
+                        "provider",
+                        "presumed_platform"
+                      ]
+                    },
+                    "reasons": {
+                      "type": "array",
+                      "items": {}
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "code",
+                    "message",
+                    "retryable"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "retryable": {
+                      "type": "boolean"
+                    },
+                    "meta": {
+                      "type": "object",
+                      "propertyNames": {
+                        "type": "string"
+                      },
+                      "additionalProperties": {}
+                    },
+                    "trace_id": {
+                      "type": "string"
+                    },
+                    "span_id": {
+                      "type": "string"
+                    },
+                    "trace": {
+                      "type": "object",
+                      "properties": {
+                        "traceId": {
+                          "type": "string"
+                        },
+                        "spanId": {
+                          "type": "string"
+                        },
+                        "traceUrl": {
+                          "type": "string"
+                        },
+                        "logsUrl": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "tips": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "docs_url": {
+                      "type": "string"
+                    },
+                    "fault": {
+                      "type": "string",
+                      "enum": [
+                        "customer",
+                        "platform",
+                        "provider",
+                        "presumed_platform"
+                      ]
+                    },
+                    "reasons": {
+                      "type": "array",
+                      "items": {}
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "code",
+                    "message",
+                    "retryable"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "retryable": {
+                      "type": "boolean"
+                    },
+                    "meta": {
+                      "type": "object",
+                      "propertyNames": {
+                        "type": "string"
+                      },
+                      "additionalProperties": {}
+                    },
+                    "trace_id": {
+                      "type": "string"
+                    },
+                    "span_id": {
+                      "type": "string"
+                    },
+                    "trace": {
+                      "type": "object",
+                      "properties": {
+                        "traceId": {
+                          "type": "string"
+                        },
+                        "spanId": {
+                          "type": "string"
+                        },
+                        "traceUrl": {
+                          "type": "string"
+                        },
+                        "logsUrl": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "tips": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "docs_url": {
+                      "type": "string"
+                    },
+                    "fault": {
+                      "type": "string",
+                      "enum": [
+                        "customer",
+                        "platform",
+                        "provider",
+                        "presumed_platform"
+                      ]
+                    },
+                    "reasons": {
+                      "type": "array",
+                      "items": {}
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "code",
+                    "message",
+                    "retryable"
+                  ]
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "retryable": {
+                      "type": "boolean"
+                    },
+                    "meta": {
+                      "type": "object",
+                      "propertyNames": {
+                        "type": "string"
+                      },
+                      "additionalProperties": {}
+                    },
+                    "trace_id": {
+                      "type": "string"
+                    },
+                    "span_id": {
+                      "type": "string"
+                    },
+                    "trace": {
+                      "type": "object",
+                      "properties": {
+                        "traceId": {
+                          "type": "string"
+                        },
+                        "spanId": {
+                          "type": "string"
+                        },
+                        "traceUrl": {
+                          "type": "string"
+                        },
+                        "logsUrl": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "tips": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "docs_url": {
+                      "type": "string"
+                    },
+                    "fault": {
+                      "type": "string",
+                      "enum": [
+                        "customer",
+                        "platform",
+                        "provider",
+                        "presumed_platform"
+                      ]
+                    },
+                    "reasons": {
+                      "type": "array",
+                      "items": {}
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "code",
+                    "message",
+                    "retryable"
+                  ]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "retryable": {
+                      "type": "boolean"
+                    },
+                    "meta": {
+                      "type": "object",
+                      "propertyNames": {
+                        "type": "string"
+                      },
+                      "additionalProperties": {}
+                    },
+                    "trace_id": {
+                      "type": "string"
+                    },
+                    "span_id": {
+                      "type": "string"
+                    },
+                    "trace": {
+                      "type": "object",
+                      "properties": {
+                        "traceId": {
+                          "type": "string"
+                        },
+                        "spanId": {
+                          "type": "string"
+                        },
+                        "traceUrl": {
+                          "type": "string"
+                        },
+                        "logsUrl": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "tips": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "docs_url": {
+                      "type": "string"
+                    },
+                    "fault": {
+                      "type": "string",
+                      "enum": [
+                        "customer",
+                        "platform",
+                        "provider",
+                        "presumed_platform"
+                      ]
+                    },
+                    "reasons": {
+                      "type": "array",
+                      "items": {}
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "code",
+                    "message",
+                    "retryable"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "description": "Changes the name, queue settings, sources, schedule, access keys or status of a Security Lake source. Fields left out keep their stored value. The external id stays as LangWatch generated it.",
+        "summary": "Edit an AWS Security Lake source",
+        "tags": [
+          "Governance / Security Lake"
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 128
+                  },
+                  "description": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "maxLength": 2000
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "config": {
+                    "type": "object",
+                    "properties": {
+                      "region": {
+                        "type": "string",
+                        "pattern": "^[a-z]{2}(-[a-z]+)+-\\d$"
+                      },
+                      "subscriberRoleArn": {
+                        "type": "string",
+                        "pattern": "^arn:aws[a-z-]*:iam::\\d{12}:role\\/.+$"
+                      },
+                      "queueUrl": {
+                        "type": "string",
+                        "format": "uri"
+                      },
+                      "sources": {
+                        "minItems": 1,
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "enum": [
+                            "CLOUD_TRAIL_MGMT",
+                            "S3_DATA",
+                            "LAMBDA_EXECUTION"
+                          ]
+                        }
+                      },
+                      "maxMessagesPerRun": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 1000
+                      },
+                      "maxReceives": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 20
+                      },
+                      "s3Endpoint": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "format": "uri"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "sqsEndpoint": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "format": "uri"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "schedule": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "credentials": {
+                    "type": "object",
+                    "properties": {
+                      "aws_access_key_id": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "aws_secret_access_key": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "aws_session_token": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
+                    "required": [
+                      "aws_access_key_id",
+                      "aws_secret_access_key"
+                    ]
+                  },
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "active",
+                      "disabled"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "admin_api_key": []
+          }
+        ],
+        "x-access-policy": {
+          "kind": "handlerManaged",
+          "credential": [
+            "organization_api_key"
+          ],
+          "permissions": [
+            "ingestionSources:manage"
+          ]
+        },
+        "parameters": [
+          {
+            "in": "path",
+            "name": "sourceId",
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required": true
+          }
+        ]
+      },
+      "get": {
+        "operationId": "getApiGovernanceSecurityLakeSourcesById",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "string"
+                    },
+                    "region": {
+                      "type": "string"
+                    },
+                    "queueUrl": {
+                      "type": "string"
+                    },
+                    "subscriberRoleArn": {
+                      "type": "string"
+                    },
+                    "externalId": {
+                      "type": "string"
+                    },
+                    "sources": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "enum": [
+                          "CLOUD_TRAIL_MGMT",
+                          "S3_DATA",
+                          "LAMBDA_EXECUTION"
+                        ]
+                      }
+                    },
+                    "schedule": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name",
+                    "status",
+                    "region",
+                    "queueUrl",
+                    "subscriberRoleArn",
+                    "externalId",
+                    "sources",
+                    "schedule"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "retryable": {
+                      "type": "boolean"
+                    },
+                    "meta": {
+                      "type": "object",
+                      "propertyNames": {
+                        "type": "string"
+                      },
+                      "additionalProperties": {}
+                    },
+                    "trace_id": {
+                      "type": "string"
+                    },
+                    "span_id": {
+                      "type": "string"
+                    },
+                    "trace": {
+                      "type": "object",
+                      "properties": {
+                        "traceId": {
+                          "type": "string"
+                        },
+                        "spanId": {
+                          "type": "string"
+                        },
+                        "traceUrl": {
+                          "type": "string"
+                        },
+                        "logsUrl": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "tips": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "docs_url": {
+                      "type": "string"
+                    },
+                    "fault": {
+                      "type": "string",
+                      "enum": [
+                        "customer",
+                        "platform",
+                        "provider",
+                        "presumed_platform"
+                      ]
+                    },
+                    "reasons": {
+                      "type": "array",
+                      "items": {}
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "code",
+                    "message",
+                    "retryable"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "retryable": {
+                      "type": "boolean"
+                    },
+                    "meta": {
+                      "type": "object",
+                      "propertyNames": {
+                        "type": "string"
+                      },
+                      "additionalProperties": {}
+                    },
+                    "trace_id": {
+                      "type": "string"
+                    },
+                    "span_id": {
+                      "type": "string"
+                    },
+                    "trace": {
+                      "type": "object",
+                      "properties": {
+                        "traceId": {
+                          "type": "string"
+                        },
+                        "spanId": {
+                          "type": "string"
+                        },
+                        "traceUrl": {
+                          "type": "string"
+                        },
+                        "logsUrl": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "tips": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "docs_url": {
+                      "type": "string"
+                    },
+                    "fault": {
+                      "type": "string",
+                      "enum": [
+                        "customer",
+                        "platform",
+                        "provider",
+                        "presumed_platform"
+                      ]
+                    },
+                    "reasons": {
+                      "type": "array",
+                      "items": {}
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "code",
+                    "message",
+                    "retryable"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "retryable": {
+                      "type": "boolean"
+                    },
+                    "meta": {
+                      "type": "object",
+                      "propertyNames": {
+                        "type": "string"
+                      },
+                      "additionalProperties": {}
+                    },
+                    "trace_id": {
+                      "type": "string"
+                    },
+                    "span_id": {
+                      "type": "string"
+                    },
+                    "trace": {
+                      "type": "object",
+                      "properties": {
+                        "traceId": {
+                          "type": "string"
+                        },
+                        "spanId": {
+                          "type": "string"
+                        },
+                        "traceUrl": {
+                          "type": "string"
+                        },
+                        "logsUrl": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "tips": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "docs_url": {
+                      "type": "string"
+                    },
+                    "fault": {
+                      "type": "string",
+                      "enum": [
+                        "customer",
+                        "platform",
+                        "provider",
+                        "presumed_platform"
+                      ]
+                    },
+                    "reasons": {
+                      "type": "array",
+                      "items": {}
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "code",
+                    "message",
+                    "retryable"
+                  ]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "retryable": {
+                      "type": "boolean"
+                    },
+                    "meta": {
+                      "type": "object",
+                      "propertyNames": {
+                        "type": "string"
+                      },
+                      "additionalProperties": {}
+                    },
+                    "trace_id": {
+                      "type": "string"
+                    },
+                    "span_id": {
+                      "type": "string"
+                    },
+                    "trace": {
+                      "type": "object",
+                      "properties": {
+                        "traceId": {
+                          "type": "string"
+                        },
+                        "spanId": {
+                          "type": "string"
+                        },
+                        "traceUrl": {
+                          "type": "string"
+                        },
+                        "logsUrl": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "tips": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "docs_url": {
+                      "type": "string"
+                    },
+                    "fault": {
+                      "type": "string",
+                      "enum": [
+                        "customer",
+                        "platform",
+                        "provider",
+                        "presumed_platform"
+                      ]
+                    },
+                    "reasons": {
+                      "type": "array",
+                      "items": {}
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "code",
+                    "message",
+                    "retryable"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "description": "The source's settings and the external id LangWatch generated for it. The subscriber role's trust policy must require this external id as the `sts:ExternalId` condition.",
+        "summary": "Read a Security Lake source",
+        "tags": [
+          "Governance / Security Lake"
+        ],
+        "security": [
+          {
+            "admin_api_key": []
+          }
+        ],
+        "x-access-policy": {
+          "kind": "handlerManaged",
+          "credential": [
+            "organization_api_key"
+          ],
+          "permissions": [
+            "ingestionSources:manage"
+          ]
+        },
+        "parameters": [
+          {
+            "in": "path",
+            "name": "sourceId",
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required": true
+          }
+        ]
+      }
+    },
+    "/api/v1/governance/security-lake/sources/{sourceId}/test": {
+      "post": {
+        "operationId": "postApiGovernanceSecurityLakeSourcesByIdTest",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    },
+                    "waiting": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "inFlight": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "error": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "ok",
+                    "waiting",
+                    "inFlight",
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "retryable": {
+                      "type": "boolean"
+                    },
+                    "meta": {
+                      "type": "object",
+                      "propertyNames": {
+                        "type": "string"
+                      },
+                      "additionalProperties": {}
+                    },
+                    "trace_id": {
+                      "type": "string"
+                    },
+                    "span_id": {
+                      "type": "string"
+                    },
+                    "trace": {
+                      "type": "object",
+                      "properties": {
+                        "traceId": {
+                          "type": "string"
+                        },
+                        "spanId": {
+                          "type": "string"
+                        },
+                        "traceUrl": {
+                          "type": "string"
+                        },
+                        "logsUrl": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "tips": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "docs_url": {
+                      "type": "string"
+                    },
+                    "fault": {
+                      "type": "string",
+                      "enum": [
+                        "customer",
+                        "platform",
+                        "provider",
+                        "presumed_platform"
+                      ]
+                    },
+                    "reasons": {
+                      "type": "array",
+                      "items": {}
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "code",
+                    "message",
+                    "retryable"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "retryable": {
+                      "type": "boolean"
+                    },
+                    "meta": {
+                      "type": "object",
+                      "propertyNames": {
+                        "type": "string"
+                      },
+                      "additionalProperties": {}
+                    },
+                    "trace_id": {
+                      "type": "string"
+                    },
+                    "span_id": {
+                      "type": "string"
+                    },
+                    "trace": {
+                      "type": "object",
+                      "properties": {
+                        "traceId": {
+                          "type": "string"
+                        },
+                        "spanId": {
+                          "type": "string"
+                        },
+                        "traceUrl": {
+                          "type": "string"
+                        },
+                        "logsUrl": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "tips": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "docs_url": {
+                      "type": "string"
+                    },
+                    "fault": {
+                      "type": "string",
+                      "enum": [
+                        "customer",
+                        "platform",
+                        "provider",
+                        "presumed_platform"
+                      ]
+                    },
+                    "reasons": {
+                      "type": "array",
+                      "items": {}
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "code",
+                    "message",
+                    "retryable"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "retryable": {
+                      "type": "boolean"
+                    },
+                    "meta": {
+                      "type": "object",
+                      "propertyNames": {
+                        "type": "string"
+                      },
+                      "additionalProperties": {}
+                    },
+                    "trace_id": {
+                      "type": "string"
+                    },
+                    "span_id": {
+                      "type": "string"
+                    },
+                    "trace": {
+                      "type": "object",
+                      "properties": {
+                        "traceId": {
+                          "type": "string"
+                        },
+                        "spanId": {
+                          "type": "string"
+                        },
+                        "traceUrl": {
+                          "type": "string"
+                        },
+                        "logsUrl": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "tips": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "docs_url": {
+                      "type": "string"
+                    },
+                    "fault": {
+                      "type": "string",
+                      "enum": [
+                        "customer",
+                        "platform",
+                        "provider",
+                        "presumed_platform"
+                      ]
+                    },
+                    "reasons": {
+                      "type": "array",
+                      "items": {}
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "code",
+                    "message",
+                    "retryable"
+                  ]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "retryable": {
+                      "type": "boolean"
+                    },
+                    "meta": {
+                      "type": "object",
+                      "propertyNames": {
+                        "type": "string"
+                      },
+                      "additionalProperties": {}
+                    },
+                    "trace_id": {
+                      "type": "string"
+                    },
+                    "span_id": {
+                      "type": "string"
+                    },
+                    "trace": {
+                      "type": "object",
+                      "properties": {
+                        "traceId": {
+                          "type": "string"
+                        },
+                        "spanId": {
+                          "type": "string"
+                        },
+                        "traceUrl": {
+                          "type": "string"
+                        },
+                        "logsUrl": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "tips": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "docs_url": {
+                      "type": "string"
+                    },
+                    "fault": {
+                      "type": "string",
+                      "enum": [
+                        "customer",
+                        "platform",
+                        "provider",
+                        "presumed_platform"
+                      ]
+                    },
+                    "reasons": {
+                      "type": "array",
+                      "items": {}
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "code",
+                    "message",
+                    "retryable"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "description": "Reads the subscriber queue's backlog without taking a message. Settings and keys in the body are tested over the stored ones and not saved; an empty body tests the stored source. `ok` is false with the AWS error code when the queue refused or could not be reached.",
+        "summary": "Test a Security Lake source's connection",
+        "tags": [
+          "Governance / Security Lake"
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "config": {
+                    "type": "object",
+                    "properties": {
+                      "region": {
+                        "type": "string",
+                        "pattern": "^[a-z]{2}(-[a-z]+)+-\\d$"
+                      },
+                      "subscriberRoleArn": {
+                        "type": "string",
+                        "pattern": "^arn:aws[a-z-]*:iam::\\d{12}:role\\/.+$"
+                      },
+                      "queueUrl": {
+                        "type": "string",
+                        "format": "uri"
+                      },
+                      "sources": {
+                        "minItems": 1,
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "enum": [
+                            "CLOUD_TRAIL_MGMT",
+                            "S3_DATA",
+                            "LAMBDA_EXECUTION"
+                          ]
+                        }
+                      },
+                      "maxMessagesPerRun": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 1000
+                      },
+                      "maxReceives": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 20
+                      },
+                      "s3Endpoint": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "format": "uri"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "sqsEndpoint": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "format": "uri"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "schedule": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "credentials": {
+                    "type": "object",
+                    "properties": {
+                      "aws_access_key_id": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "aws_secret_access_key": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "aws_session_token": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
+                    "required": [
+                      "aws_access_key_id",
+                      "aws_secret_access_key"
+                    ]
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "admin_api_key": []
+          }
+        ],
+        "x-access-policy": {
+          "kind": "handlerManaged",
+          "credential": [
+            "organization_api_key"
+          ],
+          "permissions": [
+            "ingestionSources:manage"
+          ]
+        },
+        "parameters": [
+          {
+            "in": "path",
+            "name": "sourceId",
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required": true
+          }
+        ]
+      }
+    },
+    "/api/v1/governance/security-lake/sources/{sourceId}/health": {
+      "get": {
+        "operationId": "getApiGovernanceSecurityLakeSourcesByIdHealth",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "sourceId": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "string"
+                    },
+                    "lastError": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "health": {
+                      "type": "object",
+                      "properties": {
+                        "lastReadAt": {
+                          "type": [
+                            "number",
+                            "null"
+                          ]
+                        },
+                        "lagMs": {
+                          "type": [
+                            "number",
+                            "null"
+                          ]
+                        },
+                        "runs": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        "messages": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        "objects": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        "rows": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        "written": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        "dropped": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        "invalid": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        "retried": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        "poisonCount": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        "poison": {
+                          "maxItems": 20,
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "messageId": {
+                                "type": "string"
+                              },
+                              "key": {
+                                "type": "string"
+                              },
+                              "reason": {
+                                "type": "string"
+                              },
+                              "at": {
+                                "type": "number"
+                              }
+                            },
+                            "required": [
+                              "messageId",
+                              "key",
+                              "reason",
+                              "at"
+                            ],
+                            "additionalProperties": false
+                          }
+                        }
+                      },
+                      "required": [
+                        "lastReadAt",
+                        "lagMs",
+                        "runs",
+                        "messages",
+                        "objects",
+                        "rows",
+                        "written",
+                        "dropped",
+                        "invalid",
+                        "retried",
+                        "poisonCount",
+                        "poison"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "sourceId",
+                    "status",
+                    "lastError",
+                    "health"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "retryable": {
+                      "type": "boolean"
+                    },
+                    "meta": {
+                      "type": "object",
+                      "propertyNames": {
+                        "type": "string"
+                      },
+                      "additionalProperties": {}
+                    },
+                    "trace_id": {
+                      "type": "string"
+                    },
+                    "span_id": {
+                      "type": "string"
+                    },
+                    "trace": {
+                      "type": "object",
+                      "properties": {
+                        "traceId": {
+                          "type": "string"
+                        },
+                        "spanId": {
+                          "type": "string"
+                        },
+                        "traceUrl": {
+                          "type": "string"
+                        },
+                        "logsUrl": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "tips": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "docs_url": {
+                      "type": "string"
+                    },
+                    "fault": {
+                      "type": "string",
+                      "enum": [
+                        "customer",
+                        "platform",
+                        "provider",
+                        "presumed_platform"
+                      ]
+                    },
+                    "reasons": {
+                      "type": "array",
+                      "items": {}
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "code",
+                    "message",
+                    "retryable"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "retryable": {
+                      "type": "boolean"
+                    },
+                    "meta": {
+                      "type": "object",
+                      "propertyNames": {
+                        "type": "string"
+                      },
+                      "additionalProperties": {}
+                    },
+                    "trace_id": {
+                      "type": "string"
+                    },
+                    "span_id": {
+                      "type": "string"
+                    },
+                    "trace": {
+                      "type": "object",
+                      "properties": {
+                        "traceId": {
+                          "type": "string"
+                        },
+                        "spanId": {
+                          "type": "string"
+                        },
+                        "traceUrl": {
+                          "type": "string"
+                        },
+                        "logsUrl": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "tips": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "docs_url": {
+                      "type": "string"
+                    },
+                    "fault": {
+                      "type": "string",
+                      "enum": [
+                        "customer",
+                        "platform",
+                        "provider",
+                        "presumed_platform"
+                      ]
+                    },
+                    "reasons": {
+                      "type": "array",
+                      "items": {}
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "code",
+                    "message",
+                    "retryable"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "retryable": {
+                      "type": "boolean"
+                    },
+                    "meta": {
+                      "type": "object",
+                      "propertyNames": {
+                        "type": "string"
+                      },
+                      "additionalProperties": {}
+                    },
+                    "trace_id": {
+                      "type": "string"
+                    },
+                    "span_id": {
+                      "type": "string"
+                    },
+                    "trace": {
+                      "type": "object",
+                      "properties": {
+                        "traceId": {
+                          "type": "string"
+                        },
+                        "spanId": {
+                          "type": "string"
+                        },
+                        "traceUrl": {
+                          "type": "string"
+                        },
+                        "logsUrl": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "tips": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "docs_url": {
+                      "type": "string"
+                    },
+                    "fault": {
+                      "type": "string",
+                      "enum": [
+                        "customer",
+                        "platform",
+                        "provider",
+                        "presumed_platform"
+                      ]
+                    },
+                    "reasons": {
+                      "type": "array",
+                      "items": {}
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "code",
+                    "message",
+                    "retryable"
+                  ]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "retryable": {
+                      "type": "boolean"
+                    },
+                    "meta": {
+                      "type": "object",
+                      "propertyNames": {
+                        "type": "string"
+                      },
+                      "additionalProperties": {}
+                    },
+                    "trace_id": {
+                      "type": "string"
+                    },
+                    "span_id": {
+                      "type": "string"
+                    },
+                    "trace": {
+                      "type": "object",
+                      "properties": {
+                        "traceId": {
+                          "type": "string"
+                        },
+                        "spanId": {
+                          "type": "string"
+                        },
+                        "traceUrl": {
+                          "type": "string"
+                        },
+                        "logsUrl": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "tips": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "docs_url": {
+                      "type": "string"
+                    },
+                    "fault": {
+                      "type": "string",
+                      "enum": [
+                        "customer",
+                        "platform",
+                        "provider",
+                        "presumed_platform"
+                      ]
+                    },
+                    "reasons": {
+                      "type": "array",
+                      "items": {}
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "code",
+                    "message",
+                    "retryable"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "description": "The source's last read time, lag (from the oldest event written in the last run to that run), running counts of messages, objects, rows, events written and dropped, the last run's error, and the latest poison objects the reader gave up on.",
+        "summary": "Read a Security Lake source's health",
+        "tags": [
+          "Governance / Security Lake"
+        ],
+        "security": [
+          {
+            "admin_api_key": []
+          }
+        ],
+        "x-access-policy": {
+          "kind": "handlerManaged",
+          "credential": [
+            "organization_api_key"
+          ],
+          "permissions": [
+            "ingestionSources:view"
+          ]
+        },
+        "parameters": [
+          {
+            "in": "path",
+            "name": "sourceId",
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required": true
+          }
+        ]
       }
     },
     "/api/v1/auth/cli/budget/status": {
@@ -110561,7 +113257,6 @@
                     }
                   },
                   "parameters": {
-                    "default": {},
                     "type": "object",
                     "propertyNames": {
                       "type": "string"
@@ -113787,7 +116482,6 @@
                     }
                   },
                   "parameters": {
-                    "default": {},
                     "type": "object",
                     "propertyNames": {
                       "type": "string"
@@ -116041,6 +118735,32 @@
                           "null"
                         ]
                       },
+                      "traceQuietPeriodMs": {
+                        "description": "Milliseconds the agent's trace must stay unchanged before the judge reads it, or null for the project's recommendation. Absent on servers that predate judge trace settings.",
+                        "anyOf": [
+                          {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "traceWaitTimeoutMs": {
+                        "description": "Milliseconds the judge waits for the agent's trace before a verdict, or null for the project's recommendation. Absent on servers that predate judge trace settings.",
+                        "anyOf": [
+                          {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
                       "maxTurns": {
                         "description": "The most conversation turns a run of this scenario takes, or null for the default. Absent on servers that predate turn limits on this family.",
                         "anyOf": [
@@ -116244,6 +118964,32 @@
                       "type": [
                         "string",
                         "null"
+                      ]
+                    },
+                    "traceQuietPeriodMs": {
+                      "description": "Milliseconds the agent's trace must stay unchanged before the judge reads it, or null for the project's recommendation. Absent on servers that predate judge trace settings.",
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "traceWaitTimeoutMs": {
+                      "description": "Milliseconds the judge waits for the agent's trace before a verdict, or null for the project's recommendation. Absent on servers that predate judge trace settings.",
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
                       ]
                     },
                     "maxTurns": {
@@ -116454,6 +119200,32 @@
                         "type": "string",
                         "maxLength": 200,
                         "pattern": "^[a-zA-Z0-9_-]+(?:\\/[^\\s/]+)+$"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "traceQuietPeriodMs": {
+                    "description": "Milliseconds (0 to 60000) the agent's trace must stay unchanged before the judge reads it. Null uses the project's recommendation.",
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 60000
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "traceWaitTimeoutMs": {
+                    "description": "Milliseconds (1000 to 300000) the judge waits for the agent's trace before a verdict. Null uses the project's recommendation.",
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "minimum": 1000,
+                        "maximum": 300000
                       },
                       {
                         "type": "null"
@@ -116691,6 +119463,32 @@
                         "null"
                       ]
                     },
+                    "traceQuietPeriodMs": {
+                      "description": "Milliseconds the agent's trace must stay unchanged before the judge reads it, or null for the project's recommendation. Absent on servers that predate judge trace settings.",
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "traceWaitTimeoutMs": {
+                      "description": "Milliseconds the judge waits for the agent's trace before a verdict, or null for the project's recommendation. Absent on servers that predate judge trace settings.",
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
                     "maxTurns": {
                       "description": "The most conversation turns a run of this scenario takes, or null for the default. Absent on servers that predate turn limits on this family.",
                       "anyOf": [
@@ -116924,6 +119722,32 @@
                         "null"
                       ]
                     },
+                    "traceQuietPeriodMs": {
+                      "description": "Milliseconds the agent's trace must stay unchanged before the judge reads it, or null for the project's recommendation. Absent on servers that predate judge trace settings.",
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "traceWaitTimeoutMs": {
+                      "description": "Milliseconds the judge waits for the agent's trace before a verdict, or null for the project's recommendation. Absent on servers that predate judge trace settings.",
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
                     "maxTurns": {
                       "description": "The most conversation turns a run of this scenario takes, or null for the default. Absent on servers that predate turn limits on this family.",
                       "anyOf": [
@@ -117134,6 +119958,32 @@
                         "type": "string",
                         "maxLength": 200,
                         "pattern": "^[a-zA-Z0-9_-]+(?:\\/[^\\s/]+)+$"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "traceQuietPeriodMs": {
+                    "description": "Milliseconds (0 to 60000) the agent's trace must stay unchanged before the judge reads it. Null uses the project's recommendation.",
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 60000
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "traceWaitTimeoutMs": {
+                    "description": "Milliseconds (1000 to 300000) the judge waits for the agent's trace before a verdict. Null uses the project's recommendation.",
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "minimum": 1000,
+                        "maximum": 300000
                       },
                       {
                         "type": "null"
@@ -117340,6 +120190,32 @@
                         "null"
                       ]
                     },
+                    "traceQuietPeriodMs": {
+                      "description": "Milliseconds the agent's trace must stay unchanged before the judge reads it, or null for the project's recommendation. Absent on servers that predate judge trace settings.",
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "traceWaitTimeoutMs": {
+                      "description": "Milliseconds the judge waits for the agent's trace before a verdict, or null for the project's recommendation. Absent on servers that predate judge trace settings.",
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
                     "maxTurns": {
                       "description": "The most conversation turns a run of this scenario takes, or null for the default. Absent on servers that predate turn limits on this family.",
                       "anyOf": [
@@ -117550,6 +120426,32 @@
                         "type": "string",
                         "maxLength": 200,
                         "pattern": "^[a-zA-Z0-9_-]+(?:\\/[^\\s/]+)+$"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "traceQuietPeriodMs": {
+                    "description": "Milliseconds (0 to 60000) the agent's trace must stay unchanged before the judge reads it. Null uses the project's recommendation.",
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 60000
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "traceWaitTimeoutMs": {
+                    "description": "Milliseconds (1000 to 300000) the judge waits for the agent's trace before a verdict. Null uses the project's recommendation.",
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "minimum": 1000,
+                        "maximum": 300000
                       },
                       {
                         "type": "null"
@@ -125922,7 +128824,8 @@
                         "governanceCost:view",
                         "sso:view",
                         "seatRequests:view",
-                        "members:view"
+                        "members:view",
+                        "gatewayA2aTargets:view"
                       ]
                     }
                   },
@@ -126094,7 +128997,8 @@
                               "governanceCost:view",
                               "sso:view",
                               "seatRequests:view",
-                              "members:view"
+                              "members:view",
+                              "gatewayA2aTargets:view"
                             ]
                           }
                         },
@@ -126226,7 +129130,8 @@
                             "governanceCost:view",
                             "sso:view",
                             "seatRequests:view",
-                            "members:view"
+                            "members:view",
+                            "gatewayA2aTargets:view"
                           ]
                         },
                         "generation": {
@@ -126341,7 +129246,8 @@
                 "governanceCost:view",
                 "sso:view",
                 "seatRequests:view",
-                "members:view"
+                "members:view",
+                "gatewayA2aTargets:view"
               ]
             },
             "required": true
@@ -126818,6 +129724,32 @@
                         "type": [
                           "string",
                           "null"
+                        ]
+                      },
+                      "traceQuietPeriodMs": {
+                        "description": "Milliseconds the agent's trace must stay unchanged before the judge reads it, or null for the scenario setting or the project's recommendation. Absent on servers that predate judge trace settings.",
+                        "anyOf": [
+                          {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "traceWaitTimeoutMs": {
+                        "description": "Milliseconds the judge waits for the agent's trace before a verdict, or null for the scenario setting or the project's recommendation. Absent on servers that predate judge trace settings.",
+                        "anyOf": [
+                          {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991
+                          },
+                          {
+                            "type": "null"
+                          }
                         ]
                       },
                       "labels": {
@@ -127467,6 +130399,32 @@
                           }
                         ]
                       },
+                      "traceQuietPeriodMs": {
+                        "description": "Milliseconds (0 to 60000) the agent's trace must stay unchanged before the judge reads it, for every scenario in the run. Overrides each scenario's own setting. Leave it out for the scenario setting or the project's recommendation.",
+                        "anyOf": [
+                          {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 60000
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "traceWaitTimeoutMs": {
+                        "description": "Milliseconds (1000 to 300000) the judge waits for the agent's trace before a verdict, for every scenario in the run. Overrides each scenario's own setting. Leave it out for the scenario setting or the project's recommendation.",
+                        "anyOf": [
+                          {
+                            "type": "integer",
+                            "minimum": 1000,
+                            "maximum": 300000
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
                       "scenarioIds": {
                         "description": "The scenarios a test_suites or scenarios scope covers. Read by a scenarios scope alone; a scope that states a rule resolves its own list at run time.",
                         "type": "array",
@@ -127842,6 +130800,32 @@
                       "type": [
                         "string",
                         "null"
+                      ]
+                    },
+                    "traceQuietPeriodMs": {
+                      "description": "Milliseconds the agent's trace must stay unchanged before the judge reads it, or null for the scenario setting or the project's recommendation. Absent on servers that predate judge trace settings.",
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "traceWaitTimeoutMs": {
+                      "description": "Milliseconds the judge waits for the agent's trace before a verdict, or null for the scenario setting or the project's recommendation. Absent on servers that predate judge trace settings.",
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
                       ]
                     },
                     "labels": {
@@ -130586,6 +133570,32 @@
                       }
                     ]
                   },
+                  "traceQuietPeriodMs": {
+                    "description": "Milliseconds (0 to 60000) the agent's trace must stay unchanged before the judge reads it, for every scenario in the run. Overrides each scenario's own setting. Leave it out for the scenario setting or the project's recommendation.",
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 60000
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "traceWaitTimeoutMs": {
+                    "description": "Milliseconds (1000 to 300000) the judge waits for the agent's trace before a verdict, for every scenario in the run. Overrides each scenario's own setting. Leave it out for the scenario setting or the project's recommendation.",
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "minimum": 1000,
+                        "maximum": 300000
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
                   "idempotencyKey": {
                     "description": "Repeat the same key to make a retry join the batch the first call started instead of running everything again. Send the same request with it: the same key over a different configuration starts its own batch. Defaults to a new key per call.",
                     "type": "string"
@@ -133042,6 +136052,32 @@
                     "type": [
                       "string",
                       "null"
+                    ]
+                  },
+                  "traceQuietPeriodMs": {
+                    "description": "Milliseconds (0 to 60000) the agent's trace must stay unchanged before the judge reads it, for every scenario in the run. Used only when the id names a test suite.",
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 60000
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "traceWaitTimeoutMs": {
+                    "description": "Milliseconds (1000 to 300000) the judge waits for the agent's trace before a verdict, for every scenario in the run. Used only when the id names a test suite.",
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "minimum": 1000,
+                        "maximum": 300000
+                      },
+                      {
+                        "type": "null"
+                      }
                     ]
                   },
                   "parameters": {
@@ -136755,6 +139791,153 @@
               }
             }
           }
+        }
+      }
+    },
+    "/api/v1/traces/settle-settings": {
+      "get": {
+        "operationId": "getApiTracesSettleSettings",
+        "responses": {
+          "200": {
+            "description": "The recommended wait, extension and quiet period, in milliseconds",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "waitTimeoutMs": {
+                      "type": "integer",
+                      "exclusiveMinimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "waitExtensionMs": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "quietPeriodMs": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    }
+                  },
+                  "required": [
+                    "waitTimeoutMs",
+                    "waitExtensionMs",
+                    "quietPeriodMs"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        },
+        "description": "How long a scenario judge should wait for this project's traces before a verdict: the first wait, the one extension it may ask for, and how long the span set must hold still. Measured on the project's own ingest; defaults without history.",
+        "summary": "Recommended trace wait for a scenario judge",
+        "tags": [
+          "Traces"
+        ],
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ],
+        "x-access-policy": {
+          "kind": "handlerManaged",
+          "credential": [
+            "project_api_key"
+          ],
+          "permissions": [
+            "traces:view"
+          ]
         }
       }
     },

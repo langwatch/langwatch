@@ -6,6 +6,7 @@ import type {
   PullResult,
   PullRunOptions,
 } from "@langwatch/enterprise-governance-contract";
+import { DispatchError } from "@langwatch/eventing";
 import { nowInstant } from "@langwatch/time";
 /**
  * S3PollingPullerService — universal S3-polling adapter for SaaS
@@ -40,6 +41,10 @@ import { silentIngestionPullDiagnostics } from "./ingestion-pull-log.service.ts"
 
 const MAX_FILES_PER_RUN = 100;
 const MAX_BYTES_PER_FILE = 50 * 1024 * 1024; // 50 MB safety cap
+
+/** Without the source's own pair the SDK would sign with the worker's AWS identity. */
+export const S3_SOURCE_KEYS_MISSING_MESSAGE =
+  "This S3 source has no access keys. Add an access key ID and secret access key to read the bucket.";
 
 const eventMappingSchema = z.object({
   source_event_id: z.string().min(1),
@@ -121,22 +126,36 @@ function asInt(value: unknown): number {
 }
 
 export class S3PollingPullerService implements PullerAdapter<S3PollingConfig> {
-  private constructor(
-    readonly id: string,
-    private readonly objects: GovernanceObjectStore,
-    private readonly diagnostics: IngestionPullDiagnosticsSink = silentIngestionPullDiagnostics,
-  ) {}
+  readonly id: string;
+  private readonly objects: GovernanceObjectStore;
+  private readonly diagnostics: IngestionPullDiagnosticsSink;
+  private readonly deploymentAwsIdentity: boolean;
 
+  private constructor(options: {
+    id: string;
+    objects: GovernanceObjectStore;
+    diagnostics: IngestionPullDiagnosticsSink;
+    deploymentAwsIdentity: boolean;
+  }) {
+    this.id = options.id;
+    this.objects = options.objects;
+    this.diagnostics = options.diagnostics;
+    this.deploymentAwsIdentity = options.deploymentAwsIdentity;
+  }
+
+  /** `deploymentAwsIdentity`: a source with no keys at all reads as the deployment (self-hosted). */
   static create(options: {
     id?: string;
     objects: GovernanceObjectStore;
     diagnostics?: IngestionPullDiagnosticsSink;
+    deploymentAwsIdentity?: boolean;
   }): S3PollingPullerService {
-    return new S3PollingPullerService(
-      options.id ?? "s3_polling",
-      options.objects,
-      options.diagnostics,
-    );
+    return new S3PollingPullerService({
+      id: options.id ?? "s3_polling",
+      objects: options.objects,
+      diagnostics: options.diagnostics ?? silentIngestionPullDiagnostics,
+      deploymentAwsIdentity: options.deploymentAwsIdentity ?? false,
+    });
   }
 
   validateConfig(config: unknown): S3PollingConfig {
@@ -252,12 +271,29 @@ export class S3PollingPullerService implements PullerAdapter<S3PollingConfig> {
     return unmapped;
   }
 
+  /**
+   * The source's own key pair. A source with no key at all reads as the deployment only where the
+   * deployment allows it (self-hosted); anywhere else it is refused rather than read as the worker.
+   */
   private credentials(options: PullRunOptions) {
     const credentials = options.credentials ?? {};
+    const accessKeyId = credentials.aws_access_key_id?.trim();
+    const secretAccessKey = credentials.aws_secret_access_key?.trim();
+    if (this.deploymentAwsIdentity && !accessKeyId && !secretAccessKey) {
+      return {};
+    }
+    if (!accessKeyId || !secretAccessKey) {
+      throw new DispatchError({
+        message: "s3_polling: source has no complete AWS key pair",
+        retryable: false,
+        customerMessage: S3_SOURCE_KEYS_MISSING_MESSAGE,
+      });
+    }
     return {
-      accessKeyId: credentials.aws_access_key_id,
-      secretAccessKey: credentials.aws_secret_access_key,
-      sessionToken: credentials.aws_session_token,
+      accessKeyId,
+      secretAccessKey,
+      sessionToken: credentials.aws_session_token?.trim() || undefined,
+      requireStaticKeys: true,
     };
   }
 

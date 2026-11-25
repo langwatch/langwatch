@@ -7,6 +7,7 @@ import { PageHeaderSizeProvider } from "@langwatch/design-system/page-layout";
 import { Box, type StackProps, VStack } from "@langwatch/design-system/primitives";
 import { RestrictedAccess } from "@langwatch/design-system/restricted-access";
 import type { NavigationTeam } from "@langwatch/navigation-contract";
+import { CODING_AGENTS_PATH } from "@langwatch/user-contract";
 import { useEffect, type ReactNode } from "react";
 import { ErrorBoundary } from "react-error-boundary";
 
@@ -14,7 +15,7 @@ import { PaymentRecoveryBanner } from "../../behavior/lent-payment-recovery-bann
 import { navigationApi } from "../../behavior/navigation-api.ts";
 import { useNavigationHost } from "../../model/navigation-host.ts";
 import { planManagementHref } from "../../model/plan-management-href.ts";
-import { isPathUnder } from "../../model/products.ts";
+import { isOrganizationDashboardsPath, isPathUnder } from "../../model/products.ts";
 import { isResolverAddress } from "../../model/resolve-shell-route.ts";
 import { SETTINGS_MEASURE, settingsColumnCss } from "../../model/settings-column.ts";
 import { cloudAdminGroup, instanceGroup } from "../../model/settings-menu.ts";
@@ -73,15 +74,27 @@ function readerMayOpenThePage({
   if (isResolverAddress(pathname)) return true;
   // Personal-scope addresses are the reader's by construction, even when
   // membership of the ambient team cannot be confirmed: without this a member
-  // on /me/* hits the refusal and the page never renders.
+  // on /coding-agents/* hits the refusal and the page never renders.
   if (isPersonalScopeRoute || isDemoProject) return true;
+  // The organization's Dashboards library names no team: it asks each project's own access.
+  if (isOrganizationDashboardsPath(pathname)) return true;
   // Administrators created through a role binding alone have no membership row
   // and still have full team access.
   if (organizationRole === ORGANIZATION_ADMIN_ROLE) return true;
+  // The plan pages belong to the organization, not a team: whoever may pay needs no team.
+  if (PLAN_PAGES.some((base) => isPathUnder({ pathname, base }))) return true;
   // The same predicate the host's own ambient team resolution prefers on, so
   // the team the application picks and the one the chrome draws cannot diverge.
   return !!team && !!userId && (team.members ?? []).some((member) => member.userId === userId);
 }
+
+/** Each page refuses a reader without its permission on its own (ADR-205). */
+const PLAN_PAGES = [
+  "/settings/subscription",
+  "/settings/plans",
+  "/settings/usage",
+  "/settings/license",
+];
 
 const MEASURED_OPS_PAGES = [...instanceGroup().items, ...cloudAdminGroup().items];
 
@@ -133,6 +146,27 @@ function PageMeasure({ pathname, children }: { pathname: string; children: React
   );
 }
 
+/** On no team: whoever pays (Billing only, ADR-205) goes to the plan page; others wait. */
+function NoTeamRefusal({ organizationName }: { organizationName: string }) {
+  const host = useNavigationHost();
+  const pays = host.hasOrganizationPermission("subscription:manage");
+  const planPage = planManagementHref(!!host.deployment().isSaaS);
+  useEffect(() => {
+    if (pays) host.replace(planPage);
+  }, [pays, planPage, host]);
+
+  if (pays) return null;
+  return (
+    host.teamAccessWaiting({ organizationName }) ?? (
+      <RestrictedAccess
+        area="this organization's projects"
+        description="You are not part of any team in this organization. Ask an organization admin to add you to a team so you can open its projects."
+        onBack={() => host.navigate("/")}
+      />
+    )
+  );
+}
+
 export const ShellPageBody = ({
   children,
   personalScope = false,
@@ -171,7 +205,7 @@ export const ShellPageBody = ({
       ? { label: team.name }
       : null;
   const isPersonalScopeRoute =
-    personalScope || pathname.startsWith("/me") || isOnOwnPersonalProject;
+    personalScope || isPathUnder({ pathname, base: CODING_AGENTS_PATH }) || isOnOwnPersonalProject;
 
   // Audit emission for cross-scope reads. Fires once per project the
   // administrator drills into. Fail-quiet: a refused emission must not stop
@@ -230,15 +264,7 @@ export const ShellPageBody = ({
         </ErrorBoundary>
       </Box>
     ) : (
-      (host.teamAccessWaiting({
-        organizationName: organization?.name ?? "your organization",
-      }) ?? (
-        <RestrictedAccess
-          area="this organization's projects"
-          description="You are not part of any team in this organization. Ask an organization admin to add you to a team so you can open its projects."
-          onBack={() => host.navigate("/")}
-        />
-      ))
+      <NoTeamRefusal organizationName={organization?.name ?? "your organization"} />
     );
 
   return (

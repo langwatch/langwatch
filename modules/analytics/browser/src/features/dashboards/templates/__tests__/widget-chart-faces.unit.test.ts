@@ -79,21 +79,21 @@ describe("given a cost card", () => {
   });
 
   /** @scenario "AC215b Partial cost: some spans priced at zero" */
-  it('shows "$0.00, some spans not priced" when the priced spans sum to 0', () => {
+  it('shows "$0.00, some requests not priced" when the priced spans sum to 0', () => {
     expect(cost.costText({ sum: 0, priced: true, unpriced: true })).toBe(
-      "$0.00, some spans not priced",
+      "$0.00, some requests not priced",
     );
     expect(cost.costFigure({ completeness: report({ total: 3, unpriced: 1 }) }, 0)).toBe(
-      "$0.00, some spans not priced",
+      "$0.00, some requests not priced",
     );
   });
 
-  /** @scenario "AC215d Partial cost: a sum above 0 with some spans not priced" */
+  /** @scenario "AC215d Partial cost: a sum above 0 with some requests not priced" */
   it('marks a sum above 0 "+" when some spans have no cost', () => {
     expect(cost.costText({ sum: 12.5, priced: true, unpriced: true })).toBe("$12.50+");
   });
 
-  /** @scenario "AC215d Partial cost: a sum above 0 with some spans not priced" */
+  /** @scenario "AC215d Partial cost: a sum above 0 with some requests not priced" */
   it("keeps today's figure for a fully priced sum, and never reads $0.00+", () => {
     expect(cost.costText({ sum: 12.5, priced: true, unpriced: false })).toBe("$12.50");
     expect(cost.costText({ sum: 0, priced: true, unpriced: false })).toBe("$0.00");
@@ -116,16 +116,18 @@ describe("given the AI cost per resolved figure while nothing is resolved", () =
   /** @scenario "AC215b Partial cost: some spans priced at zero" */
   it("names the unpriced spans when the priced ones sum to 0", () => {
     expect(cost.spentHint({ completeness: report({ total: 3, unpriced: 1 }) }, 0)).toBe(
-      "$0.00 spent, some spans not priced",
+      "$0.00 spent, some requests not priced",
     );
   });
 
-  /** @scenario "AC215d Partial cost: a sum above 0 with some spans not priced" */
+  /** @scenario "AC215d Partial cost: a sum above 0 with some requests not priced" */
   it("keeps today's figure, + included, for a sum above 0", () => {
     expect(cost.spentHint({ completeness: report({ total: 3, unpriced: 1 }) }, 12.5)).toBe(
-      "$12.50+ spent, nothing resolved yet",
+      "$12.50+ spent, no conversation resolved yet",
     );
-    expect(cost.spentHint({ completeness: null }, 12.5)).toBe("$12.50 spent, nothing resolved yet");
+    expect(cost.spentHint({ completeness: null }, 12.5)).toBe(
+      "$12.50 spent, no conversation resolved yet",
+    );
     expect(code("ck-kpis")).toContain("<Hint>{spentHint(spend, num(s.cost))}</Hint>");
   });
 });

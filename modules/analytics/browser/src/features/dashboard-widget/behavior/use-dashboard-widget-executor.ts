@@ -24,13 +24,34 @@ import {
 import { explainAnyError } from "@langwatch/handled-error/presentation";
 import { readHandledError } from "@langwatch/handled-error/read-handled-error";
 import { nowInstant } from "@langwatch/time";
-import { useState } from "react";
+import { createContext, useContext, useState } from "react";
 
 import { analyticsApi } from "../../../behavior/analytics-api.ts";
 import type { ChartFrameExecuteQuery } from "../../../behavior/frame-bridge.ts";
 import { createLangWatchQLExecute } from "../../../behavior/lwql-execute.ts";
 import type { LangWatchQLParameterValue } from "../../../model/lwql-request-state.ts";
-import { widgetLimitNotes } from "../model/widget-limit-notes.ts";
+import { runSources } from "../../dashboards/model/widget-sources.ts";
+
+/**
+ * The diagnostics that say the server limited a run, shown on the card as one (i) line.
+ * SOURCES_IGNORED is left to the sources line: its text is for the query's author.
+ */
+const LIMIT_DIAGNOSTIC_CODES: readonly string[] = ["SHARE_WINDOW_LIMITED", "GRANULARITY_COARSENED"];
+
+/** The messages a card's (i) line shows for one run's diagnostics (dashboards-v2 AC213). */
+export function cardLimitMessages(
+  diagnostics: readonly { code: string; message: string }[],
+): string[] {
+  return diagnostics
+    .filter(({ code }) => LIMIT_DIAGNOSTIC_CODES.includes(code))
+    .map(({ message }) => message);
+}
+
+/**
+ * Whether a widget naming no projects reads every project the member may read, not the bound
+ * one: true on a Gateway or Governance board, which reads the organization (ADR-002, D2).
+ */
+export const WidgetReadsEveryProjectContext = createContext(false);
 
 /** Widgets run against the last 24 hours at an hourly step — no toolbar. */
 const DEFAULT_GRANULARITY: LangWatchQLGranularityStep = 3600;
@@ -109,18 +130,20 @@ export function useDashboardWidgetExecutor(
     overrides?.granularitySeconds ?? DEFAULT_GRANULARITY;
   // By value, not by object: a caller that builds the ids afresh each render keeps one run.
   const { dashboardId, widgetId, templateId } = telemetryIdsOf(overrides);
+  const readsEveryProject = useContext(WidgetReadsEveryProjectContext);
   const execute = createLangWatchQLExecute({
     transport: {
       mutate: (input, options) => utils.client.analytics.lwql.query.mutate(input, options),
     },
     projectId,
+    readsEveryProject,
   });
   const [lastRuns, setLastRuns] = useState<Record<string, QueryLastRun>>({});
 
   // What the server limited, per statement: the (i) line a card shows (dashboards-v2 AC213).
   const [limitsBySql, setLimitsBySql] = useState<Record<string, readonly string[]>>({});
   const noteLimits = ({ query, result }: { query: string; result: LangWatchQLQueryResult }) => {
-    const messages = widgetLimitNotes(result.diagnostics);
+    const messages = cardLimitMessages(result.diagnostics);
     setLimitsBySql((prev) =>
       prev[query]?.join() === messages.join() ? prev : { ...prev, [query]: messages },
     );
@@ -132,7 +155,7 @@ export function useDashboardWidgetExecutor(
   };
 
   const runValidated = async (
-    query: Pick<DashboardWidgetQuery, "sql" | "sources" | "projects">,
+    query: Pick<DashboardWidgetQuery, "name" | "sql" | "sources" | "projects">,
     params: Readonly<Record<string, LangWatchQLParameterValue>>,
     signal?: AbortSignal,
   ): Promise<ChartQueryResult> => {
@@ -142,8 +165,7 @@ export function useDashboardWidgetExecutor(
         parameters: params,
         timeWindow: pageWindow,
         granularitySeconds,
-        // What the query stores; null asks the server for the default (dashboards-v2 AC200f).
-        sources: query.sources ?? null,
+        sources: runSources(query),
         ...(query.projects ? { projects: query.projects } : {}),
         telemetry: runTelemetryOf({ dashboardId, widgetId, templateId }),
       },

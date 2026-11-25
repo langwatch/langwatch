@@ -81,6 +81,14 @@ export class AuthzGrantWriterService {
     await this.ceiling.assertBindingsWithinCaller(input);
   }
 
+  /** Billing only holds no binding at any scope (ADR-205). */
+  async assertNoBillingOnlyPrincipal(input: {
+    organizationId: string;
+    userIds: string[];
+  }): Promise<void> {
+    await this.ceiling.assertNoBillingOnlyPrincipal(input);
+  }
+
   /** The same ceiling for a role change: the new role and the current one. */
   async assertRoleChangeWithinCaller(
     input: Parameters<AuthzGrantCeilingService["assertRoleChangeWithinCaller"]>[0],
@@ -116,6 +124,8 @@ export class AuthzGrantWriterService {
       bindings: [input],
       scopeRows,
     });
+    const { organizationId, userId } = input;
+    await this.ceiling.assertNoBillingOnlyPrincipal({ organizationId, userIds: [userId] });
     await this.ceiling.assertWithinCaller({
       organizationId: input.organizationId,
       caller: input.caller,
@@ -197,6 +207,11 @@ export class AuthzGrantWriterService {
           scopeRows,
         });
       }
+      const userIds = [binding.userId];
+      await this.ceiling.assertNoBillingOnlyPrincipal({
+        organizationId: input.organizationId,
+        userIds,
+      });
     }
 
     await this.options.ledger.changeBindingRole({
@@ -260,6 +275,11 @@ export class AuthzGrantWriterService {
       organizationRole,
       bindings: input.bindingsToCreate,
       scopeRows: createScopeRows,
+    });
+    const userIds = input.bindingsToCreate.length > 0 ? [input.userId] : [];
+    await this.ceiling.assertNoBillingOnlyPrincipal({
+      organizationId: input.organizationId,
+      userIds,
     });
     await this.ceiling.assertWithinCaller({
       organizationId: input.organizationId,

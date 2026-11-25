@@ -67,6 +67,27 @@ describe("<UpgradeSeatsDialog/> data retention", () => {
     });
   });
 
+  describe("when the dialog lays out its parts", () => {
+    /** @scenario "The data retention comes after the price" */
+    it("shows the seats, then the price and its lines, then the data retention", () => {
+      renderDialog();
+
+      const parts = [
+        screen.getByTestId("upgrade-seats-stepper"),
+        screen.getByTestId("upgrade-seats-total"),
+        screen.getByText("200,000 events a month included. Lite members free."),
+        screen.getByText("Invite people after checkout."),
+        screen.getByRole("combobox", { name: "Data retention" }),
+        screen.getByTestId("upgrade-retention-change-note"),
+        screen.getByTestId("upgrade-retention-included"),
+      ];
+      parts.slice(1).forEach((later, index) => {
+        const position = parts[index]!.compareDocumentPosition(later);
+        expect(position & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      });
+    });
+  });
+
   describe("when a longer retention is picked", () => {
     it("shows the storage line with a loading estimate", async () => {
       renderDialog();

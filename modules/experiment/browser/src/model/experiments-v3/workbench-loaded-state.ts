@@ -42,8 +42,7 @@ export const loadedWorkbenchState = ({
   const hiddenColumns = Array.isArray(state.hiddenColumns)
     ? new Set(state.hiddenColumns as string[])
     : current.ui.hiddenColumns;
-  const concurrency =
-    typeof state.concurrency === "number" ? state.concurrency : current.ui.concurrency;
+  const concurrency = typeof state.concurrency === "number" ? state.concurrency : undefined;
 
   return {
     ...current,
