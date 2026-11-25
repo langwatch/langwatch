@@ -211,10 +211,10 @@ describe("langwatch onboarding", () => {
 
   describe("given `langwatch onboarding start meeting` runs", () => {
     /** @scenario "the CLI refuses a start other than coding or call before any request" */
-    it("fails naming coding and call, and never asks the platform", async () => {
-      await expect(onboardingStartCommand("meeting")).rejects.toThrow(
-        "Unknown start: meeting. Use coding or call.",
-      );
+    it("fails as langy_start_unknown, and never asks the platform", async () => {
+      await expect(onboardingStartCommand("meeting")).rejects.toMatchObject({
+        code: "langy_start_unknown",
+      });
       expect(resolveCredentials).not.toHaveBeenCalled();
       expect(recordLangyStart).not.toHaveBeenCalled();
     });

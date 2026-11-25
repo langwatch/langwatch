@@ -7,11 +7,12 @@ import type { CioBatchCall, NurturingSignalOf } from "@langwatch/enterprise-nurt
 import type { GuidedOnboardingRecord } from "@langwatch/onboarding-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { CustomerIoChannel } from "../../channels/customer-io.channel.ts";
 import { MemoryNurturingOrganizationMemberRepository } from "../../repositories/memory/memory.nurturing-organization-member.repository.ts";
 import { MemoryNurturingClaimRepository } from "../../repositories/memory/memory.nurturing.repositories.ts";
+import type { NurturingClaimRepository } from "../../repositories/nurturing-claim.repository.ts";
 import { NurturingGuidedOnboardingBackfillService } from "../nurturing-guided-onboarding-backfill.service.ts";
 import { NurturingService } from "../nurturing.service.ts";
 
@@ -31,6 +32,18 @@ class RecordingChannel extends CustomerIoChannel {
   }
 }
 
+const LOGIN_AT = 1_792_664_000_000;
+const TWO_HOURS_MS = 2 * 60 * 60 * 1000;
+
+/** Claims that hold as Redis would, but whose release always fails. */
+function claimsWhoseReleaseFails(): NurturingClaimRepository {
+  const memory = MemoryNurturingClaimRepository.create();
+  return {
+    claim: (key, ttlSeconds) => memory.claim(key, ttlSeconds),
+    release: () => Promise.reject(new Error("redis unavailable")),
+  };
+}
+
 function sessionStarted(at: number): NurturingSignalOf<"session_started"> {
   return {
     kind: "session_started",
@@ -43,7 +56,10 @@ function sessionStarted(at: number): NurturingSignalOf<"session_started"> {
 }
 
 /** A person whose only organization holds `record`, read through organization's capability. */
-async function backfillOver(record: GuidedOnboardingRecord) {
+async function backfillOver(
+  record: GuidedOnboardingRecord,
+  claims: NurturingClaimRepository = MemoryNurturingClaimRepository.create(),
+) {
   const channel = new RecordingChannel();
   const members = MemoryNurturingOrganizationMemberRepository.create();
   await members.recordMembershipChange({
@@ -52,28 +68,38 @@ async function backfillOver(record: GuidedOnboardingRecord) {
     change: "joined",
     at: 1_000,
   });
-  const guided = { record };
+  const guided = {
+    record,
+    read: (): Promise<GuidedOnboardingRecord> => Promise.resolve(guided.record),
+  };
   const backfill = NurturingGuidedOnboardingBackfillService.create({
-    claims: MemoryNurturingClaimRepository.create(),
+    claims,
     customerIo: NurturingService.create({ channel }),
     members,
     organizations: createApiFixture<OrganizationApi>({
-      readGuidedOnboardingState: () => Promise.resolve(guided.record),
+      readGuidedOnboardingState: () => guided.read(),
     }),
   });
   return { channel, backfill, guided };
 }
 
 describe("NurturingGuidedOnboardingBackfillService", () => {
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(LOGIN_AT);
+  });
+  afterEach(() => vi.useRealTimers());
+
   describe("given a member whose latest organization picked gateway then llmops", () => {
     /** @scenario "a login backfills the picked paths of the person's latest organization, once" */
-    it("identifies and groups the picked paths once over two sessions", async () => {
+    it("identifies the picked paths once, even on a session long after the first", async () => {
       const { channel, backfill } = await backfillOver({
         state: { paths: ["gateway", "llmops"], donePaths: [] },
         variant: "guided",
       });
 
       await backfill.deliver(sessionStarted(2_000));
+      vi.setSystemTime(LOGIN_AT + TWO_HOURS_MS);
       await backfill.deliver(sessionStarted(3_000));
 
       expect(channel.sent).toEqual([
@@ -97,6 +123,54 @@ describe("NurturingGuidedOnboardingBackfillService", () => {
           },
         },
       ]);
+    });
+  });
+
+  describe("given another member's pick lands between the first read and the claim", () => {
+    /** @scenario "a backfill sends the state read after its claim, not the one read before it" */
+    it("sends the organization's newer picks", async () => {
+      const { channel, backfill, guided } = await backfillOver({
+        state: { paths: ["gateway"], donePaths: [] },
+        variant: "guided",
+      });
+      guided.read = () => {
+        const snapshot = guided.record;
+        guided.record = {
+          state: { paths: ["llmops", "gateway"], donePaths: [] },
+          variant: "guided",
+        };
+        return Promise.resolve(snapshot);
+      };
+
+      await backfill.deliver(sessionStarted(2_000));
+
+      expect(channel.sent).toMatchObject([
+        { type: "identify", traits: { onboarding_primary_path: "llmops" } },
+        { type: "group", traits: { onboarding_primary_path: "llmops" } },
+      ]);
+    });
+  });
+
+  describe("given the picks are gone by the read after the claim", () => {
+    it("sends nothing and gives the claim back, so a later login sends the next picks", async () => {
+      const { channel, backfill, guided } = await backfillOver({
+        state: { paths: ["gateway"], donePaths: [] },
+        variant: "guided",
+      });
+      guided.read = () => {
+        const snapshot = guided.record;
+        guided.record = { state: { paths: [], donePaths: [] }, variant: "guided" };
+        return Promise.resolve(snapshot);
+      };
+
+      await backfill.deliver(sessionStarted(2_000));
+      expect(channel.sent).toEqual([]);
+
+      guided.record = { state: { paths: ["governance"], donePaths: [] }, variant: "guided" };
+      guided.read = () => Promise.resolve(guided.record);
+      await backfill.deliver(sessionStarted(3_000));
+
+      expect(channel.sent.map((call) => call.type)).toEqual(["identify", "group"]);
     });
   });
 
@@ -135,6 +209,26 @@ describe("NurturingGuidedOnboardingBackfillService", () => {
       await backfill.deliver(sessionStarted(3_000));
 
       expect(channel.sent.map((call) => call.type)).toEqual(["identify", "group"]);
+    });
+
+    describe("and giving its claim back fails too", () => {
+      /** @scenario "a backfill whose send and claim release both fail is sent on a later login" */
+      it("sends it on a login after the attempt's hour has passed", async () => {
+        const { channel, backfill } = await backfillOver(
+          { state: { paths: ["gateway"], donePaths: [] }, variant: "guided" },
+          claimsWhoseReleaseFails(),
+        );
+        channel.refusals = 1;
+
+        await backfill.deliver(sessionStarted(2_000));
+        vi.setSystemTime(LOGIN_AT + TWO_HOURS_MS);
+        await backfill.deliver(sessionStarted(3_000));
+
+        expect(channel.sent).toMatchObject([
+          { type: "identify", traits: { onboarding_primary_path: "gateway" } },
+          { type: "group", traits: { onboarding_primary_path: "gateway" } },
+        ]);
+      });
     });
   });
 

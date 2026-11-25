@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
-import type { NurturingSignal } from "@langwatch/enterprise-nurturing-contract";
+import type { CioBatchCall, NurturingSignal } from "@langwatch/enterprise-nurturing-contract";
 import { createLogger } from "@langwatch/observability";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 
@@ -15,6 +15,12 @@ const nurturingLogger = createLogger("langwatch:nurturing");
 /** Once per person and organization, so this outlives any realistic replay of a login. */
 const BACKFILL_WINDOW_SECONDS = 365 * 24 * 60 * 60;
 
+/**
+ * How long an attempt holds the claim before its send has succeeded. Short, so an attempt whose
+ * send and release both failed blocks the backfill for an hour, not for the year.
+ */
+const ATTEMPT_WINDOW_SECONDS = 60 * 60;
+
 type GuidedOnboardingBackfillDependencies = Readonly<{
   claims: NurturingClaimRepository;
   customerIo: NurturingService;
@@ -25,8 +31,10 @@ type GuidedOnboardingBackfillDependencies = Readonly<{
 /**
  * The first-login backfill: a person who picked paths before the live hooks reached Customer.io
  * gets their latest organization's guided traits on their next session, once. The claim is taken
- * only for a state with picks and given back when the send fails, so a later login sends it. A
- * failed read only logs: the login's own delivery never fails for it.
+ * only for a state with picks, for an hour; a successful send holds it for the year, and a failed
+ * one gives it back, or lets it lapse, so a later login sends it. The calls are idempotent, so a
+ * send whose year-long hold failed is harmlessly sent again on a later login. A failure only
+ * logs: the login's own delivery never fails for it.
  * @see specs/nurturing/guided-onboarding-customer-io.feature
  */
 export class NurturingGuidedOnboardingBackfillService {
@@ -43,31 +51,50 @@ export class NurturingGuidedOnboardingBackfillService {
     try {
       await this.backfill(signal.userId);
     } catch (error) {
-      nurturingLogger.warn({ error }, "the guided onboarding backfill could not be read");
+      nurturingLogger.warn({ error }, "the guided onboarding backfill could not be completed");
     }
   }
 
   private async backfill(userId: string): Promise<void> {
-    const { claims, customerIo, members, organizations } = this.dependencies;
+    const { claims, customerIo, members } = this.dependencies;
     const memberships = await members.findMembershipsOfUsers({ userIds: [userId] });
     const [latest] = latestCurrentMemberships(memberships);
     if (!latest) return;
     const { organizationId } = latest;
 
-    const { state, variant } = await organizations.readGuidedOnboardingState({ organizationId });
-    const calls = fireGuidedOnboardingBackfill({ userId, organizationId, variant, state });
-    if (calls.length === 0) return;
+    if ((await this.callsFor({ userId, organizationId })).length === 0) return;
 
     const claimKey = `nurturing:guided_onboarding_backfill:${userId}:${organizationId}`;
-    if (!(await claims.claim(claimKey, BACKFILL_WINDOW_SECONDS))) return;
+    if (!(await claims.claim(claimKey, ATTEMPT_WINDOW_SECONDS))) return;
+    const release = () => NurturingClaimReleaseService.create(claims).releasedAll([claimKey]);
+    let calls: CioBatchCall[];
     try {
-      await customerIo.batchOrThrow(calls);
+      // Read again after the claim so another member's newer pick is not reverted by this send;
+      // what the few milliseconds left still miss, the next live path event overwrites.
+      calls = await this.callsFor({ userId, organizationId });
+      if (calls.length > 0) await customerIo.batchOrThrow(calls);
     } catch (error) {
-      const released = await NurturingClaimReleaseService.create(claims).releasedAll([claimKey]);
       nurturingLogger.warn(
-        { error, released },
-        "the guided onboarding backfill could not be delivered; its claim is given back",
+        { error, released: await release() },
+        "the guided onboarding backfill could not be delivered; its claim is given back or lapses",
       );
+      return;
     }
+    if (calls.length === 0) {
+      await release();
+      return;
+    }
+    // A claim's window is fixed when it is taken, so the attempt's is swapped for the year's.
+    await claims.release(claimKey);
+    await claims.claim(claimKey, BACKFILL_WINDOW_SECONDS);
+  }
+
+  private async callsFor({
+    userId,
+    organizationId,
+  }: Readonly<{ userId: string; organizationId: string }>): Promise<CioBatchCall[]> {
+    const { organizations } = this.dependencies;
+    const { state, variant } = await organizations.readGuidedOnboardingState({ organizationId });
+    return fireGuidedOnboardingBackfill({ userId, organizationId, variant, state });
   }
 }

@@ -131,6 +131,14 @@ Feature: Customer.io guided onboarding traits and campaign triggers
     And the organization group carries onboarding_primary_path "gateway" once
 
   @unit
+  Scenario: a backfill sends the state read after its claim, not the one read before it
+    Given a member whose latest organization picked gateway in the guided variant
+    And another member picks llmops first after the backfill's first read and before its claim
+    When their session starts
+    Then they are identified with onboarding_primary_path "llmops"
+    And the organization group carries onboarding_primary_path "llmops"
+
+  @unit
   Scenario: a login before any pick sends no backfill and keeps it for a later login
     Given a member whose latest organization picked no path yet
     When their session starts
@@ -144,6 +152,14 @@ Feature: Customer.io guided onboarding traits and campaign triggers
     And Customer.io refuses the first backfill
     When their session starts twice
     Then the second session sends the backfill
+
+  @unit
+  Scenario: a backfill whose send and claim release both fail is sent on a later login
+    Given a member whose latest organization picked gateway in the guided variant
+    And Customer.io refuses the first backfill
+    And giving its claim back fails
+    When their session starts again after the attempt's hour has passed
+    Then that session sends the backfill
 
   @unit
   Scenario: an organization with picks but no variant sends no backfill
