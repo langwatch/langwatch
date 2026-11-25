@@ -79,14 +79,55 @@ function trackLanded({
   for (const event of events) if (event) analytics.track(event);
 }
 
+/**
+ * The board's id, resolved once: on a new board the first write stores it, and an Undo after a
+ * later "+" still reads this board rather than storing another.
+ */
+function useBoardIdOnce({
+  dashboardId,
+  storedBoardId,
+}: {
+  dashboardId: string;
+  storedBoardId: (() => Promise<string>) | undefined;
+}): () => Promise<string> {
+  const resolved = useRef<string | undefined>(void 0);
+  return async () => {
+    if (!storedBoardId) return dashboardId;
+    resolved.current ??= await storedBoardId();
+    return resolved.current;
+  };
+}
+
+/** Runs one save at a time, held at once: on a new board a save first waits for the store. */
+function useOneSaveAtATime<Input>(run: (input: Input) => Promise<boolean>) {
+  const running = useRef(false);
+  const [isSaving, setSaving] = useState(false);
+  const save = async (input: Input): Promise<boolean> => {
+    if (running.current) return false;
+    running.current = true;
+    setSaving(true);
+    try {
+      return await run(input);
+    } finally {
+      running.current = false;
+      setSaving(false);
+    }
+  };
+  return { save, isSaving };
+}
+
 export function useBoardWidgets({
   dashboardId,
   isOwnedElsewhere = false,
+  storedBoardId,
 }: {
   dashboardId: string;
   /** An Organization board another project owns: read by board, from where it is stored. */
   isOwnedElsewhere?: boolean;
+  /** A new board's: stores it before its first widget, and answers the id it got. */
+  storedBoardId?: (() => Promise<string>) | undefined;
 }) {
+  const boardId = useBoardIdOnce({ dashboardId, storedBoardId });
   const host = useAnalyticsHost();
   const analytics = useUiAnalytics();
   const projectId = host.project()?.id ?? "";
@@ -136,7 +177,7 @@ export function useBoardWidgets({
   const createWidget = async ({ name, definition, source }: NewWidget): Promise<string> => {
     const created = await create.mutateAsync({
       projectId,
-      dashboardId,
+      dashboardId: await boardId(),
       name,
       code: definition.code,
       queries: definition.queries,
@@ -155,7 +196,7 @@ export function useBoardWidgets({
         const stored = await utils.dashboardWidgets.list.fetch({ projectId });
         const plan = boardRestorePlan({
           before,
-          now: boardWidgetsOf({ widgets: stored, dashboardId }),
+          now: boardWidgetsOf({ widgets: stored, dashboardId: await boardId() }),
         });
         await Promise.all(plan.remove.map((id) => remove.mutateAsync({ projectId, id })));
         await Promise.all(
@@ -305,6 +346,11 @@ export function useBoardWidgets({
         }),
     });
 
+  const editorSave = useOneSaveAtATime(
+    ({ widget, draft }: { widget: BoardWidget | null; draft: DashboardWidgetDraft }) =>
+      widget ? saveWidget({ widget, draft }) : addWidget(draft),
+  );
+
   /**
    * Deletes a widget off the board at once, with Undo straight away. Undo waits for the delete
    * to land before writing the board back; a refused delete brings the widget back, takes the
@@ -350,7 +396,7 @@ export function useBoardWidgets({
     widgets,
     status: list.status,
     error: list.error,
-    isSaving: create.isPending || update.isPending,
+    isSaving: editorSave.isSaving || create.isPending || update.isPending,
     isWriting:
       create.isPending ||
       update.isPending ||
@@ -361,6 +407,8 @@ export function useBoardWidgets({
     addQuestionWidgets,
     addWidget,
     saveWidget,
+    /** The editor's Save, a new widget or an edit; a second Save while one runs is ignored. */
+    saveFromEditor: editorSave.save,
     removeWidget,
     commitPlacements,
   };

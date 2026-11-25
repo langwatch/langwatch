@@ -369,6 +369,10 @@ const ORG_SCOPED_MODELS: Record<string, OrgScopedModelConfig> = {
   NurturingOrganizationCreated: {
     extraBound: ({ clause, action }) => READ_ACTIONS.has(action) && isTraceWindowEndSweep(clause),
   },
+  // Nurturing's plan copy: one row per organization, by its id.
+  NurturingOrganizationPlan: {},
+  // Nurturing's gateway key copy: a key by its organization and id.
+  NurturingVirtualKey: {},
   // Nurturing's member copy: an organization's rows, or a READ of the named members' other rows.
   NurturingOrganizationMember: {
     extraBound: ({ clause, action }) => READ_ACTIONS.has(action) && hasUserBound(clause),
@@ -384,6 +388,19 @@ const ORG_SCOPED_MODELS: Record<string, OrgScopedModelConfig> = {
   NurturingTracedProject: {
     extraBound: ({ clause }) => typeof clauseField(clause, "projectId") === "string",
   },
+  // The digest's enrolled cohort, one row per organization keyed by it. The weekly plan reads
+  // the whole list (organization ids only, no customer content); every write names one.
+  DigestCohortOrganization: {
+    platformScopeActions: ["findMany"],
+  },
+  // The digest's weekly folds: a project's week and a person's week within one organization.
+  // Written by the fold's row id, read by organization; the retention sweep across
+  // organizations is raw SQL that says why it skips the tenant check.
+  DigestProjectWeek: {},
+  DigestUserWeek: {},
+  // A person's digest send for one week, stamped with the organization whose week it carried;
+  // claimed by a create naming that organization, read back by its row id.
+  DigestSend: {},
 };
 
 /**

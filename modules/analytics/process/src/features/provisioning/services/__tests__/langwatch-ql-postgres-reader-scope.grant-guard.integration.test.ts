@@ -25,6 +25,9 @@ import {
   VIEW_NAMES,
 } from "./langwatch-ql-postgres-reader-scope.fixtures.ts";
 
+/** Provisioning every view takes over a minute on a shared CI runner. */
+const PROVISION_HOOK_TIMEOUT_MS = 300_000;
+
 describe("given the scoped-reader group and the app's view provisioning", () => {
   let harness: ScopeHarness;
   const admin = (sql: string) => harness.admin(sql);
@@ -52,7 +55,7 @@ describe("given the scoped-reader group and the app's view provisioning", () => 
       await harness.provisionViews();
       await revokeAll();
       await harness.provisionViews();
-    });
+    }, PROVISION_HOOK_TIMEOUT_MS);
 
     it("the group has SELECT on every copy", async () => {
       const missing = await admin(
@@ -77,7 +80,7 @@ describe("given the scoped-reader group and the app's view provisioning", () => 
         .postgresScopedViewStatements({ schema: SCHEMA })
         .filter((candidate) => candidate.includes(copy(view)));
       await admin(statement as string);
-    });
+    }, PROVISION_HOOK_TIMEOUT_MS);
 
     it("the group has SELECT on the recreated copy", async () => {
       expect(await canSelect(view)).toBe("t");
@@ -104,7 +107,7 @@ describe("given the scoped-reader group and the app's view provisioning", () => 
       await replaceWithLookAlike(stale);
       await admin(`GRANT SELECT ON ${copy(stale)} TO ${GROUP}`);
       await grantAsApp();
-    });
+    }, PROVISION_HOOK_TIMEOUT_MS);
 
     /** @scenario "The scoped-reader group is granted only a live view that is provably row-scoped" */
     it("the group has no SELECT on the unscoped copy, a stale grant included", async () => {
@@ -130,7 +133,7 @@ describe("given the scoped-reader group and the app's view provisioning", () => 
       afterReplace = await canSelect(view);
       // No manual step: the deploy's own statements recreate the copy and re-grant it.
       await harness.applyAll(deployStatements());
-    });
+    }, PROVISION_HOOK_TIMEOUT_MS);
 
     it("the group has SELECT on the scoped copy first", () => {
       expect(afterGrant).toBe("t");
@@ -167,7 +170,7 @@ describe("given the scoped-reader group and the app's view provisioning", () => 
         await admin(`GRANT SELECT ON ${copy(view)} TO ${GROUP}`);
       }
       await grantAsApp();
-    });
+    }, PROVISION_HOOK_TIMEOUT_MS);
 
     /** @scenario "The scoped-reader group is granted only a live view that is provably row-scoped" */
     it("the group has no SELECT on a copy with no membership join, a stale grant included", async () => {
@@ -217,7 +220,7 @@ describe("given the scoped-reader group and the app's view provisioning", () => 
         await connection.close();
       }
       afterCheck = await reach();
-    });
+    }, PROVISION_HOOK_TIMEOUT_MS);
 
     /** @scenario "The reconvergence check guards every scoped copy" */
     it("a deploy revokes both", () => {
@@ -310,7 +313,7 @@ describe("given a deployment where the scoped-reader group does not exist", () =
       } finally {
         await connection.close();
       }
-    });
+    }, PROVISION_HOOK_TIMEOUT_MS);
 
     it("the check finds the scoped schema absent", () => {
       expect(gapsFound).toEqual([{ kind: "scoped-schema-absent" }]);

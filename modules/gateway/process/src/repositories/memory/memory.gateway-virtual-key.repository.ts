@@ -2,6 +2,7 @@ import {
   identityPatchData,
   type GatewayVirtualKeyRecord,
   type GatewayVirtualKeyScope,
+  type VirtualKeyPurpose,
 } from "@langwatch/gateway-contract";
 import { nowInstant, Temporal, type Instant } from "@langwatch/time";
 
@@ -9,6 +10,7 @@ import {
   GatewayVirtualKeyRepository,
   type CreateGatewayVirtualKeyInput,
   type GatewayLicensedKey,
+  type GatewayRecentlyUsedKey,
   type SetGatewayVirtualKeyDisabledInput,
   type UpdateGatewayVirtualKeyInput,
 } from "../gateway-virtual-key.repository.ts";
@@ -103,6 +105,29 @@ export class MemoryGatewayVirtualKeyRepository extends GatewayVirtualKeyReposito
           : key.principalUserId === input.principalUserId) &&
         key.revokedAt === null,
     );
+  }
+
+  async findLiveUsedSince(input: {
+    purpose: VirtualKeyPurpose;
+    since: Instant;
+  }): Promise<GatewayRecentlyUsedKey[]> {
+    return this.#keys()
+      .filter(
+        (key) =>
+          key.purpose === input.purpose &&
+          key.status === "ACTIVE" &&
+          key.revokedAt === null &&
+          key.lastUsedAt !== null &&
+          Temporal.Instant.compare(key.lastUsedAt, input.since) >= 0,
+      )
+      .toSorted((left, right) => (left.id < right.id ? -1 : 1))
+      .map(({ id, organizationId, name, principalUserId, traceProjectId }) => ({
+        id,
+        organizationId,
+        name,
+        principalUserId,
+        traceProjectId,
+      }));
   }
 
   async findAllForScope(scope: GatewayVirtualKeyScope): Promise<GatewayVirtualKeyRecord[]> {

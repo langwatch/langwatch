@@ -39,7 +39,7 @@ Feature: Stock trace widgets read the light trace table
 
     @unit
     Scenario: The moved widget queries read trace_metrics, not traces
-      Given the 14 stock queries tasks#1117 lists, plus att-table/passRates, from gen-acceptance/actions to ask-rising/daily
+      Given the 14 stock queries tasks#1117 lists, plus att-table/passRates and att-change/units, from gen-acceptance/actions to ask-rising/daily
       Then each reads trace_metrics and never traces
       And each keeps to its sources with Source IN {dashboard_context_sources:Array(String)}
 
@@ -92,7 +92,7 @@ Feature: Stock trace widgets read the light trace table
       When att-change/change is sent the way the executor sends it
       Then it reads LastUsedPromptVersionId and never names traces
       And every trace_metrics read in it goes to its floored twin
-      And no other stock query reads the managed version from traces but att-change/units and the two changes queries
+      And no other stock query reads the managed version from traces but the two changes queries
 
     @integration
     Scenario: A version first used 200 days ago keeps the first-seen time it had
@@ -119,6 +119,13 @@ Feature: Stock trace widgets read the light trace table
       And it counts the trace with the older write's version, at the older write's time
 
     @integration
+    Scenario: A judged trace whose newest row anchored before the window drops out of att-change/units, unlike main
+      Given a judged trace whose newest row is before the window and whose older row has version pv-old inside it
+      When att-change/units runs
+      Then the trace is not counted
+      And main still counts pv-old, from a stale row in another weekly partition, which this move does not copy
+
+    @integration
     Scenario: A trace with a row from a source not in the list is left out under the application list
       Given a trace written twice inside the window, the older write from application, the newer from langy
       And a second trace written twice inside the window, the older write from langy, the newer from application
@@ -136,6 +143,16 @@ Feature: Stock trace widgets read the light trace table
       When att-change/change reads a 60-day period and the window before it, under the widget cap at compatibility 25.10
       Then it answers on both projects
       And its median peak over three runs on the project with history is within 10% of the project without
+
+    @integration
+    Scenario: att-change/units's memory no longer grows with the project's older history
+      Given a large project with 300 days of older history and a large project with none
+      And every trace judged twice, a tenth of them with an unmerged retraction pair
+      When att-change/units reads a 60-day period and the window before it, under a raised test cap at compatibility 25.10
+      Then it answers on both projects
+      And its median peak over three runs on the project with history is no more than 10% above the project without
+      And on the project with history it reads fewer rows than main and peaks no more than 10% above main's median
+      And its runs are measured with the raised test cap so they can finish, because the evaluations read sets the floor (shared with att-table/passRates) and keep it over the widget cap; production's cap is unchanged
 
     @integration
     Scenario: A trace folded before the column existed reads its version after the replay

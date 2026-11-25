@@ -14,6 +14,8 @@ export type SeededDraft = {
   text: string;
   about: LangyDraftAbout;
   contextIds: readonly string[];
+  /** Page chips the ask chose that were not chosen before it, so they leave with the seed. */
+  chipIds?: readonly string[];
   shown: boolean;
 };
 

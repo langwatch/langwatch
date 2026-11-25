@@ -1,5 +1,10 @@
 import { Box } from "@langwatch/design-system/primitives";
-import { getFacetValueState, extractRangeValue } from "@langwatch/trace-contract";
+import {
+  displayStateFor,
+  getFacetValueState,
+  extractRangeValue,
+  type FacetDisplayState,
+} from "@langwatch/trace-contract";
 import type { LiqeQuery } from "liqe";
 import { ChevronDown, ChevronRight, type LucideIcon } from "lucide-react";
 import type React from "react";
@@ -7,7 +12,6 @@ import { memo } from "react";
 
 import {
   type FacetItem,
-  type FacetValueState,
   type Section,
 } from "../../../../behavior/explorer/filter-sidebar/types.ts";
 import type { NumericMode } from "../../../../features/explorer/behavior/numeric-mode.store.ts";
@@ -23,7 +27,9 @@ interface SectionRendererProps {
   section: Section;
   ast: LiqeQuery;
   facetItemsByKey: Map<string, FacetItem[]>;
-  valueStateGetters: Map<string, (value: string) => FacetValueState>;
+  valueStateGetters: Map<string, (value: string) => FacetDisplayState>;
+  /** What each row shows, built once per query by the sidebar (`buildFacetDisplayLookup`). */
+  displayStates: ReadonlyMap<string, FacetDisplayState>;
   toggleFacet: ({ field, value }: { field: string; value: string }) => void;
   /** Force a categorical value to excluded / back to neutral — drives the
    * row's trailing exclude affordance. */
@@ -120,6 +126,7 @@ const CategoricalSectionRenderer: React.FC<
   ast,
   facetItemsByKey,
   valueStateGetters,
+  displayStates,
   toggleFacet,
   excludeFacet,
   toggleEvaluatorSubFilter,
@@ -142,7 +149,14 @@ const CategoricalSectionRenderer: React.FC<
   // row — verdict pills, score range, label flag — sourced from the `aggregates` the
   // discover endpoint already attached to each evaluator value. No second query.
   const eventActiveRowExtras = (item: FacetItem) =>
-    item.eventMetrics ? <EventDrilldown item={item} ast={ast} toggleFacet={toggleFacet} /> : null;
+    item.eventMetrics ? (
+      <EventDrilldown
+        item={item}
+        ast={ast}
+        displayStates={displayStates}
+        toggleFacet={toggleFacet}
+      />
+    ) : null;
   const evaluatorActiveRowExtras = (item: FacetItem) =>
     item.aggregates ? (
       <EvaluatorDrilldown
@@ -189,7 +203,14 @@ const CategoricalSectionRenderer: React.FC<
           subject="event metric"
         />
       ),
-      below: isExpanded ? <EventDrilldown item={item} ast={ast} toggleFacet={toggleFacet} /> : null,
+      below: isExpanded ? (
+        <EventDrilldown
+          item={item}
+          ast={ast}
+          displayStates={displayStates}
+          toggleFacet={toggleFacet}
+        />
+      ) : null,
     };
   };
   const evaluatorInactiveRowExtras = (
@@ -313,7 +334,7 @@ const RangeSectionRenderer: React.FC<
         icon={icon}
         field={section.key}
         items={facetItemsByKey.get(section.key) ?? []}
-        getValueState={valueStateGetters.get(section.key) ?? ((): FacetValueState => "neutral")}
+        getValueState={valueStateGetters.get(section.key) ?? ((): FacetDisplayState => "neutral")}
         onToggle={(field, value) => toggleFacet({ field, value })}
         onExclude={(field, value) => excludeFacet({ field, value })}
         onShiftToggle={onShiftToggle}
@@ -349,7 +370,16 @@ const RangeSectionRenderer: React.FC<
 
 const AttributesSectionRenderer: React.FC<
   SectionRendererProps & { section: Exclude<Section, { kind: "cat" | "range" }>; icon: LucideIcon }
-> = ({ section, ast, toggleFacet, onShiftToggle, onHide, dragHandleProps, icon }) => {
+> = ({
+  section,
+  ast,
+  displayStates,
+  toggleFacet,
+  onShiftToggle,
+  onHide,
+  dragHandleProps,
+  icon,
+}) => {
   // One component for trace/span/event/metadata attributes: the section data carries its own
   // filter prefix and key list, so the renderer doesn't need to know which flavour it's drawing.
   const { filterPrefix, keys, label, displayStripPrefix, emptyDocsHref } = section;
@@ -362,7 +392,9 @@ const AttributesSectionRenderer: React.FC<
       filterPrefix={filterPrefix}
       displayStripPrefix={displayStripPrefix}
       emptyDocsHref={emptyDocsHref}
-      getValueState={(attrKey, value) => getFacetValueState(ast, fieldFor(attrKey), value)}
+      getValueState={(attrKey, value) =>
+        displayStateFor({ lookup: displayStates, field: fieldFor(attrKey), value })
+      }
       getNoneActive={(attrKey) => getFacetValueState(ast, "none", fieldFor(attrKey)) === "include"}
       onToggleValue={(attrKey, value) => toggleFacet({ field: fieldFor(attrKey), value })}
       onToggleNone={(attrKey) => toggleFacet({ field: "none", value: fieldFor(attrKey) })}

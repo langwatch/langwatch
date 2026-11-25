@@ -20,6 +20,7 @@ import type {
 } from "../../repositories/langwatch-ql-postgres.repository.ts";
 import { LWQL_COLLECTION_UNCONFIRMED } from "../../rules/langwatch-ql-collection-probe.rules.ts";
 import { flooredViewNames } from "../../rules/lwql-dedup-floor.rules.ts";
+import { traceIdsViewNames } from "../../rules/lwql-dedup-trace-ids.rules.ts";
 import { LWQL_VIEW_CATALOG } from "../../rules/lwql-view-catalog.rules.ts";
 import {
   convergeLwqlAccessModel,
@@ -1210,8 +1211,9 @@ describe("findLwqlAppOwnedDrift", () => {
     expect(drift.clickHouse).toEqual([
       ...lacking.flatMap((view) => (view.postgres ? [view.sourceTable] : [])),
       ...lacking.map((view) => view.name),
-      // A floored twin carries its base view's columns, so it lacks them too.
+      // A twin, floored or cut by trace, carries its base view's columns, so it lacks them too.
       ...flooredViewNames(lacking),
+      ...traceIdsViewNames(lacking),
     ]);
     expect(drift.clickHouse).toContain("trace_metrics");
   });

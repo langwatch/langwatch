@@ -27,6 +27,7 @@ import {
   StripeUsageReportingBuilder,
   type UsageReportingService,
 } from "./services/usage-reporting.service.ts";
+import { CustomerIoPlanResyncTask } from "./tasks/customer-io-plan-resync.task.ts";
 import { detectEnvironment, StripePricesSyncTask } from "./tasks/stripe-prices-sync.task.ts";
 import { TieredFreeToSeatEventMigrateTask } from "./tasks/tiered-free-to-seat-event.task.ts";
 import { billingStripeWebhookRest } from "./transport/billing-stripe-webhook.rest.ts";
@@ -112,6 +113,13 @@ export const billingProcessModule: PublishedProcessModule<
         subscriptions: repositories.subscriptions,
       },
       facts: { pricingModelChanged: (input) => app.pricingModelChanged(input) },
+    }),
+    // Hand-run after the rollout, dry run unless --execute (tasks#1196).
+    CustomerIoPlanResyncTask.create({
+      peers: {
+        organizations: repositories.organizations,
+        catchUp: (input) => app.catchUpCustomerIoPlan(input),
+      },
     }),
     await secrets.into(BillingModule.secrets.stripeSecretKey, (secretKey) =>
       StripePricesSyncTask.create({

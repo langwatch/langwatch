@@ -198,6 +198,43 @@ func TestRefusesCallWithoutKey(t *testing.T) {
 	}
 }
 
+// A unit amount keeps a price off the BILLABLE_EVENTS fallback, so only catalogMetered meters it.
+// @scenario "Each dollar usage price is metered on its own meter"
+func TestCatalogMetersEachUsagePriceOnItsOwnMeter(t *testing.T) {
+	raw := []byte(`{
+		"mapping": {
+			"GROWTH_INSTANT_EVAL_USD": {"test": "price_instant"},
+			"GROWTH_PII_REDACTION_USD": {"test": "price_pii"}
+		},
+		"meters": {
+			"INSTANT_EVAL_USD": {"test": "mtr_instant"},
+			"PII_REDACTION_USD": {"test": "mtr_pii"}
+		},
+		"prices": {
+			"price_instant": {"id": "price_instant", "unitAmount": 100, "currency": "usd", "recurring": {"interval": "month", "intervalCount": 1}},
+			"price_pii": {"id": "price_pii", "unitAmount": 100, "currency": "usd", "recurring": {"interval": "month", "intervalCount": 1}}
+		}
+	}`)
+	st := newState()
+	if err := st.seedCatalog(raw, "test", epoch); err != nil {
+		t.Fatal(err)
+	}
+	want := map[string]string{"price_instant": "mtr_instant", "price_pii": "mtr_pii"}
+	for _, p := range st.prices {
+		meter, ok := want[p.ID]
+		if !ok {
+			continue
+		}
+		if !isMetered(p) || p.Recurring.Meter == nil || *p.Recurring.Meter != meter {
+			t.Errorf("%s: recurring %+v, want metered on %s", p.ID, p.Recurring, meter)
+		}
+		delete(want, p.ID)
+	}
+	if len(want) != 0 {
+		t.Fatalf("prices not seeded: %v", want)
+	}
+}
+
 // @scenario "The catalog seeds the product's own price ids"
 func TestCatalogSeedsRealPriceIDs(t *testing.T) {
 	g := newRig(t)

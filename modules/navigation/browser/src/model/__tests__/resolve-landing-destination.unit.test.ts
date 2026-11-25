@@ -94,6 +94,19 @@ describe("resolveLandingDestination", () => {
         resolveLandingDestination(input({ rememberedProduct: "dashboards", projectSlug: "demo" })),
       ).toBe("/demo/dashboards");
     });
+
+    /** @scenario "A remembered Dashboards lands on the organization's library" */
+    it("opens the organization's library when the library is on", () => {
+      expect(
+        resolveLandingDestination(
+          input({
+            rememberedProduct: "dashboards",
+            projectSlug: "demo",
+            hasOrganizationLibrary: true,
+          }),
+        ),
+      ).toBe("/dashboards");
+    });
   });
 
   describe("when nothing is remembered", () => {

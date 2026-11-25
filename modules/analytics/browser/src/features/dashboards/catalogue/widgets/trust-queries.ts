@@ -5,120 +5,142 @@
 
 import { bucketOf, inPeriod } from "../../templates/model/lwql-period.ts";
 
-/** A trace field the boards lean on, and how a trace shows it carries it. */
+/** A trace field the boards lean on, and the widgets that read it. */
 export interface HealthField {
-  readonly key: "model" | "cost" | "user" | "conversation" | "labels" | "outcome";
+  readonly key: "model" | "cost" | "conversation" | "user" | "labels" | "outcome";
   readonly label: string;
-  /** What to send, in the words of the SDK's trace metadata. */
-  readonly send: string;
-  /** The LangWatchQL view and condition a trace that carries the field meets. */
-  readonly view: "trace_metrics" | "traces";
-  readonly condition: string;
   /** A widget reads the field when one of its queries matches, or the catalogue lists `need`. */
   readonly readBy: RegExp;
   readonly need: string;
 }
 
 export const HEALTH_FIELDS: readonly HealthField[] = [
-  {
-    key: "model",
-    label: "Model",
-    send: "the model name on each LLM call",
-    view: "trace_metrics",
-    condition: "notEmpty(Models)",
-    readBy: /\bModels?\b/,
-    need: "model",
-  },
-  {
-    key: "cost",
-    label: "Cost",
-    send: "token counts or a cost on each LLM call",
-    view: "trace_metrics",
-    // A trace that called no model (tools, retrieval, an evaluator) stores no cost and owes none.
-    condition: "(TotalCost IS NOT NULL OR empty(Models))",
-    readBy: /\b(?:TotalCost|Cost|CostSum)\b/,
-    need: "cost",
-  },
-  {
-    key: "user",
-    label: "User",
-    send: "a user_id in the trace metadata",
-    view: "trace_metrics",
-    condition: "UserId IS NOT NULL",
-    readBy: /\bUserId\b/,
-    need: "user",
-  },
+  { key: "model", label: "Model name", readBy: /\bModels?\b/, need: "model" },
+  { key: "cost", label: "Cost", readBy: /\b(?:TotalCost|Cost|CostSum)\b/, need: "cost" },
   {
     key: "conversation",
-    label: "Conversation",
-    send: "a thread_id in the trace metadata",
-    view: "trace_metrics",
-    condition: "ConversationId IS NOT NULL",
+    label: "Conversation id",
     readBy: /\bConversationId\b/,
     need: "thread",
   },
+  { key: "user", label: "User id", readBy: /\bUserId\b/, need: "user" },
   {
     key: "labels",
-    label: "Labels",
-    send: "labels in the trace metadata",
-    view: "trace_metrics",
-    condition: "notEmpty(Labels)",
-    readBy: /\bLabels\b/,
+    label: "Customer or labels",
+    readBy: /\b(?:Labels|CustomerId)\b/,
     need: "labels",
   },
   {
     key: "outcome",
-    label: "Outcome",
-    send: "an outcome, such as resolved, in the trace metadata",
-    view: "trace_metrics",
-    condition: "MetadataOutcome != ''",
+    label: "How it ended",
     readBy: /metadata\.outcome|\bMetadataOutcome\b/,
     need: "outcome",
   },
 ];
 
-// Each field is a filter, never a column the result reads, so the completeness report does
-// not swap a missing field for a setup view. One scan per view, a flag per field on each trace's
-// 128-bit hash, then summed: a set of ids per field ran out of memory over 60 days. The fields
-// unfold from a split string, as LangWatchQL allows no array literal. A field no trace carries
-// keeps its row at 0; a period with no trace has no row.
-const scan = ({ view, fields }: { view: string; fields: readonly Coverage[] }) => {
-  const flagged = fields.filter(({ condition }) => condition);
-  const flags = flagged
-    .map(({ key, condition }) => `max(${condition}) AS has_${key}`)
-    .join(",\n      ");
-  const sums = flagged.map(({ key }) => `sum(has_${key}) AS has_${key}`).join(", ");
-  const keys = fields.map(({ key }) => key).join(",");
-  const counts = fields
-    .map(({ key, condition }) => `field = '${key}', ${condition ? `has_${key}` : "total"}`)
-    .join(", ");
-  return `SELECT arrayJoin(splitByChar(',', '${keys}')) AS field,
-  multiIf(${counts}, 0) AS traces
+/** A row of the coverage result: what it counts, out of which requests, and one that misses. */
+interface CoverageRow {
+  readonly field: string;
+  readonly present: string;
+  readonly base: string;
+  /** The requests a missing one is picked from; absent when nothing can miss. */
+  readonly missing?: string;
+}
+
+// `has_calls`: a step LangWatch types as a model call (set from gen_ai attributes when the app
+// sends no type), or a model name on the request. `has_named`: the request names a model.
+const COVERAGE: readonly CoverageRow[] = [
+  { field: "all", present: "true", base: "true" },
+  {
+    field: "model",
+    present: "has_calls AND has_named",
+    base: "has_calls",
+    missing: "has_calls AND NOT has_named",
+  },
+  {
+    field: "cost",
+    present: "has_named AND has_priced",
+    base: "has_named",
+    missing: "has_named AND NOT has_priced",
+  },
+  {
+    field: "no_tokens",
+    present: "has_named AND NOT has_priced AND NOT has_unpriced",
+    base: "has_named",
+    missing: "has_named AND NOT has_priced AND NOT has_unpriced",
+  },
+  {
+    field: "no_price",
+    present: "has_named AND has_unpriced",
+    base: "has_named",
+    missing: "has_named AND has_unpriced",
+  },
+  ...["conversation", "user", "labels", "outcome"].map((field) => ({
+    field,
+    present: `has_${field}`,
+    base: "true",
+    missing: `NOT has_${field}`,
+  })),
+  {
+    field: "neither",
+    present: "NOT has_conversation AND NOT has_user",
+    base: "true",
+    missing: "NOT has_conversation AND NOT has_user",
+  },
+];
+
+const pick = (part: (row: CoverageRow) => string, otherwise = "0") =>
+  `multiIf(${COVERAGE.map((row) => `field = '${row.field}', ${part(row)}`).join(", ")}, ${otherwise})`;
+
+/** The per-trace flags each side of the scan writes; the other side writes 0. */
+const FLAGS = ["llm", "named", "priced", "unpriced", "conversation", "user", "labels", "outcome"];
+const flags = (values: Readonly<Record<string, string>>) =>
+  FLAGS.map((flag) => `toUInt8(${values[flag] ?? "0"}) AS ${flag}`).join(", ");
+
+/**
+ * Each field over the requests it applies to (dashboards-v2 AC166b): one scan of each view, folded
+ * per trace on its 128-bit hash (a set of ids ran out of memory over 60 days). Rows unfold from a
+ * split string, as LangWatchQL allows no array literal.
+ */
+export const FIELD_COVERAGE_SQL = `SELECT arrayJoin(splitByChar(',', '${COVERAGE.map(({ field }) => field).join(",")}')) AS field,
+  ${pick(({ field }) => (field === "all" ? "total" : `${field}_present`))} AS present,
+  ${pick(({ base }) => (base === "true" ? "total" : `${base.slice(4)}_base`))} AS base,
+  ${pick(({ field, missing }) => (missing ? `${field}_example` : "''"), "''")} AS example
 FROM (
-  SELECT count() AS total, ${sums}
+  SELECT count() AS total, countIf(has_calls) AS calls_base, countIf(has_named) AS named_base,
+    ${COVERAGE.filter(({ field }) => field !== "all")
+      .map(
+        ({ field, present, missing }) =>
+          `countIf(${present}) AS ${field}_present, minIf(example_id, ${missing}) AS ${field}_example`,
+      )
+      .join(",\n    ")}
   FROM (
-    SELECT sipHash128(TraceId) AS trace,
-      ${flags}
-    FROM ${view}
-    WHERE ${inPeriod("OccurredAt")}
+    SELECT trace, min(id) AS example_id, max(llm OR named) AS has_calls,
+      ${FLAGS.filter((flag) => flag !== "llm")
+        .map((flag) => `max(${flag}) AS has_${flag}`)
+        .join(", ")}
+    FROM (
+      SELECT sipHash128(TraceId) AS trace, TraceId AS id, ${flags({ llm: "1" })}, false AS isTrace
+      FROM span_metrics
+      WHERE SpanType = 'llm' AND ${inPeriod("StartTime")}
+      UNION ALL
+      SELECT sipHash128(TraceId) AS trace, TraceId AS id, ${flags({
+        named: "notEmpty(Models)",
+        priced: "TotalCost IS NOT NULL AND UnpricedSpanCount = 0",
+        unpriced: "UnpricedSpanCount > 0",
+        conversation: "ConversationId IS NOT NULL",
+        user: "UserId IS NOT NULL",
+        labels: "notEmpty(Labels) OR CustomerId IS NOT NULL",
+        outcome: "MetadataOutcome != ''",
+      })}, true AS isTrace
+      FROM trace_metrics
+      WHERE ${inPeriod("OccurredAt")}
+    )
     GROUP BY trace
+    HAVING countIf(isTrace) > 0
   )
   HAVING total > 0
 )`;
-};
-
-interface Coverage {
-  readonly key: string;
-  readonly view: string;
-  readonly condition?: string;
-}
-
-const COVERAGE: readonly Coverage[] = [{ key: "all", view: "trace_metrics" }, ...HEALTH_FIELDS];
-
-/** Traces in the period ("all"), and how many carry each field. */
-export const FIELD_COVERAGE_SQL = [...new Set(COVERAGE.map(({ view }) => view))]
-  .map((view) => scan({ view, fields: COVERAGE.filter((field) => field.view === view) }))
-  .join("\nUNION ALL\n");
 
 /**
  * Traces with a model, and those with a span whose model has no price, per bucket. Traces

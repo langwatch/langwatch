@@ -31,6 +31,19 @@ describe("resolveOrgSwitchDestination", () => {
       ).toBe("/beta-app/dashboards");
     });
 
+    /** @scenario "Switching organization on an org-level page" */
+    it("lands on the new organization's library when it has the Dashboards area", () => {
+      expect(
+        resolveOrgSwitchDestination({
+          currentProduct: "dashboards",
+          reachableProducts: ["llm-ops", "dashboards"],
+          projectSlug: "beta-app",
+          hasOrganizationLibrary: true,
+        }),
+      ).toBe("/dashboards");
+    });
+
+    /** @scenario Switching organization falls through a product with no project */
     it("lands on the root when the product has no home to offer", () => {
       // The root re-resolves server side, where a Billing-only override can
       // answer the plan page; picking a product here would skip that answer.
@@ -56,6 +69,7 @@ describe("resolveOrgSwitchDestination", () => {
       ).toBe("/acme-app");
     });
 
+    /** @scenario Switching organization with no project lands on root */
     it("lands on the root when there is no project and Me is reachable", () => {
       expect(
         resolveOrgSwitchDestination({

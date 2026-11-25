@@ -6,7 +6,7 @@ The server half of [governance](../README.md). AI governance: ingestion sources 
 
 ## Installation
 
-`defineProcessModule("governance").withRepositories(governanceRepositories).withApi(GovernanceModule).withTransports(governanceRest, agentRegistryRest, agentKillSwitchRest, ocsfSiemRest, governanceCliRest, governanceIngestRest, meUsageRest, departmentsTrpcTransport, ingestionTemplatesTrpcTransport, aiToolsTrpcTransport, ingestionSourcesTrpcTransport, governanceTrpcTransport, anomalyRulesTrpcTransport, activityMonitorTrpcTransport, governanceKillSwitchTrpcTransport, personalSessionsTrpcTransport, ingestionKeyTrpcTransport, sessionPolicyTrpcTransport, governancePeopleTrpcTransport, governanceAgentsTrpcTransport, governanceCostTrpcTransport).provideMiddlewareBindings(…).provideMiddlewareContext(…).withEventing(pulledUsageEventing).withEventing(ingestionPullEventing).withEventing(ingestionPullReconcileEventing).withEventing(governanceActivityMonitorEventing).withEventing(codingAssistantBillingEventing).withEventing(agentRegistryEventing).withEventing(agentStopEventing).withEventing(ocsfPushEventing).withMigrations(…)`, `src/governance.module.ts:77`.
+`defineProcessModule("governance").withRepositories(governanceRepositories).withApi(GovernanceModule).withTransports(governanceRest, agentRegistryRest, agentKillSwitchRest, ocsfSiemRest, governanceCliRest, governanceIngestRest, meUsageRest, departmentsTrpcTransport, ingestionTemplatesTrpcTransport, aiToolsTrpcTransport, ingestionSourcesTrpcTransport, governanceTrpcTransport, anomalyRulesTrpcTransport, activityMonitorTrpcTransport, governanceKillSwitchTrpcTransport, personalSessionsTrpcTransport, ingestionKeyTrpcTransport, sessionPolicyTrpcTransport, governancePeopleTrpcTransport, governanceAgentsTrpcTransport, governanceCostTrpcTransport).provideMiddlewareBindings(…).provideMiddlewareContext(…).withEventing(pulledUsageEventing).withEventing(ingestionPullEventing).withEventing(ingestionPullReconcileEventing).withEventing(governanceActivityMonitorEventing).withEventing(codingAssistantBillingEventing).withEventing(ingestionSourceLifecycleEventing).withEventing(agentRegistryEventing).withEventing(agentStopEventing).withEventing(ocsfPushEventing).withMigrations(…)`, `src/governance.module.ts:78`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -1559,7 +1559,7 @@ Permission `complianceExport:view`. Entitlement `enterprise` (feature `OCSF_EXPO
 Answers at `/api/governance/ocsf/events`, `/api/v1/governance/ocsf/events`.
 
 ```typescript
-// Query: ocsfEventsQuerySchema, ../contract/src/features/ocsf/ocsf-siem.ts:87
+// Query: ocsfEventsQuerySchema, ../contract/src/features/ocsf/ocsf-siem.ts:102
 interface Query {
   limit?: number;
   since?: string;
@@ -1568,7 +1568,7 @@ interface Query {
   source_type?: string;
   source_id?: string;
 }
-// Response: ocsfEventsPageSchema, ../contract/src/features/ocsf/ocsf-siem.ts:122
+// Response: ocsfEventsPageSchema, ../contract/src/features/ocsf/ocsf-siem.ts:137
 interface Response {
   ocsf_version: string;
   data: Record<string, unknown>[];
@@ -1586,7 +1586,7 @@ Permission `complianceExport:view`. Entitlement `enterprise` (feature `OCSF_EXPO
 Answers at `/api/governance/ocsf/traces`, `/api/v1/governance/ocsf/traces`.
 
 ```typescript
-// Query: ocsfTracesQuerySchema, ../contract/src/features/ocsf/ocsf-siem.ts:96
+// Query: ocsfTracesQuerySchema, ../contract/src/features/ocsf/ocsf-siem.ts:111
 interface Query {
   limit?: number;
   since?: string;
@@ -1594,7 +1594,7 @@ interface Query {
   cursor?: string;
   project_id?: string;
 }
-type Response = z.infer<typeof ocsfEventsPageSchema>; // ../contract/src/features/ocsf/ocsf-siem.ts:122
+type Response = z.infer<typeof ocsfEventsPageSchema>; // ../contract/src/features/ocsf/ocsf-siem.ts:137
 ```
 
 #### `GET /api/governance/ocsf/audit` · `listOcsfAudit`
@@ -1606,14 +1606,14 @@ Permission `complianceExport:view`. Entitlement `enterprise` (feature `OCSF_EXPO
 Answers at `/api/governance/ocsf/audit`, `/api/v1/governance/ocsf/audit`.
 
 ```typescript
-// Query: ocsfAuditQuerySchema, ../contract/src/features/ocsf/ocsf-siem.ts:104
+// Query: ocsfAuditQuerySchema, ../contract/src/features/ocsf/ocsf-siem.ts:119
 interface Query {
   limit?: number;
   since?: string;
   until?: string;
   cursor?: string;
 }
-type Response = z.infer<typeof ocsfEventsPageSchema>; // ../contract/src/features/ocsf/ocsf-siem.ts:122
+type Response = z.infer<typeof ocsfEventsPageSchema>; // ../contract/src/features/ocsf/ocsf-siem.ts:137
 ```
 
 #### `POST /api/governance/ocsf/ingest` · `ingestOcsfEvents`
@@ -1625,8 +1625,8 @@ Permission `governance:manage`. Entitlement `enterprise` (feature `OCSF_EXPORT`)
 Answers at `/api/governance/ocsf/ingest`, `/api/v1/governance/ocsf/ingest`.
 
 ```typescript
-type Body = z.infer<typeof ocsfIngestRequestSchema>; // ../contract/src/features/ocsf/ocsf-siem.ts:168
-// Response: ocsfIngestResponseSchema, ../contract/src/features/ocsf/ocsf-siem.ts:179
+type Body = z.infer<typeof ocsfIngestRequestSchema>; // ../contract/src/features/ocsf/ocsf-siem.ts:183
+// Response: ocsfIngestResponseSchema, ../contract/src/features/ocsf/ocsf-siem.ts:194
 interface Response {
   accepted: number;
 }
@@ -2195,13 +2195,13 @@ interface Output {
 
 Contract `../contract/src/features/cost/governance-cost.trpc.ts:15`, router `src/transport/governance-cost.trpc.ts:13`.
 
-| Procedure                        | Kind  | Gate                                                | Input                                    | Output                                     |
-| -------------------------------- | ----- | --------------------------------------------------- | ---------------------------------------- | ------------------------------------------ |
-| `governanceCost.summary`         | query | Permission `governanceCost:view`                    | `governanceCostWindowInputSchema`        | `governanceCostSummarySchema`              |
-| `governanceCost.dailyByProvider` | query | Permission `governanceCost:view`                    | `governanceCostWindowInputSchema`        | `governanceCostProviderDayBreakdownSchema` |
-| `governanceCost.spendByModel`    | query | Permission `governanceCost:view`                    | `governanceCostWindowInputSchema`        | `governanceCostModelBreakdownSchema`       |
-| `governanceCost.periodRecords`   | query | Permission `governanceCost:view`                    | `governanceCostPeriodRecordsInputSchema` | `governanceCostDayRecordsSchema`           |
-| `governanceCost.spenders`        | query | Permission `governanceCost:view or governance:view` | `governanceCostWindowInputSchema`        | `governanceSpenderBreakdownSchema`         |
+| Procedure                        | Kind  | Gate                                                 | Input                                    | Output                                     |
+| -------------------------------- | ----- | ---------------------------------------------------- | ---------------------------------------- | ------------------------------------------ |
+| `governanceCost.summary`         | query | Permission `governanceCost:view`                     | `governanceCostWindowInputSchema`        | `governanceCostSummarySchema`              |
+| `governanceCost.dailyByProvider` | query | Permission `governanceCost:view`                     | `governanceCostWindowInputSchema`        | `governanceCostProviderDayBreakdownSchema` |
+| `governanceCost.spendByModel`    | query | Permission `governanceCost:view`                     | `governanceCostWindowInputSchema`        | `governanceCostModelBreakdownSchema`       |
+| `governanceCost.periodRecords`   | query | Permission `governanceCost:view`                     | `governanceCostPeriodRecordsInputSchema` | `governanceCostDayRecordsSchema`           |
+| `governanceCost.spenders`        | query | Permission `governanceCost:view and governance:view` | `governanceCostWindowInputSchema`        | `governanceSpenderBreakdownSchema`         |
 
 ```typescript
 // governanceCost.summary
@@ -2495,7 +2495,7 @@ type Output = {
 interface Input {
   organizationId: string;
 }
-// Output: personaResolutionSchema, ../contract/src/features/personal/persona-home.ts:54
+// Output: personaResolutionSchema, ../contract/src/features/personal/persona-home.ts:56
 interface Output {
   persona: "personal_only" | "mixed" | "project_only" | "governance_admin";
   destination: string;
@@ -3011,6 +3011,15 @@ Declared at `src/eventing/ingestion-pull.pipeline.ts:105`. Events: `ingestionPul
 | Postgres projection | `≈ IngestionPullRunStatusEventingProjection.create(this.options.runStatusStore)` | –                                                 | `src/eventing/ingestion-pull.pipeline.ts:123` |
 | retention           | `≈ this.options.retention`                                                       | –                                                 | `src/eventing/ingestion-pull.pipeline.ts:136` |
 
+### Pipeline `governance_ingestion_source` (aggregate `governance_ingestion_source`)
+
+Declared at `src/eventing/ingestion-source-lifecycle.pipeline.ts:128`. Events: `ingestionSourceCreatedEventSchema`, `ingestionSourceWentLiveEventSchema`.
+
+| Kind    | Name                            | Handles | Declared at                                               |
+| ------- | ------------------------------- | ------- | --------------------------------------------------------- |
+| command | `recordIngestionSourceCreated`  | –       | `src/eventing/ingestion-source-lifecycle.pipeline.ts:133` |
+| command | `recordIngestionSourceWentLive` | –       | `src/eventing/ingestion-source-lifecycle.pipeline.ts:134` |
+
 ### Pipeline `pulled_usage_processing` (aggregate `pulled_usage`)
 
 Declared at `src/eventing/pulled-usage.pipeline.ts:167`. Events: `pulledUsageObservedEventSchema`, `pulledUsageRetractedEventSchema`, `pulledUsagePricedEventSchema`.
@@ -3069,7 +3078,7 @@ Declared at `src/features/registry/eventing/agent-registry.pipeline.ts:89`.
 
 | Kind   | Leaf                       | Environment variable                  | Declared at                               |
 | ------ | -------------------------- | ------------------------------------- | ----------------------------------------- |
-| secret | `–`                        | `GOVERNANCE_ERASURE_PSEUDONYM_SECRET` | `src/app/governance.app.ts:589`           |
+| secret | `–`                        | `GOVERNANCE_ERASURE_PSEUDONYM_SECRET` | `src/app/governance.app.ts:594`           |
 | config | `gatewayPublicUrl`         | `LW_GATEWAY_PUBLIC_URL`               | `../contract/src/governance.config.ts:41` |
 | config | `gatewayInternalUrl`       | `LW_GATEWAY_INTERNAL_URL`             | `../contract/src/governance.config.ts:42` |
 | config | `gatewayLegacyUrl`         | `LW_GATEWAY_BASE_URL`                 | `../contract/src/governance.config.ts:43` |

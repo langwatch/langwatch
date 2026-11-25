@@ -633,6 +633,17 @@ export const uiRouteTable: readonly UiRouteDescriptor[] = [
             path: "/gateway/webhooks",
             page: "pages/gateway/webhooks",
           },
+
+          // The organization's Dashboards area: no project in the address, so no project chip
+          // (ADR-002). With its flag off `/dashboards` forwards to the reader's project, as
+          // before; with Dashboards off in the organization the shell answers not-found.
+          { path: "/dashboards", page: "pages/dashboards/index" },
+          { path: "/dashboards/templates", page: "pages/dashboards/templates" },
+          {
+            path: "/dashboards/curated/:templateId",
+            page: "pages/dashboards/curated/[templateId]",
+          },
+          { path: "/dashboards/:dashboardId", page: "pages/dashboards/[dashboardId]" },
           ...uiLegacyRedirectRoutes,
         ],
       },

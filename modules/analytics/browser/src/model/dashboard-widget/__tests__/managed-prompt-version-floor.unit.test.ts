@@ -157,6 +157,7 @@ describe("readsManagedPromptVersionFromTraceMetrics", () => {
     ["SELECT LastUsedPromptVersionId FROM trace_metrics", true],
     ["SELECT any(t.LastUsedPromptVersionId) AS v FROM trace_metrics AS t", true],
     ["SELECT LastUsedPromptVersionId FROM analytics.trace_metrics", true],
+    ["SELECT LastUsedPromptVersionId FROM langwatch.trace_metrics", true],
     [
       "SELECT m.LastUsedPromptVersionId FROM traces AS t JOIN trace_metrics AS m USING TraceId",
       true,
