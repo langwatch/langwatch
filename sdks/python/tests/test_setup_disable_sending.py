@@ -2,6 +2,7 @@
 
 import opentelemetry.trace
 import pytest
+from opentelemetry.sdk.trace.export import SpanExporter, SpanExportResult
 from opentelemetry.util._once import Once
 
 import langwatch
@@ -16,6 +17,27 @@ def _reset_global_tracer_provider():
     opentelemetry.trace._TRACER_PROVIDER_SET_ONCE = Once()  # type: ignore[attr-defined]
 
 
+class _RecordingExporter(SpanExporter):
+    """Stands in for the OTLP exporter: records the spans that reach the wire."""
+    exported: list = []
+    def __init__(self, *args, **kwargs) -> None:
+        pass
+    def export(self, spans):  # type: ignore[override]
+        _RecordingExporter.exported.extend(span.name for span in spans)
+        return SpanExportResult.SUCCESS
+    def force_flush(self, timeout_millis: int = 30000) -> bool:
+        return True
+    def shutdown(self) -> None:
+        pass
+@pytest.fixture
+def exported_span_names(monkeypatch):
+    """Names of the spans the LangWatch exporter would have sent."""
+    _RecordingExporter.exported = []
+    monkeypatch.setattr("langwatch.client.OTLPSpanExporter", _RecordingExporter)
+    return _RecordingExporter.exported
+def _end_span_and_flush(provider, name):
+    provider.get_tracer("test-776").start_span(name).end()
+    provider.force_flush()
 @pytest.fixture(autouse=True)
 def reset_client():
     Client.reset_for_testing()
@@ -43,7 +65,7 @@ def test_setup_defaults_to_sending_enabled():
 
 
 # @scenario "Re-enabling sending through setup() resumes the provider it created"
-def test_setup_re_enabling_sending_resumes_the_provider():
+def test_setup_re_enabling_sending_resumes_the_provider(exported_span_names):
     _reset_global_tracer_provider()
     try:
         langwatch.setup(
@@ -65,6 +87,9 @@ def test_setup_re_enabling_sending_resumes_the_provider():
         # A tracer handed out while sending was disabled samples again too.
         assert tracer_from_before.start_span("after-re-enable").is_recording()
         assert provider.get_tracer("test-776-new").start_span("new").is_recording()
+        # And the span reaches the exporter, not only the sampler.
+        _end_span_and_flush(provider, "reaches-the-exporter")
+        assert "reaches-the-exporter" in exported_span_names
     finally:
         Client.reset_for_testing()
         _reset_global_tracer_provider()
@@ -93,3 +118,33 @@ def test_setup_re_enabling_inside_a_disabled_trace_applies_on_exit():
         assert client.disable_sending is True
 
     assert client.disable_sending is False
+# @scenario "setup() inside a disable_sending trace keeps sending disabled after the trace"
+def test_setup_inside_a_disabled_trace_keeps_spans_off_the_exporter(exported_span_names):
+    _reset_global_tracer_provider()
+    try:
+        langwatch.setup(api_key="test-key-776", endpoint_url="http://127.0.0.1:9")
+        provider = Client._tracer_provider
+        assert provider is not None
+        with langwatch.trace(name="disabled-trace", disable_sending=True):
+            langwatch.setup(disable_sending=True)
+        _end_span_and_flush(provider, "after-the-disabled-trace")
+        assert "after-the-disabled-trace" not in exported_span_names
+    finally:
+        Client.reset_for_testing()
+        _reset_global_tracer_provider()
+# @scenario "setup() inside a disable_sending trace can re-enable sending after the trace"
+def test_setup_re_enabling_inside_a_disabled_trace_resumes_the_exporter(exported_span_names):
+    _reset_global_tracer_provider()
+    try:
+        langwatch.setup(
+            api_key="test-key-776", endpoint_url="http://127.0.0.1:9", disable_sending=True
+        )
+        provider = Client._tracer_provider
+        assert provider is not None
+        with langwatch.trace(name="disabled-trace", disable_sending=True):
+            langwatch.setup(disable_sending=False)
+        _end_span_and_flush(provider, "after-the-disabled-trace")
+        assert "after-the-disabled-trace" in exported_span_names
+    finally:
+        Client.reset_for_testing()
+        _reset_global_tracer_provider()

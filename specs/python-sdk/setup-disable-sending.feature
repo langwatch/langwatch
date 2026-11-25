@@ -21,12 +21,14 @@ Feature: langwatch.setup() can disable sending traces
     When I call langwatch.setup again with disable_sending=False
     Then the provider samples spans again, including from tracers handed out before
     And the LangWatch exporter is attached to it
+    And a span ended afterwards reaches the exporter
 
   @unit
   Scenario: setup() inside a disable_sending trace keeps sending disabled after the trace
     Given a trace with disable_sending=True is active
     When I call langwatch.setup with disable_sending=True inside it
     Then sending stays disabled after the trace exits
+    And a span ended afterwards does not reach the exporter
 
   @unit
   Scenario: setup() inside a disable_sending trace can re-enable sending after the trace
@@ -35,3 +37,4 @@ Feature: langwatch.setup() can disable sending traces
     When I call langwatch.setup with disable_sending=False inside it
     Then sending stays disabled until the trace exits
     And sending is enabled after the trace exits
+    And a span ended afterwards reaches the exporter
