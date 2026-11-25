@@ -133,7 +133,7 @@ afterEach(cleanup);
 describe("asking Langy from a widget card", () => {
   describe("given Langy is on and the member may start a conversation", () => {
     /** @scenario "AC120 Ask Langy: each widget card offers Ask Langy only when Langy is available" */
-    it("spells out Ask Langy, outside the controls that show only on hover", async () => {
+    it("spells out Ask Langy, with the controls that show only on hover", async () => {
       openBoard();
 
       const ask = await screen.findByRole(
@@ -143,7 +143,7 @@ describe("asking Langy from a widget card", () => {
       );
       const menu = screen.getByRole("button", { name: "Actions for Top errors" });
       expect(ask).toHaveTextContent("Ask Langy");
-      expect(menu.parentElement?.contains(ask)).toBe(false);
+      expect(menu.parentElement?.contains(ask)).toBe(true);
     });
 
     describe("when the chart reports a series clicked on one day", () => {

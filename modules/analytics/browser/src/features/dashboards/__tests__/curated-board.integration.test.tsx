@@ -453,7 +453,8 @@ describe("given a member opens a From LangWatch board", () => {
 
   describe("when Langy is available", () => {
     /** @scenario "AC120b Ask Langy: every widget on every board has Ask Langy, From LangWatch boards included" */
-    it("gives every widget an Ask Langy button that drafts that widget's prompt", async () => {
+    /** @scenario "AC121b Ask Langy: clicking opens the widget large beside Langy" */
+    it("gives every widget an Ask Langy button that drafts that widget's prompt and opens it large", async () => {
       const user = userEvent.setup({ pointerEventsCheck: 0 });
       const { host } = openCurated({ templateId: "release" });
       const names = curatedBoardById("release")?.widgets.map(({ name }) => name) ?? [];
@@ -470,6 +471,7 @@ describe("given a member opens a From LangWatch board", () => {
       expect(host.langyAsks[0]?.question).toBeUndefined();
       expect(host.langyAsks[0]?.draft).toContain(names[0]);
       expect(host.langyAsks[0]?.context[0]?.ref).toContain("From LangWatch dashboard");
+      expect(await screen.findByRole("dialog", { name: names[0] })).toBeInTheDocument();
       expect(host.lastQuery).not.toEqual(PICKER_OPEN);
       expect(screen.queryByRole("heading", { name: "Add a widget" })).toBeNull();
     });

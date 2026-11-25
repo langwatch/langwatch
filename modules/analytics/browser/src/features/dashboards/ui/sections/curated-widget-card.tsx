@@ -23,6 +23,7 @@ import { WidgetExportMenu } from "../blocks/widget-export-menu.tsx";
 import { WidgetMenu } from "../blocks/widget-menu.tsx";
 import { WidgetDragHandle } from "../elements/widget-drag-handle.tsx";
 import { chartAsks, type WidgetCardLangy } from "./board-widget-card.tsx";
+import { WIDGET_VIEW_CHART_HEIGHT_PX, WidgetLangyView } from "./widget-langy-view.tsx";
 
 export function CuratedWidgetCard({
   widget,
@@ -75,20 +76,60 @@ export function CuratedWidgetCard({
   const csvExport = useWidgetCsvExport({ board: boardName, widget: name });
   const viewRef = useWidgetViewed({ widgetSource: "curated" });
   const isEditable = onEdit !== undefined || onDelete !== undefined;
+  const [isViewOpen, setViewOpen] = useState(false);
+  const footer = widgetCardSourcesLine(definition.queries);
+  const actionRow = langyOnData && actions.length > 0 && (
+    <WidgetActionRow name={name} actions={actions} onAction={langyOnData.act} />
+  );
+  /** The widget's frame; only the card's reports what the board counts, such as empty cards. */
+  const frame = ({ maxHeight, onCard }: { maxHeight: number; onCard: boolean }) => (
+    <DashboardWidgetFrameOverWindow
+      id={frameId}
+      graph={definition}
+      projectId={projectId}
+      projectSlug={projectSlug}
+      widgetName={name}
+      telemetry={{
+        dashboardId: curatedBoardTelemetryId(templateId),
+        widgetId: widget.key,
+        templateId: widget.key,
+      }}
+      maxHeight={maxHeight}
+      timeWindow={timeWindow}
+      granularitySeconds={granularitySeconds}
+      periodKey={periodKey}
+      limitAudience={{ kind: "built_in" }}
+      {...(onCard
+        ? {
+            onFaceChange: setFace,
+            onExportChange: csvExport.onExportChange,
+            onEmptyChange,
+            onLimitFailureChange,
+          }
+        : {})}
+      onSignal={({ problem: shows }) => setProblem(shows)}
+      {...chartAsks({ langy: langyOnData, declared })}
+    />
+  );
 
-  return (
+  const card = (
     <WidgetCardShell
       viewRef={viewRef}
       name={name}
       description={definition.description}
-      footer={widgetCardSourcesLine(definition.queries)}
-      ask={langyOnData && <AskLangyButton name={name} onClick={langyOnData.ask} />}
-      actions={
-        langyOnData &&
-        actions.length > 0 && (
-          <WidgetActionRow name={name} actions={actions} onAction={langyOnData.act} />
+      footer={footer}
+      ask={
+        langyOnData && (
+          <AskLangyButton
+            name={name}
+            onClick={() => {
+              setViewOpen(true);
+              langyOnData.ask();
+            }}
+          />
         )
       }
+      actions={actionRow}
       controls={
         isEditable ? (
           <>
@@ -106,33 +147,27 @@ export function CuratedWidgetCard({
         )
       }
     >
-      {(bodyHeightPx) => (
-        <DashboardWidgetFrameOverWindow
-          id={frameId}
-          graph={definition}
-          projectId={projectId}
-          projectSlug={projectSlug}
-          widgetName={name}
-          telemetry={{
-            dashboardId: curatedBoardTelemetryId(templateId),
-            widgetId: widget.key,
-            templateId: widget.key,
-          }}
-          maxHeight={
-            bodyHeightPx ?? widgetBodyHeightPx(rowSpan, { withActions: actions.length > 0 })
-          }
-          timeWindow={timeWindow}
-          granularitySeconds={granularitySeconds}
-          periodKey={periodKey}
-          onFaceChange={setFace}
-          limitAudience={{ kind: "built_in" }}
-          onExportChange={csvExport.onExportChange}
-          onEmptyChange={onEmptyChange}
-          onLimitFailureChange={onLimitFailureChange}
-          onSignal={({ problem: shows }) => setProblem(shows)}
-          {...chartAsks({ langy: langyOnData, declared })}
-        />
-      )}
+      {(bodyHeightPx) =>
+        frame({
+          maxHeight:
+            bodyHeightPx ?? widgetBodyHeightPx(rowSpan, { withActions: actions.length > 0 }),
+          onCard: true,
+        })
+      }
     </WidgetCardShell>
+  );
+  if (!isViewOpen || !langyOnData) return card;
+  return (
+    <>
+      {card}
+      <WidgetLangyView
+        name={name}
+        description={definition.description}
+        footer={footer}
+        actions={actionRow}
+        onClose={() => setViewOpen(false)}
+        chart={frame({ maxHeight: WIDGET_VIEW_CHART_HEIGHT_PX, onCard: false })}
+      />
+    </>
   );
 }

@@ -1,6 +1,6 @@
 /**
- * A widget's Ask Langy button on a board card, spelled out and always visible: one click
- * hands Langy a ready draft about this widget, the same hand-off picking a widget gives (AC120).
+ * A widget's Ask Langy button on a board card, spelled out and shown with the card's hover
+ * controls: one click opens the widget large beside Langy, with a ready draft about it (AC120).
  */
 
 import { Button } from "@langwatch/design-system/primitives";

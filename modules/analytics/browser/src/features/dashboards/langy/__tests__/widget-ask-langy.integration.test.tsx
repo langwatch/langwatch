@@ -7,7 +7,7 @@
  */
 
 import type { UiProcedureCall } from "@langwatch/browser/testing-transport";
-import { cleanup, screen, waitFor } from "@testing-library/react";
+import { cleanup, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -113,6 +113,11 @@ describe("Ask Langy on a widget card", () => {
       const menu = screen.getByRole("button", { name: "Actions for Traffic" });
       expect(info.compareDocumentPosition(ask) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
       expect(ask.compareDocumentPosition(menu) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      expect(ask).toHaveTextContent("Ask Langy");
+      // Shown on hover or focus with the menu, never on a card at rest.
+      const controls = ask.closest("[data-testid='widget-card-controls']");
+      expect(controls).not.toBeNull();
+      expect(controls).toContainElement(menu);
     });
 
     describe("when the member clicks it", () => {
@@ -133,6 +138,24 @@ describe("Ask Langy on a widget card", () => {
         expect(widgetRef).toContain("description: Traces per bucket");
         expect(widgetRef).toContain(`series: ${SQL}`);
         expect(request?.context[0]).toMatchObject({ kind: "dashboard", label: "Weekly review" });
+      });
+
+      /** @scenario "AC121b Ask Langy: clicking opens the widget large beside Langy" */
+      it("opens the widget large in a drawer, and closing it leaves the board", async () => {
+        const user = userEvent.setup({ pointerEventsCheck: 0 });
+        openBoard({ server: inMemoryServer() });
+
+        await user.click(await screen.findByRole("button", { name: ASK_TRAFFIC }));
+
+        const view = await screen.findByRole("dialog", { name: "Traffic" });
+        expect(view).toHaveTextContent("Traces per bucket");
+        expect(within(view).getByTestId("widget-langy-view-chart")).toBeInTheDocument();
+        expect(within(view).getAllByTitle("Custom chart").length).toBeGreaterThan(0);
+
+        await user.keyboard("{Escape}");
+
+        await waitFor(() => expect(screen.queryByRole("dialog", { name: "Traffic" })).toBeNull());
+        expect(screen.getByRole("button", { name: ASK_TRAFFIC })).toBeInTheDocument();
       });
     });
   });

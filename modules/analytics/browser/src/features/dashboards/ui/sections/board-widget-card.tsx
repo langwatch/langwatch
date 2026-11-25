@@ -1,6 +1,7 @@
 /**
  * One stored widget on a board, in the card chrome: Ask Langy, the drag handle and menu, its
  * declared Langy actions and its queries' sources (AC200), over the board's period and grain.
+ * Ask Langy also opens the widget large beside Langy (AC121b).
  */
 
 import type { ChartAskSubject } from "@langwatch/analytics-contract/chart-frame-protocol";
@@ -37,6 +38,7 @@ import { WidgetActionRow } from "../blocks/widget-action-row.tsx";
 import { WidgetCardShell, widgetBodyHeightPx } from "../blocks/widget-card-shell.tsx";
 import { WidgetMenu } from "../blocks/widget-menu.tsx";
 import { WidgetDragHandle } from "../elements/widget-drag-handle.tsx";
+import { WIDGET_VIEW_CHART_HEIGHT_PX, WidgetLangyView } from "./widget-langy-view.tsx";
 
 /** What a card asks of Langy; every one of them is absent when Langy is not available. */
 export interface WidgetCardLangy {
@@ -145,28 +147,71 @@ export function BoardWidgetCard({
   const actions = shownWidgetButtons({ actions: declared, problem: problem && face === "chart" });
   const { periodStart, periodEnd, granularitySeconds } = period;
   const timeWindow = { start: periodStart, end: periodEnd };
+  const [isViewOpen, setViewOpen] = useState(false);
+  const footer = widgetCardFooter({
+    sourcesLine: widgetCardSourcesLine(widget.definition.queries),
+    projectsLine: widgetProjectsLine({
+      queries: widget.definition.queries,
+      boardProjectName: host.project()?.name ?? "",
+      readable,
+    }),
+    limits,
+  });
+  const actionRow = langyOnData && actions.length > 0 && (
+    <WidgetActionRow name={widget.name} actions={actions} onAction={langyOnData.act} />
+  );
+  /** The widget's frame; only the card's reports what the board counts, such as empty cards. */
+  const frame = ({ maxHeight, onCard }: { maxHeight: number; onCard: boolean }) => (
+    <DashboardWidgetFrameOverWindow
+      id={widget.id}
+      graph={widget.definition}
+      projectId={projectId}
+      projectSlug={projectSlug}
+      dashboardId={dashboardId}
+      widgetName={widget.name}
+      maxHeight={maxHeight}
+      timeWindow={timeWindow}
+      granularitySeconds={granularitySeconds}
+      periodKey={periodKey}
+      limitAudience={editableLimitAudience({
+        isWriting,
+        withLangy: !!langyOnData,
+        canEditCode,
+        onEdit,
+      })}
+      {...(onCard
+        ? {
+            onFaceChange: setFace,
+            onLimitsChange: setLimits,
+            onExportChange: csvExport.onExportChange,
+            onEmptyChange,
+            onLimitFailureChange,
+          }
+        : {})}
+      {...(langy ? { onAskLangyToSetUp: langy.setUpMissing } : {})}
+      onSignal={({ problem: shows }) => setProblem(shows)}
+      {...chartAsks({ langy: langyOnData, declared })}
+    />
+  );
 
-  return (
+  const card = (
     <WidgetCardShell
       viewRef={viewRef}
       name={widget.name}
       description={widget.definition.description}
-      footer={widgetCardFooter({
-        sourcesLine: widgetCardSourcesLine(widget.definition.queries),
-        projectsLine: widgetProjectsLine({
-          queries: widget.definition.queries,
-          boardProjectName: host.project()?.name ?? "",
-          readable,
-        }),
-        limits,
-      })}
-      ask={langyOnData && <AskLangyButton name={widget.name} onClick={langyOnData.ask} />}
-      actions={
-        langyOnData &&
-        actions.length > 0 && (
-          <WidgetActionRow name={widget.name} actions={actions} onAction={langyOnData.act} />
+      footer={footer}
+      ask={
+        langyOnData && (
+          <AskLangyButton
+            name={widget.name}
+            onClick={() => {
+              setViewOpen(true);
+              langyOnData.ask();
+            }}
+          />
         )
       }
+      actions={actionRow}
       controls={
         <>
           {onEdit && <WidgetDragHandle />}
@@ -190,37 +235,34 @@ export function BoardWidgetCard({
         picksNoSources(widget.definition.queries) ? (
           <NoSourcesPicked />
         ) : (
-          <DashboardWidgetFrameOverWindow
-            id={widget.id}
-            graph={widget.definition}
-            projectId={projectId}
-            projectSlug={projectSlug}
-            dashboardId={dashboardId}
-            widgetName={widget.name}
-            maxHeight={
+          frame({
+            maxHeight:
               bodyHeightPx ??
-              widgetBodyHeightPx(widget.placement.rowSpan, { withActions: actions.length > 0 })
-            }
-            timeWindow={timeWindow}
-            granularitySeconds={granularitySeconds}
-            periodKey={periodKey}
-            onFaceChange={setFace}
-            limitAudience={editableLimitAudience({
-              isWriting,
-              withLangy: !!langyOnData,
-              canEditCode,
-              onEdit,
-            })}
-            onLimitsChange={setLimits}
-            onExportChange={csvExport.onExportChange}
-            onEmptyChange={onEmptyChange}
-            onLimitFailureChange={onLimitFailureChange}
-            {...(langy ? { onAskLangyToSetUp: langy.setUpMissing } : {})}
-            onSignal={({ problem: shows }) => setProblem(shows)}
-            {...chartAsks({ langy: langyOnData, declared })}
-          />
+              widgetBodyHeightPx(widget.placement.rowSpan, { withActions: actions.length > 0 }),
+            onCard: true,
+          })
         )
       }
     </WidgetCardShell>
+  );
+  if (!isViewOpen || !langyOnData) return card;
+  return (
+    <>
+      {card}
+      <WidgetLangyView
+        name={widget.name}
+        description={widget.definition.description}
+        footer={footer}
+        actions={actionRow}
+        onClose={() => setViewOpen(false)}
+        chart={
+          picksNoSources(widget.definition.queries) ? (
+            <NoSourcesPicked />
+          ) : (
+            frame({ maxHeight: WIDGET_VIEW_CHART_HEIGHT_PX, onCard: false })
+          )
+        }
+      />
+    </>
   );
 }

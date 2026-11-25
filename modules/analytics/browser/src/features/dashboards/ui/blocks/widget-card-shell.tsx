@@ -1,7 +1,7 @@
 /**
- * A board card's chrome: its name and a faint info tip, Ask Langy, the controls a board gives it
- * (shown only on hover or focus, so a board of cards stays calm), its body, its Langy actions,
- * then a quiet footer line. A widget frame in the body publishes what its data is missing here.
+ * A board card's chrome: its name, a faint info tip, then Ask Langy and the board's controls
+ * (on hover or focus, always without hover, so a board stays calm), its body, its Langy actions
+ * and a quiet footer line. A widget frame in the body publishes what its data is missing here.
  */
 
 import { Box, HStack, Text, VStack } from "@langwatch/design-system/primitives";
@@ -45,7 +45,7 @@ export function WidgetCardShell({
 }: {
   name: string;
   description?: string;
-  /** Ask Langy, always visible beside the hover controls; absent without Langy. */
+  /** Ask Langy, first of the hover controls; absent without Langy. */
   ask?: ReactNode;
   /** The widget's Langy actions, a row under the body; absent when it declares none. */
   actions?: ReactNode;
@@ -112,16 +112,12 @@ export function WidgetCardShell({
         {(description || hasNotes) && (
           <WidgetInfoTip name={name} description={description} completeness={completeness} />
         )}
-        {ask && (
-          <Box marginLeft="auto" flexShrink={0}>
-            {ask}
-          </Box>
-        )}
-        {controls && (
+        {(ask || controls) && (
           <HStack
             gap={0.5}
-            marginLeft={ask ? undefined : "auto"}
+            marginLeft="auto"
             flexShrink={0}
+            data-testid="widget-card-controls"
             opacity={0}
             transition="opacity 0.15s"
             _groupHover={{ opacity: 1 }}
@@ -132,6 +128,7 @@ export function WidgetCardShell({
               "@media (hover: none)": { opacity: 1 },
             }}
           >
+            {ask}
             {controls}
           </HStack>
         )}
