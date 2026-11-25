@@ -1,9 +1,12 @@
 package domain
 
 import (
+	"bufio"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"io"
+	"net/http"
 	"strings"
 )
 
@@ -29,7 +32,11 @@ var turnImageMediaTypes = map[string]bool{
 	"image/webp": true,
 }
 
-// ValidateTurnImages checks the count, media type and payload of each image.
+// sniffBytes is how much of an image http.DetectContentType reads.
+const sniffBytes = 512
+
+// ValidateTurnImages checks the count, media type and payload of each image,
+// and that the decoded bytes are an image of the declared media type.
 // It returns a message safe to show the caller, or "" when every image is
 // valid. The message names an image by position, never by its data.
 func ValidateTurnImages(images []TurnImage) string {
@@ -43,14 +50,29 @@ func ValidateTurnImages(images []TurnImage) string {
 		if img.Data == "" {
 			return fmt.Sprintf("images[%d]: data is empty", i)
 		}
-		decoder := base64.NewDecoder(base64.StdEncoding, strings.NewReader(img.Data))
-		n, err := io.Copy(io.Discard, io.LimitReader(decoder, MaxTurnImageBytes+1))
-		if err != nil {
-			return fmt.Sprintf("images[%d]: data is not valid base64", i)
+		if msg := validateTurnImageData(i, img); msg != "" {
+			return msg
 		}
-		if n > MaxTurnImageBytes {
-			return fmt.Sprintf("images[%d]: larger than %d bytes", i, MaxTurnImageBytes)
-		}
+	}
+	return ""
+}
+
+func validateTurnImageData(i int, img TurnImage) string {
+	decoded := bufio.NewReaderSize(
+		base64.NewDecoder(base64.StdEncoding, strings.NewReader(img.Data)), sniffBytes)
+	head, err := decoded.Peek(sniffBytes)
+	if err != nil && !errors.Is(err, io.EOF) {
+		return fmt.Sprintf("images[%d]: data is not valid base64", i)
+	}
+	n, err := io.Copy(io.Discard, io.LimitReader(decoded, MaxTurnImageBytes+1))
+	if err != nil {
+		return fmt.Sprintf("images[%d]: data is not valid base64", i)
+	}
+	if n > MaxTurnImageBytes {
+		return fmt.Sprintf("images[%d]: larger than %d bytes", i, MaxTurnImageBytes)
+	}
+	if http.DetectContentType(head) != img.MediaType {
+		return fmt.Sprintf("images[%d]: data is not a %s image", i, img.MediaType)
 	}
 	return ""
 }

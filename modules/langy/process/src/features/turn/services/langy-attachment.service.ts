@@ -25,6 +25,10 @@ import type {
   LangyWorkerDispatchInput,
   LangyWorkerImage,
 } from "../../../channels/langy-worker.channel.ts";
+import {
+  LANGY_IMAGE_SNIFF_BYTES,
+  langyImageMediaTypeOfBytes,
+} from "../../../rules/langy-image-bytes.rules.ts";
 
 const logger = createLogger("langwatch:langy:attachments");
 
@@ -69,6 +73,10 @@ export class LangyAttachmentService {
       projectId: input.projectId,
       objectId: input.objectId,
     });
+    const head = await this.leadingBytes({ projectId: input.projectId, id: reference.id });
+    if (langyImageMediaTypeOfBytes(head) !== reference.mediaType.toLowerCase()) {
+      throw new LangyAttachmentRefusedError("not_an_image");
+    }
     return {
       objectId: reference.id,
       url: langyAttachmentUrlOf({
@@ -119,13 +127,28 @@ export class LangyAttachmentService {
       const read = await this.storedObjects.getById({ projectId, id: ref.objectId });
       const chunks: Uint8Array[] = [];
       for await (const chunk of read.bytes) chunks.push(chunk);
-      images.push({
-        name: ref.filename,
-        mediaType: metadata.mediaType.toLowerCase(),
-        data: Buffer.concat(chunks).toString("base64"),
-      });
+      const bytes = Buffer.concat(chunks);
+      const mediaType = metadata.mediaType.toLowerCase();
+      if (langyImageMediaTypeOfBytes(bytes) !== mediaType) {
+        logger.warn({ projectId, objectId: ref.objectId }, "langy image bytes are not its type");
+        continue;
+      }
+      images.push({ name: ref.filename, mediaType, data: bytes.toString("base64") });
     }
     return images;
+  }
+
+  /** The first bytes of a stored file, enough to tell which image format it is. */
+  private async leadingBytes({ projectId, id }: { projectId: string; id: string }) {
+    const read = await this.storedObjects.getById({ projectId, id });
+    const chunks: Uint8Array[] = [];
+    let length = 0;
+    for await (const chunk of read.bytes) {
+      chunks.push(chunk);
+      length += chunk.length;
+      if (length >= LANGY_IMAGE_SNIFF_BYTES) break;
+    }
+    return Buffer.concat(chunks);
   }
 
   /** The worker channel with each dispatch's image references read into image input. */

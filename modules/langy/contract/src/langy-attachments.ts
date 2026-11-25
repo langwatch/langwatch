@@ -122,11 +122,15 @@ export type LangyAttachmentAddress = Readonly<{
 export function langyAttachmentAddressOf(url: string): LangyAttachmentAddress | "not_stored" {
   const match = FILE_URL.exec(url);
   if (!match?.[1] || !match[2] || !match[3]) return "not_stored";
-  return {
-    projectId: decodeURIComponent(match[1]),
-    objectId: decodeURIComponent(match[2]),
-    filename: decodeURIComponent(match[3]),
-  };
+  try {
+    return {
+      projectId: decodeURIComponent(match[1]),
+      objectId: decodeURIComponent(match[2]),
+      filename: decodeURIComponent(match[3]),
+    };
+  } catch {
+    return "not_stored";
+  }
 }
 
 /** An image chip in a message's text: `[▣ name.png]` where the image was put. */

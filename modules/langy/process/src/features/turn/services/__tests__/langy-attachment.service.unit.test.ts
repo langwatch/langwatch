@@ -4,8 +4,11 @@
 import type { HandledError } from "@langwatch/handled-error";
 import type { LangyAttachmentRef } from "@langwatch/langy-contract";
 import {
+  STORED_OBJECT_DELIVERY_AUDIENCES,
   type StoredObjectApi,
   type StoredObjectMetadata,
+  type StoredObjectReference,
+  storedObjectReferenceSchema,
   StoredObjectNotFoundError,
   storedObjectMetadataSchema,
 } from "@langwatch/stored-object-contract";
@@ -42,8 +45,23 @@ function metadataOf({
   });
 }
 
-async function* bytesOf(text: string) {
-  yield new TextEncoder().encode(text);
+function referenceOf(): StoredObjectReference {
+  const { projectId, id, sha256, byteLength, filename, mediaType } = metadataOf();
+  return storedObjectReferenceSchema.parse({
+    projectId,
+    id,
+    sha256,
+    byteLength,
+    filename,
+    mediaType,
+    audience: STORED_OBJECT_DELIVERY_AUDIENCES[0],
+  });
+}
+
+const PNG_BYTES = Uint8Array.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1, 2, 3, 4]);
+
+async function* bytesOf(bytes: Uint8Array) {
+  yield bytes;
 }
 
 function refusalOf(error: unknown): { code?: string; reason?: unknown } {
@@ -172,7 +190,7 @@ describe("LangyAttachmentService", () => {
       const service = LangyAttachmentService.create({
         storedObjects: createApiFixture<StoredObjectApi>({
           getMetadata: async () => metadataOf(),
-          getById: async () => ({ metadata: metadataOf(), bytes: bytesOf("PNG!") }),
+          getById: async () => ({ metadata: metadataOf(), bytes: bytesOf(PNG_BYTES) }),
         }),
       });
 
@@ -183,10 +201,69 @@ describe("LangyAttachmentService", () => {
         {
           name: "pasted-1a2b3c.png",
           mediaType: "image/png",
-          data: Buffer.from("PNG!").toString("base64"),
+          data: Buffer.from(PNG_BYTES).toString("base64"),
         },
       ]);
       expect(worker.dispatched[0]).not.toHaveProperty("imageRefs");
+    });
+  });
+
+  describe("given an upload whose bytes are not the image it claims to be", () => {
+    /** @scenario A file whose bytes are not the image it claims is refused when it is confirmed */
+    it("refuses the confirmation with langy_attachment_refused naming not_an_image", async () => {
+      const service = LangyAttachmentService.create({
+        storedObjects: createApiFixture<StoredObjectApi>({
+          confirmUpload: async () => referenceOf(),
+          getById: async () => ({
+            metadata: metadataOf(),
+            bytes: bytesOf(new TextEncoder().encode("hello, not a png")),
+          }),
+        }),
+      });
+
+      const error = await service
+        .confirmUpload({ projectId: PROJECT, objectId: "storedobject_a" })
+        .catch((caught: unknown) => caught);
+
+      expect(refusalOf(error)).toEqual({
+        code: "langy_attachment_refused",
+        reason: "not_an_image",
+      });
+    });
+
+    /** @scenario A file whose bytes are not the image it claims is refused when it is confirmed */
+    it("confirms a PNG whose bytes are a PNG", async () => {
+      const service = LangyAttachmentService.create({
+        storedObjects: createApiFixture<StoredObjectApi>({
+          confirmUpload: async () => referenceOf(),
+          getById: async () => ({ metadata: metadataOf(), bytes: bytesOf(PNG_BYTES) }),
+        }),
+      });
+
+      const attachment = await service.confirmUpload({
+        projectId: PROJECT,
+        objectId: "storedobject_a",
+      });
+
+      expect(attachment.url).toBe("/api/files/project_1/storedobject_a/pasted-1a2b3c.png");
+    });
+
+    /** @scenario A file whose bytes are not the image it claims is refused when it is confirmed */
+    it("leaves an image whose stored bytes are not its type out of the dispatch", async () => {
+      const worker = new RecordingWorker();
+      const service = LangyAttachmentService.create({
+        storedObjects: createApiFixture<StoredObjectApi>({
+          getMetadata: async () => metadataOf(),
+          getById: async () => ({
+            metadata: metadataOf(),
+            bytes: bytesOf(new TextEncoder().encode("GIF89a, not a png")),
+          }),
+        }),
+      });
+
+      await service.withImages(worker).dispatch(dispatchInput([ref]));
+
+      expect(worker.dispatched[0]?.images).toBeUndefined();
     });
   });
 

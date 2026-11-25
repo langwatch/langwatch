@@ -104,3 +104,10 @@ Feature: Images attached to a Langy message reach the model
     When the conversation shows it
     Then the image is drawn from a short-lived signed URL for that stored file
     And the image's chip in the text shows its file name
+
+  @unit
+  Scenario: A file whose bytes are not the image it claims is refused when it is confirmed
+    Given a person uploaded a file named and typed as a PNG whose bytes are text
+    When the upload is confirmed
+    Then the confirmation is refused with langy_attachment_refused naming not_an_image
+    And a stored image whose bytes are not its type is left out of a turn's dispatch

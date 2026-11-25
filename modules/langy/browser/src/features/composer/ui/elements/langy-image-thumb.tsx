@@ -50,6 +50,50 @@ function ThumbFace({
   );
 }
 
+function UploadingVeil({ name }: { name: string }) {
+  return (
+    <Box
+      position="absolute"
+      inset={0}
+      display="grid"
+      placeItems="center"
+      borderRadius="9px"
+      background="bg.panel/55"
+    >
+      <Spinner size="xs" aria-label={`Uploading ${name}`} />
+    </Box>
+  );
+}
+
+function RemoveImageButton({ name, onRemove }: { name: string; onRemove: () => void }) {
+  return (
+    <chakra.button
+      type="button"
+      aria-label={`Remove ${name}`}
+      onClick={onRemove}
+      position="absolute"
+      top="-6px"
+      right="-6px"
+      width="18px"
+      height="18px"
+      display="grid"
+      placeItems="center"
+      borderRadius="full"
+      borderWidth="1px"
+      borderStyle="solid"
+      borderColor="border.emphasized"
+      background="bg.panel"
+      color="fg.muted"
+      cursor="pointer"
+      boxShadow="sm"
+      _hover={{ color: "fg" }}
+      _focusVisible={{ outline: "2px solid", outlineColor: "orange.focusRing" }}
+    >
+      <X size={11} aria-hidden />
+    </chakra.button>
+  );
+}
+
 /** An image in the row above the composer's text: its thumbnail, upload state and remove button. */
 export function LangyImageThumb({
   name,
@@ -82,44 +126,8 @@ export function LangyImageThumb({
       background={failed ? "red.subtle" : "bg.muted"}
     >
       <ThumbFace name={name} src={src} failed={failed} error={error} />
-      {status === "uploading" ? (
-        <Box
-          position="absolute"
-          inset={0}
-          display="grid"
-          placeItems="center"
-          borderRadius="9px"
-          background="bg.panel/55"
-        >
-          <Spinner size="xs" aria-label={`Uploading ${name}`} />
-        </Box>
-      ) : null}
-      {onRemove ? (
-        <chakra.button
-          type="button"
-          aria-label={`Remove ${name}`}
-          onClick={onRemove}
-          position="absolute"
-          top="-6px"
-          right="-6px"
-          width="18px"
-          height="18px"
-          display="grid"
-          placeItems="center"
-          borderRadius="full"
-          borderWidth="1px"
-          borderStyle="solid"
-          borderColor="border.emphasized"
-          background="bg.panel"
-          color="fg.muted"
-          cursor="pointer"
-          boxShadow="sm"
-          _hover={{ color: "fg" }}
-          _focusVisible={{ outline: "2px solid", outlineColor: "orange.focusRing" }}
-        >
-          <X size={11} aria-hidden />
-        </chakra.button>
-      ) : null}
+      {status === "uploading" ? <UploadingVeil name={name} /> : null}
+      {onRemove ? <RemoveImageButton name={name} onRemove={onRemove} /> : null}
     </Box>
   );
   if (failed || !src) return thumb;

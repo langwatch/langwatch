@@ -6,6 +6,7 @@ import { type RefObject, useCallback, useRef } from "react";
 import { useLangyStore } from "../../../../behavior/langy.store.ts";
 import {
   imageFileParts,
+  imagesAllowSend,
   useLangyComposerImages,
 } from "../../../composer/behavior/langy-composer-images.store.ts";
 import { langyDraftToRestore } from "../../../composer/model/langy-draft-recovery.ts";
@@ -55,6 +56,12 @@ function sendLabel(text: string): string {
  * The panel's send, kept stable for the composer while its implementation reads this render's
  * context. `/feedback` is a client command: it summons the rating card and sends nothing.
  */
+/** An image still uploading, or one that failed, holds back the person's own send. */
+function composerImagesHoldSend({ askedFrom }: Pick<LangySendOptions, "askedFrom">): boolean {
+  if (askedFrom !== "composer") return false;
+  return !imagesAllowSend(useLangyComposerImages.getState().images);
+}
+
 /** Only the person's own words carry the composer's images; a message sent for them never does. */
 function composerImagesFor({ askedFrom }: Pick<LangySendOptions, "askedFrom">) {
   if (askedFrom !== "composer") return [];
@@ -85,7 +92,7 @@ export function useLangyPanelSend({
     text: string,
     { keepOnFailure = true, askedFrom }: LangySendOptions = {},
   ) => {
-    if (!text.trim() || !projectId || isBusy) return;
+    if (!text.trim() || !projectId || isBusy || composerImagesHoldSend({ askedFrom })) return;
     const images = composerImagesFor({ askedFrom });
     setDraft("");
     if (text.trim().toLowerCase() === "/feedback") {
