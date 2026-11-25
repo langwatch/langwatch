@@ -1,20 +1,17 @@
 /**
- * A widget opened large from its card's Ask Langy (AC121b): a drawer from the left that stops
- * short of Langy's dock, so the chart and the conversation about it sit side by side.
+ * A widget opened large from its card's Ask Langy (AC121b): a drawer that Langy rides beside
+ * as it does beside the trace drawer, so the chart and the conversation about it sit together.
  */
 
+import { useInPlaceDrawer } from "@langwatch/browser-host/drawer";
 import { Drawer } from "@langwatch/design-system/drawer";
 import { Box, Text, VStack } from "@langwatch/design-system/primitives";
-import { LANGY_DOCK_WIDTH_PX } from "@langwatch/langy-contract";
 import type { ReactNode } from "react";
 
-import { useReservedEndInset } from "../../../dashboard-widget/ui/sections/dashboard-widget-edit-drawer.tsx";
+import { useFloatingLangyAtOpen } from "../../langy/behavior/use-floating-langy-at-open.ts";
 
 /** The chart's height in the drawer: room to read it, under the drawer's header. */
 export const WIDGET_VIEW_CHART_HEIGHT_PX = 440;
-
-/** Langy's dock plus the drawer's own inset and a gap, so the two sit side by side. */
-const BESIDE_LANGY_PX = LANGY_DOCK_WIDTH_PX + 24;
 
 export function WidgetLangyView({
   name,
@@ -34,16 +31,17 @@ export function WidgetLangyView({
   /** The widget drawn at `WIDGET_VIEW_CHART_HEIGHT_PX`. */
   chart: ReactNode;
 }) {
-  useReservedEndInset({ open: true, reserveEndPx: BESIDE_LANGY_PX });
+  useInPlaceDrawer({ open: true });
+  const waitForFloatingLangy = useFloatingLangyAtOpen();
   return (
     <Drawer
       open
       onClose={onClose}
       size="xl"
-      placement="start"
-      companionMotion="follow"
+      companionMotion={waitForFloatingLangy ? "wait" : "follow"}
       title={name}
       {...(description ? { subtitle: description } : {})}
+      data-testid="widget-langy-view"
     >
       <VStack align="stretch" gap={3}>
         <Box height={`${WIDGET_VIEW_CHART_HEIGHT_PX}px`} data-testid="widget-langy-view-chart">

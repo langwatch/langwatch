@@ -292,6 +292,8 @@ describe("given the bulk upload drawer", () => {
       await user.upload(fileInput(), [csv("one.csv")]);
       await waitFor(() => expect(screen.getByText("one")).toBeInTheDocument());
       await user.click(uploadButton());
+      // Under load the upload starts a tick after the click; resolving earlier resolves nothing.
+      await waitFor(() => expect(uploadStoredObject).toHaveBeenCalled());
 
       act(() => closeDrawer());
       finishUpload({ id: "so_1" });
