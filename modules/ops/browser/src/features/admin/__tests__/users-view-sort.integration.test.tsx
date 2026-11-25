@@ -1,6 +1,6 @@
 /**
  * @vitest-environment jsdom
- * @see modules/ops/specs/instance-admin-user-sort.feature
+ * @see modules/ops/specs/admin-user-sort.feature
  */
 import { screen, within } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
@@ -26,7 +26,7 @@ const lastSort = () => asked.at(-1)?.sort;
 const columnHeader = (name: string) =>
   screen.getAllByRole("columnheader").find((cell) => within(cell).queryByRole("button", { name }))!;
 
-describe("Feature: Sorting the Back office users list", () => {
+describe("Feature: Sorting the Admin users list", () => {
   beforeEach(() => {
     asked.length = 0;
   });

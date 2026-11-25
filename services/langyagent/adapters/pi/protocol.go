@@ -5,7 +5,11 @@
 // implements.
 package pi
 
-import "encoding/json"
+import (
+	"encoding/json"
+
+	"github.com/langwatch/langwatch/services/langyagent/domain"
+)
 
 // protocolVersion is the wire version this manager speaks. The wrapper
 // announces its own in the ready event; version 1 is the only one that exists.
@@ -21,6 +25,9 @@ type command struct {
 	System      string `json:"system,omitempty"`
 	ResumeToken string `json:"resumeToken,omitempty"`
 	DeadlineMs  int64  `json:"deadlineMs,omitempty"`
+	// Images (turn only) carry name, mediaType and base64 data, the same
+	// field names as domain.TurnImage and the wrapper's TurnCommand.
+	Images []domain.TurnImage `json:"images,omitempty"`
 }
 
 // planItem is one row of a wrapper plan event.
