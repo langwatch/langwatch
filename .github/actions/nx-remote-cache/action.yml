@@ -21,7 +21,7 @@ runs:
         role=""
         if [ "$REF" = refs/heads/main ] && { [ "$EVENT" = push ] || [ "$EVENT" = workflow_dispatch ]; }; then
           role="arn:aws:iam::$account:role/langwatch-nx-cache-ci-main"
-        elif { [ "$EVENT" = pull_request ] && [ "$SAME_REPO" = true ] && [ "$ACTOR" != "dependabot[bot]" ]; } || [ "$EVENT" = merge_group ]; then
+        elif [ "$EVENT" = pull_request ] && [ "$SAME_REPO" = true ] && [ "$ACTOR" != "dependabot[bot]" ]; then
           role="arn:aws:iam::$account:role/langwatch-nx-cache-ci-pr"
         fi
         echo "arn=$role" >> "$GITHUB_OUTPUT"

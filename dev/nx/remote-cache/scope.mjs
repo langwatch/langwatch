@@ -22,9 +22,8 @@ const ciScope = (env) => {
       taintedWrite: null,
     };
   }
-  if (event !== "pull_request" && event !== "merge_group") return null;
-  const own =
-    event === "pull_request" && env.GITHUB_HEAD_REF ? branchPrefix(env.GITHUB_HEAD_REF) : null;
+  if (event !== "pull_request") return null;
+  const own = env.GITHUB_HEAD_REF ? branchPrefix(env.GITHUB_HEAD_REF) : null;
   return {
     tier: "pr",
     read: [{ prefix: PR }, { prefix: MAIN }, ...(own ? [{ prefix: own, laptop: true }] : [])],

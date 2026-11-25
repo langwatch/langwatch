@@ -142,6 +142,7 @@ describe("Nx remote cache", () => {
       null,
     );
     assert.equal(cacheScope({ env: ci({ GITHUB_EVENT_NAME: "pull_request_target" }) }), null);
+    assert.equal(cacheScope({ env: ci({ GITHUB_EVENT_NAME: "merge_group" }) }), null);
   });
 
   /** @scenario "No AWS access leaves Nx on its local cache" */

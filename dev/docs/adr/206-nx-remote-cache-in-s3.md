@@ -16,11 +16,11 @@ Task results go to the private bucket `langwatch-dev-nx-remote-cache` in the lw-
 
 Nx talks to a small local server (`dev/nx/remote-cache/`) that speaks the HTTP protocol and reads and writes S3 with SigV4, so the workspace root needs no AWS SDK. The bucket has three namespaces:
 
-| Namespace        | Written by                                                                                | Read by                                      |
-| ---------------- | ----------------------------------------------------------------------------------------- | -------------------------------------------- |
-| `main/`          | CI on a push to main (role `langwatch-nx-cache-ci-main`)                                  | everyone                                     |
-| `pr/`            | CI on a same-repository pull request or the merge queue (role `langwatch-nx-cache-ci-pr`) | everyone                                     |
-| `branch/<name>/` | a laptop on that branch (AWS SSO), or a pull request job that used a laptop entry         | laptops, and that branch's pull request jobs |
+| Namespace        | Written by                                                                        | Read by                                      |
+| ---------------- | --------------------------------------------------------------------------------- | -------------------------------------------- |
+| `main/`          | CI on a push to main (role `langwatch-nx-cache-ci-main`)                          | everyone                                     |
+| `pr/`            | CI on a same-repository pull request (role `langwatch-nx-cache-ci-pr`)            | everyone                                     |
+| `branch/<name>/` | a laptop on that branch (AWS SSO), or a pull request job that used a laptop entry | laptops, and that branch's pull request jobs |
 
 Main never reads `branch/`. A pull request job reads `pr/`, then `main/`, then its own `branch/`. Once it uses a laptop entry it writes `branch/` for the rest of the job, so a result built from laptop output never reaches `pr/` and from there main. The bucket policy enforces who may write each namespace and that the main role cannot read `branch/`. An entry is written once (`If-None-Match: *`) and never replaced.
 
@@ -32,7 +32,7 @@ A pull request's CI runs code that is not reviewed yet, and main trusts `pr/`. T
 
 IAM cannot tie a laptop to its own branch, so any engineer can write any `branch/` namespace. That reaches only laptops and pull request jobs, never main.
 
-Release images build in Docker from source and do not use this cache.
+Release images build in Docker from source and do not use this cache. The merge queue gets no role either: its OIDC subject names each queue branch, and the langwatch-saas infra tests refuse a role that trusts a wildcard subject.
 
 Traffic from S3 to GitHub-hosted runners is internet egress. Test results are a few kilobytes; `dist` outputs are larger, so uploads above 200 MB are skipped (`LANGWATCH_NX_REMOTE_CACHE_MAX_MB`).
 

@@ -35,7 +35,7 @@ Feature: Nx remote cache shared by CI and laptops
     Then it writes nothing
 
   Scenario: Other CI events get no remote cache
-    Given a CI run on a tag, a schedule or a branch push other than main
+    Given a CI run on a tag, a schedule, the merge queue or a branch push other than main
     When the cache scope is resolved
     Then the remote cache is off
 
