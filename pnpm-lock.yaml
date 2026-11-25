@@ -3075,7 +3075,7 @@ importers:
         version: 7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2)
       vitest:
         specifier: 'catalog:'
-        version: 5.0.1(patch_hash=6e76d3f23022ff8bd2641479eade71ef47ee1a716eecdfff4bc13c09e77c8d5a)(@opentelemetry/api@1.9.1)(@types/node@26.2.0)(@vitest/browser-playwright@5.0.1)(@vitest/coverage-v8@5.0.1)(@vitest/ui@5.0.1)(jsdom@30.0.1(@noble/hashes@2.2.0))(msw@2.15.0(@types/node@26.2.0)(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2)))(vite@8.3.4(@types/node@26.2.0)(esbuild@0.28.2)(jiti@2.7.0)(sass@1.101.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0))
+        version: 5.0.5(patch_hash=e9a704efeaeab1f2439439e962408f8ebff29586ed2d21bb27cb45ec1757737a)(@opentelemetry/api@1.9.1)(@types/node@26.2.0)(@vitest/browser-playwright@5.0.5)(@vitest/coverage-v8@5.0.5)(@vitest/ui@5.0.5)(jsdom@30.0.1(@noble/hashes@2.2.0))(msw@2.15.0(@types/node@26.2.0)(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2)))(vite@8.3.4(@types/node@26.2.0)(esbuild@0.28.2)(jiti@2.7.0)(sass@1.101.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0))
 
   enterprise/modules/digest/process:
     dependencies:
@@ -14575,8 +14575,8 @@ importers:
   modules/scenario/contract:
     dependencies:
       '@ag-ui/core':
-        specifier: ~0.0.57
-        version: 0.0.58
+        specifier: ^1.0.5
+        version: 1.0.5(zod@4.6.7)
       '@langwatch/agent-contract':
         specifier: workspace:*
         version: link:../../agent/contract
@@ -19368,6 +19368,14 @@ packages:
 
   '@ag-ui/core@0.0.58':
     resolution: {integrity: sha512-XgGb7YmhV+yMBaEmlrpsd5S+nUxq0JgSegss2t4gIFR1j7w3w0ibtKfRgcQHWeMvwZxcT5S28VEEarqtgxYYHw==}
+
+  '@ag-ui/core@1.0.5':
+    resolution: {integrity: sha512-W7xg7E/bVco3svYxZCp3CMqJ6/fB15U7yAaMS3mhLCwwlJXFzZJ/bGwMqnNrx6Afmj1WmnjFKzliYds+KFXMMQ==}
+    peerDependencies:
+      zod: '>=4.6.6 <5'
+    peerDependenciesMeta:
+      zod:
+        optional: true
 
   '@ai-sdk/anthropic@3.0.69':
     resolution: {integrity: sha512-LshR7X3pFugY0o41G2VKTmg1XoGpSl7uoYWfzk6zjVZLhCfeFiwgpOga+eTV4XY1VVpZwKVqRnkDbIL7K2eH5g==}
@@ -30862,6 +30870,10 @@ snapshots:
   '@ag-ui/core@0.0.58':
     dependencies:
       zod: 3.25.76
+
+  '@ag-ui/core@1.0.5(zod@4.6.7)':
+    optionalDependencies:
+      zod: 4.6.7
 
   '@ai-sdk/anthropic@3.0.69(zod@4.6.7)':
     dependencies:
