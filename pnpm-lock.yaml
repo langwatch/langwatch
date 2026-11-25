@@ -821,7 +821,7 @@ packageExtensionsChecksum: sha256-e5N5Ba4Bx3dE0pPtNbBHAB9bDDqeAwl5hO7n+ivTx0U=
 patchedDependencies:
   '@better-auth/core@1.7.11': e8bd8d0d2c12cd6bab840bd74c551cdfc2b9c220aaa28abefe6ffc87a50d6d81
   '@better-auth/sso@1.7.11': dd7d60e346b61223b86e78b49ce80e09385ad171961f7279ad702a9b437bb46e
-  oxlint@1.85.0: 9fb1fb20e35cfef0ff1bf42892ad5aa46445808dc4b8696d73a3e294104a5fb4
+  oxlint@1.85.0: d2d650fc4cdb1ad51b9a0c8e2cd282b2b0b3172f6f7deb81adb00ef3604b6ee0
   typescript@7.0.2: 3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2
   vitest@5.0.5: e9a704efeaeab1f2439439e962408f8ebff29586ed2d21bb27cb45ec1757737a
 
@@ -861,7 +861,7 @@ importers:
         version: 0.70.0
       oxlint:
         specifier: 'catalog:'
-        version: 1.85.0(patch_hash=9fb1fb20e35cfef0ff1bf42892ad5aa46445808dc4b8696d73a3e294104a5fb4)(oxlint-tsgolint@7.0.2002)
+        version: 1.85.0(patch_hash=d2d650fc4cdb1ad51b9a0c8e2cd282b2b0b3172f6f7deb81adb00ef3604b6ee0)(oxlint-tsgolint@7.0.2002)
       oxlint-tsgolint:
         specifier: 'catalog:'
         version: 7.0.2002
@@ -17377,7 +17377,7 @@ importers:
         version: 5.4.3
       oxlint:
         specifier: 'catalog:'
-        version: 1.85.0(patch_hash=9fb1fb20e35cfef0ff1bf42892ad5aa46445808dc4b8696d73a3e294104a5fb4)(oxlint-tsgolint@7.0.2002)
+        version: 1.85.0(patch_hash=d2d650fc4cdb1ad51b9a0c8e2cd282b2b0b3172f6f7deb81adb00ef3604b6ee0)(oxlint-tsgolint@7.0.2002)
       vitest:
         specifier: 'catalog:'
         version: 5.0.5(patch_hash=e9a704efeaeab1f2439439e962408f8ebff29586ed2d21bb27cb45ec1757737a)(@opentelemetry/api@1.9.1)(@types/node@26.2.0)(@vitest/browser-playwright@5.0.5)(@vitest/coverage-v8@5.0.5)(@vitest/ui@5.0.5)(jsdom@30.0.1(@noble/hashes@2.2.0))(msw@2.15.0(@types/node@26.2.0)(typescript@6.0.3))(vite@8.3.4(@types/node@26.2.0)(esbuild@0.28.2)(jiti@2.7.0)(sass@1.101.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0))
@@ -18381,7 +18381,7 @@ importers:
         version: 26.2.0
       oxlint:
         specifier: 'catalog:'
-        version: 1.85.0(patch_hash=9fb1fb20e35cfef0ff1bf42892ad5aa46445808dc4b8696d73a3e294104a5fb4)(oxlint-tsgolint@7.0.2002)
+        version: 1.85.0(patch_hash=d2d650fc4cdb1ad51b9a0c8e2cd282b2b0b3172f6f7deb81adb00ef3604b6ee0)(oxlint-tsgolint@7.0.2002)
       typescript:
         specifier: 'catalog:'
         version: 7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2)
@@ -41722,7 +41722,7 @@ snapshots:
       '@oxlint-tsgolint/win32-arm64': 7.0.2002
       '@oxlint-tsgolint/win32-x64': 7.0.2002
 
-  oxlint@1.85.0(patch_hash=9fb1fb20e35cfef0ff1bf42892ad5aa46445808dc4b8696d73a3e294104a5fb4)(oxlint-tsgolint@7.0.2002):
+  oxlint@1.85.0(patch_hash=d2d650fc4cdb1ad51b9a0c8e2cd282b2b0b3172f6f7deb81adb00ef3604b6ee0)(oxlint-tsgolint@7.0.2002):
     optionalDependencies:
       '@oxlint/binding-android-arm-eabi': 1.85.0
       '@oxlint/binding-android-arm64': 1.85.0
