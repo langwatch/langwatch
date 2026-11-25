@@ -31,11 +31,12 @@ widget queries" tables list failed widget runs by project, newest first.
 
 A "failed" line logs at `warn` when the customer's query is at fault (a memory
 or scan limit, a refused statement), at `error` for ours (timeout, database
-down, unhandled), at `info` when aborted. It carries `projectId` (the board's
-project, or the key's own) to group by. `projectIds` is a list of the project
-ids the run covered. Logs Insights shows each as `projectIds.0`,
-`projectIds.1`, and so on (the dashboard panel shows the first three; open the
-log line for the full list).
+down, unhandled), at `info` when aborted. It carries `projectId` to group by,
+which is the first entry of `projectIds`: the run's own project, or for an
+aggregate board or an organisation-wide key the first project of the resolved
+scope. `projectIds` is a list of the project ids the run covered. Logs Insights
+shows each as `projectIds.0`, `projectIds.1`, and so on (the dashboard panel
+shows the first three; open the log line for the full list).
 
 A chart, a board header action or a widget's sandboxed frame that crashes while
 drawing goes to PostHog as an exception (`surface`, board and widget ids), not
