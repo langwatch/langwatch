@@ -33,6 +33,12 @@ const registry = {
       "A key that reads exactly one project, such as a project API key, needs none: it defaults to that project",
     ],
   },
+  billing_only_keeps_billing: {
+    tips: [
+      "To stop a Billing-only member paying, remove them from the organization",
+      "To keep them in the organization without Billing, change their organization role to a seat role first, then turn Billing off",
+    ],
+  },
   billing_only_no_team_access: {
     tips: [
       "Send the Billing-only invite with no `teams` and no `teamIds`",

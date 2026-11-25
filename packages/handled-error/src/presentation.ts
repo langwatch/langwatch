@@ -3261,6 +3261,12 @@ const presentations = {
     title: "Add a billing email first",
     describe: () => "Billing needs an email address on the account before this can go through.",
   },
+  billing_only_keeps_billing: {
+    // Billing is the whole of a Billing-only membership (ADR-205); without it nothing is taken away.
+    title: "A Billing-only member always pays",
+    describe: () =>
+      "Billing only is the whole of their membership. To stop them paying, remove them from the organization, or move them to a seat role first.",
+  },
   billing_only_no_team_access: {
     // The Billing-only person reaches the plan and invoices, never a project (ADR-205).
     title: "A Billing-only member joins no team",

@@ -127,6 +127,7 @@ export const APP_ERROR_CODES = [
   "billing_currency_unsupported",
   "billing_customer_deleted",
   "billing_customer_email_required",
+  "billing_only_keeps_billing",
   "billing_only_no_team_access",
   "billing_plan_price_missing",
   "billing_provider_unavailable",

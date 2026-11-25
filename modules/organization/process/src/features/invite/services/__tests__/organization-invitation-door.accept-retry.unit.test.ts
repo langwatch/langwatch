@@ -58,7 +58,7 @@ function doorOver({
 
 const FINANCE = { id: "user-finance", name: "Finance", email: "finance@acme.com" } as never;
 
-describe("given a Billing-only invitation already accepted, whose Billing an admin turned off", () => {
+describe("given a Billing-only invitation already accepted, whose Billing grant has since gone", () => {
   describe("when the person who accepted it uses the old link again", () => {
     /** @scenario "Using a spent invitation link again writes nothing" */
     it("answers that it was accepted and writes no grant", async () => {
