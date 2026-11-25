@@ -250,6 +250,50 @@ describe.skipIf(!TEST_DATABASE_URL)("the license registry on Postgres", () => {
     ).toBeNull();
   });
 
+  /** @scenario "The registry revokes an unbound license and refuses to bind a revoked one in single writes" */
+  it("lets one of a racing unused-key revoke and a bind win, in either order", async () => {
+    const at = nowInstant();
+    const revokeOf = (id: string) => (tx: Prisma.TransactionClient) =>
+      PrismaIssuedLicenseRepository.create(tx, SEALING).revokeUnbound({
+        id,
+        at,
+        revokedById: "user_operator",
+        revokedReason: "unused",
+      });
+    const bindOf = (id: string) => (tx: Prisma.TransactionClient) =>
+      PrismaIssuedLicenseRepository.create(tx, SEALING).bindInstance({
+        id,
+        instanceId: "instance-a",
+        at,
+      });
+
+    const revokedFirst = (await issue("ACME Revoke Then Bind")).license;
+    expect(
+      await raceOnOneRow({
+        prisma,
+        table: "IssuedLicense",
+        first: revokeOf(revokedFirst.id),
+        second: bindOf(revokedFirst.id),
+      }),
+    ).toEqual({ first: true, second: false });
+    const revokedRow = await prisma.issuedLicense.findUnique({ where: { id: revokedFirst.id } });
+    expect(revokedRow?.revokedAt).not.toBeNull();
+    expect(revokedRow?.instanceId).toBeNull();
+
+    const boundFirst = (await issue("ACME Bind Then Revoke")).license;
+    expect(
+      await raceOnOneRow({
+        prisma,
+        table: "IssuedLicense",
+        first: bindOf(boundFirst.id),
+        second: revokeOf(boundFirst.id),
+      }),
+    ).toEqual({ first: true, second: false });
+    const boundRow = await prisma.issuedLicense.findUnique({ where: { id: boundFirst.id } });
+    expect(boundRow?.instanceId).toBe("instance-a");
+    expect(boundRow?.revokedAt).toBeNull();
+  });
+
   /** @scenario "Two instances racing to bind leave exactly one bound" */
   it("binds the first of two installs and refuses the one waiting on the row", async () => {
     const { license } = await issue("ACME Bind Race");

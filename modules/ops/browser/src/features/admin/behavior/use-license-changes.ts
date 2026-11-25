@@ -14,6 +14,13 @@ import { termsPayload, type TermsForm } from "../model/license-terms.ts";
 
 const UNUSED_KEY_REASON = "Replaced by a new key before any install used it";
 
+/**
+ * A key a change signed. `forCustomer` when no install holds the chain and the
+ * unused key was retired, so the customer pastes the new one; otherwise an
+ * install picks it up over sync.
+ */
+export type SignedKey = { licenseKey: string; forCustomer: boolean };
+
 export type ReplacementChange = {
   /** ISO 8601. The instant the replacement's term ends. */
   expiresAt: string;
@@ -66,13 +73,24 @@ export function useLicenseChanges() {
     chain: LicenseChainState;
     change: ReplacementChange;
     failureTitle: string;
-  }): Promise<string | null> {
+  }): Promise<SignedKey | null> {
     const signed = await reissue
       .mutateAsync({ id: chain.head.id, ...change })
       .catch((error: unknown) => showError({ error, fallbackTitle: failureTitle }));
     if (!signed) return null;
-    await retireUnused({ chain });
-    return signed.licenseKey;
+    return afterSigning({ chain, licenseKey: signed.licenseKey });
+  }
+
+  /** Retires the unused key and says who the new one is for: kept even when retiring is refused. */
+  async function afterSigning({
+    chain,
+    licenseKey,
+  }: {
+    chain: LicenseChainState;
+    licenseKey: string;
+  }): Promise<SignedKey> {
+    const retired = await retireUnused({ chain });
+    return { licenseKey, forCustomer: chain.unbound && retired };
   }
 
   /**
@@ -119,7 +137,7 @@ export function useLicenseChanges() {
 
   return {
     signReplacement,
-    retireUnused,
+    afterSigning,
     saveTerms,
     resetInstanceBinding,
     isSigning: reissue.isPending || retire.isPending,

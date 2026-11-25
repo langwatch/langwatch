@@ -172,6 +172,9 @@ export class LicenseRefreshService {
       seats: await this.countSeats(organizationId),
     });
     if (!answer.license) return { outcome: "unchanged" };
+    // Another sync may have applied a newer license while this answer was out.
+    const [current] = await this.deps.install.findCredential(organizationId);
+    if (current?.token !== credential.token) return { outcome: "unchanged" };
 
     return this.deliver({ organizationId, license: answer.license });
   }

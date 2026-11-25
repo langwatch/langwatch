@@ -271,6 +271,13 @@ Feature: License sync
     And once the install presents it, both licenses before it are superseded and neither copy is held
 
   @unit
+  Scenario: An answer that arrives after a newer license was applied is not stored
+    Given the install asked for its license with its current credential
+    And another sync applied a newer license before the answer arrived
+    When the answer carries the license the newer one replaced
+    Then the install keeps the newer license and stores nothing
+
+  @unit
   Scenario: A sync never carries a license that a delivery retired while it looked
     Given LangWatch extended the license, and extended it again before the install synced
     And a sync on the oldest license is walking the chain

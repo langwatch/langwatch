@@ -14,7 +14,11 @@ import { nowEpochMs } from "@langwatch/time";
 import { useMemo, useState } from "react";
 
 import { api } from "../../../../behavior/ops-api.ts";
-import { useLicenseChanges, type ReplacementChange } from "../../behavior/use-license-changes.ts";
+import {
+  useLicenseChanges,
+  type ReplacementChange,
+  type SignedKey,
+} from "../../behavior/use-license-changes.ts";
 import { useLicenseCommands } from "../../behavior/use-license-commands.ts";
 import {
   formatDay,
@@ -29,7 +33,7 @@ import {
   type TermsForm,
 } from "../../model/license-terms.ts";
 import { LicenseDeliveryBanner, LicenseInstallStatus } from "../blocks/license-install-status.tsx";
-import { LicensePanel, type LicensePart, type SignedKey } from "../blocks/license-panel.tsx";
+import { LicensePanel, type LicensePart } from "../blocks/license-panel.tsx";
 import { LicenseTermsFields } from "../blocks/license-terms-fields.tsx";
 import { formatDateTime } from "../elements/admin-cells.tsx";
 import { Panel } from "../elements/drawer-sections.tsx";
@@ -137,9 +141,9 @@ function DrawerBody({
     change: ReplacementChange;
     failureTitle: string;
   }) => {
-    const licenseKey = await changes.signReplacement({ chain, change, failureTitle });
-    if (licenseKey) setSigned({ licenseKey, forCustomer: chain.unbound });
-    return licenseKey !== null;
+    const signed = await changes.signReplacement({ chain, change, failureTitle });
+    if (signed) setSigned(signed);
+    return signed;
   };
 
   return (
@@ -155,8 +159,8 @@ function DrawerBody({
         signed={signed}
         isSigning={changes.isSigning}
         onSign={signReplacement}
-        onSeatsChanged={(licenseKey) => {
-          setSigned({ licenseKey, forCustomer: chain.unbound });
+        onSeatsChanged={(signed) => {
+          setSigned(signed);
           setSeatChanges((count) => count + 1);
         }}
       />
@@ -193,11 +197,11 @@ function DrawerBody({
             seatCurrency: head.seatCurrency,
             commitUsdCents: head.commitUsdCents,
             onBillingState,
-            signPaidTerm: ({ expiresAt }) =>
-              signReplacement({
+            signPaidTerm: async ({ expiresAt }) =>
+              (await signReplacement({
                 change: { expiresAt },
                 failureTitle: "The license was not signed for the paid term",
-              }),
+              })) !== null,
           }}
         />
       ) : null}

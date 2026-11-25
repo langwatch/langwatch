@@ -290,6 +290,25 @@ describe("LicenseDetailDrawer", () => {
     });
   });
 
+  describe("given a license an install bound after the drawer opened", () => {
+    /** @scenario "An extension whose unused key an install bound meanwhile keeps the new key for sync" */
+    it("reports the refusal and keeps the new key for the install instead of the customer", async () => {
+      state.chain = [license()];
+      state.revoke.mockRejectedValue(new Error("license_in_use"));
+      const { host } = openDrawer({ id: "il_1" });
+
+      extendByTwoWeeks();
+
+      expect(
+        await screen.findByRole("button", { name: "Install can't sync? Show the signed key" }),
+      ).toBeTruthy();
+      expect(screen.queryByTestId("send-key")).toBeNull();
+      expect(host.recording.failures.map((failure) => failure.fallbackTitle)).toContain(
+        "The new key is signed, but the unused one still works: revoke it",
+      );
+    });
+  });
+
   describe("given an operator picks an end date that does not extend the term", () => {
     /** @scenario "A new end date that does not extend the term cannot be saved" */
     it("disables the save and says the date must be after the current end", () => {

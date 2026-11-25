@@ -213,6 +213,19 @@ Feature: License registry
     And the license and its managed key stay live
 
   @unit
+  Scenario: A bind and an unused-key revoke racing on one license cannot both win
+    Given a license no install has used
+    When an install binds it after the drawer's revoke read the row, before the revoke writes
+    Then the revoke is refused with license_in_use and the license stays bound and live
+    And a bind that arrives after an unused-key revoke is refused
+
+  @integration
+  Scenario: The registry revokes an unbound license and refuses to bind a revoked one in single writes
+    Given an unbound license and a bound one
+    When the unbound one is revoked as unused and an install then tries to bind it
+    Then the revoke wins, the bind is refused, and revoking the bound one as unused is refused
+
+  @unit
   Scenario: Reissuing a license
     Given an active license for "ACME" with 50 seats
     When an operator reissues it with 80 seats and a new term
@@ -396,6 +409,13 @@ Feature: License registry
     When an operator extends its term
     Then the new license key is shown to send to the customer
     And the license it replaces is revoked, since no install holds it
+
+  @integration
+  Scenario: An extension whose unused key an install bound meanwhile keeps the new key for sync
+    Given a license no install had used when the drawer opened
+    When an operator extends its term and the registry refuses to retire the old key as in use
+    Then the drawer says why the old key still works
+    And the new key is kept behind "Install can't sync?" instead of being offered to send
 
   @integration
   Scenario: A new end date that does not extend the term cannot be saved

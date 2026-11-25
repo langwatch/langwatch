@@ -237,6 +237,84 @@ describe("a reissued license over a sync", () => {
   });
 });
 
+/** A host whose answer lands after another sync stored `applied`: it hands back `stale`. */
+class LateAnswerHost extends RegistryHost {
+  constructor(
+    private readonly rows: Map<string, ConnectOrganizationRecord>,
+    private readonly answer: { stale: string; applied: string },
+  ) {
+    super(undefined as never);
+  }
+
+  async syncLicense() {
+    this.rows.set(ORGANIZATION, {
+      ...(this.rows.get(ORGANIZATION) as ConnectOrganizationRecord),
+      license: this.answer.applied,
+    });
+    return { services: [], license: this.answer.stale };
+  }
+}
+
+describe("an answer that arrives after a newer license was applied", () => {
+  /** @scenario An answer that arrives after a newer license was applied is not stored */
+  it("keeps the newer license and stores nothing", async () => {
+    const first = licenseOf({ licenseId: "lic-1", maxMembers: 50 });
+    const second = licenseOf({ licenseId: "lic-2", maxMembers: 50 });
+    const third = licenseOf({ licenseId: "lic-3", maxMembers: 50 });
+    const rows = new Map<string, ConnectOrganizationRecord>([
+      [
+        ORGANIZATION,
+        {
+          organizationId: ORGANIZATION,
+          license: first,
+          servicesDisabled: [],
+          lastSyncAt: null,
+          lastSyncError: null,
+        },
+      ],
+    ]);
+    const stored: string[] = [];
+    const refresher = LicenseRefreshService.create({
+      install: ConnectInstallService.create({
+        organizations: MemoryConnectOrganizationRepository.create({ rows }),
+        facts: appliedConnectFacts(rows),
+        identity: InstanceIdentityService.create({
+          repository: MemoryInstanceIdentityRepository.create({ now: () => NOW }),
+          newInstanceId: () => INSTANCE,
+        }),
+        cryptography,
+        deployment: {
+          permitted: true,
+          gatewayEndpoint: "https://gateway.langwatch.ai",
+          licenseEndpoint: "https://connect.langwatch.ai",
+        },
+        gateway: MemoryConnectGatewayChannel.create(),
+        instanceLicenseKey: () => void 0,
+        publicKey: TEST_PUBLIC_KEY,
+      }),
+      instanceId: async () => INSTANCE,
+      facts: appliedConnectFacts(rows),
+      seats: { getMemberCount: async () => 8, getMembersLiteCount: async () => 0 },
+      licenses: {
+        validateAndStoreLicense: async ({ licenseKey }) => {
+          stored.push(licenseKey);
+          return { success: true, planInfo: { maxMembers: 50 } };
+        },
+      },
+      cryptography,
+      host: new LateAnswerHost(rows, { stale: second, applied: third }),
+      version: () => "1.42.0",
+      now: () => NOW,
+    });
+
+    const outcome = await refresher.refresh(ORGANIZATION);
+
+    expect(outcome).toEqual({ outcome: "unchanged" });
+    expect(stored).toEqual([]);
+    expect(rows.get(ORGANIZATION)?.license).toBe(third);
+  });
+});
+
 /** A registry holding license-1, then two extensions that both wait for delivery. */
 async function chainOfThree() {
   const first = licenseOf({ licenseId: "lic-1", maxMembers: 50 });

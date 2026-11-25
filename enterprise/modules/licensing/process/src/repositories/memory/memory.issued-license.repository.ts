@@ -151,8 +151,32 @@ export class MemoryIssuedLicenseRepository implements IssuedLicenseRepository {
     at: Instant;
   }): Promise<boolean> {
     const row = this.rows.get(id);
-    if (!row || row.instanceId !== null) return false;
+    if (!row || row.instanceId !== null || row.revokedAt !== null) return false;
     this.rows.set(id, { ...row, instanceId, instanceBoundAt: at });
+    return true;
+  }
+
+  async revokeUnbound({
+    id,
+    at,
+    revokedById,
+    revokedReason,
+  }: {
+    id: string;
+    at: Instant;
+    revokedById: string;
+    revokedReason: string;
+  }): Promise<boolean> {
+    const row = this.rows.get(id);
+    if (!row || row.instanceId !== null || row.revokedAt !== null) return false;
+    this.rows.set(id, {
+      ...row,
+      revokedAt: at,
+      revokedById,
+      revokedReason,
+      pendingDeliveryLicense: null,
+      updatedAt: at,
+    });
     return true;
   }
 

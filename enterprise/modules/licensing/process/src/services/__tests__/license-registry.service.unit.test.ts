@@ -347,6 +347,39 @@ describe("the license registry", () => {
     expect(managedKeys.retired).toEqual([]);
   });
 
+  /** @scenario "A bind and an unused-key revoke racing on one license cannot both win" */
+  it("refuses the revoke when a bind lands between its read and its write", async () => {
+    const { registry, repository, managedKeys } = harness();
+    const { license } = await registry.issue(issueInput());
+    const revokeUnbound = repository.revokeUnbound.bind(repository);
+    repository.revokeUnbound = async (params) => {
+      await repository.bindInstance({ id: license.id, instanceId: "install-1", at: NOW });
+      return revokeUnbound(params);
+    };
+
+    await expect(
+      registry.revoke({ id: license.id, operatorId: "op", reason: "unused", unusedOnly: true }),
+    ).rejects.toMatchObject({ code: "license_in_use" });
+
+    const row = await repository.findById(license.id);
+    expect(row?.instanceId).toBe("install-1");
+    expect(row?.revokedAt).toBeNull();
+    expect(managedKeys.retired).toEqual([]);
+  });
+
+  /** @scenario "A bind and an unused-key revoke racing on one license cannot both win" */
+  it("refuses a bind that arrives after an unused-key revoke", async () => {
+    const { registry, repository } = harness();
+    const { license } = await registry.issue(issueInput());
+
+    await registry.revoke({ id: license.id, operatorId: "op", reason: "unused", unusedOnly: true });
+
+    expect(
+      await repository.bindInstance({ id: license.id, instanceId: "install-1", at: NOW }),
+    ).toBe(false);
+    expect((await repository.findById(license.id))?.revokedAt).toEqual(NOW);
+  });
+
   /** @scenario "Reissuing a license" */
   it("signs a replacement that points at the license it replaces", async () => {
     const { registry, repository } = harness();

@@ -176,7 +176,7 @@ export class LicenseRegistryService {
     // An expired license can still be revoked: its term may be extended by a
     // reissue, and a leaked key should stay dead through that.
     this.refuseIfSettled(row);
-    if (input.unusedOnly && row.instanceId !== null) throw new LicenseInUseError();
+    if (input.unusedOnly) return this.revokeUnused({ row, ...input });
     // The key ends first. If the row update then fails, the license reads as
     // active with a dead key, which resolves to a refusal, and revoking again
     // finishes the job. The other order could leave a revoked license whose
@@ -189,6 +189,37 @@ export class LicenseRegistryService {
       pendingDeliveryLicense: null,
     });
     await this.syncBudget(updated, input.operatorId);
+    return this.toView(updated);
+  }
+
+  /**
+   * Revokes a key no install used, in one conditional write that a bind racing
+   * it cannot also win. The row goes first: an unbound row's key reaches no
+   * install, so retiring it after the write leaves nothing usable in between.
+   */
+  private async revokeUnused({
+    row,
+    operatorId,
+    reason,
+  }: {
+    row: IssuedLicenseRecord;
+    operatorId: string;
+    reason: string;
+  }): Promise<IssuedLicenseView> {
+    const revoked = await this.options.repository.revokeUnbound({
+      id: row.id,
+      at: this.options.now(),
+      revokedById: operatorId,
+      revokedReason: reason,
+    });
+    if (!revoked) {
+      const current = await this.getRow(row.id);
+      this.refuseIfSettled(current);
+      throw new LicenseInUseError();
+    }
+    await this.retireManagedKey({ row, actorId: operatorId });
+    const updated = await this.getRow(row.id);
+    await this.syncBudget(updated, operatorId);
     return this.toView(updated);
   }
 

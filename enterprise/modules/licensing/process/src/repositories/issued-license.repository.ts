@@ -99,10 +99,21 @@ export interface IssuedLicenseRepository {
   /** Removes a row a failed flow wrote; a row already gone is not an error. */
   delete(id: string): Promise<void>;
   /**
-   * Binds the license to an install only while it has none, and answers whether
-   * this call was the one that bound it.
+   * Binds the license to an install only while it has none and is not revoked,
+   * and answers whether this call was the one that bound it.
    */
   bindInstance(params: { id: string; instanceId: string; at: Instant }): Promise<boolean>;
+  /**
+   * Revokes the license only while no install is bound and it is not revoked,
+   * in the same statement as the check, so a bind and this revoke cannot both
+   * win. Answers whether this call revoked it.
+   */
+  revokeUnbound(params: {
+    id: string;
+    at: Instant;
+    revokedById: string;
+    revokedReason: string;
+  }): Promise<boolean>;
   /**
    * Records the managed key only while the license has none and still is the
    * active license of that customer on that install. `requires` is checked in

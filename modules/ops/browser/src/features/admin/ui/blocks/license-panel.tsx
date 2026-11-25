@@ -2,7 +2,11 @@ import { Badge, Button, HStack, Text, VStack } from "@langwatch/design-system/pr
 import { useState } from "react";
 
 import { useOpsToaster } from "../../../../behavior/ops-feedback.ts";
-import { useLicenseChanges, type ReplacementChange } from "../../behavior/use-license-changes.ts";
+import {
+  useLicenseChanges,
+  type ReplacementChange,
+  type SignedKey,
+} from "../../behavior/use-license-changes.ts";
 import { useLicenseCommands } from "../../behavior/use-license-commands.ts";
 import { formatDay, type LicenseChainState } from "../../model/license-chain.ts";
 import { SERVICE_LABELS, type License } from "../../model/license-terms.ts";
@@ -16,12 +20,11 @@ import { LicenseSeatsForm, type SeatsChange } from "./license-seats-form.tsx";
 export type LicensePart = "extend" | "seats" | "terms" | "history" | null;
 
 /** A key signed in the drawer: shown at once when no install is bound, else behind a link. */
-export type SignedKey = { licenseKey: string; forCustomer: boolean };
 
 export type SignReplacement = (input: {
   change: ReplacementChange;
   failureTitle: string;
-}) => Promise<boolean>;
+}) => Promise<SignedKey | null>;
 
 function liteSeatsText(license: License): string {
   if (license.liteSeatsUnlimited) return "unlimited lite";
@@ -148,26 +151,26 @@ function usePanelChanges({
   chain: LicenseChainState;
   onSign: SignReplacement;
   onDone: () => void;
-  onSeatsChanged: (licenseKey: string) => void;
+  onSeatsChanged: (signed: SignedKey) => void;
 }) {
   const commands = useLicenseCommands();
-  const { retireUnused } = useLicenseChanges();
+  const { afterSigning } = useLicenseChanges();
   const toaster = useOpsToaster();
   const [seatSummary, setSeatSummary] = useState<string | null>(null);
   const install = chain.unbound ? null : chain.inUse.instanceId;
 
   const extend = async (expiresAt: string) => {
-    const done = await onSign({
+    const signed = await onSign({
       change: { expiresAt },
       failureTitle: "The license was not extended",
     });
-    if (!done) return;
+    if (!signed) return;
     onDone();
     toaster.create({
       title: `Term extended to ${formatDay(expiresAt)}`,
-      description: install
-        ? `${install} picks it up on its next sync. Nothing to send.`
-        : "Send the new key to the customer. The unused one no longer works.",
+      description: signed.forCustomer
+        ? "Send the new key to the customer. The unused one no longer works."
+        : `${install ?? "The install"} picks it up on its next sync. Nothing to send.`,
       type: "success",
       duration: 5000,
     });
@@ -194,8 +197,7 @@ function usePanelChanges({
         onSuccess: (result) => {
           onDone();
           setSeatSummary(seatChangeSummary(result));
-          onSeatsChanged(result.licenseKey);
-          void retireUnused({ chain });
+          void afterSigning({ chain, licenseKey: result.licenseKey }).then(onSeatsChanged);
         },
       },
     );
@@ -228,7 +230,7 @@ export function LicensePanel({
   signed: SignedKey | null;
   isSigning: boolean;
   onSign: SignReplacement;
-  onSeatsChanged: (licenseKey: string) => void;
+  onSeatsChanged: (signed: SignedKey) => void;
 }) {
   const { head, inUse } = chain;
   const changes = usePanelChanges({ chain, onSign, onDone: () => onPart(null), onSeatsChanged });

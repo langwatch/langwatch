@@ -121,11 +121,11 @@ describe("LicenseDetailDrawer, changing seats", () => {
     });
 
     /** @scenario "An operator changes the seats of a running license" */
-    it("tells the operator billing invoices the added seats, and shows the signed license once", () => {
+    it("tells the operator billing invoices the added seats, and shows the signed license once", async () => {
+      expect(await screen.findByDisplayValue(SIGNED)).toBeTruthy();
       expect(screen.getByTestId("change-seats-result").textContent).toBe(
         "Seats raised from 50 to 58. The install picks the new license up on its next sync or when an admin presses refresh. Billing invoices the added seats, prorated to the end of the term; the Billing section shows the outcome.",
       );
-      expect(screen.getByDisplayValue(SIGNED)).toBeTruthy();
     });
 
     it("rereads the registry, as main's section did", () => {
