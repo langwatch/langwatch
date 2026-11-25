@@ -5182,6 +5182,16 @@ const presentations = {
     title: "This conversation belongs to someone else",
     describe: () => "You can view shared conversations but only the owner can continue them.",
   },
+  langy_attachment_refused: {
+    title: "Langy can't take that file",
+    describe: (error) => {
+      const reason = str(error, "reason", "");
+      if (reason === "not_an_image") return "Attach a PNG, JPEG, GIF or WebP image.";
+      if (reason === "too_large") return "Attach an image of 5 MB or less.";
+      if (reason === "too_many") return "Send at most four images in one message.";
+      return "Attach the image again, then send.";
+    },
+  },
   langy_empty_message: {
     title: "Nothing to send",
     describe: () => "Type a message first.",
