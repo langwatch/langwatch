@@ -513,21 +513,22 @@ Declared at `src/eventing/analytics-lwql-reconvergence.pipeline.ts:57`.
 
 | Kind   | Leaf                              | Environment variable                      | Declared at                              |
 | ------ | --------------------------------- | ----------------------------------------- | ---------------------------------------- |
-| secret | `lwqlClickHousePassword`          | `LWQL_CLICKHOUSE_PASSWORD`                | `src/app/analytics.app.ts:514`           |
-| secret | `lwqlPostgresReaderPassword`      | `LWQL_POSTGRES_READER_PASSWORD`           | `src/app/analytics.app.ts:515`           |
-| secret | `queryHashKey`                    | `API_KEY_PEPPER`                          | `src/app/analytics.app.ts:516`           |
-| secret | `queryHashKeyFallback`            | `CREDENTIALS_SECRET`                      | `src/app/analytics.app.ts:517`           |
-| secret | `queryHashKeyLastFallback`        | `NEXTAUTH_SECRET`                         | `src/app/analytics.app.ts:518`           |
-| config | `langwatchQl.url`                 | `LWQL_CLICKHOUSE_URL`                     | `../contract/src/analytics.config.ts:11` |
-| config | `langwatchQl.username`            | `LWQL_CLICKHOUSE_USER`                    | `../contract/src/analytics.config.ts:12` |
-| config | `langwatchQl.database`            | `LWQL_DATABASE`                           | `../contract/src/analytics.config.ts:13` |
-| config | `langwatchQl.tenantSetting`       | `LWQL_TENANT_SETTING`                     | `../contract/src/analytics.config.ts:14` |
-| config | `langwatchQl.postgresHost`        | `LWQL_POSTGRES_HOST`                      | `../contract/src/analytics.config.ts:15` |
-| config | `langwatchQl.accessModelMode`     | `LWQL_ACCESS_MODEL_MODE`                  | `../contract/src/analytics.config.ts:16` |
-| config | `langwatchQl.sqlSingleNode`       | `LWQL_ACCESS_MODEL_SQL_SINGLE_NODE`       | `../contract/src/analytics.config.ts:17` |
-| config | `langwatchQl.clickhouseCluster`   | `CLICKHOUSE_CLUSTER`                      | `../contract/src/analytics.config.ts:19` |
-| config | `langwatchQl.aggregateMaxMembers` | `LWQL_AGGREGATE_MAX_MEMBERS`              | `../contract/src/analytics.config.ts:21` |
-| config | `tenantAnalyticsConcurrency`      | `CLICKHOUSE_TENANT_ANALYTICS_CONCURRENCY` | `../contract/src/analytics.config.ts:27` |
-| config | `publicBaseUrl`                   | `BASE_HOST`                               | `../contract/src/analytics.config.ts:32` |
+| secret | `lwqlClickHousePassword`          | `LWQL_CLICKHOUSE_PASSWORD`                | `src/app/analytics.app.ts:547`           |
+| secret | `lwqlPostgresReaderPassword`      | `LWQL_POSTGRES_READER_PASSWORD`           | `src/app/analytics.app.ts:548`           |
+| secret | `queryHashKey`                    | `API_KEY_PEPPER`                          | `src/app/analytics.app.ts:549`           |
+| secret | `queryHashKeyFallback`            | `CREDENTIALS_SECRET`                      | `src/app/analytics.app.ts:550`           |
+| secret | `queryHashKeyLastFallback`        | `NEXTAUTH_SECRET`                         | `src/app/analytics.app.ts:551`           |
+| config | `langwatchQl.url`                 | `LWQL_CLICKHOUSE_URL`                     | `../contract/src/analytics.config.ts:17` |
+| config | `langwatchQl.username`            | `LWQL_CLICKHOUSE_USER`                    | `../contract/src/analytics.config.ts:18` |
+| config | `langwatchQl.database`            | `LWQL_DATABASE`                           | `../contract/src/analytics.config.ts:19` |
+| config | `langwatchQl.tenantSetting`       | `LWQL_TENANT_SETTING`                     | `../contract/src/analytics.config.ts:20` |
+| config | `langwatchQl.postgresHost`        | `LWQL_POSTGRES_HOST`                      | `../contract/src/analytics.config.ts:21` |
+| config | `langwatchQl.accessModelMode`     | `LWQL_ACCESS_MODEL_MODE`                  | `../contract/src/analytics.config.ts:22` |
+| config | `langwatchQl.sqlSingleNode`       | `LWQL_ACCESS_MODEL_SQL_SINGLE_NODE`       | `../contract/src/analytics.config.ts:23` |
+| config | `langwatchQl.clickhouseCluster`   | `CLICKHOUSE_CLUSTER`                      | `../contract/src/analytics.config.ts:25` |
+| config | `langwatchQl.installMethod`       | `INSTALL_METHOD`                          | `../contract/src/analytics.config.ts:27` |
+| config | `langwatchQl.aggregateMaxMembers` | `LWQL_AGGREGATE_MAX_MEMBERS`              | `../contract/src/analytics.config.ts:29` |
+| config | `tenantAnalyticsConcurrency`      | `CLICKHOUSE_TENANT_ANALYTICS_CONCURRENCY` | `../contract/src/analytics.config.ts:35` |
+| config | `publicBaseUrl`                   | `BASE_HOST`                               | `../contract/src/analytics.config.ts:40` |
 
 <!-- readme:generated:end -->
