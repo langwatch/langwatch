@@ -24,7 +24,8 @@ import {
   pickerSections,
 } from "../catalogue/index.ts";
 import { boardSubject } from "../langy/model/board-langy.ts";
-import { CURATED_BOARDS, curatedBoardById } from "../model/curated-boards.ts";
+import { curatedBoardById } from "../model/curated-boards.ts";
+import { finderPool } from "../model/template-library.ts";
 import { BlockPickerDialog } from "../ui/sections/block-picker-dialog.tsx";
 import DashboardBoardScreen from "../ui/sections/dashboard-board.screen.tsx";
 import { SavedDashboardsSection } from "../ui/sections/saved-dashboards-section.tsx";
@@ -354,7 +355,7 @@ describe("a member's board", () => {
      * @scenario "Boards: every empty board shows one view"
      * @scenario "Only an empty LLM Ops board offers templates"
      */
-    it("shows the ask bar, the suggested questions and the From LangWatch boards to start from", async () => {
+    it("shows the ask bar, the suggested questions and every template with the chips", async () => {
       openBoard({
         server: inMemoryServer({ boards: OWN_BOARDS }),
         flags: LANGY_ON,
@@ -367,13 +368,15 @@ describe("a member's board", () => {
         expect(screen.getByRole("button", { name: question })).toBeInTheDocument();
       }
       const start = within(screen.getByRole("region", { name: "Start from a template" }));
-      expect(start.getAllByRole("button").map((card) => card.getAttribute("aria-label"))).toEqual(
-        CURATED_BOARDS.map(({ name }) => `Use ${name}`),
-      );
-      expect(start.getByRole("link", { name: "View all templates" })).toHaveAttribute(
-        "href",
-        "/test-project/dashboards/templates",
-      );
+      expect(start.getByRole("group", { name: "Categories" })).toBeInTheDocument();
+      expect(start.getByRole("group", { name: "Agent types" })).toBeInTheDocument();
+      expect(
+        start
+          .getAllByRole("button", { name: /^Use / })
+          .map((each) => each.getAttribute("aria-label")),
+      ).toEqual(finderPool({}).map(({ board }) => `Use ${board.name}`));
+      expect(start.queryByRole("link", { name: "View all templates" })).toBeNull();
+      expect(screen.queryByRole("searchbox")).toBeNull();
       expect(screen.queryByRole("button", { name: /^Add a widget Start/ })).toBeNull();
     });
 
@@ -396,13 +399,12 @@ describe("a member's board", () => {
         ).toBeInTheDocument();
         expect(screen.getByRole("button", { name: "Add a widget" })).toBeInTheDocument();
         expect(screen.queryByText("Or start from a template")).toBeNull();
-        expect(screen.queryByRole("link", { name: "View all templates" })).toBeNull();
       });
     });
 
-    describe("when the member presses a From LangWatch card", () => {
-      /** @scenario "Boards: every empty board shows one view" */
-      it("makes their own board from that template and opens it", async () => {
+    describe("when the member uses a template", () => {
+      /** @scenario "Boards: a template used on an empty board fills that board" */
+      it("fills this board with its widgets and its job, keeping the board's own name", async () => {
         const user = userEvent.setup();
         const server = inMemoryServer({ boards: OWN_BOARDS });
         const { host } = openBoard({ server });
@@ -410,23 +412,43 @@ describe("a member's board", () => {
 
         await user.click(await screen.findByRole("button", { name: `Use ${template.name}` }));
 
-        await waitFor(() =>
-          expect(host.navigations).toEqual(["/test-project/dashboards/board-new-3"]),
+        await waitFor(() => expect(server.state.widgets).toHaveLength(template.widgets.length));
+        expect(server.state.widgets.every(({ dashboardId }) => dashboardId === "board-1")).toBe(
+          true,
         );
-        expect(callsTo(server, "boards.create").map(({ input }) => input)).toEqual([
-          { projectId: "proj-1", name: template.name },
+        expect(callsTo(server, "boards.create")).toEqual([]);
+        expect(callsTo(server, "boards.update").map(({ input }) => input)).toEqual([
+          { projectId: "proj-1", dashboardId: "board-1", description: template.description },
         ]);
-        expect(callsTo(server, "dashboardWidgets.create")).toHaveLength(template.widgets.length);
+        expect(host.navigations).toEqual([]);
+        await waitFor(() => expect(screen.queryByText("Or start from a template")).toBeNull());
+      });
+
+      /** @scenario "Boards: a template used on an empty board fills that board" */
+      it("names an untitled board after the template", async () => {
+        const user = userEvent.setup();
+        const untitled = { ...OWN_BOARDS[0]!, name: "Untitled dashboard 1", description: "Mine" };
+        const server = inMemoryServer({ boards: [untitled, OWN_BOARDS[1]!] });
+        openBoard({ server });
+        const template = curatedBoardById("data")!.card.board;
+
+        await user.click(await screen.findByRole("button", { name: `Use ${template.name}` }));
+
+        await waitFor(() => expect(callsTo(server, "boards.update")).toHaveLength(1));
+        expect(callsTo(server, "boards.update")[0]?.input).toEqual({
+          projectId: "proj-1",
+          dashboardId: "board-1",
+          name: template.name,
+        });
       });
     });
 
-    describe("when the board a card makes cannot be made", () => {
-      /** @scenario "Boards: every empty board shows one view" */
+    describe("when the template's widgets cannot be added", () => {
+      /** @scenario "Boards: a template used on an empty board fills that board" */
       it("leaves the member on the empty board and says so", async () => {
         const user = userEvent.setup();
-        const { host } = openBoard({
-          server: inMemoryServer({ boards: OWN_BOARDS, refuseWidgetCreate: true }),
-        });
+        const server = inMemoryServer({ boards: OWN_BOARDS, refuseWidgetCreate: true });
+        const { host } = openBoard({ server });
 
         await user.click(
           await screen.findByRole("button", {
@@ -437,11 +459,12 @@ describe("a member's board", () => {
         await waitFor(() =>
           expect(host.failures).toEqual([
             expect.objectContaining({
-              fallbackTitle: "Couldn't create the dashboard from the template",
+              fallbackTitle: "Couldn't add the template to this dashboard",
             }),
           ]),
         );
         expect(host.navigations).toEqual([]);
+        expect(callsTo(server, "boards.update")).toEqual([]);
         expect(screen.getByText("Or start from a template")).toBeInTheDocument();
       });
     });
@@ -1403,6 +1426,37 @@ describe("a member's board", () => {
       expect(screen.getByRole("button", { name: "Add a widget" })).toBeInTheDocument();
       await waitFor(() => expect(callsTo(server, "boards.getAll").length).toBeGreaterThan(0));
       expect(callsTo(server, "boards.create")).toEqual([]);
+    });
+
+    /**
+     * @scenario "Boards: a template used on an empty board fills that board"
+     * @scenario "AC162c A new board's first widget stores it once"
+     */
+    it("stores the new board once, under the template's name, holding its widgets", async () => {
+      const user = userEvent.setup();
+      const server = inMemoryServer({ boards: OWN_BOARDS });
+      const { host } = openBoard({
+        server,
+        dashboardId: "new",
+        flags: LANGY_ON,
+        permissions: LANGY_MEMBER,
+      });
+      const template = curatedBoardById("data")!.card.board;
+
+      await user.click(await screen.findByRole("button", { name: `Use ${template.name}` }));
+
+      await waitFor(() => expect(host.langyAsks).toHaveLength(1));
+      expect(host.langyAsks[0]?.context[0]).toMatchObject({ label: template.name });
+      expect(callsTo(server, "boards.create").map(({ input }) => input)).toEqual([
+        { projectId: "proj-1", name: template.name, homeProduct: "llm-ops" },
+      ]);
+      expect(server.state.widgets.every(({ dashboardId }) => dashboardId === "board-new-3")).toBe(
+        true,
+      );
+      expect(server.state.boards.find(({ id }) => id === "board-new-3")?.description).toBe(
+        template.description,
+      );
+      expect(host.navigations).toEqual(["/test-project/dashboards/board-new-3"]);
     });
 
     /** @scenario "AC10 Blank board matches the reference" */

@@ -798,13 +798,14 @@ Feature: Organization-wide Dashboards area
     And every Dashboards row has the height, padding, text style and colours of the sidebar's own entries
     # Evidence: screenshots of the open board's row beside "Agent Testing", light and dark
 
+  # Owner, 2026-11-25: "I find it weird this 'Browse templates' ... how is it different than
+  # 'start from a template'?". A new board is where the templates are.
   @integration
-  Scenario: The LLM Ops section ends with Browse templates
-    When I am in a product in "Shop"
-    Then the last row of its Dashboards section is "Browse templates", which opens "/shop/dashboards/templates"
-    And the Gateway, Coding agents and Governance sections have no "Browse templates", because every template reads LLM Ops data
-    # Evidence: screenshot of the section and the address after the click
-
+  Scenario: The Dashboards section has no templates entry
+    When I am in any product in "Shop"
+    Then its Dashboards section has no "Browse templates" row
+    And a new board from its "+" shows every template until it has a widget
+    # Evidence: screenshot of the section
   @integration @unimplemented
   Scenario: A long sidebar scrolls with a fade, and its footer stays put
     Given more boards than the window can show
@@ -831,8 +832,8 @@ Feature: Organization-wide Dashboards area
   Scenario: Only an empty LLM Ops board offers templates
     Given an empty LLM Ops board in "Shop" and an empty Gateway board
     When I open the "Shop" board at "/shop/dashboards/<id>", or at "/dashboards/<id>" as its sidebar row does
-    Then at either address its "Or start from a template" lists the From LangWatch boards and "View all templates" opens "/shop/dashboards/templates"
-    And the Gateway board shows no "Or start from a template" and no "View all templates" at either address, as no Coding agents or Governance board does
+    Then at either address its "Or start from a template" lists every template, as "/shop/dashboards/templates" does
+    And the Gateway board shows no "Or start from a template" at either address, as no Coding agents or Governance board does
     And each still shows its ask bar, its suggested questions and its header's "Add a widget"
     # Evidence: a screenshot of each empty board, the LLM Ops one at both addresses
 

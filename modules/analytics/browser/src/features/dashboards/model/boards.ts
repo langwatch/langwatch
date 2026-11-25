@@ -72,11 +72,6 @@ export function withQueryString({
   return kept.length === 0 ? path : `${path}?${new URLSearchParams(kept).toString()}`;
 }
 
-/** The address of the templates library. */
-export function dashboardTemplatesPath({ projectSlug }: { projectSlug: string }): string {
-  return `${dashboardsPath({ projectSlug })}/${TEMPLATES_SEGMENT}`;
-}
-
 /** The address of one From LangWatch board. */
 export function curatedBoardPath({
   projectSlug,
@@ -96,19 +91,17 @@ export function organizationBoardPath({ dashboardId }: { dashboardId: string }):
 }
 
 /**
- * Where an empty board's "View all templates" leads, or undefined where no template is offered:
- * templates read LLM Ops data, so only an LLM Ops board offers them (owner, 2026-11-23), at any
- * address it is open at, and it leads to the templates of the project it runs in.
+ * Whether an empty board offers the templates: they read LLM Ops data, so only an LLM Ops board
+ * offers them (owner, 2026-11-23), at any address it is open at, in a project.
  */
-export function templateLinks({
+export function offersTemplates({
   projectSlug,
   homeProduct,
 }: {
   projectSlug: string;
   homeProduct: DashboardHomeProduct;
-}): { templatesHref: string } | undefined {
-  if (projectSlug === "" || homeProduct !== DEFAULT_DASHBOARD_HOME_PRODUCT) return void 0;
-  return { templatesHref: dashboardTemplatesPath({ projectSlug }) };
+}): boolean {
+  return projectSlug !== "" && homeProduct === DEFAULT_DASHBOARD_HOME_PRODUCT;
 }
 
 /** What the area has open, read from the address under `/dashboards/`. */
@@ -140,6 +133,11 @@ export function untitledBoardName({ takenNames }: { takenNames: readonly string[
     (_, index) => `Untitled dashboard ${index + 1}`,
   );
   return candidates.find((name) => !names.has(name)) ?? `Untitled dashboard ${names.size + 1}`;
+}
+
+/** Whether a board still has the name `untitledBoardName` gave it, so a template may name it. */
+export function isUntitledBoardName(name: string): boolean {
+  return /^Untitled dashboard \d+$/.test(name);
 }
 
 /** The name a duplicate is offered before numbering: the board's, marked as a copy. */

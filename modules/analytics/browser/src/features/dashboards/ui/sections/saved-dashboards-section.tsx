@@ -203,6 +203,8 @@ function DraftRow({
           store({ edit: { name }, fallbackTitle: "Couldn't rename the dashboard" });
         },
         onRenameCancel: () => onRenaming(false),
+        // Nothing is stored yet, so Delete only throws the new board away.
+        ...(draft.isStoring ? {} : { remove: { onDelete: draft.discard } }),
       }}
     />
   );

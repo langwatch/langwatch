@@ -22,7 +22,7 @@ import { useAnalyticsHost } from "../../../../model/analytics-host.ts";
 import type { DashboardWidgetDraft } from "../../../../model/dashboard-widget-draft.ts";
 import { DashboardRefreshedAtContext } from "../../../../ui/sections/use-dashboard-auto-refresh.ts";
 import { WidgetReadsEveryProjectContext } from "../../../dashboard-widget/behavior/use-dashboard-widget-executor.ts";
-import { useAddTemplate } from "../../behavior/use-add-template.ts";
+import { useApplyTemplate } from "../../behavior/use-apply-template.ts";
 import {
   useBlockPickerAddress,
   WIDGET_PICKER_QUERY_KEY,
@@ -61,8 +61,7 @@ import {
   widgetSetupDraft,
 } from "../../langy/model/board-langy.ts";
 import { BoardLangy } from "../../langy/ui/sections/board-langy.tsx";
-import { DRAFT_SEGMENT, myDashboardId, templateLinks } from "../../model/boards.ts";
-import { CURATED_BOARDS } from "../../model/curated-boards.ts";
+import { DRAFT_SEGMENT, myDashboardId, offersTemplates } from "../../model/boards.ts";
 import { mayRenameBoard } from "../../model/organization-library.ts";
 import { AddBlockCard, EmptyBoard } from "../blocks/blank-board.tsx";
 import { BoardDataSourceLabel } from "../blocks/board-data-source-label.tsx";
@@ -200,7 +199,7 @@ function boardDataHome({
   const homeProduct = organizationArea ? board.homeProduct : DEFAULT_DASHBOARD_HOME_PRODUCT;
   return {
     readsOrganization: ORGANIZATION_DATA_HOMES.includes(homeProduct),
-    templates: templateLinks({ projectSlug, homeProduct }),
+    templates: offersTemplates({ projectSlug, homeProduct }),
   };
 }
 
@@ -266,7 +265,11 @@ function OpenBoard({ board, unsaved }: { board: SavedBoard; unsaved?: UnsavedBoa
   const isEmpty = boardWidgets.status === "success" && widgets.length === 0;
   const isMyDashboard = myDashboardId({ boards: [board], userId: host.userId() }) === board.id;
   const renameBoard = useBoardTitleRename({ board, unsaved, organizationArea });
-  const fromTemplate = useAddTemplate({ existingNames: saved.boards.map(({ name }) => name) });
+  const fromTemplate = useApplyTemplate({
+    board,
+    unsaved,
+    takenNames: saved.boards.map(({ name }) => name),
+  });
 
   return (
     <WidgetReadsEveryProjectContext.Provider value={readsOrganization}>
@@ -327,10 +330,8 @@ function OpenBoard({ board, unsaved }: { board: SavedBoard; unsaved?: UnsavedBoa
         )}
         {isEmpty && canEdit && templates && (
           <EmptyBoard
-            boards={CURATED_BOARDS}
-            creatingId={fromTemplate.creatingId}
-            onUse={({ card }) => void fromTemplate.add(card.board)}
-            templatesHref={templates.templatesHref}
+            applyingId={fromTemplate.applyingId}
+            onUse={(template) => void fromTemplate.apply(template)}
           />
         )}
         {boardWidgets.status === "success" && widgets.length > 0 && (

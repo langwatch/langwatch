@@ -29,7 +29,7 @@ export type DashboardCreatedFrom =
   | "widget_curated";
 
 /** How a widget landed on a board. */
-export type WidgetAddedFrom = "catalogue" | "editor" | "duplicate";
+export type WidgetAddedFrom = "catalogue" | "editor" | "duplicate" | "template";
 
 /** The boundary the widget editor's LangWatchQL events are sent under. */
 export const LWQL_BOUNDARY = "lwql";

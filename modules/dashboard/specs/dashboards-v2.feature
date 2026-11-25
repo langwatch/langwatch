@@ -742,31 +742,33 @@ Feature: Dashboards v2 polish and bring-your-own-AI
       in its trunk's colour
     # Owner, 2026-11-24: "All" is ranked by what customers need most, not grouped by category
 
-  @unit
-  Scenario: AC102 Templates library: search matches name, job, widget questions and agent kinds
-    When the member searches the library
-    Then a template is listed when its name, its job, one of its widgets' questions
-      or one of its agent kinds contains the search, ignoring case
+  # Owner, 2026-11-25: "there is yet another search bar that looks like it but this one is not
+  # 'what do you want to know?', I don't like it I would just drop it".
+  @integration
+  Scenario: AC102 Templates library: the finder has no search box of its own
+    Given the templates finder, or the templates on an empty board
+    Then there is no template search box: "What do you want to know?" is the one search
+    And the chips are the way to narrow the templates
 
   @unit @integration
   Scenario: AC103 Templates library: one category chip and one agent-type chip narrow the finder
-    Given one plain search, the category chips "All", Grow, Protect, Profit and Trust,
+    Given the category chips "All", Grow, Protect, Profit and Trust,
       and a chip for each agent type with something made for it
     When the member picks a category
-    Then only that category's templates are listed, with the search applied
+    Then only that category's templates are listed
     And clicking the picked category again, or "All", clears it
     And there is no "Any agent" chip and no coding agent chip
-    And each category counts the templates it would show with the search applied
+    And each category counts the templates it would show
 
   @unit @integration
-  Scenario: AC104 Templates library: the search and filters are kept in the address
-    When the member searches or picks a chip
-    Then the address carries the search, the category and the agent type
+  Scenario: AC104 Templates library: the filters are kept in the address
+    When the member picks a chip on the templates finder
+    Then the address carries the category and the agent type
     And opening that address shows the same view
 
   @integration
   Scenario: AC105 Templates library: no match says so and offers to clear the filters
-    Given a search and filters that match no template
+    Given filters that match no template
     Then the library says no template matches
     And clearing the filters shows every template again
 
@@ -1404,6 +1406,16 @@ Feature: Dashboards v2 polish and bring-your-own-AI
     And an unnamed new board is listed as "Untitled dashboard <n>"
     And once it is stored, or the member leaves it unedited, that row is gone
 
+  # Owner, 2026-11-25: "when i hover on the menu the ... are not there ... still i wish i could
+  # remove it already".
+  @integration
+  Scenario: AC162k The new board's sidebar row has its menu before it is stored
+    Given the member opened a new board in a project
+    When they hover its sidebar row
+    Then its "⋮" shows, offering Rename and Delete
+    And Rename stores the board under the new name (AC162d)
+    And Delete throws the new board away without storing anything, and leaves for the project's dashboards
+
   @integration
   Scenario: AC162i A product sidebar's '+' in a project opens the new board in that project
     Given the member is in a project where they may create dashboards
@@ -1493,13 +1505,27 @@ Feature: Dashboards v2 polish and bring-your-own-AI
   # Owner, 2026-11-23: "templates should only be llm ops, not also on the dashboards page".
   # A board homed elsewhere shows no templates; an LLM Ops one shows them at "/dashboards/<id>" too
   # (dashboards-organization-area.feature, "Only an empty LLM Ops board offers templates").
+  # Owner, 2026-11-25: "the untitled dashboard part below the search, until you add a first widget
+  # or so should actually be just the view all templates page"; "if I created a new and started
+  # from template I expected it to replace my current".
   @integration
   Scenario: Boards: every empty board shows one view
     Given an LLM Ops board with no widgets, opened in its project
-    Then it shows the ask bar, the suggested questions,
-      "Or start from a template" with the three From LangWatch boards and "View all templates"
-    And each card makes the member's own board from that template and opens it
-    And a card whose board cannot be made leaves the member on the empty board, told why
+    Then it shows the ask bar, the suggested questions, and under "Or start from a template"
+      every template with the category and agent-type chips, as the templates finder lists them
+    And there is no "View all templates" card and no template search box
+    And once the board has a widget the templates are gone
+
+  @integration
+  Scenario: Boards: a template used on an empty board fills that board
+    Given an empty LLM Ops board, stored or new
+    When the member presses "Use this template" on a template's card
+    Then the template's widgets land on this board, and no other dashboard is made
+    And a board still named "Untitled dashboard <n>" takes the template's name
+    And a board with no description takes the template's job
+    And on a new board this is its first edit: it stores the board once (AC162c)
+    And Langy drafts the template's report, unsent, as AC140 does
+    And a template whose widgets cannot be added leaves the board empty, told why
 
   @integration
   Scenario: Boards: the suggested questions show in full at every width

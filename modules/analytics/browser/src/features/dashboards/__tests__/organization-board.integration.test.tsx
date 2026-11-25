@@ -18,7 +18,7 @@ import {
   StubAnalyticsHost,
   type StubAnalyticsHostOptions,
 } from "../../../testing.tsx";
-import { CURATED_BOARDS } from "../model/curated-boards.ts";
+import { finderPool } from "../model/template-library.ts";
 import OrganizationBoardScreen from "../ui/sections/organization-board.screen.tsx";
 import { NO_PROCEDURES, renderDashboards } from "./render-dashboards.test-helpers.tsx";
 
@@ -186,7 +186,7 @@ describe("a board opened at /dashboards/<id>", () => {
   describe("when it is an empty board the member may edit", () => {
     describe("given it is homed in LLM Ops", () => {
       /** @scenario "Only an empty LLM Ops board offers templates" */
-      it("offers the From LangWatch boards and templates of the project it runs in", async () => {
+      it("offers every template, as the finder lists them", async () => {
         renderBoard({
           answer: resolved({ id: "board-org", scope: "PROJECT", project: SHOP }),
           asLangyEditor: true,
@@ -199,13 +199,11 @@ describe("a board opened at /dashboards/<id>", () => {
         expect(screen.getByRole("button", { name: "Where does my money go?" })).toBeInTheDocument();
         expect(screen.getByRole("button", { name: "Add a widget" })).toBeInTheDocument();
         const start = within(screen.getByRole("region", { name: "Start from a template" }));
-        expect(start.getAllByRole("button").map((card) => card.getAttribute("aria-label"))).toEqual(
-          CURATED_BOARDS.map(({ name }) => `Use ${name}`),
-        );
-        expect(start.getByRole("link", { name: "View all templates" })).toHaveAttribute(
-          "href",
-          `/${SHOP.slug}/dashboards/templates`,
-        );
+        expect(
+          start
+            .getAllByRole("button", { name: /^Use / })
+            .map((each) => each.getAttribute("aria-label")),
+        ).toEqual(finderPool({}).map(({ board }) => `Use ${board.name}`));
       });
     });
 
@@ -232,7 +230,6 @@ describe("a board opened at /dashboards/<id>", () => {
         ).toBeInTheDocument();
         expect(screen.getByRole("button", { name: "Add a widget" })).toBeInTheDocument();
         expect(screen.queryByText("Or start from a template")).not.toBeInTheDocument();
-        expect(screen.queryByRole("link", { name: "View all templates" })).not.toBeInTheDocument();
       });
     });
   });
