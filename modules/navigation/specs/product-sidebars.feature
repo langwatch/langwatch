@@ -184,6 +184,9 @@ Feature: Product sidebars
   # Owner list, 2026-10-08; reshaped by product owner feedback, 2026-10-27. Analytics lends
   # the section and draws it; navigation places it in the LLM Ops sidebar (and, behind a flag,
   # Gateway and Coding agents). A dashboard is pinned to a project by the member's star there.
+  # Pins hold only with the organization's Dashboards area off; with it on no sidebar reads
+  # stars (owner, 2026-11-23; "No sidebar has a Starred dashboards group" in
+  # modules/dashboard/specs/dashboards-organization-area.feature).
   @integration
   Scenario: The LLM Ops sidebar has a Dashboards section listing the pinned dashboards
     Given I can reach Dashboards and I have pinned dashboards to this project

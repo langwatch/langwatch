@@ -15,6 +15,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { ANALYTICS_MEMBER_PERMISSIONS, StubAnalyticsHost } from "../../../testing.tsx";
 import { AGENT_KIND_CHIP_LABELS, PICKER_QUESTIONS, PICKER_SECTIONS } from "../catalogue/index.ts";
 import { boardSubject } from "../langy/model/board-langy.ts";
+import { CURATED_BOARDS, curatedBoardById } from "../model/curated-boards.ts";
 import { BlockPickerDialog } from "../ui/sections/block-picker-dialog.tsx";
 import DashboardBoardScreen from "../ui/sections/dashboard-board.screen.tsx";
 import { SavedDashboardsSection } from "../ui/sections/saved-dashboards-section.tsx";
@@ -136,6 +137,8 @@ function inMemoryServer({
         if (input.description !== void 0) updated.description = input.description as string | null;
         return Promise.resolve({ ...updated });
       }
+      case "featureFlag.isEnabledForEachOrganization":
+        return Promise.resolve({ enabledByOrganizationId: { "org-1": true } });
       case "boards.listStarred":
         return Promise.resolve(
           state.boards
@@ -259,6 +262,7 @@ function openBoard({
   withSidebar = false,
   userId = "user-1",
   permissions,
+  projectPermissions,
   flags = FLAG_ON,
 }: {
   server: ReturnType<typeof inMemoryServer>;
@@ -267,12 +271,15 @@ function openBoard({
   withSidebar?: boolean;
   userId?: string;
   permissions?: string[];
+  /** Grants by project id, which a rename asks of the project that owns the board. */
+  projectPermissions?: Record<string, string[]>;
   flags?: Record<string, boolean>;
 }) {
   const host = new StubAnalyticsHost({
     flags,
     userId,
     permissions,
+    ...(projectPermissions ? { projectPermissions } : {}),
     route: { params: { dashboardId }, query },
   });
   const view = renderDashboards({
@@ -303,7 +310,10 @@ afterEach(cleanup);
 
 describe("a member's board", () => {
   describe("given a member opens a board with nothing on it", () => {
-    /** @scenario "Boards: every empty board shows one view" */
+    /**
+     * @scenario "Boards: every empty board shows one view"
+     * @scenario "Only an empty LLM Ops board offers templates"
+     */
     it("shows the ask bar, the suggested questions and the From LangWatch boards to start from", async () => {
       openBoard({
         server: inMemoryServer({ boards: OWN_BOARDS }),
@@ -317,25 +327,80 @@ describe("a member's board", () => {
         expect(screen.getByRole("button", { name: question })).toBeInTheDocument();
       }
       const start = within(screen.getByRole("region", { name: "Start from a template" }));
-      expect(start.getAllByRole("link").map((link) => link.getAttribute("href"))).toEqual([
-        "/test-project/dashboards/curated/release",
-        "/test-project/dashboards/curated/data",
-        "/test-project/dashboards/curated/breaks",
+      expect(start.getAllByRole("button").map((card) => card.getAttribute("aria-label"))).toEqual(
+        CURATED_BOARDS.map(({ name }) => `Use ${name}`),
+      );
+      expect(start.getByRole("link", { name: "View all templates" })).toHaveAttribute(
+        "href",
         "/test-project/dashboards/templates",
-      ]);
-      expect(start.getByRole("link", { name: "View all templates" })).toBeInTheDocument();
+      );
       expect(screen.queryByRole("button", { name: /^Add a widget Start/ })).toBeNull();
     });
 
-    describe("when the member opens a From LangWatch card", () => {
+    describe("when the board is homed in Gateway", () => {
+      /** @scenario "Only an empty LLM Ops board offers templates" */
+      it("offers no template, and keeps the ask bar, its questions and Add a widget", async () => {
+        openBoard({
+          server: inMemoryServer({
+            boards: OWN_BOARDS.map((each) => ({ ...each, homeProduct: "gateway" as const })),
+          }),
+          flags: LANGY_ON,
+          permissions: LANGY_MEMBER,
+        });
+
+        expect(
+          await screen.findByRole("button", { name: "Where does my money go?" }),
+        ).toBeInTheDocument();
+        expect(
+          screen.getByRole("button", { name: "What do you want to know?" }),
+        ).toBeInTheDocument();
+        expect(screen.getByRole("button", { name: "Add a widget" })).toBeInTheDocument();
+        expect(screen.queryByText("Or start from a template")).toBeNull();
+        expect(screen.queryByRole("link", { name: "View all templates" })).toBeNull();
+      });
+    });
+
+    describe("when the member presses a From LangWatch card", () => {
       /** @scenario "Boards: every empty board shows one view" */
-      it("opens that live board", async () => {
+      it("makes their own board from that template and opens it", async () => {
         const user = userEvent.setup();
-        const { host } = openBoard({ server: inMemoryServer({ boards: OWN_BOARDS }) });
+        const server = inMemoryServer({ boards: OWN_BOARDS });
+        const { host } = openBoard({ server });
+        const template = curatedBoardById("data")!.card.board;
 
-        await user.click(await screen.findByRole("link", { name: "Release check" }));
+        await user.click(
+          await screen.findByRole("button", { name: "Use Can I trust my numbers?" }),
+        );
 
-        expect(host.navigations).toEqual(["/test-project/dashboards/curated/release"]);
+        await waitFor(() =>
+          expect(host.navigations).toEqual(["/test-project/dashboards/board-new-3"]),
+        );
+        expect(callsTo(server, "boards.create").map(({ input }) => input)).toEqual([
+          { projectId: "proj-1", name: template.name },
+        ]);
+        expect(callsTo(server, "dashboardWidgets.create")).toHaveLength(template.widgets.length);
+      });
+    });
+
+    describe("when the board a card makes cannot be made", () => {
+      /** @scenario "Boards: every empty board shows one view" */
+      it("leaves the member on the empty board and says so", async () => {
+        const user = userEvent.setup();
+        const { host } = openBoard({
+          server: inMemoryServer({ boards: OWN_BOARDS, refuseWidgetCreate: true }),
+        });
+
+        await user.click(await screen.findByRole("button", { name: "Use Release check" }));
+
+        await waitFor(() =>
+          expect(host.failures).toEqual([
+            expect.objectContaining({
+              fallbackTitle: "Couldn't create the dashboard from the template",
+            }),
+          ]),
+        );
+        expect(host.navigations).toEqual([]);
+        expect(screen.getByText("Or start from a template")).toBeInTheDocument();
       });
     });
 
@@ -959,6 +1024,94 @@ describe("a member's board", () => {
       expect(await screen.findByRole("heading", { name: "Weekly review" })).toBeInTheDocument();
       expect(screen.queryByRole("button", { name: /Pin dashboard|Unpin dashboard/ })).toBeNull();
       expect(screen.queryByRole("button", { name: "Rename dashboard" })).toBeNull();
+    });
+  });
+
+  describe("given a member who may edit in the project that owns the board", () => {
+    const EDITOR = { "proj-1": ["analytics:update"] };
+
+    describe("when they click the title, type a new name and press Enter", () => {
+      /** @scenario "Boards: clicking the title renames the board" */
+      it("saves the trimmed name in the owning project, says so and shows it as the title", async () => {
+        const user = userEvent.setup({ pointerEventsCheck: 0 });
+        const server = inMemoryServer({ boards: OWN_BOARDS });
+        const { host } = openBoard({ server, projectPermissions: EDITOR });
+
+        const title = await screen.findByRole("heading", { name: "Weekly review" });
+        await user.click(await within(title).findByRole("button", { name: "Weekly review" }));
+        const field = screen.getByRole("textbox", { name: "Dashboard name" });
+        expect(field).toHaveValue("Weekly review");
+        await user.clear(field);
+        await user.type(field, "  Launch week {Enter}");
+
+        await waitFor(() =>
+          expect(callsTo(server, "boards.update").map((call) => call.input)).toEqual([
+            { projectId: "proj-1", dashboardId: "board-1", name: "Launch week" },
+          ]),
+        );
+        expect(await screen.findByRole("heading", { name: "Launch week" })).toBeInTheDocument();
+        await waitFor(() =>
+          expect(host.successes.map((notice) => notice.title)).toEqual(["Dashboard renamed"]),
+        );
+      });
+    });
+
+    describe("when they leave the name blank or unchanged", () => {
+      /** @scenario "Boards: clicking the title renames the board" */
+      it("saves nothing and shows the title again", async () => {
+        const user = userEvent.setup({ pointerEventsCheck: 0 });
+        const server = inMemoryServer({ boards: OWN_BOARDS });
+        openBoard({ server, projectPermissions: EDITOR });
+
+        await user.click(await screen.findByRole("button", { name: "Weekly review" }));
+        await user.clear(screen.getByRole("textbox", { name: "Dashboard name" }));
+        await user.keyboard("{Enter}");
+        await user.click(await screen.findByRole("button", { name: "Weekly review" }));
+        await user.keyboard("{Enter}");
+
+        expect(await screen.findByRole("heading", { name: "Weekly review" })).toBeInTheDocument();
+        expect(callsTo(server, "boards.update")).toEqual([]);
+      });
+    });
+
+    describe("when they press Escape while renaming", () => {
+      /** @scenario "Boards: Escape cancels a rename from the title" */
+      it("keeps the old name and saves nothing", async () => {
+        const user = userEvent.setup({ pointerEventsCheck: 0 });
+        const server = inMemoryServer({ boards: OWN_BOARDS });
+        openBoard({ server, projectPermissions: EDITOR });
+
+        await user.click(await screen.findByRole("button", { name: "Weekly review" }));
+        await user.type(screen.getByRole("textbox", { name: "Dashboard name" }), " draft{Escape}");
+
+        expect(await screen.findByRole("heading", { name: "Weekly review" })).toBeInTheDocument();
+        expect(screen.queryByRole("textbox", { name: "Dashboard name" })).toBeNull();
+        expect(callsTo(server, "boards.update")).toEqual([]);
+      });
+    });
+  });
+
+  describe("given a reader who may not rename the board", () => {
+    /** @scenario "Boards: a reader who may not rename sees a plain title" */
+    it("shows the title as plain text without edit rights in the owning project", async () => {
+      openBoard({ server: inMemoryServer({ boards: OWN_BOARDS }) });
+
+      const title = await screen.findByRole("heading", { name: "Weekly review" });
+      expect(within(title).queryByRole("button")).toBeNull();
+    });
+
+    /** @scenario "Boards: a reader who may not rename sees a plain title" */
+    it("shows My dashboard's title as plain text, edit rights or not", async () => {
+      openBoard({
+        server: inMemoryServer({
+          boards: [{ ...OWN_BOARDS[0]!, id: "mine", name: "My dashboard" }],
+        }),
+        dashboardId: "mine",
+        projectPermissions: { "proj-1": ["analytics:update"] },
+      });
+
+      const title = await screen.findByRole("heading", { name: "My dashboard" });
+      expect(within(title).queryByRole("button")).toBeNull();
     });
   });
 

@@ -234,7 +234,7 @@ export class DashboardWidgetService {
     input: { projectId: string; dashboardId: string } & Viewed,
   ): Promise<DashboardWidgetRow[]> {
     const found = await this.#boards.findReadable(input);
-    if (!found) throw new DashboardNotFoundError(input.projectId);
+    if (!found) throw new DashboardNotFoundError({ projectId: input.projectId });
     const rows = await this.#repository.findAll({ projectId: found.board.projectId });
     return rows.filter((row) => row.dashboardId === input.dashboardId);
   }
@@ -269,7 +269,7 @@ export class DashboardWidgetService {
     input: { projectId: string; dashboardId: string } & Viewed,
   ): Promise<void> {
     const found = await this.#boards.findReadable(input);
-    if (!found) throw new DashboardNotFoundError(input.projectId);
+    if (!found) throw new DashboardNotFoundError({ projectId: input.projectId });
     if (found.standing === "guest") throw new DashboardReadOnlyHereError(input.projectId);
   }
 

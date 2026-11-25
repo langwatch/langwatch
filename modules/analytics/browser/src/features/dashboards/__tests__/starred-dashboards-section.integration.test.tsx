@@ -5,6 +5,7 @@
  * "Add a widget" on it, and an "Add dashboard" item when nothing is pinned.
  * @see modules/navigation/specs/product-sidebars.feature
  * @see modules/dashboard/specs/dashboards-telemetry.feature
+ * @see modules/dashboard/specs/dashboards-organization-area.feature
  */
 
 import type { StarredDashboardsProject } from "@langwatch/analytics-client";
@@ -14,6 +15,7 @@ import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/re
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it } from "vitest";
 
+import type { AnalyticsRouteReading } from "../../../model/analytics-host.ts";
 import { ANALYTICS_MEMBER_PERMISSIONS, StubAnalyticsHost } from "../../../testing.tsx";
 import { CURATED_BOARDS } from "../model/curated-boards.ts";
 import { StarredDashboardsSection } from "../ui/sections/starred-dashboards-section.tsx";
@@ -75,6 +77,7 @@ function renderSection({
   project,
   projectPermissions,
   tracked,
+  route,
 }: {
   stars: unknown[];
   fails?: boolean;
@@ -88,10 +91,13 @@ function renderSection({
   projectPermissions?: Readonly<Record<string, readonly string[]>>;
   /** Records the product events the section sends. */
   tracked?: RecordingUiAnalytics;
+  /** The page's route, for the board it opens. */
+  route?: AnalyticsRouteReading;
 }) {
   const host = new StubAnalyticsHost({
     ...(permissions ? { permissions } : {}),
     ...(projectPermissions ? { projectPermissions } : {}),
+    ...(route ? { route } : {}),
   });
   const calls: UiProcedureCall[] = [];
   const answer = (call: UiProcedureCall) => {
@@ -156,6 +162,26 @@ describe("the LLM Ops sidebar's Dashboards section", () => {
       );
       await user.click(group.getByRole("link", { name: "Latency" }));
       expect(host.navigations).toEqual(["/test-project/dashboards/board-1"]);
+    });
+  });
+
+  describe("given a pinned board is the page open, with the library off", () => {
+    /** @scenario "The open board's sidebar row is marked as the page I am on" */
+    it("marks its row, and no other, as the current page", async () => {
+      renderSection({
+        stars: [
+          { kind: "board", dashboard: LATENCY },
+          { kind: "template", templateId: "release" },
+        ],
+        route: { params: { project: "test-project", dashboardId: LATENCY.id }, query: {} },
+      });
+
+      const group = await section();
+      await waitFor(() => expect(group.getAllByRole("link")).toHaveLength(2));
+      const current = group
+        .getAllByRole("link")
+        .filter((link) => link.getAttribute("aria-current") === "page");
+      expect(current.map((link) => link.textContent)).toEqual(["Latency"]);
     });
   });
 

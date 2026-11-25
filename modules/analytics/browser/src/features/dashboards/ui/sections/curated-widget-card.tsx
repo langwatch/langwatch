@@ -1,7 +1,7 @@
 /**
- * One widget of a From LangWatch board, in the card chrome, read-only: its controls are Ask
- * Langy and a menu that holds only Export CSV, which change nothing. A widget the reader may
- * not see keeps its place and title and offers neither, since both would read its data.
+ * One widget of a From LangWatch board, in the card chrome: Ask Langy and Export CSV, and for a
+ * member who may make boards the drag handle, "Edit code" and "Delete", each asking first as it
+ * makes the member's own copy. A widget the reader may not see offers nothing that reads its data.
  */
 
 import { useState } from "react";
@@ -17,6 +17,8 @@ import type { BoardTemplateWidget } from "../../templates/index.ts";
 import { AskLangyButton } from "../blocks/ask-langy-button.tsx";
 import { WidgetCardShell, widgetBodyHeightPx } from "../blocks/widget-card-shell.tsx";
 import { WidgetExportMenu } from "../blocks/widget-export-menu.tsx";
+import { WidgetMenu } from "../blocks/widget-menu.tsx";
+import { WidgetDragHandle } from "../elements/widget-drag-handle.tsx";
 
 export function CuratedWidgetCard({
   widget,
@@ -30,6 +32,8 @@ export function CuratedWidgetCard({
   granularitySeconds,
   periodKey,
   onAskLangy,
+  onEdit,
+  onDelete,
   onEmptyChange,
   onLimitFailureChange,
 }: {
@@ -49,6 +53,9 @@ export function CuratedWidgetCard({
   periodKey: string;
   /** Drafts a prompt about the widget in Langy; absent when Langy is not available. */
   onAskLangy?: () => void;
+  /** These two are absent for a member who may not make boards: the card is then read-only. */
+  onEdit?: () => void;
+  onDelete?: () => void;
   /** Told whether the card shows none of the widget's data. */
   onEmptyChange?: (empty: boolean) => void;
   /** Told whether the card's final failure is a resource limit. */
@@ -59,7 +66,8 @@ export function CuratedWidgetCard({
   const canAskLangy = onAskLangy !== undefined && face !== "no_access";
   const csvExport = useWidgetCsvExport({ board: boardName, widget: name });
   const viewRef = useWidgetViewed({ widgetSource: "curated" });
-  const hasControls = canAskLangy || csvExport.item !== undefined;
+  const isEditable = onEdit !== undefined || onDelete !== undefined;
+  const hasControls = isEditable || canAskLangy || csvExport.item !== undefined;
 
   return (
     <WidgetCardShell
@@ -70,8 +78,19 @@ export function CuratedWidgetCard({
       controls={
         hasControls && (
           <>
+            {isEditable && <WidgetDragHandle />}
             {canAskLangy && <AskLangyButton name={name} onClick={onAskLangy} />}
-            {csvExport.item && <WidgetExportMenu name={name} exportCsv={csvExport.item} />}
+            {isEditable ? (
+              <WidgetMenu
+                name={name}
+                disabled={false}
+                onEditCode={face === "no_access" ? undefined : onEdit}
+                exportCsv={csvExport.item}
+                onDelete={onDelete}
+              />
+            ) : (
+              csvExport.item && <WidgetExportMenu name={name} exportCsv={csvExport.item} />
+            )}
           </>
         )
       }

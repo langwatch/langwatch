@@ -1,11 +1,12 @@
 /**
- * A From LangWatch board's widgets on the board grid, read-only: no drag or resize, only Ask
- * Langy and Export CSV, which change nothing. Each widget runs its own queries over the
- * board's period.
+ * A From LangWatch board's widgets on the board grid. Ask Langy and Export CSV change nothing; a
+ * member who may make boards also moves, edits and deletes, each asking first as it makes their
+ * own copy. Each widget runs its own queries over the board's period.
  */
 
 import { useMemo } from "react";
 
+import type { ChartGridPlacement } from "../../../../model/chart-grid.ts";
 import { ChartGrid } from "../../../../ui/sections/chart-grid.tsx";
 import {
   atLeastBoardMinRows,
@@ -25,6 +26,9 @@ export function CuratedWidgetsGrid({
   period,
   periodKey,
   onAskLangy,
+  onEdit,
+  onDelete,
+  onPlacementsCommit,
   onEmptyChange,
   onLimitFailureChange,
 }: {
@@ -38,6 +42,10 @@ export function CuratedWidgetsGrid({
   periodKey: string;
   /** Drafts a prompt about the widget in Langy; absent when Langy is not available. */
   onAskLangy?: (widget: BoardTemplateWidget) => void;
+  /** These three are absent for a member who may not make boards: the grid is then read-only. */
+  onEdit?: (widget: BoardTemplateWidget) => void;
+  onDelete?: (widget: BoardTemplateWidget) => void;
+  onPlacementsCommit?: (placements: ChartGridPlacement[]) => void;
   /** Told whether each widget shows none of its data. */
   onEmptyChange?: (input: { widget: BoardTemplateWidget; empty: boolean }) => void;
   /** Told whether each widget's final failure is a resource limit. */
@@ -56,6 +64,7 @@ export function CuratedWidgetsGrid({
   return (
     <ChartGrid
       placements={placements}
+      onPlacementsCommit={onPlacementsCommit}
       rowHeightPx={BOARD_GRID_ROW_HEIGHT_PX}
       minRowSpan={BOARD_MIN_ROW_SPAN}
       renderCard={({ graphId, rowSpan }) => {
@@ -74,6 +83,8 @@ export function CuratedWidgetsGrid({
             granularitySeconds={granularitySeconds}
             periodKey={periodKey}
             onAskLangy={onAskLangy && (() => onAskLangy(widget))}
+            onEdit={onEdit && (() => onEdit(widget))}
+            onDelete={onDelete && (() => onDelete(widget))}
             onEmptyChange={onEmptyChange && ((empty) => onEmptyChange({ widget, empty }))}
             onLimitFailureChange={
               onLimitFailureChange && ((limited) => onLimitFailureChange({ widget, limited }))
