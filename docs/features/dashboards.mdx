@@ -93,12 +93,15 @@ widgets and opens it. The dashboard's header has no such button.
 
 "Ready to ship?" compares production before and after your newest change. A
 change is a new release of your application, a new prompt version, or a model
-your traces start using. LangWatch reads the release from the version your
-application sends with each trace: the OpenTelemetry resource attribute
-`service.version`, else `version` in the trace metadata, else `app_version`.
-A release is marked at the first trace that carries its version, and counts
-only traces of the sources the widget reads, so a version or model that only
-Langy's own runs used is never a release of your application.
+your traces start using.
+
+LangWatch reads the release from the version your application sends with each
+trace: the OpenTelemetry resource attribute `service.version`, else `version` in
+the trace metadata, else `app_version`. A release is marked at the first trace
+that carries its version.
+
+The widget counts only traces of the sources it reads, so a version or model
+that only Langy's own runs used is never a release of your application.
 
 ## Period and grain
 
