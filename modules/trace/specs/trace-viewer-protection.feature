@@ -29,13 +29,19 @@ Scenario: A failed group membership read hides group-restricted trace content
 
   # A project-bound access token (`lw_at_`, minted by the hosted MCP's OAuth sign-in) is its
   # person capped at one project, so it reads content as that person does in the app. An API
-  # key is not a person and keeps reading the public cut. A by-id read that falls back to the
-  # person's other projects serves their view there too, as the app does.
+  # key is not a person and keeps reading the public cut. Outside its own project the token is
+  # capped: a by-id read that falls back to another project reads that project as the public.
   @unit
   Scenario: A project-bound access token reads restricted trace content as its person
     Given trace input, output, system instructions and tool calls are restricted to "Admins"
     When an admin's project-bound access token reads a trace over REST
     Then all four are visible to it, as they are to that admin in the app
+
+  @unit
+  Scenario: A project-bound access token reads another project's trace as the public
+    Given a project-bound access token for one project
+    When its by-id read finds the trace only in another project its person may read
+    Then that trace's content is resolved as the public, not as the person
 
   @unit
   Scenario: A project-bound access token never reads more than its person

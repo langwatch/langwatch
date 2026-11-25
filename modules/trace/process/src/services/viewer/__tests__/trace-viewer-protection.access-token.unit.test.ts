@@ -161,6 +161,19 @@ describe("TraceViewerProtectionService.resolveForApiKey", () => {
       expect(protections.capturedInputVisibleTo).toBe("Admins");
     });
 
+    it("reads as the public when asked outside the token's own project", async () => {
+      const { service } = protectionsWith({ held: ADMIN });
+
+      const protections = await service.resolveForApiKey({
+        projectId: project.id,
+        principal: { type: "user", id: "admin-1" },
+        readsAsPerson: false,
+      });
+
+      expect(protections.canSeeCapturedInput).toBe(false);
+      expect(protections.contentCategories?.system.canSee).toBe(false);
+    });
+
     /** @scenario "An API key keeps reading restricted trace content as the public" */
     it("hides the input from an API key, whatever its grants", async () => {
       const { service } = protectionsWith({ held: ADMIN });

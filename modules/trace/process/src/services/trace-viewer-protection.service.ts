@@ -81,9 +81,14 @@ export class TraceViewerProtectionService {
       projectId: string;
       principal: PrincipalRef | null;
       authorization?: Authorization;
+      /** False outside the token's own project: there it reads as the public. */
+      readsAsPerson?: boolean;
     }>,
   ): Promise<Protections> {
-    const personId = input.principal?.type === "user" ? input.principal.id : void 0;
+    const personId =
+      input.readsAsPerson !== false && input.principal?.type === "user"
+        ? input.principal.id
+        : void 0;
     const proof = input.authorization;
     const ownProof =
       personId && proof?.principal.type === "user" && proof.principal.id === personId;

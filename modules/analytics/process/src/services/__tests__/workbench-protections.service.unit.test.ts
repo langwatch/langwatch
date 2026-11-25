@@ -58,6 +58,29 @@ function inputRestrictedTo(groupId: string): dataPrivacyContractModule.ResolvedD
   };
 }
 
+/** Input and output both restricted to admins only. */
+function bothRestrictedToAdmins(): dataPrivacyContractModule.ResolvedDataPrivacy {
+  const adminsOnly = {
+    disposition: "restrict" as const,
+    audience: {
+      allMembers: false,
+      admins: true,
+      members: false,
+      viewers: false,
+      projectOwner: false,
+      groupIds: [],
+    },
+  };
+  return {
+    ...PLATFORM_DEFAULT_DATA_PRIVACY,
+    categories: {
+      ...PLATFORM_DEFAULT_DATA_PRIVACY.categories,
+      input: adminsOnly,
+      output: adminsOnly,
+    },
+  };
+}
+
 const API_KEY_CREDENTIAL: RestCredentialPrincipal = {
   kind: "apiKey",
   apiKeyId: "key-1",
@@ -455,6 +478,22 @@ describe("resolveApiKeyProtections", () => {
     /** @scenario "A project-bound access token reads captured content as its person" */
     it("shows the content, as the workbench shows it to that admin", async () => {
       const { authz } = authzAnswering(true);
+      const { dataPrivacy } = dataPrivacyResolving(async () => bothRestrictedToAdmins());
+
+      const resolved = await serviceOver({ authz, dataPrivacy }).resolveApiKeyProtections({
+        projectId: "project-1",
+        credential: ACCESS_TOKEN_CREDENTIAL,
+      });
+
+      expect(resolved.canSeeCapturedInput).toBe(true);
+      expect(resolved.canSeeCapturedOutput).toBe(true);
+      expect(resolved.canSeeCosts).toBe(true);
+    });
+  });
+
+  describe("given an admin's access token and input restricted to a group they are not in", () => {
+    it("hides the input, as the workbench hides it from that admin", async () => {
+      const { authz } = authzAnswering(true);
       const { dataPrivacy } = dataPrivacyResolving(async () => inputRestrictedTo("group-a"));
 
       const resolved = await serviceOver({ authz, dataPrivacy }).resolveApiKeyProtections({
@@ -462,9 +501,8 @@ describe("resolveApiKeyProtections", () => {
         credential: ACCESS_TOKEN_CREDENTIAL,
       });
 
-      expect(resolved.canSeeCapturedOutput).toBe(true);
       expect(resolved.canSeeCapturedInput).toBe(false);
-      expect(resolved.canSeeCosts).toBe(true);
+      expect(resolved.canSeeCapturedOutput).toBe(true);
     });
   });
 });
