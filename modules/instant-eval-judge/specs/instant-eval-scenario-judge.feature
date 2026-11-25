@@ -26,12 +26,14 @@ Feature: A scenario judgement answered by the judge router
     When its question is built
     Then its instructions name the criterion after the fixed judging sentence
     And its two sides say the conversation shows it was met, or does not
+    And a criterion past 4,000 characters is cut to its first 4,000 in its question
 
   @unit
   Scenario: A sure decision answer settles its criterion without an LLM call
     Given every criterion's decision answer is at or above the route's threshold
     When the verdict is judged
     Then a probability of one half or more is met and below it is unmet
+    And a criterion with no probability is inconclusive
     And no LLM call is sent
 
   @unit
@@ -40,6 +42,7 @@ Feature: A scenario judgement answered by the judge router
     When the verdict is judged
     Then one LLM call is sent with the judge's own messages and the finish_test tool forced
     And both criteria are read from that call by their keys
+    And an entry that is not true, false or inconclusive is left out, and a call with no criteria object reads none
     And the call's tokens are billed once
 
   @unit @regression
@@ -167,6 +170,10 @@ Feature: A scenario judgement answered by the judge router
     When the judge's verdict call is sent
     Then the body carries the judge's system and user messages and only the forced tool
     And the called tool's arguments and the billed tokens are read back
+    And with no tool forced the model must call one of the offered tools
+    And a call to a tool that was not offered, or arguments that are not JSON, is read as no call with its tokens still billed
+    And a call sent with empty arguments is read as a call with no arguments
+    And a wire this install holds no key for is skipped as not configured, sending nothing
 
   @unit
   Scenario: A provider failure of the judge's own call is a failed leg, never a retry
@@ -195,6 +202,13 @@ Feature: A scenario judgement answered by the judge router
     Then the easy criterion is one decision request and is answered by it
     And the two hard criteria share one send of the judge's own verdict call
     And the gate's sends, the decision request and the shared call are billed in the one fact
+
+  @unit @regression
+  Scenario: The gate reads a criterion as the raw criterion the benchmark measured
+    Given a gated scenario route
+    When a criterion is routed
+    Then the gate's task line is the criterion's own text, as the gate's cut was measured on
+    And never the decision question's judging sentence around it
 
   @unit
   Scenario: The shared verdict call carries the backend's reasoning effort

@@ -19,6 +19,7 @@ Feature: LangWatch Judge (preview) as the scenario judge
     Then each property of the tool's criteria is a criterion, keyed by its name with its description as text
     And the description is the text of the system prompt's scenario block
     And the content is the judge's user message
+    And a later user message is appended to the content, its text parts read
 
   @unit
   Scenario: A custom system prompt without a scenario block is kept whole
@@ -43,6 +44,7 @@ Feature: LangWatch Judge (preview) as the scenario judge
     Given a chat request with no judge tool
     When it is read
     Then it is refused as invalid, saying the model judges scenario runs only
+    And a request offering only one of the two decision tools is refused
 
   @unit
   Scenario: A streamed request is refused
@@ -141,10 +143,11 @@ Feature: LangWatch Judge (preview) as the scenario judge
     Then the endpoint answers 401
 
   @unit
-  Scenario: The flag is read for the project within its organization
+  Scenario: The flag is read for the project's organization alone
     Given LangWatch Cloud
     When availability is asked for a project
-    Then release_langwatch_judge_preview is read with the project and its organization
+    Then release_langwatch_judge_preview is read for the project's organization, never the project
+    And the judge pickers and the Judge default's save gate ask it at the same level
 
   @unit
   Scenario: A run judged by LangWatch Judge (preview) is pointed at the app's own endpoint

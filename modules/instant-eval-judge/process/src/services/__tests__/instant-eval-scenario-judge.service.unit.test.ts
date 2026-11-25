@@ -128,11 +128,14 @@ function harness({
   });
   const classifierRequests: string[] = [];
   const gateRequests: string[] = [];
+  /** The text each gate send read, per criterion key. */
+  const gateTexts = new Map<string, string>();
   const classifier = MemoryInstantEvalClassifierChannel.create({
-    answer: async ({ questions }) => {
+    answer: async ({ questions, text }) => {
       const asked = questions[0];
       if (asked?.kind === "score") {
         gateRequests.push(asked.id);
+        gateTexts.set(asked.id, text);
         const score = gateScores[asked.id];
         return {
           verdicts: score === undefined ? [] : [{ questionId: asked.id, score }],
@@ -201,6 +204,7 @@ function harness({
     hostedDecisions,
     classifierRequests,
     gateRequests,
+    gateTexts,
     llmJudge,
     recorded,
     lines,
@@ -800,6 +804,19 @@ describe("given a gated scenario route", () => {
         3 * GATE_TOKENS * 5_000 + 1_000 * 1_000 + 2_000 * 10_000 + 100 * 100_000,
       );
       expect(recorded[0]?.model).toBe("langwatch-judge-preview");
+    });
+
+    /** @scenario "The gate reads a criterion as the raw criterion the benchmark measured" */
+    it("tells the gate each raw criterion as its task, without the decision question's framing", async () => {
+      const { service, gateTexts } = harness({ table, gateScores });
+
+      await service.judge(scenarioJudgeCall());
+
+      expect(gateTexts.get("criterion_0")).toContain("Task: The agent offers a refund\n");
+      expect(gateTexts.get("criterion_2")).toContain(
+        "Task: The agent does not ask for a card number\n",
+      );
+      expect(gateTexts.get("criterion_0")).not.toContain("Judge the AI agent under test");
     });
 
     /** @scenario "The shared verdict call carries the backend's reasoning effort" */

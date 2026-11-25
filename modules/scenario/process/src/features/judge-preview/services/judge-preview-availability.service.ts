@@ -40,9 +40,9 @@ export class JudgePreviewAvailabilityService {
     const organizationId = await this.deps.projects.findOrganizationId(projectId);
     // A project with no organization reads as off: no organization rule could name it.
     if (!organizationId) return { isAvailable: false, message: NOT_TURNED_ON };
+    // Asked of the organization only, as the pickers and the Judge default's save gate ask it.
     const isEnabled = await this.deps.featureFlags.isEnabled(JUDGE_PREVIEW_FLAG_KEY, {
-      kind: "project",
-      projectId,
+      kind: "organization",
       organizationId,
     });
     if (!isEnabled) return { isAvailable: false, message: NOT_TURNED_ON };

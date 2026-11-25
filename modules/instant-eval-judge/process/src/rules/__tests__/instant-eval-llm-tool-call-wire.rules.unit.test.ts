@@ -90,6 +90,7 @@ describe("instantEvalLlmToolCallBodyOf", () => {
     });
   });
 
+  /** @scenario "The judge's own call is sent on the leg's wire with its tool forced" */
   it("requires one of the offered tools when none is forced", () => {
     const prompt = { system: "judge", user: "transcript", tools: [CONTINUE, VERDICT] };
 
@@ -147,6 +148,7 @@ describe("readInstantEvalLlmToolCall", () => {
     });
   });
 
+  /** @scenario "The judge's own call is sent on the leg's wire with its tool forced" */
   it("reads no call from a tool that was not offered, and still bills the tokens", () => {
     const reading = readInstantEvalLlmToolCall({
       wire: "openai_responses",
@@ -160,6 +162,7 @@ describe("readInstantEvalLlmToolCall", () => {
     expect(reading).toEqual({ outcome: "none", inputTokens: 700, outputTokens: 30 });
   });
 
+  /** @scenario "The judge's own call is sent on the leg's wire with its tool forced" */
   it("reads no call from arguments that are not JSON or a body of another shape", () => {
     const badArguments = readInstantEvalLlmToolCall({
       wire: "openai_responses",
@@ -179,6 +182,7 @@ describe("readInstantEvalLlmToolCall", () => {
     expect(otherShape).toEqual({ outcome: "none", inputTokens: 0, outputTokens: 0 });
   });
 
+  /** @scenario "The judge's own call is sent on the leg's wire with its tool forced" */
   it("reads a call sent with empty arguments as a call with no arguments, on both readers", () => {
     const body = {
       output: [{ type: "function_call", name: "evaluation", arguments: "" }],
@@ -208,6 +212,7 @@ describe("readInstantEvalLlmToolCall", () => {
 });
 
 describe("instantEvalLlmJudgeBodyOf", () => {
+  /** @scenario "The LLM legs send one forced yes-or-no tool call and read it back" */
   it("is the tool-call body with the evaluation tool forced, on every wire", () => {
     const prompt = instantEvalLlmJudgePromptOf({
       job: "search",

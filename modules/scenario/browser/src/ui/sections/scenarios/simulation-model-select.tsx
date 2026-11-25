@@ -43,10 +43,11 @@ export function SimulationModelSelect({
   const { project, organization } = useOrganizationTeamProject();
   const projectId = project?.id ?? "";
   // LangWatch's own scenario judge, listed for the judge only and only where its flag is on.
+  // Asked of the organization only, as Default models and every server check ask it.
   const judgePreview = useFeatureFlag(FrontendFlags.release_langwatch_judge_preview, {
-    projectId: project?.id ?? NOT_TARGETED,
+    projectId: NOT_TARGETED,
     organizationId: organization?.id ?? NOT_TARGETED,
-    enabled: featureKey === "scenarios.judge" && !!project?.id,
+    enabled: featureKey === "scenarios.judge" && !!organization?.id,
   });
   const isJudgePreviewOffered = featureKey === "scenarios.judge" && judgePreview.enabled;
 

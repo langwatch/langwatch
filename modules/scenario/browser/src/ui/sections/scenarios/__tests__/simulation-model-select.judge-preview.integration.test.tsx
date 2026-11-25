@@ -5,15 +5,25 @@
  * @see specs/model-providers/judge-default-model.feature
  */
 import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { NOT_TARGETED } from "@langwatch/feature-flag-contract";
 import { cleanup, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 const flagsOn = new Set<string>();
+/** The targets each flag was asked with, by flag name. */
+const flagAsks: { name: string; projectId?: string; organizationId?: string }[] = [];
 vi.mock("@langwatch/feature-flag-client", () => ({
-  useFeatureFlag: (flag: { name: string }, options: { enabled?: boolean }) => ({
-    enabled: options.enabled !== false && flagsOn.has(flag.name),
-    isLoading: false,
-  }),
+  useFeatureFlag: (
+    flag: { name: string },
+    options: { enabled?: boolean; projectId?: string; organizationId?: string },
+  ) => {
+    flagAsks.push({
+      name: flag.name,
+      projectId: options.projectId,
+      organizationId: options.organizationId,
+    });
+    return { enabled: options.enabled !== false && flagsOn.has(flag.name), isLoading: false };
+  },
 }));
 
 vi.mock("@langwatch/browser-host/use-organization-team-project", () => ({
@@ -38,6 +48,7 @@ import { SimulationModelSelect } from "../simulation-model-select.tsx";
 
 afterEach(() => {
   flagsOn.clear();
+  flagAsks.length = 0;
   cleanup();
 });
 
@@ -77,5 +88,18 @@ describe("<SimulationModelSelect/> and LangWatch Judge (preview)", () => {
 
     expect(values).not.toContain("langwatch/judge-preview");
     expect(values.length).toBeGreaterThan(0);
+  });
+
+  /** @scenario "A scenario's judge picker offers LangWatch Judge (preview) where its flag is on" */
+  it("asks the flag of the organization alone, as the Default models drawer does", () => {
+    flagsOn.add("release_langwatch_judge_preview");
+
+    optionsOf("scenarios.judge");
+
+    const asks = flagAsks.filter((ask) => ask.name === "release_langwatch_judge_preview");
+    expect(asks.length).toBeGreaterThan(0);
+    for (const ask of asks) {
+      expect(ask).toMatchObject({ projectId: NOT_TARGETED, organizationId: "org-1" });
+    }
   });
 });

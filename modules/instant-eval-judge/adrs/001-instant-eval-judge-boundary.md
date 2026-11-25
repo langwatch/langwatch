@@ -107,8 +107,8 @@ bucket per project and one for the deployment. The module owns and closes it.
 
 The router adds two outbound HTTP channels, each built only when its key is set: the hosted
 decisions endpoint (`http.instant-eval-hosted-decisions.channel.ts`) and an LLM judge channel for
-Anthropic and OpenAI (`http.instant-eval-llm-judge.channel.ts`). The module owns and closes them.
-The leaf now has four upstreams. It still calls no peer Api.
+Anthropic, OpenAI and Gemini (`http.instant-eval-llm-judge.channel.ts`). The module owns and closes
+them. The leaf now has five upstreams. It still calls no peer Api.
 
 Pricing has two rules. An unrouted judgement is priced from its input tokens at the classifier's
 rate, under the model `langwatch-instant-preview` (older rows carry `langwatch-evals-preview` or

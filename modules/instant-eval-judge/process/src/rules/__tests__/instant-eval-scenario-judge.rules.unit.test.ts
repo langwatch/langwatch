@@ -35,6 +35,7 @@ describe("instantEvalScenarioQuestionOf", () => {
     });
   });
 
+  /** @scenario "A criterion's question keeps the measured wording" */
   it("cuts a criterion past 4,000 characters in its question", () => {
     const question = instantEvalScenarioQuestionOf({ key: "k", text: "a".repeat(5_000) });
 
@@ -43,6 +44,7 @@ describe("instantEvalScenarioQuestionOf", () => {
 });
 
 describe("instantEvalScenarioTextOf", () => {
+  /** @scenario "Each criterion is routed as its own yes or no question" */
   it("heads the judge's content with the scenario's description", () => {
     expect(instantEvalScenarioTextOf({ description: "a refund", content: "<transcript/>" })).toBe(
       "# Scenario\na refund\n\n<transcript/>",
@@ -51,6 +53,7 @@ describe("instantEvalScenarioTextOf", () => {
 });
 
 describe("findInstantEvalScenarioVerdictReading", () => {
+  /** @scenario "Unsure criteria share one send of the judge's own verdict call" */
   it("reads each criterion by key and the reasoning, leaving out an unreadable entry", () => {
     const reading = findInstantEvalScenarioVerdictReading({
       criteria: { a: "true", b: "false", c: "inconclusive", d: "maybe", e: true },
@@ -67,6 +70,7 @@ describe("findInstantEvalScenarioVerdictReading", () => {
     expect(reading?.reasoning).toBe("because");
   });
 
+  /** @scenario "Unsure criteria share one send of the judge's own verdict call" */
   it("reads nothing from arguments with no criteria object", () => {
     expect(findInstantEvalScenarioVerdictReading({ verdict: "success" })).toBeUndefined();
     expect(findInstantEvalScenarioVerdictReading("finish")).toBeUndefined();
@@ -74,6 +78,7 @@ describe("findInstantEvalScenarioVerdictReading", () => {
 });
 
 describe("instantEvalScenarioCriterionResultOf", () => {
+  /** @scenario "A sure decision answer settles its criterion without an LLM call" */
   it("is met at one half or more, unmet below, and inconclusive without a probability", () => {
     const of = (probability: number) =>
       instantEvalScenarioCriterionResultOf({ questionId: "k", probability });

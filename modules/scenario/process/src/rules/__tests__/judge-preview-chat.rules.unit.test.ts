@@ -53,6 +53,7 @@ describe("judgePreviewLeafCallOf", () => {
       expect(call.description).toBe("Judge strictly.");
     });
 
+    /** @scenario "The judge's verdict call becomes one leaf call with a criterion per tool property" */
     it("appends a later user message and reads text parts", () => {
       const request = verdictRequest();
       const call = judgePreviewLeafCallOf({
@@ -92,6 +93,7 @@ describe("judgePreviewLeafCallOf", () => {
       expect(refuse).toThrow("LangWatch Judge (preview) judges scenario runs only.");
     });
 
+    /** @scenario "A request that is not a scenario judge call is refused" */
     it("refuses a request offering only one of the two decision tools", () => {
       const request = decisionRequest();
       const tools = request.tools?.filter((tool) => tool.function.name === "continue_test");

@@ -104,7 +104,7 @@ export class InstantEvalScenarioJudgeService {
           text,
           questions: [instantEvalScenarioQuestionOf({ key, text: criterion })],
           route: { job: "scenario_judge" },
-          scenario: { criterionKey: key, verdicts },
+          scenario: { criterionKey: key, criterionText: criterion, verdicts },
           ...(signal ? { signal } : {}),
         }),
     });

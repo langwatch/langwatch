@@ -133,6 +133,7 @@ Feature: Judge column in Default models
     Then LangWatch Judge (preview) is listed first
     And the user simulator picker does not list it
     And with the flag off neither picker lists it
+    And the flag is asked of the organization alone, as the Default models drawer asks it
 
   @unit
   Scenario: Saving LangWatch Judge (preview) as the Judge default stores it as picked

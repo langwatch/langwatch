@@ -346,6 +346,7 @@ describe("a judgement's spend after one more call", () => {
     ).toEqual({ spend: { inputTokens: 1100, costNanoUsd: 150_007 }, isUnpriced: false });
   });
 
+  /** @scenario "Each call's tokens and cost are added to its judgement's spend" */
   it("adds an unpriced call's tokens and no cost, and says it had no price", () => {
     expect(
       instantEvalJudgeSpendAfterCall({
@@ -358,6 +359,7 @@ describe("a judgement's spend after one more call", () => {
     ).toEqual({ spend: { inputTokens: 1100, costNanoUsd: 7 }, isUnpriced: true });
   });
 
+  /** @scenario "Each call's tokens and cost are added to its judgement's spend" */
   it("changes nothing for a call that billed no tokens, priced or not", () => {
     for (const backend of ["llm", "other"]) {
       expect(
@@ -372,6 +374,7 @@ describe("a judgement's spend after one more call", () => {
     }
   });
 
+  /** @scenario "Each call's tokens and cost are added to its judgement's spend" */
   it("counts a call that billed output tokens alone", () => {
     expect(
       instantEvalJudgeSpendAfterCall({

@@ -124,6 +124,7 @@ describe("HttpInstantEvalLlmJudgeChannel.call", () => {
     expect(sends).toBe(1);
   });
 
+  /** @scenario "The judge's own call is sent on the leg's wire with its tool forced" */
   it("bills the tokens of an answer that called no offered tool", async () => {
     agent
       .get("https://api.openai.com")
@@ -143,6 +144,7 @@ describe("HttpInstantEvalLlmJudgeChannel.call", () => {
     });
   });
 
+  /** @scenario "The judge's own call is sent on the leg's wire with its tool forced" */
   it("skips a wire this install holds no key for, sending nothing", async () => {
     const answer = await llm({ anthropic_messages: "lw-anthropic" } as never).call(
       request("openai_responses"),

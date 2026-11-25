@@ -1,6 +1,6 @@
 /**
- * Where LangWatch Judge (preview) may judge: the release flag read for the project within its
- * organization, and no answer for a project outside one.
+ * Where LangWatch Judge (preview) may judge: the release flag read for the project's
+ * organization alone, and no answer for a project outside one.
  * @see modules/scenario/specs/judge-preview.feature
  */
 import { describe, expect, it } from "vitest";
@@ -10,8 +10,8 @@ import { judgePreviewAvailabilityFixture } from "../../../../__tests__/support/j
 const PROJECT_ID = "project-1";
 
 describe("JudgePreviewAvailabilityService", () => {
-  /** @scenario "The flag is read for the project within its organization" */
-  it("reads the release flag for the project within its organization", async () => {
+  /** @scenario "The flag is read for the project's organization alone" */
+  it("reads the release flag for the project's organization, never the project", async () => {
     const flagChecks: unknown[][] = [];
     const availability = judgePreviewAvailabilityFixture({
       isSaas: true,
@@ -26,7 +26,7 @@ describe("JudgePreviewAvailabilityService", () => {
     expect(flagChecks).toEqual([
       [
         "release_langwatch_judge_preview",
-        { kind: "project", projectId: PROJECT_ID, organizationId: "organization-9" },
+        { kind: "organization", organizationId: "organization-9" },
       ],
     ]);
   });

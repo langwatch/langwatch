@@ -46,7 +46,7 @@ This record supersedes ADR-174 in part:
 - the pricing bullet of decision 8, for routed calls;
 - decision 11, for routing (a separate flag).
 
-It amends decision 13. The leaf now owns two pricing rules and four upstreams: the hosted classifier, the hosted decisions endpoint, Anthropic and OpenAI. It still calls no peer Api.
+It amends decision 13. The leaf now owns two pricing rules and five upstreams: the hosted classifier, the hosted decisions endpoint, Anthropic, OpenAI and Gemini. It still calls no peer Api.
 
 ## Resolved questions
 

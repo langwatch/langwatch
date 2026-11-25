@@ -79,3 +79,12 @@ Feature: What the Instant Evals judge costs us, and what the customer is charged
     Then the input tokens no routed cost covers are priced at the classifier's rate
     And the routed judgements are priced from their summed cost
     And the two are added
+
+  @unit
+  Scenario: Each call's tokens and cost are added to its judgement's spend
+    Given a judgement's spend so far
+    When one more call is added
+    Then a priced call adds its input tokens and its tokens' cost at the backend's rates
+    And an unpriced call adds its input tokens and no cost, and is flagged as unpriced
+    And a call that billed no tokens changes nothing, priced or not
+    And a call that billed output tokens alone still adds their cost

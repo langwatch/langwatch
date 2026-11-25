@@ -61,6 +61,8 @@ export type InstantEvalJudgeRouteRunDeps = Readonly<{
  */
 export type InstantEvalJudgeScenarioLeg = Readonly<{
   criterionKey: string;
+  /** The raw criterion: the gate's task line as the benchmark measured it, unframed. */
+  criterionText: string;
   verdicts: InstantEvalScenarioLlmVerdictService;
 }>;
 
@@ -184,6 +186,7 @@ export class InstantEvalJudgeRouteRunService {
       escalateTo,
       logger: this.logger,
       flag: (flag) => this.flags.push(flag),
+      taskOf: (question) => this.scenario?.criterionText ?? question.instructions,
       ask: (input) => this.ask(input),
       askOne: (input) => this.askOne(input),
     }).ask(questions);

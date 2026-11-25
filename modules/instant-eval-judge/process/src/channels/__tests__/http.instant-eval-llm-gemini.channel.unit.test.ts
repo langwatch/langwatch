@@ -184,6 +184,7 @@ describe("HttpInstantEvalLlmJudgeChannel on a Gemini backend", () => {
       expect(sent).toHaveLength(1);
     });
 
+    /** @scenario "The judge's own call is sent on the leg's wire with its tool forced" */
     it("bills an answer that called no offered tool and reads none from it", async () => {
       reply(200, {
         candidates: [{ content: { parts: [{ text: "I would rather not" }] } }],
