@@ -499,3 +499,13 @@ Feature: Product sidebars
   Scenario: An organization whose creation date has not arrived keeps the Analytics entry
     Given my organization's creation date is not known
     Then the Analytics entry is offered
+
+  # A From LangWatch board pinned in a product's sidebar opens in that product,
+  # so clicking it keeps the reader's sidebar. Boards pinned to no product, and
+  # any id not pinned at all, stay in LLM Ops.
+  @unit
+  Scenario: A product's pinned board opens inside that product
+    Given a From LangWatch board pinned to the gateway or Coding agents product
+    When I open that board from the product's sidebar
+    Then the board's home product is the one I clicked it from
+    And a From LangWatch board not pinned to a product opens in LLM Ops
