@@ -83,7 +83,7 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 - [Custom Events](https://langwatch.ai/docs/user-events/custom.md): Track custom user events in your LLM application using LangWatch to support analytics, evaluations, and agent testing workflows.
 
 - [Querying your data](https://langwatch.ai/docs/features/querying-your-data.md): LangWatch answers two query languages, analytics SQL and the trace filter. One endpoint describes both, and the CLI runs either without a browser.
-- [Dashboards](https://langwatch.ai/docs/features/dashboards.md): Build dashboards of charts over your LangWatch data, or start one from the Agent health template for an at-a-glance view of your project.
+- [Dashboards](https://langwatch.ai/docs/features/dashboards.md): Build dashboards of charts over your LangWatch data, or start one from the My agent at a glance template for a quick view of your project.
 - [Alerts and Automations](https://langwatch.ai/docs/features/automations.md): Configure Alerts and Automations in LangWatch to detect regressions, notify teams, and enforce automated guardrails for AI agent testing.
 - [Braids](https://langwatch.ai/docs/features/braids.md): Show another project's matching spans inside your traces, so an agent that calls agents in other projects can follow each call all the way down. The spans stay where they were recorded.
 - [Topic clustering](https://langwatch.ai/docs/features/topic-clustering.md): Group your traces into topics and subtopics automatically, choose the model it uses, and run it on demand from Settings.
@@ -600,6 +600,7 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 - [Microsoft Copilot Studio](https://langwatch.ai/docs/ai-governance/ingestion-sources/copilot-studio.md): Read Copilot Studio conversations from your Power Platform Dataverse environment. Each conversation becomes a trace with turns, tool calls, and attribution to the person who asked.
 - [OpenAI Enterprise Compliance](https://langwatch.ai/docs/ai-governance/ingestion-sources/openai-compliance.md): Setup contract only, S3 bucket + cross-account role config captured; the JSONL puller is pending.
 - [Anthropic Claude Enterprise Compliance](https://langwatch.ai/docs/ai-governance/ingestion-sources/claude-compliance.md): Setup contract only, workspace API key captured; the compliance API poller is pending.
+- [Cloud agent discovery](https://langwatch.ai/docs/ai-governance/cloud-agent-discovery.md): List the agents your organisation runs on AWS Bedrock, Bedrock AgentCore, Google Cloud Vertex AI Agent Engine and any ARD registry, and find the shadow and dormant ones.
 
 ## Detection
 
@@ -1055,9 +1056,11 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 - [Get the registry as an ARD manifest](https://langwatch.ai/docs/api-reference/governance-agent-registry/get-the-registry-as-an-ard-manifest.md)
 - [Read the registry change feed](https://langwatch.ai/docs/api-reference/governance-agent-registry/read-the-registry-change-feed.md)
 - [Get the registry's JSON Schemas](https://langwatch.ai/docs/api-reference/governance-agent-registry/get-the-registry-s-json-schemas.md)
+- [Get the registry settings](https://langwatch.ai/docs/api-reference/governance-agent-registry/get-the-registry-settings.md)
 - [Search the registry (ARD search)](https://langwatch.ai/docs/api-reference/governance-agent-registry/search-the-registry-ard-search.md)
 - [Get one registry agent](https://langwatch.ai/docs/api-reference/governance-agent-registry/get-one-registry-agent.md)
 - [List one registry agent's versions](https://langwatch.ai/docs/api-reference/governance-agent-registry/list-one-registry-agent-s-versions.md)
+- [Save the registry settings](https://langwatch.ai/docs/api-reference/governance-agent-registry/save-the-registry-settings.md)
 
 ## Agent Kill Switch
 

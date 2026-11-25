@@ -33,6 +33,12 @@ const registry = {
       "A key that reads exactly one project, such as a project API key, needs none: it defaults to that project",
     ],
   },
+  billing_only_keeps_billing: {
+    tips: [
+      "To stop a Billing-only member paying, remove them from the organization",
+      "To keep them in the organization without Billing, change their organization role to a seat role first, then turn Billing off",
+    ],
+  },
   billing_only_no_team_access: {
     tips: [
       "Send the Billing-only invite with no `teams` and no `teamIds`",
@@ -698,7 +704,9 @@ const registry = {
     docsPath: "/governance/kill-switch",
   },
   governance_aws_connection_not_found: {
-    tips: ["Create the AWS connection on the Agents page before naming it in a stop plan"],
+    tips: [
+      "Create the AWS connection on the Agents page before naming it in a stop plan or an AWS agent source",
+    ],
     docsPath: "/governance/kill-switch",
   },
   agent_offline: {

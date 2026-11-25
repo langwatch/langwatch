@@ -9,6 +9,8 @@ import type {
   LangWatchQLRunTelemetryRequest,
 } from "@langwatch/analytics-contract";
 import type {
+  ChartAskSubject,
+  ChartSignal,
   ChartFrameDashboardContext,
   NavigableTarget,
 } from "@langwatch/analytics-contract/chart-frame-protocol";
@@ -121,6 +123,10 @@ type DashboardWidgetFrameOverWindowProps = DashboardWidgetFrameProps & {
   readonly periodKey: string;
   /** Drafts the step that sends a field no trace carries; absent, the setup view has no button. */
   readonly onAskLangyToSetUp?: (missing: { field: string; label: string }) => void;
+  /** Drafts Langy about a bar, point or legend entry clicked; absent, none is clickable. */
+  readonly onAskLangyAbout?: (subject: ChartAskSubject) => void;
+  /** Told whether the widget's code reports the problem it watches for (`LW.signal`). */
+  readonly onSignal?: (signal: ChartSignal) => void;
   /** Who reads the card; with it, a memory or time limit failure gets its own words and actions. */
   readonly limitAudience?: WidgetLimitAudience;
   /** Told which face the frame draws, so the card offers only what that face allows. */
@@ -222,6 +228,8 @@ function WidgetFrameOverWindow({
   timeWindow,
   granularitySeconds,
   onAskLangyToSetUp,
+  onAskLangyAbout,
+  onSignal,
   limitAudience,
   onFaceChange,
   onLimitFailureChange,
@@ -293,6 +301,7 @@ function WidgetFrameOverWindow({
   // on the wire — omitted where a caller (e.g. the playground) has none.
   // refreshedAt is the dashboard's scheduled-refresh clock: a new value is a
   // context change the frame's useChartQuery re-runs on.
+  const canAskLangy = onAskLangyAbout !== undefined;
   const dashboardContext: ChartFrameDashboardContext = useMemo(
     () => ({
       timeWindow: hostParams.timeWindow,
@@ -304,8 +313,9 @@ function WidgetFrameOverWindow({
       dashboardId,
       widgetName,
       ...(refreshedAt === undefined ? {} : { refreshedAt }),
+      canAskLangy,
     }),
-    [hostParams, colorMode, id, projectId, dashboardId, widgetName, refreshedAt],
+    [hostParams, colorMode, id, projectId, dashboardId, widgetName, refreshedAt, canAskLangy],
   );
 
   // LW.params has no other source of a value yet (no dashboard-side
@@ -354,6 +364,8 @@ function WidgetFrameOverWindow({
           params={paramsSnapshot}
           onLog={onLog}
           onNavigate={onNavigate}
+          onAskLangy={onAskLangyAbout}
+          onSignal={onSignal}
           maxHeight={maxHeight}
           cover={loading && !cover ? <WidgetLoadingFace slow={slow} /> : undefined}
           onIdleChange={setFrameIdle}

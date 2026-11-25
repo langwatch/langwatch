@@ -53,18 +53,13 @@ export function a2aTargetService({
   });
 }
 
-/** A repository that fails the test once a list read asks it to unseal target headers. */
+/** A repository that fails the test once a read of every target asks to unseal their headers. */
 export function sealedA2aTargetRepository(): MemoryGatewayA2aTargetRepository {
   const repository = MemoryGatewayA2aTargetRepository.create();
   const findAll = repository.findAll.bind(repository);
-  const findByProject = repository.findByProject.bind(repository);
   repository.findAll = async (organizationId, options) => {
     if (options?.headers !== false) throw new Error("unsealed every target's headers");
     return findAll(organizationId, options);
-  };
-  repository.findByProject = async (input, options) => {
-    if (options?.headers !== false) throw new Error("unsealed the project's target headers");
-    return findByProject(input, options);
   };
   return repository;
 }

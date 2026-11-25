@@ -181,7 +181,7 @@ describe("given no module lends an action to the board header", () => {
         lends: [],
       });
 
-      expect(await screen.findByRole("heading", { name: "Release check" })).toBeInTheDocument();
+      expect(await screen.findByRole("heading", { name: "Ready to ship?" })).toBeInTheDocument();
       expect(screen.queryByLabelText("Lent action")).toBeNull();
     });
   });

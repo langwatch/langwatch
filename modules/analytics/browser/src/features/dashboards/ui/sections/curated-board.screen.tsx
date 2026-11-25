@@ -27,7 +27,13 @@ import { useOrganizationLibraryOpen } from "../../behavior/use-organization-libr
 import { useSavedDashboards } from "../../behavior/use-saved-dashboards.ts";
 import { useStoreProject } from "../../behavior/use-store-project.ts";
 import { useBoardOnScreen, useLangyAsk } from "../../langy/behavior/use-board-langy.ts";
-import { boardSetupDraft, boardSubject, widgetPromptDraft } from "../../langy/model/board-langy.ts";
+import {
+  boardSetupDraft,
+  boardSubject,
+  widgetActionDraft,
+  widgetChartDraft,
+  widgetPromptDraft,
+} from "../../langy/model/board-langy.ts";
 import { BoardLangy } from "../../langy/ui/sections/board-langy.tsx";
 import { CURATED_SEGMENT } from "../../model/boards.ts";
 import { type CuratedBoard, curatedBoardById } from "../../model/curated-boards.ts";
@@ -38,7 +44,6 @@ import { BoardPeriodControl } from "../blocks/board-period-control.tsx";
 import { EmptyWidgetsBanner } from "../blocks/empty-widgets-banner.tsx";
 import { LimitFailedWidgetsBanner } from "../blocks/limit-failed-widgets-banner.tsx";
 import { ModifyCuratedDialog } from "../blocks/modify-curated-dialog.tsx";
-import { OldAnalyticsBanner } from "../blocks/old-analytics-banner.tsx";
 import { AddWidgetButton } from "../elements/add-widget-button.tsx";
 import { BlockPickerDialog } from "./block-picker-dialog.tsx";
 import { CuratedWidgetsGrid } from "./curated-widgets-grid.tsx";
@@ -193,9 +198,23 @@ function OpenCuratedBoard({
               widgets={board.widgets}
               period={period}
               periodKey={`${range}:${grain}`}
-              onAskLangy={
+              langyFor={
                 langy.enabled
-                  ? (widget) => langy.ask(widgetPromptDraft({ widget, board: subject, period }))
+                  ? (widget) => ({
+                      ask: () => langy.ask(widgetPromptDraft({ widget, board: subject, period })),
+                      askAbout: (about, click) =>
+                        langy.ask(
+                          widgetChartDraft({
+                            subject: about,
+                            click,
+                            widget,
+                            board: subject,
+                            period,
+                          }),
+                        ),
+                      act: (action) =>
+                        langy.ask(widgetActionDraft({ action, widget, board: subject, period })),
+                    })
                   : undefined
               }
               onEmptyChange={({ widget, empty: isEmpty }) =>
@@ -249,12 +268,7 @@ export function CuratedBoardPage({ atOrganization = false }: { atOrganization?: 
   const templateId = useAnalyticsHost().route().params.templateId ?? "";
   const board = curatedBoardById(templateId);
   if (!board) return <UiPageNotFound />;
-  return (
-    <>
-      <OldAnalyticsBanner />
-      <OpenCuratedBoard key={board.templateId} board={board} atOrganization={atOrganization} />
-    </>
-  );
+  return <OpenCuratedBoard key={board.templateId} board={board} atOrganization={atOrganization} />;
 }
 
 export default function CuratedBoardScreen() {

@@ -28,16 +28,27 @@ const NEW_MODELS = `SELECT Model, min(OccurredAt) AS first_seen
 
 /** Every change in the period, unordered, with the bucket a chart marks it on. */
 export const CHANGES_SQL = `SELECT ${bucketOf("v.CreatedAt")} AS bucket, toDateTime(v.CreatedAt) AS at,
-  concat(p.PromptHandle, ' v', toString(v.VersionNumber)) AS label
+  concat('Prompt ', p.PromptHandle, ' v', toString(v.VersionNumber)) AS label
 FROM prompt_versions AS v
 INNER JOIN prompts AS p ON p.PromptId = v.PromptId
 WHERE ${inPeriod("v.CreatedAt")}
 LIMIT 50
 UNION ALL
 SELECT ${bucketOf("first_seen")} AS bucket, toDateTime(first_seen) AS at,
-  concat('model ', Model) AS label
+  concat('Model: ', Model) AS label
 FROM (${NEW_MODELS})
 LIMIT 50`;
+
+/**
+ * The name a person knows each managed prompt version by, "handle vN", keyed by the version id
+ * a trace stores; newest first, so a widget names the versions it marks.
+ */
+export const PROMPT_VERSION_NAMES_SQL = `SELECT v.PromptVersionId AS id,
+  concat(p.PromptHandle, ' v', toString(v.VersionNumber)) AS name
+FROM prompt_versions AS v
+INNER JOIN prompts AS p ON p.PromptId = v.PromptId
+ORDER BY v.CreatedAt DESC
+LIMIT 500`;
 
 /** The moment of the newest change in the period; the epoch when there was none. */
 export const LAST_CHANGE_AT = `greatest(

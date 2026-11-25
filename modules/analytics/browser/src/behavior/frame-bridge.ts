@@ -16,6 +16,8 @@
  */
 
 import type {
+  ChartAskSubject,
+  ChartSignal,
   ChartFrameDashboardContext,
   ChartFrameLogSource,
   ChartFrameParamsSnapshot,
@@ -28,6 +30,8 @@ import type {
 import {
   CHART_FRAME_HEARTBEAT_TIMEOUT_MS,
   CHART_FRAME_PATH,
+  readChartAsk,
+  readChartSignal,
 } from "@langwatch/analytics-contract/chart-frame-protocol";
 import { nowInstant } from "@langwatch/time";
 
@@ -84,6 +88,10 @@ export interface CreateFrameBridgeOptions {
     target: string;
     params: Readonly<Record<string, unknown>>;
   }) => void;
+  /** `LW.askLangy(subject)` from the frame, read through `readChartAsk`; omitted, it no-ops. */
+  readonly onAskLangy?: (subject: ChartAskSubject) => void;
+  /** `LW.signal(state)` from the frame, read through `readChartSignal`; omitted, it no-ops. */
+  readonly onSignal?: (signal: ChartSignal) => void;
   /** Called once when the watchdog kills the frame. */
   readonly onTeardown: () => void;
   /**
@@ -227,6 +235,14 @@ export class FrameBridgeSession implements FrameBridge {
       case "lw:navigate":
         onNavigate?.({ target: message.target, params: message.params ?? {} });
         return;
+      case "lw:ask-langy":
+        this.#askLangy(message.subject);
+        return;
+      case "lw:signal": {
+        const reading = readChartSignal(message.signal);
+        if (reading.kind === "signal") this.#options.onSignal?.(reading.signal);
+        return;
+      }
       case "lw:log":
         onLog({ level: message.level, source: message.source, text: message.parts.join(" ") });
         return;
@@ -237,6 +253,11 @@ export class FrameBridgeSession implements FrameBridge {
         return;
     }
   };
+
+  #askLangy(raw: unknown): void {
+    const ask = readChartAsk(raw);
+    if (ask.kind === "subject") this.#options.onAskLangy?.(ask.subject);
+  }
 
   /** Past the in-flight cap a query is refused at once rather than piled onto the executor. */
   #handleQuery(

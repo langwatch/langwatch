@@ -9,12 +9,16 @@ export const TOPIC_NAME = `const topicName = (value) =>
   value ? String(value).charAt(0).toUpperCase() + String(value).slice(1) : "No topic";`;
 
 /** One labelled bar per row: label and figure on a line, the bar, then an optional note. */
-export const SHARE_ROWS = `// value: bar length, 0 to 1 of the widest; note, colour, title optional
-function ShareRows({ rows }) {
+export const SHARE_ROWS = `// value: bar length, 0 to 1 of the widest; note, colour, title optional. kind names what a
+// row is ("topic") to make it ask Langy about it; a row's key is its raw value.
+function ShareRows({ rows, kind }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
       {rows.map((row) => (
-        <div key={row.label} title={row.title}>
+        <div key={row.key ?? row.label}
+          {...(kind ? askable({ kind, label: row.label, value: row.key ?? row.label }) : {})}
+          {...(row.title ? { title: row.title } : {})}
+          style={kind ? askCursor() : undefined}>
           <div style={{ display: "flex", alignItems: "baseline", gap: 8, fontSize: 12 }}>
             <span style={{ flex: 1, minWidth: 0, fontWeight: 500, overflow: "hidden",
               textOverflow: "ellipsis", whiteSpace: "nowrap" }}>

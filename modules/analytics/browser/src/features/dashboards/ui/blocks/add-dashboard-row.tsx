@@ -2,7 +2,7 @@ import { Box } from "@langwatch/design-system/primitives";
 import { Plus } from "lucide-react";
 
 /** The dotted-outline first item while nothing is pinned; it does what the "+" does. */
-export function AddDashboardRow({ isCreating, onAdd }: { isCreating: boolean; onAdd: () => void }) {
+export function AddDashboardRow({ onAdd }: { onAdd: () => void }) {
   return (
     <Box as="li" listStyleType="none" width="full">
       <Box
@@ -21,10 +21,7 @@ export function AddDashboardRow({ isCreating, onAdd }: { isCreating: boolean; on
         color="fg.subtle"
         cursor="pointer"
         _hover={{ color: "fg", background: "border/50" }}
-        aria-disabled={isCreating || void 0}
-        onClick={() => {
-          if (!isCreating) onAdd();
-        }}
+        onClick={onAdd}
       >
         <Plus size={14} aria-hidden />
         Add dashboard

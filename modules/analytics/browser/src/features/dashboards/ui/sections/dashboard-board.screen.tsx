@@ -12,6 +12,7 @@ import {
 } from "@langwatch/dashboard-contract";
 import { Spinner, Text, VStack } from "@langwatch/design-system/primitives";
 import { HandledErrorAlert } from "@langwatch/error-views";
+import { useEffect } from "react";
 
 import {
   DashboardRefetchIntervalContext,
@@ -27,29 +28,40 @@ import {
   WIDGET_PICKER_QUERY_KEY,
 } from "../../behavior/use-block-picker-address.ts";
 import { useBoardAccess } from "../../behavior/use-board-access.ts";
-import { useBoardDescription } from "../../behavior/use-board-description.ts";
 import { useBoardEditor } from "../../behavior/use-board-editor.ts";
+import { type UnsavedBoard, useBoardHeaderEdits } from "../../behavior/use-board-header-edits.ts";
 import { useBoardPeriod, useBoardRange } from "../../behavior/use-board-period.ts";
 import { useBoardProjects } from "../../behavior/use-board-projects.ts";
 import { useBoardScope } from "../../behavior/use-board-scope.ts";
 import { useBoardWidgets } from "../../behavior/use-board-widgets.ts";
 import { useDashboardViewed } from "../../behavior/use-dashboard-viewed.ts";
+import {
+  afterDraftWrites,
+  openDraftAddress,
+  useDraftBoard,
+} from "../../behavior/use-draft-board.ts";
 import { useEmptyWidgets } from "../../behavior/use-empty-widgets.ts";
 import { useLibraryBoardEdits } from "../../behavior/use-library-board-edits.ts";
 import { useLimitFailedWidgets } from "../../behavior/use-limit-failed-widgets.ts";
 import { useOrganizationLibraryOpen } from "../../behavior/use-organization-library-open.ts";
 import { type SavedBoard, useSavedDashboards } from "../../behavior/use-saved-dashboards.ts";
-import { useBoardLangyChip, useLangyAsk } from "../../langy/behavior/use-board-langy.ts";
+import {
+  UnsavedBoardProvider,
+  useBoardLangyChip,
+  useLangyAsk,
+} from "../../langy/behavior/use-board-langy.ts";
 import {
   boardContextChip,
   boardSetupDraft,
   boardSubject,
+  widgetActionDraft,
+  widgetChartDraft,
   widgetMissingDataDraft,
   widgetPromptDraft,
   widgetSetupDraft,
 } from "../../langy/model/board-langy.ts";
 import { BoardLangy } from "../../langy/ui/sections/board-langy.tsx";
-import { myDashboardId, templateLinks } from "../../model/boards.ts";
+import { DRAFT_SEGMENT, myDashboardId, templateLinks } from "../../model/boards.ts";
 import { CURATED_BOARDS } from "../../model/curated-boards.ts";
 import { mayRenameBoard } from "../../model/organization-library.ts";
 import { AddBlockCard, EmptyBoard } from "../blocks/blank-board.tsx";
@@ -122,9 +134,11 @@ function dataSourceLabel({
  * has no inline rename. */
 function useBoardTitleRename({
   board,
+  unsaved,
   organizationArea,
 }: {
   board: SavedBoard;
+  unsaved: UnsavedBoard | undefined;
   organizationArea: boolean;
 }): ((name: string) => void) | undefined {
   const host = useAnalyticsHost();
@@ -138,8 +152,38 @@ function useBoardTitleRename({
     }),
   });
   if (!organizationArea || !mayRename) return void 0;
+  // A draft's new name is its first edit: it stores the board under that name.
+  if (unsaved) {
+    return (name) =>
+      void unsaved.materialise({ name }).catch((error: unknown) => {
+        host.failed({ error, fallbackTitle: "Couldn't save the dashboard" });
+      });
+  }
+  // A board a draft just became takes a rename after the draft's queued writes, never before.
   return (name) =>
-    edits.renameBoard({ board: { ...board, project: { id: board.projectId } }, name });
+    void afterDraftWrites(board.id).then(() =>
+      edits.renameBoard({ board: { ...board, project: { id: board.projectId } }, name }),
+    );
+}
+
+/** What the header's lent actions point at; a board not stored yet offers none. */
+function boardPointer({
+  board,
+  unsaved,
+  boardWidgets: { status, widgets },
+}: {
+  board: SavedBoard;
+  unsaved: UnsavedBoard | undefined;
+  boardWidgets: ReturnType<typeof useBoardWidgets>;
+}) {
+  if (unsaved) return {};
+  const widgetCount = status === "success" ? widgets.length : void 0;
+  return { pointer: { boardKind: "dashboard" as const, boardId: board.id, widgetCount } };
+}
+
+/** On a new board, Langy's asks store it first and then name the stored board. */
+function unsavedLangy(unsaved: UnsavedBoard | undefined) {
+  return unsaved && { draftId: DRAFT_SEGMENT, storedBoardId: unsaved.materialise };
 }
 
 /** Whether the board reads the organization, and its empty-board templates. Off with the
@@ -160,7 +204,7 @@ function boardDataHome({
   };
 }
 
-function OpenBoard({ board }: { board: SavedBoard }) {
+function OpenBoard({ board, unsaved }: { board: SavedBoard; unsaved?: UnsavedBoard }) {
   const host = useAnalyticsHost();
   const organizationArea = useOrganizationLibraryOpen().isOpen;
   const projectId = host.project()?.id ?? "";
@@ -177,10 +221,13 @@ function OpenBoard({ board }: { board: SavedBoard }) {
   const boardWidgets = useBoardWidgets({
     dashboardId: board.id,
     isOwnedElsewhere: !access.isHome,
+    storedBoardId: unsaved?.materialise,
   });
-  const { description, saveDescription } = useBoardDescription({
-    dashboardId: board.id,
-    stored: board.description,
+  const { description, saveDescription, pickScope } = useBoardHeaderEdits({
+    board,
+    unsaved,
+    names,
+    scope,
   });
   const { range } = useBoardRange();
   const autoRefresh = useDashboardAutoRefresh({ live: range === "live" });
@@ -194,7 +241,8 @@ function OpenBoard({ board }: { board: SavedBoard }) {
     dashboardId: board.id,
     dashboardKind: "stored",
     widgetCount: widgets.length,
-    isLoaded: boardWidgets.status === "success",
+    // A new board is viewed once stored; a draft nobody edits was never a dashboard.
+    isLoaded: boardWidgets.status === "success" && !unsaved,
   });
   const subject = boardSubject({ board, widgets });
   const langy = useLangyAsk();
@@ -212,15 +260,12 @@ function OpenBoard({ board }: { board: SavedBoard }) {
   };
   /** Saves the editor's widget, a new one or an edit, and closes it once that landed. */
   const saveEdited = async (edited: DashboardWidgetDraft) => {
-    const widget = editor.editing?.widget;
-    const landed = widget
-      ? await boardWidgets.saveWidget({ widget, draft: edited })
-      : await boardWidgets.addWidget(edited);
-    if (landed) editor.close();
+    const widget = editor.editing?.widget ?? null;
+    if (await boardWidgets.saveFromEditor({ widget, draft: edited })) editor.close();
   };
   const isEmpty = boardWidgets.status === "success" && widgets.length === 0;
   const isMyDashboard = myDashboardId({ boards: [board], userId: host.userId() }) === board.id;
-  const renameBoard = useBoardTitleRename({ board, organizationArea });
+  const renameBoard = useBoardTitleRename({ board, unsaved, organizationArea });
   const fromTemplate = useAddTemplate({ existingNames: saved.boards.map(({ name }) => name) });
 
   return (
@@ -235,16 +280,12 @@ function OpenBoard({ board }: { board: SavedBoard }) {
                 scope={board.scope}
                 lock={access.scopeLock}
                 names={names}
-                onPick={(to) => scope.request({ board, names, to })}
+                onPick={pickScope}
               />
             }
             onRename={renameBoard}
             onDescribe={canEdit && !isMyDashboard ? saveDescription : void 0}
-            pointer={{
-              boardKind: "dashboard",
-              boardId: board.id,
-              widgetCount: boardWidgets.status === "success" ? widgets.length : void 0,
-            }}
+            {...boardPointer({ board, unsaved, boardWidgets })}
             action={canEdit ? <AddWidgetButton onClick={openPicker} /> : null}
             {...projectSlot({
               organizationArea,
@@ -330,6 +371,20 @@ function OpenBoard({ board }: { board: SavedBoard }) {
                             langy.ask(
                               widgetMissingDataDraft({ missing, widget, board: subject, period }),
                             ),
+                          askAbout: (about, click) =>
+                            langy.ask(
+                              widgetChartDraft({
+                                subject: about,
+                                click,
+                                widget,
+                                board: subject,
+                                period,
+                              }),
+                            ),
+                          act: (action) =>
+                            langy.ask(
+                              widgetActionDraft({ action, widget, board: subject, period }),
+                            ),
                         })
                       : undefined
                   }
@@ -352,6 +407,7 @@ function OpenBoard({ board }: { board: SavedBoard }) {
           <BlockPickerDialog
             board={subject}
             period={period}
+            {...startingPickerKind(board.homeProduct)}
             onAddWidgets={boardWidgets.addQuestionWidgets}
             onSkip={() => {
               editor.open({ widget: null, withLangy: false, closing: [WIDGET_PICKER_QUERY_KEY] });
@@ -387,22 +443,39 @@ function OpenBoard({ board }: { board: SavedBoard }) {
 
 /** The board the address names, in the project in view; the org-level page runs it too. */
 export function Board() {
-  const dashboardId = useAnalyticsHost().route().params.dashboardId;
+  const host = useAnalyticsHost();
+  const projectId = host.project()?.id ?? "";
+  const dashboardId = host.route().params.dashboardId;
   const { boards, organizationBoards, isLoading, isRefreshing, loadError } = useSavedDashboards();
+  const draft = useDraftBoard({ takenNames: boards.map(({ name }) => name) });
+  const isDraft = dashboardId === DRAFT_SEGMENT;
+  useEffect(() => {
+    if (isDraft && projectId) openDraftAddress(projectId);
+  }, [isDraft, projectId]);
   if (isLoading) return <UiPageLoading />;
   // A member the list refuses sees the page the flag being off shows (AC21).
   if (loadError) return <UiPageNotFound />;
-  const board = [...boards, ...organizationBoards].find(({ id }) => id === dashboardId);
+  const board = isDraft
+    ? draft.board
+    : [...boards, ...organizationBoards].find(({ id }) => id === dashboardId);
   // A board made a moment ago is missing from the list held before it; wait for the re-read.
   if (!board && isRefreshing) return <UiPageLoading />;
   // A deleted board and one set to Only me read the same: the server tells neither apart.
   if (!board) return <ProjectBoardUnavailable />;
-  // Keyed so a board's in-flight edits never leak into the next board.
+  const unsaved = isDraft ? draft : void 0;
+  // Keyed so a board's in-flight edits never leak into the next board; a draft just stored
+  // keeps its key, so the screen stays as it was while its address moves to the board's.
+  // Above the board, so every Langy ask made on a new board stores it first.
   return (
-    <>
-      <OldAnalyticsBanner />
-      <OpenBoard key={board.id} board={board} />
-    </>
+    <UnsavedBoardProvider value={unsavedLangy(unsaved)}>
+      {/* Only the board the Analytics entry lands on points back to it (AC3i, AC3t). */}
+      {board.id === myDashboardId({ boards, userId: host.userId() }) && <OldAnalyticsBanner />}
+      <OpenBoard
+        key={isDraft || board.id === draft.savedId ? draft.key : board.id}
+        board={board}
+        {...(unsaved ? { unsaved } : {})}
+      />
+    </UnsavedBoardProvider>
   );
 }
 
@@ -412,4 +485,9 @@ export default function DashboardBoardScreen() {
       <Board />
     </DashboardsGate>
   );
+}
+
+/** A Coding agents board opens "Add a widget" on its coding-agent widgets. */
+function startingPickerKind(homeProduct: DashboardHomeProduct): { startingAgentKind?: "coding" } {
+  return homeProduct === "me" ? { startingAgentKind: "coding" } : {};
 }

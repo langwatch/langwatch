@@ -65,6 +65,22 @@ The cost of the flag is that every counter must pass it to the classifier. A cou
 it counts the person as Lite, which refuses a seat rather than granting access. The counters are
 covered by the scenario "Accepting a Billing-only invite takes no seat".
 
+Billing is the whole of a Billing-only membership, so it cannot be turned off on its own: the
+Billing role service refuses with `billing_only_keeps_billing`. Every organization role keeps the
+organization floor, which already includes `subscription:upgrade`, so a Billing-only member
+without Billing would still open the plan page and could pay again, which gives Billing back.
+The cost is one more step for an admin who wants to keep the person but stop them paying: move
+them to a seat first (which is metered), then turn Billing off. To stop them entirely, remove them.
+The drawer locks the switch only while the grant is held, so a Billing-only member whose grant
+was never written can still be repaired by turning Billing on.
+
+The home page sends a Billing-only member to the plan page, reading the flag through the
+organization module's member read. It answers as an override, the same as a home the reader
+pinned, so neither a pin set in another organization nor a product the browser remembers takes
+them elsewhere. The cost is one more read per home resolution. Switching organization in the
+header still decides in the browser and can land a Billing-only member on the coding-agents page
+once; opening the home page takes them to the plan page.
+
 ## Consequences
 
 - The member list and plan page can show Billing-only members apart from Lite ones.
