@@ -60,6 +60,10 @@ class OfflineLicenseStorage implements LicenseStorage {
   async getMembersLiteCount(): Promise<number> {
     return 0;
   }
+
+  async getMembersDeveloperCount(): Promise<number> {
+    return 0;
+  }
 }
 
 const cryptography = NodeLicenseCryptographyService.create({ publicKey: fixture.publicKey });

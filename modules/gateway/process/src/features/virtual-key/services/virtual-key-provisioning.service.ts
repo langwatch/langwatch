@@ -165,6 +165,7 @@ export class VirtualKeyProvisioningService {
     await this.governanceSignals?.emitVirtualKeyLifecycle({
       virtualKey: created,
       action: "created",
+      actorUserId: input.actorUserId,
     });
 
     return { virtualKey: created, secret };
@@ -274,7 +275,7 @@ export class VirtualKeyProvisioningService {
   }): Promise<UpdatePlan> {
     const previousConfig = parseVirtualKeyConfig(existing.config);
     const config = input.config
-      ? virtualKeyConfigSchema.parse({ ...previousConfig, ...input.config })
+      ? virtualKeyConfigSchema.parse({ ...previousConfig, ...namedSections(input.config) })
       : previousConfig;
     const guardrailDelta = VirtualKeyValidationService.diffGuardrailAttachments(
       previousConfig.guardrailAttachments,
@@ -460,4 +461,9 @@ export class VirtualKeyProvisioningService {
   private nextVirtualKeyId(): string {
     return `vk_${randomBytes(16).toString("base64url")}`;
   }
+}
+
+/** The config sections an update names; a section present but undefined keeps the stored one. */
+function namedSections(config: Partial<VirtualKeyConfig>): Partial<VirtualKeyConfig> {
+  return Object.fromEntries(Object.entries(config).filter(([, value]) => value !== undefined));
 }

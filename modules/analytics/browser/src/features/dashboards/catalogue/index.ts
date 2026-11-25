@@ -1,8 +1,9 @@
 /** The dashboards catalogue: the question tree, every widget and every template. */
 
 export { preloadedTemplatesFor } from "./model/catalogue-boards.ts";
-export { GALLERY_TEMPLATES, stackWidgets } from "./model/catalogue-gallery.ts";
+export { GALLERY_TEMPLATES, GALLERY_VARIANTS, stackWidgets } from "./model/catalogue-gallery.ts";
 export {
+  CODING_PICKER_QUESTIONS,
   PICKER_QUESTIONS,
   PICKER_SECTIONS,
   type PickerBranch,
@@ -12,11 +13,19 @@ export {
   pickerSections,
   pickerWidgets,
 } from "./model/catalogue-picker.ts";
+export {
+  CODING_PICKER_RANKING,
+  PICKER_RANKING,
+  RETIRED_PICKER_WIDGETS,
+} from "./model/picker-ranking.ts";
 export { CATALOGUE_WIDGET_BUILDS, type CatalogueWidgetBuild } from "./widgets/index.ts";
-export { IMPLEMENTED_WIDGET_IDS, implementedWidget } from "./model/widget-implementations.ts";
+export {
+  catalogueWidgetActions,
+  IMPLEMENTED_WIDGET_IDS,
+  implementedWidget,
+} from "./model/widget-implementations.ts";
 export {
   AGENT_KIND_CHIP_LABELS,
-  AGENT_KIND_FOCUS_LABELS,
   AGENT_KIND_LABELS,
   AGENT_KINDS,
   PERSONA_LABELS,
@@ -38,7 +47,12 @@ export {
   CATALOGUE_TEMPLATES,
   type CatalogueTemplate,
   focusTemplateId,
+  TEMPLATE_VARIANTS,
+  type TemplateArea,
+  templateArea,
+  templateForKind,
   templateSetupNeeds,
+  templatesInArea,
   templateWidgetGaps,
 } from "./model/catalogue-templates.ts";
 export {

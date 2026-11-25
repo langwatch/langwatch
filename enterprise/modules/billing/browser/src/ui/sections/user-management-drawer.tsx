@@ -3,6 +3,7 @@
  * the confirm invites into Free or is the upgrade; on Growth it changes the seats in place.
  * @see specs/licensing/seat-buying.feature
  */
+import { describeError } from "@langwatch/browser-host/errors";
 import { Banner } from "@langwatch/design-system/banner";
 import { Drawer } from "@langwatch/design-system/drawer";
 import {
@@ -28,7 +29,10 @@ import { seatQuoteOf } from "../../model/seat-change-summary.ts";
 import {
   billingDayOrUndefined,
   type DeveloperSeatPlan,
+  developerMinimumHint,
   developerSeatHint,
+  developerSeatMinimum,
+  developerTargetWithin,
   freeSeatPlan,
   type GrowthSeatPlan,
   growthMinimumSeats,
@@ -38,6 +42,7 @@ import {
   type SeatPrice,
   seatChangeToast,
   seatConfirm,
+  snapDeveloperTarget,
 } from "../../model/seat-purchase.ts";
 import {
   isValidEmail,
@@ -70,6 +75,7 @@ const SEAT_BADGE: Record<MemberType, { tone: string; label: string }> = {
   FullMember: { tone: "blue", label: "Full Member" },
   LiteMember: { tone: "yellow", label: "Lite Member" },
   Developer: { tone: "teal", label: "Developer" },
+  BillingOnly: { tone: "gray", label: "Billing only" },
 };
 
 const PRICE_FAILED = "The price for this change did not load";
@@ -124,6 +130,7 @@ export function UserManagementDrawer({
   isLoading,
   mode,
   inUse,
+  developersInUse,
   held,
   price,
   onInvite,
@@ -139,6 +146,8 @@ export function UserManagementDrawer({
   mode: SeatDrawerMode;
   /** Full seats held now, members and open invites as enforcement counts them. */
   inUse: number;
+  /** Developer seats held now, members and open invites, the floor the server enforces. */
+  developersInUse: number;
   /** Of `inUse`, the seats held for people who left a full seat, as the server lists them. */
   held: HeldSeats;
   price: SeatPrice;
@@ -163,6 +172,7 @@ export function UserManagementDrawer({
     open,
     mode: mode.kind === "growth" ? mode : undefined,
     inUse,
+    developersInUse,
     held,
     invites: emails.length,
     price,
@@ -218,6 +228,8 @@ export function UserManagementDrawer({
   };
 
   const disabledReason = disabledReasonOf({ action, pendingReason: growth?.pendingReason });
+  // A price that did not load leaves nothing to total, so the footer drops the sums.
+  const priceFailed = growth?.priceFailed ?? false;
 
   return (
     <>
@@ -228,7 +240,7 @@ export function UserManagementDrawer({
         title="Manage seats"
         busy={isInviting || isUpgradeLoading}
         footer={{
-          summary: view ? <SeatSummaryLines lines={view.summary} /> : undefined,
+          summary: view && !priceFailed ? <SeatSummaryLines lines={view.summary} /> : undefined,
           cancel: { label: "Cancel", onClick: onClose },
           primaryAction: {
             label: action.label,
@@ -255,7 +267,11 @@ export function UserManagementDrawer({
               chip={view?.rowChip ?? ""}
             />
             {growth && <OtherSeatTypes growth={growth} price={price} />}
-            <SeatDrawerNote priceFailed={growth?.priceFailed ?? false} note={view?.note} />
+            <SeatDrawerNote
+              priceFailed={growth?.priceFailed ?? false}
+              priceError={growth?.priceError}
+              note={view?.note}
+            />
           </VStack>
         )}
       </Drawer>
@@ -272,11 +288,22 @@ export function UserManagementDrawer({
   );
 }
 
-function SeatDrawerNote({ priceFailed, note }: { priceFailed: boolean; note: string | undefined }) {
+function SeatDrawerNote({
+  priceFailed,
+  priceError,
+  note,
+}: {
+  priceFailed: boolean;
+  priceError: unknown;
+  note: string | undefined;
+}) {
   if (priceFailed) {
     return (
       <Banner status="error" data-testid="seat-drawer-price-failed">
-        The price for this change did not load. Close Manage seats and try again.
+        {describeError({
+          error: priceError,
+          fallbackTitle: "The price for this change did not load",
+        })}
       </Banner>
     );
   }
@@ -317,14 +344,20 @@ function FullSeatsHeader({
         )}
       </HStack>
       {growth?.view.minimumHint && (
-        <HStack gap={2} align="start" color="fg.muted" data-testid="seat-drawer-minimum">
-          <Box flexShrink={0} paddingTop={0.5}>
-            <Info size={14} />
-          </Box>
-          <Text textStyle="bodySm">{growth.view.minimumHint}</Text>
-        </HStack>
+        <SeatMinimumHint hint={growth.view.minimumHint} testId="seat-drawer-minimum" />
       )}
     </VStack>
+  );
+}
+
+function SeatMinimumHint({ hint, testId }: { hint: string; testId: string }) {
+  return (
+    <HStack gap={2} align="start" color="fg.muted" data-testid={testId}>
+      <Box flexShrink={0} paddingTop={0.5}>
+        <Info size={14} />
+      </Box>
+      <Text textStyle="bodySm">{hint}</Text>
+    </HStack>
   );
 }
 
@@ -453,12 +486,15 @@ function OtherSeatTypes({ growth, price }: { growth: GrowthSeats; price: SeatPri
               </VStack>
               <SeatStepper
                 value={developer.target}
-                minimum={0}
+                minimum={growth.developerMinimum}
                 onChange={growth.setDeveloperTarget}
                 label="Developer seats"
                 testId="developer-seats-stepper"
               />
             </HStack>
+          )}
+          {growth.developerHint && (
+            <SeatMinimumHint hint={growth.developerHint} testId="developer-seats-minimum" />
           )}
         </VStack>
       </Collapsible.Content>
@@ -478,14 +514,17 @@ function quoteReason({ needed, failed }: { needed: boolean; failed: boolean }) {
 function developerPlanOf({
   seats,
   target,
+  inUse,
 }: {
   seats: DeveloperSeats | undefined;
   target: number | undefined;
+  inUse: number;
 }): DeveloperSeatPlan | undefined {
   if (!seats?.available || seats.unitAmountCents === null) return undefined;
+  const current = seats.quantity;
   return {
-    current: seats.quantity,
-    target: target ?? seats.quantity,
+    current,
+    target: developerTargetWithin({ target: target ?? current, current, inUse }),
     unitCents: seats.unitAmountCents,
   };
 }
@@ -495,6 +534,7 @@ function useGrowthSeats({
   open,
   mode,
   inUse,
+  developersInUse,
   held,
   invites,
   price,
@@ -502,6 +542,7 @@ function useGrowthSeats({
   open: boolean;
   mode: Extract<SeatDrawerMode, { kind: "growth" }> | undefined;
   inUse: number;
+  developersInUse: number;
   held: HeldSeats;
   invites: number;
   price: SeatPrice;
@@ -529,7 +570,11 @@ function useGrowthSeats({
   useEffect(() => {
     if (open && isGrowth) void refetchDeveloperSeats();
   }, [open, isGrowth, refetchDeveloperSeats]);
-  const developer = developerPlanOf({ seats: developerSeats.data, target: developerTarget });
+  const developer = developerPlanOf({
+    seats: developerSeats.data,
+    target: developerTarget,
+    inUse: developersInUse,
+  });
   const developerAdded = developer ? developer.target > developer.current : false;
   const seatsChanged = seats !== paid;
 
@@ -562,15 +607,26 @@ function useGrowthSeats({
     quoteReason({ needed: developerAdded && !developerQuote.data, failed: developerQuote.isError });
   const day = billingDayOrUndefined(quote?.appliesAt ?? plan.periodEndsAt);
 
+  const developerFloor = developer
+    ? { current: developer.current, inUse: developersInUse }
+    : { current: 0, inUse: 0 };
   return {
     seats,
     minimum,
     setRequested,
     developer,
-    setDeveloperTarget,
-    view: growthSeatPlan(plan),
+    setDeveloperTarget: (next: number) =>
+      setDeveloperTarget(
+        snapDeveloperTarget({ ...developerFloor, previous: developer?.target ?? 0, next }),
+      ),
+    developerMinimum: developerSeatMinimum(developerFloor),
+    developerHint: developer
+      ? developerMinimumHint({ ...developerFloor, target: developer.target })
+      : undefined,
+    view: growthSeatPlan({ ...plan, priceFailed: pendingReason === PRICE_FAILED }),
     pendingReason,
     priceFailed: pendingReason === PRICE_FAILED,
+    priceError: seatQuote.error ?? developerQuote.error,
     confirmOpen,
     openConfirm: () => setConfirmOpen(true),
     closeConfirm: () => setConfirmOpen(false),

@@ -3,8 +3,8 @@ import {
   DashboardWidgetNotFoundError,
 } from "@langwatch/analytics-contract";
 import {
+  BOARD_WIDGET_DEFAULT_ROW_SPAN,
   CHART_GRID_DEFAULT_COL_SPAN,
-  CHART_GRID_DEFAULT_ROW_SPAN,
   chartGridBottomRow,
 } from "@langwatch/analytics-contract/chart-grid";
 import {
@@ -64,7 +64,7 @@ export class MemoryDashboardWidgetRepository implements DashboardWidgetRepositor
   async createWidget(input: CreateDashboardWidgetInput): Promise<DashboardWidgetRow> {
     const { projectId, dashboardId } = input;
     if (dashboardId !== undefined && !this.#ownsBoard({ projectId, dashboardId })) {
-      throw new DashboardNotFoundError(projectId);
+      throw new DashboardNotFoundError({ projectId });
     }
     const rows = this.#rows.filter(
       (row) =>
@@ -89,7 +89,7 @@ export class MemoryDashboardWidgetRepository implements DashboardWidgetRepositor
       gridColumn: 0,
       gridRow: chartGridBottomRow(rows),
       colSpan: CHART_GRID_DEFAULT_COL_SPAN,
-      rowSpan: CHART_GRID_DEFAULT_ROW_SPAN,
+      rowSpan: BOARD_WIDGET_DEFAULT_ROW_SPAN,
     };
     this.#rows.push(row);
 
@@ -137,7 +137,7 @@ export class MemoryDashboardWidgetRepository implements DashboardWidgetRepositor
   }
 
   async assignToDashboard(input: AssignDashboardWidgetInput): Promise<DashboardWidgetRow> {
-    if (!this.#ownsBoard(input)) throw new DashboardNotFoundError(input.projectId);
+    if (!this.#ownsBoard(input)) throw new DashboardNotFoundError({ projectId: input.projectId });
     const current = this.#require(input);
     const onDashboard = this.#rows.filter(
       (row) => row.projectId === input.projectId && row.dashboardId === input.dashboardId,

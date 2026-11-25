@@ -1,7 +1,7 @@
 Feature: Personal usage REST API
   As a developer (or a desktop/menu-bar widget acting on my behalf)
   I want a stable REST endpoint that returns my personal AI spend and usage
-  So that I can read the same numbers the /me dashboard shows without scraping tRPC
+  So that I can read the same numbers the /coding-agents dashboard shows without scraping tRPC
 
   Background:
     Given I authenticate with an API key from my personal workspace

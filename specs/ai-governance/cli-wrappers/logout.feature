@@ -43,6 +43,14 @@ Feature: `langwatch logout` clears credentials AND the telemetry wiring
       And it revokes that ingest key with cause "session"
       And an ingest key minted by another machine under the same login keeps working
 
+    @unit
+    Scenario: A session signed in with a pasted access token is revoked too
+      Given the user signed in with `langwatch login --token`, so the config
+        holds an access token and no refresh token
+      When the user runs `langwatch logout`
+      Then the access token is sent to the server to be revoked
+      And the token no longer works against LangWatch
+
     Scenario: logout is idempotent when not logged in
       Given there is no device session on disk
       When the user runs `langwatch logout`

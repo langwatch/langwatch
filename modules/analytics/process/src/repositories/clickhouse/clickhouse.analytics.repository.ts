@@ -145,6 +145,7 @@ export class ClickHouseAnalyticsRepository extends AnalyticsRepository {
       traceIds: query.input.traceIds,
       negateFilters: query.input.negateFilters,
       excludeOrigins: query.input.excludeOrigins,
+      spanAnalyticsFloor: query.spanAnalyticsFloor ?? null,
     };
     const built = build(builderInput);
 
@@ -192,6 +193,7 @@ export class ClickHouseAnalyticsRepository extends AnalyticsRepository {
       startDate: new Date(input.startDate),
       endDate: new Date(input.endDate),
       filters: input.filters,
+      spanAnalyticsFloor: input.spanAnalyticsFloor ?? null,
     });
     try {
       const result = await client.query({
@@ -236,6 +238,7 @@ export class ClickHouseAnalyticsRepository extends AnalyticsRepository {
       startDate: new Date(input.startDate),
       endDate: new Date(input.endDate),
       filters: input.filters,
+      spanAnalyticsFloor: input.spanAnalyticsFloor ?? null,
     });
     try {
       const result = await client.query({
@@ -276,6 +279,7 @@ export class ClickHouseAnalyticsRepository extends AnalyticsRepository {
       filters: input.filters,
       after: input.after,
       limit: input.limit,
+      spanAnalyticsFloor: input.spanAnalyticsFloor ?? null,
     });
     try {
       const result = await client.query({

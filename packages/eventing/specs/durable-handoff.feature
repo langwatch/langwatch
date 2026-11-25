@@ -61,6 +61,17 @@ Feature: Durable hand-off from an append to its lanes
     Then the rebuild reads the history one page at a time, never all of it at once
     And the fold's state equals a full replay of the log
 
+  # event_log is ORDER BY (TenantId, AggregateType, AggregateId, IdempotencyKey).
+  # Paged by EventTimestamp, every page re-read the whole aggregate to sort it.
+  @unit
+  Scenario: A paged history read seeks through the event log's sort key
+    Given a fold that does not depend on event order and can read its history in pages
+    When it reads the next page of an aggregate's history
+    Then the page is ordered by idempotency key, with arrival time and id as tie-breaks
+    And it resumes after the previous page's furthest key, which the primary index can seek to
+    And the upper bound on arrival time only filters
+    And the applied set it stores still holds the newest events by arrival
+
   @unit
   Scenario: A paged rebuild retries a history that lags behind what the fold applied
     Given a fold that does not depend on event order and can read its history in pages

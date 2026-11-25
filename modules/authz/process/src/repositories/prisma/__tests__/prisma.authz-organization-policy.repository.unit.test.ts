@@ -20,6 +20,7 @@ const ORGANIZATION_ID = "org_braids";
 
 type PolicyRow = {
   braidsOrganizationAdminsOnly: boolean;
+  braidsEnabled: boolean;
   updatedByUserId: string;
   updatedAt: Date;
 };
@@ -72,6 +73,30 @@ describe("PrismaAuthzOrganizationPolicyRepository", () => {
     });
   });
 
+  describe("when an organisation admin turns Braids on or off", () => {
+    it("upserts only the Braids setting on the organisation's one row", async () => {
+      const { repository, executeRaw } = harness();
+
+      await repository.setBraidsEnabled({
+        organizationId: ORGANIZATION_ID,
+        braidsEnabled: true,
+        updatedByUserId: "user_ana",
+      });
+
+      const sql = textOf(executeRaw.mock.calls[0]?.[0]);
+      expect(sql).toContain(
+        'INSERT INTO "AuthzOrganizationPolicy" ("organizationId", "braidsEnabled",' +
+          ' "updatedByUserId", "updatedAt") VALUES (?, ?, ?, now())',
+      );
+      expect(sql).toContain(
+        'ON CONFLICT ("organizationId") DO UPDATE SET "braidsEnabled" = EXCLUDED."braidsEnabled",' +
+          ' "updatedByUserId" = EXCLUDED."updatedByUserId", "updatedAt" = now()',
+      );
+      expect(sql).not.toContain("braidsOrganizationAdminsOnly");
+      expect(executeRaw.mock.calls[0]?.slice(2)).toEqual([ORGANIZATION_ID, true, "user_ana"]);
+    });
+  });
+
   describe("when the policy is read", () => {
     it("asks for the organisation's row by its id", async () => {
       const { repository, queryRaw } = harness();
@@ -79,7 +104,7 @@ describe("PrismaAuthzOrganizationPolicyRepository", () => {
       await repository.getPolicy({ organizationId: ORGANIZATION_ID });
 
       expect(textOf(queryRaw.mock.calls[0]?.[0])).toContain(
-        'SELECT "braidsOrganizationAdminsOnly", "updatedByUserId", "updatedAt"' +
+        'SELECT "braidsOrganizationAdminsOnly", "braidsEnabled", "updatedByUserId", "updatedAt"' +
           ' FROM "AuthzOrganizationPolicy" WHERE "organizationId" = ?',
       );
       const [, marker, ...values] = queryRaw.mock.calls[0] ?? [];
@@ -90,23 +115,33 @@ describe("PrismaAuthzOrganizationPolicyRepository", () => {
     it("answers the stored row with its change time in milliseconds", async () => {
       const updatedAt = new Date("2026-10-21T12:00:00Z");
       const { repository } = harness({
-        rows: [{ braidsOrganizationAdminsOnly: true, updatedByUserId: "user_ana", updatedAt }],
+        rows: [
+          {
+            braidsOrganizationAdminsOnly: true,
+            braidsEnabled: false,
+            updatedByUserId: "user_ana",
+            updatedAt,
+          },
+        ],
       });
 
       await expect(repository.getPolicy({ organizationId: ORGANIZATION_ID })).resolves.toEqual({
         organizationId: ORGANIZATION_ID,
         braidsOrganizationAdminsOnly: true,
+        braidsEnabled: false,
         updatedByUserId: "user_ana",
         updatedAtMs: updatedAt.getTime(),
       });
     });
 
+    /** @scenario Braids is off for a new organisation */
     it("answers the setting off, changed by nobody, for an organisation with no row", async () => {
       const { repository } = harness();
 
       await expect(repository.getPolicy({ organizationId: ORGANIZATION_ID })).resolves.toEqual({
         organizationId: ORGANIZATION_ID,
         braidsOrganizationAdminsOnly: false,
+        braidsEnabled: false,
         updatedByUserId: null,
         updatedAtMs: null,
       });
