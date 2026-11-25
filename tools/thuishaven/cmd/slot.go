@@ -76,7 +76,7 @@ func runSlot(ctx context.Context, _ deps, inv invocation) error {
 		if err != nil {
 			return err
 		}
-		if domain.UnderRushGate(os.Getenv) {
+		if domain.UnderRushGate(os.Getenv, os.ReadFile, args.argv) {
 			return execUnderRush(args.argv, "")
 		}
 		reportGateOffIgnored(slotCheckEnv())
