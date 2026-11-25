@@ -1,0 +1,14 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "composite": false,
+    "noEmit": true,
+    "tsBuildInfoFile": "dist/tsconfig.app.tsbuildinfo"
+  },
+  "include": ["__tests__/**/*.ts", "vitest.config.ts"],
+  "references": [
+    {
+      "path": "../../packages/vitest-config/tsconfig.build.json"
+    }
+  ]
+}

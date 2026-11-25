@@ -1,8 +1,7 @@
 /**
  * `langwatch logout` orchestration: scan → (confirm) → remove telemetry
- * wiring, and revoke the session unless --keep-credentials. Exercised
- * against a real temp HOME + isolated config path with --yes so no prompt
- * blocks and --keep-credentials so no network revoke is attempted.
+ * wiring, revoke unless --keep-credentials. Exercised with --yes (no
+ * prompt) and --keep-credentials (no network revoke).
  */
 
 import * as fs from "node:fs";
@@ -12,18 +11,28 @@ import * as path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { appSettingsTargetFor, installAppEnv } from "@/cli/utils/governance/app-settings";
+import type * as deviceFlow from "@/cli/utils/governance/device-flow";
+import { logout as serverRevokeLogout } from "@/cli/utils/governance/device-flow";
 import {
   buildScopedToolFunction,
   persistBlockToRc,
   rcPath,
   toolMarkers,
 } from "@/cli/utils/governance/shell-rc";
+
 import { logoutCommand } from "../logout";
+
+// The revoke is a network call; the case holding a refresh_token pins it, not reaches out.
+vi.mock("@/cli/utils/governance/device-flow", async () => {
+  const actual = await vi.importActual<typeof deviceFlow>("@/cli/utils/governance/device-flow");
+  return { ...actual, logout: vi.fn(async () => undefined) };
+});
 
 let tmpHome: string;
 const origHome = process.env.HOME;
 const origUserprofile = process.env.USERPROFILE;
 const origCodexHome = process.env.CODEX_HOME;
+const origCopilotHome = process.env.COPILOT_HOME;
 const origCliConfig = process.env.LANGWATCH_CLI_CONFIG;
 
 const seedClaudeAndGemini = (): void => {
@@ -47,6 +56,7 @@ beforeEach(() => {
   process.env.HOME = tmpHome;
   process.env.USERPROFILE = tmpHome;
   delete process.env.CODEX_HOME;
+  delete process.env.COPILOT_HOME;
   process.env.LANGWATCH_CLI_CONFIG = path.join(tmpHome, "config.json");
   vi.spyOn(console, "log").mockImplementation(() => undefined);
   vi.spyOn(console, "error").mockImplementation(() => undefined);
@@ -57,6 +67,8 @@ afterEach(() => {
   process.env.USERPROFILE = origUserprofile;
   if (origCodexHome === undefined) delete process.env.CODEX_HOME;
   else process.env.CODEX_HOME = origCodexHome;
+  if (origCopilotHome === undefined) delete process.env.COPILOT_HOME;
+  else process.env.COPILOT_HOME = origCopilotHome;
   if (origCliConfig === undefined) delete process.env.LANGWATCH_CLI_CONFIG;
   else process.env.LANGWATCH_CLI_CONFIG = origCliConfig;
   vi.restoreAllMocks();
@@ -100,12 +112,26 @@ describe("logoutCommand", () => {
 
       await logoutCommand({ yes: true });
 
+      expect(serverRevokeLogout).toHaveBeenCalledWith(expect.anything(), "rt", "at");
       expect(fs.existsSync(cfgPath)).toBe(false);
       const claudePath = appSettingsTargetFor("claude")!.path;
       const claude = JSON.parse(fs.readFileSync(claudePath, "utf8"));
       expect("env" in claude).toBe(false);
       const rc = fs.readFileSync(rcPath("zsh"), "utf8");
       expect(rc).not.toContain("langwatch gemini begin");
+    });
+  });
+
+  describe("when the session was signed in with a pasted access token", () => {
+    /** @scenario "A session signed in with a pasted access token is revoked too" */
+    it("sends the access token to the server to be revoked, then clears the session", async () => {
+      const cfgPath = process.env.LANGWATCH_CLI_CONFIG!;
+      fs.writeFileSync(cfgPath, JSON.stringify({ access_token: "lw_at_pasted" }, null, 2));
+
+      await logoutCommand({ yes: true });
+
+      expect(serverRevokeLogout).toHaveBeenCalledWith(expect.anything(), undefined, "lw_at_pasted");
+      expect(fs.existsSync(cfgPath)).toBe(false);
     });
   });
 

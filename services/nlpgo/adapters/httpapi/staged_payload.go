@@ -1,7 +1,7 @@
 package httpapi
 
 // Staged payload offload — the counterpart to the TS `stagePayload` helper
-// (platform/app/src/server/s3/stagePayload.ts) used by `invokeLambda`.
+// (modules/topic/process/src/ports/langevals-payload-staging.port.ts) used by `invokeLambda`.
 //
 // Why this exists
 // ---------------
@@ -24,13 +24,20 @@ package httpapi
 // signature rides in the query string, which we intentionally do not restrict.
 
 import (
+	"bytes"
 	"context"
+	"crypto/aes"
+	"crypto/cipher"
+	"encoding/base64"
 	"fmt"
 	"io"
 	"net/http"
 	"net/url"
+	"os"
 	"strings"
 	"time"
+
+	"github.com/langwatch/langwatch/services/nlpgo/app"
 )
 
 // StagedPayloadHeader carries a presigned S3 GET URL for the real request
@@ -38,14 +45,20 @@ import (
 // match STAGED_HEADER in langwatch/src/server/s3/stagePayload.ts.
 const StagedPayloadHeader = "X-Payload-S3-URL"
 
+// StagedPayloadKeyHeader carries the run's AES-256-GCM key (base64) when the
+// staged object is sealed, so a secret in the body is never readable at rest.
+// Matches STAGED_PAYLOAD_KEY_HEADER in modules/workflow/process.
+const StagedPayloadKeyHeader = "X-Payload-Key"
+
 // stagedPayloadClient fetches offloaded bodies. The 60s timeout covers a
 // large (up to maxStagedPayloadBytes) same-region S3 download with margin.
 var stagedPayloadClient = &http.Client{Timeout: 60 * time.Second}
 
 // maxStagedPayloadBytes bounds the fetched body so a tampered or unexpectedly
-// huge object can't exhaust memory. 256 MiB mirrors the langevals staged
-// middleware ceiling (langevals/staged_payload.py).
-const maxStagedPayloadBytes = 256 * 1024 * 1024
+// huge object can't exhaust memory. It is the engine's own request body cap:
+// a staged body is the same request taking another route in, so a dataset row
+// the engine accepts over direct HTTP is accepted staged as well.
+const maxStagedPayloadBytes = app.DefaultMaxRequestBodyBytes
 
 // validateStagedPayloadURL enforces the SSRF guard: https only, and the host
 // must be an AWS S3 host (path-style `s3[.-]<region>.amazonaws.com` or
@@ -60,6 +73,9 @@ func validateStagedPayloadURL(raw string) error {
 	if err != nil {
 		return fmt.Errorf("staged payload url is unparseable: %w", err)
 	}
+	if origin := stagedPayloadTestOnlyOrigin(); origin != "" && originOf(u) == origin {
+		return nil
+	}
 	if u.Scheme != "https" {
 		return fmt.Errorf("staged payload url must be https, got %q", u.Scheme)
 	}
@@ -68,6 +84,35 @@ func validateStagedPayloadURL(raw string) error {
 		return fmt.Errorf("staged payload url host %q is not an AWS S3 host", host)
 	}
 	return nil
+}
+
+// StagedPayloadTestOnlyOriginEnv names ONE extra origin ("scheme://host:port")
+// the guard above accepts, so a test can stand a fake object store up on
+// loopback and drive the whole staging round trip against a live engine
+// without an AWS account. It admits exactly that origin and nothing else: it
+// is not a suffix, not a wildcard, and not a way to turn the guard off.
+//
+// It is refused outright on a deployed environment. ENVIRONMENT is the same
+// marker the rest of this service reads, and anything but a local or test one
+// ignores the variable rather than trusting it, so an operator who exported it
+// on a real installation widens nothing.
+const StagedPayloadTestOnlyOriginEnv = "NLPGO_TEST_ONLY_STAGED_PAYLOAD_ORIGIN"
+
+// stagedPayloadTestOnlyOrigin returns the admitted test origin, or "" when
+// there is none or the environment is not one where a test runs.
+func stagedPayloadTestOnlyOrigin() string {
+	switch strings.ToLower(strings.TrimSpace(os.Getenv("ENVIRONMENT"))) {
+	case "", "local", "development", "test":
+	default:
+		return ""
+	}
+	return strings.ToLower(strings.TrimSpace(os.Getenv(StagedPayloadTestOnlyOriginEnv)))
+}
+
+// originOf renders the scheme and authority of u the way the environment
+// variable states them, so the comparison is exact rather than by host alone.
+func originOf(u *url.URL) string {
+	return strings.ToLower(u.Scheme + "://" + u.Host)
 }
 
 // isAWSS3Host reports whether host is an Amazon S3 endpoint. It requires both
@@ -110,7 +155,10 @@ func fetchStagedPayload(ctx context.Context, client *http.Client, raw string, ma
 	// Read one byte past the limit so we can distinguish "exactly at limit"
 	// from "over limit" — io.LimitReader silently truncates rather than
 	// erroring, which would otherwise hand back a corrupt (clipped) body.
-	body, err := io.ReadAll(io.LimitReader(resp.Body, maxBytes+1))
+	if resp.ContentLength > maxBytes {
+		return nil, fmt.Errorf("staged payload exceeds %d byte limit", maxBytes)
+	}
+	body, err := readAllSized(io.LimitReader(resp.Body, maxBytes+1), resp.ContentLength)
 	if err != nil {
 		return nil, fmt.Errorf("read staged payload body: %w", err)
 	}
@@ -128,7 +176,54 @@ func readStudioRequestBody(r *http.Request, client *http.Client) ([]byte, error)
 		if err := validateStagedPayloadURL(staged); err != nil {
 			return nil, err
 		}
-		return fetchStagedPayload(r.Context(), client, staged, maxStagedPayloadBytes)
+		body, err := fetchStagedPayload(r.Context(), client, staged, maxStagedPayloadBytes)
+		if err != nil {
+			return nil, err
+		}
+		if key := r.Header.Get(StagedPayloadKeyHeader); key != "" {
+			return openStagedPayload(body, key)
+		}
+		return body, nil
 	}
-	return io.ReadAll(r.Body)
+	return readAllSized(r.Body, min(r.ContentLength, app.DefaultMaxRequestBodyBytes))
+}
+
+// readAllSized reads r to the end. When the sender declared the body length
+// the buffer is allocated once at that size: io.ReadAll grows by reallocating,
+// which for a body of a few hundred megabytes leaves about as much again in
+// discarded buffers. The caller bounds `declared`, because it comes off a
+// header the sender controls.
+func readAllSized(r io.Reader, declared int64) ([]byte, error) {
+	if declared <= 0 {
+		return io.ReadAll(r)
+	}
+	buf := bytes.NewBuffer(make([]byte, 0, declared+bytes.MinRead))
+	_, err := buf.ReadFrom(r)
+	return buf.Bytes(), err
+}
+
+// openStagedPayload decrypts a sealed staged body: nonce (12 bytes), then the
+// AES-256-GCM ciphertext and tag, under the base64 key the invoke carried.
+func openStagedPayload(sealed []byte, keyB64 string) ([]byte, error) {
+	key, err := base64.StdEncoding.DecodeString(keyB64)
+	if err != nil || len(key) != 32 {
+		return nil, fmt.Errorf("staged payload key is not a base64 256-bit key")
+	}
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		return nil, fmt.Errorf("staged payload cipher: %w", err)
+	}
+	gcm, err := cipher.NewGCM(block)
+	if err != nil {
+		return nil, fmt.Errorf("staged payload cipher: %w", err)
+	}
+	if len(sealed) < gcm.NonceSize()+gcm.Overhead() {
+		return nil, fmt.Errorf("staged payload is too short to be sealed")
+	}
+	nonce, ciphertext := sealed[:gcm.NonceSize()], sealed[gcm.NonceSize():]
+	plain, err := gcm.Open(nil, nonce, ciphertext, nil)
+	if err != nil {
+		return nil, fmt.Errorf("staged payload does not open under the run key")
+	}
+	return plain, nil
 }

@@ -2,8 +2,9 @@ package app
 
 import (
 	"context"
-	"strings"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -14,16 +15,27 @@ import (
 )
 
 type recordingEmitter struct {
+	mu    sync.Mutex
 	began []domain.RequestType
 	ended []domain.AITraceParams
 }
 
+func (r *recordingEmitter) closed() []domain.AITraceParams {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return append([]domain.AITraceParams(nil), r.ended...)
+}
+
 func (r *recordingEmitter) BeginSpan(ctx context.Context, projectID string, reqType domain.RequestType) (context.Context, string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
 	r.began = append(r.began, reqType)
 	return ctx, "00-traceparent-stub-01"
 }
 
 func (r *recordingEmitter) EndSpan(_ context.Context, params domain.AITraceParams) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
 	r.ended = append(r.ended, params)
 }
 
@@ -36,6 +48,13 @@ func TestSpeechDispatchEmitsCustomerSpan(t *testing.T) {
 			return &domain.Response{Body: []byte(`{"text":"hi"}`), StatusCode: 200}, nil
 		},
 	}
+	provider.streamFn = func(ctx context.Context, req *domain.Request, cred domain.Credential) (domain.StreamIterator, error) {
+		resp, err := provider.dispatchFn(ctx, req, cred)
+		if err != nil {
+			return nil, err
+		}
+		return domain.BufferedStream(resp), nil
+	}
 	rec := &recordingEmitter{}
 	application := New(
 		WithProviders(provider),
@@ -45,10 +64,15 @@ func TestSpeechDispatchEmitsCustomerSpan(t *testing.T) {
 	)
 
 	body := `{"model":"openai/gpt-4o-mini-tts","voice":"nova","input":"hello"}`
-	_, err := application.HandleSpeech(context.Background(), testBundle(), strings.NewReader(body), "openai/gpt-4o-mini-tts")
+	result, err := application.HandleSpeechStream(context.Background(), testBundle(), []byte(body), "openai/gpt-4o-mini-tts")
 	require.NoError(t, err)
+	for result.Iterator.Next(context.Background()) {
+	}
+	require.NoError(t, result.Iterator.Close())
 
 	assert.Equal(t, []domain.RequestType{domain.RequestTypeSpeech}, rec.began, "BeginSpan must fire for speech")
-	require.Len(t, rec.ended, 1, "EndSpan must fire for speech")
-	assert.Equal(t, domain.RequestTypeSpeech, rec.ended[0].RequestType)
+	// A stream closes its span off the request path.
+	require.Eventually(t, func() bool { return len(rec.closed()) == 1 }, 2*time.Second, 5*time.Millisecond,
+		"EndSpan must fire for speech")
+	assert.Equal(t, domain.RequestTypeSpeech, rec.closed()[0].RequestType)
 }

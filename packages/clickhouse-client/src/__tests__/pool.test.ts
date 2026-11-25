@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import {
   DEFAULT_CLIENTS_PER_PROCESS,
   DEFAULT_SERVER_MAX_CONCURRENT_QUERIES,
@@ -8,7 +9,7 @@ import {
   MAX_POOL_SIZE,
   poolSizingFromEnv,
   resolvePoolSize,
-} from "../pool";
+} from "../pool.ts";
 
 describe("deriveFleetPoolCeiling", () => {
   describe("given the fleet size is unknown", () => {
@@ -109,9 +110,7 @@ describe("deriveFleetPoolCeiling", () => {
         const fixedDefault = 64;
         const ceiling = deriveFleetPoolCeiling({ replicas: 10 })!;
 
-        expect(fixedDefault * 10 * 2).toBeGreaterThan(
-          DEFAULT_SERVER_MAX_CONCURRENT_QUERIES,
-        );
+        expect(fixedDefault * 10 * 2).toBeGreaterThan(DEFAULT_SERVER_MAX_CONCURRENT_QUERIES);
         expect(ceiling).toBeLessThan(fixedDefault);
       });
     });
@@ -185,9 +184,7 @@ describe("resolvePoolSize", () => {
       });
 
       it("still reports the ceiling when nothing conflicts", () => {
-        expect(
-          resolvePoolSize({ override: 8, replicas: 10 }).derivedCeiling,
-        ).toBe(21);
+        expect(resolvePoolSize({ override: 8, replicas: 10 }).derivedCeiling).toBe(21);
       });
     });
 
@@ -230,9 +227,7 @@ describe("poolSizingFromEnv", () => {
       });
 
       it("treats an empty string as unset", () => {
-        expect(
-          poolSizingFromEnv({ CLICKHOUSE_CLIENT_REPLICAS: "" }).replicas,
-        ).toBeUndefined();
+        expect(poolSizingFromEnv({ CLICKHOUSE_CLIENT_REPLICAS: "" }).replicas).toBeUndefined();
       });
     });
   });
@@ -271,13 +266,11 @@ describe("poolSizingFromEnv", () => {
   describe("given the environment describes the production fleet", () => {
     describe("when the size is resolved", () => {
       it("resolves a size that fits the server's budget", () => {
-        const decision = resolvePoolSize(
-          poolSizingFromEnv({ CLICKHOUSE_CLIENT_REPLICAS: "10" }),
-        );
+        const decision = resolvePoolSize(poolSizingFromEnv({ CLICKHOUSE_CLIENT_REPLICAS: "10" }));
 
-        expect(
-          decision.size * 10 * DEFAULT_CLIENTS_PER_PROCESS,
-        ).toBeLessThanOrEqual(DEFAULT_SERVER_MAX_CONCURRENT_QUERIES);
+        expect(decision.size * 10 * DEFAULT_CLIENTS_PER_PROCESS).toBeLessThanOrEqual(
+          DEFAULT_SERVER_MAX_CONCURRENT_QUERIES,
+        );
       });
     });
   });
@@ -345,6 +338,99 @@ describe("cluster-wide budget derivation", () => {
           expect(deriveFleetPoolCeiling({ replicas: 10, serverNodes })).toBe(
             deriveFleetPoolCeiling({ replicas: 10 }),
           );
+        }
+      });
+    });
+  });
+
+  describe("given the server's cap is known but the fleet size is not", () => {
+    describe("when the size is resolved", () => {
+      /** @scenario "A known server cap bounds the fallback even when the fleet size is unknown" */
+      it("never claims more than one whole server's safe budget", () => {
+        // haven's server allows 32 concurrent queries; floor(32 * 0.7) = 22.
+        const decision = resolvePoolSize({ serverMaxConcurrentQueries: 32 });
+
+        expect(decision.size).toBe(22);
+        expect(decision.source).toBe("fallback");
+        expect(decision.derivedCeiling).toBe(22);
+      });
+
+      /** @scenario "A known server cap bounds the fallback even when the fleet size is unknown" */
+      it("reports the budget as exceeded, because siblings it cannot count share it", () => {
+        const decision = resolvePoolSize({ serverMaxConcurrentQueries: 32 });
+
+        expect(decision.exceedsBudget).toBe(true);
+      });
+
+      /** @scenario "A known server cap bounds the fallback even when the fleet size is unknown" */
+      it("keeps the historical fallback when the stated cap affords it", () => {
+        // The production default: floor(300 * 0.7) = 210 affords the full 64,
+        // so stating the default cap changes nothing and raises no warning.
+        const decision = resolvePoolSize({
+          serverMaxConcurrentQueries: DEFAULT_SERVER_MAX_CONCURRENT_QUERIES,
+        });
+
+        expect(decision.size).toBe(FALLBACK_POOL_SIZE);
+        expect(decision.exceedsBudget).toBe(false);
+      });
+
+      /** @scenario "A known server cap bounds the fallback even when the fleet size is unknown" */
+      it("counts every node and every client this process holds", () => {
+        // floor((32 * 2 * 0.7) / 2) = 22 - nodes widen the budget, a second
+        // client on this process narrows this pool's share of it.
+        const decision = resolvePoolSize({
+          serverMaxConcurrentQueries: 32,
+          serverNodes: 2,
+          clientsPerProcess: 2,
+        });
+
+        expect(decision.size).toBe(22);
+      });
+
+      /** @scenario "A known server cap bounds the fallback even when the fleet size is unknown" */
+      it("still hands out one usable connection against a cap below one share", () => {
+        const decision = resolvePoolSize({ serverMaxConcurrentQueries: 1 });
+
+        expect(decision.size).toBe(1);
+        expect(decision.exceedsBudget).toBe(true);
+      });
+
+      /** @scenario "An override above a known server cap is reported even when the fleet size is unknown" */
+      it("reports an override above one process's share of a stated cap", () => {
+        // The override wins - but floor(32 * 0.7) = 22, so 64 lets this one
+        // process exceed the server alone, and silence here is the exact
+        // hole the fallback clamp closes.
+        const decision = resolvePoolSize({
+          override: 64,
+          serverMaxConcurrentQueries: 32,
+        });
+
+        expect(decision.size).toBe(64);
+        expect(decision.source).toBe("override");
+        expect(decision.exceedsBudget).toBe(true);
+        expect(decision.derivedCeiling).toBe(22);
+      });
+
+      /** @scenario "An override above a known server cap is reported even when the fleet size is unknown" */
+      it("raises no conflict for an override inside that share", () => {
+        const decision = resolvePoolSize({
+          override: 10,
+          serverMaxConcurrentQueries: 32,
+        });
+
+        expect(decision.size).toBe(10);
+        expect(decision.exceedsBudget).toBe(false);
+        expect(decision.derivedCeiling).toBe(22);
+      });
+
+      /** @scenario "A known server cap bounds the fallback even when the fleet size is unknown" */
+      it("ignores a cap that is not a positive integer", () => {
+        for (const serverMaxConcurrentQueries of [0, -3, 2.5, Number.NaN]) {
+          const decision = resolvePoolSize({ serverMaxConcurrentQueries });
+
+          expect(decision.size).toBe(FALLBACK_POOL_SIZE);
+          expect(decision.derivedCeiling).toBeNull();
+          expect(decision.exceedsBudget).toBe(false);
         }
       });
     });

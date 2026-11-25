@@ -1,6 +1,13 @@
 export { DatasetsFacade } from "./datasets.facade";
 export { DatasetService } from "./dataset.service";
-export { DatasetError, DatasetNotFoundError, DatasetApiError, DatasetValidationError, DatasetPlanLimitError } from "./errors";
+export {
+  DatasetError,
+  DatasetNotFoundError,
+  DatasetApiError,
+  DatasetValidationError,
+  DatasetPlanLimitError,
+} from "./errors";
+export type { DatasetValidationCode } from "./errors";
 export type {
   Dataset,
   DatasetEntry,
@@ -22,4 +29,6 @@ export type {
   DeleteRecordsResponse,
   UploadResponse,
   DatasetRecordResponse,
+  UpsertRecordsOptions,
+  UpsertRecordsResult,
 } from "./types";

@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/langwatch/langwatch/pkg/herr"
 	"github.com/langwatch/langwatch/services/aigateway/domain"
 )
 
@@ -28,12 +29,16 @@ func TestResolve_ColdMiss_ConfigFetchFailure_FailsClosedAndCachesNothing(t *test
 	}
 	svc, _ := newService(t, Options{Resolver: &fetcher.fakeResolver, ConfigFetcher: fetcher})
 
-	_, err := svc.Resolve(context.Background(), "vk-lw-cold")
+	_, err := svc.Resolve(context.Background(), domain.PresentedKey{Token: "vk-lw-cold"})
 	if err == nil {
 		t.Fatal("expected a failure when the config fetch fails on a cold miss")
 	}
 	if !errors.Is(err, domain.ErrAuthUpstream) {
 		t.Fatalf("expected auth_upstream_unavailable (retryable), got %v", err)
+	}
+	var unavailable herr.E
+	if !errors.As(err, &unavailable) || !unavailable.Retryable {
+		t.Fatalf("auth_upstream_unavailable always tells the client to retry: %v", err)
 	}
 	if svc.l1.Len() != 0 {
 		t.Fatalf("a config-less bundle must not be cached; L1 holds %d entries", svc.l1.Len())
@@ -41,7 +46,7 @@ func TestResolve_ColdMiss_ConfigFetchFailure_FailsClosedAndCachesNothing(t *test
 
 	// Control plane recovers: the retry succeeds and serves real credentials.
 	fetcher.cfgErr = nil
-	bundle, err := svc.Resolve(context.Background(), "vk-lw-cold")
+	bundle, err := svc.Resolve(context.Background(), domain.PresentedKey{Token: "vk-lw-cold"})
 	if err != nil {
 		t.Fatalf("expected recovery once the config fetch works: %v", err)
 	}
@@ -58,7 +63,7 @@ func TestResolve_ColdMiss_EmptyCredentialsFromControlPlane_IsCachedAndServed(t *
 	}
 	svc, _ := newService(t, Options{Resolver: &fetcher.fakeResolver, ConfigFetcher: fetcher})
 
-	bundle, err := svc.Resolve(context.Background(), "vk-lw-noprov")
+	bundle, err := svc.Resolve(context.Background(), domain.PresentedKey{Token: "vk-lw-noprov"})
 	if err != nil {
 		t.Fatalf("a successfully fetched empty config is a valid resolution: %v", err)
 	}
@@ -81,10 +86,10 @@ func TestResolve_StaleEntry_ConfigFetchFailure_ServesStaleCredentials(t *testing
 	svc, _ := newService(t, Options{Resolver: &fetcher.fakeResolver, ConfigFetcher: fetcher})
 
 	rawKey := "vk-lw-stale"
-	h := hashKey(rawKey)
-	svc.storeL1(h, bundleWithCreds("vk_stale", time.Now().Add(-30*time.Second), "cred-old"), "")
+	h := hashKey(domain.PresentedKey{Token: rawKey})
+	seedL1(svc, h, bundleWithCreds("vk_stale", time.Now().Add(-30*time.Second), "cred-old"), "")
 
-	bundle, err := svc.Resolve(context.Background(), rawKey)
+	bundle, err := svc.Resolve(context.Background(), domain.PresentedKey{Token: rawKey})
 	if err != nil {
 		t.Fatalf("expected the stale bundle to serve: %v", err)
 	}
@@ -122,7 +127,7 @@ func TestResolve_StaleEntryAtHardCap_ConfigFetchFailure_FailsRetryable(t *testin
 	rawKey := "vk-lw-capped"
 	seedExpiredEntry(t, svc, rawKey, "vk_capped", 30*time.Second)
 
-	_, err := svc.Resolve(context.Background(), rawKey)
+	_, err := svc.Resolve(context.Background(), domain.PresentedKey{Token: rawKey})
 	if err == nil {
 		t.Fatal("expected a failure once the hard grace cap is exhausted")
 	}
@@ -143,10 +148,10 @@ func TestRefreshBackground_ConfigFetchFailure_KeepsExistingEntry(t *testing.T) {
 	svc, _ := newService(t, Options{Resolver: &fetcher.fakeResolver, ConfigFetcher: fetcher})
 
 	rawKey := "vk-lw-bg"
-	h := hashKey(rawKey)
-	svc.storeL1(h, bundleWithCreds("vk_bg", time.Now().Add(5*time.Minute), "cred-old"), "")
+	h := hashKey(domain.PresentedKey{Token: rawKey})
+	seedL1(svc, h, bundleWithCreds("vk_bg", time.Now().Add(5*time.Minute), "cred-old"), "")
 
-	svc.refreshBackground(rawKey, h)
+	refreshCurrent(svc, domain.PresentedKey{Token: rawKey}, h)
 
 	e, ok := svc.l1.Get(h)
 	if !ok {
@@ -158,7 +163,7 @@ func TestRefreshBackground_ConfigFetchFailure_KeepsExistingEntry(t *testing.T) {
 
 	// Control plane recovers: the next refresh replaces the entry for real.
 	fetcher.cfgErr = nil
-	svc.refreshBackground(rawKey, h)
+	refreshCurrent(svc, domain.PresentedKey{Token: rawKey}, h)
 	e, ok = svc.l1.Get(h)
 	if !ok {
 		t.Fatal("expected the refreshed entry in L1")

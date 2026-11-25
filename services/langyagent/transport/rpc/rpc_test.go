@@ -7,6 +7,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/langwatch/langwatch/services/langyagent/adapters/github"
+	"github.com/langwatch/langwatch/services/langyagent/app"
 	"github.com/langwatch/langwatch/services/langyagent/domain"
 )
 
@@ -82,32 +84,23 @@ func TestProbe_BindsSignatureToPrincipal(t *testing.T) {
 	}
 }
 
-// The probe folds the harness into the signature it compares, so a harness
-// flip is a probe MISS: the control plane then mints and the turn replaces
-// the worker, while an omitted harness normalises with the default and keeps
-// hitting workers spawned before harness selection existed.
+// The disabled skills are part of the signature Acquire compares. A probe that
+// dropped them answered "alive" for a worker the turn then replaced with a
+// keyless spawn, which the manager refused with credentials_required.
 //
-// @scenario "The pre-turn probe answers for the harness the turn will use"
-func TestProbe_CarriesHarnessIntoTheSignature(t *testing.T) {
+// @scenario "The warm and the turn's probe carry the same disabled skills"
+func TestProbe_SignatureCarriesDisabledSkills(t *testing.T) {
 	pool := &stubPool{liveWorker: true}
 	router := newTestRouter(pool)
-
-	rec := post(t, router, "/worker/probe", `{"conversationId":"c1","projectId":"project-1","actorUserId":"user-a","model":"m","harness":"pi"}`)
+	rec := post(t, router, "/worker/probe", `{"conversationId":"c1","projectId":"project-1","actorUserId":"user-a","model":"m","disabledSkillIds":["playground-widgets"]}`)
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status = %d, want 200", rec.Code)
 	}
-	if pool.lastSig.Harness != "pi" {
-		t.Fatalf("probe signature harness = %q, want pi", pool.lastSig.Harness)
-	}
-
-	// Omitted harness → the default, so the probe asks the same question a
-	// pre-selection control plane always asked.
-	rec = post(t, router, "/worker/probe", `{"conversationId":"c1","projectId":"project-1","actorUserId":"user-a","model":"m"}`)
-	if rec.Code != http.StatusOK {
-		t.Fatalf("status = %d, want 200", rec.Code)
-	}
-	if pool.lastSig.Harness != "opencode" {
-		t.Fatalf("probe signature harness = %q, want opencode when omitted", pool.lastSig.Harness)
+	want := domain.SignatureOf("project-1", "user-a", "m", nil,
+		app.SignatureKeys([]app.Capability{github.New("", "", "")}),
+		[]string{"playground-widgets"}, "")
+	if pool.lastSig != want {
+		t.Fatalf("probe signature = %+v, want the one a turn with those disabled skills acquires: %+v", pool.lastSig, want)
 	}
 }
 

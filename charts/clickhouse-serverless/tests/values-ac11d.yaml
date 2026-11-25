@@ -1,0 +1,31 @@
+# Fixture for the AC11-D transition-guard test (issue langwatch/langwatch-saas#1168).
+#
+# The guard being tested is chart-level, not binary-level, so the image tag here
+# only has to be an image that exists locally and starts: 0.3.0 is the released
+# tag the upgrade experiment used as its "old" side. replicas is deliberately
+# NOT pinned — the test supplies it per case via --set, which is the whole point
+# of the assertion.
+image:
+  tag: "0.3.0"
+  pullPolicy: Never
+memory: 1Gi
+cpu: "500m"
+storage:
+  size: 1Gi
+
+auth:
+  password: "ac11d-test"
+
+autogen:
+  enabled: true
+
+keeper:
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 250m
+      memory: 256Mi
+  storage:
+    size: 1Gi

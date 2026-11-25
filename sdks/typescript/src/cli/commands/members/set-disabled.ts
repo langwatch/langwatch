@@ -1,5 +1,7 @@
 import chalk from "chalk";
+
 import { OrganizationApiService } from "@/client-sdk/services/organization/organization-api.service";
+
 import type { CommandResult } from "../../utils/output";
 import { orDash, printFacts, runManagement } from "../management/_shared";
 
@@ -18,8 +20,7 @@ const setMemberDisabled = async ({
   runManagement({
     action: disabled ? "disable member" : "enable member",
     pending: `${disabled ? "Disabling" : "Enabling"} member "${userId}"...`,
-    run: () =>
-      new OrganizationApiService().updateMember({ userId, input: { disabled } }),
+    run: () => new OrganizationApiService().updateMember({ userId, input: { disabled } }),
     succeed: (member) =>
       `Member "${userId}" is now ${member.disabled ? chalk.yellow("disabled") : chalk.green("active")}`,
     table: (member) => {
@@ -32,12 +33,8 @@ const setMemberDisabled = async ({
     },
   });
 
-export const disableMemberCommand = (
-  userId: string,
-): Promise<CommandResult | void> =>
+export const disableMemberCommand = (userId: string): Promise<CommandResult | void> =>
   setMemberDisabled({ userId, disabled: true });
 
-export const enableMemberCommand = (
-  userId: string,
-): Promise<CommandResult | void> =>
+export const enableMemberCommand = (userId: string): Promise<CommandResult | void> =>
   setMemberDisabled({ userId, disabled: false });

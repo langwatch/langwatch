@@ -1,5 +1,6 @@
 import * as fs from "fs";
 import * as path from "path";
+
 import * as yaml from "yaml";
 
 export interface PromptConfig {
@@ -9,26 +10,16 @@ export interface PromptConfig {
     maxTokens?: number;
     [key: string]: any;
   };
-  messages: Array<{
+  messages: {
     role: "system" | "user" | "assistant";
     content: string;
-  }>;
+  }[];
   [key: string]: any;
 }
 
-/**
- * Manages prompt YAML files.
- *
- * Responsibilities:
- * - Create and update prompt YAML files
- * - Read prompt file contents
- * - Handle YAML parsing and serialization
- * - Manage prompts directory structure
- */
+/** Manages prompt YAML files: create/update, read, and directory structure. */
 export class PromptFileManager {
-  constructor(
-    private readonly config: { cwd: string; materializedDir?: boolean },
-  ) {}
+  constructor(private readonly config: { cwd: string; materializedDir?: boolean }) {}
 
   /**
    * Gets the absolute path to a prompt file.

@@ -1,0 +1,563 @@
+package app
+
+import (
+	"bytes"
+	"context"
+	"errors"
+	"os"
+	"path/filepath"
+	"runtime"
+	"strings"
+	"testing"
+
+	"github.com/langwatch/langwatch/tools/thuishaven/domain"
+)
+
+// fakeTools is a machine with a declared set of binaries and brew formulae on
+// it, recording every installer it was asked to run. Nothing here touches the
+// real machine, which is the point: the ordering, the refusals and the skip
+// bookkeeping are the behavior, and none of it should need a laptop with the
+// wrong things installed to exercise.
+type fakeTools struct {
+	binaries map[string]bool
+	// paths overrides BinaryPath for a name with a real, on-disk path, used
+	// where a probe actually runs the resolved binary (golangci-lint version),
+	// so the test needs a real executable and not just a name that resolves.
+	paths    map[string]string
+	formulae []string
+	ran      []string
+	failOn   string
+	// sysctl answers Sysctl by name; an absent name is an unreadable setting.
+	sysctl map[string]string
+	// fetched records every pinned download asked for, by destination.
+	fetched []string
+}
+
+func (f *fakeTools) Fetch(_ context.Context, _ domain.PinnedArtifact, dest string) error {
+	f.fetched = append(f.fetched, dest)
+	return nil
+}
+
+func (f *fakeTools) Sysctl(_ context.Context, name string) (string, error) {
+	v, ok := f.sysctl[name]
+	if !ok {
+		return "", errors.New("no such sysctl")
+	}
+	return v, nil
+}
+
+func (f *fakeTools) BinaryPath(name string) string {
+	if p, ok := f.paths[name]; ok {
+		return p
+	}
+	if f.binaries[name] {
+		return "/usr/local/bin/" + name
+	}
+	return ""
+}
+
+func (f *fakeTools) FormulaInstalled(_ context.Context, prefix string) (string, bool) {
+	for _, name := range f.formulae {
+		if strings.HasPrefix(name, prefix) {
+			return name, true
+		}
+	}
+	return "", false
+}
+
+func (f *fakeTools) Install(_ context.Context, command string) error {
+	f.ran = append(f.ran, command)
+	if f.failOn != "" && strings.Contains(command, f.failOn) {
+		return errors.New("installer exploded")
+	}
+	return nil
+}
+
+// installOrchestrator builds the smallest graph the install command needs.
+func installOrchestrator(tools *fakeTools, store *fakeStore, proxy Proxy) *Orchestrator {
+	return &Orchestrator{prereqs: tools, store: store, proxy: proxy, goos: "darwin"}
+}
+
+// missingPortlessProxy is a machine where portless has never been installed.
+type missingPortlessProxy struct {
+	fakeProxy
+	installs int
+}
+
+func (p *missingPortlessProxy) Installed() bool { return false }
+func (p *missingPortlessProxy) Version() string { return "" }
+func (p *missingPortlessProxy) Install() error  { p.installs++; return nil }
+
+// @scenario "A required prerequisite that is missing fails the check"
+func TestCheckPrereqsReportsAMissingRequiredEntry(t *testing.T) {
+	o := installOrchestrator(&fakeTools{}, &fakeStore{}, &missingPortlessProxy{})
+	report := o.CheckPrereqs(context.Background())
+	st := reportEntry(t, report, "portless")
+	if st.State != domain.PrereqMissing {
+		t.Errorf("portless = %v, want missing", st.State)
+	}
+	if !strings.Contains(domain.ReadyLine(report), "not ready") {
+		t.Errorf("verdict = %q, want not ready", domain.ReadyLine(report))
+	}
+}
+
+// A tool installed but not linked onto PATH is installed. brew keeps
+// postgresql@NN keg-only, so probing `psql` alone reports a machine with a
+// perfectly good server as having none — and then offers to install a second.
+// @scenario "Everything present reports ready and installs nothing"
+func TestCheckPrereqsFallsBackToTheBrewFormula(t *testing.T) {
+	if runtime.GOOS != "darwin" {
+		t.Skip("the brew-backed entries are macOS only")
+	}
+	tools := &fakeTools{binaries: map[string]bool{}, formulae: []string{"postgresql@15"}}
+	o := installOrchestrator(tools, &fakeStore{}, &fakeProxy{})
+	st := reportEntry(t, o.CheckPrereqs(context.Background()), "postgres")
+	if st.State != domain.PrereqSatisfied {
+		t.Errorf("postgres = %v, want satisfied — an unlinked keg is still installed", st.State)
+	}
+	if st.Observed != "postgresql@15" {
+		t.Errorf("observed = %q, want the formula that matched", st.Observed)
+	}
+}
+
+// Every binary a candidate names has to be there. colima with no docker is
+// not a runtime haven can drive, and calling it one moves the failure to the
+// first image build.
+// @scenario "A missing runtime offers the alternatives as one pick"
+func TestCheckPrereqsNeedsEveryBinaryOfACandidate(t *testing.T) {
+	if runtime.GOOS != "darwin" {
+		t.Skip("the container runtime is macOS only here")
+	}
+	tools := &fakeTools{binaries: map[string]bool{"colima": true}}
+	o := installOrchestrator(tools, &fakeStore{}, &fakeProxy{})
+	colima, _ := domain.LookupCandidate(prereqByKey(t, "runtime"), "colima")
+	if o.probeCandidate(context.Background(), colima).Present {
+		t.Errorf("colima probed present, want missing — colima without docker is not a runtime")
+	}
+}
+
+// macOS needs no container runtime (HAVEN-NO-COLIMA-MAC), so the report and
+// picker leave it off there; `haven self install runtime=colima` still installs it.
+func TestCheckPrereqsLeavesTheRuntimeOffTheMacReport(t *testing.T) {
+	o := installOrchestrator(&fakeTools{}, &fakeStore{}, &fakeProxy{})
+	for _, st := range o.CheckPrereqs(context.Background()) {
+		if st.Key == "runtime" {
+			t.Fatalf("runtime listed on macOS as %v, want it left off", st.State)
+		}
+	}
+	if _, err := ResolvePrereqNames([]string{"runtime=colima"}); err != nil {
+		t.Fatalf("runtime=colima must stay installable by name: %v", err)
+	}
+	o.goos = "linux"
+	reportEntry(t, o.CheckPrereqs(context.Background()), "runtime")
+}
+
+// @scenario "Installs run with the terminal to themselves"
+func TestInstallPrereqsRunsInDependencyOrder(t *testing.T) {
+	tools := &fakeTools{}
+	o := installOrchestrator(tools, &fakeStore{}, &fakeProxy{})
+	_, err := o.installPrereqsTo(context.Background(), &bytes.Buffer{}, []domain.Chosen{
+		{Key: "redis", Candidate: "redis"},
+		{Key: "node", Candidate: "node"},
+	})
+	if err != nil {
+		t.Fatalf("InstallPrereqs: %v", err)
+	}
+	if len(tools.ran) != 2 || !strings.Contains(tools.ran[0], "node") {
+		t.Errorf("ran %v, want node first", tools.ran)
+	}
+}
+
+// @scenario "A prerequisite haven cannot install itself is explained, not attempted"
+func TestInstallPrereqsExplainsTheManualEntryInsteadOfRunningIt(t *testing.T) {
+	tools := &fakeTools{}
+	o := installOrchestrator(tools, &fakeStore{}, &fakeProxy{})
+	var out bytes.Buffer
+	manual, err := o.installPrereqsTo(context.Background(), &out, []domain.Chosen{{Key: "brew", Candidate: "brew"}})
+	if err != nil {
+		t.Fatalf("a manual entry must not be an error: %v", err)
+	}
+	if len(tools.ran) != 0 {
+		t.Errorf("ran %v, want nothing — haven does not run the Homebrew installer", tools.ran)
+	}
+	if len(manual) != 1 || !strings.Contains(manual[0].Command, "install.sh") {
+		t.Errorf("the command to run by hand must be handed back, got %+v", manual)
+	}
+}
+
+// @scenario "One failed install does not silently skip the rest"
+func TestInstallPrereqsStopsAtTheFirstFailure(t *testing.T) {
+	tools := &fakeTools{failOn: "pnpm"}
+	o := installOrchestrator(tools, &fakeStore{}, &fakeProxy{})
+	_, err := o.installPrereqsTo(context.Background(), &bytes.Buffer{}, []domain.Chosen{
+		{Key: "node", Candidate: "node"},
+		{Key: "pnpm", Candidate: "pnpm"},
+		{Key: "redis", Candidate: "redis"},
+	})
+	if err == nil {
+		t.Fatal("a failed install must fail the run rather than report a success it did not get")
+	}
+	if !strings.Contains(err.Error(), "pnpm") {
+		t.Errorf("error %q must name the prerequisite that failed", err)
+	}
+	for _, ran := range tools.ran {
+		if strings.Contains(ran, "redis") {
+			t.Error("the run must stop rather than carry on past a failure its successors may depend on")
+		}
+	}
+}
+
+// portless is installed through the proxy adapter, which owns the pinned
+// package and the by-hand error — not through a second `npm install -g` that
+// would have to be kept in step with it.
+// @scenario "Installs run with the terminal to themselves"
+func TestInstallPortlessGoesThroughTheProxyAdapter(t *testing.T) {
+	proxy := &missingPortlessProxy{}
+	tools := &fakeTools{}
+	o := installOrchestrator(tools, &fakeStore{}, proxy)
+	if _, err := o.installPrereqsTo(context.Background(), &bytes.Buffer{}, []domain.Chosen{{Key: "portless", Candidate: "portless"}}); err != nil {
+		t.Fatalf("InstallPrereqs: %v", err)
+	}
+	if proxy.installs != 1 {
+		t.Errorf("proxy installs = %d, want 1", proxy.installs)
+	}
+	if len(tools.ran) != 0 {
+		t.Errorf("nothing should be shelled out for portless, ran %v", tools.ran)
+	}
+}
+
+// @scenario "Declining with never is persisted"
+func TestSkipPrereqsRecordsAndIsHonoured(t *testing.T) {
+	store := &fakeStore{}
+	o := installOrchestrator(&fakeTools{}, store, &fakeProxy{})
+	changed, err := o.SkipPrereqs([]string{"clickhouse-client"})
+	if err != nil {
+		t.Fatalf("SkipPrereqs: %v", err)
+	}
+	if len(changed) != 1 {
+		t.Fatalf("changed = %v, want the one key", changed)
+	}
+	if !o.PrereqSkips()["clickhouse-client"] {
+		t.Error("the skip must be readable back")
+	}
+	// A repeat is a no-op, so a second run does not report a change it did
+	// not make.
+	again, err := o.SkipPrereqs([]string{"clickhouse-client"})
+	if err != nil || len(again) != 0 {
+		t.Errorf("second skip = %v, %v; want no change", again, err)
+	}
+}
+
+// @scenario "Declining with never is persisted"
+func TestSkipPrereqsRefusesARequiredEntry(t *testing.T) {
+	o := installOrchestrator(&fakeTools{}, &fakeStore{}, &fakeProxy{})
+	if _, err := o.SkipPrereqs([]string{"portless"}); err == nil {
+		t.Fatal("a required prerequisite must not be silenceable")
+	}
+	if o.PrereqSkips()["portless"] {
+		t.Error("a refused skip must not be written")
+	}
+}
+
+// @scenario "A skipped prerequisite is still installed when named"
+func TestInstallingASkippedPrerequisiteClearsTheSkip(t *testing.T) {
+	store := &fakeStore{prereqSkips: map[string]bool{"clickhouse-client": true}}
+	o := installOrchestrator(&fakeTools{}, store, &fakeProxy{})
+	chosen, err := ResolvePrereqNames([]string{"clickhouse-client"})
+	if err != nil {
+		t.Fatalf("ResolvePrereqNames: %v", err)
+	}
+	if _, err := o.installPrereqsTo(context.Background(), &bytes.Buffer{}, chosen); err != nil {
+		t.Fatalf("InstallPrereqs: %v", err)
+	}
+	if o.PrereqSkips()["clickhouse-client"] {
+		t.Error("installing it answers the question the skip was suppressing — the skip must go")
+	}
+}
+
+// @scenario "The skips can be cleared"
+func TestResetPrereqSkipsClearsEverything(t *testing.T) {
+	store := &fakeStore{prereqSkips: map[string]bool{"clickhouse-client": true, "runtime": true}}
+	o := installOrchestrator(&fakeTools{}, store, &fakeProxy{})
+	cleared, err := o.ResetPrereqSkips()
+	if err != nil {
+		t.Fatalf("ResetPrereqSkips: %v", err)
+	}
+	if len(cleared) != 2 {
+		t.Errorf("cleared = %v, want both", cleared)
+	}
+	if len(o.PrereqSkips()) != 0 {
+		t.Errorf("skips = %v, want empty", o.PrereqSkips())
+	}
+	// Nothing to clear reports nothing rather than claiming a change.
+	again, err := o.ResetPrereqSkips()
+	if err != nil || len(again) != 0 {
+		t.Errorf("second reset = %v, %v; want no change", again, err)
+	}
+}
+
+// @scenario "A non-interactive run with --yes installs what is needed"
+func TestAutoPrereqsTakesWhatHavenNeedsAndLeavesConveniences(t *testing.T) {
+	report := domain.PlanPrereqs(map[string]domain.Found{}, nil, "darwin")
+	chosen := AutoPrereqs(report)
+	picked := map[string]string{}
+	for _, c := range chosen {
+		picked[c.Key] = c.Candidate
+	}
+	for _, want := range []string{"node", "pnpm", "portless", "postgres", "redis", "go", "bun"} {
+		if _, ok := picked[want]; !ok {
+			t.Errorf("--yes must install %s (required or recommended)", want)
+		}
+	}
+	for _, unwanted := range []string{"clickhouse-client", "runtime", "rtk"} {
+		if _, ok := picked[unwanted]; ok {
+			t.Errorf("--yes must not install the optional %s — it was never asked for", unwanted)
+		}
+	}
+	// Homebrew is chosen but not run: InstallPrereqs prints its command. It
+	// still belongs in the list, or a machine with no brew gets a wall of
+	// formula failures and no hint of the cause.
+	if _, ok := picked["brew"]; !ok {
+		t.Error("--yes must still surface Homebrew, since every formula below it depends on it")
+	}
+}
+
+// @scenario "A skipped prerequisite is still installed when named"
+func TestResolvePrereqNamesRejectsUnknownNames(t *testing.T) {
+	if _, err := ResolvePrereqNames([]string{"postgres", "nonsense"}); err == nil {
+		t.Fatal("an unknown prerequisite must fail with the list, not be ignored")
+	} else if !strings.Contains(err.Error(), "clickhouse-client") {
+		t.Errorf("error %q should list what is available", err)
+	}
+}
+
+// @scenario "A missing runtime offers the alternatives as one pick"
+func TestResolvePrereqNamesTakesAnExplicitCandidate(t *testing.T) {
+	chosen, err := ResolvePrereqNames([]string{"runtime=docker-desktop"})
+	if err != nil {
+		t.Fatalf("ResolvePrereqNames: %v", err)
+	}
+	if chosen[0].Candidate != "docker-desktop" {
+		t.Errorf("candidate = %q, want the one named", chosen[0].Candidate)
+	}
+	if _, err := ResolvePrereqNames([]string{"runtime=podman"}); err == nil {
+		t.Error("an option that does not exist must fail rather than fall back to the default")
+	}
+}
+
+// @scenario "Everything present reports ready and installs nothing"
+func TestInstallPrereqsWithNothingChosenInstallsNothing(t *testing.T) {
+	tools := &fakeTools{}
+	o := installOrchestrator(tools, &fakeStore{}, &fakeProxy{})
+	var out bytes.Buffer
+	if _, err := o.installPrereqsTo(context.Background(), &out, nil); err != nil {
+		t.Fatalf("InstallPrereqs: %v", err)
+	}
+	if len(tools.ran) != 0 {
+		t.Errorf("ran %v, want nothing", tools.ran)
+	}
+	if !strings.Contains(out.String(), "nothing installed") {
+		t.Errorf("output = %q, want it to say nothing happened", out.String())
+	}
+}
+
+// fakeRepoRoot writes a Makefile pinning golangci-lint and a go.work naming a
+// toolchain, so golangciPin has real files to read instead of a hand-built
+// string. The parsing itself lives in domain and is unit-tested there; this
+// exercises the app layer's own file lookup.
+func fakeRepoRoot(t *testing.T, pinnedVersion, goVersion string) string {
+	t.Helper()
+	dir := t.TempDir()
+	makefile := "GOLANGCI := golangci-lint\nGOLANGCI_VERSION := v" + pinnedVersion + "\n"
+	if err := os.WriteFile(filepath.Join(dir, "Makefile"), []byte(makefile), 0o644); err != nil {
+		t.Fatalf("writing fake Makefile: %v", err)
+	}
+	goWork := "go " + goVersion + "\n\nuse ./fake\n"
+	if err := os.WriteFile(filepath.Join(dir, "go.work"), []byte(goWork), 0o644); err != nil {
+		t.Fatalf("writing fake go.work: %v", err)
+	}
+	return dir
+}
+
+// fakeGolangciLint writes a script that answers `golangci-lint version` the
+// way the real binary does, so probeGolangciLint's actual subprocess call
+// runs against something real rather than being special-cased out of the
+// test.
+func fakeGolangciLint(t *testing.T, version string) string {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), "golangci-lint")
+	script := "#!/bin/sh\necho 'golangci-lint has version v" + version + " built with go1.27.1 from (unknown) on (unknown)'\n"
+	if err := os.WriteFile(path, []byte(script), 0o755); err != nil {
+		t.Fatalf("writing fake golangci-lint: %v", err)
+	}
+	return path
+}
+
+// @scenario "A wrong-version linter is reported outdated, not installed"
+func TestProbeGolangciLintReportsMissingWhenNotOnPath(t *testing.T) {
+	root := fakeRepoRoot(t, "2.11.4", "1.26.6")
+	o := &Orchestrator{prereqs: &fakeTools{}, store: &fakeStore{}, proxy: &fakeProxy{}, cfg: Config{RepoRoot: root}}
+	found := o.probeGolangciLint(context.Background())
+	if found.Present {
+		t.Errorf("nothing on PATH must report absent, got %+v", found)
+	}
+}
+
+// @scenario "A wrong-version linter is reported outdated, not installed"
+func TestProbeGolangciLintReportsSatisfiedAtThePinnedVersion(t *testing.T) {
+	root := fakeRepoRoot(t, "2.11.4", "1.26.6")
+	path := fakeGolangciLint(t, "2.11.4")
+	tools := &fakeTools{paths: map[string]string{"golangci-lint": path}}
+	o := &Orchestrator{prereqs: tools, store: &fakeStore{}, proxy: &fakeProxy{}, cfg: Config{RepoRoot: root}}
+	found := o.probeGolangciLint(context.Background())
+	if !found.Present || found.Outdated {
+		t.Errorf("the pinned version must report satisfied, got %+v", found)
+	}
+}
+
+// The case that bit tonight: a v1.64.8 binary read as installed and refused
+// the repo's v2 lint config. The report has to say outdated, not installed.
+// @scenario "A wrong-version linter is reported outdated, not installed"
+func TestProbeGolangciLintReportsOutdatedAtAnyOtherVersion(t *testing.T) {
+	root := fakeRepoRoot(t, "2.11.4", "1.26.6")
+	path := fakeGolangciLint(t, "1.64.8")
+	tools := &fakeTools{paths: map[string]string{"golangci-lint": path}}
+	o := &Orchestrator{prereqs: tools, store: &fakeStore{}, proxy: &fakeProxy{}, cfg: Config{RepoRoot: root}}
+	found := o.probeGolangciLint(context.Background())
+	if !found.Present || !found.Outdated {
+		t.Errorf("a v1.64.8 binary satisfies nothing and must report outdated, got %+v", found)
+	}
+	if !strings.Contains(found.Detail, "1.64.8") || !strings.Contains(found.Detail, "2.11.4") {
+		t.Errorf("the detail must name both versions, got %q", found.Detail)
+	}
+	report := domain.PlanPrereqs(map[string]domain.Found{"golangci-lint": found}, nil, runtime.GOOS)
+	if st := reportEntry(t, report, "golangci-lint"); st.State != domain.PrereqOutdated {
+		t.Errorf("plan state = %v, want outdated", st.State)
+	}
+}
+
+// @scenario "A wrong-version linter is reported outdated, not installed"
+func TestProbeGolangciLintDoesNotCrashWhenTheMakefileLineIsMissing(t *testing.T) {
+	dir := t.TempDir() // no Makefile at all
+	path := fakeGolangciLint(t, "1.64.8")
+	tools := &fakeTools{paths: map[string]string{"golangci-lint": path}}
+	o := &Orchestrator{prereqs: tools, store: &fakeStore{}, proxy: &fakeProxy{}, cfg: Config{RepoRoot: dir}}
+	found := o.probeGolangciLint(context.Background())
+	if !found.Present || found.Outdated {
+		t.Errorf("no pin to compare against must not read as outdated: %+v", found)
+	}
+	if !strings.Contains(found.Detail, "Makefile") {
+		t.Errorf("the reason must say why, got %q", found.Detail)
+	}
+}
+
+// @scenario "A wrong-version linter is reported outdated, not installed"
+func TestInstallGolangciLintComposesTheGotoolchainPinnedCommand(t *testing.T) {
+	root := fakeRepoRoot(t, "2.11.4", "1.26.6")
+	tools := &fakeTools{}
+	o := &Orchestrator{prereqs: tools, store: &fakeStore{}, proxy: &fakeProxy{}, cfg: Config{RepoRoot: root}}
+	if err := o.installGolangciLint(context.Background()); err != nil {
+		t.Fatalf("installGolangciLint: %v", err)
+	}
+	if len(tools.ran) != 1 {
+		t.Fatalf("expected one install command, got %v", tools.ran)
+	}
+	want := "env GOTOOLCHAIN=go1.26.6 go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.11.4"
+	if tools.ran[0] != want {
+		t.Errorf("got %q, want %q", tools.ran[0], want)
+	}
+}
+
+// A `--yes` run edits nothing but PATH-visible installs. golangci-lint is
+// Internal like haven-path, so it must not be picked up automatically.
+func TestAutoPrereqsNeverInstallsGolangciLintSilently(t *testing.T) {
+	report := domain.PlanPrereqs(map[string]domain.Found{}, nil, runtime.GOOS)
+	for _, c := range AutoPrereqs(report) {
+		if c.Key == "golangci-lint" {
+			t.Errorf("golangci-lint must never be chosen automatically, got %v", c)
+		}
+	}
+}
+
+func reportEntry(t *testing.T, report []domain.PrereqStatus, key string) domain.PrereqStatus {
+	t.Helper()
+	for _, st := range report {
+		if st.Key == key {
+			return st
+		}
+	}
+	t.Fatalf("no %q in the report", key)
+	return domain.PrereqStatus{}
+}
+
+// @scenario "A small macOS accept queue is reported and haven self install sets it"
+func TestSomaxconnBelowTheFloorIsMissingWithTheSysctlFix(t *testing.T) {
+	cases := []struct {
+		value       string
+		wantMissing bool
+	}{{"128", true}, {"1024", false}, {"", false}}
+	for _, tc := range cases {
+		tools := &fakeTools{}
+		if tc.value != "" {
+			tools.sysctl = map[string]string{"kern.ipc.somaxconn": tc.value}
+		}
+		o := installOrchestrator(tools, &fakeStore{}, nil)
+		var st domain.PrereqStatus
+		for _, s := range o.CheckPrereqs(context.Background()) {
+			if s.Key == "somaxconn" {
+				st = s
+			}
+		}
+		if got := st.State == domain.PrereqMissing; got != tc.wantMissing {
+			t.Errorf("somaxconn=%q: missing = %v, want %v (state %v)", tc.value, got, tc.wantMissing, st.State)
+		}
+	}
+	c, _ := domain.LookupCandidate(prereqByKey(t, "somaxconn"), "somaxconn")
+	for _, want := range []string{"sudo sysctl -w kern.ipc.somaxconn=1024", "/etc/sysctl.conf"} {
+		if !strings.Contains(c.Install, want) {
+			t.Errorf("install = %q, want it to contain %q", c.Install, want)
+		}
+	}
+}
+
+func prereqByKey(t *testing.T, key string) domain.Prereq {
+	t.Helper()
+	for _, p := range domain.Prereqs {
+		if p.Key == key {
+			return p
+		}
+	}
+	t.Fatalf("no prerequisite %q", key)
+	return domain.Prereq{}
+}
+
+// @scenario "The accept queue is not checked off macOS"
+func TestSomaxconnIsNotApplicableOffDarwin(t *testing.T) {
+	o := installOrchestrator(&fakeTools{}, &fakeStore{}, nil)
+	o.goos = "linux"
+	for _, s := range o.CheckPrereqs(context.Background()) {
+		if s.Key == "somaxconn" && s.State != domain.PrereqNotApplicable {
+			t.Errorf("linux somaxconn state = %v, want not applicable", s.State)
+		}
+	}
+}
+
+// @scenario "A failed recommended install does not stop the run"
+func TestInstallPrereqsCarriesOnPastAFailedRecommendedRow(t *testing.T) {
+	tools := &fakeTools{failOn: "loki"}
+	o := installOrchestrator(tools, &fakeStore{}, &fakeProxy{})
+	var out bytes.Buffer
+	_, err := o.installPrereqsTo(context.Background(), &out, []domain.Chosen{
+		{Key: "observability", Candidate: "observability"},
+		{Key: "runtime", Candidate: "colima"},
+	})
+	if err != nil {
+		t.Fatalf("a failed recommended row must not fail the run: %v", err)
+	}
+	if len(tools.ran) != 2 || !strings.Contains(tools.ran[1], "colima") {
+		t.Errorf("ran %v, want the runtime install after the failed observability row", tools.ran)
+	}
+	if !strings.Contains(out.String(), "not installed") || !strings.Contains(out.String(), "observability") {
+		t.Errorf("the summary must name the failed row, got %q", out.String())
+	}
+}

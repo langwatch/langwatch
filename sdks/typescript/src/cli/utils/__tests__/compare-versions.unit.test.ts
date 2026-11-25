@@ -1,8 +1,7 @@
 /**
- * The version ordering two callers depend on: the copilot version gate, which
- * warns below a floor, and the Claude Code plugin update, which only moves an
- * installed copy forward. Both read the SIGN, so the cases that matter are the
- * ones where a naive string comparison would disagree with a numeric one.
+ * The version ordering two callers depend on (copilot's floor gate; the
+ * plugin update's forward-only move) -- both read the SIGN, so what matters
+ * is where a naive string compare would disagree with a numeric one.
  */
 
 import { describe, expect, it } from "vitest";

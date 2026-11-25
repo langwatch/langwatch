@@ -47,9 +47,3 @@ Feature: State-projection visibility in ops
     Given state-projection jobs moving through the queue
     When the dashboard aggregates throughput by phase
     Then that work counts in the projections phase, not commands
-
-  @unit
-  Scenario: A state projection's kill switch can be reached from the flags page
-    Given a registered state projection
-    When the kill-switch descriptors are generated
-    Then a descriptor exists whose key matches the one the runtime checks

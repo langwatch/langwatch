@@ -31,7 +31,7 @@ func govern(o *Orchestrator) {
 // twoStacks returns a focused stack (most recently updated, so first) and an
 // unfocused one behind it, both live.
 func twoStacks() (*fakeStore, *fakeSystem) {
-	store := &fakeStore{stacks: []domain.Stack{
+	store := &fakeStore{focus: "focused", stacks: []domain.Stack{
 		{Slug: "focused", LauncherPID: 100},
 		{Slug: "background", LauncherPID: 200},
 	}}
@@ -126,7 +126,7 @@ func TestGovernorDemotesEveryStackButTheFocusedOne(t *testing.T) {
 func TestGovernorNeverSignalsAZeroLauncher(t *testing.T) {
 	t.Run("given a registered stack whose launcher pid was never recorded", func(t *testing.T) {
 		newStore := func() *fakeStore {
-			return &fakeStore{stacks: []domain.Stack{
+			return &fakeStore{focus: "focused", stacks: []domain.Stack{
 				{Slug: "focused", LauncherPID: 100},
 				{Slug: "unrecorded", LauncherPID: 0},
 			}}
@@ -168,7 +168,7 @@ func TestGovernorNamesTheWorstOffenderWithoutStoppingIt(t *testing.T) {
 	t.Run("given pressure is red", func(t *testing.T) {
 		store, sys := twoStacks()
 		sys.memStat = domain.MemStat{
-			TotalBytes: 18 * testGiB, SwapUsedBytes: 3900 * (1 << 20), SwapTotalBytes: 4 * testGiB,
+			TotalBytes: 18 * testGiB, CompressedBytes: 4 * testGiB, SwapUsedBytes: 3900 * (1 << 20), SwapTotalBytes: 4 * testGiB,
 		}
 
 		t.Run("when the daemon completes a tick", func(t *testing.T) {

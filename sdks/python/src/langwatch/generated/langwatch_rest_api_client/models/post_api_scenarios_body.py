@@ -1,12 +1,19 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import Any, TypeVar, cast
+from typing import TYPE_CHECKING, Any, TypeVar, cast
 
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
 
+from ..models.post_api_scenarios_body_kind import PostApiScenariosBodyKind
 from ..types import UNSET, Unset
+
+if TYPE_CHECKING:
+    from ..models.post_api_scenarios_body_fields import PostApiScenariosBodyFields
+    from ..models.post_api_scenarios_body_parameters_item import PostApiScenariosBodyParametersItem
+    from ..models.post_api_scenarios_body_red_team import PostApiScenariosBodyRedTeam
+
 
 T = TypeVar("T", bound="PostApiScenariosBody")
 
@@ -19,12 +26,49 @@ class PostApiScenariosBody:
         situation (str):
         criteria (list[str] | Unset):
         labels (list[str] | Unset):
+        parameters (list[PostApiScenariosBodyParametersItem] | Unset): The parameters this scenario declares by name,
+            each with an optional description and default. A run supplies values for these names, readable from the
+            scenario's own text as params.NAME. A parameter marked secret carries no default: its value is supplied per run,
+            encrypted, delivered to the target as secrets.NAME, and never readable from the scenario's own text.
+        simulator_model (None | str | Unset): Model for the simulated user, e.g. openai/gpt-6-luna. Null uses the
+            project default.
+        judge_model (None | str | Unset): Model for the judge, e.g. openai/gpt-6-luna. Null uses the project default.
+        trace_quiet_period_ms (int | None | Unset): Milliseconds (0 to 60000) the agent's trace must stay unchanged
+            before the judge reads it. Null uses the project's recommendation.
+        trace_wait_timeout_ms (int | None | Unset): Milliseconds (1000 to 300000) the judge waits for the agent's trace
+            before a verdict. Null uses the project's recommendation.
+        max_turns (int | None | Unset): Maximum conversation turns for a run of this scenario. Null uses the default.
+        min_turns (int | None | Unset): Minimum conversation turns before the judge may end the run. Null uses the
+            default.
+        test_suite_id (None | str | Unset): The test suite to file this scenario in. It must name a non-archived test
+            suite of the same project. null files the scenario into the project's Default test suite.
+        fields (PostApiScenariosBodyFields | Unset): The value for each field the test suite declares, keyed by field
+            identifier: text, a number or a boolean, in the field's own type. A field the suite does not declare answers 422
+            scenario_field_unknown; a value of the wrong type answers 422 scenario_field_type_invalid. An empty value clears
+            the field.
+        kind (PostApiScenariosBodyKind | Unset): Absent or "standard" plays a user simulator. "red_team" plays an
+            attacker and requires redTeam; a standard scenario with redTeam answers 422 scenario_red_team_config_mismatch.
+        red_team (PostApiScenariosBodyRedTeam | Unset): The attack a red_team scenario plays: goal, OWASP ids, strategy
+            and turn budget.
+        source_template_id (Any | Unset): Refused: only applying a suite template marks a scenario with its template.
     """
 
     name: str
     situation: str
     criteria: list[str] | Unset = UNSET
     labels: list[str] | Unset = UNSET
+    parameters: list[PostApiScenariosBodyParametersItem] | Unset = UNSET
+    simulator_model: None | str | Unset = UNSET
+    judge_model: None | str | Unset = UNSET
+    trace_quiet_period_ms: int | None | Unset = UNSET
+    trace_wait_timeout_ms: int | None | Unset = UNSET
+    max_turns: int | None | Unset = UNSET
+    min_turns: int | None | Unset = UNSET
+    test_suite_id: None | str | Unset = UNSET
+    fields: PostApiScenariosBodyFields | Unset = UNSET
+    kind: PostApiScenariosBodyKind | Unset = UNSET
+    red_team: PostApiScenariosBodyRedTeam | Unset = UNSET
+    source_template_id: Any | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -40,6 +84,69 @@ class PostApiScenariosBody:
         if not isinstance(self.labels, Unset):
             labels = self.labels
 
+        parameters: list[dict[str, Any]] | Unset = UNSET
+        if not isinstance(self.parameters, Unset):
+            parameters = []
+            for parameters_item_data in self.parameters:
+                parameters_item = parameters_item_data.to_dict()
+                parameters.append(parameters_item)
+
+        simulator_model: None | str | Unset
+        if isinstance(self.simulator_model, Unset):
+            simulator_model = UNSET
+        else:
+            simulator_model = self.simulator_model
+
+        judge_model: None | str | Unset
+        if isinstance(self.judge_model, Unset):
+            judge_model = UNSET
+        else:
+            judge_model = self.judge_model
+
+        trace_quiet_period_ms: int | None | Unset
+        if isinstance(self.trace_quiet_period_ms, Unset):
+            trace_quiet_period_ms = UNSET
+        else:
+            trace_quiet_period_ms = self.trace_quiet_period_ms
+
+        trace_wait_timeout_ms: int | None | Unset
+        if isinstance(self.trace_wait_timeout_ms, Unset):
+            trace_wait_timeout_ms = UNSET
+        else:
+            trace_wait_timeout_ms = self.trace_wait_timeout_ms
+
+        max_turns: int | None | Unset
+        if isinstance(self.max_turns, Unset):
+            max_turns = UNSET
+        else:
+            max_turns = self.max_turns
+
+        min_turns: int | None | Unset
+        if isinstance(self.min_turns, Unset):
+            min_turns = UNSET
+        else:
+            min_turns = self.min_turns
+
+        test_suite_id: None | str | Unset
+        if isinstance(self.test_suite_id, Unset):
+            test_suite_id = UNSET
+        else:
+            test_suite_id = self.test_suite_id
+
+        fields: dict[str, Any] | Unset = UNSET
+        if not isinstance(self.fields, Unset):
+            fields = self.fields.to_dict()
+
+        kind: str | Unset = UNSET
+        if not isinstance(self.kind, Unset):
+            kind = self.kind.value
+
+        red_team: dict[str, Any] | Unset = UNSET
+        if not isinstance(self.red_team, Unset):
+            red_team = self.red_team.to_dict()
+
+        source_template_id = self.source_template_id
+
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
         field_dict.update(
@@ -52,11 +159,39 @@ class PostApiScenariosBody:
             field_dict["criteria"] = criteria
         if labels is not UNSET:
             field_dict["labels"] = labels
+        if parameters is not UNSET:
+            field_dict["parameters"] = parameters
+        if simulator_model is not UNSET:
+            field_dict["simulatorModel"] = simulator_model
+        if judge_model is not UNSET:
+            field_dict["judgeModel"] = judge_model
+        if trace_quiet_period_ms is not UNSET:
+            field_dict["traceQuietPeriodMs"] = trace_quiet_period_ms
+        if trace_wait_timeout_ms is not UNSET:
+            field_dict["traceWaitTimeoutMs"] = trace_wait_timeout_ms
+        if max_turns is not UNSET:
+            field_dict["maxTurns"] = max_turns
+        if min_turns is not UNSET:
+            field_dict["minTurns"] = min_turns
+        if test_suite_id is not UNSET:
+            field_dict["testSuiteId"] = test_suite_id
+        if fields is not UNSET:
+            field_dict["fields"] = fields
+        if kind is not UNSET:
+            field_dict["kind"] = kind
+        if red_team is not UNSET:
+            field_dict["redTeam"] = red_team
+        if source_template_id is not UNSET:
+            field_dict["sourceTemplateId"] = source_template_id
 
         return field_dict
 
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
+        from ..models.post_api_scenarios_body_fields import PostApiScenariosBodyFields
+        from ..models.post_api_scenarios_body_parameters_item import PostApiScenariosBodyParametersItem
+        from ..models.post_api_scenarios_body_red_team import PostApiScenariosBodyRedTeam
+
         d = dict(src_dict)
         name = d.pop("name")
 
@@ -66,11 +201,118 @@ class PostApiScenariosBody:
 
         labels = cast(list[str], d.pop("labels", UNSET))
 
+        _parameters = d.pop("parameters", UNSET)
+        parameters: list[PostApiScenariosBodyParametersItem] | Unset = UNSET
+        if _parameters is not UNSET:
+            parameters = []
+            for parameters_item_data in _parameters:
+                parameters_item = PostApiScenariosBodyParametersItem.from_dict(parameters_item_data)
+
+                parameters.append(parameters_item)
+
+        def _parse_simulator_model(data: object) -> None | str | Unset:
+            if data is None:
+                return data
+            if isinstance(data, Unset):
+                return data
+            return cast(None | str | Unset, data)
+
+        simulator_model = _parse_simulator_model(d.pop("simulatorModel", UNSET))
+
+        def _parse_judge_model(data: object) -> None | str | Unset:
+            if data is None:
+                return data
+            if isinstance(data, Unset):
+                return data
+            return cast(None | str | Unset, data)
+
+        judge_model = _parse_judge_model(d.pop("judgeModel", UNSET))
+
+        def _parse_trace_quiet_period_ms(data: object) -> int | None | Unset:
+            if data is None:
+                return data
+            if isinstance(data, Unset):
+                return data
+            return cast(int | None | Unset, data)
+
+        trace_quiet_period_ms = _parse_trace_quiet_period_ms(d.pop("traceQuietPeriodMs", UNSET))
+
+        def _parse_trace_wait_timeout_ms(data: object) -> int | None | Unset:
+            if data is None:
+                return data
+            if isinstance(data, Unset):
+                return data
+            return cast(int | None | Unset, data)
+
+        trace_wait_timeout_ms = _parse_trace_wait_timeout_ms(d.pop("traceWaitTimeoutMs", UNSET))
+
+        def _parse_max_turns(data: object) -> int | None | Unset:
+            if data is None:
+                return data
+            if isinstance(data, Unset):
+                return data
+            return cast(int | None | Unset, data)
+
+        max_turns = _parse_max_turns(d.pop("maxTurns", UNSET))
+
+        def _parse_min_turns(data: object) -> int | None | Unset:
+            if data is None:
+                return data
+            if isinstance(data, Unset):
+                return data
+            return cast(int | None | Unset, data)
+
+        min_turns = _parse_min_turns(d.pop("minTurns", UNSET))
+
+        def _parse_test_suite_id(data: object) -> None | str | Unset:
+            if data is None:
+                return data
+            if isinstance(data, Unset):
+                return data
+            return cast(None | str | Unset, data)
+
+        test_suite_id = _parse_test_suite_id(d.pop("testSuiteId", UNSET))
+
+        _fields = d.pop("fields", UNSET)
+        fields: PostApiScenariosBodyFields | Unset
+        if isinstance(_fields, Unset):
+            fields = UNSET
+        else:
+            fields = PostApiScenariosBodyFields.from_dict(_fields)
+
+        _kind = d.pop("kind", UNSET)
+        kind: PostApiScenariosBodyKind | Unset
+        if isinstance(_kind, Unset):
+            kind = UNSET
+        else:
+            kind = PostApiScenariosBodyKind(_kind)
+
+        _red_team = d.pop("redTeam", UNSET)
+        red_team: PostApiScenariosBodyRedTeam | Unset
+        if isinstance(_red_team, Unset):
+            red_team = UNSET
+        else:
+            red_team = PostApiScenariosBodyRedTeam.from_dict(_red_team)
+
+        source_template_id = d.pop("sourceTemplateId", UNSET)
+
         post_api_scenarios_body = cls(
             name=name,
             situation=situation,
             criteria=criteria,
             labels=labels,
+            parameters=parameters,
+            simulator_model=simulator_model,
+            judge_model=judge_model,
+            trace_quiet_period_ms=trace_quiet_period_ms,
+            trace_wait_timeout_ms=trace_wait_timeout_ms,
+            max_turns=max_turns,
+            min_turns=min_turns,
+            test_suite_id=test_suite_id,
+            fields=fields,
+            kind=kind,
+            red_team=red_team,
+            source_template_id=source_template_id,
         )
 
         post_api_scenarios_body.additional_properties = d

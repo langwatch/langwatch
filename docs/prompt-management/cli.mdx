@@ -4,7 +4,7 @@ description: "Use the LangWatch Prompts CLI to manage prompts as code with versi
 ---
 
 <Tip>
-  **Automated setup available.** [Copy the prompts skill prompt](/skills/code-prompts#version-my-prompts) into your coding agent to set up prompt versioning automatically.
+  **Automated setup available.** [Copy the prompts skill prompt](/skills/directory) into your coding agent to set up prompt versioning automatically.
 </Tip>
 
 The `langwatch prompt` command provides dependency management for AI prompts as plain YAML files, enabling you to version prompts locally with Git while synchronizing with the LangWatch platform for testing, evaluation, and team collaboration.
@@ -153,6 +153,7 @@ The SDK loads prompts dynamically at runtime, and fetches both kinds from LangWa
 For production deployments, the CLI materializes prompts locally so you have a complete snapshot of all dependencies. The SDK can automatically use these materialized prompts for [guaranteed availability](/prompt-management/features/advanced/guaranteed-availability) in offline or air-gapped environments. However, when online, the SDK always fetches the latest version from the server unless you specify a version.
 
 Learn more about [guaranteed availability and offline deployments](/prompt-management/features/advanced/guaranteed-availability).
+
 </Info>
 
 ### Loading Specific Versions
@@ -169,6 +170,7 @@ prompt = langwatch.prompts.get("my-summarizer", version=5)
 // Get a specific version
 const prompt = await langwatch.prompts.get("my-summarizer", { version: 5 });
 ```
+
 </CodeGroup>
 
 ### Prompt Variables
@@ -203,13 +205,15 @@ const compiled = prompt.compile({
   role: "customer support",
   user_name: "John Doe",
   context: "Premium user since 2020",
-  user_input: "I need help with my account"
+  user_input: "I need help with my account",
 });
 ```
+
 </CodeGroup>
 
 <Check>
-The compiled prompt contains fully rendered messages ready to send to your LLM provider, with all variables replaced and the correct model configuration applied.
+  The compiled prompt contains fully rendered messages ready to send to your LLM provider, with all
+  variables replaced and the correct model configuration applied.
 </Check>
 
 ## Core Concepts
@@ -264,7 +268,7 @@ The CLI uses two configuration files:
 Prompts files end with `.prompt.yaml` extension and follow this format:
 
 ```yaml
-model: openai/gpt-5.5
+model: openai/gpt-6-luna
 modelParameters:
   max_tokens: 1000
 messages:
@@ -363,7 +367,7 @@ langwatch prompt sync
 **Conflict Resolution:**
 When local and remote versions have both changed:
 
-```
+```text
 Conflict detected for my-prompt:
 Local changes: Updated system message
 Remote changes: Added temperature parameter
@@ -539,7 +543,7 @@ Since prompts are just YAML files, you refer to them directly from other tools o
 
 Reference prompts in a `.cursor/rules/*.mdc` file:
 
-```yaml
+```markdown
 ---
 description:
 globs:

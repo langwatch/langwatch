@@ -8,7 +8,7 @@
 what shipped and what turned out to be wrong.
 
 **Builds on:** the `@langwatch/langy/cards` contract (one card per result
-*shape*, shared by the CLI and the Langy panel so the two can never disagree
+_shape_, shared by the CLI and the Langy panel so the two can never disagree
 about what a command produced), and the capability catalog / registry that binds
 a view to each CLI resource.
 
@@ -29,10 +29,10 @@ run — and the card is chosen from the command's **name**:
 ```ts
 // packages/langy/src/cards/tool-result.ts
 export function toCliToolResult({ resource, verb, payload }) {
-  const card = cardKindFor({ resource, verb });   // name only
+  const card = cardKindFor({ resource, verb }); // name only
   const parsed = schemaByCard[card].safeParse(payload);
   if (parsed.success) return { kind: "card", card, payload: parsed.data };
-  return { kind: "json", payload };               // soft-fail to a raw receipt
+  return { kind: "json", payload }; // soft-fail to a raw receipt
 }
 ```
 
@@ -44,7 +44,7 @@ event log, the Redis live edge, the browser and the CLI's own terminal rendering
 all inherit that one decision. Nothing downstream re-decides.
 
 **It already holds the payload, and ignores it.** The choice is made from
-`resource` and `verb`; `payload` is only used to *validate* the pre-chosen card.
+`resource` and `verb`; `payload` is only used to _validate_ the pre-chosen card.
 So a result can arrive full of summable cost or a chartable time series and still
 render as a generic table because of what the command was called.
 
@@ -90,8 +90,8 @@ non-determinism wearing a deterministic mask.
 
 This is not novel and we will not pretend it is. Automated visualisation
 recommendation solved "this data shape wants this view" decades ago —
-Mackinlay's *Show Me* ranks every eligible view against expressiveness and
-effectiveness criteria; UW's *Draco* encodes design knowledge as hard and soft
+Mackinlay's _Show Me_ ranks every eligible view against expressiveness and
+effectiveness criteria; UW's _Draco_ encodes design knowledge as hard and soft
 constraints and returns a ranked recommendation. First-match `if`-chains are the
 thing both papers exist to replace.
 
@@ -160,8 +160,8 @@ Apps SDK, MCP Apps, Google's A2UI, CopilotKit — all landed on a fixed,
 developer-owned registry in which the model contributes at most a discriminator
 and data.
 
-The AI SDK detail is worth stating because the term misleads: *the model picks a
-**tool**; the developer binds the **component**.* Its own documentation defines
+The AI SDK detail is worth stating because the term misleads: _the model picks a
+**tool**; the developer binds the **component**._ Its own documentation defines
 generative UI as "connecting the results of a tool call to a React component",
 and the RSC variant that streams model-chosen UI carries a standing
 "experimental — use AI SDK UI for production" warning with concrete defects.
@@ -172,8 +172,8 @@ Anthropic's own surfaces argue the same way. Artifacts are chosen by
 content-property heuristics — self-contained, over roughly fifteen lines,
 worth reusing outside the conversation — which is a payload-shape test over a
 closed type set. MCP Apps pre-declares UI templates as resources referenced from
-*tool metadata*, chosen by the tool author, justified explicitly so that hosts
-can prefetch and review a template *before* the tool runs — a property that is
+_tool metadata_, chosen by the tool author, justified explicitly so that hosts
+can prefetch and review a template _before_ the tool runs — a property that is
 unobtainable if the model chooses.
 
 ### Why not let the model choose
@@ -184,7 +184,7 @@ Three independent reasons, each sufficient on its own:
 `cardKind` enum is the weakest case for them.** Anthropic's documentation states
 that enum casing is not guaranteed, and that both a refusal and a `max_tokens`
 stop leave the output outside the schema. Structured outputs would make a model's
-card choice *parseable*; they would not make it *correct*.
+card choice _parseable_; they would not make it _correct_.
 
 **Temperature 0 does not buy determinism.** Non-determinism in LLM inference
 arises from batch-invariance in reduction kernels — output depends on server-side
@@ -197,7 +197,7 @@ benchmarks find the dominant error class is choosing the wrong item, and that
 accuracy degrades with catalogue size and with semantic adjacency. Our cards are
 adjacent by construction — `spend`, `usage`, `cost-breakdown`, `series`. Worse,
 the CLI's JSON is **tenant-controlled data**: routing it into a model that
-decides presentation means a tenant can author a record whose *content* steers
+decides presentation means a tenant can author a record whose _content_ steers
 which card, and therefore which affordances, a user is shown. A deterministic
 probe is also influenceable, but its blast radius is bounded to one of N
 pre-vetted, pre-styled cards, and no attacker-authored string ever becomes
@@ -206,7 +206,7 @@ component identity.
 ### What we give up
 
 A model would be better than a ranking function at one thing: choosing between
-two *equally* eligible presentations based on what the user actually asked. "What
+two _equally_ eligible presentations based on what the user actually asked. "What
 did this cost?" and "show me the errors" over the same trace list want different
 headline cards, and that intent lives in the prompt, not the JSON.
 
@@ -229,14 +229,14 @@ input render the same card twice. Selection accuracy under semantic adjacency is
 a capability limit, not an instruction-clarity limit.
 
 **And we have already run the experiment.** `AGENTS.md` rule 12 forbids narrating
-a tool call and lists, verbatim, the banned opener *"Using the analytics skill
-to..."*. Langy emitted *"Using the agent-performance skill to search recent
-traces."* The rule was present, specific, and exemplified; it was violated anyway,
+a tool call and lists, verbatim, the banned opener _"Using the analytics skill
+to..."_. Langy emitted _"Using the agent-performance skill to search recent
+traces."_ The rule was present, specific, and exemplified; it was violated anyway,
 and the fix that shipped was deterministic client-side stripping
 (`logic/langyToolNarration.ts`). A more editable copy of that file would have
 changed nothing — the rule was already right.
 
-What editability genuinely improves is the *other* half of this ADR. Both
+What editability genuinely improves is the _other_ half of this ADR. Both
 `langwatch present` (§5) and a `--view` intent argument (§7) depend on the model
 knowing when to reach for them, which is exactly a prompt rule, and cheap
 iteration is what makes them practical. Editability therefore strengthens **what
@@ -250,8 +250,8 @@ exists; these rules must actually use it.
 
 Finally, the customer-facing reading points the same way. If a tenant could edit
 the prompt that decides presentation, card selection would become tenant-
-controlled UI selection — upgrading the injection concern from "tenant *data*
-influences the card" to "tenant *configuration* controls it". ADR-050 already
+controlled UI selection — upgrading the injection concern from "tenant _data_
+influences the card" to "tenant _configuration_ controls it". ADR-050 already
 forecloses this (the agent definition is deployment-global; `PromptScope` has no
 global tier), but that is currently a consequence of the schema rather than a
 stated safety property, and it should be treated as the latter.
@@ -286,7 +286,7 @@ envelope, and then the renderer derived the card AGAIN from the command's name
 (`cardKindFor`) and required the two to be equal, dropping the call when they
 were not. Promotion's defining property is that the promoted card differs from
 the name's, so every promotion failed that check and the call vanished from the
-capability stream — the mechanism could only ever *remove* a card, never improve
+capability stream — the mechanism could only ever _remove_ a card, never improve
 one. "Nothing downstream re-decides" was stated here as a property of the
 transport; it was not a property of the code. It is now a rule with a name:
 the descriptor is re-seated on the envelope's card (`withDecidedCard`), the
@@ -367,10 +367,10 @@ payload through the envelope and into a rendered card**
   https://github.com/google/A2UI
 - CopilotKit — the controlled / declarative / open-ended spectrum:
   https://docs.copilotkit.ai/concepts/generative-ui-overview
-- Visualisation recommendation as ranked eligibility — *Show Me*
+- Visualisation recommendation as ranked eligibility — _Show Me_
   (Mackinlay, Hanrahan, Stolte, InfoVis 2007):
   https://www.tableau.com/whitepapers/show-me-automatic-presentation-visual-analysis ·
-  *Draco*: https://idl.cs.washington.edu/files/2019-Draco-InfoVis.pdf
+  _Draco_: https://idl.cs.washington.edu/files/2019-Draco-InfoVis.pdf
 - Airbnb server-driven UI (discriminator + closed union + client registry):
   https://medium.com/airbnb-engineering/a-deep-dive-into-airbnbs-server-driven-ui-system-842244c5f5
 
@@ -385,6 +385,6 @@ rather than the primary Airbnb post.
 
 More importantly: **no published post-mortem was found of a team shipping
 model-chosen components and reverting.** The convergence argument here is
-*architectural* — what the protocols permit and what their authors say about why
-— not *empirical*. That is a real gap in the evidence and this ADR should not be
+_architectural_ — what the protocols permit and what their authors say about why
+— not _empirical_. That is a real gap in the evidence and this ADR should not be
 read as claiming otherwise.

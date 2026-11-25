@@ -13,9 +13,10 @@ Feature: Seat subscription provisions an organization retention policy
   # under scenarios), so the entitlement is recorded rather than implied — it
   # survives any future lowering of the platform default that an org without an
   # override would otherwise drift down to. Provisioning is idempotent (one
-  # override per scope + category) and is a best-effort side effect: a retention
-  # failure is logged, never raised, so it can never fail the Stripe webhook and
-  # leave the subscription stuck PENDING.
+  # override per scope + category) and data-retention applies it from billing's
+  # subscription_started fact (round 37 D4): a retention failure is retried on
+  # data-retention's side and can never fail the Stripe webhook or leave the
+  # subscription stuck PENDING.
 
   Background:
     Given an organization with no retention override
@@ -44,6 +45,46 @@ Feature: Seat subscription provisions an organization retention policy
     And provisioning the retention policy will fail
     When the subscription is activated by a successful payment
     Then the activation still completes and the confirmation notification is sent
+
+  # Retention is stamped on every stored row when it is written, so a longer
+  # policy alone would still expire what the organization already holds. The
+  # activation records a retention_extended fact; one command per project and
+  # category then raises the stored rows to the project's resolved retention
+  # and records retention_applied. Raising is non-destructive, so it runs
+  # without asking; a row already kept longer, or kept forever, is never
+  # shortened.
+
+  @unit
+  Scenario: Upgrading extends retention of stored traces
+    Given a Free organization whose two projects hold traces stamped for 14 days
+    When a Growth Seat subscription that keeps traces for 90 days is activated
+    Then a retention extended fact is recorded for the organization
+    And every project's stored data is raised to its resolved retention, one applied fact per project and category
+
+  @integration
+  Scenario: Upgrading re-stamps stored rows to the longer retention
+    Given a project whose stored spans are stamped to expire after 14 days
+    When a Growth Seat subscription that keeps traces for 90 days is activated
+    Then those stored spans are stamped to expire after 90 days
+
+  @integration
+  Scenario: Upgrading never shortens stored rows kept longer
+    Given a project with stored spans stamped for 365 days and spans kept forever
+    When a Growth Seat subscription that keeps traces for 90 days is activated
+    Then the spans stamped for 365 days keep 365 days and the spans kept forever stay kept forever
+
+  @unit
+  Scenario: A failed re-stamp of stored data is retried and never fails the upgrade
+    Given re-stamping a project's stored traces fails the first time
+    When a Growth Seat subscription is activated
+    Then the organization policies are still provisioned
+    And the re-stamp is retried until the applied fact is recorded once
+
+  @unit
+  Scenario: A redelivered activation records the extension once
+    Given a Growth Seat activation that was already applied to stored data
+    When the same activation fact is delivered again
+    Then no second retention extended fact is recorded
 
   # Activating a self-hosted license is the second paid entry point and
   # provisions the same organization-scoped policies — but create-if-absent
@@ -82,3 +123,36 @@ Feature: Seat subscription provisions an organization retention policy
     Given an organization whose only active subscription is cancelled
     When the cancellation is finalized
     Then the organization-scoped retention policies are left in place
+
+  # seat-event-subscription.service.ts, customer.service.ts,
+  # currency.service.ts, stripe-customer-currency.service.ts
+
+  @unit @unimplemented
+  Scenario: Adding a member raises the billed seat count
+    Given an organization billed for three seats
+    When a fourth member is added
+    Then Stripe is told the organization now holds four seats
+
+  @unit @unimplemented
+  Scenario: A seat sync for an organization with no subscription is a no-op
+    Given an organization that has never subscribed
+    When its seats are synced
+    Then nothing is sent to Stripe and no error reaches the caller
+
+  @unit @unimplemented
+  Scenario: A seat sync that Stripe rejects reports a named failure
+    Given an organization whose Stripe customer no longer exists
+    When its seats are synced
+    Then the sync fails with a handled error naming the missing customer, not an unknown error
+
+  @unit @unimplemented
+  Scenario: A customer in a euro country is created in euros
+    Given a new customer whose billing country uses the euro
+    When the Stripe customer is created
+    Then its currency is EUR and every later price is quoted in EUR
+
+  @unit @unimplemented
+  Scenario: An existing customer's currency is never rewritten
+    Given a Stripe customer already transacting in dollars
+    When the organization's billing country changes to a euro country
+    Then the customer keeps its dollar currency

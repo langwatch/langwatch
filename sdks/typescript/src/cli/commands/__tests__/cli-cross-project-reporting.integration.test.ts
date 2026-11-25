@@ -1,11 +1,14 @@
 /**
- * How the CLI answers a `--project` it cannot resolve, and how it reports the
- * reach of the login key: `projects list` and `whoami`.
- *
+ * How the CLI answers a `--project` it cannot resolve, and how it reports
+ * the reach of the login key: `projects list` and `whoami`.
  * Feature: specs/typescript-sdk/cli-cross-project-access.feature
  */
-import { readCliErrorDocument } from "@langwatch/langy/cards/handled-error";
+import {
+  type LangWatchHandledErrorShape,
+  readCliErrorDocument,
+} from "@langwatch/handled-error/langwatch-handled-error";
 import { describe, expect, it } from "vitest";
+
 import {
   installCrossProjectHarness,
   LOGIN_KEY,
@@ -14,6 +17,13 @@ import {
   PERSONAL_PROJECT,
   PERSONAL_PROJECT_ROW,
 } from "./crossProjectAccessHarness";
+
+/** The CLI error document stdout carried; these cases all expect one. */
+function cliErrorDocument(output: unknown): LangWatchHandledErrorShape {
+  const read = readCliErrorDocument(output);
+  if (read.kind !== "error") throw new Error("stdout held no CLI error document");
+  return read.error;
+}
 
 const { writeSession, run, recorded } = installCrossProjectHarness();
 
@@ -40,7 +50,7 @@ describe("given a login that minted a user-scoped CLI key", () => {
       });
 
       expect(result.exitCode).not.toBe(0);
-      const document = readCliErrorDocument(result.stdout);
+      const document = cliErrorDocument(result.stdout);
       expect(document?.code).toBe("project_not_accessible");
       expect(document?.meta?.project).toBe("someone-elses");
       expect(result.stderr).toContain("someone-elses");
@@ -61,9 +71,7 @@ describe("given a login that minted a user-scoped CLI key", () => {
       });
 
       expect(result.exitCode).not.toBe(0);
-      expect(result.stderr).toContain(
-        'no accessible project matches "does-not-exist"',
-      );
+      expect(result.stderr).toContain('no accessible project matches "does-not-exist"');
       expect(recorded.searchAuth).toBeNull();
     });
   });
@@ -94,6 +102,34 @@ describe("given a login that minted a user-scoped CLI key", () => {
       expect(result.exitCode).toBe(0);
       expect(result.stdout).toContain("Organization: Acme");
       expect(result.stdout).toContain("Login key:    whole organization");
+    });
+
+    /** @scenario "whoami states the login key's permissions" */
+    it("lists the permission slugs the key was minted with", async () => {
+      writeSession({
+        cli_api_key: LOGIN_KEY,
+        cli_api_key_scope: {
+          ...ORG_WIDE_SCOPE,
+          permissions: ["scenarios:manage", "prompts:view"],
+        },
+      });
+
+      const result = await run({ args: ["whoami"] });
+
+      expect(result.exitCode).toBe(0);
+      expect(result.stdout).toContain("Permissions:  prompts:view, scenarios:manage");
+    });
+
+    /** @scenario "whoami stays silent about permissions the login never recorded" */
+    it("prints no permissions line when the login predates the field", async () => {
+      loginWithOrgWideKey();
+
+      const result = await run({ args: ["whoami"] });
+
+      // The exit code first: an absence assertion on stdout also holds when
+      // the command failed and printed nothing at all.
+      expect(result.exitCode).toBe(0);
+      expect(result.stdout).not.toContain("Permissions:");
     });
 
     it("counts the projects when the key covers a subset", async () => {

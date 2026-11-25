@@ -1,10 +1,13 @@
 import chalk from "chalk";
-import { createSpinner } from "../../utils/spinner";
+
 import { ScenariosApiService } from "@/client-sdk/services/scenarios";
 import type { ScenarioResponse } from "@/client-sdk/services/scenarios";
+
 import { resolveCredentials } from "../../utils/apiKey";
-import { failSpinner } from "../../utils/spinnerError";
 import type { CommandResult } from "../../utils/output";
+import { createSpinner } from "../../utils/spinner";
+import { failSpinner } from "../../utils/spinnerError";
+import { resolveScenarioOrExit } from "./resolveScenario";
 
 const formatScenarioDetails = (scenario: ScenarioResponse): void => {
   console.log();
@@ -38,14 +41,15 @@ const formatScenarioDetails = (scenario: ScenarioResponse): void => {
   console.log();
 };
 
-export const getScenarioCommand = async (id: string): Promise<CommandResult | void> => {
+/** Reads one scenario, named by its id or by its name. */
+export const getScenarioCommand = async (reference: string): Promise<CommandResult | void> => {
   await resolveCredentials();
 
   const service = new ScenariosApiService();
-  const spinner = createSpinner(`Fetching scenario "${id}"...`).start();
+  const spinner = createSpinner(`Fetching scenario "${reference}"...`).start();
 
   try {
-    const scenario = await service.get(id);
+    const scenario = await resolveScenarioOrExit({ reference, service });
     spinner.succeed(`Found scenario "${scenario.name}"`);
     return {
       data: scenario,

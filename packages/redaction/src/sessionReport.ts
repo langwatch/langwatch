@@ -1,43 +1,10 @@
 /**
- * Session-report scrubbing: prepares a coding-agent session transcript (or a
- * free-form summary) for sending to the LangWatch team as an issue report.
- *
- * Everything here runs locally, before anything leaves the machine. Three
- * passes, strongest first:
- *
- *  1. Environment literals: the exact values of environment variables whose
- *     names look sensitive (keys, tokens, secrets, passwords) are removed
- *     wherever they appear, regardless of shape.
- *  2. Credential patterns: the same secret rules the LangWatch platform runs
- *     at ingestion (see `secrets.ts`): provider API keys (sk-...), AWS and
- *     Google keys, GitHub / Slack / Stripe tokens, JWTs, private-key blocks,
- *     connection-URL passwords, bearer tokens. JSON keys with sensitive names
- *     (password, api_key, authorization, cookie, ...) have their whole value
- *     scrubbed.
- *  3. Basic PII patterns: email addresses, phone numbers (international
- *     `+`-prefixed or punctuated formats), credit card numbers (Luhn-checked),
- *     public IPv4 addresses. Loopback, private-range, and link-local addresses
- *     are kept: they identify nobody and are essential to debug local setups.
- *     There is no IPv6 pattern, so a native IPv6 address is sent as written.
- *     An IPv4-mapped one loses its dotted-quad tail to the IPv4 pattern, which
- *     is a side effect rather than IPv6 coverage.
- *
- * Deliberate limits, so reports stay debuggable:
- *  - Bare unformatted digit runs only count as card numbers at lengths 14-16;
- *    a 13-digit run is far more often a millisecond timestamp and a 19-digit
- *    run a nanosecond timestamp than a card.
- *  - Phone numbers without a `+` prefix are only matched in punctuated forms
- *    like (415) 555-2671 or 415-555-2671, never as bare digit runs.
- *  - IPv6 is not scanned; public IPv6 addresses are rare in agent sessions
- *    and the pattern is too noisy against base64 and hex ids.
- *
- * This module is mirrored verbatim into the `langwatch` CLI
- * (`sdks/typescript/src/internal/generated/redaction/`), so this file is the
- * exact code that runs before a report is sent. A drift test pins the mirror
- * byte-for-byte.
+ * Session-report scrubbing: strips secrets/PII from a transcript locally.
+ * Loopback/private IPs are kept (harmless); IPv6 isn't scanned. Mirrored
+ * byte-for-byte into the `langwatch` CLI and drift-tested — change both.
  */
-import { formatPiiMarker, SECRET_MARKER } from "./markers.js";
-import { isSensitiveAttributeKey, redactSecretsInText } from "./secrets.js";
+import { formatPiiMarker, SECRET_MARKER } from "./markers.ts";
+import { isSensitiveAttributeKey, redactSecretsInText } from "./secrets.ts";
 
 const EMAIL_MARKER = formatPiiMarker("EMAIL_ADDRESS");
 const PHONE_MARKER = formatPiiMarker("PHONE_NUMBER");
@@ -45,11 +12,9 @@ const CARD_MARKER = formatPiiMarker("CREDIT_CARD");
 const IP_MARKER = formatPiiMarker("IP_ADDRESS");
 
 /**
- * Env-var NAMES that hold secrets. Broader than the platform's attribute-key
- * rule on purpose: attribute keys must not match telemetry names like
- * `gen_ai.usage.input_tokens`, but env names are short and structured, so
- * bare `KEY` and `TOKEN` segments are safe to treat as sensitive
- * (GITHUB_TOKEN, AWS_SECRET_ACCESS_KEY, SSH_KEY, NPM_TOKEN, ...).
+ * Env-var NAMES that hold secrets — broader than the attribute-key rule,
+ * since env names are short/structured (unlike telemetry names), so bare
+ * `KEY`/`TOKEN` segments are safe (GITHUB_TOKEN, AWS_SECRET_ACCESS_KEY, ...).
  */
 const ENV_SECRET_NAME_REGEX =
   /(?:^|[._-])(?:key|token|secret|password|passwd|pwd|credentials?|auth)(?:$|[._-])/i;
@@ -73,22 +38,20 @@ export function collectSensitiveEnvValues(
     if (!ENV_SECRET_NAME_REGEX.test(name)) continue;
     values.add(trimmed);
   }
-  return [...values].sort((a, b) => b.length - a.length);
+  return [...values].toSorted((a, b) => b.length - a.length);
 }
 
 // Quantifiers bounded to the RFC limits (64-char local part, 253-char domain)
 // so a long run of name-like characters costs constant backtracking per
 // position instead of a quadratic scan on huge transcript strings.
-const EMAIL_REGEX =
-  /[A-Za-z0-9._%+-]{1,64}@[A-Za-z0-9.-]{1,253}\.[A-Za-z]{2,24}/g;
+const EMAIL_REGEX = /[A-Za-z0-9._%+-]{1,64}@[A-Za-z0-9.-]{1,253}\.[A-Za-z]{2,24}/g;
 
 /** International phone candidates: `+` then 7-15 digits with light punctuation. */
 const INTL_PHONE_REGEX =
   /(?<![\w.+-])\+[1-9]\d{0,2}(?:[\s.-]?(?:\(\d{1,4}\)[\s.-]?)?\d{1,4}){1,5}(?!\d)/g;
 
 /** Punctuated national formats: (415) 555-2671, 415-555-2671, 415.555.2671. */
-const NATIONAL_PHONE_REGEX =
-  /(?<!\d)(?:\(\d{3}\)[\s.-]?|\d{3}[.-])\d{3}[.-]\d{4}(?!\d)/g;
+const NATIONAL_PHONE_REGEX = /(?<!\d)(?:\(\d{3}\)[\s.-]?|\d{3}[.-])\d{3}[.-]\d{4}(?!\d)/g;
 
 /** Card candidates: 13-19 digits, optionally separated by spaces or dashes. */
 const CARD_REGEX = /(?<![\d.-])\d(?:[ -]?\d){12,18}(?![\d.-])/g;
@@ -138,12 +101,9 @@ function isPrivateOrLocalIp(ip: string): boolean {
 }
 
 /**
- * `redactSecretsInText` passes very long inputs through untouched (its scan
- * budget protects the ingestion hot path). Session transcripts routinely carry
- * huge single strings, so here long text is redacted in slices below that
- * budget instead of skipped. Slices prefer newline boundaries so multi-line
- * patterns (PEM blocks) stay intact; a secret sitting exactly on a hard slice
- * boundary of a 200k+ single-line string is the accepted trade-off.
+ * `redactSecretsInText` passes long inputs through untouched (protects the
+ * hot path), so here text is sliced and redacted instead. Slices prefer
+ * newlines to keep PEM blocks intact; a hard-boundary miss is the accepted trade-off.
  */
 const SLICE_TARGET = 200_000;
 
@@ -197,10 +157,7 @@ function redactPiiPatterns(text: string): SessionRedactionResult {
   return { text: result, redactedCount };
 }
 
-function scrubEnvLiterals(
-  text: string,
-  envValues: readonly string[],
-): SessionRedactionResult {
+function scrubEnvLiterals(text: string, envValues: readonly string[]): SessionRedactionResult {
   let result = text;
   let redactedCount = 0;
   for (const value of envValues) {
@@ -257,11 +214,7 @@ function redactJsonValue(
   if (value && typeof value === "object") {
     const out: Record<string, unknown> = {};
     for (const [key, entry] of Object.entries(value)) {
-      if (
-        isSensitiveAttributeKey(key) &&
-        entry !== null &&
-        entry !== undefined
-      ) {
+      if (isSensitiveAttributeKey(key) && entry !== null && entry !== undefined) {
         out[key] = SECRET_MARKER;
         count.redacted++;
         continue;
@@ -274,11 +227,9 @@ function redactJsonValue(
 }
 
 /**
- * Redact a session transcript in JSONL form (one JSON document per line, the
- * format Claude Code and Codex write). Lines that parse as JSON are walked
- * structurally: sensitive keys have their whole value scrubbed and every
- * string is pattern-redacted. Lines that do not parse are redacted as text,
- * so nothing is skipped.
+ * Redacts a session transcript in JSONL form (one JSON document per line).
+ * Lines that parse are walked structurally: sensitive keys are scrubbed
+ * whole, every string pattern-redacted. Lines that don't parse are redacted as text.
  */
 export function redactSessionJsonl({
   jsonl,

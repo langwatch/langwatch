@@ -1,0 +1,185 @@
+/**
+ * Procedures this package calls: derived namespaces from contract, borrowed ones
+ * from features not yet split. Segment names are load-bearing for React Query cache.
+ */
+
+import { createModuleApi, type ContractApiMap } from "@langwatch/api/web";
+import type { authTrpc } from "@langwatch/auth-contract";
+import type { CodingAgentUsageTotals } from "@langwatch/coding-agent-contract";
+import type {
+  personalVirtualKeysTrpc,
+  routingPolicyTrpc,
+} from "@langwatch/enterprise-gateway-contract";
+import type {
+  AiToolEntry,
+  governanceTrpc,
+  ingestionKeyTrpc,
+  personalSessionsTrpc,
+} from "@langwatch/enterprise-governance-contract";
+import type { gatewayBudgetTrpc } from "@langwatch/gateway-contract";
+import type { identityTrpc } from "@langwatch/identity-contract";
+import type { userTrpc } from "@langwatch/user-contract";
+
+/**
+ * The budget that binds this person, as the banners read it. A union, and the narrow arm is a
+ * real answer: an organization with no applicable budget collapses to `{ status: "ok" }` with
+ * none of the figures. The amounts are DECIMAL STRINGS, because the ledger's are.
+ */
+export type PersonalBudgetState =
+  | { status: "ok" }
+  | {
+      status: "ok" | "warning" | "exceeded";
+      scope: string;
+      spentUsd: string;
+      limitUsd: string;
+      period: string;
+      requestIncreaseUrl?: string | undefined;
+      adminEmail: string | null;
+    };
+
+/** Which of the optional workspace features are turned on. */
+export type PersonalWorkspaceFeatures = {
+  evaluations: boolean;
+  datasets: boolean;
+  annotations: boolean;
+  automations: boolean;
+};
+
+/** An ingestion template a person can install a key for. */
+export type IngestionTemplateView = {
+  id: string;
+  slug: string;
+  sourceType: string;
+  displayName: string;
+  description: string | null;
+  iconAsset: string | null;
+  credentialSchema: string | null;
+  ottlRules: string;
+  platformPublished: boolean;
+  enabled: boolean;
+  organizationId: string | null;
+};
+
+/** Where this person should land, and why. */
+export type PersonaResolutionView = {
+  persona: "personal_only" | "mixed" | "project_only" | "governance_admin";
+  destination: string;
+  isOverride: boolean;
+  governanceUiEnabled: boolean;
+  intentPinned: boolean;
+  firstProjectSlug: string | null;
+};
+
+/**
+ * The organization graph, narrowed to what this family reads. The procedure answers with the
+ * stored Prisma rows, every instant as an ISO 8601 string.
+ */
+export type PersonalOrganizationGraph = {
+  id: string;
+  name: string;
+  slug: string;
+  members: { role: string }[];
+  ssoProvider?: string | null;
+  teams: {
+    id: string;
+    name: string;
+    projects: { id: string; name: string; slug: string }[];
+  }[];
+};
+
+/** One of THIS reader's own keys, the fields the profile summary shows. */
+export type PersonalApiKeyListEntry = {
+  id: string;
+  name: string;
+  permissionMode: string;
+  userId: string | null;
+  revokedAt: string | null;
+  lastUsedAt: string | null;
+};
+
+type BorrowedProcedures = {
+  license: {
+    getSsoGateStatus: {
+      query: {
+        input: Record<string, never>;
+        output: { configuredProvider: string | null; licensed: boolean; mounted: boolean };
+      };
+    };
+  };
+  plan: {
+    getActivePlan: {
+      query: {
+        input: { organizationId: string };
+        output: { type: string };
+      };
+    };
+  };
+  personalWorkspaceFeatures: {
+    get: {
+      query: { input: { projectId: string }; output: PersonalWorkspaceFeatures };
+    };
+    enableAll: {
+      mutation: { input: { projectId: string }; output: PersonalWorkspaceFeatures };
+    };
+    disableAll: {
+      mutation: { input: { projectId: string }; output: PersonalWorkspaceFeatures };
+    };
+  };
+  aiTools: {
+    list: {
+      query: { input: { organizationId: string }; output: AiToolEntry[] };
+    };
+    providerAvailability: {
+      query: {
+        input: { organizationId: string };
+        output: { configuredProviders: string[] };
+      };
+    };
+  };
+  ingestionTemplates: {
+    list: {
+      query: { input: { organizationId: string }; output: IngestionTemplateView[] };
+    };
+  };
+  codingAgents: {
+    usageTotals: {
+      query: {
+        input: { projectId: string; fromMs?: number; toMs?: number };
+        output: CodingAgentUsageTotals;
+      };
+    };
+  };
+  project: {
+    getHasFirstMessage: {
+      query: { input: { projectId: string }; output: { firstMessage: boolean } };
+    };
+  };
+  organization: {
+    getScopeGraph: {
+      query: {
+        input: Record<string, never>;
+        output: PersonalOrganizationGraph[];
+      };
+    };
+  };
+};
+
+export type PersonalWorkspaceApiMap = ContractApiMap<typeof userTrpc> &
+  ContractApiMap<typeof authTrpc> &
+  ContractApiMap<typeof identityTrpc> &
+  ContractApiMap<typeof personalVirtualKeysTrpc> &
+  ContractApiMap<typeof routingPolicyTrpc> &
+  ContractApiMap<typeof personalSessionsTrpc> &
+  ContractApiMap<typeof governanceTrpc> &
+  ContractApiMap<typeof ingestionKeyTrpc> &
+  ContractApiMap<typeof gatewayBudgetTrpc> &
+  BorrowedProcedures;
+
+/**
+ * The personal workspace's typed tRPC hooks. Same machinery, same transport and same React
+ * Query cache as the application's `api` proxy.
+ */
+export const personalWorkspaceApi = createModuleApi<PersonalWorkspaceApiMap>();
+
+/** The name the screens call it by. */
+export const api = personalWorkspaceApi;

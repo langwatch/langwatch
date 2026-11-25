@@ -27,7 +27,7 @@ Feature: CLI Prompt Tag Commands
   # --- SDK: renameTag method ---
 
   @unit
-  Scenario: renameTag calls PUT /api/prompts/tags/{tag} with new name
+  Scenario: renameTag calls PUT /api/v1/prompts/tags/{tag} with new name
     When I call promptsApiService.renameTag({ tag: "old-name", name: "new-name" })
     Then the SDK sends PUT /api/prompts/tags/old-name with body { name: "new-name" }
 

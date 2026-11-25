@@ -20,21 +20,19 @@ import (
 	"github.com/langwatch/langwatch/pkg/contexts"
 	"github.com/langwatch/langwatch/pkg/customertracebridge"
 	"github.com/langwatch/langwatch/pkg/otelsetup"
-	"github.com/langwatch/langwatch/services/langyagent/domain"
+	"github.com/langwatch/langwatch/pkg/providererr"
 )
 
-// The pi harness exports no OTLP: the wrapper is a thin stdio process and pi
+// The worker exports no OTLP: the wrapper is a thin stdio process and pi
 // itself ships no exporter. Every one of its LLM calls still crosses THIS
 // proxy, so the relay retells each call as one gen_ai span into the customer's
 // trace, model from the manager-held config, token usage read from the
-// response as it streams through untouched, parent = the turn span. Gated on
-// WorkerInfo.Harness == pi: opencode workers keep exporting their own spans
-// and would double-report if the relay synthesized more.
+// response as it streams through untouched, parent = the turn span.
 //
 // The gateway's own gen_ai span (joined via the injected traceparent) remains
-// the authoritative METER for tokens and cost, exactly as on the opencode
-// path, so the synthesized span carries the skip-token-accumulation stamp and
-// its usage attributes are descriptive, never double-counted.
+// the authoritative METER for tokens and cost, so the synthesized span carries
+// the skip-token-accumulation stamp and its usage attributes are descriptive,
+// never double-counted.
 
 // maxGenAIJSONBodyBytes caps how much of a non-streaming response body the
 // usage scanner accumulates. Usage rides a small trailing object; a body past
@@ -96,6 +94,13 @@ type genAICall struct {
 	start time.Time
 
 	status int
+	// paramsDropped is the gateway's own statement of which request options
+	// it removed before dispatch (the X-LangWatch-Params-Dropped header).
+	// Two production outages were invisible until a live probe because
+	// nothing langy-side recorded what the gateway dropped; carried onto the
+	// retold span so the next field pi starts sending shows up on the first
+	// turn, not as a dead card in production.
+	paramsDropped string
 	// isTransportFailure marks a call the proxy could never deliver (dial
 	// failure, upstream reset). No response ever arrives, so observeResponse
 	// never runs and the span has to be closed from the proxy's ErrorHandler.
@@ -111,15 +116,18 @@ type genAICall struct {
 	cacheReadTokens       int64
 	cacheCreationTokens   int64
 	cacheCreation1hTokens int64
+	// streamError is an in-stream error event's JSON payload, kept so the
+	// span records why a 200 stream failed.
+	streamError []byte
 
 	finishOnce sync.Once
 }
 
 // newGenAICall returns the observer for one call, or nil when no span should
-// be synthesized: a non-pi worker, an invalid turn context (nothing to parent
-// under), or a non-generation request (only POSTs carry model calls).
+// be synthesized: an invalid turn context (nothing to parent under), or a
+// non-generation request (only POSTs carry model calls).
 func newGenAICall(r *Relay, entry *workerEntry, req *http.Request) *genAICall {
-	if entry.info.Harness != domain.HarnessPi || req.Method != http.MethodPost {
+	if req.Method != http.MethodPost {
 		return nil
 	}
 	turn := entry.turnContext()
@@ -156,8 +164,21 @@ func genAIOperation(path string) string {
 func (g *genAICall) observeResponse(resp *http.Response) {
 	g.status = resp.StatusCode
 	g.sse = strings.HasPrefix(resp.Header.Get("Content-Type"), "text/event-stream")
+	if dropped := resp.Header.Get(paramsDroppedHeader); dropped != "" {
+		g.paramsDropped = dropped
+		if g.entry.noteParamsDropped(dropped) {
+			clog.Get(g.relay.baseCtx).Info("gateway dropped params from a langy model call",
+				zap.String("conversation", g.entry.info.ConversationID),
+				zap.String("model", g.entry.info.Model),
+				zap.String("params_dropped", dropped))
+		}
+	}
 	resp.Body = &genAIBody{call: g, body: resp.Body}
 }
+
+// paramsDroppedHeader is the gateway's drop signal: the request options the
+// parameter policy removed before dispatch, comma separated.
+const paramsDroppedHeader = "X-LangWatch-Params-Dropped"
 
 // genAIBody is the pass-through reader: scan on Read, finish on EOF or Close
 // (whichever lands first, Close always does, ReverseProxy closes the body).
@@ -226,10 +247,17 @@ func (g *genAICall) bufferLine(part []byte) {
 
 func (g *genAICall) inspectSSELine(line []byte) {
 	payload, ok := bytes.CutPrefix(line, sseDataLinePrefix)
-	if !ok || !bytes.Contains(payload, []byte(`"usage"`)) {
+	if !ok {
 		return
 	}
-	g.takeUsage(payload)
+	if g.streamError == nil && bytes.Contains(payload, errorEventTypeMark) &&
+		gjson.GetBytes(payload, "type").Str == "error" {
+		g.streamError = append([]byte(nil), payload...)
+		return
+	}
+	if bytes.Contains(payload, []byte(`"usage"`)) {
+		g.takeUsage(payload)
+	}
 }
 
 // takeUsage reads the usage fields out of one JSON payload. Latest non-zero
@@ -334,16 +362,28 @@ func (g *genAICall) forwardSpan() {
 	if g.cacheCreation1hTokens > 0 {
 		span.Attributes().PutInt(customertracebridge.AttrGenAIUsageCacheCreate1h, g.cacheCreation1hTokens)
 	}
+	if g.paramsDropped != "" {
+		span.Attributes().PutStr("langwatch.langy.params_dropped", g.paramsDropped)
+	}
 	// The gateway's gen_ai span is the meter for this same call; the retold
 	// copy is structure, not a second bill.
 	span.Attributes().PutStr(attrSkipTokenAccumulation, "true")
 	if strings.HasPrefix(info.Model, codexModelPrefix) {
 		span.Attributes().PutStr(attrCostNonBillable, "true")
 	}
-	if g.isTransportFailure {
-		span.Attributes().PutStr("error.type", "transport_error")
+	if g.status > 0 {
+		span.Attributes().PutInt("http.response.status_code", int64(g.status))
 	}
-	if g.status >= 400 {
+	failed := g.status >= 400 || g.streamError != nil
+	switch {
+	case g.isTransportFailure:
+		span.Attributes().PutStr("error.type", "transport_error")
+	case g.streamError != nil:
+		g.recordFailure(span, g.streamError, 0)
+	case g.status >= 400:
+		g.recordFailure(span, g.jsonBody, g.status)
+	}
+	if failed {
 		span.Status().SetCode(ptrace.StatusCodeError)
 	} else {
 		span.Status().SetCode(ptrace.StatusCodeOk)
@@ -370,6 +410,27 @@ func (g *genAICall) forwardSpan() {
 				zap.Error(err))
 		}
 	}()
+}
+
+// recordFailure states on the span why the call failed: the error's own type
+// and the account cause the proxy classified. Provider prose can quote a key
+// back in shapes no list covers, so the only message recorded is the
+// gateway's own governance message. status is 0 for an in-stream error.
+func (g *genAICall) recordFailure(span ptrace.Span, body []byte, status int) {
+	attrs := span.Attributes()
+	if code := providerErrorCode(body); code != "" {
+		attrs.PutStr("error.type", string(code))
+	}
+	cause, hasCause := accountCauseReason(status, body)
+	if hasCause {
+		attrs.PutStr("langwatch.langy.error_cause", string(cause))
+	}
+	message := gjson.GetBytes(body, "error.message").Str
+	if message != providererr.GatewayAccountExhaustedMessage {
+		return
+	}
+	attrs.PutStr("error.message", message)
+	span.Status().SetMessage(message)
 }
 
 // randomSpanID mints a fresh non-zero span id for a synthesized span.

@@ -3,8 +3,12 @@ Feature: Experimentation resources are OSS (Apache 2.0) and uncapped
   LangWatch's core experimentation surfaces — prompts, evaluators/LLM-as-a-Judge,
   scenarios + agent simulations, workflows, agents, experiments, online evaluations,
   datasets, dashboards, custom graphs, and automations — are open source under
-  Apache 2.0. They carry NO creation limit on any plan or license, including the
-  free tier and self-hosted deployments without a license.
+  Apache 2.0. They carry NO creation limit on any license or self-hosted
+  deployment, with or without a license, and none on paid cloud plans.
+
+  One exception, on the cloud Free plan only: scenarios, simulations (scenario
+  sets) and custom evaluators are capped at 3 each. See
+  cloud-free-creation-caps.feature.
 
   Commercial value is captured elsewhere: traces/messages volume, member
   seats (members / lite members), Enterprise security (advanced SSO/SCIM,
@@ -13,10 +17,11 @@ Feature: Experimentation resources are OSS (Apache 2.0) and uncapped
   projects and teams — is uncapped on every plan, same as the experimentation
   resources above.
 
-  As a LangWatch user on any plan (free, paid, or self-hosted without a license)
+  As a LangWatch user on a paid cloud plan or a self-hosted deployment
   I want to create unlimited prompts, evaluators, scenarios, and other
   experimentation resources
-  So that I can build and iterate without hitting an artificial "up to 3" cap
+  So that I can build and iterate without a creation cap
+  (cloud Free keeps its 3 scenario, simulation and custom evaluator caps)
 
   Background:
     Given an organization "org-123" exists
@@ -32,8 +37,6 @@ Feature: Experimentation resources are OSS (Apache 2.0) and uncapped
     Examples:
       | resource           |
       | prompts            |
-      | evaluators         |
-      | scenarios          |
       | workflows          |
       | agents             |
       | experiments        |
@@ -50,7 +53,7 @@ Feature: Experimentation resources are OSS (Apache 2.0) and uncapped
     Then the prompt is created successfully
 
   Scenario: Agent simulations are not gated by a scenario-set cap
-    Given the organization is on the free plan
+    Given a self-hosted deployment or a paid cloud plan
     And the organization has already run simulations across 10 distinct scenario sets
     When a RUN_STARTED event arrives for an 11th, new scenario set
     Then the event is accepted and the simulation runs
@@ -62,10 +65,11 @@ Feature: Experimentation resources are OSS (Apache 2.0) and uncapped
     Then it is created successfully
     And no upgrade modal or limit error is shown
 
-  Scenario: Creation-limit enforcement still applies only to member seats
+  Scenario: Creation-limit enforcement applies to member seats and the cloud Free caps
     Given the organization is on the free plan
     Then creation limits are still enforced for "members" and "membersLite"
-    But creation limits are not enforced for projects, teams, or any experimentation resource
+    And on the cloud Free plan for "scenarios", "scenarioSets" and "evaluators"
+    But creation limits are not enforced for projects, teams, or any other experimentation resource
 
   @unit
   Scenario: A pre-existing signed license that still encodes experimentation limits stays valid

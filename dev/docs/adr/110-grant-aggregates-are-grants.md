@@ -23,20 +23,16 @@ path and therefore never appends, so its fold state is permanently empty and
 the shape's flaw could not show. Here it did: one aggregate's state became
 every grant the organization had ever held, reloaded in full on every batch.
 
-Measured on organization `HXECRq2mRfSQpxTiSCcsS`, 2026-08-20:
+The shape of what that cost, on an organization large enough to show it: the
+rate at which facts landed fell far below the rate the convergence budget
+assumed, so the work still outstanding needed far longer than the ceiling the
+budget granted, and the import was cancelled every time.
 
-| | |
-|---|---|
-| grant rows on the aggregate | 69,826 |
-| facts landed 10:26 → 16:22 | 326 (~0.015/sec) |
-| rate the convergence budget assumed | ~1.8/sec |
-| cutover facts awaiting | ~69,500, needing ~10.7 hours |
-| budget the ceiling granted | 20 minutes |
-
-The import decelerated as it ran — every batch re-read a head the previous
-batch had grown — so no retry could succeed. Every subsystem reported healthy
-throughout: commands completed, projection completed, no blocked groups, 1.3s
-backlog. Nothing was broken; the arithmetic was.
+It decelerated as it ran — every batch re-read a head the previous batch had
+grown — so no retry could succeed, and a bigger budget would only have moved
+the failure later. Every subsystem reported healthy throughout: commands
+completed, projection completed, no blocked groups, a small backlog. Nothing
+was broken; the arithmetic was.
 
 The rollout carried its own weight. Three migrations with prerequisites
 between them, a separate cutover step with a typed confirmation, a cutover
@@ -54,10 +50,17 @@ of nothing.
 
 ```
               tenantId = organizationId  (both)
-  authz_grant                    authz_role
+         aggregateType = authz_grant  (both)
   id = grantId                   id = roleId
   one grant's lifecycle          one role definition's lifecycle
 ```
+
+The persisted aggregate type names the installed Eventing pipeline, not a
+second organization boundary. Grant and role events therefore retain the one
+wire value `authz_grant`; their distinct grant or role aggregate IDs are what
+give each entity its own lifecycle and ordering lane. Introducing an
+`authz_role` wire type would require a second pipeline and is not part of this
+decision.
 
 There is no organization-keyed aggregate. Roles, which an earlier draft put on
 one, are entities with their own lifecycle and their own referents
@@ -104,10 +107,33 @@ enrolled, or the migration is on for everyone. No sampling, no cohorts, no
 pacing ladder. Self-hosted runs it for every organization automatically, as it
 already did.
 
+**And on cloud the switch is now thrown: this migration is enrolled
+automatically.** The migration declares `enrolledAutomatically`, and the
+cohort admits every cloud organization with no enrollment row and no operator
+action. Enrollment paced the rollout while it was happening; the rollout is
+finished, and what enrollment would still decide is only whether an
+organization created SINCE ever migrates — which must not depend on an
+operator remembering it. An organization created today is created against the
+legacy authorization path exactly as before, writes its founder's legacy rows
+imperatively, and the next pass adopts them. Creation never touches the
+ledger, so nothing here re-introduces the born-on-engine coupling that made
+signup wait on the queue. The cohort leaves nobody out — an organization
+running a private data plane included. This migration is rooted in the
+ORGANIZATION, and `getClickHouseClientForTenant` resolves an organization-id
+tenant to that organization and routes to its own ClickHouse instance when
+one is configured, refusing to fall back to the shared client rather than
+leaking; so its facts already land where they belong, and excluding it would
+only strand that customer on the legacy authorization path forever. The
+user-rooted identity migrations are the case that genuinely cannot place
+their events — a user tenant is neither a project nor an organization — which
+is why they, and not this one, exclude private-dataplane members. The
+declaration is per migration, so a migration still mid-rollout — the identity
+ones — keeps its enrollment pacing untouched.
+
 **Aggregate ids must be STABLE ACROSS RETRIES, which is not determinism.** The
 event log dedupes on `(TenantId, AggregateType, AggregateId, IdempotencyKey)`,
 so `AggregateId` is part of the dedup key and an idempotency key only dedupes
-*within* an aggregate. An id minted freshly per attempt defeats idempotency
+_within_ an aggregate. An id minted freshly per attempt defeats idempotency
 outright — the retry lands elsewhere, nothing collapses, and every pass adds
 another copy. A migrated fact therefore keeps the legacy row's own id, which is
 already a public handle (`DELETE /role-bindings/:id`); a fact the legacy schema
@@ -133,8 +159,8 @@ only authz writes whose effect can exist without an event behind it.
 
 Bounding the aggregate is what fixes the measurements above: a projection write
 becomes a lookup of one row by primary key, so cost per event stops depending
-on how much the organization already holds, and 69,500 share links import in
-parallel rather than through one queue.
+on how much the organization already holds, and a large organization's share
+links import in parallel rather than through one queue.
 
 Collapsing the rollout is the larger saving in complexity, and the argument for
 the two-step version was never strong. A separate cutover buys the ability to
@@ -151,9 +177,9 @@ role resolves to the empty permission list, which grants nothing, and the deny
 sweep is a query plus compensating commands, which is what it already was.
 
 Offboarding is the exception and needs care, because the organization aggregate
-was carrying a safety property that is easy to drop by accident: *"the fold
+was carrying a safety property that is easy to drop by accident: _"the fold
 sweeps by principal, so an incomplete list cannot leave the member holding
-access."* Per-grant aggregates cannot sweep. We keep it by making enforcement
+access."_ Per-grant aggregates cannot sweep. We keep it by making enforcement
 take a **principal filter** rather than a list of ids — the shape SpiceDB uses
 for `DeleteRelationships` — so it removes what the caller could not enumerate.
 Anything less trades a security property for a performance one.
@@ -188,7 +214,8 @@ aggregate is measured and was blocking the rollout.
 - [ADR-092](092-unified-authorization-engine.md) — partially superseded
 - [ADR-100](100-dispatch-plane-group-keys.md), [ADR-105](105-defining-an-aggregate.md) — the lane and the declaration form
 - Specs: `specs/rbac/authz-grants.feature`, `specs/migration/authz-grants-rollout.feature`
-- Incident: `HXECRq2mRfSQpxTiSCcsS`, 2026-08-20
+- Incident: 2026-08-20 (the organization and its figures are deliberately
+  not named here — this repository is public)
 
 Numbering: 100–109 were all claimed by in-flight branches (the event-sourcing
 corpus, the identity redesign), so this record takes 110.

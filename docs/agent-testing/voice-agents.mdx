@@ -1,0 +1,101 @@
+---
+title: Voice Agents
+sidebarTitle: Voice Agents
+keywords: langwatch, agent testing, voice agents, voice testing, elevenlabs, twilio, phone, openai realtime, pipecat, gemini live, audio testing, caller voice
+description: Test a voice agent over real audio. A simulated caller talks to your agent, and a judge scores the call against your criteria.
+---
+
+A voice test is a [scenario](/agent-testing/scenarios) played out over audio. A simulated caller speaks to your agent, listens to each reply and answers, turn by turn. A judge then scores the call against your criteria. You write the scenario the same way as for a text agent.
+
+<img src="/images/scenario-voice.webp" alt="A voice scenario: a simulated caller, the agent under test and the judge" width="100%" />
+
+This page gets one voice test running from the platform, against an ElevenLabs agent or a phone number. To test another transport, or to run voice tests in CI, see [Test from code](#test-from-code).
+
+## Before you start
+
+<Note>
+  Voice agents are in private beta. On cloud, write to support@langwatch.ai to enable them for your organization. Self-hosted, set `FEATURE_FLAG_FORCE_ENABLE=release_voice_agents_enabled` on the app.
+</Note>
+
+Add the providers under **Settings > Model Providers**. See [Model Providers](/platform/model-providers).
+
+- **OpenAI**, for every voice test. The simulated caller speaks with OpenAI text-to-speech, and the judge reads an OpenAI transcript of the call.
+- **ElevenLabs**, to test an ElevenLabs agent. The key must be in the same ElevenLabs workspace as the agent, with `convai_read`, `convai_write` and conversation read.
+- **Twilio**, to test a phone number. The call is placed from your Twilio number.
+
+## Add your voice agent
+
+1. Open **Agents** in the sidebar and press **New Agent**.
+2. Pick **Voice Agent** and give it a **Name**.
+3. Under **Reached via**, pick **ElevenLabs agent** and paste the **Agent id** from ElevenLabs. For a phone number, pick **Phone number** and enter it in international format, for example `+14155550123`.
+4. Press **Create Agent**.
+
+LangWatch tests the agent as ElevenLabs has it configured. It does not send prompt overrides.
+
+For an ElevenLabs agent, press **Talk to it** to hear the agent from your browser before you write a scenario. This call is not scored.
+
+## Run a scenario against it
+
+Open **Agent Testing**, create a scenario the way you would for a text agent, and press **Run**. In the run dialog, pick your voice agent as the **Agent to be tested**. See [Test from the platform](/agent-testing/test-from-the-platform) for writing scenarios and the run dialog.
+
+A voice run takes one to two minutes per scenario, because every turn is spoken, then transcribed.
+
+## Read the result
+
+The run shows the same verdict as a text run: each criterion passed or failed, with the judge's reasoning. The conversation drawer adds the recording of the call, with the transcript per turn. See [Results](/agent-testing/results).
+
+## Test from code
+
+The [Scenario](https://langwatch.ai/scenario/) SDK runs voice tests from your own test runner, in Python or TypeScript. It has adapters for ElevenLabs, OpenAI Realtime, Gemini Live, Pipecat and Twilio, and can add background noise and interruptions. With `LANGWATCH_API_KEY` set, each run appears in **Agent Testing** with its recording and transcript.
+
+<CardGroup cols={2}>
+  <Card title="Voice quick start" icon="rocket" href="https://langwatch.ai/scenario/voice/getting-started/">
+    Install, set up keys and run your first voice scenario.
+  </Card>
+  <Card title="Choose an adapter" icon="plug" href="https://langwatch.ai/scenario/voice/choosing-an-adapter/">
+    Pick the adapter for your transport.
+  </Card>
+  <Card title="Voice recipes" icon="sliders" href="https://langwatch.ai/scenario/voice/recipes/">
+    Audio effects, interruptions, multi-turn calls and observability.
+  </Card>
+  <Card title="Troubleshooting" icon="wrench" href="https://langwatch.ai/scenario/voice/troubleshooting/">
+    The failures that come up most often in voice scenarios.
+  </Card>
+</CardGroup>
+
+## Reference
+
+<AccordionGroup>
+  <Accordion title="Caller voice">
+    The caller voice is part of the scenario, so every run of it uses the same caller. In the scenario editor, open **Customize scenario**, then **Caller voice**.
+
+    | Field | Values |
+    |---|---|
+    | **Voice** | An OpenAI text-to-speech voice. Default `nova`. |
+    | **Interrupts** | How often the caller talks over the agent, from 0% to 100%. |
+    | **Effects** | None, phone line, or background noise. |
+  </Accordion>
+  <Accordion title="Score a call you make yourself">
+    Run a single scenario and, in the run dialog, pick **Call it myself** to talk to an ElevenLabs agent from your browser. The call is saved as a run of the scenario, and the judge scores it like a simulated call.
+
+    The browser needs HTTPS or localhost and microphone permission.
+  </Accordion>
+  <Accordion title="Limits and cost">
+    A call is cut after 5 minutes. The run is marked "Cut at the call limit", and the judge scores what was said. Each project runs 2 voice calls at a time per worker process, and more voice runs wait in the queue. Self-hosted, change these limits with the voice variables in [Environment Variables](/self-hosting/configuration/environment-variables#voice-agents).
+
+    Every call uses ElevenLabs conversation minutes, or Twilio minutes for a phone number. A simulated call also uses OpenAI audio tokens.
+
+    Projects that share one ElevenLabs key share that workspace's agents and calls, because ElevenLabs checks the key, not the project. Give each project its own key to keep them apart.
+  </Accordion>
+  <Accordion title="Troubleshooting">
+    | Message | Fix |
+    |---|---|
+    | "...missing the permission convai_write..." | Create an ElevenLabs key with `convai_read`, `convai_write` and conversation read. |
+    | "ElevenLabs rejected the connection" with status 401 | The key is wrong or revoked. Check it in **Settings > Model Providers**. |
+    | Agent not found | Check the agent id, and that the agent is in the same ElevenLabs workspace as the key. |
+    | "The caller voice needs an OpenAI key..." | Add an OpenAI provider in **Settings > Model Providers**. |
+    | "Recording not ready yet" | ElevenLabs is still processing the call. Reload the run after a short wait. |
+    | The agent is silent in the browser | Click the page once, allow the microphone, and use HTTPS or localhost. |
+    | "Cut at the call limit" | Shorten the scenario, or raise the call limit if you self-host. |
+  </Accordion>
+</AccordionGroup>

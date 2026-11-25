@@ -32,6 +32,18 @@ Feature: Annotation CLI Commands
     When I run "langwatch annotation create trace_abc123 --comment 'Incorrect answer' --thumbs-down"
     Then a new annotation is created with negative feedback
 
+  Scenario: Create annotation without a comment
+    When I run "langwatch annotation create trace_abc123 --thumbs-up"
+    Then I see an error that --comment is required and no annotation is created
+
+  Scenario: Create annotation without a rating
+    When I run "langwatch annotation create trace_abc123 --comment 'No rating'"
+    Then I see an error that one rating flag is required and no annotation is created
+
+  Scenario: Create annotation with both rating flags
+    When I run "langwatch annotation create trace_abc123 --comment 'Cannot be both' --thumbs-up --thumbs-down"
+    Then I see an error that the rating flags cannot be combined and no annotation is created
+
   Scenario: Delete an annotation
     Given my project has an annotation with ID "ann_123"
     When I run "langwatch annotation delete ann_123"

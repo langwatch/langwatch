@@ -16,40 +16,30 @@ import (
 	"github.com/langwatch/langwatch/pkg/clog"
 	"github.com/langwatch/langwatch/pkg/herr"
 	"github.com/langwatch/langwatch/services/langyagent/adapters/egress"
-	"github.com/langwatch/langwatch/services/langyagent/adapters/opencode"
 	"github.com/langwatch/langwatch/services/langyagent/adapters/otelrelay"
 	"github.com/langwatch/langwatch/services/langyagent/app"
 	"github.com/langwatch/langwatch/services/langyagent/domain"
 )
 
-// Worker is the pool's bookkeeping for one OpenCode subprocess. It satisfies
+// Worker is the pool's bookkeeping for one worker subprocess. It satisfies
 // app.Worker so the app orchestrator can drive a turn without importing this
 // adapter.
 type Worker struct {
 	conversationID string
-	// agent drives the turn on this worker's coding-agent process through the
-	// endpoint below — Post/Stream/Notify all route through it, so the pool never
-	// touches the agent's wire protocol (adapters/opencode implements it).
+	// agent drives the turn on this worker's coding-agent process —
+	// Post/Stream/Notify all route through it, so the pool never touches the
+	// agent's wire protocol (adapters/pi implements it).
 	agent app.CodingAgent
-	// endpoint is the loopback address + credential the authProxy exposes for the
-	// agent process: the external (authproxy) port the manager dials, the internal
-	// port opencode actually listens on (fronted by the proxy, never exposed to
-	// callers), the per-worker bearer token, and the precomputed external BaseURL
-	// so per-turn calls don't re-Sprintf the host.
-	endpoint app.Endpoint
-	// authProxy fronts opencode with bearer-token auth. Shutdown on worker exit
-	// so the externally-advertised port frees up.
-	authProxy *opencode.AuthProxy
 	// egress is the per-worker OUTBOUND egress handle (ADR-076) returned by the
 	// egress guard's PrepareWorker: it carries the loopback forward-proxy port
 	// the worker's HTTPS_PROXY points at (0 when the guard runs no proxy) and a
 	// Close that tears the proxy down. Closed on every teardown path (kill /
-	// exit / spawn failure), exactly like authProxy, so it never outlives the
-	// worker or leaks across a recycle.
-	egress            egress.WorkerEgress
-	openCodeSessionID string
-	cmd               *exec.Cmd
-	uid               uint32
+	// exit / spawn failure), so it never outlives the worker or leaks across a
+	// recycle.
+	egress    egress.WorkerEgress
+	sessionID string
+	cmd       *exec.Cmd
+	uid       uint32
 
 	// otelRelay + otelToken are this worker's registration with the manager's
 	// loopback telemetry/LLM relay (adapters/otelrelay): the token routes the
@@ -87,8 +77,14 @@ type Worker struct {
 	prewarmed bool
 
 	mu sync.Mutex
+	// spawnedAt bounds the worker's life to its session key's (WorkerMaxAge).
+	spawnedAt time.Time
 	// lastSeen drives the idle reaper.
 	lastSeen time.Time
+	// retired is set, between turns only, when the pool takes the worker out of
+	// service. A turn that acquired it just before gets ClaimBusy and is
+	// re-dispatched onto a fresh worker instead of running on a dying one.
+	retired bool
 	// inFlight serializes turns on the same conversation. Two simultaneous
 	// /worker requests for one conversationID would otherwise both subscribe to
 	// the same /event stream and each terminate on the other's terminal event,
@@ -130,13 +126,60 @@ func (w *Worker) Touch() {
 	w.mu.Unlock()
 }
 
-// shouldReap reports whether the worker has been genuinely idle for longer than
-// cutoff. An in-flight turn is never idle, even when it runs longer than the
-// configured idle timeout.
-func (w *Worker) shouldReap(cutoff time.Duration) bool {
+// overAgeQuietPeriod is how long an over-age worker must sit idle before the
+// reaper retires it: a re-dispatch racing a just-finished turn must still find
+// the worker that remembers the turn, or the turn would run twice.
+const overAgeQuietPeriod = time.Minute
+
+// retireIfStale retires the worker when no turn is in flight and it has been
+// idle longer than idleCutoff, or is older than maxAge and quiet. An in-flight
+// turn is never retired, however long it runs. maxAge <= 0 disables the age rule.
+func (w *Worker) retireIfStale(idleCutoff, maxAge time.Duration) bool {
 	w.mu.Lock()
 	defer w.mu.Unlock()
-	return !w.inFlight && time.Since(w.lastSeen) > cutoff
+	idleFor := time.Since(w.lastSeen)
+	due := idleFor > idleCutoff || (w.overAgeLocked(maxAge) && idleFor > overAgeQuietPeriod)
+	return w.retireBetweenTurnsLocked(due)
+}
+
+// retireIfOverAge retires an over-age worker unless a turn is in flight or
+// turnID is one it already ran, decided under one lock with ClaimTurn's state.
+func (w *Worker) retireIfOverAge(maxAge time.Duration, turnID string) bool {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	return w.retireBetweenTurnsLocked(w.overAgeLocked(maxAge) && !w.ranTurnLocked(turnID))
+}
+
+// ranTurnLocked reports whether turnID is this worker's current or a recently
+// completed turn. An empty turnID (older control plane) matches nothing.
+func (w *Worker) ranTurnLocked(turnID string) bool {
+	if turnID == "" {
+		return false
+	}
+	if w.currentTurnID == turnID {
+		return true
+	}
+	_, done := w.handled[turnID]
+	return done
+}
+
+// overAge reports whether the worker has outlived maxAge (<= 0 disables).
+func (w *Worker) overAge(maxAge time.Duration) bool {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	return w.overAgeLocked(maxAge)
+}
+
+func (w *Worker) overAgeLocked(maxAge time.Duration) bool {
+	return maxAge > 0 && time.Since(w.spawnedAt) > maxAge
+}
+
+func (w *Worker) retireBetweenTurnsLocked(due bool) bool {
+	if !due || w.inFlight {
+		return false
+	}
+	w.retired = true
+	return true
 }
 
 // idleSince reports the worker's idle state for capacity eviction: whether no
@@ -166,6 +209,9 @@ func (w *Worker) ClaimTurn(turnID string) app.ClaimOutcome {
 		if _, done := w.handled[turnID]; done {
 			return app.ClaimAlreadyHandled
 		}
+	}
+	if w.retired {
+		return app.ClaimBusy
 	}
 	w.inFlight = true
 	w.currentTurnID = turnID
@@ -255,7 +301,7 @@ func (w *Worker) LastLLMError() (herr.E, bool) {
 	return w.otelRelay.LastLLMError(w.otelToken)
 }
 
-// PostMessage queues a turn on the worker's opencode session.
+// PostMessage queues a turn on the worker's agent session.
 //
 // historySeed is the control plane's conversation-so-far block. It is folded in
 // AHEAD of the prompt on the session's first delivered message only
@@ -267,7 +313,7 @@ func (w *Worker) LastLLMError() (herr.E, bool) {
 //
 // resumeToken (ADR-048) is the opaque checkpoint from a prior turn that handed
 // off on shutdown; empty on a normal cold start. It is forwarded verbatim to
-// opencode, never parsed by the manager.
+// the agent, never parsed by the manager.
 func (w *Worker) PostMessage(ctx context.Context, system, prompt, historySeed, resumeToken string) error {
 	w.mu.Lock()
 	if !w.promptDelivered && historySeed != "" {
@@ -277,7 +323,7 @@ func (w *Worker) PostMessage(ctx context.Context, system, prompt, historySeed, r
 	// turns (pi) tags this exact turn, the id a later AbortTurn will name.
 	turnID := w.currentTurnID
 	w.mu.Unlock()
-	err := w.agent.Post(ctx, w.endpoint, w.openCodeSessionID, app.Turn{
+	err := w.agent.Post(ctx, w.sessionID, app.Turn{
 		TurnID:      turnID,
 		System:      system,
 		Prompt:      prompt,
@@ -292,11 +338,11 @@ func (w *Worker) PostMessage(ctx context.Context, system, prompt, historySeed, r
 }
 
 // NotifyShutdownImminent posts a shutdown-imminent notice to this worker's
-// opencode control API (ADR-048), asking it to checkpoint the in-flight turn and
+// agent (ADR-048), asking it to checkpoint the in-flight turn and
 // emit a terminal `handoff` frame before the process-group kill. deadline is the
 // absolute instant the worker must checkpoint before.
 func (w *Worker) NotifyShutdownImminent(ctx context.Context, deadline time.Time) error {
-	return w.agent.NotifyShutdownImminent(ctx, w.endpoint, w.openCodeSessionID, deadline)
+	return w.agent.NotifyShutdownImminent(ctx, w.sessionID, deadline)
 }
 
 // AbortTurn asks this worker's agent to abort the named in-flight turn, the
@@ -306,7 +352,7 @@ func (w *Worker) NotifyShutdownImminent(ctx context.Context, deadline time.Time)
 // the wrong generation. An empty turnID is a no-op: a cancel needs a name.
 //
 // The abort is an OPTIONAL agent capability (app.TurnAborter): an agent that
-// does not implement it (opencode today) is a silent no-op, fail-open, so
+// does not implement it is a silent no-op, fail-open, so
 // the stop stays truthful on the durable record and only the token burn
 // continues. Best-effort by design: a failed abort is logged, never surfaced.
 func (w *Worker) AbortTurn(ctx context.Context, turnID string) {
@@ -323,7 +369,7 @@ func (w *Worker) AbortTurn(ctx context.Context, turnID string) {
 	if !ok {
 		return
 	}
-	if err := aborter.AbortTurn(ctx, w.endpoint, w.openCodeSessionID, turnID); err != nil {
+	if err := aborter.AbortTurn(ctx, w.sessionID, turnID); err != nil {
 		clog.Get(ctx).Warn("abort turn failed, the generation runs to completion on its own",
 			zap.String("conversation", w.conversationID),
 			zap.String("turn_id", turnID),
@@ -346,7 +392,7 @@ func (w *Worker) isInFlight() bool {
 // events as ndjson into the sink until a terminal event lands or ctx is
 // canceled.
 func (w *Worker) StreamEvents(ctx context.Context, sink app.ChatSink) error {
-	return w.agent.Stream(ctx, w.endpoint, w.openCodeSessionID, sink)
+	return w.agent.Stream(ctx, w.sessionID, sink)
 }
 
 // tombstoneWorkerHome atomically renames the per-worker home to a unique sibling

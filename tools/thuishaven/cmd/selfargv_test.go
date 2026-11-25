@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-// `haven play` and `haven pr` both re-invoke haven with the child's cwd set to an
+// `haven pr --throwaway` and `haven pr` both re-invoke haven with the child's cwd set to an
 // unreviewed PR checkout. That checkout is the same repository, so it contains a
 // cmd/haven of its own — a relative "./cmd/haven" would compile and run the PR's
 // orchestrator, which owns the docker socket, the overlay writer and teardown,

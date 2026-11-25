@@ -23,8 +23,13 @@ func (m *model) applyMeta(i int, r MetaResult) {
 	row.OriginGone = r.OriginGone
 	row.StaleFor = r.StaleFor
 	row.StaleKnown = r.StaleKnown
+	row.Reason = r.Reason
+	// A classified row (temporary scratch, a branch already on main) is pre-ticked
+	// on its reason rather than its age — the classification is why it is
+	// reclaimable, and it already applied every guard the age rule applies.
+	staleEnough := row.StaleKnown && row.StaleFor >= m.actions.Threshold
 	if !m.touched[row.Dir] && row.Deletable && !row.IsLive && !row.IsDirty &&
-		row.StaleKnown && row.StaleFor >= m.actions.Threshold {
+		(staleEnough || row.Reason != "") {
 		m.selected[row.Dir] = true
 	}
 	if m.metaCount == len(m.rows) && m.sortUsesMeta() {

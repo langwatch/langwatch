@@ -60,10 +60,37 @@ Feature: MCP outbound request and browser capability hardening
       When a client requests the application root
       Then the response contains the Permissions-Policy header
       And geolocation is disabled
-      And microphone is disabled
+      And microphone is allowed only for the app's own origin, for the voice agents panel
       And camera is disabled
       And payment is disabled
       And USB is disabled
+
+    @unit @regression
+    Scenario: Development responses report the production CSP without enforcing it
+      Given LangWatch is running in development mode
+      When a client requests the application root
+      Then the response carries no Content-Security-Policy header
+      And it carries the production policy as Content-Security-Policy-Report-Only
+      And a directive that would break production is visible as a console violation locally
+
+  Rule: Responses force HTTPS only where the deployment is served over HTTPS
+
+    @unit @regression
+    Scenario: An HTTPS production install forces HTTPS on the browser
+      Given LangWatch is running in production mode
+      And its public address is an https URL
+      When a client requests the application root
+      Then the Content-Security-Policy carries upgrade-insecure-requests
+      And the response carries Strict-Transport-Security
+
+    @unit @regression
+    Scenario: A self-hosted install over plain HTTP is not forced onto HTTPS
+      Given LangWatch is running in production mode
+      And its public address is an http URL on a host other than localhost
+      When a client requests the application root
+      Then the Content-Security-Policy is enforced without upgrade-insecure-requests
+      And no response carries Strict-Transport-Security
+      And the browser loads the page and its assets over plain HTTP
 
   Rule: Other MCP HTTP tools cannot reach non-public destinations
 
@@ -87,3 +114,29 @@ Feature: MCP outbound request and browser capability hardening
       When the MCP tool runs that agent
       Then it returns a validation error
       And LangWatch does not request the private destination
+
+  Rule: The anonymous docs endpoint's shared fetcher keeps its cache bounded
+
+    @unit
+    Scenario: A cached docs page is fetched again once its time to live has passed
+      Given the shared documentation fetcher has served a page
+      When the same page is asked for again after its 60 second time to live
+      Then it is fetched from the docs again
+
+    @unit
+    Scenario: The docs cache drops its oldest page past the entry limit
+      Given the shared documentation fetcher holds as many pages as its entry limit
+      When another page is fetched
+      Then the oldest cached page is dropped and fetched again when next asked for
+
+    @unit
+    Scenario: A docs page larger than the whole cache is served but not kept
+      Given a docs page larger than the cache's byte limit
+      When it is asked for twice
+      Then it is served both times and fetched both times
+
+    @unit
+    Scenario: The shared fetcher refuses a URL outside the docs before fetching it
+      Given the shared documentation fetcher
+      When it is asked for a URL outside the trusted docs
+      Then it refuses with a validation error, without fetching or counting it

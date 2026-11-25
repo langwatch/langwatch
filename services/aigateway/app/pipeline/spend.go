@@ -97,6 +97,9 @@ func Spend(emit SpendEmitter) Interceptor {
 		Name: "spend",
 		Sync: func(next DispatchFunc) DispatchFunc {
 			return func(ctx context.Context, call *Call) (*domain.Response, error) {
+				if !admissible(call) {
+					return next(ctx, call)
+				}
 				start := time.Now()
 				admission := admissionFor(ctx, call, start)
 				emit.AdmitSpend(admission)
@@ -114,6 +117,9 @@ func Spend(emit SpendEmitter) Interceptor {
 		},
 		Stream: func(next StreamFunc) StreamFunc {
 			return func(ctx context.Context, call *Call) (domain.StreamIterator, error) {
+				if !admissible(call) {
+					return next(ctx, call)
+				}
 				start := time.Now()
 				admission := admissionFor(ctx, call, start)
 				emit.AdmitSpend(admission)
@@ -132,6 +138,15 @@ func Spend(emit SpendEmitter) Interceptor {
 			}
 		},
 	}
+}
+
+// admissible reports whether a request can open a spend record at all. One
+// that names no model cannot: the control plane refuses an admission without
+// one, and the model resolver answers the caller with its own customer error
+// before anything could be spent, so there is nothing to bill and nothing to
+// record.
+func admissible(call *Call) bool {
+	return call.Request != nil && call.Request.Model != ""
 }
 
 // deferredOutcome reports the request types whose spend record this dispatch
@@ -200,18 +215,25 @@ func ResolveEndUser(ctx context.Context, call *Call) string {
 	switch call.Request.Type {
 	case domain.RequestTypeChat, domain.RequestTypeMessages,
 		domain.RequestTypeEmbeddings, domain.RequestTypeResponses,
-		domain.RequestTypeSpeech:
+		domain.RequestTypeSpeech, domain.RequestTypeImageGeneration,
+		domain.RequestTypeImageEdit:
 		if err := call.MaterializeBody(); err != nil {
 			return ""
 		}
 		return customertracebridge.EndUserIDFromBody(call.Request.Body)
+	case domain.RequestTypeDecisions:
+		if err := call.MaterializeBody(); err != nil {
+			return ""
+		}
+		return customertracebridge.DecisionsEndUserIDFromBody(call.Request.Body)
 	case domain.RequestTypePassthrough, domain.RequestTypeTranscription,
 		domain.RequestTypeRealtimeSession:
 		// Passthrough carries a provider-native body shape, transcription is
 		// multipart form, not JSON, and a session mint declares a socket
 		// rather than a completion: none exposes the OpenAI `user` field
 		// this reads, so header-only attribution (resolved above) is all
-		// these types get.
+		// these types get. The image edit route is also multipart and still
+		// reads the field above, because its synthesized body states it.
 		return ""
 	}
 	return ""
@@ -304,6 +326,10 @@ func (w *spendStreamWrapper) Next(ctx context.Context) bool {
 func (w *spendStreamWrapper) Chunk() []byte       { return w.inner.Chunk() }
 func (w *spendStreamWrapper) Usage() domain.Usage { return w.inner.Usage() }
 func (w *spendStreamWrapper) Err() error          { return w.inner.Err() }
+
+// Unwrap exposes the wrapped iterator so its optional extensions stay
+// reachable (domain.StreamHeadersOf).
+func (w *spendStreamWrapper) Unwrap() domain.StreamIterator { return w.inner }
 
 func (w *spendStreamWrapper) RawFraming() bool {
 	if rf, ok := w.inner.(domain.RawFramer); ok {

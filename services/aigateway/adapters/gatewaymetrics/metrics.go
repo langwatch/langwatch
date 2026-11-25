@@ -59,6 +59,16 @@ const (
 	CacheOutcomeMiss = "miss"
 )
 
+// Reasons on gateway_auth_cache_refusals_total and sources on
+// gateway_auth_cache_stale_serves_total.
+const (
+	AuthRefusalDeniedRevoked  = "denied_vk_revoked"
+	AuthRefusalDeniedDisabled = "denied_vk_disabled"
+	AuthRefusalFailClosed     = "fail_closed"
+	StaleServeLastKnown       = "last_known"
+	StaleServeWhileError      = "stale_while_error"
+)
+
 // Drop reasons on gateway_spend_spool_dropped_total. Intake is a record the
 // spool's writer could not accept (queue full, or the spool already closed);
 // overflow is a sealed segment deleted to keep the spool inside its size
@@ -95,29 +105,34 @@ type Recorder struct {
 	// metrics that have no series yet.
 	declared []prometheus.Collector
 
-	httpRequests   *prometheus.CounterVec
-	httpDuration   *prometheus.HistogramVec
-	inFlight       prometheus.Gauge
-	streamingOpen  prometheus.Gauge
-	streamNoUsage  *prometheus.CounterVec
-	providerTime   *prometheus.HistogramVec
-	providerTries  *prometheus.CounterVec
-	fallbackEvents *prometheus.CounterVec
-	circuitState   *prometheus.GaugeVec
-	authHits       *prometheus.CounterVec
-	authMisses     *prometheus.CounterVec
-	authLookups    prometheus.Counter
-	budgetBlocks   *prometheus.CounterVec
-	cacheHits      *prometheus.CounterVec
-	cacheRuleHits  *prometheus.CounterVec
-	guardrails     *prometheus.CounterVec
-	internalRTT    *prometheus.HistogramVec
-	controlPlane   *prometheus.CounterVec
-	rateLimits     *prometheus.CounterVec
-	clientRejects  *prometheus.CounterVec
-	realtimeMints  *prometheus.CounterVec
-	realtimeLimits *prometheus.CounterVec
-	realtimeErrors *prometheus.CounterVec
+	httpRequests    *prometheus.CounterVec
+	httpDuration    *prometheus.HistogramVec
+	inFlight        prometheus.Gauge
+	streamingOpen   prometheus.Gauge
+	streamNoUsage   *prometheus.CounterVec
+	providerTime    *prometheus.HistogramVec
+	providerTries   *prometheus.CounterVec
+	fallbackEvents  *prometheus.CounterVec
+	circuitState    *prometheus.GaugeVec
+	authHits        *prometheus.CounterVec
+	authMisses      *prometheus.CounterVec
+	authRefusals    *prometheus.CounterVec
+	authStaleServes *prometheus.CounterVec
+	authLookups     prometheus.Counter
+	budgetBlocks    *prometheus.CounterVec
+	cacheHits       *prometheus.CounterVec
+	cacheRuleHits   *prometheus.CounterVec
+	guardrails      *prometheus.CounterVec
+	internalRTT     *prometheus.HistogramVec
+	controlPlane    *prometheus.CounterVec
+	rateLimits      *prometheus.CounterVec
+	clientRejects   *prometheus.CounterVec
+	realtimeMints   *prometheus.CounterVec
+	realtimeLimits  *prometheus.CounterVec
+	realtimeErrors  *prometheus.CounterVec
+	voiceSessions   *prometheus.GaugeVec
+	voiceEnded      *prometheus.CounterVec
+	voiceReports    *prometheus.CounterVec
 
 	draining      gaugeSource
 	authCacheSize gaugeSource
@@ -198,6 +213,16 @@ func New() *Recorder {
 		Help: "Virtual-key lookups that missed a cache tier and had to fall through.",
 	}, []string{"tier"})
 
+	r.authRefusals = prometheus.NewCounterVec(prometheus.CounterOpts{
+		Name: "gateway_auth_cache_refusals_total",
+		Help: "Cached virtual keys refused by the revocation list or the fail-closed rule.",
+	}, []string{"reason"})
+
+	r.authStaleServes = prometheus.NewCounterVec(prometheus.CounterOpts{
+		Name: "gateway_auth_cache_stale_serves_total",
+		Help: "Virtual keys served from cache because the control plane could not answer.",
+	}, []string{"source"})
+
 	r.authLookups = prometheus.NewCounter(prometheus.CounterOpts{
 		Name: "gateway_auth_cache_lookups_total",
 		Help: "Virtual-key resolutions attempted. Denominator for the cache hit rate.",
@@ -222,6 +247,21 @@ func New() *Recorder {
 		Name: "gateway_realtime_registry_errors_total",
 		Help: "Failed calls to the control plane's voice-session record, by operation (reserve, correlate, release, usage). A reserve failure refuses the mint; a correlate failure costs the session its exact join key to the vendor's report.",
 	}, []string{"operation"})
+
+	r.voiceSessions = prometheus.NewGaugeVec(prometheus.GaugeOpts{
+		Name: "gateway_voice_sessions_supervised",
+		Help: "Brokered voice calls this pod is supervising from its own server-side socket, by kind (live, realtime). Media does not pass through the pod; this counts the calls it meters and can end.",
+	}, []string{"kind"})
+
+	r.voiceEnded = prometheus.NewCounterVec(prometheus.CounterOpts{
+		Name: "gateway_voice_sessions_ended_total",
+		Help: "Supervised voice calls that ended, by kind and reason (vendor_closed, budget_exceeded, key_revoked, sideband_lost, drain, session_closed). Every reason but vendor_closed is the gateway ending the call.",
+	}, []string{"kind", "reason"})
+
+	r.voiceReports = prometheus.NewCounterVec(prometheus.CounterOpts{
+		Name: "gateway_voice_usage_reports_total",
+		Help: "Usage reports the gateway sent for supervised voice calls, by outcome (recorded, duplicate, closed, already_closed, error, dropped). error is retried; dropped is usage lost because the retry queue of one call was full.",
+	}, []string{"outcome"})
 
 	r.cacheHits = prometheus.NewCounterVec(prometheus.CounterOpts{
 		Name: "gateway_cache_hits_total",
@@ -286,11 +326,12 @@ func New() *Recorder {
 		r.httpRequests, r.httpDuration, r.inFlight,
 		r.streamingOpen, r.streamNoUsage,
 		r.providerTime, r.providerTries, r.fallbackEvents, r.circuitState,
-		r.authHits, r.authMisses, r.authLookups,
+		r.authHits, r.authMisses, r.authLookups, r.authRefusals, r.authStaleServes,
 		r.budgetBlocks, r.cacheHits, r.cacheRuleHits,
 		r.guardrails, r.internalRTT, r.controlPlane, r.rateLimits,
 		r.clientRejects,
 		r.realtimeMints, r.realtimeLimits, r.realtimeErrors,
+		r.voiceSessions, r.voiceEnded, r.voiceReports,
 	)
 	return r
 }
@@ -535,6 +576,22 @@ func (r *Recorder) RecordAuthCacheMiss(tier string) {
 	r.authMisses.WithLabelValues(orUnknown(tier)).Inc()
 }
 
+// RecordAuthCacheRefusal counts a cached key the gateway refused.
+func (r *Recorder) RecordAuthCacheRefusal(reason string) {
+	if r == nil {
+		return
+	}
+	r.authRefusals.WithLabelValues(orUnknown(reason)).Inc()
+}
+
+// RecordAuthCacheStaleServe counts a key served while the control plane was down.
+func (r *Recorder) RecordAuthCacheStaleServe(source string) {
+	if r == nil {
+		return
+	}
+	r.authStaleServes.WithLabelValues(orUnknown(source)).Inc()
+}
+
 // RecordBudgetBlock counts a request rejected by the named budget scope.
 func (r *Recorder) RecordBudgetBlock(scope string) {
 	if r == nil {
@@ -659,7 +716,9 @@ func (r *Recorder) StreamClosed(provider, model string, usage domain.Usage) {
 		return
 	}
 	r.streamingOpen.Dec()
-	if usage.TotalTokens == 0 && usage.PromptTokens == 0 && usage.CompletionTokens == 0 {
+	// A streamed audio call is measured in characters or seconds, not tokens.
+	measured := usage.InputChars > 0 || usage.AudioSeconds > 0
+	if !measured && usage.TotalTokens == 0 && usage.PromptTokens == 0 && usage.CompletionTokens == 0 {
 		r.streamNoUsage.WithLabelValues(orUnknown(provider), orUnknown(model)).Inc()
 	}
 }

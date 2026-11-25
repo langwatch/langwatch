@@ -189,6 +189,67 @@ func TestRouter_MidStreamPlainError_UsesErrorEventObject(t *testing.T) {
 	assert.NotContains(t, body, `{"error":"`)
 }
 
+// @scenario "A handled failure states the same thing mid-stream as it does before the stream opens"
+//
+// herr.E.Error() renders "code (map[...whole meta...])" plus every wrapped
+// reason, so building the frame from it published the engine's internal cause
+// — the credential parse offset, the unreadable provider body — that the JSON
+// boundary deliberately keeps to the log line. That is also the exact shape
+// the production report arrived in: provider_timeout (map[message:error
+// creating auth token source status:0]).
+func TestRouter_MidStreamHandledError_StatesCustomerCopyNotTheCause(t *testing.T) {
+	handled := herr.New(context.Background(), domain.ErrProviderCredentialInvalid,
+		herr.M{"message": "The credentials configured for this model provider were not accepted."},
+		errors.New("failed to parse auth credentials JSON: {\"private_key\": \"redacted-by-this-fixture\""))
+
+	provider := &mockStreamProvider{
+		dispatchStreamFn: func(_ context.Context, _ *domain.Request, _ domain.Credential) (domain.StreamIterator, error) {
+			return &midStreamErrIter{err: handled}, nil
+		},
+	}
+	router := buildRouter(
+		app.WithAuth(errTransportAuth()),
+		app.WithProviders(provider),
+		app.WithLogger(zap.NewNop()),
+	)
+
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, messagesRequest(true))
+	body := rec.Body.String()
+
+	require.Contains(t, body, "event: error")
+	assert.Contains(t, body, `"type":"provider_credential_invalid"`,
+		"the frame carries the handled code, the way the JSON boundary does")
+	assert.Contains(t, body, "The credentials configured for this model provider were not accepted.")
+	assert.NotContains(t, body, "BEGIN PRIVATE KEY")
+	assert.NotContains(t, body, "failed to parse auth credentials JSON")
+	assert.NotContains(t, body, "map[", "the meta map must not be rendered into the frame")
+}
+
+// A handled error with no customer copy still must not fall back to
+// err.Error(). The code alone is the floor.
+func TestRouter_MidStreamHandledError_WithoutCopyFallsBackToTheCode(t *testing.T) {
+	handled := herr.New(context.Background(), domain.ErrProviderError, herr.M{"provider": "vertex"})
+
+	provider := &mockStreamProvider{
+		dispatchStreamFn: func(_ context.Context, _ *domain.Request, _ domain.Credential) (domain.StreamIterator, error) {
+			return &midStreamErrIter{err: handled}, nil
+		},
+	}
+	router := buildRouter(
+		app.WithAuth(errTransportAuth()),
+		app.WithProviders(provider),
+		app.WithLogger(zap.NewNop()),
+	)
+
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, messagesRequest(true))
+	body := rec.Body.String()
+
+	assert.Contains(t, body, `"message":"provider_error"`)
+	assert.NotContains(t, body, "map[")
+}
+
 // @scenario "Terminal upstream error is identical across stream and non-stream"
 func TestRouter_UpstreamTerminal_IdenticalAcrossPaths(t *testing.T) {
 	const authErrBody = `{"type":"error","error":{"type":"authentication_error","message":"invalid x-api-key"}}`
@@ -293,4 +354,49 @@ func TestRouter_WriteJSONResponse_StripsSpoofedMarkerHeader(t *testing.T) {
 	assert.Empty(t, rec.Header().Get(herr.HandledErrorHeader),
 		"a passthrough response's own headers cannot spoof the LangWatch marker")
 	assert.JSONEq(t, geminiErrBody, rec.Body.String())
+}
+
+// @scenario "A plain-text provider error body reaches the client as a JSON error"
+func TestWriteUpstreamError_PlainTextBodyIsWrappedInEnvelope(t *testing.T) {
+	rec := httptest.NewRecorder()
+	writeUpstreamError(rec, &domain.UpstreamError{
+		StatusCode: http.StatusPaymentRequired,
+		Body:       []byte("Account balance too low.\n"),
+		Provider:   "doubleword",
+	})
+
+	require.Equal(t, http.StatusPaymentRequired, rec.Code)
+	assert.Equal(t, "application/json", rec.Header().Get("Content-Type"))
+	assert.JSONEq(t,
+		`{"error":{"type":"provider_error","code":"provider_error","message":"Account balance too low.","meta":{"status":402,"provider":"doubleword"}}}`,
+		rec.Body.String())
+}
+
+// @scenario "A governance message survives a plain-text provider error body"
+func TestWriteUpstreamError_PlainTextBodyKeepsAMessageAlreadySet(t *testing.T) {
+	rec := httptest.NewRecorder()
+	writeUpstreamError(rec, &domain.UpstreamError{
+		StatusCode: http.StatusPaymentRequired,
+		Body:       []byte("Account balance too low.\n"),
+		Message:    "Your organization's AI gateway access is exhausted. Contact your LangWatch admin.",
+		Provider:   "doubleword",
+	})
+
+	require.Equal(t, http.StatusPaymentRequired, rec.Code)
+	assert.JSONEq(t,
+		`{"error":{"type":"provider_error","code":"provider_error","message":"Your organization's AI gateway access is exhausted. Contact your LangWatch admin.","meta":{"status":402,"provider":"doubleword"}}}`,
+		rec.Body.String())
+}
+
+func TestWriteUpstreamError_PlainTextBodyWithItsOwnContentTypeIsVerbatim(t *testing.T) {
+	rec := httptest.NewRecorder()
+	writeUpstreamError(rec, &domain.UpstreamError{
+		StatusCode: http.StatusPaymentRequired,
+		Body:       []byte("Account balance too low."),
+		Headers:    map[string]string{"Content-Type": "text/plain"},
+	})
+
+	require.Equal(t, http.StatusPaymentRequired, rec.Code)
+	assert.Equal(t, "text/plain", rec.Header().Get("Content-Type"))
+	assert.Equal(t, "Account balance too low.", rec.Body.String())
 }

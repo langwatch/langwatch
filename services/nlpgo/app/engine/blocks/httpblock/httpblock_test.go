@@ -97,6 +97,24 @@ func TestExtractJSONPath_NumericIndex(t *testing.T) {
 	assert.InDelta(t, 2.0, got, 1e-9)
 }
 
+func TestExtractJSONPath_NegativeSliceAndIndex(t *testing.T) {
+	data := map[string]any{"messages": []any{
+		map[string]any{"content": "first"},
+		map[string]any{"content": "last"},
+	}}
+	got, err := httpblock.ExtractJSONPath(data, "$.messages[-1:].content")
+	require.NoError(t, err)
+	assert.Equal(t, "last", got)
+
+	got, err = httpblock.ExtractJSONPath(data, "$.messages[-1].content")
+	require.NoError(t, err)
+	assert.Equal(t, "last", got)
+
+	got, err = httpblock.ExtractJSONPath(data, "$.messages[:5].content")
+	require.NoError(t, err)
+	assert.Equal(t, []any{"first", "last"}, got)
+}
+
 func TestSSRF_BlocksLoopback(t *testing.T) {
 	for _, u := range []string{
 		"http://127.0.0.1/x",
@@ -477,6 +495,81 @@ func TestSafeDialer_BlocksMetadataIPAtDialTime(t *testing.T) {
 	_, err := dial(context.Background(), "tcp", "imds-bait.example:80")
 	require.Error(t, err)
 	assert.ErrorIs(t, err, httpblock.ErrSSRFBlocked)
+}
+
+// @scenario "An allowlisted hostname that resolves to the metadata address is refused"
+func TestSafeDialer_RefusesAnAllowlistedNameThatResolvesToMetadata(t *testing.T) {
+	opts := httpblock.SSRFOptions{
+		AllowedHosts: []string{"imds-bait.example"},
+		Resolver: func(string) ([]net.IP, error) {
+			return []net.IP{net.ParseIP("10.0.0.5"), net.ParseIP("169.254.169.254")}, nil
+		},
+	}
+	_, err := httpblock.SafeDialer(opts)(context.Background(), "tcp", "imds-bait.example:80")
+	require.ErrorIs(t, err, httpblock.ErrSSRFBlocked)
+	require.ErrorIs(t, httpblock.CheckURL("http://imds-bait.example/latest/meta-data/", opts), httpblock.ErrSSRFBlocked)
+}
+
+// @scenario "The HTTP block falls back across the addresses it checked"
+func TestSafeDialer_DialsAnAllowlistedPrivateNameAtTheCheckedAddress(t *testing.T) {
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+	defer func() { _ = ln.Close() }()
+	_, port, _ := net.SplitHostPort(ln.Addr().String())
+
+	dial := httpblock.SafeDialer(httpblock.SSRFOptions{
+		AllowedHosts: []string{"agent.corp.local"},
+		Resolver: func(string) ([]net.IP, error) {
+			// Nothing listens on the IPv6 loopback, so the dial must fall back.
+			return []net.IP{net.ParseIP("::1"), net.ParseIP("127.0.0.1")}, nil
+		},
+	})
+	conn, err := dial(context.Background(), "tcp", net.JoinHostPort("agent.corp.local", port))
+	require.NoError(t, err)
+	defer func() { _ = conn.Close() }()
+	assert.Equal(t, ln.Addr().String(), conn.RemoteAddr().String())
+}
+
+// @scenario "The HTTP block falls back across the addresses it checked"
+func TestSafeDialer_ASilentAddressDoesNotSpendTheWholeDeadline(t *testing.T) {
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+	defer func() { _ = ln.Close() }()
+	_, port, _ := net.SplitHostPort(ln.Addr().String())
+
+	dial := httpblock.SafeDialer(httpblock.SSRFOptions{
+		AllowedHosts: []string{"agent.corp.local"},
+		Resolver: func(string) ([]net.IP, error) {
+			// 192.0.2.1 is a documentation address: a dial to it hangs or fails.
+			return []net.IP{net.ParseIP("192.0.2.1"), net.ParseIP("127.0.0.1")}, nil
+		},
+	})
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	conn, err := dial(ctx, "tcp", net.JoinHostPort("agent.corp.local", port))
+	require.NoError(t, err)
+	defer func() { _ = conn.Close() }()
+	assert.Equal(t, ln.Addr().String(), conn.RemoteAddr().String())
+}
+
+// @scenario "The HTTP block falls back across the addresses it checked"
+func TestSafeDialer_FallsBackAcrossCheckedAddressesWithoutAnAllowlist(t *testing.T) {
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+	defer func() { _ = ln.Close() }()
+	_, port, _ := net.SplitHostPort(ln.Addr().String())
+
+	dial := httpblock.SafeDialer(httpblock.SSRFOptions{
+		AllowLocal: true,
+		Resolver: func(string) ([]net.IP, error) {
+			// Nothing listens on the IPv6 loopback, so the dial must fall back.
+			return []net.IP{net.ParseIP("::1"), net.ParseIP("127.0.0.1")}, nil
+		},
+	})
+	conn, err := dial(context.Background(), "tcp", net.JoinHostPort("agent.example", port))
+	require.NoError(t, err)
+	defer func() { _ = conn.Close() }()
+	assert.Equal(t, ln.Addr().String(), conn.RemoteAddr().String())
 }
 
 // TestSafeDialer_BlocksLiteralPrivateIP catches direct dials by IP.

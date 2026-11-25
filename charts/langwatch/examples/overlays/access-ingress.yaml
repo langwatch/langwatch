@@ -10,7 +10,12 @@
 #     --set "app.http.baseHost=https://${LANGWATCH_HOST}" \
 #     --set "app.http.publicUrl=https://${LANGWATCH_HOST}" \
 #     --set "ingress.hosts[0].host=${LANGWATCH_HOST}" \
-#     --set "ingress.tls[0].hosts[0]=${LANGWATCH_HOST}"
+#     --set "ingress.tls[0].hosts[0]=${LANGWATCH_HOST}" \
+#     --set "ingress.gateway.host=gateway.${LANGWATCH_HOST}"
+#
+# This uses ingress-nginx. On another controller, change className and swap
+# the nginx annotations for that controller's equivalents; see
+# docs/self-hosting/deployment/routing.
 
 app:
   http:
@@ -33,3 +38,10 @@ ingress:
         paths:
           - path: /
             pathType: Prefix
+  # The AI Gateway gets its own host and its own Ingress object, built from
+  # the settings above. With className nginx the chart adds the streaming,
+  # timeout and body-size annotations the gateway needs.
+  gateway:
+    host: gateway.langwatch.example.com
+    tls:
+      secretName: langwatch-gateway-tls

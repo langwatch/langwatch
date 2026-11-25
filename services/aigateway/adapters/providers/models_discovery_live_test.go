@@ -40,6 +40,7 @@ func TestModelsDiscoveryLive_HostedCatalogs(t *testing.T) {
 		{domain.ProviderXAI, "XAI_API_KEY", "grok"},
 		{domain.ProviderDeepSeek, "DEEPSEEK_API_KEY", "deepseek"},
 		{domain.ProviderCerebras, "CEREBRAS_API_KEY", "llama"},
+		{domain.ProviderDoubleword, "DOUBLEWORD_API_KEY", "deepseek-ai/"},
 	}
 	for _, tc := range cases {
 		t.Run(string(tc.provider), func(t *testing.T) {

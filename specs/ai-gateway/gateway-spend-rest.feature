@@ -40,6 +40,13 @@ Feature: Gateway spend reconciliation REST surface
       Then the pull route's contract states the fixed thirteen month window
       And it warns about downstream biller dedup windows
 
+    @unit
+    Scenario: The pulled envelope publishes every field the webhook delivers
+      Given a confirmed spend row
+      When the pull renders it
+      Then the envelope keeps the typed data fields, identity and rate version included
+      And its usage carries the image quantities as their own fields
+
   Rule: Rollups serve the rebilling loop
 
     @integration

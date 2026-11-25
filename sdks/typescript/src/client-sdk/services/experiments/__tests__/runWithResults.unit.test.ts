@@ -1,11 +1,10 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { ExperimentsFacade } from "../experiments.facade";
+
 import { createLangWatchApiClient } from "@/internal/api/client";
 import { NoOpLogger } from "@/logger";
-import {
-  ExperimentNotFoundError,
-  ExperimentsApiError,
-} from "../platformErrors";
+
+import { ExperimentsFacade } from "../experiments.facade";
+import { ExperimentNotFoundError, ExperimentsApiError } from "../platformErrors";
 
 const mockFetch = vi.fn();
 vi.stubGlobal("fetch", mockFetch);
@@ -17,8 +16,7 @@ const jsonResponse = (body: unknown, init?: ResponseInit): Response =>
     ...init,
   });
 
-const requestAt = (call: number): Request =>
-  mockFetch.mock.calls[call]![0] as Request;
+const requestAt = (call: number): Request => mockFetch.mock.calls[call]![0] as Request;
 
 const ENDPOINT = "https://api.langwatch.test";
 
@@ -113,17 +111,13 @@ describe("ExperimentsFacade.runWithResults", () => {
         // 1) start
         const startReq = requestAt(0);
         expect(startReq.method).toBe("POST");
-        expect(startReq.url).toBe(
-          `${ENDPOINT}/api/evaluations/v3/my-experiment/run`,
-        );
+        expect(startReq.url).toBe(`${ENDPOINT}/api/evaluations/v3/my-experiment/run`);
         expect(await startReq.clone().json()).toEqual({
           data: [{ question: "What is 2 + 2?" }],
         });
 
         // 2) poll
-        expect(requestAt(1).url).toBe(
-          `${ENDPOINT}/api/evaluations/v3/runs/run_1`,
-        );
+        expect(requestAt(1).url).toBe(`${ENDPOINT}/api/evaluations/v3/runs/run_1`);
 
         // 3) results (with experimentSlug)
         expect(requestAt(2).url).toBe(
@@ -175,6 +169,38 @@ describe("ExperimentsFacade.runWithResults", () => {
     });
   });
 
+  describe("given a concurrency is provided", () => {
+    describe("when the run starts", () => {
+      /** @scenario "The SDKs send a concurrency on the run they start" */
+      it("posts the concurrency in the start body", async () => {
+        mockFetch
+          .mockResolvedValueOnce(jsonResponse(startResponse))
+          .mockResolvedValueOnce(jsonResponse(completedStatus))
+          .mockResolvedValueOnce(jsonResponse(resultsResponse));
+
+        await makeFacade().runWithResults("my-experiment", { concurrency: 1, pollInterval: 0 });
+
+        expect(await requestAt(0).clone().json()).toEqual({ concurrency: 1 });
+      });
+    });
+  });
+
+  describe("given a dataset version is provided", () => {
+    describe("when the run completes", () => {
+      it("posts it as dataset_version", async () => {
+        mockFetch
+          .mockResolvedValueOnce(jsonResponse(startResponse))
+          .mockResolvedValueOnce(jsonResponse(completedStatus))
+          .mockResolvedValueOnce(jsonResponse(resultsResponse));
+
+        const facade = makeFacade();
+        await facade.runWithResults("my-experiment", { datasetVersion: 3, pollInterval: 0 });
+
+        expect(await requestAt(0).clone().json()).toEqual({ dataset_version: 3 });
+      });
+    });
+  });
+
   describe("given no overrides are provided", () => {
     describe("when the run completes", () => {
       it("posts a body-less start request", async () => {
@@ -196,17 +222,15 @@ describe("ExperimentsFacade.runWithResults", () => {
   describe("given the run fails", () => {
     describe("when polling reports a failed status", () => {
       it("throws an ExperimentRunFailedError", async () => {
-        mockFetch
-          .mockResolvedValueOnce(jsonResponse(startResponse))
-          .mockResolvedValueOnce(
-            jsonResponse({
-              runId: "run_1",
-              status: "failed",
-              progress: 0,
-              total: 1,
-              error: "execution exploded",
-            }),
-          );
+        mockFetch.mockResolvedValueOnce(jsonResponse(startResponse)).mockResolvedValueOnce(
+          jsonResponse({
+            runId: "run_1",
+            status: "failed",
+            progress: 0,
+            total: 1,
+            error: "execution exploded",
+          }),
+        );
 
         const facade = makeFacade();
         const err = await facade
@@ -251,10 +275,7 @@ describe("ExperimentsFacade.runWithResults", () => {
           .mockResolvedValueOnce(jsonResponse(startResponse))
           .mockResolvedValueOnce(jsonResponse(completedStatus))
           .mockResolvedValueOnce(
-            jsonResponse(
-              { error: "Run not found or results not yet available" },
-              { status: 404 },
-            ),
+            jsonResponse({ error: "Run not found or results not yet available" }, { status: 404 }),
           )
           .mockResolvedValueOnce(jsonResponse(resultsResponse));
 
@@ -283,9 +304,7 @@ describe("ExperimentsFacade.runWithResults", () => {
         mockFetch
           .mockResolvedValueOnce(jsonResponse(startResponse))
           .mockResolvedValueOnce(jsonResponse(noRowsStatus))
-          .mockResolvedValueOnce(
-            jsonResponse({ error: "Unauthorized" }, { status: 401 }),
-          )
+          .mockResolvedValueOnce(jsonResponse({ error: "Unauthorized" }, { status: 401 }))
           // A second results response is queued but must never be reached: with
           // no rows expected, a thrown error is terminal, not a lag retry.
           .mockResolvedValueOnce(jsonResponse(resultsResponse));
@@ -316,9 +335,7 @@ describe("ExperimentsFacade.run error compatibility", () => {
       jsonResponse({ error: "Experiment not found" }, { status: 404 }),
     );
 
-    await expect(makeFacade().run("missing-experiment")).rejects.toThrow(
-      ExperimentNotFoundError,
-    );
+    await expect(makeFacade().run("missing-experiment")).rejects.toThrow(ExperimentNotFoundError);
   });
 
   it("keeps the public API error for invalid credentials", async () => {
@@ -326,8 +343,43 @@ describe("ExperimentsFacade.run error compatibility", () => {
       jsonResponse({ error: "Invalid credentials" }, { status: 401 }),
     );
 
-    await expect(makeFacade().run("my-experiment")).rejects.toThrow(
-      ExperimentsApiError,
-    );
+    await expect(makeFacade().run("my-experiment")).rejects.toThrow(ExperimentsApiError);
+  });
+});
+
+describe("ExperimentsFacade.run concurrency", () => {
+  beforeEach(() => {
+    mockFetch.mockReset();
+    vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+    vi.spyOn(console, "log").mockImplementation(() => undefined);
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  describe("given a concurrency is provided", () => {
+    /** @scenario "The SDKs send a concurrency on the run they start" */
+    it("posts the concurrency in the start body", async () => {
+      mockFetch
+        .mockResolvedValueOnce(jsonResponse(startResponse))
+        .mockResolvedValueOnce(jsonResponse(completedStatus));
+
+      await makeFacade().run("my-experiment", { concurrency: 1, pollInterval: 0 });
+
+      expect(await requestAt(0).clone().json()).toEqual({ concurrency: 1 });
+    });
+  });
+
+  describe("given no concurrency is provided", () => {
+    it("posts a body-less start request", async () => {
+      mockFetch
+        .mockResolvedValueOnce(jsonResponse(startResponse))
+        .mockResolvedValueOnce(jsonResponse(completedStatus));
+
+      await makeFacade().run("my-experiment", { pollInterval: 0 });
+
+      expect(await requestAt(0).clone().text()).toBe("");
+    });
   });
 });

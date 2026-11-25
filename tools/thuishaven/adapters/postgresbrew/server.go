@@ -17,6 +17,7 @@ import (
 	"fmt"
 	"os/exec"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -50,9 +51,13 @@ func (s *Server) Ensure(ctx context.Context) (int, error) {
 		return 0, fmt.Errorf("brew is not installed — haven manages Postgres via `brew services` (install: https://brew.sh)")
 	}
 
-	if isRunning, _ := runningPostgresFormula(ctx); !isRunning {
-		if err := s.start(ctx); err != nil {
-			return 0, err
+	// A server already answering is reused without asking brew: `brew services
+	// list` costs seconds on a loaded machine, pg_isready a few milliseconds.
+	if !s.ready(ctx) {
+		if isRunning, _ := runningPostgresFormula(ctx); !isRunning {
+			if err := s.start(ctx); err != nil {
+				return 0, err
+			}
 		}
 	}
 
@@ -121,7 +126,8 @@ func (s *Server) ready(ctx context.Context) bool {
 
 // ensureRole creates the shared role every stack's DATABASE_URL connects as, if
 // it does not already exist. Idempotent: `CREATE ROLE` has no IF NOT EXISTS, so
-// existence is checked first via pg_roles.
+// existence is checked first via pg_roles. CREATEROLE lets lwql-provision
+// manage LangWatchQL's reader role (lwql_ro); an older role is granted it here.
 func (s *Server) ensureRole(ctx context.Context) error {
 	exists, err := s.queryBool(ctx, "postgres",
 		fmt.Sprintf("SELECT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = %s)", quoteLiteral(domain.PostgresRole)))
@@ -129,9 +135,9 @@ func (s *Server) ensureRole(ctx context.Context) error {
 		return err
 	}
 	if exists {
-		return nil
+		return s.exec(ctx, "postgres", fmt.Sprintf("ALTER ROLE %s CREATEROLE", quoteIdent(domain.PostgresRole)))
 	}
-	sql := fmt.Sprintf("CREATE ROLE %s WITH LOGIN CREATEDB PASSWORD %s",
+	sql := fmt.Sprintf("CREATE ROLE %s WITH LOGIN CREATEDB CREATEROLE PASSWORD %s",
 		quoteIdent(domain.PostgresRole), quoteLiteral(domain.PostgresRolePassword))
 	return s.exec(ctx, "postgres", sql)
 }
@@ -174,6 +180,31 @@ func (s *Server) Databases(ctx context.Context) ([]string, error) {
 	return dbs, nil
 }
 
+// StrayDatabases lists lw_*_test and lw_*_ci databases with no connections whose
+// directory was created more than olderThan ago. Reading the directory's mtime
+// needs superuser (true of the brew server); an error is returned, not guessed.
+func (s *Server) StrayDatabases(ctx context.Context, olderThan time.Duration) ([]string, error) {
+	out, err := s.query(ctx, "postgres", fmt.Sprintf(`SELECT d.datname FROM pg_database d
+JOIN pg_stat_database sd ON sd.datid = d.oid
+WHERE d.datname ~ '^lw_.*_(test|ci)$' AND sd.numbackends = 0
+AND (pg_stat_file('base/' || d.oid || '/PG_VERSION')).modification < now() - interval '%d seconds'
+ORDER BY d.datname`, int64(olderThan.Seconds())))
+	if err != nil {
+		return nil, err
+	}
+	var dbs []string
+	for _, line := range strings.Split(strings.TrimSpace(out), "\n") {
+		if line = strings.TrimSpace(line); line != "" {
+			dbs = append(dbs, line)
+		}
+	}
+	return dbs, nil
+}
+
+// devTuning is only recommended, never written: the server is the user's brew
+// install, not haven's. Needs a restart (shared_buffers, pg_stat_statements).
+const devTuning = "synchronous_commit=off shared_buffers=1GB effective_cache_size=16GB random_page_cost=1.1 max_wal_size=4GB shared_preload_libraries=pg_stat_statements"
+
 // Port returns the configured port (0 only if never constructed via New).
 func (s *Server) Port() int { return s.port }
 
@@ -185,19 +216,53 @@ func (s *Server) Running() bool {
 }
 
 // Health pings the server and returns a one-line status. The formula named is
-// whatever is actually running (live-detected), not necessarily s.formula —
-// each `haven postgres` invocation is a fresh process, so a formula another
-// invocation started (or that was already running) isn't remembered in s.
+// whatever is actually running: the server's own major version when it answers,
+// and only when it does not, `brew services list` (seconds on a loaded machine)
+// for the hint. One psql call reads the version, the tuning and the databases.
 func (s *Server) Health(ctx context.Context) (bool, string) {
-	formula := s.formula
-	if isRunning, active := runningPostgresFormula(ctx); isRunning {
-		formula = active
-	}
 	if !s.ready(ctx) {
+		formula := s.formula
+		if isRunning, active := runningPostgresFormula(ctx); isRunning {
+			formula = active
+		}
 		return false, fmt.Sprintf("not answering on :%d (brew services info %s)", s.port, formula)
 	}
-	dbs, _ := s.Databases(ctx)
-	return true, fmt.Sprintf("up on :%d (%s), %d stack database(s)", s.port, formula, len(dbs))
+	out, _ := s.query(ctx, "postgres", healthQuery) // unreadable: reported as up, zero databases
+	h := parseHealth(s.formula, out)
+	detail := fmt.Sprintf("up on :%d (%s), %d stack database(s)", s.port, h.formula, h.databases)
+	if h.untuned {
+		detail += "; untuned for dev, consider in postgresql.conf: " + devTuning
+	}
+	return true, detail
+}
+
+// healthQuery reads in one round trip what Health reports: the server's major
+// version, whether synchronous_commit is still on, and the stack databases.
+const healthQuery = `SELECT current_setting('server_version_num')::int / 10000,
+current_setting('synchronous_commit') = 'on',
+(SELECT count(*) FROM pg_database WHERE datname LIKE 'lw\_%')`
+
+// serverHealth is healthQuery's one row.
+type serverHealth struct {
+	formula   string
+	untuned   bool
+	databases int
+}
+
+// parseHealth reads healthQuery's `major|untuned|count` row; a field it cannot
+// read keeps the fallback formula, tuned, or zero databases.
+func parseHealth(fallback, out string) serverHealth {
+	h := serverHealth{formula: fallback}
+	fields := strings.Split(strings.TrimSpace(out), "|")
+	if len(fields) != 3 {
+		return h
+	}
+	if major, err := strconv.Atoi(fields[0]); err == nil && major > 0 {
+		h.formula = "postgresql@" + fields[0]
+	}
+	h.untuned = fields[1] == "t"
+	h.databases, _ = strconv.Atoi(fields[2])
+	return h
 }
 
 // Stop is deliberately a no-op. A brew-managed Postgres is a machine-wide

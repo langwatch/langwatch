@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"go.uber.org/zap"
+	"go.uber.org/zap/zaptest/observer"
 
 	"github.com/langwatch/langwatch/infra/clickhouse-serverless/internal/config"
 	"github.com/langwatch/langwatch/infra/clickhouse-serverless/internal/render"
@@ -17,7 +18,7 @@ import (
 const gb1 int64 = 1 << 30
 
 func testInput() *config.Input {
-	return &config.Input{
+	i := &config.Input{
 		CPU:                  4,
 		RAMBytes:             16 * gb1,
 		Replicated:           false,
@@ -32,6 +33,7 @@ func testInput() *config.Input {
 		S3Region:             "us-east-1",
 		LogLevel:             "warning",
 		LogFormat:            "json",
+		LogToFile:            true,
 		SystemLogTTLDays:     30,
 		EnableQueryLog:       true,
 		QueryLogTTLDays:      7,
@@ -58,12 +60,17 @@ func testInput() *config.Input {
 		MetricLogCollectMs:   10000,
 		TextLogLevel:         "warning",
 	}
+	i.ReadTierMaxExecutionTime = 300
+	i.AccessSidecar = "embedded"
+	i.AccessListen = "127.0.0.1:8124"
+	return i
 }
 
 func testLogger() *zap.Logger {
 	return zap.NewNop()
 }
 
+// @scenario "Standalone mode writes no keeper-backed storage configuration"
 func TestRenderAll_CreatesExpectedFiles(t *testing.T) {
 	dir := t.TempDir()
 	input := testInput()
@@ -77,8 +84,11 @@ func TestRenderAll_CreatesExpectedFiles(t *testing.T) {
 		"config.d/limits.yaml",
 		"config.d/logging.yaml",
 		"config.d/network.yaml",
+		"config.d/custom-settings-prefixes.yaml",
+		"config.d/access-control.yaml",
 		"users.d/profiles.yaml",
 		"users.d/default-password.yaml",
+		"users.d/zz-access-management.yaml",
 	}
 
 	for _, f := range expectedFiles {
@@ -90,6 +100,17 @@ func TestRenderAll_CreatesExpectedFiles(t *testing.T) {
 
 	// Keeper + interserver should NOT exist (Replicated=false).
 	for _, f := range []string{"config.d/keeper.yaml", "config.d/interserver.yaml"} {
+		if _, err := os.Stat(filepath.Join(dir, f)); err == nil {
+			t.Errorf("%s should not exist when Replicated=false", f)
+		}
+	}
+
+	// Nor should the keeper-backed stores: a standalone server has no keeper,
+	// and a user_directories file it cannot satisfy stops it from starting.
+	for _, f := range []string{
+		"config.d/user-directories.yaml",
+		"config.d/named-collections-storage.yaml",
+	} {
 		if _, err := os.Stat(filepath.Join(dir, f)); err == nil {
 			t.Errorf("%s should not exist when Replicated=false", f)
 		}
@@ -117,8 +138,9 @@ func TestRenderAll_KeeperNotWrittenForStandalone(t *testing.T) {
 	}
 }
 
-func TestRenderAll_KeeperWrittenForReplicated(t *testing.T) {
-	dir := t.TempDir()
+// replicatedInput is testInput() flipped into replicated mode with a full set
+// of cluster wiring, so every replicated-mode test starts from one shape.
+func replicatedInput() *config.Input {
 	input := testInput()
 	input.Replicated = true
 	input.ClusterName = "mycluster"
@@ -129,6 +151,15 @@ func TestRenderAll_KeeperWrittenForReplicated(t *testing.T) {
 	input.DataNodes = "ch-0.ch-headless,ch-1.ch-headless,ch-2.ch-headless"
 	input.DataNodePort = 9000
 	input.ClusterSecretFile = "/mnt/secrets/cluster-secret"
+	return input
+}
+
+// @scenario "The cluster secret is applied only when asked for"
+func TestRenderAll_KeeperWrittenForReplicated(t *testing.T) {
+	dir := t.TempDir()
+	input := replicatedInput()
+	input.ClusterSecretEnabled = true
+	input.ClusterSecret = "cluster-secret-value"
 	computed := config.ComputeFromResources(input.CPU, input.RAMBytes, input)
 
 	if err := render.RenderAll(testLogger(), input, computed, dir); err != nil {
@@ -149,11 +180,58 @@ func TestRenderAll_KeeperWrittenForReplicated(t *testing.T) {
 		"shard_01",
 		"node-0",
 		"internal_replication: true",
-		"from_file",
-		"/mnt/secrets/cluster-secret",
+		"secret: cluster-secret-value",
 	} {
 		if !strings.Contains(content, want) {
 			t.Errorf("keeper.yaml missing %q\n--- actual content ---\n%s", want, content)
+		}
+	}
+	// ClickHouse has no from_file substitution; the attribute would leave the secret empty.
+	if strings.Contains(content, "from_file") {
+		t.Errorf("keeper.yaml must carry the secret value, not a from_file attribute\n%s", content)
+	}
+}
+
+// Without the opt-in the secret renders as before (an ignored from_file
+// attribute), so a rolling upgrade never mixes secret and no-secret pods.
+// @scenario "The cluster secret is applied only when asked for"
+func TestRenderAll_ClusterSecretOffKeepsEarlierShape(t *testing.T) {
+	dir := t.TempDir()
+	input := replicatedInput()
+	computed := config.ComputeFromResources(input.CPU, input.RAMBytes, input)
+
+	core, logs := observer.New(zap.WarnLevel)
+	if err := render.RenderAll(zap.New(core), input, computed, dir); err != nil {
+		t.Fatalf("RenderAll: %v", err)
+	}
+	if logs.FilterMessageSnippet("CLICKHOUSE_CLUSTER_SECRET_ENABLED").Len() != 1 {
+		t.Errorf("want one warning naming CLICKHOUSE_CLUSTER_SECRET_ENABLED, got %v", logs.All())
+	}
+	data, err := os.ReadFile(filepath.Join(dir, "config.d/keeper.yaml"))
+	if err != nil {
+		t.Fatalf("read keeper.yaml: %v", err)
+	}
+	if !strings.Contains(string(data), "'@from_file': /mnt/secrets/cluster-secret") {
+		t.Errorf("keeper.yaml should keep the from_file attribute without the opt-in\n%s", data)
+	}
+}
+
+// @scenario "A deployment that still sets CACHE_MAX_SIZE is told it is no longer read"
+func TestRenderAll_RetiredCacheMaxSizeWarns(t *testing.T) {
+	for _, tc := range []struct {
+		value string
+		warns int
+	}{{"", 0}, {"10737418240", 1}} {
+		input := testInput()
+		input.RetiredCacheMaxSize = tc.value
+		computed := config.ComputeFromResources(input.CPU, input.RAMBytes, input)
+
+		core, logs := observer.New(zap.WarnLevel)
+		if err := render.RenderAll(zap.New(core), input, computed, t.TempDir()); err != nil {
+			t.Fatalf("RenderAll: %v", err)
+		}
+		if got := logs.FilterMessageSnippet("CACHE_MAX_SIZE").Len(); got != tc.warns {
+			t.Errorf("CACHE_MAX_SIZE=%q: %d warnings, want %d: %v", tc.value, got, tc.warns, logs.All())
 		}
 	}
 }
@@ -194,8 +272,8 @@ func TestRenderAll_LimitsContainsMergeTreeSettings(t *testing.T) {
 	content := string(data)
 	checks := []string{
 		"merge_tree:",
-		"max_parts_to_merge_at_once: 8",   // 4 CPU -> 8
-		"background_pool_size: 2",          // max(2, 4/2) = 2
+		"max_parts_to_merge_at_once: 8", // 4 CPU -> 8
+		"background_pool_size: 2",       // max(2, 4/2) = 2
 		"max_server_memory_usage:",
 		"query_log:",
 		"INTERVAL 7 DAY DELETE", // query_log TTL
@@ -204,6 +282,48 @@ func TestRenderAll_LimitsContainsMergeTreeSettings(t *testing.T) {
 	for _, check := range checks {
 		if !strings.Contains(content, check) {
 			t.Errorf("limits.yaml missing %q", check)
+		}
+	}
+}
+
+// @scenario "The image holds 25.10 behaviour on ClickHouse 26.8"
+func TestRenderAll_UpgradePinsHold25_10Behaviour(t *testing.T) {
+	dir := t.TempDir()
+	input := testInput()
+	computed := config.ComputeFromResources(input.CPU, input.RAMBytes, input)
+
+	if err := render.RenderAll(testLogger(), input, computed, dir); err != nil {
+		t.Fatalf("RenderAll: %v", err)
+	}
+
+	files := map[string][]string{
+		"config.d/limits.yaml": {
+			"propagate_types_serialization_versions_to_nested_types: 0",
+			"escape_index_filenames: 0",
+			"serialization_info_version: basic",
+			"string_serialization_version: single_stream",
+			"patch_parts_version: v1",
+			"packed_skip_index_max_bytes: 0",
+			`auto_statistics_types: ""`,
+			"asynchronous_metrics_key_values_mode: legacy_names",
+			"memory_worker_dynamic_hard_limit: 0",
+		},
+		"users.d/profiles.yaml": {
+			`compatibility: "25.10"`,
+			"input_format_read_datetime_number_as_raw_value: 1",
+			"deduplicate_insert: backward_compatible_choice",
+		},
+	}
+
+	for file, checks := range files {
+		data, err := os.ReadFile(filepath.Join(dir, file))
+		if err != nil {
+			t.Fatalf("read %s: %v", file, err)
+		}
+		for _, check := range checks {
+			if !strings.Contains(string(data), check) {
+				t.Errorf("%s missing %q", file, check)
+			}
 		}
 	}
 }
@@ -386,5 +506,215 @@ func TestRenderAll_NetworkSettings(t *testing.T) {
 	}
 	if !strings.Contains(profContent, "tcp_keep_alive_timeout: 20") {
 		t.Error("profiles.yaml should contain tcp_keep_alive_timeout: 20")
+	}
+}
+
+func TestRenderAll_LangWatchQLAccessPrerequisites(t *testing.T) {
+	dir := t.TempDir()
+	input := testInput()
+	computed := config.ComputeFromResources(input.CPU, input.RAMBytes, input)
+
+	if err := render.RenderAll(testLogger(), input, computed, dir); err != nil {
+		t.Fatalf("RenderAll: %v", err)
+	}
+
+	prefixData, err := os.ReadFile(filepath.Join(dir, "config.d/custom-settings-prefixes.yaml"))
+	if err != nil {
+		t.Fatalf("read custom-settings-prefixes.yaml: %v", err)
+	}
+	if !strings.Contains(string(prefixData), "custom_settings_prefixes: custom_") {
+		t.Error("custom-settings-prefixes.yaml should declare the custom_ prefix")
+	}
+
+	// The zz- name is load-bearing: users.d merges lexicographically and the
+	// later file wins, so this must sort after any access_management: 0.
+	accessData, err := os.ReadFile(filepath.Join(dir, "users.d/zz-access-management.yaml"))
+	if err != nil {
+		t.Fatalf("read zz-access-management.yaml: %v", err)
+	}
+	accessContent := string(accessData)
+	for _, want := range []string{
+		"access_management: 1",
+		"named_collection_control: 1",
+		"show_named_collections: 1",
+	} {
+		if !strings.Contains(accessContent, want) {
+			t.Errorf("zz-access-management.yaml should contain %q", want)
+		}
+	}
+	// show_named_collections_secrets is deliberately withheld (SaaS parity): it
+	// would expose the lwql_postgres plaintext PG password via SHOW CREATE NAMED
+	// COLLECTION.
+	if strings.Contains(accessContent, "show_named_collections_secrets") {
+		t.Error("zz-access-management.yaml must NOT grant show_named_collections_secrets (exposes lwql_postgres plaintext password)")
+	}
+}
+
+// The access-DDL permission and the custom_ prefix are properties of every
+// server, not of a topology. Gating either on replicated mode would break
+// single-replica LangWatchQL, so both modes are asserted from one table.
+// @scenario "Access management stays enabled in <mode> mode"
+func TestRenderAll_AccessPrerequisitesPresentInBothModes(t *testing.T) {
+	for _, tc := range []struct {
+		name  string
+		input *config.Input
+	}{
+		{"standalone", testInput()},
+		{"replicated", replicatedInput()},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			dir := t.TempDir()
+			computed := config.ComputeFromResources(tc.input.CPU, tc.input.RAMBytes, tc.input)
+
+			if err := render.RenderAll(testLogger(), tc.input, computed, dir); err != nil {
+				t.Fatalf("RenderAll: %v", err)
+			}
+
+			prefixData, err := os.ReadFile(filepath.Join(dir, "config.d/custom-settings-prefixes.yaml"))
+			if err != nil {
+				t.Fatalf("read custom-settings-prefixes.yaml: %v", err)
+			}
+			if !strings.Contains(string(prefixData), "custom_settings_prefixes: custom_") {
+				t.Error("custom-settings-prefixes.yaml should declare the custom_ prefix")
+			}
+
+			accessData, err := os.ReadFile(filepath.Join(dir, "users.d/zz-access-management.yaml"))
+			if err != nil {
+				t.Fatalf("read zz-access-management.yaml: %v", err)
+			}
+			if !strings.Contains(string(accessData), "access_management: 1") {
+				t.Error("zz-access-management.yaml should grant access_management")
+			}
+			if !strings.Contains(string(accessData), "named_collection_control: 1") {
+				t.Error("zz-access-management.yaml should grant named_collection_control")
+			}
+		})
+	}
+}
+
+// Design C (issue langwatch-saas#1168) deletes the keeper-backed access and
+// named-collection stores outright: a chart-managed server renders the
+// LangWatchQL access model as config rather than accepting SQL-created
+// entities into a replicated directory. renderUserDirectories and
+// renderNamedCollectionsStorage no longer exist, so neither file is ever
+// written — asserted for both modes by TestRenderAll_NoKeeperBackedAccessStores.
+// @scenario "No keeper-backed access or named-collection store is written in any mode"
+func TestRenderAll_NoKeeperBackedAccessStores(t *testing.T) {
+	for _, tc := range []struct {
+		name  string
+		input *config.Input
+	}{
+		{"standalone", testInput()},
+		{"replicated", replicatedInput()},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			dir := t.TempDir()
+			computed := config.ComputeFromResources(tc.input.CPU, tc.input.RAMBytes, tc.input)
+
+			if err := render.RenderAll(testLogger(), tc.input, computed, dir); err != nil {
+				t.Fatalf("RenderAll: %v", err)
+			}
+
+			// No chart-written user_directories anywhere: the merge/precedence
+			// hazard (AC8) that file caused is deleted, not mitigated.
+			for _, f := range []string{
+				"config.d/user-directories.yaml",
+				"config.d/named-collections-storage.yaml",
+			} {
+				if _, err := os.Stat(filepath.Join(dir, f)); err == nil {
+					t.Errorf("%s must never be written under Design C", f)
+				}
+			}
+		})
+	}
+}
+
+// The chart-managed server never renders a LangWatchQL access model of its
+// own — the app self-provisions the langwatch_lwql user, its profile, grants
+// and the lwql_postgres named collection via SQL DDL at boot (issue #8258).
+// @scenario "Chart-managed ClickHouse renders no LangWatchQL access model"
+func TestRenderAll_NoLWQLAccessModelRendered(t *testing.T) {
+	dir := t.TempDir()
+	input := testInput()
+	computed := config.ComputeFromResources(input.CPU, input.RAMBytes, input)
+
+	if err := render.RenderAll(testLogger(), input, computed, dir); err != nil {
+		t.Fatalf("RenderAll: %v", err)
+	}
+
+	for _, f := range []string{"users.d/lwql.yaml", "config.d/lwql-server.yaml"} {
+		if _, err := os.Stat(filepath.Join(dir, f)); err == nil {
+			t.Errorf("%s must never be written — the app owns the LangWatchQL access model", f)
+		}
+	}
+}
+
+// settings_constraints_replace_previous is not part of the LangWatchQL access
+// model itself — it is a server prerequisite the app's self-provisioned
+// `<database>_profile` settings profile (`langwatch_profile` by default)
+// depends on to mark custom_api_key_hash changeable_in_readonly, and it must
+// be rendered unconditionally (no LWQL password gate any more).
+func TestRenderAll_SettingsConstraintsReplacePrevious(t *testing.T) {
+	dir := t.TempDir()
+	input := testInput()
+	computed := config.ComputeFromResources(input.CPU, input.RAMBytes, input)
+
+	if err := render.RenderAll(testLogger(), input, computed, dir); err != nil {
+		t.Fatalf("RenderAll: %v", err)
+	}
+
+	data, err := os.ReadFile(filepath.Join(dir, "config.d", "access-control.yaml"))
+	if err != nil {
+		t.Fatalf("read access-control.yaml: %v", err)
+	}
+	if !strings.Contains(string(data), "settings_constraints_replace_previous: true") {
+		t.Errorf("access-control.yaml should contain settings_constraints_replace_previous: true\n--- actual ---\n%s", string(data))
+	}
+}
+
+// The LangWatchQL app functions are SQL user-defined functions created by DDL,
+// and a CREATE FUNCTION writes the local disk store of whichever replica ran
+// it. In replicated mode the store has to live in Keeper instead, or two of
+// the three replicas answer UNKNOWN_FUNCTION for a function the third has.
+// @scenario "A replicated chart-managed server stores the functions in Keeper"
+func TestRenderAll_LWQLUserDefinedStoreInKeeperForReplicated(t *testing.T) {
+	dir := t.TempDir()
+	input := replicatedInput()
+	computed := config.ComputeFromResources(input.CPU, input.RAMBytes, input)
+
+	if err := render.RenderAll(testLogger(), input, computed, dir); err != nil {
+		t.Fatalf("RenderAll: %v", err)
+	}
+
+	serverData, err := os.ReadFile(filepath.Join(dir, "config.d", "access-control.yaml"))
+	if err != nil {
+		t.Fatalf("read config.d/access-control.yaml: %v", err)
+	}
+	server := string(serverData)
+	if !strings.Contains(server, "user_defined_zookeeper_path: /clickhouse/user_defined") {
+		t.Errorf("replicated mode must move the SQL function store into Keeper\n--- actual ---\n%s", server)
+	}
+}
+
+// On a single node there is no Keeper to reach, so declaring the path would
+// point the function store at an ensemble that is not there. The control for
+// the test above: without it, a renderer that always wrote the path would pass
+// that one and be wrong here.
+// @scenario "A single-node server stores them on local disk"
+func TestRenderAll_LWQLUserDefinedStoreLocalForStandalone(t *testing.T) {
+	dir := t.TempDir()
+	input := testInput()
+	computed := config.ComputeFromResources(input.CPU, input.RAMBytes, input)
+
+	if err := render.RenderAll(testLogger(), input, computed, dir); err != nil {
+		t.Fatalf("RenderAll: %v", err)
+	}
+
+	serverData, err := os.ReadFile(filepath.Join(dir, "config.d", "access-control.yaml"))
+	if err != nil {
+		t.Fatalf("read config.d/access-control.yaml: %v", err)
+	}
+	if strings.Contains(string(serverData), "user_defined_zookeeper_path") {
+		t.Errorf("standalone mode must leave the SQL function store on local disk\n--- actual ---\n%s", string(serverData))
 	}
 }

@@ -1,9 +1,11 @@
 import chalk from "chalk";
-import { createSpinner } from "../../utils/spinner";
+
 import { WorkflowsApiService } from "@/client-sdk/services/workflows/workflows-api.service";
+
 import { resolveCredentials } from "../../utils/apiKey";
-import { failSpinner } from "../../utils/spinnerError";
 import type { CommandResult } from "../../utils/output";
+import { createSpinner } from "../../utils/spinner";
+import { failSpinner } from "../../utils/spinnerError";
 
 export const getWorkflowCommand = async (id: string): Promise<CommandResult | void> => {
   await resolveCredentials();
@@ -25,10 +27,18 @@ export const getWorkflowCommand = async (id: string): Promise<CommandResult | vo
         if (workflow.description) {
           console.log(`  ${chalk.gray("Description:")} ${workflow.description}`);
         }
-        console.log(`  ${chalk.gray("Evaluator:")}   ${workflow.isEvaluator ? chalk.green("yes") : "no"}`);
-        console.log(`  ${chalk.gray("Component:")}   ${workflow.isComponent ? chalk.green("yes") : "no"}`);
-        console.log(`  ${chalk.gray("Created:")}     ${new Date(workflow.createdAt).toLocaleString()}`);
-        console.log(`  ${chalk.gray("Updated:")}     ${new Date(workflow.updatedAt).toLocaleString()}`);
+        console.log(
+          `  ${chalk.gray("Evaluator:")}   ${workflow.isEvaluator ? chalk.green("yes") : "no"}`,
+        );
+        console.log(
+          `  ${chalk.gray("Component:")}   ${workflow.isComponent ? chalk.green("yes") : "no"}`,
+        );
+        console.log(
+          `  ${chalk.gray("Created:")}     ${new Date(workflow.createdAt).toLocaleString()}`,
+        );
+        console.log(
+          `  ${chalk.gray("Updated:")}     ${new Date(workflow.updatedAt).toLocaleString()}`,
+        );
         console.log();
       },
     };

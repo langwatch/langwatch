@@ -185,7 +185,7 @@ Feature: AI Gateway Governance — Admin RoutingPolicies (decoupled from VK)
   @bdd @ui @routing-policy @user-visibility
   Scenario: Personal Settings page shows the policy a user's keys reference
     Given jane's personal VK references the "developer-default" policy
-    When she navigates to "/me/settings"
+    When she navigates to "/coding-agents/configure"
     Then a small "Routing policy" line in the Profile section reads "Routing: developer-default (managed by your org)"
     And the line links to a read-only policy preview drawer (no edit affordance)
 
@@ -248,7 +248,13 @@ Feature: AI Gateway Governance — Admin RoutingPolicies (decoupled from VK)
   # The editor
   # ---------------------------------------------------------------------------
 
-  Rule: The routing policy editor opens from its own address
+  Rule: The routing policy editor opens from one address, whoever opened it
+
+    The editor is reached from two places that have nothing else in common: a
+    row on the policies table, and a virtual key's detail page saying which
+    policy that key routes through. Both have to land on the same editor
+    showing the same policy, and the link has to survive being pasted to a
+    colleague who is on neither page.
 
     @integration
     Scenario: Editing a policy from the list opens the editor for that policy
@@ -256,6 +262,18 @@ Feature: AI Gateway Governance — Admin RoutingPolicies (decoupled from VK)
       When carol picks Edit from the policy's actions
       Then the routing policy editor opens for that policy
       And the address carries the policy, so the same link reopens it
+
+    @integration
+    Scenario: An editor opened from a pasted link closes back to the page under it
+      Given carol opened the routing policy editor from a link, with no page handing it a close action
+      When she closes the editor
+      Then the address loses every drawer parameter and keeps the rest of its query
+
+    @integration
+    Scenario: A guardrail editor opened from a pasted link closes back to the page under it
+      Given carol opened the guardrail editor from a link, with no page handing it a close action
+      When she closes the editor
+      Then the address loses every drawer parameter and keeps the rest of its query
 
     @integration
     Scenario: A tier name cannot be set twice

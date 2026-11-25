@@ -1,0 +1,360 @@
+/**
+ * One metered judge call (ADR-174 decisions 8, 10, 14, 15): cloud only, unknown project, budget,
+ * classify, price, priced fact; a refusal is returned. An own model skips all but the call (ADR-182
+ * decision 7). Spec: modules/instant-eval/specs/instant-eval-judge-model.feature
+ */
+
+import {
+  INSTANT_EVAL_FREE_BUDGET_USD,
+  InstantEvalFreeBudgetExhaustedError,
+  InstantEvalJudgeStoppedError,
+  isInstantEvalSpendBillable,
+  pickInstantEvalJudgementRoutedSpend,
+  pickInstantEvalRoutedSpend,
+  instantEvalSkipped,
+  type InstantEvalClassification,
+  type InstantEvalJudgeAnswer,
+  type InstantEvalJudgeCall,
+  type InstantEvalJudgement,
+  type InstantEvalJudgeRefusalCode,
+  type InstantEvalJudgeRoutePricing,
+  type InstantEvalJudgeSpendPricedEventData,
+  type InstantEvalJudgeSpendRecord,
+  type InstantEvalPricing,
+  type InstantEvalRoutedSpend,
+} from "@langwatch/instant-eval-judge-contract";
+import { createLogger, type Logger } from "@langwatch/observability";
+import type { Instant } from "@langwatch/time";
+
+import type {
+  InstantEvalClassifierChannel,
+  InstantEvalRateLimiter,
+} from "../channels/instant-eval-classifier.channel.ts";
+import type {
+  InstantEvalDecisionModelAnswer,
+  InstantEvalDecisionModelChannel,
+} from "../channels/instant-eval-decision-model.channel.ts";
+import type { InstantEvalProviderSpend } from "../channels/instant-eval-judge.channels.ts";
+import type { InstantEvalJudgeRepositories } from "../repositories/instant-eval-judge.repositories.ts";
+import { instantEvalJudgeBudgetOf } from "../rules/instant-eval-judge-budget.rules.ts";
+import {
+  instantEvalJudgeSpendPricedOf,
+  instantEvalJudgeSpendRequestId,
+} from "../rules/instant-eval-judge-spend.rules.ts";
+import type { InstantEvalJudgeRouterService } from "./instant-eval-judge-router.service.ts";
+
+const defaultLogger: Logger = createLogger("langwatch:instant-eval-judge:judge");
+
+/** The two levels the judge call logs at, injected so a test can read them. */
+type InstantEvalJudgeLogger = Pick<Logger, "warn" | "error">;
+
+/** Its own request type, so the tokens never count against the Instant Evals free budget. */
+const OWN_DECISION_MODEL_REQUEST_TYPE = "instant_eval_decision_model";
+
+const PROJECT_UNKNOWN_MESSAGE =
+  "Instant Evals has not learned this project yet, so it judged nothing.";
+const NOT_CONFIGURED_MESSAGE =
+  "Instant Evals judges only on LangWatch cloud, so this installation judged nothing.";
+
+type InstantEvalJudgeServiceDeps = Readonly<{
+  repositories: Pick<InstantEvalJudgeRepositories, "projects" | "usageBilling" | "spend">;
+  /** LangWatch's own classifier; absent where the deployment holds no key. */
+  classifier: InstantEvalClassifierChannel | undefined;
+  /** An organization's own decision model, unmetered and uncapped (ADR-182 decision 7). */
+  decisionModels: InstantEvalDecisionModelChannel;
+  /** Where an own model's provider tokens are written; absent writes nothing (ADR-193). */
+  spend?: InstantEvalProviderSpend;
+  /** Paces every classify send over the module's own rate buckets. */
+  limiter: InstantEvalRateLimiter;
+  /** Answers a call that carries a route. */
+  router: InstantEvalJudgeRouterService;
+  /** The router's prices; a routed spend is priced from its cost at this markup. */
+  routePricing: InstantEvalJudgeRoutePricing;
+  /** LangWatch cloud, the only install a judge call is answered on. */
+  isCloud: boolean;
+  /** Appends the priced fact; the judge's spend row and gateway's ledger row follow from it. */
+  recordSpendPriced: (fact: InstantEvalJudgeSpendPricedEventData) => Promise<void>;
+  mintRequestId: () => string;
+  now: () => Instant;
+  /** The published rates; a test names its own so a price comes out round. */
+  pricing?: InstantEvalPricing;
+  logger?: InstantEvalJudgeLogger;
+}>;
+
+export class InstantEvalJudgeService {
+  private readonly logger: InstantEvalJudgeLogger;
+
+  private constructor(private readonly deps: InstantEvalJudgeServiceDeps) {
+    this.logger = deps.logger ?? defaultLogger;
+  }
+
+  static create(deps: InstantEvalJudgeServiceDeps): InstantEvalJudgeService {
+    return new InstantEvalJudgeService(deps);
+  }
+
+  /**
+   * One unmetered classify, the one dispatch `judge` and the Api's `classify` share: an own
+   * decision model, else the router for a routed call, else LangWatch's classifier, else a skip.
+   */
+  async classifyOnce({
+    projectId,
+    text,
+    questions,
+    signal,
+    decisionModel,
+    route,
+    requestKey,
+  }: InstantEvalClassification & {
+    requestKey?: string | undefined;
+  }): Promise<InstantEvalJudgement> {
+    const signalArgs = signal ? [signal] : [];
+    if (decisionModel) {
+      const startedAt = this.deps.now().epochMilliseconds;
+      const { providerUsage, ...judgement } = await this.deps.decisionModels.classify(
+        { text, questions, decisionModel },
+        ...signalArgs,
+      );
+      await this.recordOwnModelUsage({
+        projectId,
+        model: decisionModel.model,
+        providerUsage,
+        startedAt,
+        requestKey,
+      });
+      return judgement;
+    }
+    const { classifier, limiter, router } = this.deps;
+    // The router skips a missing classifier itself, and its table may never reach it.
+    if (route) {
+      return router.classify({ projectId, text, questions, route, ...(signal ? { signal } : {}) });
+    }
+    if (!classifier) return instantEvalSkipped("classifier_not_configured");
+    return classifier.classify({ projectId, text, questions, limiter }, ...signalArgs);
+  }
+
+  /** Best effort: the provider already billed the call, so a ledger failure is only logged. */
+  private async recordOwnModelUsage({
+    projectId,
+    model,
+    providerUsage,
+    startedAt,
+    requestKey,
+  }: {
+    projectId: string;
+    model: string;
+    providerUsage: InstantEvalDecisionModelAnswer["providerUsage"];
+    startedAt: number;
+    requestKey: string | undefined;
+  }): Promise<void> {
+    if (!providerUsage || !this.deps.spend) return;
+    const occurredAt = this.deps.now().epochMilliseconds;
+    const callId = instantEvalJudgeSpendRequestId({ requestKey, mint: this.deps.mintRequestId });
+    const entry = {
+      requestId: `${OWN_DECISION_MODEL_REQUEST_TYPE}:${callId}:${model}`,
+      projectId,
+      model,
+      requestType: OWN_DECISION_MODEL_REQUEST_TYPE,
+      usage: { input_tokens: providerUsage.inputTokens, output_tokens: providerUsage.outputTokens },
+      durationMs: occurredAt - startedAt,
+      occurredAt,
+    };
+    try {
+      const { status } = await this.deps.spend.recordProviderUsage(entry);
+      if (status !== "recorded") {
+        this.logger.error(
+          { ...entry, status },
+          "own decision model usage not written to the ledger",
+        );
+      }
+    } catch (error) {
+      this.logger.error({ ...entry, error }, "own decision model usage not written to the ledger");
+    }
+  }
+
+  async judge({ requestKey, ...call }: InstantEvalJudgeCall): Promise<InstantEvalJudgeAnswer> {
+    const { projectId, decisionModel } = call;
+    if (decisionModel) {
+      const judgement = await this.classifyOnce({ ...call, requestKey });
+      return { outcome: "judged", judgement, priceUsd: 0 };
+    }
+    // Off cloud nothing judges, so the project's placement is never the reason to give. A routed
+    // call needs no hosted classifier key: boot checks the keys its table can reach.
+    if (!this.deps.isCloud || (!this.deps.classifier && !call.route)) {
+      return refused({ code: "classifier_not_configured", message: NOT_CONFIGURED_MESSAGE });
+    }
+    const placement = await this.deps.repositories.projects.getPlacement({ projectId });
+    if (placement.outcome === "unknown") {
+      // The project catch-up teaches it: the log names the job, so the gap shows on first refusal.
+      this.logger.warn(
+        { projectId },
+        "Instant Evals judge refused a project it has not learned; retry the project:record-created-facts step in Ops",
+      );
+      return refused({ code: "instant_eval_project_unknown", message: PROJECT_UNKNOWN_MESSAGE });
+    }
+
+    const { organizationId } = placement;
+    const budget = await this.budgetOf({ organizationId });
+    if (budget.outcome === "exhausted") {
+      const { message } = new InstantEvalFreeBudgetExhaustedError({
+        spentUsd: budget.spentUsd,
+        budgetUsd: INSTANT_EVAL_FREE_BUDGET_USD,
+      });
+      return refused({ code: "instant_eval_free_budget_exhausted", message });
+    }
+
+    const spend = { organizationId, projectId, requestKey };
+    const judgement = await this.classifyRecordingStop({ spend, call });
+    // A skip billed nothing, so it records nothing; a routed cost with no input tokens still bills.
+    if (!isInstantEvalSpendBillable(judgement))
+      return { outcome: "judged", judgement, priceUsd: 0 };
+
+    const { inputTokens, costNanoUsd } = judgement;
+    const priceUsd = await this.priceAndRecord({ ...spend, inputTokens, costNanoUsd });
+    return { outcome: "judged", judgement, priceUsd };
+  }
+
+  /**
+   * One classify; a routed stop after paid legs records what they spent under a freshly minted
+   * request id, never the retry key, so the redelivery keeps the key's row. A spend that cannot be
+   * written is logged with what it spent, and the stop is still what the caller gets.
+   */
+  private async classifyRecordingStop({
+    spend,
+    call,
+  }: {
+    spend: Readonly<{ organizationId: string; projectId: string; requestKey?: string | undefined }>;
+    call: InstantEvalClassification;
+  }): Promise<InstantEvalJudgement> {
+    try {
+      return await this.classifyOnce(call);
+    } catch (error) {
+      if (error instanceof InstantEvalJudgeStoppedError) {
+        const { organizationId, projectId } = spend;
+        const { inputTokens, costNanoUsd } = error;
+        try {
+          await this.priceAndRecord({ organizationId, projectId, inputTokens, costNanoUsd });
+        } catch (recordError) {
+          this.logger.error(
+            { error: recordError, organizationId, projectId, inputTokens, costNanoUsd },
+            "Instant Evals judge could not record a stopped call's paid legs; rethrowing the stop",
+          );
+        }
+      }
+      throw error;
+    }
+  }
+
+  /** One paid call, priced and recorded. The router prices all it returns: a cost marks routed. */
+  private async priceAndRecord({
+    organizationId,
+    projectId,
+    requestKey,
+    inputTokens,
+    costNanoUsd,
+  }: {
+    organizationId: string;
+    projectId: string;
+    requestKey?: string | undefined;
+    inputTokens: number;
+    costNanoUsd: number | undefined;
+  }): Promise<number> {
+    const { priceUsd, fact } = instantEvalJudgeSpendPricedOf({
+      organizationId,
+      projectId,
+      requestId: instantEvalJudgeSpendRequestId({
+        requestKey,
+        mint: this.deps.mintRequestId,
+      }),
+      inputTokens,
+      occurredAt: this.deps.now().epochMilliseconds,
+      ...this.pricing(),
+      routed: this.priced(pickInstantEvalJudgementRoutedSpend({ inputTokens, costNanoUsd })),
+    });
+    await this.record({ fact });
+    return priceUsd;
+  }
+
+  /**
+   * A run's or judged query's spend, under the organization its caller resolved: no project
+   * placement and no budget is read here, since runs keep their own $1 check (decision 12).
+   * A fact that cannot be stored throws, so a run's finish retries onto the same request id.
+   */
+  async recordSpend({
+    organizationId,
+    projectId,
+    requestId,
+    inputTokens,
+    costNanoUsd,
+    routedInputTokens,
+    requests,
+    runId,
+    occurredAt,
+  }: InstantEvalJudgeSpendRecord): Promise<void> {
+    if (!isInstantEvalSpendBillable({ inputTokens, costNanoUsd })) return;
+    const { fact } = instantEvalJudgeSpendPricedOf({
+      organizationId,
+      projectId,
+      requestId,
+      inputTokens,
+      occurredAt,
+      requests,
+      runId,
+      ...this.pricing(),
+      routed: this.priced(pickInstantEvalRoutedSpend({ costNanoUsd, routedInputTokens })),
+    });
+    await this.deps.recordSpendPriced(fact);
+  }
+
+  /** A routed spend is priced from its routed cost at the router's prices; none, as before. */
+  private priced(routed: InstantEvalRoutedSpend | undefined) {
+    return routed && { ...routed, pricing: this.deps.routePricing };
+  }
+
+  private pricing(): { pricing?: InstantEvalPricing } {
+    return this.deps.pricing ? { pricing: this.deps.pricing } : {};
+  }
+
+  /** Only the judge call reads the usage-billing copy; an organization never folded is capped. */
+  private async budgetOf({ organizationId }: { organizationId: string }) {
+    const { usageBilling, spend } = this.deps.repositories;
+    const [billing, total] = await Promise.all([
+      usageBilling.getUsageBilling({ organizationId }),
+      spend.getTotal({ organizationId }),
+    ]);
+    return instantEvalJudgeBudgetOf({
+      usageBilled: billing.outcome === "folded" && billing.fact.usageBilled,
+      spentNanoUsd: total.spendNanoUsd,
+    });
+  }
+
+  /**
+   * The classifier was paid, so a cancelled caller still records. A fact that cannot be appended
+   * is logged and the verdict kept, as a judged query does today (ADR-174 decision 8).
+   */
+  private async record({ fact }: { fact: InstantEvalJudgeSpendPricedEventData }): Promise<void> {
+    try {
+      await this.deps.recordSpendPriced(fact);
+    } catch (error) {
+      this.logger.error(
+        {
+          error,
+          organizationId: fact.organizationId,
+          projectId: fact.projectId,
+          requestId: fact.requestId,
+          priceNanoUsd: fact.priceNanoUsd,
+        },
+        "Instant Evals judge spend could not be recorded; the verdict is kept",
+      );
+    }
+  }
+}
+
+function refused({
+  code,
+  message,
+}: {
+  code: InstantEvalJudgeRefusalCode;
+  message: string;
+}): InstantEvalJudgeAnswer {
+  return { outcome: "refused", code, message };
+}

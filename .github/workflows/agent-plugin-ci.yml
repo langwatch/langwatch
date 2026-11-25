@@ -7,11 +7,12 @@
 # ones that still do.
 #
 # What it guards: the plugin is published as a directory of hand-authored JSON
-# plus one bundled script, so nothing about it is checked by any other job. Its
-# manifests are read by two clients that both fail quietly (an Agent Plugins
-# client rejects a manifest that violates the closed schema; Claude Code loads a
-# plugin whose hooks point at a file that is not there), and the bundle is only
-# ever exercised by spawning it.
+# plus one committed launcher script that runs the installed `langwatch` CLI,
+# so nothing about it is checked by any other job. Its manifests are read by
+# two clients that both fail quietly (an Agent Plugins client rejects a
+# manifest that violates the closed schema; Claude Code loads a plugin whose
+# hooks point at a file that is not there), and the launcher is only ever
+# exercised by spawning it against the built CLI.
 name: agent-plugin-ci
 
 on:
@@ -25,16 +26,20 @@ on:
     # ready_for_review is NOT a default pull_request activity type. Without
     # it, taking a PR out of draft fires no event at all, so the job's draft
     # guard below would never get its first non-draft run.
+    # No `labeled`: a label starts no run, and `ci:full` counts from the next push.
     types: [opened, synchronize, reopened, ready_for_review]
     paths:
-      # The hook script is bundled from the SDK sources below, so a change to
-      # any of them changes what the published plugin runs.
       - "plugins/**"
-      - "sdks/typescript/src/cli/plugin/**"
-      - "sdks/typescript/src/cli/commands/ingestion/**"
+      # The launcher runs the CLI, and the integration test runs the launcher
+      # against the built CLI dist. Anything under the CLI tree can change the
+      # half of the contract the CLI holds (the hook command, the guidance,
+      # the config the launcher reads, the state directory it writes), so the
+      # filter is the whole CLI tree rather than a hand-picked list of the
+      # files that mattered last time.
+      - "sdks/typescript/src/cli/**"
       - "sdks/typescript/src/internal/endpoint.ts"
-      - "sdks/typescript/tsup.plugin-hook.config.ts"
       - "sdks/typescript/package.json"
+      - "sdks/typescript/tsup.config.ts"
       # The single lockfile, workspace definition, root manifest and hoist
       # config live at the repo root since ADR-076; a dependency or override
       # change touches only these.
@@ -49,10 +54,9 @@ on:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
-  # Supersede an outdated run on a PR branch, never on main: every commit
-  # that lands on main has to keep its own validation, and cancelling here
-  # would let a merge silently void the run for the commit before it.
-  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+  # A newer commit supersedes an older run, on main too: the newest verdict
+  # covers the commits before it. Image and release builds keep their own rule.
+  cancel-in-progress: true
 
 permissions:
   contents: read
@@ -62,8 +66,16 @@ jobs:
     # Draft PRs release the runner slot entirely; the work returns on
     # ready_for_review and in the merge queue. This was `needs.changes.outputs
     # .heavy`, which cost a whole gate job to compute the same expression.
-    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    # A PR labelled `ci:full` runs on a draft or release-please PR too.
+    if: >-
+      (github.event_name != 'pull_request' || (github.event.pull_request.draft == false
+       && !(startsWith(github.head_ref, 'release-please--') && github.event.pull_request.user.login == 'langwatch-agent'))
+       || contains(github.event.pull_request.labels.*.name, 'ci:full'))
     runs-on: ubuntu-latest
+    # Read the checkout; write only to prune this pull request's older cache copies.
+    permissions:
+      contents: read
+      actions: write
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
@@ -71,8 +83,8 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
       # Two filters, so the shared action's single-filter input cannot express
-      # it: the build needs the SDK the hook is bundled from, and the tests need
-      # the plugin package's own vitest.
+      # it: the integration test needs the CLI the launcher runs, and the tests
+      # need the plugin package's own vitest.
       - uses: ./.github/actions/setup-pnpm-node
 
       - name: Install dependencies
@@ -80,16 +92,27 @@ jobs:
           CI=true pnpm install --frozen-lockfile
           --filter "langwatch..."
           --filter "@langwatch/agent-plugin..."
+          --filter "@langwatch/workspace"
+
+      # The launcher is plain ESM with no build. The CLI it runs is the one
+      # thing to build here, and the integration test would build it on
+      # demand anyway; doing it as its own step keeps a build failure readable.
+      # It comes before the typecheck, whose references reach observability,
+      # which imports the built SDK.
+      - uses: ./.github/actions/nx-cache
+        with:
+          suffix: agent-plugin
+
+      - name: Build the CLI
+        run: pnpm exec nx run langwatch:build --outputStyle=static
 
       - name: Typecheck
         run: pnpm --filter @langwatch/agent-plugin run typecheck
 
-      - name: Build the plugin
-        run: pnpm --filter @langwatch/agent-plugin run build
-
-      # Unit tests read the manifests; integration tests spawn the bundle
-      # against a local collector and a scratch git checkout. Both need only
-      # node and git, which the runner already has.
+      # Unit tests read the manifests and run the launcher against fake CLIs;
+      # integration tests run it against the built CLI, a local collector and a
+      # scratch git checkout. All need only node and git, which the runner
+      # already has.
       - name: Run tests
         run: pnpm --filter @langwatch/agent-plugin run test
 

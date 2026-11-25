@@ -13,19 +13,19 @@ func TestWorker_ReaperOnlyCountsTimeAfterTurnCompletion(t *testing.T) {
 	if got := w.ClaimTurn("turn-long"); got != app.ClaimGranted {
 		t.Fatalf("claim = %v, want granted", got)
 	}
-	if w.shouldReap(time.Second) {
+	if w.retireIfStale(time.Second, 0) {
 		t.Fatal("an in-flight worker must never be reaped")
 	}
 
 	w.Release()
-	if w.shouldReap(time.Second) {
+	if w.retireIfStale(time.Second, 0) {
 		t.Fatal("idle age must restart when the turn completes")
 	}
 
 	w.mu.Lock()
 	w.lastSeen = time.Now().Add(-2 * time.Second)
 	w.mu.Unlock()
-	if !w.shouldReap(time.Second) {
+	if !w.retireIfStale(time.Second, 0) {
 		t.Fatal("a genuinely idle worker older than the cutoff should be reaped")
 	}
 }

@@ -18,8 +18,8 @@ import (
 	commonpb "go.opentelemetry.io/proto/otlp/common/v1"
 	"google.golang.org/protobuf/proto"
 
+	"github.com/langwatch/langwatch/pkg/aitrace"
 	"github.com/langwatch/langwatch/pkg/contexts"
-	"github.com/langwatch/langwatch/services/aigateway/domain"
 )
 
 const (
@@ -87,7 +87,18 @@ func attrValue(a *commonpb.KeyValue) string {
 
 // emitOne runs one full BeginSpan/EndSpan cycle through an emitter wired to the
 // given mirror config, and flushes.
-func emitOne(t *testing.T, mirror MirrorConfig, params domain.AITraceParams) *capturingIngest {
+func emitOne(t *testing.T, mirror MirrorConfig, params aitrace.Params) *capturingIngest {
+	t.Helper()
+	return emitOneIn(t, mirror, params, func(ctx context.Context) context.Context { return ctx })
+}
+
+// emitOneIn is emitOne with the request context shaped as a gateway middleware would.
+func emitOneIn(
+	t *testing.T,
+	mirror MirrorConfig,
+	params aitrace.Params,
+	shape func(context.Context) context.Context,
+) *capturingIngest {
 	t.Helper()
 	ingest := startCapturingIngest(t)
 
@@ -116,17 +127,17 @@ func emitOne(t *testing.T, mirror MirrorConfig, params domain.AITraceParams) *ca
 	// as an unjoinable duplicate instead of exporting it (the Langy drop
 	// guard), which is its own test, not this fixture's subject.
 	ctx = WithTraceParent(ctx, "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01")
-	spanCtx, _ := e.BeginSpan(ctx, "proj-customer", domain.RequestTypeChat)
+	spanCtx, _ := e.BeginSpan(shape(ctx), "proj-customer", aitrace.RequestTypeChat)
 	e.EndSpan(spanCtx, params)
 	require.NoError(t, e.tp.ForceFlush(context.Background()))
 	return ingest
 }
 
-func baseParams() domain.AITraceParams {
-	return domain.AITraceParams{
+func baseParams() aitrace.Params {
+	return aitrace.Params{
 		Model:        "gpt-test",
-		Usage:        domain.Usage{PromptTokens: 10, CompletionTokens: 5, TotalTokens: 15},
-		RequestType:  domain.RequestTypeChat,
+		Usage:        aitrace.Usage{PromptTokens: 10, CompletionTokens: 5, TotalTokens: 15},
+		RequestType:  aitrace.RequestTypeChat,
 		RequestBody:  []byte(`{"messages":` + mirrorTestPrompt + `}`),
 		ResponseBody: []byte(`{"choices":[{"message":{"role":"assistant","content":"` + mirrorTestCompletion + `"}}]}`),
 	}
@@ -226,16 +237,25 @@ func TestMirrorLeg(t *testing.T) {
 			"a VK with no mirror tier must never be mirrored")
 	})
 
-	// With no mirror configured (the self-hosted default) the leg is dormant and
-	// the customer path is byte-for-byte what it always was.
+	// With no mirror configured (the self-hosted default) the leg is dormant:
+	// the customer gets exactly one copy, with its content and without the
+	// reserved markers, which the ingest pipeline would otherwise strip and log
+	// as user-submitted reserved attributes.
+	// @scenario "An install with no mirror sends model calls without the mirror's markers"
 	t.Run("when no mirror is configured", func(t *testing.T) {
 		p := baseParams()
 		p.MirrorTier = mirrorTierContent
+		p.MirrorSourceOrgID = "org-acme"
 		byProject := emitOne(t, MirrorConfig{}, p).spansByProject(t)
 
 		require.Len(t, byProject["proj-customer"], 1)
 		assert.Empty(t, byProject["proj-mirror"])
-		assert.Contains(t, byProject["proj-customer"][0][string(attrInputMessages)], "Jane Doe")
+		attrs := byProject["proj-customer"][0]
+		assert.Contains(t, attrs[string(attrInputMessages)], "Jane Doe")
+		_, hasTier := attrs[string(attrMirrorTier)]
+		_, hasOrgMarker := attrs[string(attrMirrorSourceOrg)]
+		assert.False(t, hasTier, "the customer copy carries the reserved tier marker")
+		assert.False(t, hasOrgMarker, "the customer copy carries the reserved source marker")
 	})
 }
 

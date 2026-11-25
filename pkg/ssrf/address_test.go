@@ -9,7 +9,7 @@ import (
 )
 
 // addressVector mirrors one entry of testdata/address_vectors.json — the corpus
-// shared with the @langwatch/ssrf TypeScript package. Keeping the two languages
+// shared with the TypeScript half in packages/egress/src/ssrf/address.ts. Keeping the two languages
 // bound to the same file is the whole point: a rule added to one implementation
 // but not the other fails here or in the TS suite.
 type addressVector struct {
@@ -98,5 +98,21 @@ func TestInvalidAddressFailsClosed(t *testing.T) {
 	}
 	if IsPublicAddress(zero) {
 		t.Fatal("IsPublicAddress(invalid) = true, want false — must fail closed")
+	}
+}
+
+func TestUnmapKeepsOrdinaryIPv6(t *testing.T) {
+	cases := map[string]string{
+		"::":                       "unspecified address",
+		"::1":                      "loopback",
+		"::169.254.169.254":        "169.254.169.254 (cloud instance metadata)",
+		"::ffff:0:169.254.169.254": "169.254.169.254 (cloud instance metadata)",
+		"2606:4700::a9fe:a9fe":     "globally routable",
+		"::1:0:a9fe:a9fe":          "globally routable",
+	}
+	for in, want := range cases {
+		if got := Describe(netip.MustParseAddr(in)); got != want {
+			t.Errorf("Describe(%s) = %q, want %q", in, got, want)
+		}
 	}
 }

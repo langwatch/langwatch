@@ -29,11 +29,10 @@ import (
 	"time"
 
 	otelapi "go.opentelemetry.io/otel"
-	"go.opentelemetry.io/otel/baggage"
 	"go.opentelemetry.io/otel/propagation"
 
 	"github.com/langwatch/langwatch/pkg/otelsetup"
-	"github.com/langwatch/langwatch/services/nlpgo/adapters/httpapi"
+	"github.com/langwatch/langwatch/services/nlpgo/app/engine/blocks/blocktimeout"
 )
 
 // Executor runs a single evaluator block invocation.
@@ -44,8 +43,11 @@ type Executor struct {
 
 // Options configures an Executor.
 type Options struct {
-	Client         *http.Client  // nil → http.DefaultClient
-	DefaultTimeout time.Duration // 0 → 12min (Lambda max 15min; we leave 3min margin)
+	Client *http.Client // nil → http.DefaultClient
+	// DefaultTimeout is both the budget for a request that names none and
+	// the ceiling a request's own TimeoutMS is clamped to. 0 → 12min
+	// (Lambda max 15min; we leave 3min margin).
+	DefaultTimeout time.Duration
 }
 
 // New builds an Executor with the given options.
@@ -94,8 +96,20 @@ type Request struct {
 	// ThreadID groups Studio runs into a single conversation in trace
 	// metadata. Mirrors langwatch_nlp commit ac986cc3c. Optional.
 	ThreadID string
-	// TimeoutMS overrides the executor default timeout. 0 → default.
+	// MaxAttachmentBytes is the per-file attachment limit of the calling run,
+	// sent as X-LangWatch-Max-Attachment-Bytes so a workflow run this call
+	// starts fetches attachments under the same limit. 0 sends no header.
+	MaxAttachmentBytes int64
+	// TimeoutMS asks for LESS time than the operator allows; it can never
+	// buy more. 0 (and any negative) means the executor's own ceiling.
 	TimeoutMS int
+}
+
+// DefaultTimeout reports the wall-clock ceiling this executor applies.
+// Exported so the wiring that feeds it an operator knob is observable from a
+// test.
+func (e *Executor) DefaultTimeout() time.Duration {
+	return e.defaultTime
 }
 
 // Result is the executor's parsed output. Mirrors the Python
@@ -186,10 +200,12 @@ func (e *Executor) Execute(ctx context.Context, req Request) (*Result, error) {
 		return nil, fmt.Errorf("evaluatorblock: marshal body: %w", err)
 	}
 
-	timeout := e.defaultTime
-	if req.TimeoutMS > 0 {
-		timeout = time.Duration(req.TimeoutMS) * time.Millisecond
-	}
+	// The operator's ceiling wins. A node's TimeoutMS only ever shortens the
+	// budget: a workflow author must not be able to escape
+	// NLPGO_ENGINE_EVALUATOR_TIMEOUT_SECONDS — the bound on how long one
+	// evaluator call may hold a worker — by writing a bigger number into
+	// their own node.
+	timeout := blocktimeout.Clamp(e.defaultTime, req.TimeoutMS)
 	reqCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
@@ -208,6 +224,9 @@ func (e *Executor) Execute(ctx context.Context, req Request) (*Result, error) {
 	if req.ThreadID != "" {
 		httpReq.Header.Set("X-LangWatch-Thread-Id", req.ThreadID)
 	}
+	if req.MaxAttachmentBytes > 0 {
+		httpReq.Header.Set("X-LangWatch-Max-Attachment-Bytes", strconv.FormatInt(req.MaxAttachmentBytes, 10))
+	}
 
 	// Propagate W3C trace context + baggage on the outbound call so the
 	// receiving service sees us as the parent span and inherits our
@@ -215,10 +234,10 @@ func (e *Executor) Execute(ctx context.Context, req Request) (*Result, error) {
 	// re-dispatching evaluations on spans we emit. See
 	// specs/monitors/online-evaluator-loop-prevention.feature.
 	otelapi.GetTextMapPropagator().Inject(reqCtx, propagation.HeaderCarrier(httpReq.Header))
-	if depth := currentCausalityDepthFromBaggage(reqCtx); depth > 0 {
+	if depth := otelsetup.CausalityDepth(reqCtx); depth > 0 {
 		// Also surface as a plain header for non-OTel consumers (eg.
 		// langwatch app's collector reads this directly).
-		httpReq.Header.Set(httpapi.CausalityDepthHeader, strconv.Itoa(depth))
+		httpReq.Header.Set(otelsetup.CausalityDepthHeader, strconv.Itoa(depth))
 	}
 
 	start := time.Now()
@@ -316,22 +335,6 @@ func parseResult(body []byte) (*Result, error) {
 		Label:   u.Label,
 		Cost:    u.Cost,
 	}, nil
-}
-
-// currentCausalityDepthFromBaggage reads the depth set by the httpapi
-// inbound handler (applyInboundCausality). Returns 0 when absent so
-// callers outside an evaluator request (eg. direct invocations) don't
-// emit a spurious header.
-func currentCausalityDepthFromBaggage(ctx context.Context) int {
-	m := baggage.FromContext(ctx).Member(otelsetup.BaggageKeyCausalityDepth)
-	if m.Key() == "" {
-		return 0
-	}
-	v, err := strconv.Atoi(m.Value())
-	if err != nil || v < 0 {
-		return 0
-	}
-	return v
 }
 
 func truncate(b []byte, n int) string {

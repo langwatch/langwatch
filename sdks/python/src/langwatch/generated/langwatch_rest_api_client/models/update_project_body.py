@@ -19,12 +19,15 @@ class UpdateProjectBody:
         name (str | Unset):
         language (str | Unset):
         framework (str | Unset):
-        pii_redaction_level (UpdateProjectBodyPiiRedactionLevel | Unset):
+        team_id (str | Unset): Moves the project to this team
+        pii_redaction_level (UpdateProjectBodyPiiRedactionLevel | Unset): The PII level the project's traces are
+            redacted at
     """
 
     name: str | Unset = UNSET
     language: str | Unset = UNSET
     framework: str | Unset = UNSET
+    team_id: str | Unset = UNSET
     pii_redaction_level: UpdateProjectBodyPiiRedactionLevel | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
@@ -34,6 +37,8 @@ class UpdateProjectBody:
         language = self.language
 
         framework = self.framework
+
+        team_id = self.team_id
 
         pii_redaction_level: str | Unset = UNSET
         if not isinstance(self.pii_redaction_level, Unset):
@@ -48,6 +53,8 @@ class UpdateProjectBody:
             field_dict["language"] = language
         if framework is not UNSET:
             field_dict["framework"] = framework
+        if team_id is not UNSET:
+            field_dict["teamId"] = team_id
         if pii_redaction_level is not UNSET:
             field_dict["piiRedactionLevel"] = pii_redaction_level
 
@@ -62,6 +69,8 @@ class UpdateProjectBody:
 
         framework = d.pop("framework", UNSET)
 
+        team_id = d.pop("teamId", UNSET)
+
         _pii_redaction_level = d.pop("piiRedactionLevel", UNSET)
         pii_redaction_level: UpdateProjectBodyPiiRedactionLevel | Unset
         if isinstance(_pii_redaction_level, Unset):
@@ -73,6 +82,7 @@ class UpdateProjectBody:
             name=name,
             language=language,
             framework=framework,
+            team_id=team_id,
             pii_redaction_level=pii_redaction_level,
         )
 

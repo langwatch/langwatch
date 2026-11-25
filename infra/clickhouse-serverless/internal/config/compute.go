@@ -1,11 +1,21 @@
 package config
 
+import (
+	"os"
+	"strconv"
+
+	"go.uber.org/zap"
+)
+
 const (
 	gb1  int64 = 1 << 30
 	gb4  int64 = 4 << 30
 	gb8  int64 = 8 << 30
 	mb10 int64 = 10 << 20
 	mb50 int64 = 50 << 20
+
+	// smallPodRAM is the largest pod that gets the explicit small-pod budget.
+	smallPodRAM int64 = 4 << 30
 )
 
 // Computed holds all derived ClickHouse configuration parameters.
@@ -19,7 +29,30 @@ type Computed struct {
 	MaxBytesBeforeExternalSort    int64   `env:"MAX_BYTES_BEFORE_EXTERNAL_SORT"`
 	UncompressedCacheSize         int64   `env:"UNCOMPRESSED_CACHE_SIZE"`
 	UseUncompressedCache          int     `env:"USE_UNCOMPRESSED_CACHE"`
-	CacheMaxSize                  int64   `env:"CACHE_MAX_SIZE"`
+
+	// Small-pod budget: server settings in config.d. Zero (or false) leaves
+	// the ClickHouse default, so pods above smallPodRAM render none of these.
+	MarkCacheSize               int64   `env:"MARK_CACHE_SIZE"`
+	IndexMarkCacheSize          int64   `env:"INDEX_MARK_CACHE_SIZE"`
+	PrimaryIndexCacheSize       int64   `env:"PRIMARY_INDEX_CACHE_SIZE"`
+	QueryConditionCacheSize     int64   `env:"QUERY_CONDITION_CACHE_SIZE"`
+	CompiledExpressionCacheSize int64   `env:"COMPILED_EXPRESSION_CACHE_SIZE"`
+	MmapCacheSize               int     `env:"MMAP_CACHE_SIZE"`
+	MergesMemoryRatio           float64 `env:"MERGES_MUTATIONS_MEMORY_USAGE_TO_RAM_RATIO"`
+	BackgroundSchedulePoolSize  int     `env:"BACKGROUND_SCHEDULE_POOL_SIZE"`
+	BackgroundCommonPoolSize    int     `env:"BACKGROUND_COMMON_POOL_SIZE"`
+	BackgroundMovePoolSize      int     `env:"BACKGROUND_MOVE_POOL_SIZE"`
+	BackgroundBrokerPoolSize    int     `env:"BACKGROUND_MESSAGE_BROKER_SCHEDULE_POOL_SIZE"`
+	BackgroundDistPoolSize      int     `env:"BACKGROUND_DISTRIBUTED_SCHEDULE_POOL_SIZE"`
+	BackgroundBufferPoolSize    int     `env:"BACKGROUND_BUFFER_FLUSH_SCHEDULE_POOL_SIZE"`
+	BackgroundFetchesPoolSize   int     `env:"BACKGROUND_FETCHES_POOL_SIZE"`
+	MaxThreadPoolFreeSize       int     `env:"MAX_THREAD_POOL_FREE_SIZE"`
+
+	// System log queues: a failed flush keeps rows in memory up to max_size_rows.
+	SystemLogMaxSizeRows        int  `env:"SYSTEM_LOG_MAX_SIZE_ROWS"`
+	SystemLogReservedSizeRows   int  `env:"SYSTEM_LOG_RESERVED_SIZE_ROWS"`
+	SystemLogFlushThresholdRows int  `env:"SYSTEM_LOG_BUFFER_SIZE_ROWS_FLUSH_THRESHOLD"`
+	RemoveQueryDetailLogs       bool `env:"REMOVE_QUERY_DETAIL_LOGS"`
 
 	// CPU (derived from CPU cores)
 	BackgroundPoolSize    int `env:"BACKGROUND_POOL_SIZE"`
@@ -45,6 +78,12 @@ type Computed struct {
 	PoolFreeEntryLowerMerge        int   `env:"NUMBER_OF_FREE_ENTRIES_IN_POOL_TO_LOWER_MAX_SIZE_OF_MERGE"`
 	PoolFreeEntryOptimizePartition int   `env:"NUMBER_OF_FREE_ENTRIES_IN_POOL_TO_EXECUTE_OPTIMIZE_ENTIRE_PARTITION"`
 
+	// SELECTs' own ceiling inside max_concurrent_queries; 0 = no separate cap.
+	MaxConcurrentSelectQueries int `env:"MAX_CONCURRENT_SELECT_QUERIES"`
+
+	// Byte cap on one merge block; 0 leaves the ClickHouse default.
+	MergeMaxBlockSizeBytes int64 `env:"MERGE_MAX_BLOCK_SIZE_BYTES"`
+
 	// Async Insert
 	AsyncInsertEnabled       int `env:"ASYNC_INSERT_ENABLED"`
 	AsyncInsertWait          int `env:"ASYNC_INSERT_WAIT"`
@@ -53,6 +92,12 @@ type Computed struct {
 
 	// Insert performance
 	OptimizeOnInsert int `env:"OPTIMIZE_ON_INSERT"`
+
+	// Default profile: inter-server compression and abandoned HTTP reads.
+	// Unset (empty or 0) renders nothing, so the ClickHouse default holds.
+	NetworkCompressionMethod               string `env:"NETWORK_COMPRESSION_METHOD"`
+	NetworkZstdCompressionLevel            int    `env:"NETWORK_ZSTD_COMPRESSION_LEVEL"`
+	CancelHTTPReadonlyQueriesOnClientClose int    `env:"CANCEL_HTTP_READONLY_QUERIES_ON_CLIENT_CLOSE"`
 
 	// Query limits
 	MaxExecutionTime    int    `env:"MAX_EXECUTION_TIME"`
@@ -94,7 +139,9 @@ func ComputeFromResources(cpu int, ramBytes int64, input *Input) *Computed {
 		c.UseUncompressedCache = 1
 	}
 
-	c.CacheMaxSize = ramBytes / 4 // 25% for S3 cache
+	if ramBytes <= smallPodRAM {
+		applySmallPodBudget(c, ramBytes, input != nil && input.Replicated)
+	}
 
 	// --- CPU allocation ---
 	c.BackgroundPoolSize = max(2, cpu/2)
@@ -127,9 +174,11 @@ func ComputeFromResources(cpu int, ramBytes int64, input *Input) *Computed {
 	c.MergeWithTTLTimeout = 86400
 	c.MergeSelectingSleepMs = 1000
 
-	c.PoolFreeEntryMutation = max(1, c.BackgroundPoolSize/2)
-	c.PoolFreeEntryLowerMerge = max(1, c.BackgroundPoolSize/4)
-	c.PoolFreeEntryOptimizePartition = max(1, c.BackgroundPoolSize/2)
+	derivePoolFreeEntries(c)
+
+	if ramBytes <= smallPodRAM {
+		c.ConcurrencyRatio = 1 // at most background_pool_size merges at once
+	}
 
 	// --- Async Insert (constants) ---
 	c.AsyncInsertEnabled = 1
@@ -160,4 +209,75 @@ func ComputeFromResources(cpu int, ramBytes int64, input *Input) *Computed {
 	}
 
 	return c
+}
+
+// Env names of the pool-entry thresholds; an explicit value wins over derivation.
+const (
+	envPoolFreeEntryMutation          = "NUMBER_OF_FREE_ENTRIES_IN_POOL_TO_EXECUTE_MUTATION"
+	envPoolFreeEntryLowerMerge        = "NUMBER_OF_FREE_ENTRIES_IN_POOL_TO_LOWER_MAX_SIZE_OF_MERGE"
+	envPoolFreeEntryOptimizePartition = "NUMBER_OF_FREE_ENTRIES_IN_POOL_TO_EXECUTE_OPTIMIZE_ENTIRE_PARTITION"
+)
+
+// derivePoolFreeEntries sets the pool-entry thresholds from BackgroundPoolSize.
+func derivePoolFreeEntries(c *Computed) {
+	c.PoolFreeEntryMutation = max(1, c.BackgroundPoolSize/2)
+	c.PoolFreeEntryLowerMerge = max(1, c.BackgroundPoolSize/4)
+	c.PoolFreeEntryOptimizePartition = max(1, c.BackgroundPoolSize/2)
+}
+
+// ApplyOverrides applies env overrides to c, then re-derives each pool-entry
+// threshold not set explicitly from the effective background_pool_size, so a
+// BACKGROUND_POOL_SIZE override moves them too.
+func ApplyOverrides(log *zap.Logger, c *Computed) {
+	ApplyEnvOverrides(log, c)
+	derived := *c
+	derivePoolFreeEntries(&derived)
+	for _, f := range []struct {
+		env string
+		dst *int
+		val int
+	}{
+		{envPoolFreeEntryMutation, &c.PoolFreeEntryMutation, derived.PoolFreeEntryMutation},
+		{envPoolFreeEntryLowerMerge, &c.PoolFreeEntryLowerMerge, derived.PoolFreeEntryLowerMerge},
+		{envPoolFreeEntryOptimizePartition, &c.PoolFreeEntryOptimizePartition, derived.PoolFreeEntryOptimizePartition},
+	} {
+		if raw, set := os.LookupEnv(f.env); set {
+			if _, err := strconv.Atoi(raw); err == nil {
+				continue
+			}
+		}
+		*f.dst = f.val
+	}
+}
+
+// applySmallPodBudget bounds the caches ClickHouse otherwise sizes at up to
+// half of RAM each (cache_size_to_ram_max_ratio 0.5), trims idle thread pools
+// on a single node (replication fetches and schedules on them) and caps system
+// log queues. Every name is a 25.10 server setting; log caps are per-table keys.
+func applySmallPodBudget(c *Computed, ramBytes int64, replicated bool) {
+	c.MarkCacheSize = ramBytes / 16
+	c.IndexMarkCacheSize = ramBytes / 64
+	c.PrimaryIndexCacheSize = ramBytes / 64
+	c.QueryConditionCacheSize = ramBytes / 64
+	c.CompiledExpressionCacheSize = ramBytes / 64
+	c.MmapCacheSize = 128
+	c.MergesMemoryRatio = 0.25
+
+	c.SystemLogMaxSizeRows = 16384
+	c.SystemLogReservedSizeRows = 1024
+	c.SystemLogFlushThresholdRows = 8192
+	c.RemoveQueryDetailLogs = true
+
+	if replicated {
+		return
+	}
+	// Each idle thread keeps its own allocator cache: 338 threads held ~350 MiB untracked at 1 GiB.
+	c.BackgroundSchedulePoolSize = 16
+	c.BackgroundCommonPoolSize = 4
+	c.BackgroundMovePoolSize = 2
+	c.BackgroundBrokerPoolSize = 1
+	c.BackgroundDistPoolSize = 1
+	c.BackgroundBufferPoolSize = 1
+	c.BackgroundFetchesPoolSize = 1
+	c.MaxThreadPoolFreeSize = 8
 }

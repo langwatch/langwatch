@@ -150,13 +150,21 @@ Feature: CLI wrapper login → token → env injection → routing
   # ─────────────────────────────────────────────────────────────────────
   # Tool-not-found — clear error, not a generic exec failure
   # ─────────────────────────────────────────────────────────────────────
+  @unit
   Scenario: Wrapped tool not on PATH yields actionable error
     Given the user is logged in
     And the binary `claude` is NOT on PATH
     When the user runs `langwatch claude`
     Then the wrapper exits with code 127
-    And stderr contains "claude not found in PATH — install it first"
-    And stderr contains a docs link to the AI Gateway governance admin-setup page
+    And stderr contains "claude not found in PATH - install it first"
+    And stderr contains a link to the claude page of the coding-agents docs
+
+  @unit
+  Scenario: A wrapped tool that is not installed has nothing written for it
+    Given the binary `pi` is NOT on PATH, nor an alias or function of the user's
+    When the user runs `langwatch pi`
+    Then the wrapper exits with code 127 before it reads the config or signs in
+    And no config, shell rc block, hook file or pi extension is written
 
   # ─────────────────────────────────────────────────────────────────────
   # Exit-code propagation — wrapper is transparent

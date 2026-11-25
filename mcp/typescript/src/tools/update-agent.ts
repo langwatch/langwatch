@@ -1,4 +1,4 @@
-import { updateAgent as apiUpdateAgent } from "../langwatch-api-agents.js";
+import { updateAgent as apiUpdateAgent } from "../langwatch-api-agents.ts";
 
 export async function handleUpdateAgent(params: {
   id: string;

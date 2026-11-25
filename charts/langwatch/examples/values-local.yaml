@@ -13,9 +13,9 @@ autogen:
   enabled: true
 
 images:
-  app:        { tag: local, pullPolicy: Never }
+  app: { tag: local, pullPolicy: Never }
   langwatch_nlp: { tag: local, pullPolicy: Never }
-  langevals:  { tag: local, pullPolicy: Never }
+  langevals: { tag: local, pullPolicy: Never }
 
 app:
   replicaCount: 1
@@ -25,7 +25,7 @@ app:
     publicUrl: "http://localhost:30560"
   resources:
     requests: { cpu: 250m, memory: 1Gi }
-    limits:   { cpu: 1, memory: 3Gi }
+    limits: { cpu: 1, memory: 3Gi }
 
 workers:
   enabled: true
@@ -33,13 +33,13 @@ workers:
   # Same image as the app: needs ~2Gi to cold-load via tsx without OOM-restarts.
   resources:
     requests: { cpu: 250m, memory: 768Mi }
-    limits:   { cpu: 1, memory: 2Gi }
+    limits: { cpu: 1, memory: 2Gi }
 
 langwatch_nlp:
   replicaCount: 1
   resources:
     requests: { cpu: 100m, memory: 512Mi }
-    limits:   { cpu: 500m, memory: 1Gi }
+    limits: { cpu: 500m, memory: 1Gi }
 
 langevals:
   replicaCount: 1
@@ -47,7 +47,7 @@ langevals:
   # not a reservation, so it costs nothing until an evaluator loads a model.
   resources:
     requests: { cpu: 100m, memory: 768Mi }
-    limits:   { cpu: 500m, memory: 4Gi }
+    limits: { cpu: 500m, memory: 4Gi }
   extraEnvs:
     - { name: DISABLE_EVALUATORS_PRELOAD, value: "true" }
 
@@ -68,7 +68,7 @@ postgresql:
     persistence: { size: 2Gi }
     resources:
       requests: { cpu: 100m, memory: 256Mi }
-      limits:   { cpu: 500m, memory: 512Mi }
+      limits: { cpu: 500m, memory: 512Mi }
 
 redis:
   chartManaged: true
@@ -76,10 +76,10 @@ redis:
     persistence: { size: 1Gi }
     resources:
       requests: { cpu: 50m, memory: 64Mi }
-      limits:   { cpu: 250m, memory: 256Mi }
+      limits: { cpu: 250m, memory: 256Mi }
 
 prometheus: { chartManaged: false }
-cronjobs:   { enabled: false }
+cronjobs: { enabled: false }
 
 # Nothing to set for Langy: the chart default already runs the agent on the
 # node's normal runtime, which is what kind and minikube offer.

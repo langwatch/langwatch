@@ -1,12 +1,10 @@
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
-import { EvaluationsFacade } from "../evaluations.facade";
-import {
-  EvaluatorNotFoundError,
-  EvaluationsApiError,
-  EvaluatorCallError,
-} from "../errors";
-import type { EvaluateResponse } from "../types";
+
 import { NoOpLogger } from "@/logger";
+
+import { EvaluatorNotFoundError, EvaluationsApiError, EvaluatorCallError } from "../errors";
+import { EvaluationsFacade } from "../evaluations.facade";
+import type { EvaluateResponse } from "../types";
 
 // Mock fetch globally
 const mockFetch = vi.fn();
@@ -111,7 +109,7 @@ describe("EvaluationsFacade", () => {
       });
 
       expect(mockFetch).toHaveBeenCalledWith(
-        "https://api.langwatch.ai/api/evaluations/presidio/pii_detection/evaluate",
+        "https://api.langwatch.ai/api/v1/evaluations/presidio/pii_detection/evaluate",
         expect.objectContaining({
           method: "POST",
           headers: expect.objectContaining({
@@ -120,7 +118,7 @@ describe("EvaluationsFacade", () => {
             "x-auth-token": "test-api-key",
           }),
           body: expect.any(String),
-        })
+        }),
       );
 
       // Verify body contents
@@ -139,9 +137,11 @@ describe("EvaluationsFacade", () => {
         text: () => Promise.resolve("Not found"),
       });
 
-      const error = await facade.evaluate("non-existent", {
-        data: { input: "test" },
-      }).catch((e) => e);
+      const error = await facade
+        .evaluate("non-existent", {
+          data: { input: "test" },
+        })
+        .catch((e) => e);
 
       expect(error).toBeInstanceOf(EvaluatorNotFoundError);
       expect(error.message).toBe("Evaluator not found: non-existent");
@@ -157,7 +157,7 @@ describe("EvaluationsFacade", () => {
       await expect(
         facade.evaluate("test-evaluator", {
           data: { input: "test" },
-        })
+        }),
       ).rejects.toThrow(EvaluationsApiError);
     });
 
@@ -220,9 +220,11 @@ describe("EvaluationsFacade", () => {
     it("wraps network errors in EvaluatorCallError", async () => {
       mockFetch.mockRejectedValueOnce(new Error("Network error"));
 
-      const error = await facade.evaluate("test-evaluator", {
-        data: { input: "test" },
-      }).catch((e) => e);
+      const error = await facade
+        .evaluate("test-evaluator", {
+          data: { input: "test" },
+        })
+        .catch((e) => e);
 
       expect(error).toBeInstanceOf(EvaluatorCallError);
       expect(error.message).toContain("Network error");
@@ -234,15 +236,12 @@ describe("EvaluationsFacade", () => {
       mockFetch.mockRejectedValueOnce(new Error("Timeout"));
 
       // The facade should throw, but we can test internal behavior via mocks
-      try {
-        await facade.evaluate("test-guardrail", {
+      await expect(
+        facade.evaluate("test-guardrail", {
           data: { input: "test" },
           asGuardrail: true,
-        });
-      } catch (error) {
-        // Expected - the error is re-thrown
-        expect(error).toBeInstanceOf(EvaluatorCallError);
-      }
+        }),
+      ).rejects.toBeInstanceOf(EvaluatorCallError);
     });
 
     it("uses slug as default span name when name not provided", async () => {

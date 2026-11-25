@@ -4,6 +4,12 @@
 
 **Status:** Accepted
 
+**Physical ownership:**
+[ADR-111](./111-physical-application-workspaces.md) moves the Vite build to
+`apps/ui` and production static serving to `apps/api`. This ADR's runtime asset
+base, same-image, CSP and immutable-CDN decisions remain unchanged; its source
+paths move with those owners.
+
 ## Context
 
 The web app is a Vite SPA whose JS/CSS chunks carry content-hash filenames
@@ -22,14 +28,14 @@ GET https://app.langwatch.ai/assets/dialog.anatomy-CGguCKQj.js net::ERR_ABORTED 
 
 Two mitigations already exist and remain: the `vite:preloadError` reload guard
 (`src/utils/chunkReload.ts`) and the deliberate `404` for missing `/assets/*`
-(spa-fallback.feature). Neither closes the *mid-deploy* window — a reload can
+(spa-fallback.feature). Neither closes the _mid-deploy_ window — a reload can
 re-split across builds, and the 10s cooldown then strands the tab for the rest of
 a multi-minute roll.
 
 No `RollingUpdate` tuning removes the overlap (a Deployment is inherently
 rolling); `Recreate` removes it only by adding downtime; blue-green only shrinks
-the window. The overlap is not the root cause — coupling *asset availability* to
-*which pod/build serves the request* is. The durable fix is to make every build's
+the window. The overlap is not the root cause — coupling _asset availability_ to
+_which pod/build serves the request_ is. The durable fix is to make every build's
 assets available independent of which pod serves the shell.
 
 The hard constraint: the published `langwatch` Docker image is **shared by
@@ -87,7 +93,7 @@ distribution, the S3 bucket + lifecycle rule, DNS, and wiring the upload +
 Baking the base at build time (a `VITE_ASSET_BASE` arg) is simpler but forks the
 image: the public image would point self-hosters at `cdn.langwatch.ai`. Runtime
 injection keeps one image for both audiences at the cost of a small server-side
-HTML transform and one inline script. Because JS chunks are served *by the CDN*,
+HTML transform and one inline script. Because JS chunks are served _by the CDN_,
 serve-time string replacement in the JS is impossible — the base must resolve in
 the browser at execution time, which is exactly what `renderBuiltUrl`'s `runtime`
 form provides.
@@ -97,7 +103,7 @@ belt-and-suspenders: with the CDN they should effectively never fire, but they
 still cover a self-host install, a prefix expired earlier than a tab's lifetime,
 or an asset genuinely absent from the bucket.
 
-The rollout strategy is left untouched — the fix removes the *need* to serialize
+The rollout strategy is left untouched — the fix removes the _need_ to serialize
 the roll, so no downtime (`Recreate`) and no new cluster dependency (Argo
 Rollouts blue-green) are introduced.
 
@@ -125,7 +131,7 @@ Rollouts blue-green) are introduced.
 - **Self-sufficient artifact / Web Workers.** The `renderBuiltUrl` runtime
   expression is self-defaulting — `(globalThis.__lwAssetUrl || (p => "/"+p))(…)`
   — so the built bundle works even when the resolver was never injected: `vite
-  preview`, the CI boot-smoke, and any raw-`dist/` static server all fall back to
+preview`, the CI boot-smoke, and any raw-`dist/` static server all fall back to
   same-origin. Reading via `globalThis` (defined in Web Worker scopes too, where
   `window` is not) means a worker chunk degrades to same-origin rather than
   throwing. The only consequence: a future CDN-hosted worker asset would be

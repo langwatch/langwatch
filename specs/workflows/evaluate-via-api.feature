@@ -60,4 +60,4 @@ Feature: Trigger workflow evaluations via the API
   Scenario: A workflow with no committed version cannot be evaluated
     Given a workflow that was never committed
     When I POST to its evaluate endpoint
-    Then the response is a 400 explaining a version must be committed first
+    Then the response is a 400 with code "workflow_version_required"

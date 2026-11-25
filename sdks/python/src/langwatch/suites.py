@@ -6,6 +6,7 @@ Uses httpx via the generated REST API client for HTTP transport.
 """
 
 import urllib.parse
+import warnings
 from typing import Any, Dict, Optional
 
 import httpx
@@ -65,10 +66,19 @@ class SuitesFacade:
     """
     Facade for managing LangWatch suites via REST API.
 
+    Deprecated. A suite was two things at once: the test suite the scenarios
+    are filed in and the configuration a run executes under. Those are now
+    ``langwatch.test_suites`` and ``langwatch.run_plans``.
+
     Provides list, get, create, update, run, and delete operations.
     """
 
     def __init__(self, rest_api_client: LangWatchRestApiClient) -> None:
+        warnings.warn(
+            "langwatch.suites is deprecated; use langwatch.run_plans and langwatch.test_suites",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         self._client = rest_api_client
 
     @classmethod
@@ -92,7 +102,7 @@ class SuitesFacade:
         Returns:
             Dictionary with suite data.
         """
-        response = self._http().get("/api/suites")
+        response = self._http().get("/api/v1/suites")
         _raise_for_status(response, operation="list")
         return response.json()
 
@@ -106,7 +116,7 @@ class SuitesFacade:
         Returns:
             Dictionary containing the suite data.
         """
-        response = self._http().get(f"/api/suites/{_quote(suite_id)}")
+        response = self._http().get(f"/api/v1/suites/{_quote(suite_id)}")
         _raise_for_status(response, operation="get")
         return response.json()
 
@@ -119,13 +129,16 @@ class SuitesFacade:
         Create a new suite.
 
         Args:
-            params: Dictionary of suite fields (name, slug, etc.).
+            params: Dictionary of suite fields (name, scenarioIds, targets,
+                and optionally kind, description, scope, repeatCount,
+                labels). A field the endpoint does not have is refused
+                with a 422 that names it; the slug is derived from the name.
 
         Returns:
             Dictionary containing the created suite data.
         """
         body = params or {}
-        response = self._http().post("/api/suites", json=body)
+        response = self._http().post("/api/v1/suites", json=body)
         _raise_for_status(response, operation="create")
         return response.json()
 
@@ -147,7 +160,7 @@ class SuitesFacade:
         """
         body = params or {}
         response = self._http().patch(
-            f"/api/suites/{_quote(suite_id)}", json=body
+            f"/api/v1/suites/{_quote(suite_id)}", json=body
         )
         _raise_for_status(response, operation="update")
         return response.json()
@@ -180,7 +193,7 @@ class SuitesFacade:
         if parameters is not None:
             body["parameters"] = parameters
         response = self._http().post(
-            f"/api/suites/{_quote(suite_id)}/run", json=body
+            f"/api/v1/suites/{_quote(suite_id)}/run", json=body
         )
         _raise_for_status(response, operation="run")
         return response.json()
@@ -196,7 +209,7 @@ class SuitesFacade:
             Dictionary containing the duplicated suite data.
         """
         response = self._http().post(
-            f"/api/suites/{_quote(suite_id)}/duplicate"
+            f"/api/v1/suites/{_quote(suite_id)}/duplicate"
         )
         _raise_for_status(response, operation="duplicate")
         return response.json()
@@ -211,6 +224,6 @@ class SuitesFacade:
         Returns:
             Dictionary with deletion result.
         """
-        response = self._http().delete(f"/api/suites/{_quote(suite_id)}")
+        response = self._http().delete(f"/api/v1/suites/{_quote(suite_id)}")
         _raise_for_status(response, operation="delete")
         return response.json()

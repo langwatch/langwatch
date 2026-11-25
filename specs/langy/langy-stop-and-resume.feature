@@ -57,6 +57,24 @@ Feature: Langy lets me stop a turn for real, continue where it left off, and rej
     Then the empty reply row says "Interrupted"
     And it does not say "No content", because the emptiness was my own doing
 
+  # The record keeps every reply, so a turn that ended with nothing to show and
+  # was then run again leaves an empty reply above the one that answered. The
+  # empty row only speaks for the end of the conversation: above a later
+  # message it would read as something missing from a reply that is right there.
+  @integration
+  Scenario: An empty reply with messages after it draws nothing
+    Given a guided conversation whose tour card is followed by a settled reply with nothing visible
+    And Langy's opener and its code access card come after that reply
+    When I open the conversation
+    Then nothing is drawn between the tour card and the opener
+    And no "No content" line shows anywhere in the conversation
+
+  @integration
+  Scenario: An empty reply at the end of the conversation still says so
+    Given the last message of a conversation is a settled reply with nothing visible
+    When I open the conversation
+    Then the empty reply row says "No content"
+
   # A reply with a card or a paragraph in it used to look exactly like a finished
   # one, so the reader had to remember pressing Stop to read the answer correctly.
   @unit
@@ -141,6 +159,99 @@ Feature: Langy lets me stop a turn for real, continue where it left off, and rej
     And it settles to stopped only once the turn's terminal has been recorded
     And it never reports stopped while the turn is still running on the backend
 
+  # The stop's own answer arrives only once the terminal is recorded, so it is the
+  # confirmation. A tab that hears nothing else (a lost update signal, a record that
+  # lags) was left on Stopping with no way to send again.
+  @integration
+  Scenario: A confirmed stop hands the composer back even when no update reaches the tab
+    Given Langy is working on my message and I click Stop
+    And no conversation update reaches this tab afterwards
+    When the backend confirms the stop
+    Then the composer shows Send again
+    And I can send my next message
+
+  # The stop's answer can land after I moved on. It may only settle the turn it stopped.
+  @integration
+  Scenario: A late stop answer leaves a newer turn alone
+    Given I clicked Stop and then sent a new message, or opened another turn
+    When the backend confirms the earlier stop
+    Then the newer turn keeps its live lines and its working composer state
+
+  # The live stream that would close the card is the one Stop aborted, so the stop's
+  # own answer closes it. A reload already read it as closed; the live tab did not.
+  @integration
+  Scenario: The question card closes as soon as Stop is answered, without a reload
+    Given Langy asked a question and I clicked Stop before answering
+    When the backend confirms the stop
+    Then the question card's options can no longer be chosen
+    And a question card a newer turn raised stays open
+
+  # The server ends a waiting command's permission card on Stop and tells the command
+  # line no answer is coming. The live tab must close the card too, or a click on it
+  # is refused with a red line under buttons that still look answerable.
+  @integration
+  Scenario: The permission card closes as soon as Stop is answered, without a reload
+    Given Langy asked permission to run a command and I clicked Stop before answering
+    And no conversation update reaches this tab afterwards
+    When the backend confirms the stop
+    Then the permission card offers no answers any more
+    And it says it was cancelled with the turn
+
+  # A failure ending one card must not strand the rest, or a waiting command hangs
+  # until its own timeout.
+  @unit
+  Scenario: One card that fails to end on Stop leaves the turn's other cards ending
+    Given a stopped turn has two waiting cards and ending one of them fails
+    When the turn is stopped
+    Then the other card still ends
+    And a waiting command still gets its expired answer
+
+  # The server leaves a confirmation card the platform raised answerable after Stop,
+  # since its click is read in a later turn; the live tab must not lock it either.
+  @integration
+  Scenario: A confirmation card raised during the turn stays answerable after Stop
+    Given the turn raised a question card and a platform confirmation card, and I clicked Stop
+    When the backend confirms the stop
+    Then the question card's options can no longer be chosen
+    And the confirmation card stays answerable
+
+  # An untagged live card would make Stop close nothing, so the tag is pinned.
+  @integration
+  Scenario: A question card the stream raises is tied to the turn the tab is streaming
+    Given the tab is streaming a turn
+    When the stream raises a question card
+    Then the card is recorded against that turn
+
+  # The worker's abort only ends its own polling. A card or a command the turn left
+  # on my machine would otherwise wait for an answer nobody reads (ADR-129).
+  @unit
+  Scenario: Stopping a turn ends what it left open on my machine
+    Given the turn left a question card waiting and a command running on my machine
+    When I stop the turn
+    Then the card ends as cancelled and the command is told to stop
+    And cards and commands of other turns are left alone
+    And the stop is still recorded when ending them fails
+
+  # A stop the user chose is not a failure of the question tool.
+  @integration
+  Scenario: A question card I stopped reads as closed, not as failed
+    Given Langy asked a question and I stopped the turn before answering
+    When the reply is drawn
+    Then no failed-step line is drawn for the question
+
+  @integration
+  Scenario: A command I stopped reads as stopped, not as failed
+    Given a command was running on my machine and I stopped the turn
+    When the reply is drawn
+    Then no failed-step line is drawn for the command
+    And the command is drawn as an interrupted row
+
+  @integration
+  Scenario: A question I answered keeps my choice when the stop text lands after it
+    Given I answered a question and then stopped the turn
+    When the reply is drawn
+    Then the card still shows the option I chose
+
   @integration
   Scenario: Only someone who can control the conversation may stop its turn
     Given a conversation and turn I am not allowed to control
@@ -176,16 +287,37 @@ Feature: Langy lets me stop a turn for real, continue where it left off, and rej
     Then the stop is dispatched against the turn the durable record names
     And that turn reaches a stopped terminal
 
-  # The honesty rule, made structural: the control moves to "stopping" ONLY on
-  # the branch that dispatches a stop. There is no path that shows the stopping
-  # spinner without a request behind it.
-  @unit
-  Scenario: Stop says nothing it cannot back up
-    Given a turn is in flight but no turn id is known yet
+  # --- Stopping while the turn is still starting up -------------------------
+  #
+  # The turn only gets an id when the create/continue call answers, and on a
+  # cold worker that is 6 to 12 seconds after the send. For that whole window
+  # the composer showed Send, so a message sent by accident could not be called
+  # back, and a stop clicked in it was answered with "try again in a moment".
+  #
+  # Stop is now available from the send itself. A click before the turn has an
+  # id is an intent the panel KEEPS and dispatches the moment the turn is
+  # named — by this tab's own send, or by the durable record.
+
+  @integration
+  Scenario: Stop is available the moment I send
+    Given I send a message to Langy
+    Then the composer shows Stop while the turn is still starting up
+    And I do not have to wait for Langy to answer before I can stop it
+
+  @unit @integration
+  Scenario: Stop during startup is kept and dispatched when the turn is identified
+    Given I sent a message and the turn has no id yet
     When I click Stop
-    Then no stop is dispatched
-    And the control stays on Stop rather than showing it is stopping
-    And I am told the turn cannot be stopped yet
+    Then the control shows it is stopping
+    And the stop is dispatched against that turn as soon as it is identified
+    And I am never told to try stopping it again in a moment
+
+  @unit @integration
+  Scenario: A send that fails before the turn is identified hands the control back
+    Given I clicked Stop while my message was still starting up
+    When the send fails before any turn id exists
+    Then no stop is dispatched, because nothing was ever running
+    And the composer returns to Send with my message back in the field
 
   @unit
   Scenario: A stop that never reached the backend hands the control back
@@ -215,6 +347,17 @@ Feature: Langy lets me stop a turn for real, continue where it left off, and rej
     When I ask to stop a turn the conversation does not have in flight
     Then the request is refused
     And no terminal is recorded against that turn
+
+  # A turn is admitted on the record before its worker is running: the dispatch
+  # is fired at the manager, and a re-drive (outbox, liveness) can follow it
+  # seconds later. A stop in that window has to reach the work as well as the
+  # record, or the answer the user stopped is generated anyway.
+  @integration
+  Scenario: A stop before the worker starts still stops the turn
+    Given a turn was admitted but its worker is not running it yet
+    When I stop that turn
+    Then the turn settles as stopped on the durable record
+    And a later dispatch of that turn does not start the work
 
   # ===========================================================================
   # (2) Continue a stopped chat
@@ -255,11 +398,11 @@ Feature: Langy lets me stop a turn for real, continue where it left off, and rej
     Then a Continue affordance is shown on that stopped turn
 
   @integration @unimplemented
-  Scenario: Continuing does not spend a second daily pull-request permit for the same intent
+  Scenario: Continuing does not count the same pull request twice against the daily cap
     # Tracked: not shipped — depends on Continue existing at all.
-    Given a turn that reserved the daily pull-request permit before I stopped it
+    Given a turn that opened a pull request before I stopped it
     When I continue that stopped turn
-    Then the continuation does not reserve a second permit for the same intent
+    Then that pull request counts once against my daily cap
 
   # ===========================================================================
   # (3) Refresh and carry on from where it was streaming

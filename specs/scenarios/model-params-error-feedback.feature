@@ -14,7 +14,7 @@ Feature: Model params preparation error feedback
   # Factory-level structured errors - Unit Tests
   # ============================================================================
   # The production modelParamsProvider (in createDataPrefetcherDependencies)
-  # currently returns null for all failure cases. Each case must return a
+  # currently returns null for all failure scenarios. Each scenario must return a
   # ModelParamsResult with a specific reason code and actionable message.
 
   @unit @unimplemented

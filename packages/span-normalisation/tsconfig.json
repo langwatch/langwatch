@@ -1,0 +1,26 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "outDir": "dist",
+    "module": "ESNext",
+    "lib": ["ES2023"],
+    "esModuleInterop": true,
+    "resolveJsonModule": true,
+    "rootDir": "src",
+    "types": ["node"],
+    "tsBuildInfoFile": "dist/tsconfig.typecheck.tsbuildinfo",
+    "composite": true,
+    "noEmit": false
+  },
+  "files": [],
+  "include": [],
+
+  "references": [
+    {
+      "path": "./tsconfig.build.json"
+    },
+    {
+      "path": "./tsconfig.test.json"
+    }
+  ]
+}

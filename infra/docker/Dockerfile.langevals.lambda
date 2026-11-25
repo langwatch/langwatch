@@ -20,6 +20,20 @@ ARG EVALUATOR
 # Install only base + specific evaluator extra
 RUN uv sync --frozen --no-dev --extra $EVALUATOR
 
+# No outbound calls from libraries at runtime. LangEvals prices calls from
+# LangWatch's own model catalog (langevals_core/model_pricing.py), so LiteLLM
+# never downloads its price list; RAGAS analytics are off unless the operator
+# sets RAGAS_DO_NOT_TRACK=false. Every tiktoken encoding is cached in the image,
+# and LiteLLM points tiktoken at CUSTOM_TIKTOKEN_CACHE_DIR, so tokenizing
+# downloads nothing either.
+ENV LITELLM_LOCAL_MODEL_COST_MAP=True
+ENV RAGAS_DO_NOT_TRACK=true
+ENV LANGWATCH_MODEL_PRICING_DIR=/usr/src/app/model-pricing
+ENV TIKTOKEN_CACHE_DIR=/usr/src/app/tiktoken
+ENV CUSTOM_TIKTOKEN_CACHE_DIR=/usr/src/app/tiktoken
+COPY modules/model-provider/contract/src/catalog/model-catalog.json modules/model-provider/contract/src/catalog/model-catalog.overlay.json model-pricing/
+RUN uv run --no-sync python -c "import tiktoken; [tiktoken.get_encoding(name) for name in tiktoken.list_encoding_names()]"
+
 COPY services/langevals/langevals/ langevals/
 RUN PYTHONPATH="." uv run python langevals/server.py --preload
 

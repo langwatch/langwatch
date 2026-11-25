@@ -1,42 +1,28 @@
-/**
- * Turns a `--project <idOrSlug>` value into the project id a command targets.
- *
- * The user-scoped login key (`cli_api_key`) reaches every project the user
- * selected while approving the login, but it carries no project identity of
- * its own: the server resolves the role binding from the project the REQUEST
- * names. So a command that runs against another project needs an id, and the
- * user is entitled to type the slug they see in the URL bar instead.
- *
- * One resolver for every command group. `--project` starts on the `trace`
- * commands and `session events`; anything that adopts the flag later passes
- * the value to `resolveCredentials({ project })` and gets the same lookup, the
- * same errors and the same wiring for free.
- *
- * Spec: specs/typescript-sdk/cli-cross-project-access.feature
- */
+/** Resolves a --project id/slug to the project id; spec in cli-cross-project-access.feature. */
 
 import {
   ProjectsApiService,
   type Project,
 } from "@/client-sdk/services/projects/projects-api.service";
+
 import type { GovernanceConfig } from "./governance/config";
 
-/**
- * A `--project` value the CLI could not turn into a project it may use.
- *
- * `code` is the contract; the message is copy. `project_not_accessible` covers
- * both shapes of that answer — a name nothing matches, and a name the login
- * key is not allowed to see — because the platform answers them identically:
- * a credential that cannot view a project does not get it in the listing.
- * `project_lookup_failed` is the different case, where the listing itself did
- * not come back and we know nothing about the project either way.
- */
+/** Error on --project resolution: code is not_accessible or lookup_failed. */
 export class ProjectScopeError extends Error {
   constructor(
-    public readonly code: "project_not_accessible" | "project_lookup_failed",
+    public readonly code:
+      | "project_not_accessible"
+      | "project_lookup_failed"
+      | "project_scope_not_supported",
     message: string,
     /** The `--project` value the user typed, echoed back for the message. */
     public readonly project: string,
+    /**
+     * The way out, in the words of the credential actually in hand: telling
+     * someone to unset an environment variable they never set sends them
+     * after a key that is not the one answering.
+     */
+    public readonly remediation: string[] = [],
   ) {
     super(message);
     this.name = "ProjectScopeError";
@@ -62,9 +48,7 @@ const statusOf = (error: unknown): number | undefined => {
  * listing is filtered server-side by what the credential holds `project:view`
  * on, so "not in here" and "not yours" are the same fact.
  */
-const listAccessibleProjects = async (
-  service: ProjectsApiService,
-): Promise<Project[]> => {
+const listAccessibleProjects = async (service: ProjectsApiService): Promise<Project[]> => {
   const collected: Project[] = [];
   for (let page = 1; page <= MAX_PAGES; page++) {
     const result = await service.list({ page, limit: PAGE_SIZE });
@@ -86,19 +70,7 @@ const listAccessibleProjects = async (
   return collected;
 };
 
-/**
- * Resolve a `--project` value to a project id.
- *
- * The stored personal project answers without a round trip, since it is the
- * one project the CLI already knows by both id and slug. Everything else goes
- * through the listing, matching on id FIRST: ids and slugs live in one
- * namespace here, and an id is the exact reference, so a slug that happens to
- * read like another project's id can never steal the request.
- *
- * Throws `ProjectScopeError` rather than exiting, so the caller decides how to
- * render it (prose or the structured document) and the resolution stays
- * testable on its own.
- */
+/** Resolves a --project selector to id; checks personal first, then listing. */
 export const resolveProjectSelector = async ({
   selector,
   cfg,
@@ -153,10 +125,74 @@ export const resolveProjectSelector = async ({
   );
 };
 
+/**
+ * Where the key in hand came from, which decides the advice when it cannot be pointed at the named
+ * project: drop `--api-key`, or unset `LANGWATCH_API_KEY`.
+ */
+export type BoundKeySource = "flag-key" | "env-key" | "personal-project-login";
+
+/** The sentence and the way out, per credential the request could be holding. */
+const BOUND_KEY_COPY: Record<
+  BoundKeySource,
+  { refusal: (selector: string) => string; remediation: string[] }
+> = {
+  "flag-key": {
+    refusal: (selector) =>
+      `the key passed with --api-key is a project key, which carries its own project, so it cannot be pointed at "${selector}".`,
+    remediation: [
+      "Drop --api-key and run as your login, which reaches every project you approved:",
+      "  langwatch login",
+    ],
+  },
+  "env-key": {
+    refusal: (selector) =>
+      `LANGWATCH_API_KEY is a project key, which carries its own project, so it cannot be pointed at "${selector}".`,
+    remediation: [
+      "Log in with a key that reaches more than one project:",
+      "  langwatch login",
+      "",
+      "A key in LANGWATCH_API_KEY or .env is used ahead of that login, so unset it first.",
+    ],
+  },
+  "personal-project-login": {
+    refusal: (selector) =>
+      `this login reaches only your personal project, so it cannot be pointed at "${selector}".`,
+    remediation: [
+      "Log in again so the CLI mints a key that reaches every project you approve:",
+      "  langwatch login",
+    ],
+  },
+};
+
+/**
+ * The refusal for a project named against a legacy project key (`sk-lw-`, no lookup id), whose
+ * project the server reads off the token; running anyway would silently answer from elsewhere.
+ */
+export const projectScopeNotSupported = ({
+  selector,
+  keySource,
+}: {
+  selector: string;
+  keySource: BoundKeySource;
+}): ProjectScopeError => {
+  const copy = BOUND_KEY_COPY[keySource];
+  return new ProjectScopeError(
+    "project_scope_not_supported",
+    copy.refusal(selector),
+    selector,
+    copy.remediation,
+  );
+};
+
 /** The human error block for a `--project` that did not resolve. */
-export const projectScopeErrorLines = (error: ProjectScopeError): string[] => [
-  `Error: ${error.message}`,
-  "",
-  "List the projects your login reaches:",
-  "  langwatch projects list",
-];
+export const projectScopeErrorLines = (error: ProjectScopeError): string[] => {
+  if (error.code === "project_scope_not_supported") {
+    return [`Error: ${error.message}`, "", ...error.remediation];
+  }
+  return [
+    `Error: ${error.message}`,
+    "",
+    "List the projects your login reaches:",
+    "  langwatch projects list",
+  ];
+};

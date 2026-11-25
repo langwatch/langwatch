@@ -1,12 +1,31 @@
 import {
-  createLangWatchApiClient,
-  type LangwatchApiClient,
-} from "@/internal/api/client";
-import { type InternalConfig } from "@/client-sdk/types";
-import {
   extractStatusFromResponse,
   formatApiErrorForOperation,
 } from "@/client-sdk/services/_shared/format-api-error";
+import { throwIfHandledError } from "@/client-sdk/services/_shared/throw-handled-error";
+import { unwrapApiResult } from "@/client-sdk/services/_shared/unwrap-api-result";
+import { type InternalConfig } from "@/client-sdk/types";
+import { createLangWatchApiClient, type LangwatchApiClient } from "@/internal/api/client";
+import type { paths } from "@/internal/generated/openapi/api-client";
+
+/** One run parameter an agent declares, as the platform lists it. */
+export interface AgentParameterSpec {
+  name: string;
+  type: "string" | "number" | "boolean";
+  options?: string[];
+  default?: string | number | boolean;
+  description?: string;
+  required?: boolean;
+  secret?: boolean;
+}
+
+/** One process connected as an instance of a connected agent. */
+export interface AgentInstance {
+  id: string;
+  hostname: string;
+  label?: string | null;
+  connectedAt: string;
+}
 
 export interface AgentResponse {
   id: string;
@@ -16,7 +35,43 @@ export interface AgentResponse {
   createdAt: string;
   updatedAt: string;
   platformUrl?: string;
+  /** Connected agents: the environment the SDK registered under. */
+  environment?: string | null;
+  /** Connected agents: online while at least one instance is connected. */
+  status?: "online" | "offline" | null;
+  instances?: AgentInstance[];
+  lastSeenAt?: string | null;
+  /** The owner of a personal agent. */
+  owner?: { userId: string; name: string } | null;
+  /** The machine a host-scoped development agent belongs to. */
+  hostLabel?: string | null;
+  /**
+   * Whether this key can run the agent. A personal development agent of
+   * another person is listed all the same, so two agents of one name can be
+   * told apart, but it cannot be run with this key.
+   */
+  selectable?: boolean;
+  /** Why the agent cannot be run with this key; null when it can. */
+  notSelectableReason?: "owned_by_another_person" | null;
+  parameters?: AgentParameterSpec[];
+  /** The version this read shows: the latest unless a label or a version was asked for. */
+  version?: number | null;
+  /** The deploy labels and the version each one points at. */
+  labels?: { label: string; version: number }[];
+  createdBy?: { id: string; name: string | null } | null;
+  updatedBy?: { id: string; name: string | null } | null;
 }
+
+/** Which version of an agent to read: a deploy label such as `production`, or a number. */
+export type AgentVersionSelector = { label?: string; version?: number };
+
+/** An agent's versions, newest first, and where each deploy label points. */
+export type AgentVersionsResponse =
+  paths["/api/v1/agents/{agentId}/versions"]["get"]["responses"][200]["content"]["application/json"];
+
+/** A deploy label after it was moved. */
+export type AgentLabelResponse =
+  paths["/api/v1/agents/{agentId}/labels/{label}"]["put"]["responses"][200]["content"]["application/json"];
 
 export interface AgentListResponse {
   data: AgentResponse[];
@@ -27,6 +82,22 @@ export interface AgentListResponse {
     totalPages: number;
   };
 }
+
+/** The body `POST /api/v1/agents/{id}/call` takes. */
+export type AgentCallBody = NonNullable<
+  paths["/api/v1/agents/{id}/call"]["post"]["requestBody"]
+>["content"]["application/json"];
+
+/** One conversation message as the relay carries it, OpenAI style. */
+export type AgentCallMessage = AgentCallBody["messages"][number];
+
+/** The reply of the relay: the function's output and the instance that ran it. */
+export type AgentCallResponse =
+  paths["/api/v1/agents/{id}/call"]["post"]["responses"][200]["content"]["application/json"];
+
+/** The ids `POST /api/v1/agents/{id}/test` answers with. */
+export type AgentTestRunResponse =
+  paths["/api/v1/agents/{id}/test"]["post"]["responses"][200]["content"]["application/json"];
 
 export class AgentsApiError extends Error {
   constructor(
@@ -46,27 +117,43 @@ export class AgentsApiService {
     this.apiClient = config?.langwatchApiClient ?? createLangWatchApiClient();
   }
 
-  private handleApiError(operation: string, error: unknown): never {
-    const message = formatApiErrorForOperation({ operation: operation, error: error, options: {
-      status: extractStatusFromResponse(error),
-    } });
+  private handleApiError(operation: string, error: unknown, response?: Response): never {
+    const message = formatApiErrorForOperation({
+      operation: operation,
+      error: error,
+      options: {
+        status: response?.status ?? extractStatusFromResponse(error),
+      },
+    });
+    throwIfHandledError({ operation, error, message });
     throw new AgentsApiError(message, operation, error);
   }
 
   async list(params?: { page?: number; limit?: number }): Promise<AgentListResponse> {
-    const { data, error } = await this.apiClient.GET("/api/agents", {
+    const { data, error, response } = await this.apiClient.GET("/api/v1/agents", {
       params: { query: params },
     });
-    if (error) this.handleApiError("list agents", error);
-    return data as unknown as AgentListResponse;
+    return unwrapApiResult({
+      operation: "list agents",
+      data,
+      error,
+      response,
+      onError: this.handleApiError.bind(this),
+    }) as unknown as AgentListResponse;
   }
 
-  async get(id: string): Promise<AgentResponse> {
-    const { data, error } = await this.apiClient.GET("/api/agents/{id}", {
-      params: { path: { id } },
+  /** Reads the latest version unless a `label` or a `version` is asked for. */
+  async get(id: string, selector: AgentVersionSelector = {}): Promise<AgentResponse> {
+    const { data, error, response } = await this.apiClient.GET("/api/v1/agents/{id}", {
+      params: { path: { id }, query: selector },
     });
-    if (error) this.handleApiError(`get agent "${id}"`, error);
-    return data as unknown as AgentResponse;
+    return unwrapApiResult({
+      operation: `get agent "${id}"`,
+      data,
+      error,
+      response,
+      onError: this.handleApiError.bind(this),
+    }) as unknown as AgentResponse;
   }
 
   async create(params: {
@@ -74,32 +161,135 @@ export class AgentsApiService {
     type: string;
     config: Record<string, unknown>;
     workflowId?: string;
+    /** Recorded on version 1. */
+    commitMessage?: string;
   }): Promise<AgentResponse> {
-    const { data, error } = await this.apiClient.POST("/api/agents", {
+    const { data, error, response } = await this.apiClient.POST("/api/v1/agents", {
       body: params as never,
     });
-    if (error) this.handleApiError("create agent", error);
-    return data as unknown as AgentResponse;
+    return unwrapApiResult({
+      operation: "create agent",
+      data,
+      error,
+      response,
+      onError: this.handleApiError.bind(this),
+    }) as unknown as AgentResponse;
   }
 
-  async update(id: string, params: {
-    name?: string;
-    type?: string;
-    config?: Record<string, unknown>;
-  }): Promise<AgentResponse> {
-    const { data, error } = await this.apiClient.PATCH("/api/agents/{id}", {
+  async update(
+    id: string,
+    params: {
+      name?: string;
+      type?: string;
+      config?: Record<string, unknown>;
+      /** Recorded on the version this update appends. */
+      commitMessage?: string;
+    },
+  ): Promise<AgentResponse> {
+    const { data, error, response } = await this.apiClient.PATCH("/api/v1/agents/{id}", {
       params: { path: { id } },
       body: params as never,
     });
-    if (error) this.handleApiError(`update agent "${id}"`, error);
-    return data as unknown as AgentResponse;
+    return unwrapApiResult({
+      operation: `update agent "${id}"`,
+      data,
+      error,
+      response,
+      onError: this.handleApiError.bind(this),
+    }) as unknown as AgentResponse;
   }
 
   async delete(id: string): Promise<{ id: string; name: string }> {
-    const { data, error } = await this.apiClient.DELETE("/api/agents/{id}", {
+    const { data, error, response } = await this.apiClient.DELETE("/api/v1/agents/{id}", {
       params: { path: { id } },
     });
-    if (error) this.handleApiError(`delete agent "${id}"`, error);
-    return data as unknown as { id: string; name: string };
+    return unwrapApiResult({
+      operation: `delete agent "${id}"`,
+      data,
+      error,
+      response,
+      onError: this.handleApiError.bind(this),
+    }) as unknown as { id: string; name: string };
+  }
+
+  /**
+   * Runs one turn of a connected agent through the relay: the platform
+   * dispatches it to a live instance and answers with the function's output.
+   */
+  async call(id: string, body: AgentCallBody): Promise<AgentCallResponse> {
+    const { data, error, response } = await this.apiClient.POST("/api/v1/agents/{id}/call", {
+      params: { path: { id } },
+      body,
+    });
+    return unwrapApiResult({
+      operation: `call agent "${id}"`,
+      data,
+      error,
+      response,
+      onError: this.handleApiError.bind(this),
+    }) as AgentCallResponse;
+  }
+
+  /**
+   * Runs one scripted scenario against an agent: the user sends "ping", the agent answers,
+   * and the run succeeds when the answer arrives. The project gains no scenario, run plan or
+   * test suite, and the answer carries the run ids to follow.
+   */
+  async test(id: string): Promise<AgentTestRunResponse> {
+    const { data, error, response } = await this.apiClient.POST("/api/v1/agents/{id}/test", {
+      params: { path: { id } },
+    });
+    return unwrapApiResult({
+      operation: `test agent "${id}"`,
+      data,
+      error,
+      response,
+      onError: this.handleApiError.bind(this),
+    }) as AgentTestRunResponse;
+  }
+
+  /** Every version of the agent, newest first, with the labels on each. */
+  async listVersions(id: string): Promise<AgentVersionsResponse> {
+    const { data, error, response } = await this.apiClient.GET(
+      "/api/v1/agents/{agentId}/versions",
+      { params: { path: { agentId: id } } },
+    );
+    return unwrapApiResult({
+      operation: `list versions of agent "${id}"`,
+      data,
+      error,
+      response,
+      onError: this.handleApiError.bind(this),
+    }) as AgentVersionsResponse;
+  }
+
+  /** Points a deploy label, such as `production`, at one of the agent's versions. */
+  async assignLabel(id: string, label: string, version: number): Promise<AgentLabelResponse> {
+    const { data, error, response } = await this.apiClient.PUT(
+      "/api/v1/agents/{agentId}/labels/{label}",
+      { params: { path: { agentId: id, label } }, body: { version } },
+    );
+    return unwrapApiResult({
+      operation: `deploy label "${label}" of agent "${id}"`,
+      data,
+      error,
+      response,
+      onError: this.handleApiError.bind(this),
+    }) as AgentLabelResponse;
+  }
+
+  /** Removes a deploy label from the agent. */
+  async removeLabel(id: string, label: string): Promise<{ label: string; removed: true }> {
+    const { data, error, response } = await this.apiClient.DELETE(
+      "/api/v1/agents/{agentId}/labels/{label}",
+      { params: { path: { agentId: id, label } } },
+    );
+    return unwrapApiResult({
+      operation: `remove label "${label}" of agent "${id}"`,
+      data,
+      error,
+      response,
+      onError: this.handleApiError.bind(this),
+    }) as { label: string; removed: true };
   }
 }

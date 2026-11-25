@@ -1,0 +1,81 @@
+{
+	"scopeName": "copilot-chat",
+	"spanName": "invoke_agent GitHub Copilot Chat",
+	"vendorVersion": "0.67.0",
+	"resourceAttributes": {
+		"service.name": "copilot-chat",
+		"service.version": "0.67.0",
+		"session.id": "00000000-0000-4000-8000-0000000000131792414498335"
+	},
+	"attributes": {
+		"gen_ai.operation.name": "invoke_agent",
+		"gen_ai.provider.name": "github",
+		"gen_ai.agent.name": "GitHub Copilot Chat",
+		"gen_ai.conversation.id": "00000000-0000-4000-8000-000000000014",
+		"copilot_chat.session_id": "00000000-0000-4000-8000-000000000014",
+		"copilot_chat.chat_session_id": "00000000-0000-4000-8000-000000000014",
+		"github.copilot.agent.type": "builtin",
+		"copilot_chat.repo.head_branch_name": "feature/repo-b-work",
+		"github.copilot.git.branch": "feature/repo-b-work",
+		"copilot_chat.repo.head_commit_hash": "d20b1bc1c6d7c1b95ca1a9d3d0ae039662db9f7e",
+		"github.copilot.git.commit_sha": "d20b1bc1c6d7c1b95ca1a9d3d0ae039662db9f7e",
+		"copilot_chat.repo.remote_url": "https://github.com/example-org/repo-b.git",
+		"github.copilot.git.repository": "https://github.com/example-org/repo-b.git",
+		"github.copilot.github.org": "example-org",
+		"gen_ai.request.model": "gpt-6-luna",
+		"gen_ai.input.messages": "[{\"role\":\"user\",\"parts\":[{\"type\":\"text\",\"content\":\"<redacted>\"}]}]",
+		"copilot_chat.user_request": "<redacted>",
+		"copilot_chat.turn_count": 2,
+		"gen_ai.usage.input_tokens": 48989,
+		"gen_ai.usage.output_tokens": 128,
+		"gen_ai.usage.cache_read.input_tokens": 24438,
+		"gen_ai.usage.reasoning.output_tokens": 50,
+		"gen_ai.response.model": "gpt-6-luna",
+		"gen_ai.output.messages": "[{\"role\":\"assistant\",\"parts\":[{\"type\":\"text\",\"content\":\"<redacted>\"}]}]",
+		"gen_ai.tool.definitions": "[{\"type\":\"function\",\"name\":\"apply_patch\",\"description\":\"<redacted>\",\"parameters\":{\"type\":\"object\",\"properties\":{\"input\":{\"type\":\"string\",\"description\":\"<redacted>\"},\"explanation\":{\"type\":\"string\",\"description\":\"<redacted>\"}},\"required\":[\"<redacted>\",\"<redacted>\"]}},{\"type\":\"function\",\"name\":\"create_directory\",\"description\":\"<redacted>\",\"parameters\":{\"type\":\"object\",\"properties\":{\"dirPath\":{\"type\":\"string\",\"description\":\"<redacted>\"}},\"required\":[\"<redacted>\"]}},{\"type\":\"function\",\"name\":\"create_file\",\"description\":\"<redacted>\",\"parameters\":{\"type\":\"object\",\"properties\":{\"filePath\":{\"type\":\"string\",\"description\":\"<redacted>\"},\"content\":{\"type\":\"string\",\"description\":\"<redacted>\"}},\"required\":[\"<redacted>\",\"<redacted>\"]}}]"
+	},
+	"events": [
+		{
+			"name": "user_message",
+			"attributes": {
+				"content": "<redacted>",
+				"copilot_chat.chat_session_id": "00000000-0000-4000-8000-000000000014"
+			}
+		},
+		{
+			"name": "turn_start",
+			"attributes": {
+				"turnId": "0",
+				"copilot_chat.chat_session_id": "00000000-0000-4000-8000-000000000014"
+			}
+		},
+		{
+			"name": "tools_available",
+			"attributes": {
+				"toolDefinitions": "[{\"type\":\"function\",\"name\":\"apply_patch\",\"description\":\"<redacted>\",\"parameters\":{\"type\":\"object\",\"properties\":{\"input\":{\"type\":\"string\",\"description\":\"<redacted>\"},\"explanation\":{\"type\":\"string\",\"description\":\"<redacted>\"}},\"required\":[\"<redacted>\",\"<redacted>\"]}},{\"type\":\"function\",\"name\":\"create_directory\",\"description\":\"<redacted>\",\"parameters\":{\"type\":\"object\",\"properties\":{\"dirPath\":{\"type\":\"string\",\"description\":\"<redacted>\"}},\"required\":[\"<redacted>\"]}},{\"type\":\"function\",\"name\":\"create_file\",\"description\":\"<redacted>\",\"parameters\":{\"type\":\"object\",\"properties\":{\"filePath\":{\"type\":\"string\",\"description\":\"<redacted>\"},\"content\":{\"type\":\"string\",\"description\":\"<redacted>\"}},\"required\":[\"<redacted>\",\"<redacted>\"]}}]",
+				"copilot_chat.chat_session_id": "00000000-0000-4000-8000-000000000014"
+			}
+		},
+		{
+			"name": "turn_end",
+			"attributes": {
+				"turnId": "0",
+				"copilot_chat.chat_session_id": "00000000-0000-4000-8000-000000000014"
+			}
+		},
+		{
+			"name": "turn_start",
+			"attributes": {
+				"turnId": "1",
+				"copilot_chat.chat_session_id": "00000000-0000-4000-8000-000000000014"
+			}
+		},
+		{
+			"name": "turn_end",
+			"attributes": {
+				"turnId": "1",
+				"copilot_chat.chat_session_id": "00000000-0000-4000-8000-000000000014"
+			}
+		}
+	]
+}

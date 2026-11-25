@@ -1,0 +1,344 @@
+/**
+ * What Instant Evals refuse. Each clears ADR-045: we know the cause and the
+ * caller can act on it. No message names a provider, key, host or table.
+ *
+ * @see dev/docs/best_practices/error-handling.md
+ * @see modules/instant-eval/specs/instant-eval-api.feature
+ */
+
+import { HandledError, remediation } from "@langwatch/handled-error";
+
+/**
+ * The statement would send more text to be judged than one synchronous
+ * request may. Refused before anything is sent: the alternative is a caller
+ * discovering the size of their query from the bill.
+ */
+export class InstantEvalQueryBudgetExceededError extends HandledError {
+  declare readonly code: "instant_eval_query_budget_exceeded";
+
+  constructor({
+    estimatedTokens,
+    budget,
+  }: {
+    readonly estimatedTokens: number;
+    readonly budget: number;
+  }) {
+    super(
+      "instant_eval_query_budget_exceeded",
+      "This query would judge more text than one request may. Lower the row limit, extract less text per row, or run it as a job.",
+      {
+        httpStatus: 422,
+        fault: "customer",
+        meta: { estimatedTokens, budget },
+      },
+    );
+    this.name = "InstantEvalQueryBudgetExceededError";
+  }
+}
+
+/** What each refusal of the switch says, by who refused it. */
+const NOT_OFFERED_MESSAGES = {
+  enterprise: "LangWatch switches Instant Evals on for an enterprise plan. Contact us to get them.",
+  self_hosted:
+    "A self-hosted install gets Instant Evals from its license, or from whoever runs it when it has judging turned off, never from this switch. Contact us to add them to your license.",
+  hosted_off:
+    "LangWatch's hosted model is turned off for this organization. Run Instant Evals on your own decision model: pick one in the Instant Evals column of Default models.",
+} as const;
+
+/**
+ * The organization's own switch was thrown where the popover does not offer it. `meta.deployment`
+ * says which refused: an enterprise plan is switched on by us; a self-hosted install by its
+ * license or operator; `hosted_off` is an organization LangWatch keeps on its own models.
+ * @see modules/instant-eval/specs/instant-eval-opt-in.feature
+ */
+export class InstantEvalOptInNotOfferedError extends HandledError {
+  declare readonly code: "instant_eval_opt_in_not_offered";
+
+  constructor({ deployment }: { readonly deployment: keyof typeof NOT_OFFERED_MESSAGES }) {
+    super("instant_eval_opt_in_not_offered", NOT_OFFERED_MESSAGES[deployment], {
+      httpStatus: 403,
+      fault: "customer",
+      meta: { deployment },
+      ...remediation("instant_eval_opt_in_not_offered"),
+    });
+    this.name = "InstantEvalOptInNotOfferedError";
+  }
+}
+
+/** The questions alone fill the judge's state, leaving no room for any text. */
+export class InstantEvalQuestionsTooLongError extends HandledError {
+  declare readonly code: "instant_eval_questions_too_long";
+
+  constructor({
+    questionTokens,
+    stateTokens,
+  }: {
+    readonly questionTokens: number;
+    readonly stateTokens: number;
+  }) {
+    super(
+      "instant_eval_questions_too_long",
+      "The questions are too long to leave room for any text to judge. Shorten them, or ask fewer of them at once.",
+      {
+        httpStatus: 422,
+        fault: "customer",
+        meta: { questionTokens, stateTokens },
+      },
+    );
+    this.name = "InstantEvalQuestionsTooLongError";
+  }
+}
+
+/** The project may not run Instant Evals at all. */
+export class InstantEvalNotEnabledError extends HandledError {
+  declare readonly code: "instant_eval_not_enabled";
+
+  constructor() {
+    super("instant_eval_not_enabled", "Instant Evals are not available for this project yet.", {
+      httpStatus: 403,
+      fault: "customer",
+    });
+    this.name = "InstantEvalNotEnabledError";
+  }
+}
+
+/**
+ * The project is released for Instant Evals, but the deployment has no classifier that can judge
+ * for its organization: it is not LangWatch Cloud and has no hosted judging through Connect. The
+ * operator can act on it, which is why it is not folded into `instant_eval_not_enabled`.
+ */
+export class InstantEvalClassifierNotConfiguredError extends HandledError {
+  declare readonly code: "instant_eval_classifier_not_configured";
+
+  constructor() {
+    super(
+      "instant_eval_classifier_not_configured",
+      "Instant Evals are turned on for this project, but this installation has nothing to judge with yet.",
+      {
+        httpStatus: 403,
+        fault: "customer",
+        ...remediation("instant_eval_classifier_not_configured"),
+      },
+    );
+    this.name = "InstantEvalClassifierNotConfiguredError";
+  }
+}
+
+/**
+ * Every row of a run's page was refused for the project's own decision model's key: refused by
+ * the provider, no key, or the provider row off. Failed rather than recorded as skips, which a
+ * caller would read as nothing matching. Names no provider and no key.
+ */
+export class InstantEvalDecisionModelKeyInvalidError extends HandledError {
+  declare readonly code: "instant_eval_decision_model_key_invalid";
+
+  constructor() {
+    super(
+      "instant_eval_decision_model_key_invalid",
+      "The key for this project's Instant Evals model could not be used. Check it in Settings > Model Providers.",
+      {
+        httpStatus: 403,
+        fault: "customer",
+        ...remediation("instant_eval_decision_model_key_invalid"),
+      },
+    );
+    this.name = "InstantEvalDecisionModelKeyInvalidError";
+  }
+}
+
+/** The memory judge answers from a hash, not the text, so a production process refuses it. */
+export class InstantEvalMemoryJudgeInProductionError extends HandledError {
+  declare readonly code: "instant_eval_memory_judge_in_production";
+
+  constructor() {
+    super(
+      "instant_eval_memory_judge_in_production",
+      "The memory Instant Evals judge is a development stand-in and cannot run in production.",
+      { httpStatus: 500, fault: "platform" },
+    );
+    this.name = "InstantEvalMemoryJudgeInProductionError";
+  }
+}
+
+/** No run of this project has that id. */
+export class InstantEvalRunNotFoundError extends HandledError {
+  declare readonly code: "instant_eval_not_found";
+
+  constructor({ runId }: { runId: string }) {
+    super("instant_eval_not_found", "That Instant Eval run does not exist.", {
+      httpStatus: 404,
+      fault: "customer",
+      meta: { runId },
+    });
+    this.name = "InstantEvalRunNotFoundError";
+  }
+}
+
+/**
+ * The statement is not one a run can execute: a surface-owned parameter
+ * nothing will fill, or a parameter name this surface owns. A statement the
+ * query policy refuses raises the policy's own error instead.
+ */
+export class InstantEvalQueryInvalidError extends HandledError {
+  declare readonly code: "instant_eval_query_invalid";
+
+  constructor({
+    reason,
+    parameters,
+    fields,
+    violations,
+    reasons,
+  }: {
+    /** Customer-safe sentence naming what about the statement cannot run. */
+    readonly reason: string;
+    readonly parameters?: readonly string[];
+    /** Which of `target`, `filter`, `questions` a shorthand must rewrite. */
+    readonly fields?: readonly string[];
+    readonly violations?: unknown;
+    readonly reasons?: readonly Error[];
+  }) {
+    super("instant_eval_query_invalid", reason, {
+      httpStatus: 422,
+      fault: "customer",
+      meta: {
+        ...(parameters && parameters.length > 0 ? { parameters } : {}),
+        ...(fields && fields.length > 0 ? { fields } : {}),
+        ...(violations === undefined ? {} : { violations }),
+      },
+      ...(reasons ? { reasons } : {}),
+    });
+    this.name = "InstantEvalQueryInvalidError";
+  }
+}
+
+/** The statement does not project what a run needs to judge and record. */
+export class InstantEvalQueryMissingColumnsError extends HandledError {
+  declare readonly code: "instant_eval_query_missing_columns";
+
+  constructor({
+    missing,
+    isEvalFunctionMissing,
+  }: {
+    readonly missing: readonly string[];
+    readonly isEvalFunctionMissing: boolean;
+  }) {
+    super(
+      "instant_eval_query_missing_columns",
+      isEvalFunctionMissing
+        ? "An Instant Eval run needs a statement that projects TraceId and at least one eval function."
+        : `An Instant Eval run needs a statement that projects ${missing.join(", ")}.`,
+      {
+        httpStatus: 422,
+        fault: "customer",
+        meta: { missing, isEvalFunctionMissing },
+      },
+    );
+    this.name = "InstantEvalQueryMissingColumnsError";
+  }
+}
+
+/** The run asked for more rows than this plan may judge. */
+export class InstantEvalRowCapExceededError extends HandledError {
+  declare readonly code: "instant_eval_row_cap_exceeded";
+
+  constructor({
+    requested,
+    cap,
+    plan,
+    maxCap,
+  }: {
+    readonly requested: number;
+    readonly cap: number;
+    readonly plan: string;
+    /** The highest cap any plan offers, so a caller knows what upgrading buys. */
+    readonly maxCap: number;
+  }) {
+    super(
+      "instant_eval_row_cap_exceeded",
+      requested > maxCap
+        ? "That is more rows than one Instant Eval run may judge."
+        : "That is more rows than this plan may judge in one Instant Eval run.",
+      {
+        httpStatus: 422,
+        fault: "customer",
+        meta: { requested, cap, plan, maxCap },
+      },
+    );
+    this.name = "InstantEvalRowCapExceededError";
+  }
+}
+
+/** The run is over, so there is nothing left to cancel. */
+export class InstantEvalAlreadyFinishedError extends HandledError {
+  declare readonly code: "instant_eval_already_finished";
+
+  constructor({ runId, status }: { runId: string; status: string }) {
+    super("instant_eval_already_finished", "That Instant Eval run has already finished.", {
+      httpStatus: 409,
+      fault: "customer",
+      // Spelled as the run's own wire status, so a reader compares like with like.
+      meta: { runId, status: status.toLowerCase() },
+    });
+    this.name = "InstantEvalAlreadyFinishedError";
+  }
+}
+
+/**
+ * The estimate could not be made. `platform` fault: estimating reads the
+ * caller's own statement through our query path, so a failure here is ours.
+ */
+export class InstantEvalEstimateUnavailableError extends HandledError {
+  declare readonly code: "instant_eval_estimate_unavailable";
+
+  constructor(options: { reasons?: readonly Error[] } = {}) {
+    super(
+      "instant_eval_estimate_unavailable",
+      "The size of this run could not be worked out right now.",
+      { httpStatus: 503, fault: "platform", ...options },
+    );
+    this.name = "InstantEvalEstimateUnavailableError";
+  }
+}
+
+/** Whose budget a gateway refusal names, by the gateway's own lower-case scope. */
+const GATEWAY_BUDGET_OWNERS: Readonly<Record<string, string>> = {
+  organization: "This organization's",
+  team: "This team's",
+  project: "This project's",
+};
+
+/**
+ * A gateway budget set to block has been reached. Refused before anything is judged, and
+ * between pages of a run under way, so the budget is a ceiling as it is for gateway traffic.
+ * @see modules/instant-eval/specs/instant-eval-billing.feature
+ */
+export class InstantEvalGatewayBudgetExceededError extends HandledError {
+  declare readonly code: "instant_eval_gateway_budget_exceeded";
+
+  constructor({
+    budgetId,
+    scope,
+    window,
+    limitUsd,
+    spentUsd,
+  }: {
+    readonly budgetId: string;
+    readonly scope: string;
+    readonly window: string;
+    readonly limitUsd: number;
+    readonly spentUsd: number;
+  }) {
+    const owner = Object.hasOwn(GATEWAY_BUDGET_OWNERS, scope) ? GATEWAY_BUDGET_OWNERS[scope] : "A";
+    super(
+      "instant_eval_gateway_budget_exceeded",
+      `${owner} gateway budget is used up. Raise or remove it under AI Gateway, Budgets to keep judging.`,
+      {
+        httpStatus: 402,
+        fault: "customer",
+        meta: { budgetId, scope, window, limitUsd, spentUsd },
+        ...remediation("instant_eval_gateway_budget_exceeded"),
+      },
+    );
+    this.name = "InstantEvalGatewayBudgetExceededError";
+  }
+}

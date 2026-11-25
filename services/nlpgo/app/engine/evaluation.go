@@ -9,6 +9,7 @@ import (
 	"io"
 	mathrand "math/rand"
 	"net/http"
+	"sort"
 	"sync"
 	"time"
 
@@ -390,7 +391,7 @@ func (e *Engine) executeEvaluationStream(ctx context.Context, req ExecuteRequest
 					Type:      "execute_flow",
 				}
 				entryRes, err := e.Execute(rowCtx, entryReq)
-				duration := time.Since(entryStart).Milliseconds()
+				duration := elapsedMS(entryStart)
 				var entryTraceID string
 				if entryRes != nil {
 					entryTraceID = entryRes.TraceID
@@ -413,7 +414,9 @@ func (e *Engine) executeEvaluationStream(ctx context.Context, req ExecuteRequest
 				// recordEntry uses; reading the field directly across
 				// goroutines is a data race (CodeRabbit critical on
 				// PR #3607).
-				emit(ctx, out, evaluationProgressEvent(req, traceID, reporter.progressCount(), total, started))
+				progress := evaluationProgressEvent(req, traceID, reporter.progressCount(), total, started)
+				addRowUsage(progress, entryRes)
+				emit(ctx, out, progress)
 			}
 		}()
 	}
@@ -479,15 +482,15 @@ func selectEvaluationEntries(wf *dsl.Workflow, evaluateOn string, datasetEntry *
 		return nil, fmt.Errorf("evaluation: workflow has no entry node")
 	}
 	if entryNode.Data.Dataset == nil || entryNode.Data.Dataset.Inline == nil {
-		// Studio's loadDatasets() (platform/app/src/optimization_studio/
-		// server/loadDatasets.ts) is supposed to fetch + inline saved
+		// Studio's dataset materializer (modules/workflow/process/src/
+		// services/studio-dataset-materializer.service.ts) is supposed to inline saved
 		// datasets server-side before posting the event to nlpgo. If
 		// we end up here it means the inlining was skipped (an older
 		// server version, or the bypass-when-all branch that broke
 		// 3.2.0 prod for a 3.2.0 customer). Surface the *actionable*
 		// path — pointing at the TS helper — rather than blaming the
 		// user for "remote datasets not supported".
-		return nil, fmt.Errorf("evaluation: entry node has no inline dataset — Studio's loadDatasets() must inline saved datasets before forwarding to the Go engine; check platform/app/src/optimization_studio/server/loadDatasets.ts")
+		return nil, fmt.Errorf("evaluation: entry node has no inline dataset — Studio's loadDatasets() must inline saved datasets before forwarding to the Go engine; check modules/workflow/process/src/services/studio-dataset-materializer.service.ts")
 	}
 	rows, err := dataset.Materialize(entryNode.Data.Dataset.Inline)
 	if err != nil {
@@ -609,8 +612,9 @@ func splitTrainTest(rows []map[string]any, trainSize, testSize *float64, seed *i
 
 // evaluationProgressEvent emits an evaluation_state_change carrying the
 // current progress + total counts. Studio's reducer renders the progress
-// bar and partial results from these (platform/app/src/optimization_studio/
-// hooks/usePostEvent.tsx case "evaluation_state_change"). Without these
+// bar and partial results from these (modules/workflow/browser/src/ui/
+// sections/optimization_studio/use-post-event.tsx case
+// "evaluation_state_change"). Without these
 // the UI stays at "Waiting for evaluation results" until the success
 // event lands at the very end.
 func evaluationProgressEvent(req ExecuteRequest, traceID string, progress, total int, started time.Time) StreamEvent {
@@ -629,4 +633,44 @@ func evaluationProgressEvent(req ExecuteRequest, traceID string, progress, total
 			},
 		},
 	}
+}
+
+// addRowUsage puts the provider usage of one evaluated row's LLM nodes on the
+// progress event that row produced. The evaluation stream carries no per-node
+// events, so this is the only place the control plane sees those tokens and
+// writes them to the spend ledger (ADR-193). One row, one progress event, so
+// each row's usage crosses the wire once.
+func addRowUsage(ev StreamEvent, res *ExecuteResult) {
+	usage := nodeUsages(res)
+	if len(usage) > 0 {
+		ev.Payload["usage"] = usage
+	}
+}
+
+// nodeUsages lists every node of a finished run that reported token metrics,
+// sorted by node id, each with the run's trace id.
+func nodeUsages(res *ExecuteResult) []map[string]any {
+	if res == nil {
+		return nil
+	}
+	ids := make([]string, 0, len(res.Nodes))
+	for id, ns := range res.Nodes {
+		if ns != nil && ns.Metrics != nil {
+			ids = append(ids, id)
+		}
+	}
+	sort.Strings(ids)
+	usage := make([]map[string]any, 0, len(ids))
+	for _, id := range ids {
+		entry := map[string]any{
+			"node_id":  id,
+			"trace_id": res.TraceID,
+			"metrics":  res.Nodes[id].Metrics,
+		}
+		if d := res.Nodes[id].DurationMS; d > 0 {
+			entry["duration_ms"] = d
+		}
+		usage = append(usage, entry)
+	}
+	return usage
 }

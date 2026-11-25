@@ -8,7 +8,7 @@ Feature: Native receiver-side lift via canonicalisation extractor pipeline
   (GenAI / Mastra / Vercel / Traceloop / Logfire / Strands / Haystack).
 
   Architecture decision: each platform tool is a class under
-  `platform/app/src/server/app-layer/traces/canonicalisation/extractors/`
+  `modules/trace/process/src/adapters/`
   that implements the `applyLog(LogExtractorContext)` method on the
   `CanonicalAttributesExtractor` interface. The trace-processing log
   fold projection runs the registry via
@@ -24,7 +24,7 @@ Feature: Native receiver-side lift via canonicalisation extractor pipeline
   platform-native tools.
 
   As a developer running Claude Code / Codex / Gemini CLI / opencode
-  on their `/me` ingestion endpoint, my session's cost, tokens,
+  on their `/coding-agents` ingestion endpoint, my session's cost, tokens,
   model, and conversation grouping land on the trace summary without
   the admin needing to author OTTL statements per tool.
 

@@ -44,14 +44,29 @@ const (
 
 // Executor implements app.LLMClient.
 type Executor struct {
-	gw app.GatewayClient
+	gw      app.GatewayClient
+	catalog litellm.OutputTokensLookup
+}
+
+// Option configures an Executor.
+type Option func(*Executor)
+
+// WithModelCatalog gives the executor the model catalog, which decides the
+// name each model takes its output token limit as. Without it every model
+// keeps the engine's name rule.
+func WithModelCatalog(catalog litellm.OutputTokensLookup) Option {
+	return func(e *Executor) { e.catalog = catalog }
 }
 
 // New builds an Executor from a GatewayClient. The gateway client owns
 // HTTP transport, signing, and base URL; the executor is pure shape
 // translation.
-func New(gw app.GatewayClient) *Executor {
-	return &Executor{gw: gw}
+func New(gw app.GatewayClient, opts ...Option) *Executor {
+	e := &Executor{gw: gw}
+	for _, opt := range opts {
+		opt(e)
+	}
+	return e
 }
 
 // Compile-time interface check.
@@ -59,7 +74,7 @@ var _ app.LLMClient = (*Executor)(nil)
 
 // Execute runs a single LLM call, blocking until the response arrives.
 func (e *Executor) Execute(ctx context.Context, req app.LLMRequest) (*app.LLMResponse, error) {
-	gwReq, err := buildGatewayRequest(ctx, req, false)
+	gwReq, err := e.buildGatewayRequest(ctx, req, false)
 	if err != nil {
 		return nil, err
 	}
@@ -87,7 +102,7 @@ func (e *Executor) Execute(ctx context.Context, req app.LLMRequest) (*app.LLMRes
 // ExecuteStream opens a streaming /v1/chat/completions request and returns
 // a StreamIterator the caller pumps for incremental deltas.
 func (e *Executor) ExecuteStream(ctx context.Context, req app.LLMRequest) (app.StreamIterator, error) {
-	gwReq, err := buildGatewayRequest(ctx, req, true)
+	gwReq, err := e.buildGatewayRequest(ctx, req, true)
 	if err != nil {
 		return nil, err
 	}
@@ -143,137 +158,147 @@ func (e *GatewayHTTPError) Error() string {
 // LiteLLM-wrapped "litellm.RateLimitError: ..." string. Returns "" when
 // the body isn't recognizable JSON — caller falls back to the bare
 // status-code message.
+//
+// Aggregator envelopes (OpenRouter and compatible relays) wrap the real
+// upstream failure: `error.message` is a generic "Provider returned
+// error" while `error.metadata.raw` carries the upstream's own error
+// response and `error.metadata.provider_name` says which upstream
+// failed. Without the metadata the surfaced message gives the user zero
+// signal, so both are appended when present: the name as it stands, and
+// the upstream's own message field out of `raw`, never the response
+// itself. See upstreamMessageFrom and flattenErrorDetail.
 func extractProviderErrorMessage(body []byte) string {
 	if len(body) == 0 {
 		return ""
 	}
 	var envelope struct {
 		Error struct {
-			Message string `json:"message"`
-			Type    string `json:"type"`
-			Code    any    `json:"code"`
+			Message  string `json:"message"`
+			Type     string `json:"type"`
+			Code     any    `json:"code"`
+			Metadata struct {
+				Raw          string `json:"raw"`
+				ProviderName string `json:"provider_name"`
+			} `json:"metadata"`
 		} `json:"error"`
 		Message string `json:"message"`
 	}
 	if err := json.Unmarshal(body, &envelope); err != nil {
 		return ""
 	}
-	if envelope.Error.Message != "" {
-		return envelope.Error.Message
+	message := envelope.Error.Message
+	if message == "" {
+		message = envelope.Message
 	}
-	return envelope.Message
+	if message == "" {
+		return ""
+	}
+	name := flattenErrorDetail(
+		envelope.Error.Metadata.ProviderName,
+		maxAggregatorProviderNameRunes,
+	)
+	upstream := flattenErrorDetail(
+		upstreamMessageFrom(envelope.Error.Metadata.Raw),
+		maxAggregatorRawRunes,
+	)
+	switch {
+	case name != "" && upstream != "":
+		message = message + " (" + name + ": " + upstream + ")"
+	case name != "":
+		message = message + " (" + name + ")"
+	case upstream != "":
+		message = message + " (" + upstream + ")"
+	}
+	return message
+}
+
+// upstreamMessageFrom reads the upstream's own message out of an aggregator's
+// `raw` field, or "" when the field carries no message.
+//
+// `raw` is the upstream's whole error RESPONSE, not a curated message field.
+// It can be another vendor's JSON envelope, an HTML error page, or a body that
+// echoes part of the request back, and the surfaced message travels in an SSE
+// error frame and an `error.message` trace attribute. Truncating an
+// unstructured body bounds its size and redacts nothing, so only a message
+// FIELD is taken: that is the same class of vendor-written text as the
+// top-level `error.message` this function already surfaces. A `raw` that is
+// not a JSON document, or that names no message, is dropped, and the provider
+// name alone says which upstream failed.
+//
+// The complete response is still on GatewayHTTPError.Body for server-side
+// reading, so nothing is lost for diagnostics.
+func upstreamMessageFrom(raw string) string {
+	trimmed := strings.TrimSpace(raw)
+	if !strings.HasPrefix(trimmed, "{") {
+		return ""
+	}
+	var upstream struct {
+		Error struct {
+			Message string `json:"message"`
+		} `json:"error"`
+		Message string `json:"message"`
+		Detail  string `json:"detail"`
+	}
+	if err := json.Unmarshal([]byte(trimmed), &upstream); err != nil {
+		return ""
+	}
+	for _, candidate := range []string{
+		upstream.Error.Message,
+		upstream.Message,
+		upstream.Detail,
+	} {
+		if candidate != "" {
+			return candidate
+		}
+	}
+	return ""
+}
+
+// Bounds for the aggregator metadata appended to a surfaced message. Both are
+// vendor-written text rather than whole bodies, but a message field still has
+// no length contract, and the name is only ever a few words.
+const (
+	maxAggregatorRawRunes          = 512
+	maxAggregatorProviderNameRunes = 64
+)
+
+// flattenErrorDetail makes an upstream error fragment safe to concatenate
+// into the message the engine surfaces.
+//
+// The surfaced message travels in an SSE error frame and a trace
+// attribute, where a multi-line or multi-kilobyte fragment either breaks
+// the frame's line shape or buries the part the reader needs. Bounding it
+// here is the same posture evaluatorblock and agentblock take on upstream
+// bodies (truncate before embedding in an error). The complete response
+// stays on GatewayHTTPError.Body for server-side reading, so nothing is
+// lost for diagnostics.
+//
+// Bounds run over runes rather than bytes so a cut cannot split a UTF-8
+// sequence and leave a replacement character where the text was.
+func flattenErrorDetail(detail string, maxRunes int) string {
+	flattened := strings.Join(strings.Fields(detail), " ")
+	runes := []rune(flattened)
+	if len(runes) <= maxRunes {
+		return flattened
+	}
+	return strings.TrimRight(string(runes[:maxRunes]), " ") + "..."
 }
 
 // buildGatewayRequest performs all the shape mapping in one place so the
 // streaming and non-streaming paths share identical translation logic.
-func buildGatewayRequest(ctx context.Context, req app.LLMRequest, stream bool) (app.GatewayRequest, error) {
-	// req.Provider is authoritative when set: the engine strips the
-	// provider prefix in `splitModel` (engine.go) and stores it there.
-	// Splitting req.Model first would mis-derive the provider for custom
-	// model ids that contain a slash of their own — "custom/Qwen/Qwen2.5"
-	// arrives here as Model "Qwen/Qwen2.5" + Provider "custom", and the
-	// split would yield provider "qwen".
-	provider := req.Provider
-	if provider == "" {
-		provider, _ = litellm.SplitProviderModel(req.Model)
+func (e *Executor) buildGatewayRequest(ctx context.Context, req app.LLMRequest, stream bool) (app.GatewayRequest, error) {
+	provider, err := requestProvider(req)
+	if err != nil {
+		return app.GatewayRequest{}, err
 	}
-	if provider == "" {
-		return app.GatewayRequest{}, fmt.Errorf("could not infer provider from model %q", req.Model)
+	route := requestRoute{
+		provider:        provider,
+		translatedModel: litellm.TranslateModelID(prefixedModelID(req.Model, provider)),
+		gatewayProvider: litellm.GatewayProviderForModel(provider),
 	}
+	translatedModel := route.translatedModel
 
-	// Reconstruct the prefixed model id before TranslateModelID so its
-	// providersNeedingDotToDash gate can see the provider — without
-	// re-prefixing, TranslateModelID falls to its empty-provider safety
-	// branch (treats as anthropic-like) and dot→dashes every model id,
-	// mangling Gemini + Vertex + Gemini's 2.5 family on the
-	// inline-credentials path. Prefix-check (not just slash-check) so a
-	// custom model id like "Qwen/Qwen2.5-32B-Instruct" still gets its
-	// "custom/" prefix restored.
-	prefixedModel := req.Model
-	if !strings.HasPrefix(req.Model, provider+"/") {
-		prefixedModel = provider + "/" + req.Model
-	}
-	translatedModel := litellm.TranslateModelID(prefixedModel)
-	gatewayProvider := litellm.GatewayProviderForModel(provider)
-
-	// Build the OpenAI-shape body. Empty-content messages are filtered
-	// before marshaling — Anthropic strictly rejects messages with empty
-	// text content blocks ("text content blocks must be non-empty"),
-	// and OpenAI tolerates the removal silently. Mirrors the Python
-	// _filter_empty_content_messages guard from langwatch_nlp regression
-	// 1ed2c7fdf.
-	body := map[string]any{
-		"model":    translatedModelOrInferred(translatedModel, gatewayProvider, req.Model),
-		"messages": filterEmptyContentMessages(req.Messages),
-	}
-	if len(req.Tools) > 0 {
-		body["tools"] = req.Tools
-	}
-	if req.Temperature != nil {
-		body["temperature"] = *req.Temperature
-	}
-	if req.MaxTokens != nil {
-		body["max_tokens"] = *req.MaxTokens
-	}
-	if req.TopP != nil {
-		body["top_p"] = *req.TopP
-	}
-	if req.ReasoningEffort != "" {
-		body["reasoning_effort"] = req.ReasoningEffort
-	}
-	if req.ResponseFormat != nil {
-		// Bedrock + Anthropic: don't ship response_format. bifrost v1.4.22's
-		// bedrock provider routes response_format on anthropic-family
-		// models (any model whose id contains "anthropic." or "claude")
-		// through Anthropic's native output_config.format extension via
-		// additionalModelRequestFields (providers/bedrock/utils.go:1011-
-		// 1015). That field is a Bedrock+Anthropic feature that ships with
-		// rolling per-region / per-model-version support and requires the
-		// right anthropic-beta header to activate; when the combination
-		// doesn't line up the field is silently ignored and the model
-		// returns prose. Customer dogfood 2026-05-30 caught this on
-		// us.anthropic.claude-haiku-4-5-* via a managed-bedrock VPCE: a
-		// signature node with {output:bool, reason:str} got raw
-		// "TRUE\n\nReason: ..." back, the engine's extractSignatureOutputs
-		// then fell through to the prose-fallback and dumped the whole
-		// blob into the first declared field.
-		//
-		// LiteLLM (python langwatch_nlp's path) bypasses this entirely:
-		// it translates response_format → toolConfig.tools + toolChoice
-		// (forced tool_use), which is the oldest and most universally
-		// supported Anthropic structured-output mechanism. Every claude
-		// model in every region honors it, no beta header required. We
-		// mirror that translation here so the Go path has python parity
-		// + the same robustness profile.
-		//
-		// Conversion is one-shot and self-contained: build a synthetic
-		// tool whose input schema IS the response_format schema, append
-		// it to the tools array, pin tool_choice to it, then drop
-		// response_format from the body. The response side
-		// (parseChatCompletionResponse) lifts the tool_call arguments
-		// back into Content so engine.extractSignatureOutputs sees the
-		// same JSON-shape payload it would have received from
-		// response_format on a provider that does honor it natively.
-		if shouldUseToolUseForStructuredOutput(provider, req.Model) {
-			if tool, choice, ok := buildStructuredOutputTool(req.ResponseFormat); ok {
-				existingTools, _ := body["tools"].([]app.Tool)
-				body["tools"] = append(existingTools, tool)
-				body["tool_choice"] = choice
-			} else {
-				// Schema malformed (no "json_schema.schema"). Fall back to
-				// the response_format pass-through so providers that DO
-				// honor a top-level response_format get something rather
-				// than nothing — same defensive posture as the recoverJSON
-				// fallback in the engine.
-				body["response_format"] = req.ResponseFormat
-			}
-		} else {
-			body["response_format"] = req.ResponseFormat
-		}
-	}
-	if stream {
-		body["stream"] = true
-	}
+	body := buildRequestBody(req, route, stream)
 
 	// Apply the preserved post-DSPy behaviors.
 	litellm.NormalizeReasoningEffort(body)
@@ -281,7 +306,7 @@ func buildGatewayRequest(ctx context.Context, req app.LLMRequest, stream bool) (
 	// ApplyReasoningOverrides so OpenAI reasoning models inherit the
 	// floor when the override migrates max_tokens → max_completion_tokens.
 	litellm.EnsureReasoningMaxTokens(body)
-	litellm.ApplyReasoningOverrides(translatedModel, body)
+	litellm.ApplyReasoningOverrides(translatedModel, body, e.catalog)
 	litellm.ClampAnthropicTemperature(provider, body)
 
 	// Build inline credentials from litellm_params.
@@ -299,6 +324,157 @@ func buildGatewayRequest(ctx context.Context, req app.LLMRequest, stream bool) (
 		return app.GatewayRequest{}, fmt.Errorf("marshal request body: %w", err)
 	}
 
+	headers := gatewayHeaders(ctx, req, credsHeader)
+
+	return app.GatewayRequest{
+		Body:    bodyBytes,
+		Headers: headers,
+		Model:   translatedModel,
+		Project: req.ProjectID,
+	}, nil
+}
+
+// requestProvider is the provider the request dispatches to.
+func requestProvider(req app.LLMRequest) (string, error) {
+	// req.Provider is authoritative when set: the engine strips the
+	// provider prefix in `splitModel` (engine.go) and stores it there.
+	// Splitting req.Model first would mis-derive the provider for custom
+	// model ids that contain a slash of their own — "custom/Qwen/Qwen2.5"
+	// arrives here as Model "Qwen/Qwen2.5" + Provider "custom", and the
+	// split would yield provider "qwen".
+	provider := req.Provider
+	if provider == "" {
+		provider, _ = litellm.SplitProviderModel(req.Model)
+	}
+	if provider == "" {
+		return "", fmt.Errorf("could not infer provider from model %q", req.Model)
+	}
+
+	return provider, nil
+}
+
+// prefixedModelID is the model id with its provider prefix.
+//
+// Reconstruct the prefixed model id before TranslateModelID so its
+// providersNeedingDotToDash gate can see the provider — without
+// re-prefixing, TranslateModelID falls to its empty-provider safety
+// branch (treats as anthropic-like) and dot→dashes every model id,
+// mangling Gemini + Vertex + Gemini's 2.5 family on the
+// inline-credentials path. Prefix-check (not just slash-check) so a
+// custom model id like "Qwen/Qwen2.5-32B-Instruct" still gets its
+// "custom/" prefix restored.
+func prefixedModelID(model, provider string) string {
+	if strings.HasPrefix(model, provider+"/") {
+		return model
+	}
+	return provider + "/" + model
+}
+
+// requestRoute is where a request goes: its provider, the model id the
+// provider is asked for, and the provider the gateway dispatches on.
+type requestRoute struct {
+	provider        string
+	translatedModel string
+	gatewayProvider string
+}
+
+// buildRequestBody is the OpenAI-shape body for the request.
+func buildRequestBody(req app.LLMRequest, route requestRoute, stream bool) map[string]any {
+	// Build the OpenAI-shape body. Empty-content messages are filtered
+	// before marshaling — Anthropic strictly rejects messages with empty
+	// text content blocks ("text content blocks must be non-empty"),
+	// and OpenAI tolerates the removal silently. Mirrors the Python
+	// _filter_empty_content_messages guard from langwatch_nlp regression
+	// 1ed2c7fdf.
+	body := map[string]any{
+		"model":    translatedModelOrInferred(route.translatedModel, route.gatewayProvider, req.Model),
+		"messages": filterEmptyContentMessages(req.Messages),
+	}
+	addSamplingParams(body, req)
+	addResponseFormat(body, req, route.provider)
+	if stream {
+		body["stream"] = true
+	}
+	return body
+}
+
+// addSamplingParams copies the request's optional knobs onto the body.
+func addSamplingParams(body map[string]any, req app.LLMRequest) {
+	if len(req.Tools) > 0 {
+		body["tools"] = req.Tools
+	}
+	if req.Temperature != nil {
+		body["temperature"] = *req.Temperature
+	}
+	if req.MaxTokens != nil {
+		body["max_tokens"] = *req.MaxTokens
+	}
+	if req.TopP != nil {
+		body["top_p"] = *req.TopP
+	}
+	if req.ReasoningEffort != "" {
+		body["reasoning_effort"] = req.ReasoningEffort
+	}
+}
+
+// addResponseFormat asks for the request's structured output the way the
+// provider honors it.
+func addResponseFormat(body map[string]any, req app.LLMRequest, provider string) {
+	if req.ResponseFormat == nil {
+		return
+	}
+	// Bedrock + Anthropic: don't ship response_format. bifrost v1.4.22's
+	// bedrock provider routes response_format on anthropic-family
+	// models (any model whose id contains "anthropic." or "claude")
+	// through Anthropic's native output_config.format extension via
+	// additionalModelRequestFields (providers/bedrock/utils.go:1011-
+	// 1015). That field is a Bedrock+Anthropic feature that ships with
+	// rolling per-region / per-model-version support and requires the
+	// right anthropic-beta header to activate; when the combination
+	// doesn't line up the field is silently ignored and the model
+	// returns prose. Customer dogfood 2026-05-30 caught this on
+	// us.anthropic.claude-haiku-4-5-* via a managed-bedrock VPCE: a
+	// signature node with {output:bool, reason:str} got raw
+	// "TRUE\n\nReason: ..." back, the engine's extractSignatureOutputs
+	// then fell through to the prose-fallback and dumped the whole
+	// blob into the first declared field.
+	//
+	// LiteLLM (python langwatch_nlp's path) bypasses this entirely:
+	// it translates response_format → toolConfig.tools + toolChoice
+	// (forced tool_use), which is the oldest and most universally
+	// supported Anthropic structured-output mechanism. Every claude
+	// model in every region honors it, no beta header required. We
+	// mirror that translation here so the Go path has python parity
+	// + the same robustness profile.
+	//
+	// Conversion is one-shot and self-contained: build a synthetic
+	// tool whose input schema IS the response_format schema, append
+	// it to the tools array, pin tool_choice to it, then drop
+	// response_format from the body. The response side
+	// (parseChatCompletionResponse) lifts the tool_call arguments
+	// back into Content so engine.extractSignatureOutputs sees the
+	// same JSON-shape payload it would have received from
+	// response_format on a provider that does honor it natively.
+	if shouldUseToolUseForStructuredOutput(provider, req.Model) {
+		if tool, choice, ok := buildStructuredOutputTool(req.ResponseFormat); ok {
+			existingTools, _ := body["tools"].([]app.Tool)
+			body["tools"] = append(existingTools, tool)
+			body["tool_choice"] = choice
+		} else {
+			// Schema malformed (no "json_schema.schema"). Fall back to
+			// the response_format pass-through so providers that DO
+			// honor a top-level response_format get something rather
+			// than nothing — same defensive posture as the recoverJSON
+			// fallback in the engine.
+			body["response_format"] = req.ResponseFormat
+		}
+	} else {
+		body["response_format"] = req.ResponseFormat
+	}
+}
+
+// gatewayHeaders are the headers the gateway request carries.
+func gatewayHeaders(ctx context.Context, req app.LLMRequest, credsHeader string) map[string]string {
 	headers := map[string]string{
 		headerInlineCredentials: credsHeader,
 	}
@@ -308,13 +484,7 @@ func buildGatewayRequest(ctx context.Context, req app.LLMRequest, stream bool) (
 	if origin, ok := originFromContext(ctx); ok {
 		headers[headerOrigin] = origin
 	}
-
-	return app.GatewayRequest{
-		Body:    bodyBytes,
-		Headers: headers,
-		Model:   translatedModel,
-		Project: req.ProjectID,
-	}, nil
+	return headers
 }
 
 // structuredOutputToolPrefix marks tools synthesized from
@@ -488,6 +658,14 @@ func parseChatCompletionResponse(body []byte, durationMS int64) (*app.LLMRespons
 			CompletionTokens int `json:"completion_tokens"`
 			TotalTokens      int `json:"total_tokens"`
 			ReasoningTokens  int `json:"reasoning_tokens"`
+			// Anthropic-style top-level counts, in case a provider passes them through.
+			CacheReadInputTokens     int `json:"cache_read_input_tokens"`
+			CacheCreationInputTokens int `json:"cache_creation_input_tokens"`
+			PromptTokensDetails      struct {
+				CachedTokens      int `json:"cached_tokens"`
+				CachedReadTokens  int `json:"cached_read_tokens"`
+				CachedWriteTokens int `json:"cached_write_tokens"`
+			} `json:"prompt_tokens_details"`
 		} `json:"usage"`
 	}
 	if err := json.Unmarshal(body, &raw); err != nil {
@@ -498,6 +676,15 @@ func parseChatCompletionResponse(body []byte, durationMS int64) (*app.LLMRespons
 	}
 	choice := raw.Choices[0]
 
+	// The gateway emits cached_read_tokens and cached_write_tokens, plus
+	// cached_tokens (their sum). Plain OpenAI sends only cached_tokens (a read).
+	details := raw.Usage.PromptTokensDetails
+	cacheRead := max(details.CachedReadTokens, raw.Usage.CacheReadInputTokens)
+	cacheWrite := max(details.CachedWriteTokens, raw.Usage.CacheCreationInputTokens)
+	if cacheRead == 0 && cacheWrite == 0 {
+		cacheRead = details.CachedTokens
+	}
+
 	out := &app.LLMResponse{
 		ToolCalls: choice.Message.ToolCalls,
 		Usage: app.Usage{
@@ -505,6 +692,9 @@ func parseChatCompletionResponse(body []byte, durationMS int64) (*app.LLMRespons
 			CompletionTokens: raw.Usage.CompletionTokens,
 			TotalTokens:      raw.Usage.TotalTokens,
 			ReasoningTokens:  raw.Usage.ReasoningTokens,
+
+			CacheReadInputTokens:     cacheRead,
+			CacheCreationInputTokens: cacheWrite,
 		},
 		Raw:        body,
 		DurationMS: durationMS,

@@ -18,6 +18,15 @@ Feature: Negate filters and trace scoping affect analytics results
     When the query is executed
     Then the executed query carries the negation
 
+  # A span filter reads its own tenant-scoped subquery, so the negation is written
+  # as NOT IN; a NOT around the subquery is refused by the tenant guard (WEB-17801).
+  @unit
+  Scenario: Negating a span filter inverts the selection and passes the tenant guard
+    Given a timeseries request with a span model filter and the negate toggle enabled
+    When the query is built
+    Then the span filter reads as "not in" its tenant-scoped subquery
+    And the tenant guard admits the query
+
   @unit
   Scenario: A graph scoped to specific traces reads only those traces
     Given a timeseries request scoped to specific trace ids
@@ -30,6 +39,24 @@ Feature: Negate filters and trace scoping affect analytics results
     And a timeseries request the optimized storage could otherwise serve
     When the request carries the negate toggle
     Then the query is served by the storage that honors the negation
+
+  # A caller can leave trace origins out of a count on its own account, apart
+  # from the user's filters: the home figures leave out Langy's own turns,
+  # which trace into the project (ADR-061) but were never sent by the
+  # customer. The exclusion is not part of the selection the toggle negates.
+  @unit
+  Scenario: Leaving out an origin keeps the rest of the count intact
+    Given a timeseries request that leaves out the "langy" origin
+    When the query is executed
+    Then the executed query keeps every trace of every other origin
+    And the exclusion is not inverted when the negate toggle is enabled
+
+  @unit
+  Scenario: Leaving out an origin stays accurate on optimized analytics storage
+    Given a project with the optimized analytics read path enabled
+    And a timeseries request the bucketed storage could otherwise serve
+    When the request leaves out an origin
+    Then the query is served by the storage that keeps the origin of every trace
 
   @unit
   Scenario: Trace-scoped graphs stay accurate on optimized analytics storage

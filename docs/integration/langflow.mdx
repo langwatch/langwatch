@@ -33,6 +33,7 @@ Run a message through your Langflow project and check the LangWatch dashboard fo
 That's it! You should now see your Langflow component traces on the LangWatch dashboard.
 
 ![LangWatch results](/images/integration/langflow/langflow-2.png)
+
 </Step>
 </Steps>
 
@@ -41,6 +42,12 @@ That's it! You should now see your Langflow component traces on the LangWatch da
 You can customize what LangWatch captures as the final input and output of your Langflow component for better observability.
 
 To do this, you can add this two lines of code in the execution function of any Langflow component:
+
+If `langwatch` is not installed in the Python environment Langflow runs in, install it there first:
+
+```bash
+pip install langwatch
+```
 
 ```python
 import langwatch
@@ -58,7 +65,6 @@ Then scroll down to find the `def` responsible for execution of that component a
 The message on LangWatch will render as you defined:
 
 ![LangWatch message](/images/integration/langflow/langwatch-message.png)
-
 
 ## Capturing additional metadata
 

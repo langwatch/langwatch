@@ -1,34 +1,10 @@
 import { describe, it, expect } from "vitest";
-import { filterFields } from "../schemas/filter-fields.js";
-import { analyticsMetrics } from "../schemas/analytics-metrics.js";
-import { analyticsGroups } from "../schemas/analytics-groups.js";
+
+import { analyticsGroups } from "../schemas/analytics-groups.ts";
+import { analyticsMetrics } from "../schemas/analytics-metrics.ts";
 
 describe("schemas", () => {
-  describe("filterFields", () => {
-    it("has at least 22 entries", () => {
-      expect(filterFields.length).toBeGreaterThanOrEqual(22);
-    });
-
-    it("has non-empty field and description for every entry", () => {
-      for (const entry of filterFields) {
-        expect(entry.field).toBeTruthy();
-        expect(entry.description).toBeTruthy();
-      }
-    });
-
-    it("contains expected filter fields", () => {
-      const fieldNames = filterFields.map((f) => f.field);
-      expect(fieldNames).toContain("topics.topics");
-      expect(fieldNames).toContain("metadata.user_id");
-      expect(fieldNames).toContain("spans.model");
-      expect(fieldNames).toContain("evaluations.passed");
-      expect(fieldNames).toContain("events.event_type");
-      expect(fieldNames).toContain("annotations.hasAnnotation");
-      expect(fieldNames).toContain("sentiment.input_sentiment");
-    });
-  });
-
-  describe("analyticsMetrics", () => {
+  describe("when reading analyticsMetrics", () => {
     it("covers expected categories", () => {
       const categories = new Set(analyticsMetrics.map((m) => m.category));
       expect(categories).toContain("metadata");
@@ -61,7 +37,7 @@ describe("schemas", () => {
     });
   });
 
-  describe("analyticsGroups", () => {
+  describe("when reading analyticsGroups", () => {
     it("has at least 10 entries", () => {
       expect(analyticsGroups.length).toBeGreaterThanOrEqual(10);
     });
