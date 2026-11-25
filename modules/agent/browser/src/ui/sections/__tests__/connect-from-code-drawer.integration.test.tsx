@@ -81,7 +81,7 @@ describe("the connect-from-code drawer", () => {
       await waitFor(() => expect(highlightedAs("python")).toHaveLength(1));
       expect(highlightedAs("typescript")).toHaveLength(1);
       expect(highlightedAs("bash")).toHaveLength(2);
-      expect(highlightedAs("bash")[0]).toHaveTextContent("pip install langwatch");
+      expect(highlightedAs("bash")[0]).toHaveTextContent('pip install "langwatch>=1.3.0"');
       expect(new Set(appearance.adapterModes)).toEqual(new Set(["light"]));
 
       let node: HTMLElement | null = highlightedAs("python")[0] as HTMLElement;

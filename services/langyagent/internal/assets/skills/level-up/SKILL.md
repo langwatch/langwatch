@@ -47,7 +47,7 @@ Add LangWatch tracing to capture all LLM calls, costs, and latency.
    langwatch docs integration/python/guide        # Python (or pick your framework)
    langwatch docs integration/typescript/guide    # TypeScript (or pick your framework)
    ```
-2. Install the LangWatch SDK (`pip install langwatch` or `npm install langwatch`)
+2. Install the LangWatch SDK (`pip install "langwatch>=1.3.0"` or `npm install langwatch`)
 3. Add instrumentation following the framework-specific guide
 4. Add `LANGWATCH_API_KEY` to `.env`
 

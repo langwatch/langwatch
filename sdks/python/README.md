@@ -14,7 +14,7 @@ First, you need a LangWatch API key. Sign up at [app.langwatch.ai](https://app.l
 Ensure you have the SDK installed:
 
 ```bash
-pip install langwatch
+pip install "langwatch>=1.3.0"
 ```
 
 The SDK supports Python 3.11 through 3.14. On an interpreter outside that
