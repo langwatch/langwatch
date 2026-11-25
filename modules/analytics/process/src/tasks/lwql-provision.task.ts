@@ -53,6 +53,7 @@ import {
   postgresErrorCodeFields,
   statementKind,
 } from "../rules/langwatch-ql-config-store.rules.ts";
+import { withLwqlDefaultCredentials } from "../rules/lwql-default-credentials.rules.ts";
 import type { LangWatchQLNames } from "../services/langwatch-ql-access-model.service.ts";
 import { LangWatchQLSqlModeClusterGuardService } from "../services/langwatch-ql-sql-mode-cluster-guard.service.ts";
 
@@ -843,7 +844,7 @@ function connectionLimitFields(databaseUrl: string | undefined): { connectionLim
 
 async function runLwqlProvisioningTask({
   database,
-  source,
+  source: environment,
   failOnError,
 }: {
   database: LwqlProvisioningDatabase;
@@ -851,6 +852,7 @@ async function runLwqlProvisioningTask({
   /** The environment the launching process was configured with. */
   source: Record<string, string | undefined>;
 }): Promise<void> {
+  const source = withLwqlDefaultCredentials(environment);
   const selfProvision = selfProvisioning.request({ source });
   if (!selfProvision.requested) {
     logger.info("LWQL not configured, skipping");
