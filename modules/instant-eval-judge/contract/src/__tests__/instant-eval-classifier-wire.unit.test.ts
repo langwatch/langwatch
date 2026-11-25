@@ -304,6 +304,20 @@ describe("given a score question that names its levels", () => {
   });
 
   /** @scenario "The gate reads a frozen framing of the case" */
+  it("reads a label in another case or with surrounding space as that level", () => {
+    expect(
+      read({ type: "score", probabilities: { " Easy": 0.5, MEDIUM: 0.3, "Very Hard ": 0.2 } }),
+    ).toBeCloseTo(0.7, 10);
+    expect(
+      read({
+        type: "score",
+        legend: { a: "EASY", b: " Medium: other wording", c: "very hard" },
+        probabilities: { a: 0.5, b: 0.3, c: 0.2 },
+      }),
+    ).toBeCloseTo(0.7, 10);
+  });
+
+  /** @scenario "The gate reads a frozen framing of the case" */
   it("refuses to send names whose range is not 0 to the last level index", () => {
     expect(() => toClassifierQuestions([{ ...difficulty, range: { min: 1, max: 10 } }])).toThrow(
       /range must be 0 to 2, not 1 to 10/,

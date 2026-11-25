@@ -96,8 +96,10 @@ export class HttpInstantEvalLlmJudgeChannel implements InstantEvalLlmJudgeChanne
     const { inputTokens, outputTokens } = reading;
     if (reading.outcome === "none") {
       logger.warn(
-        { wire, kind: question.kind },
-        "Instant Evals LLM leg answered without a readable evaluation call",
+        { wire, kind: question.kind, stoppedBy: reading.stoppedBy, reasoningEffort },
+        reading.stoppedBy
+          ? "Instant Evals LLM leg stopped before its evaluation call"
+          : "Instant Evals LLM leg answered without a readable evaluation call",
       );
       return { outcome: "skipped", reason: "classifier_failed", inputTokens, outputTokens };
     }

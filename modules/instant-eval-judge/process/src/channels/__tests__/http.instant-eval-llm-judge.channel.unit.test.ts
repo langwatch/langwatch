@@ -255,9 +255,56 @@ describe("HttpInstantEvalLlmJudgeChannel, given a backend's reasoning effort", (
     await llm().judge({ ...request("openai_responses"), reasoningEffort: "medium" });
 
     const [plain, withEffort] = bodies.map((body) => JSON.parse(body) as Record<string, unknown>);
-    const { reasoning, ...rest } = withEffort!;
+    const { reasoning, max_output_tokens, ...rest } = withEffort!;
     expect(reasoning).toEqual({ effort: "medium" });
-    expect(rest).toEqual(plain);
+    expect(max_output_tokens).toBe(32_000);
+    expect(rest).toEqual({ ...plain, max_output_tokens: undefined });
+    expect(Object.keys(withEffort!)).toEqual([
+      "model",
+      "input",
+      "max_output_tokens",
+      "reasoning",
+      "store",
+      "tools",
+      "tool_choice",
+    ]);
+  });
+
+  /** @scenario "A reasoning effort is sent only when the backend sets one" */
+  it.each([
+    ["none", 8_000],
+    ["minimal", 32_000],
+    ["low", 32_000],
+    ["high", 32_000],
+  ] as const)("asks effort %s with an output cap of %i tokens", async (effort, cap) => {
+    let sent = "";
+    answering((body) => (sent = body));
+
+    await llm().judge({ ...request("openai_responses"), reasoningEffort: effort });
+
+    expect((JSON.parse(sent) as Record<string, unknown>).max_output_tokens).toBe(cap);
+  });
+
+  /** @scenario "A reasoning effort is sent only when the backend sets one" */
+  it("skips an answer stopped at the output cap before its call, billing its tokens", async () => {
+    agent
+      .get("https://api.openai.com")
+      .intercept({ path: "/v1/responses", method: "POST" })
+      .reply(200, {
+        status: "incomplete",
+        incomplete_details: { reason: "max_output_tokens" },
+        output: [{ type: "reasoning", summary: [] }],
+        usage: { input_tokens: 500, output_tokens: 32_000 },
+      });
+
+    const answer = await llm().judge({ ...request("openai_responses"), reasoningEffort: "high" });
+
+    expect(answer).toEqual({
+      outcome: "skipped",
+      reason: "classifier_failed",
+      inputTokens: 500,
+      outputTokens: 32_000,
+    });
   });
 
   /** @scenario "A reasoning effort is sent only when the backend sets one" */

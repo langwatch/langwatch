@@ -226,7 +226,8 @@ function findLevelForKey({
 
 /**
  * The index of the named level a key or legend entry stands for: the level as sent, or its label,
- * the part before the first colon ("hard: needs multi-step checking" answers to "hard").
+ * the part before the first colon ("hard: needs multi-step checking" answers to "hard"), both
+ * compared ignoring case and surrounding space (" Hard" answers to "hard").
  */
 function findNamedLevelIndex({
   said,
@@ -235,9 +236,11 @@ function findNamedLevelIndex({
   said: string;
   names: readonly string[];
 }): number[] {
+  const loose = (text: string) => text.trim().toLowerCase();
+  const heard = loose(said);
   const at = names.findIndex((name) => {
-    const label = name.split(":", 1)[0] ?? name;
-    return said === name || said === label || said.startsWith(`${label}:`);
+    const label = loose(name.split(":", 1)[0] ?? name);
+    return heard === loose(name) || heard === label || heard.startsWith(`${label}:`);
   });
   return at < 0 ? [] : [at];
 }

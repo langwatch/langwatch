@@ -141,6 +141,7 @@ Feature: Routing an Instant Evals judgement across decision models and LLMs
     When a question is routed
     Then the gate's backend is asked one score question about how hard the case is to judge
     And its levels are sent by name, easiest first, and the score read back is the weighted mean level index
+    And a level read back in another case or with surrounding space counts as that level
     And a question that names its levels with any range other than 0 to the last level index is refused before any call
     And it reads the job, the question's first 3,000 characters and the full text
     And a text over 12,000 characters is shown as its first and last 6,000 with the cut length between
@@ -280,6 +281,8 @@ Feature: Routing an Instant Evals judgement across decision models and LLMs
     Given an OpenAI Responses backend whose table entry sets a reasoning effort
     When its leg is asked
     Then the request names that effort, and the reasoning tokens it reports are billed as output
+    And an effort other than none raises the request's output cap from 8,000 to 32,000 tokens
+    And an answer the provider stopped before the evaluation call is no answer, its tokens billed and its stop reason logged
     And a backend that sets none sends the request it sent before, with no effort named
     And the table refuses an effort on any other backend kind, or one the provider does not name
 
