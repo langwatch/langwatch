@@ -6040,6 +6040,10 @@ const presentations = {
     title: "This dataset isn't valid",
     describe: () => "Check its columns and try again.",
   },
+  invalid_images: {
+    title: "Langy couldn't read an attached image",
+    describe: () => "Attach PNG, JPEG, GIF or WebP images up to 5 MB, then send again.",
+  },
   unsupported_node_kind: {
     title: "This step isn't supported",
     describe: () => "Remove or replace it to run the workflow.",
@@ -6584,11 +6588,6 @@ const presentations = {
   agent_session_not_found: {
     title: "The session was lost",
     describe: () => "Start a new message to continue.",
-  },
-  invalid_images: {
-    title: "Langy can't read those images",
-    describe: () =>
-      "Attach up to 4 PNG, JPEG, GIF or WebP images of 5 MB or less each, then send again.",
   },
   max_workers_reached: {
     title: "Busy right now",
