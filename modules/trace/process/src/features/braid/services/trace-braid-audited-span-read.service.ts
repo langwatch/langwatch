@@ -128,6 +128,8 @@ const noBraidedOwner = (): Owners => [];
  */
 const BRAID_OWNERS_OF: { readonly [K in TraceBraidRead]: BraidOwnerRule<K> } = {
   findReaderTraceIds: noBraidedOwner,
+  findOutsideParents: noBraidedOwner,
+  findTracesHoldingSpans: noBraidedOwner,
   countOwnerSpansInTraces: noBraidedOwner,
   findAttributeKeys: noBraidedOwner,
   countOwnerBraidActivity: noBraidedOwner,
@@ -179,6 +181,8 @@ export class TraceBraidAuditedSpanReadService {
     this.#audit = deps.audit;
     this.braidReads = {
       findReaderTraceIds: (params) => this.#readBraid("findReaderTraceIds", params),
+      findOutsideParents: (params) => this.#readBraid("findOutsideParents", params),
+      findTracesHoldingSpans: (params) => this.#readBraid("findTracesHoldingSpans", params),
       countOwnerSpansInTraces: (params) => this.#readBraid("countOwnerSpansInTraces", params),
       findAttributeKeys: (params) => this.#readBraid("findAttributeKeys", params),
       countOwnerBraidActivity: (params) => this.#readBraid("countOwnerBraidActivity", params),
@@ -215,6 +219,27 @@ export class TraceBraidAuditedSpanReadService {
       authorization: params.authorization,
       ownerProjectIds: [...named({ params, result: span }), ...named({ params, result: events })],
       result: { span, events },
+    });
+  }
+
+  /** A trace's spans and their resource rows, audited once for both. */
+  async readSpansWithResources(
+    params: SpanReadParams<"getSpansByTraceId"> & SpanReadParams<"getSpanResourcesByTraceId">,
+  ): Promise<{
+    spans: SpanReadResult<"getSpansByTraceId">;
+    resources: SpanReadResult<"getSpanResourcesByTraceId">;
+  }> {
+    const [spans, resources] = await Promise.all([
+      this.#spans.getSpansByTraceId(params),
+      this.#spans.getSpanResourcesByTraceId(params),
+    ]);
+    return this.#audited({
+      authorization: params.authorization,
+      ownerProjectIds: [
+        ...OWNERS_OF.getSpansByTraceId({ params, result: spans }),
+        ...OWNERS_OF.getSpanResourcesByTraceId({ params, result: resources }),
+      ],
+      result: { spans, resources },
     });
   }
 

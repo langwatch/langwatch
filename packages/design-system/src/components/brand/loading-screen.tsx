@@ -18,7 +18,12 @@ const useIsomorphicLayoutEffect = typeof window === "undefined" ? useEffect : us
  * `AnimatePresence` to animate an exit for. A layout-effect cleanup instead
  * pins a static copy over the page and dissolves that, with no bare frame.
  */
-export const LoadingScreen = () => {
+export const LoadingScreen = ({
+  reason,
+}: {
+  /** What the page waits on, read by the boot report when a first load stalls on this screen. */
+  reason?: string;
+} = {}) => {
   const reduceMotion = useReducedMotion();
   const rootRef = useRef<HTMLDivElement>(null);
   // Read at unmount, so the cleanup never closes over a stale preference.
@@ -68,6 +73,7 @@ export const LoadingScreen = () => {
     <Box
       ref={rootRef}
       data-testid="loading-screen"
+      data-loading-reason={reason}
       width="full"
       height="full"
       minHeight="100vh"

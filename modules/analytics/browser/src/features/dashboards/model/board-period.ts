@@ -8,6 +8,7 @@ import {
   LWQL_GRANULARITY_MAX_BUCKETS,
   type LangWatchQLAcceptedGranularityStep,
 } from "@langwatch/analytics-contract";
+import { Temporal } from "@langwatch/time";
 
 /** "live" is the last hour, rolling, refreshed every minute (dashboards-v2 AC19c). */
 export const BOARD_PERIOD_RANGES = ["live", "1h", "24h", "7d", "30d", "90d", "1y"] as const;
@@ -148,4 +149,58 @@ export function parseBoardPeriodGrain(value: string | undefined): BoardPeriodGra
   return (BOARD_PERIOD_GRAINS as readonly string[]).includes(value ?? "")
     ? (value as BoardPeriodGrain)
     : DEFAULT_BOARD_PERIOD_GRAIN;
+}
+
+/** Each range as a person says it; Live is the last hour, as its window is. */
+const RANGE_WORDS: Readonly<Record<Exclude<BoardPeriodRange, "live">, string>> = {
+  "1h": "the last hour",
+  "24h": "the last 24 hours",
+  "7d": "the last 7 days",
+  "30d": "the last 30 days",
+  "90d": "the last 90 days",
+  "1y": "the last year",
+};
+
+const dayInWords = (epochMs: number) =>
+  Temporal.Instant.fromEpochMilliseconds(epochMs)
+    .toZonedDateTimeISO("UTC")
+    .toPlainDate()
+    .toLocaleString("en-GB", { day: "numeric", month: "long", year: "numeric" });
+
+/** The board's period as the header reads it ("the last 30 days"), else its first and last day. */
+export function boardPeriodInWords({ periodStart, periodEnd }: BoardPeriod): string {
+  const span = periodEnd - periodStart;
+  const range = (Object.keys(RANGE_WORDS) as (keyof typeof RANGE_WORDS)[]).find(
+    (each) => RANGE_MS[each] === span,
+  );
+  if (range) return RANGE_WORDS[range];
+  return `${dayInWords(periodStart)} to ${dayInWords(periodEnd)}`;
+}
+
+function instantOf(at: string) {
+  try {
+    return Temporal.Instant.from(at);
+  } catch {
+    return void 0;
+  }
+}
+
+/**
+ * A clicked bucket in words: its day, the hour too on an hourly board, or the week it starts.
+ * Undefined when `at` is no instant.
+ */
+export function bucketInWords({
+  at,
+  granularitySeconds,
+}: {
+  at: string;
+  granularitySeconds: number;
+}): string | undefined {
+  const instant = instantOf(at);
+  if (!instant) return void 0;
+  const day = dayInWords(instant.epochMilliseconds);
+  if (granularitySeconds >= 604_800) return `the week of ${day}`;
+  if (granularitySeconds >= 86_400) return day;
+  const time = instant.toZonedDateTimeISO("UTC").toPlainTime().toString().slice(0, 5);
+  return `${day} at ${time} UTC`;
 }

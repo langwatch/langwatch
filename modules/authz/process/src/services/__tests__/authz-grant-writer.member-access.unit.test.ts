@@ -74,7 +74,10 @@ class MemberAccessStore {
   readonly rows: AuthzManagedBindingRow[] = [];
   private next = 0;
 
-  constructor(private readonly seatByUser: Map<string, OrganizationRole>) {}
+  constructor(
+    private readonly seatByUser: Map<string, OrganizationRole>,
+    private readonly billingOnlyUsers: ReadonlySet<string> = new Set(),
+  ) {}
 
   newBindingId(): string {
     this.next += 1;
@@ -118,6 +121,8 @@ class MemberAccessStore {
           scopes.some((asked) => asked.scopeType === scope.type && asked.scopeId === scope.id),
         ),
       findOrganizationRole: async ({ userId }: { userId: string }) => this.seatOf(userId),
+      isBillingOnlyMember: async ({ userId }: { userId: string }) =>
+        this.billingOnlyUsers.has(userId),
       // Only rows this member actually holds — a staged id naming another
       // principal, or one a concurrent change already deleted, simply is not
       // among them, which is what makes both saves clean.
@@ -226,12 +231,13 @@ class MemberAccessStore {
  * The member the dialog is open on: an admin of their own team, a member of a shared one,
  * beside a companion and a group holding rows of their own.
  */
-function world(options: { seat?: OrganizationRole } = {}) {
+function world(options: { seat?: OrganizationRole; billingOnly?: boolean } = {}) {
   const store = new MemberAccessStore(
     new Map<string, OrganizationRole>([
       [MEMBER_ID, options.seat ?? "MEMBER"],
       [COMPANION_ID, "MEMBER"],
     ]),
+    new Set(options.billingOnly ? [MEMBER_ID] : []),
   );
 
   const soloRow = store.seed({
@@ -481,6 +487,44 @@ describe("given an organization admin editing a member's access", () => {
           bindingsToCreate: [{ role: "VIEWER", scopeType: "PROJECT", scopeId: PROJECT_ID }],
         }),
       ).rejects.toMatchObject({ code: "developer_seat_no_shared_access" });
+    });
+  });
+
+  describe("given the member is Billing only", () => {
+    /** @scenario "A Billing-only member is given no team, project or personal workspace" */
+    it("refuses even a Viewer row on a shared team, writing nothing", async () => {
+      const { store, save } = world({ seat: "EXTERNAL", billingOnly: true });
+
+      await expect(
+        save({
+          bindingIdsToDelete: [],
+          bindingsToCreate: [{ role: "VIEWER", scopeType: "TEAM", scopeId: SHARED_TEAM_ID }],
+        }),
+      ).rejects.toMatchObject({ code: "billing_only_no_team_access" });
+
+      expect(
+        store.countMatching((row) => row.userId === MEMBER_ID && row.scopeId === SHARED_TEAM_ID),
+      ).toBe(0);
+    });
+
+    /** @scenario "A Billing-only member is given no team, project or personal workspace" */
+    it("refuses a Viewer row on a shared project", async () => {
+      const { save } = world({ seat: "EXTERNAL", billingOnly: true });
+
+      await expect(
+        save({
+          bindingIdsToDelete: [],
+          bindingsToCreate: [{ role: "VIEWER", scopeType: "PROJECT", scopeId: PROJECT_ID }],
+        }),
+      ).rejects.toMatchObject({ code: "billing_only_no_team_access" });
+    });
+
+    it("still lets the admin take rows away", async () => {
+      const { save, soloRow } = world({ seat: "EXTERNAL", billingOnly: true });
+
+      await expect(
+        save({ bindingIdsToDelete: [soloRow.id], bindingsToCreate: [] }),
+      ).resolves.toEqual({ success: true });
     });
   });
 });

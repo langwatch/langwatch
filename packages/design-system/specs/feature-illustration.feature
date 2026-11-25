@@ -28,3 +28,13 @@ Feature: A branded feature's illustrations are decorative and stay still
     Given the Braids Enterprise illustration forced to dark mode
     When it renders
     Then it carries the dark colour-mode class so its tokens take their dark values
+
+  @integration
+  Scenario: The Braids empty state matches the brand kit
+    # Decided by Alex, 2026-11-18 (3a): dev/docs/plans/braids/brand/braids-empty-state.svg is the source.
+    When the Braids empty state illustration renders
+    Then its strands are dotted, since the projects are not braided yet
+    And each project shows a square badge with two letters
+    And the strands take the kit's orange, blue and green, never purple
+    And the empty trace carries a "+" target where a braid starts
+    And every colour comes from a token, so light and dark both hold

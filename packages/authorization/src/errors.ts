@@ -20,6 +20,9 @@ function permissionDeniedMessage({
     return "This feature is not available for your account";
   }
   if (denialReason === "developer-restricted") return "This is outside your Developer seat";
+  if (denialReason === "braids-kept-to-organisation-admins") {
+    return "Your organisation keeps braids to its admins, so only they can create, change or remove them";
+  }
   return `You do not have permission to access this ${scopeType}`;
 }
 

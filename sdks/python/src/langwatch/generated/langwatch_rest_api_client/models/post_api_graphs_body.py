@@ -24,20 +24,20 @@ class PostApiGraphsBody:
         graph (PostApiGraphsBodyGraph):
         dashboard_id (str | Unset):
         filters (PostApiGraphsBodyFilters | Unset):
-        grid_column (float | Unset):
-        grid_row (float | Unset):
-        col_span (float | Unset):
-        row_span (float | Unset):
+        grid_column (int | Unset):
+        grid_row (int | Unset):
+        col_span (int | Unset):
+        row_span (int | Unset):
     """
 
     name: str
     graph: PostApiGraphsBodyGraph
     dashboard_id: str | Unset = UNSET
     filters: PostApiGraphsBodyFilters | Unset = UNSET
-    grid_column: float | Unset = UNSET
-    grid_row: float | Unset = UNSET
-    col_span: float | Unset = UNSET
-    row_span: float | Unset = UNSET
+    grid_column: int | Unset = UNSET
+    grid_row: int | Unset = UNSET
+    col_span: int | Unset = UNSET
+    row_span: int | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:

@@ -178,13 +178,6 @@ updates:
         applies-to: version-updates
         patterns:
           - "langchain*"
-      arize:
-        # arize-phoenix today; grouped pre-emptively because upstream ships
-        # sibling packages (arize-phoenix-otel/-evals/-client) that release in
-        # step with it and would otherwise fragment the same way once used.
-        applies-to: version-updates
-        patterns:
-          - "arize*"
       minor-and-patch:
         applies-to: version-updates
         patterns:

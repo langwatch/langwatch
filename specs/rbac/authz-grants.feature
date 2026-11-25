@@ -305,6 +305,13 @@ Feature: Authorization grants
     And an attach naming a user with no live membership is refused
 
   @unit
+  Scenario: A grant for a user with no live membership is refused as outside the organisation
+    Given a user who holds no live membership of "org_acme"
+    When an admin grants that user a role in "org_acme"
+    Then it is refused with grant_principal_not_found, a 422, never a server error
+    And no grant is stated
+
+  @unit
   Scenario: The insert is fenced on the lifetime the fact was stamped against
     Given a stamped USER fact arriving at the projection
     When the row is written

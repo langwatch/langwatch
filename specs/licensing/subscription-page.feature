@@ -496,3 +496,60 @@ Feature: Subscription Page Plan Management
       And I continue to checkout from the seat dialog
       Then I see why the upgrade could not start
       And I stay on the subscription page
+
+  # ============================================================================
+  # An unpaid invoice is paid, not replaced by a new checkout
+  # ============================================================================
+
+  Rule: While a payment recovery case is open the page sends the reader to the open invoice
+
+    A failed renewal leaves the subscription in place with an open invoice. A
+    fresh Growth checkout would start a second subscription next to it, so
+    while the case is open the plan card offers the open invoice's page, the
+    same one the payment banner opens, and no upgrade.
+    Design: enterprise/modules/billing/specs/payment-recovery.feature
+
+    @integration
+    Scenario: A paused organization's plan card offers to pay the open invoice, not an upgrade
+      Given my organization was moved to the Free plan on day 21 of an unpaid invoice
+      And I can manage the subscription
+      When I view the subscription page
+      Then the current plan card has a "Pay now" action that opens the open invoice's payment page
+      And the page offers no "Upgrade to Growth" or "Upgrade now"
+
+    @integration
+    Scenario: A paid plan with a failed payment offers to update the card
+      Given my organization's Growth renewal payment failed and its invoice is open
+      And I can manage the subscription
+      When I view the subscription page
+      Then the current plan card has an "Update card" action that opens the open invoice's payment page
+
+    @integration
+    Scenario: A checkout request is dropped while an invoice is unpaid
+      Given my organization was moved to the Free plan on day 21 of an unpaid invoice
+      When I arrive on the subscription page asking for the Growth checkout
+      Then no checkout is created and the seat dialog does not open
+      And the checkout request is removed from the address
+
+    @integration
+    Scenario: A payment page that cannot be opened says so and stays on the page
+      Given my organization was moved to the Free plan on day 21 of an unpaid invoice
+      And the open invoice's payment page cannot be read
+      When I choose "Pay now" on the plan card
+      Then I see that the payment page could not be opened
+      And I stay on the subscription page
+
+    @integration
+    Scenario: A member who cannot pay is offered neither the invoice nor an upgrade
+      Given my organization was moved to the Free plan on day 21 of an unpaid invoice
+      And I cannot manage the subscription
+      When I view the subscription page
+      Then the current plan card has no pay or upgrade action
+
+    @integration
+    Scenario: A paused organization over its seats is told to pay the invoice, not to add seats
+      Given my organization was moved to the Free plan on day 21 of an unpaid invoice
+      And it has more members than the Free plan includes
+      When I view the subscription page
+      Then the seat note says "Pay the open invoice to get your plan back."
+      And it offers no way to add seats or upgrade

@@ -82,7 +82,11 @@ const GENERATOR_OUTPUTS: readonly { generator: string; globs: readonly string[] 
   },
   {
     generator: "skills/_compiled/generate.sh",
-    globs: ["skills/_compiled/native/**", "services/langyagent/internal/assets/skills/**"],
+    globs: [
+      "skills/_compiled/native/**",
+      "skills/_compiled/cli/**",
+      "services/langyagent/internal/assets/skills/**",
+    ],
   },
 ];
 

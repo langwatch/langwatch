@@ -17,7 +17,8 @@ An exception applies only to that exact file, never its directory. New exception
 an explicit reason there. Python, DSPy, TypeScript and Azure SVGs live once in the design
 system's `icons` entry; their original brand pigments are intentionally fixed.
 
-`terminal.*` aliases the terminal's previous semantic roles in both modes. The first 16
+`terminal.*` carries fixed screen, chrome and ANSI values, identical in both colour modes:
+the Terminal tab recreates a real dark terminal. The first 16
 ANSI indices stay named until rendering; extended colour cube, grayscale and truecolour
 payloads remain absolute. Terminal startup logos keep their vendor colours in
 `ai-brand-palette.ts`. `illustration.*` retains the exact sun, cloud, ink and SDK-icon

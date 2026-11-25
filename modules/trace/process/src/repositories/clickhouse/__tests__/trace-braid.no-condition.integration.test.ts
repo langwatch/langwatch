@@ -73,19 +73,21 @@ function spanRow({
   spanId,
   name = spanId,
   attributes = {},
+  parentSpanId = null,
 }: {
   tenantId: string;
   traceId: string;
   spanId: string;
   name?: string;
   attributes?: Record<string, string>;
+  parentSpanId?: string | null;
 }) {
   return {
     ProjectionId: `proj-${nanoid()}`,
     TenantId: tenantId,
     TraceId: traceId,
     SpanId: spanId,
-    ParentSpanId: null,
+    ParentSpanId: parentSpanId,
     ParentTraceId: null,
     ParentIsRemote: null,
     Sampled: 1,
@@ -140,6 +142,7 @@ beforeAll(async () => {
         tenantId: owner,
         traceId: HELD,
         spanId: "owner-web",
+        parentSpanId: "reader-root",
         attributes: { orchestrator: "web" },
       }),
       spanRow({
@@ -150,7 +153,12 @@ beforeAll(async () => {
       }),
       spanRow({ tenantId: owner, traceId: HELD, spanId: "owner-bare" }),
       spanRow({ tenantId: owner, traceId: HELD, spanId: "owner-pay", name: "payments_agent" }),
-      spanRow({ tenantId: owner, traceId: ALSO_HELD, spanId: "owner-also" }),
+      spanRow({
+        tenantId: owner,
+        traceId: ALSO_HELD,
+        spanId: "owner-also",
+        parentSpanId: "reader-also-root",
+      }),
       spanRow({
         tenantId: owner,
         traceId: OWNER_ONLY,

@@ -1,8 +1,10 @@
-import type {
-  GovernanceIngestionSource,
-  NormalizedPullEvent,
-  PulledUsageObservedEventData,
-  PullResult,
+import {
+  type GovernanceIngestionSource,
+  type NormalizedPullEvent,
+  type PulledUsageObservedEventData,
+  type PullResult,
+  SECURITY_LAKE_ADAPTER_ID,
+  SECURITY_LAKE_SOURCE_TYPE,
 } from "@langwatch/enterprise-governance-contract";
 import { DispatchError } from "@langwatch/eventing";
 import type {
@@ -25,6 +27,7 @@ import {
   IngestionPullDeadlineExceededError,
   IngestionPullWorkerConfiguration,
   IngestionPullWorkerService,
+  SECURITY_LAKE_ADAPTER_REFUSED_MESSAGE,
 } from "../../features/ingestion-pull/services/ingestion-pull-worker.service.ts";
 import {
   type PulledUsageRateReader,
@@ -114,8 +117,13 @@ function fakeProjects(traceDestinationProject: ProjectWithTeam | null = null): P
   );
 }
 
+/** Records the page it is handed, one `rowWritten` call per row. */
 class FakeSink implements GovernanceOcsfEventSink {
-  insertEvent = vi.fn(async (_input: GovernanceOcsfEventInput) => {});
+  rowWritten = vi.fn(async (_input: GovernanceOcsfEventInput) => {});
+
+  async insertEvents(rows: GovernanceOcsfEventInput[]): Promise<void> {
+    for (const row of rows) await this.rowWritten(row);
+  }
 }
 class FakeEntitlement implements PulledUsageEntitlements {
   readonly calls = vi.fn();
@@ -168,6 +176,7 @@ class FakeRates implements PulledUsageRateReader {
 
 function worker(input: {
   runOnce: () => Promise<PullResult>;
+  adapterId?: string;
   deadlineMs?: number;
   source?: GovernanceIngestionSource | null;
   entitlement?: boolean | Error;
@@ -180,7 +189,7 @@ function worker(input: {
 }) {
   const registry = PullerRegistryService.create();
   registry.register({
-    id: "test",
+    id: input.adapterId ?? "test",
     validateConfig: (config) => config,
     runOnce: input.runOnce,
   });
@@ -334,7 +343,7 @@ describe("IngestionPullWorkerService", () => {
       nextCursor: "next",
       eventCount: 1,
     });
-    expect(sink.insertEvent).toHaveBeenCalledWith(
+    expect(sink.rowWritten).toHaveBeenCalledWith(
       expect.objectContaining({
         tenantId: "gov-project",
         eventId: "http_custom:source-1:event-1",
@@ -343,7 +352,7 @@ describe("IngestionPullWorkerService", () => {
       }),
     );
 
-    const [row] = sink.insertEvent.mock.calls[0]!;
+    const [row] = sink.rowWritten.mock.calls[0]!;
     expect(JSON.parse(row.rawOcsfJson)).toMatchObject({
       class_uid: 6003,
       category_uid: 6,
@@ -367,7 +376,7 @@ describe("IngestionPullWorkerService", () => {
     await expect(service.run({ sourceId: "source-1", cursor: "held" })).rejects.toBeInstanceOf(
       IngestionPullDeadlineExceededError,
     );
-    expect(sink.insertEvent).not.toHaveBeenCalled();
+    expect(sink.rowWritten).not.toHaveBeenCalled();
   });
 
   it("keeps collected events when an adapter reports errors after advancing", async () => {
@@ -385,7 +394,7 @@ describe("IngestionPullWorkerService", () => {
       nextCursor: "after-unreadable-row",
       eventCount: 1,
     });
-    expect(sink.insertEvent).toHaveBeenCalledTimes(1);
+    expect(sink.rowWritten).toHaveBeenCalledTimes(1);
   });
 
   it("fails without writing when an adapter reports errors and makes no progress", async () => {
@@ -400,7 +409,7 @@ describe("IngestionPullWorkerService", () => {
     await expect(service.run({ sourceId: "source-1", cursor: "held" })).rejects.toThrow(
       "reported 1 error",
     );
-    expect(sink.insertEvent).not.toHaveBeenCalled();
+    expect(sink.rowWritten).not.toHaveBeenCalled();
   });
 
   it("routes conversations through the trace port under the destination project", async () => {
@@ -454,6 +463,17 @@ describe("IngestionPullWorkerService", () => {
     );
   });
 
+  it("counts the events an adapter wrote itself, so the source reads as receiving events", async () => {
+    const { service } = worker({
+      runOnce: async () => ({ events: [], writtenCount: 9, cursor: "next", errorCount: 0 }),
+    });
+
+    await expect(service.run({ sourceId: "source-1", cursor: null })).resolves.toMatchObject({
+      nextCursor: "next",
+      eventCount: 9,
+    });
+  });
+
   it("keeps the audit path and priced usage on the same durable retry boundary", async () => {
     const { service, sink, entitlement } = worker({
       entitlement: true,
@@ -469,7 +489,7 @@ describe("IngestionPullWorkerService", () => {
       service.run({ sourceId: "source-1", cursor: "held", pulledUsage: usage }),
     ).resolves.toMatchObject({ nextCursor: "next", eventCount: 2 });
 
-    expect(sink.insertEvent).toHaveBeenCalledTimes(2);
+    expect(sink.rowWritten).toHaveBeenCalledTimes(2);
     expect(usage.records).toHaveBeenCalledTimes(2);
     expect(entitlement.calls).toHaveBeenCalledTimes(1);
 
@@ -499,7 +519,7 @@ describe("IngestionPullWorkerService", () => {
     await expect(
       service.run({ sourceId: "source-1", cursor: "held", pulledUsage: usage }),
     ).rejects.toThrow("event store unavailable");
-    expect(sink.insertEvent).toHaveBeenCalledTimes(1);
+    expect(sink.rowWritten).toHaveBeenCalledTimes(1);
   });
 
   it("fails closed when the pulled-usage entitlement cannot be resolved", async () => {
@@ -516,7 +536,7 @@ describe("IngestionPullWorkerService", () => {
     await expect(
       service.run({ sourceId: "source-1", cursor: "held", pulledUsage: usage }),
     ).rejects.toThrow("entitlement unavailable");
-    expect(sink.insertEvent).not.toHaveBeenCalled();
+    expect(sink.rowWritten).not.toHaveBeenCalled();
     expect(usage.records).not.toHaveBeenCalled();
   });
 
@@ -537,7 +557,7 @@ describe("IngestionPullWorkerService", () => {
     await expect(
       service.run({ sourceId: "source-1", cursor: "held", pulledUsage: usage }),
     ).resolves.toMatchObject({ nextCursor: "next", eventCount: 2 });
-    expect(sink.insertEvent).toHaveBeenCalledTimes(2);
+    expect(sink.rowWritten).toHaveBeenCalledTimes(2);
     expect(usage.records).toHaveBeenCalledTimes(1);
     expect(diagnostics.error).toHaveBeenCalledWith(
       expect.stringContaining("could not map"),
@@ -684,7 +704,7 @@ describe("given a pull carrying an event that names an erased person", () => {
       await service.run({ sourceId: "source-1", cursor: null });
 
       expect(traceIngestion.ingest).not.toHaveBeenCalled();
-      expect(sink.insertEvent).not.toHaveBeenCalled();
+      expect(sink.rowWritten).not.toHaveBeenCalled();
     });
   });
 
@@ -747,7 +767,7 @@ describe("given a directory listing that names an erased person", () => {
 
     await service.run({ sourceId: "source-1", cursor: null });
 
-    expect(sink.insertEvent).not.toHaveBeenCalled();
+    expect(sink.rowWritten).not.toHaveBeenCalled();
     expect(JSON.stringify(discover.mock.calls)).not.toContain(ERASED);
     expect(JSON.stringify(departmentSync.mock.calls)).not.toContain(ERASED);
   });
@@ -765,7 +785,7 @@ describe("given a pull where person discovery itself breaks", () => {
 
     await service.run({ sourceId: "source-1", cursor: null });
 
-    expect(sink.insertEvent).toHaveBeenCalled();
+    expect(sink.rowWritten).toHaveBeenCalled();
     expect(traceIngestion.ingest).toHaveBeenCalledTimes(1);
     expect(identityMatch).not.toHaveBeenCalled();
     expect(diagnostics.error).toHaveBeenCalledWith(
@@ -966,6 +986,54 @@ describe("given a pull the provider refuses", () => {
       await expect(service.run({ sourceId: "source-1", cursor: null })).rejects.toBe(failure);
       expect(diagnostics.error).toHaveBeenCalledTimes(1);
       expect(diagnostics.capture).toHaveBeenCalledTimes(1);
+    });
+  });
+});
+
+describe("given a source of another type whose pull adapter is the Security Lake reader", () => {
+  const securityLakeRead = vi.fn(async () => ({ events: [], cursor: "read", errorCount: 0 }));
+  const sourceOf = (sourceType: string) =>
+    ingestionSource({
+      sourceType,
+      parserConfig: { adapter: SECURITY_LAKE_ADAPTER_ID, credentials: {} },
+    });
+
+  describe("when its scheduled pull runs", () => {
+    /** @scenario The scheduled pull refuses the Security Lake reader for a source of another type */
+    it("refuses the run and never runs the reader", async () => {
+      securityLakeRead.mockClear();
+      const { service, sink } = worker({
+        adapterId: SECURITY_LAKE_ADAPTER_ID,
+        runOnce: securityLakeRead,
+        source: sourceOf("otel_generic"),
+      });
+
+      const error = await service
+        .run({ sourceId: "source-1", cursor: null })
+        .catch((caught: unknown) => caught);
+
+      expect(error).toBeInstanceOf(DispatchError);
+      expect(error).toMatchObject({
+        retryable: false,
+        customerMessage: SECURITY_LAKE_ADAPTER_REFUSED_MESSAGE,
+      });
+      expect(securityLakeRead).not.toHaveBeenCalled();
+      expect(sink.rowWritten).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when the source is a Security Lake source", () => {
+    it("runs the reader", async () => {
+      securityLakeRead.mockClear();
+      const { service } = worker({
+        adapterId: SECURITY_LAKE_ADAPTER_ID,
+        runOnce: securityLakeRead,
+        source: sourceOf(SECURITY_LAKE_SOURCE_TYPE),
+      });
+
+      await service.run({ sourceId: "source-1", cursor: null });
+
+      expect(securityLakeRead).toHaveBeenCalledTimes(1);
     });
   });
 });

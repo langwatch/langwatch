@@ -125,6 +125,7 @@ describe("the routes each legacy project key scope flag opens", () => {
           "GET traces /:traceId",
           "GET traces /:traceId/transcript",
           "GET traces /facets",
+          "GET traces /settle-settings",
           "POST trace-legacy /api/trace/search",
           "POST traces /search",
         ],

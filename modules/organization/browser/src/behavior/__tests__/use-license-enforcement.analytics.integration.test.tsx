@@ -13,9 +13,12 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { renderWithOrganizationHost } from "../../testing.tsx";
 import { useLicenseEnforcement } from "../use-license-enforcement.ts";
 
-const { openUpgradeModal, lent } = vi.hoisted(() => ({
+const REACHED = { allowed: false, current: 5, max: 5 };
+
+const { openUpgradeModal, lent, limit } = vi.hoisted(() => ({
   openUpgradeModal: vi.fn(),
   lent: { current: true },
+  limit: { current: { allowed: false, current: 5, max: 5 } as Record<string, unknown> },
 }));
 
 vi.mock("@langwatch/browser-host/lent", async (importOriginal) => ({
@@ -24,11 +27,10 @@ vi.mock("@langwatch/browser-host/lent", async (importOriginal) => ({
 }));
 
 vi.mock("../organization-api.ts", () => {
-  const answers: Record<string, unknown> = {
-    "licenseEnforcement.checkLimit": { allowed: false, current: 5, max: 5 },
-  };
+  const answers = (path: string): unknown =>
+    path === "licenseEnforcement.checkLimit" ? limit.current : undefined;
   const endpoint = (path: string) => ({
-    useQuery: () => ({ data: answers[path], isLoading: false, refetch: vi.fn() }),
+    useQuery: () => ({ data: answers(path), isLoading: false, refetch: vi.fn() }),
     useMutation: () => ({ mutate: vi.fn(), mutateAsync: vi.fn(), isPending: false }),
     invalidate: vi.fn(),
   });
@@ -55,10 +57,10 @@ class RecordingUiAnalytics extends UiAnalytics {
   reset(): void {}
 }
 
-function InviteAnother() {
+function InviteAnother({ onAllowed = () => void 0 }: { onAllowed?: () => void }) {
   const { checkAndProceed } = useLicenseEnforcement("members");
   return (
-    <button type="button" onClick={() => checkAndProceed(() => void 0)}>
+    <button type="button" onClick={() => checkAndProceed(onAllowed)}>
       Invite another
     </button>
   );
@@ -69,6 +71,23 @@ describe("license enforcement", () => {
     cleanup();
     openUpgradeModal.mockClear();
     lent.current = true;
+    limit.current = REACHED;
+  });
+
+  describe("when new members are held for a failed payment", () => {
+    /** @scenario "Inviting any kind of member while a payment is unpaid names the failed payment" */
+    it("sends the invite on to the server, which names the failed payment, with no upgrade prompt", async () => {
+      limit.current = { allowed: false, current: 2, max: 9999, heldForPayment: true };
+      const invite = vi.fn();
+      const analytics = new RecordingUiAnalytics();
+      renderWithOrganizationHost(<InviteAnother onAllowed={invite} />, void 0, { analytics });
+
+      await userEvent.click(screen.getByText("Invite another"));
+
+      expect(invite).toHaveBeenCalledTimes(1);
+      expect(openUpgradeModal).not.toHaveBeenCalled();
+      expect(analytics.tracked).toEqual([]);
+    });
   });
 
   describe("when the seat limit is already reached", () => {

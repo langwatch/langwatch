@@ -120,6 +120,7 @@ const SIMULATION_KEYS = [
   "command:recordCutAtLimit",
   "command:recordEvaluations",
   "command:recordHooks",
+  "command:recordRedTeamReport",
   "command:startRun",
   "command:textMessageEnd",
   "command:textMessageStart",
