@@ -423,16 +423,17 @@ describe("the Dashboards section handed a project, in Gateway or Coding agents",
   const SHOP_MEMBER = { "proj-shop": ANALYTICS_MEMBER_PERMISSIONS };
 
   describe("given the member pinned a board in that project", () => {
-    /** @scenario "Gateway and Coding agents show the Dashboards section, naming its project" */
-    it("names the project in its title and lists that project's pins", async () => {
+    /** @scenario "Gateway and Coding agents show the Dashboards section of the project LLM Ops opens" */
+    it('titles it "Dashboards" with no project name and lists that project\'s pins', async () => {
       const user = userEvent.setup();
       const { host, calls } = renderSection({
         stars: [{ kind: "board", dashboard: { ...LATENCY, projectId: "proj-shop" } }],
         project: SHOP,
       });
 
-      const group = within(await screen.findByRole("region", { name: "Dashboards · Shop" }));
-      expect(group.getByText("Dashboards · Shop")).toBeInTheDocument();
+      const group = within(await screen.findByRole("region", { name: "Dashboards" }));
+      expect(group.getByText("Dashboards")).toBeInTheDocument();
+      expect(group.queryByText(/Shop/)).not.toBeInTheDocument();
       await waitFor(() => expect(inputsTo(calls, "boards.listStarred")).toHaveLength(1));
       expect(inputsTo(calls, "boards.listStarred")).toEqual([{ projectId: "proj-shop" }]);
       await user.click(await group.findByRole("link", { name: "Latency" }));
@@ -450,7 +451,7 @@ describe("the Dashboards section handed a project, in Gateway or Coding agents",
         projectPermissions: SHOP_MEMBER,
       });
 
-      const group = within(await screen.findByRole("region", { name: "Dashboards · Shop" }));
+      const group = within(await screen.findByRole("region", { name: "Dashboards" }));
       await user.click(group.getByRole("button", { name: "New dashboard" }));
 
       await waitFor(() =>
@@ -476,7 +477,7 @@ describe("the Dashboards section handed a project, in Gateway or Coding agents",
         projectPermissions: { "proj-shop": VIEWER },
       });
 
-      const group = within(await screen.findByRole("region", { name: "Dashboards · Shop" }));
+      const group = within(await screen.findByRole("region", { name: "Dashboards" }));
       await user.click(await group.findByRole("button", { name: "Actions for Latency" }));
 
       expect(await screen.findByRole("menuitem", { name: "Unpin" })).toBeInTheDocument();
@@ -511,7 +512,7 @@ describe("the Dashboards section handed a project, in Gateway or Coding agents",
         tracked,
       });
 
-      const group = within(await screen.findByRole("region", { name: "Dashboards · Shop" }));
+      const group = within(await screen.findByRole("region", { name: "Dashboards" }));
       await user.click(group.getByRole("button", { name: "New dashboard" }));
       await waitFor(() => expect(host.navigations).toHaveLength(1));
       await user.click(await group.findByRole("button", { name: "Actions for Latency" }));

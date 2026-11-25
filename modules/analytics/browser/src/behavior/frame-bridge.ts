@@ -135,7 +135,9 @@ export class FrameBridgeSession implements FrameBridge {
     this.#disposed = true;
     if (this.#watchdog !== null) clearInterval(this.#watchdog);
     this.#options.iframe.removeEventListener("load", this.#onFrameLoad);
-    document.removeEventListener("visibilitychange", this.#onVisibilityChange);
+    if (typeof document !== "undefined") {
+      document.removeEventListener("visibilitychange", this.#onVisibilityChange);
+    }
     for (const abort of this.#activeAborts.values()) abort.abort();
     this.#activeAborts.clear();
     this.#port?.close();
@@ -185,6 +187,11 @@ export class FrameBridgeSession implements FrameBridge {
 
   /** Suspended while hidden: background throttling hits both sides, so silence proves nothing. */
   #checkHeartbeat(): void {
+    // No document means the page is gone; stop the watchdog instead of reading it.
+    if (typeof document === "undefined") {
+      this.dispose();
+      return;
+    }
     if (document.visibilityState === "hidden") return;
     if (
       nowInstant().epochMilliseconds - this.#lastHeartbeatAt <=

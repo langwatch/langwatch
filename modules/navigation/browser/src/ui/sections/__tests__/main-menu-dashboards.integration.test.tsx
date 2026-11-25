@@ -88,6 +88,7 @@ import {
   applyFeatureFlagOverridesFromSearch,
   clearAllFeatureFlagOverrides,
 } from "@langwatch/feature-flag-client";
+import { pickFlagDefinition } from "@langwatch/feature-flag-contract";
 import type {
   NavigationOrganization,
   NavigationProject,
@@ -145,6 +146,10 @@ const analyticsLends = uiDeclarations([
   },
 ]);
 
+/** What `release_dashboards_in_every_product` reads when nothing sets it. */
+const EVERY_PRODUCT_DEFAULT =
+  pickFlagDefinition("release_dashboards_in_every_product")?.defaultValue === true;
+
 function renderSidebar({
   surface,
   pathname,
@@ -153,7 +158,7 @@ function renderSidebar({
   dashboardsLoading = false,
   organizationLoading = false,
   kind,
-  everyProductFlag = false,
+  everyProductFlag = EVERY_PRODUCT_DEFAULT,
   project = kind ? { ...PROJECT, kind } : PROJECT,
   openableTeams,
   rememberedProjectSlug,
@@ -174,7 +179,7 @@ function renderSidebar({
   dashboardsLoading?: boolean;
   organizationLoading?: boolean;
   kind?: string;
-  /** `release_dashboards_in_every_product`. */
+  /** `release_dashboards_in_every_product`; unset, it holds the registry default. */
   everyProductFlag?: boolean;
   project?: NavigationProject;
   openableTeams?: readonly NavigationTeam[];
@@ -365,7 +370,7 @@ describe("the Dashboards section analytics lends", () => {
       { surface: "governance", pathname: "/governance" },
       { surface: "me", pathname: "/coding-agents" },
     ] as const)("draws no section in $surface", async ({ surface, pathname }) => {
-      renderSidebar({ surface, pathname });
+      renderSidebar({ surface, pathname, everyProductFlag: false });
 
       await expectNoSection();
     });
@@ -374,7 +379,11 @@ describe("the Dashboards section analytics lends", () => {
   describe("given the same member, in Dashboards", () => {
     /** @scenario "Only the LLM Ops sidebar shows the Dashboards section" */
     it("leaves the boards to the saved-dashboards list", async () => {
-      renderSidebar({ surface: "dashboards", pathname: "/demo/dashboards" });
+      renderSidebar({
+        surface: "dashboards",
+        pathname: "/demo/dashboards",
+        everyProductFlag: false,
+      });
 
       expect(await screen.findByTestId("saved-dashboards")).toBeInTheDocument();
       await expectNoSection();
@@ -399,7 +408,7 @@ describe("the Dashboards section with Dashboards in every product on", () => {
   ] as const;
 
   describe("given a member who can reach Dashboards, in Gateway or Coding agents", () => {
-    /** @scenario "Gateway and Coding agents show the Dashboards section, naming its project" */
+    /** @scenario "Gateway and Coding agents show the Dashboards section of the project LLM Ops opens" */
     it.each(outsideLlmOps)(
       "hands the section the project LLM Ops would open, in $surface",
       async ({ surface, pathname, project }) => {
@@ -419,8 +428,28 @@ describe("the Dashboards section with Dashboards in every product on", () => {
     );
   });
 
+  describe("given the same member, with nothing setting the flag", () => {
+    /** @scenario "With no setting for the flag, Gateway and Coding agents show the Dashboards section" */
+    it.each(outsideLlmOps)(
+      "draws the section from the registry default, in $surface",
+      async ({ surface, pathname, project }) => {
+        renderSidebar({
+          surface,
+          pathname,
+          project,
+          openableTeams: [PERSONAL_TEAM, SHOP_TEAM],
+          rememberedProjectSlug: "shop",
+        });
+
+        expect(await screen.findByTestId("starred-dashboards")).toHaveTextContent(
+          "Pinned dashboards in Shop (project-shop)",
+        );
+      },
+    );
+  });
+
   describe("given the same member, in Governance", () => {
-    /** @scenario "Gateway and Coding agents show the Dashboards section, naming its project" */
+    /** @scenario "Gateway and Coding agents show the Dashboards section of the project LLM Ops opens" */
     it("draws no section", async () => {
       renderSidebar({ surface: "governance", pathname: "/governance", everyProductFlag: true });
 
@@ -429,7 +458,7 @@ describe("the Dashboards section with Dashboards in every product on", () => {
   });
 
   describe("given a member who cannot reach Dashboards, in Gateway or Coding agents", () => {
-    /** @scenario "Gateway and Coding agents show the Dashboards section, naming its project" */
+    /** @scenario "Gateway and Coding agents show the Dashboards section of the project LLM Ops opens" */
     it.each(outsideLlmOps)("draws no section in $surface", async ({ surface, pathname }) => {
       renderSidebar({ surface, pathname, permissions: [], everyProductFlag: true });
 
@@ -438,7 +467,7 @@ describe("the Dashboards section with Dashboards in every product on", () => {
   });
 
   describe("given no project LLM Ops could open", () => {
-    /** @scenario "Gateway and Coding agents show the Dashboards section, naming its project" */
+    /** @scenario "Gateway and Coding agents show the Dashboards section of the project LLM Ops opens" */
     it("draws no section in Coding agents", async () => {
       renderSidebar({
         surface: "me",
