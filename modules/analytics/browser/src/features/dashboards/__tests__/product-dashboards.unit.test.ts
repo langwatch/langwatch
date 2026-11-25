@@ -50,7 +50,7 @@ describe("productSidebarBoards", () => {
         board({ id: "mine", name: "My dashboard", createdById: ME }),
       ]);
 
-      expect(groups.map(({ id }) => id)).toEqual(["mine", "alpha", "zeta"]);
+      expect(groups.map(({ id }: LibraryBoard) => id)).toEqual(["mine", "alpha", "zeta"]);
     });
 
     it("leaves out a board that opens nowhere", () => {
@@ -71,7 +71,11 @@ describe("productSidebarBoards", () => {
         { product: "llm-ops" },
       );
 
-      expect(groups.map(({ id }) => id)).toEqual(["only-me", "ops-organization", "shop-project"]);
+      expect(groups.map(({ id }: LibraryBoard) => id)).toEqual([
+        "only-me",
+        "ops-organization",
+        "shop-project",
+      ]);
     });
   });
 });

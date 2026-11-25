@@ -483,8 +483,7 @@ const AUTHORED_TEMPLATES: readonly AuthoredTemplate[] = [
     widgets: ["fd-gateway"],
     byAgentKind: {},
     preloadFor: [],
-    reportPrompt:
-      'Write a short report on my "Gateway costs" dashboard for the dashboard period. Which gateway keys spend the most, and what each one costs. For each of these questions, answer in one or two sentences with the real numbers from LangWatchQL: (1) Which virtual keys spend the most through the gateway? (2) What does each route cost me? (3) Which key has grown fastest this period? Then name the one thing that most needs attention, and why. If a question has no data for the period, say so rather than guessing.',
+    formerNames: [],
   },
   {
     id: "coding-costs",
@@ -498,8 +497,7 @@ const AUTHORED_TEMPLATES: readonly AuthoredTemplate[] = [
     widgets: ["fd-coding-agents"],
     byAgentKind: {},
     preloadFor: [],
-    reportPrompt:
-      'Write a short report on my "Coding agent costs" dashboard for the dashboard period. What my team\'s coding agents cost, per agent and per model. For each of these questions, answer in one or two sentences with the real numbers from LangWatchQL: (1) Which coding agent costs the most? (2) How many tokens does each agent use, and on which models? (3) Is spend rising or falling this period? Then name the one thing that most needs attention, and why. If a question has no data for the period, say so rather than guessing.',
+    formerNames: [],
   },
   {
     id: "me-tokens",
