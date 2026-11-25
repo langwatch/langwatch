@@ -28,7 +28,7 @@ describe.skipIf(!DB_URL)("PrismaInstanceAdminRepository users list order", () =>
   const prisma = connection.client as PrismaClient;
 
   const id = (key: string) => `sort_${key}_${run}`;
-  const ids = (keys: string) => [...keys].map(id);
+  const ids = (keys: string) => keys.split("").map(id);
   // a: active, 2 orgs, 3 projects. b: unverified, 1 org, 1 project. c: pending SSO, no org.
   // d: deactivated though verified, no name, 1 org, 2 projects. e: unverified, a cleared
   // (empty) name, no org. Only b has logged in.
