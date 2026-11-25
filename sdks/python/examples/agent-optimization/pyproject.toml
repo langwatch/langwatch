@@ -29,4 +29,5 @@ constraint-dependencies = [
   "litellm>=1.100.4", # security: litellm advisory GHSA-7hp6-4w63-5g45, fixed in 1.100.4
   "pyasn1>=0.6.5", # security: pyasn1 decoder advisories covering <=0.6.4 (#3358-#3361)
   "filelock>=4.2.1", # security: filelock advisories covering 3.20.4-4.2.0 (#3195)
+  "opentelemetry-api>=1.45.2", # security: quadratic-time traceparent parsing covering <=1.45.1 (#3464)
 ]
