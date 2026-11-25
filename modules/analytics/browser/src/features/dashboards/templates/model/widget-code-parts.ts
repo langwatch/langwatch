@@ -366,7 +366,7 @@ const BUTTON = `const BUTTON = {
   border: 0,
   borderRadius: 8,
   background: C.teal,
-  color: "rgb(255, 255, 255)",
+  color: "var(--chakra-colors-bg-card)",
   fontFamily: "inherit",
   fontSize: 12,
   fontWeight: 500,
@@ -385,7 +385,7 @@ export const FACE_FULL_MIN_HEIGHT_PX = 180;
  * the full face is 208px with a two-line line, 164px without its icon; the row is 75px.
  */
 const FIT_CSS = `.lw-row { display: none; }
-[data-lw-ask]:hover { background: rgba(127, 127, 127, 0.1); border-radius: 4px; }
+[data-lw-ask]:hover { background: var(--chakra-colors-bg-muted); border-radius: 4px; }
 @media (max-height: ${FACE_ICON_MIN_HEIGHT_PX - 1}px) { .lw-icon { display: none !important; } }
 @media (max-height: ${FACE_FULL_MIN_HEIGHT_PX - 1}px) {
   .lw-full { display: none !important; }

@@ -1,31 +1,36 @@
 /**
  * Hints, never errors: a hard-coded colour in widget code still saves and runs. The hint
- * points at `LW.palette` so the chart follows light and dark instead of staying one mode.
+ * points at a theme value so the chart and its surfaces follow light and dark.
  */
 
 export interface RawColourHint {
   /** 1-based, as Monaco and editors number lines. */
   readonly line: number;
-  /** 1-based column of the `#`. */
+  /** 1-based column of the colour, or of the opening quote for a named colour. */
   readonly column: number;
-  /** Length of the hex token, `#` included. */
+  /** Length of the hinted text. */
   readonly length: number;
-  readonly hex: string;
+  /** The colour as written: a hex, a function call or `white` or `black`. */
+  readonly colour: string;
   readonly message: string;
 }
 
 /** A CSS hex colour: 3, 4, 6 or 8 digits, and no longer word running on from it. */
 const HEX_TOKEN =
   /#(?:[0-9a-fA-F]{8}|[0-9a-fA-F]{6}|[0-9a-fA-F]{4}|[0-9a-fA-F]{3})(?![0-9a-zA-Z_-])/y;
+/** A colour function call such as `rgb(0, 0, 0)` or `hsl(0 0% 0%)`, not part of a word. */
+const COLOUR_FUNCTION = /(?<![\w-])(?:rgba?|hsla?)\([^)\n]*\)/iy;
+/** A whole string that is `white` or `black`, optionally after a border style. */
+const NAMED_COLOUR = /^(?:.*\b(?:solid|dashed|dotted|double)\s+)?(?:white|black)$/i;
 
 /** The hint text, exported so the editor and tests show the same words. */
 export const RAW_COLOUR_HINT_MESSAGE =
-  "Hard-coded colour: prefer LW.palette.series[n] or LW.chartStyle so it follows light and dark.";
+  "Hard-coded colour: use LW.palette, LW.chartStyle, LW.theme or a CSS variable, " +
+  "so it follows light and dark.";
 
 /**
- * Hex colours in string and template literals, e.g. `"#9f7aea"` or `` `${x} #9f7aea` ``. Code
- * and comments are skipped. A quoted string ends at its line, so a JSX apostrophe cannot hide
- * the lines after it.
+ * Hard-coded colours inside string and template literals. Code and comments are skipped. A
+ * quoted string ends at its line, so a JSX apostrophe cannot hide the lines after it.
  */
 export function rawColourHints(source: string): readonly RawColourHint[] {
   const cursor: Cursor = { source, index: 0, line: 1, lineStart: 0 };
@@ -90,20 +95,24 @@ function skipBlockComment(cursor: Cursor): void {
  */
 function scanString(cursor: Cursor, quote: string, hints: RawColourHint[]): void {
   const { source } = cursor;
+  const start = cursor.index;
+  const opened = { line: cursor.line, column: start - cursor.lineStart + 1 };
   cursor.index += 1;
   while (cursor.index < source.length && source[cursor.index] !== quote) {
     const here = source[cursor.index];
     if (here === "\n") {
-      if (quote !== "`") return;
+      if (quote !== "`") break;
       consumeNewline(cursor);
     } else if (here === "\\") {
       skipEscape(cursor);
     } else {
-      if (here === "#") hexTokenAt(cursor, hints);
+      colourAt(cursor, hints);
       cursor.index += 1;
     }
   }
+  const body = source.slice(start + 1, cursor.index);
   if (source[cursor.index] === quote) cursor.index += 1;
+  namedColourHint(body, opened, hints);
 }
 
 /** Steps over a backslash escape; an escaped newline still starts a new line. */
@@ -115,16 +124,38 @@ function skipEscape(cursor: Cursor): void {
   cursor.index += 2;
 }
 
-/** Records the hex colour starting at the cursor's `#`, if one does. */
-function hexTokenAt(cursor: Cursor, hints: RawColourHint[]): void {
-  HEX_TOKEN.lastIndex = cursor.index;
-  const match = HEX_TOKEN.exec(cursor.source);
-  if (!match) return;
-  hints.push({
+/** Records a hex or colour function starting at the cursor, if one does. */
+function colourAt(cursor: Cursor, hints: RawColourHint[]): void {
+  const colour = colourMatchAt(cursor);
+  if (colour === null) return;
+  pushHint(hints, {
     line: cursor.line,
     column: cursor.index - cursor.lineStart + 1,
-    length: match[0].length,
-    hex: match[0],
-    message: RAW_COLOUR_HINT_MESSAGE,
+    length: colour.length,
+    colour,
   });
+}
+
+function colourMatchAt(cursor: Cursor): string | null {
+  for (const pattern of [HEX_TOKEN, COLOUR_FUNCTION]) {
+    pattern.lastIndex = cursor.index;
+    const match = pattern.exec(cursor.source);
+    if (match) return match[0];
+  }
+  return null;
+}
+
+/** Records a string that is only `white` or `black`, hinted at its opening quote. */
+function namedColourHint(
+  body: string,
+  opened: { line: number; column: number },
+  hints: RawColourHint[],
+): void {
+  const colour = body.trim();
+  if (!NAMED_COLOUR.test(colour)) return;
+  pushHint(hints, { ...opened, length: body.length + 2, colour });
+}
+
+function pushHint(hints: RawColourHint[], found: Omit<RawColourHint, "message">): void {
+  hints.push({ ...found, message: RAW_COLOUR_HINT_MESSAGE });
 }

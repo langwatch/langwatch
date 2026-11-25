@@ -94,7 +94,7 @@ The widget runs in a frame on the dashboard, in the reader's light or dark theme
 
 Text and surfaces still come from the CSS variables, written as `var(--chakra-colors-fg)`: `--chakra-colors-fg` (text), `--chakra-colors-fg-subtle`, `--chakra-colors-bg-card` and `--chakra-colors-border-card` (a tooltip or panel), `--chakra-colors-border-muted` (tile borders), `--chakra-colors-fg-error`, `--chakra-colors-fg-success`.
 
-A hard-coded hex colour still runs, but the editor hints at it: use `LW.palette` or `LW.chartStyle` instead, so the chart follows the theme. Never write `white` or a light background such as `#f8fafc`: a stat tile like that is a white block in dark mode. A tile has no background of its own, only a `1px solid var(--chakra-colors-border-muted)` border. `LW.theme` (`"light"` or `"dark"`) is there for anything the variables do not cover.
+A hard-coded colour still runs (hex, `rgb()`, `hsl()`, `white` or `black`), but the editor hints at it: use a theme value instead, so the chart follows the theme. Never write `white` or a light background such as `#f8fafc`: a stat tile like that is a white block in dark mode. A tile has no background of its own, only a `1px solid var(--chakra-colors-border-muted)` border. `LW.theme` (`"light"` or `"dark"`) is there for anything the variables do not cover.
 
 A new widget lands half the board wide and about 200 px tall inside. Fill that space rather than guessing a height: the outer element is `height: "100%"` and a flex column, at most one row of stat tiles goes on top, and the chart takes the rest (`flex: 1, minHeight: 0`, with `<ResponsiveContainer width="100%" height="100%">`). Never give a chart a fixed pixel height: one taller than the card hides its bars until the reader drags the card bigger.
 
@@ -198,11 +198,14 @@ export default function Widget() {
       <div style={{ flex: 1, minHeight: 0 }}>
         <ResponsiveContainer width="100%" height="100%">
           <BarChart data={rows}>
-            <CartesianGrid stroke={color("border-muted")} vertical={false} />
+            <CartesianGrid stroke={LW.chartStyle.grid} vertical={false} />
             <XAxis dataKey="day" tick={{ fontSize: 10, fill: color("fg-subtle") }} />
             <YAxis allowDecimals={false} tick={{ fontSize: 10, fill: color("fg-subtle") }} />
             <Tooltip
+              cursor={{ fill: LW.chartStyle.track }}
               contentStyle={{ background: color("bg-card"), border: `1px solid ${color("border-card")}` }}
+              itemStyle={{ color: color("fg") }}
+              labelStyle={{ color: color("fg-subtle") }}
             />
             <Bar dataKey="traces" fill={color("chart-1")} />
           </BarChart>

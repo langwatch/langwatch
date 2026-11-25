@@ -54,3 +54,21 @@ Feature: Widget code draws in the chart palette for the reader's mode
       Given every widget the catalogue ships
       When the editor checks each widget's source
       Then no colour hint is raised for any of them
+
+    @unit
+    Scenario: A colour function inside a string is hinted
+      Given widget code with "rgb(0, 0, 0)" and "hsl(0 0% 0%)" in string literals
+      When the editor checks the source
+      Then a colour hint is raised for each function call
+
+    @unit
+    Scenario: A white or black colour in a string is hinted
+      Given widget code with "white" and "1px solid black" in string literals
+      When the editor checks the source
+      Then a colour hint is raised for each named colour
+
+    @unit
+    Scenario: Text that merely contains white or black is not hinted
+      Given widget code with "Black box" and "a white space" in string literals
+      When the editor checks the source
+      Then no colour hint is raised
