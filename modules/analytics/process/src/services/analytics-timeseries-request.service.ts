@@ -11,6 +11,8 @@ import {
   type Instant,
 } from "@langwatch/time";
 
+import { refuseUnapplicableFilters } from "../rules/analytics-filter-values.rules.ts";
+
 const MINUTES_PER_DAY = 24 * 60;
 const MAX_TIMESERIES_BUCKETS = 1000;
 const MS_PER_MINUTE = 60_000;
@@ -64,6 +66,12 @@ export class AnalyticsTimeseriesRequestService {
         );
       }
     }
+  }
+
+  /** Refused before the cache and the table router, so every builder answers the same. */
+  refuseUnapplicableFilters(input: AnalyticsTimeseriesInput): void {
+    refuseUnapplicableFilters(input.filters);
+    for (const series of input.series) refuseUnapplicableFilters(series.filters);
   }
 
   windowOf(parsed: AnalyticsTimeseriesInput): AnalyticsTimeseriesWindow {

@@ -12,6 +12,10 @@ import type {
 import { tenantScope, tenantSet } from "@langwatch/clickhouse-client";
 import { customMetadataKeyCondition } from "@langwatch/trace-contract";
 
+import {
+  findUnapplicableFilterValue,
+  unapplicableFilterError,
+} from "../../rules/analytics-filter-values.rules.ts";
 import { TRACE_ANALYTICS_HAS_SIGNAL_SQL } from "../../rules/trace-signal.rules.ts";
 import type { TimeseriesQueryInput } from "./clickhouse.aggregation-builder.mapper.ts";
 import {
@@ -316,9 +320,11 @@ function appendSlimFilterClause({
       break;
     }
     case "traces.error": {
-      // ES sends "true"/"false"; map to HasError boolean.
+      // The options endpoint returns "true"/"false"; any other value is refused, never dropped.
       const vals = collectStringValues(rawValue);
       if (vals.length === 0) break;
+      const unapplicable = findUnapplicableFilterValue({ field, values: vals, depth: 0 });
+      if (unapplicable) throw unapplicableFilterError(unapplicable);
       const wantsErrors = vals.includes("true");
       const wantsClean = vals.includes("false");
       if (wantsErrors && !wantsClean) {
