@@ -204,6 +204,7 @@ describe("LangWatchQLPlacementGateService", () => {
             Promise.resolve({
               recordedPrivate: tenantId === ROUTED.id,
               routedPrivately: tenantId === ROUTED.id,
+              organizationId: tenantId === ROUTED.id ? "org-routed" : null,
               origin: MEMORY_SHARED_ORIGIN,
             }),
         },
@@ -214,6 +215,29 @@ describe("LangWatchQLPlacementGateService", () => {
       expect(await run(ROUTED)).toBe("lwql_not_provisioned");
       expect(privateProbes()).toBe(1);
       expect(executor.calls).toHaveLength(sharedCalls);
+    });
+  });
+
+  describe("given two organisations routed to one origin", () => {
+    /** @scenario "A second organization on an already-provisioned private database is refused and warned" */
+    it("probes each on its own, so the first's answer never admits the second", async () => {
+      const answers: LangWatchQLAccessModelAnswer[] = ["provisioned", "not_provisioned"];
+      const { run, privateProbes } = serviceOver({
+        privateAnswer: () => Promise.resolve(answers.shift() ?? "not_provisioned"),
+        placement: {
+          placementOf: ({ tenantId }) =>
+            Promise.resolve({
+              recordedPrivate: true,
+              routedPrivately: true,
+              organizationId: tenantId === ROUTED.id ? "org-first" : "org-second",
+              origin: "http://one-server.invalid:8123",
+            }),
+        },
+      });
+
+      expect(await run(ROUTED)).toBe("answered");
+      expect(await run(UNROUTED)).toBe("lwql_not_provisioned");
+      expect(privateProbes()).toBe(2);
     });
   });
 

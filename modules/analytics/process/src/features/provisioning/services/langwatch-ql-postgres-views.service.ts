@@ -158,7 +158,6 @@ export class LangWatchQLPostgresViewsService {
       columns: [
         {
           exposed: "KeyHash",
-          source: "lwqlKey",
           expression: `encode(sha256(convert_to(${base}."lwqlKey", 'UTF8')), 'hex')`,
         },
         { exposed: "TenantId", source: "id" },

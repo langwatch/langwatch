@@ -3,17 +3,23 @@
  * builders over a recorded converge and a stubbed repository.
  * @see specs/lwql/api.feature
  */
+import { createHash } from "node:crypto";
+
 import type * as Observability from "@langwatch/observability";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { LangWatchQLSelfProvisioningService } from "../../features/provisioning/services/langwatch-ql-self-provisioning.service.ts";
+import {
+  LangWatchQLSelfProvisioningService,
+  LwqlPrivateCollectionAbsentError,
+} from "../../features/provisioning/services/langwatch-ql-self-provisioning.service.ts";
 import { privateReaderOf } from "../../rules/lwql-private-reader.rules.ts";
 import { provisionLwqlPrivateTargets } from "../lwql-private-targets.task.ts";
 import { convergeLwqlPrivateRepository, type LwqlConvergencePlan } from "../lwql-provision.task.ts";
 
-const { logCalls, policyRows } = vi.hoisted(() => ({
+const { logCalls, policyRows, policyChecks } = vi.hoisted(() => ({
   logCalls: [] as { level: string; fields: unknown; message: unknown }[],
   policyRows: { n: 1 },
+  policyChecks: [] as { reader: string; tables: readonly string[] }[],
 }));
 vi.mock("@langwatch/observability", async (importActual) => {
   const actual = await importActual<typeof Observability>();
@@ -35,7 +41,10 @@ vi.mock("@langwatch/observability", async (importActual) => {
 vi.mock("../../repositories/clickhouse/clickhouse.langwatch-ql-provisioning.repository.ts", () => ({
   ClickHouseLangWatchQLProvisioningRepository: {
     open: () => ({
-      queryRows: async () => [{ n: String(policyRows.n) }],
+      findUnguardedTables: async (input: { reader: string; tables: readonly string[] }) => {
+        policyChecks.push(input);
+        return policyRows.n > 0 ? [] : [input.tables[0] ?? ""];
+      },
       close: async () => undefined,
     }),
   },
@@ -93,7 +102,6 @@ function run({
       sharedUrl: SHARED_URL,
       keyPepper: keyPepper ?? undefined,
       shared: SHARED_PLAN,
-      clusterName: undefined,
       converge: converged,
     }),
   };
@@ -101,6 +109,7 @@ function run({
 
 beforeEach(() => {
   logCalls.length = 0;
+  policyChecks.length = 0;
   policyRows.n = 1;
 });
 
@@ -156,19 +165,81 @@ describe("given a private ClickHouse whose admin user the route URL carries", ()
   });
 });
 
-describe("given two route variables naming one ClickHouse", () => {
-  /** @scenario "A private ClickHouse routed twice is provisioned once" */
-  it("converges that server once, and never the shared one", async () => {
+describe("given two organisations whose routes name one server and database", () => {
+  /** @scenario "A second organization on an already-provisioned private database is refused and warned" */
+  it("converges it once for the first organisation in id order and warns for the other", async () => {
     const { converged, done } = run({
       endpoints: [
-        { organizationId: "org-acme", url: ADMIN_URL },
-        { organizationId: "org-acme-again", url: ADMIN_URL },
-        { organizationId: "org-shared", url: SHARED_URL },
+        { organizationId: "org-b", url: "https://other-admin:pw@ACME.invalid:8443/acme_db?x=1" },
+        { organizationId: "org-a", url: ADMIN_URL },
       ],
     });
     await done;
 
     expect(converged).toHaveBeenCalledTimes(1);
+    const [plan] = converged.mock.calls[0] ?? [];
+    expect(plan?.names.database).toBe("acme_db");
+    expect(plan?.names.restrictedUser).toBe(
+      privateReaderOf({ keyPepper: PEPPER, organizationId: "org-a" }).username,
+    );
+    const warning = logCalls.find((call) => call.level === "warn");
+    expect(warning?.fields).toMatchObject({ organizationId: "org-b", owner: "org-a" });
+    expect(JSON.stringify(logCalls)).not.toContain("other-admin");
+  });
+
+  /** @scenario "A second organization on an already-provisioned private database is refused and warned" */
+  it("converges one organisation's route listed twice once, with no warning", async () => {
+    const { converged, done } = run({
+      endpoints: [
+        { organizationId: "org-a", url: ADMIN_URL },
+        { organizationId: "org-a", url: ADMIN_URL },
+      ],
+    });
+    await done;
+
+    expect(converged).toHaveBeenCalledTimes(1);
+    expect(logCalls.filter((call) => call.level === "warn")).toEqual([]);
+  });
+});
+
+describe("given a private route naming the shared server's own database", () => {
+  /** @scenario "A private route naming the shared server's database is refused and warned" */
+  it("refuses it however the URL is spelt, converges nothing and warns naming the organisation", async () => {
+    const { converged, done } = run({
+      endpoints: [
+        { organizationId: "org-shared", url: "HTTP://admin:pw@SHARED.invalid:8123/langwatch?x=1" },
+      ],
+    });
+    await done;
+
+    expect(converged).not.toHaveBeenCalled();
+    expect(logCalls.find((call) => call.level === "warn")?.fields).toMatchObject({
+      organizationId: "org-shared",
+    });
+  });
+
+  /** @scenario "A private route naming the shared server's database is refused and warned" */
+  it("still provisions another database on the shared server's origin", async () => {
+    const { converged, done } = run({
+      endpoints: [{ organizationId: "org-a", url: "http://admin:pw@shared.invalid:8123/acme_db" }],
+    });
+    await done;
+
+    expect(converged).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("given a route whose database name is not a plain identifier", () => {
+  /** @scenario "A private route naming the shared server's database is refused and warned" */
+  it("refuses it before any statement or query, and warns without the URL", async () => {
+    const { converged, done } = run({
+      endpoints: [{ organizationId: "org-a", url: "https://admin:pw@acme.invalid/acme'db" }],
+    });
+    await done;
+
+    expect(converged).not.toHaveBeenCalled();
+    expect(policyChecks).toEqual([]);
+    expect(JSON.stringify(logCalls)).not.toContain("acme.invalid");
   });
 });
 
@@ -215,11 +286,17 @@ describe("given a private route and no key pepper", () => {
 });
 
 describe("given a private ClickHouse provisioned without error", () => {
-  /** @scenario "A private ClickHouse with no row policy on traces after provisioning warns" */
-  it("warns when no row policy on traces applies to the reader, and stays quiet when one does", async () => {
+  /** @scenario "A private ClickHouse with a source table not policed for the reader after provisioning warns" */
+  it("checks the reader's policies on the source tables, warning only when one is unguarded", async () => {
     policyRows.n = 0;
     await run({ endpoints: [{ organizationId: "org-acme", url: ADMIN_URL }] }).done;
     expect(logCalls.filter((call) => call.level === "warn")).toHaveLength(1);
+
+    const [check] = policyChecks;
+    expect(check?.reader).toBe(
+      privateReaderOf({ keyPepper: PEPPER, organizationId: "org-acme" }).username,
+    );
+    expect(check?.tables).toContain("acme_db.trace_summaries");
 
     logCalls.length = 0;
     policyRows.n = 1;
@@ -266,7 +343,23 @@ describe("given a private ClickHouse that mounts its own lwql_postgres collectio
 
 describe("given a private ClickHouse without a lwql_postgres collection", () => {
   /** @scenario "A private ClickHouse without lwql_postgres is left unprovisioned and warns" */
-  it("runs no statement and warns, so the organisation stays refused", async () => {
+  it("warns once, naming the organisation and the missing collection, and still resolves", async () => {
+    const { done } = run({
+      endpoints: [{ organizationId: "org-acme", url: ADMIN_URL }],
+      converge: async () => {
+        throw new LwqlPrivateCollectionAbsentError({ collection: "lwql_postgres" });
+      },
+    });
+    await done;
+
+    const warnings = logCalls.filter((call) => call.level === "warn");
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]?.fields).toMatchObject({ organizationId: "org-acme" });
+    expect(String(warnings[0]?.message)).toContain("lwql_postgres");
+  });
+
+  /** @scenario "A private ClickHouse without lwql_postgres is left unprovisioned and warns" */
+  it("runs no statement and raises the named error, leaving the one warning to the caller", async () => {
     const { repository, statements } = repositoryHolding({ available: [] });
     const plan = {
       ...SHARED_PLAN,
@@ -279,7 +372,7 @@ describe("given a private ClickHouse without a lwql_postgres collection", () => 
     );
 
     expect(statements).toEqual([]);
-    expect(logCalls.some((call) => call.level === "warn")).toBe(true);
+    expect(logCalls.filter((call) => call.level === "warn")).toEqual([]);
   });
 });
 
@@ -316,26 +409,47 @@ describe("given the plan for a private ClickHouse", () => {
   });
 
   /** @scenario "A private ClickHouse reads its key map from Postgres through lwql_postgres" */
-  it("points every row policy at that engine table", () => {
+  it("polices every source table and the key map for the reader alone, each tenant policy reading the engine table", () => {
     const policies = statementsFor({ privateServer: true }).filter((statement) =>
       statement.startsWith("CREATE ROW POLICY"),
     );
-    const tenantPolicies = policies.filter((statement) => statement.includes("IN (SELECT any("));
+    const guarded = policies.map((policy) => /ON (\S+)/.exec(policy)?.[1]);
+    const expected = [
+      ...LangWatchQLSelfProvisioningService.create().policedTables({
+        names: PRIVATE_NAMES,
+        sourceDatabase: "acme_db",
+      }),
+      "acme_db.lwql_project_keys",
+    ];
 
+    const byName = (a: string | undefined, b: string | undefined) =>
+      (a ?? "").localeCompare(b ?? "");
+    expect([...new Set(guarded)].toSorted(byName)).toEqual([...new Set(expected)].toSorted(byName));
+    expect(new Set(guarded).size).toBe(guarded.length);
+    for (const policy of policies) {
+      expect(policy).toMatch(new RegExp(`TO ${PRIVATE_NAMES.restrictedUser}$`));
+      expect(policy).not.toMatch(/USING\s+(1|true)\b/i);
+    }
+    const tenantPolicies = policies.filter((statement) => statement.includes("IN (SELECT any("));
     expect(tenantPolicies.length).toBeGreaterThan(0);
     for (const policy of tenantPolicies) expect(policy).toContain("FROM acme_db.lwql_project_keys");
   });
 
-  /** @scenario "No statement sent to a private ClickHouse carries a capability" */
+  /** @scenario "No provisioning statement sent to a private ClickHouse carries a capability" */
   it("sends no insert and no capability value, only the reader's own password hash", () => {
     const sent = statementsFor({ privateServer: true });
+    const readerHash = createHash("sha256").update("reader-password").digest("hex");
 
     expect(sent.filter((statement) => /^INSERT/i.test(statement))).toEqual([]);
-    const others = sent.filter((statement) => !statement.startsWith("CREATE USER"));
-    expect(others.filter((statement) => /\b[0-9a-f]{64}\b/.test(statement))).toEqual([]);
-    expect(
-      others.filter((statement) => /custom_lwql_key_hash\s*=\s*'[^']/.test(statement)),
-    ).toEqual([]);
+    const hashes = sent.flatMap(
+      (statement) => statement.match(/(?<![0-9a-f])[0-9a-f]{64}(?![0-9a-f])/gi) ?? [],
+    );
+    expect(hashes).toEqual([readerHash]);
+    const createUser = sent.find((statement) => statement.startsWith("CREATE USER")) ?? "";
+    expect(createUser).toContain(`'${readerHash}'`);
+    expect(sent.filter((statement) => /custom_lwql_key_hash\s*=\s*'[^']/.test(statement))).toEqual(
+      [],
+    );
   });
 });
 

@@ -810,10 +810,17 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
     And that user's password is never written into a statement
 
   @unit
-  Scenario: A private ClickHouse routed twice is provisioned once
-    Given two route variables naming the same ClickHouse URL
+  Scenario: A second organization on an already-provisioned private database is refused and warned
+    Given two organizations whose routes name the same server and database, whatever their credentials
     When the upgrade provisions LangWatchQL
-    Then that server is converged once
+    Then that database is converged once, for the first organization in id order
+    And the other is refused with a warning naming it, and its queries stay refused
+
+  @unit
+  Scenario: A private route naming the shared server's database is refused and warned
+    Given an organization whose route names the same origin and database as the shared ClickHouse
+    When the upgrade provisions LangWatchQL
+    Then nothing is converged for it and a warning names the organization
 
   @unit
   Scenario: A private ClickHouse that cannot be provisioned warns and leaves the rest running
@@ -859,13 +866,13 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
     When the upgrade provisions LangWatchQL on it
     Then its key map is a PostgreSQL-engine table over the scoped project keys, bound to lwql_postgres
     And no local key-map table is created and every row policy reads that engine table
-    And a view or login that cannot be read gives the policy no rows
+    And no statement gives the server a key row, so the engine table is its only source
 
   @unit
-  Scenario: No statement sent to a private ClickHouse carries a capability
+  Scenario: No provisioning statement sent to a private ClickHouse carries a capability
     Given the plan for a private ClickHouse
     When its statements are rendered
-    Then none inserts a row and none carries a key hash or a tenant capability value
+    Then none inserts a row and none carries a key hash or a tenant capability value, only the reader's own password hash
 
   @unit
   Scenario: The shared ClickHouse keeps its local key-map table
@@ -874,11 +881,37 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
     Then it still creates the local key-map table and the row policies read it
 
   @unit
-  Scenario: A private ClickHouse with no row policy on traces after provisioning warns
+  Scenario: A private ClickHouse is provisioned after the shared one, and PostgreSQL runs once
+    Given routes for two organizations on their own ClickHouse servers
+    When the provisioning task runs
+    Then the shared server converges first, and the private step runs once with both routes
+    And no private server's converge runs a PostgreSQL statement
+
+  @unit
+  Scenario: Private provisioning waits for the shared converge and is skipped when it fails
+    Given the shared server's converge did not complete
+    When the provisioning task runs
+    Then no private server is touched and one warning says why
+
+  @unit
+  Scenario: A malformed private route variable warns and never fails the upgrade
+    Given the ClickHouse route variables cannot be read
+    When the provisioning task runs
+    Then it warns without the route text, skips the private servers and the upgrade completes
+
+  @unit
+  Scenario: The project-keys copy is written and granted on every scoped converge
+    Given the scoped-reader group exists
+    When a full converge or a drift repair writes the scoped copies
+    Then a full converge writes the project-keys copy after the group's grants
+    And a repair writes it only when that copy is a gap
+
+  @unit
+  Scenario: A private ClickHouse with a source table not policed for the reader after provisioning warns
     Given a private ClickHouse provisioned without error
-    And no row policy on traces applies to the organization's reader
+    And a source table has no row policy for the organization's reader, or one applying to all or all but some
     When the post-provisioning check reads the server
-    Then a warning says the organization's reader has no row policy on traces
+    Then a warning names the tables and says its queries are not isolated
 
   @unit
   Scenario: A LangWatchQL query for an organization whose private route is missing is refused, never answered from the shared ClickHouse

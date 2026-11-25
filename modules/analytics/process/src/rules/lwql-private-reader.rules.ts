@@ -20,7 +20,7 @@ export interface LwqlPrivateReader {
   readonly password: string;
 }
 
-/** An organisation's private reader; absent where no key pepper is set, so nothing derives. */
+/** Derives an organisation's private reader; the executor holds none where no key pepper is set. */
 export type LwqlPrivateReaderOf = (input: { organizationId: string }) => LwqlPrivateReader;
 
 /** `langwatch_lwql_<12 hex of the organisation id's sha256>`: a plain, lower-case identifier. */

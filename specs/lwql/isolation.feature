@@ -76,7 +76,7 @@ Feature: LangWatchQL never answers across a tenant or an instance
     Then each refuses with error code lwql_not_provisioned
     And once that server is provisioned, each answers
 
-  # --- The capability stays on the LangWatchQL server ----------------------
+  # --- No provisioning writes a capability to a server a customer controls ---
 
   @unit
   Scenario: A routed project's key-map row is written only to the LangWatchQL server

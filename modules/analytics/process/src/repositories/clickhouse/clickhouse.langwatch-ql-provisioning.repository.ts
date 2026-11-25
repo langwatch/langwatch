@@ -281,8 +281,18 @@ export class ClickHouseLangWatchQLProvisioningRepository extends LangWatchQLProv
   }
 
   /** The deploy task's own admin connection, from its resolved `CLICKHOUSE_URL`. */
-  static open({ url }: { url: string | undefined }): ClickHouseLangWatchQLProvisioningRepository {
-    const client = createClient({ url });
+  static open({
+    url,
+    requestTimeoutMs,
+  }: {
+    url: string | undefined;
+    /** Bounds every request, so one unresponsive server cannot hold a deploy. */
+    requestTimeoutMs?: number;
+  }): ClickHouseLangWatchQLProvisioningRepository {
+    const client = createClient({
+      url,
+      ...(requestTimeoutMs === undefined ? {} : { request_timeout: requestTimeoutMs }),
+    });
     return new ClickHouseLangWatchQLProvisioningRepository(
       {
         async command(statement) {
@@ -394,6 +404,29 @@ export class ClickHouseLangWatchQLProvisioningRepository extends LangWatchQLProv
 
   queryRows(sql: string): Promise<Record<string, unknown>[]> {
     return this.client.rows(sql);
+  }
+
+  async findUnguardedTables({
+    reader,
+    tables,
+  }: {
+    reader: string;
+    tables: readonly string[];
+  }): Promise<string[]> {
+    const rows = await this.client.rows(
+      `SELECT concat(database, '.', table) AS name, ` +
+        `countIf(has(apply_to_list, {reader:String})) AS own, ` +
+        `countIf(apply_to_all OR length(apply_to_except) > 0) AS broad ` +
+        `FROM system.row_policies WHERE concat(database, '.', table) IN {tables:Array(String)} ` +
+        `GROUP BY name`,
+      { reader, tables: [...tables] },
+    );
+    const guarded = new Set(
+      rows
+        .filter((row) => Number(row.own) > 0 && Number(row.broad) === 0)
+        .map((row) => String(row.name)),
+    );
+    return tables.filter((table) => !guarded.has(table));
   }
 
   /** @param table Already qualified and validated by `keyMapTableQualifiedName`. */

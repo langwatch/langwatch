@@ -13,6 +13,7 @@ import {
   LWQL_ORG_MEMBERSHIP_FRAGMENT,
   LWQL_ORG_SCOPE_FRAGMENT,
   LWQL_PROJECT_KEYS_VIEW,
+  LWQL_SCOPED_READER_GROUP,
 } from "../../rules/lwql-scoped-view.rules.ts";
 import { LangWatchQLProductionProvisioningService } from "../langwatch-ql-production-provisioning.service.ts";
 
@@ -35,7 +36,15 @@ describe("given the scoped project-keys copy", () => {
   it("exposes the project id and the lower-hex sha256 of the key, never the key itself", () => {
     expect(view).toContain(`encode(sha256(convert_to("m"."lwqlKey", 'UTF8')), 'hex') AS "KeyHash"`);
     expect(view).toContain(`"m"."id" AS "TenantId"`);
+    // Read twice per body (the hash, the empty-key filter), and the view carries two bodies.
+    expect(view.match(/"m"\."lwqlKey"/g)).toHaveLength(4);
     expect(view).not.toMatch(/"m"\."lwqlKey" AS/);
+    const projection = view.split("\nFROM")[0] ?? "";
+    const exposed = [...projection.matchAll(/ AS "(\w+)"/g)].map((match) => match[1]);
+    expect([...new Set(exposed)].toSorted((a, b) => (a ?? "").localeCompare(b ?? ""))).toEqual([
+      "KeyHash",
+      "TenantId",
+    ]);
   });
 
   /** @scenario "The Postgres scoped schema carries a row-scoped copy of each project's key capability" */
@@ -52,5 +61,9 @@ describe("given the scoped project-keys copy", () => {
     expect(grant).toContain(`'${LWQL_PROJECT_KEYS_VIEW}'`);
     expect(grant).toContain("pg_get_viewdef(c.oid)");
     expect(grant).toContain("GRANT SELECT ON");
+    const grants = [...grant.matchAll(/GRANT SELECT ON (\S+) TO (\S+?)'/g)];
+    expect(grants.map((match) => [match[1], match[2]])).toEqual([
+      [`"lwql_scoped"."${LWQL_PROJECT_KEYS_VIEW}"`, `"${LWQL_SCOPED_READER_GROUP}"`],
+    ]);
   });
 });

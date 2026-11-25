@@ -33,6 +33,7 @@ import {
 } from "./langwatch-ql-clickhouse-drift.service.ts";
 import {
   LangWatchQLCollectionBindingService,
+  LWQL_RENDERED_NAMED_COLLECTION,
   type LwqlAccessModelMode,
   type LwqlPostgresEndpoint,
   type LwqlPostgresSettings,
@@ -61,7 +62,7 @@ const collectionBinding = LangWatchQLCollectionBindingService.create();
 
 /** What an external collection leaves in the definition: never rendered, so never a password. */
 const NO_NAMED_COLLECTION_VALUES = {
-  collection: "lwql_postgres",
+  collection: LWQL_RENDERED_NAMED_COLLECTION,
   host: "",
   port: 0,
   database: "",
@@ -136,6 +137,14 @@ function postgresEndpoints({
   return [
     { host: host || parsed.hostname, port: parsed.port ? Number(parsed.port) : 5432, database },
   ];
+}
+
+/** A private ClickHouse without the `lwql_postgres` named collection: provisioning stops there. */
+export class LwqlPrivateCollectionAbsentError extends Error {
+  constructor({ collection }: { collection: string }) {
+    super(`named collection absent: ${collection}`);
+    this.name = "LwqlPrivateCollectionAbsentError";
+  }
 }
 
 /** The self-hosted provisioning statements, and the environment that selects them. */
@@ -370,6 +379,19 @@ export class LangWatchQLSelfProvisioningService {
         dedup: SHIPPED_LWQL_DEDUP,
       }),
     ];
+  }
+
+  /** Every table a row policy must guard for this access model, as `database.table`. */
+  policedTables({
+    names,
+    sourceDatabase,
+  }: {
+    names: LangWatchQLNames;
+    sourceDatabase: string;
+  }): string[] {
+    return viewProvisioning
+      .sourceTables({ names, sourceDatabase })
+      .map((table) => `${table.database ?? names.database}.${table.table}`);
   }
 
   /** The catalog datasets whose approved PostgreSQL view is among `approvedViews`. */

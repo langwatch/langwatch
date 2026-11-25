@@ -1,7 +1,7 @@
 /**
  * Runs each LangWatchQL statement where its projects' rows are: the shared ClickHouse, or an
  * organization's own as that organization's derived reader; neither the shared login nor the
- * route URL's own ever signs a query. Unreachable until ADR-200's opt-in. Spec: api.feature.
+ * route URL's own ever signs a query. Spec: api.feature.
  */
 import { LangWatchQLUnavailableError } from "@langwatch/analytics-contract";
 import {
@@ -10,11 +10,11 @@ import {
   TenantScopeError,
 } from "@langwatch/clickhouse-client";
 
-import { RESERVED_DATABASES } from "../../rules/langwatch-ql-policy.rules.ts";
 import type {
   LwqlPrivateReader,
   LwqlPrivateReaderOf,
 } from "../../rules/lwql-private-reader.rules.ts";
+import { readPrivateRoute } from "../../rules/lwql-private-route.rules.ts";
 import {
   type LangWatchQLConnection,
   type LangWatchQLExecutionRequest,
@@ -31,8 +31,6 @@ export type LangWatchQLExecutorFactory = (input: {
   connection: LangWatchQLConnection;
   target: LangWatchQLTarget;
 }) => LangWatchQLExecutorRepository;
-
-const PLAIN_DATABASE_NAME = /^[a-z_][a-z0-9_]*$/;
 
 /** Private executors kept open at once; the least recently used is closed past this. */
 const DEFAULT_MAX_PRIVATE_EXECUTORS = 100;
@@ -67,29 +65,15 @@ function privateConnectionOf({
   url: string;
   reader: LwqlPrivateReader | null;
 }): LangWatchQLConnection {
-  let parsed: URL;
-  let database: string;
-  try {
-    parsed = new URL(url);
-    database = decodeURIComponent(parsed.pathname.replace(/^\/+/, ""));
-  } catch {
-    // Never the caught error: a URL parse failure carries the whole URL, password included.
-    throw refused("unparsable route URL");
-  }
-  // Any other scheme parses to the origin "null", which no driver can dial.
-  if (parsed.protocol !== "http:" && parsed.protocol !== "https:") throw refused("bad scheme");
-  // Failing closed: a route naming no database must not adopt the shared deployment's.
-  if (database === "") throw refused("no database");
-  // Written unquoted into generated SQL: only a lower-case identifier, never a reserved one.
-  if (!PLAIN_DATABASE_NAME.test(database)) throw refused("bad name shape");
-  if (RESERVED_DATABASES.includes(database)) throw refused("reserved database");
+  const read = readPrivateRoute({ url });
+  if ("refusal" in read) throw refused(read.refusal);
   // Failing closed: with no reader to derive, the route's own login must not stand in.
   if (reader === null) throw refused("no private reader");
   return {
-    url: parsed.origin,
+    url: read.route.origin,
     username: reader.username,
     password: reader.password,
-    database,
+    database: read.route.database,
     tenantSetting: shared.tenantSetting,
   };
 }

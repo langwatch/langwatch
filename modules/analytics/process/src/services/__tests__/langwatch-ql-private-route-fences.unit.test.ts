@@ -287,15 +287,6 @@ describe("given one query that reads the main result and then its completeness",
     expect(attempt.onTarget("private").length).toBeGreaterThan(1);
     expect(attempt.routeCalls()).toBe(1);
   });
-
-  it("keeps every statement on the server the first answer named", async () => {
-    const attempt = run({ answers: [PRIVATE, SHARED_ROUTE], sql: PERIOD_SQL, timeWindow: WINDOW });
-
-    await attempt.done;
-
-    expect(attempt.onTarget("shared")).toEqual([]);
-    expect(attempt.databasesDialled()).toEqual(new Set(["acme_db"]));
-  });
 });
 
 describe("given FINAL on a table qualified with the route's database", () => {

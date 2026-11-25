@@ -112,7 +112,7 @@ async function appOver({ routedAnswer }: { routedAnswer?: "provisioned" } = {}) 
   await memory.lwqlAccessModelAnswer.recordAnswer({ origin: TARGET_ORIGIN, answer: "provisioned" });
   if (routedAnswer) {
     await memory.lwqlAccessModelAnswer.recordAnswer({
-      origin: `private:${ROUTED_ORIGIN}`,
+      origin: `private:${ROUTED_ORIGIN}:${ROUTED}`,
       answer: routedAnswer,
     });
   }

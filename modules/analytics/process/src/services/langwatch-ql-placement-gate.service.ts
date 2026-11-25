@@ -42,7 +42,9 @@ type LangWatchQLPrivateAccessModelProbe = Readonly<{
 }>;
 
 /** Where a run's projects are: one shared server, or one organisation's own, by origin. */
-type LangWatchQLPlacedOn = Readonly<{ kind: "shared" | "private"; origin: string }>;
+type LangWatchQLPlacedOn = Readonly<
+  { kind: "shared"; origin: string } | { kind: "private"; origin: string; organizationId: string }
+>;
 
 function ownerAnswer(owner: LwqlAccessModelOwner): LangWatchQLAccessModelAnswer {
   return owner === "none" ? "not_provisioned" : "provisioned";
@@ -116,8 +118,15 @@ export class LangWatchQLPlacementGateService {
     if (origin === undefined || origin === null || origins.length !== 1) return null;
     const isPrivate = placements.every((each) => each.routedPrivately);
     const isShared = placements.every((each) => !each.routedPrivately);
-    if (!isPrivate && !(isShared && origin === shared)) return null;
-    return { kind: isPrivate ? "private" : "shared", origin };
+    if (isShared && origin === shared) return { kind: "shared", origin };
+    if (!isPrivate) return null;
+    // Two organisations at one origin may hold different databases: never one server's answer.
+    const organizations = [...new Set(placements.map((each) => each.organizationId))];
+    const [organizationId] = organizations;
+    if (organizationId === undefined || organizationId === null || organizations.length !== 1) {
+      return null;
+    }
+    return { kind: "private", origin, organizationId };
   }
 
   /** Config decides where it can; otherwise the fleet's answer, probing once it has expired. */
@@ -128,8 +137,12 @@ export class LangWatchQLPlacementGateService {
     projectIds: readonly string[];
     placedOn: LangWatchQLPlacedOn;
   }): Promise<LangWatchQLAccessModelAnswer> {
-    // A private server's answer never stands for the shared one's, even at the same origin.
-    const origin = placedOn.kind === "private" ? `private:${placedOn.origin}` : placedOn.origin;
+    // A private answer is the organisation's own: never the shared server's, nor another
+    // organisation's on the same origin, whose reader and database are not this one's.
+    const origin =
+      placedOn.kind === "private"
+        ? `private:${placedOn.origin}:${placedOn.organizationId}`
+        : placedOn.origin;
     const { accessModel, privateAccessModel } = this.deps;
     if (placedOn.kind === "shared" && !accessModel.configured) return "not_provisioned";
     const held = await this.#decide({

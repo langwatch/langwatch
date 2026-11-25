@@ -59,6 +59,12 @@ const CREDENTIAL_FINGERPRINT_SALT = "lwql-postgres-named-collection";
  */
 export const POSTGRES_BASE_ALIAS = "m";
 
+/** A view column: a source column read on an alias, or an expression written in the view. */
+export type PostgresApprovedViewColumn = { exposed: string } & (
+  | { source: string; alias?: string }
+  | { expression: string }
+);
+
 /** The `DO` block's dollar-quote tag. */
 const APPROVED_VIEW_DOLLAR_TAG = "$lwql$";
 
@@ -313,7 +319,7 @@ export class LangWatchQLPostgresMappingService {
      * `alias` defaults to {@link POSTGRES_BASE_ALIAS}; the tenant column names the last
      * {@link joins} hop's alias. An `expression` replaces the `source` read: catalogue text.
      */
-    columns: readonly { exposed: string; source: string; alias?: string; expression?: string }[];
+    columns: readonly PostgresApprovedViewColumn[];
     /**
      * The join chain from the base relation to the relation carrying the owning
      * project. Empty renders a single-table body.
@@ -354,9 +360,10 @@ export class LangWatchQLPostgresMappingService {
       .map(
         (column) =>
           `  ${
-            column.expression ??
-            `${sqlText.postgresQuoted(column.alias ?? POSTGRES_BASE_ALIAS)}.` +
-              sqlText.postgresQuoted(column.source)
+            "expression" in column
+              ? column.expression
+              : `${sqlText.postgresQuoted(column.alias ?? POSTGRES_BASE_ALIAS)}.` +
+                sqlText.postgresQuoted(column.source)
           } AS ${sqlText.postgresQuoted(column.exposed)}`,
       )
       .join(",\n");
