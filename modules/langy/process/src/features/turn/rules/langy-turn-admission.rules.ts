@@ -19,7 +19,7 @@ type AdmissionTurn = {
  * Admits a turn only when it can be signed, its model is allowed and the
  * conversation is not already running; answers the run token to sign with.
  */
-export function requireRunnableTurn({
+export function getRunnableTurn({
   turn,
   current,
   runToken,

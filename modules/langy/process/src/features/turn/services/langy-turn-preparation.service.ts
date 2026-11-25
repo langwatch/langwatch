@@ -21,7 +21,7 @@ import {
 } from "../../../rules/langy-conversation-title.rules.ts";
 import { mintRunToken } from "../../../rules/langy-frame-auth.rules.ts";
 import { langyDispatchIntentOf } from "../../../rules/langy-worker-runtime.rules.ts";
-import { requireRunnableTurn } from "../rules/langy-turn-admission.rules.ts";
+import { getRunnableTurn } from "../rules/langy-turn-admission.rules.ts";
 import { LangyEndedTurnService } from "./langy-ended-turn.service.ts";
 import type { LangyTurnAttemptService } from "./langy-turn-attempt.service.ts";
 import { LangyTurnOverrideService } from "./langy-turn-override.service.ts";
@@ -103,7 +103,7 @@ export class LangyTurnPreparationService {
       args.credentials.disabledSkillIds = disabledSkills;
     }
     const [currentResult, , runTokenResult, modelsAllowedResult] = results;
-    const runToken = requireRunnableTurn({
+    const runToken = getRunnableTurn({
       turn: args,
       current: currentResult,
       runToken: runTokenResult,
