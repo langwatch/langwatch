@@ -39,6 +39,7 @@ const ui = (
   theme: "light" | "dark" = "light",
   onIdleChange?: (idle: boolean) => void,
   cover?: ReactNode,
+  onSignal?: (signal: { problem: boolean }) => void,
 ) => (
   <DesignSystemProvider forcedTheme="light">
     <SandboxedChartFrame
@@ -48,9 +49,24 @@ const ui = (
       onLog={vi.fn()}
       onIdleChange={onIdleChange}
       cover={cover}
+      onSignal={onSignal}
     />
   </DesignSystemProvider>
 );
+
+const reportedProblem = () => {
+  const options = bridgeMock.mock.calls.at(-1)?.[0] as {
+    onSignal: (signal: { problem: boolean }) => void;
+    onTeardown: () => void;
+  };
+  act(() => options.onSignal({ problem: true }));
+  return options;
+};
+/** The context the bridge the frame built last sends when its frame loads. */
+function lastBridgeContext(): unknown {
+  const [options] = bridgeMock.mock.lastCall as [{ readDashboardContext: () => unknown }];
+  return options.readDashboardContext();
+}
 
 afterEach(() => {
   cleanup();
@@ -66,14 +82,10 @@ describe("given a sandboxed chart frame", () => {
       const iframe = container.querySelector("iframe");
       expect(iframe?.hasAttribute("src")).toBe(false);
       expect(iframe?.hasAttribute("srcdoc")).toBe(false);
-      expect(bridgeMock).toHaveBeenLastCalledWith(
-        expect.objectContaining({
-          source: "A",
-          dashboardContext: expect.objectContaining({
-            colors: expect.objectContaining({ "bg.card": "#123456", "chart.1": "#123456" }),
-          }),
-        }),
-      );
+      expect(bridgeMock).toHaveBeenLastCalledWith(expect.objectContaining({ source: "A" }));
+      expect(lastBridgeContext()).toMatchObject({
+        colors: expect.objectContaining({ "bg.card": "#123456", "chart.1": "#123456" }),
+      });
     });
   });
 
@@ -100,9 +112,7 @@ describe("given a sandboxed chart frame", () => {
       const second = container.querySelector("iframe");
 
       expect(second).not.toBe(first);
-      expect(bridgeMock).toHaveBeenLastCalledWith(
-        expect.objectContaining({ dashboardContext: expect.objectContaining({ theme: "dark" }) }),
-      );
+      expect(lastBridgeContext()).toMatchObject({ theme: "dark" });
     });
   });
 
@@ -141,6 +151,34 @@ describe("given a sandboxed chart frame", () => {
 
       expect(screen.getByText("The chart stopped responding. Restarting…")).toBeTruthy();
       expect(screen.queryByText("Loading cover")).toBeNull();
+    });
+  });
+
+  describe("when its frame reported a problem and is torn down", () => {
+    /** @scenario "AC244 Widget actions: Investigate and Propose a fix show only while the widget reports its problem" */
+    it("clears the problem at teardown and again when the new frame starts", () => {
+      const onSignal = vi.fn();
+      render(ui("A", "light", undefined, undefined, onSignal));
+      const options = reportedProblem();
+      expect(onSignal).toHaveBeenLastCalledWith({ problem: true });
+
+      act(() => options.onTeardown());
+
+      expect(onSignal).toHaveBeenLastCalledWith({ problem: false });
+    });
+  });
+
+  describe("when its frame reported a problem and is taken away", () => {
+    /** @scenario "AC244 Widget actions: Investigate and Propose a fix show only while the widget reports its problem" */
+    it("clears the problem as the frame leaves", () => {
+      const onSignal = vi.fn();
+      const { unmount } = render(ui("A", "light", undefined, undefined, onSignal));
+      reportedProblem();
+      expect(onSignal).toHaveBeenLastCalledWith({ problem: true });
+
+      unmount();
+
+      expect(onSignal).toHaveBeenLastCalledWith({ problem: false });
     });
   });
 });

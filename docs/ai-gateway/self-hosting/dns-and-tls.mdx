@@ -39,7 +39,7 @@ ingress:
       secretName: gateway-tls
 ```
 
-Replace both hosts. The chart renders a second Ingress, `<release>-gateway-ingress`, with the same `className` and `annotations`. It routes `/v1` and `/health` on the gateway host to the gateway Service. The control plane derives the public URL CLI users get from `ingress.gateway.host`.
+Replace both hosts. The chart renders a second Ingress, `<release>-gateway-ingress`, with the same `className` and `annotations`. It routes `/v1`, `/a2a` and `/health` on the gateway host to the gateway Service. The control plane derives the public URL CLI users get from `ingress.gateway.host`.
 
 With `className: nginx` the chart adds annotations to the gateway Ingress only. They keep streamed responses unbuffered, let a stream run for an hour, and raise the body limit to 32 MB. Keys in `ingress.gateway.annotations` override them.
 

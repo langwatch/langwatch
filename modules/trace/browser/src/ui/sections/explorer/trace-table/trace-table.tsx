@@ -12,6 +12,7 @@ import {
   useSessionGroups,
 } from "../../../../features/explorer/behavior/use-session-groups.ts";
 import { useTraceList } from "../../../../features/explorer/behavior/use-trace-list.ts";
+import { useHasPendingNegatedEval } from "../../../../features/instant-eval/behavior/use-has-pending-negated-eval.ts";
 import { HandledErrorState, readHandledError } from "../../errors/index.ts";
 import { ConversationLensBody } from "./conversation-lens-body.tsx";
 import { EmptyFilterState } from "./empty-filter-state.tsx";
@@ -132,6 +133,8 @@ export const TraceTable: React.FC = () => {
   const sessions = useSessionGroups();
   const { totalHits } = useExplorerCounts();
   const activeLens = useEffectiveLens();
+  // A pending NOT chip negates nothing judged: its rows are not results yet.
+  const hasPendingNegatedEval = useHasPendingNegatedEval();
 
   if (!activeLens) return <EmptyFilterState />;
 
@@ -150,6 +153,8 @@ export const TraceTable: React.FC = () => {
           error,
         });
 
+  // A failed read says so first, as `filter_too_complex` has its own way out.
+  if (hasPendingNegatedEval && !shell.isError) return <EmptyFilterState />;
   const placeholder = shellPlaceholder(shell);
   if (placeholder) return placeholder;
 

@@ -88,6 +88,9 @@ export class TestUserApi implements UserApi {
   create: UserApi["create"] = (input) =>
     this.overrides.create?.(input) ?? this.unimplemented("create");
 
+  recordCreated: UserApi["recordCreated"] = (input) =>
+    this.overrides.recordCreated?.(input) ?? this.unimplemented("recordCreated");
+
   createPasskeyUser: UserApi["createPasskeyUser"] = (input) =>
     this.overrides.createPasskeyUser?.(input) ?? this.unimplemented("createPasskeyUser");
 

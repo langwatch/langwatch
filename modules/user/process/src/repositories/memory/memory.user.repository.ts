@@ -215,6 +215,10 @@ export class MemoryUserRepository implements UserRepository {
     return userProfileSchema.parse(profileOf(row));
   }
 
+  async appendCreatedFact(id: string): Promise<void> {
+    await this.#appendMintFacts({ row: this.#require(id) });
+  }
+
   async createCredentialUser(input: CreateCredentialUserRow): Promise<CreatedCredentialUser> {
     const row = this.#insertUser({
       name: input.name,

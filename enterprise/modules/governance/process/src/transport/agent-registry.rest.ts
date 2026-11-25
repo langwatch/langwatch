@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
- * `/api/governance/registry`: the organisation's agent registry, its change feed and its ARD v0.91
- * view, read with an organisation API key holding `governance:view` on an Enterprise plan.
- * Spec: enterprise/modules/governance/specs/agent-registry.feature
+ * `/api/governance/registry`: the organisation's agent registry, its change feed, its ARD v0.91
+ * view and its settings, read with an organisation API key holding `governance:view` on an
+ * Enterprise plan. Spec: enterprise/modules/governance/specs/agent-registry.feature
  */
 import {
   canonicalBaseResponses,
@@ -21,6 +21,8 @@ import {
   agentRegistryListResponseSchema,
   agentRegistryParamsSchema,
   agentRegistrySchemaResponseSchema,
+  agentRegistrySettingsResponseSchema,
+  agentRegistrySettingsSchema,
   ardManifestSchema,
   ardSearchRequestSchema,
   ardSearchResponseSchema,
@@ -52,7 +54,7 @@ export const agentRegistryRest = defineRestRouter(GovernanceRestApi)
     summary: "List the organisation's agent registry",
     tags: TAGS,
     description:
-      "Every agent LangWatch sees for the organisation: agents defined in its projects, agents a governance source listed (Databricks Genie, Copilot Studio) and agents its traces name in `gen_ai.agent.name`. Ordered by last change, oldest first; pass `next_cursor` back as `cursor`. `updated_since` returns only entries changed at or after that instant.",
+      "Every agent LangWatch sees for the organisation: agents defined in its projects, agents a governance source listed (Databricks Genie, Copilot Studio, AWS Bedrock, Google Vertex AI, an ARD registry) and agents its traces name in `gen_ai.agent.name`. Ordered by last change, oldest first; pass `next_cursor` back as `cursor`. `updated_since` returns only entries changed at or after that instant. `posture` returns only `governed`, `shadow` or `dormant` entries.",
     responses: { ...canonicalBaseResponses, ...canonicalUnprocessableResponses },
   })
   .handle(({ app, input, scope }) =>
@@ -62,6 +64,7 @@ export const agentRegistryRest = defineRestRouter(GovernanceRestApi)
       ...(input.cursor ? { cursor: input.cursor } : {}),
       ...(input.updated_since ? { updatedSince: input.updated_since } : {}),
       ...(input.status ? { status: input.status } : {}),
+      ...(input.posture ? { posture: input.posture } : {}),
     }),
   )
 
@@ -180,4 +183,42 @@ export const agentRegistryRest = defineRestRouter(GovernanceRestApi)
   .handle(({ app, input, scope }) =>
     app.searchRegistryArd({ organizationId: scope.id, request: input }),
   )
+
+  .get("/api/governance/registry/settings", "getRegistrySettings")
+  .withPermission("governance:view")
+  .withEntitlement("enterprise", { feature: "AGENT_REGISTRY" })
+  .withOutput(agentRegistrySettingsResponseSchema)
+  .withDocs({
+    operationId: "getApiGovernanceRegistrySettings",
+    summary: "Get the registry settings",
+    tags: TAGS,
+    description:
+      "The organisation's dormancy window: the days without a trace after which a listed agent reads as `dormant`. 30 until the organisation saves another value.",
+    responses: { ...canonicalBaseResponses },
+  })
+  .handle(async ({ app, scope }) => ({
+    data: await app.getRegistrySettings({ organizationId: scope.id }),
+  }))
+
+  .put("/api/governance/registry/settings", "saveRegistrySettings")
+  .keepsRecords()
+  .withAudit("governanceRegistry.saveSettings")
+  .withInput(agentRegistrySettingsSchema)
+  .withPermission("ingestionSources:manage")
+  .withEntitlement("enterprise", { feature: "AGENT_REGISTRY" })
+  .withOutput(agentRegistrySettingsResponseSchema)
+  .withDocs({
+    operationId: "putApiGovernanceRegistrySettings",
+    summary: "Save the registry settings",
+    tags: TAGS,
+    description:
+      "Sets the organisation's dormancy window, 1 to 365 days. The next reconcile applies it to every listed agent. Needs `ingestionSources:manage`.",
+    responses: { ...canonicalBaseResponses, ...canonicalUnprocessableResponses },
+  })
+  .handle(async ({ app, input, scope }) => ({
+    data: await app.saveRegistrySettings({
+      organizationId: scope.id,
+      dormantAfterDays: input.dormant_after_days,
+    }),
+  }))
   .build();

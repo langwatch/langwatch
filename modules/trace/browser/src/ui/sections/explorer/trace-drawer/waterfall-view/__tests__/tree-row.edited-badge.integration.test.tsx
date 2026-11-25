@@ -121,3 +121,17 @@ describe("TreeRow", () => {
     });
   });
 });
+
+describe("<TreeRow/> A2A label", () => {
+  /** @scenario "An A2A span is labelled in the span tree" */
+  it("labels an A2A span", () => {
+    const { container } = renderRow({ isA2a: true });
+    expect(container.textContent).toContain("A2A");
+  });
+
+  /** @scenario "An A2A span is labelled in the span tree" */
+  it("leaves other spans unlabelled", () => {
+    const { container } = renderRow();
+    expect(container.textContent).not.toContain("A2A");
+  });
+});

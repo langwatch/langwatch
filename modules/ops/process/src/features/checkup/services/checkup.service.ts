@@ -188,8 +188,8 @@ export class CheckupService {
       return {
         outcome: "unchecked",
         detail:
-          "ClickHouse did not answer the two settings the provisioning probe reads (system.replicas and user_defined_zookeeper_path).",
-        fix: "Give the app's ClickHouse user read access to system.replicas and system.server_settings.",
+          "ClickHouse did not answer the provisioning probe's reads (system.replicas, and system.zookeeper on a replicated server).",
+        fix: "Give the app's ClickHouse user SELECT on system.replicas and system.zookeeper.",
         docsPath: CHECKUP_DOCS.lwql,
       };
     }
@@ -198,8 +198,8 @@ export class CheckupService {
         outcome: "refused",
         code: "checkup_lwql_not_provisionable",
         detail:
-          "ClickHouse is replicated and user_defined_zookeeper_path is not set, so LWQL app functions cannot be created on every replica.",
-        fix: "Set user_defined_zookeeper_path in the ClickHouse server configuration on every replica and restart ClickHouse.",
+          "ClickHouse is replicated and Keeper has no function store at /clickhouse/user_defined, so LWQL app functions cannot reach every replica.",
+        fix: "Set user_defined_zookeeper_path to /clickhouse/user_defined in the server config of every ClickHouse replica and restart them.",
         docsPath: CHECKUP_DOCS.lwql,
       };
     }

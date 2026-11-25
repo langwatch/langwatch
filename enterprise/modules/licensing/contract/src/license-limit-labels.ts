@@ -45,4 +45,4 @@ export type LimitType = (typeof limitTypes)[number];
  * server-decided (role, custom-role permissions); seat pricing, usage
  * display and limit enforcement all must name the same two values.
  */
-export type MemberType = "FullMember" | "LiteMember" | "Developer";
+export type MemberType = "FullMember" | "LiteMember" | "Developer" | "BillingOnly";

@@ -5,8 +5,8 @@ import {
   type DashboardWidgetDefinitionInput,
 } from "@langwatch/analytics-contract";
 import {
+  BOARD_WIDGET_DEFAULT_ROW_SPAN,
   CHART_GRID_DEFAULT_COL_SPAN,
-  CHART_GRID_DEFAULT_ROW_SPAN,
   chartGridBottomRow,
 } from "@langwatch/analytics-contract/chart-grid";
 import {
@@ -101,7 +101,7 @@ export class PrismaDashboardWidgetRepository
   }): Promise<DashboardWidgetRow> {
     const row = await this.transaction(async (tx) => {
       if (dashboardId !== undefined && !(await ownsBoard(tx, { dashboardId, projectId }))) {
-        throw new DashboardNotFoundError(projectId);
+        throw new DashboardNotFoundError({ projectId });
       }
 
       // Scoped to the placement target: a card on another dashboard must not push this one
@@ -121,7 +121,7 @@ export class PrismaDashboardWidgetRepository
           gridColumn: 0,
           gridRow: chartGridBottomRow(existing),
           colSpan: CHART_GRID_DEFAULT_COL_SPAN,
-          rowSpan: CHART_GRID_DEFAULT_ROW_SPAN,
+          rowSpan: BOARD_WIDGET_DEFAULT_ROW_SPAN,
         },
       });
     });
@@ -233,7 +233,7 @@ export class PrismaDashboardWidgetRepository
   }): Promise<DashboardWidgetRow> {
     await this.transaction(async (tx) => {
       if (!(await ownsBoard(tx, { dashboardId, projectId }))) {
-        throw new DashboardNotFoundError(projectId);
+        throw new DashboardNotFoundError({ projectId });
       }
       // The next free row on the target board (gridRow is shared between the authoring grid
       // and the board's grid: accepted prototype coupling).

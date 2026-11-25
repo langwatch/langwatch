@@ -99,6 +99,8 @@ export const experimentRunPinnedVersionsSchema: ExperimentRunPinnedVersionsSchem
 
 const experimentRunPlanSchemaDefinition = z.object({
   concurrency: z.number().int().positive(),
+  /** How many times every dataset row runs; run row `r * repeat + k` is dataset row `r`. */
+  repeat: z.number().int().min(2).optional(),
   origin: experimentRunOriginSchema,
   persistResults: z.boolean(),
   /** Who the run's board write is credited to: a person, a Langy session or a personless key. */

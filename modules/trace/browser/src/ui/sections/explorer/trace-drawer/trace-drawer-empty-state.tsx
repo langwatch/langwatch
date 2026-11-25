@@ -1,3 +1,4 @@
+import { Link as RoutedLink } from "@langwatch/browser-host/link";
 import {
   Box,
   Button,
@@ -8,7 +9,17 @@ import {
   VStack,
 } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { AlertTriangle, ArrowLeft, Check, Copy, Inbox, RotateCw, SearchX, X } from "lucide-react";
+import {
+  AlertTriangle,
+  ArrowLeft,
+  Check,
+  Copy,
+  Inbox,
+  Lock,
+  RotateCw,
+  SearchX,
+  X,
+} from "lucide-react";
 
 import { useCopyToClipboard } from "../../../../index.ts";
 import { type ErrorExplanation, explainAnyError } from "../../errors/index.ts";
@@ -27,7 +38,7 @@ interface TraceDrawerEmptyStateProps {
   onGoBack?: () => void;
 }
 
-type ErrorKind = "not-found" | "load-failed" | "no-selection";
+type ErrorKind = "not-found" | "load-failed" | "no-selection" | "withheld";
 
 function classifyError(error: unknown, traceId: string | undefined): ErrorKind {
   if (!traceId) return "no-selection";
@@ -43,6 +54,7 @@ function classifyError(error: unknown, traceId: string | undefined): ErrorKind {
   )?.data;
   const domainCode = data?.error?.code ?? data?.error?.kind;
   if (domainCode === "trace_not_found") return "not-found";
+  if (domainCode === "trace_withheld_over_plan") return "withheld";
   if (data?.code === "NOT_FOUND") return "not-found";
   return "load-failed";
 }
@@ -60,6 +72,7 @@ const KIND_CONFIG: Record<
   "not-found": { Icon: SearchX, palette: "gray" },
   "load-failed": { Icon: AlertTriangle, palette: "orange" },
   "no-selection": { Icon: Inbox, palette: "blue" },
+  withheld: { Icon: Lock, palette: "orange" },
 };
 
 /**
@@ -70,6 +83,7 @@ const KIND_FALLBACK_TITLE: Record<ErrorKind, string> = {
   "not-found": "Trace not found",
   "load-failed": "Couldn't load this trace",
   "no-selection": "No trace selected",
+  withheld: "Trace held until your plan is sorted",
 };
 
 /** The one kind with no error behind it, so the one kind that keeps a string. */
@@ -191,7 +205,7 @@ export function TraceDrawerEmptyState({
             paddingX={0}
             color="fg"
             truncate
-            maxWidth="220px"
+            minWidth={0}
           >
             {traceId}
           </Code>
@@ -222,10 +236,38 @@ export function TraceDrawerEmptyState({
             <Text>Try again</Text>
           </Button>
         )}
-        <Button size="sm" variant="solid" colorPalette="orange" onClick={onClose}>
-          Close
-        </Button>
+        {kind === "withheld" ? (
+          <WithheldTraceActions onClose={onClose} />
+        ) : (
+          <Button size="sm" variant="solid" colorPalette="orange" onClick={onClose}>
+            Close
+          </Button>
+        )}
       </HStack>
     </VStack>
+  );
+}
+
+/**
+ * A withheld trace shows once the plan covers the members, so a retry cannot help:
+ * the drawer offers the two ways out the app banner offers (over-plan-trace-withholding.feature).
+ */
+function WithheldTraceActions({ onClose }: { onClose: () => void }) {
+  return (
+    <>
+      <Button size="sm" variant="ghost" onClick={onClose}>
+        Close
+      </Button>
+      <Button asChild size="sm" variant="outline">
+        <RoutedLink unstyled href="/settings/members">
+          Manage members
+        </RoutedLink>
+      </Button>
+      <Button asChild size="sm" variant="solid" colorPalette="orange">
+        <RoutedLink unstyled href="/settings/subscription">
+          Compare plans
+        </RoutedLink>
+      </Button>
+    </>
   );
 }

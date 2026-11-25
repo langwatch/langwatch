@@ -49,6 +49,7 @@ const makeService = (overrides: {
     {
       readChunks: (params) => activeStorage.readChunks(params),
       readChunk: (params) => activeStorage.readChunk(params),
+      readMeasuredChunk: (params) => activeStorage.readMeasuredChunk(params),
     },
     "dataset chunks",
   );
@@ -102,17 +103,25 @@ const record = (id: string, entry: Record<string, unknown>): DatasetRecord => ({
   updatedAt: new Date("2026-01-01T00:00:00Z"),
 });
 
-const mockChunks = (byIndex: Record<number, unknown[]> = chunks) => {
+/** The bytes a chunk of these rows occupies in storage: one JSON line per row. */
+const jsonlBytes = (rows: unknown[]): number =>
+  Buffer.byteLength(rows.map((row) => `${JSON.stringify(row)}\n`).join(""));
+
+const mockChunks = (
+  byIndex: Record<number, unknown[]> = chunks,
+  storedBytes: Record<number, number> = {},
+) => {
   const readChunks = vi.fn();
   const readChunk = vi.fn(({ index }: { index: number }) => Promise.resolve(byIndex[index] ?? []));
+  const readMeasuredChunk = vi.fn(({ index }: { index: number }) => {
+    const rows = byIndex[index] ?? [];
+    return Promise.resolve({ rows, byteSize: storedBytes[index] ?? jsonlBytes(rows) });
+  });
   activeStorage = createApiFixture<DatasetChunkRepository>(
-    {
-      readChunks,
-      readChunk,
-    },
+    { readChunks, readChunk, readMeasuredChunk },
     "dataset storage",
   );
-  return { readChunks, readChunk };
+  return { readChunks, readChunk, readMeasuredChunk };
 };
 
 const searchPage = ({
@@ -206,7 +215,7 @@ describe("dataset search (s3_jsonl)", () => {
         // `readChunks` (plural) pulls every chunk into the heap. A search must not
         // use it: heap stays at one chunk plus the matches kept for the window,
         // whatever the dataset's size.
-        const { readChunks, readChunk } = mockChunks();
+        const { readChunks, readMeasuredChunk } = mockChunks();
         const service = makeService({});
 
         await searchPage({
@@ -216,7 +225,7 @@ describe("dataset search (s3_jsonl)", () => {
         });
 
         expect(readChunks).not.toHaveBeenCalled();
-        expect(readChunk).toHaveBeenCalledTimes(3);
+        expect(readMeasuredChunk).toHaveBeenCalledTimes(3);
       });
 
       it("returns nothing when a word appears only in a column name", async () => {
@@ -256,7 +265,7 @@ describe("dataset search (s3_jsonl)", () => {
 
       /** @scenario A dataset too large to search is refused before any of it is read */
       it("refuses before reading any chunk, rather than part-way through", async () => {
-        const { readChunk } = mockChunks();
+        const { readMeasuredChunk } = mockChunks();
         const service = makeService({});
 
         await expect(
@@ -269,7 +278,7 @@ describe("dataset search (s3_jsonl)", () => {
             search: "escalation",
           }),
         ).rejects.toBeInstanceOf(DatasetTooLargeToSearchError);
-        expect(readChunk).not.toHaveBeenCalled();
+        expect(readMeasuredChunk).not.toHaveBeenCalled();
       });
 
       /** @scenario A dataset within the row limit but over the byte limit refuses the search */
@@ -295,7 +304,7 @@ describe("dataset search (s3_jsonl)", () => {
       });
 
       it("refuses an over-sized dataset before reading any chunk", async () => {
-        const { readChunk } = mockChunks();
+        const { readMeasuredChunk } = mockChunks();
         const service = makeService({});
 
         await expect(
@@ -309,7 +318,7 @@ describe("dataset search (s3_jsonl)", () => {
             search: "escalation",
           }),
         ).rejects.toBeInstanceOf(DatasetTooLargeToSearchError);
-        expect(readChunk).not.toHaveBeenCalled();
+        expect(readMeasuredChunk).not.toHaveBeenCalled();
       });
 
       it("searches a dataset sitting exactly on the byte limit", async () => {
@@ -339,7 +348,7 @@ describe("dataset search (s3_jsonl)", () => {
       it("refuses when the chunks it reads outweigh the size the dataset recorded", async () => {
         // sizeBytes is stale; scan counts real bytes to stop on right dimension.
         const halfTheLimitEach = Math.ceil(DATASET_SEARCH_MAX_BYTES / 2) + 1;
-        const { readChunk } = mockChunks();
+        const { readMeasuredChunk } = mockChunks();
         const service = makeService({});
 
         await expect(
@@ -379,7 +388,7 @@ describe("dataset search (s3_jsonl)", () => {
         // dataset was read before anyone objected. One is the chunk that fit — the
         // one that would have breached the limit is refused rather than fetched
         // and then complained about.
-        expect(readChunk).toHaveBeenCalledTimes(1);
+        expect(readMeasuredChunk).toHaveBeenCalledTimes(1);
       });
 
       it("keeps counting bytes across a chunk whose size was never recorded", async () => {
@@ -427,7 +436,7 @@ describe("dataset search (s3_jsonl)", () => {
         // the total still looks safe. Treated the same as a missing size:
         // unmeasurable, contributing nothing.
         const halfTheLimitEach = Math.ceil(DATASET_SEARCH_MAX_BYTES / 2) + 1;
-        const { readChunk } = mockChunks();
+        const { readMeasuredChunk } = mockChunks();
         const service = makeService({});
 
         await expect(
@@ -463,7 +472,32 @@ describe("dataset search (s3_jsonl)", () => {
         ).rejects.toBeInstanceOf(DatasetTooLargeToSearchError);
         // Two: the unmeasurable chunk and the one that fit. Three would mean the
         // negative had paid for the chunk that should have been refused.
-        expect(readChunk).toHaveBeenCalledTimes(2);
+        expect(readMeasuredChunk).toHaveBeenCalledTimes(2);
+      });
+    });
+  });
+
+  describe("given chunks whose stored bytes outweigh their parsed rows", () => {
+    describe("when the scan counts what it has read", () => {
+      /** @scenario A search counts the bytes storage handed it, not a re-encoding of the rows */
+      it("refuses on the bytes storage reported, and re-reads no chunk to weigh it", async () => {
+        const overHalfTheLimit = Math.ceil(DATASET_SEARCH_MAX_BYTES / 2) + 1;
+        const { readChunk, readMeasuredChunk } = mockChunks(chunks, {
+          0: overHalfTheLimit,
+          1: overHalfTheLimit,
+          2: overHalfTheLimit,
+        });
+        const service = makeService({});
+
+        await expect(
+          searchPage({
+            service,
+            dataset: { ...baseS3Dataset, sizeBytes: null, chunkOffsets: null },
+            search: "escalation",
+          }),
+        ).rejects.toMatchObject({ code: "dataset_too_large_to_search" });
+        expect(readMeasuredChunk).toHaveBeenCalledTimes(2);
+        expect(readChunk).not.toHaveBeenCalled();
       });
     });
   });
@@ -511,7 +545,7 @@ describe("dataset search (s3_jsonl)", () => {
         // sizeBytes null, offsets lack byteSize, recorded total stuck at zero;
         // bound by bytes actually scanned.
         const wideRow = { text: `escalation ${"x".repeat(3 * 1024 * 1024)}` };
-        const { readChunk } = mockChunks({
+        const { readMeasuredChunk } = mockChunks({
           0: [wideRow],
           1: [wideRow],
           2: [wideRow],
@@ -538,7 +572,7 @@ describe("dataset search (s3_jsonl)", () => {
         // that coming, so the fourth is read before it is refused. Overshooting
         // by the one chunk that carried the total over is the cost of measuring;
         // reading all four and returning a page would be the bug.
-        expect(readChunk).toHaveBeenCalledTimes(4);
+        expect(readMeasuredChunk).toHaveBeenCalledTimes(4);
       });
     });
   });
@@ -568,7 +602,7 @@ describe("dataset search (s3_jsonl)", () => {
         // silently drop the chunks the bad entries describe and answer "no matches"
         // for rows paging still shows — paging already falls back to `chunkCount`
         // on one bad entry, and the search has to agree with it.
-        const { readChunk } = mockChunks();
+        const { readMeasuredChunk } = mockChunks();
         const service = makeService({});
 
         const result = await searchPage({
@@ -584,7 +618,7 @@ describe("dataset search (s3_jsonl)", () => {
           search: "escalation",
         });
 
-        expect(readChunk).toHaveBeenCalledTimes(3);
+        expect(readMeasuredChunk).toHaveBeenCalledTimes(3);
         expect(result.pagination.total).toBe(2);
       });
 
@@ -594,7 +628,7 @@ describe("dataset search (s3_jsonl)", () => {
         // too. Reading it as zero would scan nothing and answer "no matches" for
         // a dataset that has rows — indistinguishable from a right answer — so
         // this throws instead.
-        const { readChunk } = mockChunks();
+        const { readMeasuredChunk } = mockChunks();
         const service = makeService({});
 
         await expect(
@@ -608,7 +642,7 @@ describe("dataset search (s3_jsonl)", () => {
             search: "escalation",
           }),
         ).rejects.toBeInstanceOf(DatasetChunkCountMissingError);
-        expect(readChunk).not.toHaveBeenCalled();
+        expect(readMeasuredChunk).not.toHaveBeenCalled();
       });
     });
   });

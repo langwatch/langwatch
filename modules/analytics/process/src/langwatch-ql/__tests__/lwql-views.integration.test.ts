@@ -403,6 +403,7 @@ describe("given the LangWatchQL views provisioned over the shipped fact tables w
     const twins = LWQL_VIEW_CATALOG.filter((view) => flooredViewNames([view]).length > 0);
     expect(twins.length, "no floored twin in the catalog to check").toBeGreaterThan(0);
     expect(twins.map((view) => flooredViewName(view.name))).toEqual([
+      "trace_metrics__floor",
       "evaluation_metrics__floor",
       "trace_evaluation_metrics__floor",
       "trace_evaluation_checks__floor",

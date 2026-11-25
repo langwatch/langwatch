@@ -27,6 +27,8 @@ import { lastAssistantText } from "./scenario-transcript";
 
 const model = openai("gpt-5-mini");
 
+const CODING_START_OPTION = "Track my coding agent";
+
 let org: GuidedOrganization;
 let watcher: ConversationWatcher | undefined;
 
@@ -44,12 +46,12 @@ describe("Langy closes the governance path from the kickoff", () => {
   });
 
   describe("when the kickoff for the governance path arrives", () => {
-    /** @scenario The governance path ends with one line */
-    it("records the path and says the one line, with no question and no page opened", async () => {
+    /** @scenario The governance path asks how to start, records it, and ends with one line */
+    it("asks how to start, records the coding start, closes the path and says the one line", async () => {
       const langy = makeLangyAdapter();
       watcher = watchLangyConversation({
         adapter: langy,
-        answerQuestion: () => [],
+        answerQuestion: () => [CODING_START_OPTION],
       });
       await queueGuidedKickoff({
         adapter: langy,
@@ -62,7 +64,7 @@ describe("Langy closes the governance path from the kickoff", () => {
         config: {
           name: "guided onboarding: the governance path",
           description:
-            "Someone who just signed up picked Governance. The app sends Langy the guided onboarding kickoff; nothing was typed by the person. The tour has already walked the governance pages, so Langy only records the path and says one line.",
+            "Someone who just signed up picked Governance. The app sends Langy the guided onboarding kickoff; nothing was typed by the person. The tour has already walked the governance pages, so Langy asks how they want to start, records the answer, closes the path and says one line.",
           agents: [
             langy,
             scenario.userSimulatorAgent({ model }),
@@ -70,7 +72,8 @@ describe("Langy closes the governance path from the kickoff", () => {
               model,
               criteria: [
                 `Langy says, word for word: "${GUIDED_LINES.governanceLine}"`,
-                "Langy asks no question, opens no page and creates nothing.",
+                `Langy asks one question, with the replies "${CODING_START_OPTION}" and "Book a call for the company setup", and opens no page.`,
+                "Langy never says or implies that a call is booked.",
                 "Langy ends the turn on that line, with nothing after it.",
                 ...GUIDED_TONE_CRITERIA,
               ],
@@ -93,9 +96,16 @@ describe("Langy closes the governance path from the kickoff", () => {
       console.log("[layer2] navigate:", langy.state.navigateHrefs.join(", "));
       console.log("[layer2] commands:", langy.state.toolCommands.join(" | "));
 
-      expect(langy.state.toolNames).not.toContain("question");
-      expect(watcher.questions).toHaveLength(0);
+      expect(watcher.questions).toHaveLength(1);
       expect(langy.state.navigateHrefs).toHaveLength(0);
+      const recorded = langy.state.toolCommands.findIndex((command) =>
+        /langwatch onboarding start coding/.test(command),
+      );
+      const closed = langy.state.toolCommands.findIndex((command) =>
+        /langwatch onboarding complete-path governance/.test(command),
+      );
+      expect(recorded).toBeGreaterThan(-1);
+      expect(closed).toBeGreaterThan(recorded);
       expect(
         langy.state.toolCommands.some((command) =>
           /langwatch onboarding complete-path governance/.test(command),
