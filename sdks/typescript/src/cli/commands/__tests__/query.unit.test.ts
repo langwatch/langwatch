@@ -153,7 +153,7 @@ describe("given a QueryApiService that returns rows", () => {
       const short = await printed(["SELECT count(*) AS count", "-f", "json"]);
       const long = await printed(["SELECT count(*) AS count", "--format", "json"]);
 
-      expect(JSON.parse(short)).toEqual(RUN_RESULT.rows);
+      expect(JSON.parse(short).rows).toEqual(RUN_RESULT.rows);
       expect(short).toBe(long);
       expect(exited).toEqual([]);
     });
