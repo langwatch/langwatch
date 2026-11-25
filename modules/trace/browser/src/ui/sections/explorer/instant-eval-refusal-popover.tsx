@@ -61,7 +61,8 @@ export const OWN_MODEL_LINK = {
 const INSTANT_EVALS_DESCRIPTION =
   "Ask your traces a question in plain language and keep only the results that answer it. Pick how it judges.";
 
-/** Where an admin adds a decision model key: Model providers, with the Instant Evals picker open. */
+/** Where an admin adds a decision model key: Model providers, with the Instant Evals picker
+ *  open. */
 export const INSTANT_EVALS_SETUP_HREF = "/settings/model-providers?setup=instant-evals";
 
 /** Where a project without Instant Evals asks for them to be switched on. */

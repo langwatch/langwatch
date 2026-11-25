@@ -230,14 +230,8 @@ describe("given the model-provider editor drawer", () => {
   });
 
   describe("when it was opened from the Instant Evals picker for a model", () => {
-    afterEach(() => {
-      stack.canGoBack = false;
-    });
-
-    /** @scenario "Saving the key returns to the Default models drawer with the model picked" */
-    it("goes back to the picker's drawer with the model, instead of closing", async () => {
+    beforeEach(() => {
       stack.canGoBack = true;
-      const user = userEvent.setup({ pointerEventsCheck: 0 });
       renderWithModelProviderHost(
         <EditModelProviderDrawer
           providerKey="openai"
@@ -247,6 +241,14 @@ describe("given the model-provider editor drawer", () => {
         />,
         new FakeModelProviderHost(),
       );
+    });
+    afterEach(() => {
+      stack.canGoBack = false;
+    });
+
+    /** @scenario "Saving the key returns to the Default models drawer with the model picked" */
+    it("goes back to the picker's drawer with the model, instead of closing", async () => {
+      const user = userEvent.setup({ pointerEventsCheck: 0 });
 
       await typeTheKey(user, "sk-test123");
       await user.click(screen.getByRole("button", { name: /save/i }));
@@ -259,17 +261,7 @@ describe("given the model-provider editor drawer", () => {
 
     /** @scenario "Cancelling the provider form returns to the Default models drawer" */
     it("goes back to the picker's drawer on Cancel, keeping the stack", async () => {
-      stack.canGoBack = true;
       const user = userEvent.setup({ pointerEventsCheck: 0 });
-      renderWithModelProviderHost(
-        <EditModelProviderDrawer
-          providerKey="openai"
-          modelProviderId="new"
-          projectId="proj-1"
-          returnPick="openai/decisions:gpt-6-luna"
-        />,
-        new FakeModelProviderHost(),
-      );
 
       await user.click(await screen.findByRole("button", { name: /cancel/i }));
 

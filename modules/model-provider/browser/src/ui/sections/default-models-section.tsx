@@ -452,7 +452,8 @@ function ConfigCell({
 /**
  * The Instant Evals cell: unset, or an id the catalogue dropped, reads as the faded LangWatch
  * Instant (preview) default, never "Not configured" (ADR-182 decision 1). Where it is not offered,
- * unset or pinned to it asks for a decision model. Only an own model can need an update: no hosted row.
+ * unset or pinned to it asks for a decision model. Only an own model can need an update: no
+ * hosted row.
  */
 function DecisionModelChip({
   model,
