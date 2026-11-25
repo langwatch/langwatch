@@ -18,6 +18,7 @@ import {
   expectAnswered,
   type Form,
   median,
+  MEMORY_LIMIT_EXCEEDED,
   mib,
   type QueryLabel,
   type Run,
@@ -64,7 +65,6 @@ const MAIN_RUNS = SWEEP ? RUNS : 1;
 const SWEEP_SEED_BUDGET_SECONDS = 900;
 /** Up to twelve runs a sweep case. */
 const SWEEP_CASE_TIMEOUT_MS = 900_000;
-const MEMORY_LIMIT_EXCEEDED = 241;
 
 const SHIPPED = DEFAULT_LWQL_RESOURCE_LIMITS;
 /** A shipped byte budget, kept in its shipped proportion to the memory cap. */
