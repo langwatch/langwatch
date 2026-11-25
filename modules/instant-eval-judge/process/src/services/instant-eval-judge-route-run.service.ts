@@ -164,8 +164,8 @@ export class InstantEvalJudgeRouteRunService {
 
   /**
    * A gated plan: the gate rates each question's case, then the primary answers the easy ones
-   * alone and the escalation the rest alone, side by side, and no sureness is read. A branch whose
-   * backend cannot answer is answered by the other one, flagged (ADR-190 decision 11).
+   * alone and the escalation the rest alone, side by side, with no sureness read. A failed branch
+   * is answered by the other backend, flagged; the hard branch is not an escalation (ADR-190 d11).
    */
   private async judgeGated({
     questions,
@@ -199,8 +199,7 @@ export class InstantEvalJudgeRouteRunService {
     const legs = asked.filter(isInstantEvalJudgeLegAnswered);
     const failed = asked.findLast((leg) => leg.outcome === "failed");
     if (legs.length === 0 && failed?.outcome === "failed") return this.nothingAnswered(failed);
-    // The escalation's answers: the hard branch's own, and the easy ones a failed primary left it.
-    const escalated = answersIn(hardLegs.own) + answersIn(easyLegs.other);
+    const escalated = answersIn(easyLegs.other);
     // The branches waited side by side, so the longer one; a branch's own two asks are in a row.
     const waitMs = Math.max(waitOf(easyLegs), waitOf(hardLegs));
     return this.result({ questions, legs, escalated, waitMs });

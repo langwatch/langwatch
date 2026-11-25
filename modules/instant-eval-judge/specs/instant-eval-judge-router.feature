@@ -152,7 +152,7 @@ Feature: Routing an Instant Evals judgement across decision models and LLMs
     Then the primary answers alone, however unsure, and the escalation is not called
     When the gate scores the case at or above the threshold
     Then the escalation answers alone on the full text, and the primary is not called
-    And the judgement counts one escalation, flags the branch taken and sums the gate's cost and that one call's
+    And the judgement counts no escalation, flags the branch taken and sums the gate's cost and that one call's
     And the gate's limiter wait counts toward the judgement's limiter wait, with that one call's
     And a gated plan never shares its first send with another kind's plan
 
@@ -167,7 +167,7 @@ Feature: Routing an Instant Evals judgement across decision models and LLMs
   Scenario: A gated branch that cannot answer is answered by the other backend, flagged
     Given a gated plan
     When the gate picks the primary and the primary cannot answer
-    Then the escalation answers, flagged as a failed primary
+    Then the escalation answers, flagged as a failed primary and counted as one escalation
     When the gate picks the escalation and the escalation cannot answer
     Then the primary answers, flagged as a failed hard branch
     And when neither answers the judgement is skipped with the platform's skip reason, the gate still billed

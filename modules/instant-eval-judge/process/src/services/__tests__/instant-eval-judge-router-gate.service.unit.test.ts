@@ -187,7 +187,7 @@ describe("InstantEvalJudgeRouterService, given a gated plan", () => {
       expect(judgement.verdicts).toEqual([{ questionId: "q", probability: 1 }]);
       expect(judgement.routing).toMatchObject({
         answeredBy: { "llm-b": 1 },
-        escalated: 1,
+        escalated: 0,
         flags: ["gate:hard"],
       });
       expect(hostedDecisions.requests).toHaveLength(0);
@@ -264,7 +264,7 @@ describe("InstantEvalJudgeRouterService, given a gated plan", () => {
       ]);
       expect(judgement.routing).toMatchObject({
         answeredBy: { "decision-a": 1, "llm-b": 1 },
-        escalated: 1,
+        escalated: 0,
         flags: ["gate:easy", "gate:hard"],
       });
       expect(judgement.costNanoUsd).toBe(2 * GATE_COST + DECISIONS_COST + LLM_COST);
@@ -317,7 +317,7 @@ describe("InstantEvalJudgeRouterService, given a gated plan", () => {
       });
       const judgement = await classify();
       expect(judgement.verdicts).toEqual([{ questionId: "q", probability: 1 }]);
-      expect(judgement.routing).toMatchObject({ answeredBy: { "llm-b": 1 }, escalated: 1 });
+      expect(judgement.routing).toMatchObject({ answeredBy: { "llm-b": 1 }, escalated: 0 });
       expect(judgement.routing?.flags).toEqual(
         expect.arrayContaining(["gate-a_timed_out", "gate_no_score", "gate:hard"]),
       );
