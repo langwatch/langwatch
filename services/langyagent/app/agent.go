@@ -3,6 +3,8 @@ package app
 import (
 	"context"
 	"time"
+
+	"github.com/langwatch/langwatch/services/langyagent/domain"
 )
 
 // CodingAgent is the driven port for a coding agent the worker runs a turn on;
@@ -53,4 +55,6 @@ type Turn struct {
 	System      string
 	Prompt      string
 	ResumeToken string
+	// Images go to the model alongside Prompt. Never logged.
+	Images []domain.TurnImage
 }
