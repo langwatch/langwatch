@@ -18,6 +18,7 @@ import {
   type InstantEvalJudgeMode,
   type InstantEvalJudgeRouteRequest,
   type InstantEvalJudgeRouteEntry,
+  type InstantEvalJudgeRouteGate,
   type InstantEvalJudgeRouteSlot,
   type InstantEvalJudgeRouteTable,
   type InstantEvalQuestion,
@@ -55,6 +56,8 @@ export interface InstantEvalJudgeRoutePlan {
   readonly pairWith?: string;
   readonly escalateTo?: string;
   readonly threshold?: number;
+  /** Present when a gate picks between the primary and the escalation before either is asked. */
+  readonly gate?: InstantEvalJudgeRouteGate;
   /** Each planned backend's enabled fallbacks, in order. */
   readonly fallbacks: Readonly<Record<string, readonly string[]>>;
 }
@@ -177,6 +180,7 @@ function planForView({
     ...(entry.pairWith ? { pairWith: entry.pairWith } : {}),
     ...(entry.escalateTo ? { escalateTo: entry.escalateTo } : {}),
     ...(entry.threshold === undefined ? {} : { threshold: entry.threshold }),
+    ...(entry.gate ? { gate: entry.gate } : {}),
     fallbacks: fallbacksOf({ entry, table }),
   };
 }

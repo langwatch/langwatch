@@ -195,6 +195,92 @@ function anthropicAnswering(
     });
 }
 
+describe("HttpInstantEvalLlmJudgeChannel, given a backend's reasoning effort", () => {
+  const answering = (capture: (body: string) => void) =>
+    agent
+      .get("https://api.openai.com")
+      .intercept({ path: "/v1/responses", method: "POST" })
+      .reply(200, (options) => {
+        capture(sentText(options.body));
+        return {
+          output: [
+            {
+              type: "function_call",
+              name: "evaluation",
+              arguments: JSON.stringify({ reasoning: "r", result: true }),
+            },
+          ],
+          // A reasoning model reports its reasoning inside the output tokens.
+          usage: { input_tokens: 500, output_tokens: 900 },
+        };
+      });
+
+  /** @scenario "A reasoning effort is sent only when the backend sets one" */
+  it("sends the effort on OpenAI Responses and bills the reasoning as output", async () => {
+    let sent = "";
+    answering((body) => (sent = body));
+
+    const answer = await llm().judge({ ...request("openai_responses"), reasoningEffort: "high" });
+
+    expect((JSON.parse(sent) as Record<string, unknown>).reasoning).toEqual({ effort: "high" });
+    expect(answer).toMatchObject({ outcome: "answered", inputTokens: 500, outputTokens: 900 });
+  });
+
+  /** @scenario "A reasoning effort is sent only when the backend sets one" */
+  it("sends the body unchanged, key for key, when the backend sets none", async () => {
+    let sent = "";
+    answering((body) => (sent = body));
+
+    await llm().judge(request("openai_responses"));
+
+    const body = JSON.parse(sent) as Record<string, unknown>;
+    expect(Object.keys(body)).toEqual([
+      "model",
+      "input",
+      "max_output_tokens",
+      "store",
+      "tools",
+      "tool_choice",
+    ]);
+    expect(body).toMatchObject({ model: "llm-model-b", max_output_tokens: 8000, store: false });
+  });
+
+  /** @scenario "A reasoning effort is sent only when the backend sets one" */
+  it("adds only the effort to that body, in the same place every time", async () => {
+    const bodies: string[] = [];
+    answering((body) => bodies.push(body));
+    answering((body) => bodies.push(body));
+
+    await llm().judge(request("openai_responses"));
+    await llm().judge({ ...request("openai_responses"), reasoningEffort: "medium" });
+
+    const [plain, withEffort] = bodies.map((body) => JSON.parse(body) as Record<string, unknown>);
+    const { reasoning, ...rest } = withEffort!;
+    expect(reasoning).toEqual({ effort: "medium" });
+    expect(rest).toEqual(plain);
+  });
+
+  /** @scenario "A reasoning effort is sent only when the backend sets one" */
+  it("never sends one on Anthropic Messages, which the table refuses it on", async () => {
+    let sent = "";
+    agent
+      .get("https://api.anthropic.com")
+      .intercept({ path: "/v1/messages", method: "POST" })
+      .reply(200, (options) => {
+        sent = sentText(options.body);
+        return {
+          content: [
+            { type: "tool_use", name: "evaluation", input: { reasoning: "r", result: true } },
+          ],
+        };
+      });
+
+    await llm().judge({ ...request("anthropic_messages"), reasoningEffort: "high" });
+
+    expect(JSON.parse(sent)).not.toHaveProperty("reasoning");
+  });
+});
+
 describe("HttpInstantEvalLlmJudgeChannel, given a score or category question", () => {
   /** @scenario "The LLM legs send one forced score or category tool call and read it back" */
   it("asks an evaluator's score on its range and reads the number back", async () => {
