@@ -3,11 +3,13 @@
  * @see modules/authz/specs/braids.feature
  */
 import type { GrantCondition, LedgerActor } from "@langwatch/authorization";
+import { AuthzGrantNotConfirmedError } from "@langwatch/authz-contract";
 import { fromDate } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
 
 import type { LedgerBraidRow } from "../../repositories/authz-ledger-read.repository.ts";
 import { MemoryAuthzBraidLockRepository } from "../../repositories/memory/memory.authz-braid-lock.repository.ts";
+import { MemoryAuthzBraidWriteRepository } from "../../repositories/memory/memory.authz-braid-write.repository.ts";
 import { RedisAuthzEpochRepository } from "../../repositories/redis/redis.authz-epoch.repository.ts";
 import { AuthzBraidService } from "../authz-braid.service.ts";
 
@@ -30,6 +32,16 @@ type Row = LedgerBraidRow & { revokedReason: string | null };
 
 function setup({ beyondCaller = [] as string[] } = {}) {
   const rows: Row[] = [];
+  /** Attaches sent while the projection lags: in the ledger, not yet in the projection. */
+  const unprojected = new Map<string, Row>();
+  /** `landsMidRead`: the projection lands just after the next projection read answers. */
+  const projection = {
+    lags: false,
+    landsMidRead: false,
+    refuses: null as Error | null,
+    confirmFails: null as Error | null,
+  };
+  const clock = { ms: Date.now() };
   let ids = 0;
   const epoch = { bump: vi.fn(async () => {}) };
   const ledger = {
@@ -40,9 +52,11 @@ function setup({ beyondCaller = [] as string[] } = {}) {
         condition: GrantCondition;
         expiresAtMs?: number;
         replacesGrantId?: string;
+        grantId: string;
+        commandId: string;
       }) => {
-        const grantId = `grant_${++ids}`;
-        rows.push({
+        const { grantId } = input;
+        const row: Row = {
           grantId,
           ownerProjectId: input.ownerProjectId,
           readerProjectId: input.readerProjectId,
@@ -54,8 +68,18 @@ function setup({ beyondCaller = [] as string[] } = {}) {
           isLive: true,
           replacesGrantId: input.replacesGrantId ?? null,
           isReplaced: false,
-        });
+        };
+        if (projection.refuses) throw projection.refuses;
+        if (rows.some((held) => held.grantId === grantId)) return { grantId };
+        unprojected.set(grantId, row);
         return { grantId };
+      },
+    ),
+    awaitSharedProjectGrants: vi.fn(
+      async (_input: { organizationId: string; grantIds: string[] }) => {
+        if (projection.lags) throw new AuthzGrantNotConfirmedError();
+        land();
+        if (projection.confirmFails) throw projection.confirmFails;
       },
     ),
     revokeBindings: vi.fn(
@@ -76,23 +100,45 @@ function setup({ beyondCaller = [] as string[] } = {}) {
       },
     ),
   };
+  /** The projection catches up with every attach the ledger holds. */
+  const land = () => {
+    rows.push(...unprojected.values());
+    unprojected.clear();
+  };
+  const landingMidRead = <T>(answer: T): T => {
+    if (projection.landsMidRead) {
+      projection.landsMidRead = false;
+      land();
+    }
+    return answer;
+  };
+  const writes = MemoryAuthzBraidWriteRepository.create();
   const service = AuthzBraidService.create({
     ledger,
+    now: () => clock.ms,
+    newGrantId: () => `grant_${++ids}`,
+    writes,
     reads: {
+      findStoredGrantIds: async ({ grantIds }) =>
+        landingMidRead(
+          rows.filter((row) => grantIds.includes(row.grantId)).map((row) => row.grantId),
+        ),
       findBraids: async ({ projectId, grantId, includeRevoked }) =>
-        rows
-          .filter(
-            (row) =>
-              (includeRevoked || row.isLive) &&
-              (grantId === undefined || row.grantId === grantId) &&
-              (projectId === undefined ||
-                row.ownerProjectId === projectId ||
-                row.readerProjectId === projectId),
-          )
-          .map((row) => ({
-            ...row,
-            isReplaced: rows.some((other) => other.replacesGrantId === row.grantId),
-          })),
+        landingMidRead(
+          rows
+            .filter(
+              (row) =>
+                (includeRevoked || row.isLive) &&
+                (grantId === undefined || row.grantId === grantId) &&
+                (projectId === undefined ||
+                  row.ownerProjectId === projectId ||
+                  row.readerProjectId === projectId),
+            )
+            .map((row) => ({
+              ...row,
+              isReplaced: rows.some((other) => other.replacesGrantId === row.grantId),
+            })),
+        ),
     },
     lineage: {
       findProjectLineage: async ({ projectId }) => {
@@ -113,7 +159,7 @@ function setup({ beyondCaller = [] as string[] } = {}) {
       caller: CALLER,
       ...overrides,
     });
-  return { service, rows, ledger, epoch, create };
+  return { service, rows, ledger, epoch, create, projection, land, writes, clock };
 }
 
 async function refusalOf(promise: Promise<unknown>): Promise<string | undefined> {
@@ -179,6 +225,180 @@ describe("AuthzBraidService", () => {
 
       expect(new Set(codes)).toEqual(new Set(["braid_already_exists", undefined]));
       expect(rows).toHaveLength(1);
+    });
+
+    /** @scenario "Repeating a create with the same command id answers the same braid" */
+    it("answers a repeated command id with the same braid and writes once", async () => {
+      const { create, ledger, rows } = setup();
+      const commandId = "cmd_0123456789abcdef";
+
+      const first = await create({ where: 'name == "a"', commandId });
+      const saved = await create({ where: 'name == "a"', commandId });
+
+      expect(saved.braidId).toBe(first.braidId);
+      expect(ledger.attachBraidGrant).toHaveBeenCalledTimes(1);
+      expect(rows).toHaveLength(1);
+      expect(await refusalOf(create({ where: 'name == "c"', commandId }))).toBe(
+        "grant_validation_failed",
+      );
+    });
+
+    it("answers a repeated command id with the braid still being saved", async () => {
+      const { create, ledger, rows, projection } = setup();
+      const commandId = "cmd_0123456789abcdef";
+      projection.lags = true;
+      expect(await refusalOf(create({ commandId }))).toBe("authz_grant_not_confirmed");
+      projection.lags = false;
+
+      const repeat = await create({ commandId });
+
+      const sent = ledger.attachBraidGrant.mock.calls.map(([input]) => input);
+      expect(sent).toHaveLength(2);
+      expect(sent[0]).toMatchObject({ commandId: `braid:cmd:user:user_ana:${commandId}` });
+      expect(sent[1]).toMatchObject({
+        grantId: sent[0]?.grantId,
+        commandId: `braid:cmd:user:user_ana:${commandId}`,
+      });
+      expect(repeat.braidId).toBe(sent[0]?.grantId);
+      expect(rows).toHaveLength(1);
+    });
+
+    /** @scenario "A braid not confirmed in time is saved once, and its retry answers it" */
+    it("keeps a braid not confirmed in time saved once while its retry waits", async () => {
+      const { create, ledger, rows, projection, land } = setup();
+      const commandId = "cmd_0123456789abcdef";
+      projection.lags = true;
+
+      expect(await refusalOf(create({ commandId }))).toBe("authz_grant_not_confirmed");
+      expect(await refusalOf(create({ commandId }))).toBe("authz_grant_not_confirmed");
+      const [first, second] = ledger.attachBraidGrant.mock.calls.map(([input]) => input);
+      expect(second).toEqual(first);
+      land();
+
+      const answered = await create({ commandId });
+      expect(answered.braidId).toBe(first?.grantId);
+      expect(rows).toHaveLength(1);
+      expect(ledger.attachBraidGrant).toHaveBeenCalledTimes(2);
+    });
+
+    /** @scenario "A braid identical to one still being saved is refused" */
+    it("refuses a braid identical to one the projection has not landed", async () => {
+      const { create, service, rows, projection, land } = setup();
+      const other = await create({ where: 'name == "other"' });
+      projection.lags = true;
+      expect(await refusalOf(create({ where: 'name == "a"' }))).toBe("authz_grant_not_confirmed");
+
+      expect(await refusalOf(create({ where: 'name == "a"' }))).toBe("braid_already_exists");
+      const changed = service.changeBraid({
+        projectId: OWNER,
+        readerProjectId: READER,
+        braidId: other.braidId,
+        where: 'name == "a"',
+        fromMs: FROM_MS,
+        actor: ANA,
+        caller: CALLER,
+      });
+      expect(await refusalOf(changed)).toBe("braid_already_exists");
+      land();
+      expect(rows.map((row) => row.condition?.where)).toEqual(['name == "other"', 'name == "a"']);
+    });
+
+    it("refuses a twin even when the projection lands between its reads", async () => {
+      const { create, projection } = setup();
+      projection.lags = true;
+      expect(await refusalOf(create({ where: 'name == "a"' }))).toBe("authz_grant_not_confirmed");
+      projection.lags = false;
+      projection.landsMidRead = true;
+
+      expect(await refusalOf(create({ where: 'name == "a"' }))).toBe("braid_already_exists");
+    });
+
+    it("forgets a write the ledger refused, so it never reads as being saved", async () => {
+      const { create, projection, writes, rows } = setup();
+      const commandId = "cmd_0123456789abcdef";
+      projection.refuses = new Error("ledger refused the command");
+      await expect(create({ commandId, where: 'name == "a"' })).rejects.toThrow("ledger refused");
+      projection.refuses = null;
+
+      expect(
+        await writes.findByCommand({
+          organizationId: ORG,
+          commandId: `braid:cmd:user:user_ana:${commandId}`,
+        }),
+      ).toEqual([]);
+      const again = await create({ where: 'name == "a"' });
+      expect(rows.map((row) => row.grantId)).toEqual([again.braidId]);
+    });
+
+    it("keeps a write whose confirmation timed out, since it may still land", async () => {
+      const { create, projection, writes } = setup();
+      const commandId = "cmd_0123456789abcdef";
+      projection.lags = true;
+      expect(await refusalOf(create({ commandId }))).toBe("authz_grant_not_confirmed");
+
+      expect(
+        await writes.findByCommand({
+          organizationId: ORG,
+          commandId: `braid:cmd:user:user_ana:${commandId}`,
+        }),
+      ).toHaveLength(1);
+    });
+
+    /** @scenario "A braid write the ledger accepted stays saved when its confirmation fails" */
+    it("keeps a write the ledger accepted when the epoch bump after it fails", async () => {
+      const { create, projection, writes } = setup();
+      const commandId = "cmd_0123456789abcdef";
+      projection.confirmFails = new Error("epoch bump failed");
+
+      await expect(create({ commandId })).rejects.toThrow("epoch bump failed");
+
+      expect(
+        await writes.findByCommand({
+          organizationId: ORG,
+          commandId: `braid:cmd:user:user_ana:${commandId}`,
+        }),
+      ).toHaveLength(1);
+    });
+
+    describe("when another actor retries a command id still being saved", () => {
+      /** @scenario "A command id answers only the actor who sent it" */
+      it("is not resent under the other actor and the braid is refused as already saving", async () => {
+        const { create, ledger, projection } = setup();
+        const commandId = "cmd_0123456789abcdef";
+        projection.lags = true;
+        expect(await refusalOf(create({ commandId }))).toBe("authz_grant_not_confirmed");
+        projection.lags = false;
+
+        const tom = { type: "user", id: "user_tom" } as const;
+        const code = await refusalOf(create({ commandId, actor: tom, caller: tom }));
+
+        expect(code).toBe("braid_already_exists");
+        expect(ledger.attachBraidGrant).toHaveBeenCalledTimes(1);
+        expect(ledger.attachBraidGrant.mock.calls[0]?.[0]).toMatchObject({ actor: ANA });
+      });
+    });
+
+    /** @scenario "A braid still being saved counts however long ago it was sent" */
+    it("refuses a twin of a write the projection has not landed hours later", async () => {
+      const { create, projection, clock } = setup();
+      projection.lags = true;
+      expect(await refusalOf(create({ where: 'name == "a"' }))).toBe("authz_grant_not_confirmed");
+      projection.lags = false;
+      clock.ms += 3 * 60 * 60_000;
+
+      expect(await refusalOf(create({ where: 'name == "a"' }))).toBe("braid_already_exists");
+    });
+
+    it("counts a braid still being saved toward the reader's distinct conditions", async () => {
+      const { create, projection } = setup();
+      for (let index = 0; index < 49; index++) await create({ where: `name == "n${index}"` });
+      projection.lags = true;
+      expect(await refusalOf(create({ where: 'name == "n49"' }))).toBe("authz_grant_not_confirmed");
+      projection.lags = false;
+
+      expect(await refusalOf(create({ where: 'name == "one more"' }))).toBe(
+        "braid_condition_limit_reached",
+      );
     });
 
     /** @scenario "Nobody braids spans they could not read themselves" */
@@ -269,6 +489,38 @@ describe("AuthzBraidService", () => {
       expect(repeated.braidId).toBe(first.braidId);
       expect(ledger.attachBraidGrant).toHaveBeenCalledTimes(2);
       expect(ledger.revokeBindings).not.toHaveBeenCalled();
+    });
+
+    describe("when the braid a change is still saving was removed meanwhile", () => {
+      /** @scenario "A retried change whose braid was removed meanwhile is refused" */
+      it("refuses the retry with braid_changed and never resends the replacement", async () => {
+        const { create, service, ledger, projection } = setup();
+        const braid = await create();
+        const commandId = "cmd_0123456789abcdef";
+        const change = () =>
+          service.changeBraid({
+            projectId: OWNER,
+            readerProjectId: READER,
+            braidId: braid.braidId,
+            where: 'name == "a"',
+            fromMs: FROM_MS,
+            actor: ANA,
+            caller: CALLER,
+            commandId,
+          });
+        projection.lags = true;
+        expect(await refusalOf(change())).toBe("authz_grant_not_confirmed");
+        projection.lags = false;
+        await service.removeBraid({
+          projectId: OWNER,
+          braidId: braid.braidId,
+          actor: ANA,
+          caller: CALLER,
+        });
+
+        expect(await refusalOf(change())).toBe("braid_changed");
+        expect(ledger.attachBraidGrant).toHaveBeenCalledTimes(2);
+      });
     });
 
     it("lets a braid with the replaced grant's terms be made while its revoke is pending", async () => {

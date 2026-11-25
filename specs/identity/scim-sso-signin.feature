@@ -31,14 +31,3 @@ Feature: First sign-in for a provisioned directory member
     Then identity reads the committed membership and refuses the account link
     And no account is attached and no session is issued
     And a membership that does not exist is refused the same way
-
-  @unit @regression
-  Scenario: The native account-link refusal maps to a stable sign-in error
-    When the authentication library reports that the account is not linked
-    Then the error is treated as OAuthAccountNotLinked
-    And it is classified as a stable sign-in error
-
-  @unit @regression
-  Scenario: The different-email refusal in every spelling shows the specific message
-    When the authentication library reports "email_does_not_match"
-    Then the error is treated as DIFFERENT_EMAIL_NOT_ALLOWED

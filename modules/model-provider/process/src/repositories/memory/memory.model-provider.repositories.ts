@@ -2,6 +2,7 @@ import type { ModelProviderRepositories } from "../model-provider.repositories.t
 import { MemoryModelCostRepository } from "./memory.model-cost.repository.ts";
 import { MemoryModelDefaultRepository } from "./memory.model-default.repository.ts";
 import { MemoryModelProviderRateLimitRepository } from "./memory.model-provider-rate-limit.repository.ts";
+import { MemoryModelProviderServedModelsRepository } from "./memory.model-provider-served-models.repository.ts";
 import { MemoryModelProviderDatabase } from "./memory.model-provider.database.ts";
 import { MemoryModelProviderRepository } from "./memory.model-provider.repository.ts";
 
@@ -20,6 +21,7 @@ export class MemoryModelProviderRepositories {
       defaults: MemoryModelDefaultRepository.create({ database }),
       costs: MemoryModelCostRepository.create({ database }),
       rateLimits: MemoryModelProviderRateLimitRepository.create(),
+      servedModels: MemoryModelProviderServedModelsRepository.create(),
     };
   }
 }

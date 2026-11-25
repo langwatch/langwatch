@@ -6,6 +6,7 @@
  */
 
 import {
+  type LangWatchQLChartCrashContext,
   type LangWatchQLDatasetColumn,
   LWQL_QUERY_RESULT_DATASET,
   starterVegaLiteSpec,
@@ -28,6 +29,8 @@ export interface LangWatchQLWidgetChartProps {
   readonly ariaLabel: string;
   /** Keeps the note about the workbench's table for screen readers only. */
   readonly isResultNoteHidden?: boolean;
+  /** The board and widget a crash while drawing is reported with. */
+  readonly crashContext?: LangWatchQLChartCrashContext;
 }
 
 /** Draws one widget's result. */
@@ -37,6 +40,7 @@ export function LangWatchQLWidgetChart({
   vegaLiteSpec,
   ariaLabel,
   isResultNoteHidden = false,
+  crashContext,
 }: LangWatchQLWidgetChartProps) {
   const spec = useMemo(
     () => vegaLiteSpec ?? starterVegaLiteSpec({ columns, datasetName: LWQL_QUERY_RESULT_DATASET }),
@@ -51,6 +55,7 @@ export function LangWatchQLWidgetChart({
         columnsByDataset={{ [LWQL_QUERY_RESULT_DATASET]: columns }}
         ariaLabel={ariaLabel}
         isResultNoteHidden={isResultNoteHidden}
+        {...(crashContext ? { crashContext } : {})}
       />
     </Box>
   );

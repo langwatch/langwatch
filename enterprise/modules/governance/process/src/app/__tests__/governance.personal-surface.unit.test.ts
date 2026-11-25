@@ -12,6 +12,7 @@ import type { GatewayApi, GatewayBudgetOverviewForUser } from "@langwatch/gatewa
 import type { LogApi } from "@langwatch/log-contract";
 import type { MetricApi } from "@langwatch/metric-contract";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
+import type { NotificationService } from "@langwatch/notification-contract";
 import {
   type OrganizationApi,
   type PersonalWorkspace,
@@ -71,6 +72,7 @@ async function buildApp(options: { workspace: PersonalWorkspace | null; member?:
     repositories: MemoryGovernanceRepositories.create(),
     dependencies: {
       webhooks: createApiFixture<WebhookApi>(),
+      notifications: createApiFixture<NotificationService>(),
       agents: createApiFixture<AgentApi>(),
       projects: createApiFixture<ProjectApi>({ findInternal: async () => null }),
       auth: createApiFixture<AuthApi>(),

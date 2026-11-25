@@ -5,7 +5,11 @@
 
 import { CHART_GRID_COLUMNS } from "../../../../model/chart-grid.ts";
 import type { BoardTemplate, BoardTemplateWidget } from "../../templates/model/board-template.ts";
-import { CATALOGUE_TEMPLATES, type CatalogueTemplate } from "./catalogue-templates.ts";
+import {
+  CATALOGUE_TEMPLATES,
+  type CatalogueTemplate,
+  TEMPLATE_VARIANTS,
+} from "./catalogue-templates.ts";
 import { implementedWidget } from "./widget-implementations.ts";
 
 /** Widgets top to bottom: full-width ones on their own rows, half-width ones in pairs. */
@@ -44,6 +48,7 @@ function galleryTemplate(template: CatalogueTemplate): BoardTemplate {
     id: template.id,
     name: template.name,
     description: template.job,
+    formerNames: template.formerNames,
     trunk: template.trunk,
     reportPrompt: template.reportPrompt,
   };
@@ -59,3 +64,6 @@ function galleryTemplate(template: CatalogueTemplate): BoardTemplate {
 
 /** Every catalogue template, in catalogue order. */
 export const GALLERY_TEMPLATES: readonly BoardTemplate[] = CATALOGUE_TEMPLATES.map(galleryTemplate);
+
+/** Every template adapted to an agent kind, which the gallery shows when that kind is picked. */
+export const GALLERY_VARIANTS: readonly BoardTemplate[] = TEMPLATE_VARIANTS.map(galleryTemplate);

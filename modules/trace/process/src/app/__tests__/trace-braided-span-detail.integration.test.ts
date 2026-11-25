@@ -20,7 +20,11 @@ import { braidedProof } from "../../__tests__/support/authorization-proofs.fixtu
 import type { SpanCostSuggestionService } from "../../features/span/services/span-cost-suggestion.service.ts";
 import { TraceViewerProtectionService } from "../../services/trace-viewer-protection.service.ts";
 import type { TraceAppDependencies, TracesSpanReader } from "../trace.app.ts";
-import { braidPlansOf, createTraceAppHarness } from "./support/trace-app.harness.ts";
+import {
+  braidPlansOf,
+  braidSettingsOf,
+  createTraceAppHarness,
+} from "./support/trace-app.harness.ts";
 
 const READER = "proj_orchestrator";
 const OWNER = "proj_specialists";
@@ -112,6 +116,7 @@ function spanPanel({
       "spanCostSuggestions",
     ),
     braidPlans: braidPlansOf("ENTERPRISE"),
+    braidSettings: braidSettingsOf(true),
     traces: {
       summary: createApiFixture<TraceAppDependencies["traces"]["summary"]>(
         { getTraceAuthorization: async ({ authorization }) => authorization },

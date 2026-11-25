@@ -139,18 +139,15 @@ describe("OpenInferenceCanonicaliserService", () => {
   });
 
   describe("when session.id is present", () => {
-    it("maps to gen_ai.conversation.id via setAttrIfAbsent", () => {
+    it("maps to gen_ai.conversation.id and consumes session.id", () => {
       const ctx = createExtractorContext({
         [ATTR_KEYS.OPENINFERENCE_SESSION_ID]: "sess-xyz",
       });
 
       extractor.apply(ctx);
 
-      expect(ctx.setAttrIfAbsent).toHaveBeenCalledWith(
-        ATTR_KEYS.GEN_AI_CONVERSATION_ID,
-        "sess-xyz",
-      );
       expect(ctx.out[ATTR_KEYS.GEN_AI_CONVERSATION_ID]).toBe("sess-xyz");
+      expect(ctx.bag.attrs.has(ATTR_KEYS.OPENINFERENCE_SESSION_ID)).toBe(false);
     });
   });
 
@@ -164,6 +161,29 @@ describe("OpenInferenceCanonicaliserService", () => {
       extractor.apply(ctx);
 
       expect(ctx.out[ATTR_KEYS.GEN_AI_CONVERSATION_ID]).toBe("existing-thread");
+    });
+
+    it("keeps session.id on the span, so a coding agent's own session stays readable", () => {
+      const ctx = createExtractorContext({
+        [ATTR_KEYS.OPENINFERENCE_SESSION_ID]: "claude-session-1",
+      });
+      ctx.out[ATTR_KEYS.GEN_AI_CONVERSATION_ID] = "launcher-thread-1";
+
+      extractor.apply(ctx);
+
+      expect(ctx.bag.attrs.get(ATTR_KEYS.OPENINFERENCE_SESSION_ID)).toBe("claude-session-1");
+    });
+
+    it("leaves a raw conversation id on the span in place of session.id", () => {
+      const ctx = createExtractorContext({
+        [ATTR_KEYS.OPENINFERENCE_SESSION_ID]: "claude-session-1",
+        [ATTR_KEYS.GEN_AI_CONVERSATION_ID]: "raw-thread-1",
+      });
+
+      extractor.apply(ctx);
+
+      expect(ctx.out[ATTR_KEYS.GEN_AI_CONVERSATION_ID]).toBeUndefined();
+      expect(ctx.bag.attrs.get(ATTR_KEYS.OPENINFERENCE_SESSION_ID)).toBe("claude-session-1");
     });
   });
 

@@ -27,6 +27,7 @@ describe("managing a project's signing keys", () => {
   let keys: MemorySigningKeyRepository;
   let usage: MemorySigningKeyUsageRepository;
   let flags: MemoryReleaseFlagsChannel;
+  let turnedOn: Set<string>;
 
   beforeEach(() => {
     now = fromDate(new Date(Date.UTC(2026, 9, 21, 12)));
@@ -35,6 +36,7 @@ describe("managing a project's signing keys", () => {
     usage = MemorySigningKeyUsageRepository.create();
     flags = MemoryReleaseFlagsChannel.create();
     flags.release({ flag: BRAIDS_FLAG, organizationId: "org_a" });
+    turnedOn = new Set(["org_a", "org_b"]);
     service = SigningKeyService.create({
       keys,
       usage,
@@ -46,14 +48,23 @@ describe("managing a project's signing keys", () => {
         },
       },
       flags,
+      settings: {
+        getOrganizationPolicy: async ({ organizationId }) => ({
+          organizationId,
+          braidsOrganizationAdminsOnly: false,
+          braidsEnabled: turnedOn.has(organizationId),
+          updatedByUserId: null,
+          updatedAtMs: null,
+        }),
+      },
       braidSignatures: BraidSignatureVerificationService.create({ keys, usage }),
       now: () => now,
     });
   });
 
   describe("given release_braids is off for the project", () => {
-    /** @scenario "With release_braids off every signing key procedure but revoke refuses with braids_not_enabled" */
-    it("refuses listing, reading, creating and rotating keys, and issues none", async () => {
+    /** @scenario "With release_braids off issuing and reading signing refuse with braids_not_enabled" */
+    it("refuses reading signing, creating and rotating keys, and issues none", async () => {
       const issued = await service.create({
         projectId: "orchestrator",
         name: "Production",
@@ -65,7 +76,6 @@ describe("managing a project's signing keys", () => {
 
       const refusals = await Promise.all(
         [
-          service.find({ projectId }),
           service.findProjectSigning({ projectId }),
           service.create({ projectId, name: "Second", userId: "ana" }),
           service.rotate({ projectId, keyId, userId: "ana" }),
@@ -77,9 +87,23 @@ describe("managing a project's signing keys", () => {
         ),
       );
 
-      expect(refusals).toEqual(Array.from({ length: 4 }, () => "braids_not_enabled"));
+      expect(refusals).toEqual(Array.from({ length: 3 }, () => "braids_not_enabled"));
       flags.release({ flag: BRAIDS_FLAG, organizationId: "org_a" });
       await expect(service.find({ projectId })).resolves.toEqual([issued.signingKey]);
+    });
+
+    /** @scenario "Listing signing keys still works while release_braids is off" */
+    it("lists the project's keys, so a leaked key can be found and revoked", async () => {
+      const issued = await service.create({
+        projectId: "orchestrator",
+        name: "Production",
+        userId: "ana",
+      });
+      flags.withhold({ flag: BRAIDS_FLAG, organizationId: "org_a" });
+
+      await expect(service.find({ projectId: "orchestrator" })).resolves.toEqual([
+        issued.signingKey,
+      ]);
     });
 
     /** @scenario "Revoking a signing key still works while release_braids is off" */
@@ -97,6 +121,31 @@ describe("managing a project's signing keys", () => {
       });
 
       expect(revoked).toMatchObject({ id: issued.signingKey.id, status: "revoked" });
+    });
+  });
+
+  describe("given the organisation has Braids turned off", () => {
+    /** @scenario "With Braids turned off a signing key cannot be created or rotated" */
+    it("refuses creating and rotating, and still lists and revokes", async () => {
+      const issued = await service.create({
+        projectId: "orchestrator",
+        name: "Production",
+        userId: "ana",
+      });
+      turnedOn.delete("org_a");
+      const projectId = "orchestrator";
+      const keyId = issued.signingKey.id;
+
+      await expect(
+        service.create({ projectId, name: "Second", userId: "ana" }),
+      ).rejects.toMatchObject({ code: "braids_turned_off" });
+      await expect(service.rotate({ projectId, keyId, userId: "ana" })).rejects.toMatchObject({
+        code: "braids_turned_off",
+      });
+      await expect(service.find({ projectId })).resolves.toEqual([issued.signingKey]);
+      await expect(service.revoke({ projectId, keyId })).resolves.toMatchObject({
+        status: "revoked",
+      });
     });
   });
 

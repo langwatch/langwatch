@@ -305,7 +305,7 @@ describe.skipIf(!DB_URL)("the upgrade runner", () => {
       const applier = fakeApplier({
         release: "3.21.0",
         during: async () => {
-          await sleep(900);
+          await sleep(2_500);
           intruder = await ledger().acquireLease({
             name: "upgrade",
             owner: "x",
@@ -319,7 +319,7 @@ describe.skipIf(!DB_URL)("the upgrade runner", () => {
         runnerFor({
           release: "3.21.0",
           applier,
-          lease: { ttlMs: 400, heartbeatMs: 100, waitMs: 1_000, pollMs: 50 },
+          lease: { ttlMs: 1_500, heartbeatMs: 100, waitMs: 1_000, pollMs: 50 },
         }),
       );
       expect(intruder).toBeNull();

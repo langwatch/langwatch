@@ -34,7 +34,7 @@ export type IngestionTemplateDto = z.infer<typeof ingestionTemplateDtoSchema>;
  * all"; the domain stores that as absent.
  */
 const governanceRestCreateTemplateSchemaDefinition = z.object({
-  source_type: z.string(),
+  source_type: z.string().min(1),
   display_name: z.string().min(1).max(80),
   description: z.string().max(2000).optional(),
   icon_asset: z.string().max(20_000).optional(),
@@ -57,7 +57,7 @@ export const governanceRestUpdateOttlRulesSchema: GovernanceRestUpdateOttlRulesS
   governanceRestUpdateOttlRulesSchemaDefinition;
 
 const governanceRestCloneTemplateSchemaDefinition = z.object({
-  source_template_id: z.string(),
+  source_template_id: z.string().min(1),
 });
 export interface GovernanceRestCloneTemplateSchema extends Named<
   typeof governanceRestCloneTemplateSchemaDefinition
