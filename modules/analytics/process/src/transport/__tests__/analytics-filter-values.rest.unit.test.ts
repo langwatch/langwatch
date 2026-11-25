@@ -101,6 +101,7 @@ async function doors() {
         sqlSingleNode: void 0,
         clickhouseCluster: void 0,
         aggregateMaxMembers: void 0,
+        installMethod: void 0,
       },
       tenantAnalyticsConcurrency: 4,
       publicBaseUrl: "https://app.langwatch.test",
