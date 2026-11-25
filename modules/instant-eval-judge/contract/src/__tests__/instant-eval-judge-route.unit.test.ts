@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   INSTANT_EVAL_JUDGE_DEFAULT_ROUTE_TABLE,
+  INSTANT_EVAL_JUDGE_GATE_QUESTIONS,
   INSTANT_EVAL_JUDGE_JOBS,
   instantEvalJudgeEnabledFallbacksOf,
   instantEvalJudgeEntryBackends,
@@ -151,16 +152,30 @@ describe("judge route table", () => {
     });
 
     /** @scenario "A gate names a hosted classifier backend and an escalation, nothing else" */
+    it("accepts a threshold equal to the question's top level", () => {
+      const gate = { backend: "gate-a", question: "difficulty_v1", easyBelow: 4 };
+      expect(INSTANT_EVAL_JUDGE_GATE_QUESTIONS.difficulty_v1.levelCount).toBe(5);
+      const parsed = instantEvalJudgeRouteTableSchema.parse(gatedTable({ entry: { gate } }));
+      expect(parsed.routes.llm_judge.all?.balanced?.gate?.easyBelow).toBe(4);
+    });
+
+    /** @scenario "A gate names a hosted classifier backend and an escalation, nothing else" */
     it("refuses an unknown gate question, a threshold outside the levels, and a gate with fallbacks", () => {
       const gate = { backend: "gate-a", question: "difficulty_v1", easyBelow: 1.5 };
       for (const bad of [
         { ...gate, question: "difficulty_v0" },
         { ...gate, easyBelow: 0 },
-        { ...gate, easyBelow: 4.1 },
+        { ...gate, easyBelow: 4.0001 },
       ]) {
         const table = gatedTable({ entry: { gate: bad } });
         expect(instantEvalJudgeRouteTableSchema.validate(table)).toBe(false);
       }
+      const aboveTop = instantEvalJudgeRouteTableSchema.safeParse(
+        gatedTable({ entry: { gate: { ...gate, easyBelow: 4.0001 } } }),
+      );
+      expect(JSON.stringify(aboveTop.error?.issues)).toContain(
+        "the gate's easyBelow must be at most difficulty_v1's top level 4",
+      );
       const parsed = instantEvalJudgeRouteTableSchema.safeParse(
         gatedTable({ backends: { "gate-a": { kind: "jev", fallbacks: ["jev"] } } }),
       );

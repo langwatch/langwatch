@@ -5,7 +5,11 @@
  */
 import { createHash } from "node:crypto";
 
-import { toClassifierQuestions } from "@langwatch/instant-eval-judge-contract";
+import {
+  INSTANT_EVAL_JUDGE_GATE_QUESTIONS,
+  type InstantEvalJudgeGateQuestionName,
+  toClassifierQuestions,
+} from "@langwatch/instant-eval-judge-contract";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -89,6 +93,19 @@ describe("instantEvalJudgeGateQuestionOf", () => {
       },
     });
   });
+});
+
+describe("given every gate question the contract names", () => {
+  /** @scenario "A gate names a hosted classifier backend and an escalation, nothing else" */
+  it.each(Object.keys(INSTANT_EVAL_JUDGE_GATE_QUESTIONS) as InstantEvalJudgeGateQuestionName[])(
+    "%s names as many levels as the contract bounds a threshold by",
+    (name) => {
+      const question = instantEvalJudgeGateQuestionOf({ name, id: "q" });
+      const { levelCount } = INSTANT_EVAL_JUDGE_GATE_QUESTIONS[name];
+      expect(question.levels).toHaveLength(levelCount);
+      expect(question.range).toEqual({ min: 0, max: levelCount - 1 });
+    },
+  );
 });
 
 describe("instantEvalJudgeGateBranchOf", () => {

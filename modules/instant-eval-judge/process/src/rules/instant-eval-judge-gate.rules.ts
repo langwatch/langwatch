@@ -5,11 +5,12 @@
  * @see modules/instant-eval-judge/specs/instant-eval-judge-router.feature
  */
 
-import type {
-  InstantEvalJudgeGateQuestionName,
-  InstantEvalJudgeJob,
-  InstantEvalScoreQuestion,
-  InstantEvalVerdict,
+import {
+  INSTANT_EVAL_JUDGE_GATE_QUESTIONS,
+  type InstantEvalJudgeGateQuestionName,
+  type InstantEvalJudgeJob,
+  type InstantEvalScoreQuestion,
+  type InstantEvalVerdict,
 } from "@langwatch/instant-eval-judge-contract";
 
 /** What the judge is deciding, as the gate is told it. */
@@ -42,7 +43,10 @@ const GATE_QUESTIONS: Record<
   },
 };
 
-/** The gate's one score question; its score is a level index, 0 the easiest. */
+/**
+ * The gate's one score question; its score is a level index, 0 the easiest. Its range is the
+ * contract's level count, the same one that bounds a route's threshold.
+ */
 export function instantEvalJudgeGateQuestionOf({
   name,
   id,
@@ -51,7 +55,8 @@ export function instantEvalJudgeGateQuestionOf({
   id: string;
 }): InstantEvalScoreQuestion {
   const { instructions, levels } = GATE_QUESTIONS[name];
-  return { id, kind: "score", instructions, range: { min: 0, max: levels.length - 1 }, levels };
+  const { levelCount } = INSTANT_EVAL_JUDGE_GATE_QUESTIONS[name];
+  return { id, kind: "score", instructions, range: { min: 0, max: levelCount - 1 }, levels };
 }
 
 /**

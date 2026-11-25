@@ -50,7 +50,7 @@ recordSpend(input: InstantEvalJudgeSpendRecord): Promise<void>;
 
 #### `queryHoldPricing`
 
-The rates a judged query's budget hold is priced at: the dearest base input rate a routed call could reach, never below the classifier's. A best-effort hold, not a hard cap: a routed query re-sends text and pays output and long-context rates, so it can spend past it (ADR-190 d7).
+A judged query's budget hold rates: the dearest base input rate a search or LLM-judge route could reach (a scenario-only backend is left out), never below the classifier's. Best-effort, not a hard cap: a routed query re-sends text, pays output and long-context rates (ADR-190 d7).
 
 ```typescript
 queryHoldPricing(): Promise<InstantEvalPricing>;

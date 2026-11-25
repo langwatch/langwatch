@@ -163,6 +163,17 @@ describe("InstantEvalJudgeRouterService, given a gated plan", () => {
       expect(judgement.costNanoUsd).toBe(GATE_COST + DECISIONS_COST);
       expect(judgement.inputTokens).toBe(400 + 1000);
     });
+
+    /** @scenario "A gate sends an easy case to the primary alone and the rest to the escalation alone" */
+    it("counts the gate's limiter wait toward the judgement's, with the primary's", async () => {
+      const { classify } = harness({
+        gate: (request) => ({ ...rated(1)(request), limiterWaitMs: 30 }),
+        decisions: () => ({ ...decided(0.5), limiterWaitMs: 7 }),
+      });
+      const judgement = await classify();
+      expect(judgement.routing?.flags).toEqual(["gate:easy"]);
+      expect(judgement.limiterWaitMs).toBe(30 + 7);
+    });
   });
 
   describe("when the gate rates the case at or above the threshold", () => {
@@ -184,6 +195,18 @@ describe("InstantEvalJudgeRouterService, given a gated plan", () => {
       expect(llmJudge.requests[0]).toMatchObject({ wire: "openai_responses", text: TEXT });
       expect(judgement.costNanoUsd).toBe(GATE_COST + LLM_COST);
       expect(judgement.inputTokens).toBe(400 + 2000);
+    });
+
+    /** @scenario "A gate sends an easy case to the primary alone and the rest to the escalation alone" */
+    it("counts the gate's limiter wait toward the judgement's, with the escalation's", async () => {
+      const { classify } = harness({
+        gate: (request) => ({ ...rated(3)(request), limiterWaitMs: 30 }),
+        llm: () => llmSays(true),
+      });
+      const judgement = await classify();
+      expect(judgement.routing?.flags).toEqual(["gate:hard"]);
+      // An LLM leg reports no limiter wait of its own, so only the gate's counts.
+      expect(judgement.limiterWaitMs).toBe(30 + 0);
     });
 
     /** @scenario "A reasoning effort is sent only when the backend sets one" */

@@ -40,9 +40,18 @@ const KINDS_TAKING_A_REASONING_EFFORT: readonly InstantEvalJudgeBackendKind[] = 
   "openai_responses",
 ];
 
-/** The gate's frozen questions, versioned by name: a threshold keeps its meaning with its name. */
-const INSTANT_EVAL_JUDGE_GATE_QUESTIONS = ["difficulty_v1"] as const;
-export type InstantEvalJudgeGateQuestionName = (typeof INSTANT_EVAL_JUDGE_GATE_QUESTIONS)[number];
+/**
+ * The gate's frozen questions, versioned by name, with how many levels each scores on: a
+ * threshold keeps its meaning with its name.
+ */
+export const INSTANT_EVAL_JUDGE_GATE_QUESTIONS = {
+  difficulty_v1: { levelCount: 5 },
+} as const satisfies Record<string, Readonly<{ levelCount: number }>>;
+export type InstantEvalJudgeGateQuestionName = keyof typeof INSTANT_EVAL_JUDGE_GATE_QUESTIONS;
+const GATE_QUESTION_NAMES = Object.keys(INSTANT_EVAL_JUDGE_GATE_QUESTIONS) as [
+  InstantEvalJudgeGateQuestionName,
+  ...InstantEvalJudgeGateQuestionName[],
+];
 
 /** Where the arithmetic flag comes from: the caller, the question regex, or the caller first. */
 const INSTANT_EVAL_JUDGE_ARITHMETIC_SOURCES = ["request", "regex", "request_then_regex"] as const;
@@ -75,14 +84,14 @@ const backendKindsSchema = z.array(z.enum(INSTANT_EVAL_JUDGE_BACKEND_KINDS)).rea
 
 /**
  * A difficulty gate: before any answer, a hosted classifier backend scores how hard the case is
- * on the named question's levels (0 the easiest). A score under `easyBelow` sends the question to
- * the entry's `primary` alone, anything else (no score included) to its `escalateTo` alone.
+ * on the named question's levels (0 the easiest). A score under `easyBelow` (at most the top
+ * level) sends the question to `primary` alone, anything else (no score too) to `escalateTo`.
  */
 const routeGateSchema = z
   .object({
     backend: z.string().min(1),
-    question: z.enum(INSTANT_EVAL_JUDGE_GATE_QUESTIONS),
-    easyBelow: z.number().gt(0).lte(4),
+    question: z.enum(GATE_QUESTION_NAMES),
+    easyBelow: z.number().gt(0),
   })
   .readonly();
 export type InstantEvalJudgeRouteGate = z.infer<typeof routeGateSchema>;
@@ -376,7 +385,8 @@ function entryIssues({
 
 /**
  * A gate picks between the primary and the escalation, so it needs both and neither a threshold
- * nor a pair; only the hosted classifier answers its question, and it is asked once, no fallback.
+ * nor a pair; only the hosted classifier answers its question, once, no fallback; its threshold
+ * is at most the question's top level.
  */
 function gateIssues({
   table,
@@ -393,6 +403,12 @@ function gateIssues({
   if (!entry.escalateTo) issues.push(`${where}: a gate needs an escalateTo`);
   if (entry.threshold !== undefined || entry.pairWith) {
     issues.push(`${where}: a gate takes no threshold and no pair`);
+  }
+  const topLevel = INSTANT_EVAL_JUDGE_GATE_QUESTIONS[gate.question].levelCount - 1;
+  if (gate.easyBelow > topLevel) {
+    issues.push(
+      `${where}: the gate's easyBelow must be at most ${gate.question}'s top level ${topLevel}`,
+    );
   }
   const backend = table.backends[gate.backend];
   if (backend && backend.kind !== "jev") {
