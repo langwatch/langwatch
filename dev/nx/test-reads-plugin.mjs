@@ -190,6 +190,8 @@ export const reads = {
     "pnpm-lock.yaml",
     "pyproject.toml",
     "uv.lock",
+    ".python-version",
+    "sdks/python/.python-version",
     "tsconfig*.json",
     "pnpm-workspace.yaml",
   ],
