@@ -1573,9 +1573,10 @@ Feature: Dashboards v2 polish and bring-your-own-AI
 
   @integration
   Scenario: From LangWatch: Make a copy, with the organization's Dashboards area off
-    Given "the organization's Dashboards area" is off and a member who may create dashboards
+    Given "the organization's Dashboards area" is off, and a member who may create and edit
     When the member opens a From LangWatch board
     Then its header offers "Make a copy" and no "Add a widget" or "Use this template"
+    And "Make a copy" stays disabled until the saved boards have loaded
     When the member presses "Make a copy"
     Then a board named "<name> (copy)" is made for the project with the template's built widgets
     And it opens, and nothing on the From LangWatch board is changed

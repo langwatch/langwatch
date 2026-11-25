@@ -205,7 +205,9 @@ describe("given a member opens a From LangWatch board", () => {
       expect(screen.queryByRole("button", { name: "Use this template" })).toBeNull();
       expect(screen.queryByRole("button", { name: "Make a copy" })).toBeNull();
       expect(
-        screen.getByText("Members who can create dashboards can make their own copy to edit it."),
+        screen.getByText(
+          "Members who can create and edit dashboards can make their own copy to edit it.",
+        ),
       ).toBeInTheDocument();
       expect(screen.queryByTitle("Edit name")).toBeNull();
       expect(screen.queryByTitle("Edit description")).toBeNull();
@@ -244,6 +246,28 @@ describe("given a member opens a From LangWatch board", () => {
       ]);
       expect(inputsTo(server, "dashboardWidgets.create")).toHaveLength(RELEASE.widgets.length);
       expect(screen.queryByRole("dialog")).toBeNull();
+    });
+
+    it("offers no Make a copy to a member who may create but not update, and says so", async () => {
+      const permissions = MEMBER.filter((permission) => permission !== "analytics:update");
+      openCurated({ templateId: "release", organizationArea: false, permissions });
+
+      expect(await screen.findByRole("heading", { name: "Ready to ship?" })).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Make a copy" })).toBeNull();
+      expect(screen.getByText(/can create and edit dashboards can make/)).toBeInTheDocument();
+    });
+
+    it("keeps Make a copy disabled until the saved boards have loaded", async () => {
+      let load = () => {};
+      const boardsGate = new Promise<void>((resolve) => {
+        load = resolve;
+      });
+      openCurated({ templateId: "release", organizationArea: false, boardsGate });
+
+      const button = await screen.findByRole("button", { name: "Make a copy" });
+      expect(button).toBeDisabled();
+      load();
+      await waitFor(() => expect(button).toBeEnabled());
     });
   });
 

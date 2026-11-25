@@ -69,12 +69,22 @@ function UseTemplateButton({ isCreating, onClick }: { isCreating: boolean; onCli
 }
 
 /** Makes the member's own copy of this board and opens it: the copy path where edits are off. */
-function MakeCopyButton({ isCopying, onClick }: { isCopying: boolean; onClick: () => void }) {
+function MakeCopyButton({
+  isCopying,
+  disabled,
+  onClick,
+}: {
+  isCopying: boolean;
+  /** Until the saved boards load, so the copy's name is numbered past them. */
+  disabled: boolean;
+  onClick: () => void;
+}) {
   return (
     <Button
       size="sm"
       variant="solid"
       colorPalette="accent"
+      disabled={disabled}
       loading={isCopying}
       loadingText="Copying…"
       onClick={onClick}
@@ -130,6 +140,8 @@ function OpenCuratedBoard({
   // Edits to a From LangWatch board belong to the organization area; off, the page is main's.
   const organizationArea = useOrganizationLibraryOpen().isOpen;
   const mayEdit = organizationArea && mayCreate;
+  // A copy is saved and filled, which asks analytics:update in the project in view too.
+  const mayCopy = mayCreate && reader.mayEdit;
   const { createWithWidget } = useBoardFromTemplate({
     atOrganization,
     storeProject: store.storeProject,
@@ -155,10 +167,11 @@ function OpenCuratedBoard({
         />
       </>
     );
-  } else if (mayCreate) {
+  } else if (mayCopy) {
     headerAction = (
       <MakeCopyButton
         isCopying={copy.creatingId === board.templateId}
+        disabled={saved.isLoading}
         onClick={() => void copy.duplicate(board)}
       />
     );
@@ -206,9 +219,9 @@ function OpenCuratedBoard({
       <DashboardRefetchIntervalContext.Provider value={autoRefresh.refetchInterval}>
         <DashboardRefreshedAtContext.Provider value={autoRefresh.refreshedAt}>
           <VStack align="stretch" gap={4}>
-            {!mayCreate && (
+            {!mayEdit && !mayCopy && (
               <Text textStyle="bodySm" color="fg.muted">
-                Members who can create dashboards can make their own copy to edit it.
+                Members who can create and edit dashboards can make their own copy to edit it.
               </Text>
             )}
             <EmptyWidgetsBanner
