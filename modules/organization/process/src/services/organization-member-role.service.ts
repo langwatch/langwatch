@@ -5,10 +5,9 @@
 import { GrantScopeTier, type AuthzGrantCaller } from "@langwatch/authz-contract";
 import {
   TeamRoleUpdateRejectedError,
-  OrganizationUserRole,
+  type OrganizationUserRole,
   type TeamUserRole,
   CannotDisableSelfError,
-  MemberSeatLimitReachedError,
   PersonalWorkspaceNotManagedHereError,
 } from "@langwatch/organization-contract";
 
@@ -16,21 +15,25 @@ import type {
   OrganizationMembershipRepository,
   UpdateMemberRoleResult,
 } from "../repositories/organization-membership.repository.ts";
+import type { SeatLease } from "../repositories/organization-seat.repository.ts";
 import { isCustomRole } from "../rules/custom-role-naming.rules.ts";
-import { ORGANIZATION_TO_TEAM_ROLE_MAP } from "../rules/member-role-constraints.rules.ts";
+import {
+  customRoleIdsOf,
+  customRolePermissionsOf,
+} from "../rules/custom-role-permissions.rules.ts";
 import type { TeamRoleValue } from "../rules/member-role-constraints.rules.ts";
+import { intendedRoleChangeGrants, intendedTeamGrant } from "../rules/role-change-grants.rules.ts";
 import {
   EffectiveTeamRoleUpdatesService,
   type EffectiveTeamRoleUpdate,
 } from "./compute-effective-team-role-updates.service.ts";
-import type {
-  OrganizationGrantCeilingService,
-  OrganizationIntendedGrant,
-} from "./organization-grant-ceiling.service.ts";
+import type { OrganizationGrantCeilingService } from "./organization-grant-ceiling.service.ts";
+import type { OrganizationMemberSeatService } from "./organization-member-seat.service.ts";
 import type {
   OrganizationSeatLicense,
   OrganizationPlanUser,
 } from "./organization-seat-license.service.ts";
+import type { SeatHoldService } from "./seat-hold.service.ts";
 
 /**
  * Records a seat taken away or given back. User ends the person's browser sessions from the
@@ -41,12 +44,28 @@ export interface OrganizationSeatRevocationNotice {
     organizationId: string;
     userId: string;
     disabledByUserId: string | null;
+    heldFullSeat?: boolean;
   }): Promise<void>;
   memberEnabled(input: {
     organizationId: string;
     userId: string;
     enabledByUserId: string | null;
   }): Promise<void>;
+  /** Fire-and-forget: the role is already committed, so a failed record must not fail it. */
+  memberRoleChanged(input: {
+    organizationId: string;
+    userId: string;
+    role: string;
+    previousRole: string;
+    changedByUserId: string | null;
+  }): void;
+  /** Fire-and-forget: the membership is already committed, so a failed record must not fail it. */
+  memberAdmitted(input: {
+    organizationId: string;
+    userId: string;
+    role: string;
+    via: string;
+  }): void;
 }
 
 /**
@@ -71,29 +90,15 @@ async function findCustomRolePermissionGrants({
   organizationId: string;
   currentTeamBindings: { customRoleId: string | null }[];
 }): Promise<string[]> {
-  const customRoleIds = currentTeamBindings
-    .map((binding) => binding.customRoleId)
-    .filter((id): id is string => !!id);
+  const customRoleIds = customRoleIdsOf({ bindings: currentTeamBindings });
   if (customRoleIds.length === 0) {
     return [];
   }
-
   const permissionsPerRole = await repository.findCustomRolePermissions({
     organizationId,
     customRoleIds,
   });
-  const allPermissions: string[] = [];
-  for (const permissions of permissionsPerRole) {
-    // `permissions` is a Json column, so the row decides the shape, not the
-    // type: read it defensively the way every other permission reader does.
-    if (Array.isArray(permissions)) {
-      allPermissions.push(
-        ...permissions.filter((permission): permission is string => typeof permission === "string"),
-      );
-    }
-  }
-
-  return allPermissions;
+  return customRolePermissionsOf({ permissionsPerRole });
 }
 
 type OrganizationMemberRoleDependencies = {
@@ -102,6 +107,10 @@ type OrganizationMemberRoleDependencies = {
   seatNotices: OrganizationSeatRevocationNotice;
   grantCache: OrganizationGrantCache;
   ceiling: Pick<OrganizationGrantCeilingService, "assertWithinCaller">;
+  /** The 30-day seat hold a disable writes (seat-rotation.feature). */
+  seatHolds: SeatHoldService;
+  /** The seat an enable or a role change takes or leaves. */
+  memberSeats: OrganizationMemberSeatService;
 };
 
 export class OrganizationMemberRoleService {
@@ -130,30 +139,35 @@ export class OrganizationMemberRoleService {
 
     await this.repo.getMembership({ organizationId, userId });
 
-    if (!disabled) {
-      const result = await this.dependencies.seats.checkLimit({
-        organizationId,
-        resource: "members",
-        user: actingUser ?? undefined,
-      });
-      if (!result.allowed) {
-        throw new MemberSeatLimitReachedError({
-          meta: { limitType: result.limitType, current: result.current, max: result.max },
-        });
-      }
-    }
-
-    await this.repo.setMemberDisabled({ organizationId, userId, disabled });
-
     if (disabled) {
+      const heldFullSeat = await this.dependencies.seats.holdsFullSeat({ organizationId, userId });
+      const seat = await this.dependencies.seatHolds.releaseOf({
+        organizationId,
+        userId,
+        reason: "DISABLED",
+      });
+      const actorUserId = actingUser?.id ?? null;
+      await this.repo.setMemberDisabled({ organizationId, userId, disabled, seat, actorUserId });
       // The seat is gone and the authz snapshot retired below, so the next request is refused
       // now; user ends the live browser sessions from this fact (§9, R7).
       await this.dependencies.seatNotices.memberDisabled({
         organizationId,
         userId,
         disabledByUserId: actingUser?.id ?? null,
+        heldFullSeat,
       });
     } else {
+      const admitted = await this.dependencies.seats.withSeat({
+        organizationId,
+        work: (lease) =>
+          this.dependencies.memberSeats.enableUnderSeatLease({
+            organizationId,
+            userId,
+            actingUser,
+            lease,
+          }),
+      });
+      if (admitted) return;
       // M8487-MEMBER-ENABLED: governance puts the person's personal project back in aggregates.
       await this.dependencies.seatNotices.memberEnabled({
         organizationId,
@@ -162,11 +176,8 @@ export class OrganizationMemberRoleService {
       });
     }
 
-    // Disabling is a plain column write, not a grant write, so nothing else
-    // retires the authorization snapshots cached for this organization. An
-    // admin who has just revoked someone's access must not have to wait for a
-    // cache to age out before it is true, and re-enabling must not leave the
-    // person locked out for the same window.
+    // A plain column write retires no cached authorization snapshot, so drop them here: a
+    // revoke takes effect now, and a re-enable does not lock the person out meanwhile.
     await this.dependencies.grantCache.invalidateOrganization({ organizationId });
   }
 
@@ -274,28 +285,61 @@ export class OrganizationMemberRoleService {
       grants: intendedRoleChangeGrants({ organizationId, role, effectiveTeamRoleUpdates }),
     });
 
-    await this.dependencies.seats.assertRoleChangeAllowed({
+    const result = await this.dependencies.seats.withSeat({
       organizationId,
-      currentRole: currentMember.role,
-      userPermissions,
-      role,
-      user: params.planUser,
+      work: (lease) =>
+        this.writeRoleChange({
+          change: { organizationId, userId, role, effectiveTeamRoleUpdates, currentUserId, caller },
+          currentMember,
+          oldPermissions: userPermissions,
+          planUser: params.planUser,
+          lease,
+        }),
     });
+    if (role !== currentMember.role) {
+      this.dependencies.seatNotices.memberRoleChanged({
+        organizationId,
+        userId,
+        role,
+        previousRole: currentMember.role,
+        changedByUserId: currentUserId,
+      });
+    }
+    return result;
+  }
 
-    return this.repo.updateMemberRole({
+  /** The role change's seat and its write, under the seat lease the caller holds. */
+  private async writeRoleChange({
+    change,
+    currentMember,
+    oldPermissions,
+    planUser,
+    lease,
+  }: {
+    change: Parameters<OrganizationMembershipRepository["updateMemberRole"]>[0];
+    currentMember: { role: OrganizationUserRole; disabledAt: unknown; billingOnly?: boolean };
+    oldPermissions: string[] | undefined;
+    planUser: OrganizationPlanUser | undefined;
+    lease: SeatLease;
+  }): Promise<UpdateMemberRoleResult> {
+    const { organizationId, userId, role } = change;
+    const seat = await this.dependencies.memberSeats.seatOnRoleChange({
       organizationId,
       userId,
+      active: currentMember.disabledAt === null,
+      oldRole: currentMember.role,
+      oldPermissions,
+      oldBillingOnly: currentMember.billingOnly ?? false,
       role,
-      effectiveTeamRoleUpdates,
-      currentUserId,
-      caller,
+      planUser,
     });
+    await lease.assertHeld();
+    return this.repo.updateMemberRole({ ...change, seat });
   }
 
   /**
-   * Updates a member's organization role and cascades effective team role
-   * changes. Computes effective team role updates from the requested updates and
-   * current memberships.
+   * Updates a member's organization role and cascades the effective team role changes,
+   * computed from the requested updates and the current memberships.
    */
   async updateMemberRole(params: {
     organizationId: string;
@@ -419,59 +463,4 @@ export class OrganizationMemberRoleService {
       });
     }
   }
-
-  /**
-   * Returns paginated, enriched audit log entries for an organization.
-   */
-}
-
-/** The grants a member-role change writes: the organization role (none if EXTERNAL), then teams. */
-function intendedRoleChangeGrants({
-  organizationId,
-  role,
-  effectiveTeamRoleUpdates,
-}: {
-  organizationId: string;
-  role: OrganizationUserRole;
-  effectiveTeamRoleUpdates: EffectiveTeamRoleUpdate[];
-}): OrganizationIntendedGrant[] {
-  return [
-    ...(role === OrganizationUserRole.EXTERNAL
-      ? []
-      : [
-          {
-            role: ORGANIZATION_TO_TEAM_ROLE_MAP[role],
-            scopeType: GrantScopeTier.ORGANIZATION,
-            scopeId: organizationId,
-          },
-        ]),
-    ...effectiveTeamRoleUpdates.map((update) =>
-      intendedTeamGrant({
-        teamId: update.teamId,
-        role: update.role,
-        customRoleId: update.customRoleId,
-      }),
-    ),
-  ];
-}
-
-/** The team grant a requested role resolves to: a built-in role, or `custom:<id>` with its id. */
-function intendedTeamGrant({
-  teamId,
-  role,
-  customRoleId,
-}: {
-  teamId: string;
-  role: string;
-  customRoleId?: string;
-}): OrganizationIntendedGrant {
-  if (role === "ADMIN" || role === "MEMBER" || role === "VIEWER") {
-    return { role, scopeType: GrantScopeTier.TEAM, scopeId: teamId };
-  }
-  return {
-    role: "CUSTOM",
-    customRoleId: customRoleId ?? null,
-    scopeType: GrantScopeTier.TEAM,
-    scopeId: teamId,
-  };
 }

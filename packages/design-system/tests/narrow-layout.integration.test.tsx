@@ -104,7 +104,7 @@ describe("narrow layouts", () => {
     const sheet = document.querySelector<HTMLElement>("[data-part='content']");
     if (!sheet) throw new Error("drawer content panel not found");
     const style = getComputedStyle(sheet);
-    expect(style.marginLeft).toBe("0px");
+    expect(style.marginInlineStart).toBe("0px");
     expect(style.borderRadius).toBe("0px");
   });
 });

@@ -54,7 +54,7 @@ const codeOf = (call: Promise<unknown>) =>
 
 describe("BoardService", () => {
   describe("given a member creates a board", () => {
-    /** @scenario "AC156 No board is starred unless the member stars it" */
+    /** @scenario "AC156 No board is pinned unless the member pins it" */
     it("stars it for nobody, the creator included", async () => {
       const { service, stars } = serviceWith();
 
@@ -78,7 +78,7 @@ describe("BoardService", () => {
     const myDashboard = (service: BoardService) =>
       service.createBoard({ projectId: PROJECT, name: MY_DASHBOARD_NAME, createdById: "member-1" });
 
-    /** @scenario "AC160b A member with no My dashboard gets one made, starred for them" */
+    /** @scenario "AC160b A member with no My dashboard gets one made, pinned for them" */
     it("stars it for its maker and for nobody else", async () => {
       const { service, stars } = serviceWith();
 
@@ -93,7 +93,7 @@ describe("BoardService", () => {
       }).toEqual({ maker: [created.id], other: [], listed: [true] });
     });
 
-    /** @scenario "AC160c A member who unstars My dashboard keeps it unstarred" */
+    /** @scenario "AC160c A member who unpins My dashboard keeps it unpinned" */
     it("keeps it unstarred once its maker unstars it", async () => {
       const { service, stars } = serviceWith();
       const created = await myDashboard(service);
@@ -114,7 +114,7 @@ describe("BoardService", () => {
   });
 
   describe("given one member's stars", () => {
-    /** @scenario "AC157 Stars are per member" */
+    /** @scenario "AC157 Pins are per member" */
     it("does not show them to another member", async () => {
       const { service, stars } = serviceWith();
       const created = await service.createBoard({ projectId: PROJECT, name: "Reports" });
@@ -144,7 +144,7 @@ describe("BoardService", () => {
       await expect(listed(stars, "a")).resolves.toEqual([first.id, third.id, second.id]);
     });
 
-    /** @scenario "AC165 A star can point at a From LangWatch board" */
+    /** @scenario "AC165 A pin can point at a From LangWatch board" */
     it("round-trips a template star without checking it against a list", async () => {
       const { stars } = serviceWith();
 
@@ -154,7 +154,7 @@ describe("BoardService", () => {
       await expect(listed(stars, "a")).resolves.toEqual(["template:llm-costs"]);
     });
 
-    /** @scenario "AC165 A star can point at a From LangWatch board" */
+    /** @scenario "AC165 A pin can point at a From LangWatch board" */
     it("lists boards and templates in the order they were starred", async () => {
       const { service, stars } = serviceWith();
       const created = await service.createBoard({ projectId: PROJECT, name: "One" });
@@ -165,7 +165,7 @@ describe("BoardService", () => {
       await expect(listed(stars, "a")).resolves.toEqual(["template:t1", created.id]);
     });
 
-    /** @scenario "AC155 Move up and Move down reorder the member's stars" */
+    /** @scenario "AC155 Move up and Move down reorder the member's pins" */
     it("unstars a board or a template and reorders both kinds", async () => {
       const { service, stars } = serviceWith();
       const a = await service.createBoard({ projectId: PROJECT, name: "A" });
@@ -188,7 +188,7 @@ describe("BoardService", () => {
       await expect(listed(stars, "u")).resolves.toEqual([a.id]);
     });
 
-    /** @scenario "AC26 Deleting a board removes it from every member's stars" */
+    /** @scenario "AC26 Deleting a board removes it from every member's pins" */
     it("removes the board from every member's stars when it is deleted", async () => {
       const { service, stars } = serviceWith();
       const created = await service.createBoard({ projectId: PROJECT, name: "Shared" });

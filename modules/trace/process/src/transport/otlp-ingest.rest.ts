@@ -16,6 +16,8 @@ import {
   decodeBase64OpenTelemetryId,
   ingestDoorRefusalBody,
   ingestDoorRefusalStatus,
+  recordIngestDoorRefusal,
+  withClientFaultSpan,
   isIngestDoorRefusal,
   logCorrectedOtlpPath,
   OTLP_CORRECTED_PATH_HEADER,
@@ -27,7 +29,11 @@ import {
   readOtlpBody,
   OTLP_REFUSED_MEDIA_TYPES,
 } from "@langwatch/otlp";
-import { otlpIngestCredentialSchema, type OtlpIngestCredential } from "@langwatch/otlp/door";
+import {
+  otlpIngestCredentialSchema,
+  otlpIngestKeyOf,
+  type OtlpIngestCredential,
+} from "@langwatch/otlp/door";
 import { resolveRequestBound } from "@langwatch/plans";
 import { TraceApi, type TraceOtlpIngestApi } from "@langwatch/trace-contract";
 import { SpanKind, type Span } from "@opentelemetry/api";
@@ -66,16 +72,16 @@ export const otlpIngestDoor = defineRestDoor("otlp_ingest", {
       const { apiKeyId } = resolution.identity;
       const actor = apiKeyId ? { type: "api_key" as const, id: apiKeyId } : null;
 
-      return { actor, scope: { tier: "project", id: resolution.project.id }, session: resolution };
+      return {
+        actor,
+        scope: { tier: "project", id: resolution.project.id },
+        session: resolution,
+        key: otlpIngestKeyOf(resolution.identity),
+      };
     } catch (error) {
       if (!isIngestDoorRefusal(error)) throw error;
 
-      loggerTraces.warn(
-        { ...diagnostics, refusalStatus: ingestDoorRefusalStatus(error) },
-        diagnostics.hasEmptyAuthToken
-          ? "Authentication failed: X-Auth-Token sent but empty"
-          : "Authentication failed",
-      );
+      recordIngestDoorRefusal({ logger: loggerTraces, signal: "traces", error, diagnostics });
       throw error;
     }
   },
@@ -143,12 +149,18 @@ type OtlpAnswer = Readonly<{
   status: ContentfulStatusCode;
   mediaType: typeof PRODUCES_JSON;
   body: string;
+  headers?: Readonly<Record<string, string>>;
 }>;
 
-const jsonAnswer = (body: unknown, status: ContentfulStatusCode): OtlpAnswer => ({
+const jsonAnswer = (
+  body: unknown,
+  status: ContentfulStatusCode,
+  headers?: Readonly<Record<string, string>>,
+): OtlpAnswer => ({
   status,
   mediaType: PRODUCES_JSON,
   body: JSON.stringify(body),
+  ...(headers ? { headers } : {}),
 });
 
 /** The door's credential refusals and the plan limit, each in the receiver's own body. */
@@ -243,7 +255,7 @@ async function handleTracesRequest({
       result: { outcome: "unavailable", errorMessage: result.ingestionFailureMessage ?? "" },
       signal: "traces",
     });
-    return jsonAnswer(failure.body, failure.status);
+    return jsonAnswer(failure.body, failure.status, failure.headers);
   }
 
   return jsonAnswer(
@@ -284,9 +296,13 @@ export const otlpIngestRest = defineRestRouter(TraceApi)
   .withDocs({ hide: true })
   .handle(async ({ app, raw, request, response, session }) =>
     response.write(
-      await getLangWatchTracer("langwatch.otel.traces").withActiveSpan(
-        "TracesV1.handleTracesRequest",
-        { kind: SpanKind.SERVER },
+      await withClientFaultSpan<Span, OtlpAnswer>(
+        (run) =>
+          getLangWatchTracer("langwatch.otel.traces").startActiveSpan(
+            "TracesV1.handleTracesRequest",
+            { kind: SpanKind.SERVER },
+            run,
+          ),
         (span) =>
           handleTracesRequest({ request, span, rawBytes: raw, ports: app, credential: session }),
       ),

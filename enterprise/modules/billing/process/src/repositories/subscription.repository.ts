@@ -10,8 +10,21 @@ export type BillingSubscriptionRecord = {
   endDate: Instant | null;
   maxMembers: number | null;
   maxMembersLite: number | null;
+  maxMembersDeveloper: number | null;
   maxMessagesPerMonth: number | null;
   lastPaymentFailedDate: Instant | null;
+  /** Seats a decrease leaves usable until `seatsKeptUntil`, the end of the period paid for. */
+  seatsKept: number | null;
+  seatsKeptUntil: Instant | null;
+  /** The retention the checkout was bought with; absent when it offered no choice. */
+  maxRetentionDays?: number | null;
+  /** An open failed payment recovery case: its invoice, day 0, and the last notice sent. */
+  paymentRecoveryInvoiceId?: string | null;
+  paymentRecoveryStartedAt?: Instant | null;
+  paymentRecoveryNoticeDay?: number | null;
+  /** The over-plan mark: open while `overPlanSince` is set and `overPlanEndedAt` is not. */
+  overPlanSince?: Instant | null;
+  overPlanEndedAt?: Instant | null;
 };
 
 type BillingOrganizationRecord = {
@@ -54,6 +67,8 @@ export abstract class BillingSubscriptionRepository {
   abstract updateQuantities(input: {
     id: string;
     maxMembers: number | null;
+    /** Undefined leaves the stored cap alone: only a seat-priced subscription states it. */
+    maxMembersDeveloper?: number;
     maxMessagesPerMonth: number | null;
   }): Promise<BillingSubscriptionWithOrganization>;
 }

@@ -97,8 +97,11 @@ class EvaluatorStats:
     name: str
     passed: int
     failed: int
+    # 0 when the evaluator gave no verdict; check passed + failed before showing it.
     pass_rate: float
     avg_score: Optional[float] = None
+    # Cells where the evaluator crashed and gave no verdict; 0 on older servers.
+    errored: int = 0
 
 
 @dataclass
@@ -117,6 +120,9 @@ class ExperimentRunSummary:
     total_failed: int = 0
     pass_rate: float = 0.0
     total_cost: float = 0.0
+    # False when the server sent no evaluator results (an older server); the opt-in
+    # gate then fails rather than read silence as success.
+    evaluators_reported: bool = True
 
 
 @dataclass(repr=False)
@@ -217,7 +223,11 @@ class ExperimentRunResult:
 
         return pd.DataFrame()
 
-    def print_summary(self, exit_on_failure: Optional[bool] = None) -> None:
+    def print_summary(
+        self,
+        exit_on_failure: Optional[bool] = None,
+        fail_on_evaluator_failures: bool = False,
+    ) -> None:
         """
         Print a CI-friendly summary and optionally exit with code 1 on failure.
 
@@ -225,14 +235,33 @@ class ExperimentRunResult:
             exit_on_failure: If True, calls sys.exit(1) when there are failures.
                            If False, never exits.
                            If None (default), auto-detects: exits in scripts/CI, doesn't exit in notebooks.
+            fail_on_evaluator_failures: If True, also exit 1 when an evaluator returned a
+                           failing verdict or errored instead of judging, or when the server
+                           sent no evaluator results. Off by default, so existing CI keeps
+                           its exit code.
         """
         _print_summary(self)
 
         # Auto-detect: don't exit in notebooks, exit in scripts/CI
         should_exit = exit_on_failure if exit_on_failure is not None else not _is_notebook()
 
-        if should_exit and self.failed > 0:
+        tallies_missing = fail_on_evaluator_failures and not self.summary.evaluators_reported
+        if tallies_missing:
+            print(_MISSING_TALLIES_MESSAGE, file=sys.stderr)
+        evaluations_failed = tallies_missing or (
+            fail_on_evaluator_failures and self.failed_evaluations > 0
+        )
+        if should_exit and (self.failed > 0 or evaluations_failed):
             sys.exit(1)
+
+    @property
+    def failed_evaluations(self) -> int:
+        """Failed plus errored evaluations across the run, from the per-evaluator tallies.
+
+        A crashed evaluator checked nothing, so it counts against the opt-in gate: an
+        evaluator that errors on every row must not leave CI green.
+        """
+        return sum(e.failed + e.errored for e in self.summary.evaluators)
 
     def __repr__(self) -> str:
         status_icon = {"completed": "OK", "failed": "FAIL", "stopped": "STOPPED"}.get(
@@ -267,6 +296,7 @@ class ExperimentRunResult:
                 "pass_rate": e.pass_rate,
                 "passed": e.passed,
                 "failed": e.failed,
+                "errored": e.errored,
                 "avg_score": e.avg_score,
             })
 
@@ -303,8 +333,10 @@ def run(
     *,
     data: Optional[Union[List[dict], "pd.DataFrame"]] = None,
     dataset_id: Optional[str] = None,
+    dataset_version: Optional[int] = None,
     parameters: Optional[Dict[str, Any]] = None,
     row_indices: Optional[List[int]] = None,
+    concurrency: Optional[int] = None,
     poll_interval: float = 2.0,
     timeout: float = 600.0,
     on_progress: Optional[Callable[[int, int], None]] = None,
@@ -323,8 +355,16 @@ def run(
             Mutually exclusive with ``dataset_id``.
         dataset_id: Optional id of a platform dataset to evaluate. Mutually
             exclusive with ``data``.
+        dataset_version: Optional version number of the saved dataset to run.
+            Overrides the version the experiment pins; without either, the run
+            saves the dataset's current content as a version and reads that.
+            Cannot be combined with ``data``.
         parameters: Optional constants applied to every row (e.g. ``{"model": ...}``).
         row_indices: Optional subset of row indices to evaluate.
+        concurrency: Optional number of cells (one row against one target) to
+            run at once (1 to 24), for this run only; the experiment's saved
+            setting is untouched. Defaults to the server's setting. Use ``1`` to
+            run them one at a time, in order.
         poll_interval: Seconds between status checks (default: 2.0)
         timeout: Maximum seconds to wait for completion (default: 600.0 = 10 minutes)
         on_progress: Optional callback for progress updates (completed, total)
@@ -336,7 +376,9 @@ def run(
         for a per-row pandas DataFrame.
 
     Raises:
-        ValueError: If both ``data`` and ``dataset_id`` are provided
+        ValueError: If both ``data`` and ``dataset_id`` are provided, if
+            ``dataset_version`` is combined with ``data``, or is not a whole
+            number from 1
         ExperimentNotFoundError: If the experiment slug doesn't exist
         ExperimentTimeoutError: If the experiment doesn't complete within timeout
         ExperimentRunFailedError: If the experiment fails
@@ -355,6 +397,17 @@ def run(
         raise ValueError(
             "Pass either `data` or `dataset_id`, not both — they are mutually exclusive."
         )
+    if dataset_version is not None:
+        if data is not None:
+            raise ValueError(
+                "`dataset_version` names a version of a saved dataset; it cannot go with `data`."
+            )
+        if (
+            isinstance(dataset_version, bool)
+            or not isinstance(dataset_version, int)
+            or dataset_version < 1
+        ):
+            raise ValueError("`dataset_version` must be a whole number from 1.")
 
     langwatch.ensure_setup()
 
@@ -369,8 +422,10 @@ def run(
     body = _build_run_body(
         data=data,
         dataset_id=dataset_id,
+        dataset_version=dataset_version,
         parameters=parameters,
         row_indices=row_indices,
+        concurrency=concurrency,
     )
 
     # Start the run
@@ -403,8 +458,10 @@ def _build_run_body(
     *,
     data: Optional[Union[List[dict], "pd.DataFrame"]] = None,
     dataset_id: Optional[str] = None,
+    dataset_version: Optional[int] = None,
     parameters: Optional[Dict[str, Any]] = None,
     row_indices: Optional[List[int]] = None,
+    concurrency: Optional[int] = None,
 ) -> Dict[str, Any]:
     """Assemble the JSON body for a run request, including only provided keys."""
     body: Dict[str, Any] = {}
@@ -415,10 +472,14 @@ def _build_run_body(
             body["data"] = data
     if dataset_id is not None:
         body["dataset_id"] = dataset_id
+    if dataset_version is not None:
+        body["dataset_version"] = dataset_version
     if parameters is not None:
         body["parameters"] = parameters
     if row_indices is not None:
         body["row_indices"] = row_indices
+    if concurrency is not None:
+        body["concurrency"] = concurrency
     return body
 
 
@@ -594,6 +655,7 @@ def _build_result(
                 failed=e.get("failed", 0),
                 pass_rate=e.get("passRate", 0),
                 avg_score=e.get("avgScore"),
+                errored=e.get("errored", 0),
             )
         )
 
@@ -610,6 +672,7 @@ def _build_result(
         total_failed=total_failed,
         pass_rate=pass_rate,
         total_cost=summary_data.get("totalCost", 0),
+        evaluators_reported="evaluators" in summary_data,
     )
 
     return ExperimentRunResult(
@@ -624,6 +687,12 @@ def _build_result(
         experiment_slug=experiment_slug,
         api_key=api_key,
     )
+
+
+_MISSING_TALLIES_MESSAGE = (
+    "No evaluator results in the run summary, so evaluator failures cannot be checked. "
+    "Update the LangWatch server, or drop the evaluator failure gate."
+)
 
 
 def _print_summary(result: ExperimentRunResult) -> None:
@@ -657,7 +726,13 @@ def _print_summary(result: ExperimentRunResult) -> None:
         print("─" * 60)
         print("  EVALUATORS:")
         for evaluator in summary.evaluators:
-            print(f"    {evaluator.name}: {evaluator.pass_rate:.1f}% pass rate")
+            # A pass rate over no verdicts would read as "all failed"; say what happened.
+            if evaluator.passed + evaluator.failed > 0:
+                print(f"    {evaluator.name}: {evaluator.pass_rate:.1f}% pass rate")
+            else:
+                print(f"    {evaluator.name}: no verdicts")
+            if evaluator.errored:
+                print(f"      Errored: {evaluator.errored}")
             if evaluator.avg_score is not None:
                 print(f"      Avg score: {evaluator.avg_score:.2f}")
 

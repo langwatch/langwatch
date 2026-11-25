@@ -1,6 +1,7 @@
 from typing import Any, Optional
 from fastapi import FastAPI
 from pydantic import BaseModel
+from langevals_topic_clustering.usage import with_usage
 from langevals_topic_clustering.build_response import build_response
 from langevals_topic_clustering.topic_naming import (
     generate_topic_and_subtopic_names,
@@ -94,6 +95,7 @@ class BatchClusteringParams(BaseModel):
 
 def setup_endpoints(app: FastAPI):
     @app.post("/topics/batch_clustering")
+    @with_usage
     def topics_batch_clustering(
         params: BatchClusteringParams,
     ) -> TopicClusteringResponse:

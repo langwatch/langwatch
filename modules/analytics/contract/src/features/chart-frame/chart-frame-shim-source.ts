@@ -25,6 +25,10 @@ export function buildShimScript(): string {
   var buffered = [];
   var nextRequestId = 1;
   var pending = {};
+  // Keyed by our own ids, not timer handles: a handle need not be a valid key.
+  var nextRetryWaitId = 1;
+  var retryWaits = {};
+  var authorMounted = false;
   var dashboardContextCallbacks = [];
   var resolveReady;
   var ready = new Promise(function (resolve) { resolveReady = resolve; });
@@ -40,6 +44,12 @@ export function buildShimScript(): string {
     });
   }
 
+  // Only the frame knows a query waits behind a retry timer or code not yet loaded.
+  function isIdle() {
+    return authorMounted && Object.keys(pending).length === 0 && Object.keys(retryWaits).length === 0;
+  }
+
+  var lastProblem = null;
   function post(message) {
     if (port) { port.postMessage(message); } else { buffered.push(message); }
   }
@@ -116,6 +126,19 @@ export function buildShimScript(): string {
     // frameBridge.ts's "lw:navigate" case and useDashboardWidgetChartNavigate.
     navigate: function (target, params) {
       post({ type: "lw:navigate", target: String(target), params: params || {} });
+    },
+    // Fire-and-forget: the host drafts Langy about a clicked mark. It drops the ask
+    // unless LW.dashboardContext.canAskLangy, and checks the subject itself.
+    askLangy: function (subject) {
+      post({ type: "lw:ask-langy", subject: subject || {} });
+    },
+    // Called on every render with what the widget draws; posted only when it changes, so the
+    // host hears each state once. The host checks the shape itself.
+    signal: function (state) {
+      var problem = !!(state && state.problem === true);
+      if (problem === lastProblem) return;
+      lastProblem = problem;
+      post({ type: "lw:signal", signal: { problem: problem } });
     }
   };
   window.LW = LW;
@@ -211,8 +234,18 @@ export function buildShimScript(): string {
             random: Math.random
           });
         },
-        setTimer: function (callback, delayMs) { return setTimeout(callback, delayMs); },
-        clearTimer: function (timer) { clearTimeout(timer); }
+        setTimer: function (callback, delayMs) {
+          var id = nextRetryWaitId++;
+          retryWaits[id] = setTimeout(function () {
+            delete retryWaits[id];
+            callback();
+          }, delayMs);
+          return id;
+        },
+        clearTimer: function (id) {
+          clearTimeout(retryWaits[id]);
+          delete retryWaits[id];
+        }
       });
 
       runRef.current = runner.run;
@@ -324,6 +357,9 @@ export function buildShimScript(): string {
   // before this script runs; whatever runtime it wires up (today: the
   // author-runtime that compiles and mounts a React file) is what actually
   // runs the author's code.
+  // The author runtime calls this once the widget's first effects ran, so its first queries are open.
+  window.__lwAuthorMounted = function () { authorMounted = true; };
+
   function activateAuthor() {
     if (typeof window.__lwActivateAuthor === "function") {
       try {
@@ -355,7 +391,7 @@ export function buildShimScript(): string {
     buffered.forEach(function (message) { port.postMessage(message); });
     buffered = [];
     setInterval(function () {
-      port.postMessage({ type: "lw:heartbeat" });
+      port.postMessage({ type: "lw:heartbeat", idle: isIdle() });
     }, ${CHART_FRAME_HEARTBEAT_INTERVAL_MS});
     resolveReady();
     activateAuthor();

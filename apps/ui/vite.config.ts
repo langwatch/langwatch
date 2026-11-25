@@ -8,6 +8,7 @@ import { defineConfig, type Plugin, type UserConfig } from "vite";
 
 import { UI_ASSET_URL_GLOBAL } from "./vite/asset-base";
 import { bootSplash } from "./vite/boot-splash";
+import { bootTags } from "./vite/boot-tags";
 import { chunkImportRetry } from "./vite/chunk-import-retry";
 import { designSystemStorybook } from "./vite/design-system-storybook";
 import { createDevLogger } from "./vite/dev-logging";
@@ -288,6 +289,8 @@ export default defineConfig(async ({ command }): Promise<UserConfig> => {
       patchObjectInspectBrowserStub(),
       // The loading screen as plain HTML: before the bundle runs, and on Vite's bundling page.
       bootSplash(),
+      // Marks the built page's own files, the only ones the boot recovery reloads for.
+      bootTags(),
       // The api renders the page's public config; the dev server lifts it from the api's shell.
       ...(command === "serve" ? [injectDevelopmentPublicConfig({ apiUrl: API_TARGET })] : []),
       havenHmrGate(),
@@ -437,6 +440,13 @@ export default defineConfig(async ({ command }): Promise<UserConfig> => {
           changeOrigin: true,
           secure: false,
         },
+        // The docs session frame, served by the API process like the chart frame
+        // (ADR-185): without this entry the docs playground frames the SPA shell.
+        "^/connect/docs/frame(?:\\?.*)?$": {
+          target: API_TARGET,
+          changeOrigin: true,
+          secure: false,
+        },
         // Exact /mcp match (not prefix) to avoid swallowing /mcp/authorize; include query handling.
         "^/mcp(?:\\?.*)?$": {
           target: API_TARGET,
@@ -444,6 +454,12 @@ export default defineConfig(async ({ command }): Promise<UserConfig> => {
           secure: false,
         },
         "^/mcp/health(?:\\?.*)?$": {
+          target: API_TARGET,
+          changeOrigin: true,
+          secure: false,
+        },
+        // The docs-only MCP endpoint, which takes no credential.
+        "^/mcp/docs(?:\\?.*)?$": {
           target: API_TARGET,
           changeOrigin: true,
           secure: false,

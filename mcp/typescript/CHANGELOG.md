@@ -1,5 +1,64 @@
 # Changelog
 
+## [3.2.1](https://github.com/langwatch/langwatch/compare/mcp-server@v3.2.0...mcp-server@v3.2.1) (2026-11-22)
+
+
+### Bug Fixes
+
+* **mcp:** platform_update_prompt keeps the prompt's parameters ([#9776](https://github.com/langwatch/langwatch/issues/9776)) ([99e82c5](https://github.com/langwatch/langwatch/commit/99e82c56dbbb20829141150b94cdd4361977512c))
+
+## [3.2.0](https://github.com/langwatch/langwatch/compare/mcp-server@v3.1.0...mcp-server@v3.2.0) (2026-11-21)
+
+
+### Features
+
+* agent and evaluator versioning with deploy labels, plus experiment and dependency fixes ([#9124](https://github.com/langwatch/langwatch/issues/9124)) ([ec774cb](https://github.com/langwatch/langwatch/commit/ec774cb12756a472d7260f6ed5e2292e324906cd))
+* **experiments:** show the agent version a label resolved to and the concurrency each run used ([#9449](https://github.com/langwatch/langwatch/issues/9449)) ([cbabd19](https://github.com/langwatch/langwatch/commit/cbabd1909c3a20e3cd8ad25c8817294d3d990f9f))
+* **hosted-mcp:** anonymous docs-only MCP at /mcp/docs ([#9486](https://github.com/langwatch/langwatch/issues/9486)) ([73e7163](https://github.com/langwatch/langwatch/commit/73e7163c36fca148b1cadf9385b284812a398a30))
+* **scenario:** red team scenario kind, suite templates and the OWASP LLM Top 10 2025 pack (phase 1) ([#9640](https://github.com/langwatch/langwatch/issues/9640)) ([52abff0](https://github.com/langwatch/langwatch/commit/52abff019b506f987e3acd481a8585fff7909c4e))
+
+
+### Bug Fixes
+
+* **analytics:** read the stock trace widgets from trace_metrics ([#9439](https://github.com/langwatch/langwatch/issues/9439)) ([8e3254c](https://github.com/langwatch/langwatch/commit/8e3254c45b69f28f80734518c5f708b97d2af58f))
+* **evaluator:** create custom code and workflow evaluators through the public API ([#9504](https://github.com/langwatch/langwatch/issues/9504)) ([2e36264](https://github.com/langwatch/langwatch/commit/2e36264f098b5cfdaf15f732c85ccf00b444233a))
+* **gateway:** record platform provider-key spend in the ledger and stop topic clustering re-embedding ([#9302](https://github.com/langwatch/langwatch/issues/9302)) ([5dacb3f](https://github.com/langwatch/langwatch/commit/5dacb3f3dc85bb2a433a81ad04bbdbfb43a85a19))
+* **governance:** keep template OTTL rules from callers without aiTools:manage ([#9590](https://github.com/langwatch/langwatch/issues/9590)) ([619e164](https://github.com/langwatch/langwatch/commit/619e1644b10cc47a43002bf4d091bffed05e8111))
+* **mcp:** npx @langwatch/mcp-server installs again, and --http starts ([#9220](https://github.com/langwatch/langwatch/issues/9220)) ([8eeec0a](https://github.com/langwatch/langwatch/commit/8eeec0aa9001097d408167e9f0bfaef654235da0))
+
+## [3.1.0](https://github.com/langwatch/langwatch/compare/mcp-server@v3.0.0...mcp-server@v3.1.0) (2026-11-02)
+
+
+### Features
+
+* **dashboards:** widget queries take sources and projects as params ([#9171](https://github.com/langwatch/langwatch/issues/9171)) ([af5a9c3](https://github.com/langwatch/langwatch/commit/af5a9c342951371a1cf547188cff78f9cd50bcc1))
+
+## [3.0.0](https://github.com/langwatch/langwatch/compare/mcp-server@v2.2.0...mcp-server@v3.0.0) (2026-10-30)
+
+
+### ⚠ BREAKING CHANGES
+
+* **sdk:** client.dashboards and langwatch.dashboards now address the new Dashboards API, not the old Reports; use client.analyticsReports / langwatch.analytics_reports for those. MCP Reports tools are renamed platform_*_analytics_report(s).
+
+### Features
+
+* **auth:** log which credential and client each API request used ([#9003](https://github.com/langwatch/langwatch/issues/9003)) ([c55dc6e](https://github.com/langwatch/langwatch/commit/c55dc6e6e22aa2a6563b4be7d3e93d7f40c7f23b))
+* **dashboard:** add REST create and delete for Dashboards boards ([#8896](https://github.com/langwatch/langwatch/issues/8896)) ([fbc1469](https://github.com/langwatch/langwatch/commit/fbc1469027d6ef59c920243f63e2ebaf2264bcf8))
+* **dashboards:** per-widget "Langy traces" setting in the query editor ([#9137](https://github.com/langwatch/langwatch/issues/9137)) ([5e82c1e](https://github.com/langwatch/langwatch/commit/5e82c1ebc1d2dbfda817cf175f3aba62e485a0d8))
+* **experiment:** accept a per-run concurrency on the experiment run API ([#9023](https://github.com/langwatch/langwatch/issues/9023)) ([640d0f6](https://github.com/langwatch/langwatch/commit/640d0f6e21afd19e46eaed9312d4c04c121b9a4b))
+* **monitor:** pause a monitor whose evaluations mostly fail ([#9040](https://github.com/langwatch/langwatch/issues/9040)) ([fcbd9ed](https://github.com/langwatch/langwatch/commit/fcbd9edabbfa2fd9b3a4c142c678298a846e184d))
+* **sdk:** one product per dashboards path; dashboards means the new product everywhere ([#9089](https://github.com/langwatch/langwatch/issues/9089)) ([552534d](https://github.com/langwatch/langwatch/commit/552534d24487441ac5395d91c1af69ed072a0c00))
+
+
+### Bug Fixes
+
+* **dashboards:** refresh moves fixed ranges, hidden stars keep their place, agents read boards by id ([#9048](https://github.com/langwatch/langwatch/issues/9048)) ([a5ea0ed](https://github.com/langwatch/langwatch/commit/a5ea0eda1d886635096da02bb76b2b99f9bed6f6))
+* **deps:** raise authlib, litellm and dnspython for today's advisories ([#9120](https://github.com/langwatch/langwatch/issues/9120)) ([828259f](https://github.com/langwatch/langwatch/commit/828259f92eafec9a0d4e1c5ffecab87e4abd2257))
+* **langevals:** judges reach a verdict on gpt-6 reasoning models ([#9102](https://github.com/langwatch/langwatch/issues/9102)) ([d7b6238](https://github.com/langwatch/langwatch/commit/d7b623874e55e0b6af4d81ce9671114d54dfb2cc))
+* **mcp:** repair main after the board-reading merge ([#9087](https://github.com/langwatch/langwatch/issues/9087)) ([96a4bf6](https://github.com/langwatch/langwatch/commit/96a4bf61c903ffb0f75b64e93cef7fd43d0897cd))
+* **security:** close 148 of 150 alerts across the python locks ([#7634](https://github.com/langwatch/langwatch/issues/7634)) ([c0837d1](https://github.com/langwatch/langwatch/commit/c0837d164d28f15ba179fc6f1c1f0516be32cfa3))
+* **security:** close the nine alerts raised on 2026-10-22 ([#8982](https://github.com/langwatch/langwatch/issues/8982)) ([7eca2c2](https://github.com/langwatch/langwatch/commit/7eca2c24ccba4b38a1636048ea18801a2fd1d2b1))
+
 ## [2.2.0](https://github.com/langwatch/langwatch/compare/mcp-server@v2.1.0...mcp-server@v2.2.0) (2026-10-21)
 
 

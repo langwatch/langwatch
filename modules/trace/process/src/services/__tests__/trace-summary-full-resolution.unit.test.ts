@@ -32,7 +32,7 @@ import {
   NullSpanStorageRepository,
   type SpanStorageRepository,
 } from "../../repositories/span-storage.repository.ts";
-import { blobStoreResolving } from "./support/trace-blob-store.support.ts";
+import { blobStoreResolving, eventLogReads } from "./support/trace-blob-store.support.ts";
 
 // ---------------------------------------------------------------------------
 // Helpers — mirrors resolve-offloaded-traces.unit.test.ts's fixtures.
@@ -205,7 +205,7 @@ describe("TraceSummaryService.getByTraceId({ full: true })", () => {
       });
 
       expect(result.computedInput).toBe("preview-input…");
-      expect(blobStore.getFromEventLog).not.toHaveBeenCalled();
+      expect(eventLogReads(blobStore)).not.toHaveBeenCalled();
     });
   });
 
@@ -315,7 +315,7 @@ describe("TraceSummaryService.getByTraceId({ full: true })", () => {
         expect(result.tenantId).toBe("member-1");
         const spanRead = vi.mocked(spanRepo.findNormalizedSpansByTraceId).mock.calls[0]?.[0];
         expect(spanRead?.authorization.narrowedTo).toBe("member-1");
-        expect(vi.mocked(blobStore.getFromEventLog).mock.calls[0]?.[0]).toMatchObject({
+        expect(eventLogReads(blobStore).mock.calls[0]?.[0]).toMatchObject({
           tenantId: "member-1",
         });
       });

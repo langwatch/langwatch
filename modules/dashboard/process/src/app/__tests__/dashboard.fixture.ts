@@ -11,6 +11,7 @@ import type { AutomationApi, Trigger } from "@langwatch/automation-contract";
 import { ResourceScope } from "@langwatch/process";
 import type { Project, ProjectApi, ProjectIdentity } from "@langwatch/project-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import type { UserApi, UserFullProfile } from "@langwatch/user-contract";
 import { vi } from "vitest";
 
 import type { DashboardRepositories } from "../../repositories/dashboard.repositories.ts";
@@ -48,6 +49,7 @@ export function createDashboardTestAnalytics(overrides: Partial<AnalyticsApi> = 
       followsTimeWindow: false,
       followsGranularity: false,
     }),
+    assertProjectsReadable: async () => void 0,
     isWorkbenchEnabled: async () => true,
     isDashboardsEnabled: async () => true,
     assertDashboardWidgetsEnabled: async () => void 0,
@@ -105,22 +107,54 @@ export function createDashboardTestProjects(
   });
 }
 
-/** The authz peer, opening `analytics:view` on the projects named; on every project by default. */
+/**
+ * The authz peer: the projects named (every project by default) grant the permissions named
+ * (every one by default), so a check answers for the permission it asks.
+ */
 export function createDashboardTestAuthz(
-  input: Readonly<{ openProjectIds?: readonly string[] }> = {},
+  input: Readonly<{ openProjectIds?: readonly string[]; permissions?: readonly string[] }> = {},
 ): AuthzApi {
+  const opens = (projectId: string) =>
+    input.openProjectIds === undefined || input.openProjectIds.includes(projectId);
+  const grants = (permission: string) =>
+    input.permissions === undefined || input.permissions.includes(permission);
   return createApiFixture<AuthzApi>({
-    canBatchByIds: async ({ projects }) => ({
+    canBatchByIds: async ({ projects, permission }) => ({
       teams: new Map(),
       projects: new Map(
-        projects.map(({ projectId }) => [
-          projectId,
-          input.openProjectIds === undefined || input.openProjectIds.includes(projectId),
-        ]),
+        projects.map(({ projectId }) => [projectId, opens(projectId) && grants(permission)]),
       ),
       organizationRole: null,
     }),
   });
+}
+
+/** Members by id, each answered with the name given; an id not given has no profile. */
+export function createDashboardTestUsers(names: Readonly<Record<string, string | null>> = {}) {
+  return createApiFixture<UserApi>({
+    getProfiles: async ({ userIds }) =>
+      userIds.flatMap((id): UserFullProfile[] =>
+        id in names ? [testProfile({ id, name: names[id] ?? null })] : [],
+      ),
+  });
+}
+
+function testProfile({ id, name }: { id: string; name: string | null }): UserFullProfile {
+  const at = new Date("2026-11-01");
+  return {
+    id,
+    name,
+    email: null,
+    emailVerified: true,
+    image: null,
+    pendingSsoSetup: false,
+    createdAt: at,
+    updatedAt: at,
+    lastLoginAt: null,
+    deactivatedAt: null,
+    lastHomePath: null,
+    tracesExplorerTourDismissedAt: null,
+  };
 }
 
 export function createDashboardTestApp(
@@ -132,6 +166,7 @@ export function createDashboardTestApp(
       authz: AuthzApi;
       automation: AutomationApi;
       projects: ProjectApi;
+      users: UserApi;
     }>;
   }> = {},
 ): DashboardModule {
@@ -142,6 +177,7 @@ export function createDashboardTestApp(
       authz: input.dependencies?.authz ?? createDashboardTestAuthz(),
       automation: input.dependencies?.automation ?? createDashboardTestAutomation(),
       projects: input.dependencies?.projects ?? createDashboardTestProjects(),
+      users: input.dependencies?.users ?? createDashboardTestUsers(),
     },
     config: { publicBaseUrl: input.publicBaseUrl },
     resources: new ResourceScope(),

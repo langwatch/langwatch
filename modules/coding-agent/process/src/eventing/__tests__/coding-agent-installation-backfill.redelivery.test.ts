@@ -20,11 +20,13 @@ import {
   TestMetricSeries,
   createTestProjects,
   TestSessions,
+  storedTracesFixture,
   TestTraceSessions,
   session,
 } from "../../__tests__/fixtures/coding-agent.fixture.ts";
 import type { CodingAgentPullRequestMappingBackfill } from "../../features/pull-requests/services/coding-agent-pull-request-mapping-backfill.service.ts";
 import { CodingAgentFeatureService } from "../../services/coding-agent.service.ts";
+import { ModelCatalogCostEstimatorService } from "../../services/model-catalog-cost-estimator.service.ts";
 
 const LANE = "coding_agent_processing.codingAgentInstallationBackfill";
 
@@ -103,12 +105,14 @@ function backfillOverOneBranch(): {
   const service = CodingAgentFeatureService.create({
     sessions,
     traceSessions: new TestTraceSessions(),
+    storedTraces: storedTracesFixture(),
     metricSeries: new TestMetricSeries(),
     sessionEvents: new TestEvents(),
     github,
     projects,
     billing: new TestBillingPolicy(),
     clock: new TestClock(),
+    modelProviders: ModelCatalogCostEstimatorService.create(),
   });
   return { service, github };
 }

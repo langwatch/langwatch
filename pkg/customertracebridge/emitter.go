@@ -497,6 +497,12 @@ func canonicalModelID(provider aitrace.ProviderID, model string) string {
 	return string(provider) + "/" + model
 }
 
+// Tracer starts spans on the bridge's private provider. A span reaches a
+// project only when it carries langwatch.project_id, as BeginSpan's do.
+func (e *Emitter) Tracer() trace.Tracer {
+	return e.tracer
+}
+
 // Shutdown flushes pending spans to customer endpoints.
 func (e *Emitter) Shutdown(ctx context.Context) error {
 	if e.tp != nil {
@@ -564,6 +570,8 @@ func endUserID(ctx context.Context, params aitrace.Params) string {
 		aitrace.RequestTypeResponses, aitrace.RequestTypeSpeech,
 		aitrace.RequestTypeImageGeneration, aitrace.RequestTypeImageEdit:
 		return EndUserIDFromBody(params.RequestBody)
+	case aitrace.RequestTypeDecisions:
+		return DecisionsEndUserIDFromBody(params.RequestBody)
 	case aitrace.RequestTypeMessages, aitrace.RequestTypePassthrough,
 		aitrace.RequestTypeTranscription, aitrace.RequestTypeRealtimeSession:
 		// No OpenAI-wire `user` field to read on these shapes: the Anthropic
@@ -584,6 +592,15 @@ func endUserID(ctx context.Context, params aitrace.Params) string {
 func EndUserIDFromBody(body []byte) string {
 	if user := gjson.GetBytes(body, "user").String(); user != "" {
 		return SanitizeEndUserID(user)
+	}
+	return ""
+}
+
+// DecisionsEndUserIDFromBody reads the Decisions API's `safety_identifier`,
+// its end-user field, through the same sanitizer as EndUserIDFromBody.
+func DecisionsEndUserIDFromBody(body []byte) string {
+	if id := gjson.GetBytes(body, "safety_identifier").String(); id != "" {
+		return SanitizeEndUserID(id)
 	}
 	return ""
 }
@@ -615,7 +632,7 @@ func clientSessionID(ctx context.Context, params aitrace.Params) string {
 	case aitrace.RequestTypeChat, aitrace.RequestTypeEmbeddings, aitrace.RequestTypePassthrough,
 		aitrace.RequestTypeSpeech, aitrace.RequestTypeTranscription,
 		aitrace.RequestTypeImageGeneration, aitrace.RequestTypeImageEdit,
-		aitrace.RequestTypeRealtimeSession:
+		aitrace.RequestTypeRealtimeSession, aitrace.RequestTypeDecisions:
 		// No inline session id on these request shapes (audio and image bodies
 		// carry no session field at all, and a realtime mint's session id is
 		// the one the gateway itself hands back); the header lifted above
@@ -638,6 +655,10 @@ func extractInputMessages(body []byte, reqType aitrace.RequestType) string {
 		return ""
 	}
 	switch reqType {
+	case aitrace.RequestTypeDecisions:
+		// Never captured: decision inputs are often private messages under
+		// review, so the span keeps model, usage and cost only.
+		return ""
 	case aitrace.RequestTypePassthrough:
 		// Gemini-native /v1beta bodies carry `contents` not `messages`.
 		// Convert to a synthetic chat-completion `messages` shape so the
@@ -875,6 +896,9 @@ func extractOutputMessages(body []byte, reqType aitrace.RequestType) string {
 	// stream extractor first for every type, then fall back to the
 	// single-object JSON shape for non-streamed (sync) responses.
 	switch reqType {
+	case aitrace.RequestTypeDecisions:
+		// Never captured, for the same reason as the input.
+		return ""
 	case aitrace.RequestTypeChat:
 		return streamedOrSync(body, openAIChatOutputFromSSE, openAIChatOutputFromJSON)
 	case aitrace.RequestTypeMessages:

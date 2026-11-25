@@ -22,14 +22,7 @@ import {
   type RequestCredential,
 } from "@langwatch/observability/credential-census";
 import { nowInstant } from "@langwatch/time";
-import {
-  context as otContext,
-  propagation,
-  type Span,
-  SpanKind,
-  SpanStatusCode,
-  trace,
-} from "@opentelemetry/api";
+import { context as otContext, propagation, type Span, SpanKind, trace } from "@opentelemetry/api";
 import type { Context, HonoRequest, MiddlewareHandler, Next, ValidationTargets } from "hono";
 import { validator as openApiValidator } from "hono-openapi";
 import { HTTPException } from "hono/http-exception";
@@ -44,9 +37,16 @@ import {
   type ResolvedError,
 } from "../errors.ts";
 import type { RestIdentity } from "../hosting/api-door.ts";
+import { ClientAddress } from "../policy/client-address.ts";
 import type { ResponseCache } from "../ports.ts";
 import { parseApiSchema, type ApiSchema, type ApiSchemaOutput } from "../schema.ts";
+import { recordRequestSpanFailure, sampleClientFaultLog } from "./client-fault-telemetry.ts";
 import type { RestDoorCredential } from "./declaration.ts";
+import {
+  REQUEST_PRINCIPAL,
+  type RequestPrincipal,
+  requestPrincipalLogFields,
+} from "./request-principal.ts";
 import type { RestProtocolRefusal } from "./response-kind.ts";
 import {
   DECLARED_ANSWER,
@@ -692,12 +692,14 @@ export async function isBodyAbsent(request: HonoRequest): Promise<boolean> {
 
 /** The request a route reads after the body has been drained to measure it. */
 function withBufferedBody(request: Request, body: Uint8Array<ArrayBuffer>): Request {
-  return new Request(request.url, {
+  const buffered = new Request(request.url, {
     method: request.method,
     headers: request.headers,
     body,
     signal: request.signal,
   });
+
+  return ClientAddress.carried({ from: request, to: buffered });
 }
 
 /** Caps the size of a request body, rejecting anything larger with 413. */
@@ -767,8 +769,13 @@ function closeRequestSpan({ c, span, error }: { c: Context; span: Span; error: u
     if (value) span.setAttribute(key, value);
   }
   if (error) {
-    span.recordException(error as Error);
-    span.setStatus({ code: SpanStatusCode.ERROR });
+    // The handler's resolved error wins: the raw throw may be a wrapper that hides its fault.
+    const resolved = c.get(RESOLVED_ERROR) as ResolvedError | undefined;
+    recordRequestSpanFailure({
+      span,
+      error: resolved?.error ?? error,
+      answeredStatus: resolved?.status ?? c.res.status,
+    });
   }
   span.end();
 }
@@ -780,6 +787,7 @@ function logRequestOutcome({
   error,
   start,
   name,
+  clientAddress,
   credential,
   span,
 }: {
@@ -788,6 +796,8 @@ function logRequestOutcome({
   error: unknown;
   start: number;
   name: string | undefined;
+  /** Read when the request arrived: a body cap replaces the request it was resolved on. */
+  clientAddress: string | undefined;
   /** What the request authenticated with, when a door or the key directory noted it. */
   credential: RequestCredential | undefined;
   /** The request's span, open while the request is answered. */
@@ -830,10 +840,17 @@ function logRequestOutcome({
       ...(route ? { route } : {}),
       ...(family ? { family } : {}),
       ...(resolved?.traceId ? { traceId: resolved.traceId } : {}),
+      // The client address is logged on purpose: the access record exists to tell callers apart.
+      ...requestPrincipalLogFields({
+        principal: c.get(REQUEST_PRINCIPAL) as RequestPrincipal | undefined,
+        clientAddress,
+      }),
       ...(projectId ? { projectId } : {}),
       ...(credential ? { credentialType: credential.credentialType } : {}),
     },
   };
+
+  sampleClientFault({ record, family });
 
   // A status the route DECLARED is an answer, not a fault.
   if (!requestError && c.get(DECLARED_ANSWER) === true) {
@@ -849,6 +866,25 @@ function logRequestOutcome({
   }
 
   logHttpRequest(logger, record);
+}
+
+/** A caller's fault is counted by reason and logged once per window; its repeats go to debug. */
+function sampleClientFault({
+  record,
+  family,
+}: {
+  record: RequestLogData;
+  family: string | undefined;
+}): void {
+  const clientFault = sampleClientFaultLog({
+    error: record.error,
+    family,
+    statusCode: record.statusCode,
+  });
+  if (clientFault?.isRepeat) record.level = "debug";
+  if (clientFault && clientFault.suppressedRequests > 0) {
+    record.extra = { ...record.extra, suppressedRequests: clientFault.suppressedRequests };
+  }
 }
 
 /** Counts the request into the credential census and tags its span; never fails the request. */
@@ -981,6 +1017,7 @@ async function logAround({
   slot: CredentialSlot;
 }): Promise<void> {
   const span = trace.getActiveSpan();
+  const clientAddress = ClientAddress.resolvedFor(c.req.raw);
   const start = nowInstant().epochMilliseconds;
   let error: unknown = c.error;
 
@@ -999,7 +1036,16 @@ async function logAround({
     throw err;
   } finally {
     const logRequest = () =>
-      logRequestOutcome({ logger, c, error, start, name, credential: slot.credential, span });
+      logRequestOutcome({
+        logger,
+        c,
+        error,
+        start,
+        name,
+        credential: slot.credential,
+        span,
+        clientAddress,
+      });
 
     runAfterSSECompletion({
       c,
@@ -1022,6 +1068,19 @@ export function recordAnsweredCause(
 ): void {
   const resolved: ResolvedError = { error, status: status as ContentfulStatusCode };
   c.set(RESOLVED_ERROR, resolved);
+}
+
+/**
+ * Names a 5xx a route forwarded from elsewhere, so the access record says so rather than "failed
+ * without a cause attached". Status only: the forwarded body can quote customer input, and
+ * reading it would hold the request open until the upstream stream ends.
+ */
+export function recordForwardedFailure(c: Context, response: Response): void {
+  if (response.status < 500 || c.get(RESOLVED_ERROR) !== undefined) return;
+
+  const cause = new Error(`forwarded a ${response.status} answer`);
+  cause.name = "ForwardedServerError";
+  recordAnsweredCause(c, { error: cause, status: response.status });
 }
 
 /** Records a declared answer without inventing a cause. */

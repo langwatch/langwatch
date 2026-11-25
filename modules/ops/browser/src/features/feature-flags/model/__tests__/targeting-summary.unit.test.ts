@@ -27,6 +27,19 @@ describe("the targeting note", () => {
     });
   });
 
+  describe("given a rule turns a flag off for one user and a later rule turns it on for everyone", () => {
+    describe("when the note is written", () => {
+      it("says the flag is on for everyone except that user", () => {
+        const label = note([
+          { match: { userId: "user_a" }, enabled: false },
+          { match: {}, enabled: true },
+        ]);
+
+        expect(label).toBe("Enabled for everyone via rule, except 1 user");
+      });
+    });
+  });
+
   describe("given a rule turns a flag off since January and a later rule turns it on since June", () => {
     describe("when the note is written", () => {
       /** @scenario "a new-users rule an earlier rule already answered for is not claimed" */

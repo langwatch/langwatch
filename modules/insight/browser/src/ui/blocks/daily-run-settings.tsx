@@ -1,7 +1,7 @@
 /**
  * What a board's daily run carries, as one sentence with its three choices in place: the
- * hour it starts around, the time zone that hour is in, and the most it files. The offer
- * and a board's settings set a run with this one group.
+ * hour it starts around, the time zone that hour is in, and the most it files. A board's
+ * settings set a run with this one group.
  */
 
 import { Box, NativeSelect, Text } from "@langwatch/design-system/primitives";

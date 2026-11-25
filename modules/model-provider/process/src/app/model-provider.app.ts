@@ -60,6 +60,8 @@ import {
   type ModelProviderPlaygroundRequest,
   type ModelProviderListOrganizationInput,
   type ModelProviderListProjectInput,
+  type ModelProviderWithServedModels,
+  type BuiltInModel,
   type DecisionModelResolution,
   type ModelProviderResolution,
   type ModelProviderSummary,
@@ -82,7 +84,10 @@ import {
   executionProxyBaseUrlOf,
   type ModelProviderConnectionPing,
 } from "../channels/model-provider-connection-ping.channel.ts";
-import type { ModelProviderChannels } from "../channels/model-provider.channels.ts";
+import type {
+  ModelProviderChannels,
+  ModelProviderSpend,
+} from "../channels/model-provider.channels.ts";
 import { CodexAccountService } from "../features/codex/services/codex-account.service.ts";
 import {
   CodexOAuthModelProviderTokenRefresherService,
@@ -104,6 +109,11 @@ import {
 } from "../features/model-cost/services/model-cost-preview.service.ts";
 import { ModelCostRegexSafetyService } from "../features/model-cost/services/model-cost-regex-safety.service.ts";
 import { ModelLimitsService } from "../features/model-cost/services/model-limits.service.ts";
+import {
+  HttpModelProviderModelListService,
+  type ModelProviderModelList,
+} from "../features/served-models/services/http-model-provider-model-list.service.ts";
+import { ModelProviderServedModelsService } from "../features/served-models/services/model-provider-served-models.service.ts";
 import type { ModelProviderRepositories } from "../repositories/model-provider.repositories.ts";
 import { AiCallFailureService } from "../services/ai-call-failure.service.ts";
 import { ManagedModelProviderGatewayService } from "../services/managed-model-provider-gateway.service.ts";
@@ -113,6 +123,7 @@ import { ModelProviderKeysService } from "../services/model-provider-keys.servic
 import { ModelProviderPlaygroundService } from "../services/model-provider-playground.service.ts";
 import { ModelProviderStructuredGenerationService } from "../services/model-provider-structured-generation.service.ts";
 import { ModelProviderTextGenerationService } from "../services/model-provider-text-generation.service.ts";
+import { ModelProviderUsageMeteringService } from "../services/model-provider-usage-metering.service.ts";
 import { ModelProviderWriteAuthorizationService } from "../services/model-provider-write-authorization.service.ts";
 import { ModelProviderService as ModelProviderGateway } from "../services/model-provider.service.ts";
 import { PlatformProviderChainService } from "../services/platform-provider-chain.service.ts";
@@ -163,6 +174,10 @@ export interface ModelProviderInfrastructure {
   codexAccounts: ModelProviderCodexDeviceFlow;
   /** Trace's span reads, for the cost-rule preview. */
   spans: ModelCostPreviewSpanReader;
+  /** The spend ledger platform calls write their usage to; absent writes nothing (ADR-193). */
+  spend?: ModelProviderSpend;
+  /** Asks a provider which models it serves; absent, pickers offer the whole catalogue. */
+  modelList?: ModelProviderModelList;
 }
 
 /** The identifier format this deployment mints a provider, default or cost in. */
@@ -193,6 +208,8 @@ type ModelProviderBuildConfig = Readonly<{
   egress: Readonly<{ blockLocal: boolean; allowedHosts: string[]; verifyTls: boolean }>;
   /** Where a resolved model is executed, fully formed: nlpgo's `/go/proxy/v1`. */
   executionProxyBaseUrl: string;
+  /** Sent as X-LangWatch-NLP-Secret, which nlpgo requires on every `/go/*` route. */
+  nlpInternalSecret: string | undefined;
   /** The install-wide value a provider row falls back to for each field it left empty. */
   environment: Readonly<Record<string, string | undefined>>;
   /** Per provider, the API root the credential probe uses in place of the vendor's own. */
@@ -246,6 +263,8 @@ export class ModelProviderModule implements ModelProviderApi {
   /** What the module's own operations spend, never a platform provider credential. */
   static readonly operationalSecrets = {
     openRouter: Secret.load("OPENROUTER_API_KEY", { optional: true }),
+    /** Doubleword's platform key, which reads its model list and prices for the catalog sync. */
+    doublewordCatalog: Secret.load("DOUBLEWORD_API_KEY", { optional: true }),
     /** The engine hop's shared credential: the same handle the process owner holds. */
     nlpInternal: nlpInternalSecret,
   } as const;
@@ -300,6 +319,7 @@ export class ModelProviderModule implements ModelProviderApi {
         verifyTls: true,
       },
       executionProxyBaseUrl,
+      nlpInternalSecret,
       environment,
       probeBaseUrls: config.probeBaseUrls,
       codexOAuthIssuer: config.codexOAuthIssuer,
@@ -335,8 +355,9 @@ export class ModelProviderModule implements ModelProviderApi {
     dependencies: Pick<ModelProviderSetup["dependencies"], "projects" | "managed">;
   }): ModelProviderInfrastructure {
     // The catalogue's probe and `credentialProbe` are one behaviour behind the fence: one instance.
+    const egress = SsrfModelProviderEgressService.create({ policy: config.egress });
     const probe = HttpModelProviderCredentialProbeService.create({
-      egress: SsrfModelProviderEgressService.create({ policy: config.egress }),
+      egress,
       environment: config.environment,
       deployedBaseUrls: config.probeBaseUrls,
     });
@@ -354,6 +375,7 @@ export class ModelProviderModule implements ModelProviderApi {
       translation: VercelAiModelTranslationService.create({
         projects: dependencies.projects,
         executionProxyBaseUrl: config.executionProxyBaseUrl,
+        nlpInternalSecret: config.nlpInternalSecret,
       }),
       connectionPing: channels.connectionPing,
       codexGatewayPing: channels.codexGatewayPing,
@@ -367,6 +389,11 @@ export class ModelProviderModule implements ModelProviderApi {
       credentialProbe: probe,
       codexAccounts: CodexAccountService.create({ issuer: config.codexOAuthIssuer }),
       spans: channels.spans,
+      spend: channels.spend,
+      modelList: HttpModelProviderModelListService.create({
+        egress,
+        deployedBaseUrls: config.probeBaseUrls,
+      }),
     };
   }
 
@@ -410,6 +437,8 @@ export class ModelProviderModule implements ModelProviderApi {
   /** The read, write, defaults and cost lifecycles, over the chosen backend. */
   readonly #modelProviders: ModelProviderGateway;
   readonly #credentialProbe: ModelProviderCredentialProbe;
+  readonly #servedModels: ModelProviderServedModelsService | undefined;
+  readonly #providerRows: ModelProviderRepositories["providers"];
   readonly #codexAccounts: ModelProviderCodexDeviceFlow;
   readonly #spans: ModelCostPreviewSpanReader;
   /**
@@ -471,6 +500,13 @@ export class ModelProviderModule implements ModelProviderApi {
       ModelProviderAuthorizationService.create(dependencies.permissions),
     );
     this.#credentialProbe = infrastructure.credentialProbe;
+    this.#providerRows = repositories.providers;
+    this.#servedModels = infrastructure.modelList
+      ? ModelProviderServedModelsService.create({
+          modelList: infrastructure.modelList,
+          listings: repositories.servedModels,
+        })
+      : undefined;
     this.#codexAccounts = infrastructure.codexAccounts;
     this.#spans = infrastructure.spans;
     // The same install-wide fallback map `ModelProviderBuildConfig.environment` carries.
@@ -478,17 +514,20 @@ export class ModelProviderModule implements ModelProviderApi {
       modelProviders: this,
       environment,
     });
+    const metering = ModelProviderUsageMeteringService.create({ spend: infrastructure.spend });
     this.#playground = ModelProviderPlaygroundService.create({
       modelProviders: this,
       projects: dependencies.projects,
       executionProxyBaseUrl,
       nlpInternalSecret,
+      metering,
     });
     const execution = ModelProviderExecutionHandleService.create({
       modelProviders: this.#modelProviders,
       projects: dependencies.projects,
       executionProxyBaseUrl,
       nlpInternalSecret,
+      metering,
     });
     this.#structuredGeneration = ModelProviderStructuredGenerationService.create({
       execution,
@@ -572,9 +611,54 @@ export class ModelProviderModule implements ModelProviderApi {
     return this.#modelProviders.listForOrganization(input);
   }
 
+  /** `listForProject`, each row carrying the ids its provider's own model list answers with. */
+  async listForProjectWithServedModels(
+    input: ModelProviderListProjectInput,
+  ): Promise<ModelProviderWithServedModels[]> {
+    const [providers, served] = await Promise.all([
+      this.listForProject(input),
+      this.#servedModelsForProject(input),
+    ]);
+    return providers.map((provider) => ({
+      ...provider,
+      servedModels: served[provider.provider] ?? null,
+    }));
+  }
+
+  /** Per provider key the project runs on, its list's ids; absent when not asked or no answer. */
+  async #servedModelsForProject(
+    input: ModelProviderListProjectInput,
+  ): Promise<Record<string, string[]>> {
+    if (!this.#servedModels) return {};
+    const providers = await this.getExecutionProviders(input);
+    return this.#servedModels.getServedModels(
+      Object.values(providers).flatMap((provider) =>
+        provider.enabled && provider.customKeys
+          ? [{ provider: provider.provider, customKeys: provider.customKeys }]
+          : [],
+      ),
+    );
+  }
+
   /** Stores or replaces a provider row, attributed to the caller. */
-  upsert(input: ModelProviderWriteRequest, by: ModelProviderCaller): Promise<ModelProvider> {
-    return this.#modelProviders.upsert({ ...input, actorId: by.id });
+  async upsert(input: ModelProviderWriteRequest, by: ModelProviderCaller): Promise<ModelProvider> {
+    const saved = await this.#modelProviders.upsert({ ...input, actorId: by.id });
+    this.#refreshServedModels(saved);
+    return saved;
+  }
+
+  /** Asks the saved provider's model list again in the background; a failure keeps what is held. */
+  #refreshServedModels(saved: ModelProvider): void {
+    const servedModels = this.#servedModels;
+    if (!servedModels || !saved.enabled) return;
+    void this.#providerRows
+      .getById({ id: saved.id, organizationId: saved.organizationId })
+      .then((row) =>
+        row.customKeys
+          ? servedModels.refresh({ provider: row.provider, customKeys: row.customKeys })
+          : undefined,
+      )
+      .catch(() => undefined);
   }
 
   /**
@@ -582,8 +666,10 @@ export class ModelProviderModule implements ModelProviderApi {
    * the key was already held to `project:update` on its one project. The provider
    * string names that project's own row, as main's did.
    */
-  upsertUnattributed(input: ModelProviderWriteRequest): Promise<ModelProvider> {
-    return this.#modelProviders.upsertByProviderKey(input);
+  async upsertUnattributed(input: ModelProviderWriteRequest): Promise<ModelProvider> {
+    const saved = await this.#modelProviders.upsertByProviderKey(input);
+    this.#refreshServedModels(saved);
+    return saved;
   }
 
   /** Removes a provider row, attributed to the caller. */
@@ -613,6 +699,7 @@ export class ModelProviderModule implements ModelProviderApi {
     return this.#credentialProbe.probe({
       provider: input.provider,
       customKeys: input.customKeys,
+      model: input.model,
     });
   }
 
@@ -761,8 +848,22 @@ export class ModelProviderModule implements ModelProviderApi {
     return this.#modelProviders.resolveModelForFeature(input);
   }
 
-  resolveDecisionModel(input: { projectId: string }): Promise<DecisionModelResolution> {
+  resolveDecisionModel(input: {
+    projectId: string;
+    model?: string;
+  }): Promise<DecisionModelResolution> {
     return this.#modelProviders.resolveDecisionModel(input);
+  }
+
+  listDecisionModelsForProject(input: { projectId: string }): Promise<readonly BuiltInModel[]> {
+    return this.#modelProviders.listDecisionModelsForProject(input);
+  }
+
+  listDecisionModelsForScopes(input: {
+    projectId: string;
+    scopes: readonly ModelDefaultScope[];
+  }): Promise<readonly BuiltInModel[]> {
+    return this.#modelProviders.listDecisionModelsForScopes(input);
   }
 
   findAlternateModel(input: {

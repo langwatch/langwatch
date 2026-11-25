@@ -10,6 +10,8 @@ import {
   firstTraceRecordedSignal,
   integrationMethodChosenSignal,
   inviteAcceptedSignal,
+  memberAdmittedSignal,
+  memberRoleChangedSignal,
   membersInvitedSignal,
   promptCreatedSignal,
   scenarioCreatedSignal,
@@ -47,6 +49,16 @@ describe("auth's lifecycle events", () => {
       userId: "user_ada",
       organizationId: "org_acme",
       organizationName: "Acme",
+    });
+  });
+});
+
+describe("auth's domain auto-join with a role", () => {
+  it("carries the admitted role onto the signal", () => {
+    const data = { ...org, userId: "user_ada", organizationName: "Acme", role: "MEMBER" };
+    expect(ssoAutoAddedSignal({ data, aggregateId: "user_ada" })).toMatchObject({
+      kind: "sso_auto_added",
+      role: "MEMBER",
     });
   });
 });
@@ -94,6 +106,20 @@ describe("organization's lifecycle events", () => {
     });
   });
 
+  it("carry the role the invitation granted onto the accepted-invite signal", () => {
+    const data = {
+      ...org,
+      userId: "user_new",
+      inviteId: "invite_1",
+      organizationName: "Acme",
+      role: "EXTERNAL",
+    };
+    expect(inviteAcceptedSignal({ data, aggregateId: "org_acme" })).toMatchObject({
+      kind: "invite_accepted",
+      role: "EXTERNAL",
+    });
+  });
+
   it("raise the accepted invitation's person and organization", () => {
     const data = { ...org, userId: "user_new", inviteId: "invite_1", organizationName: "Acme" };
     expect(inviteAcceptedSignal({ data, aggregateId: "org_acme" })).toEqual({
@@ -104,6 +130,33 @@ describe("organization's lifecycle events", () => {
       userId: "user_new",
       organizationId: "org_acme",
       organizationName: "Acme",
+    });
+  });
+
+  it("raise a role change with the new and previous role, once per person and moment", () => {
+    const data = { ...org, userId: "user_new", role: "ADMIN", previousRole: "MEMBER" };
+    expect(memberRoleChangedSignal({ data, aggregateId: "org_acme" })).toEqual({
+      kind: "member_role_changed",
+      sourceEventId: `org_acme:role:user_new:${AT}`,
+      tenantId: "org_acme",
+      occurredAt: AT,
+      userId: "user_new",
+      organizationId: "org_acme",
+      role: "ADMIN",
+      previousRole: "MEMBER",
+    });
+  });
+
+  it("raise an admission with the role admitted, once per person and moment", () => {
+    const data = { ...org, userId: "user_new", role: "MEMBER", via: "create_membership" };
+    expect(memberAdmittedSignal({ data, aggregateId: "org_acme" })).toEqual({
+      kind: "member_admitted",
+      sourceEventId: `org_acme:admitted:user_new:${AT}`,
+      tenantId: "org_acme",
+      occurredAt: AT,
+      userId: "user_new",
+      organizationId: "org_acme",
+      role: "MEMBER",
     });
   });
 
@@ -170,7 +223,7 @@ describe("a created prompt, workflow or scenario", () => {
     });
   });
 
-  /** @scenario "Scenario creation updates scenario count and fires event" */
+  /** @scenario "Scenario creation fires its event; its count comes from the organization's usage traits" */
   it("raises the scenario, the project's count and the variant, keyed by the scenario", () => {
     const data = {
       scenarioId: "scenario-1",

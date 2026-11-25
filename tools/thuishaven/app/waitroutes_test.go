@@ -125,3 +125,39 @@ func TestWaitRoutesKeepTheRouteThroughAShortRestart(t *testing.T) {
 		t.Errorf("a restart shorter than the grace moved the route: %v", proxy.routes)
 	}
 }
+
+const waitDocsPort = 9100
+
+// docsWaitOrch is a stack whose app hostname routes through the docs mount.
+func docsWaitOrch(route int, appUp, docsUp bool) (*Orchestrator, *tableProxy) {
+	o, proxy := waitOrch(route, true, appUp)
+	o.store.(*fakeStore).stacks[0].Services[0].RoutePort = waitDocsPort
+	o.sys.(*fakeSystem).portsInUse[waitDocsPort] = docsUp
+	return o, proxy
+}
+
+// @scenario "The docs site is built and mounted at /docs on the app"
+func TestWaitRoutesKeepTheDocsAndTheAppReachableWhenEitherStops(t *testing.T) {
+	cases := []struct {
+		name          string
+		route         int
+		appUp, docsUp bool
+		want          int
+	}{
+		{"both up: through the mount", waitDocsPort, true, true, waitDocsPort},
+		{"mount still starting: straight to the app", waitDocsPort, true, false, waitAppPort},
+		{"mount back: through it again", waitAppPort, true, true, waitDocsPort},
+		{"app down, mount up: the docs stay", waitDocsPort, false, true, waitDocsPort},
+		{"both down past the grace: the waiting page", waitDocsPort, false, false, waitDaemonPort},
+		{"from the waiting page once the mount listens", waitDaemonPort, false, true, waitDocsPort},
+	}
+	for _, tc := range cases {
+		o, proxy := docsWaitOrch(tc.route, tc.appUp, tc.docsUp)
+		o.reconcileWaitRoutes(waitDaemonPort, false)
+		o.sys.(*fakeSystem).now = o.sys.Now().Add(waitGrace)
+		o.reconcileWaitRoutes(waitDaemonPort, false)
+		if got := proxy.routes[appHost]; got != tc.want {
+			t.Errorf("%s: app route = %d, want %d", tc.name, got, tc.want)
+		}
+	}
+}

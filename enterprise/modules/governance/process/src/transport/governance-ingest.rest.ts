@@ -1,5 +1,9 @@
 import { publicRoute } from "@langwatch/api/access";
-import { defineRestRouter, MANAGEMENT_API_VERSION } from "@langwatch/api/rest";
+import {
+  callerAddressContext,
+  defineRestRouter,
+  MANAGEMENT_API_VERSION,
+} from "@langwatch/api/rest";
 import {
   GovernanceRestApi,
   governanceIngestHeadersSchema,
@@ -37,10 +41,11 @@ export const governanceIngestRest = defineRestRouter(GovernanceRestApi)
   .withBodyLimit({ maxBytes: BODY_LIMIT_BULK_BYTES })
   .withAccess(INGEST_DOOR)
   .withHeaders(governanceIngestHeadersSchema)
+  .withMiddlewareContext(callerAddressContext)
   .responds(ingestAnswers)
   .withDocs({ hide: true })
-  .handle(({ app, input, raw }, headers) =>
-    app.ingestOtlpTraces({ sourceId: input.sourceId, raw, headers }),
+  .handle(({ app, input, raw }, headers, callerAddress) =>
+    app.ingestOtlpTraces({ sourceId: input.sourceId, raw, headers, callerAddress }),
   )
 
   .post("/api/ingest/webhook/:sourceId", "ingestSourceWebhook")
@@ -51,10 +56,11 @@ export const governanceIngestRest = defineRestRouter(GovernanceRestApi)
   .withBodyLimit({ maxBytes: BODY_LIMIT_JSON_BYTES })
   .withAccess(INGEST_DOOR)
   .withHeaders(governanceIngestHeadersSchema)
+  .withMiddlewareContext(callerAddressContext)
   .responds(ingestAnswers)
   .withDocs({ hide: true })
-  .handle(({ app, input, raw }, headers) =>
-    app.ingestWebhook({ sourceId: input.sourceId, raw, headers }),
+  .handle(({ app, input, raw }, headers, callerAddress) =>
+    app.ingestWebhook({ sourceId: input.sourceId, raw, headers, callerAddress }),
   )
 
   .post("/api/ingest/otel/:sourceId/v1/logs", "ingestSourceOtlpLogs")
@@ -65,10 +71,11 @@ export const governanceIngestRest = defineRestRouter(GovernanceRestApi)
   .withBodyLimit({ maxBytes: BODY_LIMIT_BULK_BYTES })
   .withAccess(INGEST_DOOR)
   .withHeaders(governanceIngestHeadersSchema)
+  .withMiddlewareContext(callerAddressContext)
   .responds(ingestAnswers)
   .withDocs({ hide: true })
-  .handle(({ app, input, raw }, headers) =>
-    app.ingestOtlpLogs({ sourceId: input.sourceId, raw, headers }),
+  .handle(({ app, input, raw }, headers, callerAddress) =>
+    app.ingestOtlpLogs({ sourceId: input.sourceId, raw, headers, callerAddress }),
   )
 
   .post("/api/ingest/otel/:sourceId/v1/metrics", "ingestSourceOtlpMetrics")
@@ -79,10 +86,11 @@ export const governanceIngestRest = defineRestRouter(GovernanceRestApi)
   .withBodyLimit({ maxBytes: BODY_LIMIT_BULK_BYTES })
   .withAccess(INGEST_DOOR)
   .withHeaders(governanceIngestHeadersSchema)
+  .withMiddlewareContext(callerAddressContext)
   .responds(ingestAnswers)
   .withDocs({ hide: true })
-  .handle(({ app, input, raw }, headers) =>
-    app.ingestOtlpMetrics({ sourceId: input.sourceId, raw, headers }),
+  .handle(({ app, input, raw }, headers, callerAddress) =>
+    app.ingestOtlpMetrics({ sourceId: input.sourceId, raw, headers, callerAddress }),
   )
 
   .build();

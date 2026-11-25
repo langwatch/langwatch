@@ -1,6 +1,6 @@
 Feature: AI Gateway Governance — `?org=` organization switch on org-scoped pages
 
-  Org-scoped pages (`/me`, `/settings/*`, `/governance`, the gateway pages)
+  Org-scoped pages (`/coding-agents`, `/settings/*`, `/governance`, the gateway pages)
   resolve the active organization from the `selectedOrganizationId` localStorage
   key, never from the URL. For a user in a single organization that is fine, but
   a multi-org user has no way to express "show me THIS org's page" in a link, and
@@ -11,7 +11,7 @@ Feature: AI Gateway Governance — `?org=` organization switch on org-scoped pag
   when loaded with `?org=<slug>` for an organization the user belongs to, selects
   that organization (writes `selectedOrganizationId`) and then strips the
   parameter from the URL so the address bar returns to the clean, memorable path
-  (`/me`, `/settings/...`). The selection persists in localStorage, so the page
+  (`/coding-agents`, `/settings/...`). The selection persists in localStorage, so the page
   and every later visit remember the last org. This keeps the short URLs while
   making per-org navigation expressible and shareable as a one-shot link.
 
@@ -21,9 +21,9 @@ Feature: AI Gateway Governance — `?org=` organization switch on org-scoped pag
   @bdd @ui @governance @org-query-param @integration
   Scenario: Visiting an org-scoped page with `?org=<slug>` selects that org
     Given the user is currently on organization "alpha"
-    When the user opens "/me?org=beta" where "beta" is an organization they belong to
+    When the user opens "/coding-agents?org=beta" where "beta" is an organization they belong to
     Then the selected organization becomes "beta"
-    And the "?org" parameter is stripped so the URL reads "/me"
+    And the "?org" parameter is stripped so the URL reads "/coding-agents"
 
   @bdd @ui @governance @org-query-param @integration
   Scenario: The `?org=` switch works on any org-scoped page, preserving the path
@@ -35,7 +35,7 @@ Feature: AI Gateway Governance — `?org=` organization switch on org-scoped pag
   @bdd @ui @governance @org-query-param @integration
   Scenario: An `?org=<slug>` the user does not belong to is ignored
     Given the user is currently on organization "alpha"
-    When the user opens "/me?org=not-a-member"
+    When the user opens "/coding-agents?org=not-a-member"
     Then the selected organization stays "alpha"
     And the "?org" parameter is stripped from the URL
 
@@ -48,5 +48,5 @@ Feature: AI Gateway Governance — `?org=` organization switch on org-scoped pag
   @bdd @ui @governance @org-query-param @integration
   Scenario: A page without `?org` leaves the remembered organization untouched
     Given the user last selected organization "beta"
-    When the user opens "/me" with no "?org" parameter
+    When the user opens "/coding-agents" with no "?org" parameter
     Then the page shows organization "beta" from the remembered selection

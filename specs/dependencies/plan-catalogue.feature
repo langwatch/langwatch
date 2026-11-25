@@ -61,7 +61,7 @@ Feature: One catalogue states every plan fact
     Scenario: The catalogue lists exactly the disputes found in the census
       Given the disputes the catalogue records
       When they are listed
-      Then they are exactly the four the census found
+      Then they are exactly the five recorded disputes
 
     @unit
     Scenario: Every dispute names the plans it lands on, and those plans name it back

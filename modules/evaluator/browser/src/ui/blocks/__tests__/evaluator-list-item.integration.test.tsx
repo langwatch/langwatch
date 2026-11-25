@@ -83,3 +83,32 @@ describe("EvaluatorListEmptyState", () => {
     expect(onCreateNew).toHaveBeenCalledOnce();
   });
 });
+
+describe("who created an evaluator", () => {
+  /** @scenario "The evaluators list shows who created each evaluator" */
+  it("shows the creator when one was recorded and nothing otherwise", () => {
+    const handlers = {
+      onClick: vi.fn(),
+      onEdit: vi.fn(),
+      onDelete: vi.fn(),
+      onUseFromApi: vi.fn(),
+    };
+    const { rerender } = renderWithDesignSystem(
+      <EvaluatorListItem
+        evaluator={{ ...evaluator, createdBy: { id: "user_ada", name: "Ada" } }}
+        updatedAtLabel="2 days ago"
+        {...handlers}
+      />,
+    );
+    expect(screen.getByText("Created by Ada")).toBeInTheDocument();
+
+    rerender(
+      <EvaluatorListItem
+        evaluator={{ ...evaluator, createdBy: null }}
+        updatedAtLabel="2 days ago"
+        {...handlers}
+      />,
+    );
+    expect(screen.queryByText(/Created by/)).not.toBeInTheDocument();
+  });
+});

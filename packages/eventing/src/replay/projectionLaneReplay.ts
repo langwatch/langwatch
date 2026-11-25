@@ -3,9 +3,16 @@ import { nowInstant } from "@langwatch/time";
 
 import { compareOrdinal } from "../utils/compareOrdinal.ts";
 import { REPLAY_CURSOR_SKEW_MARGIN_MS } from "./replayConstants.ts";
+import type { ReplayLogWriter } from "./replayLog.ts";
 import type { ReplayProjections } from "./replayProjections.ts";
 import type { ReplayService } from "./replayService.ts";
-import type { BatchCompleteInfo, ProjectionKind, ReplayConfig, ReplayResult } from "./types.ts";
+import type {
+  BatchCompleteInfo,
+  ProjectionKind,
+  ReplayConfig,
+  ReplayPagingLedger,
+  ReplayResult,
+} from "./types.ts";
 
 const logger = createLogger("langwatch:event-sourcing:projection-lane-replay");
 
@@ -93,6 +100,7 @@ interface LaneReplayInput {
   dryRun: boolean;
   signal?: AbortSignal;
   resume?: ProjectionLaneReplayResume;
+  paging?: ReplayPagingLedger;
   onBatchComplete?: (info: BatchCompleteInfo) => void;
   onTenantComplete?: (info: { tenantId: string; replayedThrough: string }) => void;
 }
@@ -100,7 +108,7 @@ interface LaneReplayInput {
 /** Each target in turn (`undefined`: every tenant in one pass), reporting each tenant done. */
 async function replayTenants({
   service,
-  input: { lane, since, dryRun, signal, onBatchComplete, onTenantComplete },
+  input: { lane, since, dryRun, signal, paging, onBatchComplete, onTenantComplete },
   selection,
   targets,
   replayedThrough,
@@ -114,6 +122,8 @@ async function replayTenants({
   const callbacks = {
     ...(onBatchComplete === undefined ? {} : { onBatchComplete }),
     ...(signal === undefined ? {} : { signal }),
+    ...(paging === undefined ? {} : { paging }),
+    log: pageLog({ lane }),
   };
   const totals = { aggregatesReplayed: 0, totalEvents: 0 };
   for (const tenantId of targets) {
@@ -136,6 +146,19 @@ async function replayTenants({
     if (tenantId !== undefined && !dryRun) onTenantComplete?.({ tenantId, replayedThrough });
   }
   return totals;
+}
+
+/** Paging's entries, numbers only, so a paged aggregate's cost shows in the worker's log. */
+function pageLog({ lane }: { lane: string }): ReplayLogWriter {
+  return {
+    write: (entry) => {
+      if (entry.step === "page-aggregate") logger.info({ lane, ...entry }, "Replay read a page");
+      // Its error text is ClickHouse's and may quote the query, so only the batch number goes on.
+      if (entry.step === "page-batch") {
+        logger.info({ lane, step: entry.step, batch: entry.batch }, "Replay pages an aggregate");
+      }
+    },
+  };
 }
 
 /** The ClickHouse router's refusal for a tenant it cannot resolve, read structurally by name. */

@@ -75,11 +75,12 @@ export const RunEvaluationButton = ({ disabled = false }: RunEvaluationButtonPro
   const promptTemplateFields = usePromptTemplateFields();
   const { status, execute, abort, isAborting } = useExecuteEvaluation();
 
-  const { targets, evaluators, activeDatasetId, results } = useEvaluationsV3Store(
+  const { targets, evaluators, activeDatasetId, datasets, results } = useEvaluationsV3Store(
     useShallow((state) => ({
       targets: state.targets,
       evaluators: state.evaluators,
       activeDatasetId: state.activeDatasetId,
+      datasets: state.datasets,
       results: state.results,
     })),
   );
@@ -87,7 +88,13 @@ export const RunEvaluationButton = ({ disabled = false }: RunEvaluationButtonPro
   const hasTargets = targets.length > 0;
   const isRunning = status === "running" || results.status === "running";
   const validate = () =>
-    validateWorkbench({ targets, evaluators, activeDatasetId, promptTemplateFields });
+    validateWorkbench({
+      targets,
+      evaluators,
+      activeDatasetId,
+      promptTemplateFields,
+      datasets,
+    });
 
   const handleClick = async () => {
     if (isRunning) return abort();

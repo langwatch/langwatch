@@ -24,11 +24,14 @@ function attributeText(value: unknown): string {
 }
 
 /**
- * Copilot's instrumentation scope name; `@github/copilot` is a legacy alias for older builds.
- * Matching by scope rather than only by a `github.copilot.*` attribute is what lets an
- * `execute_tool` span, which may carry no vendor attribute, still be classified as a tool span.
+ * Copilot's instrumentation scope names: the CLI's, its legacy `@github/copilot` alias, and VS Code
+ * Copilot Chat's. Matching by scope rather than only by a `github.copilot.*` attribute is what lets
+ * an `execute_tool` or VS Code `chat` span, which may carry no such attribute, still be classified.
  */
-const COPILOT_SCOPES = ["github.copilot", "@github/copilot"];
+const COPILOT_SCOPES = ["github.copilot", "@github/copilot", "copilot-chat"];
+
+/** VS Code Copilot Chat's spelling of the per-call AI-unit count the CLI sends as `nano_aiu`. */
+const VSCODE_NANO_AIU_ATTR = "copilot_chat.copilot_usage_nano_aiu";
 
 /** Copilot's gen_ai.operation.name values → langwatch span types. */
 const OPERATION_TO_SPAN_TYPE: Record<string, string> = {
@@ -109,7 +112,9 @@ export class CopilotCanonicaliserService implements AttributeCanonicaliser {
       ctx.recordRule(`${this.id}:cost_units`);
     }
 
-    const nanoAiu = takeAttribute(attrs, `${COPILOT_ATTR_PREFIX}nano_aiu`);
+    const nanoAiu =
+      takeAttribute(attrs, `${COPILOT_ATTR_PREFIX}nano_aiu`) ??
+      takeAttribute(attrs, VSCODE_NANO_AIU_ATTR);
     if (nanoAiu !== void 0 && nanoAiu !== null) {
       ctx.setAttr("metadata.copilot_nano_aiu", attributeText(nanoAiu));
       ctx.recordRule(`${this.id}:nano_aiu`);

@@ -12,6 +12,7 @@ export type InviteAssignableRoles = Pick<RoleApi, "filterAssignableRoles">;
 import type { OrganizationInviteMail } from "../channels/organization-invite-mail.channel.ts";
 import type { InviteSendThrottleService } from "../features/invite/services/invite-send-throttle.service.ts";
 import type { OrganizationInviteRepository } from "../repositories/organization-invite.repository.ts";
+import type { SeatLease } from "../repositories/organization-seat.repository.ts";
 
 /**
  * What an organization's seats currently cost it, and what a lite seat is - two counts and one
@@ -28,6 +29,22 @@ export interface OrganizationInviteSeatCensus {
    * lite seat from being sold the permissions of a full one.
    */
   isViewOnlyCustomRole(permissions: string[]): boolean;
+  /**
+   * The addresses among these whose person still has a live seat hold (seat-rotation.feature):
+   * inviting them back takes that seat, not another. Absent where no holds are composed.
+   */
+  findHeldEmails?(input: { organizationId: string; emails: readonly string[] }): Promise<string[]>;
+  /** An accepted person back within their hold takes the held seat back. */
+  takeBackHeldSeat?(input: {
+    organizationId: string;
+    userId: string;
+    email?: string;
+  }): Promise<boolean>;
+  /** The organization's seat lock, held while a batch is counted and written. */
+  withSeatLock<T>(input: {
+    organizationId: string;
+    work: (lease: SeatLease) => Promise<T>;
+  }): Promise<T>;
 }
 
 /**
@@ -75,6 +92,8 @@ export interface CreateAdminInviteInput {
   teamIds: string;
   teamAssignments?: TeamAssignmentInput[];
   requestedBy?: string | null;
+  /** The person who pays: role EXTERNAL, no team, no seat (ADR-205). */
+  billingOnly?: boolean;
 }
 
 /**
@@ -91,6 +110,8 @@ export interface CreateInvitesInviteInput {
     role: string;
     customRoleId?: string;
   }[];
+  /** Stored as EXTERNAL with no team, whatever `role` names (ADR-205). */
+  billingOnly?: boolean;
 }
 
 /** The validated team side of one requested invite. */

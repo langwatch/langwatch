@@ -29,8 +29,10 @@ import type {
   LoadedExecutionData,
 } from "../../../services/experiment-execution-data.service.ts";
 import { ExperimentResultDispatchService } from "../../../services/experiment-result-dispatch.service.ts";
+import { ExperimentRunDatasetVersionService } from "../../../services/experiment-run-dataset-version.service.ts";
 import type { ExperimentService } from "../../../services/experiment.service.ts";
 import type { ExperimentRunCommandDispatcherService } from "../../run/services/experiment-run-command-dispatcher.service.ts";
+import type { ExperimentRunConcurrencyService } from "../../run/services/experiment-run-concurrency.service.ts";
 import type { ExperimentWorkbenchObserver } from "./experiment-workbench-observer.service.ts";
 
 const logger = createLogger("langwatch:experiments-v3");
@@ -50,8 +52,8 @@ export type WorkbenchRunPipeline = Readonly<{
   services: ExecutionDataServices;
   /** Refuses a run against someone else's personal development agent before it starts. */
   ownership: Pick<ExperimentAgentOwnershipService, "assertConnectedAgentsRunnable">;
-  /** Cells in flight at once when a run names no limit of its own. */
-  concurrency: number;
+  /** The cells in flight at once a run starts with when it names no limit of its own. */
+  concurrency: Pick<ExperimentRunConcurrencyService, "resolve" | "release">;
   /** What this process refuses of a run, for want of Redis or a public address. */
   refusals: ExperimentRunRefusals;
 }>;
@@ -131,19 +133,22 @@ export class ExperimentWorkbenchPipelineRunService {
    * `GET /runs/:runId` (spec section 7).
    */
   async *streamRun(run: PipelineRunStart): AsyncGenerator<EvaluationV3Event> {
+    const sent = { start: false };
     try {
       // A personal development agent runs on one person's machine; only they may send it a turn.
       await this.runs.ownership.assertConnectedAgentsRunnable({
         agents: [...run.data.loadedAgents.values()],
         actor: run.actor,
       });
-      for await (const frame of this.#frames(run)) {
+      for await (const frame of this.#frames(run, sent)) {
         yield frame;
         if (run.ran && (frame.type === "done" || frame.type === "stopped")) {
           this.observer.recordExperimentRan(run.ran);
         }
       }
     } catch (error) {
+      // Once the start is sent the worker runs the cells, so the claim stays until completion.
+      if (!sent.start) await this.#releaseClaim(run);
       logger.error({ error, ...run.reportContext }, "Pipeline run error");
       this.observer.reportError(error, run.reportContext);
       yield mapThrownErrorEvent({ error });
@@ -166,13 +171,27 @@ export class ExperimentWorkbenchPipelineRunService {
       return;
     }
 
-    await this.runs.commands.startExperimentRun(run.start);
+    try {
+      await this.runs.commands.startExperimentRun(run.start);
+    } catch (error) {
+      await this.#releaseClaim(run);
+      throw error;
+    }
+    await this.#linkDatasetVersion({ run });
     await this.#carryBoard({ run });
     await this.#recordStart({ run });
   }
 
+  /** A run whose start command was never sent gives its concurrency claim back. */
+  async #releaseClaim(run: PipelineRunStart): Promise<void> {
+    await this.runs.concurrency.release({ projectId: run.start.tenantId, runId: run.start.runId });
+  }
+
   /** The run's frames in `seq` order, a redelivered one dropped, until the run ends. */
-  async *#frames(run: PipelineRunStart): AsyncGenerator<EvaluationV3Event> {
+  async *#frames(
+    run: PipelineRunStart,
+    sent: { start: boolean },
+  ): AsyncGenerator<EvaluationV3Event> {
     const { runId } = run.start;
     const queued: ExperimentRunStreamMessage[] = [];
     let wake: (() => void) | null = null;
@@ -185,6 +204,8 @@ export class ExperimentWorkbenchPipelineRunService {
     });
     try {
       await this.runs.commands.startExperimentRun(run.start);
+      sent.start = true;
+      await this.#linkDatasetVersion({ run });
       await this.#carryBoard({ run });
       // The page polls the moment a frame names the run; the run API answers for it first.
       await this.#recordStart({ run });
@@ -233,10 +254,29 @@ export class ExperimentWorkbenchPipelineRunService {
     });
   }
 
+  /** Records the dataset version the run read; a failed link is logged, never the run's failure. */
+  async #linkDatasetVersion({ run }: { run: PipelineRunStart }): Promise<void> {
+    await ExperimentRunDatasetVersionService.create({ datasets: this.runs.services.datasets }).link(
+      {
+        projectId: run.start.tenantId,
+        runId: run.start.runId,
+        experimentId: run.start.experimentId,
+        datasetVersion: run.data.datasetVersion,
+      },
+    );
+  }
+
   async #recordStart({ run }: { run: PipelineRunStart }): Promise<void> {
-    const { tenantId, runId, experimentId, total, occurredAt } = run.start;
+    const { tenantId, runId, experimentId, total, occurredAt, plan } = run.start;
     await this.runs.folds.recordRunStart({
-      start: { projectId: tenantId, runId, experimentId, total, startedAt: occurredAt },
+      start: {
+        projectId: tenantId,
+        runId,
+        experimentId,
+        total,
+        ...(plan ? { concurrency: plan.concurrency } : {}),
+        startedAt: occurredAt,
+      },
     });
   }
 

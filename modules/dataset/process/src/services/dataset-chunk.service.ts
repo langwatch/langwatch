@@ -4,7 +4,7 @@
  * advisory lock (Decision 9 / I-COUNT); this class keeps append, edit and locate.
  */
 
-import { type DatasetColumns } from "@langwatch/dataset-contract";
+import { type DatasetColumnRenames, type DatasetColumns } from "@langwatch/dataset-contract";
 import { createLogger } from "@langwatch/observability";
 
 import type { DatasetChunkRepository } from "../repositories/dataset-chunk.repository.ts";
@@ -24,6 +24,7 @@ import {
   chunkedMeta,
   chunkMetaOf,
 } from "../rules/dataset-chunking.rules.ts";
+import { assertColumnsCurrent } from "../rules/dataset-columns.rules.ts";
 import { DatasetChunkDeleteService } from "./dataset-chunk-delete.service.ts";
 import { DatasetChunkMaintenanceService } from "./dataset-chunk-maintenance.service.ts";
 
@@ -180,12 +181,15 @@ export class DatasetChunkService {
     recordId,
     entry,
     storage,
+    columns,
   }: {
     dataset: DatasetMutationRecord;
     projectId: string;
     recordId: string;
     entry: unknown;
     storage: DatasetChunkRepository;
+    /** The columns the caller keyed the entry by; refused when one is gone. */
+    columns?: readonly string[] | undefined;
   }): Promise<{ updated: boolean }> {
     const datasetStorage = storage;
 
@@ -206,6 +210,7 @@ export class DatasetChunkService {
     return this.datasets.withDatasetLock(dataset.id, async (tx) => {
       const current = await tx.getOne({ id: dataset.id, projectId });
       assertReady(current);
+      assertColumnsCurrent({ columns, columnTypes: current.columnTypes });
 
       const target = { tx, current, dataset, projectId, recordId, entry, storage: datasetStorage };
       const hinted = await this.editHintedChunk({ ...target, hint });
@@ -369,6 +374,7 @@ export class DatasetChunkService {
     projectId: string;
     oldColumnTypes: DatasetColumns;
     newColumnTypes: DatasetColumns;
+    columnRenames?: DatasetColumnRenames;
     name: string;
     slug: string;
     storage: DatasetChunkRepository;

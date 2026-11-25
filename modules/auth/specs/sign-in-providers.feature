@@ -24,7 +24,7 @@ Feature: The deployment's sign-in providers mount on Better Auth
     Given AUTH_PROVIDER is "auth0" with its client id, secret and issuer set
     When enterprise SSO shapes the providers Better Auth mounts
     Then auth0 is mounted on the callback path customers registered
-    And its accounts stay under their stored issuer and its ID token must verify
+    And its ID token must verify
 
   @unit
   Scenario: A named provider without its secret mounts nothing
@@ -110,3 +110,9 @@ Feature: The deployment's sign-in providers mount on Better Auth
     When the sign-in screen renders in development
     Then google is offered
     And no other social provider is offered
+
+  @regression @integration
+  Scenario: Every provider mark on a sign-in button declares its own size
+    Given the sign-in screen offers google, github and microsoft
+    When their buttons render
+    Then each provider mark is an svg with a width and height equal to its box

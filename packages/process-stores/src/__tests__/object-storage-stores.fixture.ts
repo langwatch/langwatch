@@ -12,6 +12,7 @@ export type ObjectStorageSettings = StoresConfig["objectStorage"];
 
 export const noObjectStorage: ObjectStorageSettings = {
   backend: undefined,
+  uploads: undefined,
   localRoot: undefined,
   s3: { bucket: undefined, endpoint: undefined, region: undefined },
   azure: {
@@ -45,6 +46,7 @@ export async function openObjectStorage(options: {
     queueTenantCap: undefined,
     queueGlobalBudget: undefined,
     clickhouseStatementLaneReserveShare: undefined,
+    clickhousePasswordFile: undefined,
     clickhousePool: {
       override: undefined,
       replicas: undefined,

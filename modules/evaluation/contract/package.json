@@ -17,13 +17,14 @@
   },
   "scripts": {
     "typecheck": "GOMAXPROCS=2 GOMEMLIMIT=2GiB tsc -b",
-    "test": "vitest run"
+    "test": "vitest run --fsModuleCache"
   },
   "dependencies": {
     "@langwatch/authorization": "workspace:*",
     "@langwatch/config": "workspace:*",
     "@langwatch/evaluator-contract": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
+    "@langwatch/ksuid": "workspace:*",
     "@langwatch/module": "workspace:*",
     "@langwatch/secrets": "workspace:*",
     "@langwatch/topic-contract": "workspace:*",

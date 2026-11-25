@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { describe, it, expect, expectTypeOf, beforeEach, afterEach, vi } from "vitest";
 
 import { createLangWatchApiClient } from "@/internal/api/client";
 
@@ -159,6 +159,22 @@ describe("WorkflowsApiService.run", () => {
     });
   });
 
+  describe("given a dataset version", () => {
+    describe("when the run completes", () => {
+      it("includes dataset_version in the evaluate body", async () => {
+        mockFetch
+          .mockResolvedValueOnce(jsonResponse(evaluateResponse))
+          .mockResolvedValueOnce(jsonResponse(completedStatus))
+          .mockResolvedValueOnce(jsonResponse(resultsResponse));
+
+        const service = makeService();
+        await service.run("workflow_123", { datasetVersion: 2, pollInterval: 0 });
+
+        expect(await requestAt(0).clone().json()).toEqual({ dataset_version: 2 });
+      });
+    });
+  });
+
   describe("given the workflow is unknown", () => {
     describe("when the evaluate call returns 404", () => {
       it("throws a WorkflowsApiError with operation context", async () => {
@@ -235,5 +251,13 @@ describe("WorkflowsApiService.run", () => {
         expect(result.rows).toHaveLength(1);
       });
     });
+  });
+});
+
+describe("WorkflowsApiService.run options", () => {
+  it("takes no concurrency, which the workflow evaluate endpoint has no field for", () => {
+    type RunOptions = NonNullable<Parameters<WorkflowsApiService["run"]>[1]>;
+
+    expectTypeOf<RunOptions>().not.toHaveProperty("concurrency");
   });
 });

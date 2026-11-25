@@ -1,7 +1,7 @@
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
 import { fromDate } from "@langwatch/time";
-import { EmailAlreadyRegisteredError } from "@langwatch/user-contract";
+import { EmailAlreadyRegisteredError, UserNotFoundError } from "@langwatch/user-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import { PrismaUserRepository, type UserDatabase } from "../prisma.user.repository.ts";
@@ -252,6 +252,38 @@ describe("PrismaUserRepository credential creation", () => {
       await expect(
         repositoryOver(database).create({ name: "Ada", email: "ada@example.com" }),
       ).rejects.toBeInstanceOf(EmailAlreadyRegisteredError);
+    });
+  });
+
+  describe("when the created fact is recorded for an existing user", () => {
+    it("stamps it from the row's createdAt", async () => {
+      const { database, outboxCreateMany, userFindUnique } = makeDatabase();
+      userFindUnique.mockResolvedValue({ createdAt: new Date(5_000) });
+
+      await repositoryOver(database).appendCreatedFact("user-1");
+
+      expect(userFindUnique).toHaveBeenCalledWith({
+        where: { id: "user-1" },
+        select: { createdAt: true },
+      });
+      expect(outboxCreateMany.mock.calls[0]?.[0]?.data).toEqual([
+        expect.objectContaining({
+          processName: "userLifecycleFacts",
+          tenantId: "user-1",
+          messageKey: "user-1:created",
+          intentType: "recordCreated",
+          payload: { tenantId: "user-1", userId: "user-1", occurredAt: 5_000 },
+        }),
+      ]);
+    });
+
+    it("rejects an unknown user and appends nothing", async () => {
+      const { database, outboxCreateMany } = makeDatabase();
+
+      await expect(repositoryOver(database).appendCreatedFact("ghost")).rejects.toBeInstanceOf(
+        UserNotFoundError,
+      );
+      expect(outboxCreateMany).not.toHaveBeenCalled();
     });
   });
 

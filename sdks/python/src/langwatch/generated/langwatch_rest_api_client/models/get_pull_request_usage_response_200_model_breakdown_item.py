@@ -20,6 +20,7 @@ class GetPullRequestUsageResponse200ModelBreakdownItem:
         total_tokens (float):
         cost_usd (float | None):
         tokens_known (bool):
+        ai_units (float | None):
     """
 
     model: str
@@ -30,6 +31,7 @@ class GetPullRequestUsageResponse200ModelBreakdownItem:
     total_tokens: float
     cost_usd: float | None
     tokens_known: bool
+    ai_units: float | None
 
     def to_dict(self) -> dict[str, Any]:
         model = self.model
@@ -49,6 +51,9 @@ class GetPullRequestUsageResponse200ModelBreakdownItem:
 
         tokens_known = self.tokens_known
 
+        ai_units: float | None
+        ai_units = self.ai_units
+
         field_dict: dict[str, Any] = {}
 
         field_dict.update(
@@ -61,6 +66,7 @@ class GetPullRequestUsageResponse200ModelBreakdownItem:
                 "totalTokens": total_tokens,
                 "costUsd": cost_usd,
                 "tokensKnown": tokens_known,
+                "aiUnits": ai_units,
             }
         )
 
@@ -90,6 +96,13 @@ class GetPullRequestUsageResponse200ModelBreakdownItem:
 
         tokens_known = d.pop("tokensKnown")
 
+        def _parse_ai_units(data: object) -> float | None:
+            if data is None:
+                return data
+            return cast(float | None, data)
+
+        ai_units = _parse_ai_units(d.pop("aiUnits"))
+
         get_pull_request_usage_response_200_model_breakdown_item = cls(
             model=model,
             input_tokens=input_tokens,
@@ -99,6 +112,7 @@ class GetPullRequestUsageResponse200ModelBreakdownItem:
             total_tokens=total_tokens,
             cost_usd=cost_usd,
             tokens_known=tokens_known,
+            ai_units=ai_units,
         )
 
         return get_pull_request_usage_response_200_model_breakdown_item

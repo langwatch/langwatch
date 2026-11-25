@@ -197,7 +197,7 @@ describe.skipIf(!databaseUrl)("dashboard widget service (integration)", () => {
         const foreign = await createDashboard(otherProject);
 
         await expect(create({ dashboardId: foreign.id })).rejects.toMatchObject({
-          code: "dashboard_widget_not_found",
+          code: "dashboard_not_found",
         });
 
         const written = await database().dashboardWidget.count({
@@ -219,7 +219,7 @@ describe.skipIf(!databaseUrl)("dashboard widget service (integration)", () => {
             projectId: project.id,
             dashboardId: foreign.id,
           }),
-        ).rejects.toMatchObject({ code: "dashboard_widget_not_found" });
+        ).rejects.toMatchObject({ code: "dashboard_not_found" });
 
         const read = await service.getById({
           id: widget.id,
@@ -243,6 +243,7 @@ describe.skipIf(!databaseUrl)("dashboard widget service (integration)", () => {
         });
 
         expect(updated.definition.code).toBe("new");
+        // Created unset over SQL that never reads the sources parameter, so none stores a list.
         expect(updated.definition.queries).toEqual(QUERIES);
       });
     });

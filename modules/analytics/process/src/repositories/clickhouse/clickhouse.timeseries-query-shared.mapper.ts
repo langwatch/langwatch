@@ -1,6 +1,8 @@
 import type { AnalyticsFilterValue } from "@langwatch/analytics-contract";
 import { customMetadataValueCondition } from "@langwatch/trace-contract";
 
+import { latestVersionColumnOf } from "./clickhouse.latest-version-dedup.mapper.ts";
+
 /**
  * Internal helpers shared by the slim + rollup timeseries SQL builders
  * (ADR-034 Phase 3). Centralising the `toStartOf…` bucket function keeps
@@ -159,7 +161,7 @@ export function appendMetadataValueFilterClauses({
   }
 }
 
-/** The columns of a deduped slim read: `OccurredAt` plus each `<alias>.<Column>` mentioned. */
+/** The columns of a deduped slim read: `OccurredAt` plus the column each `<alias>.<key>` names. */
 export function referencedAliasColumns({
   alias,
   expressions,
@@ -173,7 +175,7 @@ export function referencedAliasColumns({
   const pattern = new RegExp(`\\b${alias}\\.([A-Za-z_][A-Za-z0-9_]*)`, "g");
   for (const expression of expressions) {
     for (const match of expression.matchAll(pattern)) {
-      if (match[1]) columns.add(match[1]);
+      if (match[1]) columns.add(latestVersionColumnOf(match[1]));
     }
   }
   for (const key of keyColumns) columns.delete(key);

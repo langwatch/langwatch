@@ -4,15 +4,18 @@
  */
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type {
+  ModelDefaultScope,
+  ModelProvider,
   ModelProviderApiKeyValidation,
   ModelProviderCredentialVerdict,
 } from "@langwatch/model-provider-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
-import type { ProjectApi } from "@langwatch/project-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
+import { createModelProviderTestProjects } from "../../../../app/__tests__/model-provider.fixture.ts";
 import { MemoryModelProviderRepositories } from "../../../../repositories/memory/memory.model-provider.repositories.ts";
+import type { ModelProviderRepositories } from "../../../../repositories/model-provider.repositories.ts";
 import { ModelProviderAuthorizationService } from "../../../../services/model-provider-authorization.service.ts";
 import { ModelProviderDecisionModelService } from "../../../../services/model-provider-decision-model.service.ts";
 import { ModelProviderScopeService } from "../../../../services/model-provider-scope.service.ts";
@@ -44,6 +47,34 @@ const ORGANIZATION = "organization-1";
 const SCOPE = { scopeType: "ORGANIZATION" as const, scopeId: ORGANIZATION };
 const CONFIG_ID = "config-1";
 const MERCURY = "inception/decisions:mercury-decide";
+const PROJECT_A = { scopeType: "PROJECT" as const, scopeId: "project-a" };
+const PROJECT_B = { scopeType: "PROJECT" as const, scopeId: "project-b" };
+
+function inceptionRow(): ModelProvider {
+  const at = new Date(0);
+  return {
+    id: "mp_inception",
+    organizationId: ORGANIZATION,
+    provider: "inception",
+    name: "Inception",
+    enabled: true,
+    routingHandle: null,
+    scopes: [],
+    customKeys: { INCEPTION_API_KEY: "customer-key" },
+    customModels: [],
+    customEmbeddingsModels: [],
+    extraHeaders: [],
+    rateLimitRpm: null,
+    rateLimitTpm: null,
+    rateLimitRpd: null,
+    fallbackPriorityGlobal: null,
+    providerConfig: null,
+    createdAt: at,
+    updatedAt: at,
+  };
+}
+
+const scopeKey = (scope: ModelDefaultScope) => `${scope.scopeType}:${scope.scopeId}`;
 
 function unused(member: string) {
   return (): never => {
@@ -52,24 +83,30 @@ function unused(member: string) {
 }
 
 async function writerOver({
+  defaults = MemoryModelProviderRepositories.create().defaults,
   stored,
+  storedScopes = [SCOPE],
   isFlagOn,
+  keyedScopes = [SCOPE],
 }: {
   stored?: Record<string, string>;
+  storedScopes?: ModelDefaultScope[];
   isFlagOn: boolean;
+  /** The scopes whose own chain holds an enabled Inception key. */
+  keyedScopes?: ModelDefaultScope[];
+  defaults?: ModelProviderRepositories["defaults"];
 }) {
-  const { defaults } = MemoryModelProviderRepositories.create();
   if (stored) {
     await defaults.save({
       id: CONFIG_ID,
       organizationId: ORGANIZATION,
       config: stored,
-      scopes: [SCOPE],
+      scopes: storedScopes,
       authorId: null,
     });
   }
   const scopes = ModelProviderScopeService.create({
-    projects: createApiFixture<ProjectApi>({}, "ProjectApi"),
+    projects: createModelProviderTestProjects(),
     organizations: createApiFixture<OrganizationApi>(
       {
         getBillingProfile: async ({ organizationId }) => ({
@@ -81,10 +118,15 @@ async function writerOver({
       "OrganizationApi",
     ),
   });
+  const keyed = new Set(keyedScopes.map(scopeKey));
   const decisionModels = ModelProviderDecisionModelService.create({
     resolution: { resolve: unused("resolve") },
     scopes,
     findProviderForProject: unused("findProviderForProject"),
+    findProviderForScope: ({ scope, provider }) =>
+      Promise.resolve(
+        provider === "inception" && keyed.has(scopeKey(scope)) ? inceptionRow() : null,
+      ),
     isOwnModelAllowed: () => Promise.resolve(isFlagOn),
   });
   return ModelProviderDefaultsWriteService.create({
@@ -123,16 +165,57 @@ describe("ModelProviderDefaultsWriteService and the Instant Evals column", () =>
       expect(saved.config).toEqual({ INSTANT_EVALS: MERCURY, FAST: "openai/gpt-5.4-mini" });
     });
 
-    it("accepts LangWatch Instant Preview", async () => {
-      const writer = await writerOver({ isFlagOn: false });
+    /** @scenario "Saving a config stores LangWatch's model under the id the previous release reads" */
+    it.each(["langwatch/instant-preview", "langwatch/instant-evals"])(
+      "stores %s as langwatch/instant-evals",
+      async (sent) => {
+        const writer = await writerOver({ isFlagOn: false });
 
-      const saved = await writer.save({
-        config: { INSTANT_EVALS: "langwatch/instant-evals" },
-        scopes: [SCOPE],
+        const saved = await writer.save({
+          config: { INSTANT_EVALS: sent },
+          scopes: [SCOPE],
+          authorId: null,
+        });
+
+        expect(saved.config).toEqual({ INSTANT_EVALS: "langwatch/instant-evals" });
+      },
+    );
+
+    /** @scenario "Saving a config stores LangWatch's model under the id the previous release reads" */
+    it("stores LangWatch Instant (preview) set as one default under the earlier id", async () => {
+      const { defaults } = MemoryModelProviderRepositories.create();
+      const writer = await writerOver({ isFlagOn: false, defaults });
+
+      await writer.set({
+        scope: SCOPE,
+        key: "INSTANT_EVALS",
+        model: "langwatch/instant-preview",
         authorId: null,
       });
 
-      expect(saved.config).toEqual({ INSTANT_EVALS: "langwatch/instant-evals" });
+      const [stored] = await defaults.findForOrganization(ORGANIZATION);
+      expect(stored?.config).toEqual({ INSTANT_EVALS: "langwatch/instant-evals" });
+    });
+
+    /** @scenario "The Instant Evals column refuses LangWatch Evals (preview)" */
+    it("refuses LangWatch Evals (preview) in the column on a save and on a single set", async () => {
+      const writer = await writerOver({ isFlagOn: false });
+
+      await expect(
+        writer.save({
+          config: { INSTANT_EVALS: "langwatch/evals-preview" },
+          scopes: [SCOPE],
+          authorId: null,
+        }),
+      ).rejects.toMatchObject({ code: "validation_error" });
+      await expect(
+        writer.set({
+          scope: SCOPE,
+          key: "INSTANT_EVALS",
+          model: "langwatch/evals-preview",
+          authorId: null,
+        }),
+      ).rejects.toHaveProperty("code");
     });
   });
 
@@ -147,6 +230,61 @@ describe("ModelProviderDefaultsWriteService and the Instant Evals column", () =>
       });
 
       expect(saved.config).toEqual({ INSTANT_EVALS: MERCURY });
+    });
+
+    /** @scenario "Picking an own decision model for a scope with no key for it is refused" */
+    it("refuses an organization config when only one project holds the key", async () => {
+      const writer = await writerOver({ isFlagOn: true, keyedScopes: [PROJECT_A] });
+
+      await expect(
+        writer.save({ config: { INSTANT_EVALS: MERCURY }, scopes: [SCOPE], authorId: null }),
+      ).rejects.toMatchObject({
+        code: "validation_error",
+        message: expect.stringContaining("can't run for every scope"),
+      });
+    });
+
+    it("accepts a project config whose project holds the key", async () => {
+      const writer = await writerOver({ isFlagOn: true, keyedScopes: [PROJECT_A] });
+
+      const saved = await writer.save({
+        config: { INSTANT_EVALS: MERCURY },
+        scopes: [PROJECT_A],
+        authorId: null,
+      });
+
+      expect(saved.scopes).toEqual([PROJECT_A]);
+    });
+
+    /** @scenario "A kept own decision model is checked only on the scopes it gains" */
+    it("refuses adding a scope with no key to a config that keeps its model", async () => {
+      const writer = await writerOver({
+        isFlagOn: true,
+        stored: { INSTANT_EVALS: MERCURY },
+        storedScopes: [PROJECT_A],
+        keyedScopes: [PROJECT_A],
+      });
+
+      await expect(
+        writer.save({ id: CONFIG_ID, scopes: [PROJECT_A, PROJECT_B], authorId: null }),
+      ).rejects.toMatchObject({ code: "validation_error" });
+    });
+
+    it("does not recheck a kept model on the scopes it already had", async () => {
+      const writer = await writerOver({
+        isFlagOn: true,
+        stored: { INSTANT_EVALS: MERCURY },
+        storedScopes: [PROJECT_A],
+        keyedScopes: [],
+      });
+
+      const saved = await writer.save({
+        id: CONFIG_ID,
+        config: { INSTANT_EVALS: MERCURY, FAST: "openai/gpt-5.4-mini" },
+        authorId: null,
+      });
+
+      expect(saved.config).toEqual({ INSTANT_EVALS: MERCURY, FAST: "openai/gpt-5.4-mini" });
     });
   });
 

@@ -29,11 +29,24 @@ const logger = createLogger("langwatch:gateway:config-assembly");
 /** The reserved names a routing policy may give a meaning to. */
 export const MODEL_TIERS = ["complex", "reasoning", "fast"] as const;
 
+/** Providers whose whole credential is one API key, and the stored field that holds it. */
+const API_KEY_ONLY_FIELDS: Record<string, string> = {
+  anthropic: "ANTHROPIC_API_KEY",
+  openai: "OPENAI_API_KEY",
+  deepseek: "DEEPSEEK_API_KEY",
+  xai: "XAI_API_KEY",
+  cerebras: "CEREBRAS_API_KEY",
+  doubleword: "DOUBLEWORD_API_KEY",
+  groq: "GROQ_API_KEY",
+  cloudflare: "CLOUDFLARE_API_KEY",
+};
+
 const HOSTED_CATALOG_PREFIXES: Record<string, string> = {
   openai: "openai",
   anthropic: "anthropic",
   gemini: "gemini",
   deepseek: "deepseek",
+  doubleword: "doubleword",
   xai: "xai",
   voyage: "voyageai",
 };
@@ -146,6 +159,11 @@ export class GatewayConfigAssemblyService implements GatewayConfigAssembly {
     const pick = (k: string): string =>
       typeof customKeys[k] === "string" ? (customKeys[k] as string) : "";
 
+    const apiKeyField = Object.hasOwn(API_KEY_ONLY_FIELDS, provider)
+      ? API_KEY_ONLY_FIELDS[provider]
+      : undefined;
+    if (apiKeyField) return { api_key: pick(apiKeyField) };
+
     switch (provider) {
       case "azure": {
         return {
@@ -184,8 +202,6 @@ export class GatewayConfigAssemblyService implements GatewayConfigAssembly {
           provider_row_id: mp.id,
         };
       }
-      case "anthropic":
-        return { api_key: pick("ANTHROPIC_API_KEY") };
       case "gemini":
       case "google_gemini":
         return geminiCredentials(pick);
@@ -199,18 +215,6 @@ export class GatewayConfigAssemblyService implements GatewayConfigAssembly {
           project_id: pick("GOOGLE_AGENT_PLATFORM_PROJECT").trim(),
           region: pick("GOOGLE_AGENT_PLATFORM_LOCATION").trim(),
         };
-      case "openai":
-        return { api_key: pick("OPENAI_API_KEY") };
-      case "deepseek":
-        return { api_key: pick("DEEPSEEK_API_KEY") };
-      case "xai":
-        return { api_key: pick("XAI_API_KEY") };
-      case "cerebras":
-        return { api_key: pick("CEREBRAS_API_KEY") };
-      case "groq":
-        return { api_key: pick("GROQ_API_KEY") };
-      case "cloudflare":
-        return { api_key: pick("CLOUDFLARE_API_KEY") };
       default: {
         const apiKey = Object.entries(customKeys).find(([k]) => k.endsWith("_API_KEY"))?.[1];
 

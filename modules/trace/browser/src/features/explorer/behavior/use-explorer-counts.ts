@@ -7,6 +7,7 @@ import {
   selectInstantEvalRunPhase,
   useInstantEvalRunStore,
 } from "../../instant-eval/behavior/instant-eval-run.store.ts";
+import { useHasPendingNegatedEval } from "../../instant-eval/behavior/use-has-pending-negated-eval.ts";
 import { useInstantEvalRuns } from "../../instant-eval/behavior/use-instant-eval-runs.ts";
 import { useSessionGroups } from "./use-session-groups.ts";
 import { useTraceListQuery } from "./use-trace-list-query.ts";
@@ -18,7 +19,7 @@ interface ActiveInstantEval {
   total: number | null;
   matched: number;
   /** Judging, asked to stop, or ended with its last verdicts still landing. */
-  phase: Exclude<InstantEvalRunPhase, "settled">;
+  phase: Exclude<InstantEvalRunPhase, "settled" | "failed">;
 }
 
 interface ExplorerCounts {
@@ -55,20 +56,26 @@ export function useExplorerCounts(): ExplorerCounts {
   const list = useTraceListQuery();
   const sessions = useSessionGroups();
   const byConversation = useExplorerStore((s) => s.grouping) === "by-conversation";
+  // The rows a pending NOT chip lists were never judged, so none of them count.
+  const hasPendingNegatedEval = useHasPendingNegatedEval();
   const pageTraceIds = useMemo(
-    () => (byConversation ? [] : list.data.map((trace) => trace.traceId)),
-    [byConversation, list.data],
+    () => (byConversation || hasPendingNegatedEval ? [] : list.data.map((trace) => trace.traceId)),
+    [byConversation, hasPendingNegatedEval, list.data],
   );
   const { chips } = useInstantEvalRuns();
   const runs = useInstantEvalRunStore((s) => s.runs);
   const stoppedByUser = useInstantEvalRunStore((s) => s.stoppedByUser);
   const settled = useInstantEvalRunStore((s) => s.settled);
+  // Another chip's run still judging counts nothing either: no row of this result was judged.
   const instantEval = useMemo(
-    () => firstUnsettledInstantEval({ chips, state: { runs, stoppedByUser, settled } }),
-    [chips, runs, stoppedByUser, settled],
+    () =>
+      hasPendingNegatedEval
+        ? null
+        : firstUnsettledInstantEval({ chips, state: { runs, stoppedByUser, settled } }),
+    [hasPendingNegatedEval, chips, runs, stoppedByUser, settled],
   );
 
-  const counts = byConversation
+  const read = byConversation
     ? {
         totalHits: sessions.totalHits,
         itemNoun: "conversations" as const,
@@ -83,6 +90,7 @@ export function useExplorerCounts(): ExplorerCounts {
         isFetching: list.isFetching,
         isPlaceholderData: list.isPlaceholderData,
       };
+  const counts = hasPendingNegatedEval ? { ...read, totalHits: 0 } : read;
 
   // The store keeps the last answer so a reader of the page state (Langy's
   // `explorer.getState`) sees the count the page shows.
@@ -118,7 +126,8 @@ function firstUnsettledInstantEval({
     const run = runId === null ? undefined : state.runs[runId];
     if (!run) continue;
     const phase = selectInstantEvalRunPhase(state, run.id);
-    if (phase === null || phase === "settled") continue;
+    // A failed run has no counters left to wait for: the counts read the list.
+    if (phase === null || phase === "settled" || phase === "failed") continue;
     return {
       runId: run.id,
       judged: run.progress,

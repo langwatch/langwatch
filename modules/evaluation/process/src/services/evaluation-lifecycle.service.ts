@@ -1,4 +1,7 @@
-import type { EvaluationRunData } from "@langwatch/evaluation-contract";
+import type {
+  EvaluationMonitorErrorRateExceededEventData,
+  EvaluationRunData,
+} from "@langwatch/evaluation-contract";
 import type { EventingCommands, RetentionPolicyResolver } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import { nowInstant } from "@langwatch/time";
@@ -9,8 +12,8 @@ import { buildEvaluationLifecyclePipeline } from "../eventing/evaluation-lifecyc
 const logger = createLogger("langwatch:evaluation:lifecycle");
 
 /**
- * Records evaluation's own lifecycle facts on its pipeline: that a person ran one by hand, and that
- * one settled. Nurturing names the admin and counts them from its own side (§9).
+ * Records evaluation's own lifecycle facts on its pipeline: that a person ran one by hand, that one
+ * settled, and that a monitor's runs mostly errored. Peers react from their own side (§9).
  */
 export class EvaluationLifecycleService {
   readonly pipeline: EvaluationLifecyclePipeline;
@@ -61,6 +64,16 @@ export class EvaluationLifecycleService {
       evaluatorType: run.evaluatorType,
       score: run.score,
       passed: run.passed,
+    });
+  }
+
+  /** Throws to be retried: the error-rate count calls it once per monitor revision. */
+  async monitorErrorRateExceeded(
+    input: Omit<EvaluationMonitorErrorRateExceededEventData, "tenantId">,
+  ): Promise<void> {
+    await this.#senders().recordMonitorErrorRateExceeded.send({
+      ...input,
+      tenantId: input.projectId,
     });
   }
 

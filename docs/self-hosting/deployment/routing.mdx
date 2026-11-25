@@ -16,10 +16,11 @@ LangWatch uses two hostnames. Browsers and SDKs reach the app. LLM clients and c
 | App | `/api/internal` | Prefix | Do not route. Block it. | |
 | Gateway, for example `gateway.acme.com` | `/v1` | Prefix | `<release>-gateway` | `80` |
 | Gateway | `/health` | Exact | `<release>-gateway` | `80` |
+| Gateway | `/a2a` | Prefix | `<release>-gateway` | `80` |
 
-`<release>` is the Helm release name. The gateway Service forwards port 80 to container port 5563.
+`<release>` is the Helm release name. The gateway Service forwards its port to container port 5563. Port 80 is the default; if you set `gateway.service.port`, use that port in every route that names the gateway Service.
 
-Do not expose any other gateway path. `/healthz`, `/readyz`, `/startupz`, `/debug/control-plane` and `/internal/*` are for in-cluster use only. Metrics are served on a separate port (`9464`) and are not part of the gateway Service. Gemini-native clients also need `/v1beta`. Add it as a third Prefix rule if you use them.
+Do not expose any other gateway path. `/healthz`, `/readyz`, `/startupz`, `/debug/control-plane` and `/internal/*` are for in-cluster use only. Metrics are served on a separate port (`9464`) and are not part of the gateway Service. `/a2a` is the agent-to-agent proxy; route it if agents call A2A targets through the gateway. Gemini-native clients also need `/v1beta`. Add it as another Prefix rule if you use them.
 
 `/api/internal` on the app is the private control plane that the gateway and the Langy agent call over cluster DNS. The chart Ingress blocks it by default with `ingress.blockedPaths`. Your own routes must block it too. See [Security](/self-hosting/security#private-control-plane-paths-are-blocked-at-the-ingress).
 
@@ -33,6 +34,10 @@ Do not expose any other gateway path. `/healthz`, `/readyz`, `/startupz`, `/debu
 | Total request timeout | Disabled, or longer than your longest stream | Disabled, or above 15 minutes. A provider call can run up to 14 minutes. |
 | Request body size | At least 50 MB | At least 32 MB, the gateway `security.maxRequestBodyBytes` |
 | WebSocket upgrades | Pass through on `/api/trpc-ws` and `/api/v1/agents/connect` | Not used |
+
+### Uploads through LangWatch
+
+When uploads go through LangWatch (`app.dataplane.uploads: through-langwatch`, or `STORED_OBJECTS_UPLOADS=through-langwatch`), browsers and SDKs send files of up to 5 GiB to `/api/stored-objects/uploads` on the app host. That path needs request buffering off, a body size of at least 5 GiB, and read and send timeouts long enough for your slowest upload (the chart nginx default is `3600`). With direct uploads, the default, files go straight to the bucket and this path carries no file bytes. See [Dataset storage](/self-hosting/upgrade-dataset-storage#when-browsers-cannot-reach-the-bucket).
 
 Envoy and Traefik stream responses without buffering and pass WebSocket upgrades by default. ingress-nginx buffers request bodies by default, caps them at 1 MB, and turns on response buffering when the controller config does, so it needs annotations. On the gateway Ingress the chart sets both buffering annotations to off so a controller-wide setting cannot change them. The app Ingress keeps the controller defaults. See [Architecture](/self-hosting/infrastructure/architecture) for the connected-agents WebSocket.
 
@@ -70,7 +75,21 @@ ingress:
 
 With `className: nginx` the chart adds these to the gateway Ingress only: `proxy-buffering: "off"`, `proxy-request-buffering: "off"`, `proxy-read-timeout: "3600"`, `proxy-send-timeout: "3600"` and `proxy-body-size: 32m`. They override the same keys from `ingress.annotations`. Keys in `ingress.gateway.annotations` override both.
 
-The chart matches on the value of `className`. If `className` is empty and the cluster default IngressClass is ingress-nginx, the gateway Ingress gets none of these settings. On ingress-nginx, set `className: nginx`.
+With `className: nginx` the chart also renders `<release>-uploads-ingress`, routing `/api/stored-objects/uploads` (Prefix) on every `ingress.hosts` host to the app Service. Set `ingress.uploads.enabled: true` to render it for any other class, such as an empty default class or `nginx-internal`, or `false` to turn it off.
+
+The uploads Ingress takes `ingress.annotations` minus the rewrite annotations and `server-snippet`, which applies to the whole host and would run twice. A `configuration-snippet` is copied, so a location rule such as a deny list also covers uploads.
+
+A host whose `ingress.hosts` paths already route exactly `/api/stored-objects/uploads` (with or without a trailing slash) is left out: that route is yours, and ingress-nginx refuses the same host and path twice. Give your route the upload settings yourself. A longer path under it does not count, so the rest of the upload route keeps the chart's settings.
+
+When the class name contains `nginx`, the chart adds `proxy-request-buffering: "off"`, `proxy-body-size: 5121m` (the 5 GiB upload limit and some headroom), `proxy-read-timeout: "3600"` and `proxy-send-timeout: "3600"` to the uploads Ingress. On other classes the chart adds no settings of its own, so put your controller's settings in `ingress.uploads.annotations`. Keys there override everything else.
+
+The uploads Ingress carries no `tls` entry: ingress-nginx serves the host's certificate from the app Ingress.
+
+A prefix in `ingress.blockedPaths` that covers the path stops the uploads Ingress rendering. Without it, uploads go through the app Ingress, so raise its body limit and timeouts there.
+
+With `className: nginx` the app Ingress also gets `proxy-read-timeout: "120"` and `proxy-send-timeout: "120"`, so an analytics query can use its full 60 s; ingress-nginx's default is 60 s. Keys in `ingress.annotations` override them.
+
+The chart matches on the value of `className`, not on the controller. If `className` is empty, or names an ingress-nginx IngressClass other than `nginx`, neither Ingress gets these settings. Then either set `className: nginx`, if your cluster has that class, or keep your class and set the annotations yourself: the app's two timeouts of `"120"` in `ingress.annotations`, and the gateway's five settings in `ingress.gateway.annotations`.
 
 On another controller, set `className` to your IngressClass, or leave it empty for the cluster default. Put the gateway settings for that controller in `ingress.gateway.annotations`. Traefik works with `className: traefik` and no extra annotations for buffering. It can also serve the HTTPRoutes below through its Gateway API provider.
 
@@ -127,6 +146,7 @@ spec:
     - matches:
         - path: { type: PathPrefix, value: /v1 }
         - path: { type: Exact, value: /health }
+        - path: { type: PathPrefix, value: /a2a }
       backendRefs:
         - name: langwatch-gateway
           port: 80

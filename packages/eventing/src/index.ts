@@ -117,6 +117,7 @@ export type {
   PeerEvent,
   PeerEventSchema,
   PeerFoldProjectionDeclaration,
+  PeerFoldSubscriberSpec,
   PeerMapProjectionDeclaration,
 } from "./projections/peerProjection.ts";
 export { RepositoryFoldStore } from "./projections/repositoryFoldStore.ts";

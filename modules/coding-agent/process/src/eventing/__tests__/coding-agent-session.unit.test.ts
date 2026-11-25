@@ -743,7 +743,8 @@ describe("CodingAgentSessionFoldProjection", () => {
 
     /** @scenario A session context event from Codex folds its git identity */
     /** @scenario A session context event from opencode folds its git identity */
-    it.each(["codex", "opencode"])(
+    /** @scenario A session context event from pi folds its git identity */
+    it.each(["codex", "opencode", "pi"])(
       "folds the same identity for %s, because nothing in the fold is per-agent",
       (agent) => {
         const projection = makeProjection();
@@ -836,6 +837,20 @@ describe("CodingAgentSessionFoldProjection", () => {
       );
       expect(state.title).toBe("Fix the retry loop in the outbox worker");
       expect(state.prompts).toBe(2);
+    });
+
+    /** @scenario A first prompt that opens with a markdown heading does not name the session */
+    it("lets the user's own words replace a stored heading-led name", () => {
+      const projection = makeProjection();
+      let state = projection.init();
+      state = { ...state, title: "## Your skills", titleSource: "prompt" };
+
+      state = projection.handleCodingAgentSessionLogFactsContributed(
+        logFactsEvent({ facts: promptFacts("Draft the changelog for this week") }),
+        state,
+      );
+
+      expect(state.title).toBe("Draft the changelog for this week");
     });
 
     /** @scenario A generated title replaces the prompt-derived name */
@@ -934,6 +949,62 @@ describe("CodingAgentSessionFoldProjection", () => {
       // Neither the prompt nor the regenerated conversation title moved it.
       expect(state.title).toBe("pr-reviewer");
       expect(state.titleSource).toBe("name");
+    });
+
+    /** @scenario "Any record that carries a name names the session" */
+    it("takes the name from a prompt record with no context record", () => {
+      const projection = makeProjection();
+      let state = projection.init();
+
+      state = projection.handleCodingAgentSessionLogFactsContributed(
+        logFactsEvent({
+          facts: { ...promptFacts("## Your skills"), "langwatch.session.name": "Scout" },
+        }),
+        state,
+      );
+      expect(state.title).toBe("Scout");
+      expect(state.titleSource).toBe("name");
+
+      state = projection.handleCodingAgentSessionLogFactsContributed(
+        logFactsEvent({
+          facts: {
+            "event.name": "claude_code.api_response_body",
+            "langwatch.session.title": "Review the open pull requests",
+          },
+          timeMs: 3_000,
+        }),
+        state,
+      );
+      expect(state.title).toBe("Scout");
+    });
+
+    /** @scenario "A launcher's name does not undo a harness rename" */
+    it("keeps a harness rename over the launcher's name on later records", () => {
+      const projection = makeProjection();
+      let state = projection.init();
+      const prompt = { ...promptFacts("## Your skills"), "langwatch.session.name": "Scout" };
+
+      state = projection.handleCodingAgentSessionLogFactsContributed(
+        logFactsEvent({ facts: prompt }),
+        state,
+      );
+      state = projection.handleCodingAgentSessionLogFactsContributed(
+        logFactsEvent({
+          facts: {
+            "event.name": "langwatch.session_context",
+            "coding_agent.name": "claude_code",
+            "langwatch.session.name": "pr-reviewer",
+          },
+          timeMs: 2_000,
+        }),
+        state,
+      );
+      state = projection.handleCodingAgentSessionLogFactsContributed(
+        logFactsEvent({ facts: prompt, timeMs: 3_000 }),
+        state,
+      );
+
+      expect(state.title).toBe("pr-reviewer");
     });
 
     /** @scenario "A renamed session renames its row" */
@@ -1959,7 +2030,7 @@ describe("coding-agent session fold, codex", () => {
       ]);
     });
 
-    it("reads codex's bare mcp_server spelling into the server set", () => {
+    it("reads codex's bare mcp_server into the server set and its tool_name as the MCP tool", () => {
       const projection = makeProjection();
 
       const state = projection.handleCodingAgentSessionLogFactsContributed(
@@ -1978,6 +2049,29 @@ describe("coding-agent session fold, codex", () => {
       );
 
       expect(state.mcpServers).toEqual(["grafana"]);
+      expect(state.mcpTools).toEqual(["search"]);
+    });
+
+    it("reads a codex builtin, with an empty mcp_server, as no MCP call", () => {
+      const projection = makeProjection();
+
+      const state = projection.handleCodingAgentSessionLogFactsContributed(
+        logFactsEvent({
+          agent: "codex",
+          timeMs: 2_000,
+          facts: {
+            "event.name": "codex.tool_result",
+            tool_name: "shell",
+            success: "true",
+            duration_ms: 50,
+            mcp_server: "",
+          },
+        }),
+        projection.init(),
+      );
+
+      expect(state.mcpServers).toEqual([]);
+      expect(state.mcpTools).toEqual([]);
     });
   });
 

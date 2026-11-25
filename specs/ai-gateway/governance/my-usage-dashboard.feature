@@ -1,6 +1,6 @@
 Feature: AI Gateway Governance — My Usage personal dashboard
   As an enterprise developer using LangWatch-governed AI tools
-  I want a personal dashboard at "/me" that shows my own AI usage, my spend,
+  I want a personal dashboard at "/coding-agents" that shows my own AI usage, my spend,
   my budget, and a breakdown by tool/model/provider
   So that I can see what I'm spending, understand my own habits, and notice
   unusual usage before my admin does
@@ -24,7 +24,7 @@ Feature: AI Gateway Governance — My Usage personal dashboard
 
   @bdd @ui @dashboard @cards
   Scenario: Three summary cards render at the top of the page
-    When I navigate to "/me"
+    When I navigate to "/coding-agents"
     Then I see three cards in a row:
       | card                  | shape                                              |
       | Spent this month      | dollar amount + the bundled portion when there is one |
@@ -40,7 +40,7 @@ Feature: AI Gateway Governance — My Usage personal dashboard
   Scenario: The spend card reports the bundled portion, never a budget
     Given jane's organization has an AI-Gateway budget
     And part of jane's spend this month is bundled with her plan
-    When I navigate to "/me"
+    When I navigate to "/coding-agents"
     Then the spend card names the bundled amount
     And it states no budget figure
     And the card carries no over-budget emphasis, since the exceeded budget is
@@ -53,7 +53,7 @@ Feature: AI Gateway Governance — My Usage personal dashboard
   @bdd @ui @dashboard @charts
   Scenario: Spending-over-time chart shows last 30 days bucketed daily
     Given the personal project has traces with cost on the last 14 days
-    When I navigate to "/me"
+    When I navigate to "/coding-agents"
     Then I see a "Spending over time" line chart
     And the x-axis spans the last 30 days
     And the y-axis shows USD per day
@@ -63,7 +63,7 @@ Feature: AI Gateway Governance — My Usage personal dashboard
   @bdd @ui @dashboard @charts @empty
   Scenario: Spending-over-time chart shows an empty state with onboarding hint
     Given the personal project has no traces
-    When I navigate to "/me"
+    When I navigate to "/coding-agents"
     Then the chart area shows "No usage yet — run `langwatch claude` to get started"
     And the empty state links to a copy-pasteable CLI install snippet
 
@@ -78,7 +78,7 @@ Feature: AI Gateway Governance — My Usage personal dashboard
       | Claude Code  | $31.40 |
       | Cursor       | $ 8.22 |
       | Codex CLI    | $ 2.56 |
-    When I navigate to "/me"
+    When I navigate to "/coding-agents"
     Then I see a "By tool" horizontal bar list with each tool, a bar proportional to its share, and the dollar amount
     And the tool is inferred from the request's User-Agent and/or OTel `langwatch.client.name` attribute
     And tools without an identifiable User-Agent are bucketed under "Other / API"
@@ -96,7 +96,7 @@ Feature: AI Gateway Governance — My Usage personal dashboard
 
   @bdd @ui @dashboard @recent
   Scenario: Recent activity list shows the last 10 requests with cost
-    When I navigate to "/me"
+    When I navigate to "/coding-agents"
     Then I see a "Recent activity" section
     And it shows the last 10 traces from the personal project
     And each row contains: timestamp, tool name, short summary (first line of input), cost
@@ -106,10 +106,10 @@ Feature: AI Gateway Governance — My Usage personal dashboard
   @integration @dashboard @recent @empty
   Scenario: Recent activity with no traces points to the on-page setup tiles, not SDK integration
     Given the personal project has no traces yet
-    When I navigate to "/me"
+    When I navigate to "/coding-agents"
     Then the "Recent activity" section shows a getting-started empty state
     And it offers to set up a coding assistant, mint an ingestion key, or create an API key
-    And each offer links to the matching tile or settings page already on /me
+    And each offer links to the matching tile or settings page already on /coding-agents
     And it does not pitch the generic agent / MCP / SDK integration guide used on the project traces page
 
   # ---------------------------------------------------------------------------
@@ -117,43 +117,43 @@ Feature: AI Gateway Governance — My Usage personal dashboard
   # ---------------------------------------------------------------------------
 
   @bdd @ui @dashboard @workspace-switcher
-  Scenario: Switching workspace context away from "My Workspace" navigates away from /me
-    Given I am on "/me" with the workspace switcher set to "My Workspace"
+  Scenario: Switching workspace context away from "My Workspace" navigates away from /coding-agents
+    Given I am on "/coding-agents" with the workspace switcher set to "My Workspace"
     When I open the workspace switcher and pick team "Sales Engineering"
     Then I am navigated to the team's overview page (or dashboard route)
     And the workspace switcher chip in the header shows "Sales Engineering"
 
   @bdd @ui @dashboard @workspace-switcher @return
-  Scenario: Switching back to "My Workspace" returns the user to /me
+  Scenario: Switching back to "My Workspace" returns the user to /coding-agents
     Given I am on a team or project page with the switcher pointing at it
     When I open the workspace switcher and pick "My Workspace"
-    Then I am navigated to "/me"
+    Then I am navigated to "/coding-agents"
 
   # ---------------------------------------------------------------------------
   # Authorization
   # ---------------------------------------------------------------------------
 
   @bdd @ui @dashboard @authz
-  Scenario: A logged-out user hitting /me is redirected to login
+  Scenario: A logged-out user hitting /coding-agents is redirected to login
     Given there is no active session
-    When I navigate to "/me"
+    When I navigate to "/coding-agents"
     Then I am redirected to the login page
 
   @bdd @ui @dashboard @authz
-  Scenario: One user cannot view another user's /me page directly
+  Scenario: One user cannot view another user's /coding-agents page directly
     Given the API has `user.personalContext` keyed by current session
-    When jane@acme.com is signed in and navigates to "/me"
+    When jane@acme.com is signed in and navigates to "/coding-agents"
     Then she only sees her own personal team / project / VKs / spend
-    And there is no URL parameter that would let her render someone else's /me
+    And there is no URL parameter that would let her render someone else's /coding-agents
 
   # ---------------------------------------------------------------------------
   # Performance
   # ---------------------------------------------------------------------------
 
   @bdd @ui @dashboard @perf
-  Scenario: /me dashboard P95 server-side render is under 500ms for a user with ≤10k traces
+  Scenario: /coding-agents dashboard P95 server-side render is under 500ms for a user with ≤10k traces
     Given the personal project has 10000 traces in the last 30 days
-    When I cold-load "/me"
+    When I cold-load "/coding-agents"
     Then the server renders the page in ≤500ms P95
     And client-side hydration adds ≤200ms before charts paint
     And no charts block on an aggregation that fans out across multiple ClickHouse tenants

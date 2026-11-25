@@ -1,7 +1,6 @@
 /**
  * A board's daily run as its person reads it: the choices a run takes, the words for when it
- * runs and how the last one ended, and when a board offers it. Pure, so the control, the
- * offer and the settings say the same thing.
+ * runs and how the last one ended. Pure, so the control and the settings say the same thing.
  * @see modules/insight/specs/insight-daily-run.feature
  */
 
@@ -14,7 +13,6 @@ import {
   type InsightRunSettings,
   type InsightRunSkipReason,
   type InsightScheduleOffReason,
-  type InsightScheduleState,
 } from "@langwatch/insight-contract";
 import { differenceInCalendarDays, format, toZonedDateTime } from "@langwatch/time";
 
@@ -181,24 +179,8 @@ export function lastRunWords({
 }
 
 /**
- * Whether a board offers daily insights now. Today: once per visit, to a person who never
- * answered, on a board that opened with a widget. An answer is the server's `on` or `off`,
- * so nothing is kept in the browser. How often the offer shows is decided here alone.
+ * Said in a From LangWatch board's settings, and in the toast when its run is turned on or saved:
+ * no run can read one yet.
  */
-export function shouldOfferDailyInsights({
-  state,
-  widgetCountAtOpen,
-  closedThisVisit,
-}: {
-  state: InsightScheduleState;
-  /** The board's widgets when the visit began; undefined while they load. */
-  widgetCountAtOpen: number | undefined;
-  /** The offer was closed without an answer during this visit. */
-  closedThisVisit: boolean;
-}): boolean {
-  return state === "undecided" && (widgetCountAtOpen ?? 0) > 0 && !closedThisVisit;
-}
-
-/** Said before a person turns a From LangWatch board on: no run can read one yet. */
 export const TEMPLATE_BOARD_NOTE =
   "Langy cannot read From LangWatch boards yet. Until it can, a run on this board files nothing.";

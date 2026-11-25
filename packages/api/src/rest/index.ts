@@ -6,8 +6,10 @@ export {
   assertVersionLabel,
   basePathOf,
   canonicalV1Path,
+  DASHBOARDS_API_VERSION,
   isDateVersion,
   MANAGEMENT_API_VERSION,
+  pinnedVersionPath,
   RestVersionSelector,
   restVersionSelectorMiddleware,
   undescribedStack,
@@ -31,13 +33,16 @@ export {
 // a route states its sources, its answers and its door with.
 export {
   browserSessionContext,
+  callerAddressContext,
   defineRestRouter,
   permissionOf,
   projectRequestContext,
   type FeatureApiWitness,
   type RestDeprecation,
   type RestDoorCredential,
+  type RestLegacyKeyScopes,
   type RestMethodName,
+  type RestPermissionOptions,
   type RestPermissionPlatform,
   type RestPermissionReach,
   type RestPermissionTarget,
@@ -104,10 +109,13 @@ export {
 } from "./idempotency.ts";
 export type {
   IdempotencyReceiptCreateInput,
+  IdempotencyReceiptFence,
   IdempotencyReceiptPersistence,
   IdempotencyReceiptRecord,
+  IdempotencyReceiptUpdate,
 } from "./repositories/prisma/prisma.idempotency-receipt.ts";
 
+export { recordRequestPrincipal } from "./request-principal.ts";
 export {
   bindMiddlewareContext,
   bodyLimit,
@@ -154,6 +162,7 @@ export {
   type AppRestProjectVariables,
   browserCallerOfRequest,
   browserSessionOfRequest,
+  callerAddressOfRequest,
   credentialPrincipalOf,
   credentialPrincipalOfToken,
   keyCredentialOfRequest,
@@ -173,11 +182,14 @@ export {
   projectOf,
   type ProjectScopedContext,
   recordBrowserCaller,
+  keyPrincipalOfApiKey,
   recordKeyCredential,
   recordOrganizationCredential,
   recordProjectCredential,
+  recordRouteTemplate,
   recordScimCredential,
   resolvePersonalCaller,
+  routeTemplateOf,
   type RestBrowserCaller,
   type RestResolvedScimCredential,
   scimCredentialOfRequest,
@@ -328,6 +340,7 @@ export {
 export {
   assertKeyKind,
   keyCredentialOf,
+  keyCredentialOfDoor,
   REST_KEY_KINDS,
   type RestKeyCredential,
   type RestKeyDoor,

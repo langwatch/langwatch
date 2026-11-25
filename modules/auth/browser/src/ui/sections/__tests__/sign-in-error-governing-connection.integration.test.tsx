@@ -20,8 +20,9 @@ vi.mock("../../../behavior/auth-client.tsx", async (importOriginal) => {
 });
 
 import type * as authClientModule from "../../../behavior/auth-client.tsx";
+import { UI_SIGN_OUT_PATH } from "../../../behavior/ui-session-client.ts";
 import { WithTestAuthHost } from "../../../testing.tsx";
-import { FEDERATED_LOGOUT_PATH, SignInErrorScreen } from "../sign-in-error-screen.tsx";
+import { SignInErrorScreen } from "../sign-in-error-screen.tsx";
 
 function renderErrorRoute(query: Record<string, string>) {
   return render(
@@ -55,7 +56,7 @@ describe("given a refused link whose address an organization's connection govern
       ).toBeTruthy();
       expect(document.body.textContent).not.toMatch(/Settings > Security/);
       expect(screen.getByRole("link", { name: /sign out.*try again/i }).getAttribute("href")).toBe(
-        FEDERATED_LOGOUT_PATH,
+        UI_SIGN_OUT_PATH,
       );
     });
 

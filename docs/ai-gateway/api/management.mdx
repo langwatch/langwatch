@@ -16,7 +16,7 @@ Authentication uses existing LangWatch API tokens (`Authorization: Bearer lwp_..
 
 ## Base
 
-```
+```text
 Base URL: https://app.langwatch.ai/api/gateway/v1
 Auth:     Authorization: Bearer <project_api_token>
 Content:  application/json
@@ -162,7 +162,7 @@ curl -sS "https://app.langwatch.ai/api/gateway/v1/budgets?external_id=acme-tenan
 
 ### List
 
-```
+```http
 GET /virtual-keys
 GET /virtual-keys?limit=100&cursor=<next_cursor>
 ```
@@ -210,7 +210,7 @@ Response:
 
 ### Create
 
-```
+```http
 POST /virtual-keys
 ```
 
@@ -256,7 +256,7 @@ Response `201`:
 
 ### Get
 
-```
+```http
 GET /virtual-keys/:id
 ```
 
@@ -264,7 +264,7 @@ Response: `{ "virtual_key": {...} }`. No secret.
 
 ### Spend
 
-```
+```http
 GET /virtual-keys/:id/spend?from=1782950400000&to=1784160000000
 ```
 
@@ -274,7 +274,7 @@ On deployments without a ClickHouse spend source the endpoint answers `412` with
 
 ### Update
 
-```
+```http
 PATCH /virtual-keys/:id
 ```
 
@@ -298,7 +298,7 @@ Body (all fields optional):
 
 ### Rotate, disable, enable, revoke
 
-```
+```http
 POST /virtual-keys/:id/rotate
 POST /virtual-keys/:id/disable      { "reason": "payment overdue" }   // reason optional
 POST /virtual-keys/:id/enable
@@ -317,7 +317,7 @@ All four are idempotent, audit-logged, propagate to the gateway in seconds, and 
 
 ### List
 
-```
+```http
 GET /budgets
 GET /budgets?scope_type=virtual_key,principal
 GET /budgets?limit=100&cursor=<next_cursor>
@@ -368,7 +368,7 @@ Response:
 
 ### Create
 
-```
+```http
 POST /budgets
 ```
 
@@ -403,7 +403,7 @@ Body:
 
 ### Get
 
-```
+```http
 GET /budgets/:id
 ```
 
@@ -411,7 +411,7 @@ Response: `{ "budget": {...} }`, the same row shape the list returns, including 
 
 ### Update
 
-```
+```http
 PATCH /budgets/:id
 ```
 
@@ -419,7 +419,7 @@ Updatable fields: `name`, `description`, `limit_usd`, `on_breach`, `timezone`. S
 
 ### Reset period
 
-```
+```http
 POST /budgets/:id/reset
 POST /budgets/:id/reset?end_user_id=u_123      // one end-user bucket of a template
 ```
@@ -434,7 +434,7 @@ Per-end-user usage and the caps that apply to it are served on the billing surfa
 
 ### Archive
 
-```
+```http
 DELETE /budgets/:id
 ```
 
@@ -448,7 +448,7 @@ Provider credentials, rate limits, and fallback priority live on the platform-wi
 
 Organization-scoped overrides that modulate cache behaviour for gateway requests. Evaluated first-match-wins by priority descending; a matched rule beats the per-key default but loses to a per-request `X-LangWatch-Cache` header.
 
-```
+```text
 GET    /cache-rules            gatewayCacheRules:view
 GET    /cache-rules/:id        gatewayCacheRules:view
 POST   /cache-rules            gatewayCacheRules:create
@@ -503,7 +503,7 @@ This API and the dashboard call the same service layer on the server, so a rule 
 
 Every route on this API is described in LangWatch's OpenAPI 3.1 document, served unauthenticated at:
 
-```
+```http
 GET https://app.langwatch.ai/api/gateway/v1/openapi.json
 ```
 

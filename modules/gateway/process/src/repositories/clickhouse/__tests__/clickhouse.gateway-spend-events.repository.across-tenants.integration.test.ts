@@ -3,6 +3,7 @@
 /** Spec: specs/webhooks/webhook-endpoints.feature (webhook's listing, answered by gateway) */
 import { type ClickHouseClient, createClient } from "@clickhouse/client";
 import { startTestClickHouseEndpoints } from "@langwatch/clickhouse-client/testing";
+import { Temporal, toDate } from "@langwatch/time";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import type { GatewayClickHouseResolver } from "../clickhouse.gateway-session.store.ts";
@@ -77,7 +78,8 @@ function spendRow(input: {
     PodId: "pod-1",
     PodSeq: 1,
     DurationMS: 500,
-    OccurredAt: input.occurredAtMs,
+    // A Date, as the fold writes it: 26.8 reads an unquoted integer here as seconds (#108091).
+    OccurredAt: toDate(Temporal.Instant.fromEpochMilliseconds(input.occurredAtMs)),
     CreatedAt: input.occurredAtMs,
     LastEventOccurredAt: input.occurredAtMs,
     EventTimestamp: input.occurredAtMs,
@@ -110,7 +112,11 @@ beforeAll(async () => {
     names: ["shared"],
     environment: process.env,
   });
-  client = createClient({ url: endpoint!.url });
+  // The managed client's input format: 26.5 defaults to it, earlier servers need it asked.
+  client = createClient({
+    url: endpoint!.url,
+    clickhouse_settings: { date_time_input_format: "best_effort" },
+  });
   // The endpoint is reused across runs, so start from an empty table.
   await client.command({ query: "DROP TABLE IF EXISTS gateway_spend SYNC" });
   await client.command({ query: CREATE_TABLE });

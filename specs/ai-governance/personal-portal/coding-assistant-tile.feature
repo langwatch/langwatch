@@ -1,5 +1,5 @@
 Feature: AI Tools Portal — Coding-assistant tile click-to-expand
-  As an end user choosing a coding CLI from my /me portal
+  As an end user choosing a coding CLI from my /coding-agents portal
   I want clicking a coding-assistant tile to reveal the exact command
   to run, with copy support and a walkthrough of what happens next
   So that I can paste-and-run instead of hunting through SDK docs
@@ -9,7 +9,7 @@ Feature: AI Tools Portal — Coding-assistant tile click-to-expand
     `helperText`+`setupDocsUrl` are the only stored fields.
 
   Background:
-    Given user "jane@acme.com" is on /me with the AI Tools Portal visible
+    Given user "jane@acme.com" is on /coding-agents with the AI Tools Portal visible
     And the org-scoped catalog has a coding-assistant entry "Claude Code" with:
       | field         | value                                                   |
       | setupCommand  | langwatch claude                                        |

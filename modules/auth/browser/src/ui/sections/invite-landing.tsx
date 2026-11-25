@@ -8,7 +8,7 @@ import { hardRedirect } from "../../behavior/hard-redirect.ts";
 import { usePasskeyCeremony } from "../../behavior/passkey-ceremony.store.ts";
 import { useSignInRouting } from "../../behavior/use-sign-in-routing.ts";
 import { explainErrorCode } from "../../model/error-presentation.ts";
-import { acceptInviteResultSchema } from "../../model/invite-messages.ts";
+import { acceptInviteResultSchema, landingAfterAccept } from "../../model/invite-messages.ts";
 import { readHandledError } from "../../model/read-handled-error.ts";
 import { AuthCard } from "../elements/auth-card.tsx";
 import { FrontDoorLinkButton } from "../elements/front-door-link-button.tsx";
@@ -42,6 +42,16 @@ export function InviteLanding({ inviteCode }: { inviteCode: string }) {
           <Text color="fg.muted">Looking up your invitation…</Text>
         </HStack>
       </AuthCard>
+    );
+  }
+
+  // Spent already, most often by this person: "Join" again would only answer that it was.
+  if (session && landing.data.alreadyAccepted) {
+    return (
+      <AlreadyAccepted
+        organizationName={landing.data.organizationName}
+        inviterName={landing.data.inviterName}
+      />
     );
   }
 
@@ -235,9 +245,7 @@ function ConfirmAndJoin({
       // organization" state have to go, or the next page bounces the new
       // member into onboarding.
       const accepted = acceptInviteResultSchema.safeParse(data);
-      hardRedirect(
-        accepted.success && accepted.data.project?.slug ? `/${accepted.data.project.slug}` : "/",
-      );
+      hardRedirect(accepted.success ? landingAfterAccept(accepted.data) : "/");
     },
   });
 
@@ -308,6 +316,36 @@ function ConfirmAndJoin({
           </Box>
         )}
       </Text>
+    </AuthCard>
+  );
+}
+
+/**
+ * A spent invitation opened while signed in goes in, as a fresh join would; the card is
+ * what shows while the navigation runs, with the link in case it does not.
+ */
+function AlreadyAccepted({
+  organizationName,
+  inviterName,
+}: {
+  organizationName: string;
+  inviterName: string | null;
+}) {
+  useEffect(() => {
+    hardRedirect("/");
+  }, []);
+
+  return (
+    <AuthCard
+      title="This invitation was already accepted"
+      intro="Taking you to LangWatch."
+      actions={<FrontDoorLinkButton href="/" label="Continue to LangWatch" />}
+    >
+      <InvitingOrganization
+        organizationName={organizationName}
+        inviterName={inviterName}
+        testId="invite-already-accepted"
+      />
     </AuthCard>
   );
 }

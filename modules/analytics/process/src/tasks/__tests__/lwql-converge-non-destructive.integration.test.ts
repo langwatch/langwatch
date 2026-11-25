@@ -6,12 +6,16 @@
 import type { ClickHouseClient } from "@clickhouse/client";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
+import { LangWatchQLCollectionBindingService } from "../../features/provisioning/services/langwatch-ql-collection-binding.service.ts";
+import { LWQL_POSTGRES_READER_ROLE } from "../../features/provisioning/services/langwatch-ql-production-provisioning.service.ts";
 import { LangWatchQLSelfProvisioningService } from "../../features/provisioning/services/langwatch-ql-self-provisioning.service.ts";
 import {
   type LangWatchQLClickHouseHarness,
   type LangWatchQLPostgresHarness,
+  removeNamedCollectionFile,
   startLangWatchQLClickHouse,
   startLangWatchQLPostgres,
+  writeNamedCollectionFile,
 } from "../../langwatch-ql/__tests__/lwql-clickhouse-harness.ts";
 import { ClickHouseLangWatchQLProvisioningRepository } from "../../repositories/clickhouse/clickhouse.langwatch-ql-provisioning.repository.ts";
 import type { LwqlProvisioningDatabase } from "../../repositories/langwatch-ql-postgres.repository.ts";
@@ -21,6 +25,8 @@ import { LangWatchQLCatalogShapesService } from "../../services/langwatch-ql-cat
 import { convergeLwqlAccessModel, type LwqlConvergencePlan } from "../lwql-provision.task.ts";
 
 const selfProvisioning = LangWatchQLSelfProvisioningService.create();
+
+const collectionBinding = LangWatchQLCollectionBindingService.create();
 const POSTGRES_VIEWS = LangWatchQLCatalogShapesService.create().postgresViews(LWQL_VIEW_CATALOG);
 const ENGINE_TABLES = [...new Set(POSTGRES_VIEWS.map((view) => view.sourceTable))];
 
@@ -70,7 +76,12 @@ describe("given a rendered-mode install whose PostgreSQL engine tables work", ()
         tenantSetting: names.tenantSetting,
       },
       postgresReaderPassword: postgres.readerPassword,
-      endpoint: { host: "host.docker.internal", port: 5432, database: "unused_in_rendered_mode" },
+      // What the config store renders, so the check can show ClickHouse holds the app's values.
+      endpoint: {
+        host: postgres.container.getIpAddress("bridge"),
+        port: 5432,
+        database: postgres.container.getDatabase(),
+      },
     },
     names,
     sourceDatabase: () => names.database,
@@ -123,19 +134,38 @@ describe("given a rendered-mode install whose PostgreSQL engine tables work", ()
       startLangWatchQLPostgres(),
     ]);
     names = { ...harness.names, database: harness.factDatabase };
-    collection = selfProvisioning.namedCollection({ names });
-    // The SQL stand-in for the collection the config store mounts; the containers share a bridge.
-    await harness.applyAsAdmin([
-      `DROP NAMED COLLECTION IF EXISTS ${collection}`,
-      `CREATE NAMED COLLECTION ${collection} AS host = '${postgres.container.getIpAddress("bridge")}', ` +
-        `port = 5432, database = '${postgres.container.getDatabase()}', ` +
-        `user = '${postgres.readerRole}', password = '${postgres.readerPassword}'`,
-    ]);
+    // Per-suite name, never the server-global lwql_postgres: suites share one ClickHouse server,
+    // and the rendered binding takes the per-database name while no lwql_postgres exists.
+    collection = collectionBinding.namedCollection({ names, mode: "sql" });
+    // The app's own reader role, which the deploy's PostgreSQL half converges in production.
+    for (const statement of selfProvisioning.postgresReaderStatements({
+      readerPassword: postgres.readerPassword,
+      schema: "public",
+    })) {
+      const result = await postgres.asAdmin(statement);
+      if (result.exitCode !== 0) throw new Error(`reader role setup failed: ${result.stderr}`);
+    }
+    // The collection as the config store mounts it, a config.d file; the containers share a bridge.
+    await writeNamedCollectionFile({
+      harness,
+      collection,
+      values: {
+        host: postgres.container.getIpAddress("bridge"),
+        port: 5432,
+        database: postgres.container.getDatabase(),
+        user: LWQL_POSTGRES_READER_ROLE,
+        password: postgres.readerPassword,
+      },
+    });
     await convergeLwqlAccessModel({ database: noPostgres, plan: plan(), failOnError: true });
   }, 600_000);
 
   afterAll(async () => {
-    await harness?.applyAsAdmin([`DROP NAMED COLLECTION IF EXISTS ${collection}`]);
+    // A reused container reloads each table at restart; one whose collection is gone never loads.
+    await harness?.applyAsAdmin(
+      ENGINE_TABLES.map((table) => `DROP TABLE IF EXISTS ${names.database}.${table}`),
+    );
+    if (harness) await removeNamedCollectionFile({ harness, collection });
     await Promise.all([harness?.stop(), postgres?.stop()]);
   });
 
@@ -170,7 +200,8 @@ describe("given a rendered-mode install whose PostgreSQL engine tables work", ()
       expect(await engineTables()).toEqual(ENGINE_TABLES.toSorted());
       const before = await answers();
 
-      await harness.applyAsAdmin([`DROP NAMED COLLECTION ${collection}`]);
+      // As production loses it: the config file goes. 26.8 refuses a SQL DROP of a used collection.
+      await removeNamedCollectionFile({ harness, collection });
       await expect(
         convergeLwqlAccessModel({ database: noPostgres, plan: plan(), failOnError: true }),
       ).rejects.toMatchObject({ code: "669" });

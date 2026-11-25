@@ -23,7 +23,7 @@ const { state, recordPageOpened } = vi.hoisted(() => ({
 vi.mock("../../../../behavior/use-personal-context.ts", () => ({
   usePersonalContext: () => state.ctx,
 }));
-vi.mock("../../../../behavior/use-record-page-opened.ts", () => ({
+vi.mock("@langwatch/auth-client", () => ({
   useRecordPageOpened: recordPageOpened,
 }));
 vi.mock("../../../../behavior/lent-coding-agent-tables.tsx", () => ({

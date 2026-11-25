@@ -28,11 +28,15 @@ export const modelProviderIcons: Record<ProviderIconKey, React.ReactNode> = {
   custom: designSystemIcons.custom,
   xai: designSystemIcons.xai,
   cerebras: designSystemIcons.cerebras,
+  doubleword: designSystemIcons.doubleword,
   voyage: designSystemIcons.voyage,
   azure_safety: <Azure />,
   inception: designSystemIcons.inception,
   perplexity: designSystemIcons.perplexity,
   cloudflare: designSystemIcons.cloudflare,
+  typesafe: designSystemIcons.typesafe,
+  openrouter: designSystemIcons.openrouter,
+  fireworks: designSystemIcons.fireworks,
   langwatch: designSystemIcons.langwatch,
 };
 
@@ -46,6 +50,9 @@ export const MONOCHROME_PROVIDER_ICONS = new Set<ProviderIconKey>([
   "anthropic",
   "voyage",
   "inception",
+  "typesafe",
+  "openrouter",
+  "fireworks",
 ]);
 
 /**

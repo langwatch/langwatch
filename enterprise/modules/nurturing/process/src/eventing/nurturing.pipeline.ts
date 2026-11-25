@@ -17,11 +17,15 @@ import {
 import {
   CHECKOUT_COMPLETED_EVENT_TYPE,
   checkoutCompletedEventDataSchema,
-  SUBSCRIPTION_CHANGED_EVENT_TYPE,
-  subscriptionChangedEventDataSchema,
   SUBSCRIPTION_STARTED_EVENT_TYPE,
   subscriptionStartedEventDataSchema,
 } from "@langwatch/enterprise-billing-contract";
+import {
+  INGESTION_SOURCE_CREATED_EVENT_TYPE,
+  INGESTION_SOURCE_WENT_LIVE_EVENT_TYPE,
+  type IngestionSourceFactData,
+  ingestionSourceFactDataSchema,
+} from "@langwatch/enterprise-governance-contract/ingestion-source-lifecycle";
 import type { NurturingSignal } from "@langwatch/enterprise-nurturing-contract";
 import {
   USAGE_REPORT_RECEIVED_EVENT_TYPE,
@@ -52,9 +56,30 @@ import {
   experimentRanEventDataSchema,
 } from "@langwatch/experiment-contract";
 import {
+  GATEWAY_BUDGET_CROSSING_EVENT_TYPE,
+  GATEWAY_UNBUDGETED_SPEND_EVENT_TYPE,
+  GATEWAY_VK_FIRST_REQUEST_EVENT_TYPE,
+  GATEWAY_VK_LIFECYCLE_EVENT_TYPE,
+  type RecordBudgetCrossingCommandData,
+  recordBudgetCrossingCommandDataSchema,
+  type RecordUnbudgetedSpendCommandData,
+  recordUnbudgetedSpendCommandDataSchema,
+  type RecordVkFirstRequestCommandData,
+  recordVkFirstRequestCommandDataSchema,
+  type RecordVkLifecycleCommandData,
+  recordVkLifecycleCommandDataSchema,
+} from "@langwatch/gateway-contract";
+import {
+  INSIGHT_EVENT_TYPES,
+  insightFiledEventDataSchema,
+  insightReaderEventDataSchema,
+} from "@langwatch/insight-contract";
+import {
   GUIDED_ONBOARDING_TURN_FAILED_EVENT_TYPE,
   type GuidedOnboardingTurnFailedEventData,
   guidedOnboardingTurnFailedEventDataSchema,
+  LANGY_FIRST_MESSAGE_SEEN_EVENT_TYPE,
+  langyFirstMessageSeenEventDataSchema,
 } from "@langwatch/langy-contract";
 import {
   GUIDED_ONBOARDING_RECORDED_EVENT_TYPE,
@@ -70,14 +95,13 @@ import {
   inviteAcceptedEventDataSchema,
   MEMBERS_INVITED_EVENT_TYPE,
   membersInvitedEventDataSchema,
+  ORGANIZATION_MEMBER_ADMITTED_EVENT_TYPE,
+  organizationMemberAdmittedEventDataSchema,
+  ORGANIZATION_MEMBER_ROLE_CHANGED_EVENT_TYPE,
+  organizationMemberRoleChangedEventDataSchema,
   ORGANIZATION_SIGNED_UP_EVENT_TYPE,
   organizationSignedUpEventDataSchema,
 } from "@langwatch/organization-contract";
-import {
-  PROJECT_CREATED_EVENT_TYPE,
-  type ProjectCreatedEventData,
-  projectCreatedEventDataSchema,
-} from "@langwatch/project-contract";
 import {
   PROMPT_CREATED_EVENT_TYPE,
   promptCreatedEventDataSchema,
@@ -97,8 +121,10 @@ import {
 } from "@langwatch/trace-contract";
 import {
   USER_CREATED_EVENT_TYPE,
+  USER_ERASED_EVENT_TYPE,
   USER_REGISTERED_EVENT_TYPE,
   userCreatedEventDataSchema,
+  userErasedEventDataSchema,
   userLifecycleEventDataSchema,
 } from "@langwatch/user-contract";
 import {
@@ -108,7 +134,14 @@ import {
 import { z } from "zod";
 
 import type { NurturingModule } from "../app/nurturing.app.ts";
-import { appOpenedSignals } from "../rules/nurturing-app-opened.rules.ts";
+import {
+  appOpenedSignals,
+  langyFirstMessageSeenSignal,
+} from "../rules/nurturing-app-opened.rules.ts";
+import {
+  insightFiledSignal,
+  insightReaderSignal,
+} from "../rules/nurturing-insight-signals.rules.ts";
 import {
   checkoutCompletedSignal,
   evaluationRanSignal,
@@ -117,6 +150,8 @@ import {
   guidedOnboardingSignal,
   integrationMethodChosenSignal,
   inviteAcceptedSignal,
+  memberAdmittedSignal,
+  memberRoleChangedSignal,
   membersInvitedSignal,
   onboardingVariantAssignedSignal,
   projectActiveDaySignal,
@@ -127,7 +162,6 @@ import {
   sessionStartedSignal,
   signedUpSignal,
   ssoAutoAddedSignal,
-  subscriptionChangedSignal,
   subscriptionStartedSignal,
   traceReceivedSignal,
   userCreatedSignal,
@@ -219,7 +253,6 @@ export type NurturingPipeline = StaticPipelineDefinition<
  */
 export function buildNurturingPipeline(deps: {
   deliver: (input: { key: string; signal: NurturingSignal }) => Promise<void>;
-  projectCreated: (data: ProjectCreatedEventData) => Promise<void>;
   guidedTurnFailed: (data: GuidedOnboardingTurnFailedEventData) => Promise<void>;
   usageReportReceived: (input: {
     data: UsageReportReceivedEventData;
@@ -242,6 +275,39 @@ export function buildNurturingPipeline(deps: {
   /** Decides the first session, agent types and active days from a project's stored sessions. */
   codingSessionsStored: (input: {
     sessions: readonly CodingAgentSessionStoredEventData[];
+    deliver: (signal: NurturingSignal) => Promise<void>;
+  }) => Promise<void>;
+  /** Takes an erased account out of nurturing's own rows; never delivers. */
+  forgetErasedUser: (input: { userId: string }) => Promise<void>;
+  /** A gateway key's lifecycle fact: a created person's key delivers one person's signal. */
+  virtualKeyCreated: (input: {
+    data: RecordVkLifecycleCommandData;
+    deliver: (signal: NurturingSignal) => Promise<void>;
+  }) => Promise<void>;
+  /** A budget crossing: a copied person's key delivers one person's signal. */
+  keyBudgetCrossed: (input: {
+    data: RecordBudgetCrossingCommandData;
+    deliver: (signal: NurturingSignal) => Promise<void>;
+  }) => Promise<void>;
+  /** A key's first request: a copied person's key delivers one person's signal. */
+  keyFirstRequested: (input: {
+    data: RecordVkFirstRequestCommandData;
+    deliver: (signal: NurturingSignal) => Promise<void>;
+    deliveryAttempt?: number;
+  }) => Promise<void>;
+  /** An organization's weekly unbudgeted spend: its admin's signal. */
+  unbudgetedSpendRecorded: (input: {
+    data: RecordUnbudgetedSpendCommandData;
+    deliver: (signal: NurturingSignal) => Promise<void>;
+  }) => Promise<void>;
+  /** A governance source was created: its creator's signal, else its organization admin's. */
+  governanceSourceConnected: (input: {
+    data: IngestionSourceFactData;
+    deliver: (signal: NurturingSignal) => Promise<void>;
+  }) => Promise<void>;
+  /** A governance source took its first data: its creator's signal, else the admin's. */
+  governanceSourceLive: (input: {
+    data: IngestionSourceFactData;
     deliver: (signal: NurturingSignal) => Promise<void>;
   }) => Promise<void>;
 }): NurturingPipeline {
@@ -330,19 +396,6 @@ export function buildNurturingPipeline(deps: {
             }),
         }),
       )
-      .withPeerSubscriber("projectCreated", {
-        eventType: PROJECT_CREATED_EVENT_TYPE,
-        data: projectCreatedEventDataSchema,
-        handle: (data) => deps.projectCreated(data),
-      })
-      .withPeerSubscriber("subscriptionChanged", {
-        eventType: SUBSCRIPTION_CHANGED_EVENT_TYPE,
-        data: subscriptionChangedEventDataSchema,
-        handle: (data, { aggregateId }) => {
-          const signal = subscriptionChangedSignal({ data, aggregateId });
-          return deliverSignal(signal);
-        },
-      })
       .withPeerSubscriber("subscriptionStarted", {
         eventType: SUBSCRIPTION_STARTED_EVENT_TYPE,
         data: subscriptionStartedEventDataSchema,
@@ -422,6 +475,22 @@ export function buildNurturingPipeline(deps: {
         data: inviteAcceptedEventDataSchema,
         handle: (data, { aggregateId }) => {
           const signal = inviteAcceptedSignal({ data, aggregateId });
+          return deliverSignal(signal);
+        },
+      })
+      .withPeerSubscriber("memberRoleChanged", {
+        eventType: ORGANIZATION_MEMBER_ROLE_CHANGED_EVENT_TYPE,
+        data: organizationMemberRoleChangedEventDataSchema,
+        handle: (data, { aggregateId }) => {
+          const signal = memberRoleChangedSignal({ data, aggregateId });
+          return deliverSignal(signal);
+        },
+      })
+      .withPeerSubscriber("memberAdmitted", {
+        eventType: ORGANIZATION_MEMBER_ADMITTED_EVENT_TYPE,
+        data: organizationMemberAdmittedEventDataSchema,
+        handle: (data, { aggregateId }) => {
+          const signal = memberAdmittedSignal({ data, aggregateId });
           return deliverSignal(signal);
         },
       })
@@ -523,10 +592,77 @@ export function buildNurturingPipeline(deps: {
             }),
         }),
       )
+      // User's erasure fact: nurturing deletes its own rows naming the account, and sends nothing.
+      .withPeerSubscriber("userErased", {
+        eventType: USER_ERASED_EVENT_TYPE,
+        data: userErasedEventDataSchema,
+        handle: ({ userId }) => deps.forgetErasedUser({ userId }),
+      })
       .withPeerSubscriber("appPageOpened", {
         eventType: APP_PAGE_OPENED_EVENT_TYPE,
         data: appPageOpenedEventDataSchema,
         handle: (data) => deliverEach(appOpenedSignals({ data })),
+      })
+      // Gateway's key facts: the recipient is chosen from nurturing's own key and member copies.
+      .withPeerSubscriber("virtualKeyCreated", {
+        eventType: GATEWAY_VK_LIFECYCLE_EVENT_TYPE,
+        data: recordVkLifecycleCommandDataSchema,
+        handle: (data) => deps.virtualKeyCreated({ data, deliver: deliverSignal }),
+      })
+      .withPeerSubscriber("keyBudgetThreshold", {
+        eventType: GATEWAY_BUDGET_CROSSING_EVENT_TYPE,
+        data: recordBudgetCrossingCommandDataSchema,
+        handle: (data) => deps.keyBudgetCrossed({ data, deliver: deliverSignal }),
+      })
+      .withPeerSubscriber("keyFirstRequest", {
+        eventType: GATEWAY_VK_FIRST_REQUEST_EVENT_TYPE,
+        data: recordVkFirstRequestCommandDataSchema,
+        handle: (data, { deliveryAttempt }) =>
+          deps.keyFirstRequested({ data, deliveryAttempt, deliver: deliverSignal }),
+      })
+      .withPeerSubscriber("gatewaySpendWithoutBudget", {
+        eventType: GATEWAY_UNBUDGETED_SPEND_EVENT_TYPE,
+        data: recordUnbudgetedSpendCommandDataSchema,
+        handle: (data) => deps.unbudgetedSpendRecorded({ data, deliver: deliverSignal }),
+      })
+      .withPeerSubscriber("governanceSourceConnected", {
+        eventType: INGESTION_SOURCE_CREATED_EVENT_TYPE,
+        data: ingestionSourceFactDataSchema,
+        handle: (data) => deps.governanceSourceConnected({ data, deliver: deliverSignal }),
+      })
+      .withPeerSubscriber("governanceSourceLive", {
+        eventType: INGESTION_SOURCE_WENT_LIVE_EVENT_TYPE,
+        data: ingestionSourceFactDataSchema,
+        handle: (data) => deps.governanceSourceLive({ data, deliver: deliverSignal }),
+      })
+      .withPeerSubscriber("langyFirstMessageSeen", {
+        eventType: LANGY_FIRST_MESSAGE_SEEN_EVENT_TYPE,
+        data: langyFirstMessageSeenEventDataSchema,
+        handle: (data) => deliverSignal(langyFirstMessageSeenSignal({ data })),
+      })
+      // Insight's facts for PostHog: one signal per event, never its words or ids.
+      .withPeerSubscriber("insightFiled", {
+        eventType: INSIGHT_EVENT_TYPES.FILED,
+        data: insightFiledEventDataSchema,
+        handle: (data, context) => deliverEach(insightFiledSignal({ data, context })),
+      })
+      .withPeerSubscriber("insightSeen", {
+        eventType: INSIGHT_EVENT_TYPES.SEEN,
+        data: insightReaderEventDataSchema,
+        handle: (data, context) =>
+          deliverSignal(insightReaderSignal({ act: "seen", data, context })),
+      })
+      .withPeerSubscriber("insightArchived", {
+        eventType: INSIGHT_EVENT_TYPES.ARCHIVED,
+        data: insightReaderEventDataSchema,
+        handle: (data, context) =>
+          deliverSignal(insightReaderSignal({ act: "archived", data, context })),
+      })
+      .withPeerSubscriber("insightKept", {
+        eventType: INSIGHT_EVENT_TYPES.KEPT,
+        data: insightReaderEventDataSchema,
+        handle: (data, context) =>
+          deliverSignal(insightReaderSignal({ act: "kept", data, context })),
       })
       .withCommand("recordSignal", RecordNurturingSignalCommand)
       .withLaneAliases(MAIN_NURTURING_LANE_ALIASES)

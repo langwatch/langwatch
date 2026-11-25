@@ -1,3 +1,4 @@
+import { splitLeadingContextBlocks } from "@langwatch/coding-agent-contract";
 import { type BubbleTone } from "@langwatch/design-system/bubble-tones";
 import { useConversationExpand } from "@langwatch/design-system/conversation-expand-context";
 import { formatCost, formatDuration } from "@langwatch/design-system/display-formatters";
@@ -30,6 +31,7 @@ import {
 import { TRANSLATE_TEXT_MAX_CHARS } from "../../../../../model/constants.ts";
 import { formatRelativeTimeAgo } from "../../../../../model/display-formatters.ts";
 import { isTerminalOrigin } from "../../../../../model/terminal-origin.ts";
+import { ContextDisclosure } from "../../../../blocks/transcript/context-disclosure.tsx";
 import { MessageExpandToggle } from "../../../../elements/explorer/trace-drawer/conversation-view/message-expand-toggle.tsx";
 import { Markdown } from "../../../markdown.tsx";
 import { RedactedInline } from "../../../redacted-field.tsx";
@@ -164,7 +166,7 @@ interface ChatTurnRowProps {
 
 export const ChatTurnRow = memo<ChatTurnRowProps>(function ChatTurnRow({
   turn,
-  userText: originalUserText,
+  userText: writtenUserText,
   assistantText: originalAssistantText,
   assistantReasoning,
   userMedia = EMPTY_MEDIA,
@@ -180,6 +182,8 @@ export const ChatTurnRow = memo<ChatTurnRowProps>(function ChatTurnRow({
   showSessionCheckbox = false,
 }) {
   const handleSelect = useCallback(() => onSelect(turn.traceId), [onSelect, turn.traceId]);
+  // An agent's injected context (Copilot's date block) folds away, as the Terminal tab folds it.
+  const { context: userContext, body: originalUserText } = foldLeadingContext(writtenUserText);
 
   // Translate-to-English per message rather than per turn
   // (specs/traces-v2/message-translation.feature): a reader flips exactly the
@@ -326,6 +330,7 @@ export const ChatTurnRow = memo<ChatTurnRowProps>(function ChatTurnRow({
           label={userVisuals.bubbleLabel}
           icon={<UserIcon />}
           text={userText}
+          context={userContext}
           media={visibleUserMedia}
           isSelected={isCurrent}
           onClick={handleSelect}
@@ -479,6 +484,8 @@ interface TurnMessageProps {
   icon: React.ReactNode;
   text: string;
   reasoning?: string;
+  /** Context blocks peeled off the front of the text, folded above it. Thread layout only. */
+  context?: string;
   /** Media recorded on this message's side of the turn. Thread layout only. */
   media?: MediaPartData[];
   isSelected?: boolean;
@@ -494,11 +501,17 @@ interface TurnMessageProps {
  * One message bubble in a turn, rendered either as a side bubble (bubbles layout) or a
  * full-width ChatGPT-style row (thread layout).
  */
-function TurnMessage({ layout, side, media, ...rest }: TurnMessageProps) {
+function TurnMessage({ layout, side, media, context, ...rest }: TurnMessageProps) {
   if (layout === "thread") {
-    return <ThreadMessage media={media} {...rest} />;
+    return <ThreadMessage media={media} context={context} {...rest} />;
   }
   return <Bubble side={side} size="compact" maxChars={500} {...rest} />;
+}
+
+/** Leading `<tag>…</tag>` blocks apart from the words after them; none peeled when only tags. */
+function foldLeadingContext(text: string): { context: string; body: string } {
+  const { context, body } = splitLeadingContextBlocks(text);
+  return context && body.trim() ? { context, body } : { context: "", body: text };
 }
 
 /** Maps a bubble tone onto the canonical role palette used by thread layout. */
@@ -517,6 +530,7 @@ function ThreadMessage({
   icon,
   text,
   reasoning,
+  context,
   media = EMPTY_MEDIA,
   onClick,
   annotation,
@@ -623,6 +637,12 @@ function ThreadMessage({
         {reasoning && (
           <Box mb={text ? "2.5" : "0"} bg="bg.muted/60" px="3" py="2" borderRadius="md">
             <ReasoningBlock text={reasoning} />
+          </Box>
+        )}
+
+        {context && (
+          <Box mb={display ? "1.5" : "0"} onClick={(e: React.MouseEvent) => e.stopPropagation()}>
+            <ContextDisclosure context={context} />
           </Box>
         )}
 

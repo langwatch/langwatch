@@ -111,4 +111,60 @@ describe.skipIf(!DB_URL)("Better Auth's storage on the live tier", () => {
       expect(body?.user.email).toBe(PERSON.email);
     });
   });
+
+  describe.skipIf(!REDIS_URL)("given a user with no password", () => {
+    let redis: RedisConnection;
+    let userId: string;
+
+    beforeAll(async () => {
+      redis = new RedisConnectionService().connect({
+        url: REDIS_URL,
+        clusterEndpoints: undefined,
+        dbIndex: undefined,
+      })!;
+      userId = (
+        await prisma.user.create({
+          data: { email: `${ns}-linked@company.test`, name: "Lin", emailVerified: true },
+        })
+      ).id;
+    });
+    afterAll(async () => {
+      await redis?.quit();
+    });
+
+    /** @scenario "A password linked to an existing user is stored under the local credential issuer" */
+    it("stores the linked password's account under the local credential issuer", async () => {
+      const { transport } = await liveTier(redis);
+      const context = await transport.$context;
+      await context.internalAdapter.linkAccount({
+        userId,
+        providerId: "credential",
+        accountId: userId,
+        password: await hash(PERSON.password, 4),
+      });
+
+      const account = await prisma.account.findFirst({
+        where: { userId, provider: "credential" },
+        select: { issuer: true },
+      });
+      expect(account?.issuer).toBe("local:credential");
+    });
+
+    /** @scenario "An enterprise OAuth account linked to an existing user is stored under its local namespace" */
+    it("stores a linked Auth0 account under the local OAuth namespace", async () => {
+      const { transport } = await liveTier(redis);
+      const context = await transport.$context;
+      await context.internalAdapter.linkAccount({
+        userId,
+        providerId: "auth0",
+        accountId: `${ns}-auth0-subject`,
+      });
+
+      const account = await prisma.account.findFirst({
+        where: { userId, provider: "auth0" },
+        select: { issuer: true },
+      });
+      expect(account?.issuer).toBe("local:oauth:auth0");
+    });
+  });
 });

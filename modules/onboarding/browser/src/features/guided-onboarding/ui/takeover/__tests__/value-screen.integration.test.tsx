@@ -23,14 +23,22 @@ afterEach(cleanup);
 
 function renderValue({
   target = "ACME",
+  firstName = "Rogerio",
   onNext = vi.fn(),
 }: {
   target?: string;
+  /** `null` stands for an account with no name. */
+  firstName?: string | null;
   onNext?: (paths: string[]) => void;
 } = {}) {
   render(
     <DesignSystemProvider forcedTheme="light">
-      <ValueScreen firstName="Rogerio" target={target} fading={false} onNext={onNext} />
+      <ValueScreen
+        firstName={firstName ?? undefined}
+        target={target}
+        fading={false}
+        onNext={onNext}
+      />
     </DesignSystemProvider>,
   );
   act(() => {
@@ -75,6 +83,14 @@ describe("ValueScreen", () => {
         "So tell me, Rogerio, what are the most valuable things we can set up for ACME today?",
       );
       expect(emitMock).toHaveBeenCalledWith("viewed", "value");
+    });
+
+    /** @scenario The value question leaves the name out when the account has none */
+    it("asks the question without a name or a placeholder", () => {
+      renderValue({ target: "ACME", firstName: null });
+      expect(screen.getByTestId("value-line")).toHaveTextContent(
+        /^So tell me, what are the most valuable things we can set up for ACME today\?/,
+      );
     });
 
     /** @scenario The value question says "you" when the user is on their own */

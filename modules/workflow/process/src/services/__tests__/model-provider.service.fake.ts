@@ -27,6 +27,10 @@ export class TestModelProviderService implements ModelProviderApi {
 
   constructor(private readonly providers: Record<string, ModelProviderSummary> = {}) {}
 
+  listForProjectWithServedModels(): Promise<[]> {
+    return Promise.resolve([]);
+  }
+
   listForProject(): Promise<ModelProviderSummary[]> {
     return Promise.resolve(Object.values(this.providers));
   }
@@ -88,6 +92,14 @@ export class TestModelProviderService implements ModelProviderApi {
 
   resolveDecisionModel(): Promise<never> {
     throw new Error("Not used by Workflow tests.");
+  }
+
+  listDecisionModelsForProject(): Promise<[]> {
+    return Promise.resolve([]);
+  }
+
+  listDecisionModelsForScopes(): Promise<[]> {
+    return Promise.resolve([]);
   }
 
   findAlternateModel(): Promise<never> {

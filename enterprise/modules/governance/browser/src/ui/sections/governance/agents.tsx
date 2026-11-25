@@ -20,6 +20,7 @@ import {
   AgentFilterBar,
   type AgentFilters,
   AgentFleetSummaryStrip,
+  type AgentRowExtras,
   type AgentsLayout,
   AgentsLayoutControl,
   AgentsList,
@@ -37,6 +38,12 @@ import {
   useAgentFilters,
 } from "../../../features/agents/index.ts";
 import { GovernanceSyncButton, governanceSyncStatus } from "../../../features/agents/sync/index.ts";
+import {
+  AgentKillSwitchMenu,
+  AgentStopStatusChip,
+  StopApprovalsCard,
+  useKillSwitchReads,
+} from "../../../features/kill-switch/index.ts";
 import { withGovernanceSection } from "../../../ui/sections/governance-section-gate.tsx";
 import {
   GovernanceEmptyState,
@@ -164,8 +171,10 @@ function useAgentsScreen() {
     rows: sample.active ? SAMPLE_AGENT_ROWS : (agents.data ?? []),
     // Suppress loading/error under sample mode. Use `!orgId` not `!!orgId` to avoid false
     // "no agents registered" before org resolves.
-    isLoading: !sample.active && (!orgId || agents.isLoading),
+    // `isPending`: a read paused offline has no answer yet either.
+    isLoading: !sample.active && (!orgId || agents.isPending),
     error: sample.active ? null : agents.error,
+    retry: () => void agents.refetch(),
   };
 }
 
@@ -254,14 +263,18 @@ function AgentsPane({
   layout,
   sample,
   isLoading,
+  failed,
   noAgents,
   onClearFilters,
+  extras,
 }: {
   rows: readonly GovernanceAgentRow[];
   filters: AgentFilters;
   layout: AgentsLayout;
   sample: boolean;
   isLoading: boolean;
+  /** The read failed: the page's alert says so, and an empty pane would claim an answer. */
+  failed: boolean;
   /**
    * What to show when the organization holds no agents, decided by the page
    * (a read this pane doesn't make). Words and press travel together so a
@@ -274,6 +287,8 @@ function AgentsPane({
     testId: string;
   };
   onClearFilters: () => void;
+  /** The kill switch's status and actions per row; absent under sample mode. */
+  extras?: AgentRowExtras;
 }) {
   const visible = applyAgentFilters(rows, filters);
 
@@ -288,8 +303,12 @@ function AgentsPane({
   }
 
   if (visible.length > 0) {
-    return <AgentsList agents={visible} layout={layout} sample={sample} />;
+    return <AgentsList agents={visible} layout={layout} sample={sample} extras={extras} />;
   }
+
+  // A failed read with nothing already on screen has no rows to stand behind
+  // either empty state: the alert above is the whole answer.
+  if (failed && rows.length === 0) return null;
 
   // Two different nothings, and they must never borrow each other's words.
   // Telling a reader who has ten agents and a narrow filter to go register one
@@ -411,8 +430,32 @@ function AgentsPage() {
     orgId: organization?.id ?? "",
     canManage,
   });
-  const { sample, rows, isLoading, error } = useAgentsScreen();
+  const { sample, rows, isLoading, error, retry } = useAgentsScreen();
   const { filters, setFilter, clearFilters } = useAgentFilters();
+  const organizationId = organization?.id ?? "";
+  // Sample rows are invented, so they carry no stop and offer no Stop.
+  const killSwitch = useKillSwitchReads({ organizationId, enabled: !sample.active });
+  const killSwitchExtras: AgentRowExtras | undefined =
+    sample.active || killSwitch.byRowId.size === 0
+      ? undefined
+      : (agent) => {
+          const summary = killSwitch.byRowId.get(agent.id);
+          if (!summary) return {};
+          return {
+            status: summary.openStop ? (
+              <AgentStopStatusChip status={summary.openStop.status} />
+            ) : null,
+            actions: (
+              <AgentKillSwitchMenu
+                organizationId={organizationId}
+                agentName={agent.name}
+                summary={summary}
+                summaries={killSwitch.summaries}
+                canManage={canManage}
+              />
+            ),
+          };
+        };
   // Gated on the unfiltered set, never the visible one: a reader who filters
   // down to nothing must still have the chip that gets them back. The layout
   // switch takes the same gate, because there is nothing to lay out either
@@ -472,17 +515,39 @@ function AgentsPage() {
               These agents are an illustration of what this page will hold, nothing here is real.
             </SampleDataBanner>
           )}
-          {/* Above the content rather than in place of it. A failed read leaves
-            the page with no rows, and the pane below already has a sentence
-            for that; what it cannot say is that the emptiness is a failure
-            rather than an answer. `useAgentsScreen` has already decided this
-            is null under sample mode. */}
-          {error ? <HandledErrorAlert error={error} fallbackTitle="Couldn't load agents" /> : null}
+          {/* Above the content. A failed first read leaves the pane blank, not
+            "no agents registered": emptiness after a failure is not an answer.
+            A failed refresh keeps the rows already read under it.
+            `useAgentsScreen` has already decided this is null under sample mode. */}
+          {error ? (
+            <HandledErrorAlert error={error} fallbackTitle="Couldn't load agents" onRetry={retry} />
+          ) : null}
           {/* Under the banner, above the chips. Under the banner because every
             figure on it is invented while sample mode is on, and the banner is
             the page's one claim about the whole screen; above the chips
             because the strip summarizes the fleet rather than whatever the
             chips have left of it. */}
+          {killSwitch.summariesError ? (
+            <HandledErrorAlert
+              error={killSwitch.summariesError}
+              fallbackTitle="Couldn't load the agents' stop state"
+              onRetry={killSwitch.retrySummaries}
+            />
+          ) : null}
+          {killSwitch.pendingApprovalsError ? (
+            <HandledErrorAlert
+              error={killSwitch.pendingApprovalsError}
+              fallbackTitle="Couldn't load the stops waiting for approval"
+              onRetry={killSwitch.retryPendingApprovals}
+            />
+          ) : null}
+          {killSwitch.pendingApprovals.length > 0 && (
+            <StopApprovalsCard
+              organizationId={organizationId}
+              stops={killSwitch.pendingApprovals}
+              canManage={canManage}
+            />
+          )}
           {summary && <AgentFleetSummaryStrip summary={summary} />}
           {/* Out of the content and into the header. Controls that narrow what
             is below should not live inside the thing they narrow — the api
@@ -503,8 +568,10 @@ function AgentsPage() {
             layout={layout}
             sample={sample.active}
             isLoading={isLoading}
+            failed={!!error}
             noAgents={noAgents}
             onClearFilters={clearFilters}
+            extras={killSwitchExtras}
           />
         </VStack>
       </PageLayout.Container>

@@ -56,6 +56,7 @@ export abstract class JoinRequestListReadRepository extends JoinRequestReadRepos
  * one would let anybody make any organization look like theirs by typing an address at it.
  */
 export abstract class JoinCandidateRepository {
+  /** Oldest organization first: the order the join step keeps between organizations of one size. */
   abstract findCandidateOrganizations(args: {
     domain: string;
   }): Promise<JoinCandidateOrganization[]>;

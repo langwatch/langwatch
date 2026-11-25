@@ -306,14 +306,20 @@ async function signInWithSso({
   providerId,
   target,
   shouldRedirect,
+  loginHint,
 }: {
   providerId: string;
   target: string | undefined;
   shouldRedirect: boolean;
+  loginHint?: string;
 }): Promise<SignInResult> {
   const result = await client.$fetch("/sign-in/sso", {
     method: "POST",
-    body: { providerId, callbackURL: parkAndHandOff(target) ?? "/" },
+    body: {
+      providerId,
+      callbackURL: parkAndHandOff(target) ?? "/",
+      ...(loginHint ? { loginHint } : {}),
+    },
   });
   if (result.error) {
     const refusal = ssoRefusalSchema.safeParse(result.error).data;
@@ -329,17 +335,35 @@ async function signInWithSso({
   return { ok: true };
 }
 
-export const signIn = async (
-  provider: string,
-  options?: {
-    email?: string;
-    password?: string;
-    callbackUrl?: string;
-    redirect?: boolean;
-    /** The address already typed, handed to the provider as the OIDC login hint. */
-    loginHint?: string;
-  },
-): Promise<SignInResult> => {
+type SignInOptions = {
+  email?: string;
+  password?: string;
+  callbackUrl?: string;
+  redirect?: boolean;
+  /** The address already typed, handed to the provider as the OIDC login hint. */
+  loginHint?: string;
+};
+
+/**
+ * The provider hand-off this document has started. Each start overwrites the one state cookie
+ * the callback checks, so a second press while the first is on its way would send the browser
+ * off with a state the cookie no longer holds (`state_mismatch`). A later press joins this one.
+ */
+let handOffInFlight: Promise<SignInResult> | null = null;
+
+/** A page restored from the back-forward cache never left: its hand-off may be started again. */
+if (typeof window !== "undefined") {
+  window.addEventListener("pageshow", (event) => {
+    if (event.persisted) handOffInFlight = null;
+  });
+}
+
+/** Forgets the hand-off in flight; for tests, which share one module across cases. */
+export const resetSignInHandOff = (): void => {
+  handOffInFlight = null;
+};
+
+export const signIn = async (provider: string, options?: SignInOptions): Promise<SignInResult> => {
   // Same-origin guard on the post-login redirect target.
   const target = options?.callbackUrl ? safeRedirectTarget(options.callbackUrl) : undefined;
   const shouldRedirect = options?.redirect !== false;
@@ -347,10 +371,42 @@ export const signIn = async (
   if (provider === "credentials" || provider === "email") {
     return signInWithPassword({ options, target, shouldRedirect });
   }
+  if (!shouldRedirect) return startHandOff({ provider, options, target, shouldRedirect });
+  if (handOffInFlight) return handOffInFlight;
 
+  const handOff = startHandOff({ provider, options, target, shouldRedirect });
+  handOffInFlight = handOff;
+  // A refused start leaves this page in place, so the next press starts afresh.
+  void handOff.then(
+    (result) => {
+      if (result?.ok !== true && handOffInFlight === handOff) handOffInFlight = null;
+    },
+    () => {
+      if (handOffInFlight === handOff) handOffInFlight = null;
+    },
+  );
+  return handOff;
+};
+
+async function startHandOff({
+  provider,
+  options,
+  target,
+  shouldRedirect,
+}: {
+  provider: string;
+  options: SignInOptions | undefined;
+  target: string | undefined;
+  shouldRedirect: boolean;
+}): Promise<SignInResult> {
   // An organization's connection is registered with the SSO plugin, not as a social provider.
   if (looksLikeSsoConnectionId(provider)) {
-    return signInWithSso({ providerId: provider, target, shouldRedirect });
+    return signInWithSso({
+      providerId: provider,
+      target,
+      shouldRedirect,
+      loginHint: options?.loginHint,
+    });
   }
 
   // Every other provider goes through signIn.social, social (google, github, gitlab, microsoft) and
@@ -385,7 +441,7 @@ export const signIn = async (
     }
   }
   return { ok: true };
-};
+}
 
 /**
  * Browser navigation. Exported as its own export so tests can spy on it

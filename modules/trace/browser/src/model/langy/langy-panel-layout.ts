@@ -14,6 +14,9 @@ export const LANGY_DOCKED_OFFSET = SIDEBAR_PANEL_WIDTH;
  */
 export const LANGY_DOCK_GAP = 12;
 
+/** How far a right-anchored drawer sits from the viewport edge while the docked panel is open. */
+export const LANGY_DRAWER_YIELD_PX = 8 + SIDEBAR_PANEL_WIDTH + LANGY_DOCK_GAP;
+
 /**
  * The app shell's header-bar height. The shell's content cards, and the docked panel,
  * which joins them as a second card, start below this line. DashboardLayout derives its

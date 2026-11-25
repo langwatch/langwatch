@@ -9,14 +9,17 @@ import { writeFileSync } from "node:fs";
 import chalk from "chalk";
 
 import {
+  type QueryRunParams,
   type QueryRunResult,
   QueryApiService,
 } from "@/client-sdk/services/query/query-api.service";
 
 import { resolveCredentials } from "../../utils/apiKey";
+import { readCommandError } from "../../utils/errorOutput";
 import type { CommandResult } from "../../utils/output";
 import { createSpinner } from "../../utils/spinner";
 import { failSpinner } from "../../utils/spinnerError";
+import { parseCommaList } from "../comma-list";
 import { type QueryColumn, type QueryOutputFormat, type QueryRow, renderRows } from "./rows";
 import {
   type ParameterValue,
@@ -56,6 +59,108 @@ export interface QueryRunOptions {
   pageBy?: string;
   out?: string;
   project?: string;
+  projects?: string;
+  sources?: string;
+}
+
+/** The trace sources and projects a run names, as the request carries them. */
+interface RunReach {
+  projectId?: string;
+  projects?: string[] | "all";
+  sources?: QueryRunParams["sources"];
+}
+
+/** What the CLI tells a person whose key names no project (the platform's `projects_required`). */
+const PROJECTS_REQUIRED_MESSAGE =
+  "Name the projects to query: pass --projects <id,id>, or --projects all";
+
+/** A flag's comma list; a flag that is given but names nothing is refused, not read as unset. */
+function listFlag({
+  value,
+  flag,
+}: {
+  value: string | undefined;
+  flag: string;
+}): string[] | undefined {
+  if (value === undefined) return undefined;
+  const items = parseCommaList(value);
+  if (items.length === 0) refuse(`${flag}: pass a comma list`);
+
+  return items;
+}
+
+/** `--projects` as the request carries it: the string "all" alone, else a list of ids. */
+function readProjectsFlag({
+  project,
+  projects,
+}: {
+  project: string | undefined;
+  projects: string | undefined;
+}): string[] | "all" | undefined {
+  const listed = listFlag({ value: projects, flag: "--projects" });
+  const isAll = (item: string) => item.toLowerCase() === "all";
+  if (listed?.some(isAll) && listed.length > 1) {
+    refuse('--projects: "all" stands alone; pass it by itself, or list project ids');
+  }
+  // `--project` narrows the run to one project, so beside `--projects` it would be a second answer
+  // to the same question; the server refuses the pair, and the CLI says so before sending.
+  if (project !== undefined && listed !== undefined) {
+    refuse("--project and --projects both name the projects to read; pass one of them");
+  }
+
+  return listed?.[0] !== undefined && isAll(listed[0]) ? "all" : listed;
+}
+
+/** Turns the platform's `projects_required` into the flag that fixes it. */
+function explainProjectsRequired(error: unknown): void {
+  if (readCommandError(error).code === "projects_required") refuse(PROJECTS_REQUIRED_MESSAGE);
+}
+
+/** Whether the run was bound to any placeholder; an empty map has nothing to say. */
+function hasParams(result: Pick<QueryRunResult, "params">): boolean {
+  return result.params !== undefined && Object.keys(result.params).length > 0;
+}
+
+/** One line saying what the run was bound to, printed after a table. */
+function paramsLine(result: QueryRunResult): string {
+  return hasParams(result) ? chalk.dim(`Ran with ${JSON.stringify(result.params)}`) : "";
+}
+
+/**
+ * What a machine reads on success: the rows, and beside them what the run was bound to and what
+ * the server said about it, so an agent can tell a limited answer from a whole one.
+ */
+function resultEnvelope({
+  rows,
+  result,
+}: {
+  rows: readonly QueryRow[];
+  result: Pick<QueryRunResult, "params" | "diagnostics">;
+}) {
+  return {
+    rows,
+    ...(result.params ? { params: result.params } : {}),
+    diagnostics: result.diagnostics,
+  };
+}
+
+/** The bytes of a machine format: one JSON object holding the envelope, or bare rows. */
+function machineBody({
+  format,
+  columns,
+  rows,
+  result,
+}: {
+  format: Exclude<QueryOutputFormat, "table">;
+  columns: readonly QueryColumn[];
+  rows: readonly QueryRow[];
+  result: Pick<QueryRunResult, "params" | "diagnostics">;
+}): string {
+  if (format === "json") return JSON.stringify(resultEnvelope({ rows, result }), null, 2);
+  // CSV and JSON lines hold rows only, so what the run was bound to rides on stderr.
+  if (hasParams(result)) process.stderr.write(`${JSON.stringify({ params: result.params })}\n`);
+
+  return renderRows({ format, columns, rows });
 }
 
 /** Where the next page of a keyset walk starts. */
@@ -122,7 +227,7 @@ async function walkKeyset({
   sql,
   parameters,
   timeWindow,
-  projectId,
+  reach,
   limit,
   onPage,
 }: {
@@ -130,7 +235,7 @@ async function walkKeyset({
   sql: string;
   parameters: Record<string, ParameterValue>;
   timeWindow?: { start: string; end: string };
-  projectId?: string;
+  reach: RunReach;
   limit?: number;
   onPage: (page: QueryRunResult, rows: readonly QueryRow[]) => void;
 }): Promise<{ pages: number; rows: number }> {
@@ -150,7 +255,7 @@ async function walkKeyset({
       sql,
       parameters: { ...parameters, ...cursor },
       ...(timeWindow ? { timeWindow } : {}),
-      ...(projectId === undefined ? {} : { projectId }),
+      ...reach,
     });
     pages += 1;
     if (page.rows.length === 0) break;
@@ -176,7 +281,7 @@ async function runKeysetWalk({
   statement,
   parameters,
   timeWindow,
-  projectId,
+  reach,
   limit,
   format,
   output,
@@ -185,41 +290,47 @@ async function runKeysetWalk({
   statement: string;
   parameters: Record<string, ParameterValue>;
   timeWindow?: { start: string; end: string };
-  projectId?: string;
+  reach: RunReach;
   limit?: number;
   format: QueryOutputFormat;
   output?: string;
 }): Promise<void> {
   const spinner = createSpinner("Running statement...").start();
-  const chunks: string[] = [];
-  let columns: readonly QueryColumn[] = [];
+  const collected: QueryRow[] = [];
+  let first: QueryRunResult | undefined;
   try {
     const walked = await walkKeyset({
       service,
       sql: statement,
       parameters,
       timeWindow,
-      projectId,
+      reach,
       limit,
       onPage: (page, rows) => {
-        columns = page.columns;
-        chunks.push(
-          renderRows({
-            format: format === "table" ? "jsonl" : format,
-            columns: page.columns,
-            rows,
-          }),
-        );
+        first ??= page;
+        collected.push(...rows);
       },
     });
     spinner.succeed(
       `Read ${walked.rows} row${walked.rows !== 1 ? "s" : ""} over ${walked.pages} page${walked.pages !== 1 ? "s" : ""}`,
     );
   } catch (error) {
+    explainProjectsRequired(error);
     failSpinner({ spinner, error, action: "run statement" });
     process.exit(1);
   }
-  writeOrPrint({ body: chunks.join("\n"), output, columns });
+  if (!first) return writeOrPrint({ body: "", output, columns: [] });
+
+  writeOrPrint({
+    body: machineBody({
+      format: format === "table" ? "jsonl" : format,
+      columns: first.columns,
+      rows: collected,
+      result: first,
+    }),
+    output,
+    columns: first.columns,
+  });
 }
 
 async function runSinglePage({
@@ -227,7 +338,7 @@ async function runSinglePage({
   statement,
   parameters,
   timeWindow,
-  projectId,
+  reach,
   limit,
   format,
   output,
@@ -236,7 +347,7 @@ async function runSinglePage({
   statement: string;
   parameters: Record<string, ParameterValue>;
   timeWindow?: { start: string; end: string };
-  projectId?: string;
+  reach: RunReach;
   limit?: number;
   format: QueryOutputFormat;
   output?: string;
@@ -248,9 +359,10 @@ async function runSinglePage({
       sql: statement,
       ...(Object.keys(parameters).length > 0 ? { parameters } : {}),
       ...(timeWindow ? { timeWindow } : {}),
-      ...(projectId === undefined ? {} : { projectId }),
+      ...reach,
     });
   } catch (error) {
+    explainProjectsRequired(error);
     failSpinner({ spinner, error, action: "run statement" });
     process.exit(1);
   }
@@ -262,23 +374,26 @@ async function runSinglePage({
 
   if (format !== "table" || output !== undefined) {
     return writeOrPrint({
-      body: renderRows({
+      body: machineBody({
         format: format === "table" ? "json" : format,
         columns: result.columns,
         rows,
+        result,
       }),
       output,
       columns: result.columns,
     });
   }
 
-  // `data` is the rows array, not the whole result: `langwatch query "<sql>"
-  // -o json` must print exactly one JSON array of rows, which is also what
-  // `--format json` renders. The statistics and diagnostics reach a reader
-  // through the table and the spinner line, not through the machine payload.
+  // `data` carries the rows with `params` and `diagnostics` beside them, so `-o json` and the
+  // other machine outputs return what the run was bound to as part of the answer.
   return {
-    data: rows,
-    table: () => printTable({ ...result, rows }),
+    data: resultEnvelope({ rows, result }),
+    table: () => {
+      printTable({ ...result, rows });
+      const line = paramsLine(result);
+      if (line !== "") console.log(line);
+    },
   };
 }
 
@@ -305,13 +420,21 @@ export const runQueryCommand = async (
     ...(options.out === undefined ? {} : { output: options.out }),
   };
 
+  const projects = readProjectsFlag({ project: options.project, projects: options.projects });
+  const sources = listFlag({ value: options.sources, flag: "--sources" });
   // Only an explicit `--project` narrows the run: the personal project the
   // credential falls back to is not a project the user asked to read alone.
   const credentials = await resolveCredentials({ project: options.project });
   const projectId = options.project === undefined ? undefined : credentials.projectId;
+  const reach: RunReach = {
+    ...(projectId === undefined ? {} : { projectId }),
+    ...(projects ? { projects } : {}),
+    // The server owns the origin list and refuses an unknown name with its own message.
+    ...(sources ? { sources: sources as QueryRunParams["sources"] } : {}),
+  };
   const common = {
     ...resolved,
-    ...(projectId === undefined ? {} : { projectId }),
+    reach,
     service: new QueryApiService(),
   };
 

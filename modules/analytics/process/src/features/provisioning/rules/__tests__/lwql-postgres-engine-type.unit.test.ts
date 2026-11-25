@@ -73,7 +73,11 @@ describe("given the shipped Postgres-backed views", () => {
   });
 
   describe("when their PostgreSQL-engine table statements are built", () => {
-    const statements = postgresViews.engineTableStatements({ names: NAMES, collection: "pg" });
+    const statements = postgresViews.engineTableStatements({
+      names: NAMES,
+      collection: "pg",
+      schema: "public",
+    });
     const byTable = new Map(
       POSTGRES_VIEWS.map((view, index) => [
         view.sourceTable,

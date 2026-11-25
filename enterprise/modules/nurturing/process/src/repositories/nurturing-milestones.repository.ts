@@ -1,4 +1,10 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
+/**
+ * How many repo keys an organization's row holds, so its size stays bounded; the count stops here.
+ * Far past what nurturing segments on, and a few tens of KB at most.
+ */
+export const MAX_CODING_REPOSITORY_KEYS = 500;
+
 /** An organization as nurturing knows it from project's created events and its own counts. */
 export type NurturingOrganizationState = Readonly<{
   organizationId: string;
@@ -27,10 +33,18 @@ export type NurturingOrganizationRow = NurturingOrganizationCounts &
 
 /**
  * Nurturing's own read model, written by its peer subscribers (§9). A project's organization is
- * read by the service through `NurturingProjectDirectoryRepository`, never here (R40).
+ * read by the service through `NurturingProjectDirectoryRepository`, never here (R40). Every read
+ * of an organization's row names no erased admin, a count's included.
  */
 export interface NurturingMilestonesRepository {
-  /** Learns the project's organization; idempotent, `seeded` is set only when first learned. */
+  /** The organization's row, naming no erased admin; empty when nurturing never learned it. */
+  findOrganization(
+    input: Readonly<{ organizationId: string }>,
+  ): Promise<NurturingOrganizationRow[]>;
+  /**
+   * Learns the project's organization; idempotent, `seeded` is set only when first learned.
+   * Superseded by `recordAdminFact`, which is order-free.
+   */
   recordOrganization(
     input: Readonly<{
       organizationId: string;
@@ -48,12 +62,43 @@ export interface NurturingMilestonesRepository {
   ): Promise<NurturingOrganizationCounts[]>;
 }
 
+/** The admin an organization's row names, which an account's erasure takes back. */
+export interface NurturingOrganizationAdminRepository {
+  /**
+   * Folds one project-created fact into the organization's row, creating it when absent, in any
+   * order and any number of times with the same result. The admin is the one named by the
+   * latest-stamped fact naming one (on one stamp, the greater id), or no one if that person is
+   * erased; a fact naming no admin leaves it. `seeded` only ever turns on.
+   */
+  recordAdminFact(
+    input: Readonly<{
+      organizationId: string;
+      adminUserId: string | null;
+      /** Epoch ms of the fact's stamp. */
+      at: number;
+      seeded: boolean;
+    }>,
+  ): Promise<void>;
+  /**
+   * Marks the user erased and clears them as admin of every organization naming them; no read
+   * names them admin afterwards, even where a late fact stores them again.
+   */
+  forgetAdmin(input: Readonly<{ adminUserId: string }>): Promise<void>;
+}
+
+/** The organization's latest trace, the one fact of it a person joining later must be told. */
+export interface NurturingTraceMilestonesRepository {
+  /**
+   * Moves the time forward only, creating the organization's row when nurturing holds none; a
+   * late or repeated trace changes nothing.
+   */
+  recordLastTrace(input: Readonly<{ organizationId: string; occurredAt: number }>): Promise<void>;
+  /** Epoch ms of the latest recorded trace; null when none was recorded. */
+  findLastTraceAt(input: Readonly<{ organizationId: string }>): Promise<number | null>;
+}
+
 /** The coding-agent signals of the same organizations table, written one conditional update each. */
 export interface NurturingCodingMilestonesRepository {
-  /** The organization's row; empty when nurturing never learned it. */
-  findOrganization(
-    input: Readonly<{ organizationId: string }>,
-  ): Promise<NurturingOrganizationRow[]>;
   /**
    * Sets the first coding session once; `first` is true for the setter and a retry of its
    * `occurredAt`.
@@ -65,6 +110,18 @@ export interface NurturingCodingMilestonesRepository {
   addCodingAgentType(
     input: Readonly<{ organizationId: string; agentType: string }>,
   ): Promise<string[]>;
+  /** Adds the terminal type once; the list is always the current one. */
+  addCodingTerminalType(
+    input: Readonly<{ organizationId: string; terminalType: string }>,
+  ): Promise<string[]>;
+  /** Adds the repo's key once, up to the cap; answers how many distinct repos it holds. */
+  addCodingRepository(
+    input: Readonly<{ organizationId: string; repositoryKey: string }>,
+  ): Promise<number>;
+  /** Adds a first-three-days offset once; answers how many distinct offsets it holds. */
+  addCodingSessionDayOffset(
+    input: Readonly<{ organizationId: string; dayOffset: number }>,
+  ): Promise<number>;
   /** Counts the UTC `day` when later than the last one; `changed` stays true for that same day. */
   recordCodingActiveDay(
     input: Readonly<{ organizationId: string; day: string }>,

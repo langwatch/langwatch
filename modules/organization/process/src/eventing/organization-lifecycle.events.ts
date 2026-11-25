@@ -23,12 +23,24 @@ import {
   ORGANIZATION_MEMBER_REMOVED_EVENT_TYPE,
   ORGANIZATION_MEMBER_REMOVED_EVENT_VERSION,
   organizationMemberRemovedEventDataSchema,
+  ORGANIZATION_MEMBER_LISTED_EVENT_TYPE,
+  ORGANIZATION_MEMBER_LISTED_EVENT_VERSION,
+  organizationMemberListedEventDataSchema,
   ORGANIZATION_MEMBER_DEPARTMENT_CHANGED_EVENT_TYPE,
   ORGANIZATION_MEMBER_DEPARTMENT_CHANGED_EVENT_VERSION,
+  ORGANIZATION_MEMBER_ROLE_CHANGED_EVENT_TYPE,
+  ORGANIZATION_MEMBER_ROLE_CHANGED_EVENT_VERSION,
+  organizationMemberRoleChangedEventDataSchema,
+  ORGANIZATION_MEMBER_ADMITTED_EVENT_TYPE,
+  ORGANIZATION_MEMBER_ADMITTED_EVENT_VERSION,
+  organizationMemberAdmittedEventDataSchema,
   organizationMemberDepartmentChangedEventDataSchema,
   ORGANIZATION_TRACE_SHARING_DISABLED_EVENT_TYPE,
   ORGANIZATION_TRACE_SHARING_DISABLED_EVENT_VERSION,
   organizationTraceSharingDisabledEventDataSchema,
+  ORGANIZATION_DOCS_PLAYGROUND_SESSIONS_DISABLED_EVENT_TYPE,
+  ORGANIZATION_DOCS_PLAYGROUND_SESSIONS_DISABLED_EVENT_VERSION,
+  organizationDocsPlaygroundSessionsDisabledEventDataSchema,
   PERSONAL_WORKSPACE_PROVISIONED_EVENT_TYPE,
   PERSONAL_TEAM_CREATED_EVENT_TYPE,
   personalWorkspaceProvisionedEventDataSchema,
@@ -44,7 +56,6 @@ import { z } from "zod";
 
 /** An organization's membership milestones, and the integration method its founder chose. */
 export const ORGANIZATION_LIFECYCLE_PIPELINE_NAME = "organization_lifecycle" as const;
-export const ORGANIZATION_AGGREGATE_TYPE = "organization" as const;
 export const ORGANIZATION_LIFECYCLE_EVENT_VERSION = "2026-09-29" as const;
 
 export const RECORD_SIGNED_UP_COMMAND_TYPE = "lw.organization.record_signed_up" as const;
@@ -68,13 +79,20 @@ export const RECORD_PRESENCE_SETTING_CHANGED_COMMAND_TYPE =
   "lw.organization.record_presence_setting_changed" as const;
 export const RECORD_TRACE_SHARING_DISABLED_COMMAND_TYPE =
   "lw.organization.record_trace_sharing_disabled" as const;
+export const RECORD_DOCS_PLAYGROUND_SESSIONS_DISABLED_COMMAND_TYPE =
+  "lw.organization.record_docs_playground_sessions_disabled" as const;
 export const RECORD_CREATED_COMMAND_TYPE = "lw.organization.record_created" as const;
 export const RECORD_MEMBER_DISABLED_COMMAND_TYPE =
   "lw.organization.record_member_disabled" as const;
 export const RECORD_MEMBER_REMOVED_COMMAND_TYPE = "lw.organization.record_member_removed" as const;
 export const RECORD_MEMBER_ENABLED_COMMAND_TYPE = "lw.organization.record_member_enabled" as const;
+export const RECORD_MEMBER_LISTED_COMMAND_TYPE = "lw.organization.record_member_listed" as const;
 export const RECORD_MEMBER_DEPARTMENT_CHANGED_COMMAND_TYPE =
   "lw.organization.record_member_department_changed" as const;
+export const RECORD_MEMBER_ROLE_CHANGED_COMMAND_TYPE =
+  "lw.organization.record_member_role_changed" as const;
+export const RECORD_MEMBER_ADMITTED_COMMAND_TYPE =
+  "lw.organization.record_member_admitted" as const;
 
 /** Somebody finished onboarding by creating this organization. */
 export const recordSignedUpCommandDataSchema = organizationSignedUpEventDataSchema;
@@ -216,6 +234,23 @@ export type OrganizationTraceSharingDisabledEvent = z.infer<
   typeof organizationTraceSharingDisabledEventSchema
 >;
 
+/** Docs playground sessions switched off; versioned on its own, like the trace sharing switch. */
+export const recordDocsPlaygroundSessionsDisabledCommandDataSchema =
+  organizationDocsPlaygroundSessionsDisabledEventDataSchema;
+export type RecordDocsPlaygroundSessionsDisabledCommandData = z.infer<
+  typeof recordDocsPlaygroundSessionsDisabledCommandDataSchema
+>;
+
+export const organizationDocsPlaygroundSessionsDisabledEventSchema = z.object({
+  ...EventSchema.shape,
+  type: z.literal(ORGANIZATION_DOCS_PLAYGROUND_SESSIONS_DISABLED_EVENT_TYPE),
+  version: z.literal(ORGANIZATION_DOCS_PLAYGROUND_SESSIONS_DISABLED_EVENT_VERSION),
+  data: organizationDocsPlaygroundSessionsDisabledEventDataSchema,
+});
+export type OrganizationDocsPlaygroundSessionsDisabledEvent = z.infer<
+  typeof organizationDocsPlaygroundSessionsDisabledEventSchema
+>;
+
 /** A seat taken away; versioned on its own, like the trace sharing switch. */
 export const recordMemberDisabledCommandDataSchema = organizationMemberDisabledEventDataSchema;
 export type RecordMemberDisabledCommandData = z.infer<typeof recordMemberDisabledCommandDataSchema>;
@@ -252,6 +287,18 @@ export const organizationMemberRemovedEventSchema = z.object({
 });
 export type OrganizationMemberRemovedEvent = z.infer<typeof organizationMemberRemovedEventSchema>;
 
+/** An existing active membership listed by the upgrade step; versioned on its own. */
+export const recordMemberListedCommandDataSchema = organizationMemberListedEventDataSchema;
+export type RecordMemberListedCommandData = z.infer<typeof recordMemberListedCommandDataSchema>;
+
+export const organizationMemberListedEventSchema = z.object({
+  ...EventSchema.shape,
+  type: z.literal(ORGANIZATION_MEMBER_LISTED_EVENT_TYPE),
+  version: z.literal(ORGANIZATION_MEMBER_LISTED_EVENT_VERSION),
+  data: organizationMemberListedEventDataSchema,
+});
+export type OrganizationMemberListedEvent = z.infer<typeof organizationMemberListedEventSchema>;
+
 /** A member's department set or cleared (M8487-DEPT-CHANGE). */
 export const recordMemberDepartmentChangedCommandDataSchema =
   organizationMemberDepartmentChangedEventDataSchema;
@@ -268,6 +315,35 @@ export const organizationMemberDepartmentChangedEventSchema = z.object({
 export type OrganizationMemberDepartmentChangedEvent = z.infer<
   typeof organizationMemberDepartmentChangedEventSchema
 >;
+
+/** A member's organization role changed. */
+export const recordMemberRoleChangedCommandDataSchema =
+  organizationMemberRoleChangedEventDataSchema;
+export type RecordMemberRoleChangedCommandData = z.infer<
+  typeof recordMemberRoleChangedCommandDataSchema
+>;
+
+export const organizationMemberRoleChangedEventSchema = z.object({
+  ...EventSchema.shape,
+  type: z.literal(ORGANIZATION_MEMBER_ROLE_CHANGED_EVENT_TYPE),
+  version: z.literal(ORGANIZATION_MEMBER_ROLE_CHANGED_EVENT_VERSION),
+  data: organizationMemberRoleChangedEventDataSchema,
+});
+export type OrganizationMemberRoleChangedEvent = z.infer<
+  typeof organizationMemberRoleChangedEventSchema
+>;
+
+/** A person was admitted by a path that raises no joined fact of its own. */
+export const recordMemberAdmittedCommandDataSchema = organizationMemberAdmittedEventDataSchema;
+export type RecordMemberAdmittedCommandData = z.infer<typeof recordMemberAdmittedCommandDataSchema>;
+
+export const organizationMemberAdmittedEventSchema = z.object({
+  ...EventSchema.shape,
+  type: z.literal(ORGANIZATION_MEMBER_ADMITTED_EVENT_TYPE),
+  version: z.literal(ORGANIZATION_MEMBER_ADMITTED_EVENT_VERSION),
+  data: organizationMemberAdmittedEventDataSchema,
+});
+export type OrganizationMemberAdmittedEvent = z.infer<typeof organizationMemberAdmittedEventSchema>;
 
 /** An organization now exists; versioned on its own, born after the lifecycle's first facts. */
 export const recordCreatedCommandDataSchema = organizationCreatedEventDataSchema;

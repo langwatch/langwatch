@@ -82,7 +82,7 @@ function projectsForRest(organizationProjects: readonly string[]) {
  * are the ones the scope port answered for the principal the transport handed
  * it — not a set the test decided for itself.
  */
-function mount({
+async function mount({
   project,
   apiKeyUserId,
   reach = { key: [OWNER_PROJECT], holder: [OWNER_PROJECT] },
@@ -97,7 +97,7 @@ function mount({
   const repositories = MemoryCodingAgentRepositories.create();
   const candidateReads = vi.spyOn(repositories.sessions, "findByRepositoryBranch");
 
-  const app = CodingAgentModule.create({
+  const app = await CodingAgentModule.create({
     dependencies: {
       github,
       projects: projectsForRest([...new Set([...reach.key, ...reach.holder])]),
@@ -183,7 +183,7 @@ describe("given the project-scoped pull request usage read", () => {
   describe("when a personal-workspace key reads a mapped pull request", () => {
     /** @scenario A pull request usage read over the API is recorded */
     it("records the read against the caller, the organization and the pull request without naming contributors", async () => {
-      const api = mount({
+      const api = await mount({
         project: { id: OWNER_PROJECT, isPersonal: true, ownerUserId: "user-1" },
         apiKeyUserId: "user-1",
       });
@@ -212,7 +212,7 @@ describe("given the project-scoped pull request usage read", () => {
   describe("when the key belongs to a workspace that is not one person's", () => {
     /** @scenario A shared-workspace key cannot read pull request usage */
     it("refuses with the personal-workspace key required code and reads nothing", async () => {
-      const api = mount({
+      const api = await mount({
         project: { id: "project_team", isPersonal: false, ownerUserId: null },
         apiKeyUserId: "user-1",
       });
@@ -229,7 +229,7 @@ describe("given the project-scoped pull request usage read", () => {
   describe("when a user-bound key is pointed at another user's personal workspace", () => {
     /** @scenario A key cannot read another user's pull request usage */
     it("refuses with the key mismatch code and says nothing about whose workspace it is", async () => {
-      const api = mount({
+      const api = await mount({
         project: { id: OTHER_WORKSPACE, isPersonal: true, ownerUserId: "user-2" },
         apiKeyUserId: "user-1",
       });
@@ -250,7 +250,7 @@ describe("given a key bound to fewer projects than the person holding it", () =>
   describe("when that key reads the project-scoped rollup", () => {
     /** @scenario "A narrowed personal-workspace key reads with its own scope, not its holder's" */
     it("counts the key's own projects, never the holder's wider access", async () => {
-      const api = mount({
+      const api = await mount({
         project: { id: OWNER_PROJECT, isPersonal: true, ownerUserId: "user-1" },
         apiKeyUserId: "user-1",
         reach: { key: [OWNER_PROJECT], holder: [OWNER_PROJECT, TEAMMATE_PROJECT] },
@@ -269,7 +269,7 @@ describe("given a key for a personal workspace that belongs to no person", () =>
   describe("when it reads the project-scoped rollup", () => {
     /** @scenario "An ownerless key on the personal rollup is refused rather than answered as the owner" */
     it("refuses by name rather than answering as the workspace's owner", async () => {
-      const api = mount({
+      const api = await mount({
         project: { id: OWNER_PROJECT, isPersonal: true, ownerUserId: "user-1" },
         apiKeyUserId: null,
       });

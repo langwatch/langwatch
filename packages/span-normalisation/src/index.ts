@@ -17,6 +17,7 @@ export {
 } from "./canonicalAttributes.ts";
 export { isRecord, isReplyTextPart } from "./canonicalGuard.ts";
 export { parseJsonStringValues } from "./canonicalJson.ts";
+export { asSessionKey, readDeclaredSessionKey } from "./langwatch/langwatchIdentity.ts";
 export { extractLastUserMessageText, extractMessageContentText } from "./canonicalMessage.ts";
 export {
   claudeCacheWritesLongLived,
@@ -39,6 +40,7 @@ export { LegacyOtelCanonicaliserService } from "./legacyOtelCanonicaliser.ts";
 export { LogfireCanonicaliserService } from "./logfireCanonicaliser.ts";
 export { MastraCanonicaliserService } from "./mastraCanonicaliser.ts";
 export { OpenInferenceCanonicaliserService } from "./openinferenceCanonicaliser.ts";
+export { PiCanonicaliserService } from "./piCanonicaliser.ts";
 export { SPRING_AI_SCOPE_NAMES, SpringAICanonicaliserService } from "./springAiCanonicaliser.ts";
 export { StrandsCanonicaliserService } from "./strandsCanonicaliser.ts";
 export { TraceloopCanonicaliserService } from "./traceloopCanonicaliser.ts";

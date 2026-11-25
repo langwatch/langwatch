@@ -43,6 +43,9 @@ vi.mock("../../experiment-api.ts", () => ({
 
 vi.mock("../use-open-target-editor.ts", () => ({
   scrollToTargetColumn: vi.fn(),
+  isAgentTargetDrawer: () => false,
+  agentTargetDrawerCallbacks: vi.fn(),
+  buildUIMappings: vi.fn(),
   useOpenTargetEditor: () => ({
     openTargetEditor: vi.fn(),
     buildAvailableSources: () => [],

@@ -1,12 +1,12 @@
 ---
 title: AI Tools Portal overview
-description: A customizable card-grid home at /me where every developer in your organization can see the AI tools available to them, coding assistants, model providers for virtual-key creation, and admin-curated external tools, published and scoped by your IT admins.
+description: A customizable card-grid home at /coding-agents where every developer in your organization can see the AI tools available to them, coding assistants, model providers for virtual-key creation, and admin-curated external tools, published and scoped by your IT admins.
 sidebarTitle: Overview
 ---
 
 The **AI Tools Portal** is the company-wide AI starting point. When an
 engineer signs in via `langwatch login` (without a tool subcommand) or
-opens the LangWatch dashboard, they land on `/me` and see a card grid of
+opens the LangWatch dashboard, they land on `/coding-agents` and see a card grid of
 every AI tool their organization has published for them: the coding
 assistants they can install, the model providers they can mint virtual
 keys for, and the external AI tools (Copilot Studio, internal chat agents,
@@ -75,7 +75,7 @@ team entry overrides for users in that team. This is how admins say
 A fresh organization has an empty catalog. The first admin to visit
 `/governance/inventory?tab=catalog` sees a starter-pack import CTA
 ([Admin catalog](/ai-governance/personal-portal/admin-catalog#starter-pack)).
-End users on `/me` see a "your IT team is still setting things up"
+End users on `/coding-agents` see a "your IT team is still setting things up"
 message until the admin publishes the catalog.
 
 ![Portal empty state, end-user view before admin publishes the catalog](/images/ai-governance/portal/portal-empty.png)
@@ -85,7 +85,7 @@ message until the admin publishes the catalog.
 Two new RBAC permissions gate the portal surfaces:
 
 - `aiTools:view`, granted to ADMIN, MEMBER, and EXTERNAL by default.
-  Required to see the grid at `/me` and call the public tile list.
+  Required to see the grid at `/coding-agents` and call the public tile list.
   This is intentionally broad: the portal is the company's curated AI
   starting point and must work for everyone.
 - `aiTools:manage`, granted to ADMIN by default. Required to access

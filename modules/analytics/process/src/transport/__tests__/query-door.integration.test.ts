@@ -4,20 +4,42 @@
  * @see specs/lwql/api.feature
  * @vitest-environment node
  */
-import { lwqlResultSchema, type LangWatchQLProtections } from "@langwatch/analytics-contract";
+import {
+  lwqlResultSchema,
+  type LangWatchQLKeyReach,
+  type LangWatchQLProtections,
+} from "@langwatch/analytics-contract";
+import type { AuthzApi } from "@langwatch/authz-contract";
+import type { DataPrivacyApi } from "@langwatch/data-privacy-contract";
+import type { DataRetentionApi } from "@langwatch/data-retention-contract";
+import type { EntitlementApi } from "@langwatch/entitlement-contract";
+import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
+import type { InstantEvalApi } from "@langwatch/instant-eval-contract";
+import { createRecordingMeterProvider } from "@langwatch/observability/metrics/testing";
+import { resolveRequestBound } from "@langwatch/plans";
+import type { ProjectApi } from "@langwatch/project-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import type { TraceApi } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
+import { analyticsTestSecrets } from "../../app/__tests__/analytics-secrets.fixture.ts";
+import {
+  ADMIT_EVERY_PLACEMENT,
+  TEST_RUN_TELEMETRY,
+} from "../../app/__tests__/analytics.fixture.ts";
+import { AnalyticsModule } from "../../app/analytics.app.ts";
 import { GATED_DATASET } from "../../langwatch-ql/__tests__/gatedDatasetFixture.ts";
 import {
   LangWatchQLExecutorRepository,
   type LangWatchQLExecutionRequest,
   type LangWatchQLExecutionResult,
 } from "../../repositories/langwatch-ql-executor.repository.ts";
+import { MemoryAnalyticsRepositories } from "../../repositories/memory/memory.analytics.repositories.ts";
 import { LWQL_CATALOG, LWQL_VIEW_CATALOG } from "../../rules/lwql-view-catalog.rules.ts";
 import { EVERY_CATALOGUE_PERMISSION } from "../../services/__tests__/lwql-catalogue-access.fixture.ts";
 import { LangWatchQLService } from "../../services/langwatch-ql.service.ts";
-import { mountQueryDoor } from "./query-door.harness.ts";
+import { mountQueryDoor, mountQueryDoorOverApp } from "./query-door.harness.ts";
 
 const DATABASE = "analytics";
 const TENANT = { id: "project-a", lwqlKey: "lwql-key-a" };
@@ -47,9 +69,17 @@ class RecordingExecutor extends LangWatchQLExecutorRepository {
 }
 
 /** The door over the real service, with the gated fixture dataset beside the shipped catalogue. */
-function mountDoor({ protections = PERMITTED }: { protections?: LangWatchQLProtections } = {}) {
+function mountDoor({
+  protections = PERMITTED,
+  reach,
+}: {
+  protections?: LangWatchQLProtections;
+  reach?: () => LangWatchQLKeyReach;
+} = {}) {
   const executor = new RecordingExecutor();
   const service = LangWatchQLService.create({
+    runTelemetry: TEST_RUN_TELEMETRY,
+    placement: ADMIT_EVERY_PLACEMENT,
     executor,
     database: DATABASE,
     views: [...LWQL_VIEW_CATALOG, GATED_DATASET],
@@ -57,12 +87,20 @@ function mountDoor({ protections = PERMITTED }: { protections?: LangWatchQLProte
     // A frozen clock, so hydration adds no wall time to the executor's elapsedMs.
     stopwatch: () => 0,
   });
-  const door = mountQueryDoor({ tenant: () => TENANT, service: () => service, protections });
+  const door = mountQueryDoor({
+    tenant: () => TENANT,
+    service: () => service,
+    protections,
+    ...(reach ? { reach } : {}),
+  });
 
-  const run = async (request: Record<string, unknown>) => {
+  const run = async (
+    request: Record<string, unknown>,
+    identity: Readonly<Record<string, string>> = {},
+  ) => {
     const response = await door.fetch("/api/v1/query", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", ...identity },
       body: JSON.stringify(request),
     });
 
@@ -71,7 +109,13 @@ function mountDoor({ protections = PERMITTED }: { protections?: LangWatchQLProte
     return { status: response.status, body };
   };
 
-  return { executor, run };
+  const get = async (path: string) => {
+    const response = await door.fetch(path);
+
+    return { status: response.status, body: (await response.json()) as unknown };
+  };
+
+  return { executor, run, get, reaches: door.reaches, doors: door.doors };
 }
 
 /** The refusal envelope as the caller reads it: code plus the meta the scenarios inspect. */
@@ -199,6 +243,149 @@ describe("given the query door over the real service", () => {
       expect(withheld.executor.requests).toEqual([]);
       expect(read.status).toBe(200);
       expect(held.executor.requests).toHaveLength(1);
+    });
+  });
+
+  describe("when the key is one Langy minted for a chat session", () => {
+    const langyReach: LangWatchQLKeyReach = {
+      kind: "apiKey",
+      apiKeyId: "key-langy",
+      userId: "user-1",
+      organizationId: "org-1",
+      resolvedProject: { id: TENANT.id, teamId: "team-1" },
+      isLangySessionKey: true,
+    };
+
+    /** @scenario "A Langy session key runs a LangWatchQL query and reads its schema and reference" */
+    it("runs the query and reads the schema and reference, each with its own reach", async () => {
+      const { executor, reaches, run, get } = mountDoor({ reach: () => langyReach });
+
+      const query = await run({ sql: `SELECT TraceId FROM ${DATABASE}.traces LIMIT 5` });
+      const schema = await get("/api/v1/query/schema");
+      const reference = await get("/api/v1/query/reference");
+
+      expect([query.status, schema.status, reference.status]).toEqual([200, 200, 200]);
+      expect(executor.requests).toHaveLength(1);
+      expect(reaches).toEqual([langyReach, langyReach, langyReach]);
+    });
+  });
+
+  describe("when the CLI, an MCP server or any other client runs a query", () => {
+    /** @scenario "Telemetry: a key's query is counted by the client that sent it" */
+    it("names the CLI and both MCP servers apart, and every other client rest_api", async () => {
+      const { run, doors } = mountDoor();
+      const sql = `SELECT TraceId FROM ${DATABASE}.traces LIMIT 5`;
+
+      await run({ sql }, { "User-Agent": "langwatch-cli/1.4.0" });
+      await run(
+        { sql },
+        { "X-LangWatch-SDK-Name": "langwatch-client-sdk", "X-LangWatch-Surface": "cli" },
+      );
+      await run({ sql }, { "X-LangWatch-SDK-Name": "langwatch-mcp" });
+      await run(
+        { sql },
+        { "X-LangWatch-SDK-Name": "langwatch-mcp", "X-LangWatch-MCP-Host": "hosted" },
+      );
+      await run({ sql }, { "User-Agent": "langwatch-sdk-node/1.0.0" });
+      await run({ sql }, { "User-Agent": "curl/8.5.0" });
+
+      expect(doors).toEqual(["cli", "cli", "mcp", "mcp", "rest_api", "rest_api"]);
+    });
+  });
+
+  describe("when an MCP server's query is refused before the engine", () => {
+    /** @scenario "Telemetry: a key's query is counted by the client that sent it" */
+    it("counts the refusal under the mcp caller", async () => {
+      const metrics = createRecordingMeterProvider();
+      metrics.install();
+      try {
+        // An organization with no project the key may read: refused before any statement runs.
+        const app = await AnalyticsModule.create({
+          dependencies: {
+            featureFlags: createApiFixture<FeatureFlagApi>(),
+            authz: createApiFixture<AuthzApi>(),
+            dataPrivacy: createApiFixture<DataPrivacyApi>(),
+            projects: createApiFixture<ProjectApi>({
+              getOrganizationId: async () => "org-1",
+              listByOrganization: ({ limit }) =>
+                Promise.resolve({ data: [], pagination: { page: 1, limit, total: 0 } }),
+            }),
+            plans: createApiFixture<EntitlementApi>({
+              requestBound: ({ key }) => Promise.resolve(resolveRequestBound(key, "ENTERPRISE")),
+            }),
+            traces: createApiFixture<TraceApi>(),
+            retention: createApiFixture<DataRetentionApi>(),
+          },
+          channels: { judge: createApiFixture<InstantEvalApi>() },
+          repositories: MemoryAnalyticsRepositories.create(),
+          config: {
+            langwatchQl: {
+              url: void 0,
+              username: void 0,
+              database: void 0,
+              tenantSetting: void 0,
+              postgresHost: void 0,
+              accessModelMode: void 0,
+              sqlSingleNode: void 0,
+              clickhouseCluster: void 0,
+              aggregateMaxMembers: void 0,
+            },
+            tenantAnalyticsConcurrency: 4,
+            publicBaseUrl: "https://app.langwatch.test",
+          },
+          resources: { own: () => void 0, ownService: () => void 0 },
+          secrets: analyticsTestSecrets(),
+        });
+        const door = mountQueryDoorOverApp({
+          app,
+          reach: () => ({
+            kind: "apiKey",
+            apiKeyId: "key-mcp",
+            userId: null,
+            organizationId: "org-1",
+          }),
+        });
+
+        const response = await door.fetch("/api/v1/query", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "X-LangWatch-SDK-Name": "langwatch-mcp" },
+          body: JSON.stringify({ sql: `SELECT TraceId FROM ${DATABASE}.traces LIMIT 5` }),
+        });
+        const { code } = refusalSchema.parse(await response.json());
+
+        expect(response.status).toBeGreaterThanOrEqual(400);
+        expect(metrics.valueOf("lwql_queries_total", { caller: "mcp", outcome: code })).toBe(1);
+        expect(metrics.valueOf("lwql_queries_total", { caller: "rest_api", outcome: code })).toBe(
+          0,
+        );
+      } finally {
+        metrics.uninstall();
+      }
+    });
+  });
+
+  describe("when an organization key's credential carries no Langy flag", () => {
+    /** @scenario "An organization key whose credential carries no Langy flag still runs a query" */
+    it("runs the query whether the flag is absent or present as undefined", async () => {
+      const organizationReach = {
+        kind: "apiKey",
+        apiKeyId: "key-org",
+        userId: null,
+        organizationId: "org-1",
+      } as const;
+      const absent = mountDoor({ reach: () => organizationReach });
+      const undefinedValued = mountDoor({
+        reach: () => ({ ...organizationReach, isLangySessionKey: undefined }),
+      });
+      const sql = `SELECT TraceId FROM ${DATABASE}.traces LIMIT 5`;
+
+      const fromAbsent = await absent.run({ sql });
+      const fromUndefined = await undefinedValued.run({ sql });
+
+      expect([fromAbsent.status, fromUndefined.status]).toEqual([200, 200]);
+      expect(absent.reaches).toEqual([organizationReach]);
+      expect(undefinedValued.reaches).toEqual([organizationReach]);
+      expect(undefinedValued.executor.requests).toHaveLength(1);
     });
   });
 

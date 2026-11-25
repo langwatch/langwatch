@@ -15,7 +15,7 @@ async def main(message: cl.Message):
     )
 
     completion = client.chat.completions.create(
-        model="gpt-5",
+        model="gpt-6-luna",
         messages=[
             {
                 "role": "system",

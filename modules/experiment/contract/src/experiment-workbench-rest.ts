@@ -177,6 +177,14 @@ const startRunResponseSchemaDefinition = z.object({
   runId: z.string().describe("Identifier to poll this run with"),
   status: z.literal("running"),
   total: z.number().describe("Number of cells this run will execute"),
+  concurrency: z
+    .number()
+    .int()
+    .positive()
+    .optional()
+    .describe(
+      "Cells this run executes at once: the request's `concurrency`, else the server default",
+    ),
   runUrl: z.string().optional().describe("Link to the run in the LangWatch app"),
 });
 export interface StartRunResponseSchema extends Named<typeof startRunResponseSchemaDefinition> {}
@@ -223,6 +231,22 @@ const runListEntrySchema = z.object({
   timestamps: runTimestampsSchema,
   progress: z.number().nullable().optional(),
   total: z.number().nullable().optional(),
+  concurrency: z
+    .number()
+    .int()
+    .positive()
+    .nullable()
+    .optional()
+    .describe("Cells the run executed at once. Null for a run that recorded none."),
+  repeat: z
+    .number()
+    .int()
+    .positive()
+    .nullable()
+    .optional()
+    .describe(
+      "How many times the run repeated every dataset row. Run row `r * repeat + k` is repetition `k` of dataset row `r`. Null for a run that ran each row once.",
+    ),
   summary: runAggregateSummarySchema,
 });
 
@@ -281,7 +305,13 @@ const executionSummarySchemaDefinition = z.object({
         name: z.string(),
         passed: z.number(),
         failed: z.number(),
-        passRate: z.number(),
+        errored: z
+          .number()
+          .optional()
+          .describe("Cells where the evaluator crashed and gave no verdict"),
+        passRate: z
+          .number()
+          .describe("Percentage of verdicts that passed; 0 when passed and failed are both 0"),
         avgScore: z.number().optional(),
       }),
     )
@@ -305,6 +335,12 @@ const runStatusResponseSchemaDefinition = z.object({
   status: runStatusSchema,
   progress: z.number().describe("Cells finished so far"),
   total: z.number().describe("Cells in the run"),
+  concurrency: z
+    .number()
+    .int()
+    .positive()
+    .optional()
+    .describe("Cells the run executes at once, as it was fixed when the run started"),
   startedAt: z.number().optional().describe("Unix milliseconds"),
   finishedAt: z
     .number()
@@ -369,6 +405,18 @@ const runTargetSchema = z.object({
   promptId: z.string().nullable().optional(),
   promptVersion: z.number().nullable().optional(),
   agentId: z.string().nullable().optional(),
+  agentLabel: z
+    .string()
+    .nullable()
+    .optional()
+    .describe("The deploy label an agent target ran at, such as production"),
+  agentVersion: z
+    .number()
+    .int()
+    .positive()
+    .nullable()
+    .optional()
+    .describe("The agent version the label pointed at when the run started"),
   evaluatorId: z.string().nullable().optional(),
   model: z.string().nullable().optional(),
   metadata: z
@@ -384,6 +432,22 @@ const runResultsResponseSchemaDefinition = z.object({
   workflowVersionId: z.string().nullable().optional(),
   progress: z.number().nullable().optional(),
   total: z.number().nullable().optional(),
+  concurrency: z
+    .number()
+    .int()
+    .positive()
+    .nullable()
+    .optional()
+    .describe("Cells the run executed at once. Null for a run that recorded none."),
+  repeat: z
+    .number()
+    .int()
+    .positive()
+    .nullable()
+    .optional()
+    .describe(
+      "How many times the run repeated every dataset row. Run row `r * repeat + k` is repetition `k` of dataset row `r`. Null for a run that ran each row once.",
+    ),
   targets: z
     .array(runTargetSchema)
     .nullable()

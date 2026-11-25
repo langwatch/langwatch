@@ -12,7 +12,7 @@ import {
 } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { useEscapeKey } from "@langwatch/design-system/use-escape-key";
-import { evaluatorHasMissingMappings } from "@langwatch/experiment-contract/mapping-validation";
+import { evaluatorMappingGaps } from "@langwatch/experiment-contract/mapping-validation";
 import type { SerializedHandledError } from "@langwatch/handled-error";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { LuCheck, LuCopy, LuListTree, LuPlay, LuPlus, LuSquare } from "react-icons/lu";
@@ -447,11 +447,14 @@ export function TargetCellContent({
   const { openDrawer } = useDrawer();
   const targetName = useTargetName(target);
   const openEvaluatorEditor = useOpenEvaluatorEditor();
-  const { evaluators, activeDatasetId, removeEvaluator } = useEvaluationsV3Store((state) => ({
-    evaluators: state.evaluators,
-    activeDatasetId: state.activeDatasetId,
-    removeEvaluator: state.removeEvaluator,
-  }));
+  const { evaluators, activeDatasetId, datasets, removeEvaluator } = useEvaluationsV3Store(
+    (state) => ({
+      evaluators: state.evaluators,
+      activeDatasetId: state.activeDatasetId,
+      datasets: state.datasets,
+      removeEvaluator: state.removeEvaluator,
+    }),
+  );
 
   // Code evaluators (DB type "code") route their edit flow to the code editor.
   const codeEvaluatorIds = useCodeEvaluatorIds(evaluators);
@@ -522,10 +525,18 @@ export function TargetCellContent({
     () =>
       new Set(
         evaluators
-          .filter((evaluator) => evaluatorHasMissingMappings(evaluator, activeDatasetId, target.id))
+          .filter(
+            (evaluator) =>
+              !evaluatorMappingGaps({
+                evaluator,
+                datasetId: activeDatasetId,
+                targetId: target.id,
+                datasets,
+              }).isValid,
+          )
           .map((evaluator) => evaluator.id),
       ),
-    [evaluators, activeDatasetId, target.id],
+    [evaluators, activeDatasetId, target.id, datasets],
   );
 
   // Use shared utility for consistent output formatting

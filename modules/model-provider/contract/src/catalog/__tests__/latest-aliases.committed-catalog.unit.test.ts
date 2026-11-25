@@ -12,7 +12,7 @@ describe("given the committed model catalog", () => {
   describe("when the recommendation is read per provider", () => {
     /** @scenario The recommendation is the newest main-tier model of each provider */
     it.each([
-      ["openai", "openai/gpt-5.6-terra"],
+      ["openai", "openai/gpt-6.1-terra"],
       ["anthropic", "anthropic/claude-opus-5-5"],
       ["gemini", "gemini/gemini-3.8-flash"],
       ["deepseek", "deepseek/deepseek-v4-pro"],

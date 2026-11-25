@@ -27,11 +27,11 @@ Switch on **Use API Gateway** when your Azure OpenAI traffic goes through Azure 
 
 ## Deployments and model names
 
-Azure serves models through deployments that you name yourself. The gateway uses the model id as the deployment name: `azure/gpt-5-mini` calls the deployment named `gpt-5-mini` on the resource.
+Azure serves models through deployments that you name yourself. The gateway uses the model id as the deployment name: `azure/gpt-6-luna` calls the deployment named `gpt-6-luna` on the resource.
 
-Add each deployment name under **Custom Models** on the row. A request for a model that is not on the row's list is rejected before it reaches Azure with `400 provider_config_invalid` and the message `This model provider is not configured to serve "gpt-5-mini"`.
+Add each deployment name under **Custom Models** on the row. A request for a model that is not on the row's list is rejected before it reaches Azure with `400 provider_config_invalid` and the message `This model provider is not configured to serve "gpt-6-luna"`.
 
-To keep application code on generic names when your deployment names differ, map them on the key with `model_aliases`, for example `{"gpt-5-mini": "azure/acme-mini-eu"}`. See [Model aliases](/ai-gateway/model-aliases).
+To keep application code on generic names when your deployment names differ, map them on the key with `model_aliases`, for example `{"gpt-6-luna": "azure/acme-mini-eu"}`. See [Model aliases](/ai-gateway/model-aliases).
 
 ## Send a request
 
@@ -40,7 +40,7 @@ curl https://gateway.langwatch.ai/v1/chat/completions \
   -H "Authorization: Bearer $LANGWATCH_VIRTUAL_KEY" \
   -H "Content-Type: application/json" \
   -d '{
-    "model": "azure/gpt-5-mini",
+    "model": "azure/gpt-6-luna",
     "messages": [{"role": "user", "content": "Say hi in one word"}]
   }'
 ```
@@ -60,4 +60,4 @@ The gateway sends the request to `<endpoint>/openai/deployments/<deployment>/cha
 
 ## More than one resource
 
-Create one row per Azure resource and give each a **Routing handle**, for example `eu` and `us`. `eu/gpt-5-mini` pins the request to that resource. A routing policy sets the order a key tries them in. See [Routing policies](/ai-gateway/governance/routing-policies).
+Create one row per Azure resource and give each a **Routing handle**, for example `eu` and `us`. `eu/gpt-6-luna` pins the request to that resource. A routing policy sets the order a key tries them in. See [Routing policies](/ai-gateway/governance/routing-policies).

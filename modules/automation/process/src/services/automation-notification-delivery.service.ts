@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 
 import { EMAIL_RX, type AlertType, type SlackPayload } from "@langwatch/automation-contract";
+import { ALERT_LINK_MARKER } from "@langwatch/automation-contract/alert-link";
 import { toDispatchError } from "@langwatch/eventing";
 import type { MailRender, TriggerDigestEntry } from "@langwatch/mail";
 import type { NotificationService } from "@langwatch/notification-contract";
@@ -39,6 +40,12 @@ type SettlementDigestEntry = {
 
 /** How much of a trace's input the digest shows before it stops being a preview. */
 const DIGEST_PREVIEW_MAX_CHARS = 140;
+
+/**
+ * The packaged digest's template id, written out rather than imported: the template module
+ * pulls react-email onto this boot graph. An author's own template carries no id.
+ */
+const TRIGGER_DIGEST_TEMPLATE = "trigger-digest";
 
 /**
  * A settled match for the digest template, using pre-hydrated trace timestamps
@@ -202,6 +209,7 @@ export class AutomationNotificationDeliveryService extends AutomationNotificatio
         projectSlug: input.projectSlug,
         baseHost: this.baseHost,
         entries: input.triggerData.map(toDigestEntry),
+        linkMarker: ALERT_LINK_MARKER,
       });
     } catch (error) {
       throw toDispatchError(error, {
@@ -217,6 +225,7 @@ export class AutomationNotificationDeliveryService extends AutomationNotificatio
         projectId: input.projectId,
         subject: `${input.triggerType ? `(${input.triggerType}) ` : ""}Trigger - ${input.triggerName}`,
         html,
+        template: TRIGGER_DIGEST_TEMPLATE,
         isRecipientSent: input.isRecipientSent,
         recordRecipientSent: input.recordRecipientSent,
       });
@@ -314,6 +323,7 @@ export class AutomationNotificationDeliveryService extends AutomationNotificatio
     projectId: string;
     subject: string;
     html: string;
+    template?: string;
     isRecipientSent(recipientHash: string): Promise<boolean>;
     recordRecipientSent(recipientHash: string): Promise<void>;
   }): Promise<void> {
@@ -347,7 +357,13 @@ export class AutomationNotificationDeliveryService extends AutomationNotificatio
         // A test to the author's own inbox needs no suppression context, and
         // the token requires a real automation id. Sentinel sends also stay
         // out of the dedup ledger entirely.
-        await this.mailer.sendEmail({ to: recipient, replyless, subject, html: input.html });
+        await this.mailer.sendEmail({
+          to: recipient,
+          replyless,
+          subject,
+          html: input.html,
+          template: input.template,
+        });
         continue;
       }
 
@@ -362,6 +378,7 @@ export class AutomationNotificationDeliveryService extends AutomationNotificatio
         subject,
         html: injectFooterIntoBody(input.html, unsubscribe.footerHtml),
         unsubscribe: { url: unsubscribe.oneClickUrl },
+        template: input.template,
       });
 
       // Recorded only AFTER the provider accepted it, so a retryable failure

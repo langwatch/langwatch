@@ -1,6 +1,9 @@
 import type { FrontendFeatureFlag } from "@langwatch/feature-flag-contract";
+import { CODING_AGENTS_PATH } from "@langwatch/user-contract";
 
+import type { DashboardsSidebarHint } from "./dashboards-sidebar-hint.ts";
 import {
+  isOrganizationDashboardsPath,
   isOrganizationScopedProduct,
   isPathUnder,
   isSettingsShellRoute,
@@ -67,20 +70,34 @@ function seatRefusalAt({
 }
 
 /**
- * The product the chrome draws. Dashboards wins over the personal plane: its
- * sidebar is the saved-dashboards list, which the Me sidebar does not carry.
+ * An open board draws its home product, whatever its address. With the organization's library on,
+ * a project's Dashboards pages are LLM Ops (owner decision D1); without it the LLM Ops hint holds,
+ * except in the library. Dashboards beats the personal plane: Coding agents lists no dashboards.
  */
 function activeProductFor({
   isSettingsRoute,
   isPersonalScopeRoute,
+  isOrganizationLibrary,
   addressedProductId,
+  sidebarHint,
+  boardHomeProduct,
+  hasOrganizationLibrary,
 }: {
   isSettingsRoute: boolean;
   isPersonalScopeRoute: boolean;
+  isOrganizationLibrary: boolean;
   addressedProductId: ProductId | null;
+  sidebarHint: DashboardsSidebarHint | null;
+  boardHomeProduct: ProductId | null;
+  hasOrganizationLibrary: boolean;
 }): ProductId | null {
   if (isSettingsRoute) return null;
-  if (addressedProductId === "dashboards") return "dashboards";
+  if (addressedProductId === "dashboards") {
+    if (boardHomeProduct) return boardHomeProduct;
+    if (isOrganizationLibrary) return "dashboards";
+    if (hasOrganizationLibrary) return "llm-ops";
+    return sidebarHint === "llm-ops" ? "llm-ops" : "dashboards";
+  }
   if (isPersonalScopeRoute) return "me";
   return addressedProductId ?? "llm-ops";
 }
@@ -110,6 +127,9 @@ export function resolveShellRoute({
   isOrgScope,
   isOnOwnPersonalProject,
   organizationRole,
+  sidebarHint = null,
+  boardHomeProduct = null,
+  hasOrganizationLibrary = false,
 }: {
   pathname: string;
   isPersonalScope: boolean;
@@ -117,23 +137,41 @@ export function resolveShellRoute({
   isOnOwnPersonalProject: boolean;
   /** The viewer's seat; the seat gate refuses a product it does not reach. */
   organizationRole: string | null | undefined;
+  /** The sidebar this tab last came from; only a Dashboards address reads it. */
+  sidebarHint?: DashboardsSidebarHint | null;
+  /** The open board's home product, if the seat reaches it; only a Dashboards address reads it. */
+  boardHomeProduct?: ProductId | null;
+  /** Whether the organization's Dashboards library is on (ADR-002). */
+  hasOrganizationLibrary?: boolean;
 }): ShellRoute {
   const isSettingsRoute = isSettingsShellRoute(pathname);
   // The product the ADDRESS names, before any sticky scope is applied.
   const addressedProductId = productFromPathname(pathname);
   /** Org-scoped products: exclude personal scope to avoid wrong shell at /gateway */
   const isOrgScopedProduct = isOrganizationScopedProduct(addressedProductId);
+  // The organization's Dashboards library needs no project, and draws no project chip.
+  const isOrganizationLibrary = isOrganizationDashboardsPath(pathname);
   const isPersonalScopeRoute =
     !isSettingsRoute &&
     !isOrgScopedProduct &&
-    (isPersonalScope || isPathUnder({ pathname, base: "/me" }) || isOnOwnPersonalProject);
+    !isOrganizationLibrary &&
+    (isPersonalScope ||
+      isPathUnder({ pathname, base: CODING_AGENTS_PATH }) ||
+      isOnOwnPersonalProject);
   const activeProductId = activeProductFor({
     isSettingsRoute,
     isPersonalScopeRoute,
+    isOrganizationLibrary,
     addressedProductId,
+    sidebarHint,
+    boardHomeProduct,
+    hasOrganizationLibrary,
   });
   const isOrgScopeRoute =
-    isOrgScope || isSettingsRoute || isOrganizationScopedProduct(activeProductId);
+    isOrgScope ||
+    isSettingsRoute ||
+    isOrganizationLibrary ||
+    isOrganizationScopedProduct(activeProductId);
 
   return {
     isSettingsRoute,

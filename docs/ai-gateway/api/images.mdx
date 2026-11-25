@@ -12,7 +12,7 @@ Models: `openai/gpt-image-2`, `openai/gpt-image-1` and `openai/gpt-image-1-mini`
 
 ## Generation
 
-```
+```http
 POST /v1/images/generations
 Authorization: Bearer vk-lw-<ULID>
 Content-Type: application/json
@@ -50,7 +50,7 @@ const png = Buffer.from(image.data[0].b64_json, "base64");
 
 ## Editing
 
-```
+```http
 POST /v1/images/edits
 Authorization: Bearer vk-lw-<ULID>
 Content-Type: multipart/form-data

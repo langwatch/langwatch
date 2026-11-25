@@ -11,8 +11,11 @@ import {
   type EvaluatorApi,
 } from "@langwatch/evaluator-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
+import type { NotificationService } from "@langwatch/notification-contract";
 import { ResourceScope } from "@langwatch/process";
+import type { ProjectApi } from "@langwatch/project-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import type { UserApi } from "@langwatch/user-contract";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
 
 import { MemoryMonitorRepository } from "../../repositories/memory/memory.monitor.repository.ts";
@@ -62,6 +65,16 @@ export class FakeMonitorEvaluators {
 
   async findById(input: { id: string; projectId: string }): Promise<Evaluator | undefined> {
     return this.#known.has(input.id) ? this.getById(input) : undefined;
+  }
+
+  /** Config each evaluator holds at a deploy label, as `labelled[evaluatorId][label]`. */
+  readonly labelled: Record<string, Record<string, unknown>> = {};
+
+  async atLabelOrLatest(input: { evaluator: Evaluator; label: string }): Promise<Evaluator> {
+    const config = this.labelled[input.evaluator.id]?.[input.label];
+    return config === undefined
+      ? input.evaluator
+      : evaluatorSchema.parse({ ...input.evaluator, config });
   }
 
   async archive(input: { id: string; projectId: string }): Promise<Evaluator> {
@@ -127,6 +140,9 @@ export function createMonitorTestApp(
     recoverySwitch?: FakeRecoverySwitch;
     replication?: FakeMonitorReplication;
     publicBaseUrl?: string;
+    projects?: ProjectApi;
+    users?: UserApi;
+    notifications?: NotificationService;
   }> = {},
 ): MonitorModule {
   const evaluators = input.evaluators ?? new FakeMonitorEvaluators();
@@ -143,6 +159,7 @@ export function createMonitorTestApp(
       evaluators: createApiFixture<EvaluatorApi>({
         getById: (scope) => evaluators.getById(scope),
         findById: (scope) => evaluators.findById(scope),
+        atLabelOrLatest: (pinned) => evaluators.atLabelOrLatest(pinned),
         archive: (scope) => evaluators.archive(scope),
         copy: (copy) => replication.copy(copy),
       }),
@@ -152,6 +169,9 @@ export function createMonitorTestApp(
       workflows: createApiFixture<WorkflowApi>({
         deleteUncommitted: (reference) => replication.deleteUncommitted(reference),
       }),
+      projects: input.projects ?? createApiFixture<ProjectApi>(),
+      users: input.users ?? createApiFixture<UserApi>({ getProfiles: async () => [] }),
+      notifications: input.notifications ?? createApiFixture<NotificationService>(),
     },
     resources: new ResourceScope(),
     secrets: createApiFixture<MonitorTestSetup["secrets"]>(),

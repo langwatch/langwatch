@@ -3,7 +3,11 @@
  * invariant: nothing engine grants is hidden, nothing appears that engine won't.
  */
 
-import { builtinRoleGrants, roleKeyForTeamRole } from "@langwatch/authz-contract";
+import {
+  builtinRoleGrants,
+  permissionsConferred,
+  roleKeyForTeamRole,
+} from "@langwatch/authz-contract";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -77,17 +81,17 @@ describe("the built-in roles", () => {
     const granted = (teamRole: "ADMIN" | "MEMBER" | "VIEWER") =>
       new Set<string>(builtinRoleGrantedPermissions(teamRole));
 
-    /** @scenario A predefined role card describes the role it actually is */
+    /** @scenario A predefined role row describes the role it actually is */
     it("says Viewer changes nothing, and Viewer can change nothing", () => {
       const viewer = BUILTIN_ROLE_CARDS.find((card) => card.teamRole === "VIEWER");
 
-      expect(viewer?.description).toContain("change none of it");
+      expect(viewer?.description).toContain("changes none of it");
       for (const permission of granted("VIEWER")) {
         expect(permission.endsWith(":view")).toBe(true);
       }
     });
 
-    /** @scenario A predefined role card describes the role it actually is */
+    /** @scenario A predefined role row describes the role it actually is */
     it("says Member creates and changes the work, and stops short of the team", () => {
       const member = granted("MEMBER");
 
@@ -102,7 +106,7 @@ describe("the built-in roles", () => {
       expect(member.has("project:delete")).toBe(false);
     });
 
-    /** @scenario A predefined role card describes the role it actually is */
+    /** @scenario A predefined role row describes the role it actually is */
     it("says Admin holds the team, its projects and the gateway, and it does", () => {
       const admin = granted("ADMIN");
 
@@ -113,7 +117,7 @@ describe("the built-in roles", () => {
       expect(admin.has("gatewayBudgets:manage")).toBe(true);
     });
 
-    /** @scenario A predefined role card describes the role it actually is */
+    /** @scenario A predefined role row describes the role it actually is */
     it("leads each tier above the base with something the tier below lacks", () => {
       for (const card of BUILTIN_ROLE_CARDS) {
         const below = BUILTIN_ROLE_CARDS.find((candidate) => candidate.name === card.inheritsFrom);
@@ -161,5 +165,28 @@ describe("the built-in roles", () => {
       expect(peopleHoldingBuiltinRole({ bindings, teamRole: "VIEWER" })).toBe(1);
       expect(peopleHoldingBuiltinRole({ bindings, teamRole: "MEMBER" })).toBe(0);
     });
+  });
+});
+
+describe("who may braid (ADR-201 §2)", () => {
+  it("is the admin role, never member or viewer", () => {
+    expect(builtinRoleGrants({ role: "admin", permission: "braids:manage" })).toBe(true);
+    expect(builtinRoleGrants({ role: "member", permission: "braids:manage" })).toBe(false);
+    expect(builtinRoleGrants({ role: "viewer", permission: "braids:manage" })).toBe(false);
+  });
+
+  it("is every organisation admin, and no organisation member", () => {
+    const conferred = ({ role }: { role: "ADMIN" | "MEMBER" }) =>
+      permissionsConferred({ role, scopeType: "ORGANIZATION", customPermissions: [] });
+    expect(conferred({ role: "ADMIN" })).toContain("braids:manage");
+    expect(conferred({ role: "MEMBER" })).not.toContain("braids:manage");
+  });
+
+  it("is conferred by a team or project admin binding", () => {
+    for (const scopeType of ["TEAM", "PROJECT"] as const) {
+      expect(permissionsConferred({ role: "ADMIN", scopeType, customPermissions: [] })).toContain(
+        "braids:manage",
+      );
+    }
   });
 });

@@ -7,6 +7,7 @@ import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 import {
+  monitorEvaluatorLabelSchema,
   monitorExecutionModeSchema,
   monitorSettingsSchema,
   structuredMonitorPreconditionsSchema,
@@ -90,6 +91,7 @@ const monitorApiCreateInputSchemaDefinition = z.object({
   evaluatorId: z.string().min(1).optional(),
   level: z.enum(["trace", "thread"]).optional(), // Trace or thread
   threadIdleTimeout: z.number().int().positive().nullable().optional(), // Idle timeout (seconds)
+  evaluatorLabel: monitorEvaluatorLabelSchema.nullable().optional(),
 });
 export interface MonitorApiCreateInputSchema extends Named<
   typeof monitorApiCreateInputSchemaDefinition
@@ -112,6 +114,7 @@ const monitorApiUpdateInputSchemaDefinition = z.object({
   evaluatorId: z.string().min(1).nullable().optional(),
   level: z.enum(["trace", "thread"]).optional(), // Trace or thread
   threadIdleTimeout: z.number().int().positive().nullable().optional(), // Idle timeout (seconds)
+  evaluatorLabel: monitorEvaluatorLabelSchema.nullable().optional(),
 });
 export interface MonitorApiUpdateInputSchema extends Named<
   typeof monitorApiUpdateInputSchemaDefinition

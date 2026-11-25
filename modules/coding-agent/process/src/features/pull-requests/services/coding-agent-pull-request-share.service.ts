@@ -1,9 +1,11 @@
 import type { CodingAgentSessionBranchRecord } from "@langwatch/coding-agent-contract";
 
 import { MAX_USAGE_CONTEXTS } from "../../../eventing/coding-agent-session-state.projection.ts";
-import type { SessionModelTotalsRow } from "../../../repositories/coding-agent-session-event.repository.ts";
 import {
+  allocateCost,
   allocateCounters,
+  type BucketAmounts,
+  bucketAmountsOf,
   isStampedOnRepository,
   isUnstamped,
   costOf,
@@ -15,6 +17,7 @@ import type {
   AssignablePullRequest,
   CodingAgentPullRequestAssignmentService,
 } from "./coding-agent-pull-request-assignment.service.ts";
+import type { PullRequestModelTotalsRow } from "./coding-agent-pull-request-usage.service.ts";
 
 interface PullRequestAttribution {
   /**
@@ -24,11 +27,11 @@ interface PullRequestAttribution {
    */
   sessions: CodingAgentSessionBranchRecord[];
   /**
-   * The per-model event totals that belong to THIS pull request: rows stamped onto its
+   * The per-model totals that belong to THIS pull request: rows stamped onto its
    * branch, plus each attached session's unstamped rows where this pull request is the
    * legacy winner.
    */
-  modelTotals: SessionModelTotalsRow[];
+  modelTotals: PullRequestModelTotalsRow[];
 }
 
 /** The bucket a row falls in, named without reference to any pull request. */
@@ -76,11 +79,11 @@ export class CodingAgentPullRequestShareService {
     prNumber: number;
     repositoryHost: string;
     repositoryFullName: string;
-    modelTotals: readonly SessionModelTotalsRow[];
+    modelTotals: readonly PullRequestModelTotalsRow[];
   }): PullRequestAttribution {
     const totalsBySession = CodingAgentPullRequestShareService.groupBySession(modelTotals);
     const scaled: CodingAgentSessionBranchRecord[] = [];
-    const attributedTotals: SessionModelTotalsRow[] = [];
+    const attributedTotals: PullRequestModelTotalsRow[] = [];
 
     for (const session of sessions) {
       const key = CodingAgentPullRequestShareService.sessionKey(session);
@@ -118,7 +121,7 @@ export class CodingAgentPullRequestShareService {
     repositoryFullName,
   }: {
     session: CodingAgentSessionBranchRecord;
-    rows: readonly SessionModelTotalsRow[];
+    rows: readonly PullRequestModelTotalsRow[];
     rowMatched: boolean;
     pullRequests: readonly AssignablePullRequest[];
     prNumber: number;
@@ -126,7 +129,7 @@ export class CodingAgentPullRequestShareService {
     repositoryFullName: string;
   }): {
     session: CodingAgentSessionBranchRecord;
-    prRows: SessionModelTotalsRow[];
+    prRows: PullRequestModelTotalsRow[];
   } | null {
     const ledger = CodingAgentPullRequestShareService.ledgerOf({ session, rows });
     const { weightOf, totalWeight } = weighing(ledger);
@@ -162,6 +165,15 @@ export class CodingAgentPullRequestShareService {
       repositoryHost,
       repositoryFullName,
     });
+    const amounts = bucketAmountsOf({
+      ledger,
+      keyOf: (usage) =>
+        CodingAgentPullRequestShareService.bucketKeyOf({
+          usage,
+          repositoryHost,
+          repositoryFullName,
+        }),
+    });
 
     const unstampedWinner = CodingAgentPullRequestShareService.unstampedWinnerOf({
       ledger,
@@ -182,6 +194,7 @@ export class CodingAgentPullRequestShareService {
       perBranch,
       prNumber,
       buckets,
+      amounts,
       totalWeight,
       repositoryHost,
       repositoryFullName,
@@ -197,23 +210,25 @@ export class CodingAgentPullRequestShareService {
     perBranch,
     prNumber,
     buckets,
+    amounts,
     totalWeight,
     repositoryHost,
     repositoryFullName,
   }: {
     session: CodingAgentSessionBranchRecord;
-    rows: readonly SessionModelTotalsRow[];
+    rows: readonly PullRequestModelTotalsRow[];
     rowMatched: boolean;
     unstampedWinner: number | undefined;
     perBranch: ReadonlyMap<string, number>;
     prNumber: number;
     buckets: ReadonlyMap<string, number>;
+    amounts: ReadonlyMap<string, BucketAmounts>;
     totalWeight: number;
     repositoryHost: string;
     repositoryFullName: string;
   }): {
     session: CodingAgentSessionBranchRecord;
-    prRows: SessionModelTotalsRow[];
+    prRows: PullRequestModelTotalsRow[];
   } | null {
     const ownsBucket = (key: string): boolean => {
       if (key === ELSEWHERE_BUCKET) {
@@ -244,20 +259,13 @@ export class CodingAgentPullRequestShareService {
         }),
       ),
     );
-    const allocated = allocateCounters({
-      session,
-      buckets,
-      totalWeight,
-      ownKeys,
-    });
+    const split = { buckets, amounts, totalWeight, ownKeys };
 
     return {
       session: {
         ...session,
-        ...allocated,
-        // Cost is never rounded: it is a currency amount, so the share stays
-        // exact and only the integer counters need whole units handed out.
-        costUsd: (session.costUsd * prWeight) / totalWeight,
+        ...allocateCounters({ session, ...split }),
+        costUsd: allocateCost({ costUsd: session.costUsd, ...split }),
       },
       prRows,
     };
@@ -278,7 +286,7 @@ export class CodingAgentPullRequestShareService {
   }: {
     session: CodingAgentSessionBranchRecord;
     ledger: readonly StampedUsage[];
-    rows: readonly SessionModelTotalsRow[];
+    rows: readonly PullRequestModelTotalsRow[];
     pullRequests: readonly AssignablePullRequest[];
     repositoryHost: string;
     repositoryFullName: string;
@@ -324,7 +332,7 @@ export class CodingAgentPullRequestShareService {
     rows,
   }: {
     session: CodingAgentSessionBranchRecord;
-    rows: readonly SessionModelTotalsRow[];
+    rows: readonly PullRequestModelTotalsRow[];
   }): readonly StampedUsage[] {
     const recorded = session.usageByContext.filter(
       (usage) => tokensOf(usage) > 0 || costOf(usage) > 0,
@@ -462,9 +470,9 @@ export class CodingAgentPullRequestShareService {
   }
 
   private static groupBySession(
-    rows: readonly SessionModelTotalsRow[],
-  ): Map<string, SessionModelTotalsRow[]> {
-    const grouped = new Map<string, SessionModelTotalsRow[]>();
+    rows: readonly PullRequestModelTotalsRow[],
+  ): Map<string, PullRequestModelTotalsRow[]> {
+    const grouped = new Map<string, PullRequestModelTotalsRow[]>();
     for (const row of rows) {
       const key = CodingAgentPullRequestShareService.sessionKey(row);
       const list = grouped.get(key) ?? [];

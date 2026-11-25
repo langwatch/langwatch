@@ -23,14 +23,15 @@ import {
   PROTECTED_RESOURCE_METADATA_PATH,
 } from "../rules/mcp-routes.rules.ts";
 import type { AuthzMcpSessionGrantService } from "./authz-mcp-session-grant.service.ts";
-import type { HeaderMcpClientAddressService } from "./header-mcp-client-address.service.ts";
 import { McpCallerAuthService } from "./mcp-caller-auth.service.ts";
+import { McpDocsTransportService } from "./mcp-docs-transport.service.ts";
 import { McpHttpService } from "./mcp-http.service.ts";
 import { McpOAuthEndpointService } from "./mcp-oauth-endpoint.service.ts";
 import { type McpCliSessions, McpOAuthTokenService } from "./mcp-oauth-token.service.ts";
 import { McpSessionService } from "./mcp-session.service.ts";
 import { McpStreamableTransportService } from "./mcp-streamable-transport.service.ts";
 import type { ProjectMcpProjectLookupService } from "./project-mcp-project-lookup.service.ts";
+import type { ResolvedMcpClientAddressService } from "./resolved-mcp-client-address.service.ts";
 
 const logger = createLogger("langwatch:mcp");
 
@@ -60,7 +61,7 @@ type McpEndpointCollaborators = Readonly<{
   projects: Pick<ProjectMcpProjectLookupService, "resolveLiveProjectByApiKey">;
   grants: Pick<AuthzMcpSessionGrantService, "stillGranted">;
   cliSessions: McpCliSessions;
-  address: Pick<HeaderMcpClientAddressService, "clientIp">;
+  address: Pick<ResolvedMcpClientAddressService, "clientIp">;
   sessionTools?: Pick<GovernanceRestApi, "registerMcpTools"> | undefined;
   /** The public origin the MCP client is told to come back to. */
   baseHost: string;
@@ -109,9 +110,10 @@ export class McpEndpointService implements McpHandler {
       oauthTokens: this.#oauthTokens,
       clients: collaborators.oauthClients,
     });
-    this.#routes = this.#routeTable(
-      McpStreamableTransportService.create({ http, auth, sessions: this.#sessions }),
-    );
+    this.#routes = this.#routeTable({
+      streamable: McpStreamableTransportService.create({ http, auth, sessions: this.#sessions }),
+      docs: McpDocsTransportService.create({ http }),
+    });
     this.#reaper = setInterval(() => this.#reap(), REAPER_INTERVAL_MS);
     this.#keepalive = setInterval(() => this.#sessions.pingOpenStreams(), KEEPALIVE_INTERVAL_MS);
     // The process may exit while either timer is still scheduled.
@@ -197,7 +199,13 @@ export class McpEndpointService implements McpHandler {
     await handle(req, res);
   }
 
-  #routeTable(streamable: McpStreamableTransportService): ReadonlyMap<string, RouteVerbs> {
+  #routeTable({
+    streamable,
+    docs,
+  }: {
+    streamable: McpStreamableTransportService;
+    docs: McpDocsTransportService;
+  }): ReadonlyMap<string, RouteVerbs> {
     const oauth = this.#oauth;
     const only = (method: string, handler: RouteHandler): RouteVerbs => ({
       byMethod: new Map([[method, handler]]),
@@ -230,6 +238,8 @@ export class McpEndpointService implements McpHandler {
       ["/oauth/register", only("POST", (req, res) => oauth.handleRegister(req, res))],
       ["/oauth/token", only("POST", (req, res) => oauth.handleToken(req, res))],
       ["/mcp", streamableVerbs],
+      // Stateless, so there is no stream to GET and no session to DELETE: both answer 405.
+      ["/mcp/docs", only("POST", (req, res) => docs.handlePost(req, res))],
       // The SSE transport is retired; a client still configured with its URL is served the
       // Streamable HTTP transport there.
       ["/sse", streamableVerbs],
