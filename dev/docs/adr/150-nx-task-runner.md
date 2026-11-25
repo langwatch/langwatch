@@ -116,9 +116,8 @@ the SDK and the e2e suites. Silently widening it would have changed what
 `pnpm test` means for everyone mid-branch. The cutover is a separate decision
 with a separate blast radius, and it should be made against a green tree.
 
-The cache is local-only. No Nx Cloud account is configured and `nxCloudId` is
-absent, so nothing about this change sends source or task metadata anywhere.
-Remote caching is a later decision with its own trade-offs.
+No Nx Cloud account is configured and `nxCloudId` is absent, so nothing sends
+source or task metadata to Nx. The remote cache in our own S3 bucket is ADR-206.
 
 ## Consequences
 

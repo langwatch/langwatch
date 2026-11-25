@@ -1,0 +1,144 @@
+import { appendFileSync, mkdirSync, renameSync, writeFileSync } from "node:fs";
+import { createServer } from "node:http";
+import { dirname } from "node:path";
+import { pathToFileURL } from "node:url";
+
+import { credentialSource } from "./credentials.mjs";
+import { getObject, putObject } from "./s3.mjs";
+import { writePrefixFor } from "./scope.mjs";
+
+// Nx's self-hosted HTTP cache (NX_SELF_HOSTED_REMOTE_CACHE_SERVER) in front of S3. Nx fails
+// the run when this server errors, so every S3 problem is a miss on read and a silent
+// skip on write: the remote cache only ever makes a run faster.
+const HASH = /^\/v1\/cache\/([A-Za-z0-9]+)$/;
+
+// The first namespace that holds the hash, in the scope's read order.
+const findEntry = async ({ scope, store, hash, log }) => {
+  for (const read of scope.read) {
+    const key = `${read.prefix}${hash}`;
+    const hit = await store.get(key).catch((error) => {
+      log(`get ${key}: ${error.message}`);
+      return null;
+    });
+    if (hit) return { hit, read, key };
+  }
+  return null;
+};
+
+const answerAfterBody = (req, res) => {
+  if (req.complete) return void res.writeHead(200).end();
+  req.on("end", () => res.writeHead(200).end());
+  req.on("error", () => res.destroy());
+  req.resume();
+};
+
+const uploadable = ({ prefix, length, maxUploadBytes }) =>
+  Boolean(prefix) && Number.isFinite(length) && length > 0 && length <= maxUploadBytes;
+
+const markTainted = (ctx, found) => {
+  const { scope, state, log } = ctx;
+  if (!found.read.laptop || state.tainted || scope.taintedWrite === scope.write) return;
+  state.tainted = true;
+  log(`used a laptop entry (${found.key}); this job no longer writes ${scope.write}`);
+};
+
+const serveGet = async (ctx, hash, res) => {
+  const found = await findEntry({ ...ctx, hash });
+  if (!found) return void res.writeHead(404).end();
+  markTainted(ctx, found);
+  const { length, body } = found.hit;
+  res.writeHead(200, {
+    "content-type": "application/octet-stream",
+    ...(length ? { "content-length": length } : {}),
+  });
+  body.on("error", () => res.destroy());
+  body.pipe(res);
+};
+
+const servePut = async (ctx, hash, req, res) => {
+  const { scope, state, store, maxUploadBytes, log } = ctx;
+  const prefix = writePrefixFor({ scope, tainted: state.tainted });
+  const length = Number(req.headers["content-length"]);
+  if (!uploadable({ prefix, length, maxUploadBytes })) return answerAfterBody(req, res);
+  const key = `${prefix}${hash}`;
+  const status = await store.put(key, req, length).catch((error) => {
+    log(`put ${key}: ${error.message}`);
+    return 0;
+  });
+  if (status !== 200 && status !== 412) log(`put ${key}: S3 answered ${status}`);
+  answerAfterBody(req, res);
+};
+
+const route = (ctx, token) => (req, res) => {
+  if (req.url === "/health") return res.writeHead(200).end("ok");
+  const match = HASH.exec(req.url ?? "");
+  if (!match) return res.writeHead(404).end();
+  if (req.headers.authorization !== `Bearer ${token}`) return res.writeHead(401).end();
+  if (req.method === "GET") return void serveGet(ctx, match[1], res);
+  if (req.method === "PUT") return void servePut(ctx, match[1], req, res);
+  return res.writeHead(405).end();
+};
+
+export const createCacheServer = ({ scope, token, store, maxUploadBytes, log = () => {} }) =>
+  createServer(route({ scope, store, maxUploadBytes, log, state: { tainted: false } }, token));
+
+export const s3Store = ({ bucket, region, credentials }) => ({
+  get: async (key) => {
+    const creds = await credentials();
+    if (!creds) return null;
+    const res = await getObject({ bucket, region, credentials: creds, key });
+    if (res.statusCode !== 200) {
+      res.resume();
+      return null;
+    }
+    return { body: res, length: res.headers["content-length"] };
+  },
+  put: async (key, body, length) => {
+    const creds = await credentials();
+    if (!creds) return 0;
+    return putObject({ bucket, region, credentials: creds, key, body, length });
+  },
+});
+
+const fileLogger = (file) => (line) => {
+  try {
+    appendFileSync(file, `${new Date().toISOString()} ${line}\n`);
+  } catch {
+    // A log that cannot be written is not worth failing a cache request for.
+  }
+};
+
+// Started detached by launch.mjs with its settings in LANGWATCH_NX_REMOTE_CACHE_CONFIG.
+// It writes its port to the state file once listening and exits after an idle hour.
+const main = () => {
+  const config = JSON.parse(process.env.LANGWATCH_NX_REMOTE_CACHE_CONFIG ?? "{}");
+  delete process.env.LANGWATCH_NX_REMOTE_CACHE_CONFIG;
+  const log = fileLogger(config.logFile);
+  const credentials = credentialSource({ profile: config.profile, env: process.env, log });
+  const server = createCacheServer({
+    scope: config.scope,
+    token: config.token,
+    store: s3Store({ bucket: config.bucket, region: config.region, credentials }),
+    maxUploadBytes: config.maxUploadBytes,
+    log,
+  });
+  let idle;
+  const touch = () => {
+    clearTimeout(idle);
+    idle = setTimeout(() => process.exit(0), config.idleExitMs).unref();
+  };
+  server.on("request", touch);
+  server.listen(0, "127.0.0.1", () => {
+    touch();
+    const { port } = server.address();
+    const state = { port, pid: process.pid, key: config.key, token: config.token };
+    mkdirSync(dirname(config.stateFile), { recursive: true });
+    writeFileSync(`${config.stateFile}.tmp`, JSON.stringify(state), { mode: 0o600 });
+    renameSync(`${config.stateFile}.tmp`, config.stateFile);
+    log(
+      `listening on ${port} for ${config.scope.tier}, writing ${config.scope.write ?? "nothing"}`,
+    );
+  });
+};
+
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) main();

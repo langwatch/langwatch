@@ -184,6 +184,7 @@ jobs:
               # feeds. These entries cover every action this file uses
               # (`grep -o "uses: \./\.github/actions/[a-z-]*"`).
               - '.github/actions/detect-changes/**'
+              - '.github/actions/nx-remote-cache/**'
               - '.github/actions/prepare-generated-files/**'
               - '.github/actions/setup-pnpm-node/**'
             # The parity scanner binds @scenario annotations from test files
@@ -430,6 +431,7 @@ jobs:
     permissions:
       contents: read
       actions: write
+      id-token: write # assume the Nx cache role (nx-remote-cache action)
     timeout-minutes: 30
     steps:
       - name: Checkout
@@ -447,6 +449,9 @@ jobs:
         with:
           install: all
           save-store: "true"
+
+      # The shared Nx task cache in S3, before the first nx call (nx-remote-cache action).
+      - uses: ./.github/actions/nx-remote-cache
 
       - uses: ./.github/actions/prepare-generated-files
 
@@ -710,6 +715,7 @@ jobs:
     permissions:
       contents: read
       actions: write
+      id-token: write # assume the Nx cache role (nx-remote-cache action)
     # Bounded within a leg: PACKAGE_SUITES_CONCURRENCY suites at once, a heavy
     # suite alone, integration and browser suites one at a time (run-package-suites.ts).
     # Parallel across legs: over two hundred package suites run one after
@@ -773,6 +779,9 @@ jobs:
       - uses: ./.github/actions/setup-pnpm-node
         with:
           install: "all"
+
+      # The shared Nx task cache in S3, before the first nx call (nx-remote-cache action).
+      - uses: ./.github/actions/nx-remote-cache
 
       - uses: ./.github/actions/prepare-generated-files
 
@@ -997,6 +1006,7 @@ jobs:
     # nothing back, so the write scope went with it.
     permissions:
       contents: read
+      id-token: write # assume the Nx cache role (nx-remote-cache action)
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
@@ -1018,6 +1028,9 @@ jobs:
       - uses: ./.github/actions/setup-pnpm-node
         with:
           install: "all"
+
+      # The shared Nx task cache in S3, before the first nx call (nx-remote-cache action).
+      - uses: ./.github/actions/nx-remote-cache
 
       # The ADR-076 workspace invariants: one lockfile, one workspace
       # definition, no member carrying overrides pnpm would ignore, the app and
@@ -1308,6 +1321,7 @@ jobs:
     permissions:
       contents: read
       actions: write
+      id-token: write # assume the Nx cache role (nx-remote-cache action)
     env:
       # Disable telemetry and optimize build for CI
       NEXT_TELEMETRY_DISABLED: 1
@@ -1394,6 +1408,9 @@ jobs:
       - uses: ./.github/actions/nx-cache
         with:
           suffix: build
+
+      # The shared Nx task cache in S3, before the first nx call (nx-remote-cache action).
+      - uses: ./.github/actions/nx-remote-cache
 
       - name: Prepare files
         run: pnpm start:prepare:files && pnpm ensure:built
