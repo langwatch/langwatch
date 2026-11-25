@@ -168,12 +168,20 @@ function KeyHandOff({
   const [revealed, setRevealed] = useState(false);
   const [copied, setCopied] = useState(false);
   const copiedTimer = useRef<number | undefined>(undefined);
+  const isMountedRef = useRef(false);
 
-  // Cleared on unmount so a late tick cannot setState on a torn-down component.
-  useEffect(() => () => window.clearTimeout(copiedTimer.current), []);
+  // Cleanup runs before an await resumes, so the mounted flag guards the resumed copy.
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+      window.clearTimeout(copiedTimer.current);
+    };
+  }, []);
 
   const copyKey = async () => {
-    if (!(await copy({ text: token, what: "API key" }))) return;
+    const didCopy = await copy({ text: token, what: "API key" });
+    if (!isMountedRef.current || !didCopy) return;
     setCopied(true);
     window.clearTimeout(copiedTimer.current);
     copiedTimer.current = window.setTimeout(() => setCopied(false), 2000);

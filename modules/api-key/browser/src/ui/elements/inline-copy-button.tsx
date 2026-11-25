@@ -24,15 +24,23 @@ export function InlineCopyButton({
   const host = useApiKeyHost();
   const [copied, setCopied] = useState(false);
   const copiedTimer = useRef<number | undefined>(undefined);
+  const isMountedRef = useRef(false);
 
-  // Cleared on unmount so a late tick cannot setState on a torn-down component.
-  useEffect(() => () => window.clearTimeout(copiedTimer.current), []);
+  // Cleanup runs before an await resumes, so the mounted flag guards the resumed copy.
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+      window.clearTimeout(copiedTimer.current);
+    };
+  }, []);
 
   async function handleCopy(): Promise<void> {
     const ok = await host.copyToClipboard({
       text,
       succeeded: { title: "Copied", description: `${label} copied to clipboard` },
     });
+    if (!isMountedRef.current) return;
     if (ok) {
       setCopied(true);
       window.clearTimeout(copiedTimer.current);
