@@ -190,11 +190,7 @@ description = "Placeholder bearer keys in the docs' curl examples, not credentia
 targetRules = ["curl-auth-header"]
 condition = "AND"
 paths = ['''docs/llms-full\.txt''']
-regexes = [
-  '''^(?:.*\.\.\.|.*…)$''',
-  '''^your[-_]api[-_]key$''',
-  '''^sk-your-litellm-key$''',
-]
+regexes = ['''^(?:.*\.\.\.|.*…)$''', '''^your[-_]api[-_]key$''', '''^sk-your-litellm-key$''']
 
 # `azure-secret-hygiene.unit.test.ts` proves the opposite of a leak: that
 # `redactAuthorizationMaterial` strips bearer tokens out of Azure error text
