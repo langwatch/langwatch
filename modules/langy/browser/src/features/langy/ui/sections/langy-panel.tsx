@@ -48,6 +48,7 @@ import { useOrganizationTeamProject } from "../../../../behavior/use-organizatio
 import { useScrolledFromTop } from "../../../../behavior/use-scrolled-from-top.ts";
 import { type LangyUiActionHandlers } from "../../../../model/ui-actions/langy-ui-action-types.ts";
 import { LangyContextTargetLayer } from "../../../../ui/sections/langy-context-target-layer.tsx";
+import { useLangyImageUpload } from "../../../composer/behavior/use-langy-image-attach.ts";
 import { mergeContextChips } from "../../../context-target/behavior/langy-context-chips.ts";
 import { removeContextChip } from "../../../context-target/behavior/langy-context-target.store.ts";
 import { useLangyContextDropZone } from "../../../context-target/behavior/use-langy-context-drop-zone.ts";
@@ -278,6 +279,7 @@ function LangyPanel({
   });
   const model = useLangyComposerModel({ projectId });
   const makeDefault = useLangyMakeDefault({ resolvedDefault: model.resolvedDefault });
+  const uploadImage = useLangyImageUpload();
   const engine = useLangyChatEngine({ transport });
   refs.sendStrandedRef.current = () => engine.applyHistoryToEngine([]);
   const isBusy = engine.status === "submitted" || engine.status === "streaming";
@@ -760,6 +762,7 @@ function LangyPanel({
                       onAddChip={chooseChip}
                       awaitingAnswer={waits.awaitingAnswer}
                       terminalConnected={waits.terminalConnected}
+                      uploadImage={uploadImage}
                     />
                   </LangyComposerSlot>
                 </>

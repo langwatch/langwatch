@@ -119,6 +119,8 @@ type ChatRequest struct {
 	// requests keep a byte-stable, provider-cacheable prefix. Empty for a
 	// brand-new conversation.
 	HistorySeed string
+	// Images ride the turn's prompt to the model as image input.
+	Images      []domain.TurnImage
 	Credentials domain.Credentials
 	// ResumeToken (ADR-048) is an opaque, worker-authored checkpoint from a prior
 	// turn that handed off on shutdown. Threaded into PostMessage so the agent
@@ -380,7 +382,7 @@ func (a *App) driveTurn(ctx context.Context, req ChatRequest, worker Worker) {
 		emitError(ctx, sink, message, code)
 	}
 
-	if err := worker.PostMessage(ctx, req.System, req.Prompt, req.HistorySeed, req.ResumeToken); err != nil {
+	if err := worker.PostMessage(ctx, req.System, req.Prompt, req.HistorySeed, req.ResumeToken, req.Images); err != nil {
 		cancelStream()
 		<-errCh // the stream consumer has now fully returned.
 		if errors.Is(err, domain.ErrSessionNotFound) {
