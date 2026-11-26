@@ -273,7 +273,7 @@ describe("given a step that fails", () => {
   });
 
   describe("when the outbox will not retry the refusal", () => {
-    /** @scenario "A step failing with a refusal the outbox will not retry fails the run on that attempt" */
+    /** @scenario "A step failing with a refusal the outbox will not retry records the page's failure on that attempt" */
     it("fails the page on the first attempt instead of rethrowing", async () => {
       const { deps: dispatch, commands } = deps({
         raises: new UnreachableRefusal(),
@@ -282,6 +282,7 @@ describe("given a step that fails", () => {
       await createInstantEvalJudgePageHandler(dispatch)(PAGE_PAYLOAD, intentContext(1));
 
       expect(commands.pageFailures[0]).toMatchObject({ errorCode: "connect_unreachable" });
+      expect(commands.finishes).toEqual([]);
     });
 
     /** @scenario "A run stopped by a budget between pages bills the pages judged before it" */

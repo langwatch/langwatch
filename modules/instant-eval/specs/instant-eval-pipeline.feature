@@ -298,10 +298,11 @@ Feature: The Instant Eval run on the queue, plan, judge page by page, finish
     Then the page is recorded with those rows as skips
 
   @unit
-  Scenario: A step failing with a refusal the outbox will not retry fails the run on that attempt
+  Scenario: A step failing with a refusal the outbox will not retry records the page's failure on that attempt
     Given a page step that throws a handled refusal the outbox will not retry, such as "connect_unreachable"
     When it fails on its first attempt
-    Then the run is recorded as failed with that refusal's code
+    Then the page's failure is recorded with that refusal's code
+    And the step writes no finish itself, so the run's process manager finishes the run
     And the step does not throw, so the run never waits on a delivery that will not come
 
   @unit
