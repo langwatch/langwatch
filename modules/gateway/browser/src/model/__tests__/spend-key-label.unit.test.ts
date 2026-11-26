@@ -24,14 +24,14 @@ describe("given a spend row of request type instant_eval with no virtual key", (
 
 describe("given a spend row of request type instant_eval_decision_model with no virtual key", () => {
   describe("when the spend page names its key", () => {
-    /** @scenario "A spend row with no virtual key and the own decision model request type reads as Instant Evals on your own model" */
-    it("says Instant Evals (own model)", () => {
+    /** @scenario "A spend row with no virtual key and the own decision model request type reads as Own model" */
+    it("says Own model", () => {
       expect(
         spendKeyLabel({
           row: { virtualKeyId: "", requestType: "instant_eval_decision_model" },
           virtualKeyName: undefined,
         }),
-      ).toBe("Instant Evals (own model)");
+      ).toBe("Own model");
     });
   });
 });
