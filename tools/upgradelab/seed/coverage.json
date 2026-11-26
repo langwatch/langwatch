@@ -414,11 +414,6 @@
       "seed": "unplanned",
       "note": "refolds the traces those evaluations land on; seeds with trace:record-evaluation-outcomes"
     },
-    "trace:link-unowned-trace-media": {
-      "status": "pending",
-      "seed": "unplanned",
-      "note": "needs trace media stored by the old release without owner links; no seed writes trace media yet"
-    },
     "upcast:entitlement:lw.usage.month_counted": {
       "status": "unheld",
       "note": "branch-era event type, never written by a release; the upcast-events overlay (L5) injects it"
@@ -444,11 +439,6 @@
       "status": "seeded",
       "seed": "product-seeds:workflow",
       "cells": ["C1", "C3"]
-    },
-    "dashboard:mark-my-dashboards": {
-      "status": "pending",
-      "seed": "unplanned",
-      "note": "needs a member's My dashboard without its owner column, as the previous release wrote it"
     }
   },
   "systemMigrations": {
