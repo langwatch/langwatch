@@ -153,6 +153,7 @@
               },
               "agent-testing/voice-agents",
               "agent-testing/red-teaming",
+              "agent-testing/owasp-red-team",
               "agent-testing/red-team-templates",
               "agent-testing/red-team-open-source"
             ]

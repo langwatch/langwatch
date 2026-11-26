@@ -35,7 +35,7 @@ app.kubernetes.io/component: langyagent
 {{- if .Values.selectorLabels -}}
 {{- $labels := dict }}
 {{- range $key, $value := .Values.selectorLabels }}
-{{- $_ := set $labels $key ($value | toString) }}
+{{- $_ := set $labels $key (include "langyagent.string" $value) }}
 {{- end }}
 {{- toYaml $labels }}
 {{- else -}}
@@ -51,7 +51,7 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- $labels := dict }}
 {{- /* toString: a label value is a string, and `--set podLabels.version=2` is a number. */ -}}
 {{- range $key, $value := .Values.podLabels | default dict }}
-{{- $_ := set $labels $key ($value | toString) }}
+{{- $_ := set $labels $key (include "langyagent.string" $value) }}
 {{- end }}
 {{- /* set, not merge: merge treats an empty selector value as unset. */ -}}
 {{- range $key, $value := include "langyagent.selectorLabels" . | fromYaml }}
@@ -69,4 +69,15 @@ app.kubernetes.io/instance: {{ .Release.Name }}
        ConfigMap key. */ -}}
 {{- define "langyagent.ownedEnvNames" -}}
 ENVIRONMENT,PORT,LANGY_MAX_WORKERS,LANGY_WORKER_IDLE_MS,LANGY_WORKER_MAX_AGE_MS,LANGY_READINESS_TIMEOUT_MS,LANGY_EGRESS_FQDN_FLOOR,LANGY_EGRESS_REQUIRE_TLS,LANGY_EGRESS_ENFORCE_FLOOR,LANGY_EGRESS_SNI_CROSSCHECK,LANGY_MIRROR_TRACE_ENDPOINT,LANGY_INTERNAL_SECRET,LANGY_MIRROR_TRACE_KEY
+{{- end }}
+
+{{- /* A values-file number is float64, which toString prints as "1.8e+07" once
+       it reaches 1e6, and the agent cannot parse that (issue #9906). A whole
+       number renders as its digits; anything else renders as toString does. */ -}}
+{{- define "langyagent.string" -}}
+{{- if and (kindIs "float64" .) (eq (floor .) .) -}}
+{{- printf "%.0f" . -}}
+{{- else -}}
+{{- toString . -}}
+{{- end -}}
 {{- end }}

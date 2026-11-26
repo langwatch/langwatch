@@ -14,7 +14,7 @@ content. Read "The pipeline" below before editing anything.
 | Path                                             | What it is                                                                                                                                                                                                                       |
 | ------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `<skill>/SKILL.mdx` (e.g. `tracing/`, `github/`) | Canonical source for a **feature skill**. Public skills are curated in `FEATURE_SKILLS`; Langy-only skills are curated in `NATIVE_ONLY_SKILLS`.                                                                                  |
-| `recipes/<name>/SKILL.mdx`                       | **Recipe** skills (use-case cookbooks). Auto-discovered: every `recipes/*/SKILL.mdx` is published, no registration needed.                                                                                                       |
+| `recipes/<name>/SKILL.mdx`                       | **Recipe** skills (use-case cookbooks). Auto-discovered: every `recipes/*/SKILL.mdx` is published, no registration needed. Files beside it, such as a `templates/` folder, ship with it.                                         |
 | `_shared/*.mdx`                                  | Partials (`<CliSetup />`, `<PlanLimits />`, …) imported by skills and inlined at compile time. Published output never references `_shared/`.                                                                                     |
 | `_lib/`                                          | Shared tooling: `feature-skills.ts` (the ONE definition of "our published skill set"), `mdx-inline.ts` (partial inliner), `frontmatter.ts`.                                                                                      |
 | `_compiler/`                                     | Generators: `compile.ts` (copy-paste prompts) and `native.ts` (opencode `SKILL.md` files for Langy).                                                                                                                             |
@@ -80,19 +80,27 @@ and `_tests/native-skills.test.ts` pins it to the root-compiled output.
    `FEATURE_SKILLS` in `_lib/feature-skills.ts`. **Recipe**: create
    `recipes/<name>/SKILL.mdx` — that's it, discovery is automatic.
    Skill naming follows feature-map leaf IDs (ADR-012).
-2. Frontmatter must carry `name` and `description` — the description is what a
+2. A skill may ship files beside its `SKILL.mdx`, such as the `templates/` folder
+   of `recipes/owasp-red-team/` that a coding agent copies into the user's
+   repository. Every consumer copies them next to the compiled `SKILL.md`
+   (`listSkillAssets` and `copySkillAssets` in `_lib/feature-skills.ts`).
+   `isShippableAsset` leaves out dot paths, `__pycache__`, `*.pyc`,
+   `node_modules`, `coverage`, `dist` and lockfiles. The `vitest.config.ts`
+   exclude keeps test files under `recipes/*/templates/` out of this
+   workspace's test run.
+3. Frontmatter must carry `name` and `description`: the description is what a
    model uses to decide the skill applies, so write it as "what you get + when
    to use", not marketing copy. `user-prompt` is the canonical trigger phrase.
-3. Regenerate the committed outputs:
+4. Regenerate the committed outputs:
    ```bash
    bash skills/_compiled/generate.sh
    ```
    and commit the `_compiled/native/` and `_compiled/cli/` changes together with the source change.
    `_tests/native-skills.test.ts` fails if the committed native output drifts
    from the sources.
-4. If Langy should route to the new skill from user phrasing, add a row to the
+5. If Langy should route to the new skill from user phrasing, add a row to the
    routing table in `services/langyagent/internal/assets/AGENTS.md`.
-5. Run the fast structural tests, then the affected dogfood test locally
+6. Run the fast structural tests, then the affected dogfood test locally
    (`_tests/README.md` — dogfood tests hit live LLMs and cost money; CI cannot
    gate on them, you must):
    ```bash
