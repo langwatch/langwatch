@@ -119,7 +119,12 @@ Feature: The organization picks its PII redaction level on the Data Privacy page
     When the plan is a euro Growth seat plan
     Then the price is quoted in euros
     And any other plan, or one the reader may not read, quotes dollars
-    And while the plan is still loading no price is quoted at all
+    And while the plan is still loading, or when its read fails or answers nothing, no price is quoted at all
+
+  @unit
+  Scenario: The page reads the subscription's plan only on Cloud, for a reader allowed to
+    Then the plan is read on LangWatch Cloud for a reader who may view the organization
+    And not self-hosted, without an organization in scope, or for a reader without organization:view
 
   @unit
   Scenario: Changing the organization level keeps the rest of the organization rule
@@ -243,6 +248,21 @@ Feature: The organization picks its PII redaction level on the Data Privacy page
     And a project rule on "web-app" with PII level essential
     When an admin sets that rule's PII redaction to Strict in the drawer and saves
     Then a confirmation names the LangWatch PII Redaction Model and its price
+    And the rule is saved only once the admin confirms
+
+  @unit
+  Scenario: Saving a rule at Strict asks with the euro price on a euro Growth subscription
+    Given "acme" is on a Growth subscription in euros
+    When a rule is saved from the drawer at Strict
+    Then the confirmation asks at "€0.425 per 1M characters"
+
+  @unit @integration
+  Scenario: A Strict rule save waits for the subscription's currency
+    Given release_pii_redaction_model_enabled is on for "acme"
+    And the subscription's plan has not answered, or its read failed
+    When an admin saves a rule at Strict from the drawer
+    Then the rule is not saved and no price is quoted
+    And once the plan answers in euros the confirmation asks at "€0.425 per 1M characters"
     And the rule is saved only once the admin confirms
 
   @unit

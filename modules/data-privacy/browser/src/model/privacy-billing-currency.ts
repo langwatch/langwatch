@@ -21,7 +21,7 @@ export function mayReadSubscriptionPlan({
   return isSaaS && !!organizationId && canViewOrganization;
 }
 
-/** Euros for a euro Growth plan, loading while it loads; dollars for any other or unreadable. */
+/** Euros for a euro Growth plan, dollars for any other; unknown until a plan answers. */
 export function billingCurrencyOf({
   mayRead,
   plan,
@@ -30,7 +30,6 @@ export function billingCurrencyOf({
   plan: { isLoading: boolean; isError: boolean; data: { type: string } | undefined };
 }): PrivacyBillingCurrencyReading {
   if (!mayRead) return "USD";
-  if (plan.isLoading) return "loading";
-  if (plan.isError || !plan.data) return "USD";
+  if (plan.isLoading || plan.isError || !plan.data) return "unknown";
   return parseGrowthSeatPlanType(plan.data.type)?.currency === "EUR" ? "EUR" : "USD";
 }

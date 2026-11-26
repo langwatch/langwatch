@@ -2,8 +2,8 @@ import { HStack, IconButton, Text, VStack } from "@langwatch/design-system/primi
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { Info } from "lucide-react";
 
-import type { PrivacyBillingCurrency } from "../../model/data-privacy-host.ts";
 import {
+  type PiiRedactionModel,
   piiRedactionModelPriceIn,
   PII_REDACTION_MODEL_PRICE_UNIT,
   STRICT_BILLING_NOTE,
@@ -17,22 +17,13 @@ import {
  * "Included for your organization" when free ("with your Enterprise licence" self-hosted), with
  * the billing and fallback notes behind an (i).
  */
-export function PiiRedactionModelPrice({
-  free,
-  licensed = false,
-  split = false,
-  currency = "USD",
-}: {
-  free: boolean;
-  licensed?: boolean;
-  /** Long spans go to the model in parts (ADR-207): the small print names the split limit. */
-  split?: boolean;
-  currency?: PrivacyBillingCurrency;
-}) {
+export function PiiRedactionModelPrice({ model }: { model: PiiRedactionModel }) {
+  const { free, split } = model;
+  const licensed = model.free && model.licensed;
   return (
     <HStack gap={1.5} wrap="wrap" align="center" data-testid="pii-redaction-model-price">
       <Text fontSize="sm" fontWeight="600">
-        {free ? "Included" : piiRedactionModelPriceIn(currency)}
+        {model.free ? "Included" : piiRedactionModelPriceIn(model.currency)}
       </Text>
       <Text fontSize="xs" color="fg.muted">
         {free ? includedFor({ licensed }) : PII_REDACTION_MODEL_PRICE_UNIT}

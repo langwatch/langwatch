@@ -83,6 +83,7 @@ describe("euroUsagePriceErrors()", () => {
   });
 
   describe("given a euro price mapped where its dollar price is not", () => {
+    /** @scenario "A euro usage price mapped without its dollar price is refused" */
     it("refuses it, since there is no dollar price to follow", () => {
       const file = withEuroInstantEvalPrice({});
       const { GROWTH_INSTANT_EVAL_USD: _unmapped, ...mapping } = file.mapping;

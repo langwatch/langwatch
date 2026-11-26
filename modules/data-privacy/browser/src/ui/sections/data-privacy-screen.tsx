@@ -41,7 +41,8 @@ import {
 } from "../../model/data-privacy-rule-filter.ts";
 import {
   type PiiRedactionModelOffer,
-  ruleSaveConfirmation,
+  ruleSaveDialog,
+  ruleSaveStep,
 } from "../../model/pii-redaction-level-offer.ts";
 import { EffectiveSummary } from "../blocks/effective-summary.tsx";
 import { NoPrivacyRules } from "../blocks/no-privacy-rules.tsx";
@@ -163,10 +164,7 @@ function DataPrivacyPage({ host, projectId }: { host: DataPrivacyHostApi; projec
 
         {piiRedactionModelOffer?.kind === "model" && snapshot && (
           <OrganizationPiiLevelSection
-            free={piiRedactionModelOffer.free}
-            licensed={piiRedactionModelOffer.licensed}
-            split={piiRedactionModelOffer.split}
-            currency={piiRedactionModelOffer.currency}
+            model={piiRedactionModelOffer}
             host={host}
             projectId={projectId}
             snapshot={snapshot}
@@ -287,24 +285,25 @@ function PrivacyRuleDrawerMount({
     config: DataPrivacyConfig;
   } | null>(null);
   // The price of Strict and a key reading restricted content each ask first (ADR-208).
-  const asksBefore = (config: DataPrivacyConfig) => {
-    const price = ruleSaveConfirmation({
-      offer: piiRedactionModelOffer,
-      before: editingRule?.config,
-      after: config,
-    });
-    const key = apiKeySaveConfirmation({
+  const stepFor = (config: DataPrivacyConfig) =>
+    ruleSaveStep({ offer: piiRedactionModelOffer, before: editingRule?.config, after: config });
+  const keyAskFor = (config: DataPrivacyConfig) =>
+    apiKeySaveConfirmation({
       before: editingRule?.config,
       after: config,
       options: snapshot.audienceOptions,
     });
-    return combineSaveConfirmations(price, key);
-  };
-  const confirmation = pending ? asksBefore(pending.config) : null;
+  // Read live: a save waiting for the subscription's currency asks with its price once it loads.
+  const step = pending ? stepFor(pending.config) : null;
+  const confirmation =
+    step?.kind === "wait"
+      ? ruleSaveDialog(step)
+      : pending
+        ? combineSaveConfirmations(ruleSaveDialog(step), keyAskFor(pending.config))
+        : null;
   const saveOrAsk = (scopes: PrivacyScopeEntry[], config: DataPrivacyConfig) => {
-    const asks = asksBefore(config);
-    if (asks) setPending({ scopes, config });
-    else void save(scopes, config);
+    if (stepFor(config).kind === "save" && keyAskFor(config) === null) void save(scopes, config);
+    else setPending({ scopes, config });
   };
 
   return (
@@ -313,12 +312,14 @@ function PrivacyRuleDrawerMount({
         open={confirmation !== null}
         onClose={() => setPending(null)}
         onConfirm={() => {
+          if (step?.kind === "wait") return;
           if (pending) void save(pending.scopes, pending.config);
           setPending(null);
         }}
         title={confirmation?.title ?? ""}
         description={confirmation?.description ?? ""}
         confirmLabel={confirmation?.confirmLabel}
+        loading={step?.kind === "wait"}
         tone="default"
       />
       <PrivacyRuleDrawer

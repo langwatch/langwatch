@@ -15,12 +15,12 @@ import { SettingsSection } from "@langwatch/design-system/settings-section";
 import { ChevronRight } from "lucide-react";
 import { type ReactNode, useEffect, useRef } from "react";
 
-import type { PrivacyBillingCurrency } from "../../model/data-privacy-host.ts";
 import {
   ESSENTIAL_FINDS,
   ESSENTIAL_MISSES,
   type OrganizationPiiLevel,
   PII_REDACTION_MODEL_NAME,
+  type PiiRedactionModel,
   STRICT_BILLED_NOTE,
   STRICT_GAPS,
 } from "../../model/pii-redaction-level-offer.ts";
@@ -104,17 +104,7 @@ function LevelCard({
 }
 
 /** Essential and Strict side by side; Strict carries the model, its price and the New badge. */
-function LevelCards({
-  free,
-  licensed,
-  split,
-  currency,
-}: {
-  free: boolean;
-  licensed: boolean;
-  split: boolean;
-  currency: PrivacyBillingCurrency;
-}) {
+function LevelCards({ model }: { model: PiiRedactionModel }) {
   return (
     <Grid templateColumns={{ base: "1fr", md: "1fr 1fr" }} gap={3}>
       <LevelCard
@@ -135,14 +125,7 @@ function LevelCards({
           </Badge>
         }
         subtitle={PII_REDACTION_MODEL_NAME}
-        price={
-          <PiiRedactionModelPrice
-            free={free}
-            licensed={licensed}
-            split={split}
-            currency={currency}
-          />
-        }
+        price={<PiiRedactionModelPrice model={model} />}
         points={[
           "Names and full street addresses in 8 languages",
           "Plus everything Essential finds",
@@ -200,10 +183,7 @@ export function OrganizationPiiLevelPicker({
   level,
   pendingLevel,
   otherLevelLabel,
-  free,
-  licensed = false,
-  split = false,
-  currency = "USD",
+  model,
   canWrite,
   isSaving,
   onPick,
@@ -211,13 +191,8 @@ export function OrganizationPiiLevelPicker({
   level: OrganizationPiiLevel | null;
   pendingLevel: OrganizationPiiLevel | null;
   otherLevelLabel: string;
-  free: boolean;
-  /** Self-hosted: included with the Enterprise licence rather than for the organization. */
-  licensed?: boolean;
-  /** Long spans go to the model in parts (ADR-207): the small print names the split limit. */
-  split?: boolean;
-  /** The subscription's currency, which Strict's price is quoted in. */
-  currency?: PrivacyBillingCurrency;
+  /** Strict's model: its price in the subscription's currency, or why it is included. */
+  model: PiiRedactionModel;
   canWrite: boolean;
   isSaving: boolean;
   onPick: (level: OrganizationPiiLevel) => void;
@@ -253,10 +228,10 @@ export function OrganizationPiiLevelPicker({
             }
           }}
         >
-          <LevelCards free={free} licensed={licensed} split={split} currency={currency} />
+          <LevelCards model={model} />
         </RadioCard.Root>
         {level && <LevelExample level={level} />}
-        {level === "strict" && !free && (
+        {level === "strict" && !model.free && (
           <Text fontSize="xs" color="fg.muted">
             {STRICT_BILLED_NOTE}
           </Text>

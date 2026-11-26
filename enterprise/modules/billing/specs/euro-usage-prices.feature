@@ -89,3 +89,9 @@ Feature: Euro Growth subscriptions are charged for Instant Evals and PII redacti
       Given the Stripe catalogue in either mode
       When a euro usage price is mapped beside its dollar price
       Then it is a monthly euro price whose unit amount is 0.85 of the dollar price's
+
+    @unit
+    Scenario: A euro usage price mapped without its dollar price is refused
+      Given the Stripe catalogue in either mode
+      When a euro usage price is mapped and its dollar price is not
+      Then the catalogue check refuses the euro price, since it has no dollar price to follow

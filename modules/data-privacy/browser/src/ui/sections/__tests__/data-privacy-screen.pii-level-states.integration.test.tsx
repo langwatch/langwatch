@@ -256,4 +256,40 @@ describe("given the Data Privacy page", () => {
       );
     });
   });
+
+  describe("when a rule is saved at Strict before the subscription's currency is read", () => {
+    /** @scenario "A Strict rule save waits for the subscription's currency" */
+    it("saves nothing and quotes no price, then asks at the euro price once the plan answers", async () => {
+      api.snapshot = snapshotWith({ rules: [projectRuleWith({ pii: { level: "essential" } })] });
+      const { answerPlan } = page({
+        flagOn: true,
+        billingCurrency: "unknown",
+        query: { rule: "PROJECT:proj-1:false" },
+      });
+      const user = userEvent.setup();
+
+      await user.click(await screen.findByLabelText("PII redaction"));
+      await user.click(await screen.findByRole("option", { name: /^Strict/ }));
+      await user.click(screen.getByRole("button", { name: "Save" }));
+
+      const waiting = await screen.findByRole("dialog", { name: "Turn on Strict?" });
+      expect(waiting.textContent).toContain("hasn't loaded yet");
+      expect(waiting.textContent).not.toMatch(/[$€]/);
+      await user.click(within(waiting).getByRole("button", { name: "Turn on Strict" }));
+      expect(api.setForScope).not.toHaveBeenCalled();
+
+      answerPlan("EUR");
+
+      const dialog = await screen.findByRole("dialog", { name: "Turn on Strict?" });
+      await waitFor(() => expect(dialog.textContent).toContain("€0.425 per 1M characters"));
+      expect(api.setForScope).not.toHaveBeenCalled();
+      await user.click(within(dialog).getByRole("button", { name: "Turn on Strict" }));
+
+      await waitFor(() =>
+        expect(api.setForScope).toHaveBeenCalledWith(
+          expect.objectContaining({ config: { pii: { level: "strict" } } }),
+        ),
+      );
+    });
+  });
 });

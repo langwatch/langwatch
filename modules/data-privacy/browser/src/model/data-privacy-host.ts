@@ -46,8 +46,8 @@ export type PrivacyLicence = "loading" | "enterprise" | "none" | "unknown";
 /** The currency the organization's subscription is billed in, which Strict's price is quoted in. */
 export type PrivacyBillingCurrency = "USD" | "EUR";
 
-/** The currency as the host reads it: "loading" until the plan answers, so no price flashes. */
-export type PrivacyBillingCurrencyReading = PrivacyBillingCurrency | "loading";
+/** The currency as the host reads it: "unknown" until the plan answers, or when it cannot. */
+export type PrivacyBillingCurrencyReading = PrivacyBillingCurrency | "unknown";
 
 /** The one thing the screen is handed. */
 export abstract class DataPrivacyHostApi {

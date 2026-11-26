@@ -19,7 +19,8 @@ import {
   piiRedactionModelOfferOf,
   piiRedactionModelPrice,
   piiRedactionModelPriceIn,
-  ruleSaveConfirmation,
+  RULE_SAVE_WAITING,
+  ruleSaveStep,
   strictFallbackNote,
   STRICT_RULE_BASED_NOTES,
   withOrganizationPiiLevel,
@@ -45,6 +46,7 @@ describe("given the deployment and the PII redaction model flags", () => {
         splitFlag: true,
         licence,
         mayManageLicence,
+        currency: "USD",
       });
 
     /** @scenario The Strict offer on a self-hosted deployment follows the license and the model flag */
@@ -52,8 +54,8 @@ describe("given the deployment and the PII redaction model flags", () => {
       expect(selfHosted({ licence: "enterprise", modelFlag: true })).toEqual({
         kind: "model",
         free: true,
-        licensed: true,
         split: false,
+        licensed: true,
       });
     });
 
@@ -120,6 +122,7 @@ describe("given the deployment and the PII redaction model flags", () => {
           splitFlag,
           licence: "none",
           mayManageLicence: true,
+          currency: "USD",
         });
       expect(cloud({ modelFlag: false, freeFlag: true })).toBeNull();
       expect(cloud({ modelFlag: true, freeFlag: false })).toEqual({
@@ -132,7 +135,7 @@ describe("given the deployment and the PII redaction model flags", () => {
         kind: "model",
         free: true,
         split: false,
-        currency: "USD",
+        licensed: false,
       });
     });
 
@@ -145,6 +148,7 @@ describe("given the deployment and the PII redaction model flags", () => {
         splitFlag: true,
         licence: "none",
         mayManageLicence: true,
+        currency: "USD",
       });
       expect(cloud).toEqual({ kind: "model", free: false, split: true, currency: "USD" });
       const selfHosted = piiRedactionModelOfferOf({
@@ -154,6 +158,7 @@ describe("given the deployment and the PII redaction model flags", () => {
         splitFlag: true,
         licence: "enterprise",
         mayManageLicence: true,
+        currency: "USD",
       });
       expect(selfHosted).toMatchObject({ kind: "model", split: false });
     });
@@ -174,7 +179,7 @@ describe("given the deployment and the PII redaction model flags", () => {
     });
 
     /** @scenario "The price currency is the subscription's, read from its Growth plan" */
-    it("offers nothing while the subscription's currency is still loading, so no price flashes", () => {
+    it("quotes no price until the subscription's currency is read, loading or failed", () => {
       expect(
         piiRedactionModelOfferOf({
           isSaaS: true,
@@ -183,9 +188,23 @@ describe("given the deployment and the PII redaction model flags", () => {
           splitFlag: false,
           licence: "unknown",
           mayManageLicence: true,
-          currency: "loading",
+          currency: "unknown",
         }),
-      ).toBeNull();
+      ).toEqual({ kind: "price-unknown" });
+    });
+
+    it("offers Strict as included to a free organization whatever the currency reading", () => {
+      expect(
+        piiRedactionModelOfferOf({
+          isSaaS: true,
+          modelFlag: true,
+          freeFlag: true,
+          splitFlag: false,
+          licence: "unknown",
+          mayManageLicence: true,
+          currency: "unknown",
+        }),
+      ).toEqual({ kind: "model", free: true, split: false, licensed: false });
     });
   });
 });
@@ -194,7 +213,7 @@ describe("given the rate billing charges for the PII redaction model", () => {
   describe("when it is 500 nano-dollars per character", () => {
     /** @scenario The price is derived from the rate billing charges */
     it("reads $0.50 per 1M characters", () => {
-      expect(piiRedactionModelPrice({ nanoUsdPerCharacter: 500 })).toBe("$0.50");
+      expect(piiRedactionModelPrice({ nanoUsdPerCharacter: 500, currency: "USD" })).toBe("$0.50");
       expect(`${piiRedactionModelPriceIn("USD")} ${PII_REDACTION_MODEL_PRICE_UNIT}`).toBe(
         "$0.50 per 1M characters excl. VAT, pay as you go",
       );
@@ -203,7 +222,7 @@ describe("given the rate billing charges for the PII redaction model", () => {
 
   describe("when the rate changes", () => {
     it("follows it", () => {
-      expect(piiRedactionModelPrice({ nanoUsdPerCharacter: 1_250 })).toBe("$1.25");
+      expect(piiRedactionModelPrice({ nanoUsdPerCharacter: 1_250, currency: "USD" })).toBe("$1.25");
     });
   });
 
@@ -282,9 +301,12 @@ describe("given the organization's resolved PII level", () => {
 });
 
 describe("given a change of the organization's level", () => {
+  const priced = { kind: "model", free: false, split: false, currency: "USD" } as const;
+  const included = { kind: "model", free: true, split: false, licensed: false } as const;
+
   describe("when Essential turns into Strict for a paying organization", () => {
     it("asks with the model and its price", () => {
-      expect(levelChangeConfirmation({ from: "essential", to: "strict", free: false })).toEqual({
+      expect(levelChangeConfirmation({ from: "essential", to: "strict", model: priced })).toEqual({
         title: "Turn on Strict?",
         description:
           "Strict uses the LangWatch PII Redaction Model at $0.50 per 1M characters excl. VAT, pay as you go. Turn it on?",
@@ -297,8 +319,11 @@ describe("given a change of the organization's level", () => {
     /** @scenario "Strict shows the euro price to an organization on a euro Growth subscription" */
     it("asks with the euro price", () => {
       expect(
-        levelChangeConfirmation({ from: "essential", to: "strict", free: false, currency: "EUR" })
-          ?.description,
+        levelChangeConfirmation({
+          from: "essential",
+          to: "strict",
+          model: { ...priced, currency: "EUR" },
+        })?.description,
       ).toBe(
         "Strict uses the LangWatch PII Redaction Model at €0.425 per 1M characters excl. VAT, pay as you go. Turn it on?",
       );
@@ -307,14 +332,16 @@ describe("given a change of the organization's level", () => {
 
   describe("when the organization is free", () => {
     it("turns Strict on without asking", () => {
-      expect(levelChangeConfirmation({ from: "essential", to: "strict", free: true })).toBeNull();
+      expect(
+        levelChangeConfirmation({ from: "essential", to: "strict", model: included }),
+      ).toBeNull();
     });
   });
 
   describe("when Custom turns into Essential", () => {
     it("asks before replacing the custom settings", () => {
       expect(
-        levelChangeConfirmation({ from: "custom", to: "essential", free: false })?.description,
+        levelChangeConfirmation({ from: "custom", to: "essential", model: priced })?.description,
       ).toBe("This replaces your custom PII settings with Essential.");
     });
   });
@@ -322,7 +349,7 @@ describe("given a change of the organization's level", () => {
   describe("when Custom turns into Strict for a paying organization", () => {
     it("asks once, naming both", () => {
       expect(
-        levelChangeConfirmation({ from: "custom", to: "strict", free: false })?.description,
+        levelChangeConfirmation({ from: "custom", to: "strict", model: priced })?.description,
       ).toBe(
         "This replaces your custom PII settings. Strict uses the LangWatch PII Redaction Model at $0.50 per 1M characters excl. VAT, pay as you go. Turn it on?",
       );
@@ -331,7 +358,9 @@ describe("given a change of the organization's level", () => {
 
   describe("when Strict goes back to Essential", () => {
     it("needs no confirmation", () => {
-      expect(levelChangeConfirmation({ from: "strict", to: "essential", free: false })).toBeNull();
+      expect(
+        levelChangeConfirmation({ from: "strict", to: "essential", model: priced }),
+      ).toBeNull();
     });
   });
 });
@@ -369,57 +398,65 @@ describe("given the fallback note", () => {
 });
 
 describe("given a rule saved from the drawer", () => {
-  const model = { kind: "model", free: false, split: false } as const;
+  const model = { kind: "model", free: false, split: false, currency: "USD" } as const;
+  const turnsStrictOn = {
+    before: { pii: { level: "essential" as const } },
+    after: { pii: { level: "strict" as const } },
+  };
+  const confirmationOf = (step: ReturnType<typeof ruleSaveStep>) =>
+    step.kind === "ask" ? step.confirmation : null;
 
   describe("when it turns Strict on where Strict is the model at a euro price", () => {
+    /** @scenario "Saving a rule at Strict asks with the euro price on a euro Growth subscription" */
     it("asks with the euro price", () => {
-      expect(
-        ruleSaveConfirmation({
-          offer: { kind: "model", free: false, split: false, currency: "EUR" },
-          before: { pii: { level: "essential" } },
-          after: { pii: { level: "strict" } },
-        })?.description,
-      ).toContain("€0.425 per 1M characters");
+      const step = ruleSaveStep({ offer: { ...model, currency: "EUR" }, ...turnsStrictOn });
+      expect(confirmationOf(step)?.description).toContain("€0.425 per 1M characters");
     });
   });
 
   describe("when it turns Strict on where Strict is the model at a price", () => {
     it("asks with the price", () => {
-      expect(
-        ruleSaveConfirmation({
-          offer: model,
-          before: { pii: { level: "essential" } },
-          after: { pii: { level: "strict" } },
-        })?.confirmLabel,
-      ).toBe("Turn on Strict");
+      expect(confirmationOf(ruleSaveStep({ offer: model, ...turnsStrictOn }))?.confirmLabel).toBe(
+        "Turn on Strict",
+      );
+    });
+  });
+
+  describe("when it turns Strict on before the subscription's currency is read", () => {
+    /** @scenario "A Strict rule save waits for the subscription's currency" */
+    it("waits rather than saving unasked, and its message quotes no price", () => {
+      expect(ruleSaveStep({ offer: { kind: "price-unknown" }, ...turnsStrictOn })).toEqual({
+        kind: "wait",
+      });
+      expect(RULE_SAVE_WAITING.description).not.toMatch(/[$€]/);
     });
   });
 
   /** @scenario Saving a rule asks for the price only when it turns Strict on at a price */
   it("does not ask when nothing new is billed", () => {
     const strict = { pii: { level: "strict" as const } };
-    expect(ruleSaveConfirmation({ offer: model, before: strict, after: strict })).toBeNull();
+    const save = { kind: "save" };
+    expect(ruleSaveStep({ offer: model, before: strict, after: strict })).toEqual(save);
     expect(
-      ruleSaveConfirmation({
-        offer: { kind: "model", free: true, split: false },
+      ruleSaveStep({ offer: { kind: "price-unknown" }, before: strict, after: strict }),
+    ).toEqual(save);
+    expect(
+      ruleSaveStep({
+        offer: { kind: "model", free: true, split: false, licensed: false },
         before: undefined,
         after: strict,
       }),
-    ).toBeNull();
+    ).toEqual(save);
     expect(
-      ruleSaveConfirmation({
+      ruleSaveStep({
         offer: { kind: "rule-based", note: "licence", activate: true },
         before: undefined,
         after: strict,
       }),
-    ).toBeNull();
-    expect(ruleSaveConfirmation({ offer: null, before: undefined, after: strict })).toBeNull();
+    ).toEqual(save);
+    expect(ruleSaveStep({ offer: null, before: undefined, after: strict })).toEqual(save);
     expect(
-      ruleSaveConfirmation({
-        offer: model,
-        before: undefined,
-        after: { pii: { level: "essential" } },
-      }),
-    ).toBeNull();
+      ruleSaveStep({ offer: model, before: undefined, after: { pii: { level: "essential" } } }),
+    ).toEqual(save);
   });
 });

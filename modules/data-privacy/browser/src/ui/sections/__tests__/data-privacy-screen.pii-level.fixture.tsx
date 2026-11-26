@@ -27,7 +27,6 @@ import { expect, vi } from "vitest";
 import type { dataPrivacyApi } from "../../../behavior/data-privacy-api.ts";
 import {
   DataPrivacyHostApi,
-  type PrivacyBillingCurrency,
   type PrivacyBillingCurrencyReading,
   DataPrivacyHostProvider,
   type PrivacyFailureNotice,
@@ -127,7 +126,7 @@ export class TestPrivacyHost extends DataPrivacyHostApi {
     private readonly plan: {
       licence: PrivacyLicence;
       mayManageLicence: boolean;
-      billingCurrency?: PrivacyBillingCurrency;
+      billingCurrency?: PrivacyBillingCurrencyReading;
     } = {
       licence: "enterprise",
       mayManageLicence: true,
@@ -169,7 +168,10 @@ export class TestPrivacyHost extends DataPrivacyHostApi {
   }
 }
 
-/** Renders the page; `rerender` renders it again over the current snapshot. */
+/**
+ * Renders the page; `rerender` renders it again over the current snapshot, and `answerPlan`
+ * mounts a new host as the plan answering does, with the subscription's currency.
+ */
 export function renderScreen({
   screenElement,
   flagOn,
@@ -189,10 +191,11 @@ export function renderScreen({
   isSaaS?: boolean;
   licence?: PrivacyLicence;
   mayManageLicence?: boolean;
-  billingCurrency?: PrivacyBillingCurrency;
+  billingCurrency?: PrivacyBillingCurrencyReading;
   query?: Record<string, string>;
 }) {
   const host = new TestPrivacyHost(query, { licence, mayManageLicence, billingCurrency });
+  let mounted = host;
   const answers: Record<string, boolean> = {
     release_pii_redaction_model_enabled: flagOn,
     release_pii_redaction_model_free: free,
@@ -214,12 +217,16 @@ export function renderScreen({
   const tree = () => (
     <UiHostServicesContextProvider value={services}>
       <UiHostServiceProvider value={new Map([[UiFlagsService.name, flags]])}>
-        <DataPrivacyHostProvider value={host}>{screenElement}</DataPrivacyHostProvider>
+        <DataPrivacyHostProvider value={mounted}>{screenElement}</DataPrivacyHostProvider>
       </UiHostServiceProvider>
     </UiHostServicesContextProvider>
   );
   const result = renderWithDesignSystem(tree());
-  return { host, rerender: () => result.rerender(tree()) };
+  const answerPlan = (answered: PrivacyBillingCurrencyReading) => {
+    mounted = new TestPrivacyHost(query, { licence, mayManageLicence, billingCurrency: answered });
+    result.rerender(tree());
+  };
+  return { host, rerender: () => result.rerender(tree()), answerPlan };
 }
 
 export const confirmStrict = async () =>

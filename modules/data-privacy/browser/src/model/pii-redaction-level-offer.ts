@@ -33,10 +33,10 @@ const PRICE_UNIT_CHARACTERS = 1_000_000;
 /** "$0.50", or "€0.425" to a euro subscription: the rate billing charges per 1M characters. */
 export function piiRedactionModelPrice({
   nanoUsdPerCharacter,
-  currency = "USD",
+  currency,
 }: {
   nanoUsdPerCharacter: number;
-  currency?: PrivacyBillingCurrency;
+  currency: PrivacyBillingCurrency;
 }): string {
   const usd = (nanoUsdPerCharacter * PRICE_UNIT_CHARACTERS) / NANO_USD_PER_USD;
   return new Intl.NumberFormat("en-US", {
@@ -48,7 +48,7 @@ export function piiRedactionModelPrice({
 }
 
 /** The published price in the subscription's currency. */
-export const piiRedactionModelPriceIn = (currency: PrivacyBillingCurrency = "USD"): string =>
+export const piiRedactionModelPriceIn = (currency: PrivacyBillingCurrency): string =>
   piiRedactionModelPrice({ nanoUsdPerCharacter: PII_REDACTION_NANO_USD_PER_CHARACTER, currency });
 export const PII_REDACTION_MODEL_PRICE_UNIT = "per 1M characters excl. VAT, pay as you go";
 
@@ -95,18 +95,20 @@ export const STRICT_BILLED_NOTE =
   "Strict is billed from the next trace. Projects or teams with their own Strict rule keep it when the organization moves to Essential.";
 
 /**
- * What the page offers for Strict: the model (free on the free list, or with the licence
- * self-hosted), the rule-based detector with a note, or null for today's page.
+ * The model on offer: priced in the subscription's currency, or included (the free list on
+ * Cloud, the licence self-hosted). `split`: long spans go to the model in parts (ADR-207).
+ */
+export type PiiRedactionModel =
+  | { kind: "model"; free: false; split: boolean; currency: PrivacyBillingCurrency }
+  | { kind: "model"; free: true; split: boolean; licensed: boolean };
+
+/**
+ * What the page offers for Strict: the model; its price before the subscription's currency is
+ * read, so none is quoted and a Strict save waits; the rule-based detector with a note; or null.
  */
 export type PiiRedactionModelOffer =
-  /** `split`: the organization's long spans go to the model in parts (ADR-207); Cloud only. */
-  | {
-      kind: "model";
-      free: boolean;
-      licensed?: boolean;
-      split: boolean;
-      currency?: PrivacyBillingCurrency;
-    }
+  | PiiRedactionModel
+  | { kind: "price-unknown" }
   | { kind: "rule-based"; note: Exclude<StrictRuleBasedNote, "licence"> }
   /** `activate`: this reader may activate a license, so the advert links there. */
   | { kind: "rule-based"; note: "licence"; activate: boolean }
@@ -124,7 +126,7 @@ export function piiRedactionModelOfferOf({
   splitFlag,
   licence,
   mayManageLicence,
-  currency = "USD",
+  currency,
 }: {
   isSaaS: boolean;
   /** `undefined` while the flags are not answered yet: no offer then, so nothing flashes. */
@@ -133,18 +135,20 @@ export function piiRedactionModelOfferOf({
   splitFlag: boolean;
   licence: PrivacyLicence;
   mayManageLicence: boolean;
-  /** The subscription's currency, which a Cloud offer quotes in; none while it is loading. */
-  currency?: PrivacyBillingCurrencyReading;
+  /** The subscription's currency, which a priced Cloud offer quotes in. */
+  currency: PrivacyBillingCurrencyReading;
 }): PiiRedactionModelOffer {
   if (isSaaS) {
-    if (modelFlag !== true || currency === "loading") return null;
-    return { kind: "model", free: freeFlag, split: splitFlag, currency };
+    if (modelFlag !== true) return null;
+    if (freeFlag) return { kind: "model", free: true, split: splitFlag, licensed: false };
+    if (currency === "unknown") return { kind: "price-unknown" };
+    return { kind: "model", free: false, split: splitFlag, currency };
   }
   if (licence === "loading" || licence === "unknown" || modelFlag === undefined) return null;
   if (licence === "none")
     return { kind: "rule-based", note: "licence", activate: mayManageLicence };
   return modelFlag
-    ? { kind: "model", free: true, licensed: true, split: false }
+    ? { kind: "model", free: true, split: false, licensed: true }
     : { kind: "rule-based", note: "turn-on" };
 }
 
@@ -158,19 +162,17 @@ type LevelChangeConfirmation = {
 export function levelChangeConfirmation({
   from,
   to,
-  free,
-  currency = "USD",
+  model,
 }: {
   from: PiiLevel;
   to: OrganizationPiiLevel;
-  free: boolean;
-  currency?: PrivacyBillingCurrency;
+  model: PiiRedactionModel;
 }): LevelChangeConfirmation | null {
   const replacesCustom = from === "custom" ? "This replaces your custom PII settings. " : "";
-  if (to === "strict" && !free) {
+  if (to === "strict" && !model.free) {
     return {
       title: "Turn on Strict?",
-      description: `${replacesCustom}Strict uses the ${PII_REDACTION_MODEL_NAME} at ${piiRedactionModelPriceIn(currency)} ${PII_REDACTION_MODEL_PRICE_UNIT}. Turn it on?`,
+      description: `${replacesCustom}Strict uses the ${PII_REDACTION_MODEL_NAME} at ${piiRedactionModelPriceIn(model.currency)} ${PII_REDACTION_MODEL_PRICE_UNIT}. Turn it on?`,
       confirmLabel: "Turn on Strict",
     };
   }
@@ -194,8 +196,24 @@ export function organizationPiiLevel(level: PiiLevel | undefined): OrganizationP
   return level === "essential" || level === "strict" ? level : null;
 }
 
-/** A rule saved at Strict where Strict is the model at a price asks first, unless it was Strict. */
-export function ruleSaveConfirmation({
+/** What saving a rule does next: save, ask with the price first, or wait for the price. */
+export type RuleSaveStep =
+  | { kind: "save" }
+  | { kind: "ask"; confirmation: LevelChangeConfirmation }
+  | { kind: "wait" };
+
+export const RULE_SAVE_WAITING: LevelChangeConfirmation = {
+  title: "Turn on Strict?",
+  description:
+    "Strict's price is in your subscription's currency, which hasn't loaded yet. Try again in a moment.",
+  confirmLabel: "Turn on Strict",
+};
+
+/**
+ * A rule turned to Strict where the model has a price asks first, quoting it; before the
+ * subscription's currency is read it waits rather than saving unasked. Anything else saves.
+ */
+export function ruleSaveStep({
   offer,
   before,
   after,
@@ -203,15 +221,18 @@ export function ruleSaveConfirmation({
   offer: PiiRedactionModelOffer;
   before: DataPrivacyConfig | undefined;
   after: DataPrivacyConfig;
-}): LevelChangeConfirmation | null {
-  if (offer?.kind !== "model" || offer.free) return null;
-  if (after.pii?.level !== "strict" || before?.pii?.level === "strict") return null;
-  return levelChangeConfirmation({
-    from: "essential",
-    to: "strict",
-    free: false,
-    ...(offer.currency ? { currency: offer.currency } : {}),
-  });
+}): RuleSaveStep {
+  if (after.pii?.level !== "strict" || before?.pii?.level === "strict") return { kind: "save" };
+  if (offer?.kind === "price-unknown") return { kind: "wait" };
+  if (offer?.kind !== "model") return { kind: "save" };
+  const confirmation = levelChangeConfirmation({ from: "essential", to: "strict", model: offer });
+  return confirmation ? { kind: "ask", confirmation } : { kind: "save" };
+}
+
+/** What the drawer's dialog says for a step: its question, the wait, or nothing. */
+export function ruleSaveDialog(step: RuleSaveStep | null): LevelChangeConfirmation | null {
+  if (step?.kind === "ask") return step.confirmation;
+  return step?.kind === "wait" ? RULE_SAVE_WAITING : null;
 }
 
 /** How the picker names a level it does not offer: "Off", or "Custom (2 types)". */

@@ -90,7 +90,8 @@ export function EffectiveSummary({
   const { effective, scopeLabel } = pickEffectiveForScope(snapshot, scopeFilter, currentTeamId);
   const piiValue = piiLevelLabel({
     pii: effective.pii,
-    piiRedactionModelOffered: piiRedactionModelOffer?.kind === "model",
+    piiRedactionModelOffered:
+      piiRedactionModelOffer?.kind === "model" || piiRedactionModelOffer?.kind === "price-unknown",
   });
   const secretsValue = `${effective.secrets.enabled ? "On" : "Off"}${
     effective.secrets.customPatterns.length > 0

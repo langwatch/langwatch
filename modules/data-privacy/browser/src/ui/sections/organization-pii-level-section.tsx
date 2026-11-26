@@ -8,13 +8,14 @@ import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
 import { useState } from "react";
 
 import { dataPrivacyApi } from "../../behavior/data-privacy-api.ts";
-import type { DataPrivacyHostApi, PrivacyBillingCurrency } from "../../model/data-privacy-host.ts";
+import type { DataPrivacyHostApi } from "../../model/data-privacy-host.ts";
 import {
   levelChangeConfirmation,
   organizationPiiLevel,
   organizationRule,
   type OrganizationPiiLevel,
   otherPiiLevelLabel,
+  type PiiRedactionModel,
   withOrganizationPiiLevel,
 } from "../../model/pii-redaction-level-offer.ts";
 import { OrganizationPiiLevelPicker } from "../blocks/organization-pii-level-picker.tsx";
@@ -34,21 +35,14 @@ function useOptimisticPick(stored: string | undefined) {
 
 /** Strict at a price, or replacing Custom, asks first; a free organization is never asked. */
 export function OrganizationPiiLevelSection({
-  free,
-  licensed = false,
-  split = false,
-  currency = "USD",
+  model,
   host,
   projectId,
   snapshot,
   onSaved,
 }: {
-  free: boolean;
-  licensed?: boolean;
-  /** Long spans go to the model in parts (ADR-207): the small print names the split limit. */
-  split?: boolean;
-  /** The subscription's currency, which Strict's price and its confirmation quote. */
-  currency?: PrivacyBillingCurrency;
+  /** Strict's model: its price in the subscription's currency, or why it is included. */
+  model: PiiRedactionModel;
   host: DataPrivacyHostApi;
   projectId: string;
   snapshot: DataPrivacySnapshot;
@@ -65,7 +59,7 @@ export function OrganizationPiiLevelSection({
   const shown = picked && picked.over === stored ? picked.level : stored;
   const ownRule = organizationRule({ rules: snapshot.rules, organizationId });
   const confirmationFor = (level: OrganizationPiiLevel) =>
-    levelChangeConfirmation({ from: storedPii.level, to: level, free, currency });
+    levelChangeConfirmation({ from: storedPii.level, to: level, model });
   const confirmation = asking ? confirmationFor(asking) : null;
 
   const save = async (level: OrganizationPiiLevel) => {
@@ -94,10 +88,7 @@ export function OrganizationPiiLevelSection({
           level: storedPii.level,
           entityCount: storedPii.entities.length,
         })}
-        free={free}
-        licensed={licensed}
-        split={split}
-        currency={currency}
+        model={model}
         canWrite={snapshot.available.organization !== null}
         isSaving={setForScope.isPending}
         onPick={(level) => (confirmationFor(level) ? setAsking(level) : void save(level))}

@@ -134,13 +134,7 @@ export function PiiRedactionFields({
         </Text>
       )}
       {piiRedactionModelOffer?.kind === "model" && (
-        <PiiRedactionLevelDetail
-          level={effectiveLevel}
-          free={piiRedactionModelOffer.free}
-          licensed={piiRedactionModelOffer.licensed}
-          split={piiRedactionModelOffer.split}
-          currency={piiRedactionModelOffer.currency}
-        />
+        <PiiRedactionLevelDetail level={effectiveLevel} model={piiRedactionModelOffer} />
       )}
       {piiRedactionModelOffer?.kind === "rule-based" && effectiveLevel === "strict" && (
         <StrictRuleBasedNote offer={piiRedactionModelOffer} />
