@@ -1,6 +1,6 @@
 /**
- * Refuses an @opentelemetry/api older than 1.10 with a message, before the OpenTelemetry JS 3.x
- * packages load and die on it with an unexplained TypeError. Each public entry imports this first.
+ * Refuses an @opentelemetry/api older than 1.10 with a message, before CommonJS loads the 3.x packages.
+ * ESM links every module before evaluating any, so there the 3.x packages' named imports fail first.
  * @module otel-api-guard
  */
 import * as installedOtelApi from "@opentelemetry/api";
