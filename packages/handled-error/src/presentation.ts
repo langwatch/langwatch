@@ -6045,10 +6045,6 @@ const presentations = {
   },
 
   // ---- NLP engine ----
-  invalid_images: {
-    title: "These images can't be sent",
-    describe: () => "Attach fewer or smaller images in a supported format and try again.",
-  },
   invalid_workflow: {
     title: "This workflow isn't valid",
     describe: () => "Check the steps and try again.",
@@ -6056,10 +6052,6 @@ const presentations = {
   invalid_dataset: {
     title: "This dataset isn't valid",
     describe: () => "Check its columns and try again.",
-  },
-  invalid_images: {
-    title: "Langy couldn't read an attached image",
-    describe: () => "Attach PNG, JPEG, GIF or WebP images up to 5 MB, then send again.",
   },
   unsupported_node_kind: {
     title: "This step isn't supported",
