@@ -94,6 +94,8 @@ export type UseProviderFormSubmitState = {
 export type UseProviderFormSubmitActions = {
   submit: () => Promise<void>;
   reset: () => void;
+  /** Drops the credential refusal shown beside the fields, once a credential changes. */
+  clearErrors: () => void;
 };
 
 export type UseProviderFormSubmitReturn = UseProviderFormSubmitState & UseProviderFormSubmitActions;
@@ -657,10 +659,13 @@ export function useProviderFormSubmit({
     setIsSaving(false);
   }, []);
 
+  const clearErrors = useCallback(() => setErrors({}), []);
+
   return {
     isSaving,
     errors,
     submit,
     reset,
+    clearErrors,
   };
 }

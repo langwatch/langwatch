@@ -188,6 +188,10 @@ describe("useProviderFormSubmit()", () => {
       expect(result.current.errors.customKeysRoot).toContain("nothing was saved");
       expect(result.current.isSaving).toBe(false);
       expect(mockToasterCreate).not.toHaveBeenCalled();
+
+      act(() => result.current.clearErrors());
+
+      expect(result.current.errors.customKeysRoot).toBeUndefined();
     });
   });
 
