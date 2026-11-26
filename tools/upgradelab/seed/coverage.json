@@ -439,11 +439,6 @@
       "status": "seeded",
       "seed": "product-seeds:workflow",
       "cells": ["C1", "C3"]
-    },
-    "dashboard:mark-my-dashboards": {
-      "status": "pending",
-      "seed": "unplanned",
-      "note": "needs a member's My dashboard without its owner column, as the previous release wrote it"
     }
   },
   "systemMigrations": {
