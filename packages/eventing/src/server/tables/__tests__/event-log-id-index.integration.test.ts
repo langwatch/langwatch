@@ -12,7 +12,6 @@ import { resolve } from "node:path";
 import {
   ClickHouseQueryClient,
   fillOwnerIdIndexes,
-  type QueryDriver,
   type QueryRequest,
   TenantGuard,
 } from "@langwatch/clickhouse-client";
@@ -24,6 +23,7 @@ import { nowInstant } from "@langwatch/time";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import type { ReplayEvent } from "../../../replay/replayEventSource.ts";
+import { clickHouseHttpDriver } from "../../__tests__/support/clickhouse-http-driver.ts";
 import { EventingClickHouseEventRepository } from "../../adapters/clickhouse/event-repository.clickhouse.ts";
 import { EventingClickHouseReplayEventSource } from "../../adapters/clickhouse/replay-event-source.clickhouse.ts";
 import type { EventingClickHouseClientResolver } from "../../clickhouse-client-resolver.ts";
@@ -52,66 +52,6 @@ const decoyIds = ["!decoy", "~decoy"];
 let statements: QueryRequest[] = [];
 let clickhouse: ClickHouseQueryClient;
 let sql: (query: string, params?: Record<string, unknown>) => Promise<unknown[]>;
-
-/** The server's HTTP interface, so the suite needs no client package beyond clickhouse-client. */
-function httpDriver(url: string): QueryDriver {
-  const endpoint = new URL(url);
-  const database = endpoint.pathname.replace(/^\//, "") || "default";
-  const authorization = `Basic ${btoa(`${decodeURIComponent(endpoint.username)}:${decodeURIComponent(endpoint.password)}`)}`;
-  const send = async (request: QueryRequest, body: string): Promise<string> => {
-    const search = new URLSearchParams({ database });
-    for (const [name, value] of Object.entries(request.params ?? {})) {
-      search.set(`param_${name}`, httpParam(value));
-    }
-    for (const [name, value] of Object.entries(request.settings ?? {})) {
-      search.set(name, String(value));
-    }
-    const response = await fetch(`${endpoint.origin}/?${search.toString()}`, {
-      method: "POST",
-      headers: { authorization },
-      body,
-    });
-    const text = await response.text();
-    if (!response.ok) throw new Error(text);
-    return text;
-  };
-  return {
-    async execute<Row>(request: QueryRequest) {
-      statements.push(request);
-      const text = await send(request, `${request.sql}\nFORMAT JSONEachRow`);
-      return { rows: rowsOf<Row>(text) };
-    },
-    async insert(request) {
-      const rows = request.rows.map((row) => JSON.stringify(row)).join("\n");
-      await send(
-        { tenantId: request.tenantId, sql: "", settings: request.settings },
-        `INSERT INTO ${request.table} FORMAT JSONEachRow\n${rows}`,
-      );
-    },
-    async command(request) {
-      await send(request, request.sql);
-    },
-  };
-}
-
-/** JSONEachRow lines, typed by the caller as the vendor client's `json<Row>()` is. */
-function rowsOf<Row>(text: string): Row[] {
-  return text
-    .split("\n")
-    .filter((line) => line.trim().length > 0)
-    .map((line) => JSON.parse(line));
-}
-
-/** One HTTP query parameter: arrays as ClickHouse literals, everything else as text. */
-function httpParam(value: unknown): string {
-  if (!Array.isArray(value)) return String(value);
-  const quoted = value.map((each) =>
-    typeof each === "number"
-      ? String(each)
-      : `'${String(each).replaceAll("\\", "\\\\").replaceAll("'", "\\'")}'`,
-  );
-  return `[${quoted.join(",")}]`;
-}
 
 /** Active `event_log` parts in the weekly partitions these occurred times fall in, any tenant's. */
 async function activeParts(occurredAtMs: readonly number[]): Promise<number> {
@@ -171,7 +111,10 @@ beforeAll(async () => {
     environment: process.env,
   });
   if (!endpoint) throw new Error("No ClickHouse endpoint was provisioned for the suite");
-  const driver = httpDriver(endpoint.url);
+  const driver = clickHouseHttpDriver({
+    url: endpoint.url,
+    onExecute: (request) => statements.push(request),
+  });
   sql = async (query, params) =>
     (await driver.execute<unknown>({ tenantId, sql: query, params })).rows;
   clickhouse = new ClickHouseQueryClient({ tenantGuard: new TenantGuard(), driver });

@@ -2076,6 +2076,11 @@ const presentations = {
     title: "That end date has already passed",
     describe: () => "A license can only end on a future date. Pick a later one and try again.",
   },
+  license_in_use: {
+    title: "An install is using this license",
+    describe: () =>
+      "An install started using this license, so its key keeps working. The new license reaches that install on its next sync.",
+  },
   license_signing_key_not_pem: {
     title: "That doesn't look like a private key",
     describe: () => "Paste the whole key, including its BEGIN and END lines.",

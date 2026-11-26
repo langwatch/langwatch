@@ -1,4 +1,5 @@
 import { OrganizationNotFoundError } from "@langwatch/enterprise-licensing-contract";
+import { skipTenantCheck } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { prismaTables } from "@langwatch/prisma-client/ownership";
 import { fromDate, toDate, type Instant } from "@langwatch/time";
@@ -19,7 +20,7 @@ import type {
  */
 type OrganizationLicenseDatabase = Pick<
   PrismaClient,
-  "organization" | "organizationLicense" | "$transaction"
+  "organization" | "organizationLicense" | "$transaction" | "$executeRaw"
 >;
 
 const instantOrNull = (date: Date | null) => (date === null ? null : fromDate(date));
@@ -144,6 +145,53 @@ export class PrismaOrganizationLicenseRepository implements OrganizationLicenseR
       create: { organizationId, ...rowOf(license) },
       update: rowOf(license),
     });
+  }
+
+  async replaceLicense({
+    organizationId,
+    license,
+    replacing,
+  }: Readonly<{
+    organizationId: string;
+    license: StoredLicense;
+    replacing: string | null;
+  }>): Promise<boolean> {
+    const row = rowOf(license);
+    // One statement over the key the install reads (newerLicense): the column while newer,
+    // else the row. A row written meanwhile is compared again by key on conflict. The new
+    // row is stamped after the locked column it read, so it is the key reads see next.
+    const written = await this.prisma.$executeRaw`
+      ${skipTenantCheck({
+        // Licences are keyed by organization; this write names its organization by id.
+        SKIP_TENANT_CHECK: true,
+      })}
+      WITH held AS (
+        SELECT o."id",
+               o."updatedAt" AS "columnUpdatedAt",
+               o."license" AS "columnKey",
+               CASE WHEN ol."organizationId" IS NULL OR o."updatedAt" > ol."updatedAt"
+                    THEN o."license" ELSE ol."licenseKey" END AS "key"
+          FROM "Organization" o
+          LEFT JOIN "OrganizationLicense" ol ON ol."organizationId" = o."id"
+         WHERE o."id" = ${organizationId}
+           FOR SHARE OF o
+      )
+      INSERT INTO "OrganizationLicense"
+             ("organizationId", "licenseKey", "expiresAt", "validatedAt", "updatedAt")
+      SELECT "id", ${row.licenseKey}, ${row.expiresAt}, ${row.validatedAt},
+             GREATEST(clock_timestamp(), "columnUpdatedAt" + interval '1 millisecond')
+        FROM held
+       WHERE "key" IS NOT DISTINCT FROM ${replacing}
+      ON CONFLICT ("organizationId") DO UPDATE
+         SET "licenseKey" = EXCLUDED."licenseKey",
+             "expiresAt" = EXCLUDED."expiresAt",
+             "validatedAt" = EXCLUDED."validatedAt",
+             "updatedAt" = EXCLUDED."updatedAt"
+       WHERE (CASE WHEN (SELECT "columnUpdatedAt" FROM held) > "OrganizationLicense"."updatedAt"
+                   THEN (SELECT "columnKey" FROM held)
+                   ELSE "OrganizationLicense"."licenseKey" END) IS NOT DISTINCT FROM ${replacing}
+    `;
+    return written > 0;
   }
 
   async clearLicense({ organizationId }: Readonly<{ organizationId: string }>): Promise<void> {

@@ -48,8 +48,5 @@ export const sendResetPasswordEmail = async ({
   ...props
 }: ResetPasswordEmailProps & { mailer: MailSender }) => {
   const { subject, html } = await renderMailTemplate(resetPasswordEmailTemplate, props);
-  await sendEmail({
-    mailer,
-    content: { to: props.email, subject, html, template: resetPasswordEmailTemplate.id },
-  });
+  await sendEmail({ mailer, content: { to: props.email, subject, html } });
 };

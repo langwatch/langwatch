@@ -32,6 +32,11 @@ const reportUsageForMonthCommandDataSchemaDefinition = z.object({
   billableEvents: z.number().int().nonnegative().optional(),
   /** The month_counted event id the total came from; a k-sortable cursor, compared as a string. */
   countedEventId: z.string().optional(),
+  /**
+   * Set when gateway's confirmed spend dispatched the report, or on the one follow-up that
+   * report sends; absent on every other report (ADR-174 decision 20).
+   */
+  trigger: z.enum(["spend_confirmed", "spend_follow_up"]).optional(),
 });
 export interface ReportUsageForMonthCommandDataSchema extends Named<
   typeof reportUsageForMonthCommandDataSchemaDefinition

@@ -99,7 +99,7 @@ export class PrismaIssuedLicenseRepository implements IssuedLicenseRepository {
     rows: IssuedLicenseRecord[];
     total: number;
   }> {
-    const where = whereOf(query);
+    const where = whereOf({ ...query, replacedIds: await this.replacedIds(query) });
     const [rows, total] = await Promise.all([
       this.prisma.issuedLicense.findMany({
         where,
@@ -113,7 +113,19 @@ export class PrismaIssuedLicenseRepository implements IssuedLicenseRepository {
   }
 
   async countAll(query: IssuedLicenseQuery): Promise<number> {
-    return this.prisma.issuedLicense.count({ where: whereOf(query) });
+    return this.prisma.issuedLicense.count({
+      where: whereOf({ ...query, replacedIds: await this.replacedIds(query) }),
+    });
+  }
+
+  /** The rows an unrevoked row replaces, read only when the query keeps chain heads. */
+  private async replacedIds(query: IssuedLicenseQuery): Promise<string[]> {
+    if (!query.chainHeadsOnly) return [];
+    const replacements = await this.prisma.issuedLicense.findMany({
+      where: { replacesId: { not: null }, revokedAt: null },
+      select: { replacesId: true },
+    });
+    return replacements.flatMap(({ replacesId }) => (replacesId ? [replacesId] : []));
   }
 
   async update(id: string, data: IssuedLicensePatch): Promise<IssuedLicenseRecord> {
@@ -147,6 +159,86 @@ export class PrismaIssuedLicenseRepository implements IssuedLicenseRepository {
              "updatedAt" = now()
        WHERE "id" = ${id}
          AND "instanceId" IS NULL
+         AND "revokedAt" IS NULL
+    `;
+    return updated === 1;
+  }
+
+  async releaseVirtualKey({ virtualKeyId }: { virtualKeyId: string }): Promise<boolean> {
+    const updated = await this.prisma.$executeRaw`
+      ${skipTenantCheck({
+        // A managed key is addressed by its own id. The row names the organization it was
+        // issued to rather than belonging to one.
+        SKIP_TENANT_CHECK: true,
+      })}
+      UPDATE "IssuedLicense"
+         SET "virtualKeyId" = NULL,
+             "updatedAt" = now()
+       WHERE "virtualKeyId" = ${virtualKeyId}
+         AND "revokedAt" IS NULL
+    `;
+    return updated > 0;
+  }
+
+  async revokeHolding({
+    id,
+    virtualKeyId,
+    at,
+    revokedById,
+    revokedReason,
+  }: {
+    id: string;
+    virtualKeyId: string | null;
+    at: Instant;
+    revokedById: string;
+    revokedReason: string;
+  }): Promise<boolean> {
+    const updated = await this.prisma.$executeRaw`
+      ${skipTenantCheck({
+        // A license is addressed by its own primary key. The row names the organization it was
+        // issued to rather than belonging to one.
+        SKIP_TENANT_CHECK: true,
+      })}
+      UPDATE "IssuedLicense"
+         SET "revokedAt" = ${toDate(at)},
+             "revokedById" = ${revokedById},
+             "revokedReason" = ${revokedReason},
+             "pendingDeliveryLicense" = NULL,
+             "updatedAt" = now()
+       WHERE "id" = ${id}
+         AND "virtualKeyId" IS NOT DISTINCT FROM ${virtualKeyId}::text
+         AND "revokedAt" IS NULL
+    `;
+    return updated === 1;
+  }
+
+  async revokeUnbound({
+    id,
+    at,
+    revokedById,
+    revokedReason,
+  }: {
+    id: string;
+    at: Instant;
+    revokedById: string;
+    revokedReason: string;
+  }): Promise<boolean> {
+    // The same conditional shape as bindInstance, so the database lets one win.
+    const updated = await this.prisma.$executeRaw`
+      ${skipTenantCheck({
+        // A license is addressed by its own primary key. The row names the organization it was
+        // issued to rather than belonging to one.
+        SKIP_TENANT_CHECK: true,
+      })}
+      UPDATE "IssuedLicense"
+         SET "revokedAt" = ${toDate(at)},
+             "revokedById" = ${revokedById},
+             "revokedReason" = ${revokedReason},
+             "pendingDeliveryLicense" = NULL,
+             "updatedAt" = now()
+       WHERE "id" = ${id}
+         AND "instanceId" IS NULL
+         AND "revokedAt" IS NULL
     `;
     return updated === 1;
   }
@@ -245,9 +337,11 @@ function whereOf({
   search,
   status,
   emailSuffixes,
-}: IssuedLicenseQuery): Prisma.IssuedLicenseWhereInput {
+  replacedIds,
+}: IssuedLicenseQuery & { replacedIds: string[] }): Prisma.IssuedLicenseWhereInput {
   const term = search?.trim();
   const parts: Prisma.IssuedLicenseWhereInput[] = [];
+  if (replacedIds.length > 0) parts.push({ id: { notIn: replacedIds } });
   if (term) {
     parts.push({
       OR: [

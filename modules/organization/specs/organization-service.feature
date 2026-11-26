@@ -263,6 +263,19 @@ Feature: Shared organization service
     And clearing the licence empties the licence, its expiry and its validated stamp
     And setting or clearing a licence on an unknown organization refuses with organization not found
 
+  @integration
+  Scenario: The licence mirror writes only while licensing's row still holds the key
+    Given licensing's row holds key C
+    When a late fact for key B reaches the organization's licence mirror
+    Then the organization's licence column keeps its key
+    And with licensing's row holding B, the mirror writes B
+
+  @unit
+  Scenario: The memory licence mirror writes only while licensing holds the key
+    Given a memory organization whose licensing row holds key C
+    When a late fact for key B is written to the organization's licence column
+    Then the column keeps its key
+
   @unit
   Scenario: The memory organization store sets and clears a licence the same way
     Given a memory organization

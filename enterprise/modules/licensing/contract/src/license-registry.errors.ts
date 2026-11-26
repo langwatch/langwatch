@@ -96,6 +96,22 @@ export class LicenseAlreadyReissuedError extends HandledError {
   }
 }
 
+/**
+ * Retiring a key no install used, but an install bound the license since the
+ * operator looked. Its key keeps working; the replacement reaches it on sync.
+ */
+export class LicenseInUseError extends HandledError {
+  declare readonly code: "license_in_use";
+
+  constructor() {
+    super("license_in_use", "An install started using this license, so its key was not revoked", {
+      httpStatus: 409,
+      fault: "customer",
+    });
+    this.name = "LicenseInUseError";
+  }
+}
+
 /** An overage maximum was given while on-demand overage is off. */
 export class LicenseOverageMaxRequiresOverageError extends HandledError {
   declare readonly code: "license_overage_max_requires_overage";

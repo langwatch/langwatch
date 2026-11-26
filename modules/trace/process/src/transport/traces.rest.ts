@@ -248,6 +248,7 @@ async function searchTraces({
   const protections = await app.resolveApiKeyProtections({
     projectId: scope.id,
     principal: caller.principal,
+    authorization,
   });
 
   const { projection } = compileRequestedProjection({ from, select, protections });

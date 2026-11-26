@@ -269,8 +269,5 @@ export const sendPaymentRecoveryEmail = async ({
   ...props
 }: PaymentRecoveryEmailProps & { to: string; mailer: MailSender }) => {
   const { subject, html } = await renderMailTemplate(paymentRecoveryEmailTemplate, props);
-  await sendEmail({
-    mailer,
-    content: { to, subject, html, template: paymentRecoveryEmailTemplate.id },
-  });
+  await sendEmail({ mailer, content: { to, subject, html } });
 };
