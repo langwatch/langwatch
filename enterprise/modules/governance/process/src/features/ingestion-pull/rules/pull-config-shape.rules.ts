@@ -3,9 +3,15 @@
 import {
   ANTHROPIC_ADMIN_ADAPTER_ID,
   anthropicAdminPullConfigSchema,
+  ARD_REGISTRY_ADAPTER_ID,
+  ardRegistryPullConfigSchema,
+  AWS_BEDROCK_AGENTS_ADAPTER_ID,
+  awsBedrockAgentsPullConfigSchema,
   copilotStudioDataversePullConfigSchema,
   DATABRICKS_GENIE_ADAPTER_ID,
   databricksGeniePullConfigSchema,
+  GCP_VERTEX_AGENT_ENGINE_ADAPTER_ID,
+  gcpVertexAgentEnginePullConfigSchema,
   OPENAI_ADMIN_ADAPTER_ID,
   openaiAdminPullConfigSchema,
   SECURITY_LAKE_ADAPTER_ID,
@@ -25,6 +31,9 @@ const PULL_CONFIG_SCHEMAS: ReadonlyMap<string, z.ZodType> = new Map<string, z.Zo
   [ANTHROPIC_ADMIN_ADAPTER_ID, anthropicAdminPullConfigSchema],
   [OPENAI_ADMIN_ADAPTER_ID, openaiAdminPullConfigSchema],
   [SECURITY_LAKE_ADAPTER_ID, securityLakePullConfigSchema],
+  [AWS_BEDROCK_AGENTS_ADAPTER_ID, awsBedrockAgentsPullConfigSchema],
+  [GCP_VERTEX_AGENT_ENGINE_ADAPTER_ID, gcpVertexAgentEnginePullConfigSchema],
+  [ARD_REGISTRY_ADAPTER_ID, ardRegistryPullConfigSchema],
 ]);
 
 /** A bucket or queue read as the source, never with the worker's own AWS identity. */
@@ -63,6 +72,13 @@ const REQUIRED_CREDENTIALS: ReadonlyMap<string, RequiredCredentials> = new Map<
       ],
     },
   ],
+  [
+    GCP_VERTEX_AGENT_ENGINE_ADAPTER_ID,
+    {
+      group: "Service account: paste the service account key JSON",
+      fields: [["serviceAccountJson", "service account key"]],
+    },
+  ],
   [SECURITY_LAKE_ADAPTER_ID, AWS_KEY_PAIR],
   [S3_POLLING_ADAPTER_ID, AWS_KEY_PAIR],
   [OPENAI_COMPLIANCE_ADAPTER_ID, AWS_KEY_PAIR],
@@ -77,6 +93,11 @@ const FIELD_LABELS: Readonly<Record<string, string>> = {
   spaceIds: "Space IDs",
   warehouseId: "Warehouse ID",
   report: "Report",
+  awsConnectionId: "AWS connection",
+  regions: "Regions",
+  targets: "Projects and locations",
+  registryUrl: "Registry address",
+  searchUrl: "Search endpoint",
   bucketWidth: "Bucket width",
   startingAt: "Read history from",
   schedule: "Pull schedule",
@@ -106,6 +127,27 @@ export function findPullConfigComplaints(
     const label = typeof field === "string" ? (FIELD_LABELS[field] ?? field) : "Configuration";
     return `${label}: ${issue.message}`;
   });
+}
+
+/** The same complaints keyed by the configuration field each is about, for a form to place. */
+export function findPullConfigFieldErrors(
+  parserConfig: Record<string, unknown> | null | undefined,
+): Record<string, string[]> {
+  const adapter = parserConfig?.adapter;
+  if (typeof adapter !== "string") return {};
+  const schema = PULL_CONFIG_SCHEMAS.get(adapter);
+  if (!schema) return {};
+
+  const parsed = schema.safeParse(parserConfig);
+  if (parsed.success) return {};
+
+  const fieldErrors: Record<string, string[]> = {};
+  for (const issue of parsed.error.issues) {
+    const [field] = issue.path;
+    if (typeof field !== "string") continue;
+    (fieldErrors[field] ??= []).push(issue.message);
+  }
+  return fieldErrors;
 }
 
 /**

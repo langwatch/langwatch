@@ -1,6 +1,6 @@
-// Package waitforchecks blocks until every other check run on a commit has
-// finished, so the PR review spends tokens only on a change the separate
-// workflows (pr conventions, go-ci, code-scanners, ...) did not reject.
+// Package waitforchecks blocks until the checks a branch requires have
+// finished on a commit, so the PR review spends tokens only on a change that
+// can merge, and an optional workflow never holds the review's runner.
 //
 // Spec: specs/ci/pr-review-bot.feature
 package waitforchecks
@@ -30,7 +30,10 @@ type Waiter struct {
 	SHA        string
 	Token      string
 	// Exclude is the caller's own check run; waiting on it would deadlock.
-	Exclude  string
+	Exclude string
+	// Branch, when set, limits the wait to the status checks its rules require
+	// (check runs or commit statuses). Unset, or no rule found: every check.
+	Branch   string
 	HTTP     *http.Client
 	Interval time.Duration
 	Timeout  time.Duration
@@ -270,18 +273,146 @@ func timeoutError(timeout time.Duration, last summary, lastErr error) error {
 	return errors.New(msg)
 }
 
-// current reads the commit's check runs and keeps the newest run of each check.
+// current reads the commit's check runs and keeps the newest run of each check,
+// then, with a Branch, only the checks that branch requires.
 func (w Waiter) current(ctx context.Context) ([]checkRun, error) {
 	runs, err := w.list(ctx)
-	if err != nil || len(runs) == 0 {
+	if err != nil {
+		return nil, err
+	}
+	if len(runs) > 0 {
+		suiteWorkflow, err := w.workflows(ctx)
+		if err != nil {
+			return nil, err
+		}
+		runs = latest(runs, suiteWorkflow)
+	}
+	if w.Branch == "" {
+		return runs, nil
+	}
+	required, found, err := w.required(ctx)
+	if err != nil || !found {
 		return runs, err
 	}
-	suiteWorkflow, err := w.workflows(ctx)
+	statuses, err := w.statuses(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	return latest(runs, suiteWorkflow), nil
+	return requiredOnly(runs, statuses, required), nil
+}
+
+type rule struct {
+	Type       string `json:"type"`
+	Parameters struct {
+		RequiredStatusChecks []struct {
+			Context string `json:"context"`
+		} `json:"required_status_checks"`
+	} `json:"parameters"`
+}
+
+// required reads the status check names the rules on Branch require, minus
+// Exclude, in a stable order. found reports whether the rules require any
+// check at all, Exclude included: a branch that requires only the caller's
+// own check waits for nothing, not for every check.
+func (w Waiter) required(ctx context.Context) (names []string, found bool, err error) {
+	var rules []rule
+	endpoint := fmt.Sprintf("%s/repos/%s/rules/branches/%s?per_page=%d",
+		w.API, w.Repository, url.PathEscape(w.Branch), pageSize)
+	if err := w.get(ctx, endpoint, &rules); err != nil {
+		return nil, false, err
+	}
+	seen := map[string]bool{}
+	for _, r := range rules {
+		if r.Type != "required_status_checks" {
+			continue
+		}
+		for _, check := range r.Parameters.RequiredStatusChecks {
+			found = true
+			if check.Context != w.Exclude && !seen[check.Context] {
+				seen[check.Context] = true
+				names = append(names, check.Context)
+			}
+		}
+	}
+	sort.Strings(names)
+
+	return names, found, nil
+}
+
+type commitStatus struct {
+	Context string `json:"context"`
+	State   string `json:"state"`
+}
+
+type combinedStatus struct {
+	Statuses []commitStatus `json:"statuses"`
+}
+
+// statuses reads the newest commit status of each context on SHA.
+func (w Waiter) statuses(ctx context.Context) ([]commitStatus, error) {
+	var all []commitStatus
+	for page := 1; ; page++ {
+		var got combinedStatus
+		endpoint := fmt.Sprintf("%s/repos/%s/commits/%s/status?per_page=%d&page=%d",
+			w.API, w.Repository, url.PathEscape(w.SHA), pageSize, page)
+		if err := w.get(ctx, endpoint, &got); err != nil {
+			return nil, err
+		}
+		all = append(all, got.Statuses...)
+		if len(got.Statuses) < pageSize {
+			return all, nil
+		}
+	}
+}
+
+// requiredOnly keeps the check runs and commit statuses a required name
+// matches, as check runs, and adds a pending one for each required name that
+// has reported neither yet.
+func requiredOnly(runs []checkRun, statuses []commitStatus, required []string) []checkRun {
+	want := map[string]bool{}
+	for _, name := range required {
+		want[name] = true
+	}
+	kept := make([]checkRun, 0, len(required))
+	for _, run := range runs {
+		if want[run.Name] {
+			kept = append(kept, run)
+		}
+	}
+	for _, status := range statuses {
+		if want[status.Context] {
+			kept = append(kept, statusAsRun(status))
+		}
+	}
+
+	return append(kept, unreported(kept, required)...)
+}
+
+// statusAsRun reads a commit status as a check run: pending is in progress,
+// any other state is the conclusion.
+func statusAsRun(status commitStatus) checkRun {
+	if status.State == "pending" {
+		return checkRun{Name: status.Context, Status: "in_progress"}
+	}
+
+	return checkRun{Name: status.Context, Status: "completed", Conclusion: status.State}
+}
+
+// unreported is a queued run for each required name nothing in kept carries.
+func unreported(kept []checkRun, required []string) []checkRun {
+	reported := map[string]bool{}
+	for _, run := range kept {
+		reported[run.Name] = true
+	}
+	var missing []checkRun
+	for _, name := range required {
+		if !reported[name] {
+			missing = append(missing, checkRun{Name: name + " (not reported yet)", Status: "queued"})
+		}
+	}
+
+	return missing
 }
 
 // workflows reads every page of the commit's workflow runs and maps each

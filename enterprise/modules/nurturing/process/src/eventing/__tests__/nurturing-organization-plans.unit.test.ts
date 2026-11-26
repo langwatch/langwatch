@@ -49,6 +49,7 @@ import {
 } from "../../repositories/memory/memory.nurturing.repositories.ts";
 import type { NurturingPlanFoldState } from "../../rules/nurturing-organization-plan.rules.ts";
 import { memberCopyOf } from "../../services/__tests__/nurturing-member-facts.test-helpers.ts";
+import { peopleWithEmails } from "../../services/__tests__/nurturing-person-email.test-helpers.ts";
 import { NurturingDeliveryService } from "../../services/nurturing-delivery.service.ts";
 import { NurturingMemberFactsService } from "../../services/nurturing-member-facts.service.ts";
 import { NoCustomerIoChannelError } from "../../services/nurturing-plan-sync.service.ts";
@@ -130,6 +131,7 @@ const billingOwner = () =>
 async function recordingDelivery({ customerIo = true }: { customerIo?: boolean } = {}) {
   const sent: CioBatchCall[][] = [];
   const service = NurturingService.create({
+    users: peopleWithEmails(),
     channel: HttpCustomerIoChannel.create({
       config: { customerIoApiKey: "key", customerIoRegion: "us" },
       fetchFn: async (_url: string | URL | Request, init?: RequestInit) => {

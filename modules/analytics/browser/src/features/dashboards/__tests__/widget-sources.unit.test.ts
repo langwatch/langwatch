@@ -12,6 +12,7 @@ import {
   runSources,
   widgetCardFooter,
   widgetCardSourcesLine,
+  widgetProjectsLine,
   widgetSourcesLine,
 } from "../model/widget-sources.ts";
 
@@ -189,5 +190,38 @@ describe("cardLimitMessages", () => {
 
       expect(line).toBe("Sources: all sources");
     }
+  });
+});
+
+describe("widgetProjectsLine", () => {
+  const readable = [
+    { id: "shop", name: "Shop" },
+    { id: "ops", name: "Ops" },
+  ];
+  const stores = (projects?: string[]) => [{ projects }];
+
+  /** @scenario "A widget's card names its projects only where they differ from the board's" */
+  it("names no project where the widget reads what the board reads", () => {
+    for (const queries of [stores(), stores(["shop"])]) {
+      expect(widgetProjectsLine({ queries, boardProjectId: "shop", readable })).toBe("");
+    }
+  });
+
+  /** @scenario "A widget's card names its projects only where they differ from the board's" */
+  it("names the projects a widget reads beside or instead of the board's", () => {
+    const line = (projects: string[]) =>
+      widgetProjectsLine({ queries: stores(projects), boardProjectId: "shop", readable });
+
+    expect(line(["ops"])).toBe("Project: Ops");
+    expect(line(["shop", "ops"])).toBe("Projects: Shop, Ops");
+  });
+
+  /** @scenario "A widget's card names its projects only where they differ from the board's" */
+  it("on a board reading every project, names projects only where the query stores some", () => {
+    const line = (projects?: string[]) =>
+      widgetProjectsLine({ queries: stores(projects), boardProjectId: null, readable });
+
+    expect(line()).toBe("");
+    expect(line(["shop"])).toBe("Project: Shop");
   });
 });

@@ -6,6 +6,8 @@ export type MonitorPerformanceBucket = {
   scoreCount: number;
   passSum: number;
   passCount: number;
+  /** Results per label that day; empty for evaluators that only score or pass. */
+  labelCounts: Record<string, number>;
 };
 
 export type MonitorPerformanceBucketQuery = {

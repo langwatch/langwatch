@@ -1,8 +1,5 @@
 /**
- * An install that sets no LangWatchQL password still gets a working restricted identity: the
- * provisioning task derives both passwords from the key pepper and converges in `sql` mode.
- * The PostgreSQL reader role is server-wide, so its DDL is left out here; the advisory lock
- * still runs on a real PostgreSQL.
+ * An install with no LangWatchQL password derives both from the key pepper, in `sql` mode.
  * @see modules/analytics/specs/analytics-lwql-default-credentials.feature
  * @vitest-environment node
  */

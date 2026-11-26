@@ -243,8 +243,9 @@ func (o *Orchestrator) dropKeptStack(st domain.Stack) {
 	if !cur.PortlessDisabled {
 		o.removeStackRoutes(cur.Slug, cur.Services)
 	}
-	o.store.RemoveStack(cur.Slug)
+	// The plan goes first: a reader that sees the record gone also sees no plan to respawn.
 	removeKeeperPlan(cur.WorktreeDir, cur.Slug)
+	o.store.RemoveStack(cur.Slug)
 }
 
 // startHeartbeat runs heartbeat until the returned stop, which waits for it to

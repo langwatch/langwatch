@@ -80,6 +80,7 @@ import {
   filtersReadSpanType,
   type SpanAnalyticsFloor,
   TraceApi,
+  type ThreadTraceIds,
   type Trace,
   TRACE_FILTER_EXAMPLES,
 } from "@langwatch/trace-contract";
@@ -91,6 +92,7 @@ import { statementMightCallEvalFunction } from "../features/app-functions/rules/
 import { LangWatchQLHydrationComputeService } from "../features/hydration/services/langwatch-ql-hydration-compute.service.ts";
 import {
   LangWatchQLHydrationReadService,
+  type LangWatchQLThreadTraceIdsReadInput,
   type LangWatchQLThreadTraceReadInput,
   type LangWatchQLTraceReadInput,
   type LangWatchQLTraceSource,
@@ -106,8 +108,13 @@ import type {
 import { ClickHouseLangWatchQLExecutorRepository } from "../repositories/clickhouse/clickhouse.langwatch-ql-executor.repository.ts";
 import { LwqlKeyMapClickHouseRepository } from "../repositories/clickhouse/clickhouse.langwatch-ql-key-map.repository.ts";
 import { ClickHouseLangWatchQLProvisioningRepository } from "../repositories/clickhouse/clickhouse.langwatch-ql-provisioning.repository.ts";
+import { RoutedLangWatchQLExecutorRepository } from "../repositories/clickhouse/clickhouse.langwatch-ql-routed-executor.repository.ts";
+import type { LangWatchQLAccessModelAnswer } from "../repositories/langwatch-ql-access-model-answer.repository.ts";
 import type { LangWatchQLAppFunctionStoreRepository } from "../repositories/langwatch-ql-app-function-store.repository.ts";
-import type { LangWatchQLConnection } from "../repositories/langwatch-ql-executor.repository.ts";
+import type {
+  LangWatchQLConnection,
+  LangWatchQLRouter,
+} from "../repositories/langwatch-ql-executor.repository.ts";
 import {
   filterFieldRequiresKey,
   filterFieldRequiresSubkey,
@@ -128,6 +135,7 @@ import {
   type LwqlCredentials,
   resolveLwqlCredentials,
 } from "../rules/lwql-default-credentials.rules.ts";
+import { type LwqlPrivateReaderOf, privateReaderOf } from "../rules/lwql-private-reader.rules.ts";
 import { buildQueryReference } from "../rules/query-reference.rules.ts";
 import { LoggingAnalyticsTripwireService } from "../services/analytics-tripwire.service.ts";
 import { AnalyticsService as AnalyticsServiceClass } from "../services/analytics.service.ts";
@@ -144,6 +152,7 @@ import {
   type LangWatchQLPlacementTarget,
   LangWatchQLPlacementGateService,
 } from "../services/langwatch-ql-placement-gate.service.ts";
+import { LangWatchQLPrivateAccessModelProbeService } from "../services/langwatch-ql-private-access-model-probe.service.ts";
 import {
   LangWatchQLQueryScopeService,
   type LangWatchQLQueryScope,
@@ -311,6 +320,14 @@ function lwqlAccessModelProbe({
     statements: admin.statements,
   });
   return { configured: true, probeOwner: () => repository.probeOwner({ names }) };
+}
+
+/** The private servers' provisioning read: the organisation's derived reader, never an admin. */
+function lwqlPrivateAccessModelProbe({ router }: { router: LangWatchQLRouter | null }): {
+  probe(input: { projectIds: readonly string[] }): Promise<LangWatchQLAccessModelAnswer>;
+} {
+  if (!router) return { probe: () => Promise.resolve("not_provisioned") };
+  return LangWatchQLPrivateAccessModelProbeService.create({ router });
 }
 
 /** The server LangWatchQL queries, by origin, for the placement gate to compare (ADR-200). */
@@ -515,6 +532,14 @@ class TraceApiHydrationSource implements LangWatchQLTraceSource {
       maxTraces,
     });
   }
+
+  readThreadTraceIds({
+    projectId,
+    threadKeys,
+    maxTraces,
+  }: LangWatchQLThreadTraceIdsReadInput): Promise<readonly ThreadTraceIds[]> {
+    return this.traces.readThreadsTraceIds({ projectId, threadIds: [...threadKeys], maxTraces });
+  }
 }
 
 /**
@@ -633,12 +658,28 @@ export class AnalyticsModule
     const runTelemetry = LangWatchQLRunTelemetryService.create({
       queryHashKey: await queryHashKey(setup.secrets),
     });
+    const privateReader = await intoKeyPepper(
+      setup.secrets,
+      (keyPepper): LwqlPrivateReaderOf | null =>
+        keyPepper === void 0
+          ? null
+          : ({ organizationId }) => privateReaderOf({ keyPepper, organizationId }),
+    );
+    const router = connection
+      ? RoutedLangWatchQLExecutorRepository.create({
+          connection,
+          route: langWatchQl.routeTenantSet,
+          createExecutor: (input) => ClickHouseLangWatchQLExecutorRepository.create(input),
+          privateReader,
+        })
+      : null;
     const langWatchQL = LangWatchQLServiceClass.create({
-      executor: connection ? ClickHouseLangWatchQLExecutorRepository.create({ connection }) : null,
+      executor: router,
       placement: LangWatchQLPlacementGateService.create({
         placement: setup.repositories.lwqlPlacement,
         target: lwqlTargetOf({ connection }),
         accessModel: lwqlAccessModelProbe({ admin, connection }),
+        privateAccessModel: lwqlPrivateAccessModelProbe({ router }),
         answers: setup.repositories.lwqlAccessModelAnswer,
       }),
       database: connection?.database ?? DEFAULT_LWQL_DATABASE,
@@ -1043,7 +1084,6 @@ export class AnalyticsModule
     return buildQueryReference({
       protections: input.protections,
       lwqlEnabled: input.canRunLangWatchQL,
-      database,
       schema: input.canRunLangWatchQL
         ? await input.schema()
         : { database, functions: [], views: [], appFunctions: [] },
@@ -1190,6 +1230,12 @@ export class AnalyticsModule
 
   validateLangWatchQL(input: LangWatchQLValidationInput): LangWatchQLAcceptedStatement {
     return this.#dependencies.langWatchQL.validate(input);
+  }
+
+  validateLangWatchQLForRun(
+    input: LangWatchQLValidationInput,
+  ): Promise<LangWatchQLAcceptedStatement> {
+    return this.#dependencies.langWatchQL.validateForRun(input);
   }
 
   /** Where span_metrics' history starts, from trace's span_analytics replay (ADR-006). */

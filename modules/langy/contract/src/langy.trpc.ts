@@ -12,6 +12,12 @@ import {
   langyLocalWorkspaceStatusSchema,
 } from "./features/local-control/langy.local-control-http.ts";
 import {
+  langyAttachmentConfirmInputSchema,
+  langyAttachmentSchema,
+  langyAttachmentUploadInputSchema,
+  langyAttachmentUploadSchema,
+} from "./langy-attachments.ts";
+import {
   langyAnswerLocalPermissionInputSchema,
   langyAnswerQuestionInputSchema,
   langyClaimUiActionInputSchema,
@@ -87,6 +93,15 @@ export const langyTrpc = defineTrpcContract("langy")
   .mutation("deleteConversation")
   .withInput(langyPanelConversationInputSchema)
   .withOutput(langyConversationDeletedSchema)
+
+  /** An image for the next message: a signed URL to PUT it to (ADR-158). */
+  .mutation("createAttachmentUpload")
+  .withInput(langyAttachmentUploadInputSchema)
+  .withOutput(langyAttachmentUploadSchema)
+
+  .mutation("confirmAttachmentUpload")
+  .withInput(langyAttachmentConfirmInputSchema)
+  .withOutput(langyAttachmentSchema)
 
   .mutation("renameConversation")
   .withInput(langyRenameInputSchema)

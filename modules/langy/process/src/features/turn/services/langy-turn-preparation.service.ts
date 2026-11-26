@@ -1,4 +1,5 @@
 import {
+  type LangyAttachmentRef,
   LANGY_CONVERSATION_STATUS,
   LangyAgentUnavailableError,
   LangyModelNotAllowedError,
@@ -38,6 +39,8 @@ import {
 const LANGY_TURN_SHARED = LangyTurnSharedService.create();
 
 const logger = createLogger("langwatch:langy:turn-start");
+
+type PrepareArgs = Parameters<LangyTurnPreparationService["prepareAndDispatch"]>[0];
 
 export class LangyTurnPreparationService {
   private readonly override: LangyTurnOverrideService;
@@ -82,6 +85,11 @@ export class LangyTurnPreparationService {
     turnId: string;
     attempt: LangyTurnAttemptService;
   }): Promise<{ conversationId: string; turnId: string }> {
+    const imageRefs =
+      (await this.deps.attachments?.assertSendable({
+        projectId: args.projectId,
+        parts: args.lastUserMessage?.parts,
+      })) ?? [];
     const mintedRunToken = args.conversation.isNew ? mintRunToken() : null;
     // Started before the probe so the probe can carry it: the disabled skills are
     // part of the worker signature. Never rejects (a flag error reads as gated off).
@@ -103,28 +111,21 @@ export class LangyTurnPreparationService {
     const lateProbe = () => earlyWorkerProbe ?? this.probeWorker(args, disabledSkills);
     await this.ensureWorkerAccess(args, lateProbe);
     const prepared = this.buildPreparedTurn(args, results, capReachedNote);
-    await this.stashPreparedTurn({ args, prepared, runToken });
+    await this.stashPreparedTurn({ args, prepared, runToken, imageRefs });
     await this.acceptPreparedTurn(args, prepared, mintedRunToken);
-    await this.dispatchPreparedTurn(args, prepared, runToken);
+    await this.dispatchPreparedTurn({ args, prepared, runToken, imageRefs });
     this.deps.metrics.count({ outcome: "accepted" });
 
     return { conversationId: args.conversation.id, turnId: args.turnId };
   }
 
-  private readPreparation(
-    args: Parameters<LangyTurnPreparationService["prepareAndDispatch"]>[0],
-    mintedRunToken: string | null,
-  ) {
+  private readPreparation(args: PrepareArgs, mintedRunToken: string | null) {
     const { conversation, projectId, userId, credentials } = args;
 
     return Promise.allSettled([
       conversation.isNew
         ? Promise.resolve(null)
-        : this.deps.conversations.findByIdVisible({
-            id: conversation.id,
-            projectId,
-            userId,
-          }),
+        : this.deps.conversations.findByIdVisible({ id: conversation.id, projectId, userId }),
       conversation.isNew
         ? Promise.resolve(null)
         : this.deps.conversations.findPendingHandoff({
@@ -133,20 +134,14 @@ export class LangyTurnPreparationService {
           }),
       mintedRunToken
         ? Promise.resolve(mintedRunToken)
-        : this.deps.conversations.findRunToken({
-            projectId,
-            conversationId: conversation.id,
-          }),
+        : this.deps.conversations.findRunToken({ projectId, conversationId: conversation.id }),
       this.deps.credentials.findModelsAllowed({
         projectId,
         organizationId: credentials.organizationId,
       }),
       conversation.isNew || !this.deps.messages
         ? Promise.resolve<LangyMessageRow[]>([])
-        : this.deps.messages.findAllByConversation({
-            conversationId: conversation.id,
-            projectId,
-          }),
+        : this.deps.messages.findAllByConversation({ conversationId: conversation.id, projectId }),
       this.override.resolve(),
       // The live UI-action channel is flagged (`release_langy_ui_actions`), and the turn block
       // may only advertise it while the dispatch route would answer.
@@ -160,7 +155,7 @@ export class LangyTurnPreparationService {
 
   /** A RUNNING read for a turn whose live edge already ended waits for its fold. */
   private async settleEndedTurnFold(
-    args: Parameters<LangyTurnPreparationService["prepareAndDispatch"]>[0],
+    args: PrepareArgs,
     results: Awaited<ReturnType<LangyTurnPreparationService["readPreparation"]>>,
   ): Promise<Awaited<ReturnType<LangyTurnPreparationService["readPreparation"]>>> {
     const [current, ...rest] = results;
@@ -177,7 +172,7 @@ export class LangyTurnPreparationService {
   }
 
   private requireRunnableTurn(
-    args: Parameters<LangyTurnPreparationService["prepareAndDispatch"]>[0],
+    args: PrepareArgs,
     [currentResult, , runTokenResult, modelsAllowedResult]: Awaited<
       ReturnType<LangyTurnPreparationService["readPreparation"]>
     >,
@@ -231,9 +226,7 @@ export class LangyTurnPreparationService {
   }
 
   /** Reads today's opened pull requests; only one that opened counts (the PR count subscriber). */
-  private async checkPrCap(
-    args: Parameters<LangyTurnPreparationService["prepareAndDispatch"]>[0],
-  ): Promise<string> {
+  private async checkPrCap(args: PrepareArgs): Promise<string> {
     if (!args.credentials.githubToken) return "";
     const permit = await this.deps.permits.check({ userId: args.userId });
     if (permit.allowed) return "";
@@ -242,7 +235,7 @@ export class LangyTurnPreparationService {
   }
 
   private async probeWorker(
-    args: Parameters<LangyTurnPreparationService["prepareAndDispatch"]>[0],
+    args: PrepareArgs,
     disabledSkillIds: Promise<string[]> | string[],
   ): Promise<boolean> {
     return args.worker.probe(
@@ -257,10 +250,7 @@ export class LangyTurnPreparationService {
     );
   }
 
-  private async ensureWorkerAccess(
-    args: Parameters<LangyTurnPreparationService["prepareAndDispatch"]>[0],
-    probeWorker: () => Promise<boolean>,
-  ) {
+  private async ensureWorkerAccess(args: PrepareArgs, probeWorker: () => Promise<boolean>) {
     // A read-only turn never borrows a running worker's key, which may hold writes.
     if (!args.readOnly && (await probeWorker())) return;
 
@@ -277,7 +267,7 @@ export class LangyTurnPreparationService {
   }
 
   private buildPreparedTurn(
-    args: Parameters<LangyTurnPreparationService["prepareAndDispatch"]>[0],
+    args: PrepareArgs,
     [, handoffResult, , , memoryResult, overrideResult, uiActionsOpenResult]: Awaited<
       ReturnType<LangyTurnPreparationService["readPreparation"]>
     >,
@@ -349,10 +339,12 @@ export class LangyTurnPreparationService {
     args,
     prepared,
     runToken,
+    imageRefs,
   }: {
-    args: Parameters<LangyTurnPreparationService["prepareAndDispatch"]>[0];
+    args: PrepareArgs;
     prepared: ReturnType<LangyTurnPreparationService["buildPreparedTurn"]>;
     runToken: string;
+    imageRefs: readonly LangyAttachmentRef[];
   }) {
     try {
       await Promise.all([
@@ -375,6 +367,7 @@ export class LangyTurnPreparationService {
           runToken,
           permitReserved: false,
           ...(prepared.pendingHandoff ? { resumeToken: prepared.pendingHandoff.token } : {}),
+          ...(imageRefs.length > 0 ? { imageRefs: [...imageRefs] } : {}),
         }),
       ]);
     } catch (error) {
@@ -393,7 +386,7 @@ export class LangyTurnPreparationService {
   }
 
   private async acceptPreparedTurn(
-    args: Parameters<LangyTurnPreparationService["prepareAndDispatch"]>[0],
+    args: PrepareArgs,
     prepared: ReturnType<LangyTurnPreparationService["buildPreparedTurn"]>,
     mintedRunToken: string | null,
   ) {
@@ -449,14 +442,18 @@ export class LangyTurnPreparationService {
     }
   }
 
-  private async dispatchPreparedTurn(
-    args: Parameters<LangyTurnPreparationService["prepareAndDispatch"]>[0],
-    prepared: ReturnType<LangyTurnPreparationService["buildPreparedTurn"]>,
-    runToken: string,
-  ) {
-    if (!(await args.attempt.commit())) {
-      return;
-    }
+  private async dispatchPreparedTurn({
+    args,
+    prepared,
+    runToken,
+    imageRefs,
+  }: {
+    args: PrepareArgs;
+    prepared: ReturnType<LangyTurnPreparationService["buildPreparedTurn"]>;
+    runToken: string;
+    imageRefs: readonly LangyAttachmentRef[];
+  }) {
+    if (!(await args.attempt.commit())) return;
 
     void args.worker
       .dispatch({
@@ -475,6 +472,7 @@ export class LangyTurnPreparationService {
         credentials: args.credentials,
         modelOverride: args.turnModel,
         ...(prepared.pendingHandoff ? { resumeToken: prepared.pendingHandoff.token } : {}),
+        ...(imageRefs.length > 0 ? { imageRefs } : {}),
       })
       .then((outcome) => {
         if (outcome !== "accepted") {

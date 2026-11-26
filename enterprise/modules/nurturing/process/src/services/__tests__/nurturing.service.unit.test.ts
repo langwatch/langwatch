@@ -1,8 +1,11 @@
 import type { CioBatchCall } from "@langwatch/enterprise-nurturing-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import type { UserApi } from "@langwatch/user-contract";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { HttpCustomerIoChannel } from "../../channels/http/http.customer-io.channel.ts";
 import { NurturingService } from "../nurturing.service.ts";
+import { peopleWithEmails } from "./nurturing-person-email.test-helpers.ts";
 
 // Suppress logger output and captureException in tests
 vi.mock("@langwatch/observability", () => ({
@@ -30,10 +33,15 @@ function createService({
   apiKey = "test-api-key",
   region = "us" as "us" | "eu",
   fetchFn = createMockFetch(),
+  emails = {} as Readonly<Record<string, string | null>>,
+  reads = [] as string[][],
+  users = peopleWithEmails({ emails, reads }),
 } = {}) {
   const errorReporter = FakeErrorReporter.create();
   return {
+    reads,
     service: NurturingService.create({
+      users,
       channel: HttpCustomerIoChannel.create({
         config: { customerIoApiKey: apiKey, customerIoRegion: region },
         fetchFn,
@@ -68,7 +76,7 @@ describe("NurturingService", () => {
       });
 
       it("includes user ID and traits in the request body", async () => {
-        const { service, fetchFn } = createService();
+        const { service, fetchFn } = createService({ emails: { "user-123": "test@example.com" } });
 
         await service.identifyUser({
           userId: "user-123",
@@ -105,7 +113,8 @@ describe("NurturingService", () => {
   describe("trackEvent()", () => {
     describe("when called with user ID, event name, and properties", () => {
       /** @scenario 'Track call sends event payload to Customer.io' */
-      it("sends event payload to the track endpoint", async () => {
+      /** @scenario "A Customer.io track goes behind an identify that carries the person's email" */
+      it("sends the identify with the person's email in its own batch, then the track", async () => {
         const { service, fetchFn } = createService();
 
         await service.trackEvent({
@@ -116,17 +125,80 @@ describe("NurturingService", () => {
           },
         });
 
-        expect(fetchFn).toHaveBeenCalledTimes(1);
+        expect(fetchFn).toHaveBeenCalledTimes(2);
         const [url, options] = fetchFn.mock.calls[0]!;
-        expect(url).toBe("https://cdp.customer.io/v1/track");
+        expect(url).toBe("https://cdp.customer.io/v1/batch");
         expect(options.method).toBe("POST");
 
-        const body = JSON.parse(options.body);
-        expect(body).toEqual({
-          userId: "user-123",
-          event: "signed_up",
-          properties: { role: "engineer" },
+        expect(JSON.parse(fetchFn.mock.calls[0]![1].body)).toEqual({
+          batch: [
+            { type: "identify", userId: "user-123", traits: { email: "user-123@example.com" } },
+          ],
         });
+        expect(JSON.parse(fetchFn.mock.calls[1]![1].body)).toEqual({
+          batch: [
+            {
+              type: "track",
+              userId: "user-123",
+              event: "signed_up",
+              properties: { role: "engineer" },
+            },
+          ],
+        });
+      });
+
+      /** @scenario "A Customer.io track is held back when its identify is not taken" */
+      it("sends no track when the identify is not taken, and does not reject", async () => {
+        const { service, fetchFn } = createService({
+          fetchFn: createMockFetch({ ok: false, status: 500 }),
+        });
+
+        await expect(
+          service.trackEvent({ userId: "user-123", event: "signed_up" }),
+        ).resolves.toBeUndefined();
+
+        expect(fetchFn).toHaveBeenCalledTimes(1);
+        expect(
+          JSON.parse(fetchFn.mock.calls[0]![1].body).batch.map((c: { type: string }) => c.type),
+        ).toEqual(["identify"]);
+      });
+    });
+
+    describe("when the person has no email", () => {
+      /** @scenario "A Customer.io track goes behind an identify that carries the person's email" */
+      it("sends nothing, so no profile is created without one", async () => {
+        const { service, fetchFn } = createService({ emails: { "user-123": null } });
+
+        await service.trackEvent({ userId: "user-123", event: "signed_up" });
+
+        expect(fetchFn).not.toHaveBeenCalled();
+      });
+    });
+  });
+
+  describe("given a person nurturing identifies", () => {
+    describe("when the user module holds their email", () => {
+      /** @scenario "Every Customer.io identify carries the person's email, or is not sent" */
+      it("sends the identify with the email read fresh", async () => {
+        const { service, fetchFn } = createService({ emails: { "user-1": "jane@example.com" } });
+
+        await service.identifyUser({ userId: "user-1", traits: { has_traces: true } });
+
+        expect(JSON.parse(fetchFn.mock.calls[0]![1].body)).toEqual({
+          userId: "user-1",
+          traits: { has_traces: true, email: "jane@example.com" },
+        });
+      });
+    });
+
+    describe("when the person has no email, or the user module does not know them", () => {
+      /** @scenario "Every Customer.io identify carries the person's email, or is not sent" */
+      it("sends no identify", async () => {
+        const { service, fetchFn } = createService({ emails: { "user-1": null } });
+
+        await service.identifyUser({ userId: "user-1", traits: { has_traces: true } });
+
+        expect(fetchFn).not.toHaveBeenCalled();
       });
     });
   });
@@ -164,8 +236,8 @@ describe("NurturingService", () => {
   describe("batch()", () => {
     describe("when called with multiple identify and track calls", () => {
       /** @scenario 'Batch call combines multiple operations into a single request' */
-      it("sends a single HTTP request to the batch endpoint containing all calls", async () => {
-        const { service, fetchFn } = createService();
+      it("sends the identifies in one batch first, then the track and group in a second", async () => {
+        const { service, fetchFn } = createService({ emails: { "user-1": "a@b.com" } });
 
         const calls: CioBatchCall[] = [
           {
@@ -189,19 +261,16 @@ describe("NurturingService", () => {
 
         await service.batch(calls);
 
-        expect(fetchFn).toHaveBeenCalledTimes(1);
+        expect(fetchFn).toHaveBeenCalledTimes(2);
         const [url, options] = fetchFn.mock.calls[0]!;
         expect(url).toBe("https://cdp.customer.io/v1/batch");
         expect(options.method).toBe("POST");
 
-        const body = JSON.parse(options.body);
-        expect(body).toEqual({
+        expect(JSON.parse(fetchFn.mock.calls[0]![1].body)).toEqual({
+          batch: [{ type: "identify", userId: "user-1", traits: { email: "a@b.com" } }],
+        });
+        expect(JSON.parse(fetchFn.mock.calls[1]![1].body)).toEqual({
           batch: [
-            {
-              type: "identify",
-              userId: "user-1",
-              traits: { email: "a@b.com" },
-            },
             {
               type: "track",
               userId: "user-1",
@@ -217,6 +286,43 @@ describe("NurturingService", () => {
           ],
         });
       });
+    });
+  });
+
+  describe("when batch() identifies several people", () => {
+    /** @scenario "Every Customer.io identify carries the person's email, or is not sent" */
+    it("reads every address in one query and drops the person with none", async () => {
+      const { service, fetchFn, reads } = createService({ emails: { "user-2": null } });
+
+      await service.batch([
+        { type: "identify", userId: "user-1", traits: { has_traces: true } },
+        { type: "identify", userId: "user-2", traits: { has_traces: true } },
+        { type: "identify", userId: "user-3", traits: { has_traces: true } },
+      ]);
+
+      expect(reads).toEqual([["user-1", "user-2", "user-3"]]);
+      expect(JSON.parse(fetchFn.mock.calls[0]![1].body)).toEqual({
+        batch: [
+          {
+            type: "identify",
+            userId: "user-1",
+            traits: { has_traces: true, email: "user-1@example.com" },
+          },
+          {
+            type: "identify",
+            userId: "user-3",
+            traits: { has_traces: true, email: "user-3@example.com" },
+          },
+        ],
+      });
+    });
+
+    it("sends no request when no one in it has an email", async () => {
+      const { service, fetchFn } = createService({ emails: { "user-1": null } });
+
+      await service.batchOrThrow([{ type: "identify", userId: "user-1", traits: {} }]);
+
+      expect(fetchFn).not.toHaveBeenCalled();
     });
   });
 
@@ -236,6 +342,7 @@ describe("NurturingService", () => {
       });
 
       const service = NurturingService.create({
+        users: peopleWithEmails(),
         channel: HttpCustomerIoChannel.create({
           config: { customerIoApiKey: "key", customerIoRegion: "us" },
           fetchFn: slowFetch,
@@ -249,7 +356,7 @@ describe("NurturingService", () => {
         userId: "user-1",
         traits: { email: "a@b.com" },
       });
-      vi.advanceTimersByTime(10_000);
+      await vi.advanceTimersByTimeAsync(10_000);
       await promise;
       vi.useRealTimers();
 
@@ -291,6 +398,7 @@ describe("NurturingService", () => {
     it("defaults to the EU regional endpoint", async () => {
       const fetchFn = createMockFetch();
       const service = NurturingService.create({
+        users: peopleWithEmails(),
         channel: HttpCustomerIoChannel.create({
           config: { customerIoApiKey: "key", customerIoRegion: undefined },
           fetchFn,
@@ -303,10 +411,82 @@ describe("NurturingService", () => {
     });
   });
 
+  describe("given the user module fails the address read", () => {
+    const readFailure = new Error("user module unavailable");
+    const failingUsers = () =>
+      createApiFixture<UserApi>({
+        getProfiles: async () => {
+          throw readFailure;
+        },
+      });
+
+    describe("when a fire-and-forget call is sent", () => {
+      /** @scenario "Every Customer.io identify carries the person's email, or is not sent" */
+      it("resolves and sends nothing", async () => {
+        const { service, fetchFn } = createService({ users: failingUsers() });
+
+        await expect(
+          service.identifyUser({ userId: "user-1", traits: { has_traces: true } }),
+        ).resolves.toBeUndefined();
+        await expect(
+          service.trackEvent({ userId: "user-1", event: "signed_up" }),
+        ).resolves.toBeUndefined();
+        await expect(
+          service.batch([{ type: "identify", userId: "user-1", traits: {} }]),
+        ).resolves.toBeUndefined();
+
+        expect(fetchFn).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("when an OrThrow call is sent", () => {
+      /** @scenario "A Customer.io track is held back when its identify is not taken" */
+      it("rejects with the failure and sends no track when the identify is not taken", async () => {
+        const fetchFn = createMockFetch({ ok: false, status: 500 });
+        const { service } = createService({ fetchFn });
+
+        await expect(
+          service.trackEventOrThrow({ userId: "user-123", event: "joined_organization" }),
+        ).rejects.toThrow("HTTP 500");
+
+        expect(fetchFn).toHaveBeenCalledTimes(1);
+        expect(
+          JSON.parse(fetchFn.mock.calls[0]![1].body).batch.map((c: { type: string }) => c.type),
+        ).toEqual(["identify"]);
+      });
+
+      it("rejects with the failure and sends nothing, so a claiming caller retries", async () => {
+        const { service, fetchFn } = createService({ users: failingUsers() });
+
+        await expect(
+          service.batchOrThrow([{ type: "identify", userId: "user-1", traits: {} }]),
+        ).rejects.toBe(readFailure);
+        await expect(
+          service.trackEventOrThrow({ userId: "user-1", event: "joined_organization" }),
+        ).rejects.toBe(readFailure);
+
+        expect(fetchFn).not.toHaveBeenCalled();
+      });
+    });
+  });
+
+  describe("given a channel with no API key", () => {
+    it("reads no address, since nothing would be sent", async () => {
+      const { service, fetchFn, reads } = createService({ apiKey: "" });
+
+      await service.identifyUser({ userId: "user-1", traits: { has_traces: true } });
+      await service.batchOrThrow([{ type: "track", userId: "user-1", event: "signed_up" }]);
+
+      expect(reads).toEqual([]);
+      expect(fetchFn).not.toHaveBeenCalled();
+    });
+  });
+
   describe("when created with a falsy API key", () => {
     it("behaves as a no-op without making HTTP requests", async () => {
       const fetchFn = createMockFetch();
       const service = NurturingService.create({
+        users: peopleWithEmails(),
         channel: HttpCustomerIoChannel.create({
           config: { customerIoApiKey: undefined, customerIoRegion: "us" },
           fetchFn,

@@ -408,11 +408,32 @@ Feature: Organization-wide Dashboards area
     And a LangWatchQL REST run with projects "all" binds no governance project, as before
     # Evidence: screenshots, signed in as each member, of the board's chart for K1 next to K1's Gateway Usage page (same period, same figure); of the hostile "count() FROM traces" chart; of the keyless member's chart; of my chart with M1 and without P1; and of the admin's chart without P1 and M1. The run response for each, showing params.dashboard_context_projects without the governance id.
 
+  # Owner, 2026-11-25: the board says whose data it shows, so a card names its projects only
+  # where they differ from the board's.
+  @unit @integration
+  Scenario: A widget's card names its projects only where they differ from the board's
+    Given a board reading "Shop"
+    When a widget's query stores no projects, or stores "Shop" alone
+    Then its card line names no project
+    When a widget's query stores "Ops", or "Shop" then "Ops"
+    Then its card line reads "Project: Ops", or "Projects: Shop, Ops"
+    And on a Gateway or Governance board, which reads every project, a card names projects only where its query stores some
+    # Evidence: haven browser screenshots of a board in "/shop/dashboards" with no card project
+    # line, and of a board at "/dashboards/<id>" where only the widget reading "Ops" names it
+
+  @integration
+  Scenario: A board in a project's own Dashboards names only other projects on its cards
+    Given a board opened at "/shop/dashboards/<id>" whose widgets store no projects
+    Then no card line names "Shop"
+    When a widget there stores "Ops" in its query's projects
+    Then that card alone reads "Project: Ops"
+    # Evidence: a haven browser screenshot of the board's cards
+
   @unit @integration @unimplemented
   Scenario: The project view of the same board is filtered to that project
     Given the same Organization board
     When I pick "Shop" in its chip, or open "/shop/dashboards/<id>"
-    Then it is the same board and the run reads "Shop" alone, with the card line "Project: Shop"
+    Then it is the same board and the run reads "Shop" alone, with no project on the card line
     And a widget that stores its own projects reads those projects in both views
     # Evidence: the run's params in both views, and two screenshots
 
@@ -646,6 +667,34 @@ Feature: Organization-wide Dashboards area
     Then no board is made and the library is unchanged
     # Evidence: screenshot of the disabled button, and the library before and after
 
+  # Owner, 2026-11-25: Project silently meant the last-used project, with no way to pick another.
+  @integration
+  Scenario: In the library, a Project board's project is picked under Project
+    Given I may create dashboards in "Shop" and "Ops", and "Shop" is my last-used project
+    When I press "New dashboard" in the library and Project is picked
+    Then a project picker under Project shows "Shop" and offers "Ops" and "Shop"
+    When I pick "Ops"
+    Then Project reads "Everyone in Ops"
+    When I create it
+    Then it opens unsaved in "Ops", and its first edit stores it in "Ops" at scope Project
+    When I pick Organization or Only me instead
+    Then no project picker is shown
+    # Evidence: a haven browser screenshot of the dialog with the picker open, and the quoted create
+
+  @integration
+  Scenario: A board is never stored in another member's personal project
+    Given I am an admin who may create dashboards in "Shop", in my own personal project and in another member's personal project
+    When the places to store a new board are listed for me
+    Then they offer "Shop" and my own personal project
+    And they never offer the other member's personal project
+
+  @integration
+  Scenario: A product's "+" inside a project offers no project picker
+    Given I am in "Shop"
+    When I press "+" in the LLM Ops sidebar's Dashboards section
+    Then Project reads "Everyone in Shop" and no project picker is shown
+    # Evidence: a haven browser screenshot of the dialog
+
   @unit @integration
   Scenario: A board outside LLM Ops cannot be Project
     When "boards.create" names home Gateway, or "boards.createAtScope" names home Governance and scope Project
@@ -809,13 +858,14 @@ Feature: Organization-wide Dashboards area
     And every Dashboards row has the height, padding, text style and colours of the sidebar's own entries
     # Evidence: screenshots of the open board's row beside "Agent Testing", light and dark
 
+  # Owner, 2026-11-25: "I find it weird this 'Browse templates' ... how is it different than
+  # 'start from a template'?". A new board is where the templates are.
   @integration
-  Scenario: The LLM Ops section ends with Browse templates
-    When I am in a product in "Shop"
-    Then the last row of its Dashboards section is "Browse templates", which opens "/shop/dashboards/templates"
-    And the Gateway, Coding agents and Governance sections have no "Browse templates", because every template reads LLM Ops data
-    # Evidence: screenshot of the section and the address after the click
-
+  Scenario: The Dashboards section has no templates entry
+    When I am in any product in "Shop"
+    Then its Dashboards section has no "Browse templates" row
+    And in LLM Ops a new board from its "+" shows every template until it has a widget
+    # Evidence: screenshot of the section
   @integration @unimplemented
   Scenario: A long sidebar scrolls with a fade, and its footer stays put
     Given more boards than the window can show
@@ -842,8 +892,8 @@ Feature: Organization-wide Dashboards area
   Scenario: Only an empty LLM Ops board offers templates
     Given an empty LLM Ops board in "Shop" and an empty Gateway board
     When I open the "Shop" board at "/shop/dashboards/<id>", or at "/dashboards/<id>" as its sidebar row does
-    Then at either address its "Or start from a template" lists the From LangWatch boards and "View all templates" opens "/shop/dashboards/templates"
-    And the Gateway board shows no "Or start from a template" and no "View all templates" at either address, as no Coding agents or Governance board does
+    Then at either address its "Or start from a template" lists every template, as "/shop/dashboards/templates" does
+    And the Gateway board shows no "Or start from a template" at either address, as no Coding agents or Governance board does
     And each still shows its ask bar, its suggested questions and its header's "Add a widget"
     # Evidence: a screenshot of each empty board, the LLM Ops one at both addresses
 

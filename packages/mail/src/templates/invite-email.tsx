@@ -104,8 +104,5 @@ export const sendInviteEmail = async ({
   ...props
 }: InviteEmailProps & { mailer: MailSender }) => {
   const { subject, html } = await renderMailTemplate(inviteEmailTemplate, props);
-  await sendEmail({
-    mailer,
-    content: { to: props.email, subject, html, template: inviteEmailTemplate.id },
-  });
+  await sendEmail({ mailer, content: { to: props.email, subject, html } });
 };

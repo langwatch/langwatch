@@ -601,8 +601,8 @@ func (o *Orchestrator) Up(ctx context.Context, p UpParams, opts PlanOptions) err
 	defer func() {
 		stopBeat()
 		if !isHandedOver {
-			cleanup()
 			removeKeeperPlan(st.WorktreeDir, st.Slug)
+			cleanup()
 		}
 	}()
 	endRegistration()
@@ -932,8 +932,8 @@ func (o *Orchestrator) reconcileRunningStack(p UpParams, opts PlanOptions) (proc
 		if !st.PortlessDisabled {
 			o.removeStackRoutes(slug, st.Services)
 		}
-		o.store.RemoveStack(slug)
 		removeKeeperPlan(st.WorktreeDir, slug) // a dead keeper's plan must not be respawned from
+		o.store.RemoveStack(slug)
 		return true, nil
 	}
 	// Everything that makes the running stack differ from what was asked for.
@@ -1077,11 +1077,11 @@ func (o *Orchestrator) Down(ctx context.Context, p UpParams, force bool) error {
 		o.removeStackRoutes(slug, st.Services)
 	}
 	o.stopNxDaemon(ctx, p.WorktreeDir)
-	o.store.RemoveStack(slug)
 	if ok {
 		removeKeeperPlan(st.WorktreeDir, slug)
 	}
 	removeKeeperPlan(p.WorktreeDir, slug)
+	o.store.RemoveStack(slug)
 	fmt.Printf("stack %q torn down (databases kept — `haven db reset` for fresh ones)\n", slug)
 	o.keepProxyForOtherStacks()
 	o.stopColimaIfIdle(ctx)

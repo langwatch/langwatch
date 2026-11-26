@@ -36,7 +36,6 @@ import {
   USER_AGGREGATE_TYPE,
   USER_ERASED_EVENT_TYPE,
   USER_LIFECYCLE_EVENT_VERSION,
-  type UserApi,
 } from "@langwatch/user-contract";
 import { beforeEach, describe, expect, it } from "vitest";
 
@@ -46,6 +45,7 @@ import { MemoryNurturingVirtualKeyRepository } from "../../repositories/memory/m
 import { MemoryNurturingRepositories } from "../../repositories/memory/memory.nurturing.repositories.ts";
 import type { NurturingVirtualKeyRepository } from "../../repositories/nurturing-gateway-key.repository.ts";
 import { virtualKeyFactOf } from "../../rules/nurturing-virtual-key.rules.ts";
+import { peopleWithEmails } from "../../services/__tests__/nurturing-person-email.test-helpers.ts";
 import {
   buildNurturingProjectUsagePipeline,
   NURTURING_PROJECT_USAGE_PIPELINE_NAME,
@@ -639,20 +639,19 @@ async function liveWorker({ events }: { events: ReplayEvent[] }) {
   const repositories = MemoryNurturingRepositories.create();
   const app = await NurturingModule.create({
     dependencies: {
-      users: createApiFixture<UserApi>({}, "UserApi"),
+      users: peopleWithEmails(),
       organizations: createApiFixture<OrganizationApi>({}, "OrganizationApi"),
     },
     config: {
       customerIoRegion: void 0,
       customerIoBaseUrl: void 0,
-      customerIoAppApiBaseUrl: void 0,
       posthogKey: void 0,
       posthogHost: void 0,
     },
     resources: { own: () => void 0, ownService: () => void 0 },
     secrets: new ScopedSecrets(async (_handle, build) => build(undefined)),
     repositories,
-    channels: { customerIo, customerIoTransactional: void 0, posthog: void 0 },
+    channels: { customerIo, posthog: void 0 },
   });
   // nurturingEventing builds `app.pipeline()`; the usage pipeline syncs, as a channel is present.
   const nurturing = app.pipeline();
@@ -675,7 +674,6 @@ async function liveWorker({ events }: { events: ReplayEvent[] }) {
     config: {
       customerIoRegion: void 0,
       customerIoBaseUrl: void 0,
-      customerIoAppApiBaseUrl: void 0,
       posthogKey: void 0,
       posthogHost: void 0,
     },
@@ -753,9 +751,20 @@ describe("given a worker composing nurturing with a recording Customer.io channe
         gatewayEvent({ type: GATEWAY_VK_LIFECYCLE_EVENT_TYPE, data: lifecycleFact(createdKey) }),
       );
 
-      expect(worker.customerIo.requests).toHaveLength(1);
-      // The channel's batchOrThrow resolves through batch, so the send records as "batch".
+      expect(worker.customerIo.requests).toHaveLength(2);
+      // The channel's batchOrThrow resolves through batch, so each send records as "batch".
+      // The identify carrying the address is sent first, awaited, then the track.
       expect(worker.customerIo.requests).toMatchObject([
+        {
+          method: "batch",
+          input: [
+            {
+              type: "identify",
+              userId: ADMIN_USER_ID,
+              traits: { email: `${ADMIN_USER_ID}@example.com` },
+            },
+          ],
+        },
         {
           method: "batch",
           input: [{ type: "track", userId: ADMIN_USER_ID, event: "virtual_key_created" }],

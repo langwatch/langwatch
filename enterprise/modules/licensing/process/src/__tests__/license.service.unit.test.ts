@@ -216,6 +216,21 @@ describe("LicenseService", () => {
     expect(repository.stored.size).toBe(0);
   });
 
+  /** @scenario "Two syncs that race to store a delivered license leave the newer one" */
+  it("stores a delivered license only while the organization holds the key the sync read", async () => {
+    const newer = mintLicenseKey({ organizationId: ORGANIZATION_ID });
+    await service.validateAndStoreLicense({ organizationId: ORGANIZATION_ID, licenseKey: newer });
+
+    const result = await service.storeDeliveredLicense({
+      organizationId: ORGANIZATION_ID,
+      licenseKey: VALID_LICENSE_KEY,
+      replacing: null,
+    });
+
+    expect(result).toEqual({ success: false, superseded: true });
+    expect(repository.stored.get(ORGANIZATION_ID)?.licenseKey).toBe(newer);
+  });
+
   describe("when platform single sign-on is asked about", () => {
     /** @scenario "One organization's genuine license enables SSO for the whole deployment" */
     it("answers licensed when any organization holds a genuine license, and scans once per process", async () => {

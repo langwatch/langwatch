@@ -46,6 +46,7 @@ import type {
   BraidPreview,
   BraidTestTrace,
 } from "./features/braid/trace-braid.schemas.ts";
+import type { ThreadTraceIds } from "./features/content/trace-content-read.service.ts";
 import type {
   TraceEditOverlayDto,
   TraceEditOverlayPatch,
@@ -484,6 +485,16 @@ export interface TraceApi extends TraceOtlpIngestApi {
     withEditOverlay?: boolean;
     maxTraces?: number;
   }): Promise<Trace[]>;
+  /**
+   * The trace ids of the named threads, one list per thread, oldest first. Reads
+   * the trace summaries' keys only: no content, so it needs no protections.
+   * `maxTraces` is the ceiling across all of the threads together.
+   */
+  readThreadsTraceIds(input: {
+    projectId: string;
+    threadIds: string[];
+    maxTraces?: number;
+  }): Promise<ThreadTraceIds[]>;
   readSampleTraces(input: {
     query: TraceLegacyListInput;
     protections: unknown;
@@ -509,13 +520,15 @@ export interface TraceApi extends TraceOtlpIngestApi {
     authorization?: Authorization;
   }): Promise<Protections>;
   /**
-   * The same redactions for an API-KEY caller: the public branch of every
-   * content category, plus the credential's own `cost:view` grant. A legacy
-   * project key (`principal: null`) predates RBAC and sees costs.
+   * The same redactions for a REST credential: an API key reads the public branch of every
+   * content category, a project-bound access token (`user` principal) reads as its person.
+   * Costs are the credential's own `cost:view` grant; a legacy key (`null`) sees them.
    */
   resolveApiKeyProtections(input: {
     projectId: string;
     principal: PrincipalRef | null;
+    /** The read's proof, folded in for an access token as for its person (ADR-177 decision 9). */
+    authorization?: Authorization;
   }): Promise<Protections>;
   findExistingTraceIds(input: {
     projectId: string;

@@ -18,6 +18,8 @@ on:
       - "cmd/chartheap/**"
       - "tools/charts3region/**"
       - "cmd/charts3region/**"
+      - "tools/chartnumbers/**"
+      - "cmd/chartnumbers/**"
       # Where the processes declare what they read. The shutdown deadline must
       # agree with the pod's grace period (workers-shutdown.sh), and every
       # variable the chart sets must still be declared somewhere
@@ -58,6 +60,8 @@ on:
       - "cmd/chartheap/**"
       - "tools/charts3region/**"
       - "cmd/charts3region/**"
+      - "tools/chartnumbers/**"
+      - "cmd/chartnumbers/**"
       # Where the processes declare what they read. The shutdown deadline must
       # agree with the pod's grace period (workers-shutdown.sh), and every
       # variable the chart sets must still be declared somewhere
@@ -122,6 +126,7 @@ jobs:
       actions: write
     outputs:
       e2e: ${{ steps.e2e-paths.outputs.e2e }}
+      behavioral: ${{ steps.e2e-paths.outputs.behavioral }}
     defaults:
       run:
         working-directory: charts/langwatch
@@ -159,6 +164,14 @@ jobs:
               - "infra/clickhouse-serverless/**"
               - ".dockerignore"
               - "pnpm-workspace.yaml"
+            # The behavioral suites read the rendered langwatch chart. A config
+            # declaration or Dockerfile change still runs every render
+            # assertion above, and main runs them on every merge.
+            behavioral:
+              - "charts/langwatch/**"
+              - "charts/lib/**"
+              - ".github/workflows/langwatch-chart.yml"
+              - "pnpm-lock.yaml"
       - uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5
         with:
           version: v3.12.0
@@ -189,8 +202,16 @@ jobs:
           render() {
             local name="$1"
             shift
-            if helm template lw . "$@" >/dev/null 2>"${RUNNER_TEMP}/${name}.err"; then
-              echo "ok    ${name}"
+            if helm template lw . "$@" >"${RUNNER_TEMP}/${name}.out" 2>"${RUNNER_TEMP}/${name}.err"; then
+              # Helm reads YAML numbers as float64, so `quote` on 18000000
+              # renders "1.8e+07" and an integer parser refuses it.
+              if grep -nE '"[0-9.]+e[+-][0-9]+"' "${RUNNER_TEMP}/${name}.out" >"${RUNNER_TEMP}/${name}.err"; then
+                echo "FAIL  ${name}: a number rendered in exponent form (pipe it through int64)"
+                sed 's/^/        /' "${RUNNER_TEMP}/${name}.err"
+                failed+=("${name}")
+              else
+                echo "ok    ${name}"
+              fi
             else
               echo "FAIL  ${name}"
               sed 's/^/        /' "${RUNNER_TEMP}/${name}.err"
@@ -315,6 +336,13 @@ jobs:
         working-directory: .
         run: go run ./cmd/chartheap -prove-node infra/docker/Dockerfile
 
+      # Helm loads a values-file number as float64 and prints 1e6 or more as
+      # "1.8e+07", which the agent cannot parse. `--set` never shows it.
+      - name: "assert langyagent numbers render as digits"
+        if: "!cancelled()"
+        working-directory: .
+        run: go run ./cmd/chartnumbers
+
       # The awsS3 provider's region must reach every container that carries the
       # S3 settings; without it a keyed client signs for the wrong region.
       - name: "assert the S3 region reaches every process"
@@ -433,10 +461,13 @@ jobs:
   behavioral:
     name: "behavioral (rendered-output assertions)"
     # Skipped on a draft or release-please PR, like the e2e legs below, unless labelled
-    # `ci:full`. No `changes` gate to read `heavy` from, so the check is inline.
+    # `ci:full`, and on a pull request that changes neither the chart nor the
+    # modules these suites test (render's behavioral filter).
+    needs: render
     if: >-
       (github.event_name != 'pull_request' || (github.event.pull_request.draft == false && !(startsWith(github.head_ref, 'release-please--') && github.event.pull_request.user.login == 'langwatch-agent'))
        || contains(github.event.pull_request.labels.*.name, 'ci:full'))
+      && (github.event_name != 'pull_request' || needs.render.outputs.behavioral == 'true' || contains(github.event.pull_request.labels.*.name, 'ci:full'))
     runs-on: ubuntu-latest
     # Read the checkout; write only to prune this pull request's older cache copies.
     permissions:

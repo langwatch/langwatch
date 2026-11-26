@@ -9543,6 +9543,15 @@
           "documentation": "The product whose sidebar lists it: llm-ops, me, gateway or governance (ADR-002,\ndecision 8). Every board made before homes existed is llm-ops."
         },
         {
+          "name": "myDashboardOfUserId",
+          "columnName": "myDashboardOfUserId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": "The member whose own My dashboard this is, whatever it is named; null on every other\nboard. Rows made before the column are filled by dashboard:mark-my-dashboards."
+        },
+        {
           "name": "excludedOrigins",
           "columnName": "excludedOrigins",
           "type": "Json",
@@ -12464,6 +12473,15 @@
         {
           "name": "customEmbeddingsModels",
           "columnName": "customEmbeddingsModels",
+          "type": "Json",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "lastListedModelIds",
+          "columnName": "lastListedModelIds",
           "type": "Json",
           "kind": "scalar",
           "isList": false,
@@ -28291,6 +28309,88 @@
       ]
     },
     {
+      "name": "DiscoveredAgentListing",
+      "tableName": "DiscoveredAgentListing",
+      "documentation": "One source's presence fact for one discovered agent. An agent is gone only when every\nsource that listed it marked it gone; an agent no source listed (older sightings) never is.",
+      "primaryKey": [
+        "id"
+      ],
+      "fields": [
+        {
+          "name": "id",
+          "columnName": "id",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "organizationId",
+          "columnName": "organizationId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "ingestionSourceId",
+          "columnName": "ingestionSourceId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "discoveredAgentId",
+          "columnName": "discoveredAgentId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "lastListedAt",
+          "columnName": "lastListedAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "goneAt",
+          "columnName": "goneAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": "Set when this source's listing stopped naming the agent; cleared when it names it again."
+        },
+        {
+          "name": "createdAt",
+          "columnName": "createdAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "updatedAt",
+          "columnName": "updatedAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        }
+      ]
+    },
+    {
       "name": "AgentRegistryEntry",
       "tableName": "AgentRegistryEntry",
       "documentation": "One agent in the organisation's governance registry, from any source governance reads\n(enterprise/modules/governance/specs/agent-registry.feature). `entry` is the latest\nmachine-readable snapshot; `version` grows by one on every material change.",
@@ -28537,6 +28637,43 @@
         {
           "name": "baselinedAt",
           "columnName": "baselinedAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        }
+      ]
+    },
+    {
+      "name": "AgentRegistrySettings",
+      "tableName": "AgentRegistrySettings",
+      "documentation": "An organisation's agent registry settings. No row reads as the defaults.",
+      "primaryKey": [
+        "organizationId"
+      ],
+      "fields": [
+        {
+          "name": "organizationId",
+          "columnName": "organizationId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "dormantAfterDays",
+          "columnName": "dormantAfterDays",
+          "type": "Int",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": "Days without traffic after which a listed agent reads as dormant."
+        },
+        {
+          "name": "updatedAt",
+          "columnName": "updatedAt",
           "type": "DateTime",
           "kind": "scalar",
           "isList": false,

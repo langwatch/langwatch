@@ -27,6 +27,10 @@ const configured: VendorBases = {
   microsoftGraph: `${SIM}/microsoft-graph`,
   databricksWorkspace: SIM,
   dataverseEnvironment: `${SIM}/dataverse`,
+  googleOauthToken: `${SIM}/google-oauth`,
+  vertexAiApi: `${SIM}/vertex`,
+  bedrockAgent: `${SIM}/bedrock-agent`,
+  bedrockAgentCoreControl: `${SIM}/bedrock-agentcore-control`,
 };
 
 class RecordingHttp implements GovernanceHttpClient {

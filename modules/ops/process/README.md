@@ -996,12 +996,12 @@ Platform permission `ops:manage`. Credential `browser`. Declared at `src/transpo
 Answers at `/api/admin/impersonate`, `/api/v1/admin/impersonate`.
 
 ```typescript
-// Body: adminImpersonationRequestSchema, ../contract/src/features/admin/admin-operation.ts:99
+// Body: adminImpersonationRequestSchema, ../contract/src/features/admin/admin-operation.ts:113
 interface Body {
   userIdToImpersonate: string;
   reason: string;
 }
-// Response: adminImpersonationStartedSchema, ../contract/src/features/admin/admin-operation.ts:130
+// Response: adminImpersonationStartedSchema, ../contract/src/features/admin/admin-operation.ts:144
 interface Response {
   message: "Impersonation started";
 }
@@ -1014,9 +1014,9 @@ Platform permission `ops:view`. Credential `browser`. Declared at `src/transport
 Answers at `/api/admin/impersonate`, `/api/v1/admin/impersonate`.
 
 ```typescript
-// Body: adminEmptyRequestSchema, ../contract/src/features/admin/admin-operation.ts:103
+// Body: adminEmptyRequestSchema, ../contract/src/features/admin/admin-operation.ts:117
 type Body = Record<string, unknown>;
-// Response: adminImpersonationStoppedSchema, ../contract/src/features/admin/admin-operation.ts:138
+// Response: adminImpersonationStoppedSchema, ../contract/src/features/admin/admin-operation.ts:152
 interface Response {
   message: "Impersonation ended";
 }
@@ -1029,12 +1029,12 @@ Platform permission `ops:view`. Credential `browser`. Declared at `src/transport
 Answers at `/api/admin/:resource`, `/api/v1/admin/:resource`.
 
 ```typescript
-// Params: adminResourceParamsSchema, ../contract/src/features/admin/admin-operation.ts:112
+// Params: adminResourceParamsSchema, ../contract/src/features/admin/admin-operation.ts:126
 interface Params {
   resource: string;
 }
-type Body = z.infer<typeof adminOperationBodySchema>; // ../contract/src/features/admin/admin-operation.ts:121
-// Response: adminOperationResponseSchema, ../contract/src/features/admin/admin-operation.ts:171
+type Body = z.infer<typeof adminOperationBodySchema>; // ../contract/src/features/admin/admin-operation.ts:135
+// Response: adminOperationResponseSchema, ../contract/src/features/admin/admin-operation.ts:185
 interface Response {
   data: unknown;
   total?: number;

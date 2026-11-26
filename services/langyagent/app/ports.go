@@ -144,8 +144,8 @@ type Worker interface {
 	// prompt has been delivered (the session's own transcript carries it from
 	// then on, and re-sending it would bloat every later message). resumeToken
 	// (ADR-048) carries an opaque prior-turn checkpoint to resume from; empty on
-	// a cold start.
-	PostMessage(ctx context.Context, system, prompt, historySeed, resumeToken string) error
+	// a cold start. images ride the prompt to the model as image input.
+	PostMessage(ctx context.Context, system, prompt, historySeed, resumeToken string, images []domain.TurnImage) error
 	// StreamEvents forwards this session's agent events into sink until a
 	// terminal event or ctx cancellation.
 	StreamEvents(ctx context.Context, sink ChatSink) error

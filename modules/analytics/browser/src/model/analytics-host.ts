@@ -90,6 +90,8 @@ export type AnalyticsLangyAskRequest = {
   /** What the draft is about; left unsent, it is dropped once that leaves the screen. */
   about?: AnalyticsLangyDraftAbout;
   context: readonly AnalyticsLangyContext[];
+  /** Where it was asked (`dashboard:<id>`): the next question there continues the conversation. */
+  askedFrom?: string;
 };
 
 /** The release flags an Analytics screen reads; the mount answers each one. */

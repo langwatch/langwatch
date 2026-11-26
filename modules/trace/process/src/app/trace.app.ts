@@ -194,6 +194,8 @@ import {
   type TraceReadOrderedSpansInput,
   type TraceReadThreadTracesInput,
   type TraceReadThreadsTracesInput,
+  type TraceReadThreadsTraceIdsInput,
+  type ThreadTraceIds,
   type TraceReadSampleTracesInput,
   TrackedEventInvalidError,
   trackEventRESTParamsValidatorSchema,
@@ -2240,6 +2242,7 @@ export class TraceModule implements TraceApi, CollectorApp {
     const protections = await this.resolveApiKeyProtections({
       projectId: input.projectId,
       principal: input.principal,
+      authorization: input.authorization,
     });
     const facetKey = this.#dependencies.traces.list.resolveFacetKey({ field, protections });
     const result = await this.readFacetValues({
@@ -2468,6 +2471,17 @@ export class TraceModule implements TraceApi, CollectorApp {
       }),
     });
   }
+  async readThreadsTraceIds(input: TraceReadThreadsTraceIdsInput): Promise<ThreadTraceIds[]> {
+    await this.#readBounds.assertIdsWithinBound(input.projectId, input.threadIds);
+
+    return this.#contentReader.readThreadsTraceIds({
+      ...input,
+      authorization: await this.#authorizeContentRead({
+        projectId: input.projectId,
+        route: "TraceApi.readThreadsTraceIds",
+      }),
+    });
+  }
   async readSampleTraces(input: TraceReadSampleTracesInput): Promise<Trace[]> {
     const pageSize = await this.#readBounds.clampPageSize(input.query.projectId, input.pageSize);
 
@@ -2503,10 +2517,25 @@ export class TraceModule implements TraceApi, CollectorApp {
   resolveApiKeyProtections(input: {
     projectId: string;
     principal: PrincipalRef | null;
+    authorization?: Authorization;
   }): Promise<Protections> {
     if (!this.#dependencies.protections)
       throw new Error("Trace protections service is unavailable");
     return this.#dependencies.protections.resolveForApiKey(input);
+  }
+
+  /** A credential's read of another project: an access token is capped at its own project. */
+  #publicProtectionsElsewhere(input: {
+    projectId: string;
+    principal: PrincipalRef | null;
+  }): Promise<Protections> {
+    if (!this.#dependencies.protections)
+      throw new Error("Trace protections service is unavailable");
+    return this.#dependencies.protections.resolveForApiKey({
+      projectId: input.projectId,
+      principal: input.principal,
+      readsAsPerson: false,
+    });
   }
 
   /**
@@ -4032,6 +4061,7 @@ export class TraceModule implements TraceApi, CollectorApp {
           ...input,
           projectId: located.project.id,
           projectSlug: located.project.slug,
+          outsideOwnProject: true,
         });
         return {
           ...served,
@@ -4058,8 +4088,11 @@ export class TraceModule implements TraceApi, CollectorApp {
     format: "digest" | "json";
     projectSlug: string;
     principal: PrincipalRef | null;
+    outsideOwnProject?: boolean;
   }): Promise<Record<string, unknown>> {
-    const protections = await this.resolveApiKeyProtections(input);
+    const protections = input.outsideOwnProject
+      ? await this.#publicProtectionsElsewhere(input)
+      : await this.resolveApiKeyProtections(input);
     const trace = await this.#getTraceByIdOrPrefix({
       ...input,
       protections,

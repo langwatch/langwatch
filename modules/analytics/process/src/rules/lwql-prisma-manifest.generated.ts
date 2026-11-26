@@ -878,6 +878,7 @@ export interface LwqlPrismaRows {
     readonly scope: "DashboardScope";
     readonly organizationId: "String?";
     readonly homeProduct: "String";
+    readonly myDashboardOfUserId: "String?";
     readonly excludedOrigins: "Json?";
     readonly createdAt: "DateTime";
     readonly updatedAt: "DateTime";
@@ -1171,6 +1172,7 @@ export interface LwqlPrismaRows {
     readonly extraHeaders: "Json?";
     readonly customModels: "Json?";
     readonly customEmbeddingsModels: "Json?";
+    readonly lastListedModelIds: "Json?";
     readonly deploymentMapping: "Json?";
     readonly rateLimitRpm: "Int?";
     readonly rateLimitTpm: "Int?";
@@ -2751,6 +2753,16 @@ export interface LwqlPrismaRows {
     readonly createdAt: "DateTime";
     readonly updatedAt: "DateTime";
   };
+  readonly DiscoveredAgentListing: {
+    readonly id: "String";
+    readonly organizationId: "String";
+    readonly ingestionSourceId: "String";
+    readonly discoveredAgentId: "String";
+    readonly lastListedAt: "DateTime";
+    readonly goneAt: "DateTime?";
+    readonly createdAt: "DateTime";
+    readonly updatedAt: "DateTime";
+  };
   readonly AgentRegistryEntry: {
     readonly id: "String";
     readonly organizationId: "String";
@@ -2781,6 +2793,11 @@ export interface LwqlPrismaRows {
   readonly AgentRegistryBaseline: {
     readonly organizationId: "String";
     readonly baselinedAt: "DateTime";
+  };
+  readonly AgentRegistrySettings: {
+    readonly organizationId: "String";
+    readonly dormantAfterDays: "Int";
+    readonly updatedAt: "DateTime";
   };
   readonly AgentStopPlanTarget: {
     readonly id: "String";

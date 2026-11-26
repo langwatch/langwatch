@@ -36,6 +36,7 @@ describe("ClickHouseLangWatchQLPlacementRepository", () => {
       expect(await repository.placementOf({ tenantId: "project-routed" })).toEqual({
         recordedPrivate: true,
         routedPrivately: true,
+        organizationId: "org-routed",
         origin: "https://routed.example:8443",
       });
       expect(asked).toEqual(["project-routed"]);
@@ -53,6 +54,7 @@ describe("ClickHouseLangWatchQLPlacementRepository", () => {
       expect(await repository.placementOf({ tenantId: "project-shared" })).toEqual({
         recordedPrivate: false,
         routedPrivately: false,
+        organizationId: null,
         origin: "http://shared:8123",
       });
     });
@@ -69,6 +71,7 @@ describe("ClickHouseLangWatchQLPlacementRepository", () => {
       expect(await repository.placementOf({ tenantId: "project-recorded" })).toEqual({
         recordedPrivate: true,
         routedPrivately: false,
+        organizationId: null,
         origin: null,
       });
     });

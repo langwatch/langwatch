@@ -24,6 +24,7 @@ concurrency:
 
 jobs:
   changes:
+    timeout-minutes: 5
     runs-on: ubuntu-latest
     outputs:
       relevant: ${{ steps.detect.outputs.relevant }}
@@ -248,6 +249,7 @@ jobs:
           fi
 
   docs-complete:
+    timeout-minutes: 5
     needs: [changes, check_links, check_structure, check_prose, check_generated_files]
     if: always()
     runs-on: ubuntu-latest

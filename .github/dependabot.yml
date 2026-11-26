@@ -35,14 +35,16 @@ version: 2
 #     minimum-release-age / exclude-newer gate, which is a deliberate
 #     supply-chain safeguard and is intentionally left in place.
 #
-#   - gomod: one entry per go.mod (Dependabot scans modules, not go.work,
-#     and each sibling SDK module is tagged and released
-#     independently — see the Go SDK module-tags convention). Grouped the same
-#     way as the JS/Python ecosystems: minor+patch together, majors individual.
-#   - docker: one entry per directory that actually contains a Dockerfile.
-#     Dependabot's docker ecosystem does not recurse, so a directory with none
-#     scans nothing — `/` alone (the previous config) covered zero files,
-#     since every Dockerfile here lives under infra/.
+#   - gomod, docker and github-actions: one entry each, listing every
+#     directory, with one group matching "*" (majors included), so a schedule
+#     tick opens one PR per ecosystem. Each Dependabot PR starts 12 to 20
+#     workflow runs: on 2026-11-25 one tick opened or updated 32 branches and
+#     queued 319 runs, 60% of the runner queue, and main waited 3+ hours.
+#   - open-pull-requests-limit stays low (5 for npm and uv, 2 or 3 for the
+#     rest) for the same reason. The limit counts version updates only;
+#     security updates keep their own allowance.
+#   - docker lists only directories that contain a Dockerfile: the ecosystem
+#     does not recurse, so a directory with none scans nothing.
 updates:
   - package-ecosystem: "npm"
     # The workspace root. dependabot reads pnpm-workspace.yaml and covers
@@ -51,7 +53,7 @@ updates:
     schedule:
       interval: "weekly"
       day: "monday"
-    open-pull-requests-limit: 50
+    open-pull-requests-limit: 5
     cooldown:
       default-days: 8
     ignore:
@@ -129,7 +131,7 @@ updates:
     schedule:
       interval: "weekly"
       day: "monday"
-    open-pull-requests-limit: 50
+    open-pull-requests-limit: 5
     cooldown:
       default-days: 8
     groups:
@@ -170,7 +172,7 @@ updates:
     schedule:
       interval: "weekly"
       day: "monday"
-    open-pull-requests-limit: 50
+    open-pull-requests-limit: 5
     cooldown:
       default-days: 8
     groups:
@@ -178,13 +180,6 @@ updates:
         applies-to: version-updates
         patterns:
           - "langchain*"
-      arize:
-        # arize-phoenix today; grouped pre-emptively because upstream ships
-        # sibling packages (arize-phoenix-otel/-evals/-client) that release in
-        # step with it and would otherwise fragment the same way once used.
-        applies-to: version-updates
-        patterns:
-          - "arize*"
       minor-and-patch:
         applies-to: version-updates
         patterns:
@@ -193,337 +188,63 @@ updates:
           - "minor"
           - "patch"
 
-  # One entry per go.mod. Dependabot scans a module, not the go.work tying
-  # them together, and the sibling SDK modules under sdks/go/instrumentation/*
-  # are tagged and released independently, so each needs its own scan.
+  # Every go.mod in one entry: Dependabot scans a module, not the go.work tying
+  # them together, so each module is listed. One group across all of them
+  # makes a schedule tick open one Go PR, not one per module.
   - package-ecosystem: "gomod"
-    directory: "/cmd"
+    directories:
+      - "/cmd"
+      - "/pkg"
+      - "/services"
+      - "/tools"
+      - "/infra/clickhouse-serverless"
+      - "/sdks/go"
+      - "/sdks/go/client"
+      - "/sdks/go/e2e"
+      - "/sdks/go/examples"
+      - "/sdks/go/instrumentation/anthropic"
+      - "/sdks/go/instrumentation/azureopenai"
+      - "/sdks/go/instrumentation/bedrock"
+      - "/sdks/go/instrumentation/genkit"
+      - "/sdks/go/instrumentation/googlegenai"
+      - "/sdks/go/instrumentation/gopenai"
+      - "/sdks/go/instrumentation/ollama"
+      - "/sdks/go/instrumentation/openai"
     schedule:
       interval: "weekly"
       day: "monday"
-    open-pull-requests-limit: 50
+    open-pull-requests-limit: 3
     cooldown:
       default-days: 8
     groups:
-      minor-and-patch:
+      go:
         applies-to: version-updates
         patterns:
           - "*"
-        update-types:
-          - "minor"
-          - "patch"
-
-  - package-ecosystem: "gomod"
-    directory: "/pkg"
-    schedule:
-      interval: "weekly"
-      day: "monday"
-    open-pull-requests-limit: 50
-    cooldown:
-      default-days: 8
-    groups:
-      minor-and-patch:
-        applies-to: version-updates
-        patterns:
-          - "*"
-        update-types:
-          - "minor"
-          - "patch"
-
-  - package-ecosystem: "gomod"
-    directory: "/services"
-    schedule:
-      interval: "weekly"
-      day: "monday"
-    open-pull-requests-limit: 50
-    cooldown:
-      default-days: 8
-    groups:
-      minor-and-patch:
-        applies-to: version-updates
-        patterns:
-          - "*"
-        update-types:
-          - "minor"
-          - "patch"
-
-  - package-ecosystem: "gomod"
-    directory: "/tools"
-    schedule:
-      interval: "weekly"
-      day: "monday"
-    open-pull-requests-limit: 50
-    cooldown:
-      default-days: 8
-    groups:
-      minor-and-patch:
-        applies-to: version-updates
-        patterns:
-          - "*"
-        update-types:
-          - "minor"
-          - "patch"
-
-  - package-ecosystem: "gomod"
-    directory: "/infra/clickhouse-serverless"
-    schedule:
-      interval: "weekly"
-      day: "monday"
-    open-pull-requests-limit: 50
-    cooldown:
-      default-days: 8
-    groups:
-      minor-and-patch:
-        applies-to: version-updates
-        patterns:
-          - "*"
-        update-types:
-          - "minor"
-          - "patch"
-
-  - package-ecosystem: "gomod"
-    directory: "/sdks/go"
-    schedule:
-      interval: "weekly"
-      day: "monday"
-    open-pull-requests-limit: 50
-    cooldown:
-      default-days: 8
-    groups:
-      minor-and-patch:
-        applies-to: version-updates
-        patterns:
-          - "*"
-        update-types:
-          - "minor"
-          - "patch"
-
-  - package-ecosystem: "gomod"
-    directory: "/sdks/go/client"
-    schedule:
-      interval: "weekly"
-      day: "monday"
-    open-pull-requests-limit: 50
-    cooldown:
-      default-days: 8
-    groups:
-      minor-and-patch:
-        applies-to: version-updates
-        patterns:
-          - "*"
-        update-types:
-          - "minor"
-          - "patch"
-
-  - package-ecosystem: "gomod"
-    directory: "/sdks/go/e2e"
-    schedule:
-      interval: "weekly"
-      day: "monday"
-    open-pull-requests-limit: 50
-    cooldown:
-      default-days: 8
-    groups:
-      minor-and-patch:
-        applies-to: version-updates
-        patterns:
-          - "*"
-        update-types:
-          - "minor"
-          - "patch"
-
-  - package-ecosystem: "gomod"
-    directory: "/sdks/go/examples"
-    schedule:
-      interval: "weekly"
-      day: "monday"
-    open-pull-requests-limit: 50
-    cooldown:
-      default-days: 8
-    groups:
-      minor-and-patch:
-        applies-to: version-updates
-        patterns:
-          - "*"
-        update-types:
-          - "minor"
-          - "patch"
-
-  - package-ecosystem: "gomod"
-    directory: "/sdks/go/instrumentation/anthropic"
-    schedule:
-      interval: "weekly"
-      day: "monday"
-    open-pull-requests-limit: 50
-    cooldown:
-      default-days: 8
-    groups:
-      minor-and-patch:
-        applies-to: version-updates
-        patterns:
-          - "*"
-        update-types:
-          - "minor"
-          - "patch"
-
-  - package-ecosystem: "gomod"
-    directory: "/sdks/go/instrumentation/azureopenai"
-    schedule:
-      interval: "weekly"
-      day: "monday"
-    open-pull-requests-limit: 50
-    cooldown:
-      default-days: 8
-    groups:
-      minor-and-patch:
-        applies-to: version-updates
-        patterns:
-          - "*"
-        update-types:
-          - "minor"
-          - "patch"
-
-  - package-ecosystem: "gomod"
-    directory: "/sdks/go/instrumentation/bedrock"
-    schedule:
-      interval: "weekly"
-      day: "monday"
-    open-pull-requests-limit: 50
-    cooldown:
-      default-days: 8
-    groups:
-      minor-and-patch:
-        applies-to: version-updates
-        patterns:
-          - "*"
-        update-types:
-          - "minor"
-          - "patch"
-
-  - package-ecosystem: "gomod"
-    directory: "/sdks/go/instrumentation/genkit"
-    schedule:
-      interval: "weekly"
-      day: "monday"
-    open-pull-requests-limit: 50
-    cooldown:
-      default-days: 8
-    groups:
-      minor-and-patch:
-        applies-to: version-updates
-        patterns:
-          - "*"
-        update-types:
-          - "minor"
-          - "patch"
-
-  - package-ecosystem: "gomod"
-    directory: "/sdks/go/instrumentation/googlegenai"
-    schedule:
-      interval: "weekly"
-      day: "monday"
-    open-pull-requests-limit: 50
-    cooldown:
-      default-days: 8
-    groups:
-      minor-and-patch:
-        applies-to: version-updates
-        patterns:
-          - "*"
-        update-types:
-          - "minor"
-          - "patch"
-
-  - package-ecosystem: "gomod"
-    directory: "/sdks/go/instrumentation/gopenai"
-    schedule:
-      interval: "weekly"
-      day: "monday"
-    open-pull-requests-limit: 50
-    cooldown:
-      default-days: 8
-    groups:
-      minor-and-patch:
-        applies-to: version-updates
-        patterns:
-          - "*"
-        update-types:
-          - "minor"
-          - "patch"
-
-  - package-ecosystem: "gomod"
-    directory: "/sdks/go/instrumentation/ollama"
-    schedule:
-      interval: "weekly"
-      day: "monday"
-    open-pull-requests-limit: 50
-    cooldown:
-      default-days: 8
-    groups:
-      minor-and-patch:
-        applies-to: version-updates
-        patterns:
-          - "*"
-        update-types:
-          - "minor"
-          - "patch"
-
-  - package-ecosystem: "gomod"
-    directory: "/sdks/go/instrumentation/openai"
-    schedule:
-      interval: "weekly"
-      day: "monday"
-    open-pull-requests-limit: 50
-    cooldown:
-      default-days: 8
-    groups:
-      minor-and-patch:
-        applies-to: version-updates
-        patterns:
-          - "*"
-        update-types:
-          - "minor"
-          - "patch"
 
   # Docker ecosystem does not recurse: it only scans Dockerfiles that live
-  # directly in the named directory, so each directory that holds one or more
-  # Dockerfiles needs its own entry.
+  # directly in a named directory, so each directory with one is listed. One
+  # group across them opens one image PR.
   - package-ecosystem: "docker"
-    directory: "/infra/docker"
+    directories:
+      - "/infra/docker"
+      - "/infra/clickhouse-serverless"
     schedule:
       interval: "weekly"
       day: "monday"
-    open-pull-requests-limit: 50
+    open-pull-requests-limit: 2
     groups:
-      minor-and-patch:
+      docker:
         applies-to: version-updates
         patterns:
           - "*"
-        update-types:
-          - "minor"
-          - "patch"
-
-  - package-ecosystem: "docker"
-    directory: "/infra/clickhouse-serverless"
-    schedule:
-      interval: "weekly"
-      day: "monday"
-    open-pull-requests-limit: 50
-    groups:
-      minor-and-patch:
-        applies-to: version-updates
-        patterns:
-          - "*"
-        update-types:
-          - "minor"
-          - "patch"
 
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
       interval: "weekly"
       day: "monday"
-    open-pull-requests-limit: 50
+    open-pull-requests-limit: 2
     groups:
       github-actions:
         applies-to: version-updates

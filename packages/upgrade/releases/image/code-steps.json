@@ -117,6 +117,14 @@
     "needsOldWritersGone": false
   },
   {
+    "id": "dashboard:mark-my-dashboards",
+    "kind": "data",
+    "mode": "background",
+    "owner": "dashboard",
+    "description": "Marks each member's existing My dashboard, so renaming it keeps it theirs.",
+    "needsOldWritersGone": true
+  },
+  {
     "id": "data-retention:keep-control-plane-events-forever",
     "kind": "data",
     "mode": "background",
@@ -145,6 +153,14 @@
     "mode": "background",
     "owner": "dataset",
     "description": "Saves version 1 of every dataset that has rows and no version history yet."
+  },
+  {
+    "id": "entitlement:materialise-billable-events-ttl",
+    "kind": "data",
+    "mode": "background",
+    "owner": "entitlement",
+    "description": "Applies the 13-month retention to billable events written before it, deleting older rows.",
+    "needsOldWritersGone": false
   },
   {
     "id": "evaluation:fill-id-indexes",

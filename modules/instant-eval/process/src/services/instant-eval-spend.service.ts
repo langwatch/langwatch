@@ -7,7 +7,6 @@
 
 import type { InstantEvalPricing } from "@langwatch/instant-eval-judge-contract";
 import { createLogger } from "@langwatch/observability";
-import type { Instant } from "@langwatch/time";
 
 import {
   type InstantEvalPricedSpend,
@@ -27,12 +26,6 @@ export interface InstantEvalSpendPeers {
   }): Promise<InstantEvalSpendAttribution | undefined>;
   /** The spend spine, which takes the price as the caller resolved it. */
   recordPricedSpend(input: InstantEvalPricedSpend): Promise<void>;
-  /**
-   * Nudges the organization's monthly billing report, so a month whose last
-   * judgement is not followed by a trace still reports. Absent on a
-   * deployment that does not bill.
-   */
-  reportBillingMonth?(input: { organizationId: string; occurredAt: Instant }): Promise<void>;
 }
 
 export class InstantEvalSpendService {
@@ -84,27 +77,5 @@ export class InstantEvalSpendService {
       },
       "Instant Eval spend recorded on the gateway spend spine",
     );
-
-    await this.#nudgeBilling({
-      organizationId: attribution.organizationId,
-      occurredAt: record.occurredAt,
-    });
-  }
-
-  /**
-   * Best effort: the report is also dispatched by every billable event and by
-   * the grace window at the start of the next month, so a failure here costs
-   * the nudge rather than the spend.
-   */
-  async #nudgeBilling(input: { organizationId: string; occurredAt: Instant }): Promise<void> {
-    if (!this.peers.reportBillingMonth) return;
-    try {
-      await this.peers.reportBillingMonth(input);
-    } catch (error) {
-      logger.warn(
-        { organizationId: input.organizationId, error },
-        "Instant Eval spend recorded, but the billing report could not be dispatched",
-      );
-    }
   }
 }
