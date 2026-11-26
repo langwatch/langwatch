@@ -158,6 +158,13 @@ Feature: Trace media blob extraction at the ingestion edge
     Then the nested JSON string is rewritten in place with the externalized reference
     And the surrounding typed-value envelope is preserved byte-for-byte otherwise
 
+  @unit
+  Scenario: Media inside a nested JSON string larger than 50 MiB is still found
+    Given a span attribute whose value is a JSON string of messages larger than 50 MiB
+      carrying an inline audio part
+    When the media walk looks for inline media
+    Then it finds the audio part inside the nested JSON string
+
   @integration
   Scenario: Media carried on span events is externalized like span attributes
     Given an instrumentation that records the prompt on a span event, with an inline image in it

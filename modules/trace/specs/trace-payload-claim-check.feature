@@ -62,6 +62,13 @@ Feature: Recalling an oversized span's payload from outside the application
     Then the read is aborted rather than buffering the whole object
 
   @unit
+  Scenario: A spooled span from an export at the body cap reads back whole
+    Given the deployment's trace export body cap
+    And a spool object larger than 50 MiB but under twice that cap
+    When the command worker reads it
+    Then the read returns the whole object
+
+  @unit
   Scenario: A malformed sibling attribute cannot mask the offloaded field
     Given a stored span carrying a numeric attribute beside the offloaded one
     When the offloaded field is recalled

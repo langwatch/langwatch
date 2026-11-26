@@ -10,9 +10,6 @@ import {
   visitContentPart,
 } from "@langwatch/trace-contract";
 
-/** Upper bound for parsing a nested JSON string (sanity guard, not a policy). */
-const MAX_NESTED_JSON_BYTES = 50 * 1024 * 1024;
-
 /** One step from the root value: an object key, an array index, or a parsed JSON string. */
 export type MediaPathSegment = { key: string } | { index: number } | { json: true };
 
@@ -60,8 +57,8 @@ function collectFromString(value: string, { depth, path, sites }: Walk): void {
     return;
   }
 
-  const worthParsing =
-    value.length >= 2 && value.length <= MAX_NESTED_JSON_BYTES && containsMediaMarkers(value);
+  // No upper bound: the string is already in memory, and the intake cap bounds its size.
+  const worthParsing = value.length >= 2 && containsMediaMarkers(value);
   if (!worthParsing) return;
 
   let parsed: unknown;

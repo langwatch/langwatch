@@ -334,7 +334,10 @@ import {
   TraceLegacyReadService,
   type BlobResolutionDeps,
 } from "../features/legacy/services/trace-legacy-read.service.ts";
-import { TraceBlobStoreService } from "../features/media/services/trace-blob-store.service.ts";
+import {
+  spoolReadCapBytes,
+  TraceBlobStoreService,
+} from "../features/media/services/trace-blob-store.service.ts";
 import { TraceEdgeMediaPayloadService } from "../features/media/services/trace-edge-media-payload.service.ts";
 import { TraceEdgeMediaTelemetryService } from "../features/media/services/trace-edge-media-telemetry.service.ts";
 import {
@@ -1174,10 +1177,11 @@ export class TraceModule implements TraceApi, CollectorApp {
     channels: Pick<TraceSetup["channels"], "legacySpool">;
     config: Pick<
       TraceSetup["config"],
-      "objectRetentionConfirmed" | "legacySpoolRetentionConfirmed"
+      "objectRetentionConfirmed" | "legacySpoolRetentionConfirmed" | "otlpTracesMaxBodyBytes"
     >;
   }): TraceBlobStoreService {
     return TraceBlobStoreService.create({
+      maxSpoolBytes: spoolReadCapBytes({ maxBodyBytes: config.otlpTracesMaxBodyBytes }),
       legacySpool: channels.legacySpool,
       payloads: repositories.eventPayloads,
       spoolStorage: {
