@@ -5,7 +5,7 @@ import { request as httpsRequest } from "node:https";
 // (infrastructure/live/dev-nx-cache) takes the developer's GitHub token and answers with
 // presigned S3 URLs. Members of the langwatch GitHub org read every namespace and write
 // their branch; anyone else reads main/ only. No AWS credentials on the laptop.
-export const GATE_URL = "";
+export const GATE_URL = "https://7dm76pnlduxexrpnjj346z3hke0ysrnv.lambda-url.eu-central-1.on.aws/";
 
 const REFUSED_BACKOFF_MS = 10 * 60_000;
 const DOWN_BACKOFF_MS = 60_000;
