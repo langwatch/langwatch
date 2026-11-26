@@ -223,6 +223,57 @@ Feature: Instant Evals are metered on the gateway spend spine, reported to Strip
       When the price is added to its subscription and the month is reported
       Then the Instant Eval meter event carries the month's total from zero
 
+    # Up to the free dollar used before upgrading never reaches the first invoice (ADR-174 decision 23, proposed in v22).
+    @unit
+    Scenario: Free use before an upgrade mid-month is not reported
+      Given an organization whose usage-billed subscription started on the 10th of the month
+      And Instant Eval spend both before and after the 10th
+      When the month is reported
+      Then the spend is read from the subscription's start to the month's end
+      And the meter event carries only the spend since the upgrade
+
+    @unit
+    Scenario: A subscription older than the month reports the whole month
+      Given an organization whose usage-billed subscription started before the month
+      When the month is reported
+      Then the spend is read from the month's start to the month's end
+
+    @unit
+    Scenario: A subscription with no recorded start reports the whole month
+      Given an organization whose usage-billed subscription has no start date, or a connected account
+      When the month is reported
+      Then the spend is read from the month's start to the month's end
+
+    @unit
+    Scenario: A month that ended before the subscription started reports nothing
+      Given an organization whose usage-billed subscription started after the month ended
+      When that month is reported
+      Then the spend read covers no time at all
+      And no Instant Eval meter event is sent
+
+    @unit
+    Scenario: A month already reported is not lowered by the subscription window
+      Given a checkpoint that reported 1.5000 dollars, free use before the upgrade included
+      And the window from the subscription's start now reads 0.5000 dollars
+      When the month is reported
+      Then no Instant Eval meter event is sent and the checkpoint stays at 1.5000
+      And spend past 1.5000 since the upgrade is reported as a positive delta
+
+    @unit
+    Scenario: A subscription replaced mid-month keeps the month's window
+      Given an organization whose subscription was replaced by a new one on the 15th after the month was already reported
+      When the month is reported
+      Then the spend is read from the replaced subscription's start
+      And spend since the last report is sent as a positive delta
+      # The window only ever starts earlier within a month, so the floor never swallows new spend.
+
+    @integration
+    Scenario: The billing lookup reads every growth-seat period a month can overlap, newest first
+      Given an organization with a live subscription, an ended one with both dates, a cancelled one with no start and a pending one with no end
+      When its billing lookup is read from Postgres
+      Then the periods are the live one and the ended one, newest start first
+      And a live subscription with no recorded start comes before every dated one
+
     @unit
     Scenario: A subscription that cannot be read holds the Instant Eval usage and retries
       Given an organization whose subscription cannot be read from Stripe

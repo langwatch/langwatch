@@ -16,6 +16,18 @@ const ORGANIZATION: BillingReportOrganizationLookup = {
     stripeCustomerId: "cus_1",
     subscriptions: [{ id: "sub_1" }],
     contract: "cloud",
+    growthSeatPeriods: [{ startMs: Date.parse("2026-02-10T13:00:00.000Z"), endMs: null }],
+  },
+};
+
+/** An entry the previous release stored: no subscription periods, under the unversioned key. */
+const PREVIOUS_RELEASE_ENTRY = {
+  outcome: "usage_billed",
+  organization: {
+    id: "organization_acme",
+    stripeCustomerId: "cus_1",
+    subscriptions: [{ id: "sub_1" }],
+    contract: "cloud",
   },
 };
 
@@ -28,12 +40,9 @@ function cacheOver(redis: Partial<BillingOrganizationCacheRedis>) {
 describe("RedisBillingOrganizationCacheRepository", () => {
   describe("given the keyspace the App's own cache writes", () => {
     /**
-     * Frozen twin: the App caches this read through
-     * `new TtlCache<CachedOrgData>(BILLING_ORG_CACHE_TTL_MS, BILLING_ORG_CACHE_PREFIX)`
-     * over the same Redis, storing `JSON.stringify(value)`. The prefix and the
-     * lifetime are LITERAL here rather than imported, because a drifted key
-     * leaves each graph reading a cache the other never writes — not an error,
-     * just two populations paying for each other's misses.
+     * The prefix and lifetime are LITERAL here rather than imported: a drifted key leaves each
+     * pod reading a cache the others never write. The prefix's version moves whenever the cached
+     * shape changes, so an entry an older release stored is never read as the new shape.
      */
     /** @scenario "Both graphs cache the billing organization read in one keyspace" */
     it("writes the key and lifetime the App writes", async () => {
@@ -42,7 +51,7 @@ describe("RedisBillingOrganizationCacheRepository", () => {
       await cacheOver({ setex }).set("organization_acme", ORGANIZATION);
 
       expect(setex).toHaveBeenCalledWith(
-        "ttlcache:billing:orgData:organization_acme",
+        "ttlcache:billing:orgData:v2:organization_acme",
         60,
         JSON.stringify(ORGANIZATION),
       );
@@ -53,7 +62,17 @@ describe("RedisBillingOrganizationCacheRepository", () => {
       const get = vi.fn(async () => JSON.stringify(ORGANIZATION));
 
       expect(await cacheOver({ get }).find("organization_acme")).toEqual(ORGANIZATION);
-      expect(get).toHaveBeenCalledWith("ttlcache:billing:orgData:organization_acme");
+      expect(get).toHaveBeenCalledWith("ttlcache:billing:orgData:v2:organization_acme");
+    });
+
+    /** @scenario "Both graphs cache the billing organization read in one keyspace" */
+    it("never reads an entry the previous release stored without subscription periods", async () => {
+      const entries = new Map([
+        ["ttlcache:billing:orgData:organization_acme", JSON.stringify(PREVIOUS_RELEASE_ENTRY)],
+      ]);
+      const get = vi.fn(async (key: string) => entries.get(key) ?? null);
+
+      expect(await cacheOver({ get }).find("organization_acme")).toBeUndefined();
     });
 
     /** @scenario "Both graphs cache the billing organization read in one keyspace" */

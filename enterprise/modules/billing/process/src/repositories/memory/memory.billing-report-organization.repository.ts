@@ -1,20 +1,34 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 import { GROWTH_SEAT_PLAN_TYPES } from "@langwatch/enterprise-billing-contract";
+import { Temporal } from "@langwatch/time";
 
 import {
   type BillingReportOrganizationLookup,
   BillingReportOrganizationRepository,
 } from "../billing-report-organization.repository.ts";
+import type { BillingSubscriptionRecord } from "../subscription.repository.ts";
 import type { MemoryBillingStore } from "./memory.billing.store.ts";
 
 /** The one pricing model that makes a month reportable at all. */
 const USAGE_BILLED = "SEAT_EVENT";
 
+/** The Prisma twin's bound on growth-seat subscriptions read. */
+const GROWTH_SEAT_PERIODS_READ = 50;
+
+/** Postgres `ORDER BY "startDate" DESC`: newest start first, and a missing start before any. */
+function newestStartFirst(a: BillingSubscriptionRecord, b: BillingSubscriptionRecord): number {
+  if (a.startDate === null || b.startDate === null) {
+    return (b.startDate === null ? 1 : 0) - (a.startDate === null ? 1 : 0);
+  }
+  return Temporal.Instant.compare(b.startDate, a.startDate);
+}
+
 /**
  * The monthly roll-up's organization read, over the store. Every predicate the
  * Prisma twin states is part of the answer here too: the pricing model decides
- * the outcome, and the subscription must be ACTIVE on a growth-seat plan.
+ * the outcome, the subscriptions are growth-seat ones, ACTIVE or ended with a start, and they
+ * come back in the order Postgres returns them.
  */
 export class MemoryBillingReportOrganizationRepository extends BillingReportOrganizationRepository {
   private constructor(private readonly store: MemoryBillingStore) {
@@ -44,19 +58,27 @@ export class MemoryBillingReportOrganizationRepository extends BillingReportOrga
       .filter(
         (subscription) =>
           subscription.organizationId === organizationId &&
-          subscription.status === "ACTIVE" &&
-          growthSeatPlans.includes(subscription.plan),
+          growthSeatPlans.includes(subscription.plan) &&
+          (subscription.status === "ACTIVE" ||
+            (subscription.endDate !== null && subscription.startDate !== null)),
       )
-      .slice(0, 1)
-      .map((subscription) => ({ id: subscription.id }));
+      .toSorted(newestStartFirst)
+      .slice(0, GROWTH_SEAT_PERIODS_READ);
 
     return {
       outcome: "usage_billed",
       organization: {
         id: organization.id,
         stripeCustomerId: organization.stripeCustomerId,
-        subscriptions,
+        subscriptions: subscriptions
+          .filter((subscription) => subscription.status === "ACTIVE")
+          .slice(0, 1)
+          .map((subscription) => ({ id: subscription.id })),
         contract: "cloud",
+        growthSeatPeriods: subscriptions.map((subscription) => ({
+          startMs: subscription.startDate?.epochMilliseconds ?? null,
+          endMs: subscription.endDate?.epochMilliseconds ?? null,
+        })),
       },
     };
   }
@@ -74,6 +96,8 @@ export class MemoryBillingReportOrganizationRepository extends BillingReportOrga
         // empty, and the caller skips the organization until it does.
         subscriptions: account.usageSubscriptionId ? [{ id: account.usageSubscriptionId }] : [],
         contract: "connected",
+        // ADR-174 decision 23 (proposed in v22) covers a Cloud upgrade; a connected month is read whole.
+        growthSeatPeriods: [],
       },
     };
   }
