@@ -48,7 +48,7 @@ await it("switches filenames and copied code together and remembers the language
         // The copy lands asynchronously. waitForFunction takes a returned promise as truthy and
         // resolves at once, so poll from here with a 30s deadline and assert on the last read.
         let copied = "";
-        for (const deadline = Date.now() + 30_000; Date.now() < deadline; ) {
+        for (const deadline = Date.now() + 30_000; Date.now() < deadline;) {
           copied = await page.evaluate(() => navigator.clipboard.readText().catch(() => ""));
           if (copied.includes("import { OpenAI }")) break;
           await page.waitForTimeout(100);
