@@ -39,7 +39,7 @@ import {
   type PiiRedactionSpendPipeline,
 } from "../eventing/pii-redaction-spend.pipeline.ts";
 import type { DataPrivacyRepositories } from "../repositories/data-privacy.repositories.ts";
-import { PII_REDACTION_MODEL_TIMEOUT_MS } from "../rules/pii-redaction-model.rules.ts";
+import { MODEL_CALL_RULES } from "../rules/pii-redaction-model.rules.ts";
 import { piiRedactionRequestIdKey } from "../rules/pii-redaction-spend.rules.ts";
 import { ContentDropPolicyService } from "../services/content-drop-policy.service.ts";
 import { DataPrivacyPermissionsService } from "../services/data-privacy-permissions.service.ts";
@@ -221,7 +221,7 @@ export class DataPrivacyModule implements DataPrivacyApi {
           // Its calls, durations and outcomes carry its own method and evaluator labels, so
           // Presidio's series stay Presidio's.
           metrics,
-          timeoutMs: PII_REDACTION_MODEL_TIMEOUT_MS,
+          timeoutMs: MODEL_CALL_RULES.single.budgetMs,
           method: "pii_redaction_model",
         }),
         featureFlags: dependencies.featureFlags,

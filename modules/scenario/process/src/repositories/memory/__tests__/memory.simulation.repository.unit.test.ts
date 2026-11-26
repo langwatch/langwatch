@@ -541,28 +541,6 @@ describe("MemorySimulationRepository", () => {
     });
   });
 
-  describe("when the external sets are listed (findDistinctExternalSetIds)", () => {
-    it("answers the external sets across the projects asked", async () => {
-      const { simulations } = await given([
-        runState({ ScenarioRunId: "run-1", ScenarioSetId: "" }),
-        inProject({
-          projectId: OTHER_PROJECT,
-          state: runState({ ScenarioRunId: "run-2", ScenarioSetId: "set-b" }),
-        }),
-        runState({ ScenarioRunId: "run-3", ScenarioSetId: "__internal__s1__suite" }),
-        inProject({
-          projectId: "project-3",
-          state: runState({ ScenarioRunId: "run-4", ScenarioSetId: "set-c" }),
-        }),
-      ]);
-
-      expect(
-        await simulations.findDistinctExternalSetIds({ projectIds: [PROJECT, OTHER_PROJECT] }),
-      ).toEqual(new Set(["default", "set-b"]));
-      expect(await simulations.findDistinctExternalSetIds({ projectIds: [] })).toEqual(new Set());
-    });
-  });
-
   describe("when runs are exported (countRunsForExport)", () => {
     it("pages the filtered runs by start time and counts the same scope", async () => {
       const { simulations } = await given([

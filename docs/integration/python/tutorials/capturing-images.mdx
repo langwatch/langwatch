@@ -180,9 +180,11 @@ Always set the media type. Without one, LangWatch leaves the bytes inline in the
 
 ## What happens to the bytes
 
-LangWatch moves the image out of the span at ingestion. The bytes go into content-addressed object storage and the message part becomes a `/api/v1/files/<projectId>/<id>` reference, around 60 characters where the base64 was.
+LangWatch moves the image out of the span at ingestion. The bytes go into object storage and the message part becomes a `/api/v1/files/<projectId>/<id>` reference, around 60 characters where the base64 was.
 
-Storage is addressed by SHA-256, so identical bytes are stored once. For example, the same picture sent on ten traces costs one stored object.
+The stored bytes follow your project's trace retention: once a trace ages out, an hourly cleanup deletes the media stored from it, unless a trace that is still kept uses the same bytes.
+
+If media extraction is off (`RELEASE_TRACE_MEDIA_EXTRACTION=0`, or a Helm install with no object storage) or the store refuses the write, the image stays inline in the span.
 
 On read, LangWatch serves the original media type for images, audio, video and PDF files. Anything else is served as a download.
 

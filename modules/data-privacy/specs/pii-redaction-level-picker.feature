@@ -85,6 +85,14 @@ Feature: The organization picks its PII redaction level on the Data Privacy page
     Then it says every span the model answers is billed by the characters sent, even when it finds nothing, with no quota or plan, and fallbacks are free
     And it says a span goes to the rule-based detector (Presidio) when the model is unavailable or the span's text is over 8,000 characters in total, and can then go to Google Cloud DLP
 
+  @integration
+  Scenario: With long-span splitting on, the small print names the split limit and how a split span is billed
+    Given release_pii_redaction_model_enabled and release_pii_redaction_model_split_enabled are on for "acme"
+    When an admin opens the information beside Strict's price
+    Then it says a span goes to the rule-based detector (Presidio) when the model is unavailable or the span's text is over 32,000 characters in total
+    And it says a span over 8,000 characters is sent to the model in several parts and billed once on its own characters, the overlap between parts free
+    And where Strict is included it says only that such a span is sent in several parts, naming no billing
+
   @unit
   Scenario: The price is derived from the rate billing charges
     Given billing charges 500 nano-dollars per character for the PII redaction model
@@ -222,3 +230,4 @@ Feature: The organization picks its PII redaction level on the Data Privacy page
   Scenario: The settings page names the model's own length limit
     Given the process routes a span over PII_REDACTION_MODEL_MAX_BATCH_CHARACTERS to Presidio
     Then the fallback note names that same limit, read from the contract
+    And with long-span splitting on for the organization it names PII_REDACTION_MODEL_MAX_SPLIT_CHARACTERS instead

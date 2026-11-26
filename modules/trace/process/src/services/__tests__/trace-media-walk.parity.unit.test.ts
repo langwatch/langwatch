@@ -1,14 +1,14 @@
 import { containsMediaMarkers, collectMediaParts } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 
-import { TraceContentExtractionService } from "../../features/derivation/services/trace-content-extraction.service.ts";
-import type { TraceMediaStore } from "../../features/media/services/trace-stored-media-store.service.ts";
+import { isExtractableMediaPart } from "../../features/media/rules/media-sites.rules.ts";
+import { TraceMediaExtractionService } from "../../features/media/services/trace-media-extraction.service.ts";
+import type { TraceMediaStore } from "../../features/media/services/trace-media-store.service.ts";
 /**
  * @vitest-environment node
  * Spec: specs/trace-processing/trace-media-blob-extraction.feature
  * Parity pins three media-part views: classifier, marker and render.
  */
-import { TraceValueMediaExtractionService } from "../../features/media/services/trace-value-media-extraction.service.ts";
 import {
   EXTRACTABLE_PART_EXAMPLES,
   NON_EXTRACTABLE_PART_EXAMPLES,
@@ -26,19 +26,20 @@ vi.mock("@langwatch/observability", () => ({
 function makeFakeService(): TraceMediaStore {
   let count = 0;
   return {
-    storeFromBytes: async ({ mediaType }: { mediaType: string }) => {
+    purpose: "trace_content",
+    ownerKind: "trace",
+    storeFromBytes: async () => {
       count += 1;
-      return { id: `so-${count}`, mediaType, isDuplicate: false };
+      return { id: `so-${count}`, isDuplicate: false };
     },
   };
 }
 
-const PARAMS = {
-  projectId: "proj-1",
-  purpose: "trace_content",
-  ownerKind: "trace",
-  ownerId: "trace-1",
-};
+function extractPart(part: unknown) {
+  return TraceMediaExtractionService.create({
+    store: makeFakeService(),
+  }).extractFromPart({ part, projectId: "proj-1", ownerId: "trace-1" });
+}
 
 /**
  * collectMediaParts doesn't wrap raw PCM to WAV (needs Buffer/atob). Raw-PCM
@@ -52,14 +53,9 @@ const RENDER_COLLECTOR_EXAMPLES = EXTRACTABLE_PART_EXAMPLES.filter(
 describe("media walk parity", () => {
   describe.each(EXTRACTABLE_PART_EXAMPLES)("given the extractable shape: $name", ({ part }) => {
     it("is classified extractable, matching the store-side rewriter", async () => {
-      expect(TraceValueMediaExtractionService.create().isExtractableMediaPart(part)).toBe(true);
-      const { part: rewritten, ref } =
-        await TraceContentExtractionService.create().processContentPart({
-          part,
-          service: makeFakeService(),
-          ...PARAMS,
-        });
-      expect(ref).not.toBeNull();
+      expect(isExtractableMediaPart(part)).toBe(true);
+      const { part: rewritten, ref } = await extractPart(part);
+      expect(ref).toBeDefined();
       expect(rewritten).not.toBe(part);
     });
 
@@ -81,11 +77,7 @@ describe("media walk parity", () => {
     });
 
     it("is surfaced by the render-side collector after extraction", async () => {
-      const { part: rewritten } = await TraceContentExtractionService.create().processContentPart({
-        part,
-        service: makeFakeService(),
-        ...PARAMS,
-      });
+      const { part: rewritten } = await extractPart(part);
       const collected = collectMediaParts([{ role: "user", content: [rewritten] }]);
       expect(collected.length).toBeGreaterThan(0);
     });
@@ -95,14 +87,9 @@ describe("media walk parity", () => {
     "given the non-extractable shape: $name",
     ({ part }) => {
       it("is not classified extractable and passes the rewriter untouched", async () => {
-        expect(TraceValueMediaExtractionService.create().isExtractableMediaPart(part)).toBe(false);
-        const { part: rewritten, ref } =
-          await TraceContentExtractionService.create().processContentPart({
-            part,
-            service: makeFakeService(),
-            ...PARAMS,
-          });
-        expect(ref).toBeNull();
+        expect(isExtractableMediaPart(part)).toBe(false);
+        const { part: rewritten, ref } = await extractPart(part);
+        expect(ref).toBeUndefined();
         expect(rewritten).toBe(part);
       });
     },

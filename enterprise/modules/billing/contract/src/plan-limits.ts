@@ -35,15 +35,24 @@ function presetOf(type: PlanType): PlanInfo {
 }
 
 /**
- * Creation caps on the cloud Free plan. Paid plans leave them unset, which
- * means uncapped. Organizations already above a cap keep what they have;
- * only creating one more is refused.
+ * Caps on the cloud Free plan; paid plans leave them unset (uncapped). Creation caps refuse only
+ * one more (suites only on a template apply); runs are capped per UTC month after the grace.
+ * @see specs/licensing/cloud-free-creation-caps.feature
  */
 export const FREE_PLAN_CREATION_CAPS = {
   maxScenarios: 3,
   maxScenarioSets: 3,
   maxEvaluators: 3,
-} as const satisfies Pick<PlanInfo, "maxScenarios" | "maxScenarioSets" | "maxEvaluators">;
+  maxScenarioRunsPerMonth: 100,
+  scenarioRunGraceDays: 14,
+} as const satisfies Pick<
+  PlanInfo,
+  | "maxScenarios"
+  | "maxScenarioSets"
+  | "maxEvaluators"
+  | "maxScenarioRunsPerMonth"
+  | "scenarioRunGraceDays"
+>;
 
 export const PLAN_LIMITS: Record<PlanType, PlanInfo> = {
   // Cloud Free only. Self-hosted resolves its plan from the license

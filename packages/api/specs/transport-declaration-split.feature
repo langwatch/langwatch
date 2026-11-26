@@ -168,6 +168,13 @@ Feature: Transport declaration split
     And neither answer is a server fault
 
   @integration
+  Scenario: A body cap can be the module's deployment setting
+    Given a route whose body cap is read from its module's app
+    When the app answers a cap of 1 KiB and a caller sends 2 KiB
+    Then the body is refused as too large
+    And after the app answers 4 KiB the same body is served
+
+  @integration
   Scenario: A route's declared tags reach the published document
     Given a route whose docs name the groups it belongs to
     When the process publishes the OpenAPI document
