@@ -6,8 +6,15 @@ from typing import Optional
 import litellm
 
 # litellm raises a key it could not find as a server, connection or generic API
-# error with the provider's own wording, never as one type of its own.
-_MISSING_KEY = re.compile(r"missing (?:\w+ )?(?:credentials|api key)", re.IGNORECASE)
+# error with the provider's own wording, never as one type of its own. Bedrock
+# with no AWS credentials says "Unable to locate credentials" or, on chat, fails
+# reading the access key of credentials boto never found.
+_MISSING_KEY = re.compile(
+    r"missing (?:\w+ )?(?:credentials|api key)"
+    r"|unable to locate credentials"
+    r"|'NoneType' object has no attribute 'access_key'",
+    re.IGNORECASE,
+)
 _MISSING_KEY_TYPES = (
     litellm.exceptions.AuthenticationError,
     litellm.exceptions.InternalServerError,

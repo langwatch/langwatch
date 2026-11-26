@@ -7,6 +7,7 @@ Spec: specs/nlp-go/topic-clustering.feature
 """
 
 import json
+import os
 import zlib
 from types import SimpleNamespace
 
@@ -33,9 +34,15 @@ OPENAI_EMBEDDINGS = {"model": "openai/text-embedding-3-small"}
 
 
 @pytest.fixture(autouse=True)
-def no_provider_keys(monkeypatch):
+def no_provider_keys(monkeypatch, tmp_path):
+    """No provider keys, no AWS credentials anywhere boto looks, no instance metadata."""
     for key in PROVIDER_KEYS:
         monkeypatch.delenv(key, raising=False)
+    for key in [name for name in os.environ if name.startswith("AWS_")]:
+        monkeypatch.delenv(key)
+    monkeypatch.setenv("AWS_EC2_METADATA_DISABLED", "true")
+    monkeypatch.setenv("AWS_CONFIG_FILE", str(tmp_path / "aws-config"))
+    monkeypatch.setenv("AWS_SHARED_CREDENTIALS_FILE", str(tmp_path / "aws-credentials"))
 
 
 @pytest.fixture
@@ -146,7 +153,11 @@ def counted(monkeypatch, name):
 # @scenario "A model provider with no API key is answered as the customer's to fix"
 @pytest.mark.parametrize(
     "embeddings_litellm_params",
-    [OPENAI_EMBEDDINGS, {"model": "gemini/text-embedding-004"}],
+    [
+        OPENAI_EMBEDDINGS,
+        {"model": "gemini/text-embedding-004"},
+        {"model": "bedrock/amazon.titan-embed-text-v2:0", "aws_region_name": "eu-central-1"},
+    ],
 )
 @pytest.mark.parametrize("endpoint", ["batch", "incremental"])
 def test_an_embeddings_model_with_no_key_is_a_typed_4xx(
@@ -166,12 +177,20 @@ def test_an_embeddings_model_with_no_key_is_a_typed_4xx(
 
 
 # @scenario "A model provider with no API key is answered as the customer's to fix"
-def test_a_naming_model_with_no_key_is_a_typed_4xx(client, monkeypatch):
+@pytest.mark.parametrize(
+    "litellm_params",
+    [
+        OPENAI_LLM,
+        {"model": "bedrock/eu.anthropic.claude-sonnet-4-5-20250929-v1:0", "aws_region_name": "eu-central-1"},
+        {"model": "bedrock/anthropic.claude-3-5-sonnet-20240620-v1:0"},
+    ],
+)
+def test_a_naming_model_with_no_key_is_a_typed_4xx(client, monkeypatch, litellm_params):
     monkeypatch.setattr(litellm, "embedding", FakeProvider().embedding)
     monkeypatch.setattr(batch_clustering, "build_hierarchy", one_topic_hierarchy)
     calls = counted(monkeypatch, "completion")
 
-    response = client.post("/topics/batch_clustering", json=batch_body(OPENAI_LLM, OPENAI_EMBEDDINGS))
+    response = client.post("/topics/batch_clustering", json=batch_body(litellm_params, OPENAI_EMBEDDINGS))
 
     assert response.status_code == 422
     assert response.json()["detail"]["code"] == "model_provider_key_missing"
