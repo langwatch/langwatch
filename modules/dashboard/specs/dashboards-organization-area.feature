@@ -893,6 +893,13 @@ Feature: Organization-wide Dashboards area
     And it says "Couldn't save the order of your dashboards"
     And when an earlier save is refused while a later one is still out, the later order stays and shows once it is saved
 
+  @integration
+  Scenario: Quick reorders are saved in the order I made them
+    Given the LLM Ops Dashboards section lists My dashboard, "Alpha", "Beta" and "Gamma"
+    When I move "Gamma" up and then "Alpha" down while the first save is still out
+    Then the second order is sent only after the first save is answered
+    And the order I made last is the one stored and shown
+
   @unit
   Scenario: A board my order does not name is listed after the ones it does, by name
     Given my order in LLM Ops names "Beta" then "Alpha"

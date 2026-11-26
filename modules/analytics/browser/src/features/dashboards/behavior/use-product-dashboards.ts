@@ -12,6 +12,8 @@ import { useAnalyticsHost } from "../../../model/analytics-host.ts";
 import { type LibraryBoard, libraryBoardOf } from "../model/organization-library.ts";
 import { nextSidebarOrder, productSidebarBoards } from "../model/product-dashboards.ts";
 
+type SaveQueue = { confirmed: readonly string[]; isSaving: boolean; waiting?: string[] };
+
 export function useProductDashboards({ product }: { product: DashboardHomeProduct }): {
   boards: readonly LibraryBoard[];
   /** Every board the library lists, for numbering a new one in any product. */
@@ -36,8 +38,9 @@ export function useProductDashboards({ product }: { product: DashboardHomeProduc
     enabled: organizationId !== "",
   });
   const save = analyticsApi.boards.reorderSidebar.useMutation();
-  // Per organization and product: the order the server last confirmed and the saves still out.
-  const saves = useRef(new Map<string, { confirmed: readonly string[]; pending: number }>());
+  // Per organization and product: the order the server last confirmed, whether a save is out,
+  // and the latest drag's order waiting for it, so saves reach the server in drag order.
+  const saves = useRef(new Map<string, SaveQueue>());
   const stored = order.data?.dashboardIds ?? [];
   const allBoards = (list.data ?? []).map(libraryBoardOf);
   const boards = productSidebarBoards({
@@ -50,29 +53,36 @@ export function useProductDashboards({ product }: { product: DashboardHomeProduc
 
   const reorder = (shownIds: readonly string[]) => {
     const scope = `${organizationId}:${product}`;
+    const queue = saves.current.get(scope) ?? { confirmed: stored, isSaving: false };
+    saves.current.set(scope, queue);
     // With no save out, the cached order is the one the server holds.
-    const state = saves.current.get(scope) ?? { confirmed: stored, pending: 0 };
-    if (state.pending === 0) state.confirmed = stored;
-    state.pending += 1;
-    saves.current.set(scope, state);
+    if (!queue.isSaving) queue.confirmed = stored;
     const dashboardIds = nextSidebarOrder({ stored, shown: shownIds });
     utils.boards.sidebarOrder.setData(orderInput, { dashboardIds });
-    // The last save to settle shows what the server confirmed; until then the drag's order stays.
-    const settle = () => {
-      state.pending -= 1;
-      if (state.pending > 0) return;
-      utils.boards.sidebarOrder.setData(orderInput, { dashboardIds: [...state.confirmed] });
+
+    // Once the queue is empty, the cache shows what the server confirmed.
+    const send = (ids: string[]) => {
+      queue.isSaving = true;
+      const settle = () => {
+        queue.isSaving = false;
+        const waiting = queue.waiting;
+        queue.waiting = void 0;
+        if (waiting) return send(waiting);
+        utils.boards.sidebarOrder.setData(orderInput, { dashboardIds: [...queue.confirmed] });
+      };
+      save
+        .mutateAsync({ ...orderInput, dashboardIds: ids })
+        .then(() => {
+          queue.confirmed = ids;
+          settle();
+        })
+        .catch((error: unknown) => {
+          host.failed({ error, fallbackTitle: "Couldn't save the order of your dashboards" });
+          settle();
+        });
     };
-    save
-      .mutateAsync({ ...orderInput, dashboardIds })
-      .then(() => {
-        state.confirmed = dashboardIds;
-        settle();
-      })
-      .catch((error: unknown) => {
-        settle();
-        host.failed({ error, fallbackTitle: "Couldn't save the order of your dashboards" });
-      });
+    if (queue.isSaving) queue.waiting = dashboardIds;
+    else send(dashboardIds);
   };
 
   // A failed order read lists the boards by name rather than hiding the section.

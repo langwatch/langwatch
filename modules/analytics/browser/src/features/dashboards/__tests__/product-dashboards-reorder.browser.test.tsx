@@ -227,6 +227,7 @@ describe("a product's Dashboards section, reordered", () => {
     await user.keyboard(" ");
 
     await waitFor(() => expect(host.failures).toHaveLength(1));
+    await waitFor(() => expect(savedOrders(calls)).toHaveLength(2));
     expect(savedOrders(calls)).toEqual([
       ["alpha", "gamma", "beta"],
       ["gamma", "alpha", "beta"],
@@ -234,6 +235,37 @@ describe("a product's Dashboards section, reordered", () => {
     // The later save is still out, so its order stays on screen.
     expect(await listed()).toEqual(["My dashboard", "Gamma", "Alpha", "Beta"]);
     await new Promise((resolve) => setTimeout(resolve, 700));
+    expect(await listed()).toEqual(["My dashboard", "Gamma", "Alpha", "Beta"]);
+  });
+
+  /** @scenario "Quick reorders are saved in the order I made them" */
+  it("sends a second order only after the first save is answered", async () => {
+    const { calls, user } = renderSection({
+      saved: ["alpha", "beta", "gamma"],
+      saveAnswers: [{ isRefused: false, afterMs: 400 }],
+    });
+    await waitFor(async () =>
+      expect(await listed()).toEqual(["My dashboard", "Alpha", "Beta", "Gamma"]),
+    );
+
+    screen.getByRole("button", { name: "Reorder Gamma" }).focus();
+    await user.keyboard(" ");
+    await user.keyboard("{ArrowUp}");
+    await user.keyboard(" ");
+    screen.getByRole("button", { name: "Reorder Alpha" }).focus();
+    await user.keyboard(" ");
+    await user.keyboard("{ArrowDown}");
+    await user.keyboard(" ");
+
+    expect(await listed()).toEqual(["My dashboard", "Gamma", "Alpha", "Beta"]);
+    expect(savedOrders(calls)).toEqual([["alpha", "gamma", "beta"]]);
+    await waitFor(() =>
+      expect(savedOrders(calls)).toEqual([
+        ["alpha", "gamma", "beta"],
+        ["gamma", "alpha", "beta"],
+      ]),
+    );
+    await new Promise((resolve) => setTimeout(resolve, 100));
     expect(await listed()).toEqual(["My dashboard", "Gamma", "Alpha", "Beta"]);
   });
 });
