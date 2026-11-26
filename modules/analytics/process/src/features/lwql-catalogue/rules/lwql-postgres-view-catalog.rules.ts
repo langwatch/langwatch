@@ -397,6 +397,7 @@ export const LWQL_POSTGRES_CATALOGUE = defineLwqlCatalog({
       Scope: { source: "scope" },
       organizationId: "omit", // set only once a board is shared with the organization
       excludedOrigins: "omit", // deprecated, unread since queries name their sources (AC200)
+      homeProduct: "omit", // which product's sidebar lists the board; navigation only
       CreatedAt: { source: "createdAt" },
       UpdatedAt: { source: "updatedAt" },
     },
@@ -977,6 +978,7 @@ export const LWQL_POSTGRES_CATALOGUE = defineLwqlCatalog({
       PendingHandoffTurnId: "inherit",
       RunToken: "omit", // secret
       ArchivedAt: "inherit",
+      CiFollowUpsInARow: "inherit",
       CreatedAt: "inherit",
       UpdatedAt: "inherit",
       OccurredAt: "inherit",
@@ -1101,6 +1103,7 @@ export const LWQL_POSTGRES_CATALOGUE = defineLwqlCatalog({
       ProviderConfig: { source: "providerConfig", content: "output" },
       FallbackPriorityGlobal: { source: "fallbackPriorityGlobal" },
       LangySkipPermissionsModels: { source: "langySkipPermissionsModels", content: "output" },
+      lastListedModelIds: "omit", // bookkeeping for the model import on save
       HealthStatus: { source: "healthStatus" },
       CircuitOpenedAt: { source: "circuitOpenedAt" },
       LastHealthCheckAt: { source: "lastHealthCheckAt" },
@@ -1351,10 +1354,15 @@ export const LWQL_POSTGRES_CATALOGUE = defineLwqlCatalog({
       Parameters: { source: "parameters", content: "output" },
       SimulatorModel: { source: "simulatorModel" },
       JudgeModel: { source: "judgeModel" },
+      TraceQuietPeriodMs: { source: "traceQuietPeriodMs" },
+      TraceWaitTimeoutMs: { source: "traceWaitTimeoutMs" },
       MaxTurns: { source: "maxTurns" },
       MinTurns: { source: "minTurns" },
       Fields: { source: "fields", content: "output" },
       CallerVoice: { source: "callerVoice", content: "output" },
+      Kind: { source: "kind" },
+      RedTeam: { source: "redTeam", content: "output" },
+      sourceTemplateId: "omit", // internal bookkeeping: the template a scenario came from
       TestSuiteId: { source: "testSuiteId" },
       Version: { source: "version" },
       LastUpdatedById: { source: "lastUpdatedById" },
@@ -1417,10 +1425,14 @@ export const LWQL_POSTGRES_CATALOGUE = defineLwqlCatalog({
       Labels: { source: "labels" },
       SimulatorModel: { source: "simulatorModel" },
       JudgeModel: { source: "judgeModel" },
+      TraceQuietPeriodMs: { source: "traceQuietPeriodMs" },
+      TraceWaitTimeoutMs: { source: "traceWaitTimeoutMs" },
       Kind: { source: "kind" },
       ScopeConfig: { source: "scope", content: "output" }, // not a scope label
       Fields: { source: "fields", content: "output" },
       Evaluators: { source: "evaluators", content: "output" },
+      TemplateId: { source: "templateId" },
+      TemplateVersion: { source: "templateVersion" },
       ArchivedAt: { source: "archivedAt" },
       CreatedAt: { source: "createdAt" },
       UpdatedAt: { source: "updatedAt" },

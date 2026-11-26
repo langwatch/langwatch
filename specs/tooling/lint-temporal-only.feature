@@ -22,7 +22,7 @@ Feature: The linter keeps one clock
     Scenario: Reading the clock through Date.now is reported
       Given production source that calls Date.now
       When the rule runs
-      Then it reports the call and names the epoch milliseconds an instant carries
+      Then it reports the call and names the time package's epoch millisecond helper, with the instant reader for callers that need an Instant
 
     @unit
     Scenario: Constructing a Date from a value is reported

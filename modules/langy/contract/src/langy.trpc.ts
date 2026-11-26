@@ -12,6 +12,12 @@ import {
   langyLocalWorkspaceStatusSchema,
 } from "./features/local-control/langy.local-control-http.ts";
 import {
+  langyAttachmentConfirmInputSchema,
+  langyAttachmentSchema,
+  langyAttachmentUploadInputSchema,
+  langyAttachmentUploadSchema,
+} from "./langy-attachments.ts";
+import {
   langyAnswerLocalPermissionInputSchema,
   langyAnswerQuestionInputSchema,
   langyClaimUiActionInputSchema,
@@ -53,7 +59,7 @@ import {
   langyUiActionCompletedSchema,
   langyWarmedWorkerSchema,
 } from "./langy.dtos.ts";
-import { langyStreamEntrySchema } from "./langy.stream-entry.ts";
+import { langyStreamFrameSchema } from "./langy.stream-entry.ts";
 
 export const langyTrpc = defineTrpcContract("langy")
   .query("list")
@@ -87,6 +93,15 @@ export const langyTrpc = defineTrpcContract("langy")
   .mutation("deleteConversation")
   .withInput(langyPanelConversationInputSchema)
   .withOutput(langyConversationDeletedSchema)
+
+  /** An image for the next message: a signed URL to PUT it to (ADR-158). */
+  .mutation("createAttachmentUpload")
+  .withInput(langyAttachmentUploadInputSchema)
+  .withOutput(langyAttachmentUploadSchema)
+
+  .mutation("confirmAttachmentUpload")
+  .withInput(langyAttachmentConfirmInputSchema)
+  .withOutput(langyAttachmentSchema)
 
   .mutation("renameConversation")
   .withInput(langyRenameInputSchema)
@@ -185,7 +200,7 @@ export const langyTrpc = defineTrpcContract("langy")
 
   .subscription("onTurnStream")
   .withInput(langyTurnStreamInputSchema)
-  .withOutput(langyStreamEntrySchema)
+  .withOutput(langyStreamFrameSchema)
   .build();
 
 /** The project's egress allow-list editor; `set` wants `langy:manage`, behind the same gate. */

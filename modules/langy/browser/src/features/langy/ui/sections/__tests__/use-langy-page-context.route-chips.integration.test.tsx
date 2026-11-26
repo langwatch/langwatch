@@ -5,14 +5,16 @@
  */
 import { act, renderHook } from "@testing-library/react";
 import type { ReactNode } from "react";
-import { MemoryRouter } from "react-router";
+import { MemoryRouter, useNavigate } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+const page = vi.hoisted(() => ({ context: [] as LangyContextChip[] }));
+
 vi.mock("../../../../tools/ui/sections/langy-page-context.tsx", () => ({
-  useLangy: () => ({ experimentSlug: undefined, pageContext: [] }),
+  useLangy: () => ({ experimentSlug: undefined, pageContext: page.context }),
 }));
 
-import { useLangyStore } from "../../../../../behavior/langy.store.ts";
+import { type LangyContextChip, useLangyStore } from "../../../../../behavior/langy.store.ts";
 import { removeContextChip } from "../../../../context-target/behavior/langy-context-target.store.ts";
 import { langyTurnContext } from "../../../behavior/panel/use-langy-panel-transport.ts";
 import { useLangyPageContext } from "../use-langy-page-context.ts";
@@ -30,7 +32,25 @@ function offeredAt(path: string) {
 
 beforeEach(() => {
   useLangyStore.getState().resetChosenChips();
+  page.context = [];
 });
+
+/** The page context hook, plus a way to move the reader to another address. */
+function pageContextWithNavigation(path: string) {
+  const wrapper = ({ children }: { children: ReactNode }) => (
+    <MemoryRouter initialEntries={[path]}>{children}</MemoryRouter>
+  );
+  return renderHook(() => ({ context: useLangyPageContext(), navigate: useNavigate() }), {
+    wrapper,
+  }).result;
+}
+
+const usageBoardChip: LangyContextChip = {
+  id: "dashboard:dash_42",
+  kind: "dashboard",
+  label: "dashboard: Usage · 30d · 1d",
+  ref: 'dashboard "Usage" (id dash_42)',
+};
 
 describe("given the user is viewing one resource", () => {
   /** @scenario "Viewing an experiment surfaces it as context" */
@@ -121,5 +141,56 @@ describe("given the user is on a dashboards page that shows no one board", () =>
       const { chips, addableChips } = pageContextAt(path).current;
       expect([...chips, ...addableChips].map((chip) => chip.kind)).not.toContain("dashboard");
     }
+  });
+});
+
+describe("given the user is on a new board that holds nothing yet", () => {
+  /** @scenario "A new board not yet stored offers no board as context" */
+  it("attaches and offers no dashboard chip, in a project or in Dashboards", () => {
+    for (const path of ["/demo/dashboards/new", "/dashboards/new"]) {
+      const { chips, addableChips } = pageContextAt(path).current;
+      expect([...chips, ...addableChips].map((chip) => chip.kind)).not.toContain("dashboard");
+    }
+  });
+});
+
+describe("given the board is open in the organization's Dashboards area", () => {
+  /** @scenario "A board opened in the organization's Dashboards area attaches itself too" */
+  it("attaches the board the address names", () => {
+    expect(pageContextAt("/dashboards/dash_42").current.chips).toContainEqual(
+      expect.objectContaining({ id: "dashboard:dash_42", kind: "dashboard" }),
+    );
+  });
+
+  it("names no board on the library or its templates", () => {
+    for (const path of ["/dashboards", "/dashboards/templates", "/dashboards/curated/x"]) {
+      expect(pageContextAt(path).current.chips).toEqual([]);
+    }
+  });
+});
+
+describe("given the board on screen names itself", () => {
+  /** @scenario "A board the page names attaches itself even when the address does not" */
+  it("attaches the board's own chip", () => {
+    page.context = [usageBoardChip];
+    expect(pageContextAt("/demo/somewhere-else").current.chips).toContainEqual(
+      expect.objectContaining({ id: "dashboard:dash_42", label: usageBoardChip.label }),
+    );
+  });
+});
+
+describe("given the user removed a board's chip", () => {
+  /** @scenario "A removed board chip comes back when I return to that board" */
+  it("keeps it removed on that page and brings it back on the next visit", () => {
+    const result = pageContextWithNavigation("/demo/dashboards/dash_42");
+    const boardChips = () =>
+      result.current.context.chips.filter((chip) => chip.kind === "dashboard");
+
+    act(() => removeContextChip("dashboard:dash_42"));
+    expect(boardChips()).toEqual([]);
+
+    act(() => void result.current.navigate("/demo/traces"));
+    act(() => void result.current.navigate("/demo/dashboards/dash_42"));
+    expect(boardChips()).toContainEqual(expect.objectContaining({ id: "dashboard:dash_42" }));
   });
 });

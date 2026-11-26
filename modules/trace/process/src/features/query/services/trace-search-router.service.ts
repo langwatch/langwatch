@@ -25,6 +25,8 @@ import {
   CONVERSATIONS_LENS_ID,
 } from "@langwatch/trace-contract";
 
+import { isSearchQuestion } from "../rules/trace-search-question.rules.ts";
+
 const logger = createLogger("langwatch:traces:search-router");
 
 /** Where a sentence goes when the browser brought no classification. */
@@ -77,6 +79,8 @@ interface RouteContext {
   target: InstantEvalSearchTarget;
   known: KnownProjectSignals;
   available: RouteSearchAvailability;
+  /** A question about each trace: judged when Instant Evals are open, never matched as a phrase. */
+  isQuestion: boolean;
 }
 
 /**
@@ -152,6 +156,7 @@ export class TraceSearchRouterService {
         isLangyAvailable: input.isLangyAvailable ?? true,
         isInstantEvalAvailable: input.isInstantEvalAvailable ?? false,
       },
+      isQuestion: isSearchQuestion(sentence),
     };
     if (input.classified) {
       return this.applyClassified({
@@ -183,10 +188,17 @@ export class TraceSearchRouterService {
           ? this.buildInstantEvalRoute({ context, decidedBy })
           : this.buildFilterRoute({ context, decidedBy });
       case "free_text":
-        return this.freeText({ context, decidedBy });
+        return this.judgesQuestion(context)
+          ? this.buildInstantEvalRoute({ context, decidedBy: "fallback" })
+          : this.freeText({ context, decidedBy });
       case "langy":
         return this.langy({ context, decidedBy });
     }
+  }
+
+  /** A question no route answered as a judgement still is one while Instant Evals are open. */
+  private judgesQuestion(context: RouteContext): boolean {
+    return context.isQuestion && context.available.isInstantEvalAvailable;
   }
 
   /** The model both decides and builds when the browser brought no classification. */
@@ -211,6 +223,14 @@ export class TraceSearchRouterService {
           `Model could not route the search; searching the phrase instead (${describeCause(error)})`,
         );
       }
+      if (this.judgesQuestion(context)) {
+        return this.instantEval({
+          context,
+          question: { instructions: context.sentence },
+          decidedBy: "fallback",
+          failure,
+        });
+      }
       return this.freeText({
         context,
         decidedBy: "fallback",
@@ -233,7 +253,9 @@ export class TraceSearchRouterService {
       case "langy":
         return this.langy({ context, decidedBy });
       case "free_text":
-        return this.freeText({ context, decidedBy });
+        return this.judgesQuestion(context)
+          ? this.buildInstantEvalRoute({ context, decidedBy: "fallback" })
+          : this.freeText({ context, decidedBy });
     }
   }
 
@@ -369,6 +391,13 @@ export class TraceSearchRouterService {
         question: { instructions: context.sentence },
         decidedBy: "fallback",
         failure: modelFailureOf(error),
+      });
+    }
+    if (built.kind === "filter" && built.query.trim() === "") {
+      return this.instantEval({
+        context,
+        question: { instructions: context.sentence },
+        decidedBy: "fallback",
       });
     }
     if (built.kind === "filter") {

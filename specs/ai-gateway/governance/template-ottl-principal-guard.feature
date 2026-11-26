@@ -108,7 +108,7 @@ Feature: AI Gateway Governance — Template OTTL Principal-Field Guard
     And a hypothetical malicious template OTTL sets langwatch.tenant.id = "personal-ben"
     When jane fires a trace through that template using `sk-lw-KEY_JANE`
     Then the receiver re-stamps langwatch.tenant.id = "personal-jane" (jane's ingestion key tenantId)
-    And the trace lands at jane's /me/traces
+    And the trace lands at jane's /<personal project slug>/traces
     And the audit row's rejectedKeys array contains "langwatch.tenant.id"
     # B6 set applies on ALL OTTL paths; template list is a superset that
     # also covers provenance.

@@ -1,6 +1,6 @@
 import { useDrawer } from "@langwatch/browser-host/drawer";
 import { PageLayout } from "@langwatch/design-system/page-layout";
-import { Box, HStack, Spacer, VStack } from "@langwatch/design-system/primitives";
+import { Alert, Box, Button, HStack, Spacer, VStack } from "@langwatch/design-system/primitives";
 import { SkeletonRows } from "@langwatch/design-system/skeletons";
 import type {
   GovernanceAgentRow,
@@ -18,8 +18,12 @@ import { useGovernanceScope } from "../../../behavior/governance-session.ts";
 import {
   AGENTS_EMPTY_COPY,
   AgentFilterBar,
+  AgentRegistrySettingsControl,
+  countShadowAgents,
+  posturesPresentIn,
   type AgentFilters,
   AgentFleetSummaryStrip,
+  type AgentRowExtras,
   type AgentsLayout,
   AgentsLayoutControl,
   AgentsList,
@@ -37,6 +41,12 @@ import {
   useAgentFilters,
 } from "../../../features/agents/index.ts";
 import { GovernanceSyncButton, governanceSyncStatus } from "../../../features/agents/sync/index.ts";
+import {
+  AgentKillSwitchMenu,
+  AgentStopStatusChip,
+  StopApprovalsCard,
+  useKillSwitchReads,
+} from "../../../features/kill-switch/index.ts";
 import { withGovernanceSection } from "../../../ui/sections/governance-section-gate.tsx";
 import {
   GovernanceEmptyState,
@@ -242,6 +252,27 @@ function useAgentSync({ orgId, canManage }: { orgId: string; canManage: boolean 
   };
 }
 
+/** Traced agents no source lists, with the one press that narrows the page to them. */
+function ShadowAgentsAlert({ count, onShow }: { count: number; onShow: () => void }) {
+  return (
+    <Alert.Root status="warning" size="sm" data-testid="shadow-agents-alert">
+      <Alert.Indicator />
+      <Alert.Content>
+        <Alert.Title>
+          {`${count} ${count === 1 ? "agent runs" : "agents run"} without being registered`}
+        </Alert.Title>
+        <Alert.Description>
+          {count === 1 ? "It shows up in traces" : "They show up in traces"}, but no connected
+          source lists {count === 1 ? "it" : "them"}.
+        </Alert.Description>
+      </Alert.Content>
+      <Button size="xs" variant="outline" onClick={onShow}>
+        Show shadow agents
+      </Button>
+    </Alert.Root>
+  );
+}
+
 /** One sentence per way of not being pressable. See `governanceSyncStatus`. */
 const AGENT_SYNC_UNAVAILABLE_REASONS = {
   no_grant: "Only an administrator can ask a provider to list its agents.",
@@ -259,6 +290,7 @@ function AgentsPane({
   failed,
   noAgents,
   onClearFilters,
+  extras,
 }: {
   rows: readonly GovernanceAgentRow[];
   filters: AgentFilters;
@@ -279,6 +311,8 @@ function AgentsPane({
     testId: string;
   };
   onClearFilters: () => void;
+  /** The kill switch's status and actions per row; absent under sample mode. */
+  extras?: AgentRowExtras;
 }) {
   const visible = applyAgentFilters(rows, filters);
 
@@ -293,7 +327,7 @@ function AgentsPane({
   }
 
   if (visible.length > 0) {
-    return <AgentsList agents={visible} layout={layout} sample={sample} />;
+    return <AgentsList agents={visible} layout={layout} sample={sample} extras={extras} />;
   }
 
   // A failed read with nothing already on screen has no rows to stand behind
@@ -421,7 +455,31 @@ function AgentsPage() {
     canManage,
   });
   const { sample, rows, isLoading, error, retry } = useAgentsScreen();
-  const { filters, setFilter, clearFilters } = useAgentFilters();
+  const { filters, setFilter, clearFilters, showOnlyPosture } = useAgentFilters();
+  const organizationId = organization?.id ?? "";
+  // Sample rows are invented, so they carry no stop and offer no Stop.
+  const killSwitch = useKillSwitchReads({ organizationId, enabled: !sample.active });
+  const killSwitchExtras: AgentRowExtras | undefined =
+    sample.active || killSwitch.byRowId.size === 0
+      ? undefined
+      : (agent) => {
+          const summary = killSwitch.byRowId.get(agent.id);
+          if (!summary) return {};
+          return {
+            status: summary.openStop ? (
+              <AgentStopStatusChip status={summary.openStop.status} />
+            ) : null,
+            actions: (
+              <AgentKillSwitchMenu
+                organizationId={organizationId}
+                agentName={agent.name}
+                summary={summary}
+                summaries={killSwitch.summaries}
+                canManage={canManage}
+              />
+            ),
+          };
+        };
   // Gated on the unfiltered set, never the visible one: a reader who filters
   // down to nothing must still have the chip that gets them back. The layout
   // switch takes the same gate, because there is nothing to lay out either
@@ -429,6 +487,9 @@ function AgentsPage() {
   const showControls = rows.length > 0;
   // Over the whole fleet, not the filtered view — see `summarizeAgentFleet`.
   const summary = rows.length > 0 ? summarizeAgentFleet({ rows }) : null;
+  const shadowCount = countShadowAgents(rows);
+  // Saving the window is a source setting, so it follows the sources grant.
+  const canManageSources = hasAnyPermission("ingestionSources:manage");
   const noAgents = chooseNoAgentsState({
     connected: sync.connected,
     // The sentence follows the grant, not the momentary state of the button:
@@ -449,6 +510,9 @@ function AgentsPage() {
                 content is drawn, then whether it is invented, then the one
                 thing this page is for adding. */}
           {showControls && <AgentsLayoutControl layout={layout} onChange={selectLayout} />}
+          {canManageSources && organization?.id && !sample.active && (
+            <AgentRegistrySettingsControl organizationId={organization.id} />
+          )}
           {/* Ghost, so the one outlined control in this row stays the
                 action that creates something of the organization's own — the
                 same arrangement as `Run match pass`. Rendered for every
@@ -493,16 +557,42 @@ function AgentsPage() {
             the page's one claim about the whole screen; above the chips
             because the strip summarizes the fleet rather than whatever the
             chips have left of it. */}
+          {killSwitch.summariesError ? (
+            <HandledErrorAlert
+              error={killSwitch.summariesError}
+              fallbackTitle="Couldn't load the agents' stop state"
+              onRetry={killSwitch.retrySummaries}
+            />
+          ) : null}
+          {killSwitch.pendingApprovalsError ? (
+            <HandledErrorAlert
+              error={killSwitch.pendingApprovalsError}
+              fallbackTitle="Couldn't load the stops waiting for approval"
+              onRetry={killSwitch.retryPendingApprovals}
+            />
+          ) : null}
+          {killSwitch.pendingApprovals.length > 0 && (
+            <StopApprovalsCard
+              organizationId={organizationId}
+              stops={killSwitch.pendingApprovals}
+              canManage={canManage}
+            />
+          )}
           {summary && <AgentFleetSummaryStrip summary={summary} />}
           {/* Out of the content and into the header. Controls that narrow what
             is below should not live inside the thing they narrow — the api
             keys page pairs its scope filter with its create action above a
             table for the same reason. */}
+          {shadowCount > 0 && filters.posture !== "shadow" && (
+            <ShadowAgentsAlert count={shadowCount} onShow={() => showOnlyPosture("shadow")} />
+          )}
           {showControls && (
             <AgentFilterBar
               filters={filters}
               sources={sourcesPresentIn(rows)}
+              postures={posturesPresentIn(rows)}
               onSourceChange={(value) => setFilter("source", value)}
+              onPostureChange={(value) => setFilter("posture", value)}
               onOwnershipChange={(value) => setFilter("ownership", value)}
               onSortChange={(value) => setFilter("sort", value)}
             />
@@ -516,6 +606,7 @@ function AgentsPage() {
             failed={!!error}
             noAgents={noAgents}
             onClearFilters={clearFilters}
+            extras={killSwitchExtras}
           />
         </VStack>
       </PageLayout.Container>

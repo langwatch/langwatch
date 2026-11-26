@@ -65,7 +65,13 @@ interface DashboardWidgetEditDrawerProps<Tab extends string> {
 }
 
 /** Holds room free at the right edge while open, so a panel docked there stays in view. */
-function useReservedEndInset({ open, reserveEndPx }: { open: boolean; reserveEndPx?: number }) {
+export function useReservedEndInset({
+  open,
+  reserveEndPx,
+}: {
+  open: boolean;
+  reserveEndPx?: number;
+}) {
   useLayoutEffect(() => {
     if (!open || reserveEndPx === void 0) return;
     setDrawerEndInset(reserveEndPx);

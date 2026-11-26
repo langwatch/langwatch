@@ -11,7 +11,7 @@ export const IntegratePaneShell: React.FC<{
   /**
    * Faded, non-interactive page chrome rendered above the hero. The
    * project pane passes its SearchBar + Toolbar so the empty state still
-   * reads as the trace page; /me passes nothing.
+   * reads as the trace page; /coding-agents passes nothing.
    */
   chrome?: React.ReactNode;
   /**

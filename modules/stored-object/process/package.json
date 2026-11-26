@@ -40,6 +40,7 @@
     "@langwatch/eventing": "workspace:*",
     "@langwatch/dataset-contract": "workspace:*",
     "@langwatch/egress": "workspace:*",
+    "@langwatch/eventing": "workspace:*",
     "@langwatch/group-queue": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
     "@langwatch/ksuid": "workspace:*",

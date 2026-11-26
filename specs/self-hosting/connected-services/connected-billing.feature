@@ -170,6 +170,15 @@ Feature: Billing a connected self-hosted customer
     When usage is reported for the month
     Then the spend is reported to the hosted usage meter for the billing customer of "ACME"
 
+  # Which meter the quarterly price bills is unchecked against Stripe (ADR-174 decision 18).
+  @unit
+  Scenario: Hosted usage is reported without a price check until its meter is confirmed
+    Given "ACME" was onboarded
+    And hosted spend was recorded under "ACME"
+    When usage is reported for the month
+    Then the subscription is not asked for any Instant Evals price
+    And the spend is reported as before
+
   @integration
   Scenario: A connected customer is not skipped for lacking a Cloud plan
     Given "ACME" is a self-hosted customer with no LangWatch Cloud plan

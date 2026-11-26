@@ -29,18 +29,25 @@ function renderer(overrides: Partial<LangWatchQLTraceRenderer> = {}): LangWatchQ
   };
 }
 
-const NO_TRACES: LangWatchQLFetchedTraces = { byId: new Map(), byThread: new Map() };
+const NO_TRACES: LangWatchQLFetchedTraces = {
+  byId: new Map(),
+  byThread: new Map(),
+  traceIdsByThread: new Map(),
+};
 
 function fetched({
   byId = [],
   byThread = [],
+  traceIdsByThread = [],
 }: {
   byId?: readonly Trace[];
   byThread?: readonly (readonly [string, readonly Trace[]])[];
+  traceIdsByThread?: readonly (readonly [string, readonly string[]])[];
 }): LangWatchQLFetchedTraces {
   return {
     byId: new Map(byId.map((entry) => [entry.trace_id, entry])),
     byThread: new Map(byThread),
+    traceIdsByThread: new Map(traceIdsByThread),
   };
 }
 
@@ -153,6 +160,22 @@ describe("LangWatchQLHydrationComputeService", () => {
     });
 
     expect(computed.get("ids")?.get('["thread-a"]')?.value).toEqual(["trace-a", "trace-b"]);
+  });
+
+  it("answers thread_traces from the thread's trace ids when no trace was read", async () => {
+    const service = LangWatchQLHydrationComputeService.create({ renderer: renderer() });
+
+    const computed = await service.computeValues({
+      resolved: collectLangWatchQLKeys({
+        calls: [{ column: "ids", function: "thread_traces", options: [] }],
+        rows: [{ ids: "thread-a" }, { ids: "thread-missing" }],
+      }),
+      traces: fetched({ traceIdsByThread: [["thread-a", ["trace-a", "trace-b"]]] }),
+      maxHydratedValueBytes: MAX_VALUE_BYTES,
+    });
+
+    expect(computed.get("ids")?.get('["thread-a"]')?.value).toEqual(["trace-a", "trace-b"]);
+    expect(computed.get("ids")?.get('["thread-missing"]')?.isResolved).toBe(false);
   });
 
   /** @scenario "A span the trace does not hold is an unresolved key" */

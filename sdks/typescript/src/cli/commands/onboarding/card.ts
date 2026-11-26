@@ -1,6 +1,7 @@
 import type {
   GuidedOnboardingPath,
   GuidedOnboardingState,
+  LangyStart,
 } from "@/client-sdk/services/onboarding/onboarding-api.service";
 
 /** The four paths, titled the way the tour titles them. */
@@ -77,4 +78,21 @@ export interface GuidedPathDoneCard {
 
 export function guidedPathDoneCard(path: string): GuidedPathDoneCard {
   return { text: `${guidedPathTitle(path)} set up` };
+}
+
+const LANGY_START_LINES: Record<LangyStart, string> = {
+  coding: "You chose to track your coding agent",
+  call: "You chose a call for the company setup",
+};
+
+export interface LangyStartCard {
+  text: string;
+}
+
+/**
+ * What `onboarding start` prints: the choice the person made, in one line. A call reads as
+ * chosen, never as booked, since nothing books it.
+ */
+export function langyStartCard(start: LangyStart): LangyStartCard {
+  return { text: LANGY_START_LINES[start] };
 }

@@ -29,6 +29,13 @@ Feature: paymentsim, a local stand-in for Stripe
       And the billable-events meter under its catalog id
 
     @unit
+    Scenario: Each dollar usage price is metered on its own meter
+      Given a catalog mapping the Instant Evals and PII redaction prices at 100 cents per dollar, and their meters
+      When paymentsim seeds it
+      Then the Instant Evals price is metered on the Instant Evals meter
+      And the PII redaction price is metered on the PII redaction meter
+
+    @unit
     Scenario: An unknown id answers Stripe's resource_missing error
       When billing retrieves a subscription paymentsim does not hold
       Then paymentsim answers 404 with code resource_missing
@@ -93,6 +100,13 @@ Feature: paymentsim, a local stand-in for Stripe
       Given a subscription with two seats and tiered metered events
       When the clock moves past the period end
       Then a subscription_cycle invoice bills the seats and the usage above the free tier, and is paid
+
+    @unit
+    Scenario: A renewal bills the dollars judged on the catalog's Instant Evals price
+      Given paymentsim started with the billing contract's stripe-catalog.json
+      And a dollar subscription with two seats and the catalog's Instant Evals price
+      When 1.2345 dollars are sent to the Instant Evals meter and the clock moves past the period end
+      Then the renewal invoice bills the seats and 123 cents for Instant Evals
 
     @unit
     Scenario: A forced payment failure fires invoice.payment_failed and marks the subscription past due

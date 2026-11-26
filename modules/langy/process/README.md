@@ -14,7 +14,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 The portable, callable Langy capability shared by process transports.
 
-Peers call these through the token, declared at `../contract/src/langy.api.ts:299`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/langy.api.ts:305`; nothing else in this package is public.
 
 #### `ingestInternalTurnResult`
 
@@ -404,6 +404,20 @@ getConversationMessages(input: LangyPanelCall<typeof langyPanelConversationInput
 archiveConversation(input: LangyPanelCall<typeof langyPanelConversationInputSchema>): Promise<{ success: boolean }>;
 ```
 
+#### `createAttachmentUpload`
+
+Refuses a file that is not an image Langy reads, or is too large, before it uploads.
+
+```typescript
+createAttachmentUpload(input: LangyAttachmentUploadInput): Promise<LangyAttachmentUpload>;
+```
+
+#### `confirmAttachmentUpload`
+
+```typescript
+confirmAttachmentUpload(input: LangyAttachmentConfirmInput): Promise<LangyAttachment>;
+```
+
 #### `renameConversation`
 
 ```typescript
@@ -467,7 +481,7 @@ watchConversationUpdates(input: LangyPanelCall<typeof langyProjectInputSchema> &
 #### `watchTurnStream`
 
 ```typescript
-watchTurnStream(input: LangyPanelCall<typeof langyTurnStreamInputSchema> & { signal?: AbortSignal }): AsyncIterable<LangyStreamEntry>;
+watchTurnStream(input: LangyPanelCall<typeof langyTurnStreamInputSchema> & { signal?: AbortSignal }): AsyncIterable<LangyStreamFrame>;
 ```
 
 #### `getPanelLocalRecord`
@@ -959,7 +973,7 @@ type Response = unknown;
 
 ### `langy`
 
-Contract `../contract/src/langy.trpc.ts:58`, router `src/transport/langy.trpc.ts:33`.
+Contract `../contract/src/langy.trpc.ts:64`, router `src/transport/langy.trpc.ts:33`.
 
 | Procedure                        | Kind         | Gate                      | Input                                     | Output                                |
 | -------------------------------- | ------------ | ------------------------- | ----------------------------------------- | ------------------------------------- |
@@ -968,6 +982,8 @@ Contract `../contract/src/langy.trpc.ts:58`, router `src/transport/langy.trpc.ts
 | `langy.detail`                   | query        | Permission `langy:view`   | `langyPanelConversationInputSchema`       | inline                                |
 | `langy.messages`                 | query        | Permission `langy:view`   | `langyPanelConversationInputSchema`       | `langyConversationMessagesDtoSchema`  |
 | `langy.deleteConversation`       | mutation     | Permission `langy:delete` | `langyPanelConversationInputSchema`       | `langyConversationDeletedSchema`      |
+| `langy.createAttachmentUpload`   | mutation     | Permission `langy:create` | `langyAttachmentUploadInputSchema`        | `langyAttachmentUploadSchema`         |
+| `langy.confirmAttachmentUpload`  | mutation     | Permission `langy:create` | `langyAttachmentConfirmInputSchema`       | `langyAttachmentSchema`               |
 | `langy.renameConversation`       | mutation     | Permission `langy:update` | `langyRenameInputSchema`                  | `langyConversationDetailSchema`       |
 | `langy.forkConversation`         | mutation     | Permission `langy:create` | `langyForkInputSchema`                    | `langyConversationDetailSchema`       |
 | `langy.createConversation`       | mutation     | Permission `langy:create` | `langyPanelCreateConversationInputSchema` | `langyTurnStartedSchema`              |
@@ -989,7 +1005,7 @@ Contract `../contract/src/langy.trpc.ts:58`, router `src/transport/langy.trpc.ts
 | `langy.recordFeedback`           | mutation     | Permission `langy:create` | `langyRecordFeedbackInputSchema`          | –                                     |
 | `langy.feedbackPromptShown`      | mutation     | Permission `langy:create` | `langyFeedbackPromptShownInputSchema`     | –                                     |
 | `langy.onConversationUpdate`     | subscription | Permission `langy:view`   | `langyProjectInputSchema`                 | `langyConversationUpdateFrameSchema`  |
-| `langy.onTurnStream`             | subscription | Permission `langy:view`   | `langyTurnStreamInputSchema`              | `langyStreamEntrySchema`              |
+| `langy.onTurnStream`             | subscription | Permission `langy:view`   | `langyTurnStreamInputSchema`              | `langyStreamFrameSchema`              |
 
 ```typescript
 // langy.list
@@ -1023,7 +1039,7 @@ interface Input {
   projectId: string;
   conversationId: string;
 }
-// Output: inline, ../contract/src/langy.trpc.ts:70
+// Output: inline, ../contract/src/langy.trpc.ts:76
 type Output = {
   id: string;
   title: string | null;
@@ -1044,6 +1060,37 @@ type Input = z.infer<typeof langyPanelConversationInputSchema>; // ../contract/s
 // Output: langyConversationDeletedSchema, ../contract/src/langy.dtos.ts:198
 interface Output {
   success: boolean;
+}
+
+// langy.createAttachmentUpload
+// Input: langyAttachmentUploadInputSchema, ../contract/src/langy-attachments.ts:52
+interface Input {
+  projectId: string;
+  filename: string;
+  mediaType: string;
+  byteLength: number;
+}
+// Output: langyAttachmentUploadSchema, ../contract/src/langy-attachments.ts:66
+interface Output {
+  objectId: string;
+  uploadUrl: string;
+  method: "PUT";
+  headers?: Record<string, string>;
+}
+
+// langy.confirmAttachmentUpload
+// Input: langyAttachmentConfirmInputSchema, ../contract/src/langy-attachments.ts:77
+interface Input {
+  projectId: string;
+  objectId: string;
+}
+// Output: langyAttachmentSchema, ../contract/src/langy-attachments.ts:89
+interface Output {
+  objectId: string;
+  url: string;
+  filename: string;
+  mediaType: string;
+  byteLength: number;
 }
 
 // langy.renameConversation
@@ -1275,12 +1322,12 @@ interface Input {
   conversationId: string;
   turnId: string;
 }
-type Output = z.infer<typeof langyStreamEntrySchema>; // ../contract/src/langy.stream-entry.ts:120
+type Output = z.infer<typeof langyStreamFrameSchema>; // ../contract/src/langy.stream-entry.ts:133
 ```
 
 ### `langyEgress`
 
-Contract `../contract/src/langy.trpc.ts:192`, router `src/transport/langy.trpc.ts:228`.
+Contract `../contract/src/langy.trpc.ts:207`, router `src/transport/langy.trpc.ts:236`.
 
 | Procedure         | Kind     | Gate                      | Input                       | Output                   |
 | ----------------- | -------- | ------------------------- | --------------------------- | ------------------------ |
@@ -1310,7 +1357,7 @@ type Output = z.infer<typeof langyEgressStateSchema>; // ../contract/src/langy-t
 
 ### `setupSkills`
 
-Contract `../contract/src/langy.trpc.ts:208`, router `src/transport/setup-skills.trpc.ts:10`.
+Contract `../contract/src/langy.trpc.ts:223`, router `src/transport/setup-skills.trpc.ts:10`.
 
 | Procedure               | Kind  | Gate                      | Input  | Output |
 | ----------------------- | ----- | ------------------------- | ------ | ------ |
@@ -1318,12 +1365,12 @@ Contract `../contract/src/langy.trpc.ts:208`, router `src/transport/setup-skills
 
 ```typescript
 // setupSkills.getPrompt
-// Input: inline, ../contract/src/langy.trpc.ts:210
+// Input: inline, ../contract/src/langy.trpc.ts:225
 interface Input {
   projectId: string;
   skill: string;
 }
-// Output: inline, ../contract/src/langy.trpc.ts:211
+// Output: inline, ../contract/src/langy.trpc.ts:226
 interface Output {
   body: string;
 }
@@ -1339,7 +1386,7 @@ interface Output {
 
 ### Pipeline `langy_conversation_processing` (aggregate `langy_conversation`)
 
-Declared at `src/eventing/langy-conversation.pipeline.ts:117`. Events: `LangyConversationStartedEventSchema`, `LangyConversationForkedEventSchema`, `LangyMessageRecordedEventSchema`, `LangyMessageImportedEventSchema`, `LangyAgentTurnAcceptedEventSchema`, `LangyToolCallInitiatedEventSchema`, `LangyToolCallSucceededEventSchema`, `LangyToolCallFailedEventSchema`, `LangyPlanUpdatedEventSchema`, `LangyAgentResponseFailedEventSchema`, `LangyAgentRespondedEventSchema`, `LangyConversationArchivedEventSchema`, `LangyConversationMetadataUpdatedEventSchema`, `LangyConversationHandoffPendingEventSchema`, `LangyConversationHandoffConsumedEventSchema`, `LangyConversationTitleGeneratedEventSchema`, `LangyLocalControlRequestedEventSchema`, `LangyLocalWorkspaceConnectedEventSchema`, `LangyLocalWorkspaceDisconnectedEventSchema`, `LangyLocalPolicyChangedEventSchema`, `LangyUserWaitStartedEventSchema`, `LangyUserWaitEndedEventSchema`.
+Declared at `src/eventing/langy-conversation.pipeline.ts:121`. Events: `LangyConversationStartedEventSchema`, `LangyConversationForkedEventSchema`, `LangyMessageRecordedEventSchema`, `LangyMessageImportedEventSchema`, `LangyAgentTurnAcceptedEventSchema`, `LangyToolCallInitiatedEventSchema`, `LangyToolCallSucceededEventSchema`, `LangyToolCallFailedEventSchema`, `LangyPlanUpdatedEventSchema`, `LangyAgentResponseFailedEventSchema`, `LangyAgentRespondedEventSchema`, `LangyConversationArchivedEventSchema`, `LangyConversationMetadataUpdatedEventSchema`, `LangyConversationHandoffPendingEventSchema`, `LangyConversationHandoffConsumedEventSchema`, `LangyConversationTitleGeneratedEventSchema`, `LangyLocalControlRequestedEventSchema`, `LangyLocalWorkspaceConnectedEventSchema`, `LangyLocalWorkspaceDisconnectedEventSchema`, `LangyLocalPolicyChangedEventSchema`, `LangyUserWaitStartedEventSchema`, `LangyUserWaitEndedEventSchema`.
 
 ### Pipeline `langy_guided_onboarding` (aggregate `langy_guided_onboarding`)
 
@@ -1352,17 +1399,18 @@ Declared at `src/eventing/langy-guided-onboarding.pipeline.ts:41`. Events: `guid
 
 ### Pipeline `langy_maintenance` (aggregate `global`)
 
-Declared at `src/eventing/langy-maintenance.pipeline.ts:30`.
+Declared at `src/eventing/langy-maintenance.pipeline.ts:37`.
 
-| Kind            | Name                         | Handles                                                      | Declared at                                     |
-| --------------- | ---------------------------- | ------------------------------------------------------------ | ----------------------------------------------- |
-| peer subscriber | `provisionProjectVirtualKey` | `lw.project.created` from [project](../../project/README.md) | `src/eventing/langy-maintenance.pipeline.ts:37` |
+| Kind            | Name                         | Handles                                                                         | Declared at                                     |
+| --------------- | ---------------------------- | ------------------------------------------------------------------------------- | ----------------------------------------------- |
+| peer subscriber | `provisionProjectVirtualKey` | `lw.project.created` from [project](../../project/README.md)                    | `src/eventing/langy-maintenance.pipeline.ts:44` |
+| peer subscriber | `langyCiFollowUp`            | `lw.github.pull_request_checks_completed` from [github](../../github/README.md) | `src/eventing/langy-maintenance.pipeline.ts:50` |
 
 ## Configuration
 
 | Kind   | Leaf                 | Environment variable        | Declared at                          |
 | ------ | -------------------- | --------------------------- | ------------------------------------ |
-| secret | `–`                  | `LANGY_INTERNAL_SECRET`     | `src/app/langy.app.ts:294`           |
+| secret | `–`                  | `LANGY_INTERNAL_SECRET`     | `src/app/langy.app.ts:307`           |
 | config | `agentUrl`           | `LANGY_AGENT_URL`           | `../contract/src/langy.config.ts:18` |
 | config | `workerCallbackUrl`  | `LANGY_WORKER_CALLBACK_URL` | `../contract/src/langy.config.ts:19` |
 | config | `workerGatewayUrl`   | `LANGY_WORKER_GATEWAY_URL`  | `../contract/src/langy.config.ts:20` |

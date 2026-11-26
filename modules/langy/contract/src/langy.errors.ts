@@ -218,6 +218,23 @@ export class LangyEmptyMessageError extends HandledError {
   }
 }
 
+/** Why an image was refused for a Langy message; `meta.reason` carries it to the composer. */
+export type LangyAttachmentRefusal = "not_an_image" | "too_large" | "too_many" | "not_found";
+
+/** A file a Langy message cannot carry: not an image, too big, too many, or not this project's. */
+export class LangyAttachmentRefusedError extends HandledError {
+  declare readonly code: "langy_attachment_refused";
+  constructor(reason: LangyAttachmentRefusal) {
+    super("langy_attachment_refused", "That file cannot be attached to a Langy message.", {
+      httpStatus: 422,
+      fault: "customer",
+      meta: { reason },
+      ...remediation("langy_attachment_refused"),
+    });
+    this.name = "LangyAttachmentRefusedError";
+  }
+}
+
 /**
  * The caller is sending faster than the per-user Langy limit allows (HTTP 429). `meta.message`
  * carries the sentence deliberately: `serialize()` does not put a

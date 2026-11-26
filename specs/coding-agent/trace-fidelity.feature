@@ -76,6 +76,29 @@ Feature: Coding Agent Trace Fidelity (Path B direct OTLP)
     Then the trace belongs to the session's conversation
     And a codex log record that names no conversation files the trace nowhere
 
+  # --- Which conversation a Claude Code turn belongs to ---------------------
+
+  # A Claude Code subagent's spans name the subagent's own id as their
+  # conversation, not the session's. The trace keeps the first conversation a
+  # span names, and a subagent's spans often reach LangWatch before the turn's
+  # own spans do, so the turn was filed under the subagent: the session's
+  # threads split and the turn showed a thread id no session had. The turn's
+  # user_prompt record names the session, whichever spans came first.
+
+  @unit
+  Scenario: A Claude Code turn is filed under its session by its prompt record
+    Given a Claude Code user_prompt record that names its session
+    When the record is canonicalised
+    Then the trace belongs to the session's conversation
+    And a user_prompt record that names no session files the trace nowhere
+
+  @unit
+  Scenario: A Claude Code turn whose subagent span lands first stays in its session
+    Given a Claude Code turn whose subagent span reaches the trace before anything else
+    When the turn's user_prompt record is folded after that span
+    Then the trace's conversation is the session, not the subagent
+    And a subagent span folded after the record leaves the session in place
+
   # --- Reasoning effort (the request setting, not the token count) -----------
 
   @unit
@@ -156,6 +179,24 @@ Feature: Coding Agent Trace Fidelity (Path B direct OTLP)
     Given a claude code api_request_body carrying a tools array
     When the span input is built from the request body
     Then the span input carries the tool names so MCP and built-in tools are visible
+
+  # Claude Code sends a tool's answer back as a user turn holding only
+  # tool_result blocks. The person typed none of it.
+
+  @unit
+  Scenario: A user turn holding only tool results reads as the tools answering
+    Given a claude code api_request_body whose last user turn holds only tool_result blocks
+    When the span input is built from the request body
+    Then that turn is a tool message that keeps the results' text
+    And a user turn mixing typed text with tool results stays a user message
+    And a truncated request body reads its tool-result turns the same way
+
+  @unit
+  Scenario: A tool-result turn is never shown as the user's prompt
+    Given a model call whose input ends with a tool message holding a script's result
+    And the session sent no user_prompt log record
+    When the transcript is derived from the session's spans and logs
+    Then no prompt line is made from the tool message
 
   @unit
   Scenario: Identical system prompts across a session's calls are shown once

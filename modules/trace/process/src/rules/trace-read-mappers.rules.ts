@@ -31,6 +31,7 @@ import type {
   TruncatedAttribute,
 } from "@langwatch/trace-contract";
 import {
+  deriveTraceConversationId,
   deriveTraceStatus,
   deriveTraceTimestamp,
   RESERVED_INPUT_MEDIA_REFS,
@@ -139,6 +140,8 @@ export function mapLegacySpanSummaryToTreeNode(row: SpanSummaryRow): SpanTreeNod
     cacheReadTokens: row.cacheReadTokens,
     cacheCreationTokens: row.cacheCreationTokens,
     updatedAtMs: row.updatedAtMs,
+    agentName: row.agentName ?? null,
+    isA2aCall: row.isA2aCall ?? false,
     ...(row.ownerProjectId === undefined ? {} : { ownerProjectId: row.ownerProjectId }),
   };
 }
@@ -167,10 +170,7 @@ export function mapTraceSummaryToHeader(summary: TraceSummaryData): TraceHeader 
     name: summary.attributes["langwatch.span.name"] ?? summary.traceId.slice(0, 8),
     serviceName: summary.attributes["service.name"] ?? "",
     origin: summary.attributes["langwatch.origin"] ?? "application",
-    conversationId:
-      summary.attributes["gen_ai.conversation.id"] ??
-      summary.attributes["langgraph.thread_id"] ??
-      null,
+    conversationId: deriveTraceConversationId(summary.attributes) || null,
     userId: summary.attributes["langwatch.user_id"] ?? null,
     durationMs: summary.totalDurationMs,
     spanCount: summary.spanCount,

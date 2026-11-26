@@ -1,6 +1,8 @@
 import {
   chartGridPlacementSchema,
   fitsChartGridWidth,
+  fitsGridWidthIssue,
+  partialPlacementFitsGridWidth,
 } from "@langwatch/analytics-contract/chart-grid";
 import type { Named } from "@langwatch/module";
 import { z } from "zod";
@@ -26,10 +28,10 @@ export interface GraphLayoutSchema extends Named<typeof graphLayoutSchemaDefinit
 export const graphLayoutSchema: GraphLayoutSchema = graphLayoutSchemaDefinition;
 
 /** A layout the grid can draw: its column and span also stay inside the right edge. */
-const graphPlacementSchemaDefinition = graphLayoutSchema.refine(fitsChartGridWidth, {
-  message: "gridColumn + colSpan must not exceed the grid's columns",
-  path: ["colSpan"],
-});
+const graphPlacementSchemaDefinition = graphLayoutSchema.refine(
+  fitsChartGridWidth,
+  fitsGridWidthIssue,
+);
 export interface GraphPlacementSchema extends Named<typeof graphPlacementSchemaDefinition> {}
 export const graphPlacementSchema: GraphPlacementSchema = graphPlacementSchemaDefinition;
 
@@ -86,16 +88,15 @@ const graphRestParamsSchemaDefinition = z.object({ id: z.string().min(1) });
 export interface GraphRestParamsSchema extends Named<typeof graphRestParamsSchemaDefinition> {}
 export const graphRestParamsSchema: GraphRestParamsSchema = graphRestParamsSchemaDefinition;
 
-const graphRestCreateSchemaDefinition = z.object({
-  name: z.string().min(1, "name is required"),
-  graph: z.record(z.string(), z.unknown()),
-  dashboardId: z.string().optional(),
-  filters: z.record(z.string(), z.unknown()).optional(),
-  gridColumn: z.number().min(0).max(1).optional(),
-  gridRow: z.number().min(0).optional(),
-  colSpan: z.number().min(1).max(2).optional(),
-  rowSpan: z.number().min(1).max(2).optional(),
-});
+const graphRestCreateSchemaDefinition = z
+  .object({
+    name: z.string().min(1, "name is required"),
+    graph: z.record(z.string(), z.unknown()),
+    dashboardId: z.string().optional(),
+    filters: z.record(z.string(), z.unknown()).optional(),
+    ...chartGridPlacementSchema.partial().shape,
+  })
+  .refine(partialPlacementFitsGridWidth, fitsGridWidthIssue);
 export interface GraphRestCreateSchema extends Named<typeof graphRestCreateSchemaDefinition> {}
 export const graphRestCreateSchema: GraphRestCreateSchema = graphRestCreateSchemaDefinition;
 

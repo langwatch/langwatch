@@ -225,6 +225,12 @@ export const AUTHZ_RESOURCES = {
     actions: ["braided"],
     scopes: [],
   },
+  // The outbound A2A agents the gateway calls, with sealed upstream headers. Apart from
+  // `virtualKeys:*` so managing keys never opens egress; appended after `spans:braided`.
+  gatewayA2aTargets: {
+    actions: ["view", "manage"],
+    scopes: ["project", "team", "organization"],
+  },
 } as const satisfies Record<
   string,
   {

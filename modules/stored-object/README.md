@@ -18,23 +18,23 @@ Stored objects: uploads and stored bytes, their metadata, and how each is delive
 
 ## What stored-object owns
 
-| Kind            | Name                                                                                                                                                                                                                                                                        | Declared at                                                           |
-| --------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------- |
-| Stores required |                                                                                                                                                                                                                                                                             | `process/src/channels/http/http.stored-object.channels.ts:8`          |
-| Stores required | prisma, clickhouse, objectStorage, encryption, rateLimiter                                                                                                                                                                                                                  | `process/src/repositories/live/live.stored-object.repositories.ts:22` |
-| Config          | `objectRetentionConfirmed` (OBJECT_RETENTION_CONFIRMED), `legacySpoolRetentionConfirmed` (AZURE_BLOB_SPOOL_RETENTION_CONFIRMED), `blockLocalHttpCalls` (BLOCK_LOCAL_HTTP_CALLS), `allowedProxyHosts` (ALLOWED_PROXY_HOSTS), `isSaas` (IS_SAAS), `publicBaseUrl` (BASE_HOST) | `contract/src/stored-object.config.ts:35`                             |
+| Kind            | Name                                                                                                                                                                                                                                                                        | Declared at                                                                    |
+| --------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| Postgres table  | `StoredObject`                                                                                                                                                                                                                                                              | `process/src/repositories/prisma/prisma.stored-object-record.repository.ts:27` |
+| Stores required |                                                                                                                                                                                                                                                                             | `process/src/channels/http/http.stored-object.channels.ts:8`                   |
+| Stores required | prisma, clickhouse, objectStorage, encryption, rateLimiter                                                                                                                                                                                                                  | `process/src/repositories/live/live.stored-object.repositories.ts:22`          |
+| Config          | `objectRetentionConfirmed` (OBJECT_RETENTION_CONFIRMED), `legacySpoolRetentionConfirmed` (AZURE_BLOB_SPOOL_RETENTION_CONFIRMED), `blockLocalHttpCalls` (BLOCK_LOCAL_HTTP_CALLS), `allowedProxyHosts` (ALLOWED_PROXY_HOSTS), `isSaas` (IS_SAAS), `publicBaseUrl` (BASE_HOST) | `contract/src/stored-object.config.ts:35`                                      |
 
 Anything else stored-object needs belongs to another module and is reached through its `*Api`.
 
 ## Peers (static dependencies)
 
-| Name            | Token              | Module                                        |
-| --------------- | ------------------ | --------------------------------------------- |
-| `authz`         | `AuthzApi`         | [authz](../authz/README.md)                   |
-| `dataRetention` | `DataRetentionApi` | [data-retention](../data-retention/README.md) |
+| Name    | Token      | Module                      |
+| ------- | ---------- | --------------------------- |
+| `authz` | `AuthzApi` | [authz](../authz/README.md) |
 
 ## Who depends on stored-object
 
-[dataset](../dataset/README.md), [experiment](../experiment/README.md), [ops](../ops/README.md), [trace](../trace/README.md), [user](../user/README.md) (as a peer).
+[dataset](../dataset/README.md), [experiment](../experiment/README.md), [langy](../langy/README.md), [ops](../ops/README.md), [trace](../trace/README.md), [user](../user/README.md) (as a peer).
 
 <!-- readme:generated:end -->

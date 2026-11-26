@@ -14,7 +14,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 Portable audit write capability.
 
-Peers call these through the token, declared at `../contract/src/audit-log.ts:98`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/audit-log.ts:151`; nothing else in this package is public.
 
 #### `record`
 
@@ -42,6 +42,14 @@ Whether this actor already recorded this action on this target since `sinceMs`.
 
 ```typescript
 hasRecordedSince(input: RecordedSinceInput): Promise<boolean>;
+```
+
+#### `findForOrganization`
+
+Oldest first after the watermark, at most `limit`; an organisation with no rows finds none.
+
+```typescript
+findForOrganization(input: FindAuditLogForOrganizationInput): Promise<AuditLogExportEntry[]>;
 ```
 
 ## REST transport

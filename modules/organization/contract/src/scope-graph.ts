@@ -46,6 +46,8 @@ const scopeGraphOrganizationSchemaDefinition = z.object({
   presenceEnabled: z.boolean(),
   pricingModel: z.enum(["TIERED", "SEAT_EVENT"]),
   ssoProvider: z.string().nullable(),
+  /** When the organization was made; the chrome reads its age (product-sidebars.feature). */
+  createdAt: z.date(),
   /** The caller's own membership role; empty when only a binding reaches it. */
   members: z.array(z.object({ role: z.string() })),
   teams: z.array(scopeGraphTeamSchema),

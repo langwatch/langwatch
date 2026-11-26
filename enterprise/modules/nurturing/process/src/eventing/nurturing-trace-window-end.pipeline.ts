@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
- * Nurturing's hourly sweep ending organizations' trace windows (see the process file). Without a
- * Customer.io channel nothing is sent, so the pipeline holds no process.
+ * Nurturing's hourly sweep ending organizations' trace windows and pruning trace days (see the
+ * process file). Without a Customer.io channel nothing is sent and no trace day is kept, so the
+ * pipeline holds no process.
  * Spec: enterprise/modules/nurturing/specs/project-usage.feature
  */
 import {
@@ -68,6 +69,7 @@ export const nurturingTraceWindowEndEventing = defineEventingModule({
       app.syncsOrganizationUsage()
         ? {
             traceWindowsEnded: (input) => app.organizationTraceWindowsEnded(input),
+            pruneTraceDaysBefore: (input) => app.pruneTraceDaysBefore(input),
             deleteDispatchedBefore: (params) => processStore.deleteDispatchedBefore(params),
           }
         : undefined,

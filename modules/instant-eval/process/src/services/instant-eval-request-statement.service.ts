@@ -12,7 +12,7 @@ import {
   type InstantEvalRunInput,
 } from "@langwatch/instant-eval-contract";
 import type { Instant } from "@langwatch/time";
-import type { LangWatchQLTraceFilter } from "@langwatch/trace-contract";
+import type { LangWatchQLTraceFilter, SpanAnalyticsFloor } from "@langwatch/trace-contract";
 
 import {
   compileInstantEvalFilter,
@@ -45,6 +45,8 @@ export interface InstantEvalRequestStatementPeers {
     window: { from: number; to: number };
     limit: number;
   }): Promise<readonly string[]>;
+  /** Where span_analytics is complete from, so an LLM span target can skip the attribute map. */
+  spanAnalyticsFloor?(): Promise<SpanAnalyticsFloor>;
 }
 
 export class InstantEvalRequestStatementService {
@@ -77,7 +79,12 @@ export class InstantEvalRequestStatementService {
     input: InstantEvalRunInput;
     rowLimit: number;
   }): Promise<InstantEvalStatement> {
-    const base = { input, database: this.peers.database(), now: this.now() };
+    const base = {
+      input,
+      database: this.peers.database(),
+      now: this.now(),
+      spanAnalyticsFloor: await this.#spanAnalyticsFloorFor(input),
+    };
     const filter = this.#shorthandFilterOf(input);
     if (filter === undefined) return instantEvalStatementFor(base);
     const peers = this.peers;
@@ -111,6 +118,16 @@ export class InstantEvalRequestStatementService {
           ...base,
           selection: await this.#selectionFor({ projectId, actor, input, filter, rowLimit }),
         });
+    }
+  }
+
+  /** The floor for an LLM span target; any other target, or a failed read, gets none. */
+  async #spanAnalyticsFloorFor(input: InstantEvalRunInput): Promise<SpanAnalyticsFloor | null> {
+    if (input.shorthand?.target !== "llm_spans" || !this.peers.spanAnalyticsFloor) return null;
+    try {
+      return await this.peers.spanAnalyticsFloor();
+    } catch {
+      return null;
     }
   }
 

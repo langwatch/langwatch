@@ -119,6 +119,8 @@ type ChatRequest struct {
 	// requests keep a byte-stable, provider-cacheable prefix. Empty for a
 	// brand-new conversation.
 	HistorySeed string
+	// Images ride the turn's prompt to the model as image input.
+	Images      []domain.TurnImage
 	Credentials domain.Credentials
 	// ResumeToken (ADR-048) is an opaque, worker-authored checkpoint from a prior
 	// turn that handed off on shutdown. Threaded into PostMessage so the agent
@@ -243,7 +245,7 @@ func (a *App) StartTurn(ctx context.Context, req ChatRequest) (func(context.Cont
 		)
 		return func(context.Context) {}, nil
 	}
-	worker, err := a.pool.Acquire(ctx, req.ConversationID, req.Credentials)
+	worker, err := a.pool.Acquire(ctx, req.ConversationID, req.TurnID, req.Credentials)
 	if err != nil {
 		if errors.Is(err, domain.ErrMaxWorkers) {
 			a.atCapacity(ctx)
@@ -380,7 +382,7 @@ func (a *App) driveTurn(ctx context.Context, req ChatRequest, worker Worker) {
 		emitError(ctx, sink, message, code)
 	}
 
-	if err := worker.PostMessage(ctx, req.System, req.Prompt, req.HistorySeed, req.ResumeToken); err != nil {
+	if err := worker.PostMessage(ctx, req.System, req.Prompt, req.HistorySeed, req.ResumeToken, req.Images); err != nil {
 		cancelStream()
 		<-errCh // the stream consumer has now fully returned.
 		if errors.Is(err, domain.ErrSessionNotFound) {
@@ -444,8 +446,7 @@ func (a *App) driveTurn(ctx context.Context, req ChatRequest, worker Worker) {
 		}
 		failure = &domain.TurnFailure{Code: "agent_error", Message: failureMessage}
 		turnSpan.RecordError(streamErr)
-		he := herr.NewLight(ctx, domain.ErrAgentError,
-			herr.M{"message": "the agent hit an error before finishing"}, reasons...)
+		he := agentErrorHerr(ctx, reasons)
 		f, mErr := frames.ErrorFromHerr(he)
 		if mErr != nil {
 			clog.Get(ctx).Warn("build error frame failed", zap.Error(mErr))
@@ -578,4 +579,23 @@ func (a *App) atCapacity(ctx context.Context) {
 		return
 	}
 	a.telemetry.AtCapacity(ctx)
+}
+
+// agentErrorHerr is the wire herr for a turn the agent reported failed. With
+// no captured cause nothing says the provider refused the call, and a resend
+// often works, so the error is retryable; with causes, any retryable one decides.
+func agentErrorHerr(ctx context.Context, reasons []error) herr.E {
+	he := herr.NewLight(ctx, domain.ErrAgentError,
+		herr.M{"message": "the agent hit an error before finishing"}, reasons...)
+	return he.WithRetryable(len(reasons) == 0 || anyRetryable(reasons))
+}
+
+func anyRetryable(reasons []error) bool {
+	for _, reason := range reasons {
+		var he herr.E
+		if errors.As(reason, &he) && he.Retryable {
+			return true
+		}
+	}
+	return false
 }

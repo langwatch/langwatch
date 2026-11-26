@@ -1,4 +1,4 @@
-import { nowInstant } from "@langwatch/time";
+import { nowEpochMs } from "@langwatch/time";
 import type IORedis from "ioredis";
 import type { Cluster } from "ioredis";
 
@@ -2772,7 +2772,7 @@ export class GroupStagingScripts {
       jobDataJson,
       String(shouldExtend ? 1 : 0),
       String(shouldReplace ? 1 : 0),
-      String(nowInstant().epochMilliseconds),
+      String(nowEpochMs()),
       String(this.globalConcurrencyBudget),
       // ARGV[11] — appended after globalBudget so no existing index shifts.
       String(shouldSurviveDispatch ? 1 : 0),
@@ -2835,7 +2835,7 @@ export class GroupStagingScripts {
     // Appended after all per-job args: nowMs then globalBudget last, so the Lua
     // reads globalBudget as ARGV[#ARGV] and nowMs as ARGV[#ARGV-1] regardless of
     // job count.
-    args.push(String(nowInstant().epochMilliseconds));
+    args.push(String(nowEpochMs()));
     args.push(String(this.globalConcurrencyBudget));
 
     const result = await stageBatchScript.run(
@@ -3036,7 +3036,7 @@ export class GroupStagingScripts {
         jobName ?? "",
         `${this.keyPrefix}tenant_active_z:`,
         String(this.tenantConcurrencyCap),
-        String(nowInstant().epochMilliseconds),
+        String(nowEpochMs()),
         dropped ? "1" : "",
         claimToken,
         endsRetryChain ? "1" : "",
@@ -3203,7 +3203,7 @@ export class GroupStagingScripts {
         stagedJobId,
         String(activeTtlSec),
         groupId,
-        String(nowInstant().epochMilliseconds),
+        String(nowEpochMs()),
         `${this.keyPrefix}tenant_active_z:`,
         claimToken,
       ],
@@ -3308,7 +3308,7 @@ export class GroupStagingScripts {
         jobDataJson,
         String(retryTtlSec),
         `${this.keyPrefix}tenant_active_z:`,
-        String(nowInstant().epochMilliseconds),
+        String(nowEpochMs()),
         String(attempt),
         String(attemptTtlSec),
         String(this.tenantConcurrencyCap),
@@ -3602,7 +3602,7 @@ export class GroupStagingScripts {
         this.keyPrefix,
         String(LISTED_GROUPS_TTL_SEC),
         String(start),
-        String(nowInstant().epochMilliseconds + LISTED_GROUPS_TTL_SEC * 1000),
+        String(nowEpochMs() + LISTED_GROUPS_TTL_SEC * 1000),
         ...groupIds.slice(start, start + PREFLIGHT_GROUPS_PER_CALL),
       );
     }

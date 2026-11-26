@@ -21,13 +21,13 @@ A URL marked (route table) is joined from `apps/ui/src/shell/ui-route-table.ts`;
 
 ## Drawers (the name is the wire: `?drawer.open=<name>`)
 
-| Drawer          | Opens                                       | Opened from         |
-| --------------- | ------------------------------------------- | ------------------- |
-| `createProject` | `src/ui/sections/create-project-drawer.tsx` | api-key, navigation |
-| `editProject`   | `src/ui/sections/edit-project-drawer.tsx`   | –                   |
-| `createTeam`    | `src/ui/sections/create-team-drawer.tsx`    | navigation          |
-| `inviteMember`  | `src/ui/sections/invite-member-drawer.tsx`  | navigation          |
-| `person`        | `src/ui/sections/person-drawer.tsx`         | –                   |
+| Drawer          | Opens                                       | Opened from           |
+| --------------- | ------------------------------------------- | --------------------- |
+| `createProject` | `src/ui/sections/create-project-drawer.tsx` | api-key, navigation   |
+| `editProject`   | `src/ui/sections/edit-project-drawer.tsx`   | –                     |
+| `createTeam`    | `src/ui/sections/create-team-drawer.tsx`    | navigation            |
+| `inviteMember`  | `src/ui/sections/invite-member-drawer.tsx`  | licensing, navigation |
+| `person`        | `src/ui/sections/person-drawer.tsx`         | –                     |
 
 Opened from lists the other modules (and `ui`, the app) whose browser source names the drawer in a
 `…Drawer("<name>")` call, a `?drawer.open=<name>` link or by its token; a name held in a constant is not followed.

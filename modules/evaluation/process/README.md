@@ -303,14 +303,14 @@ type Response = unknown;
 
 Contract `../contract/src/evaluation.trpc.ts:26`, router `src/transport/evaluation.trpc.ts:10`.
 
-| Procedure                                     | Kind     | Gate                                            | Input                                     | Output                       |
-| --------------------------------------------- | -------- | ----------------------------------------------- | ----------------------------------------- | ---------------------------- |
-| `evaluations.availableEvaluators`             | query    | Permission `evaluations:view`                   | `evaluationProjectScopeSchema`            | `evaluatorCatalogueSchema`   |
-| `evaluations.availableCustomEvaluators`       | query    | Permission `evaluations:view`                   | `evaluationProjectScopeSchema`            | inline                       |
-| `evaluations.runEvaluation`                   | mutation | Permission `evaluations:manage`                 | `runTraceEvaluationInputSchema`           | `evaluationRunOutcomeSchema` |
-| `evaluations.warmupLambda`                    | mutation | Permission `evaluations:view`                   | `warmupEvaluatorsInputSchema`             | `evaluationWarmupSchema`     |
-| `evaluations.getMonitorPerformanceForProject` | query    | Permission `evaluations:view or analytics:view` | `monitorPerformanceForProjectInputSchema` | inline                       |
-| `evaluations.getEvaluationInputs`             | query    | Permission `traces:view`                        | `evaluationInputsInputSchema`             | `evaluationInputsSchema`     |
+| Procedure                                     | Kind     | Gate                                             | Input                                     | Output                       |
+| --------------------------------------------- | -------- | ------------------------------------------------ | ----------------------------------------- | ---------------------------- |
+| `evaluations.availableEvaluators`             | query    | Permission `evaluations:view`                    | `evaluationProjectScopeSchema`            | `evaluatorCatalogueSchema`   |
+| `evaluations.availableCustomEvaluators`       | query    | Permission `evaluations:view`                    | `evaluationProjectScopeSchema`            | inline                       |
+| `evaluations.runEvaluation`                   | mutation | Permission `evaluations:manage`                  | `runTraceEvaluationInputSchema`           | `evaluationRunOutcomeSchema` |
+| `evaluations.warmupLambda`                    | mutation | Permission `evaluations:view`                    | `warmupEvaluatorsInputSchema`             | `evaluationWarmupSchema`     |
+| `evaluations.getMonitorPerformanceForProject` | query    | Permission `evaluations:view and analytics:view` | `monitorPerformanceForProjectInputSchema` | inline                       |
+| `evaluations.getEvaluationInputs`             | query    | Permission `traces:view`                         | `evaluationInputsInputSchema`             | `evaluationInputsSchema`     |
 
 ```typescript
 // evaluations.availableEvaluators
@@ -347,19 +347,12 @@ interface Output {
 }
 
 // evaluations.getMonitorPerformanceForProject
-// Input: monitorPerformanceForProjectInputSchema, ../contract/src/evaluation.performance.ts:53
+// Input: monitorPerformanceForProjectInputSchema, ../contract/src/evaluation.performance.ts:84
 interface Input {
   projectId: string;
   timeZone?: string;
 }
-// Output: inline, ../contract/src/evaluation.trpc.ts:60
-type Output = {
-  monitorId: string;
-  metric: "score" | "pass_rate";
-  points: number[];
-  current: number | null;
-  previous: number | null;
-}[];
+// Output: onlineEvaluationPerformanceSchema.array() (inline, ../contract/src/evaluation.trpc.ts:60)
 
 // evaluations.getEvaluationInputs
 // Input: evaluationInputsInputSchema, ../contract/src/evaluation-trpc.schemas.ts:29

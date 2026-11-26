@@ -13,9 +13,11 @@ import type {
   AggregationFiltersInput,
   GetAllTracesForProjectInput,
   GetAllTracesForProjectOptions,
+  SpanAnalyticsFloor,
   TraceSummaryListOptions,
   TraceSummaryListQuery,
   TraceSummaryPage,
+  ThreadTraceIds,
 } from "@langwatch/trace-contract";
 
 import type { ClickHouseEvaluationRunRow } from "../../../rules/trace-evaluation-mapping.rules.ts";
@@ -40,6 +42,11 @@ export type ResolveTraceSpansBatchFn = (
   projectId: string,
   spansPerTrace: NormalizedSpan[][],
 ) => Promise<ResolvedTraceSpans[]>;
+
+/** The span_analytics floor a legacy list's filters read by; the unknown floor when none apply. */
+export type SpanAnalyticsFloorFor = (
+  filters: GetAllTracesForProjectInput["filters"],
+) => Promise<SpanAnalyticsFloor>;
 
 /**
  * Partition-key bound for multi-trace reads: earliest and latest occurrence
@@ -84,6 +91,8 @@ export abstract class TraceLegacyReadRepository {
       options: GetAllTracesForProjectOptions;
       /** The own-only proof the span, evaluation and event reads go through. */
       ownRead: Authorization;
+      /** Where span_analytics is complete; absent or null, span types come from stored_spans. */
+      spanAnalyticsFloor?: SpanAnalyticsFloor | null;
     },
   ): Promise<TraceLegacyPage>;
 
@@ -130,12 +139,50 @@ export abstract class TraceLegacyReadRepository {
     },
   ): Promise<TraceLegacyRow[]>;
 
+  /** The named threads' trace ids, one list per thread, oldest first; keys only, no content. */
+  abstract findTraceIdsByThreadIds(params: {
+    authorization: Authorization;
+    projectId: string;
+    threadIds: string[];
+    maxTraces?: number | undefined;
+  }): Promise<ThreadTraceIds[]>;
+
   abstract resolveTraceIdByPrefix(params: {
     projectId: string;
     prefix: string;
     occurredAt: TraceOccurredAtRange;
     limit?: number;
   }): Promise<string[]>;
+
+  /** The traces holding a span with this id since the retention floor; at most `limit`. */
+  abstract resolveTraceIdsBySpanId(params: {
+    authorization: Authorization;
+    projectId: string;
+    spanId: string;
+    retentionDays: RetentionDaysProvider | undefined;
+    limit: number;
+  }): Promise<string[]>;
+
+  /** The traces a scenario run produced (`scenario.run_id`) inside the window; at most `limit`. */
+  abstract resolveTraceIdsByScenarioRunId(params: {
+    authorization: Authorization;
+    projectId: string;
+    scenarioRunId: string;
+    occurredAt: TraceOccurredAtRange;
+    limit: number;
+  }): Promise<string[]>;
+
+  /**
+   * The trace built from its stored spans alone, for a trace whose summary is not written yet;
+   * empty when no span of it is stored inside the retention floor.
+   */
+  abstract findTraceFromStoredSpans(
+    params: TraceLegacySpanFloor & {
+      authorization: Authorization;
+      projectId: string;
+      traceId: string;
+    },
+  ): Promise<TraceLegacyRow[]>;
 
   abstract findSpanForPromptStudio(params: {
     projectId: string;

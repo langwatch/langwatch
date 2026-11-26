@@ -13,6 +13,8 @@ metadata:
 
 Turn a question ("show cost per model as a bar chart") into a widget on a dashboard: one React file rendering data pulled through named LangWatchQL queries. The loop is: **discover the schema → write the queries → write the widget → add it to a dashboard → prove it runs**.
 
+A broad question ("Is our AI saving us time?", "Is quality holding?") still ends in a widget on the board. Pick the one or two numbers in the project's own traces that speak to it (traces handled per day, typical duration, the share that passed an evaluation), chart those, and say in your answer what the widget shows and what it cannot tell. Stay in this skill until the widget is on the board: do not switch to another skill or look for the answer outside the LangWatch data.
+
 Reach for this instead of `lwql-charts` when the visualization is not a plain Vega-Lite spec over one query result — custom layout, multiple queries in one widget, conditional rendering, or anything a component can do that a declarative spec cannot.
 
 ## Prerequisites
@@ -23,15 +25,22 @@ The `langwatch dashboard` commands use the project of your API key. Only `langwa
 
 ## Step 1: Discover the schema before writing any SQL
 
-Never guess dataset or column names. The schema command lists every dataset your credentials may query, each column's type and description, and a runnable example query per dataset:
+Never guess dataset or column names. The schema command lists every view your credentials may query, each column's type and description, and a runnable example query per view. It is large (hundreds of kilobytes), so never print it whole: save it to a file, read the view names, then read only the view you need.
 
 ```bash
-langwatch dashboard widget schema -f json
+langwatch dashboard widget schema -f json > schema.json
+jq -r '.views[] | "\(.name) (\(.timeColumn)): \(.description)"' schema.json
+jq '.views[] | select(.name == "trace_metrics")' schema.json
 ```
 
-Read the datasets, their grain, their time column, and which columns are `available` to you.
+Read the view's grain, its time column, and which columns are `available` to you. Write a view by its bare name, as `schema.json` gives it (`trace_metrics`, never `langwatch.trace_metrics`), so one query runs on LangWatch Cloud and on every self-hosted install. The views most questions need:
 
-**Seed data is stale** (newest trace 2026-08-04 as of this writing). Write SQL with a wide time window — `WHERE timestamp >= subtractDays(now(), 400)` — not a narrow recent one. A query that legitimately returns 0 rows because of a narrow window is not a bug; widen the window before assuming something is broken.
+- `trace_metrics`: one row per trace with cost, latency, tokens, the user, conversation and `Source` (the origin). Traces, cost, latency and usage questions start here.
+- `evaluation_metrics` and `trace_evaluation_metrics`: evaluation and online evaluation outcomes.
+- `judgments`: Instant Eval verdicts, one row per run, trace and question. `langwatch instant-eval list -f json` gives each run's id and question; filter with `RunId = '<id>'`, and `Passed = 1` is a trace the question matched.
+- `span_metrics` and `model_usage_by_minute`: per span and per model.
+
+Every query reads the dashboard's own period: bound the view's time column with `{dashboard_context_period_start:DateTime}` and `{dashboard_context_period_end:DateTime}` (Step 2), never a fixed window such as `subtractDays(now(), 400)`. Try the statement once before writing the widget, with the dashboard period from your context: `langwatch query run "<sql>" --start "<period start>" --end "<period end>" --format json` (this command takes `--format`, not `-f`). Zero rows over the period is an answer, not a bug.
 
 ## Step 2: Write the queries file
 
@@ -49,7 +58,7 @@ Read the datasets, their grain, their time column, and which columns are `availa
 [
   {
     "name": "cost_by_model",
-    "sql": "SELECT model, sum(costCents) / 100.0 AS cost FROM traces WHERE timestamp >= subtractDays(now(), 400) GROUP BY model ORDER BY cost DESC LIMIT 10",
+    "sql": "SELECT Model AS model, sum(CostSum) AS cost FROM model_usage_by_minute WHERE BucketStart >= {dashboard_context_period_start:DateTime} AND BucketStart < {dashboard_context_period_end:DateTime} GROUP BY model ORDER BY cost DESC LIMIT 10",
     "parameters": []
   }
 ]
@@ -65,7 +74,7 @@ Fetch data with the `LW.useChartQuery(name, params)` hook, where `name` matches 
 const { data, isLoading, isError, error } = LW.useChartQuery("cost_by_model", {});
 ```
 
-- `data` is the query's result rows, or `null` until the first result lands. An empty array (`data.length === 0`) means the query genuinely returned zero rows — not an error; against stale seed data that is expected unless the SQL uses a wide window (see Step 1).
+- `data` is the query's result rows, or `null` until the first result lands. An empty array (`data.length === 0`) means the query genuinely returned zero rows — not an error: draw an empty state that says there is no data for the period.
 - `isLoading` is `true` only for the first fetch, before any data has ever landed. `isFetching` is `true` for any fetch in flight, including a background refetch — use it if you want to show a subtle "updating" state without clearing the chart.
 - `isError` is `true` on failure; `error` is then an `Error` (`error.message`) — it never throws into the component. An undeclared param, a reserved-param misuse, or a SQL error all surface here instead of crashing the widget. `status` is `"pending" | "error" | "success"` if you prefer a single field to branch on.
 - The hook auto-refetches when the page's time window changes, and when `params` changes by value — pass a plain object, not one you rebuild with a different identity every render for no reason. Call the returned `refetch()` to re-run it manually (e.g. from a button).
@@ -76,28 +85,38 @@ Params are validated against the query's declared `parameters` before anything i
 
 For code outside a component (or when you need a raw promise instead of hook semantics), `LW.query(name, params)` is the low-level escape hatch the hook is built on: it returns a promise that resolves to `{ rows, statistics }` or rejects with `{ code, title, message }`.
 
+### Colours and size: follow the dashboard
+
+The widget runs in a frame on the dashboard, in the reader's light or dark theme. The frame sets the theme's colours as CSS variables, so use only these, written as `var(--chakra-colors-fg)`:
+
+- `--chakra-colors-fg` (text), `--chakra-colors-fg-subtle` (labels, axes), `--chakra-colors-border-muted` (grid lines, tile borders)
+- `--chakra-colors-bg-card` and `--chakra-colors-border-card` (a tooltip or panel), `--chakra-colors-fg-error`, `--chakra-colors-fg-success`
+- `--chakra-colors-chart-1` to `--chakra-colors-chart-8` (series colours)
+
+Never write a hex colour, `white` or a light background such as `#f8fafc`: a stat tile like that is a white block in dark mode. A tile has no background of its own, only a `1px solid var(--chakra-colors-border-muted)` border. `LW.theme` (`"light"` or `"dark"`) is there for anything the variables do not cover.
+
+A new widget lands half the board wide and about 200 px tall inside. Fill that space rather than guessing a height: the outer element is `height: "100%"` and a flex column, at most one row of stat tiles goes on top, and the chart takes the rest (`flex: 1, minHeight: 0`, with `<ResponsiveContainer width="100%" height="100%">`). Never give a chart a fixed pixel height: one taller than the card hides its bars until the reader drags the card bigger.
+
 ### Prebuilt charts: `@langwatch/charts`
 
 Ten chart primitives, prebuilt and themed, so most widgets don't need to hand-roll a Recharts layout: `MetricStat`, `Sparkline`, `AreaTimeseries`, `StackedBars`, `GroupedBars`, `ProjectionBars`, `Donut`, `Leaderboard`, `Heatmap`. Plus `LwqlChart`, an auto-picker that infers a chart type (area / bars / donut / leaderboard / table) from a query's row shape — pass it `data`, and optionally `kind` to force one.
 
-Every component consumes `LW.useChartQuery` rows directly and themes itself — no color or style props needed.
+Every component consumes `LW.useChartQuery` rows directly, themes itself and fills its card when you pass no `height` — no color or style props needed.
 
 ```jsx
 export default function Widget() {
   const { data, isLoading, isError, error } = LW.useChartQuery("cost_by_model", {});
 
-  if (isError) return <div style={{ fontSize: 11, color: "#b00" }}>{error.message}</div>;
-  if (isLoading || data === null) return <div style={{ fontSize: 11, color: "#666" }}>Loading…</div>;
+  if (isError) return <div style={{ fontSize: 11, color: "var(--chakra-colors-fg-error)" }}>{error.message}</div>;
+  if (isLoading || data === null) return <div style={{ fontSize: 11, color: "var(--chakra-colors-fg-subtle)" }}>Loading…</div>;
 
   return <LwqlChart data={data} />;
 }
 ```
 
-More worked examples: `platform/app/scripts/north-star-widgets/`.
-
 ### Drill-down: `LW.navigate`
 
-`LW.navigate(target, params)` sends the user to another LangWatch page from inside a widget. `target` is a route key, never a path: `"traces"` and `"trace"` take `params` keyed by filter field ids (e.g. `"metadata.user_id"`) or `traceId`, which the host resolves into the Trace Explorer URL; `"scenarios"`, `"onlineEvaluations"`, `"annotations"`, `"gatewayVirtualKeys"` and `"codingSessions"` open that page of the project and take no params.
+`LW.navigate(target, params)` sends the user to another LangWatch page from inside a widget. `target` is a route key, never a path: `"traces"` and `"trace"` take `params` keyed by filter field ids (e.g. `"metadata.user_id"`) or `traceId`, which the host resolves into the Trace Explorer URL; `"scenarios"`, `"onlineEvaluations"`, `"annotations"`, `"gatewayVirtualKeys"`, `"codingSessions"` and `"modelCosts"` (Settings, Model costs) open that page and take no params; `"metadataDocs"` opens the metadata and labels docs page in a new tab.
 
 `Leaderboard` wraps this for you: pass `navigateTo={{ target, params: (row) => ({ ... }) }}` and a row click navigates. An unknown `target` is ignored rather than erroring.
 
@@ -117,7 +136,7 @@ Creating (and updating) validates the queries file's shape and the widget's JS/T
 
 ## Dashboards and their widgets
 
-A dashboard is the page widgets live on. **Use an existing dashboard** when the user is on one, named one, or one clearly fits; **create one** only when they ask for a new dashboard, or none fits and they agree.
+A dashboard is the page widgets live on. The dashboard the user is on arrives in your context with its id: a chart they ask for there goes on that board, even when they say "now a chart of..." or "another dashboard" without naming one. If they name a different existing dashboard, the chart goes on that one. **Create a board** only when they ask for a separate or new board by name ("make a new dashboard called X"), or they are on no board and none fits. When you do create one, say so in the first line of your reply and name it, so they know where to look.
 
 ```bash
 langwatch dashboard list -f json                          # ids, names, widget counts
@@ -136,7 +155,7 @@ langwatch dashboard widget delete <dashboardId> <widgetId>
 
 `add` places the widget at the dashboard's next free row — edit it from the widget's menu on that dashboard. `langwatch analytics-report list` lists the old Analytics Reports, which hold no widgets.
 
-**Which dashboard:** place on the dashboard in the user's context (the one they are on, or one they named). If no dashboard is in context, ask which one with the `question` tool, one option per dashboard from `langwatch dashboard list` with its id in `ref`. Never choose a dashboard for the user.
+**Which dashboard:** place on the dashboard the user named; if they named none, on the dashboard they are on. If no dashboard is in context, ask which one with the `question` tool, one option per dashboard from `langwatch dashboard list` with its id in `ref`. If that list is empty, create a board named after what they asked for and say so in the first line of your reply. Never choose between existing dashboards for the user.
 
 - **Never pick a dashboard for the user.** When more than one dashboard fits, ask with the `question` tool (a choices card): one option per dashboard from `langwatch dashboard list`, its id in `ref`.
 - **Confirm before any delete** of a dashboard or widget with a choices card (`Delete "NAME"?` with Delete and Keep), and run the command only on Delete. Deleting a dashboard takes its widgets with it.
@@ -151,33 +170,43 @@ langwatch dashboard widget delete <dashboardId> <widgetId>
 ```jsx
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 
+const color = (name) => `var(--chakra-colors-${name})`;
+
 export default function Widget() {
   const { data, isLoading, isError, error } = LW.useChartQuery("daily_traces", {});
 
   if (isError) {
-    return <div style={{ fontSize: 11, color: "#b00" }}>{error.message}</div>;
+    return <div style={{ fontSize: 11, color: color("fg-error") }}>{error.message}</div>;
   }
   if (isLoading || data === null) {
-    return <div style={{ fontSize: 11, color: "#666" }}>Loading…</div>;
+    return <div style={{ fontSize: 11, color: color("fg-subtle") }}>Loading…</div>;
+  }
+  if (data.length === 0) {
+    return <div style={{ fontSize: 11, color: color("fg-subtle") }}>No traces in this period.</div>;
   }
 
   const rows = data.map((row) => ({
     day: String(row.day).slice(0, 10),
     traces: Number(row.traces),
   }));
+  const total = rows.reduce((sum, row) => sum + row.traces, 0);
 
   return (
-    <div>
-      <div style={{ fontSize: 11, color: "#666", marginBottom: 4 }}>{rows.length} rows</div>
-      <ResponsiveContainer width="100%" height={230}>
-        <BarChart data={rows}>
-          <CartesianGrid strokeDasharray="3 3" />
-          <XAxis dataKey="day" tick={{ fontSize: 10 }} />
-          <YAxis allowDecimals={false} />
-          <Tooltip />
-          <Bar dataKey="traces" fill="#f97316" />
-        </BarChart>
-      </ResponsiveContainer>
+    <div style={{ height: "100%", display: "flex", flexDirection: "column", gap: 4 }}>
+      <div style={{ fontSize: 11, color: color("fg-subtle") }}>{total.toLocaleString()} traces</div>
+      <div style={{ flex: 1, minHeight: 0 }}>
+        <ResponsiveContainer width="100%" height="100%">
+          <BarChart data={rows}>
+            <CartesianGrid stroke={color("border-muted")} vertical={false} />
+            <XAxis dataKey="day" tick={{ fontSize: 10, fill: color("fg-subtle") }} />
+            <YAxis allowDecimals={false} tick={{ fontSize: 10, fill: color("fg-subtle") }} />
+            <Tooltip
+              contentStyle={{ background: color("bg-card"), border: `1px solid ${color("border-card")}` }}
+            />
+            <Bar dataKey="traces" fill={color("chart-1")} />
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
     </div>
   );
 }
@@ -189,7 +218,7 @@ export default function Widget() {
 [
   {
     "name": "daily_traces",
-    "sql": "SELECT toStartOfDay(timestamp) AS day, count() AS traces FROM traces WHERE timestamp >= subtractDays(now(), 400) GROUP BY day ORDER BY day",
+    "sql": "SELECT toStartOfDay(OccurredAt) AS day, uniqExact(TraceId) AS traces FROM trace_metrics WHERE OccurredAt >= {dashboard_context_period_start:DateTime} AND OccurredAt < {dashboard_context_period_end:DateTime} AND Source IN {dashboard_context_sources:Array(String)} GROUP BY day ORDER BY day",
     "parameters": []
   }
 ]
@@ -213,4 +242,4 @@ langwatch dashboard widget add <dashboardId> \
 - `dashboard_widget_query_undeclared_param` (shows up in the hook's `error`) — the widget code passed a param the query's `parameters` array doesn't declare; add the declaration or stop passing it.
 - `dashboard_widget_query_reserved_param` (shows up in the hook's `error`) — the widget code passed `dashboard_context_period_start`, `dashboard_context_period_end`, or `dashboard_context_granularity_seconds` directly as a param; these are bound by the executor from the page window, never by the caller.
 - "Cannot import '\<specifier>'" — the widget imported something other than `react`, `react-dom`, `react-dom/client`, `recharts`, or `@langwatch/charts`; use only those, or the corresponding global.
-- A query returning 0 rows against seed data — the seed's newest trace is 2026-08-04; widen the time window before assuming the query is wrong.
+- A query returning 0 rows over the dashboard's period — the project has no matching data in that window; say so in the widget's empty state rather than widening the window.

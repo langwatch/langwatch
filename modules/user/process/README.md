@@ -414,19 +414,19 @@ isFirstCreatedAccount(input: { userId: string }): Promise<boolean>;
 
 ### `meRest`
 
-|             |                              |
-| ----------- | ---------------------------- |
-| Declared at | `src/transport/me.rest.ts:8` |
-| Base URL    | `/api/me`, twin `/api/v1/me` |
-| Addressing  | dated                        |
-| Credential  | project                      |
-| Versions    | `2026-08-07`                 |
+|             |                               |
+| ----------- | ----------------------------- |
+| Declared at | `src/transport/me.rest.ts:13` |
+| Base URL    | `/api/me`, twin `/api/v1/me`  |
+| Addressing  | dated                         |
+| Credential  | project                       |
+| Versions    | `2026-08-07`                  |
 
 #### `GET /project` · `getApiMeProject`
 
-Identity of the project the calling API key belongs to: id, name, slug and whether it is a personal workspace project. Lets a client (the CLI's identity notice, a widget) say which project a key targets without any further access.
+Identity of the project the calling API key belongs to: id, name, slug and whether it is a personal workspace project. Answers any API key bound to the project, an ingestion key holding only traces:create included, so a client (the CLI's identity notice, a widget, a traces link) can say which project a key targets without any further access.
 
-Permission `project:view`. Declared at `src/transport/me.rest.ts:12`.
+Authenticated: Any key bound to a project, an ingestion key holding only traces:create included, reads only that project's identity (id, name, slug, isPersonal), which the door resolved from the key itself. Declared at `src/transport/me.rest.ts:17`.
 
 Answers at `/api/me/project`, `/api/v1/me/project`; also, undocumented, `/api/me/2026-08-07/project`, `/api/v1/me/2026-08-07/project`, `/api/me/latest/project`, `/api/v1/me/latest/project`.
 
