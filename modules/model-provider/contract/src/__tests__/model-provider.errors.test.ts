@@ -263,4 +263,18 @@ describe("ModelProviderInvalidError", () => {
 
     expect(error.meta).toEqual({ reason: "endpoint_not_allowed" });
   });
+
+  /** @scenario "A save refused for its base URL says why in the form" */
+  it("carries which part of the outbound policy refused the endpoint", () => {
+    const error = new ModelProviderInvalidError(
+      "blocked",
+      "endpoint_not_allowed",
+      "cloud_internal_domain",
+    );
+
+    expect(error.meta).toEqual({
+      reason: "endpoint_not_allowed",
+      refusal: "cloud_internal_domain",
+    });
+  });
 });
