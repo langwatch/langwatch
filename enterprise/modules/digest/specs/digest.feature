@@ -75,11 +75,11 @@ Feature: Weekly digest emails
 
   # Folding the week
 
-  @integration
-  Scenario: Trace spans are read from analytics, never folded
-    Given spans received for a project across two traces, one with an error
-    When the digest subscriber has had its chance to handle their events
-    Then the project's week holds no span numbers and analytics was not asked
+  @unit
+  Scenario: Trace spans are never folded
+    Given a span fact stored before spans stopped being folded
+    When the project's week folds it
+    Then the fact still parses and the week is unchanged
 
   @integration
   Scenario: Trace numbers are read from analytics, never folded

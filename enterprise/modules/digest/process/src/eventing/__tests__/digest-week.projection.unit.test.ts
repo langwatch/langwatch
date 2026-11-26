@@ -165,6 +165,7 @@ describe("a span fact stored before spans stopped being folded", () => {
     },
   };
 
+  /** @scenario "Trace spans are never folded" */
   it("still parses, and folds to nothing", () => {
     const activity: ProjectActivity = projectActivitySchema.parse(stored);
     const state = emptyProjectWeek();
