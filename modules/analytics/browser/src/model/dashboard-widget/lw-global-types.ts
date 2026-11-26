@@ -32,6 +32,12 @@ interface LwDashboardContext {
    * bound to the same zone.
    */
   readonly timezone?: string;
+  /**
+   * True when one of the widget's queries declares
+   * \`{dashboard_context_timezone:String}\`; the charts library labels on
+   * \`timezone\` only then, and on UTC otherwise.
+   */
+  readonly isTimezoneBound?: boolean;
   readonly theme: LwTheme;
   readonly widgetId?: string;
   readonly dashboardId?: string;

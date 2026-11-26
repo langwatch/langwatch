@@ -18,6 +18,7 @@ interface LWGlobal {
   dashboardContext?: {
     colors?: Readonly<Record<string, string>>;
     timezone?: string;
+    isTimezoneBound?: boolean;
     granularitySeconds?: number;
   };
   navigate?: (target: string, params?: Record<string, unknown>) => void;
@@ -135,9 +136,14 @@ function parseInstantEpochMs(value: unknown): number | undefined {
   return typeof value === "string" ? parseIsoInstant(value) : undefined;
 }
 
-/** An instant's fields on the reader's clock, the zone the host names for this frame. */
+/**
+ * An instant's fields on the reader's clock when the widget's queries bucket on it, else on UTC:
+ * a saved query that buckets by UTC days keeps UTC labels rather than reading a day early.
+ */
 function readerParts(epochMs: number) {
-  return zonedParts({ epochMs, timeZone: window.LW?.dashboardContext?.timezone });
+  const context = window.LW?.dashboardContext;
+  const timeZone = context?.isTimezoneBound === true ? context.timezone : undefined;
+  return zonedParts({ epochMs, timeZone });
 }
 
 /** A column reads as time-like by name, or by its first value parsing as a date. */

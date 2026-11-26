@@ -347,6 +347,10 @@ The outer `toTimeZone(..., 'UTC')` keeps the value a UTC time, so
 `LW.formatTime` shows it at the reader's midnight. `POST /api/v1/query` takes
 the zone as `timeZone`; a run without one is bound to `UTC`.
 
+The `@langwatch/charts` components label axes and tooltips on the reader's
+clock when one of the widget's queries reads the zone, and on UTC when none
+does, so a widget that still buckets by UTC days keeps its dates.
+
 ### Missing data: the `completeness` report
 
 A query that follows the dashboard's time window also returns a

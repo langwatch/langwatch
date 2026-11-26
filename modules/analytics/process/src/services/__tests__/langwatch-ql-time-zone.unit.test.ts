@@ -1,7 +1,6 @@
 /**
- * A widget run is bound to its reader's time zone: the statement that declares
- * {dashboard_context_timezone:String} gets the zone the browser sent, UTC when none, and its
- * completeness buckets step on the same wall clock.
+ * A statement that declares {dashboard_context_timezone:String} gets the zone the browser sent,
+ * UTC when none; its completeness buckets floor days on the reader's clock, hours on the instant.
  * @see modules/analytics/specs/dashboard-widget-time-zone.feature
  */
 import {
@@ -172,6 +171,60 @@ describe("given a statement that buckets by {dashboard_context_timezone:String}"
       expect(starts).toHaveLength(64);
       expect(new Set(starts).size).toBe(64);
       expect([starts[0], starts.at(-1)]).toEqual(["2026-03-08T06:58:00Z", "2026-03-08T08:01:00Z"]);
+    });
+  });
+
+  describe("when an hour grain covers the local day the clocks go back", () => {
+    /** @scenario "TZ14 Hourly buckets keep both copies of the hour the clocks go back" */
+    it("lists 25 hours, the repeated 01:00 twice, each with its own count", async () => {
+      const { result } = run({
+        sql: ZONED_SQL,
+        timeZone: "America/Los_Angeles",
+        timeWindow: { start: "2026-11-01T07:00:00.000Z", end: "2026-11-02T08:00:00.000Z" },
+        granularitySeconds: 3_600,
+        answers: [
+          [],
+          [
+            { bucket: epochSeconds("2026-11-01T08:00:00Z"), n: 2 },
+            { bucket: epochSeconds("2026-11-01T09:00:00Z"), n: 5 },
+          ],
+        ],
+      });
+
+      const { completeness } = await result;
+      const buckets = completeness?.buckets ?? [];
+
+      expect(buckets).toHaveLength(25);
+      expect(new Set(buckets.map((bucket) => bucket.start)).size).toBe(25);
+      expect(buckets.slice(0, 3)).toEqual([
+        { start: "2026-11-01T07:00:00Z", n: 0 },
+        { start: "2026-11-01T08:00:00Z", n: 2 },
+        { start: "2026-11-01T09:00:00Z", n: 5 },
+      ]);
+      expect(buckets.at(-1)?.start).toBe("2026-11-02T07:00:00Z");
+    });
+  });
+
+  describe("when an hour grain covers the local day the clocks go forward", () => {
+    /** @scenario "TZ15 Hourly buckets across the night the clocks go forward" */
+    it("lists 23 hours, each once", async () => {
+      const { result } = run({
+        sql: ZONED_SQL,
+        timeZone: "America/New_York",
+        timeWindow: { start: "2026-03-08T05:00:00.000Z", end: "2026-03-09T04:00:00.000Z" },
+        granularitySeconds: 3_600,
+        answers: [[], [{ bucket: epochSeconds("2026-03-08T07:00:00Z"), n: 1 }]],
+      });
+
+      const { completeness } = await result;
+      const buckets = completeness?.buckets ?? [];
+
+      expect(buckets).toHaveLength(23);
+      expect(new Set(buckets.map((bucket) => bucket.start)).size).toBe(23);
+      expect(buckets.slice(1, 3)).toEqual([
+        { start: "2026-03-08T06:00:00Z", n: 0 },
+        { start: "2026-03-08T07:00:00Z", n: 1 },
+      ]);
     });
   });
 

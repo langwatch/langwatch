@@ -34,7 +34,6 @@ import {
 } from "../rules/langwatch-ql-reserved-lists.rules.ts";
 import {
   bindTimeZone,
-  findInjected,
   mistypedTimeZoneParameter,
 } from "../rules/langwatch-ql-surface-binding.rules.ts";
 import type { LangWatchQLParameter } from "../rules/langwatch-ql-validation-shape.rules.ts";
@@ -67,6 +66,18 @@ function valueFor(name: LangWatchQLTimeWindowParameter, timeWindow: LangWatchQLT
   return formatLangWatchQLDateTimeParameter(
     name === LWQL_PERIOD_START_PARAMETER ? timeWindow.start : timeWindow.end,
   );
+}
+
+function findInjected({
+  parameters,
+  injected,
+}: {
+  parameters: Readonly<Record<string, unknown>> | undefined;
+  injected: Readonly<Record<string, unknown>>;
+}): Readonly<Record<string, unknown>> | undefined {
+  const merged = { ...parameters, ...injected };
+
+  return Object.keys(merged).length > 0 ? merged : undefined;
 }
 
 /**

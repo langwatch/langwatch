@@ -9,7 +9,10 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { browserTimeZone } from "../../../behavior/browser-time-zone.ts";
 import type { ChartFrameExecuteQuery } from "../../../behavior/frame-bridge.ts";
-import { declaredParamDefaults } from "../../../model/dashboard-widget/params-snapshot.ts";
+import {
+  declaredParamDefaults,
+  declaresTimeZone,
+} from "../../../model/dashboard-widget/params-snapshot.ts";
 import { editorLimitError } from "../../../model/dashboard-widget/widget-limit-failure.ts";
 import { useDashboardWidgetChartNavigate } from "./use-dashboard-widget-chart-navigate.ts";
 import { useDashboardWidgetExecutor } from "./use-dashboard-widget-executor.ts";
@@ -90,6 +93,7 @@ export function useWidgetPreview({
   );
 
   const paramsSnapshot = useMemo(() => declaredParamDefaults(previewQueries), [previewQueries]);
+  const isTimezoneBound = useMemo(() => declaresTimeZone(previewQueries), [previewQueries]);
 
   const onNavigate = useDashboardWidgetChartNavigate(projectSlug);
 
@@ -101,13 +105,14 @@ export function useWidgetPreview({
       timeWindow: hostParams.timeWindow,
       granularitySeconds: hostParams.granularitySeconds,
       timezone: browserTimeZone(),
+      isTimezoneBound,
       theme: colorMode === "dark" ? "dark" : "light",
       projectId,
       ...(widgetId !== undefined ? { widgetId } : {}),
       ...(dashboardId !== undefined ? { dashboardId } : {}),
       ...(widgetName !== undefined ? { widgetName } : {}),
     }),
-    [hostParams, colorMode, projectId, widgetId, dashboardId, widgetName],
+    [hostParams, colorMode, projectId, widgetId, dashboardId, widgetName, isTimezoneBound],
   );
 
   return {

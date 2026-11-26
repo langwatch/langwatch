@@ -1,10 +1,12 @@
 /**
  * The charts label a UTC bucket on the reader's clock, the zone the host puts in
- * `LW.dashboardContext.timezone`: the axis tick and the hover both.
+ * `LW.dashboardContext.timezone`, the axis tick and the hover both, when the widget's queries
+ * bucket on that zone; a widget whose SQL buckets by UTC keeps UTC labels.
  * @see modules/analytics/specs/dashboard-widget-time-zone.feature
  */
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
+import { declaresTimeZone } from "../../params-snapshot.ts";
 import { AreaTimeseries, GroupedBars, ProjectionBars, StackedBars } from "../index.ts";
 import { zonedParts } from "../utc-instant.ts";
 
@@ -18,7 +20,7 @@ const BUCKET = "2026-11-26 00:00:00";
 const ROWS = [{ bucket: BUCKET, n: 1 }];
 const globals = globalThis as Record<string, unknown>;
 
-function frameWindow(timezone: string | undefined) {
+function frameWindow(timezone: string | undefined, isTimezoneBound = true) {
   const colors = new Proxy({}, { get: () => "#000000" });
   return {
     React: {
@@ -29,7 +31,7 @@ function frameWindow(timezone: string | undefined) {
       ) => ({ type, props, children }) satisfies Element,
     },
     Recharts: new Proxy({}, { get: (_target, name) => name }),
-    LW: { dashboardContext: { colors, timezone } },
+    LW: { dashboardContext: { colors, timezone, isTimezoneBound } },
   };
 }
 
@@ -48,8 +50,8 @@ function texts(node: unknown): string[] {
   );
 }
 
-function chartFor(timezone: string | undefined) {
-  globals.window = frameWindow(timezone);
+function chartFor(timezone: string | undefined, isTimezoneBound = true) {
+  globals.window = frameWindow(timezone, isTimezoneBound);
   const tree = elements(
     AreaTimeseries({ data: [{ bucket: BUCKET, n: 1 }], x: "bucket", series: "n" }),
   );
@@ -146,5 +148,39 @@ describe("given a reader in America/Los_Angeles", () => {
     const tick = axis?.props?.tickFormatter as (value: unknown) => string;
 
     expect(data.map((row) => tick(row.bucket))).toEqual(["03-08", "03-09"]);
+  });
+});
+
+describe("given a reader in America/Los_Angeles and a widget whose SQL buckets by UTC", () => {
+  /** @scenario "TZ16 A widget whose queries do not bind the time zone keeps UTC labels" */
+  it("labels the UTC day bucket as its own day, not the evening before", () => {
+    const { tick, hover } = chartFor("America/Los_Angeles", false);
+
+    expect(tick).toBe("00:00");
+    expect(hover).toContain("Nov 26");
+    expect(hover).not.toContain("Nov 25, 16:00");
+  });
+
+  /** @scenario "TZ16 A widget whose queries do not bind the time zone keeps UTC labels" */
+  it("heads a bar tooltip on UTC too", () => {
+    globals.window = frameWindow("America/Los_Angeles", false);
+    const tree = elements(StackedBars({ data: ROWS, x: "bucket", series: ["n"] }));
+    const tooltip = tree.find((element) => element.type === "Tooltip");
+    const label = tooltip?.props?.labelFormatter as (value: unknown) => string;
+
+    expect(label(BUCKET)).toBe("Nov 26");
+  });
+});
+
+describe("given the queries of a widget", () => {
+  /** @scenario "TZ16 A widget whose queries do not bind the time zone keeps UTC labels" */
+  it.each([
+    [["SELECT {dashboard_context_timezone:String} AS zone"], true],
+    [["SELECT 1", "SELECT { dashboard_context_timezone : String }"], true],
+    [["SELECT toStartOfInterval(OccurredAt, INTERVAL 1 DAY) FROM traces"], false],
+    [["SELECT 'dashboard_context_timezone' AS name"], false],
+    [[], false],
+  ])("for %j, the host marks the zone bound: %s", (sqls, expected) => {
+    expect(declaresTimeZone(sqls.map((sql) => ({ sql })))).toBe(expected);
   });
 });

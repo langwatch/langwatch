@@ -41191,6 +41191,10 @@ The outer `toTimeZone(..., 'UTC')` keeps the value a UTC time, so
 `LW.formatTime` shows it at the reader's midnight. `POST /api/v1/query` takes
 the zone as `timeZone`; a run without one is bound to `UTC`.
 
+The `@langwatch/charts` components label axes and tooltips on the reader's
+clock when one of the widget's queries reads the zone, and on UTC when none
+does, so a widget that still buckets by UTC days keeps its dates.
+
 ### Missing data: the `completeness` report
 
 A query that follows the dashboard's time window also returns a
@@ -91974,17 +91978,17 @@ The reader can be in any time zone, and ClickHouse returns times in UTC. Never w
 
 - Bucket with `{dashboard_context_timezone:String}`. The dashboard fills it with the reader's IANA zone (UTC when the browser names none), like the period names: never in `parameters`, never passed by you.
 - A fixed day or hour: `toTimeZone(toStartOfDay(OccurredAt, {dashboard_context_timezone:String}), 'UTC') AS day`, or `toStartOfHour` the same way. Keep the `toTimeZone(..., 'UTC')` wrapper: without it ClickHouse sends the reader's wall clock with no zone mark, and the label moves by the reader's offset.
-- The board's grain, a day starting at the reader's midnight:
+- The board's grain: a day starts at the reader's midnight, and an hour or a minute stays a step of the instant, so the hour the clocks go back counts as two:
 
 ```sql
-SELECT toTimeZone(toDateTime(toString(addSeconds(toStartOfInterval(subtractSeconds(toDateTime(toString(toDateTime(OccurredAt), {dashboard_context_timezone:String}), 'UTC'), 345600), INTERVAL {dashboard_context_granularity_seconds:UInt32} SECOND), 345600)), {dashboard_context_timezone:String}), 'UTC') AS bucket,
+SELECT if({dashboard_context_granularity_seconds:UInt32} >= 86400, toTimeZone(toDateTime(toString(addSeconds(toStartOfInterval(subtractSeconds(toDateTime(toString(toDateTime(OccurredAt), {dashboard_context_timezone:String}), 'UTC'), 345600), INTERVAL {dashboard_context_granularity_seconds:UInt32} SECOND), 345600)), {dashboard_context_timezone:String}), 'UTC'), toDateTime(addSeconds(toStartOfInterval(subtractSeconds(OccurredAt, 345600), INTERVAL {dashboard_context_granularity_seconds:UInt32} SECOND), 345600), 'UTC')) AS bucket,
   count() AS traces
 FROM trace_metrics
 WHERE OccurredAt >= {dashboard_context_period_start:DateTime} AND OccurredAt < {dashboard_context_period_end:DateTime}
 GROUP BY bucket ORDER BY bucket
 ```
 
-- Label with `LW.formatTime(row.bucket)`: the reader's clock, "Nov 25, 4:00 PM" below a one-day grain and "Nov 25" at a day or week grain. Pass `Intl.DateTimeFormat` options to choose the fields, for example `LW.formatTime(row.day, { weekday: "short" })`. `LW.parseTime(row.bucket)` gives a `Date`. The `@langwatch/charts` components already label their axes and tooltips on the reader's clock.
+- Label with `LW.formatTime(row.bucket)`: the reader's clock, "Nov 25, 4:00 PM" below a one-day grain and "Nov 25" at a day or week grain. Pass `Intl.DateTimeFormat` options to choose the fields, for example `LW.formatTime(row.day, { weekday: "short" })`. `LW.parseTime(row.bucket)` gives a `Date`. The `@langwatch/charts` components already label their axes and tooltips on the reader's clock when a query declares `{dashboard_context_timezone:String}`, and on UTC when none does.
 
 ### Prebuilt charts: `@langwatch/charts`
 

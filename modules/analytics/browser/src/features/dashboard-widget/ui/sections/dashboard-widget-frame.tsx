@@ -31,7 +31,10 @@ import {
   managedPromptVersionGate,
   readsManagedPromptVersionFromTraceMetrics,
 } from "../../../../model/dashboard-widget/managed-prompt-version-floor.ts";
-import { declaredParamDefaults } from "../../../../model/dashboard-widget/params-snapshot.ts";
+import {
+  declaredParamDefaults,
+  declaresTimeZone,
+} from "../../../../model/dashboard-widget/params-snapshot.ts";
 import {
   readsSpanMetrics,
   spanDataFloorNotice,
@@ -303,11 +306,13 @@ function WidgetFrameOverWindow({
   // refreshedAt is the dashboard's scheduled-refresh clock: a new value is a
   // context change the frame's useChartQuery re-runs on.
   const canAskLangy = onAskLangyAbout !== undefined;
+  const isTimezoneBound = useMemo(() => declaresTimeZone(definition.queries), [definition.queries]);
   const dashboardContext: ChartFrameDashboardContext = useMemo(
     () => ({
       timeWindow: hostParams.timeWindow,
       granularitySeconds: hostParams.granularitySeconds,
       timezone: browserTimeZone(),
+      isTimezoneBound,
       theme: colorMode === "dark" ? "dark" : "light",
       widgetId: id,
       projectId,
@@ -316,7 +321,17 @@ function WidgetFrameOverWindow({
       ...(refreshedAt === undefined ? {} : { refreshedAt }),
       canAskLangy,
     }),
-    [hostParams, colorMode, id, projectId, dashboardId, widgetName, refreshedAt, canAskLangy],
+    [
+      hostParams,
+      colorMode,
+      id,
+      projectId,
+      dashboardId,
+      widgetName,
+      refreshedAt,
+      canAskLangy,
+      isTimezoneBound,
+    ],
   );
 
   // LW.params has no other source of a value yet (no dashboard-side

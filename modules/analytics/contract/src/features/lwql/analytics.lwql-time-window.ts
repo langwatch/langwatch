@@ -159,10 +159,13 @@ export const LWQL_ACCEPTED_GRANULARITY_STEPS = [
  */
 export const LWQL_BUCKET_ALIGNMENT_SECONDS = 345_600;
 
+/** Steps this long or longer bucket on the reader's wall clock; shorter ones on the instant. */
+export const LWQL_WALL_CLOCK_GRANULARITY_SECONDS = 86_400;
+
 /**
- * The start of the bucket `column` falls in, as a UTC `DateTime`. With a `timeZone` placeholder
- * it buckets by that zone's wall clock, so a day starts at the reader's midnight across DST;
- * without one, by UTC as before. `granularity` is the step in seconds, as SQL.
+ * The start of the bucket `column` falls in, as a UTC `DateTime`. With a `timeZone` placeholder a
+ * day or longer step floors on that zone's wall clock (a day starts at local midnight across DST)
+ * and a shorter one on the instant (a repeated hour stays two). `granularity` is SQL seconds.
  */
 export function lwqlBucketStartSql({
   column,
@@ -178,8 +181,12 @@ export function lwqlBucketStartSql({
     `addSeconds(toStartOfInterval(subtractSeconds(${time}, ${shift}), INTERVAL ${granularity} SECOND), ${shift})`;
   if (timeZone === undefined) return floor(column);
   const wall = `toDateTime(toString(toDateTime(${column}), ${timeZone}), 'UTC')`;
+  const wallFloor = `toTimeZone(toDateTime(toString(${floor(wall)}), ${timeZone}), 'UTC')`;
 
-  return `toTimeZone(toDateTime(toString(${floor(wall)}), ${timeZone}), 'UTC')`;
+  return (
+    `if(${granularity} >= ${LWQL_WALL_CLOCK_GRANULARITY_SECONDS}, ${wallFloor}, ` +
+    `toDateTime(${floor(column)}, 'UTC'))`
+  );
 }
 
 /** One of the accepted steps: the only values any door accepts. */

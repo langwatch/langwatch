@@ -31,16 +31,3 @@ export function mistypedTimeZoneParameter(declared: readonly LangWatchQLParamete
     )
     .map((parameter) => parameter.name);
 }
-
-/** The supplied parameters with the surface-bound values over them; undefined when empty. */
-export function findInjected({
-  parameters,
-  injected,
-}: {
-  parameters: Readonly<Record<string, unknown>> | undefined;
-  injected: Readonly<Record<string, unknown>>;
-}): Readonly<Record<string, unknown>> | undefined {
-  const merged = { ...parameters, ...injected };
-
-  return Object.keys(merged).length > 0 ? merged : undefined;
-}

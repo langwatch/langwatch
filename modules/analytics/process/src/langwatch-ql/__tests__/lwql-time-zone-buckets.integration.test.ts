@@ -1,7 +1,7 @@
 /**
  * The reader-zone bucket the templates and the completeness report share, run by a real
- * ClickHouse with the zone the time-window service binds: a day starts at the reader's midnight,
- * across the night the clocks go back, and UTC keeps the epoch edges.
+ * ClickHouse: a day starts at the reader's midnight across DST, an hour keeps both copies of the
+ * repeated hour, and UTC keeps the epoch edges.
  * @see modules/analytics/specs/dashboard-widget-time-zone.feature
  * @vitest-environment node
  */
@@ -28,22 +28,30 @@ const BUCKET = lwqlBucketStartSql({
   granularity: "86400",
   timeZone: "{dashboard_context_timezone:String}",
 });
+const HOUR_BUCKET = lwqlBucketStartSql({
+  column: "OccurredAt",
+  granularity: "{dashboard_context_granularity_seconds:UInt32}",
+  timeZone: "{dashboard_context_timezone:String}",
+});
 const WINDOW = { start: "2026-10-31T00:00:00.000Z", end: "2026-11-04T00:00:00.000Z" };
 let client: ClickHouseClient;
 
 /** Each trace's bucket start, for a run bound to `timeZone` by the time-window service. */
-async function bucketsIn(timeZone: string | undefined): Promise<Record<string, string>> {
+async function bucketsIn(
+  timeZone: string | undefined,
+  { bucket = BUCKET, timeWindow = WINDOW, granularitySeconds = 86_400 } = {},
+): Promise<Record<string, string>> {
   const { parameters } = timeWindows.resolveTimeWindow({
     declared: DECLARED,
-    timeWindow: WINDOW,
+    timeWindow,
     timeZone,
   });
   const result = await client.query({
     query:
-      `SELECT TraceId, toString(${BUCKET}) AS bucket FROM ${DATABASE}.traces ` +
+      `SELECT TraceId, toString(${bucket}) AS bucket FROM ${DATABASE}.traces ` +
       "WHERE OccurredAt >= {dashboard_context_period_start:DateTime} " +
       "AND OccurredAt < {dashboard_context_period_end:DateTime} ORDER BY TraceId",
-    query_params: parameters,
+    query_params: { ...parameters, dashboard_context_granularity_seconds: granularitySeconds },
     format: "JSONEachRow",
   });
   const rows = await result.json<{ TraceId: string; bucket: string }>();
@@ -62,6 +70,10 @@ describe.skipIf(!url)("given traces on both sides of the night the clocks go bac
     await client.command({
       query: `INSERT INTO ${DATABASE}.traces VALUES ('a', '2026-11-01 08:30:00.250'), ('b', '2026-11-01 09:30:00'), ('c', '2026-11-02 07:59:00')`,
     });
+    // 01:30 EST and 03:30 EDT, either side of the hour New York skips on Mar 8.
+    await client.command({
+      query: `INSERT INTO ${DATABASE}.traces VALUES ('d', '2026-03-08 06:30:00'), ('e', '2026-03-08 07:30:00')`,
+    });
   });
 
   afterAll(async () => {
@@ -72,6 +84,39 @@ describe.skipIf(!url)("given traces on both sides of the night the clocks go bac
   /** @scenario "TZ09 Day buckets start at the reader's midnight, across a DST change" */
   it("puts all three in Nov 1 starting at 07:00 UTC for Los Angeles", async () => {
     expect(await bucketsIn("America/Los_Angeles")).toEqual({
+      a: "2026-11-01 07:00:00",
+      b: "2026-11-01 07:00:00",
+      c: "2026-11-01 07:00:00",
+    });
+  });
+
+  /** @scenario "TZ14 Hourly buckets keep both copies of the hour the clocks go back" */
+  it("puts the two 01:30s in Los Angeles in two hour buckets", async () => {
+    const buckets = await bucketsIn("America/Los_Angeles", {
+      bucket: HOUR_BUCKET,
+      timeWindow: { start: "2026-11-01T07:00:00.000Z", end: "2026-11-01T11:00:00.000Z" },
+      granularitySeconds: 3_600,
+    });
+
+    expect(buckets).toEqual({ a: "2026-11-01 08:00:00", b: "2026-11-01 09:00:00" });
+  });
+
+  /** @scenario "TZ15 Hourly buckets across the night the clocks go forward" */
+  it("puts 01:30 and 03:30 in New York in the hours that start at 06:00 and 07:00 UTC", async () => {
+    const buckets = await bucketsIn("America/New_York", {
+      bucket: HOUR_BUCKET,
+      timeWindow: { start: "2026-03-08T05:00:00.000Z", end: "2026-03-08T09:00:00.000Z" },
+      granularitySeconds: 3_600,
+    });
+
+    expect(buckets).toEqual({ d: "2026-03-08 06:00:00", e: "2026-03-08 07:00:00" });
+  });
+
+  /** @scenario "TZ09 Day buckets start at the reader's midnight, across a DST change" */
+  it("keeps the day edges on the reader's midnight through the grain placeholder", async () => {
+    const buckets = await bucketsIn("America/Los_Angeles", { bucket: HOUR_BUCKET });
+
+    expect(buckets).toEqual({
       a: "2026-11-01 07:00:00",
       b: "2026-11-01 07:00:00",
       c: "2026-11-01 07:00:00",

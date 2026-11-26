@@ -61,6 +61,14 @@ Feature: Dashboard widgets bucket and label time on the reader's clock
       When a statement declares {dashboard_context_timezone:UInt32}
       Then it is refused with the code "lwql_reserved_parameter_type"
 
+    @unit
+    Scenario: TZ17 The wrong-type refusal says how to declare each mistyped name
+      Given a statement that declares the time zone, a list name or a period name with the wrong type
+      When the refusal is shown, for the time zone alone or with a list and a period name
+      Then it says to declare the time zone as {dashboard_context_timezone:String}
+      And it names the right type for every other mistyped name, and no name that was typed right
+      And a supplied dashboard_context_timezone points at the request's timeZone field
+
   Rule: Buckets start on the reader's clock
 
     @integration
@@ -76,6 +84,20 @@ Feature: Dashboard widgets bucket and label time on the reader's clock
       When it runs with timeZone "America/Los_Angeles" over the week of a DST change
       Then completeness.buckets start at each local midnight, one of them 25 hours long
 
+    @unit @integration
+    Scenario: TZ14 Hourly buckets keep both copies of the hour the clocks go back
+      Given traces at 2026-11-01 08:30 UTC and 09:30 UTC, both 01:30 on the clock in Los Angeles
+      When an hour-grain statement runs with timeZone "America/Los_Angeles"
+      Then they fall in two buckets, 08:00 UTC and 09:00 UTC
+      And completeness.buckets list 25 hours for the local day of Nov 1, each once
+
+    @unit @integration
+    Scenario: TZ15 Hourly buckets across the night the clocks go forward
+      Given traces at 2026-03-08 06:30 UTC and 07:30 UTC, 01:30 and 03:30 on the clock in New York
+      When an hour-grain statement runs with timeZone "America/New_York"
+      Then they fall in the buckets that start at 06:00 UTC and 07:00 UTC
+      And completeness.buckets list 23 hours for the local day of Mar 8, each once
+
   Rule: Labels show the reader's clock
 
     @unit
@@ -89,6 +111,14 @@ Feature: Dashboard widgets bucket and label time on the reader's clock
       Given LW.dashboardContext.timezone is "America/Los_Angeles"
       When a chart from @langwatch/charts labels the bucket "2026-11-26 00:00:00"
       Then the axis reads "16:00" and the tooltip reads "Nov 25, 16:00"
+
+    @unit
+    Scenario: TZ16 A widget whose queries do not bind the time zone keeps UTC labels
+      Given a reader in "America/Los_Angeles"
+      And a saved widget whose queries do not declare {dashboard_context_timezone:String}
+      When a chart from @langwatch/charts labels its UTC day bucket "2026-11-26 00:00:00"
+      Then the axis reads "00:00" and the tooltip reads "Nov 26", not the evening before
+      And LW.dashboardContext.isTimezoneBound is false, true only when a query declares the zone
 
     @unit
     Scenario: TZ13 Langy's widget skill buckets with the reader's zone and never hardcodes UTC

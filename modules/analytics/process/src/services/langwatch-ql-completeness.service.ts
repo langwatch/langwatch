@@ -8,6 +8,7 @@ import {
   LWQL_BUCKET_ALIGNMENT_SECONDS,
   LWQL_DEFAULT_TIME_ZONE,
   lwqlBucketStartSql,
+  LWQL_WALL_CLOCK_GRANULARITY_SECONDS,
   type LangWatchQLMemberWindow,
   type LangWatchQLTimeWindow,
   type QueryCompleteness,
@@ -333,8 +334,9 @@ function stateOf({
 }
 
 /**
- * Every bucket the window touches, empty ones at either end included, with its row count. Steps
- * on the zone's wall clock as `lwqlBucketStartSql` floors: a DST day is 23 or 25 hours long.
+ * Every bucket the window touches, empty ones at either end included, with its row count. Floors
+ * as `lwqlBucketStartSql` does: a sub-day step on the instant, a day or longer on the zone's wall
+ * clock, so a DST day is 23 or 25 hours long and a DST night has 23 or 25 hourly buckets.
  */
 function windowBuckets({
   rows,
@@ -349,6 +351,9 @@ function windowBuckets({
 }): { start: string; n: number }[] {
   const counts = new Map(rows.map((row) => [countOf(row.bucket), countOf(row.n)]));
   const endSeconds = Temporal.Instant.from(timeWindow.end).epochMilliseconds / 1000;
+  if (granularitySeconds < LWQL_WALL_CLOCK_GRANULARITY_SECONDS) {
+    return instantBuckets({ counts, timeWindow, endSeconds, granularitySeconds });
+  }
   const startWallSeconds = wallSeconds({ instant: timeWindow.start, timeZone });
   const endWallSeconds = wallSeconds({ instant: timeWindow.end, timeZone });
   const shift = LWQL_BUCKET_ALIGNMENT_SECONDS;
@@ -372,6 +377,32 @@ function windowBuckets({
     if (seen.has(seconds)) continue;
     seen.add(seconds);
     buckets.push({ start: instant.toString(), n: counts.get(seconds) ?? 0 });
+  }
+  return buckets;
+}
+
+/** Sub-day buckets: whole steps of the instant from the alignment, the same in every zone. */
+function instantBuckets({
+  counts,
+  timeWindow,
+  endSeconds,
+  granularitySeconds,
+}: {
+  counts: ReadonlyMap<number, number>;
+  timeWindow: LangWatchQLTimeWindow;
+  endSeconds: number;
+  granularitySeconds: number;
+}): { start: string; n: number }[] {
+  const shift = LWQL_BUCKET_ALIGNMENT_SECONDS;
+  const startSeconds = Math.floor(Temporal.Instant.from(timeWindow.start).epochMilliseconds / 1000);
+  const first =
+    Math.floor((startSeconds - shift) / granularitySeconds) * granularitySeconds + shift;
+  const buckets: { start: string; n: number }[] = [];
+  for (let seconds = first; seconds < endSeconds; seconds += granularitySeconds) {
+    buckets.push({
+      start: Temporal.Instant.fromEpochMilliseconds(seconds * 1000).toString(),
+      n: counts.get(seconds) ?? 0,
+    });
   }
   return buckets;
 }
