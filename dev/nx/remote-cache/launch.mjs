@@ -1,6 +1,6 @@
 import { spawn } from "node:child_process";
 import { createHash, randomBytes } from "node:crypto";
-import { appendFileSync, readFileSync } from "node:fs";
+import { appendFileSync, readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
@@ -14,14 +14,19 @@ export const BUCKET = "langwatch-dev-nx-remote-cache";
 export const REGION = "eu-central-1";
 const SERVER = fileURLToPath(new URL("./server.mjs", import.meta.url));
 
-const healthy = async ({ port }) => {
+// What /health says about the server on that port: its pid and key, or null.
+const health = async ({ port }) => {
   try {
-    return (await fetch(`http://127.0.0.1:${port}/health`, { signal: AbortSignal.timeout(500) }))
-      .ok;
+    const res = await fetch(`http://127.0.0.1:${port}/health`, {
+      signal: AbortSignal.timeout(500),
+    });
+    return res.ok ? await res.json() : null;
   } catch {
-    return false;
+    return null;
   }
 };
+
+const isServer = (answer, state) => answer?.pid === state.pid && answer?.key === state.key;
 
 const readState = (file) => {
   try {
@@ -39,28 +44,17 @@ const stop = (pid) => {
   }
 };
 
-export const ensureServer = async ({
-  workspaceRoot,
-  scope,
-  gate = null,
-  githubToken = null,
-  env,
-  serverEnv = env,
-}) => {
+// The server's settings for this worktree and configuration. One server per
+// configuration: a run on another branch starts its own and never stops one an earlier
+// run still uses. The GitHub token stays out of the key and off disk.
+export const serverConfig = ({ workspaceRoot, scope, gate = null, githubToken = null, env }) => {
   const dir = join(workspaceRoot, ".nx", "remote-cache");
   const bucket = env.LANGWATCH_NX_REMOTE_CACHE_BUCKET || BUCKET;
-  // The token itself stays out of the key and off disk: a new token means a new server.
   const tokenHash = githubToken ? createHash("sha256").update(githubToken).digest("hex") : null;
   const key = createHash("sha256")
     .update(JSON.stringify({ scope, bucket, gate, tokenHash }))
     .digest("hex");
-  // One server per configuration: a run on another branch starts its own and never stops
-  // a server an earlier run still uses. Idle servers exit on their own.
-  const stateFile = join(dir, `server-${key.slice(0, 16)}.json`);
-  let state = readState(stateFile);
-  if (state?.key === key && (await healthy(state))) return state;
-  if (state?.pid) stop(state.pid);
-  const config = {
+  return {
     scope,
     key,
     bucket,
@@ -69,10 +63,35 @@ export const ensureServer = async ({
     token: randomBytes(24).toString("hex"),
     maxUploadBytes: Number(env.LANGWATCH_NX_REMOTE_CACHE_MAX_MB || 200) * 1024 * 1024,
     idleExitMs: 60 * 60_000,
-    stateFile,
+    stateFile: join(dir, `server-${key.slice(0, 16)}.json`),
     logFile: join(dir, "server.log"),
   };
-  const child = spawn(process.execPath, [SERVER], {
+};
+
+export const logFileFor = (workspaceRoot) =>
+  join(workspaceRoot, ".nx", "remote-cache", "server.log");
+
+export const ensureServer = async ({
+  workspaceRoot,
+  scope,
+  gate = null,
+  githubToken = null,
+  env,
+  serverEnv = env,
+  serverPath = SERVER,
+  startupPolls = 30,
+}) => {
+  const config = serverConfig({ workspaceRoot, scope, gate, githubToken, env });
+  let state = readState(config.stateFile);
+  if (state) {
+    const answer = await health(state);
+    if (isServer(answer, state)) return state;
+    // Only a pid that answered as this server is signalled: after a reboot or a crash the
+    // recorded one can belong to any process.
+    if (answer?.pid === state.pid) stop(state.pid);
+    rmSync(config.stateFile, { force: true });
+  }
+  const child = spawn(process.execPath, [serverPath], {
     detached: true,
     stdio: "ignore",
     env: {
@@ -81,13 +100,14 @@ export const ensureServer = async ({
       ...(githubToken ? { LANGWATCH_NX_REMOTE_CACHE_GITHUB_TOKEN: githubToken } : {}),
     },
   });
+  child.on("error", () => {});
   child.unref();
-  for (let i = 0; i < 30; i++) {
+  for (let i = 0; i < startupPolls; i++) {
     await new Promise((r) => setTimeout(r, 100));
-    state = readState(stateFile);
-    if (state?.pid === child.pid && (await healthy(state))) return state;
+    state = readState(config.stateFile);
+    if (state?.pid === child.pid && isServer(await health(state), state)) return state;
   }
-  stop(child.pid);
+  if (child.pid) stop(child.pid);
   return null;
 };
 
@@ -96,31 +116,64 @@ export const nxEnvironment = (state) => ({
   NX_SELF_HOSTED_REMOTE_CACHE_ACCESS_TOKEN: state.token,
 });
 
-// CI: credentials come in NX_CACHE_AWS_*; only the server gets them as AWS_*. Writes the
-// Nx variables to $GITHUB_ENV, or nothing when this event has no cache scope.
-const ci = async () => {
-  const env = process.env;
+// The cache server's whole environment in CI: PATH and the role's session from
+// NX_CACHE_AWS_*. Nothing else from the job reaches it, and no step ever sees AWS_*.
+export const ciServerEnv = (env) => ({
+  PATH: env.PATH,
+  AWS_ACCESS_KEY_ID: env.NX_CACHE_AWS_ACCESS_KEY_ID,
+  AWS_SECRET_ACCESS_KEY: env.NX_CACHE_AWS_SECRET_ACCESS_KEY,
+  AWS_SESSION_TOKEN: env.NX_CACHE_AWS_SESSION_TOKEN,
+  AWS_CREDENTIAL_EXPIRATION: env.NX_CACHE_AWS_CREDENTIAL_EXPIRATION,
+});
+
+// CI: starts the server and writes the Nx variables to $GITHUB_ENV, or nothing when this
+// event has no cache scope or the server does not start.
+export const ci = async ({ env, workspaceRoot, start = ensureServer, log = console.log }) => {
   const scope = cacheScope({ env });
-  if (!scope) return console.log("This event gets no Nx remote cache.");
-  const serverEnv = {
-    PATH: env.PATH,
-    AWS_ACCESS_KEY_ID: env.NX_CACHE_AWS_ACCESS_KEY_ID,
-    AWS_SECRET_ACCESS_KEY: env.NX_CACHE_AWS_SECRET_ACCESS_KEY,
-    AWS_SESSION_TOKEN: env.NX_CACHE_AWS_SESSION_TOKEN,
-  };
-  const state = await ensureServer({
-    workspaceRoot: process.cwd(),
-    scope,
-    env,
-    serverEnv,
-  });
-  if (!state)
-    return console.log("The Nx remote cache server did not start; Nx keeps its local cache.");
+  if (!scope) {
+    log("This event gets no Nx remote cache.");
+    return;
+  }
+  const state = await start({ workspaceRoot, scope, env, serverEnv: ciServerEnv(env) });
+  if (!state) {
+    log("The Nx remote cache server did not start; Nx keeps its local cache.");
+    return;
+  }
   const lines = Object.entries(nxEnvironment(state)).map(([k, v]) => `${k}=${v}`);
   appendFileSync(env.GITHUB_ENV, `${lines.join("\n")}\n`);
-  console.log(
+  log(
     `Nx remote cache on (${scope.tier}): reads ${scope.read.map((r) => r.prefix).join(", ")}; writes ${scope.write}.`,
   );
 };
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) await ci();
+const ROUTINE = /^\S+ (listening on |used a laptop entry )/;
+
+// The end-of-job report: the server log as it is, and one warning annotation when the
+// cache failed requests, so a cache that only ever misses shows on the run page.
+export const report = (text) => {
+  const lines = text.split("\n").filter(Boolean);
+  const failures = lines.filter((line) => !ROUTINE.test(line)).length;
+  return [
+    ...lines,
+    ...(failures > 0
+      ? [
+          `::warning title=Nx remote cache::${failures} cache request(s) failed; the "Nx remote cache log" step has the details.`,
+        ]
+      : []),
+  ];
+};
+
+const printReport = (workspaceRoot) => {
+  let text = "";
+  try {
+    text = readFileSync(logFileFor(workspaceRoot), "utf8");
+  } catch {
+    return console.log("The Nx remote cache server wrote no log.");
+  }
+  for (const line of report(text)) console.log(line);
+};
+
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  if (process.argv[2] === "report") printReport(process.cwd());
+  else await ci({ env: process.env, workspaceRoot: process.cwd() });
+}

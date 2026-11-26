@@ -869,6 +869,11 @@ jobs:
           echo "PASS: canary failed as expected and failures were extracted"
           cat apps/api/test-failures.txt
 
+      # What the Nx cache server logged, plus a warning when it failed requests (ADR-206).
+      - name: Nx remote cache log
+        if: ${{ !cancelled() }}
+        run: node dev/nx/remote-cache/launch.mjs report
+
       - name: Set up Go for the Slack notifier
         if: failure() && github.ref == 'refs/heads/main'
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
@@ -1283,6 +1288,11 @@ jobs:
         if: ${{ !cancelled() }}
         run: size=$(du -sm node_modules/.vitest-cache 2>/dev/null | cut -f1); if [ "${size:-0}" -gt 400 ]; then rm -rf node_modules/.vitest-cache && mkdir -p node_modules/.vitest-cache; fi
 
+      # What the Nx cache server logged, plus a warning when it failed requests (ADR-206).
+      - name: Nx remote cache log
+        if: ${{ !cancelled() }}
+        run: node dev/nx/remote-cache/launch.mjs report
+
   # Its own job, so a run that times out (cancelled, no failed step) still posts.
   package-suites-notify:
     timeout-minutes: 5
@@ -1445,6 +1455,11 @@ jobs:
           # Under the runner's `bash -e`, a non-zero exit here fails the step
           # (the gate we want); the EXIT trap still stops the preview server.
           node scripts/smoke-boot.mjs
+
+      # What the Nx cache server logged, plus a warning when it failed requests (ADR-206).
+      - name: Nx remote cache log
+        if: ${{ !cancelled() }}
+        run: node dev/nx/remote-cache/launch.mjs report
 
       - name: Set up Go for the Slack notifier
         if: failure() && github.ref == 'refs/heads/main'

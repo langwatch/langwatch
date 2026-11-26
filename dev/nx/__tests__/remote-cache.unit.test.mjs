@@ -2,16 +2,24 @@
 // bound to specs/ci/nx-remote-cache.feature.
 
 import assert from "node:assert/strict";
+import { spawn, spawnSync } from "node:child_process";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { createServer, request } from "node:http";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { describe, it } from "node:test";
+import { fileURLToPath } from "node:url";
 
 import { laptopAccess } from "../remote-cache-plugin.mjs";
 import { credentialSource } from "../remote-cache/credentials.mjs";
 import { gateStore } from "../remote-cache/gate.mjs";
+import { ci as runCi, ensureServer, report, serverConfig } from "../remote-cache/launch.mjs";
 import { signedHeaders } from "../remote-cache/s3.mjs";
 import { cacheScope } from "../remote-cache/scope.mjs";
 import { createCacheServer } from "../remote-cache/server.mjs";
-import { afterLogin, setupStep } from "../remote-cache/setup.mjs";
+import { setupStep } from "../remote-cache/setup.mjs";
+
+const SETUP = fileURLToPath(new URL("../remote-cache/setup.mjs", import.meta.url));
 
 const prefixes = (scope) => scope.read.map((r) => r.prefix);
 const ci = (extra) => ({ GITHUB_ACTIONS: "true", ...extra });
@@ -416,30 +424,31 @@ describe("Nx remote cache", () => {
     });
   });
 
-  /** @scenario "Dev asks for a GitHub login once and never blocks" */
-  it("asks a person once, tells everyone else in one line, and remembers", () => {
+  /** @scenario "Dev tells a laptop with no GitHub login how to turn the cache on, and never waits" */
+  it("tells a person once, tells everyone else each time, and never prompts", () => {
     const base = { env: {}, gate: "https://gate.example", ghInstalled: true, remembered: null };
     assert.deepEqual(setupStep({ ...base, loggedIn: true, interactive: true }), {
       action: "none",
       remember: "on",
     });
-    assert.deepEqual(setupStep({ ...base, loggedIn: false, interactive: true }), {
-      action: "login",
-    });
-    assert.equal(setupStep({ ...base, loggedIn: false, interactive: false }).action, "say");
-    assert.equal(setupStep({ ...base, loggedIn: false, interactive: false }).remember, undefined);
+    const told = setupStep({ ...base, loggedIn: false, interactive: true });
+    assert.equal(told.action, "say");
+    assert.match(told.line, /gh auth login/);
+    assert.equal(told.remember, "told");
     assert.equal(
-      setupStep({ ...base, loggedIn: false, interactive: true, remembered: "declined" }).action,
+      setupStep({ ...base, loggedIn: false, interactive: true, remembered: "told" }).action,
       "none",
     );
-    assert.deepEqual(
-      setupStep({ ...base, ghInstalled: false, loggedIn: false, interactive: true }),
-      {
-        action: "say",
-        line: setupStep({ ...base, ghInstalled: false, loggedIn: false, interactive: true }).line,
-        remember: "no-gh",
-      },
+    // A machine that was on and lost its login hears it again.
+    assert.equal(
+      setupStep({ ...base, loggedIn: false, interactive: true, remembered: "on" }).action,
+      "say",
     );
+    assert.equal(setupStep({ ...base, loggedIn: false, interactive: false }).action, "say");
+    assert.equal(setupStep({ ...base, loggedIn: false, interactive: false }).remember, undefined);
+    const noGh = setupStep({ ...base, ghInstalled: false, loggedIn: false, interactive: true });
+    assert.equal(noGh.remember, "no-gh");
+    assert.match(noGh.line, /install the GitHub CLI/);
     assert.equal(
       setupStep({ ...base, gate: "", loggedIn: false, interactive: true }).action,
       "none",
@@ -448,7 +457,224 @@ describe("Nx remote cache", () => {
       setupStep({ ...base, env: { CI: "1" }, loggedIn: false, interactive: true }).action,
       "none",
     );
-    assert.deepEqual(afterLogin({ loggedIn: true }), { action: "none", remember: "on" });
-    assert.equal(afterLogin({ loggedIn: false }).remember, "declined");
+  });
+
+  /** @scenario "Dev tells a laptop with no GitHub login how to turn the cache on, and never waits" */
+  it("runs the dev check without a terminal and returns at once", () => {
+    const home = mkdtempSync(join(tmpdir(), "nx-cache-setup-"));
+    const started = Date.now();
+    const out = spawnSync(process.execPath, [SETUP], {
+      encoding: "utf8",
+      input: "",
+      timeout: 20_000,
+      env: { PATH: "/nonexistent", XDG_CONFIG_HOME: home, HOME: home },
+    });
+    assert.equal(out.status, 0);
+    assert.match(out.stdout, /install the GitHub CLI/);
+    assert.ok(Date.now() - started < 10_000);
+    rmSync(home, { recursive: true, force: true });
+  });
+
+  /** @scenario "CI hands the role's credentials only to the cache server" */
+  it("passes only PATH and the role's session to the server and writes the Nx variables", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "nx-cache-ci-"));
+    const githubEnv = join(dir, "github-env");
+    writeFileSync(githubEnv, "");
+    const env = ci({
+      GITHUB_EVENT_NAME: "pull_request",
+      GITHUB_HEAD_REF: "feat/x",
+      GITHUB_ENV: githubEnv,
+      PATH: "/usr/bin",
+      NX_CACHE_AWS_ACCESS_KEY_ID: "AKIA",
+      NX_CACHE_AWS_SECRET_ACCESS_KEY: "secret",
+      NX_CACHE_AWS_SESSION_TOKEN: "session",
+      NX_CACHE_AWS_CREDENTIAL_EXPIRATION: "2026-11-26T20:00:00Z",
+      OPENAI_API_KEY: "job-secret",
+    });
+    const started = [];
+    const logs = [];
+    await runCi({
+      env,
+      workspaceRoot: dir,
+      start: async (args) => {
+        started.push(args);
+        return { port: 4321, token: "tok" };
+      },
+      log: (line) => logs.push(line),
+    });
+    assert.equal(started.length, 1);
+    assert.deepEqual(started[0].serverEnv, {
+      PATH: "/usr/bin",
+      AWS_ACCESS_KEY_ID: "AKIA",
+      AWS_SECRET_ACCESS_KEY: "secret",
+      AWS_SESSION_TOKEN: "session",
+      AWS_CREDENTIAL_EXPIRATION: "2026-11-26T20:00:00Z",
+    });
+    assert.equal(started[0].scope.write, "pr/");
+    assert.ok(!Object.keys(env).some((k) => k.startsWith("AWS_")));
+    assert.equal(
+      readFileSync(githubEnv, "utf8"),
+      "NX_SELF_HOSTED_REMOTE_CACHE_SERVER=http://127.0.0.1:4321\nNX_SELF_HOSTED_REMOTE_CACHE_ACCESS_TOKEN=tok\n",
+    );
+    assert.match(logs[0], /writes pr\//);
+    // The expiry reaches the server, so its credentials stop five minutes before AWS's.
+    const near = credentialSource({
+      env: started[0].serverEnv,
+      now: () => Date.parse("2026-11-26T19:58:00Z"),
+    });
+    assert.equal(await near(), null);
+    const fresh = credentialSource({
+      env: started[0].serverEnv,
+      now: () => Date.parse("2026-11-26T18:00:00Z"),
+    });
+    assert.equal((await fresh()).accessKeyId, "AKIA");
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  /** @scenario "No GitHub login leaves Nx on its local cache" */
+  it("writes nothing to GITHUB_ENV for an event without a scope or a server that did not start", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "nx-cache-ci-"));
+    const githubEnv = join(dir, "github-env");
+    writeFileSync(githubEnv, "");
+    let calls = 0;
+    const start = async () => {
+      calls++;
+      return null;
+    };
+    const log = () => {};
+    await runCi({
+      env: ci({ GITHUB_EVENT_NAME: "schedule", GITHUB_ENV: githubEnv }),
+      workspaceRoot: dir,
+      start,
+      log,
+    });
+    assert.equal(calls, 0);
+    await runCi({
+      env: ci({ GITHUB_EVENT_NAME: "push", GITHUB_REF: "refs/heads/main", GITHUB_ENV: githubEnv }),
+      workspaceRoot: dir,
+      start,
+      log,
+    });
+    assert.equal(calls, 1);
+    assert.equal(readFileSync(githubEnv, "utf8"), "");
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  /** @scenario "A worktree keeps one cache server per configuration" */
+  it("derives one key and state file per scope, bucket and token, and reads its settings from the environment", () => {
+    const scope = cacheScope({ env: {}, localBranch: "feat/x" });
+    const base = { workspaceRoot: "/w", scope, gate: "https://gate.example", env: {} };
+    const a = serverConfig({ ...base, githubToken: "gho_a" });
+    assert.equal(serverConfig({ ...base, githubToken: "gho_a" }).key, a.key);
+    assert.notEqual(serverConfig({ ...base, githubToken: "gho_b" }).key, a.key);
+    assert.notEqual(
+      serverConfig({
+        ...base,
+        githubToken: "gho_a",
+        scope: cacheScope({ env: {}, localBranch: "feat/y" }),
+      }).key,
+      a.key,
+    );
+    assert.notEqual(
+      serverConfig({
+        ...base,
+        githubToken: "gho_a",
+        env: { LANGWATCH_NX_REMOTE_CACHE_BUCKET: "other" },
+      }).key,
+      a.key,
+    );
+    assert.equal(a.stateFile, `/w/.nx/remote-cache/server-${a.key.slice(0, 16)}.json`);
+    assert.equal(a.logFile, "/w/.nx/remote-cache/server.log");
+    assert.equal(a.bucket, "langwatch-dev-nx-remote-cache");
+    assert.equal(a.region, "eu-central-1");
+    assert.equal(a.maxUploadBytes, 200 * 1024 * 1024);
+    assert.ok(!JSON.stringify(a).includes("gho_a"));
+    const custom = serverConfig({
+      ...base,
+      env: { LANGWATCH_NX_REMOTE_CACHE_REGION: "eu-west-1", LANGWATCH_NX_REMOTE_CACHE_MAX_MB: "5" },
+    });
+    assert.equal(custom.region, "eu-west-1");
+    assert.equal(custom.maxUploadBytes, 5 * 1024 * 1024);
+    assert.notEqual(custom.token, a.token);
+  });
+
+  /** @scenario "A worktree keeps one cache server per configuration" */
+  it("reuses a running server, replaces a stale one, and never signals a pid that is not its server", async () => {
+    const root = mkdtempSync(join(tmpdir(), "nx-cache-launch-"));
+    const scope = cacheScope({ env: {}, localBranch: "feat/x" });
+    const args = { workspaceRoot: root, scope, env: {}, serverEnv: { PATH: process.env.PATH } };
+    const bystander = spawn("sleep", ["60"], { stdio: "ignore" });
+    const stranger = createServer((_req, res) => res.writeHead(200).end("ok"));
+    const strangerPort = await listen(stranger);
+    const pids = [];
+    try {
+      const first = await ensureServer(args);
+      assert.ok(first);
+      pids.push(first.pid);
+      const again = await ensureServer(args);
+      assert.equal(again.pid, first.pid);
+      assert.equal(again.port, first.port);
+
+      // A state file left from a reboot: its pid now belongs to another process and its
+      // port to another server. Neither is touched; a new server takes over.
+      const { stateFile } = serverConfig(args);
+      process.kill(first.pid);
+      await new Promise((r) => setTimeout(r, 200));
+      writeFileSync(
+        stateFile,
+        JSON.stringify({ ...first, pid: bystander.pid, port: strangerPort }),
+      );
+      const replaced = await ensureServer(args);
+      assert.ok(replaced);
+      pids.push(replaced.pid);
+      assert.notEqual(replaced.pid, bystander.pid);
+      assert.doesNotThrow(() => process.kill(bystander.pid, 0));
+      const health = await (await fetch(`http://127.0.0.1:${replaced.port}/health`)).json();
+      assert.deepEqual(health, { pid: replaced.pid, key: serverConfig(args).key });
+    } finally {
+      for (const pid of pids) {
+        try {
+          process.kill(pid);
+        } catch {
+          // Already gone.
+        }
+      }
+      bystander.kill();
+      stranger.close();
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  /** @scenario "A cache server that does not start leaves Nx on its local cache" */
+  it("gives up on a server that never answers and stops the process it started", async () => {
+    const root = mkdtempSync(join(tmpdir(), "nx-cache-launch-"));
+    const script = join(root, "silent.mjs");
+    writeFileSync(script, "setInterval(() => {}, 1000);\n");
+    const state = await ensureServer({
+      workspaceRoot: root,
+      scope: cacheScope({ env: {}, localBranch: "feat/x" }),
+      env: {},
+      serverEnv: { PATH: process.env.PATH },
+      serverPath: script,
+      startupPolls: 3,
+    });
+    assert.equal(state, null);
+    rmSync(root, { recursive: true, force: true });
+  });
+
+  /** @scenario "CI shows what the cache server saw" */
+  it("prints the server log and warns once when requests failed", () => {
+    const quiet = report("2026-11-26T00:00:00Z listening on 1234 for pr, writing pr/\n");
+    assert.deepEqual(quiet, ["2026-11-26T00:00:00Z listening on 1234 for pr, writing pr/"]);
+    const failed = report(
+      [
+        "2026-11-26T00:00:00Z listening on 1234 for pr, writing pr/",
+        "2026-11-26T00:00:01Z get pr/abc: socket hang up",
+        "2026-11-26T00:00:02Z put pr/abc: S3 answered 403",
+        "",
+      ].join("\n"),
+    );
+    assert.equal(failed.length, 4);
+    assert.match(failed[3], /^::warning title=Nx remote cache::2 cache request/);
   });
 });

@@ -47,4 +47,5 @@ runs:
         NX_CACHE_AWS_ACCESS_KEY_ID: ${{ steps.aws.outputs.aws-access-key-id }}
         NX_CACHE_AWS_SECRET_ACCESS_KEY: ${{ steps.aws.outputs.aws-secret-access-key }}
         NX_CACHE_AWS_SESSION_TOKEN: ${{ steps.aws.outputs.aws-session-token }}
+        NX_CACHE_AWS_CREDENTIAL_EXPIRATION: ${{ steps.aws.outputs.aws-expiration }}
       run: node dev/nx/remote-cache/launch.mjs

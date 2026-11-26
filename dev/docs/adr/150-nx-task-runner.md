@@ -116,8 +116,9 @@ the SDK and the e2e suites. Silently widening it would have changed what
 `pnpm test` means for everyone mid-branch. The cutover is a separate decision
 with a separate blast radius, and it should be made against a green tree.
 
-No Nx Cloud account is configured and `nxCloudId` is absent, so nothing sends
-source or task metadata to Nx. The remote cache in our own S3 bucket is ADR-206.
+The cache is local-only. No Nx Cloud account is configured and `nxCloudId` is
+absent, so nothing about this change sends source or task metadata anywhere.
+Remote caching is a later decision with its own trade-offs.
 
 ## Consequences
 
@@ -457,3 +458,10 @@ own cache, `.nx/suites`, apart from the build cache, so it holds only test
 results: one per shard, saved by main and same-repository pull requests (one
 copy kept). A re-push splits the same way and replays its unchanged suites. A
 shard whose split changed restores a partial match and runs the rest.
+
+## Amendment, 2026-11-26: a remote cache in our own S3 bucket
+
+The cache is no longer local-only. ADR-206 adds an Nx remote cache in a private
+S3 bucket in the lw-dev AWS account, shared by CI and laptops, with namespaces
+that decide what main trusts. Nx Cloud is still not configured and `nxCloudId`
+is still absent, so nothing sends source or task metadata to Nx.

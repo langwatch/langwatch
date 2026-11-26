@@ -106,8 +106,9 @@ const servePut = async (ctx, hash, req, res) => {
   answerAfterBody(req, res);
 };
 
-const route = (ctx, token) => (req, res) => {
-  if (req.url === "/health") return res.writeHead(200).end("ok");
+const route = (ctx, token, id) => (req, res) => {
+  if (req.url === "/health")
+    return res.writeHead(200, { "content-type": "application/json" }).end(JSON.stringify(id));
   const match = HASH.exec(req.url ?? "");
   if (!match) return res.writeHead(404).end();
   if (req.headers.authorization !== `Bearer ${token}`) return res.writeHead(401).end();
@@ -116,8 +117,17 @@ const route = (ctx, token) => (req, res) => {
   return res.writeHead(405).end();
 };
 
-export const createCacheServer = ({ scope, token, store, maxUploadBytes, log = () => {} }) =>
-  createServer(route({ scope, store, maxUploadBytes, log, state: { tainted: false } }, token));
+// /health answers the pid and key, so the launcher can tell its own server from whatever
+// else holds a port it once recorded.
+export const createCacheServer = ({
+  scope,
+  token,
+  store,
+  maxUploadBytes,
+  log = () => {},
+  id = {},
+}) =>
+  createServer(route({ scope, store, maxUploadBytes, log, state: { tainted: false } }, token, id));
 
 export const s3Store = ({ bucket, region, credentials }) => ({
   get: async (key) => {
@@ -167,6 +177,7 @@ const main = () => {
     store,
     maxUploadBytes: config.maxUploadBytes,
     log,
+    id: { pid: process.pid, key: config.key },
   });
   let idle;
   const touch = () => {

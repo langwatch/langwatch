@@ -70,12 +70,36 @@ Feature: Nx remote cache shared by CI and laptops
     When Nx asks for an entry or stores one
     Then a read answers not found and a write answers success
 
-  Scenario: Dev asks for a GitHub login once and never blocks
+  Scenario: Dev tells a laptop with no GitHub login how to turn the cache on, and never waits
     Given pnpm dev or haven up starts on a laptop with no GitHub login
-    When a person runs it in a terminal
-    Then it asks once to sign in with gh auth login, and remembers what happened
-    And with no terminal, or no gh, it prints one line saying the cache is off
-    And dev starts either way
+    When it starts
+    Then it prints one line saying the cache is off and to run gh auth login
+    And a person at a terminal is told once, an agent or a script every time
+    And it never prompts or reads input, so dev starts at once
+
+  Scenario: CI hands the role's credentials only to the cache server
+    Given a CI job whose cache role was assumed
+    When the nx-remote-cache action starts the server
+    Then the server's environment holds PATH and the role's session, expiry included, and nothing else
+    And no step gets AWS credentials
+    And the job's environment gains only the Nx server URL and its access token
+
+  Scenario: A worktree keeps one cache server per configuration
+    Given a cache server already running for this worktree, branch, bucket and login
+    When another Nx run starts
+    Then it reuses that server
+    And a state file left by a server that is gone is discarded, and its pid is never signalled
+
+  Scenario: A cache server that does not start leaves Nx on its local cache
+    Given a cache server that never answers its health check
+    When an Nx run starts
+    Then the launcher stops the process it started and Nx runs on its local cache
+
+  Scenario: CI shows what the cache server saw
+    Given a CI job that used the remote cache
+    When the job ends
+    Then the server's log is printed in the job
+    And requests that failed raise one warning on the run
 
   Scenario: An S3 failure is a miss, never a failed run
     Given the cache server cannot reach S3 or has no credentials
