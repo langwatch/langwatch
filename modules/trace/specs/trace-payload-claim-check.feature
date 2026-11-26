@@ -69,6 +69,13 @@ Feature: Recalling an oversized span's payload from outside the application
     Then the read returns the whole object
 
   @unit
+  Scenario: A span whose command would spool past the read cap is refused at the edge
+    Given a span whose command, re-encoded as JSON, is larger than the spool read cap
+    When the edge prepares it
+    Then no spool object is written
+    And the span is refused rather than sent inline
+
+  @unit
   Scenario: A malformed sibling attribute cannot mask the offloaded field
     Given a stored span carrying a numeric attribute beside the offloaded one
     When the offloaded field is recalled

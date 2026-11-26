@@ -26,6 +26,7 @@ import {
   MAX_SPOOL_BYTES,
   SpoolDestinationUnsupportedError,
   spoolReadCapBytes,
+  SpoolTooLargeError,
   type SpoolStorage,
 } from "../trace-blob-store.service.ts";
 
@@ -189,6 +190,25 @@ describe("putSpool — given a span payload body", () => {
       });
 
       expect(objectStore.write).toHaveBeenCalledTimes(1);
+    });
+  });
+});
+
+describe("putSpool — given a body larger than the read cap", () => {
+  describe("when putSpool is called", () => {
+    /** @scenario "A span whose command would spool past the read cap is refused at the edge" */
+    it("refuses it and writes no object", async () => {
+      const objectStore = fakeObjectStore(S3_DESTINATION);
+      const store = TraceBlobStoreService.create({
+        legacySpool: S3TraceLegacySpoolChannel.create({ resolveS3Client: forbiddenS3Resolver }),
+        spoolStorage: spoolStorageFor(objectStore),
+        maxSpoolBytes: 1024,
+      });
+
+      await expect(
+        store.putSpool({ ...spoolCoords, body: Buffer.alloc(1025) }),
+      ).rejects.toBeInstanceOf(SpoolTooLargeError);
+      expect(objectStore.write).not.toHaveBeenCalled();
     });
   });
 });

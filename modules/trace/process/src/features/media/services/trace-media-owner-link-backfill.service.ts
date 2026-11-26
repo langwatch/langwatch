@@ -9,6 +9,17 @@ export type TraceMediaOwnerLinkOutcome = {
   report: { kind: string; scanned: number; linked: number };
 };
 
+/** The project's trace retention changed during the pass, so its new links may end too early. */
+export class TraceMediaRetentionChangedError extends Error {
+  constructor({ tenantId, before, after }: { tenantId: string; before: number; after: number }) {
+    super(
+      `trace retention of ${tenantId} changed from ${before} to ${after} days while its media ` +
+        "was linked; apply the project's trace retention to existing data again, then retry",
+    );
+    this.name = "TraceMediaRetentionChangedError";
+  }
+}
+
 /**
  * Trace media stored before Stored Objects kept owner links holds none, so its sweep never
  * deletes it. Per project, this links each such object to its trace until the project's trace
@@ -38,19 +49,25 @@ export class TraceMediaOwnerLinkBackfillService {
     signal?: AbortSignal;
   }): Promise<TraceMediaOwnerLinkOutcome> {
     signal?.throwIfAborted();
-    const retentionDays = await this.retention.getRetentionDays({
-      projectId: tenantId,
-      category: "traces",
-    });
+    const retentionDays = await this.traceRetentionOf(tenantId);
     const counts = await this.storedObjects.linkUnownedObjects({
       projectId: tenantId,
       purpose: TRACE_CONTENT_MEDIA.purpose,
       retentionDays,
     });
+    // A change whose follow ran mid-pass never reaches the links written after it.
+    const after = await this.traceRetentionOf(tenantId);
+    if (after !== retentionDays) {
+      throw new TraceMediaRetentionChangedError({ tenantId, before: retentionDays, after });
+    }
 
     return {
       status: "finalized",
       report: { kind: "trace_media_owner_links_backfilled", ...counts },
     };
+  }
+
+  private traceRetentionOf(projectId: string): Promise<number> {
+    return this.retention.getRetentionDays({ projectId, category: "traces" });
   }
 }

@@ -231,3 +231,10 @@ Feature: Stored-object reuse by content and owner-linked retention
     And a project that keeps traces forever links its objects with no end
     And an object that already holds a link, a deleted object or a purpose with no retention category is left alone
     And a second run links nothing
+
+  @unit
+  Scenario: A trace retention change during the trace media backfill fails the step by name
+    Given a project whose trace retention changes while "trace:link-unowned-trace-media" links its media
+    When the step finishes its pass
+    Then the step fails, naming the project and both retentions
+    And it asks for the project's trace retention to be applied to existing data again

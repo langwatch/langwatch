@@ -94,6 +94,17 @@ export class SpoolDestinationUnsupportedError extends Error {
 }
 
 /**
+ * Raised when a command would spool past the read cap. The edge refuses that span rather than
+ * writing an object the worker cannot read back, or sending it inline instead.
+ */
+export class SpoolTooLargeError extends Error {
+  constructor({ byteLength, maxSpoolBytes }: { byteLength: number; maxSpoolBytes: number }) {
+    super(`spooled command of ${byteLength} bytes exceeds the ${maxSpoolBytes} byte read cap`);
+    this.name = "SpoolTooLargeError";
+  }
+}
+
+/**
  * Refuses a destination that cannot bound an orphaned spool object. Write path only: a rule about
  * creating new objects, not about the ones already out there.
  */
@@ -293,8 +304,8 @@ export class TraceBlobStoreService {
 
   /**
    * Writes the transient spool object for an over-threshold command and returns the reference the
-   * command carries. It lands at whichever backend the project's storage destination names and is
-   * deleted after the event_log INSERT; that prefix must carry a three-day lifecycle rule.
+   * command carries, at the project's storage destination; deleted after the event_log INSERT,
+   * under a three-day lifecycle rule. A body over the read cap is {@link SpoolTooLargeError}.
    */
   async putSpool({
     projectId,
@@ -307,6 +318,12 @@ export class TraceBlobStoreService {
     spanId: string;
     body: Buffer;
   }): Promise<string> {
+    if (body.byteLength > this.maxSpoolBytes) {
+      throw new SpoolTooLargeError({
+        byteLength: body.byteLength,
+        maxSpoolBytes: this.maxSpoolBytes,
+      });
+    }
     const { at, objects } = await this.locateSpool({
       projectId,
       traceId,

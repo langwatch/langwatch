@@ -3,6 +3,7 @@
  * attribute cap survives as a stored reference.
  * @see specs/trace-processing/trace-media-blob-extraction.feature
  */
+import type { DataRetentionApi } from "@langwatch/data-retention-contract";
 import { createTenantId, type Command } from "@langwatch/eventing";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { OtlpSpan } from "@langwatch/otlp/trace-request";
@@ -96,7 +97,7 @@ async function ingest({ data }: { data: RecordSpanCommandData }): Promise<{
       store: TraceMediaStoreService.create({
         storedObjects,
         purpose: TRACE_CONTENT_MEDIA,
-        retention: { getRetentionDays: async () => 30 },
+        retention: createApiFixture<DataRetentionApi>({ getRetentionDays: async () => 30 }),
       }),
     }),
     telemetry: { failOpen: () => {} },
