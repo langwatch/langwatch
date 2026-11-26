@@ -26,7 +26,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vites
 import type { LwqlProvisioningDatabase } from "../../repositories/langwatch-ql-postgres.repository.ts";
 import { LwqlProvisionTask } from "../lwql-provision.task.ts";
 
-const taskWarnings = vi.hoisted(() => [] as Array<{ fields: unknown; message: unknown }>);
+const taskWarnings = vi.hoisted(() => [] as { fields: unknown; message: unknown }[]);
 
 vi.mock("@langwatch/observability", async (importOriginal) => {
   const actual = await importOriginal<typeof Observability>();

@@ -704,7 +704,9 @@ const registry = {
     docsPath: "/governance/kill-switch",
   },
   governance_aws_connection_not_found: {
-    tips: ["Create the AWS connection on the Agents page before naming it in a stop plan"],
+    tips: [
+      "Create the AWS connection on the Agents page before naming it in a stop plan or an AWS agent source",
+    ],
     docsPath: "/governance/kill-switch",
   },
   agent_offline: {
@@ -1077,6 +1079,9 @@ const registry = {
     tips: [
       "The same idempotency key was reused with different content; mint a fresh key for every new send",
     ],
+  },
+  langy_attachment_refused: {
+    tips: ["Attach a PNG, JPEG, GIF or WebP image of 5 MB or less, at most four per message"],
   },
   langy_empty_message: {
     tips: ["Send a message with actual text content"],
