@@ -16,7 +16,7 @@ import (
 const (
 	goCIWorkflow      = ".github/workflows/go-ci.yaml"
 	upgradelabKey     = "upgradelab"
-	upgradelabOutput  = "steps.filter.outputs.upgradelab"
+	upgradelabOutput  = "steps.filter.outputs.upgradelab || steps.force.outputs.go"
 	upgradelabTestRun = "go test -count=1 ./tools/upgradelab/..."
 	upgradelabWhenSet = "needs.changes.outputs.upgradelab == 'true'"
 )
@@ -36,8 +36,8 @@ func UpgradelabTrigger(root string) ([]string, error) {
 		return nil, err
 	}
 	problems := missingGlobs(filter)
-	if !strings.Contains(changes.Outputs[upgradelabKey], upgradelabOutput) {
-		problems = append(problems, fmt.Sprintf("%s: the changes job must output upgradelab from %s", goCIWorkflow, upgradelabOutput))
+	if output := changes.Outputs[upgradelabKey]; !strings.HasPrefix(strings.TrimSpace(output), "${{") || expressionBody(output) != upgradelabOutput {
+		problems = append(problems, fmt.Sprintf("%s: the changes job must output upgradelab as ${{ %s }}", goCIWorkflow, upgradelabOutput))
 	}
 	return append(problems, upgradelabJobProblems(workflow.Jobs[upgradelabKey], workflow.Jobs["test"])...), nil
 }
@@ -79,9 +79,9 @@ func upgradelabJobProblems(job, test ciscan.Job) []string {
 	if expressionBody(job.If) != want {
 		problems = append(problems, fmt.Sprintf("%s: the upgradelab job's if must be %s", goCIWorkflow, want))
 	}
-	runs := slices.ContainsFunc(job.Steps, func(step ciscan.Step) bool { return step.Run == upgradelabTestRun })
+	runs := slices.ContainsFunc(job.Steps, func(step ciscan.Step) bool { return step.Run == upgradelabTestRun && step.If == "" })
 	if !runs {
-		problems = append(problems, fmt.Sprintf("%s: the upgradelab job must run %s", goCIWorkflow, upgradelabTestRun))
+		problems = append(problems, fmt.Sprintf("%s: the upgradelab job must run %s in a step with no if of its own", goCIWorkflow, upgradelabTestRun))
 	}
 	return problems
 }

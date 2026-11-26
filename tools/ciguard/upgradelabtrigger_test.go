@@ -87,6 +87,13 @@ func TestUpgradelabTriggerReportsMissingOutput(t *testing.T) {
 	problems := upgradelabProblems(t, workflow)
 	require.Len(t, problems, 1)
 	assert.Contains(t, problems[0], "the changes job must output upgradelab")
+
+	literal := strings.Replace(goodGoCI,
+		"upgradelab: ${{ steps.filter.outputs.upgradelab || steps.force.outputs.go }}",
+		"upgradelab: steps.filter.outputs.upgradelab || steps.force.outputs.go", 1)
+	require.NotEqual(t, goodGoCI, literal)
+	problems = upgradelabProblems(t, literal)
+	require.Len(t, problems, 1, "an output that is a literal, not an expression, is reported")
 }
 
 // @scenario "An upgradelab job that skips while the full test job also skips is reported"
@@ -111,6 +118,14 @@ func TestUpgradelabTriggerReportsDraftGap(t *testing.T) {
 	require.NotEqual(t, goodGoCI, extraGate)
 	problems = upgradelabProblems(t, extraGate)
 	require.Len(t, problems, 1, "an extra gate that skips drafts again is reported")
+
+	stepGate := strings.Replace(goodGoCI,
+		"      - run: go test -count=1 ./tools/upgradelab/...",
+		"      - if: needs.changes.outputs.go == 'true'\n        run: go test -count=1 ./tools/upgradelab/...", 1)
+	require.NotEqual(t, goodGoCI, stepGate)
+	problems = upgradelabProblems(t, stepGate)
+	require.Len(t, problems, 1, "a test step that skips on its own if is reported")
+	assert.Contains(t, problems[0], "no if of its own")
 
 	noRun := withoutLine(t, goodGoCI, "      - run: go test -count=1 ./tools/upgradelab/...")
 	problems = upgradelabProblems(t, noRun)
