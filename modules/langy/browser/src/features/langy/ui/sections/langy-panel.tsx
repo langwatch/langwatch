@@ -271,6 +271,7 @@ function LangyPanel({
     floating,
     reduceMotion,
     drawerEdgeHeld: placement.drawerEdgeHeld,
+    floatingWidthPx: placement.floatingPanelWidth,
   });
 
   useEffect(() => {
@@ -594,6 +595,7 @@ function LangyPanel({
           floating={floating}
           dockShellClaimed={dockShellClaimed}
           panelHeightPx={inspector.panelHeightPx}
+          panelWidthPx={placement.panelWidthPx}
         />
         <LangyExternalLinkDialog {...externalLinkGuard.dialogProps} />
         <LangyMakeDefaultDialog
@@ -718,7 +720,7 @@ function LangyPanel({
                           closePanel();
                         },
                         empty: {
-                          panelWidth: placement.floatingPanelWidth,
+                          panelWidth: placement.panelWidthPx,
                           suggestions: emptySuggestions,
                           // A picked suggestion is the member's question, asked from the composer.
                           onPick: sendFromComposer,
