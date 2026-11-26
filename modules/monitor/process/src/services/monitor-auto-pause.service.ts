@@ -103,7 +103,7 @@ export class MonitorAutoPauseService {
     );
     if (recipients.length === 0) return;
 
-    const { subject, html, template } = await renderer.renderMonitorAutoPaused({
+    const { subject, html } = await renderer.renderMonitorAutoPaused({
       monitorName: monitor.name,
       projectName: project.name,
       runs: fact.runs,
@@ -117,7 +117,6 @@ export class MonitorAutoPauseService {
           to,
           subject,
           html,
-          template,
           idempotencyKey: `monitor-auto-paused:${monitor.id}:${pausedAt}:${to}`,
         }),
       ),

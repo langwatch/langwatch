@@ -14,7 +14,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 Nurturing learns from the owners' events (§9); an owner that pushes a fact calls this.
 
-Peers call these through the token, declared at `../contract/src/nurturing-types.ts:297`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/nurturing-types.ts:293`; nothing else in this package is public.
 
 #### `recordSignal`
 
@@ -22,14 +22,6 @@ Records the signal on nurturing's pipeline; its subscriber sends what main sent,
 
 ```typescript
 recordSignal(signal: NurturingSignal): Promise<void>;
-```
-
-#### `sendTransactionalEmail`
-
-Hands one rendered email to Customer.io's transactional API and says what became of it. A refusal is an answer, not a throw: the caller falls back to its own mailer.
-
-```typescript
-sendTransactionalEmail(email: TransactionalEmail): Promise<TransactionalEmailOutcome>;
 ```
 
 ## REST transport
@@ -141,13 +133,12 @@ Declared at `src/eventing/nurturing.pipeline.ts:347`. Events: `nurturingSignalRe
 
 ## Configuration
 
-| Kind   | Leaf                      | Environment variable           | Declared at                              |
-| ------ | ------------------------- | ------------------------------ | ---------------------------------------- |
-| secret | `–`                       | `CUSTOMER_IO_API_KEY`          | `src/app/nurturing.app.ts:55`            |
-| config | `customerIoRegion`        | `CUSTOMER_IO_REGION`           | `../contract/src/nurturing.config.ts:8`  |
-| config | `customerIoBaseUrl`       | `CUSTOMER_IO_BASE_URL`         | `../contract/src/nurturing.config.ts:10` |
-| config | `customerIoAppApiBaseUrl` | `CUSTOMER_IO_APP_API_BASE_URL` | `../contract/src/nurturing.config.ts:12` |
-| config | `posthogKey`              | `POSTHOG_KEY`                  | `../contract/src/nurturing.config.ts:13` |
-| config | `posthogHost`             | `POSTHOG_HOST`                 | `../contract/src/nurturing.config.ts:14` |
+| Kind   | Leaf                | Environment variable   | Declared at                              |
+| ------ | ------------------- | ---------------------- | ---------------------------------------- |
+| secret | `–`                 | `CUSTOMER_IO_API_KEY`  | `src/app/nurturing.app.ts:51`            |
+| config | `customerIoRegion`  | `CUSTOMER_IO_REGION`   | `../contract/src/nurturing.config.ts:8`  |
+| config | `customerIoBaseUrl` | `CUSTOMER_IO_BASE_URL` | `../contract/src/nurturing.config.ts:10` |
+| config | `posthogKey`        | `POSTHOG_KEY`          | `../contract/src/nurturing.config.ts:11` |
+| config | `posthogHost`       | `POSTHOG_HOST`         | `../contract/src/nurturing.config.ts:12` |
 
 <!-- readme:generated:end -->

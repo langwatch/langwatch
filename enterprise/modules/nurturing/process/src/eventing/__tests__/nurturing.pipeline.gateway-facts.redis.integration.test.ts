@@ -101,7 +101,11 @@ describe.skipIf(!redisUrl)("gateway's key facts over Redis claims", () => {
       for (let delivery = 0; delivery < 2; delivery++) await facts.deliverFact(firstRequest);
 
       expect(facts.sent.slice(beforeFirstRequest)).toEqual([
-        { type: "identify", userId: "user-holder", traits: { has_app_request: true } },
+        {
+          type: "identify",
+          userId: "user-holder",
+          traits: { has_app_request: true, email: "user-holder@example.com" },
+        },
       ]);
     });
   });

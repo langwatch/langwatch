@@ -111,7 +111,10 @@ function refresher({
       getMembersLiteCount: async () => 7,
     },
     licenses: {
-      validateAndStoreLicense: async ({ licenseKey }) => {
+      storeDeliveredLicense: async ({ licenseKey, replacing }) => {
+        if ((rows.get(ORGANIZATION)?.license ?? null) !== replacing) {
+          return { success: false, superseded: true };
+        }
         const result = cryptography.validateLicense({
           licenseKey,
           publicKey: TEST_PUBLIC_KEY,

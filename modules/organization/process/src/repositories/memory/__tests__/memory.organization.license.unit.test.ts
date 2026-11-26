@@ -49,6 +49,7 @@ describe("MemoryOrganizationRepository licence write", () => {
       /** @scenario "The memory organization store sets and clears a licence the same way" */
       it("stores all three, clears all three, and refuses an unknown organization", async () => {
         const { memory, repository } = seeded();
+        memory.licensingLicenseKeys.set("org_acme", "key-1");
 
         await repository.setLicense({
           organizationId: "org_acme",
@@ -62,6 +63,7 @@ describe("MemoryOrganizationRepository licence write", () => {
           licenseLastValidatedAt: validatedAt,
         });
 
+        memory.licensingLicenseKeys.set("org_acme", "key-2");
         await repository.setLicense({
           organizationId: "org_acme",
           licenseKey: "key-2",
@@ -88,6 +90,23 @@ describe("MemoryOrganizationRepository licence write", () => {
         await expect(repository.clearLicense({ organizationId: "org_none" })).rejects.toMatchObject(
           { code: "organization_not_found" },
         );
+      });
+    });
+
+    describe("when a late fact names a key licensing no longer holds", () => {
+      /** @scenario "The memory licence mirror writes only while licensing holds the key" */
+      it("keeps the column's key", async () => {
+        const { memory, repository } = seeded();
+        memory.licensingLicenseKeys.set("org_acme", "key-c");
+
+        await repository.setLicense({
+          organizationId: "org_acme",
+          licenseKey: "key-b",
+          expiresAt,
+          validatedAt: null,
+        });
+
+        expect(stored(memory).license).not.toBe("key-b");
       });
     });
   });

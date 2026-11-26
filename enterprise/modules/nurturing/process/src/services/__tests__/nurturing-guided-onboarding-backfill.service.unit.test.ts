@@ -15,6 +15,7 @@ import { MemoryNurturingClaimRepository } from "../../repositories/memory/memory
 import type { NurturingClaimRepository } from "../../repositories/nurturing-claim.repository.ts";
 import { NurturingGuidedOnboardingBackfillService } from "../nurturing-guided-onboarding-backfill.service.ts";
 import { NurturingService } from "../nurturing.service.ts";
+import { peopleWithEmails } from "./nurturing-person-email.test-helpers.ts";
 
 /** A Customer.io channel that keeps each batch, and refuses the next `refusals` of them. */
 class RecordingChannel extends CustomerIoChannel {
@@ -74,7 +75,7 @@ async function backfillOver(
   };
   const backfill = NurturingGuidedOnboardingBackfillService.create({
     claims,
-    customerIo: NurturingService.create({ channel }),
+    customerIo: NurturingService.create({ users: peopleWithEmails(), channel }),
     members,
     organizations: createApiFixture<OrganizationApi>({
       readGuidedOnboardingState: () => guided.read(),
@@ -110,6 +111,7 @@ describe("NurturingGuidedOnboardingBackfillService", () => {
             onboarding_variant: "guided",
             onboarding_paths: "gateway,llmops",
             onboarding_primary_path: "gateway",
+            email: "user-1@example.com",
           },
         },
         {
@@ -251,7 +253,7 @@ describe("NurturingGuidedOnboardingBackfillService", () => {
       });
       const backfill = NurturingGuidedOnboardingBackfillService.create({
         claims: MemoryNurturingClaimRepository.create(),
-        customerIo: NurturingService.create({ channel }),
+        customerIo: NurturingService.create({ users: peopleWithEmails(), channel }),
         members,
         organizations: createApiFixture<OrganizationApi>({
           readGuidedOnboardingState: () => Promise.reject(new Error("organization unavailable")),

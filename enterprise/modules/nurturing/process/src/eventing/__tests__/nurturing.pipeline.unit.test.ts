@@ -58,6 +58,7 @@ import { MemoryNurturingErasedUserRepository } from "../../repositories/memory/m
 import { MemoryNurturingOrganizationMemberRepository } from "../../repositories/memory/memory.nurturing-organization-member.repository.ts";
 import { postHogUuidFor } from "../../rules/nurturing-guided-onboarding-service.rules.ts";
 import { unplacedMemberFacts } from "../../services/__tests__/nurturing-member-facts.test-helpers.ts";
+import { peopleWithEmails } from "../../services/__tests__/nurturing-person-email.test-helpers.ts";
 import { NurturingDeliveryService } from "../../services/nurturing-delivery.service.ts";
 import { NurturingService } from "../../services/nurturing.service.ts";
 import { RecordNurturingSignalCommand } from "../nurturing-signal.commands.ts";
@@ -103,7 +104,7 @@ function urlOf(input: string | URL | Request): string {
 }
 
 /** Nurturing's pipeline over memory PostHog and a recording Customer.io, as the app composes it. */
-function nurturingOverMemoryPostHog(users: UserApi = createApiFixture<UserApi>({})) {
+function nurturingOverMemoryPostHog(users: UserApi = peopleWithEmails()) {
   const posthog = MemoryPostHogChannel.create();
   const customerIoFetch = vi.fn(
     async (_url: string | URL | Request, _init?: RequestInit) =>
@@ -120,6 +121,7 @@ function nurturingOverMemoryPostHog(users: UserApi = createApiFixture<UserApi>({
       release: async (key: string) => void seen.delete(key),
     },
     customerIo: NurturingService.create({
+      users,
       channel: HttpCustomerIoChannel.create({
         config: { customerIoApiKey: "key", customerIoRegion: "us" },
         fetchFn: customerIoFetch,
@@ -274,7 +276,10 @@ describe("nurturing's memberRoleChanged peer subscriber", () => {
       }));
       expect(sent).toContainEqual({
         path: "/identify",
-        body: expect.objectContaining({ userId: "user-1", traits: { seat: "admin" } }),
+        body: expect.objectContaining({
+          userId: "user-1",
+          traits: { seat: "admin", email: "user-1@example.com" },
+        }),
       });
       expect(sent).toContainEqual({
         path: "/group",
@@ -324,7 +329,10 @@ describe("nurturing's memberAdmitted peer subscriber", () => {
       }));
       expect(sent).toContainEqual({
         path: "/identify",
-        body: expect.objectContaining({ userId: "user-1", traits: { seat: "member" } }),
+        body: expect.objectContaining({
+          userId: "user-1",
+          traits: { seat: "member", email: "user-1@example.com" },
+        }),
       });
       expect(sent).toContainEqual({
         path: "/group",
@@ -351,6 +359,8 @@ function createdFact({ backfilled }: { backfilled?: true } = {}): Event {
 /** The person behind user-1, read fresh at delivery and never stored (§9). */
 function jane(): UserApi {
   return createApiFixture<UserApi>({
+    getProfiles: (input) =>
+      peopleWithEmails({ emails: { "user-1": "jane@example.com" } }).getProfiles(input),
     findById: async () => ({
       id: "user-1",
       name: "Jane Doe",
@@ -982,15 +992,17 @@ describe("nurturing's scenarioRunsThresholdReached peer subscriber", () => {
           userId: "user-1",
           event: "scenario_runs_threshold_reached",
           properties: { ...properties, $groups: { organization: "org-1" } },
+          uuid: expect.any(String),
+          timestamp: expect.anything(),
         },
       ]);
-      expect(customerIoFetch).toHaveBeenCalledTimes(1);
-      const body = customerIoFetch.mock.calls[0]?.[1]?.body;
-      expect(typeof body === "string" ? JSON.parse(body) : body).toMatchObject({
-        userId: "user-1",
-        event: "scenario_runs_threshold_reached",
-        properties,
+      // The email identify goes out in its own batch first, then the one track.
+      const sent = customerIoFetch.mock.calls.map(([, init]) => {
+        const body = init?.body;
+        return typeof body === "string" ? JSON.parse(body) : body;
       });
+      expect(JSON.stringify(sent).match(/scenario_runs_threshold_reached/g)).toHaveLength(1);
+      expect(JSON.stringify(sent)).toContain('"runs":80');
     });
   });
 });

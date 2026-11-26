@@ -95,6 +95,18 @@ export class ConnectInstallService {
    * nothing. A lapsed term still yields one: it is how a renewal is collected.
    */
   async findCredential(organizationId: string): Promise<ConnectCredential[]> {
+    const held = await this.findHeldCredential(organizationId);
+    return held.map(({ credential }) => credential);
+  }
+
+  /**
+   * The credential and the key the organization holds itself (null when it runs on
+   * the instance-wide key), read from one row so a sync compares against the key
+   * its credential came from.
+   */
+  async findHeldCredential(
+    organizationId: string,
+  ): Promise<{ credential: ConnectCredential; ownKey: string | null }[]> {
     if (!this.deps.deployment.permitted) return [];
 
     const organization = await this.deps.organizations.findById(organizationId);
@@ -104,7 +116,8 @@ export class ConnectInstallService {
     const token = this.tokenOf(licenseKey);
     if (!token) return [];
 
-    return [{ token, instanceId: await this.deps.identity.getInstanceId() }];
+    const credential = { token, instanceId: await this.deps.identity.getInstanceId() };
+    return [{ credential, ownKey: organization?.license ?? null }];
   }
 
   /** Where this organization's gateway reaches hosted models; empty where no credential is held. */
