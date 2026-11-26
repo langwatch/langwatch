@@ -128,7 +128,10 @@ export const modelProviderTrpcTransport: TrpcRouterDeclaration<
       actor,
     );
 
-    return toListEntry(saved);
+    return {
+      ...toListEntry(saved),
+      ...(saved.modelImport && { modelImport: saved.modelImport }),
+    };
   })
 
   .procedure("delete")
