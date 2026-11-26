@@ -451,6 +451,7 @@ interface GovernanceAppDependencies {
   traces: Pick<
     TraceApi,
     | "otlpTraces"
+    | "otlpUsageLimit"
     | "getSpendSummary"
     | "findTopModelsByRequests"
     | "findDailySpend"
@@ -1198,6 +1199,7 @@ export class GovernanceModule implements GovernanceRestApi {
           organizations: dependencies.organizations,
         }),
         traceCollection: (input) => dependencies.traces.otlpTraces(input),
+        allowance: dependencies.traces,
         // Main's DEFAULT_PII_REDACTION_LEVEL for every push receiver.
         logCollection: (input) =>
           dependencies.logs.collectOtlpLogs({ ...input, piiRedactionLevel: "ESSENTIAL" }),
