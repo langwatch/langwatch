@@ -25,7 +25,9 @@ import {
   applyTargetOutput,
 } from "../../model/experiments-v3/execution/results-fold.ts";
 import type { EvaluationsV3Store } from "../../model/experiments-v3/types.ts";
+import { RUN_NOT_ALLOWED_TITLE } from "../../model/experiments-v3/workbench-access.ts";
 import { useEvaluationsV3Store } from "./use-evaluations-v3-store.ts";
+import { readWorkbenchAccess } from "./use-workbench-access.ts";
 
 // ============================================================================
 // Types
@@ -275,6 +277,15 @@ const failExecution = ({ err, sink }: { err: unknown; sink: ExecutionSink }): vo
   sink.setIsAborting(false);
 };
 
+/** A role that cannot run evaluations is told so instead of sending a run the server refuses. */
+const toastRunNotAllowed = (): void => {
+  toaster.create({
+    title: RUN_NOT_ALLOWED_TITLE,
+    description: "Ask an organization admin for access.",
+    type: "error",
+  });
+};
+
 const toastCannotExecute = (): void => {
   toaster.create({
     title: "Cannot execute",
@@ -476,6 +487,10 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
     ) => {
       if (!project?.id || !activeDataset) {
         toastCannotExecute();
+        return;
+      }
+      if (!readWorkbenchAccess().mayRun) {
+        toastRunNotAllowed();
         return;
       }
 

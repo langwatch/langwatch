@@ -1,11 +1,11 @@
 import { type UiAnalytics, useUiAnalytics } from "@langwatch/browser-host/analytics";
-import { isNotFoundError as isTrpcNotFound } from "@langwatch/browser-host/errors";
+import { isNotFoundError as isTrpcNotFound, showErrorToast } from "@langwatch/browser-host/errors";
 import { toaster } from "@langwatch/browser-host/toaster";
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 import { useRouter } from "@langwatch/browser-host/use-router";
 import { readHandledError } from "@langwatch/handled-error/read-handled-error";
 import { useQueryClient } from "@tanstack/react-query";
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
 
 import { AUTOSAVE_OUT_OF_DATE_REASON } from "../../model/experiments-v3/constants.ts";
@@ -14,6 +14,7 @@ import {
   extractPersistedState,
   type PersistedEvaluationsV3State,
 } from "../../model/experiments-v3/types/persistence.ts";
+import { isAccessRefusal } from "../../model/experiments-v3/workbench-access.ts";
 import { captureException, toError } from "../../model/posthog-error-capture.ts";
 import { experimentApi } from "../experiment-api.ts";
 import { useEvaluationsV3Store } from "./use-evaluations-v3-store.ts";
@@ -133,13 +134,22 @@ const handleAutosaveFailure = ({
   error,
   snapshot,
   projectId,
+  onAccessRefused,
 }: {
   analytics: UiAnalytics;
   error: unknown;
   snapshot: string;
   projectId: string | undefined;
+  onAccessRefused: () => void;
 }): RefusalOutcome => {
   const state = useEvaluationsV3Store.getState();
+  if (isAccessRefusal(error)) {
+    // The role, not the edit, is refused: every later save would be too.
+    state.setAutosaveStatus("evaluation", "idle");
+    onAccessRefused();
+    showErrorToast({ error, fallbackTitle: "Couldn't save the experiment" });
+    return "failed";
+  }
   const handled = readHandledError(error);
   if (handled?.code === "experiment_stale_workbench_state") {
     const refusal = refusedSaveStaleness({
@@ -229,6 +239,7 @@ const attemptSave = async ({
   lastSavedRef,
   markSaved,
   isRetry,
+  onAccessRefused,
 }: {
   analytics: UiAnalytics;
   projectId: string | undefined;
@@ -236,6 +247,7 @@ const attemptSave = async ({
   lastSavedRef: { current: string | null };
   markSaved: () => void;
   isRetry: boolean;
+  onAccessRefused: () => void;
 }): Promise<AutosaveOutcome> => {
   const state = useEvaluationsV3Store.getState();
   if (!projectId || !state.experimentId || !state.name) return "unchanged";
@@ -257,12 +269,26 @@ const attemptSave = async ({
     markSaved();
     return "saved";
   } catch (error) {
-    const outcome = handleAutosaveFailure({ analytics, error, snapshot, projectId });
+    const outcome = handleAutosaveFailure({
+      analytics,
+      error,
+      snapshot,
+      projectId,
+      onAccessRefused,
+    });
     if (outcome !== "adopted") return outcome;
     // Retried once only: looping would spin against whoever is actually ahead.
     return isRetry
       ? standDownAfterRetry(error)
-      : attemptSave({ analytics, projectId, save, lastSavedRef, markSaved, isRetry: true });
+      : attemptSave({
+          analytics,
+          projectId,
+          save,
+          lastSavedRef,
+          markSaved,
+          isRetry: true,
+          onAccessRefused,
+        });
   }
 };
 
@@ -293,6 +319,7 @@ const loadExperimentIntoStore = (data: {
  * out of date, or when nothing differs from the initial state or the last save.
  */
 const autosaveIsDue = ({
+  maySave,
   hasProject,
   isLoadingExisting,
   shouldLoadExisting,
@@ -302,6 +329,7 @@ const autosaveIsDue = ({
   stringifiedState,
   lastSaved,
 }: {
+  maySave: boolean;
   hasProject: boolean;
   isLoadingExisting: boolean;
   shouldLoadExisting: boolean;
@@ -311,6 +339,7 @@ const autosaveIsDue = ({
   stringifiedState: string;
   lastSaved: string | null;
 }): boolean =>
+  maySave &&
   hasProject &&
   !isLoadingExisting &&
   !shouldLoadExisting &&
@@ -406,9 +435,11 @@ const useWorkbenchLoad = ({
 
 /**
  * Manages syncing the evaluations v3 state with the database. Uses workbenchState field
- * in the Experiment model for persistence.
+ * in the Experiment model for persistence. `maySave` false (a role that cannot change
+ * experiments) keeps edits in the tab instead of sending saves the server refuses.
  */
-export const useAutosaveEvaluationsV3 = () => {
+export const useAutosaveEvaluationsV3 = ({ maySave = true }: { maySave?: boolean } = {}) => {
+  const [accessRefused, setAccessRefused] = useState(false);
   const { project } = useOrganizationTeamProject();
   const analytics = useUiAnalytics();
   const queryClient = useQueryClient();
@@ -528,6 +559,7 @@ export const useAutosaveEvaluationsV3 = () => {
           lastSavedRef,
           markSaved,
           isRetry: false,
+          onAccessRefused: () => setAccessRefused(true),
         }),
       )
       .catch((error) => {
@@ -550,6 +582,7 @@ export const useAutosaveEvaluationsV3 = () => {
       return;
     }
     const isDue = autosaveIsDue({
+      maySave: maySave && !accessRefused,
       hasProject: !!project,
       isLoadingExisting: existingExperiment.isLoading,
       shouldLoadExisting,
@@ -577,6 +610,8 @@ export const useAutosaveEvaluationsV3 = () => {
     existingExperiment.isLoading,
     staleWorkbench,
     workbenchVersion,
+    maySave,
+    accessRefused,
   ]);
 
   // Determine if experiment was truly not found
@@ -625,6 +660,8 @@ export const useAutosaveEvaluationsV3 = () => {
     /** True when the store differs from the last state the server acknowledged. */
     isDirty: lastSavedRef.current !== null && stringifiedState !== lastSavedRef.current,
     reloadFromServer,
+    /** True once the server refused a save because of the reader's role. */
+    accessRefused,
     /**
      * Persist the current store immediately instead of waiting out the debounce.
      */
