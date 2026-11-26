@@ -43,6 +43,8 @@ export interface LangWatchQLExecuteRequest {
   readonly sources?: RunSources;
   /** The projects a dashboard query reads (AC207); the board's project when absent. */
   readonly projects?: readonly string[];
+  /** The zone `{dashboard_context_timezone:String}` binds to; the browser's when absent. */
+  readonly timeZone?: string;
   /** The widget a run is for, for its log line only; absent on the workbench. */
   readonly telemetry?: LangWatchQLRunTelemetryRequest | undefined;
 }

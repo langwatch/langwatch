@@ -157,6 +157,7 @@ export const analyticsLwqlTrpcTransport: TrpcRouterDeclaration<
         ? {}
         : { granularitySeconds: input.granularitySeconds }),
       ...(input.sources === undefined ? {} : { sources: input.sources }),
+      ...(input.timeZone === undefined ? {} : { timeZone: input.timeZone }),
       ...(input.projects === undefined ? {} : { projects: input.projects, userId: actor.id }),
       ...(signal ? { signal } : {}),
       telemetry: input.telemetry

@@ -77,3 +77,41 @@ export function utcParts(epochMs: number): UtcParts {
     second: Math.floor(msOfDay / 1000) % 60,
   };
 }
+
+const ZONED_FIELDS: Intl.DateTimeFormatOptions = {
+  year: "numeric",
+  month: "numeric",
+  day: "numeric",
+  hour: "numeric",
+  minute: "numeric",
+  second: "numeric",
+  hourCycle: "h23",
+};
+
+/** The calendar and clock fields of an instant on a zone's wall clock; UTC for an unknown zone. */
+export function zonedParts({
+  epochMs,
+  timeZone,
+}: {
+  epochMs: number;
+  timeZone: string | undefined;
+}): UtcParts {
+  if (timeZone === undefined || timeZone === "UTC") return utcParts(epochMs);
+  try {
+    const parts = new Intl.DateTimeFormat("en-US", { ...ZONED_FIELDS, timeZone }).formatToParts(
+      epochMs,
+    );
+    const field = (type: Intl.DateTimeFormatPartTypes) =>
+      Number(parts.find((part) => part.type === type)?.value);
+    return {
+      year: field("year"),
+      month: field("month"),
+      day: field("day"),
+      hour: field("hour") % 24,
+      minute: field("minute"),
+      second: field("second"),
+    };
+  } catch {
+    return utcParts(epochMs);
+  }
+}

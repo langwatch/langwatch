@@ -60,12 +60,12 @@ function ms(raw) {
   return Math.round(value) + "ms";
 }`;
 
-/** ClickHouse sends buckets as `YYYY-MM-DD hh:mm:ss` in UTC. */
+/** ClickHouse sends buckets as `YYYY-MM-DD hh:mm:ss` in UTC; labels read the reader's clock. */
 export const DATES = `const utc = (value) => new Date(String(value).replace(" ", "T") + "Z");
 function bucketLabel(value) {
   const daily = LW.dashboardContext.granularitySeconds >= 86400;
   const parts = daily ? { month: "short", day: "numeric" } : { day: "numeric", hour: "numeric" };
-  return utc(value).toLocaleString("en-US", parts);
+  return LW.formatTime(value, parts);
 }
 // The bucket's start as an ISO instant, which a click hands Langy beside the label.
 const bucketStart = (value) => utc(value).toISOString();

@@ -161,6 +161,7 @@ const PARAMETERS = {
   dashboard_context_period_start: at(PERIOD_START),
   dashboard_context_period_end: at(PERIOD_END),
   dashboard_context_granularity_seconds: 86_400,
+  dashboard_context_timezone: "UTC",
 };
 
 type Seed = { trace: string; time: number; sources: string[]; prompt?: string; score?: number };

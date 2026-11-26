@@ -6,6 +6,9 @@
 import {
   formatLangWatchQLDateTimeParameter,
   LWQL_BUCKET_ALIGNMENT_SECONDS,
+  LWQL_DEFAULT_TIME_ZONE,
+  lwqlBucketStartSql,
+  LWQL_WALL_CLOCK_GRANULARITY_SECONDS,
   type LangWatchQLMemberWindow,
   type LangWatchQLTimeWindow,
   type QueryCompleteness,
@@ -39,6 +42,7 @@ const COST_UNIT = "USD";
 const START_PARAMETER = "completeness_window_start";
 const END_PARAMETER = "completeness_window_end";
 const GRANULARITY_PARAMETER = "completeness_granularity_seconds";
+const TIME_ZONE_PARAMETER = "completeness_time_zone";
 
 const NULLABLE_TYPE = /^Nullable\(/;
 const TEMPORAL_TYPE = /^(?:Nullable\()?DateTime(?:64)?\b/;
@@ -81,6 +85,8 @@ export interface LangWatchQLCompletenessInput {
   readonly timeWindow?: LangWatchQLTimeWindow;
   /** The step the query buckets by, when it follows the board granularity. */
   readonly granularitySeconds?: number;
+  /** The zone the query buckets by, when it declares the time zone; UTC otherwise. */
+  readonly timeZone?: string;
 }
 
 /** Builds `completeness` for a query that already ran. */
@@ -95,6 +101,8 @@ export class LangWatchQLCompletenessService {
   async assess(input: LangWatchQLCompletenessInput): Promise<LangWatchQLCompletenessOutcome> {
     const { timeWindow, granularitySeconds } = input;
     if (!timeWindow) return { kind: "skipped", reason: "no_window" };
+    // UTC buckets are the plain epoch ones, so only another zone pays for the wall-clock read.
+    const timeZone = input.timeZone === LWQL_DEFAULT_TIME_ZONE ? undefined : input.timeZone;
     const plan = planCompleteness(input);
     if (plan.kind === "uncountable") return { kind: "skipped", reason: "uncountable_view" };
 
@@ -103,7 +111,11 @@ export class LangWatchQLCompletenessService {
         executor: input.executor,
         request: {
           sql: scopeLangWatchQL({
-            sql: completenessSql({ plan, isBucketed: granularitySeconds !== undefined }),
+            sql: completenessSql({
+              plan,
+              isBucketed: granularitySeconds !== undefined,
+              isZoned: timeZone !== undefined,
+            }),
             database: input.database,
             views: input.views,
             timeWindow,
@@ -116,6 +128,7 @@ export class LangWatchQLCompletenessService {
             ...(granularitySeconds === undefined
               ? {}
               : { [GRANULARITY_PARAMETER]: granularitySeconds }),
+            ...(timeZone === undefined ? {} : { [TIME_ZONE_PARAMETER]: timeZone }),
           },
           tenantCapability: input.tenantCapability,
           projectIds: input.projectIds,
@@ -131,6 +144,7 @@ export class LangWatchQLCompletenessService {
           rows: execution.rows,
           timeWindow,
           ...(granularitySeconds === undefined ? {} : { granularitySeconds }),
+          ...(timeZone === undefined ? {} : { timeZone }),
         }),
       };
     } catch (error) {
@@ -222,19 +236,20 @@ function presentSql({
 function completenessSql({
   plan,
   isBucketed,
+  isZoned,
 }: {
   plan: CompletenessPlan;
   isBucketed: boolean;
+  isZoned: boolean;
 }): string {
   const time = quoted(plan.timeColumn);
-  const shift = LWQL_BUCKET_ALIGNMENT_SECONDS;
+  const bucket = lwqlBucketStartSql({
+    column: time,
+    granularity: `{${GRANULARITY_PARAMETER}:UInt32}`,
+    ...(isZoned ? { timeZone: `{${TIME_ZONE_PARAMETER}:String}` } : {}),
+  });
   const select = [
-    ...(isBucketed
-      ? [
-          `toUnixTimestamp(addSeconds(toStartOfInterval(subtractSeconds(${time}, ${shift}), ` +
-            `INTERVAL {${GRANULARITY_PARAMETER}:UInt32} SECOND), ${shift})) AS bucket`,
-        ]
-      : []),
+    ...(isBucketed ? [`toUnixTimestamp(${bucket}) AS bucket`] : []),
     "count() AS n",
     ...plan.fields.map(
       (field, index) => `${presentSql({ field, recordsModels: plan.recordsModels })} AS f${index}`,
@@ -260,11 +275,13 @@ function assembleCompleteness({
   rows,
   timeWindow,
   granularitySeconds,
+  timeZone,
 }: {
   plan: CompletenessPlan;
   rows: readonly Record<string, unknown>[];
   timeWindow: LangWatchQLTimeWindow;
   granularitySeconds?: number;
+  timeZone?: string;
 }): QueryCompleteness {
   const sum = (key: string) => rows.reduce((total, row) => total + countOf(row[key]), 0);
   const total = sum("n");
@@ -289,7 +306,14 @@ function assembleCompleteness({
     fields,
     ...(granularitySeconds === undefined
       ? {}
-      : { buckets: windowBuckets({ rows, timeWindow, granularitySeconds }) }),
+      : {
+          buckets: windowBuckets({
+            rows,
+            timeWindow,
+            granularitySeconds,
+            timeZone: timeZone ?? LWQL_DEFAULT_TIME_ZONE,
+          }),
+        }),
     ...(unpriced ? { unpriced } : {}),
   };
 }
@@ -309,33 +333,84 @@ function stateOf({
   return "complete";
 }
 
-/** Every bucket the window touches, including empty ones at either end, with its row count. */
+/**
+ * Every bucket the window touches, empty ones at either end included, with its row count. Floors
+ * as `lwqlBucketStartSql` does: a sub-day step on the instant, a day or longer on the zone's wall
+ * clock, so a DST day is 23 or 25 hours long and a DST night has 23 or 25 hourly buckets.
+ */
 function windowBuckets({
   rows,
   timeWindow,
   granularitySeconds,
+  timeZone,
 }: {
   rows: readonly Record<string, unknown>[];
   timeWindow: LangWatchQLTimeWindow;
   granularitySeconds: number;
+  timeZone: string;
 }): { start: string; n: number }[] {
   const counts = new Map(rows.map((row) => [countOf(row.bucket), countOf(row.n)]));
-  const startSeconds = Temporal.Instant.from(timeWindow.start).epochMilliseconds / 1000;
   const endSeconds = Temporal.Instant.from(timeWindow.end).epochMilliseconds / 1000;
-  const buckets: { start: string; n: number }[] = [];
+  if (granularitySeconds < LWQL_WALL_CLOCK_GRANULARITY_SECONDS) {
+    return instantBuckets({ counts, timeWindow, endSeconds, granularitySeconds });
+  }
+  const startWallSeconds = wallSeconds({ instant: timeWindow.start, timeZone });
+  const endWallSeconds = wallSeconds({ instant: timeWindow.end, timeZone });
   const shift = LWQL_BUCKET_ALIGNMENT_SECONDS;
-  for (
-    let bucket =
-      Math.floor((startSeconds - shift) / granularitySeconds) * granularitySeconds + shift;
-    bucket < endSeconds;
-    bucket += granularitySeconds
-  ) {
+  const firstWall =
+    Math.floor((Math.floor(startWallSeconds) - shift) / granularitySeconds) * granularitySeconds +
+    shift;
+  // One step past the window covers the hour a DST night adds to the wall clock.
+  const steps = Math.ceil((endWallSeconds - firstWall) / granularitySeconds) + 2;
+  const buckets: { start: string; n: number }[] = [];
+  const seen = new Set<number>();
+  for (let step = 0; step < steps; step += 1) {
+    const wall = firstWall + step * granularitySeconds;
+    const instant = Temporal.Instant.fromEpochMilliseconds(wall * 1000)
+      .toZonedDateTimeISO("UTC")
+      .toPlainDateTime()
+      .toZonedDateTime(timeZone, { disambiguation: "compatible" })
+      .toInstant();
+    const seconds = instant.epochMilliseconds / 1000;
+    if (seconds >= endSeconds) break;
+    // A wall time the spring-forward night skips lands on a real later time the loop visits too.
+    if (seen.has(seconds)) continue;
+    seen.add(seconds);
+    buckets.push({ start: instant.toString(), n: counts.get(seconds) ?? 0 });
+  }
+  return buckets;
+}
+
+/** Sub-day buckets: whole steps of the instant from the alignment, the same in every zone. */
+function instantBuckets({
+  counts,
+  timeWindow,
+  endSeconds,
+  granularitySeconds,
+}: {
+  counts: ReadonlyMap<number, number>;
+  timeWindow: LangWatchQLTimeWindow;
+  endSeconds: number;
+  granularitySeconds: number;
+}): { start: string; n: number }[] {
+  const shift = LWQL_BUCKET_ALIGNMENT_SECONDS;
+  const startSeconds = Math.floor(Temporal.Instant.from(timeWindow.start).epochMilliseconds / 1000);
+  const first =
+    Math.floor((startSeconds - shift) / granularitySeconds) * granularitySeconds + shift;
+  const buckets: { start: string; n: number }[] = [];
+  for (let seconds = first; seconds < endSeconds; seconds += granularitySeconds) {
     buckets.push({
-      start: Temporal.Instant.fromEpochMilliseconds(bucket * 1000).toString(),
-      n: counts.get(bucket) ?? 0,
+      start: Temporal.Instant.fromEpochMilliseconds(seconds * 1000).toString(),
+      n: counts.get(seconds) ?? 0,
     });
   }
   return buckets;
+}
+
+/** An instant's wall-clock time in the zone, as seconds on a UTC clock reading the same digits. */
+function wallSeconds({ instant, timeZone }: { instant: string; timeZone: string }): number {
+  const wall = Temporal.Instant.from(instant).toZonedDateTimeISO(timeZone).toPlainDateTime();
+  return wall.toZonedDateTime("UTC").epochMilliseconds / 1000;
 }
 
 /** ClickHouse JSON quotes 64-bit integers, so a count can arrive as a string. */

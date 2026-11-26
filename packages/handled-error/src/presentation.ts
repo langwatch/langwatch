@@ -154,10 +154,11 @@ const budgetMetaWord = (
   return Object.hasOwn(words, value) ? words[value] : undefined;
 };
 
-/** The request field that sets each list name, which the supplied-parameter copy points at. */
+/** The request field that sets each reserved name, which the supplied-parameter copy points at. */
 const LIST_REQUEST_FIELDS: Readonly<Record<string, string>> = {
   dashboard_context_sources: "sources",
   dashboard_context_projects: "projects",
+  dashboard_context_timezone: "timeZone",
 };
 
 /**
@@ -700,13 +701,23 @@ const presentations = {
       const lists = names.filter(
         (name) => name === "dashboard_context_sources" || name === "dashboard_context_projects",
       );
-      const listRule = `Declare ${listLabels(lists)} as Array(String), for example {dashboard_context_sources:Array(String)}`;
-      const windowRule =
-        "Declare period_start and period_end as DateTime, for example {period_start:DateTime}";
-      if (lists.length === 0) return `${windowRule}, and run the query again.`;
-      if (lists.length === names.length) return `${listRule}, and run the query again.`;
+      const zone = names.includes("dashboard_context_timezone");
+      const zoneCount = zone ? 1 : 0;
+      const declaresWindow = names.length === 0 || lists.length + zoneCount < names.length;
+      const rules = [
+        ...(lists.length > 0
+          ? [
+              `Declare ${listLabels(lists)} as Array(String), for example {dashboard_context_sources:Array(String)}`,
+            ]
+          : []),
+        ...(zone ? ["Declare the time zone as String: {dashboard_context_timezone:String}"] : []),
+        ...(declaresWindow
+          ? ["Declare period_start and period_end as DateTime, for example {period_start:DateTime}"]
+          : []),
+      ];
+      if (rules.length === 1) return `${rules[0]}, and run the query again.`;
 
-      return `${listRule}. ${windowRule}. Then run the query again.`;
+      return `${rules.join(". ")}. Then run the query again.`;
     },
   },
   lwql_result_too_large: {

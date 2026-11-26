@@ -79,6 +79,32 @@ export function buildShimScript(): string {
     return stringify(value);
   }
 
+  // ClickHouse sends a DateTime as "YYYY-MM-DD hh:mm:ss[.fff]" in UTC, with no zone mark.
+  var CLICKHOUSE_DATE_TIME = /^\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2}(\\.\\d+)?$/;
+  function parseTime(value) {
+    if (value instanceof Date) return new Date(value.getTime());
+    if (typeof value === "number") return new Date(value);
+    var text = String(value);
+    return new Date(CLICKHOUSE_DATE_TIME.test(text) ? text.replace(" ", "T") + "Z" : text);
+  }
+  function readerTimeZone() {
+    return (LW.dashboardContext && LW.dashboardContext.timezone) || "UTC";
+  }
+  function formatTime(value, options) {
+    var date = parseTime(value);
+    if (isNaN(date.getTime())) return String(value);
+    var daily = LW.dashboardContext && LW.dashboardContext.granularitySeconds >= 86400;
+    var parts = options || (daily
+      ? { month: "short", day: "numeric" }
+      : { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+    var withZone = Object.assign({ timeZone: readerTimeZone() }, parts);
+    try {
+      return date.toLocaleString("en-US", withZone);
+    } catch (_error) {
+      return date.toLocaleString("en-US", Object.assign({}, parts, { timeZone: "UTC" }));
+    }
+  }
+
   // keep in sync with bridge/lwGlobalTypes.ts — every member below (plus
   // LW.useChartQuery, LW.useDashboardContext and LW.useParams, all added
   // after this object) needs a matching declared member with JSDoc there
@@ -87,6 +113,8 @@ export function buildShimScript(): string {
     dashboardContext: undefined,
     params: undefined,
     theme: undefined,
+    parseTime: parseTime,
+    formatTime: formatTime,
     query: function (name, params) {
       return ready.then(function () {
         return new Promise(function (resolve, reject) {

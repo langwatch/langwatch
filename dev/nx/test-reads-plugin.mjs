@@ -236,6 +236,8 @@ export const reads = {
   "@langwatch/analytics-contract": [
     "dev/scripts/build-charts-lib.mjs",
     "docs/features/querying-your-data.mdx",
+    "services/langyagent/internal/assets/skills/dashboard-widgets/SKILL.md",
+    "skills/recipes/dashboard-widgets/SKILL.mdx",
   ],
   "@langwatch/clickhouse-migrations": ["packages/upgrade/releases/image/code-steps.json"],
   "@langwatch/seedgen-runner": ["tools/seedgen/**/*"],

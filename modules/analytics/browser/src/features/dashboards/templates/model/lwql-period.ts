@@ -3,7 +3,7 @@
  * parameters (ADR-130), so a stored widget follows the board's period and grain.
  */
 
-import { LWQL_BUCKET_ALIGNMENT_SECONDS } from "@langwatch/analytics-contract";
+import { lwqlBucketStartSql } from "@langwatch/analytics-contract";
 
 export const START = "{dashboard_context_period_start:DateTime}";
 export const END = "{dashboard_context_period_end:DateTime}";
@@ -32,8 +32,9 @@ export const firstTraceMetricsRow = ({ view }: { view?: string } = {}) => {
     GROUP BY TraceId)`;
 };
 
-export const bucketOf = (column: string) => {
-  const shifted = `subtractSeconds(${column}, ${LWQL_BUCKET_ALIGNMENT_SECONDS})`;
-  const bucket = `toStartOfInterval(${shifted}, INTERVAL ${GRAIN} SECOND)`;
-  return `addSeconds(${bucket}, ${LWQL_BUCKET_ALIGNMENT_SECONDS})`;
-};
+/** The reader's zone, bound by the surface, so a day bucket starts at the reader's midnight. */
+const TIME_ZONE = "{dashboard_context_timezone:String}";
+
+/** The bucket `column` falls in on the reader's clock, sent as a UTC `DateTime`. */
+export const bucketOf = (column: string) =>
+  lwqlBucketStartSql({ column, granularity: GRAIN, timeZone: TIME_ZONE });

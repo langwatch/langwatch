@@ -7,7 +7,7 @@
 import type { QueryCompleteness } from "@langwatch/analytics-contract";
 import type * as RechartsLibrary from "recharts";
 
-import { parseIsoInstant, utcParts } from "./utc-instant.ts";
+import { parseIsoInstant, utcParts, zonedParts } from "./utc-instant.ts";
 
 type Row = Record<string, unknown>;
 
@@ -15,7 +15,12 @@ type Row = Record<string, unknown>;
 const TYPE_PX = { micro: 11, caption: 12, bodySm: 13, metric: 18 } as const;
 
 interface LWGlobal {
-  dashboardContext?: { colors?: Readonly<Record<string, string>> };
+  dashboardContext?: {
+    colors?: Readonly<Record<string, string>>;
+    timezone?: string;
+    isTimezoneBound?: boolean;
+    granularitySeconds?: number;
+  };
   navigate?: (target: string, params?: Record<string, unknown>) => void;
 }
 
@@ -131,6 +136,16 @@ function parseInstantEpochMs(value: unknown): number | undefined {
   return typeof value === "string" ? parseIsoInstant(value) : undefined;
 }
 
+/**
+ * An instant's fields on the reader's clock when the widget's queries bucket on it, else on UTC:
+ * a saved query that buckets by UTC days keeps UTC labels rather than reading a day early.
+ */
+function readerParts(epochMs: number) {
+  const context = window.LW?.dashboardContext;
+  const timeZone = context?.isTimezoneBound === true ? context.timezone : undefined;
+  return zonedParts({ epochMs, timeZone });
+}
+
 /** A column reads as time-like by name, or by its first value parsing as a date. */
 function isTimeLikeColumn(data: Row[], key: string): boolean {
   if (/date|time|timestamp|day|hour|week|month|bucket/i.test(key)) return true;
@@ -139,9 +154,13 @@ function isTimeLikeColumn(data: Row[], key: string): boolean {
   return false;
 }
 
+const DAY_MS = 24 * 60 * 60 * 1000;
+/** The shortest local day: the night the clocks go forward. */
+const SHORTEST_DAY_MS = 23 * 60 * 60 * 1000;
+
 /**
- * Axis tick formatter for an XAxis's `dataKey`. Time-like columns render as
- * "MM-DD" when the series spans more than one calendar day, else "HH:mm";
+ * Axis tick formatter for an XAxis's `dataKey`. Time-like columns render on the
+ * reader's clock as "MM-DD" at a day grain or across more than a day, else "HH:mm";
  * everything else (and unparsable values) falls back to the raw string.
  */
 function axisTickFormatter(key: string, data: Row[]): (value: unknown) => string {
@@ -149,18 +168,23 @@ function axisTickFormatter(key: string, data: Row[]): (value: unknown) => string
   let spansMultipleDays = false;
   if (timeLike) {
     const times = data
-      .map((row) => parseInstantEpochMs(row[key]))
+      .map((row) => bucketEpochMs(row[key]))
       .filter((t): t is number => t !== undefined);
     if (times.length > 0) {
-      spansMultipleDays = Math.max(...times) - Math.min(...times) > 24 * 60 * 60 * 1000;
+      const sorted = [...new Set(times)].toSorted((a, b) => a - b);
+      const steps = sorted.slice(1).map((time, index) => time - sorted[index]!);
+      const grain = window.LW?.dashboardContext?.granularitySeconds ?? 0;
+      const stepsByDays = steps.length > 0 && Math.min(...steps) >= SHORTEST_DAY_MS;
+      spansMultipleDays =
+        grain * 1000 >= DAY_MS || stepsByDays || sorted.at(-1)! - sorted[0]! > DAY_MS;
     }
   }
   return (value: unknown): string => {
     const raw = String(value);
     if (!timeLike) return raw;
-    const instant = parseInstantEpochMs(raw);
+    const instant = bucketEpochMs(raw);
     if (instant === undefined) return raw;
-    const date = utcParts(instant);
+    const date = readerParts(instant);
     if (spansMultipleDays) {
       const mm = String(date.month).padStart(2, "0");
       const dd = String(date.day).padStart(2, "0");
@@ -546,14 +570,19 @@ export interface AreaTimeseriesProps {
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
-/** "Oct 7", or "Oct 7, 14:00" for a bucket that starts inside a day; UTC, as the axis is. */
+/** "Oct 7", or "Oct 7, 14:00" for a bucket that starts inside a day; the reader's clock. */
 function bucketDate(value: unknown): string {
   const epochMs = bucketEpochMs(value);
   if (epochMs === undefined) return cellText(value);
-  const utc = utcParts(epochMs);
-  const day = `${MONTHS[utc.month - 1]} ${utc.day}`;
-  if (utc.hour === 0 && utc.minute === 0) return day;
-  return `${day}, ${String(utc.hour).padStart(2, "0")}:${String(utc.minute).padStart(2, "0")}`;
+  const local = readerParts(epochMs);
+  const day = `${MONTHS[local.month - 1]} ${local.day}`;
+  if (local.hour === 0 && local.minute === 0) return day;
+  return `${day}, ${String(local.hour).padStart(2, "0")}:${String(local.minute).padStart(2, "0")}`;
+}
+
+/** A bar tooltip's heading: a time-like column on the reader's clock, like the axis below it. */
+function tooltipLabelFormatter(key: string, data: Row[]): ((label: unknown) => string) | undefined {
+  return isTimeLikeColumn(data, key) ? (label: unknown) => bucketDate(label) : undefined;
 }
 
 const GAP_BRIDGE = "__gap";
@@ -881,6 +910,7 @@ export function StackedBars({ data, x, series, projectionFrom, colors, height }:
             tickFormatter: compactNumber,
           }),
           h(R.Tooltip, {
+            labelFormatter: tooltipLabelFormatter(x, data),
             contentStyle: {
               background: c.tooltipBg,
               border: `1px solid ${c.tooltipBorder}`,
@@ -946,6 +976,7 @@ export function GroupedBars({ data, x, series, colors, height }: GroupedBarsProp
             tickFormatter: compactNumber,
           }),
           h(R.Tooltip, {
+            labelFormatter: tooltipLabelFormatter(x, data),
             contentStyle: {
               background: c.tooltipBg,
               border: `1px solid ${c.tooltipBorder}`,
@@ -1019,6 +1050,7 @@ export function ProjectionBars({
             : undefined,
       }),
       h(R.Tooltip, {
+        labelFormatter: tooltipLabelFormatter(x, data),
         contentStyle: {
           background: c.tooltipBg,
           border: `1px solid ${c.tooltipBorder}`,

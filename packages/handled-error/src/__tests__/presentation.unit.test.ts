@@ -176,6 +176,70 @@ describe("explainHandledError", () => {
       expect(description).toContain("`sources` and `projects` fields");
     });
 
+    /** @scenario "TZ17 The wrong-type refusal says how to declare each mistyped name" */
+    it("points a supplied time zone at the request's timeZone field", () => {
+      const { description } = explainHandledError(
+        shape({
+          code: "lwql_reserved_parameter_supplied",
+          meta: { parameters: ["dashboard_context_timezone"] },
+        }),
+      );
+
+      expect(description).toContain("dashboard_context_timezone comes from");
+      expect(description).toContain("Send the `timeZone` field of the request instead.");
+    });
+
+    /** @scenario "TZ17 The wrong-type refusal says how to declare each mistyped name" */
+    it("tells a mistyped time zone alone to be a String, and nothing else", () => {
+      const { description } = explainHandledError(
+        shape({
+          code: "lwql_reserved_parameter_type",
+          meta: { parameters: ["dashboard_context_timezone"] },
+        }),
+      );
+
+      expect(description).toBe(
+        "Declare the time zone as String: {dashboard_context_timezone:String}, and run the query again.",
+      );
+    });
+
+    /** @scenario "TZ17 The wrong-type refusal says how to declare each mistyped name" */
+    it("gives a rule for each kind when a list, the time zone and a period name are mistyped", () => {
+      const { description } = explainHandledError(
+        shape({
+          code: "lwql_reserved_parameter_type",
+          meta: {
+            parameters: [
+              "dashboard_context_period_start",
+              "dashboard_context_sources",
+              "dashboard_context_timezone",
+            ],
+          },
+        }),
+      );
+
+      expect(description).toBe(
+        "Declare dashboard_context_sources as Array(String), for example " +
+          "{dashboard_context_sources:Array(String)}. Declare the time zone as String: " +
+          "{dashboard_context_timezone:String}. Declare period_start and period_end as DateTime, " +
+          "for example {period_start:DateTime}. Then run the query again.",
+      );
+    });
+
+    /** @scenario "TZ17 The wrong-type refusal says how to declare each mistyped name" */
+    it("leaves the period rule out when only a list and the time zone are mistyped", () => {
+      const { description } = explainHandledError(
+        shape({
+          code: "lwql_reserved_parameter_type",
+          meta: { parameters: ["dashboard_context_projects", "dashboard_context_timezone"] },
+        }),
+      );
+
+      expect(description).toContain("{dashboard_context_timezone:String}");
+      expect(description).toContain("Array(String)");
+      expect(description).not.toContain("period_start");
+    });
+
     it("does not promise that a reload brings a missing project back", () => {
       const { description } = explainHandledError(shape({ code: "project_not_found" }));
 

@@ -4,7 +4,10 @@
  */
 import { HandledError, remediation } from "@langwatch/handled-error";
 
-import { isLangWatchQLListParameter } from "./analytics.lwql-time-window.ts";
+import {
+  isLangWatchQLListParameter,
+  LWQL_TIME_ZONE_PARAMETER,
+} from "./analytics.lwql-time-window.ts";
 
 /**
  * Feature flag disabled for this project; distinct from unavailable (no
@@ -334,14 +337,15 @@ export class LangWatchQLReservedParameterSuppliedError extends HandledError {
 /** What a reserved name declared with the wrong type should have been, for each kind named. */
 function reservedTypeMessage(mistyped: readonly string[]): string {
   const lists = mistyped.filter(isLangWatchQLListParameter);
-  if (lists.length === 0) {
-    return "The query declares a time-window parameter with a type that is not a date-time.";
-  }
-  const listFault = `The query declares ${lists.join(", ")} with a type other than Array(String).`;
+  const zone = mistyped.filter((name) => name === LWQL_TIME_ZONE_PARAMETER);
+  const windows = mistyped.length - lists.length - zone.length;
+  const faults = [
+    ...(lists.length > 0 ? [`${lists.join(", ")} with a type other than Array(String)`] : []),
+    ...(zone.length > 0 ? [`${LWQL_TIME_ZONE_PARAMETER} with a type other than String`] : []),
+    ...(windows > 0 ? ["a time-window parameter with a type that is not a date-time"] : []),
+  ];
 
-  return lists.length === mistyped.length
-    ? listFault
-    : `${listFault} It also declares a time-window parameter with a type that is not a date-time.`;
+  return `The query declares ${faults.join(", and ")}.`;
 }
 
 /**

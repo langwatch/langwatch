@@ -336,7 +336,7 @@ Authenticated: Any API key reaches the projects it holds analytics:view on: the 
 Answers at `/api/v1/query`.
 
 ```typescript
-type Body = z.infer<typeof lwqlKeyStatementSchema>; // ../contract/src/features/lwql/analytics-lwql.schemas.ts:277
+type Body = z.infer<typeof lwqlKeyStatementSchema>; // ../contract/src/features/lwql/analytics-lwql.schemas.ts:293
 type Response = z.infer<typeof lwqlResultSchema>; // ../contract/src/analytics.input-schemas.ts:205
 ```
 
@@ -386,7 +386,7 @@ Contract `../contract/src/features/lwql/analytics-lwql.trpc.ts:153`, router `src
 interface Input {
   projectId: string;
 }
-// Output: langWatchQLAvailabilitySchema, ../contract/src/features/lwql/analytics.lwql.ts:530
+// Output: langWatchQLAvailabilitySchema, ../contract/src/features/lwql/analytics.lwql.ts:532
 interface Output {
   available: boolean;
   reason?: "disabled" | "unprovisioned";
@@ -407,6 +407,7 @@ interface Input {
     end: string | number | unknown;
   };
   granularitySeconds?: 1 | 60 | 3600 | 86400 | 604800;
+  timeZone?: string;
 }
 type Output = z.infer<typeof lwqlValidationResultSchema>; // ../contract/src/features/lwql/analytics-lwql.trpc.ts:100
 

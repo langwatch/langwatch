@@ -57733,6 +57733,9 @@ type PostApiV1QueryJSONBody struct {
 		End   PostApiV1QueryJSONBody_TimeWindow_End   `json:"end"`
 		Start PostApiV1QueryJSONBody_TimeWindow_Start `json:"start"`
 	} `json:"timeWindow,omitempty"`
+
+	// TimeZone The IANA time zone {dashboard_context_timezone:String} is bound to, such as America/Los_Angeles; UTC when absent.
+	TimeZone *string `json:"timeZone,omitempty"`
 }
 
 // PostApiV1QueryJSONBodyGranularitySeconds0 defines parameters for PostApiV1Query.

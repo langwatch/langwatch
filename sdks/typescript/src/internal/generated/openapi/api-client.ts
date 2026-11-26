@@ -3426,6 +3426,8 @@ export interface operations {
                         end: string | number;
                     };
                     granularitySeconds?: 1 | 60 | 3600 | 86400 | 604800;
+                    /** @description The IANA time zone {dashboard_context_timezone:String} is bound to, such as America/Los_Angeles; UTC when absent. */
+                    timeZone?: string;
                     /** @description Reads this one project, which the key must hold analytics:view on. Send projectId or projects, not both. */
                     projectId?: string;
                     /** @description The projects to read, each one the key holds analytics:view on, or the string "all" for every project the key can read. A key that reaches several projects must name them or send "all"; a key that reads one project defaults to it. When the statement declares {dashboard_context_projects:Array(String)}, params.dashboard_context_projects lists what was read. */

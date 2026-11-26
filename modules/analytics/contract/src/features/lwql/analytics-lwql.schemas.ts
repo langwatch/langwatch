@@ -9,6 +9,7 @@ import { z } from "zod";
 
 import {
   isLangWatchQLSurfaceParameter,
+  isLangWatchQLTimeZone,
   LWQL_ACCEPTED_GRANULARITY_STEPS,
 } from "./analytics.lwql-time-window.ts";
 import {
@@ -149,6 +150,19 @@ export interface LwqlGranularityStepSchema extends Named<
 export const lwqlGranularityStepSchema: LwqlGranularityStepSchema =
   lwqlGranularityStepSchemaDefinition;
 
+/** An IANA zone name, such as "America/Los_Angeles"; anything else is refused at the door. */
+const lwqlTimeZoneSchemaDefinition = z
+  .string()
+  .refine(
+    isLangWatchQLTimeZone,
+    'timeZone must be an IANA time zone name, such as "Europe/Amsterdam"',
+  )
+  .describe(
+    "The IANA time zone {dashboard_context_timezone:String} is bound to, such as America/Los_Angeles; UTC when absent.",
+  );
+export interface LwqlTimeZoneSchema extends Named<typeof lwqlTimeZoneSchemaDefinition> {}
+export const lwqlTimeZoneSchema: LwqlTimeZoneSchema = lwqlTimeZoneSchemaDefinition;
+
 /** One submitted statement, as both doors accept it. */
 const lwqlStatementSchemaDefinition = z.object({
   // Deliberately not `.trim()`: the statement the database runs must be the one
@@ -167,6 +181,8 @@ const lwqlStatementSchemaDefinition = z.object({
    * `{period_granularity_seconds:UInt32}`, in seconds.
    */
   granularitySeconds: lwqlGranularityStepSchema.optional(),
+  /** The reader's zone, for a statement that declares `{dashboard_context_timezone:String}`. */
+  timeZone: lwqlTimeZoneSchema.optional(),
 });
 export interface LwqlStatementSchema extends Named<typeof lwqlStatementSchemaDefinition> {}
 export const lwqlStatementSchema: LwqlStatementSchema = lwqlStatementSchemaDefinition;

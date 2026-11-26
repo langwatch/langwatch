@@ -26,8 +26,18 @@ type LwTheme = "light" | "dark";
 interface LwDashboardContext {
   readonly timeWindow: LwTimeWindow;
   readonly granularitySeconds: number;
-  /** IANA zone name, e.g. "America/Sao_Paulo". */
+  /**
+   * The reader's IANA zone, e.g. "America/Sao_Paulo"; "UTC" when the browser
+   * names none. A query declaring \`{dashboard_context_timezone:String}\` is
+   * bound to the same zone.
+   */
   readonly timezone?: string;
+  /**
+   * True when one of the widget's queries declares
+   * \`{dashboard_context_timezone:String}\`; the charts library labels on
+   * \`timezone\` only then, and on UTC otherwise.
+   */
+  readonly isTimezoneBound?: boolean;
   readonly theme: LwTheme;
   readonly widgetId?: string;
   readonly dashboardId?: string;
@@ -193,6 +203,20 @@ interface LwApi {
   readonly theme: LwTheme;
 
   /**
+   * Reads a time from a query row as a \`Date\`: a ClickHouse
+   * \`"YYYY-MM-DD hh:mm:ss"\` (UTC), an ISO string, epoch milliseconds or a Date; anything else is read as text.
+   */
+  parseTime: (value: unknown) => Date;
+
+  /**
+   * Writes a time on the reader's clock (\`LW.dashboardContext.timezone\`),
+   * e.g. "Nov 25, 4:00 PM". Defaults to day and hour below a one-day grain and
+   * to the day at a day or week grain; \`options\` replaces them
+   * (\`Intl.DateTimeFormat\` options; the zone stays the reader's unless they name one).
+   */
+  formatTime: (value: unknown, options?: Intl.DateTimeFormatOptions) => string;
+
+  /**
    * Runs one of the widget's declared queries by name, forwarding the given
    * bind values. SQL never runs in the frame — only \`queryName\` and \`params\`
    * cross the bridge. Reject with an \`LwQueryError\`.
@@ -201,9 +225,9 @@ interface LwApi {
    * loading/error state and automatic refetch on dashboard context changes.
    *
    * Reserved parameter names (\`dashboard_context_period_start\`,
-   * \`dashboard_context_period_end\`, \`dashboard_context_granularity_seconds\`)
-   * are bound automatically from \`LW.dashboardContext\` and should not be
-   * passed here.
+   * \`dashboard_context_period_end\`, \`dashboard_context_granularity_seconds\`,
+   * \`dashboard_context_timezone\`) are bound automatically from
+   * \`LW.dashboardContext\` and should not be passed here.
    */
   query: <N extends string>(
     queryName: N,

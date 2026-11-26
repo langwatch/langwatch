@@ -32,6 +32,10 @@ import {
   bindListParameters,
   mistypedListParameters,
 } from "../rules/langwatch-ql-reserved-lists.rules.ts";
+import {
+  bindTimeZone,
+  mistypedTimeZoneParameter,
+} from "../rules/langwatch-ql-surface-binding.rules.ts";
 import type { LangWatchQLParameter } from "../rules/langwatch-ql-validation-shape.rules.ts";
 
 /** What a statement's reserved names mean for the request about to be made. */
@@ -259,6 +263,7 @@ export class LangWatchQLTimeWindowService {
     parameters,
     timeWindow,
     lists,
+    timeZone,
   }: {
     /** Bound parameters the validated statement declares. */
     readonly declared: readonly LangWatchQLParameter[];
@@ -268,6 +273,8 @@ export class LangWatchQLTimeWindowService {
     readonly timeWindow?: LangWatchQLTimeWindow;
     /** The lists the surface binds the two list names to, when it binds any. */
     readonly lists?: Readonly<{ sources: readonly string[]; projects: readonly string[] }>;
+    /** The reader's IANA zone, already checked at the door; UTC when absent. */
+    readonly timeZone?: string | undefined;
   }): LangWatchQLTimeWindowResolution {
     const reserved = declared.filter((parameter) =>
       isLangWatchQLTimeWindowParameter(parameter.name),
@@ -277,11 +284,13 @@ export class LangWatchQLTimeWindowService {
         .filter((parameter) => !isLangWatchQLDateTimeParameterType(parameter.type))
         .map((parameter) => parameter.name),
       ...mistypedListParameters(declared),
+      ...mistypedTimeZoneParameter(declared),
     ].toSorted();
     if (mistyped.length > 0) {
       throw new LangWatchQLReservedParameterTypeError(mistyped);
     }
-    const { followsSources, bound: listBound } = bindListParameters({ declared, lists });
+    const { followsSources, bound: listsBound } = bindListParameters({ declared, lists });
+    const surfaceBound = { ...listsBound, ...bindTimeZone({ declared, timeZone }) };
 
     const supplied = Object.keys(parameters ?? {})
       .filter(isLangWatchQLSurfaceParameter)
@@ -300,7 +309,7 @@ export class LangWatchQLTimeWindowService {
 
     const followsTimeWindow = reserved.length > 0;
     if (!timeWindow) {
-      const unwindowed = findInjected({ parameters, injected: listBound });
+      const unwindowed = findInjected({ parameters, injected: surfaceBound });
       return {
         ...(unwindowed ? { parameters: unwindowed } : {}),
         followsTimeWindow,
@@ -318,7 +327,7 @@ export class LangWatchQLTimeWindowService {
         valueFor(parameter.name as LangWatchQLTimeWindowParameter, timeWindow),
       ]),
     );
-    const merged = findInjected({ parameters, injected: { ...injected, ...listBound } });
+    const merged = findInjected({ parameters, injected: { ...injected, ...surfaceBound } });
 
     return {
       ...(merged ? { parameters: merged } : {}),

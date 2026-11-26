@@ -1002,7 +1002,7 @@ export class AnalyticsModule
     >,
   ): Promise<LangWatchQLQueryResult> {
     const { reach, projectId, projects: asked, sql, parameters, timeWindow } = input;
-    const { granularitySeconds, sources, signal } = input;
+    const { granularitySeconds, sources, timeZone, signal } = input;
     const { named: wanted, all } = this.#runScope.select({ projectId, projects: asked });
     const { projects, protections } = all
       ? await this.#queryScope.resolveAll({ reach })
@@ -1024,6 +1024,7 @@ export class AnalyticsModule
       ...(timeWindow ? { timeWindow } : {}),
       ...(granularitySeconds === undefined ? {} : { granularitySeconds }),
       ...(sources ? { sources } : {}),
+      ...(timeZone ? { timeZone } : {}),
       ...(signal ? { signal } : {}),
       telemetry: input.telemetry,
       isInstantEvalsEnabled:

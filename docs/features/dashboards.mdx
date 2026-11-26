@@ -320,6 +320,36 @@ Inside `code`, a global `LW` object gives the widget everything it needs:
 - `LW.error(err)`: report an error without throwing.
 - `LW.navigate(target, params?)`: navigate the host to an allowlisted target,
   such as a trace list or a single trace.
+- `LW.formatTime(value, options?)` / `LW.parseTime(value)`: write a time from
+  a query row on the reader's clock, such as "Nov 25, 4:00 PM", or read it as
+  a `Date`.
+
+### Time zones
+
+Each reader sees a widget in their browser's time zone. ClickHouse returns
+times in UTC, so label them with `LW.formatTime` rather than cutting text out
+of the value.
+
+To bucket by the reader's day, read `{dashboard_context_timezone:String}` in
+the query. The dashboard fills it with the reader's IANA zone, or `UTC` when
+the browser names none:
+
+```sql
+SELECT toTimeZone(toStartOfDay(OccurredAt, {dashboard_context_timezone:String}), 'UTC') AS day,
+  count() AS traces
+FROM trace_metrics
+WHERE OccurredAt >= {dashboard_context_period_start:DateTime}
+  AND OccurredAt < {dashboard_context_period_end:DateTime}
+GROUP BY day ORDER BY day
+```
+
+The outer `toTimeZone(..., 'UTC')` keeps the value a UTC time, so
+`LW.formatTime` shows it at the reader's midnight. `POST /api/v1/query` takes
+the zone as `timeZone`; a run without one is bound to `UTC`.
+
+The `@langwatch/charts` components label axes and tooltips on the reader's
+clock when one of the widget's queries reads the zone, and on UTC when none
+does, so a widget that still buckets by UTC days keeps its dates.
 
 ### Missing data: the `completeness` report
 

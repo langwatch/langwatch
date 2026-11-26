@@ -15,6 +15,7 @@ import { Temporal } from "@langwatch/time";
 
 import type { LangWatchQLExecute } from "../model/lwql-request-controller.ts";
 import type { LangWatchQLParameterValue } from "../model/lwql-request-state.ts";
+import { browserTimeZone } from "./browser-time-zone.ts";
 
 export interface LangWatchQLQueryInput {
   projectId: string;
@@ -23,6 +24,8 @@ export interface LangWatchQLQueryInput {
   timeWindow?: LangWatchQLTimeWindow;
   sources?: TraceSource[] | null;
   projects?: string[] | typeof LWQL_ALL_PROJECTS;
+  /** The reader's IANA zone, bound to `{dashboard_context_timezone:String}`. */
+  timeZone?: string;
   telemetry?: LangWatchQLRunTelemetryRequest | undefined;
 }
 
@@ -63,10 +66,12 @@ export function createLangWatchQLExecute({
   projectId: string;
   readsEveryProject?: boolean;
 }): LangWatchQLExecute {
-  return ({ timeWindow, sources, projects, ...request }, { signal }) =>
+  return ({ timeWindow, sources, projects, timeZone, ...request }, { signal }) =>
     transport.mutate(
       {
         ...request,
+        // The browser's clock unless the request names one: a widget buckets by its reader's day.
+        timeZone: timeZone ?? browserTimeZone(),
         // The wire takes plain arrays, the draft holds read-only ones.
         ...(sources === undefined ? {} : { sources: sources === null ? null : [...sources] }),
         ...projectsOf({ projects, readsEveryProject }),

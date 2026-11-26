@@ -33,6 +33,11 @@ export interface ChartFrameDashboardContext {
   readonly granularitySeconds: number;
   /** IANA zone name, e.g. "America/Sao_Paulo". */
   readonly timezone?: string;
+  /**
+   * Set when a widget query declares `{dashboard_context_timezone:String}`, so its buckets start
+   * on the reader's clock; the charts library labels on that clock only then, else on UTC.
+   */
+  readonly isTimezoneBound?: boolean;
   readonly theme: ChartFrameTheme;
   /** Active design-system colours resolved by the host for the opaque frame. */
   readonly colors?: Readonly<Record<string, string>>;

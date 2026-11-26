@@ -298,6 +298,8 @@ export type LangWatchQLRunContext = Readonly<{
   timeWindow?: LangWatchQLTimeWindow;
   granularitySeconds?: number;
   onBudgetOverflow?: LangWatchQLBudgetOverflowMode;
+  /** The reader's IANA zone for `{dashboard_context_timezone:String}`; UTC when absent. */
+  timeZone?: string;
   /** A widget query's sources (AC200), `null` for its default; the default when absent. */
   sources?: RunSources;
   /** The projects a card names (AC207); absent, the board's project. */
