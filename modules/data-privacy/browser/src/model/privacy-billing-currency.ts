@@ -21,15 +21,18 @@ export function mayReadSubscriptionPlan({
   return isSaaS && !!organizationId && canViewOrganization;
 }
 
-/** Euros for a euro Growth plan, dollars for any other; unknown until a plan answers. */
+/**
+ * Euros for a euro Growth plan, dollars for any other; unknown until a plan answers. A refresh
+ * that fails keeps the last answer, so a passing read error never takes the price away.
+ */
 export function billingCurrencyOf({
   mayRead,
   plan,
 }: {
   mayRead: boolean;
-  plan: { isLoading: boolean; isError: boolean; data: { type: string } | undefined };
+  plan: { data: { type: string } | undefined };
 }): PrivacyBillingCurrencyReading {
   if (!mayRead) return "USD";
-  if (plan.isLoading || plan.isError || !plan.data) return "unknown";
+  if (!plan.data) return "unknown";
   return parseGrowthSeatPlanType(plan.data.type)?.currency === "EUR" ? "EUR" : "USD";
 }

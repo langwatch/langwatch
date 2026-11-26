@@ -32,14 +32,22 @@ describe("mayReadSubscriptionPlan()", () => {
 });
 
 describe("billingCurrencyOf()", () => {
-  describe("when the plan is still loading, failed to read or answered nothing", () => {
+  describe("when no plan has answered yet: still loading, failed or empty", () => {
     /** @scenario "The price currency is the subscription's, read from its Growth plan" */
     it.each([
       ["loading", { isLoading: true, isError: false, data: undefined }],
-      ["failed", { isLoading: false, isError: true, data: { type: "GROWTH_SEAT_EUR_MONTHLY" } }],
+      ["failed", { isLoading: false, isError: true, data: undefined }],
       ["empty", { isLoading: false, isError: false, data: undefined }],
     ])("answers unknown when %s, so no currency is quoted", (_case, plan) => {
       expect(billingCurrencyOf({ mayRead: true, plan })).toBe("unknown");
+    });
+  });
+
+  describe("when a refresh fails after the plan answered in euros", () => {
+    /** @scenario "The price currency is the subscription's, read from its Growth plan" */
+    it("keeps the last answer's currency", () => {
+      const plan = { isLoading: false, isError: true, data: { type: "GROWTH_SEAT_EUR_MONTHLY" } };
+      expect(billingCurrencyOf({ mayRead: true, plan })).toBe("EUR");
     });
   });
 

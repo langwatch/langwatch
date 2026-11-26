@@ -11,7 +11,7 @@ import {
   type UiFeedback,
   type UiRoute,
 } from "@langwatch/browser-host/capabilities";
-import { useMemo, type ReactNode } from "react";
+import type { ReactNode } from "react";
 
 import {
   DataPrivacyHostApi,
@@ -36,6 +36,7 @@ class HostServiceDataPrivacyHost extends DataPrivacyHostApi {
       licence: PrivacyLicence;
       mayManageLicence: boolean;
       billingCurrency: PrivacyBillingCurrencyReading;
+      readPlanAgain: () => Promise<unknown>;
     },
   ) {
     super();
@@ -76,6 +77,10 @@ class HostServiceDataPrivacyHost extends DataPrivacyHostApi {
   billingCurrency(): PrivacyBillingCurrencyReading {
     return this.deps.billingCurrency;
   }
+
+  async refreshBillingCurrency(): Promise<void> {
+    await this.deps.readPlanAgain();
+  }
 }
 
 /**
@@ -105,30 +110,14 @@ export default function DataPrivacyHostMount({ children }: { children?: ReactNod
   const billingCurrency = billingCurrencyOf({ mayRead: mayReadCurrency, plan });
   const mayManageLicence = session.hasPermission("organization:manage");
 
-  const host = useMemo(
-    () =>
-      new HostServiceDataPrivacyHost({
-        scope: {
-          organizationId: organizationId ?? void 0,
-          teamId,
-          projectId: projectId ?? void 0,
-        },
-        route,
-        feedback,
-        licence,
-        mayManageLicence,
-        billingCurrency,
-      }),
-    [
-      organizationId,
-      teamId,
-      projectId,
-      route,
-      feedback,
-      licence,
-      mayManageLicence,
-      billingCurrency,
-    ],
-  );
+  const host = new HostServiceDataPrivacyHost({
+    scope: { organizationId: organizationId ?? void 0, teamId, projectId: projectId ?? void 0 },
+    route,
+    feedback,
+    licence,
+    mayManageLicence,
+    billingCurrency,
+    readPlanAgain: () => plan.refetch(),
+  });
   return <DataPrivacyHostProvider value={host}>{children}</DataPrivacyHostProvider>;
 }

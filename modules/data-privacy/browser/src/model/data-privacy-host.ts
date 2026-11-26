@@ -66,14 +66,17 @@ export abstract class DataPrivacyHostApi {
 
   abstract failed(failure: PrivacyFailureNotice): void;
 
-  /** Self-hosted only; on LangWatch Cloud the plan is not read and this is "unknown". */
+  /** The licence the plan names, self-hosted only; on LangWatch Cloud this is "unknown". */
   abstract licence(): PrivacyLicence;
 
   /** Whether this reader may activate a licence, so the advert links there. */
   abstract mayManageLicence(): boolean;
 
-  /** Euros only for a euro Growth subscription, "loading" until the plan answers, else dollars. */
+  /** Euros for a euro Growth subscription, else dollars; "unknown" until the plan answers. */
   abstract billingCurrency(): PrivacyBillingCurrencyReading;
+
+  /** Reads the plan again, for a save waiting on the currency; settles when the read does. */
+  abstract refreshBillingCurrency(): Promise<void>;
 }
 
 const DataPrivacyHostContext = createContext<DataPrivacyHostApi | undefined>(void 0);

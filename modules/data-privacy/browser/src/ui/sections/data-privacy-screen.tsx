@@ -22,7 +22,7 @@ import {
   scopeFilterAddressWrite,
   scopeFilterFromAddress,
 } from "@langwatch/design-system/scope-filter";
-import { useMemo, useState } from "react";
+import { useEffect, useEffectEvent, useMemo, useState } from "react";
 
 import { dataPrivacyApi } from "../../behavior/data-privacy-api.ts";
 import { usePiiRedactionModelOffer } from "../../behavior/use-pii-redaction-model-offer.ts";
@@ -301,10 +301,31 @@ function PrivacyRuleDrawerMount({
       : pending
         ? combineSaveConfirmations(ruleSaveDialog(step), keyAskFor(pending.config))
         : null;
-  const saveOrAsk = (scopes: PrivacyScopeEntry[], config: DataPrivacyConfig) => {
-    if (stepFor(config).kind === "save" && keyAskFor(config) === null) void save(scopes, config);
-    else setPending({ scopes, config });
+  const [readingPlan, setReadingPlan] = useState(false);
+  const readPlanAgain = async () => {
+    setReadingPlan(true);
+    try {
+      await host.refreshBillingCurrency();
+    } finally {
+      setReadingPlan(false);
+    }
   };
+  const saveOrAsk = (scopes: PrivacyScopeEntry[], config: DataPrivacyConfig) => {
+    const next = stepFor(config).kind;
+    if (next === "save" && keyAskFor(config) === null) return void save(scopes, config);
+    setPending({ scopes, config });
+    if (next === "wait") void readPlanAgain();
+  };
+  // A waiting save left with nothing to ask (the flag turned off, no key added) saves unasked.
+  const asksNothing = pending !== null && confirmation === null;
+  const savePending = useEffectEvent(() => {
+    if (!pending) return;
+    setPending(null);
+    void save(pending.scopes, pending.config);
+  });
+  useEffect(() => {
+    if (asksNothing) savePending();
+  }, [asksNothing]);
 
   return (
     <>
@@ -312,14 +333,14 @@ function PrivacyRuleDrawerMount({
         open={confirmation !== null}
         onClose={() => setPending(null)}
         onConfirm={() => {
-          if (step?.kind === "wait") return;
+          if (step?.kind === "wait") return void readPlanAgain();
           if (pending) void save(pending.scopes, pending.config);
           setPending(null);
         }}
         title={confirmation?.title ?? ""}
         description={confirmation?.description ?? ""}
         confirmLabel={confirmation?.confirmLabel}
-        loading={step?.kind === "wait"}
+        loading={step?.kind === "wait" && readingPlan}
         tone="default"
       />
       <PrivacyRuleDrawer

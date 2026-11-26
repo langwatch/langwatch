@@ -11,10 +11,16 @@ import {
 } from "@langwatch/browser-host/capabilities";
 import type { UiSessionSnapshot } from "@langwatch/browser-host/session";
 import { createUiHostServicesFromHost } from "@langwatch/browser-host/testing";
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
-type PlanQuery = { isLoading: boolean; isError: boolean; data?: { type: string } };
+type PlanQuery = {
+  isLoading: boolean;
+  isError: boolean;
+  data?: { type: string };
+  refetch?: () => Promise<unknown>;
+};
 const activePlan = vi.fn((): PlanQuery => ({
   isLoading: false,
   isError: false,
@@ -61,7 +67,15 @@ class OrganizationViewer extends UiSession {
 }
 
 function CurrencyReader() {
-  return <span data-testid="currency">{useDataPrivacyHost().billingCurrency()}</span>;
+  const host = useDataPrivacyHost();
+  return (
+    <>
+      <span data-testid="currency">{host.billingCurrency()}</span>
+      <button type="button" onClick={() => void host.refreshBillingCurrency()}>
+        Read the plan again
+      </button>
+    </>
+  );
 }
 
 function renderOnCloud() {
@@ -114,6 +128,34 @@ describe("given the Data Privacy host mounted on LangWatch Cloud", () => {
       renderOnCloud();
 
       expect(screen.getByTestId("currency")).toHaveTextContent("unknown");
+    });
+  });
+
+  describe("when a refresh fails after the plan answered in euros", () => {
+    /** @scenario "A Strict rule save waits for the subscription's currency" */
+    it("keeps reading euros", () => {
+      activePlan.mockReturnValue({
+        isLoading: false,
+        isError: true,
+        data: { type: "GROWTH_SEAT_EUR_MONTHLY" },
+      });
+
+      renderOnCloud();
+
+      expect(screen.getByTestId("currency")).toHaveTextContent("EUR");
+    });
+  });
+
+  describe("when a waiting save asks for the plan again", () => {
+    /** @scenario "A Strict rule save waits for the subscription's currency" */
+    it("refetches the plan query", async () => {
+      const refetch = vi.fn(async () => ({}));
+      activePlan.mockReturnValue({ isLoading: false, isError: true, refetch });
+
+      renderOnCloud();
+      await userEvent.setup().click(screen.getByRole("button", { name: "Read the plan again" }));
+
+      await waitFor(() => expect(refetch).toHaveBeenCalledTimes(1));
     });
   });
 });

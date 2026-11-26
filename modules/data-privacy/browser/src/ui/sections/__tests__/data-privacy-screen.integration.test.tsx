@@ -130,6 +130,8 @@ class TestPrivacyHost extends DataPrivacyHostApi {
   billingCurrency(): PrivacyBillingCurrencyReading {
     return "USD";
   }
+
+  async refreshBillingCurrency(): Promise<void> {}
 }
 
 function renderScreen(host: TestPrivacyHost) {

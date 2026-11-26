@@ -114,8 +114,8 @@ dollar meter, at 0.85 euros per dollar of usage, picked from the Stripe subscrip
     (`GROWTH_SEAT_EUR_*`). That is display only; the charge follows the Stripe subscription. The
     page quotes dollars when the reader may not read the plan, or the plan is no
     `GROWTH_SEAT_EUR_*` one (a plan set in Ops, Enterprise, or a custom seat price with no
-    lookup key). It quotes no price at all while the plan is loading, or when its read fails or
-    answers nothing, and a rule saved at Strict then waits for the price before it asks.
+    lookup key). It quotes no price at all until a plan answers; a refresh that fails keeps the
+    last answer. A rule saved at Strict meanwhile waits, reading the plan again, then asks.
 12. **No free monthly amount.** Every character the model is sent is priced from the first one
     of the month, or of its price line when that was added later (decision 15); the meter reports
     that whole total, nothing taken off. The characters
@@ -153,8 +153,10 @@ that euro and dollar customers drift apart in real terms as the exchange rate mo
 re-price, and a live rate was rejected because the invoice would change month to month. One
 meter keeps usage in one place with one checkpoint, so a currency never splits or double counts
 it; the cost is a meter named in dollars that invoices euros. A separate euro meter was rejected
-as two meters to keep in step. The price sync refuses a euro price that drifts from the ratio. A meter of its own keeps the
-invoice line honest and lets charging start independently of Instant Evals.
+as two meters to keep in step. The price sync refuses a euro price that drifts from the ratio.
+
+A meter of its own keeps the invoice line honest and lets charging start independently of
+Instant Evals.
 
 No free monthly amount (decision 12) keeps the price one number a customer can check against
 the ledger, and keeps a free tier from being farmed by many small organizations. The cost: no

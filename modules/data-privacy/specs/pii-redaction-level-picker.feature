@@ -119,7 +119,8 @@ Feature: The organization picks its PII redaction level on the Data Privacy page
     When the plan is a euro Growth seat plan
     Then the price is quoted in euros
     And any other plan, or one the reader may not read, quotes dollars
-    And while the plan is still loading, or when its read fails or answers nothing, no price is quoted at all
+    And until a plan answers, while it loads or when its read fails or answers nothing, no price is quoted at all
+    And a refresh that fails keeps the last answer's currency
 
   @unit
   Scenario: The page reads the subscription's plan only on Cloud, for a reader allowed to
@@ -262,8 +263,10 @@ Feature: The organization picks its PII redaction level on the Data Privacy page
     And the subscription's plan has not answered, or its read failed
     When an admin saves a rule at Strict from the drawer
     Then the rule is not saved and no price is quoted
+    And the page reads the plan again, and again each time the admin asks to try again
     And once the plan answers in euros the confirmation asks at "€0.425 per 1M characters"
     And the rule is saved only once the admin confirms
+    And if the model's flag turns off meanwhile, the rule saves without asking
 
   @unit
   Scenario: Saving a rule asks for the price only when it turns Strict on at a price

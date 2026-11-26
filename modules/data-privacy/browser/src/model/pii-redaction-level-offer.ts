@@ -205,8 +205,8 @@ export type RuleSaveStep =
 export const RULE_SAVE_WAITING: LevelChangeConfirmation = {
   title: "Turn on Strict?",
   description:
-    "Strict's price is in your subscription's currency, which hasn't loaded yet. Try again in a moment.",
-  confirmLabel: "Turn on Strict",
+    "Strict's price is in your subscription's currency, which hasn't loaded yet. Try again to read it.",
+  confirmLabel: "Try again",
 };
 
 /**

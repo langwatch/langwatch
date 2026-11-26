@@ -139,6 +139,13 @@ export class TestPrivacyHost extends DataPrivacyHostApi {
     return this.plan.billingCurrency ?? "USD";
   }
 
+  /** How many times the page asked for the plan again. */
+  refreshes = 0;
+
+  async refreshBillingCurrency(): Promise<void> {
+    this.refreshes += 1;
+  }
+
   licence(): PrivacyLicence {
     return this.plan.licence;
   }
@@ -169,8 +176,8 @@ export class TestPrivacyHost extends DataPrivacyHostApi {
 }
 
 /**
- * Renders the page; `rerender` renders it again over the current snapshot, and `answerPlan`
- * mounts a new host as the plan answering does, with the subscription's currency.
+ * Renders the page; `rerender` renders it again over the current snapshot. `answerPlan` mounts a
+ * new host as the plan answering does, `mounted` reads it, and `setFlag` changes a flag live.
  */
 export function renderScreen({
   screenElement,
@@ -196,12 +203,15 @@ export function renderScreen({
 }) {
   const host = new TestPrivacyHost(query, { licence, mayManageLicence, billingCurrency });
   let mounted = host;
-  const answers: Record<string, boolean> = {
+  const flagsAnswering = (answers: Readonly<Record<string, boolean>>): UiFlags => ({
+    flag: ({ name }) => answers[name] ?? false,
+  });
+  let answers: Record<string, boolean> = {
     release_pii_redaction_model_enabled: flagOn,
     release_pii_redaction_model_free: free,
     release_pii_redaction_model_split_enabled: splitFlag,
   };
-  const flags: UiFlags = { flag: ({ name }) => answers[name] ?? false };
+  let flags = flagsAnswering(answers);
   const services: UiHostServices = {
     ...createUiHostServicesFromHost({ route: () => ({ params: {}, query }), navigate: () => {} }),
     deployment: {
@@ -226,7 +236,19 @@ export function renderScreen({
     mounted = new TestPrivacyHost(query, { licence, mayManageLicence, billingCurrency: answered });
     result.rerender(tree());
   };
-  return { host, rerender: () => result.rerender(tree()), answerPlan };
+  // A new flags object, as the flags service hands out when an answer changes.
+  const setFlag = ({ name, on }: { name: string; on: boolean }) => {
+    answers = { ...answers, [name]: on };
+    flags = flagsAnswering(answers);
+    result.rerender(tree());
+  };
+  return {
+    host,
+    rerender: () => result.rerender(tree()),
+    answerPlan,
+    setFlag,
+    mounted: () => mounted,
+  };
 }
 
 export const confirmStrict = async () =>
