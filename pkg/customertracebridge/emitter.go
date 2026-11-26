@@ -39,8 +39,13 @@ const (
 	// marker must never reach either project.
 	attrMirrorTier      = attribute.Key("langwatch.reserved.mirror_tier")
 	attrMirrorSourceOrg = attribute.Key("langwatch.reserved.mirror_source_org")
-	// attrOrgID names the SOURCE organization on the mirror copy — the same
-	// ADR-053 Track A key convention the gateway's own tracer uses.
+	// attrMirrorCopySourceOrg / attrMirrorCopySourceProject ride only on the
+	// mirror copy, from mirrorExporter to resourceScrubExporter, which moves
+	// them onto the copy's resource and off the span.
+	attrMirrorCopySourceOrg     = attribute.Key("langwatch.reserved.mirror_copy_source_org")
+	attrMirrorCopySourceProject = attribute.Key("langwatch.reserved.mirror_copy_source_project")
+	// attrOrgID names the SOURCE organization on the mirror copy's resource,
+	// the same ADR-053 Track A key convention the gateway's own tracer uses.
 	attrOrgID = attribute.Key("langwatch.organization_id")
 )
 
@@ -112,7 +117,8 @@ func (d dropFilterExporter) Shutdown(ctx context.Context) error {
 // customer spans in production. Scrubbing at the export boundary holds
 // regardless of how the provider was built.
 //
-// It also removes the reserved ADR-061 mirror markers. This exporter is in the
+// It also removes the reserved ADR-061 mirror markers, lifting a mirror
+// copy's source tenant onto its resource first. This exporter is in the
 // chain whether or not a mirror is armed, so the markers never reach a project
 // even on an install with no mirror (the self-hosted default).
 //
@@ -128,7 +134,7 @@ func (r resourceScrubExporter) ExportSpans(ctx context.Context, spans []sdktrace
 	scrubbed := make([]sdktrace.ReadOnlySpan, 0, len(spans))
 	for _, s := range spans {
 		stub := tracetest.SpanStubFromReadOnlySpan(s)
-		stub.Resource = r.policy.ApplyResource(s.Resource())
+		stub.Resource = withMirrorSource(r.policy.ApplyResource(s.Resource()), stub.Attributes)
 		stub.Attributes = withoutMirrorMarkers(stub.Attributes)
 		scrubbed = append(scrubbed, stub.Snapshot())
 	}
