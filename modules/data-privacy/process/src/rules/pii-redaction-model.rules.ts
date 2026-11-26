@@ -55,3 +55,28 @@ export function piiRedactionModelTargetOf(setting: string | undefined): PiiRedac
 export function batchCharactersOf(texts: readonly string[]): number {
   return texts.reduce((total, text) => total + text.length, 0);
 }
+
+/** The failure's class name only: a refusal's message may quote the analysed text. */
+export function failureName(error: unknown): string {
+  return error instanceof Error ? error.name : typeof error;
+}
+
+/** A timeout or a throttle means the model is unavailable now; anything else is a refusal. */
+export function failureOutcomeOf(error: unknown): "timeout" | "throttled" | "error" {
+  if (isTimeout(error)) return "timeout";
+  if (isThrottled(error)) return "throttled";
+  return "error";
+}
+
+/** An abort at the time cap: the Lambda SDK and fetch both name it AbortError. */
+function isTimeout(error: unknown): boolean {
+  return error instanceof Error && (error.name === "AbortError" || error.name === "TimeoutError");
+}
+
+/** Lambda's own throttle, which the SDK names after the error code since it is not retried. */
+function isThrottled(error: unknown): boolean {
+  return (
+    error instanceof Error &&
+    (error.name === "TooManyRequestsException" || error.name === "ThrottlingException")
+  );
+}

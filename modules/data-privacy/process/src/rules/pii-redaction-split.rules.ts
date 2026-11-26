@@ -210,6 +210,17 @@ export function fitsSpanBudget({
   return Math.max(...busyUntil) <= PII_REDACTION_MODEL_SPAN_BUDGET_MS;
 }
 
+/** The text one piece sends: its slice of its batch text. */
+export function pieceTextOf({
+  texts,
+  piece,
+}: {
+  texts: readonly string[];
+  piece: SplitPiece;
+}): string {
+  return (texts[piece.text] ?? "").slice(piece.start, piece.end);
+}
+
 /**
  * Whether the model's offsets for this cut piece index its raw characters (decision 5): no
  * backslash it could unfold as JSON, nothing at either end it would trim.

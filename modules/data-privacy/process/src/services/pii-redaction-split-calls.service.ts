@@ -1,0 +1,180 @@
+import { ConcurrencyLimiter } from "@langwatch/limiter";
+import type { PIIRedactionLevel } from "@langwatch/trace-contract";
+
+import { failureOutcomeOf } from "../rules/pii-redaction-model.rules.ts";
+import {
+  PII_REDACTION_MODEL_ABORTED_SLOT_HOLD_MS,
+  PII_REDACTION_MODEL_SPAN_BUDGET_MS,
+  PII_REDACTION_MODEL_SPLIT_SLOTS,
+  type PieceAnswer,
+  pieceTextOf,
+  type SplitCall,
+} from "../rules/pii-redaction-split.rules.ts";
+import type { PresidioRedactionService } from "./presidio-redaction.service.ts";
+
+/** How a split span's calls ended: every answer, or the first failure that ends the span. */
+export type SplitOutcome =
+  | Readonly<{ kind: "answered"; answers: PieceAnswer[]; callDurationsMs: number[] }>
+  | Readonly<{ kind: "failed"; reason: "timeout" | "throttled" | "error"; error?: unknown }>;
+
+/** What a split span's calls send of its batch. */
+type SplitCallsInput = {
+  texts: readonly string[];
+  piiRedactionLevel: PIIRedactionLevel;
+  entities?: readonly string[] | undefined;
+  projectId?: string | undefined;
+};
+
+/**
+ * A split span's calls to the split model (ADR-207) over the process's split slots: the free
+ * slots taken at once, never waited for, and one budget for every call of the span.
+ */
+export class PiiRedactionSplitCallsService {
+  static create(input: {
+    split: PresidioRedactionService | undefined;
+    slots?: ConcurrencyLimiter | undefined;
+  }): PiiRedactionSplitCallsService {
+    return new PiiRedactionSplitCallsService({
+      split: input.split,
+      slots:
+        input.slots ??
+        new ConcurrencyLimiter({ maxConcurrent: PII_REDACTION_MODEL_SPLIT_SLOTS, maxQueued: 0 }),
+    });
+  }
+
+  private readonly split: PresidioRedactionService | undefined;
+  /** Per process: the split calls in flight, the same two slots for every span (decision 9). */
+  private readonly slots: ConcurrencyLimiter;
+
+  private constructor(input: {
+    split: PresidioRedactionService | undefined;
+    slots: ConcurrencyLimiter;
+  }) {
+    this.split = input.split;
+    this.slots = input.slots;
+  }
+
+  /** Whether a split model is set: asked of its channel once, like the model's. */
+  async isSplitting(): Promise<boolean> {
+    if (!this.split) return false;
+    try {
+      return await this.split.isConfigured();
+    } catch {
+      return false;
+    }
+  }
+
+  /** How many split slots are free now. */
+  freeSlots(): number {
+    return PII_REDACTION_MODEL_SPLIT_SLOTS - this.slots.stats().inFlight;
+  }
+
+  /**
+   * The span's calls over `slots` slots it takes now, each slot running calls one after another.
+   * Resolves at the first failure or the budget's end; calls still running finish on their own.
+   */
+  run({
+    input,
+    calls,
+    slots,
+    onUnavailable,
+  }: {
+    input: SplitCallsInput;
+    calls: readonly SplitCall[];
+    slots: number;
+    onUnavailable: () => void;
+  }): Promise<SplitOutcome> {
+    const split = this.split;
+    if (!split) return Promise.resolve({ kind: "failed", reason: "error" });
+    const abort = new AbortController();
+    return new Promise<SplitOutcome>((resolve) => {
+      const run: SplitRun = {
+        calls,
+        next: 0,
+        answers: [],
+        callDurationsMs: [],
+        ended: false,
+        onUnavailable,
+        answer: (splitCall) =>
+          split.answers({
+            texts: splitCall.pieces.map((piece) => pieceTextOf({ texts: input.texts, piece })),
+            piiRedactionLevel: input.piiRedactionLevel,
+            entities: input.entities,
+            projectId: input.projectId,
+            signal: abort.signal,
+          }),
+        end: (outcome) => {
+          if (run.ended) return;
+          run.ended = true;
+          clearTimeout(budget);
+          if (outcome.kind === "failed" && outcome.reason === "timeout") abort.abort();
+          resolve(outcome);
+        },
+      };
+      const budget = setTimeout(
+        () => run.end({ kind: "failed", reason: "timeout" }),
+        PII_REDACTION_MODEL_SPAN_BUDGET_MS,
+      );
+      for (let slot = 0; slot < slots; slot++) {
+        void this.slots.run({ task: () => runSplitSlot(run) }).catch(() => void 0);
+      }
+    });
+  }
+}
+
+/** One split span's calls as its slots share them. */
+type SplitRun = {
+  readonly calls: readonly SplitCall[];
+  next: number;
+  readonly answers: PieceAnswer[];
+  readonly callDurationsMs: number[];
+  ended: boolean;
+  readonly answer: (call: SplitCall) => Promise<{ findings: unknown; anonymized: unknown }[]>;
+  readonly end: (outcome: SplitOutcome) => void;
+  /** A call timed out or was throttled, even after the span ended: the breaker must hear it. */
+  readonly onUnavailable: () => void;
+};
+
+/** One slot: the span's next call until none is left, the span ended or a call failed. */
+async function runSplitSlot(run: SplitRun): Promise<void> {
+  while (!run.ended && run.next < run.calls.length) {
+    const splitCall = run.calls[run.next++];
+    if (!splitCall || !(await runSplitCall({ run, splitCall }))) return;
+  }
+}
+
+/**
+ * One call; false when it failed. A call our abort rejected keeps its slot until the model's
+ * own deadline has passed, so the slots never count as free what the model may still run.
+ */
+async function runSplitCall({
+  run,
+  splitCall,
+}: {
+  run: SplitRun;
+  splitCall: SplitCall;
+}): Promise<boolean> {
+  // Monotonic, as the single call's: a wall-clock step never makes a duration or a hold wrong.
+  const startedAt = performance.now();
+  try {
+    const answered = await run.answer(splitCall);
+    run.callDurationsMs.push(Math.round(performance.now() - startedAt));
+    for (const [i, piece] of splitCall.pieces.entries()) {
+      const answer = answered[i];
+      // A missing answer fails the span: a default of no findings would store the piece raw.
+      if (!answer) throw new Error("PII redaction split model left a piece unanswered");
+      run.answers.push({ piece, ...answer });
+    }
+    if (run.callDurationsMs.length === run.calls.length) {
+      run.end({ kind: "answered", answers: run.answers, callDurationsMs: run.callDurationsMs });
+    }
+    return true;
+  } catch (error) {
+    const reason = failureOutcomeOf(error);
+    if (reason !== "error") run.onUnavailable();
+    run.end({ kind: "failed", reason, error });
+    const holdMs = startedAt + PII_REDACTION_MODEL_ABORTED_SLOT_HOLD_MS - performance.now();
+    if (reason === "timeout" && holdMs > 0) await new Promise((wake) => setTimeout(wake, holdMs));
+    return false;
+  }
+}

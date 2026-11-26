@@ -1,13 +1,15 @@
 import type { PiiLevel } from "@langwatch/data-privacy-contract";
 import { type EntitlementApi, isEnterpriseTier } from "@langwatch/entitlement-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
-import { ConcurrencyLimiter } from "@langwatch/limiter";
+import type { ConcurrencyLimiter } from "@langwatch/limiter";
 import { createLogger } from "@langwatch/observability";
 import { nowInstant } from "@langwatch/time";
 import type { PIIRedactionLevel } from "@langwatch/trace-contract";
 
 import {
   batchCharactersOf,
+  failureName,
+  failureOutcomeOf,
   PII_REDACTION_MODEL_BREAKER_COOLDOWN_MS,
   PII_REDACTION_MODEL_FLAG,
 } from "../rules/pii-redaction-model.rules.ts";
@@ -15,13 +17,9 @@ import {
   clearSplitSpan,
   fitsSpanBudget,
   isPlaceablePiece,
-  PII_REDACTION_MODEL_ABORTED_SLOT_HOLD_MS,
-  PII_REDACTION_MODEL_SPAN_BUDGET_MS,
-  PII_REDACTION_MODEL_SPLIT_SLOTS,
-  type PieceAnswer,
+  pieceTextOf,
   planSpan,
   type SplitCall,
-  type SplitPiece,
   splitFindingsCount,
 } from "../rules/pii-redaction-split.rules.ts";
 import type { DataPrivacyProjectScopeService } from "./data-privacy-project-scope.service.ts";
@@ -30,6 +28,7 @@ import type {
   PiiRedactionModelFallbackReason,
 } from "./pii-analysis-metrics-otel.service.ts";
 import type { PiiRedactionSpendService } from "./pii-redaction-spend.service.ts";
+import { PiiRedactionSplitCallsService } from "./pii-redaction-split-calls.service.ts";
 import type { PresidioRedactionService } from "./presidio-redaction.service.ts";
 import { ProjectLookupCacheService } from "./project-lookup-cache.service.ts";
 
@@ -82,11 +81,6 @@ type BreakerAdmission = "call" | "probe";
 
 /** The single-call model and the split model trip apart, so long spans never stop short ones. */
 type BreakerKind = "single" | "split";
-
-/** How a split span's calls ended: every answer, or the first failure that ends the span. */
-type SplitOutcome =
-  | Readonly<{ kind: "answered"; answers: PieceAnswer[]; callDurationsMs: number[] }>
-  | Readonly<{ kind: "failed"; reason: "timeout" | "throttled" | "error"; error?: unknown }>;
 
 /** One strict-analysis batch, as the redaction pass hands it to Presidio. */
 type ModelClearInput = {
@@ -144,9 +138,8 @@ export class PiiRedactionModelService {
     split: { kind: "closed" },
   };
   private readonly model: PresidioRedactionService;
-  private readonly split: PresidioRedactionService | undefined;
-  /** Per process: the split calls in flight, the same two slots for every span (decision 9). */
-  private readonly splitSlots: ConcurrencyLimiter;
+  /** The split model's calls over the process's split slots (ADR-207). */
+  private readonly splitCalls: PiiRedactionSplitCallsService;
   private readonly featureFlags: FeatureFlagApi;
   private readonly scopes: DataPrivacyProjectScopeService;
   private readonly selfHosted: boolean;
@@ -170,10 +163,10 @@ export class PiiRedactionModelService {
     now: () => number;
   }) {
     this.model = input.model;
-    this.split = input.split;
-    this.splitSlots =
-      input.splitSlots ??
-      new ConcurrencyLimiter({ maxConcurrent: PII_REDACTION_MODEL_SPLIT_SLOTS, maxQueued: 0 });
+    this.splitCalls = PiiRedactionSplitCallsService.create({
+      split: input.split,
+      slots: input.splitSlots,
+    });
     this.featureFlags = input.featureFlags;
     this.scopes = input.scopes;
     this.selfHosted = input.selfHosted;
@@ -219,7 +212,7 @@ export class PiiRedactionModelService {
       return null;
     }
     const { organizationId } = routing;
-    const plan = planSpan({ texts: input.texts, splitting: await this.#isSplitting() });
+    const plan = planSpan({ texts: input.texts, splitting: await this.splitCalls.isSplitting() });
     if (plan.kind === "too_long") {
       this.metrics.modelFellBack("too_long");
       this.log.info({ ...call, findings: 0, outcome: "too_long", durationMs: 0 }, USAGE_MESSAGE);
@@ -271,16 +264,6 @@ export class PiiRedactionModelService {
     }
   }
 
-  /** Whether a split model is set: asked of its channel once, like the model's. */
-  async #isSplitting(): Promise<boolean> {
-    if (!this.split) return false;
-    try {
-      return await this.split.isConfigured();
-    } catch {
-      return false;
-    }
-  }
-
   /**
    * A long batch through the split model (ADR-207): the free slots taken at once, never waited
    * for; one 50 s budget for every call; the first failure sends the whole span to Presidio.
@@ -314,10 +297,7 @@ export class PiiRedactionModelService {
       .filter((piece) => !piece.whole)
       .every((p) => isPlaceablePiece(pieceTextOf({ texts: input.texts, piece: p })));
     if (!placeable) return fallBack("unplaceable");
-    const slots = Math.min(
-      PII_REDACTION_MODEL_SPLIT_SLOTS - this.splitSlots.stats().inFlight,
-      calls.length,
-    );
+    const slots = Math.min(this.splitCalls.freeSlots(), calls.length);
     if (slots < 1 || !fitsSpanBudget({ calls, slots })) return fallBack("busy");
     const admission = this.#admit("split");
     if (!admission) return fallBack("breaker_open");
@@ -329,7 +309,7 @@ export class PiiRedactionModelService {
       late.unavailable = true;
       if (late.settled) this.#openBreaker("split");
     };
-    const outcome = await this.#runSplitCalls({ input, calls, slots, onUnavailable });
+    const outcome = await this.splitCalls.run({ input, calls, slots, onUnavailable });
     const durationMs = elapsedSince(startedAt);
     late.settled = true;
     if (outcome.kind === "failed") {
@@ -369,58 +349,6 @@ export class PiiRedactionModelService {
       callDurationsMs: outcome.callDurationsMs,
     });
     return cleared;
-  }
-
-  /**
-   * The span's calls over `slots` slots it takes now, each slot running calls one after another.
-   * Resolves at the first failure or the budget's end; calls still running finish on their own.
-   */
-  #runSplitCalls({
-    input,
-    calls,
-    slots,
-    onUnavailable,
-  }: {
-    input: ModelClearInput;
-    calls: readonly SplitCall[];
-    slots: number;
-    onUnavailable: () => void;
-  }): Promise<SplitOutcome> {
-    const split = this.split;
-    if (!split) return Promise.resolve({ kind: "failed", reason: "error" });
-    const abort = new AbortController();
-    return new Promise<SplitOutcome>((resolve) => {
-      const run: SplitRun = {
-        calls,
-        next: 0,
-        answers: [],
-        callDurationsMs: [],
-        ended: false,
-        onUnavailable,
-        answer: (splitCall) =>
-          split.answers({
-            texts: splitCall.pieces.map((piece) => pieceTextOf({ texts: input.texts, piece })),
-            piiRedactionLevel: input.piiRedactionLevel,
-            entities: input.entities,
-            projectId: input.projectId,
-            signal: abort.signal,
-          }),
-        end: (outcome) => {
-          if (run.ended) return;
-          run.ended = true;
-          clearTimeout(budget);
-          if (outcome.kind === "failed" && outcome.reason === "timeout") abort.abort();
-          resolve(outcome);
-        },
-      };
-      const budget = setTimeout(
-        () => run.end({ kind: "failed", reason: "timeout" }),
-        PII_REDACTION_MODEL_SPAN_BUDGET_MS,
-      );
-      for (let slot = 0; slot < slots; slot++) {
-        void this.splitSlots.run({ task: () => runSplitSlot(run) }).catch(() => void 0);
-      }
-    });
   }
 
   /** Whether a batch may call the model now, and how; null while the breaker is open. */
@@ -509,92 +437,6 @@ export class PiiRedactionModelService {
       return organizationId;
     });
   }
-}
-
-/** One split span's calls as its slots share them. */
-type SplitRun = {
-  readonly calls: readonly SplitCall[];
-  next: number;
-  readonly answers: PieceAnswer[];
-  readonly callDurationsMs: number[];
-  ended: boolean;
-  readonly answer: (call: SplitCall) => Promise<{ findings: unknown; anonymized: unknown }[]>;
-  readonly end: (outcome: SplitOutcome) => void;
-  /** A call timed out or was throttled, even after the span ended: the breaker must hear it. */
-  readonly onUnavailable: () => void;
-};
-
-function pieceTextOf({ texts, piece }: { texts: readonly string[]; piece: SplitPiece }): string {
-  return (texts[piece.text] ?? "").slice(piece.start, piece.end);
-}
-
-/** One slot: the span's next call until none is left, the span ended or a call failed. */
-async function runSplitSlot(run: SplitRun): Promise<void> {
-  while (!run.ended && run.next < run.calls.length) {
-    const splitCall = run.calls[run.next++];
-    if (!splitCall || !(await runSplitCall({ run, splitCall }))) return;
-  }
-}
-
-/**
- * One call; false when it failed. A call our abort rejected keeps its slot until the model's
- * own deadline has passed, so the slots never count as free what the model may still run.
- */
-async function runSplitCall({
-  run,
-  splitCall,
-}: {
-  run: SplitRun;
-  splitCall: SplitCall;
-}): Promise<boolean> {
-  // Monotonic, as the single call's: a wall-clock step never makes a duration or a hold wrong.
-  const startedAt = performance.now();
-  try {
-    const answered = await run.answer(splitCall);
-    run.callDurationsMs.push(elapsedSince(startedAt));
-    for (const [i, piece] of splitCall.pieces.entries()) {
-      const answer = answered[i];
-      // A missing answer fails the span: a default of no findings would store the piece raw.
-      if (!answer) throw new Error("PII redaction split model left a piece unanswered");
-      run.answers.push({ piece, ...answer });
-    }
-    if (run.callDurationsMs.length === run.calls.length) {
-      run.end({ kind: "answered", answers: run.answers, callDurationsMs: run.callDurationsMs });
-    }
-    return true;
-  } catch (error) {
-    const reason = failureOutcomeOf(error);
-    if (reason !== "error") run.onUnavailable();
-    run.end({ kind: "failed", reason, error });
-    const holdMs = startedAt + PII_REDACTION_MODEL_ABORTED_SLOT_HOLD_MS - performance.now();
-    if (reason === "timeout" && holdMs > 0) await new Promise((wake) => setTimeout(wake, holdMs));
-    return false;
-  }
-}
-
-/** The failure's class name only: a refusal's message may quote the analysed text. */
-function failureName(error: unknown): string {
-  return error instanceof Error ? error.name : typeof error;
-}
-
-/** An abort at the time cap: the Lambda SDK and fetch both name it AbortError. */
-function isTimeout(error: unknown): boolean {
-  return error instanceof Error && (error.name === "AbortError" || error.name === "TimeoutError");
-}
-
-/** A timeout or a throttle means the model is unavailable now; anything else is a refusal. */
-function failureOutcomeOf(error: unknown): "timeout" | "throttled" | "error" {
-  if (isTimeout(error)) return "timeout";
-  if (isThrottled(error)) return "throttled";
-  return "error";
-}
-
-/** Lambda's own throttle, which the SDK names after the error code since it is not retried. */
-function isThrottled(error: unknown): boolean {
-  return (
-    error instanceof Error &&
-    (error.name === "TooManyRequestsException" || error.name === "ThrottlingException")
-  );
 }
 
 function elapsedSince(startedAt: number): number {
