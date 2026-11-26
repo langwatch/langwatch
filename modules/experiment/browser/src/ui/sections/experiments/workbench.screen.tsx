@@ -15,6 +15,10 @@ import { useReportPageActivityToLangy } from "../../../behavior/experiments-v3/u
 import { useSavedDatasetLoader } from "../../../behavior/experiments-v3/use-saved-dataset-loader.ts";
 import { useTargetNames } from "../../../behavior/experiments-v3/use-target-name.ts";
 import {
+  useWorkbenchAccess,
+  useWorkbenchAccessRefusal,
+} from "../../../behavior/experiments-v3/use-workbench-access.ts";
+import {
   useDatasetProposalHandlers,
   useEvaluatorProposalHandlers,
   usePromptProposalHandlers,
@@ -28,6 +32,7 @@ import { AutosaveStatus } from "../../../ui/elements/experiments-v3/autosave-sta
 import { EditableHeading } from "../../../ui/elements/experiments-v3/editable-heading.tsx";
 import { WorkbenchRowsCutBanner } from "../../../ui/elements/experiments-v3/workbench-rows-cut-banner.tsx";
 import { WorkbenchStaleStatus } from "../../../ui/elements/experiments-v3/workbench-stale-status.tsx";
+import { WorkbenchViewOnlyBanner } from "../../../ui/elements/experiments-v3/workbench-view-only-banner.tsx";
 import { EvaluationsV3Table } from "../../../ui/sections/experiments-v3/evaluations-v3-table.tsx";
 import { HistoryButton } from "../../../ui/sections/experiments-v3/history-button.tsx";
 import { PromptTemplateFieldsProvider } from "../../../ui/sections/experiments-v3/prompt-template-fields-provider.tsx";
@@ -92,6 +97,10 @@ export default function ExperimentsWorkbenchPage() {
   // integration point; undefined while flagged off, which hides the menu item.
   const optimizeTarget = useOptimizeWithLangy();
 
+  // What the reader's role allows; a refused save narrows it for the rest of the visit.
+  const access = useWorkbenchAccess();
+  const resetAccessRefusal = useWorkbenchAccessRefusal((state) => state.reset);
+
   // Enable autosave for evaluation state - this also handles loading existing experiments
   const {
     isLoading: isLoadingExperiment,
@@ -103,6 +112,7 @@ export default function ExperimentsWorkbenchPage() {
     reloadFromServer,
     saveNow,
   } = useAutosaveEvaluationsV3();
+  const isViewOnly = !access.maySave || !access.mayRun;
 
   // A save that lands elsewhere (Langy's backend fallback, the API, another
   // tab) reloads a clean workbench silently and banners a dirty one.
@@ -158,6 +168,7 @@ export default function ExperimentsWorkbenchPage() {
     return () => {
       resetAutosave();
       reset();
+      resetAccessRefusal();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -212,6 +223,7 @@ export default function ExperimentsWorkbenchPage() {
                 />
               ) : (
                 <AutosaveStatus
+                  viewOnly={!access.maySave}
                   evaluationState={autosaveStatus.evaluation}
                   datasetState={autosaveStatus.dataset}
                   evaluationError={autosaveStatus.evaluationError}
@@ -222,7 +234,10 @@ export default function ExperimentsWorkbenchPage() {
               <TableSettingsMenu disabled={isLoadingExperiment} />
               <HistoryButton disabled={isLoadingExperiment} />
               <VersionHistoryButton disabled={isLoadingExperiment} />
-              <RunEvaluationButton disabled={isLoadingExperiment || isLoadingDatasets} />
+              <RunEvaluationButton
+                disabled={isLoadingExperiment || isLoadingDatasets}
+                mayRun={access.mayRun}
+              />
             </>
           }
         >
@@ -234,6 +249,7 @@ export default function ExperimentsWorkbenchPage() {
           />
         </PageLayout.Header>
 
+        {isViewOnly && <WorkbenchViewOnlyBanner access={access} />}
         {activeRowsCut && <WorkbenchRowsCutBanner cut={activeRowsCut} />}
 
         {/* The grid: one framed, scrolling surface inset like every page body. */}
