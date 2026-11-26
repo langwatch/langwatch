@@ -1,3 +1,4 @@
+import { AccessNotGrantedError, type Authorization } from "@langwatch/authorization";
 import type {
   CodingAgentSessionCursor,
   CodingAgentSessionEvent,
@@ -5,6 +6,7 @@ import type {
 } from "@langwatch/coding-agent-contract";
 
 import { utcDayOf } from "../../rules/coding-agent-account.rules.ts";
+import { tracesFenceOf } from "../../rules/coding-agent-traces-fence.rules.ts";
 import {
   type AccountUsageGroupRow,
   CodingAgentSessionEventRepository,
@@ -96,13 +98,18 @@ export class MemoryCodingAgentSessionEventRepository extends CodingAgentSessionE
   }
 
   async summariseAccountUsage(input: {
-    tenantId: string;
+    authorization: Authorization;
     fromMs: number;
     toMs: number;
   }): Promise<AccountUsageGroupRow[]> {
+    const fence = tracesFenceOf(input.authorization);
+    if (fence.kind === "refused") throw new AccessNotGrantedError("traces:view");
+    const inFence = fence.admits;
     const groups = new Map<string, AccountUsageGroupRow>();
     const held = this.memory.sessionEvents
-      .filter((row) => row.tenantId === input.tenantId && row.accountId !== "")
+      .filter(
+        (row) => row.accountId !== "" && inFence({ tenantId: row.tenantId, atMs: row.timeUnixMs }),
+      )
       .filter((row) => row.eventKind === "model_call" || row.eventKind === "rate_limit")
       .filter((row) => row.timeUnixMs >= input.fromMs && row.timeUnixMs < input.toMs)
       .toSorted(byTimeThenRecordId);

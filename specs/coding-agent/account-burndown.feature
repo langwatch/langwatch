@@ -84,6 +84,12 @@ Feature: Subscription account burndown
     Then only that project's accounts and figures are returned
 
   @integration
+  Scenario: an aggregate project shows the accounts of its member projects
+    Given an aggregate project whose members recorded sessions on different accounts
+    When a viewer reads the aggregate's week
+    Then the accounts of every member project are shown, the same projects as the sessions list
+
+  @integration
   Scenario: sessions sent with a project key show their accounts
     Given sessions that a launcher sent with a project ingestion key and no user
     When the project's usage is read

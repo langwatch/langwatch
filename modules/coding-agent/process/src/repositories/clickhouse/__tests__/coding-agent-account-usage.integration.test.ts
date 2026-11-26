@@ -1,12 +1,13 @@
 /**
  * The subscription-account week through its real SQL against a migrated ClickHouse (00136): the
  * newest reading wins, a newer row without a limit clears an older limit, a redelivered row
- * counts once, and one project never sees another's accounts.
+ * counts once, one project never sees another's accounts, and an aggregate spans its members.
  * @see specs/coding-agent/account-burndown.feature
  */
 import { randomUUID } from "node:crypto";
 
 import type { ClickHouseClient } from "@clickhouse/client";
+import { sealAuthorization } from "@langwatch/authorization";
 import { vendorQueryClient } from "@langwatch/clickhouse-client/testing";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
@@ -110,11 +111,34 @@ afterAll(async () => {
   await ch.close();
 });
 
-function readWeek(tenant: string, canSeeCosts = true) {
+/** The proof the traces:view door mints; an aggregate's shares its members under trace windows. */
+function proofFor(tenants: readonly string[]) {
+  const actor = { type: "user", id: `${tag}-viewer` } as const;
+  const [own, ...shared] = tenants.length === 1 ? tenants : [`${tag}-aggregate`, ...tenants];
+  return sealAuthorization({
+    actor,
+    principal: actor,
+    scope: { organizationId: `${tag}-organization` },
+    grants: [
+      { projectId: own!, permissions: ["traces:view"], via: [], kind: "own" as const },
+      ...shared.map((projectId) => ({
+        projectId,
+        permissions: ["traces:view" as const],
+        via: [`${tag}-grant`],
+        kind: "shared" as const,
+        condition: { type: "trace" as const, from: 0, until: null },
+      })),
+    ],
+    expiresAt: Date.now() + 5 * 60 * 1000,
+    purpose: { kind: "route", route: "test" },
+  });
+}
+
+function readWeek(tenant: string | readonly string[], canSeeCosts = true) {
   return CodingAgentAccountBurndownService.create({
     sessionEvents: repository,
     clock: { nowMs: () => nowMs },
-  }).readWeek({ projectId: tenant, canSeeCosts });
+  }).readWeek({ authorization: proofFor([tenant].flat()), canSeeCosts });
 }
 
 describe.skipIf(clickHouseUrl === null)("subscription account week on ClickHouse", () => {
@@ -161,6 +185,15 @@ describe.skipIf(clickHouseUrl === null)("subscription account week on ClickHouse
 
     expect(page.accounts.map((account) => account.accountId)).toEqual([ACCOUNT]);
     expect(other.accounts.map((account) => account.accountId)).toEqual(["other-account"]);
+  });
+
+  /** @scenario an aggregate project shows the accounts of its member projects */
+  it("spans every project the proof fences, as the sessions list does", async () => {
+    const page = await readWeek([projectId, otherProjectId]);
+
+    expect(page.accounts.map((account) => account.accountId).toSorted()).toEqual(
+      [ACCOUNT, "other-account"].toSorted(),
+    );
   });
 
   /** @scenario sessions sent with a project key show their accounts */

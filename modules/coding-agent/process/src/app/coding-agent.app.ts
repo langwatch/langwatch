@@ -461,7 +461,7 @@ export class CodingAgentModule implements CodingAgentApi {
     });
 
     return this.#accountBurndown.readWeek({
-      projectId: input.projectId,
+      authorization: input.authorization,
       canSeeCosts: visibility.canSeeCosts,
     });
   }

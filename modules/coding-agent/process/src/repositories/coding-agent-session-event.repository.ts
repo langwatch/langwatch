@@ -1,3 +1,4 @@
+import type { Authorization } from "@langwatch/authorization";
 import type {
   CodingAgentAccountReading,
   CodingAgentSessionCursor,
@@ -28,11 +29,12 @@ export abstract class CodingAgentSessionEventRepository {
   }): Promise<SessionModelTotalsRow[]>;
 
   /**
-   * One project's model calls and rate-limit rows that name an account, deduplicated and grouped
-   * by account, UTC day, agent and model, with the newest name, source and reading per group.
+   * The model calls and rate-limit rows a proof may read that name an account, deduplicated and
+   * grouped by account, UTC day, agent and model, with the newest name, source and reading per
+   * group.
    */
   abstract summariseAccountUsage(input: {
-    tenantId: string;
+    authorization: Authorization;
     fromMs: number;
     toMs: number;
   }): Promise<AccountUsageGroupRow[]>;

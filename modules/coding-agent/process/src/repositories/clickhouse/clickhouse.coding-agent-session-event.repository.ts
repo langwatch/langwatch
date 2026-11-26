@@ -1,4 +1,10 @@
-import { type ClickHouseQueryClient, type IdBoundOptions } from "@langwatch/clickhouse-client";
+import type { Authorization } from "@langwatch/authorization";
+import {
+  AuthorizedClickHouse,
+  type ClickHouseQueryClient,
+  type IdBoundOptions,
+} from "@langwatch/clickhouse-client";
+import { tenantScope } from "@langwatch/clickhouse-markers";
 import type {
   CodingAgentSessionEvent,
   CodingAgentSessionEventRecord,
@@ -182,10 +188,17 @@ export class CodingAgentSessionEventsClickHouseRepository implements SessionEven
     return new CodingAgentSessionEventsClickHouseRepository(clickhouse, defaultTraceRetentionDays);
   }
 
+  /** The proof-checked reader the account read goes through, as the sessions list (ADR-177). */
+  private readonly authorized: AuthorizedClickHouse;
+
   private constructor(
     private readonly clickhouse: ClickHouseQueryClient,
     private readonly defaultTraceRetentionDays: number,
-  ) {}
+  ) {
+    this.authorized = new AuthorizedClickHouse({
+      resolveClient: () => Promise.resolve(clickhouse),
+    });
+  }
 
   async ensure(records: CodingAgentSessionEventRecord[], retentionDays?: number): Promise<void> {
     const [first] = records;
@@ -567,26 +580,20 @@ export class CodingAgentSessionEventsClickHouseRepository implements SessionEven
   }
 
   async summariseAccountUsage({
-    tenantId,
+    authorization,
     fromMs,
     toMs,
   }: {
-    tenantId: string;
+    authorization: Authorization;
     fromMs: number;
     toMs: number;
   }): Promise<AccountUsageGroupRow[]> {
-    EventUtils.validateTenantId(
-      { tenantId },
-      "CodingAgentSessionEventsClickHouseRepository.summariseAccountUsage",
-    );
+    const reader = this.authorized.as(authorization, { reads: "traces" });
     // Aggregates skip NULL, so each reported value rides a one-element tuple: the newest row's
     // own NULL (no limit any more) must win over an older limit. RecordId breaks key ties.
-    const { rows } = await this.clickhouse.query<ClickHouseAccountGroupRow>({
-      tenantId,
-      table: TABLE_NAME,
-      kind: "read",
-      // ID_BOUND_SKIP: one project's trailing week, bounded by the caller's own window.
-      sql: `
+    // ID_BOUND_SKIP: the fence's trailing week, bounded by the caller's own window.
+    const result = await reader.query<ClickHouseAccountGroupRow>({
+      query: `
         SELECT
           AccountId,
           toString(toDate(TimeUnixMs, 'UTC')) AS Day,
@@ -624,18 +631,20 @@ export class CodingAgentSessionEventsClickHouseRepository implements SessionEven
               toUnixTimestamp64Milli(TimeUnixMs)
             ) AS ReadingKeyMs
           FROM ${TABLE_NAME}
-          WHERE TenantId = {tenantId:String}
+          WHERE ${tenantScope("TimeUnixMs")}
             AND TimeUnixMs >= fromUnixTimestamp64Milli({fromMs:Int64})
             AND TimeUnixMs < fromUnixTimestamp64Milli({toMs:Int64})
             AND AccountId != ''
             AND EventKind IN ('model_call', 'rate_limit')
-          ORDER BY SessionId, TimeUnixMs, RecordId, UpdatedAt DESC
-          LIMIT 1 BY SessionId, TimeUnixMs, RecordId
+          ORDER BY TenantId, SessionId, TimeUnixMs, RecordId, UpdatedAt DESC
+          LIMIT 1 BY TenantId, SessionId, TimeUnixMs, RecordId
         )
         GROUP BY AccountId, Day, Agent, Model
       `,
-      params: { tenantId, fromMs, toMs },
+      query_params: { fromMs, toMs },
+      format: "JSONEachRow",
     });
+    const rows = await result.json();
 
     return rows.map((row) => CodingAgentSessionEventsClickHouseRepository.mapAccountGroup(row));
   }

@@ -92,8 +92,8 @@ export interface CodingAgentApi {
   ): Promise<CodingAgentSessionEventsPage>;
   getUsageTotals(input: CodingAgentUsageTotalsInput): Promise<CodingAgentUsageTotals>;
   /**
-   * The trailing week per subscription account of this project's own sessions; an aggregate
-   * project's members are not included. Its cost follows `cost:view`.
+   * The trailing week per subscription account, over the same projects as the sessions list (an
+   * aggregate project spans its members). Its cost follows `cost:view`.
    */
   readAccountBurndownForViewer(
     input: { projectId: string; authorization: Authorization },
