@@ -1,7 +1,7 @@
 /**
- * Langy mirror history in the live shape (ADR-061): one trace per turn of gateway gen_ai.chat
- * spans, origin "langy", with no langy.turn root, which only the asking project receives.
- * A span carries only what the gateway stamps; the ingest derives the rest, as it does live.
+ * Langy history in the live shape (ADR-061): one trace per turn of gateway gen_ai.chat spans,
+ * origin "langy". The mirror copy also holds the relay's langy.turn root, and names the source
+ * organization and project on its resources. A span carries only what the live legs stamp.
  */
 import { type DemoDay, isWeekend } from "./dashboards-demo-days.ts";
 import { DemoRandom, hexId } from "./dashboards-demo-random.ts";
@@ -122,6 +122,8 @@ interface Turn {
   projectId: string;
   /** The organization the turn came from, which only the mirror copy names. */
   organizationId?: string;
+  /** The project the turn came from, which only the mirror copy names. */
+  sourceProjectId?: string;
   model: string;
 }
 
@@ -225,6 +227,7 @@ function langyTurn({
     turnSpanId: hexId({ key: `${traceId}:turn`, length: 16 }),
     projectId,
     organizationId,
+    sourceProjectId: organizationId ? projectId : undefined,
     model: random.weighted(MODELS),
   };
   const member = random.weighted(MEMBERS);
@@ -263,18 +266,90 @@ function langyTurn({
       clock = toolCall({ turn, step, random, start: clock, messages, command });
     }
   }
+  const finishedAt = clock + random.int({ min: 100, max: 800 });
   return {
     traceId,
-    finishedAt: clock + random.int({ min: 100, max: 800 }),
+    finishedAt,
     failed: Boolean(failure),
     export: {
       resourceSpans: [
         {
-          resource: { attributes: kv({ "langwatch.origin": "gateway" }) },
+          resource: { attributes: kv({ "langwatch.origin": "gateway", ...sourceTenant(turn) }) },
           scopeSpans: [{ scope: { name: "langwatch-service-aigateway" }, spans }],
         },
+        ...(turn.organizationId
+          ? [turnRoot({ turn, start: startedAt, end: finishedAt, failure })]
+          : []),
       ],
     },
+  };
+}
+
+/** The source tenant the mirror copy names on its resources; empty for the asking project. */
+function sourceTenant(turn: Turn): Attributes {
+  return {
+    ...(turn.organizationId ? { "langwatch.organization_id": turn.organizationId } : {}),
+    ...(turn.sourceProjectId ? { "langwatch.project_id": turn.sourceProjectId } : {}),
+  };
+}
+
+/** The relay's langy.turn root as the mirror receives it, with the turn's outcome. */
+function turnRoot({
+  turn,
+  start,
+  end,
+  failure,
+}: {
+  turn: Turn;
+  start: number;
+  end: number;
+  failure: Failure | undefined;
+}): object {
+  const conversationId = `conv_${hexId({ key: `${turn.key}:conversation`, length: 16 })}`;
+  return {
+    resource: {
+      attributes: kv({
+        "langwatch.origin": "langy",
+        "service.name": "langy",
+        "langwatch.thread.id": conversationId,
+        "gen_ai.conversation.id": conversationId,
+        ...sourceTenant(turn),
+      }),
+    },
+    scopeSpans: [
+      {
+        scope: { name: "langy-agent" },
+        spans: [
+          {
+            traceId: turn.traceId,
+            spanId: turn.turnSpanId,
+            parentSpanId: "",
+            name: "langy.turn",
+            kind: 2,
+            startTimeUnixNano: nanos(start),
+            endTimeUnixNano: nanos(end),
+            attributes: kv({
+              "langwatch.origin": "langy",
+              "gen_ai.conversation.id": conversationId,
+              ...(failure ? { "langy.outcome": "agent_error" } : {}),
+            }),
+            events: failure
+              ? [
+                  {
+                    name: "exception",
+                    timeUnixNano: nanos(end),
+                    attributes: kv({
+                      "exception.type": "agent_error",
+                      "exception.message": failure.type,
+                    }),
+                  },
+                ]
+              : [],
+            status: failure ? { code: 2, message: failure.type } : { code: 1 },
+          },
+        ],
+      },
+    ],
   };
 }
 
@@ -382,7 +457,6 @@ function modelCall({
     "langwatch.model_provider_id": MODEL_PROVIDER_ID,
     "langwatch.origin": "langy",
     "langwatch.project_id": turn.projectId,
-    ...(turn.organizationId ? { "langwatch.organization_id": turn.organizationId } : {}),
   };
   return {
     end,
