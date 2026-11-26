@@ -244,6 +244,13 @@ Feature: LangWatchQL queries on the dashboard
       Then costs and captured content are both hidden
 
     @unit
+    Scenario: Analytics hides content restricted to admins from a plain member, as the trace view does
+      Given a project whose captured input and output are restricted to admins
+      When the workbench resolves what a project Member may see
+      Then captured input and output are both hidden
+      And a project Admin still sees both
+
+    @unit
     Scenario: A thrown data-privacy read hides captured content rather than defaulting it open
       Given a member whose data-privacy policy read fails
       When the workbench resolves what that member may see

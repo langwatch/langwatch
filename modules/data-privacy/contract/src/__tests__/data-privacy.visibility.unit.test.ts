@@ -7,6 +7,7 @@ import {
   isContentVisible,
   isContentVisibleToPublic,
   needsAudienceFacts,
+  viewerFactsFrom,
   type ViewerFacts,
 } from "../data-privacy.visibility.ts";
 
@@ -156,5 +157,53 @@ describe("needsAudienceFacts and isContentVisibleToPublic", () => {
     expect(isContentVisibleToPublic(eff("capture"))).toBe(true);
     expect(isContentVisibleToPublic(eff("restrict", { admins: true }))).toBe(false);
     expect(isContentVisibleToPublic(eff("drop"))).toBe(false);
+  });
+});
+
+describe("viewerFactsFrom", () => {
+  const facts = (held: { view: boolean; update: boolean; manage: boolean }) =>
+    viewerFactsFrom({
+      held: {
+        "traces:view": held.view,
+        "traces:update": held.update,
+        "project:manage": held.manage,
+      },
+      isProjectOwner: false,
+      groupIds: [],
+    });
+
+  describe("given a project Member, who writes traces but does not manage the project", () => {
+    it("reads them as the Members role, not as an admin", () => {
+      expect(facts({ view: true, update: true, manage: false })).toMatchObject({
+        isAdmin: false,
+        isMemberRole: true,
+        isViewer: false,
+      });
+    });
+
+    it("hides content restricted to admins from them", () => {
+      const viewer = facts({ view: true, update: true, manage: false });
+      expect(isContentVisible(eff("restrict", { admins: true }), viewer)).toBe(false);
+    });
+  });
+
+  describe("given a project Admin", () => {
+    it("reads them as an admin, not as the Members role", () => {
+      expect(facts({ view: true, update: true, manage: true })).toMatchObject({
+        isAdmin: true,
+        isMemberRole: false,
+        isViewer: false,
+      });
+    });
+  });
+
+  describe("given a Viewer, who only reads traces", () => {
+    it("reads them as a viewer", () => {
+      expect(facts({ view: true, update: false, manage: false })).toMatchObject({
+        isAdmin: false,
+        isMemberRole: false,
+        isViewer: true,
+      });
+    });
   });
 });

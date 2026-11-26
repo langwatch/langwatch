@@ -16,8 +16,10 @@ import {
 } from "@langwatch/authorization";
 import type { AuthzApi, AuthzScopeRef } from "@langwatch/authz-contract";
 import {
+  askViewerRolePermissions,
   isContentVisible,
   isContentVisibleToPublic,
+  viewerFactsFrom,
   type ContentCategory,
   type DataPrivacyApi,
   type ResolvedDataPrivacy,
@@ -78,16 +80,27 @@ export class WorkbenchProtectionsService {
     /** The read's proof: the policy is the strictest across it and `projectId` (ADR-177 d9). */
     authorization?: Authorization;
   }): Promise<LangWatchQLProtections> {
+    return this.memberProtections({
+      ...input,
+      isProjectOwner: this.isProjectOwner({ userId: input.userId, projectId: input.projectId }),
+    });
+  }
+
+  private async memberProtections(input: {
+    userId: string;
+    projectId: string;
+    authorization?: Authorization;
+    isProjectOwner: Promise<boolean>;
+  }): Promise<LangWatchQLProtections> {
     const { authz } = this.dependencies;
     const { userId, projectId } = input;
-    const permitted = (permission: "traces:view" | "project:update") =>
-      authz.hasPermission({ userId, permission, projectId });
-
     const scope = await this.projectScope(projectId);
-    const [catalogue, isMember, isAdmin] = await Promise.all([
+    const [catalogue, held, isProjectOwner] = await Promise.all([
       this.catalogueFor({ principal: { type: "user", id: userId }, scope }),
-      permitted("traces:view"),
-      permitted("project:update"),
+      askViewerRolePermissions((permission) =>
+        authz.hasPermission({ userId, permission, projectId }),
+      ),
+      input.isProjectOwner,
     ]);
     const canSeeCosts = holdsCostView(catalogue);
 
@@ -101,16 +114,9 @@ export class WorkbenchProtectionsService {
     }
 
     const groupIds = await this.groupIdsFor({ policy, userId, scope });
+    const viewer = viewerFactsFrom({ held, isProjectOwner, groupIds });
     const visible = (category: ContentCategory): boolean =>
-      isContentVisible(policy.categories[category], {
-        isAdmin,
-        isMember,
-        isMemberRole: isMember,
-        isViewer: isMember && !isAdmin,
-        // Ownership widens rather than narrows and is not read here, so it stays false.
-        isProjectOwner: false,
-        groupIds,
-      });
+      isContentVisible(policy.categories[category], viewer);
 
     return {
       canSeeCosts,
@@ -134,7 +140,8 @@ export class WorkbenchProtectionsService {
     if (!project) {
       throw new LangWatchQLProjectNotFoundError();
     }
-    const protections = await this.resolveMemberProtections(input);
+    const isProjectOwner = Promise.resolve(project.ownerUserId === input.userId);
+    const protections = await this.memberProtections({ ...input, isProjectOwner });
     return { project: { id: project.id, lwqlKey: project.lwqlKey }, protections };
   }
 
@@ -232,6 +239,20 @@ export class WorkbenchProtectionsService {
       canSeeCapturedOutput: isContentVisibleToPublic(policy.categories.output),
       catalogue,
     };
+  }
+
+  /** Whether the member owns the project, as the trace view reads it; unknown is not. */
+  private async isProjectOwner(input: { userId: string; projectId: string }): Promise<boolean> {
+    try {
+      const project = await this.dependencies.projects.findById(input.projectId);
+      return project?.ownerUserId != null && project.ownerUserId === input.userId;
+    } catch (error) {
+      logger.error(
+        { error, projectId: input.projectId },
+        "project owner resolution failed; treating the member as not the owner (fail-closed)",
+      );
+      return false;
+    }
   }
 
   /** The whole LangWatchQL catalogue, resolved for this principal at this project. */

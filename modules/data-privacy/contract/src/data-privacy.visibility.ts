@@ -12,6 +12,44 @@ export interface EffectiveRestriction {
   disposition: Disposition;
   audience: ResolvedAudience;
 }
+/** The project permissions a viewer's role is read from, for every reader of captured content. */
+export type ViewerRolePermission = "traces:view" | "traces:update" | "project:manage";
+
+/** Admin is `project:manage`, never `project:update`: a Member holds that too. */
+export function viewerFactsFrom({
+  held,
+  isProjectOwner,
+  groupIds,
+}: {
+  held: Readonly<Record<ViewerRolePermission, boolean>>;
+  isProjectOwner: boolean;
+  groupIds: string[];
+}): ViewerFacts {
+  const isMember = held["traces:view"];
+  const isAdmin = held["project:manage"];
+  const isMemberRole = held["traces:update"] && !isAdmin;
+  return {
+    isAdmin,
+    isMember,
+    isMemberRole,
+    isViewer: isMember && !isAdmin && !isMemberRole,
+    isProjectOwner,
+    groupIds,
+  };
+}
+
+/** Asks each role permission once, so every reader asks the same ones. */
+export async function askViewerRolePermissions(
+  ask: (permission: ViewerRolePermission) => Promise<boolean>,
+): Promise<Record<ViewerRolePermission, boolean>> {
+  const [view, update, manage] = await Promise.all([
+    ask("traces:view"),
+    ask("traces:update"),
+    ask("project:manage"),
+  ]);
+  return { "traces:view": view, "traces:update": update, "project:manage": manage };
+}
+
 export function isContentVisible(eff: EffectiveRestriction, viewer: ViewerFacts): boolean {
   if (!viewer.isMember && !viewer.isProjectOwner) return false;
   if (eff.disposition === "drop") return false;

@@ -1,7 +1,7 @@
 /** @vitest-environment node */
 
 import type { RestCredentialPrincipal } from "@langwatch/authorization";
-import type { AuthzApi } from "@langwatch/authz-contract";
+import { builtinRoleGrants, type AuthzApi } from "@langwatch/authz-contract";
 import {
   PLATFORM_DEFAULT_DATA_PRIVACY,
   type DataPrivacyApi,
@@ -29,7 +29,8 @@ function serviceOver(
   return WorkbenchProtectionsService.create({
     authz: input.authz ?? createApiFixture<AuthzApi>({}, "unused authz"),
     dataPrivacy: input.dataPrivacy ?? createApiFixture<DataPrivacyApi>({}, "unused data privacy"),
-    projects: input.projects ?? createApiFixture<ProjectApi>({}, "unused projects"),
+    projects:
+      input.projects ?? createApiFixture<ProjectApi>({ findById: async () => null }, "no project"),
   });
 }
 
@@ -254,9 +255,83 @@ describe("resolveMemberProtections", () => {
       });
 
       const member = { type: "user", id: "user-1" };
-      for (const permission of ["cost:view", "traces:view", "project:update"]) {
+      for (const permission of ["cost:view", "traces:view", "traces:update", "project:manage"]) {
         expect(checks).toContainEqual({ principal: member, permission, scope: PROJECT_SCOPE });
       }
+    });
+  });
+
+  describe("given input and output restricted to admins", () => {
+    /** The real built-in role's grants, so a test cannot drift from what the role holds. */
+    function authzAsRole(role: "admin" | "member" | "viewer") {
+      return authzGranting({
+        grants: ({ permission }) => builtinRoleGrants({ role, permission }),
+      });
+    }
+
+    /** @scenario "Analytics hides content restricted to admins from a plain member, as the trace view does" */
+    it("hides captured content from a project Member, who holds project:update but is no admin", async () => {
+      const { dataPrivacy } = dataPrivacyResolving(async () => bothRestrictedToAdmins());
+
+      const resolved = await serviceOver({
+        authz: authzAsRole("member").authz,
+        dataPrivacy,
+      }).resolveMemberProtections({ userId: "user-1", projectId: "project-1" });
+
+      expect(resolved.canSeeCapturedInput).toBe(false);
+      expect(resolved.canSeeCapturedOutput).toBe(false);
+    });
+
+    /** @scenario "Analytics hides content restricted to admins from a plain member, as the trace view does" */
+    it("shows captured content to a project Admin", async () => {
+      const { dataPrivacy } = dataPrivacyResolving(async () => bothRestrictedToAdmins());
+
+      const resolved = await serviceOver({
+        authz: authzAsRole("admin").authz,
+        dataPrivacy,
+      }).resolveMemberProtections({ userId: "user-1", projectId: "project-1" });
+
+      expect(resolved.canSeeCapturedInput).toBe(true);
+      expect(resolved.canSeeCapturedOutput).toBe(true);
+    });
+
+    it("shows captured content restricted to the owner to the member who owns the project", async () => {
+      const ownerOnly = {
+        disposition: "restrict" as const,
+        audience: {
+          ...bothRestrictedToAdmins().categories.input.audience,
+          admins: false,
+          projectOwner: true,
+        },
+      };
+      const { dataPrivacy } = dataPrivacyResolving(async () => ({
+        ...PLATFORM_DEFAULT_DATA_PRIVACY,
+        categories: { ...PLATFORM_DEFAULT_DATA_PRIVACY.categories, input: ownerOnly },
+      }));
+      const { projects } = projectsWith({
+        ...projectWith({ id: "project-1", lwqlKey: "lwql-secret" }),
+        ownerUserId: "user-1",
+      });
+
+      const resolved = await serviceOver({
+        authz: authzAsRole("member").authz,
+        dataPrivacy,
+        projects,
+      }).resolveMemberProtections({ userId: "user-1", projectId: "project-1" });
+
+      expect(resolved.canSeeCapturedInput).toBe(true);
+    });
+
+    it("hides captured content from a Viewer", async () => {
+      const { dataPrivacy } = dataPrivacyResolving(async () => bothRestrictedToAdmins());
+
+      const resolved = await serviceOver({
+        authz: authzAsRole("viewer").authz,
+        dataPrivacy,
+      }).resolveMemberProtections({ userId: "user-1", projectId: "project-1" });
+
+      expect(resolved.canSeeCapturedInput).toBe(false);
+      expect(resolved.canSeeCapturedOutput).toBe(false);
     });
   });
 
@@ -508,7 +583,7 @@ describe("resolveApiKeyProtections", () => {
       expect(resolved.canSeeCosts).toBe(true);
       expect(asked.permissionChecks).toContainEqual({
         userId: "user-1",
-        permission: "project:update",
+        permission: "project:manage",
         projectId: "project-1",
       });
       expect(asked.permissionChecks.every((c) => c.userId === "user-1")).toBe(true);
