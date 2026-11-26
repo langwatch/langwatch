@@ -891,6 +891,7 @@ Feature: Organization-wide Dashboards area
     When I move "Beta" above "Gamma" and the save fails
     Then the section lists My dashboard, "Gamma", "Alpha" and "Beta" again with no new read
     And it says "Couldn't save the order of your dashboards"
+    And when an earlier save is refused while a later one is still out, the later order stays and shows once it is saved
 
   @unit
   Scenario: A board my order does not name is listed after the ones it does, by name

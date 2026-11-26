@@ -46,13 +46,20 @@ const LISTED = [
   board({ id: "gamma", name: "Gamma" }),
 ];
 
+type SaveAnswer = { isRefused: boolean; afterMs: number };
+
 function renderSection({
   saved = [],
-  isSaveRefused = false,
-}: { saved?: readonly string[]; isSaveRefused?: boolean } = {}) {
+  saveAnswers = [],
+}: {
+  saved?: readonly string[];
+  /** How the nth save answers; a save past the list succeeds at once. */
+  saveAnswers?: readonly SaveAnswer[];
+} = {}) {
   const host = new StubAnalyticsHost();
   const calls: UiProcedureCall[] = [];
   let stored = saved;
+  let saveCount = 0;
   const answer = (call: UiProcedureCall): Promise<unknown> => {
     calls.push(call);
     if (call.path === "boards.listInOrganization") return Promise.resolve(LISTED);
@@ -61,9 +68,16 @@ function renderSection({
     if (call.path === "boards.getAll") return Promise.resolve([]);
     if (call.path === "boards.sidebarOrder") return Promise.resolve({ dashboardIds: stored });
     if (call.path === "boards.reorderSidebar") {
-      if (isSaveRefused) return Promise.reject(new Error("refused"));
-      stored = (call.input as { dashboardIds: readonly string[] }).dashboardIds;
-      return Promise.resolve({ success: true });
+      const { isRefused, afterMs } = saveAnswers[saveCount] ?? { isRefused: false, afterMs: 0 };
+      saveCount += 1;
+      const dashboardIds = (call.input as { dashboardIds: readonly string[] }).dashboardIds;
+      return new Promise((resolve, reject) =>
+        setTimeout(() => {
+          if (isRefused) return reject(new Error("refused"));
+          stored = dashboardIds;
+          resolve({ success: true });
+        }, afterMs),
+      );
     }
     return NO_PROCEDURES(call);
   };
@@ -166,7 +180,7 @@ describe("a product's Dashboards section, reordered", () => {
   it("puts the saved order back without a new read when the save fails", async () => {
     const { host, calls, user } = renderSection({
       saved: ["gamma", "alpha", "beta"],
-      isSaveRefused: true,
+      saveAnswers: [{ isRefused: true, afterMs: 0 }],
     });
     await waitFor(async () =>
       expect(await listed()).toEqual(["My dashboard", "Gamma", "Alpha", "Beta"]),
@@ -188,5 +202,38 @@ describe("a product's Dashboards section, reordered", () => {
     expect(savedOrders(calls)).toEqual([["beta", "gamma", "alpha"]]);
     expect(await listed()).toEqual(["My dashboard", "Gamma", "Alpha", "Beta"]);
     expect(reads()).toBe(readsBefore);
+  });
+
+  /** @scenario "A reorder the server refuses puts back the last saved order" */
+  it("keeps a later saved order when an earlier save is refused while it is out", async () => {
+    const { host, calls, user } = renderSection({
+      saved: ["alpha", "beta", "gamma"],
+      saveAnswers: [
+        { isRefused: true, afterMs: 150 },
+        { isRefused: false, afterMs: 600 },
+      ],
+    });
+    await waitFor(async () =>
+      expect(await listed()).toEqual(["My dashboard", "Alpha", "Beta", "Gamma"]),
+    );
+
+    screen.getByRole("button", { name: "Reorder Gamma" }).focus();
+    await user.keyboard(" ");
+    await user.keyboard("{ArrowUp}");
+    await user.keyboard(" ");
+    screen.getByRole("button", { name: "Reorder Alpha" }).focus();
+    await user.keyboard(" ");
+    await user.keyboard("{ArrowDown}");
+    await user.keyboard(" ");
+
+    await waitFor(() => expect(host.failures).toHaveLength(1));
+    expect(savedOrders(calls)).toEqual([
+      ["alpha", "gamma", "beta"],
+      ["gamma", "alpha", "beta"],
+    ]);
+    // The later save is still out, so its order stays on screen.
+    expect(await listed()).toEqual(["My dashboard", "Gamma", "Alpha", "Beta"]);
+    await new Promise((resolve) => setTimeout(resolve, 700));
+    expect(await listed()).toEqual(["My dashboard", "Gamma", "Alpha", "Beta"]);
   });
 });

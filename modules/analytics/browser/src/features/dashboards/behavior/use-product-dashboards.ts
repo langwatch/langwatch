@@ -36,9 +36,8 @@ export function useProductDashboards({ product }: { product: DashboardHomeProduc
     enabled: organizationId !== "",
   });
   const save = analyticsApi.boards.reorderSidebar.useMutation();
-  // The order the server last confirmed, and how many saves are still out; read in callbacks only.
-  const confirmed = useRef<readonly string[]>([]);
-  const pending = useRef(0);
+  // Per organization and product: the order the server last confirmed and the saves still out.
+  const saves = useRef(new Map<string, { confirmed: readonly string[]; pending: number }>());
   const stored = order.data?.dashboardIds ?? [];
   const allBoards = (list.data ?? []).map(libraryBoardOf);
   const boards = productSidebarBoards({
@@ -50,20 +49,28 @@ export function useProductDashboards({ product }: { product: DashboardHomeProduc
   });
 
   const reorder = (shownIds: readonly string[]) => {
+    const scope = `${organizationId}:${product}`;
     // With no save out, the cached order is the one the server holds.
-    if (pending.current === 0) confirmed.current = stored;
-    pending.current += 1;
+    const state = saves.current.get(scope) ?? { confirmed: stored, pending: 0 };
+    if (state.pending === 0) state.confirmed = stored;
+    state.pending += 1;
+    saves.current.set(scope, state);
     const dashboardIds = nextSidebarOrder({ stored, shown: shownIds });
     utils.boards.sidebarOrder.setData(orderInput, { dashboardIds });
+    // The last save to settle shows what the server confirmed; until then the drag's order stays.
+    const settle = () => {
+      state.pending -= 1;
+      if (state.pending > 0) return;
+      utils.boards.sidebarOrder.setData(orderInput, { dashboardIds: [...state.confirmed] });
+    };
     save
       .mutateAsync({ ...orderInput, dashboardIds })
       .then(() => {
-        confirmed.current = dashboardIds;
-        pending.current -= 1;
+        state.confirmed = dashboardIds;
+        settle();
       })
       .catch((error: unknown) => {
-        pending.current -= 1;
-        utils.boards.sidebarOrder.setData(orderInput, { dashboardIds: [...confirmed.current] });
+        settle();
         host.failed({ error, fallbackTitle: "Couldn't save the order of your dashboards" });
       });
   };
