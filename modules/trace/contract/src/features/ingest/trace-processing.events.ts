@@ -192,9 +192,9 @@ function parseStartTimeUnixMs(value: unknown): number | null {
 }
 
 /**
- * The business time a trace fold's read window centres on: a span's own start time, where the
- * row its first span filed lives (ADR-087), since a backfilled span's occurredAt is its arrival.
- * Every other event, and a span with no usable start, keeps its occurredAt.
+ * The business time a trace fold's read window also covers (ADR-087 amendment): a span's own
+ * start time, where a backfilled trace's first span filed its row, since a span's occurredAt is
+ * its arrival. Every other event, and a span with no usable start, keeps its occurredAt.
  */
 export function traceFoldReadAnchorMs(
   event: { type: string; occurredAt: number; data?: unknown },

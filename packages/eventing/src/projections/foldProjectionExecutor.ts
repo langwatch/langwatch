@@ -115,8 +115,8 @@ function canRefold<State, E extends Event>(
 
 /**
  * Names the event the read is for and carries its occurredAt and, when the fold declares
- * `options.readWindow`, the `anchor ± widthMs` bound: the fold's `anchorOf` business time, else
- * occurredAt. Only the event id is added when occurredAt is unusable: the read stays unbounded.
+ * `options.readWindow`, the `occurredAt ± widthMs` bound, stretched to also cover the fold's
+ * `anchorOf` business time ± widthMs. Only the event id is added when occurredAt is unusable.
  */
 function withReadHints<State, E extends Event>({
   context,
@@ -132,14 +132,18 @@ function withReadHints<State, E extends Event>({
   if (typeof occurredAt !== "number" || occurredAt <= 0) return named;
   const readWindow = projection.options?.readWindow;
   if (readWindow === undefined) return { ...named, occurredAtMs: occurredAt };
+  const around = readWindowAround({ anchorMs: occurredAt, widthMs: readWindow.widthMs });
   const anchorMs = readWindow.anchorOf?.(event);
+  if (typeof anchorMs !== "number" || anchorMs <= 0) {
+    return { ...named, occurredAtMs: occurredAt, readWindow: around };
+  }
   return {
     ...named,
     occurredAtMs: occurredAt,
-    readWindow: readWindowAround({
-      anchorMs: typeof anchorMs === "number" && anchorMs > 0 ? anchorMs : occurredAt,
-      widthMs: readWindow.widthMs,
-    }),
+    readWindow: {
+      fromMs: Math.min(around.fromMs, anchorMs - readWindow.widthMs),
+      toMs: Math.max(around.toMs, anchorMs + readWindow.widthMs),
+    },
   };
 }
 
@@ -401,7 +405,7 @@ export class FoldProjectionExecutor {
             read,
             missed: windowed,
             context: { ...rest, bypassReadCache: true },
-            anchorMs: (context.readWindow.fromMs + context.readWindow.toMs) / 2,
+            anchorMs: context.occurredAtMs,
             toMs: context.readWindow.toMs,
             lookbackStepsMs,
           });
@@ -549,7 +553,7 @@ export class FoldProjectionExecutor {
 
     const key = context.key ?? context.aggregateId;
     // Anchor the store read to the event's business time. A fold that declared
-    // a read window gets its backing read bounded to its anchor ± widthMs, with
+    // a read window gets its backing read bounded to occurredAt ± widthMs, with
     // the executor retrying unwindowed on a miss (see loadWithApplied).
     const loadContext = withReadHints({ context, event, projection });
     const {

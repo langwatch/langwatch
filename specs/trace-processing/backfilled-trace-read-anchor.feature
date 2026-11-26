@@ -7,19 +7,23 @@ Feature: A trace whose spans arrive late keeps its folded state
   proof that the trace has no row yet, so a brand-new trace never pays a second
   read.
 
-  A trace imported or backfilled days after it happened breaks that unless the
-  window is centred on the trace's own time. A span's occurredAt is when it
-  arrived, and the deferred origin check used to stamp its event with the time
-  it ran. Centred on those, the read missed the row, the miss was trusted, the
-  fold started empty and traceAnalytics wrote an empty row with a newer
-  UpdatedAt over the real one. Dashboards read the newest row, so the trace
-  vanished from every chart while trace search still found it.
+  A trace imported or backfilled days after it happened broke that. A span's
+  occurredAt is when it arrived, and the deferred origin check used to stamp
+  its event with the time it ran. Centred on those, the read missed the row,
+  the miss was trusted, the fold started empty and traceAnalytics wrote an
+  empty row with a newer UpdatedAt over the real one. Dashboards read the
+  newest row, so the trace vanished from every chart while trace search still
+  found it.
+
+  The row can sit near a span's arrival (a live trace, or one a log record
+  opened) or near its start time (a backfill), so a span's read covers both.
 
   @unit
-  Scenario: A fold centres its read window on the business time it declares
+  Scenario: A fold's read window covers both occurred-at and the business time it declares
     Given a fold whose read window declares an anchor for each event
-    When it folds an event whose anchor differs from its occurred-at
-    Then the store read is bounded to the anchor plus or minus the window width
+    When it folds an event whose anchor is earlier than its occurred-at
+    Then the store read runs from the anchor minus the window width
+    And it ends at the occurred-at plus the window width
 
   @unit
   Scenario: A fold without a declared anchor centres its read window on occurred-at
@@ -48,3 +52,10 @@ Feature: A trace whose spans arrive late keeps its folded state
     Then the newest trace_analytics row for the trace still counts its spans
     And that row carries the resolved origin
     And the trace counts in a 30-day trace analytics timeseries
+
+  @integration
+  Scenario: A live trace keeps its state when a span that started long before arrives
+    Given a trace whose first span started now
+    When a span that started nine days earlier arrives and the fold cache is cold
+    Then the newest trace_analytics row for the trace counts both spans
+    And the trace summary counts both spans

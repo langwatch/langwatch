@@ -66,16 +66,24 @@ async function foldBoth(traceId: string, events: readonly unknown[]): Promise<vo
   await flushWrites();
 }
 
-/** One backfilled span: it started nine days ago and arrives now. */
-async function arrive({ traceId, spanId }: { traceId: string; spanId: string }): Promise<void> {
+/** One span arriving now; by default it started nine days ago (a backfill). */
+async function arrive({
+  traceId,
+  spanId,
+  startMs = SPAN_START_MS,
+}: {
+  traceId: string;
+  spanId: string;
+  startMs?: number;
+}): Promise<void> {
   const span = createSpanReceivedEvent({
     eventId: `evt-${traceId}-${spanId}`,
     tenantId,
     traceId,
     spanId,
     occurredAt: Date.now(),
-    startTimeUnixNano: msToUnixNano(SPAN_START_MS),
-    endTimeUnixNano: msToUnixNano(SPAN_START_MS + 500),
+    startTimeUnixNano: msToUnixNano(startMs),
+    endTimeUnixNano: msToUnixNano(startMs + 500),
   });
   await foldBoth(traceId, [span]);
 }
@@ -203,5 +211,16 @@ describe.skipIf(!testClickHouseConfigured())("a backfilled trace (integration)",
     expect(summary.kind === "folded" ? summary.state.attributes["langwatch.origin"] : null).toBe(
       "application",
     );
+  });
+
+  /** @scenario "A live trace keeps its state when a span that started long before arrives" */
+  it("keeps a live trace's first span when a span that started nine days earlier arrives", async () => {
+    const traceId = `trace-live-${nanoid()}`;
+    await arrive({ traceId, spanId: "bbbb000000000001", startMs: Date.now() });
+    await arrive({ traceId, spanId: "bbbb000000000002", startMs: SPAN_START_MS });
+
+    expect((await latestAnalyticsRow(traceId))?.latestSpanCount).toBe(2);
+    const summary = await summaryStore.get(traceId, contextFor(traceId));
+    expect(summary.kind === "folded" ? summary.state.spanCount : 0).toBe(2);
   });
 });

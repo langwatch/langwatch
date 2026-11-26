@@ -94,8 +94,8 @@ describe("FoldProjectionExecutor declared read window", () => {
   describe("given the fold declares a business-time anchor for its read window", () => {
     const ANCHOR = OCCURRED_AT - 9 * 24 * 60 * 60 * 1000;
 
-    /** @scenario "A fold centres its read window on the business time it declares" */
-    it("bounds the store read to the anchor ± widthMs, keeping occurredAt as the hint", async () => {
+    /** @scenario "A fold's read window covers both occurred-at and the business time it declares" */
+    it("stretches the store read from the anchor to occurredAt, each ± widthMs", async () => {
       const { fold, store } = makeFold({
         readWindow: { widthMs: WIDTH_MS, anchorOf: () => ANCHOR },
       });
@@ -111,7 +111,7 @@ describe("FoldProjectionExecutor declared read window", () => {
         TEST_CONSTANTS.AGGREGATE_ID,
         expect.objectContaining({
           occurredAtMs: OCCURRED_AT,
-          readWindow: { fromMs: ANCHOR - WIDTH_MS, toMs: ANCHOR + WIDTH_MS },
+          readWindow: { fromMs: ANCHOR - WIDTH_MS, toMs: OCCURRED_AT + WIDTH_MS },
         }),
       );
       expect(state.count).toBe(4);

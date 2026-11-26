@@ -117,7 +117,7 @@ export interface FoldProjectionOptions<E extends Event = Event> {
   readWindow?: {
     widthMs: number;
     fallbackLookbackStepsMs?: readonly number[];
-    /** The business time to centre on when occurredAt is an arrival time; else occurredAt. */
+    /** A business time the window must also cover when occurredAt is an arrival time. */
     anchorOf?: (event: Event) => number | undefined;
   };
   // Re-fold from event log on store miss; transitional only for rows predating
