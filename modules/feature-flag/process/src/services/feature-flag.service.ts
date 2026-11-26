@@ -3,7 +3,6 @@ import {
   deriveRuleOutcome,
   ruleContextForTarget,
   resolveExperimentDecision,
-  resolveEffectiveForListing,
   readNeedsOrganizationAge,
   type ExperimentCatalogueEntry,
   type ExperimentEvaluationTarget,
@@ -22,18 +21,21 @@ import {
   type RuleEvaluationContext,
   type FeatureFlagTarget,
   FeatureFlagExperimentUnavailableError,
-  UnknownFeatureFlagError,
   UnknownFeatureFlagExperimentError,
 } from "@langwatch/feature-flag-contract";
-import { toDate } from "@langwatch/time";
 
 import type {
   ExperimentSubject,
   FeatureFlagExperimentRepository,
 } from "../repositories/feature-flag-experiment-setting.repository.ts";
 import type { FeatureFlagRepository } from "../repositories/feature-flag.repository.ts";
+import { operatorCatalogueOf } from "../rules/feature-flag-catalogue.rules.ts";
 import { deploymentDefaultOf } from "../rules/feature-flag-config.rules.ts";
-import { isExperimentFlag, tenantPolicyOf } from "../rules/feature-flag-registry.rules.ts";
+import {
+  isExperimentFlag,
+  isRegisteredFlag,
+  tenantPolicyOf,
+} from "../rules/feature-flag-registry.rules.ts";
 import type { FeatureFlagRowStore } from "./cached-feature-flag-row.service.ts";
 import type { OrganizationCreatedAtCacheService } from "./organization-created-at-cache.service.ts";
 
@@ -423,7 +425,7 @@ export class FeatureFlagService {
     const target = { kind: "organization" as const, organizationId: input.organizationId };
     const resolved = await Promise.all(
       [...candidates]
-        .filter((key) => this.isRegistered(key))
+        .filter((flagKey) => isRegisteredFlag({ registry: this.registry, flagKey }))
         .map(async (key) => ({
           key,
           enabled: await this.isEnabled(key as FeatureFlagKey, target),
@@ -435,74 +437,9 @@ export class FeatureFlagService {
       .toSorted();
   }
 
-  private isRegistered(key: string): boolean {
-    try {
-      this.registry.getDefinition(key);
-      return true;
-    } catch (error) {
-      if (error instanceof UnknownFeatureFlagError) return false;
-      throw error;
-    }
-  }
-
   async listOperatorCatalogue(): Promise<OperatorFeatureFlagCatalogue> {
     const stored = await this.repository.findAll();
-    const registeredKeys = new Set(this.registry.definitions.map(({ key }) => key));
-    const flags = this.registry.definitions.map((definition) => {
-      const row = stored.find(({ key }) => key === definition.key);
-      const envOverride = this.config.overrides.get(definition.key) ?? null;
-      const defaultValue = deploymentDefaultOf({ definition, isSaas: this.config.isSaas });
-
-      return {
-        key: definition.key,
-        scope: definition.scope,
-        defaultValue,
-        description: definition.description,
-        family: definition.family ?? null,
-        storedValue: row?.enabled ?? null,
-        rules: row?.rules ?? [],
-        envOverride,
-        effective: resolveEffectiveForListing({
-          envOverride,
-          rules: row?.rules ?? [],
-          rowEnabled: row?.enabled ?? null,
-          registryDefault: defaultValue,
-        }),
-        lastEditedBy: row?.lastEditedBy ?? null,
-        updatedAt: row?.updatedAt ? toDate(row.updatedAt) : null,
-      };
-    });
-    const orphaned = stored
-      .filter(({ key }) => !registeredKeys.has(key))
-      .map((row) => ({
-        key: row.key,
-        scope: "SYSTEM" as const,
-        defaultValue: false,
-        description: "Orphaned postgres flag row (no longer registered).",
-        family: null,
-        storedValue: row.enabled,
-        rules: row.rules,
-        envOverride: null,
-        effective: resolveEffectiveForListing({
-          envOverride: null,
-          rules: row.rules,
-          rowEnabled: row.enabled,
-          registryDefault: false,
-        }),
-        lastEditedBy: row.lastEditedBy,
-        updatedAt: toDate(row.updatedAt),
-      }));
-
-    return {
-      flags: [...flags, ...orphaned],
-      families: this.registry.families.map((family) => ({
-        family: family.family,
-        keyPrefix: family.keyPrefix,
-        scope: family.scope,
-        defaultValue: family.defaultValue,
-        description: family.description,
-      })),
-    };
+    return operatorCatalogueOf({ registry: this.registry, stored, config: this.config });
   }
 
   async setEnabled({

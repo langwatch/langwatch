@@ -4,10 +4,14 @@
  */
 import type { StaffAccessScope } from "@langwatch/authz-contract";
 import {
+  isStaffAccessFunctionName,
   STAFF_ACCESS_FUNCTION_LIMITS,
+  STAFF_ACCESS_FUNCTION_NAMES,
   STAFF_ACCESS_FUNCTIONS,
   StaffFunctionBadCursorError,
   StaffFunctionBadInputError,
+  StaffFunctionScopeMismatchError,
+  StaffFunctionUnknownError,
   type StaffAccessFunctionName,
 } from "@langwatch/staff-access-contract";
 import { type Instant, Temporal } from "@langwatch/time";
@@ -107,4 +111,25 @@ function keyOfCursor({ cursor, name }: { cursor: string; name: string }): string
     // An unreadable cursor is refused below like a foreign one.
   }
   throw new StaffFunctionBadCursorError();
+}
+
+/**
+ * The functions a request names, sorted, each in the registry and within reach of its scopes.
+ * @throws {StaffFunctionUnknownError} for a name the registry does not hold
+ * @throws {StaffFunctionScopeMismatchError} for one the scopes cannot reach
+ */
+export function functionsFor({
+  names,
+  scopes,
+}: {
+  names: readonly string[];
+  scopes: readonly StaffAccessScope[];
+}): string[] {
+  for (const name of names) {
+    if (!isStaffAccessFunctionName(name)) {
+      throw new StaffFunctionUnknownError({ names: STAFF_ACCESS_FUNCTION_NAMES, httpStatus: 422 });
+    }
+    if (!functionFitsScopes({ name, scopes })) throw new StaffFunctionScopeMismatchError({ name });
+  }
+  return names.toSorted();
 }

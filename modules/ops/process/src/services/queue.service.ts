@@ -16,6 +16,7 @@ import type {
   JobEntry,
   QueueRepository,
 } from "../repositories/queue.repository.ts";
+import { summarizeErrorShapes } from "../rules/queue-error-shape.rules.ts";
 
 /**
  * Members of each queue set one tenant count reads at most. Group keys are not indexed by
@@ -24,25 +25,6 @@ import type {
 const TENANT_COUNT_SCAN_BUDGET = 100_000;
 /** Groups per queue whose jobs a tenant count reads for its job total and oldest job. */
 const TENANT_COUNT_JOB_READ_BUDGET = 2_000;
-
-/** What an error with no recognizable class name is recorded as. */
-const UNTYPED_ERROR_SHAPE = "untyped_error";
-
-/**
- * Reduce raw job errors to something safe to keep in a durable audit row.
- */
-function summarizeErrorShapes(messages: string[]): string[] {
-  const shapes = new Set<string>();
-  for (const message of messages) {
-    const named = /^([A-Za-z][A-Za-z0-9_]*(?:Error|Exception))\b/.exec(message);
-    shapes.add(named?.[1]?.slice(0, 80) ?? UNTYPED_ERROR_SHAPE);
-    if (shapes.size >= 5) {
-      break;
-    }
-  }
-
-  return [...shapes];
-}
 
 export class QueueService {
   private readonly repository: QueueRepository;

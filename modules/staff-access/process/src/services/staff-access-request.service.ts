@@ -8,18 +8,12 @@ import type {
 } from "@langwatch/auth-contract";
 import type { StaffAccessScope } from "@langwatch/authz-contract";
 import { generate } from "@langwatch/ksuid";
-import { createLogger } from "@langwatch/observability";
 import type {
   OrganizationApi,
   OrganizationProvisioningSummary,
 } from "@langwatch/organization-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 import {
-  isStaffAccessFunctionName,
-  STAFF_ACCESS_FUNCTION_NAMES,
-  STAFF_ACCESS_PRINCIPAL,
-  StaffFunctionScopeMismatchError,
-  StaffFunctionUnknownError,
   StaffAccessAlreadyRedeemedError,
   StaffAccessInvalidCodeVerifierError,
   StaffAccessNotFoundError,
@@ -41,7 +35,7 @@ import type {
   StaffAccessRequestRepository,
   StaffAccessRequestRow,
 } from "../repositories/staff-access.repository.ts";
-import { functionFitsScopes } from "../rules/staff-access-function.rules.ts";
+import { functionsFor } from "../rules/staff-access-function.rules.ts";
 import {
   approvalChallengeOf,
   assertPending,
@@ -57,12 +51,11 @@ import {
   STAFF_ACCESS_SESSION_TTL_MS,
   typedNameRequired,
 } from "../rules/staff-access.rules.ts";
+import { StaffAccessApprovalAuditService } from "./staff-access-approval-audit.service.ts";
 import type { StaffAccessNoticeService } from "./staff-access-notice.service.ts";
 import { StaffAccessRedemptionService } from "./staff-access-redemption.service.ts";
 import type { StaffAccessRequesterService } from "./staff-access-requester.service.ts";
 import type { StaffAccessSessionService } from "./staff-access-session.service.ts";
-
-const logger = createLogger("langwatch:staff-access:request");
 
 type RequestDeps = Readonly<{
   requests: StaffAccessRequestRepository;
@@ -94,9 +87,11 @@ type Choice = Readonly<{
  */
 export class StaffAccessRequestService {
   private readonly credentials: StaffAccessRedemptionService;
+  private readonly approvals: StaffAccessApprovalAuditService;
 
   private constructor(private readonly deps: RequestDeps) {
     this.credentials = StaffAccessRedemptionService.create(deps);
+    this.approvals = StaffAccessApprovalAuditService.create(deps);
   }
 
   static create(deps: RequestDeps): StaffAccessRequestService {
@@ -277,12 +272,12 @@ export class StaffAccessRequestService {
     });
     if (!claimed) await this.throwUndecidable({ id: row.id });
 
-    await this.recordApproval({ row, userId, spendApproved });
+    await this.approvals.recordApproval({ row, userId, spendApproved });
     const confirmed = await this.deps.requests
       .confirmApproval({ id: row.id, at: this.deps.now() })
       .catch(() => false);
     if (!confirmed) {
-      await this.abandonApproval({ id: row.id, userId });
+      await this.approvals.abandonApproval({ id: row.id, userId });
       throw new StaffAccessAuditUnavailableError();
     }
 
@@ -302,64 +297,6 @@ export class StaffAccessRequestService {
       idempotencyKey: `staff-access-approved:${row.id}`,
     });
     return this.approvalViewOf(await this.rowOf({ id: row.id }));
-  }
-
-  /**
-   * Writes the approval row to the customer's audit log. Any failure, the approver lookup
-   * included, abandons the approval and refuses the operator.
-   * @throws {StaffAccessAuditUnavailableError} when the row was not written
-   */
-  private async recordApproval({
-    row,
-    userId,
-    spendApproved,
-  }: {
-    row: StaffAccessRequestRow;
-    userId: string;
-    spendApproved: boolean;
-  }): Promise<void> {
-    if (!row.organizationId) return;
-    try {
-      const approver = await this.deps.users.findById({ id: userId });
-      await this.deps.auditLog.record({
-        organizationId: row.organizationId,
-        userId,
-        actorUserId: userId,
-        action: "staffAccess.approved",
-        targetKind: "staffAccess",
-        targetId: row.id,
-        ...(row.requestIp ? { ipAddress: row.requestIp } : {}),
-        metadata: {
-          principal: STAFF_ACCESS_PRINCIPAL,
-          approvedBy: { id: userId, name: approver?.name ?? null, email: approver?.email ?? null },
-          reason: row.reason,
-          scopes: row.scopes,
-          spendApproved,
-          machine: row.machine,
-        },
-      });
-    } catch (error) {
-      logger.error({ error, requestId: row.id }, "the staff access approval row was not written");
-      await this.abandonApproval({ id: row.id, userId });
-      throw new StaffAccessAuditUnavailableError();
-    }
-  }
-
-  /**
-   * Ends an approval that did not stand. Should this revoke fail too, the request stays
-   * approving, which no redeem accepts, and the sweep settles its end once it lapses.
-   */
-  private async abandonApproval({ id, userId }: { id: string; userId: string }): Promise<void> {
-    try {
-      await this.deps.requests.revoke({
-        id,
-        at: this.deps.now(),
-        byUserId: userId,
-        cause: "approval_audit_failed",
-      });
-    } catch (error) {
-      logger.error({ error, requestId: id }, "an abandoned staff access approval was not revoked");
-    }
   }
 
   async deny({
@@ -532,25 +469,4 @@ export class StaffAccessRequestService {
       spendOffered: scopes.includes("org:support"),
     };
   }
-}
-
-/**
- * The functions a request names, sorted, each in the registry and within reach of its scopes.
- * @throws {StaffFunctionUnknownError} for a name the registry does not hold
- * @throws {StaffFunctionScopeMismatchError} for one the scopes cannot reach
- */
-function functionsFor({
-  names,
-  scopes,
-}: {
-  names: readonly string[];
-  scopes: readonly StaffAccessScope[];
-}): string[] {
-  for (const name of names) {
-    if (!isStaffAccessFunctionName(name)) {
-      throw new StaffFunctionUnknownError({ names: STAFF_ACCESS_FUNCTION_NAMES, httpStatus: 422 });
-    }
-    if (!functionFitsScopes({ name, scopes })) throw new StaffFunctionScopeMismatchError({ name });
-  }
-  return names.toSorted();
 }

@@ -63,6 +63,9 @@
       "path": "../../../packages/ksuid/tsconfig.build.json"
     },
     {
+      "path": "../../../packages/handled-error/tsconfig.build.json"
+    },
+    {
       "path": "../../gateway/contract/tsconfig.build.json"
     },
     {
@@ -70,6 +73,12 @@
     },
     {
       "path": "../../../packages/eventing/tsconfig.build.json"
+    },
+    {
+      "path": "../../evaluation/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../entitlement/contract/tsconfig.build.json"
     },
     {
       "path": "../../coding-agent/contract/tsconfig.build.json"
