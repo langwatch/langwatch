@@ -1,6 +1,7 @@
 import {
   LogRecordStorageRepository,
   type StoredLogRecordRow,
+  type TraceLogReadTarget,
 } from "../../../repositories/log-record-storage.repository.ts";
 
 /**
@@ -42,5 +43,36 @@ export class LogRecordStorageService {
     ]);
     // Log's own row goes last, so it wins a record both stores hold.
     return LogRecordStorageRepository.mergeStoredLogRows([...legacy, ...logRecords], limit);
+  }
+
+  /**
+   * {@link getLogsByTraceId} for a batch of traces in one read per store, keyed by trace id. A
+   * trace with no records is absent. Each trace keeps its own `limit`.
+   */
+  async getLogsByTraceIds({
+    tenantId,
+    traces,
+    limit,
+  }: {
+    tenantId: string;
+    traces: readonly TraceLogReadTarget[];
+    limit?: number;
+  }): Promise<ReadonlyMap<string, StoredLogRecordRow[]>> {
+    if (traces.length === 0) return new Map();
+    const query = { tenantId, traces, limitPerTrace: limit };
+    const [legacy, logRecords] = await Promise.all([
+      this.repository.findLogsByTraceIds(query),
+      this.repository.findLogRecordsByTraceIds(query),
+    ]);
+    const byTrace = new Map<string, StoredLogRecordRow[]>();
+    for (const row of [...legacy, ...logRecords]) {
+      const rows = byTrace.get(row.traceId);
+      if (rows) rows.push(row);
+      else byTrace.set(row.traceId, [row]);
+    }
+    for (const [traceId, rows] of byTrace) {
+      byTrace.set(traceId, LogRecordStorageRepository.mergeStoredLogRows(rows, limit));
+    }
+    return byTrace;
   }
 }
