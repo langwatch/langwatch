@@ -4,7 +4,10 @@
  * has been seen is collapsed onto the first, so a merged retry is not read as two.
  */
 import type { QueueSimulationRunInput } from "@langwatch/scenario-contract";
-import type { StartSuiteRunCommandData } from "@langwatch/suite-contract";
+import type {
+  CompleteSuiteRunItemCommandData,
+  StartSuiteRunCommandData,
+} from "@langwatch/suite-contract";
 
 import type { SuiteRunCommands } from "../../app/suite.app.ts";
 import { StartSuiteRunCommand } from "../../eventing/suite-run.commands.ts";
@@ -22,6 +25,16 @@ export class CollapsingRunCommands implements SuiteRunCommands {
     const jobId = StartSuiteRunCommand.makeJobId?.(data);
     if (jobId !== undefined && !this.admit(jobId)) return;
     this.started.push(data);
+  }
+
+  /** The items closed without a run, one per distinct scenario run id. */
+  readonly closed: CompleteSuiteRunItemCommandData[] = [];
+
+  async completeSuiteRunItem(data: CompleteSuiteRunItemCommandData): Promise<void> {
+    if (!this.admit(`${data.tenantId}:${data.batchRunId}:${data.scenarioRunId}:itemCompleted`)) {
+      return;
+    }
+    this.closed.push(data);
   }
 
   /** What a `ScenarioApi.queueSimulationRun` double forwards to. */

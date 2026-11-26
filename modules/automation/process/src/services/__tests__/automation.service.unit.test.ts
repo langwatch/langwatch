@@ -311,6 +311,7 @@ const makeService = (
         assertWithinUsageLimit: vi.fn(),
         getUsageMonthBreakdown: vi.fn(),
         getUsageLimits: vi.fn(),
+        assertScenarioRunAllowed: vi.fn(),
       },
       config: { free: 100, paid: 1_000, enterprise: 10_000 },
       slots: MemoryAutomationPersistCapRepository.create(),
