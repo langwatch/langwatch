@@ -115,10 +115,10 @@ export interface IssuedLicenseRepository {
     revokedReason: string;
   }): Promise<boolean>;
   /**
-   * Lets go of a managed key an unused-key revoke ended, only while the row still
-   * holds it, so the bound install's next sync provisions a new one.
+   * Lets go of an ended managed key on the live license that still names it, so its
+   * install's next sync provisions a new one. A revoked license keeps the key it names.
    */
-  releaseVirtualKey(params: { id: string; virtualKeyId: string }): Promise<boolean>;
+  releaseVirtualKey(params: { virtualKeyId: string }): Promise<boolean>;
   /**
    * Records the managed key only while the license has none and still is the
    * active license of that customer on that install. `requires` is checked in

@@ -213,6 +213,7 @@ export class LicensingModule implements LicensingApiContract {
   customerPipeline(): LicensingCustomerPipeline {
     return buildLicensingCustomerPipeline({
       attachManagedKey: (provisioned) => this.#credentials.attachProvisioned(provisioned),
+      releaseEndedKey: (retired) => this.#credentials.releaseEndedKey(retired),
     });
   }
 

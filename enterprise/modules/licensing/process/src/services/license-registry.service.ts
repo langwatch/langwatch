@@ -224,10 +224,7 @@ export class LicenseRegistryService {
   /** An unused-key revoke lost its write to a bind or another settle: say which. */
   private async refuseLostRevoke(row: IssuedLicenseRecord): Promise<never> {
     if (row.virtualKeyId) {
-      await this.options.repository.releaseVirtualKey({
-        id: row.id,
-        virtualKeyId: row.virtualKeyId,
-      });
+      await this.options.repository.releaseVirtualKey({ virtualKeyId: row.virtualKeyId });
     }
     this.refuseIfSettled(await this.getRow(row.id));
     throw new LicenseInUseError();

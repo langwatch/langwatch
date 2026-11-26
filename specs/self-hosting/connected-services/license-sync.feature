@@ -298,6 +298,13 @@ Feature: License sync
     When the sync stores the license its answer carried
     Then the store is refused and the newer column's key stays
 
+  @integration
+  Scenario: A licence written in the same millisecond as the one a sync read keeps the delivery out
+    Given a sync started from licensing's key A
+    And another write replaced A with B while the delivery waited, keeping A's timestamp
+    When the delivery's write runs after that write commits
+    Then the delivery is refused, because the key it would replace is B, not A
+
   @unit
   Scenario: A sync never carries a license that a delivery retired while it looked
     Given LangWatch extended the license, and extended it again before the install synced

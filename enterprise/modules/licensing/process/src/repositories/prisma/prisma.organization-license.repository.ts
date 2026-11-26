@@ -158,8 +158,8 @@ export class PrismaOrganizationLicenseRepository implements OrganizationLicenseR
   }>): Promise<boolean> {
     const row = rowOf(license);
     // One statement over the key the install reads (newerLicense): the organization's
-    // column while it is newer than the row, else the row. A conflicting row must be
-    // the one this statement read, so a write landing meanwhile keeps the delivery out.
+    // column while it is newer than the row, else the row. A row written meanwhile is
+    // compared again by its key on conflict, so that write keeps the delivery out.
     const written = await this.prisma.$executeRaw`
       ${skipTenantCheck({
         // Licences are keyed by organization; this write names its organization by id.
@@ -167,7 +167,8 @@ export class PrismaOrganizationLicenseRepository implements OrganizationLicenseR
       })}
       WITH held AS (
         SELECT o."id",
-               ol."updatedAt" AS "rowUpdatedAt",
+               o."updatedAt" AS "columnUpdatedAt",
+               o."license" AS "columnKey",
                CASE WHEN ol."organizationId" IS NULL OR o."updatedAt" > ol."updatedAt"
                     THEN o."license" ELSE ol."licenseKey" END AS "key"
           FROM "Organization" o
@@ -185,8 +186,9 @@ export class PrismaOrganizationLicenseRepository implements OrganizationLicenseR
              "expiresAt" = EXCLUDED."expiresAt",
              "validatedAt" = EXCLUDED."validatedAt",
              "updatedAt" = now()
-       WHERE "OrganizationLicense"."updatedAt"
-             IS NOT DISTINCT FROM (SELECT "rowUpdatedAt" FROM held)
+       WHERE (CASE WHEN (SELECT "columnUpdatedAt" FROM held) > "OrganizationLicense"."updatedAt"
+                   THEN (SELECT "columnKey" FROM held)
+                   ELSE "OrganizationLicense"."licenseKey" END) IS NOT DISTINCT FROM ${replacing}
     `;
     return written > 0;
   }

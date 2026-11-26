@@ -315,6 +315,26 @@ describe("attaching the key gateway provisioned", () => {
   });
 });
 
+describe("a managed key that was ended", () => {
+  /** @scenario "A live license lets go of a managed key once the key is ended" */
+  it("lets the live license that still names it go, so its install gets a new key", async () => {
+    const { credentials, repository, managedKeys } = harness([
+      rowFor({ instanceId: "install-1", virtualKeyId: "vk-ended" }),
+      rowFor({ id: "license-2", tokenHash: "other", revokedAt: NOW, virtualKeyId: "vk-gone" }),
+    ]);
+
+    await credentials.releaseEndedKey({ virtualKeyId: "vk-ended" });
+    await credentials.releaseEndedKey({ virtualKeyId: "vk-ended" });
+    await credentials.releaseEndedKey({ virtualKeyId: "vk-gone" });
+    const resolution = await credentials.resolve({ token: TOKEN, instanceId: "install-1" });
+
+    expect((await repository.findById("license-1"))?.virtualKeyId).toBeNull();
+    expect((await repository.findById("license-2"))?.virtualKeyId).toBe("vk-gone");
+    expect(resolution).toEqual({ ok: false, code: "connect_credential_pending" });
+    expect(managedKeys.issued.map((fact) => fact.issuedLicenseId)).toEqual(["license-1"]);
+  });
+});
+
 describe("a license sync", () => {
   function syncHarness(rows: IssuedLicenseRecord[], { allow = true }: { allow?: boolean } = {}) {
     const { repository, managedKeys, credentials } = harness(rows);

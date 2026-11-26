@@ -513,4 +513,42 @@ describe.skipIf(!TEST_DATABASE_URL)("given the licence Postgres repository", () 
       });
     },
   });
+
+  /** @scenario "A licence written in the same millisecond as the one a sync read keeps the delivery out" */
+  it("refuses a delivery once a write that kept the read row's timestamp commits first", async () => {
+    const organizationId = `${prefix}same-ms`;
+    const stamp = new Date("2026-01-01T00:00:00.000Z");
+    await prisma.organization.create({
+      data: {
+        id: organizationId,
+        name: organizationId,
+        slug: organizationId,
+        updatedAt: new Date("2020-01-01T00:00:00.000Z"),
+      },
+    });
+    await prisma.organizationLicense.create({
+      data: { organizationId, licenseKey: "key-a", updatedAt: stamp },
+    });
+    const repository = PrismaOrganizationLicenseRepository.create(prisma);
+    const deliveries: Promise<boolean>[] = [];
+
+    await prisma.$transaction(async (transaction) => {
+      await transaction.organizationLicense.update({
+        where: { organizationId },
+        data: { licenseKey: "key-b", updatedAt: stamp },
+      });
+      deliveries.push(
+        repository.replaceLicense({
+          organizationId,
+          license: { licenseKey: "delivered", expiresAt: EXPIRES, validatedAt: null },
+          replacing: "key-a",
+        }),
+      );
+      await new Promise((resolve) => setTimeout(resolve, 300));
+    });
+
+    await expect(Promise.all(deliveries)).resolves.toEqual([false]);
+    const row = await prisma.organizationLicense.findUniqueOrThrow({ where: { organizationId } });
+    expect(row.licenseKey).toBe("key-b");
+  });
 });

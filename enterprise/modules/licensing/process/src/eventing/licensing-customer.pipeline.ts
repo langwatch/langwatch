@@ -12,7 +12,10 @@ import type {
   ManagedKeyServicesSetEventData,
   SelfHostedCustomerLicensedEventData,
 } from "@langwatch/enterprise-licensing-contract";
-import { LICENSING_CUSTOMER_AGGREGATE_TYPE } from "@langwatch/enterprise-licensing-contract";
+import {
+  LICENSING_CUSTOMER_AGGREGATE_TYPE,
+  MANAGED_KEY_RETIRED_EVENT_TYPE,
+} from "@langwatch/enterprise-licensing-contract";
 import {
   defineAggregate,
   defineEventingModule,
@@ -105,8 +108,10 @@ export type LicensingCustomerPipeline = StaticPipelineDefinition<
 /** licensing_customer: facts about licensing's customers; organization and gateway apply them. */
 export function buildLicensingCustomerPipeline({
   attachManagedKey,
+  releaseEndedKey,
 }: {
   attachManagedKey: (provisioned: GatewayManagedKeyProvisionedEventData) => Promise<void>;
+  releaseEndedKey: (retired: ManagedKeyRetiredEventData) => Promise<void>;
 }): LicensingCustomerPipeline {
   return (
     definePipeline({
@@ -146,6 +151,14 @@ export function buildLicensingCustomerPipeline({
         eventType: GATEWAY_MANAGED_KEY_PROVISIONED_EVENT_TYPE,
         data: gatewayManagedKeyProvisionedEventDataSchema,
         handle: (provisioned) => attachManagedKey(provisioned),
+      })
+      // Whatever stopped after a key was ended, a live license still naming it lets go here.
+      .withEventSubscriber("licensingManagedKeyRetired", {
+        events: [MANAGED_KEY_RETIRED_EVENT_TYPE],
+        runIn: ["worker"],
+        handler: async (event) => {
+          if (event.type === MANAGED_KEY_RETIRED_EVENT_TYPE) await releaseEndedKey(event.data);
+        },
       })
       .build()
   );

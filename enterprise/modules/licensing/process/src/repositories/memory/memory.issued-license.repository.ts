@@ -156,17 +156,12 @@ export class MemoryIssuedLicenseRepository implements IssuedLicenseRepository {
     return true;
   }
 
-  async releaseVirtualKey({
-    id,
-    virtualKeyId,
-  }: {
-    id: string;
-    virtualKeyId: string;
-  }): Promise<boolean> {
-    const row = this.rows.get(id);
-    if (!row || row.virtualKeyId !== virtualKeyId) return false;
-    this.rows.set(id, { ...row, virtualKeyId: null });
-    return true;
+  async releaseVirtualKey({ virtualKeyId }: { virtualKeyId: string }): Promise<boolean> {
+    const holders = [...this.rows.values()].filter(
+      (row) => row.virtualKeyId === virtualKeyId && row.revokedAt === null,
+    );
+    for (const row of holders) this.rows.set(row.id, { ...row, virtualKeyId: null });
+    return holders.length > 0;
   }
 
   async revokeUnbound({

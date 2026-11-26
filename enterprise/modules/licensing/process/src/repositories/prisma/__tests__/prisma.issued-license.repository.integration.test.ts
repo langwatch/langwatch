@@ -294,19 +294,23 @@ describe.skipIf(!TEST_DATABASE_URL)("the license registry on Postgres", () => {
     expect(boundRow?.revokedAt).toBeNull();
   });
 
-  /** @scenario "An install that binds while its unused key is being ended gets a fresh key" */
-  it("lets go of a managed key only while the row still holds that key", async () => {
-    const { license } = await issue("ACME Release Key");
+  /** @scenario "A live license lets go of a managed key once the key is ended" */
+  it("lets go of an ended key on the live license naming it, never on a revoked one", async () => {
+    const live = (await issue("ACME Release Key")).license;
+    const revoked = (await issue("ACME Revoked Key")).license;
     const repository = PrismaIssuedLicenseRepository.create(prisma, SEALING);
-    await repository.update(license.id, { virtualKeyId: "vk-ended" });
+    await repository.update(live.id, { virtualKeyId: "vk-ended-live" });
+    await repository.update(revoked.id, {
+      virtualKeyId: "vk-ended-revoked",
+      revokedAt: nowInstant(),
+    });
 
-    expect(await repository.releaseVirtualKey({ id: license.id, virtualKeyId: "vk-other" })).toBe(
-      false,
-    );
-    expect(await repository.releaseVirtualKey({ id: license.id, virtualKeyId: "vk-ended" })).toBe(
-      true,
-    );
-    expect((await repository.findById(license.id))?.virtualKeyId).toBeNull();
+    expect(await repository.releaseVirtualKey({ virtualKeyId: "vk-other" })).toBe(false);
+    expect(await repository.releaseVirtualKey({ virtualKeyId: "vk-ended-revoked" })).toBe(false);
+    expect(await repository.releaseVirtualKey({ virtualKeyId: "vk-ended-live" })).toBe(true);
+
+    expect((await repository.findById(live.id))?.virtualKeyId).toBeNull();
+    expect((await repository.findById(revoked.id))?.virtualKeyId).toBe("vk-ended-revoked");
   });
 
   /** @scenario "Two instances racing to bind leave exactly one bound" */

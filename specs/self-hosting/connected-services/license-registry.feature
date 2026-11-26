@@ -458,6 +458,15 @@ Feature: License registry
     Then the license stays live and bound, and lets go of the ended key
     And the install's next sync provisions a new managed key
 
+  @unit @integration
+  Scenario: A live license lets go of a managed key once the key is ended
+    Given a managed key was ended and its retirement recorded as licensing's fact
+    And a live license still names that key, because the write after it never happened
+    When licensing applies its own fact
+    Then the live license no longer names the key, and its install's next call provisions a new one
+    And a revoked license keeps the key it names
+    And applying the fact again changes nothing
+
   @integration
   Scenario: Retiring an unused key that failed for another reason keeps the new key for the customer
     Given no install holds the license
