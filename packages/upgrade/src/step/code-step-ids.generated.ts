@@ -15,6 +15,7 @@ export type CodeStepId =
   | "billing:record-usage-billing-catch-up"
   | "billing:fill-seat-change-organizations"
   | "coding-agent:fill-id-indexes"
+  | "dashboard:mark-my-dashboards"
   | "data-retention:keep-control-plane-events-forever"
   | "dataset:move-content-to-object-storage"
   | "dataset:fill-empty-slugs"

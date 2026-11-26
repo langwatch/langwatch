@@ -91,3 +91,10 @@ f483fe302e7c3dfb100e1d6fa9c99b6d9a049c20:specs/server/feature-configuration.feat
 # is clean and only this pull request's history still carries the literal.
 5660559ce9c3120aecb6ee6cb4a3709f1eb01efb:.github/workflows/migration-compat.yml:curl-auth-user:219
 5660559ce9c3120aecb6ee6cb4a3709f1eb01efb:.github/workflows/migration-compat.yml:curl-auth-user:590
+
+# A Developer seats drawer test stubbed the reissued license as
+# `eyJkZXYiOjd9.signature`, base64 for {"dev":7} plus a placeholder signature,
+# which clears the generic-api-key bar beside a `licenseKey:` key. It was never
+# a credential; the stub now reads `signed-dev-seats`, so only this pull
+# request's history still carries the literal.
+913bf65da63f16c127d03e9484c997f5652feb5a:modules/ops/browser/src/features/admin/__tests__/license-developer-seats.integration.test.tsx:generic-api-key:91

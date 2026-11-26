@@ -7,7 +7,7 @@ import type { LicensingCustomerFactsService } from "./licensing-customer-facts.s
 
 type LicenseRows = Pick<
   OrganizationLicenseRepository,
-  "findLicense" | "saveLicense" | "clearLicense" | "restoreLicense"
+  "findLicense" | "saveLicense" | "replaceLicense" | "clearLicense" | "restoreLicense"
 >;
 
 type LicenseFacts = Pick<LicensingCustomerFactsService, "licenseStored" | "licenseCleared">;
@@ -41,6 +41,27 @@ export class OrganizationLicenseWriterService {
       previous,
       tell: () => this.facts.licenseStored({ organizationId, license }),
     });
+  }
+
+  /** `store`, but only while the row still holds `replacing`; whether it wrote. */
+  async replace({
+    organizationId,
+    license,
+    replacing,
+  }: Readonly<{
+    organizationId: string;
+    license: StoredLicense;
+    replacing: string | null;
+  }>): Promise<boolean> {
+    const previous = await this.licenses.findLicense({ organizationId });
+    if (!(await this.licenses.replaceLicense({ organizationId, license, replacing }))) return false;
+    await this.tellOrRestore({
+      organizationId,
+      written: license,
+      previous,
+      tell: () => this.facts.licenseStored({ organizationId, license }),
+    });
+    return true;
   }
 
   async remove({ organizationId }: Readonly<{ organizationId: string }>): Promise<void> {

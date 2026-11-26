@@ -57,6 +57,7 @@ import { MemoryNurturingErasedUserRepository } from "../../repositories/memory/m
 import { MemoryNurturingOrganizationMemberRepository } from "../../repositories/memory/memory.nurturing-organization-member.repository.ts";
 import { postHogUuidFor } from "../../rules/nurturing-guided-onboarding-service.rules.ts";
 import { unplacedMemberFacts } from "../../services/__tests__/nurturing-member-facts.test-helpers.ts";
+import { peopleWithEmails } from "../../services/__tests__/nurturing-person-email.test-helpers.ts";
 import { NurturingDeliveryService } from "../../services/nurturing-delivery.service.ts";
 import { NurturingService } from "../../services/nurturing.service.ts";
 import { RecordNurturingSignalCommand } from "../nurturing-signal.commands.ts";
@@ -102,7 +103,7 @@ function urlOf(input: string | URL | Request): string {
 }
 
 /** Nurturing's pipeline over memory PostHog and a recording Customer.io, as the app composes it. */
-function nurturingOverMemoryPostHog(users: UserApi = createApiFixture<UserApi>({})) {
+function nurturingOverMemoryPostHog(users: UserApi = peopleWithEmails()) {
   const posthog = MemoryPostHogChannel.create();
   const customerIoFetch = vi.fn(
     async (_url: string | URL | Request, _init?: RequestInit) =>
@@ -119,6 +120,7 @@ function nurturingOverMemoryPostHog(users: UserApi = createApiFixture<UserApi>({
       release: async (key: string) => void seen.delete(key),
     },
     customerIo: NurturingService.create({
+      users,
       channel: HttpCustomerIoChannel.create({
         config: { customerIoApiKey: "key", customerIoRegion: "us" },
         fetchFn: customerIoFetch,
@@ -272,7 +274,10 @@ describe("nurturing's memberRoleChanged peer subscriber", () => {
       }));
       expect(sent).toContainEqual({
         path: "/identify",
-        body: expect.objectContaining({ userId: "user-1", traits: { seat: "admin" } }),
+        body: expect.objectContaining({
+          userId: "user-1",
+          traits: { seat: "admin", email: "user-1@example.com" },
+        }),
       });
       expect(sent).toContainEqual({
         path: "/group",
@@ -322,7 +327,10 @@ describe("nurturing's memberAdmitted peer subscriber", () => {
       }));
       expect(sent).toContainEqual({
         path: "/identify",
-        body: expect.objectContaining({ userId: "user-1", traits: { seat: "member" } }),
+        body: expect.objectContaining({
+          userId: "user-1",
+          traits: { seat: "member", email: "user-1@example.com" },
+        }),
       });
       expect(sent).toContainEqual({
         path: "/group",
@@ -349,6 +357,8 @@ function createdFact({ backfilled }: { backfilled?: true } = {}): Event {
 /** The person behind user-1, read fresh at delivery and never stored (§9). */
 function jane(): UserApi {
   return createApiFixture<UserApi>({
+    getProfiles: (input) =>
+      peopleWithEmails({ emails: { "user-1": "jane@example.com" } }).getProfiles(input),
     findById: async () => ({
       id: "user-1",
       name: "Jane Doe",
@@ -385,6 +395,7 @@ describe("nurturing's userCreated peer subscriber", () => {
         traits: {
           email: "jane@example.com",
           name: "Jane Doe",
+          first_name: "Jane",
           createdAt: 1,
         },
       });

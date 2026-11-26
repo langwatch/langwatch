@@ -7,7 +7,7 @@
 
 import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import { LANGY_CONVERSATION_EVENT_TYPES } from "@langwatch/langy-contract";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -31,7 +31,7 @@ vi.mock("../../elements/langy-model-pill.tsx", () => ({
   LangyModelPill: () => <div data-testid="model-pill" />,
 }));
 
-import { Composer } from "../composer.tsx";
+import { Composer, MID_TURN_PLACEHOLDER } from "../composer.tsx";
 
 const CONVERSATION_ID = "conv-recorded";
 const TURN_ID = "turn-recorded";
@@ -69,7 +69,6 @@ function renderComposer(onSend: (text: string) => void) {
         modelOptions={["openai/gpt-5-mini"]}
         onModelChange={() => undefined}
         onSend={onSend}
-        onStop={() => undefined}
         disabled={false}
       />
     </DesignSystemProvider>,
@@ -92,34 +91,26 @@ afterEach(() => {
 
 describe("given the composer follows the recorded turn", () => {
   describe("when the record carries a turn in progress", () => {
-    /** @scenario Sending stays unavailable exactly while a turn is recorded in flight */
-    it("holds sending shut until the recorded terminal lands, then opens it", async () => {
+    /** @scenario The composer reads as mid-turn exactly while a turn is recorded in flight */
+    it("reads as mid-turn until the recorded terminal lands, then as idle", async () => {
       const onSend = vi.fn();
-      // The record says a turn is running — folded from the durable tail, the
-      // way the freshness coordinator applies it.
+      // The record says a turn is running, folded from the durable tail the way the freshness
+      // coordinator applies it.
       useLangyStore.getState().applyTurnEvents([turnAccepted({ id: "event-1", createdAt: 1_000 })]);
-      useLangyStore.getState().setDraft("what changed in p95?");
 
       const { container } = renderComposer(onSend);
-
-      expect(screen.getByLabelText("Stop")).toBeTruthy();
-      expect(screen.queryByLabelText("Send")).toBeNull();
-
-      // The one gesture that could still slip a send through mid-turn. The
-      // message field has no accessible name of its own — it is the composer's
-      // only textarea.
       const field = container.querySelector("textarea")!;
-      await userEvent.type(field, "{Enter}");
-      expect(onSend).not.toHaveBeenCalled();
 
-      // The turn reaches its recorded terminal — nothing else changes.
+      expect(field.getAttribute("placeholder")).toBe(MID_TURN_PLACEHOLDER);
+      expect(screen.queryByLabelText("Stop")).toBeNull();
+
+      // The turn reaches its recorded terminal; nothing else changes.
       useLangyStore
         .getState()
         .applyTurnEvents([agentResponded({ id: "event-2", createdAt: 2_000 })]);
 
-      expect(await screen.findByLabelText("Send")).toBeTruthy();
-      expect(screen.queryByLabelText("Stop")).toBeNull();
-
+      await waitFor(() => expect(field.getAttribute("placeholder")).not.toBe(MID_TURN_PLACEHOLDER));
+      useLangyStore.getState().setDraft("what changed in p95?");
       await userEvent.type(field, "{Enter}");
       expect(onSend).toHaveBeenCalledWith("what changed in p95?");
     });

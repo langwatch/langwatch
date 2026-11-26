@@ -89,7 +89,12 @@ export type Dashboard = z.infer<typeof dashboardSchema>;
 
 /** A Dashboards board (DashboardsV2): the stored row with the product it is homed in. */
 const boardSchemaDefinition = z
-  .object({ ...dashboardSchema.shape, homeProduct: dashboardHomeProductSchema })
+  .object({
+    ...dashboardSchema.shape,
+    homeProduct: dashboardHomeProductSchema,
+    /** The member whose own My dashboard this is; null or absent on every other board. */
+    myDashboardOfUserId: z.string().nullish(),
+  })
   .strict();
 export interface BoardSchema extends Named<typeof boardSchemaDefinition> {}
 export const boardSchema: BoardSchema = boardSchemaDefinition;
@@ -116,6 +121,8 @@ const boardSummarySchemaDefinition = z
   .object({
     ...dashboardSummarySchema.shape,
     homeProduct: dashboardHomeProductSchema,
+    /** The member whose own My dashboard this is; null or absent on every other board. */
+    myDashboardOfUserId: z.string().nullish(),
     /** Whether the member reading the list has starred this board. */
     isStarred: z.boolean(),
     /** The project that owns an Organization board listed in another project; null at home. */
@@ -138,6 +145,8 @@ const organizationBoardSchemaDefinition = z
     createdById: z.string().nullable(),
     scope: dashboardScopeSchema,
     homeProduct: dashboardHomeProductSchema,
+    /** The member whose own My dashboard this is; null or absent on every other board. */
+    myDashboardOfUserId: z.string().nullish(),
     updatedAt: z.date(),
     project: dashboardProjectSchema.nullable(),
     openProject: dashboardProjectSchema.nullable(),
@@ -172,11 +181,52 @@ export const dashboardScopeProjectsSchema: DashboardScopeProjectsSchema =
 export type DashboardScopeProjects = z.infer<typeof dashboardScopeProjectsSchema>;
 
 /**
- * A member's own default board, made the first time they open Dashboards. No column marks it, so
- * the name and its creator do; it starts Only me and in its creator's stars
- * (dashboards-v2.feature AC160b, AC170).
+ * The name a member's own default board is made with, the first time they open Dashboards. It
+ * starts Only me and in its creator's stars, and `myDashboardOfUserId` marks it, so a rename
+ * keeps it theirs (dashboards-v2.feature AC160b, AC163, AC170).
  */
 export const MY_DASHBOARD_NAME = "My dashboard";
+
+/** What the My dashboard rules read of a board. */
+export type MyDashboardCandidate = Readonly<{
+  name: string;
+  createdById: string | null;
+  myDashboardOfUserId?: string | null;
+}>;
+
+/**
+ * Whether the board is the member's own My dashboard: marked theirs, or, on a row made before the
+ * mark and not filled yet, made by them under the default name.
+ */
+export function isMyDashboardOf({
+  board,
+  userId,
+}: {
+  board: MyDashboardCandidate;
+  userId: string | undefined;
+}): boolean {
+  if (userId === undefined) return false;
+  if (board.myDashboardOfUserId !== undefined && board.myDashboardOfUserId !== null) {
+    return board.myDashboardOfUserId === userId;
+  }
+  return board.name === MY_DASHBOARD_NAME && board.createdById === userId;
+}
+
+/**
+ * The member's My dashboards among these boards, the one that counts first: those marked theirs
+ * before the unmarked ones, each group in the order given.
+ */
+export function findMyDashboards<Board extends MyDashboardCandidate>({
+  boards,
+  userId,
+}: {
+  boards: readonly Board[];
+  userId: string | undefined;
+}): Board[] {
+  const theirs = boards.filter((board) => isMyDashboardOf({ board, userId }));
+  const isMarked = (board: Board) => board.myDashboardOfUserId === userId;
+  return [...theirs.filter(isMarked), ...theirs.filter((board) => !isMarked(board))];
+}
 
 /** A From LangWatch template's id, as the browser's catalogue names it (`release`, `data`). */
 export const dashboardTemplateIdSchema = z.string().trim().min(1).max(100);

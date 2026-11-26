@@ -124,3 +124,36 @@ jobs:
           git -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
             commit -q -m "chore(upgrade): stamp release manifest ${version}"
           git push origin "HEAD:${BRANCH}"
+
+  # Release Please parses each squash commit's body as well as its subject, so a
+  # body that opens with its own conventional-commit line yields two entries for
+  # one sha, and every run rewrites the release branches from history. This job
+  # re-runs after every regeneration. Spec: specs/ci/release-notes-dedupe.feature
+  dedupe-release-notes:
+    name: Keep one release-note entry per commit
+    # After the stamp job, so the two never race on the app's release branch;
+    # still runs when it is skipped, since updated release PRs report no output.
+    needs: [release-please, stamp-release-manifest]
+    if: ${{ !cancelled() && needs.release-please.result == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
+        with:
+          # Pushes with this token, not GITHUB_TOKEN, so the release PR's
+          # checks still run on the deduplicated commit.
+          token: ${{ secrets.RELEASE_PLEASE_TOKEN }}
+          persist-credentials: true
+          sparse-checkout: |
+            /*
+            !/docs/media/
+            !/docs/images/
+          sparse-checkout-cone-mode: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v6
+        with:
+          node-version: "24.22.1"
+      - name: Deduplicate release-note entries
+        env:
+          GITHUB_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN }}
+        run: bash .github/scripts/dedupe-release-notes.sh

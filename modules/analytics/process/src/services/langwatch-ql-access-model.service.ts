@@ -324,18 +324,21 @@ export class LangWatchQLAccessModelService {
     names,
     sourceDatabase,
     includeAppFunctions = true,
+    localKeyMap = true,
   }: {
     names: LangWatchQLNames;
     sourceDatabase?: string;
     /** Off where a `CREATE FUNCTION` would reach one replica of several. */
     includeAppFunctions?: boolean;
+    /** Off where the key map is a PostgreSQL-engine table, created with the engine tables. */
+    localKeyMap?: boolean;
   }): string[] {
     this.assertNames(names);
 
     return [
       `CREATE DATABASE IF NOT EXISTS ${names.database}`,
       ...(includeAppFunctions ? appFunctionStatements.functionStatements() : []),
-      this.keyMapTableStatement({ names, sourceDatabase }),
+      ...(localKeyMap ? [this.keyMapTableStatement({ names, sourceDatabase })] : []),
     ];
   }
 }
