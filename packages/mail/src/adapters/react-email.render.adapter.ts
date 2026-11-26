@@ -75,7 +75,7 @@ export class ReactEmailMailRenderer extends MailRender {
 
   renderMonitorAutoPaused(
     input: MonitorAutoPausedEmailProps,
-  ): Promise<{ subject: string; html: string; template: string }> {
+  ): Promise<{ subject: string; html: string }> {
     return renderMonitorAutoPausedEmail(input);
   }
 

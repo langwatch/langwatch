@@ -159,7 +159,6 @@ export const sendLicenseEmail = async ({
       to: props.email,
       subject,
       html,
-      template: licenseEmailTemplate.id,
       attachments: [
         {
           filename: `${sanitizeFilenamePrefix(props.organizationName)}.langwatch-license`,

@@ -35,13 +35,10 @@ export abstract class MailRender {
     input: UpgradeAlertEmailProps,
   ): Promise<{ subject: string; html: string }>;
 
-  /**
-   * An online evaluation that paused itself, sent to each of its organization's admins. The
-   * template id travels with it so notification can pick the provider by it.
-   */
+  /** An online evaluation that paused itself, sent to each of its organization's admins. */
   abstract renderMonitorAutoPaused(
     input: MonitorAutoPausedEmailProps,
-  ): Promise<{ subject: string; html: string; template: string }>;
+  ): Promise<{ subject: string; html: string }>;
 
   /** What one platform operator did with staff access, sent to each of the other operators. */
   abstract renderStaffAccessNotice(

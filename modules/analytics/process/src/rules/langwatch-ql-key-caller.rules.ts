@@ -37,6 +37,6 @@ export function keyMaySpend(reach: LangWatchQLKeyReach): boolean {
 
 /** The project a key resolved to on its own, for a failed run's line; empty for a wider key. */
 export function keyReachProjectIds({ reach }: { reach: LangWatchQLKeyReach }): readonly string[] {
-  if (reach.kind === "project") return [reach.projectId];
+  if (reach.kind === "project" || reach.kind === "cliAccessToken") return [reach.projectId];
   return reach.resolvedProject ? [reach.resolvedProject.id] : [];
 }

@@ -477,10 +477,10 @@ resolveViewerProtections(input: { projectId: string; userId: string | null; /** 
 
 #### `resolveApiKeyProtections`
 
-The same redactions for an API-KEY caller: the public branch of every content category, plus the credential's own `cost:view` grant. A legacy project key (`principal: null`) predates RBAC and sees costs.
+The same redactions for a REST credential: an API key reads the public branch of every content category, a project-bound access token (`user` principal) reads as its person. Costs are the credential's own `cost:view` grant; a legacy key (`null`) sees them.
 
 ```typescript
-resolveApiKeyProtections(input: { projectId: string; principal: PrincipalRef | null; }): Promise<Protections>;
+resolveApiKeyProtections(input: { projectId: string; principal: PrincipalRef | null; /** The read's proof, folded in for an access token as for its person (ADR-177 decision 9). */ authorization?: Authorization; }): Promise<Protections>;
 ```
 
 #### `findExistingTraceIds`
@@ -1370,7 +1370,7 @@ type Response = unknown;
 
 |             |                                      |
 | ----------- | ------------------------------------ |
-| Declared at | `src/transport/traces.rest.ts:309`   |
+| Declared at | `src/transport/traces.rest.ts:310`   |
 | Base URL    | `/api/traces`, twin `/api/v1/traces` |
 | Addressing  | dated                                |
 | Credential  | project                              |
@@ -1380,13 +1380,13 @@ type Response = unknown;
 
 Search traces for a project
 
-Permission `traces:view`. Declared at `src/transport/traces.rest.ts:313`.
+Permission `traces:view`. Declared at `src/transport/traces.rest.ts:314`.
 
 Answers at `/api/traces/search`, `/api/v1/traces/search`; also, undocumented, `/api/traces/2026-08-07/search`, `/api/v1/traces/2026-08-07/search`, `/api/traces/latest/search`, `/api/v1/traces/latest/search`.
 
 ```typescript
 type Body = z.infer<typeof traceSearchBodySchema>; // ../contract/src/trace-rest.schemas.ts:131
-// Response: inline, src/transport/traces.rest.ts:318
+// Response: inline, src/transport/traces.rest.ts:319
 type Response = unknown;
 ```
 
@@ -1394,7 +1394,7 @@ type Response = unknown;
 
 Recommended trace wait for a scenario judge
 
-Permission `traces:view`. Declared at `src/transport/traces.rest.ts:340`.
+Permission `traces:view`. Declared at `src/transport/traces.rest.ts:341`.
 
 Answers at `/api/traces/settle-settings`, `/api/v1/traces/settle-settings`; also, undocumented, `/api/traces/2026-08-07/settle-settings`, `/api/v1/traces/2026-08-07/settle-settings`, `/api/traces/latest/settle-settings`, `/api/v1/traces/latest/settle-settings`.
 
@@ -1411,7 +1411,7 @@ interface Response {
 
 Discover what the trace filter fields hold
 
-Permission `traces:view`. Declared at `src/transport/traces.rest.ts:364`.
+Permission `traces:view`. Declared at `src/transport/traces.rest.ts:365`.
 
 Answers at `/api/traces/facets`, `/api/v1/traces/facets`; also, undocumented, `/api/traces/2026-08-07/facets`, `/api/v1/traces/2026-08-07/facets`, `/api/traces/latest/facets`, `/api/v1/traces/latest/facets`.
 
@@ -1433,7 +1433,7 @@ type Response = Record<string, unknown>;
 
 Derived coding-agent transcript for a trace: what the agent did, in order, with per-call token and cost economics. Empty entries for traces without coding-agent content.
 
-Permission `traces:view`. Declared at `src/transport/traces.rest.ts:397`.
+Permission `traces:view`. Declared at `src/transport/traces.rest.ts:398`.
 
 Answers at `/api/traces/:traceId/transcript`, `/api/v1/traces/:traceId/transcript`; also, undocumented, `/api/traces/2026-08-07/:traceId/transcript`, `/api/v1/traces/2026-08-07/:traceId/transcript`, `/api/traces/latest/:traceId/transcript`, `/api/v1/traces/latest/:traceId/transcript`.
 
@@ -1449,7 +1449,7 @@ type Response = z.infer<typeof transcriptRestResponseSchema>; // ../contract/src
 
 Update metadata on a trace after creation. Inserts a synthetic span carrying the new attributes through the standard ingestion pipeline. New keys are added, existing keys are updated, missing keys are preserved. Labels replace entirely.
 
-Permission `traces:update`. Declared at `src/transport/traces.rest.ts:436`.
+Permission `traces:update`. Declared at `src/transport/traces.rest.ts:437`.
 
 Answers at `/api/traces/:traceId/metadata`, `/api/v1/traces/:traceId/metadata`; also, undocumented, `/api/traces/2026-08-07/:traceId/metadata`, `/api/v1/traces/2026-08-07/:traceId/metadata`, `/api/traces/latest/:traceId/metadata`, `/api/v1/traces/latest/:traceId/metadata`.
 
@@ -1469,7 +1469,7 @@ interface Response {
 
 Get a single trace by ID.
 
-Permission `traces:view`. Declared at `src/transport/traces.rest.ts:462`.
+Permission `traces:view`. Declared at `src/transport/traces.rest.ts:463`.
 
 Answers at `/api/traces/:traceId`, `/api/v1/traces/:traceId`; also, undocumented, `/api/traces/2026-08-07/:traceId`, `/api/v1/traces/2026-08-07/:traceId`, `/api/traces/latest/:traceId`, `/api/v1/traces/latest/:traceId`.
 

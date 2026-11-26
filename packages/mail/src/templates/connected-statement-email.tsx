@@ -149,8 +149,5 @@ export const sendConnectedStatementEmail = async ({
   ...props
 }: ConnectedStatementEmailProps & { mailer: MailSender; to: string }): Promise<void> => {
   const { subject, html } = await renderMailTemplate(connectedStatementEmailTemplate, props);
-  await sendEmail({
-    mailer,
-    content: { to, subject, html, template: connectedStatementEmailTemplate.id },
-  });
+  await sendEmail({ mailer, content: { to, subject, html } });
 };

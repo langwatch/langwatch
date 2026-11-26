@@ -119,16 +119,7 @@ export const sendSsoDomainProofWaveringEmail = async ({
   ...props
 }: SsoDomainProofWaveringProps & { mailer: MailSender; idempotencyKey?: string }) => {
   const { subject, html } = await renderMailTemplate(ssoDomainProofWaveringTemplate, props);
-  await sendEmail({
-    mailer,
-    content: {
-      to: props.adminEmail,
-      subject,
-      html,
-      idempotencyKey,
-      template: ssoDomainProofWaveringTemplate.id,
-    },
-  });
+  await sendEmail({ mailer, content: { to: props.adminEmail, subject, html, idempotencyKey } });
 };
 
 /* ── The grace ran out: what stopped, and what did not. ──────────────────── */
@@ -196,14 +187,5 @@ export const sendSsoDomainProofLapsedEmail = async ({
   ...props
 }: SsoDomainProofLapsedProps & { mailer: MailSender; idempotencyKey?: string }) => {
   const { subject, html } = await renderMailTemplate(ssoDomainProofLapsedTemplate, props);
-  await sendEmail({
-    mailer,
-    content: {
-      to: props.adminEmail,
-      subject,
-      html,
-      idempotencyKey,
-      template: ssoDomainProofLapsedTemplate.id,
-    },
-  });
+  await sendEmail({ mailer, content: { to: props.adminEmail, subject, html, idempotencyKey } });
 };

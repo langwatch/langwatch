@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { useInRouterContext, useLocation } from "react-router";
 
 import {
@@ -85,12 +85,11 @@ export function useLangyPageContext(): {
     ...pickedChips,
   ]);
 
-  // The board on screen rides every turn unasked; every other chip waits to be chosen.
-  const attached = withAutoAttachedChips({
-    chosen,
-    autoAttachedIds: routed.filter((chip) => chip.kind === "dashboard").map((chip) => chip.id),
-    dismissed,
-  });
+  // The board on screen rides every turn unasked, whether the address or the board names it;
+  // every other chip waits to be chosen.
+  const boardChipIds = boardChipIdsOf([...routed, ...namedPageChips(pageContext)]);
+  const attached = withAutoAttachedChips({ chosen, autoAttachedIds: boardChipIds, dismissed });
+  useRestoreBoardChipOnArrival({ pathname, boardChipIds });
   const chips = selectVisibleChips(candidates, attached);
 
   // Tell the page which chips are live, so a registered target can render as
@@ -106,6 +105,38 @@ export function useLangyPageContext(): {
   };
 }
 
+/** The distinct board chips among these candidates. */
+function boardChipIdsOf(candidates: readonly LangyContextChip[]): string[] {
+  return [...new Set(candidates.filter((chip) => chip.kind === "dashboard").map(({ id }) => id))];
+}
+
+/**
+ * A board chip removed on an earlier visit comes back when the reader arrives at that board
+ * again: a removal holds while they stay on the page, not for the rest of the conversation.
+ */
+function useRestoreBoardChipOnArrival({
+  pathname,
+  boardChipIds,
+}: {
+  pathname: string;
+  boardChipIds: readonly string[];
+}): void {
+  const arrivalRef = useRef<string | null>(null);
+  const ids = boardChipIds.join(" ");
+  useEffect(() => {
+    const arrival = `${pathname} ${ids}`;
+    if (arrivalRef.current === arrival) return;
+    arrivalRef.current = arrival;
+    const restored = ids.split(" ").filter((id) => id.length > 0);
+    useLangyStore.setState((state) => {
+      if (!restored.some((id) => state.dismissedChipIds.has(id))) return state;
+      const dismissed = new Set(state.dismissedChipIds);
+      for (const id of restored) dismissed.delete(id);
+      return { dismissedChipIds: dismissed };
+    });
+  }, [pathname, ids]);
+}
+
 /** The surface segment of a `/<projectSlug>/<surface>/…` path (or ""). */
 function surfaceOf(pathname: string): string {
   return pathname.split("/").filter((s) => s.length > 0)[1] ?? "";
@@ -118,6 +149,8 @@ function surfaceOf(pathname: string): string {
  */
 function routeChips(pathname: string): LangyContextChip[] {
   const segments = pathname.split("/").filter((s) => s.length > 0);
+  // The organization's Dashboards area, `/dashboards/<id>`, has no project segment.
+  if (segments[0] === "dashboards") return boardRouteChips(segments[1]);
   // [projectSlug, surface, ...rest]
   const surface = segments[1];
   const rest = segments.slice(2);
@@ -149,12 +182,8 @@ function routeChips(pathname: string): LangyContextChip[] {
       // Shared with the dataset list rows that register as context targets, so
       // a clicked dataset and a routed one are the same chip.
       return [datasetContextChip({ datasetId: rest[0]! })];
-    case "dashboards": {
-      // The templates library and a From LangWatch board hold no board Langy may place on.
-      const dashboardId = rest[0]!;
-      if (DASHBOARD_PAGE_TAILS.has(dashboardId)) return [];
-      return [dashboardContextChip({ dashboardId })];
-    }
+    case "dashboards":
+      return boardRouteChips(rest[0]);
     default: {
       const spec = SIMPLE_ROUTE_CHIPS[surface];
       if (!spec) return [];
@@ -195,5 +224,11 @@ const SIMPLE_ROUTE_CHIPS: Record<string, { kind: LangyContextChip["kind"]; noun:
 /** Tails that are a page, not a resource. */
 const RESOURCELESS_TAILS = new Set(["new", "index", "create"]);
 
-/** `/dashboards/<tail>` pages that are not one of the project's boards. */
-const DASHBOARD_PAGE_TAILS = new Set(["templates", "curated"]);
+/** `/dashboards/<tail>` pages that are not a stored board: a draft has no id to place on yet. */
+const DASHBOARD_PAGE_TAILS = new Set(["templates", "curated", "new", "index"]);
+
+/** The board a dashboards address names; the templates library and a draft name none. */
+function boardRouteChips(dashboardId: string | undefined): LangyContextChip[] {
+  if (!dashboardId || DASHBOARD_PAGE_TAILS.has(dashboardId)) return [];
+  return [dashboardContextChip({ dashboardId })];
+}
