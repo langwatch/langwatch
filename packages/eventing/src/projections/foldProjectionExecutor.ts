@@ -132,7 +132,7 @@ function withReadHints<State, E extends Event>({
   if (typeof occurredAt !== "number" || occurredAt <= 0) return named;
   const readWindow = projection.options?.readWindow;
   if (readWindow === undefined) return { ...named, occurredAtMs: occurredAt };
-  const anchorMs = readWindow.anchorOf?.(event as E);
+  const anchorMs = readWindow.anchorOf?.(event);
   return {
     ...named,
     occurredAtMs: occurredAt,

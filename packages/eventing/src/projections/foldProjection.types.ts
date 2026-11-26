@@ -118,7 +118,7 @@ export interface FoldProjectionOptions<E extends Event = Event> {
     widthMs: number;
     fallbackLookbackStepsMs?: readonly number[];
     /** The business time to centre on when occurredAt is an arrival time; else occurredAt. */
-    anchorOf?: (event: E) => number | undefined;
+    anchorOf?: (event: Event) => number | undefined;
   };
   // Re-fold from event log on store miss; transitional only for rows predating
   // read-back columns. See ADR-066; requires eventLoaderUpTo and RedisCachedFoldStore.
