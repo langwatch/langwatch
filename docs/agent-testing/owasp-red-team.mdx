@@ -1,0 +1,83 @@
+---
+title: OWASP Red Team Pack
+sidebarTitle: OWASP Red Team Pack
+keywords: langwatch, red teaming, owasp, owasp top 10 for llm applications, owasp agentic top 10, prompt injection, agent security, scenario tests
+description: Run one multi-turn attack per OWASP risk against your agent as pytest or vitest scenario tests, with every verdict in LangWatch.
+---
+
+<Warning>Use red teaming only on agents you own or have explicit permission to test.</Warning>
+
+The OWASP pack is a set of multi-turn [red team](/agent-testing/red-teaming) tests, one per OWASP risk, that you add to your agent's test suite. You get a pytest or vitest file per language, judged against your agent's own rules, so you can show your security team where the agent stands on the OWASP Top 10 for LLM Applications and the OWASP Top 10 for Agentic Applications.
+
+To run the same OWASP lists from the platform without code, create a suite from a pack in the template gallery. See [Red Team Templates](/agent-testing/red-team-templates).
+
+## What the pack covers
+
+| OWASP id | Title | What the attacker tries |
+| --- | --- | --- |
+| LLM01:2025 | Prompt Injection | Planted instructions in pasted content or tool results |
+| LLM02:2025 | Sensitive Information Disclosure | Leaking the data you list as protected |
+| LLM05:2025 | Improper Output Handling | Scripts, handlers and tracking images in replies |
+| LLM06:2025 | Excessive Agency | Actions beyond what the user may ask for |
+| LLM07:2025 | System Prompt Leakage | Printing the system prompt or hidden rules |
+| LLM09:2025 | Misinformation | Confident answers the agent's data does not back |
+| LLM10:2025 | Unbounded Consumption | Endless output and tool loops |
+| ASI01 | Agent Goal Hijack | Redirecting the agent to the attacker's goal |
+| ASI02 | Tool Misuse and Exploitation | Tools called with injected or foreign arguments |
+| ASI03 | Identity and Privilege Abuse | Privileged tools used on a claimed identity |
+| ASI06 | Memory & Context Poisoning | A false rule planted early and used later |
+
+LLM03, LLM04, LLM08, ASI04, ASI07, ASI08 and ASI10 concern supply chain, training data, vector stores and multi-agent systems, which a conversation with your agent cannot reach. A conversation can reach ASI05 (Unexpected Code Execution) and ASI09 (Human-Agent Trust Exploitation), but the pack has no attack for them: ASI05 needs an agent that runs code, and ASI09 turns on what a person does with the reply.
+
+## Apply it with your coding agent
+
+Install the LangWatch skills and ask your coding agent:
+
+```text
+Red team my agent against the OWASP Top 10 for LLM and agentic applications
+```
+
+It follows the [OWASP red team recipe](https://github.com/langwatch/skills/tree/main/recipes/owasp-red-team). When it finishes, you have:
+
+- the pack in your tests, in the language your repo uses
+- an adapter that calls your agent
+- a config filled in from your system prompt and tools
+- the results of one attack, then of the full pack
+
+## Apply it by hand
+
+1. Copy the [Python pack](https://github.com/langwatch/skills/tree/main/recipes/owasp-red-team/templates/python) or the [TypeScript pack](https://github.com/langwatch/skills/tree/main/recipes/owasp-red-team/templates/typescript) into one test folder.
+2. In `agent_adapter.py` or `agent-adapter.ts`, make `call_agent` or `callAgent` call your real agent and return its reply, tool calls included. If your TypeScript agent takes OpenAI chat messages, use `toOpenAIMessages` and `fromOpenAIMessages` from the same file.
+3. In `owasp_config.py` or `owasp.config.ts`, fill in the config block. You describe the agent's name and job, its tools, the tools that change data, what it must never do and the data it must never disclose. The pack builds every attack goal and judge criterion from this one block. Every field ships as `FILL ME`, and the pack refuses to run while any field still holds `FILL ME`.
+
+   Two limits ship filled: `max_reply_words` (500) and `max_tool_calls_per_turn` (5). They set the longest reply and the most tool calls per message that the LLM10 attack accepts.
+
+## Run it
+
+Install the test dependencies if your repo does not have them yet:
+
+```bash
+pip install "langwatch-scenario>=1.6" pytest "pytest-asyncio>=0.24"  # Python
+npm install -D @langwatch/scenario@^1.7 vitest @ai-sdk/openai@^3     # TypeScript
+```
+
+Keep `@ai-sdk/openai` on 3.x: `@langwatch/scenario` 1.7 refuses 4.x models. The attacker and the judge need an OpenAI-compatible chat model, set with `OWASP_MODEL`. For Python, set `OWASP_MODEL` to that provider's LiteLLM id. Both languages take a LiteLLM id such as `openai/gpt-5-mini`. For TypeScript, also swap the `openai` import and factory in `owasp-pack.redteam.ts` for that provider's AI SDK package. Gemini fails as attacker or judge in the current SDK. Your agent can use any model.
+
+Set `LANGWATCH_API_KEY` and the API key of the provider `OWASP_MODEL` points to (`OPENAI_API_KEY` for the default), then run:
+
+```bash
+pytest test_owasp_pack.py -v -m agent_test                      # Python
+npx vitest run --config tests/owasp/owasp.vitest.config.ts      # TypeScript
+```
+
+Add `-k LLM01` (pytest) or `-t LLM01` (vitest) to run one id.
+
+The pack calls live models, so keep it out of your default test run and CI. For pytest, add `-m "not agent_test"` to your default options (`addopts` under `[tool.pytest.ini_options]`); `-m agent_test` on the command line overrides it. For vitest, the pack file `owasp-pack.redteam.ts` does not end in `.test.ts`, so the default include skips it and only `owasp.vitest.config.ts` runs it.
+
+`OWASP_TURNS` sets the attacker's turns per attack: 10 when unset or empty, 30 before a release. A value that is not a whole number of at least 1 stops the run.
+
+To read the results:
+
+1. In LangWatch, open Simulations.
+2. Pick the `owasp-red-team` set: it holds one run per OWASP id.
+3. Open a run to read the conversation and the judge's verdict on each criterion. The criteria judge security only, so a plain refusal passes. The test output names the unmet criteria but not the turn, so find the first agent reply that breaks one here.
