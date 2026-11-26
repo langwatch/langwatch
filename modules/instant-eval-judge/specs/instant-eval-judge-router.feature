@@ -161,7 +161,7 @@ Feature: Routing an Instant Evals judgement across decision models and LLMs
   @unit
   Scenario: A gate that gives no score sends the case to the escalation
     Given a gated plan
-    When the gate fails, runs past its timeout or answers with no readable score
+    When the gate fails, runs past its timeout or answers with no readable score or a level outside its question's
     Then the escalation answers alone, the routing flags that no score was read
     And whatever the gate billed is still billed
 

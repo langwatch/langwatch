@@ -9,6 +9,7 @@ import {
   INSTANT_EVAL_JUDGE_GATE_QUESTIONS,
   type InstantEvalJudgeGateQuestionName,
   type InstantEvalJudgeJob,
+  type InstantEvalJudgeRouteGate,
   type InstantEvalScoreQuestion,
   type InstantEvalVerdict,
 } from "@langwatch/instant-eval-judge-contract";
@@ -95,17 +96,21 @@ function viewOf(text: string): string {
 type InstantEvalJudgeGateBranch = Readonly<{ branch: "easy" | "hard"; hasScore: boolean }>;
 
 /**
- * Easy only on a score under the threshold. No readable score (the gate failed, timed out or
- * answered nothing) is hard: a case nobody rated goes to the stronger judge.
+ * Easy only on a score under the threshold. No readable score (the gate failed, timed out, or
+ * answered nothing or a level outside its question's) is hard: an unrated case goes to the
+ * stronger judge.
  */
 export function instantEvalJudgeGateBranchOf({
   verdict,
-  easyBelow,
+  gate,
 }: {
   verdict: Pick<InstantEvalVerdict, "score"> | undefined;
-  easyBelow: number;
+  gate: Pick<InstantEvalJudgeRouteGate, "question" | "easyBelow">;
 }): InstantEvalJudgeGateBranch {
   const score = verdict?.score;
-  if (score === undefined || !Number.isFinite(score)) return { branch: "hard", hasScore: false };
-  return { branch: score < easyBelow ? "easy" : "hard", hasScore: true };
+  const topLevel = INSTANT_EVAL_JUDGE_GATE_QUESTIONS[gate.question].levelCount - 1;
+  if (score === undefined || !Number.isFinite(score) || score < 0 || score > topLevel) {
+    return { branch: "hard", hasScore: false };
+  }
+  return { branch: score < gate.easyBelow ? "easy" : "hard", hasScore: true };
 }

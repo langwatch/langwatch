@@ -140,7 +140,12 @@ describe("given the hosted classifier's answer to the gate question as the refer
     const [verdict] = readClassifierVerdicts({ questions: [question], response });
     // The reference's own read of this answer: 0.96, so the hard branch at a 0.75 threshold.
     expect(verdict?.score).toBeCloseTo(0.96, 10);
-    expect(instantEvalJudgeGateBranchOf({ verdict, easyBelow: 0.75 })).toEqual({
+    expect(
+      instantEvalJudgeGateBranchOf({
+        verdict,
+        gate: { question: "difficulty_v1", easyBelow: 0.75 },
+      }),
+    ).toEqual({
       branch: "hard",
       hasScore: true,
     });
@@ -148,10 +153,12 @@ describe("given the hosted classifier's answer to the gate question as the refer
 });
 
 describe("instantEvalJudgeGateBranchOf", () => {
+  const GATE = { question: "difficulty_v1", easyBelow: 1.5 } as const;
+
   /** @scenario "A gate sends an easy case to the primary alone and the rest to the escalation alone" */
   it("is easy only on a score under the threshold", () => {
     const branch = (score: number) =>
-      instantEvalJudgeGateBranchOf({ verdict: { score }, easyBelow: 1.5 }).branch;
+      instantEvalJudgeGateBranchOf({ verdict: { score }, gate: GATE }).branch;
     expect(branch(1.49)).toBe("easy");
     expect(branch(1.5)).toBe("hard");
     expect(branch(3)).toBe("hard");
@@ -160,10 +167,23 @@ describe("instantEvalJudgeGateBranchOf", () => {
   /** @scenario "A gate that gives no score sends the case to the escalation" */
   it("is hard, and says it had no score, when nothing readable came back", () => {
     const unrated = { branch: "hard", hasScore: false };
-    expect(instantEvalJudgeGateBranchOf({ verdict: undefined, easyBelow: 1.5 })).toEqual(unrated);
-    expect(instantEvalJudgeGateBranchOf({ verdict: {}, easyBelow: 1.5 })).toEqual(unrated);
-    expect(
-      instantEvalJudgeGateBranchOf({ verdict: { score: Number.NaN }, easyBelow: 1.5 }),
-    ).toEqual(unrated);
+    expect(instantEvalJudgeGateBranchOf({ verdict: undefined, gate: GATE })).toEqual(unrated);
+    expect(instantEvalJudgeGateBranchOf({ verdict: {}, gate: GATE })).toEqual(unrated);
+    expect(instantEvalJudgeGateBranchOf({ verdict: { score: Number.NaN }, gate: GATE })).toEqual(
+      unrated,
+    );
+  });
+
+  /** @scenario "A gate that gives no score sends the case to the escalation" */
+  it("is hard, and says it had no score, on a level outside the question's 0 to 4", () => {
+    const branchOf = (score: number) =>
+      instantEvalJudgeGateBranchOf({
+        verdict: { score },
+        gate: GATE,
+      });
+    expect(branchOf(-1)).toEqual({ branch: "hard", hasScore: false });
+    expect(branchOf(4.01)).toEqual({ branch: "hard", hasScore: false });
+    expect(branchOf(0)).toEqual({ branch: "easy", hasScore: true });
+    expect(branchOf(4)).toEqual({ branch: "hard", hasScore: true });
   });
 });
