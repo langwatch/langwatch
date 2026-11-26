@@ -70,7 +70,8 @@ function harness({
 }: {
   growth: Partial<BillingSubscriptionRecord>;
   tiered: Partial<BillingSubscriptionRecord> | null;
-  tieredAtStripe?: BillingSubscriptionStatus;
+  /** `missing` leaves it unknown to Stripe, as a subscription Stripe no longer holds. */
+  tieredAtStripe?: BillingSubscriptionStatus | "missing";
   pricingModel?: "TIERED" | "SEAT_EVENT";
 }): Harness {
   const store = MemoryBillingStore.create();
@@ -89,7 +90,7 @@ function harness({
 
   const stripe = MemoryStripeSubscriptionsChannel.create();
   stripe.seed(atStripe(GROWTH_STRIPE));
-  stripe.seed(atStripe(TIERED_STRIPE, tieredAtStripe));
+  if (tieredAtStripe !== "missing") stripe.seed(atStripe(TIERED_STRIPE, tieredAtStripe));
 
   const pricingModels: string[] = [];
   const activations: string[] = [];
@@ -401,5 +402,38 @@ describe("given a tiered organization upgrading to Growth seats", () => {
       { subscriptionId: TIERED_STRIPE, prorate: true },
     ]);
     expect(upgrade.activations).toEqual([GROWTH_ROW]);
+  });
+
+  /** @scenario "An old plan our records cancelled but Stripe still bills is cancelled at Stripe by the next Growth payment" */
+  it("cancels at Stripe an old plan our records already cancelled", async () => {
+    const leaking = harness({
+      growth: { status: "ACTIVE", stripeSubscriptionId: GROWTH_STRIPE },
+      tiered: { status: "CANCELLED", stripeSubscriptionId: TIERED_STRIPE },
+      pricingModel: "SEAT_EVENT",
+    });
+
+    const [result] = await deliverTogether(leaking, [paymentSucceeded("in_renewal")]);
+
+    expect(result?.status).toBe("ok");
+    expect(leaking.stripe.cancellations).toEqual([
+      { subscriptionId: TIERED_STRIPE, prorate: true },
+    ]);
+    expect(leaking.pricingModels).toEqual([]);
+  });
+
+  /** @scenario "An old plan Stripe no longer holds does not block the Growth payment" */
+  it("does not block the Growth payment on an old plan Stripe no longer holds", async () => {
+    const stuck = harness({
+      growth: { status: "ACTIVE", stripeSubscriptionId: GROWTH_STRIPE },
+      tiered: { status: "ACTIVE", stripeSubscriptionId: TIERED_STRIPE },
+      tieredAtStripe: "missing",
+      pricingModel: "SEAT_EVENT",
+    });
+
+    const [result] = await deliverTogether(stuck, [paymentSucceeded("in_renewal")]);
+
+    expect(result?.status).toBe("ok");
+    expect(stuck.stripe.cancellations).toEqual([]);
+    expect(rowOf(stuck, TIERED_ROW)?.status).toBe("CANCELLED");
   });
 });

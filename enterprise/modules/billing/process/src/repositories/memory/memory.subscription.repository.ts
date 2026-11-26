@@ -168,8 +168,8 @@ export class MemoryBillingSubscriptionRepository extends BillingSubscriptionRepo
       ({ id, organizationId, status, plan, stripeSubscriptionId }) => {
         if (organizationId !== input.organizationId || id === input.excludeSubscriptionId)
           return [];
-        const liveTiered = status !== CANCELLED && TIERED_PLANS.includes(plan);
-        return liveTiered && stripeSubscriptionId !== null ? [{ id, stripeSubscriptionId }] : [];
+        if (!TIERED_PLANS.includes(plan) || stripeSubscriptionId === null) return [];
+        return [{ id, stripeSubscriptionId, cancelledInRecords: status === CANCELLED }];
       },
     );
   }

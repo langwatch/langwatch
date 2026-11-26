@@ -34,7 +34,7 @@ export class PrismaBillingWebhookOrganizationRepository extends BillingWebhookOr
     });
   }
 
-  async isOnSeatEventPricing(organizationId: string): Promise<boolean> {
+  async isOnSeatEventPricing({ organizationId }: { organizationId: string }): Promise<boolean> {
     const organization = await this.database.organization.findUniqueOrThrow({
       where: { id: organizationId },
       select: { pricingModel: true },

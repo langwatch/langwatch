@@ -234,3 +234,17 @@ Feature: Stripe webhook handling grants and removes plans correctly
     When the checkout-completed message is handled and then redelivered
     Then the first delivery lets the waiting members in, announces the start and fails so Stripe sends it again
     And the redelivery moves the organization to seat pricing and cancels the old plan once
+
+  @unit @regression
+  Scenario: An old plan our records cancelled but Stripe still bills is cancelled at Stripe by the next Growth payment
+    Given an organization on seat pricing whose Growth seat subscription is active
+    And whose old tiered subscription is cancelled in our records but still active at Stripe
+    When its next Growth invoice is paid
+    Then the old tiered subscription is cancelled at Stripe once, with proration
+
+  @unit @regression
+  Scenario: An old plan Stripe no longer holds does not block the Growth payment
+    Given an organization whose Growth seat subscription is active
+    And whose old tiered subscription Stripe no longer holds
+    When its next Growth invoice is paid
+    Then the delivery succeeds and the old plan is cancelled in our records

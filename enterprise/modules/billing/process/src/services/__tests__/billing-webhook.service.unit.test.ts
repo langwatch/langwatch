@@ -798,8 +798,8 @@ describe("EEWebhookService", () => {
           }),
         });
         subRepo.findSupersededBySeatEvent.mockResolvedValue([
-          { id: "sub_db_old_1", stripeSubscriptionId: "sub_old_1" },
-          { id: "sub_db_old_2", stripeSubscriptionId: "sub_old_2" },
+          { id: "sub_db_old_1", stripeSubscriptionId: "sub_old_1", cancelledInRecords: false },
+          { id: "sub_db_old_2", stripeSubscriptionId: "sub_old_2", cancelledInRecords: false },
         ]);
 
         const promise = service.handleInvoicePaymentSucceeded({
@@ -852,7 +852,7 @@ describe("EEWebhookService", () => {
           }),
         });
         subRepo.findSupersededBySeatEvent.mockResolvedValue([
-          { id: "sub_db_old_1", stripeSubscriptionId: "sub_old_1" },
+          { id: "sub_db_old_1", stripeSubscriptionId: "sub_old_1", cancelledInRecords: false },
         ]);
 
         const promise = service.handleInvoicePaymentSucceeded({

@@ -250,15 +250,22 @@ export class PrismaBillingSubscriptionRepository extends BillingSubscriptionRepo
       where: {
         organizationId: input.organizationId,
         id: { not: input.excludeSubscriptionId },
-        status: { not: SubscriptionStatus.CANCELLED as PrismaSubscriptionStatus },
         stripeSubscriptionId: { not: null },
         plan: { in: TIERED_PLAN_TYPES as PrismaPlanTypes[] },
       },
-      select: { id: true, stripeSubscriptionId: true },
+      select: { id: true, stripeSubscriptionId: true, status: true },
     });
 
-    return rows.flatMap(({ id, stripeSubscriptionId }) =>
-      stripeSubscriptionId ? [{ id, stripeSubscriptionId }] : [],
+    return rows.flatMap(({ id, stripeSubscriptionId, status }) =>
+      stripeSubscriptionId
+        ? [
+            {
+              id,
+              stripeSubscriptionId,
+              cancelledInRecords: status === SubscriptionStatus.CANCELLED,
+            },
+          ]
+        : [],
     );
   }
 

@@ -17,6 +17,13 @@ import type { BillingLifecycleAnnouncerService } from "./billing-lifecycle-annou
 const logger = createLogger("langwatch:billing:tieredPlanRetirement");
 
 /** Retiring a superseded plan failed; the caller fails the delivery after its other steps. */
+/** Stripe's refusal for an object it does not hold; the subscriptions channel passes it through. */
+function isResourceMissing(err: unknown): boolean {
+  return (
+    typeof err === "object" && err !== null && "code" in err && err.code === "resource_missing"
+  );
+}
+
 export class SupersededPlanRetirementError extends Error {
   constructor({ failures }: { failures: unknown[] }) {
     super("Failed to retire the tiered plans a Growth seat subscription supersedes", {
@@ -50,6 +57,7 @@ export class TieredPlanRetirementService {
       throw new SupersededPlanRetirementError({ failures: [err] });
     });
     if (superseded.length === 0 && onSeatPricing) return;
+    // A row we cancelled can still bill: the old upgrade marked rows before asking Stripe.
 
     // Organization sets the pricing model from the fact; a refused fact fails before any row moves.
     if (!onSeatPricing) {
@@ -64,7 +72,7 @@ export class TieredPlanRetirementService {
     for (const old of superseded) {
       try {
         await this.cancelAtStripe(old.stripeSubscriptionId);
-        await this.deps.subscriptions.cancel({ id: old.id });
+        if (!old.cancelledInRecords) await this.deps.subscriptions.cancel({ id: old.id });
       } catch (err) {
         logger.error(
           { stripeSubscriptionId: old.stripeSubscriptionId, err },
@@ -82,21 +90,30 @@ export class TieredPlanRetirementService {
         organizationId: seat.organizationId,
         excludeSubscriptionId: seat.id,
       }),
-      this.deps.organizations.isOnSeatEventPricing(seat.organizationId),
+      this.deps.organizations.isOnSeatEventPricing({ organizationId: seat.organizationId }),
     ]);
     return { superseded, onSeatPricing };
   }
 
   /** Cancels with proration unless Stripe already ended it, including by a parallel delivery. */
   private async cancelAtStripe(subscriptionId: string): Promise<void> {
-    const current = await this.deps.stripeSubscriptions.getSubscription({ subscriptionId });
-    if (ENDED_SUBSCRIPTION_STATUSES.has(current.status)) return;
+    if (await this.endedAtStripe(subscriptionId)) return;
 
     try {
       await this.deps.stripeSubscriptions.cancelSubscription({ subscriptionId, prorate: true });
     } catch (err) {
-      const after = await this.deps.stripeSubscriptions.getSubscription({ subscriptionId });
-      if (!ENDED_SUBSCRIPTION_STATUSES.has(after.status)) throw err;
+      if (!(await this.endedAtStripe(subscriptionId))) throw err;
+    }
+  }
+
+  /** A subscription Stripe no longer holds bills nothing, so it counts as ended. */
+  private async endedAtStripe(subscriptionId: string): Promise<boolean> {
+    try {
+      const current = await this.deps.stripeSubscriptions.getSubscription({ subscriptionId });
+      return ENDED_SUBSCRIPTION_STATUSES.has(current.status);
+    } catch (err) {
+      if (isResourceMissing(err)) return true;
+      throw err;
     }
   }
 }

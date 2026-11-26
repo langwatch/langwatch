@@ -20,7 +20,8 @@ function organizationDouble(rows: Record<string, unknown>[] = []) {
       },
       findUniqueOrThrow: async (args) => {
         const found = rows.find((row) => row.id === args.where.id);
-        if (!found) throw new Error(`No organization ${String(args.where.id)}`);
+        // Prisma's own "record not found" refusal carries code P2025.
+        if (!found) throw Object.assign(new Error("No Organization found"), { code: "P2025" });
         return { pricingModel: found.pricingModel };
       },
       update: async (args) => {
@@ -72,11 +73,15 @@ describe("PrismaBillingWebhookOrganizationRepository", () => {
         { id: "organization-tiered", pricingModel: "TIERED" },
       ]);
 
-      await expect(adapter.isOnSeatEventPricing("organization-seat")).resolves.toBe(true);
-      await expect(adapter.isOnSeatEventPricing("organization-tiered")).resolves.toBe(false);
-      await expect(adapter.isOnSeatEventPricing("organization-gone")).rejects.toThrow(
-        "No organization organization-gone",
-      );
+      await expect(
+        adapter.isOnSeatEventPricing({ organizationId: "organization-seat" }),
+      ).resolves.toBe(true);
+      await expect(
+        adapter.isOnSeatEventPricing({ organizationId: "organization-tiered" }),
+      ).resolves.toBe(false);
+      await expect(
+        adapter.isOnSeatEventPricing({ organizationId: "organization-gone" }),
+      ).rejects.toMatchObject({ code: "P2025" });
     });
   });
 });
