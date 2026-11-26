@@ -49,6 +49,7 @@ const USAGE_BILLED: BillingReportOrganizationLookup = {
     stripeCustomerId: "cus_1",
     subscriptions: [{ id: "sub_1" }],
     contract: "cloud",
+    growthSeatPeriods: [],
   },
 };
 
