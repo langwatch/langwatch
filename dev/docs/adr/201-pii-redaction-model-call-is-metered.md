@@ -107,8 +107,14 @@ dollar meter, at 0.85 euros per dollar of usage, picked from the Stripe subscrip
     dollar price's unit amount times 0.85, the seat ratio of EUR 29 to USD 34. The currency is
     the one Stripe holds the customer in, never `Organization.currency`, which can disagree.
     Neither mode maps a euro id yet; until an operator creates the price under that lookup key
-    and the price sync maps it, a euro checkout carries no PII line. The settings page quotes
-    Strict at 0.425 euros per 1M characters to a euro Growth subscription, read off its plan.
+    and the price sync maps it, a euro checkout carries no PII line. Live ids, dollar and euro
+    alike, wait until annual checkout is settled: Checkout refuses these monthly lines on an
+    annual plan (ADR-174 decision 18 and its open question). The settings page quotes Strict at
+    0.425 euros per 1M characters to a euro Growth subscription, read off its plan type
+    (`GROWTH_SEAT_EUR_*`). That is display only; the charge follows the Stripe subscription. The
+    page quotes dollars when the reader may not read the plan, or the plan is no
+    `GROWTH_SEAT_EUR_*` one (a plan set in Ops, Enterprise, or a custom seat price with no
+    lookup key), and quotes no price at all while the plan is still loading.
 12. **No free monthly amount.** Every character the model is sent is priced from the first one
     of the month, or of its price line when that was added later (decision 15); the meter reports
     that whole total, nothing taken off. The characters

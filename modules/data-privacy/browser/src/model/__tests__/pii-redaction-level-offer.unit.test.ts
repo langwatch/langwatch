@@ -15,10 +15,10 @@ import {
   levelChangeConfirmation,
   organizationPiiLevel,
   organizationRule,
-  PII_REDACTION_MODEL_PRICE,
   PII_REDACTION_MODEL_PRICE_UNIT,
   piiRedactionModelOfferOf,
   piiRedactionModelPrice,
+  piiRedactionModelPriceIn,
   ruleSaveConfirmation,
   strictFallbackNote,
   STRICT_RULE_BASED_NOTES,
@@ -172,6 +172,21 @@ describe("given the deployment and the PII redaction model flags", () => {
         }),
       ).toEqual({ kind: "model", free: false, split: false, currency: "EUR" });
     });
+
+    /** @scenario "The price currency is the subscription's, read from its Growth plan" */
+    it("offers nothing while the subscription's currency is still loading, so no price flashes", () => {
+      expect(
+        piiRedactionModelOfferOf({
+          isSaaS: true,
+          modelFlag: true,
+          freeFlag: false,
+          splitFlag: false,
+          licence: "unknown",
+          mayManageLicence: true,
+          currency: "loading",
+        }),
+      ).toBeNull();
+    });
   });
 });
 
@@ -180,7 +195,7 @@ describe("given the rate billing charges for the PII redaction model", () => {
     /** @scenario The price is derived from the rate billing charges */
     it("reads $0.50 per 1M characters", () => {
       expect(piiRedactionModelPrice({ nanoUsdPerCharacter: 500 })).toBe("$0.50");
-      expect(`${PII_REDACTION_MODEL_PRICE} ${PII_REDACTION_MODEL_PRICE_UNIT}`).toBe(
+      expect(`${piiRedactionModelPriceIn("USD")} ${PII_REDACTION_MODEL_PRICE_UNIT}`).toBe(
         "$0.50 per 1M characters excl. VAT, pay as you go",
       );
     });
@@ -360,7 +375,7 @@ describe("given a rule saved from the drawer", () => {
     it("asks with the euro price", () => {
       expect(
         ruleSaveConfirmation({
-          offer: { kind: "model", free: false, currency: "EUR" },
+          offer: { kind: "model", free: false, split: false, currency: "EUR" },
           before: { pii: { level: "essential" } },
           after: { pii: { level: "strict" } },
         })?.description,

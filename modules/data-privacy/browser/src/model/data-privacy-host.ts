@@ -46,6 +46,9 @@ export type PrivacyLicence = "loading" | "enterprise" | "none" | "unknown";
 /** The currency the organization's subscription is billed in, which Strict's price is quoted in. */
 export type PrivacyBillingCurrency = "USD" | "EUR";
 
+/** The currency as the host reads it: "loading" until the plan answers, so no price flashes. */
+export type PrivacyBillingCurrencyReading = PrivacyBillingCurrency | "loading";
+
 /** The one thing the screen is handed. */
 export abstract class DataPrivacyHostApi {
   /** The organization, team and project this page is about. */
@@ -69,8 +72,8 @@ export abstract class DataPrivacyHostApi {
   /** Whether this reader may activate a licence, so the advert links there. */
   abstract mayManageLicence(): boolean;
 
-  /** Euros only for a euro Growth subscription; dollars otherwise and while it is not read. */
-  abstract billingCurrency(): PrivacyBillingCurrency;
+  /** Euros only for a euro Growth subscription, "loading" until the plan answers, else dollars. */
+  abstract billingCurrency(): PrivacyBillingCurrencyReading;
 }
 
 const DataPrivacyHostContext = createContext<DataPrivacyHostApi | undefined>(void 0);

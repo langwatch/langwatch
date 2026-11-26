@@ -28,6 +28,7 @@ import type { dataPrivacyApi } from "../../../behavior/data-privacy-api.ts";
 import {
   DataPrivacyHostApi,
   type PrivacyBillingCurrency,
+  type PrivacyBillingCurrencyReading,
   DataPrivacyHostProvider,
   type PrivacyFailureNotice,
   type PrivacyHostScope,
@@ -135,7 +136,7 @@ export class TestPrivacyHost extends DataPrivacyHostApi {
     super();
   }
 
-  billingCurrency(): PrivacyBillingCurrency {
+  billingCurrency(): PrivacyBillingCurrencyReading {
     return this.plan.billingCurrency ?? "USD";
   }
 

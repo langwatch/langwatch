@@ -10,13 +10,17 @@ import type {
   PiiLevel,
 } from "@langwatch/data-privacy-contract";
 import {
-  PII_REDACTION_EUR_PER_USD,
   PII_REDACTION_MODEL_MAX_BATCH_CHARACTERS,
   PII_REDACTION_MODEL_MAX_SPLIT_CHARACTERS,
   PII_REDACTION_NANO_USD_PER_CHARACTER,
 } from "@langwatch/data-privacy-contract/pii-redaction-spend";
+import { GROWTH_USAGE_EUR_PER_USD } from "@langwatch/enterprise-billing-contract";
 
-import type { PrivacyBillingCurrency, PrivacyLicence } from "./data-privacy-host.ts";
+import type {
+  PrivacyBillingCurrency,
+  PrivacyBillingCurrencyReading,
+  PrivacyLicence,
+} from "./data-privacy-host.ts";
 
 /** The two levels the organization picker offers. */
 export type OrganizationPiiLevel = "essential" | "strict";
@@ -40,14 +44,12 @@ export function piiRedactionModelPrice({
     currency,
     minimumFractionDigits: 2,
     maximumFractionDigits: 3,
-  }).format(currency === "EUR" ? usd * PII_REDACTION_EUR_PER_USD : usd);
+  }).format(currency === "EUR" ? usd * GROWTH_USAGE_EUR_PER_USD : usd);
 }
 
 /** The published price in the subscription's currency. */
 export const piiRedactionModelPriceIn = (currency: PrivacyBillingCurrency = "USD"): string =>
   piiRedactionModelPrice({ nanoUsdPerCharacter: PII_REDACTION_NANO_USD_PER_CHARACTER, currency });
-
-export const PII_REDACTION_MODEL_PRICE = piiRedactionModelPriceIn("USD");
 export const PII_REDACTION_MODEL_PRICE_UNIT = "per 1M characters excl. VAT, pay as you go";
 
 export const STRICT_BILLING_NOTE =
@@ -131,13 +133,13 @@ export function piiRedactionModelOfferOf({
   splitFlag: boolean;
   licence: PrivacyLicence;
   mayManageLicence: boolean;
-  /** The subscription's currency, which a priced Cloud offer quotes in. */
-  currency?: PrivacyBillingCurrency;
+  /** The subscription's currency, which a Cloud offer quotes in; none while it is loading. */
+  currency?: PrivacyBillingCurrencyReading;
 }): PiiRedactionModelOffer {
-  if (isSaaS)
-    return modelFlag === true
-      ? { kind: "model", free: freeFlag, split: splitFlag, currency }
-      : null;
+  if (isSaaS) {
+    if (modelFlag !== true || currency === "loading") return null;
+    return { kind: "model", free: freeFlag, split: splitFlag, currency };
+  }
   if (licence === "loading" || licence === "unknown" || modelFlag === undefined) return null;
   if (licence === "none")
     return { kind: "rule-based", note: "licence", activate: mayManageLicence };

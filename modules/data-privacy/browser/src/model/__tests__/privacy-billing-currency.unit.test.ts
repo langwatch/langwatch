@@ -10,6 +10,18 @@ import { billingCurrencyOf } from "../privacy-billing-currency.ts";
 const answered = (type: string) => ({ isLoading: false, isError: false, data: { type } });
 
 describe("billingCurrencyOf()", () => {
+  describe("when the plan is still loading", () => {
+    /** @scenario "The price currency is the subscription's, read from its Growth plan" */
+    it("answers loading, so no dollar price is quoted before the plan says euros", () => {
+      expect(
+        billingCurrencyOf({
+          mayRead: true,
+          plan: { isLoading: true, isError: false, data: undefined },
+        }),
+      ).toBe("loading");
+    });
+  });
+
   describe("when the active plan is a euro Growth seat plan", () => {
     /** @scenario "The price currency is the subscription's, read from its Growth plan" */
     it.each(["GROWTH_SEAT_EUR_MONTHLY", "GROWTH_SEAT_EUR_ANNUAL"])("quotes euros on %s", (type) => {
@@ -24,12 +36,6 @@ describe("billingCurrencyOf()", () => {
         "USD",
       );
       expect(billingCurrencyOf({ mayRead: true, plan: answered("FREE") })).toBe("USD");
-      expect(
-        billingCurrencyOf({
-          mayRead: true,
-          plan: { isLoading: true, isError: false, data: undefined },
-        }),
-      ).toBe("USD");
       expect(
         billingCurrencyOf({
           mayRead: true,

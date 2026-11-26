@@ -16,7 +16,7 @@ import { useMemo, type ReactNode } from "react";
 import {
   DataPrivacyHostApi,
   DataPrivacyHostProvider,
-  type PrivacyBillingCurrency,
+  type PrivacyBillingCurrencyReading,
   type PrivacyFailureNotice,
   type PrivacyHostScope,
   type PrivacyLicence,
@@ -35,7 +35,7 @@ class HostServiceDataPrivacyHost extends DataPrivacyHostApi {
       feedback: UiFeedback;
       licence: PrivacyLicence;
       mayManageLicence: boolean;
-      billingCurrency: PrivacyBillingCurrency;
+      billingCurrency: PrivacyBillingCurrencyReading;
     },
   ) {
     super();
@@ -73,7 +73,7 @@ class HostServiceDataPrivacyHost extends DataPrivacyHostApi {
     return this.deps.mayManageLicence;
   }
 
-  billingCurrency(): PrivacyBillingCurrency {
+  billingCurrency(): PrivacyBillingCurrencyReading {
     return this.deps.billingCurrency;
   }
 }

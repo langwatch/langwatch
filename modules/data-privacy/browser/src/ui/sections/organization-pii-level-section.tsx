@@ -8,7 +8,7 @@ import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
 import { useState } from "react";
 
 import { dataPrivacyApi } from "../../behavior/data-privacy-api.ts";
-import type { DataPrivacyHostApi } from "../../model/data-privacy-host.ts";
+import type { DataPrivacyHostApi, PrivacyBillingCurrency } from "../../model/data-privacy-host.ts";
 import {
   levelChangeConfirmation,
   organizationPiiLevel,
@@ -37,6 +37,7 @@ export function OrganizationPiiLevelSection({
   free,
   licensed = false,
   split = false,
+  currency = "USD",
   host,
   projectId,
   snapshot,
@@ -46,6 +47,8 @@ export function OrganizationPiiLevelSection({
   licensed?: boolean;
   /** Long spans go to the model in parts (ADR-207): the small print names the split limit. */
   split?: boolean;
+  /** The subscription's currency, which Strict's price and its confirmation quote. */
+  currency?: PrivacyBillingCurrency;
   host: DataPrivacyHostApi;
   projectId: string;
   snapshot: DataPrivacySnapshot;
@@ -61,7 +64,6 @@ export function OrganizationPiiLevelSection({
   const stored = organizationPiiLevel(storedPii.level);
   const shown = picked && picked.over === stored ? picked.level : stored;
   const ownRule = organizationRule({ rules: snapshot.rules, organizationId });
-  const currency = host.billingCurrency();
   const confirmationFor = (level: OrganizationPiiLevel) =>
     levelChangeConfirmation({ from: storedPii.level, to: level, free, currency });
   const confirmation = asking ? confirmationFor(asking) : null;

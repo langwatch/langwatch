@@ -65,6 +65,31 @@ describe("given a Stripe mode where both currencies' Instant Evals prices are pr
     });
   });
 
+  describe("when an annual Growth checkout is built", () => {
+    // Pins today's behaviour: Stripe Checkout refuses the monthly usage lines on an annual plan
+    // (ADR-174 decision 18), in either currency; leaving them out is a separate change.
+    it.each([
+      ["USD", "price_seat_usd_annual", "price_events_usd_annual", "price_instant_eval_usd"],
+      ["EUR", "price_seat_eur_annual", "price_events_eur_annual", "price_instant_eval_eur"],
+    ] as const)(
+      "adds the monthly %s Instant Evals line, as for dollars",
+      (currency, seat, events, usage) => {
+        const items = createCheckoutLineItems({
+          coreMembers: 2,
+          currency,
+          interval: "annual",
+          prices: {
+            ...prices,
+            GROWTH_SEAT_USD_ANNUAL: "price_seat_usd_annual",
+            GROWTH_EVENTS_USD_ANNUAL: "price_events_usd_annual",
+          } as StripePriceMap,
+        });
+
+        expect(items).toEqual([{ price: seat, quantity: 2 }, { price: events }, { price: usage }]);
+      },
+    );
+  });
+
   describe("when the price is asked for directly", () => {
     it("answers each currency with its own price, and reports the mode provisioned", () => {
       expect(pickGrowthInstantEvalPriceId({ currency: "USD", prices })).toBe(

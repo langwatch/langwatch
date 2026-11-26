@@ -22,7 +22,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   DataPrivacyHostApi,
-  type PrivacyBillingCurrency,
+  type PrivacyBillingCurrencyReading,
   DataPrivacyHostProvider,
   type PrivacyFailureNotice,
   type PrivacyHostScope,
@@ -127,7 +127,7 @@ class TestPrivacyHost extends DataPrivacyHostApi {
     return false;
   }
 
-  billingCurrency(): PrivacyBillingCurrency {
+  billingCurrency(): PrivacyBillingCurrencyReading {
     return "USD";
   }
 }

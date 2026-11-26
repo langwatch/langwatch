@@ -32,9 +32,6 @@ export const PII_REDACTION_MODEL_MAX_SPLIT_CHARACTERS = 32_000;
 /** The published price: 0.00005 dollars per 100 characters sent to the model. */
 export const PII_REDACTION_NANO_USD_PER_CHARACTER = 500;
 
-/** Euros a euro Growth subscription pays per dollar of that price: billing's ratio (ADR-201). */
-export const PII_REDACTION_EUR_PER_USD = 0.85;
-
 /** The rate identity a priced call carries, so a replay is told from a re-rating. */
 export const PII_REDACTION_RATE_VERSION = `pii_redaction@${PII_REDACTION_NANO_USD_PER_CHARACTER}nano_per_char`;
 

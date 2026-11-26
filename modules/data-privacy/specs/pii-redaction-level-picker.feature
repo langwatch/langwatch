@@ -118,7 +118,8 @@ Feature: The organization picks its PII redaction level on the Data Privacy page
     Given the organization's active plan as billing answers it
     When the plan is a euro Growth seat plan
     Then the price is quoted in euros
-    And any other plan, a plan not yet read, or one the reader may not read quotes dollars
+    And any other plan, or one the reader may not read, quotes dollars
+    And while the plan is still loading no price is quoted at all
 
   @unit
   Scenario: Changing the organization level keeps the rest of the organization rule
