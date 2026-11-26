@@ -50,11 +50,15 @@ export interface StoredObjectOwnerLinkRepository {
     limit: number;
   }): Promise<StoredObjectOwnerLink[]>;
 
-  /** Removes these objects' links still ended at `before`; one raised since survives. */
+  /**
+   * Removes these objects' links still ended at `before`; one raised since survives.
+   * `keepingLastLink` removes an ended link only while a live link holds the object.
+   */
   deleteExpired(input: {
     tenantId: StoredObjectProjectId;
     objectIds: readonly StoredObjectId[];
     before: Instant;
+    keepingLastLink?: boolean;
   }): Promise<number>;
 
   /**

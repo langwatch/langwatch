@@ -107,7 +107,7 @@ describe("applying retention to existing data", () => {
       });
     });
 
-    /** @scenario Two retention facts in the same millisecond are both recorded */
+    /** @scenario "Two retention facts in the same millisecond are both recorded" */
     it("keys two changes in one millisecond apart, and a redelivery the same", () => {
       const keyOf = (data: RetentionAppliedToExistingDataEventData) =>
         new RecordRetentionAppliedToExistingDataCommand().handle({

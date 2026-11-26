@@ -152,26 +152,43 @@ export class StoredObjectRetentionService {
       limit: input.pageSize,
     });
     const objectIds = [...new Set(page.map((link) => link.objectId))];
+    const gone: StoredObjectId[] = [];
     const held: StoredObjectId[] = [];
+    let deletedObjects = 0;
     for (const id of objectIds) {
-      if (!(await this.#deleteIfUnheld({ tenantId: input.tenantId, id, now: input.now }))) {
-        held.push(id);
-      }
-    }
-    const removedLinks = await this.options.ownerLinks.deleteExpired({
-      tenantId: input.tenantId,
-      objectIds,
-      before: input.now,
-    });
-    // A retime between the check and the delete can end a held object's last link: ask again.
-    let deletedObjects = objectIds.length - held.length;
-    for (const id of held) {
-      if (await this.#deleteIfUnheld({ tenantId: input.tenantId, id, now: input.now })) {
+      const query = { tenantId: input.tenantId, id };
+      if (await this.#deleteIfUnheld({ ...query, now: input.now })) {
         deletedObjects += 1;
+        gone.push(id);
+      } else {
+        ((await this.#isAvailable(query)) ? held : gone).push(id);
       }
     }
+    const { tenantId, now: before } = input;
+    const removedLinks =
+      (await this.options.ownerLinks.deleteExpired({ tenantId, objectIds: gone, before })) +
+      // A retime after the check may have ended every link: one stays, so a later pass finds it.
+      (await this.options.ownerLinks.deleteExpired({
+        tenantId,
+        objectIds: held,
+        before,
+        keepingLastLink: true,
+      }));
 
-    return { removedLinks, deletedObjects, isFull: page.length >= input.pageSize };
+    return {
+      removedLinks,
+      deletedObjects,
+      isFull: page.length >= input.pageSize,
+    };
+  }
+
+  async #isAvailable(input: {
+    tenantId: StoredObjectProjectId;
+    id: StoredObjectId;
+  }): Promise<boolean> {
+    const row = await this.options.records.findById(input);
+
+    return row?.status === "available";
   }
 
   #elapsedMs(startedAt: Instant): number {

@@ -181,7 +181,7 @@ describe("StoredObjectRetentionService.sweep", () => {
 
   describe("given an ended link on an object another owner still holds", () => {
     /** @scenario "A re-time during the sweep still lets the sweep delete the object" */
-    it("deletes the object when a re-time ends the other link before the links are removed", async () => {
+    it("keeps an ended link when a re-time ends the other one, and the next run deletes it", async () => {
       const f = fixture();
       const { reference } = await f.store({ ownerId: "t1" });
       f.clock.now = dayOf(20);
@@ -190,8 +190,33 @@ describe("StoredObjectRetentionService.sweep", () => {
       f.sweepPages.beforeDelete = () =>
         f.sweeper.followRetention({ projectId: PROJECT, category: "traces", retentionDays: 7 });
 
-      await expect(f.sweeper.sweep()).resolves.toMatchObject({ deletedObjects: 1 });
+      await expect(f.sweeper.sweep()).resolves.toMatchObject({ deletedObjects: 0 });
+      expect((await f.rowOf(reference.id))?.status).toBe("available");
+      expect(await f.linksOf(reference.id)).not.toEqual([]);
 
+      await expect(f.sweeper.sweep()).resolves.toMatchObject({ deletedObjects: 1 });
+      expect((await f.rowOf(reference.id))?.status).toBe("deleted");
+      expect(await f.linksOf(reference.id)).toEqual([]);
+    });
+  });
+
+  describe("given an object whose only link has ended, and a sweep that fails deleting it", () => {
+    /** @scenario "A sweep that fails before deleting an object never strands it" */
+    it("keeps the ended link, and the next sweep deletes the object", async () => {
+      const f = fixture();
+      const { reference } = await f.store();
+      f.clock.now = dayOf(31);
+      const markDeleted = f.records.markDeletedIfUnheld.bind(f.records);
+      f.records.markDeletedIfUnheld = async () => {
+        f.records.markDeletedIfUnheld = markDeleted;
+        throw new Error("the database went away");
+      };
+
+      await expect(f.sweeper.sweep()).rejects.toThrow("The sweep failed for 1 tenant(s)");
+      expect((await f.rowOf(reference.id))?.status).toBe("available");
+      expect(await f.linksOf(reference.id)).toHaveLength(1);
+
+      await expect(f.sweeper.sweep()).resolves.toMatchObject({ deletedObjects: 1 });
       expect((await f.rowOf(reference.id))?.status).toBe("deleted");
       expect(await f.linksOf(reference.id)).toEqual([]);
     });
