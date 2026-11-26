@@ -9,7 +9,9 @@ import { clearTimeout, setTimeout } from "node:timers";
 import {
   CHILD_PROCESS,
   ScenarioAgentInstanceSchema,
+  redTeamRunReportSchema,
   scenarioRunHooksSchema,
+  type RedTeamRunReport,
   type ChildProcessJobData,
   type ScenarioExecutionResult,
   type ScenarioRunHooks,
@@ -33,6 +35,7 @@ type ScenarioChildProcessResult = {
   agentInstance?: { hostname: string; label: string | null };
   isCutAtLimit?: boolean;
   hooks?: ScenarioRunHooks;
+  redTeam?: RedTeamRunReport;
 };
 
 const scenarioChildProcessResultSchema = z.object({
@@ -45,6 +48,8 @@ const scenarioChildProcessResultSchema = z.object({
   isCutAtLimit: z.boolean().optional(),
   /** The setup and teardown results, on a passing and a failing line alike (ADR-180). */
   hooks: scenarioRunHooksSchema.optional(),
+  /** A red team run's held or broke report. */
+  redTeam: redTeamRunReportSchema.optional(),
 });
 
 /** Registers a spawned child with the pool and reads its exit, whichever runner it is. */
@@ -243,5 +248,6 @@ function childExitResult({
     ...(childResult?.agentInstance ? { agentInstance: childResult.agentInstance } : {}),
     ...(childResult?.isCutAtLimit ? { isCutAtLimit: true } : {}),
     ...(childResult?.hooks ? { hooks: childResult.hooks } : {}),
+    ...(childResult?.redTeam ? { redTeam: childResult.redTeam } : {}),
   };
 }

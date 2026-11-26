@@ -3,6 +3,7 @@ import type { StoredObjectApi, StoredObjectServerConfig } from "@langwatch/store
 
 import { StoredObjectModule } from "#app/stored-object.app";
 import { storedObjectChannels } from "#channels/stored-object-channels.registry";
+import { storedObjectEventing } from "#eventing/stored-object-maintenance.pipeline";
 import { storedObjectRetentionEventing } from "#eventing/stored-object-retention.pipeline";
 import { ClickHouseImportStoredObjectMigration } from "#migrations/clickhouse-import.stored-object.migration";
 import { storedObjectRepositories } from "#repositories/stored-object-repositories.registry";
@@ -27,7 +28,8 @@ export const storedObjectProcessModule: PublishedProcessModule<
     storedObjectTrpcTransport,
   )
   .withEventing(storedObjectRetentionEventing)
-  .withMigrations(({ dependencies, repositories }) => [
+  .withEventing(storedObjectEventing)
+  .withMigrations(({ repositories }) => [
     ClickHouseImportStoredObjectMigration.create({
       legacy: repositories.legacySource,
       records: repositories.records,

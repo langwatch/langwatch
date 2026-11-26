@@ -9,8 +9,9 @@ import type {
   StoredObjectRecord,
   StoredObjectRecordPageQuery,
   StoredObjectRecordRepository,
+  StoredObjectRecordStatus,
 } from "../stored-object-record.repository.ts";
-import type { MemoryStoredObjectOwnerLinkRepository } from "./memory.stored-object-owner-link.repository.ts";
+import { MemoryStoredObjectOwnerLinkRepository } from "./memory.stored-object-owner-link.repository.ts";
 
 /**
  * The same answers as the Prisma repository, over one Map keyed by tenant and id. The
@@ -46,6 +47,24 @@ export class MemoryStoredObjectRecordRepository implements StoredObjectRecordRep
     this.#values.set(key(value), value);
   }
 
+  async insert(value: StoredObjectRecord): Promise<boolean> {
+    if (this.#values.has(key(value))) return false;
+    this.#values.set(key(value), value);
+    return true;
+  }
+
+  async transition(input: {
+    expected: Pick<StoredObjectRecord, "status" | "generation">;
+    next: StoredObjectRecord;
+  }): Promise<boolean> {
+    const current = this.#values.get(key(input.next));
+    const isCurrent =
+      current?.status === input.expected.status && current.generation === input.expected.generation;
+    if (isCurrent) this.#values.set(key(input.next), input.next);
+
+    return isCurrent;
+  }
+
   async countActive(input: {
     tenantId: StoredObjectProjectId;
     purpose?: string;
@@ -69,7 +88,7 @@ export class MemoryStoredObjectRecordRepository implements StoredObjectRecordRep
         (value) =>
           value.tenantId === input.tenantId &&
           (!input.afterId || value.id > input.afterId) &&
-          (!input.status || value.status === input.status) &&
+          statusMatches(value.status, input.status) &&
           (!input.purpose || value.purpose === input.purpose) &&
           (!input.expiresBefore ||
             (value.expiresAt !== null &&
@@ -118,6 +137,27 @@ export class MemoryStoredObjectRecordRepository implements StoredObjectRecordRep
       .slice(0, input.limit);
   }
 
+  async findTenantsWithExpiredUploads(input: {
+    expiresBefore: Instant;
+    afterTenantId?: StoredObjectProjectId;
+    limit: number;
+  }): Promise<StoredObjectProjectId[]> {
+    const { afterTenantId } = input;
+    const tenants = new Set(
+      [...this.#values.values()]
+        .filter(
+          (value) =>
+            isReapable(value) &&
+            value.expiresAt !== null &&
+            Temporal.Instant.compare(value.expiresAt, input.expiresBefore) <= 0 &&
+            (afterTenantId === undefined || value.tenantId > afterTenantId),
+        )
+        .map((value) => value.tenantId),
+    );
+
+    return [...tenants].toSorted().slice(0, input.limit);
+  }
+
   async delete(input: { tenantId: StoredObjectProjectId; id: StoredObjectId }): Promise<void> {
     this.#values.delete(key(input));
   }
@@ -132,7 +172,13 @@ export class MemoryStoredObjectRecordRepository implements StoredObjectRecordRep
     }
     const value = this.#values.get(key(input));
     if (value?.status !== "available") return false;
-    if (this.#ownerLinks.holds({ tenantId: input.tenantId, objectId: input.id, now: input.now })) {
+    if (
+      MemoryStoredObjectOwnerLinkRepository.holds(this.#ownerLinks, {
+        tenantId: input.tenantId,
+        objectId: input.id,
+        now: input.now,
+      })
+    ) {
       return false;
     }
     this.#values.set(key(input), {
@@ -160,6 +206,20 @@ export class MemoryStoredObjectRecordRepository implements StoredObjectRecordRep
       updatedAt: input.at,
     });
   }
+}
+
+/** An open upload, or a closed row whose bytes are still held. */
+function isReapable(value: StoredObjectRecord): boolean {
+  if (value.status === "pending" || value.status === "uploading") return true;
+  return (value.status === "failed" || value.status === "deleted") && value.storage !== null;
+}
+
+function statusMatches(
+  status: StoredObjectRecordStatus,
+  wanted: StoredObjectRecordPageQuery["status"],
+): boolean {
+  if (wanted === undefined) return true;
+  return typeof wanted === "string" ? status === wanted : wanted.includes(status);
 }
 
 /**

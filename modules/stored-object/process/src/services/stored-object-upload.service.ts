@@ -5,22 +5,17 @@
  */
 import { createHash } from "node:crypto";
 
-import {
-  type DataRetentionApi,
-  INDEFINITE_RETENTION_DAYS,
-} from "@langwatch/data-retention-contract";
+import { INDEFINITE_RETENTION_DAYS } from "@langwatch/data-retention-contract";
 import { HandledError, ValidationError } from "@langwatch/handled-error";
-import { ObjectBodyShortError, ObjectBodyTooLargeError } from "@langwatch/process-stores";
+import type { ObjectDigest } from "@langwatch/process-stores/members";
 import {
   DirectUploadUnavailableError,
   StorageUnavailableError,
   StoredObjectBytesMissingError,
   StoredObjectDeletedError,
-  StoredObjectIntegrityConflictError,
   StoredObjectNotFoundError,
   UploadExpiredError,
   UploadIncompleteError,
-  UploadTokenInvalidError,
   UploadTooLargeError,
   isRefusedUploadMediaType,
   purposeByteLimitOf,
@@ -31,7 +26,6 @@ import {
   type StoreStoredObjectFromBytesResult,
   type StoredObjectByteStream,
   type StoredObjectReference,
-  type StoredObjectUploadBody,
   type StoredObjectsCreateUploadOutput,
   type WriteStoredObjectUploadInput,
 } from "@langwatch/stored-object-contract";
@@ -49,11 +43,15 @@ import type {
   StoredObjectRecord,
   StoredObjectRecordRepository,
 } from "../repositories/stored-object-record.repository.ts";
+import {
+  assertByteFacts,
+  isLanded,
+  landedDigestOf,
+  movedOn,
+} from "../rules/stored-object-lifecycle.rules.ts";
 import { storedObjectReferenceOf } from "../rules/stored-object-view.rules.ts";
+import { StoredObjectUploadReceiveService } from "./stored-object-upload-receive.service.ts";
 import type { StoredObjectUploadSignerService } from "./stored-object-upload-signer.service.ts";
-
-/** The one retention question a store asks: how long its category keeps the project's data. */
-export type StoredObjectRetention = Pick<DataRetentionApi, "getRetentionDays">;
 
 /** An owner link before it names its object. */
 type StoredObjectOwnerClaim = Omit<StoredObjectOwnerLink, "objectId">;
@@ -61,7 +59,6 @@ type StoredObjectOwnerClaim = Omit<StoredObjectOwnerLink, "objectId">;
 type StoredObjectUploadServiceOptions = Readonly<{
   records: StoredObjectRecordRepository;
   ownerLinks: StoredObjectOwnerLinkRepository;
-  retention: StoredObjectRetention;
   storage: StoredObjectBytesRepository;
   signer: StoredObjectUploadSignerService;
   maximumUploadBytes: number;
@@ -75,7 +72,11 @@ export class StoredObjectUploadService {
     return new StoredObjectUploadService(options);
   }
 
-  private constructor(private readonly options: StoredObjectUploadServiceOptions) {}
+  private readonly receiver: StoredObjectUploadReceiveService;
+
+  private constructor(private readonly options: StoredObjectUploadServiceOptions) {
+    this.receiver = StoredObjectUploadReceiveService.create(options);
+  }
 
   static async storageCall<T>(operation: () => Promise<T>): Promise<T> {
     try {
@@ -101,17 +102,6 @@ export class StoredObjectUploadService {
     }
   }
 
-  static assertByteFacts(value: StoredObjectRecord, byteLength: number): void {
-    if (value.byteLength !== byteLength) {
-      throw new StoredObjectIntegrityConflictError({
-        projectId: value.tenantId,
-        objectId: value.id,
-        expectedByteLength: value.byteLength,
-        actualByteLength: byteLength,
-      });
-    }
-  }
-
   async storeFromBytes(
     input: StoreStoredObjectFromBytesInput,
   ): Promise<StoreStoredObjectFromBytesResult> {
@@ -120,7 +110,7 @@ export class StoredObjectUploadService {
         ? this.options.maximumUploadBytes
         : purposeByteLimitOf(purposePolicyOf(input.purpose), input.maxBytes);
     const { chunks, byteLength } = await this.measured(input.bytes, ceiling);
-    const owners = await this.ownerClaimsOf(input);
+    const owners = this.ownerClaimsOf(input);
     const reusable = await this.options.records.findReusable({
       tenantId: input.projectId,
       purpose: input.purpose,
@@ -201,16 +191,12 @@ export class StoredObjectUploadService {
   }
 
   /** The caller's link if its purpose declares a retention category (ADR-002 §3), else none. */
-  private async ownerClaimsOf(
-    input: StoreStoredObjectFromBytesInput,
-  ): Promise<StoredObjectOwnerClaim[]> {
-    const category = purposePolicyOf(input.purpose).retentionCategory;
-    if (category === undefined) return [];
-
-    const days = await this.options.retention.getRetentionDays({
-      projectId: input.projectId,
-      category,
-    });
+  private ownerClaimsOf(input: StoreStoredObjectFromBytesInput): StoredObjectOwnerClaim[] {
+    if (purposePolicyOf(input.purpose).retentionCategory === undefined) return [];
+    const days = input.retentionDays;
+    if (days === undefined) {
+      throw new Error(`purpose ${input.purpose} needs the owner's retentionDays`);
+    }
     const now = this.options.now();
 
     return [
@@ -323,36 +309,8 @@ export class StoredObjectUploadService {
     };
   }
 
-  async writeUpload(input: WriteStoredObjectUploadInput): Promise<void> {
-    const seal = this.options.signer.open({
-      objectId: input.objectId,
-      signature: input.signature,
-      now: this.options.now(),
-    });
-    if (input.contentLength !== undefined && input.contentLength > seal.byteLength) {
-      throw new UploadTooLargeError(input.contentLength, seal.byteLength);
-    }
-
-    const value = await this.options.records.findById({
-      tenantId: seal.projectId,
-      id: input.objectId,
-    });
-    if (value?.status !== "pending" || !value.storage) throw new UploadTokenInvalidError();
-
-    if (!input.body) throw new UploadIncompleteError();
-
-    const address = value.storage;
-    try {
-      await this.options.storage.write({
-        projectId: seal.projectId,
-        address,
-        body: chunksOf(input.body),
-        byteLength: seal.byteLength,
-        mediaType: seal.mediaType,
-      });
-    } catch (error) {
-      throw writeRefusalOf(error, seal.byteLength);
-    }
+  writeUpload(input: WriteStoredObjectUploadInput): Promise<void> {
+    return this.receiver.writeUpload(input);
   }
 
   async confirmUpload(input: ConfirmStoredObjectUploadInput): Promise<StoredObjectReference> {
@@ -364,38 +322,64 @@ export class StoredObjectUploadService {
     if (value.status === "available") return storedObjectReferenceOf(value);
     if (value.status === "deleted")
       throw new StoredObjectDeletedError(input.projectId, input.objectId);
+    // "uploading": the bytes are still arriving through the process; the client retries.
     if (value.status !== "pending" || !value.storage) throw new UploadIncompleteError();
 
+    const digest = isLanded(value) ? landedDigestOf(value) : await this.unseenDigestOf(value);
+
+    assertByteFacts(value, digest.byteLength);
+    const now = this.options.now();
+    const available = movedOn({
+      value,
+      now,
+      changes: {
+        status: "available",
+        sha256: digest.sha256,
+        mediaTypeVerified: true,
+        expiresAt: null,
+        availableAt: now,
+      },
+    });
+    if (await this.options.records.transition({ expected: value, next: available })) {
+      return storedObjectReferenceOf(available);
+    }
+
+    return this.answerAfterLostConfirm(input);
+  }
+
+  /** Another write moved the row first: answer from what it holds now. */
+  private async answerAfterLostConfirm(
+    input: ConfirmStoredObjectUploadInput,
+  ): Promise<StoredObjectReference> {
+    const current = await this.options.records.findById({
+      tenantId: input.projectId,
+      id: input.objectId,
+    });
+    if (current?.status === "available") return storedObjectReferenceOf(current);
+    if (current?.status === "deleted") {
+      throw new StoredObjectDeletedError(input.projectId, input.objectId);
+    }
+    throw new UploadIncompleteError();
+  }
+
+  /** A direct upload's bytes, which LangWatch never saw: its window still applies. */
+  private async unseenDigestOf(value: StoredObjectRecord): Promise<ObjectDigest> {
     const isExpired =
       value.expiresAt === null ||
       Temporal.Instant.compare(value.expiresAt, this.options.now()) <= 0;
     if (isExpired) throw new UploadExpiredError();
 
     const address = value.storage;
-    const digest = await StoredObjectUploadService.storageCall(() =>
-      this.options.storage.getStat({ projectId: input.projectId, address }),
+    if (!address) throw new UploadIncompleteError();
+
+    return StoredObjectUploadService.storageCall(() =>
+      this.options.storage.getStat({ projectId: value.tenantId, address }),
     ).catch((error: unknown) => {
       if (error instanceof HandledError && error.code === "stored_object_not_found") {
         throw new UploadIncompleteError();
       }
       throw error;
     });
-
-    StoredObjectUploadService.assertByteFacts(value, digest.byteLength);
-    const now = this.options.now();
-    const available: StoredObjectRecord = {
-      ...value,
-      status: "available",
-      sha256: digest.sha256,
-      mediaTypeVerified: true,
-      generation: value.generation + 1,
-      expiresAt: null,
-      availableAt: now,
-      updatedAt: now,
-    };
-    await this.options.records.upsert(available);
-
-    return storedObjectReferenceOf(available);
   }
 
   /** In-process bytes: a buffer is written as it is; a stream is counted within the ceiling. */
@@ -449,24 +433,6 @@ function assertWithinCeiling(byteLength: number, ceiling: number): void {
 
 function refusedField(field: "purpose" | "mediaType", message: string): ValidationError {
   return new ValidationError(message, { meta: { fieldErrors: { [field]: [message] } } });
-}
-
-/** The member refuses a body past or short of its declared length, and keeps nothing. */
-function writeRefusalOf(error: unknown, byteLength: number): Error {
-  if (error instanceof ObjectBodyTooLargeError)
-    return new UploadTooLargeError(byteLength + 1, byteLength);
-  if (error instanceof ObjectBodyShortError) return new UploadIncompleteError();
-
-  return new StorageUnavailableError();
-}
-
-async function* chunksOf(body: StoredObjectUploadBody): StoredObjectByteStream {
-  const reader = body.getReader();
-  try {
-    for (let next = await reader.read(); !next.done; next = await reader.read()) yield next.value;
-  } finally {
-    reader.releaseLock();
-  }
 }
 
 async function* streamOf(chunks: readonly Uint8Array[]): StoredObjectByteStream {

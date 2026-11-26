@@ -23,8 +23,13 @@ const (
 	catalog    = "../../../enterprise/modules/billing/contract/src/stripe-catalog.json"
 	seatPrice  = "price_1SzP11IMsTw08cudRhGETYNa" // GROWTH_SEAT_USD_MONTHLY, 3200 usd
 	eventsMtr  = "mtr_test_61UBL0fe0hM4Csg7x41IMsTw08cudQaG"
+	storageMtr = "mtr_test_61VjKmnOYgbfwXOun41IMsTw08cudHtw"
+	// RETENTION_STORAGE_EUR_MONTHLY, 300 eur per GB-month
+	storagePrice = "price_1UZwpSIMsTw08cud1AbkINGw"
 	// GROWTH_PII_REDACTION_USD, 100 usd cents per dollar on the PII redaction meter
 	piiRedactionPrice = "price_1Uat9tIMsTw08cudpWWrZG4a"
+	// GROWTH_INSTANT_EVAL_USD, 100 usd cents per dollar on the Instant Evals meter
+	instantEvalPrice = "price_1UHJZnIMsTw08cudkPOesmTR"
 )
 
 var epoch = time.Date(2026, 10, 1, 12, 0, 0, 0, time.UTC)
@@ -195,6 +200,43 @@ func TestRefusesCallWithoutKey(t *testing.T) {
 	}
 }
 
+// A unit amount keeps a price off the BILLABLE_EVENTS fallback, so only catalogMetered meters it.
+// @scenario "Each dollar usage price is metered on its own meter"
+func TestCatalogMetersEachUsagePriceOnItsOwnMeter(t *testing.T) {
+	raw := []byte(`{
+		"mapping": {
+			"GROWTH_INSTANT_EVAL_USD": {"test": "price_instant"},
+			"GROWTH_PII_REDACTION_USD": {"test": "price_pii"}
+		},
+		"meters": {
+			"INSTANT_EVAL_USD": {"test": "mtr_instant"},
+			"PII_REDACTION_USD": {"test": "mtr_pii"}
+		},
+		"prices": {
+			"price_instant": {"id": "price_instant", "unitAmount": 100, "currency": "usd", "recurring": {"interval": "month", "intervalCount": 1}},
+			"price_pii": {"id": "price_pii", "unitAmount": 100, "currency": "usd", "recurring": {"interval": "month", "intervalCount": 1}}
+		}
+	}`)
+	st := newState()
+	if err := st.seedCatalog(raw, "test", epoch); err != nil {
+		t.Fatal(err)
+	}
+	want := map[string]string{"price_instant": "mtr_instant", "price_pii": "mtr_pii"}
+	for _, p := range st.prices {
+		meter, ok := want[p.ID]
+		if !ok {
+			continue
+		}
+		if !isMetered(p) || p.Recurring.Meter == nil || *p.Recurring.Meter != meter {
+			t.Errorf("%s: recurring %+v, want metered on %s", p.ID, p.Recurring, meter)
+		}
+		delete(want, p.ID)
+	}
+	if len(want) != 0 {
+		t.Fatalf("prices not seeded: %v", want)
+	}
+}
+
 // @scenario "The catalog seeds the product's own price ids"
 func TestCatalogSeedsRealPriceIDs(t *testing.T) {
 	g := newRig(t)
@@ -212,17 +254,16 @@ func TestCatalogSeedsRealPriceIDs(t *testing.T) {
 	}
 	_, meters := g.stripe(http.MethodGet, "/v1/billing/meters", "limit=10")
 	// Meters are seeded from a map, so listing order is not fixed.
-	var m map[string]any
-	for _, candidate := range meters["data"].([]any) {
-		if c := candidate.(map[string]any); c["id"] == eventsMtr {
-			m = c
-		}
+	events := map[string]any{}
+	for _, m := range meters["data"].([]any) {
+		events[m.(map[string]any)["id"].(string)] = m.(map[string]any)["event_name"]
 	}
-	if m == nil {
-		t.Fatalf("meter %s not listed: %v", eventsMtr, meters["data"])
+	if events[eventsMtr] != "langwatch_billable_events" || events[storageMtr] != "langwatch_retention_storage_gb" {
+		t.Fatalf("meters %v", events)
 	}
-	if m["event_name"] != "langwatch_billable_events" {
-		t.Fatalf("meter %v", m)
+	storage, _ := found[storagePrice]["recurring"].(map[string]any)
+	if storage == nil || storage["usage_type"] != "metered" || storage["meter"] != storageMtr {
+		t.Fatalf("storage price %v", found[storagePrice])
 	}
 }
 
@@ -352,6 +393,37 @@ func TestRenewalBillsUsage(t *testing.T) {
 	inv := list["data"].([]any)[0].(map[string]any)
 	// 2 seats x 3200 + (1500-1000) events x 2
 	if inv["billing_reason"] != "subscription_cycle" || inv["total"].(float64) != 7400 || inv["status"] != "paid" {
+		t.Fatalf("renewal invoice %v", inv)
+	}
+}
+
+// The catalog's own Instant Evals price, not a hand-seeded one: proves the mapping and the meter together.
+// @scenario "A renewal bills the dollars judged on the catalog's Instant Evals price"
+func TestRenewalBillsInstantEvalUsage(t *testing.T) {
+	g := newRig(t)
+	_, cus := g.stripe(http.MethodPost, "/v1/customers", "name=Acme")
+	customer := cus["id"].(string)
+	form := url.Values{
+		"mode": {"subscription"}, "customer": {customer}, "success_url": {"http://app/ok"},
+		"line_items[0][price]": {seatPrice}, "line_items[0][quantity]": {"2"},
+		"line_items[1][price]": {instantEvalPrice},
+	}
+	status, sess := g.stripe(http.MethodPost, "/v1/checkout/sessions", form.Encode())
+	if status != http.StatusOK {
+		t.Fatalf("checkout with the catalog's Instant Evals price: %d %v", status, sess)
+	}
+	_, done := g.control(http.MethodPost, "/_sim/api/checkout/"+sess["id"].(string)+"/complete", "")
+	subID := done["subscription"].(string)
+
+	status, out := g.stripe(http.MethodPost, "/v1/billing/meter_events", "event_name=langwatch_instant_eval_usd&payload[stripe_customer_id]="+customer+"&payload[value]=1.2345&identifier=ie1")
+	if status != http.StatusOK {
+		t.Fatalf("%d %v", status, out)
+	}
+	g.control(http.MethodPost, "/_sim/api/clock/advance", `{"seconds":2764800}`)
+	_, invoices := g.stripe(http.MethodGet, "/v1/invoices", "subscription="+subID+"&limit=1")
+	inv := invoices["data"].([]any)[0].(map[string]any)
+	// 2 seats x 3200 + 1.2345 dollars x 100 cents, to the cent
+	if inv["billing_reason"] != "subscription_cycle" || inv["total"].(float64) != 6523 {
 		t.Fatalf("renewal invoice %v", inv)
 	}
 }

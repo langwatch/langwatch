@@ -15,7 +15,8 @@ import {
   subscribeToDashboardsSidebarHint,
 } from "../model/dashboards-sidebar-hint.ts";
 import { showsDevelopmentIndicator, useNavigationHost } from "../model/navigation-host.ts";
-import type { ProductId } from "../model/products.ts";
+import type { OpenBoard } from "../model/open-board.ts";
+import { type ProductId, productFromPathname } from "../model/products.ts";
 import {
   projectNavItemAt,
   toProjectRoutePattern,
@@ -27,11 +28,13 @@ import {
   type SeatRefusal,
   type ShellRoute,
 } from "../model/resolve-shell-route.ts";
-import {
-  SHELL_SIDEBAR_WIDTH_COMPACT,
-  SHELL_SIDEBAR_WIDTH_EXPANDED,
-} from "../model/shell-layout.ts";
+import { SHELL_SIDEBAR_WIDTH_COMPACT, shellSidebarWidth } from "../model/shell-layout.ts";
+import { useSidebarWidthStore } from "./sidebar-width.store.ts";
 import { useIsMobileViewport } from "./use-is-mobile-viewport.ts";
+import { useOpenBoard } from "./use-open-board.ts";
+import { useOrganizationDashboardsArea } from "./use-organization-dashboards-area.ts";
+import { useOrganizationLibrary } from "./use-product-home.ts";
+import { useProjectAddressDestination } from "./use-project-address-redirect.ts";
 import { useReachableProducts } from "./use-reachable-products.ts";
 
 export interface NavigationShellReadyState {
@@ -45,6 +48,8 @@ export interface NavigationShellReadyState {
   isSettingsRoute: boolean;
   /** The page's product is one the viewer's seat does not reach; null when it opens. */
   seatRefusal: SeatRefusal | null;
+  /** The board the address opens, with the organization's library on; null otherwise. */
+  openBoard: OpenBoard | null;
   /** A development build, unless it asked to hide the badge. */
   showDevelopmentIndicator: boolean;
   isCompactSidebar: boolean;
@@ -83,6 +88,11 @@ export function useNavigationShellState({
     () => null,
   );
   const sidebarHint = honourDashboardsSidebarHint({ hint: storedHint, reachableProducts });
+  const organizationLibrary = useOrganizationDashboardsArea();
+  const hasOrganizationLibrary = useOrganizationLibrary();
+  const board = useOpenBoard({ enabled: hasOrganizationLibrary === true });
+  const projectAddressDestination = useProjectAddressDestination();
+  const rememberedWidth = useSidebarWidthStore((state) => state.rememberedWidth);
 
   const user = host.currentUser();
   const project = host.project();
@@ -93,14 +103,18 @@ export function useNavigationShellState({
   if (hasUnresolvedProjectParam) {
     return { status: "not-found" };
   }
-  const isFlagOff = (flag: FrontendFeatureFlag) => {
-    const reading = host.featureFlag(FrontendFlags[flag]);
-    return !reading.isLoading && !reading.enabled;
-  };
-  if (isSwitchedOffProductAt({ pathname, isFlagOff })) {
-    return { status: "not-found" };
+  const areaState = organizationAreaState({
+    host,
+    pathname,
+    organizationLibrary,
+    projectAddressDestination,
+  });
+  if (areaState !== null) {
+    return areaState;
   }
 
+  // A board homed where the seat cannot go opens in the Dashboards chrome instead.
+  const boardHome = board.openBoard?.homeProduct;
   const route = resolveShellRoute({
     pathname,
     isPersonalScope,
@@ -108,13 +122,24 @@ export function useNavigationShellState({
     isOnOwnPersonalProject: !!team?.isPersonal && team.ownerUserId === user?.id,
     organizationRole: host.organizationRole(),
     sidebarHint,
+    boardHomeProduct: boardHome && reachableProducts.includes(boardHome) ? boardHome : null,
+    hasOrganizationLibrary: hasOrganizationLibrary === true,
   });
+  // Which chrome a Dashboards address draws waits on the library's flags and the board's home.
+  const isDashboardsChromePending =
+    productFromPathname(pathname) === "dashboards" &&
+    (hasOrganizationLibrary === void 0 || board.isLoading);
 
   if (user && route.isResolverRoute && isOrgless(host)) {
     return { status: "chromeless" };
   }
 
-  if (!user || isShellDataPending({ host, route })) {
+  if (
+    !user ||
+    organizationLibrary === "loading" ||
+    isDashboardsChromePending ||
+    isShellDataPending({ host, route })
+  ) {
     return { status: "loading" };
   }
 
@@ -128,11 +153,42 @@ export function useNavigationShellState({
     activeProductId: route.activeProductId,
     isSettingsRoute: route.isSettingsRoute,
     seatRefusal: route.seatRefusal,
+    openBoard: board.openBoard,
     showDevelopmentIndicator: showsDevelopmentIndicator(host.deployment()),
     isCompactSidebar,
     isMobile,
-    menuWidth: isCompactSidebar ? SHELL_SIDEBAR_WIDTH_COMPACT : SHELL_SIDEBAR_WIDTH_EXPANDED,
+    menuWidth: isCompactSidebar
+      ? SHELL_SIDEBAR_WIDTH_COMPACT
+      : `${shellSidebarWidth({ remembered: rememberedWidth })}px`,
   };
+}
+
+/** What the organization's Dashboards area settles before any chrome; null lets the shell draw. */
+function organizationAreaState({
+  host,
+  pathname,
+  organizationLibrary,
+  projectAddressDestination,
+}: {
+  host: ReturnType<typeof useNavigationHost>;
+  pathname: string;
+  organizationLibrary: ReturnType<typeof useOrganizationDashboardsArea>;
+  projectAddressDestination: string | null;
+}): NavigationShellState | null {
+  const isFlagOff = (flag: FrontendFeatureFlag) => {
+    const reading = host.featureFlag(FrontendFlags[flag]);
+    return !reading.isLoading && !reading.enabled;
+  };
+  // The organization's library is about no project, so its flags are the organization's.
+  const isClosed =
+    organizationLibrary === "elsewhere"
+      ? isSwitchedOffProductAt({ pathname, isFlagOff })
+      : organizationLibrary === "closed";
+  if (isClosed) return { status: "not-found" };
+  // With the library's flag off the address reads as before: a project it forwards to, if any.
+  if (organizationLibrary !== "legacy") return null;
+  const isForwarding = projectAddressDestination !== null || host.isLoading();
+  return isForwarding ? { status: "loading" } : { status: "not-found" };
 }
 
 function isOrgless(host: ReturnType<typeof useNavigationHost>): boolean {

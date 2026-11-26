@@ -1,7 +1,7 @@
 import {
   LangyConversationNotFoundError,
   type LangyPanelCall,
-  type LangyStreamEntry,
+  type LangyStreamFrame,
   type langyTurnStreamInputSchema,
 } from "@langwatch/langy-contract";
 import { createLogger } from "@langwatch/observability";
@@ -36,7 +36,7 @@ export class LangyPanelTurnStreamService {
   /** One turn's live edge; "no such turn" and "not yours" answer the same not-found. */
   async *watchTurnStream(
     input: LangyPanelCall<typeof langyTurnStreamInputSchema> & { signal?: AbortSignal },
-  ): AsyncGenerator<LangyStreamEntry> {
+  ): AsyncGenerator<LangyStreamFrame> {
     await this.members.access.assertPanelAccess(input);
     const { projectId, conversationId, turnId } = input;
     const userId = input.caller.userId;

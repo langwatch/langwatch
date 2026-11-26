@@ -4,13 +4,16 @@
  * IN subqueries are used rather than EXISTS; the two are equivalent here.
  */
 
-import type { FilterField } from "@langwatch/analytics-contract";
+import { analyticsFilterRefusal, type FilterField } from "@langwatch/analytics-contract";
 import { tenantSet } from "@langwatch/clickhouse-client";
 import {
   customMetadataKeyCondition,
   customMetadataValueCondition,
+  STORED_SPANS_SOURCE,
+  type SpanAnalyticsSource,
 } from "@langwatch/trace-contract";
 
+import { findUnapplicableFilterValue } from "../../rules/analytics-filter-values.rules.ts";
 import { type CHTable, tableAliases } from "./clickhouse.field-mappings.mapper.ts";
 
 /**
@@ -29,19 +32,21 @@ export interface FilterTranslation {
 
 /**
  * Handler for one filter. `spanTimePredicate` prunes a `stored_spans` subquery to the
- * dashboard's date range.
+ * dashboard's date range; `spanAnalytics` picks the table a span type is read from.
  */
 type FilterHandler = (input: {
   values: string[];
   key?: string;
   subkey?: string;
   spanTimePredicate?: string;
+  spanAnalytics?: SpanAnalyticsSource;
 }) => FilterTranslation;
 
 /** What every side-table subquery handler is handed. */
 type SubqueryFilterInput = {
   values: string[];
   spanTimePredicate?: string;
+  spanAnalytics?: SpanAnalyticsSource;
 };
 
 /** An evaluation_runs subquery handler's input, optionally narrowed to one evaluator. */
@@ -95,8 +100,8 @@ const filterHandlers: Record<FilterField, FilterHandler | null> = {
   "traces.name": ({ values }) => translateTraceNameFilter(values),
 
   // Span Filters
-  "spans.type": ({ values, spanTimePredicate }) =>
-    translateSpanTypeFilter({ values, spanTimePredicate }),
+  "spans.type": ({ values, spanTimePredicate, spanAnalytics }) =>
+    translateSpanTypeFilter({ values, spanTimePredicate, spanAnalytics }),
   "spans.model": ({ values, spanTimePredicate }) =>
     translateSpanModelFilter({ values, spanTimePredicate }),
 
@@ -162,19 +167,28 @@ export function translateFilter({
   key,
   subkey,
   spanTimePredicate,
+  spanAnalytics,
 }: {
   field: FilterField;
   values: string[];
   key?: string;
   subkey?: string;
   spanTimePredicate?: string;
+  spanAnalytics?: SpanAnalyticsSource;
 }): FilterTranslation {
   if (values.length === 0) {
     return noOpFilter;
   }
+  // A value no handler below recognises would fall back to no predicate and widen the answer.
+  const unapplicable = findUnapplicableFilterValue({
+    field,
+    values,
+    depth: [key, subkey].filter(Boolean).length,
+  });
+  if (unapplicable) throw analyticsFilterRefusal(unapplicable);
 
   const handler = filterHandlers[field];
-  return handler ? handler({ values, key, subkey, spanTimePredicate }) : noOpFilter;
+  return handler ? handler({ values, key, subkey, spanTimePredicate, spanAnalytics }) : noOpFilter;
 }
 
 /**
@@ -330,7 +344,7 @@ function translateErrorFilter(values: string[]): FilterTranslation {
     };
   }
 
-  // Both or neither - no filtering
+  // Both states selected is every row; any other value was refused in `translateFilter`.
   return { whereClause: "1=1", requiredJoins: [], params: {} };
 }
 
@@ -349,26 +363,39 @@ function translateTraceNameFilter(values: string[]): FilterTranslation {
 }
 
 /**
- * Translate span type filter. An IN subquery, since a JOIN duplicates a trace with several
- * matching spans. It matches tenant and trace id together, so a trace id two members share
- * never keeps the other member's trace (ADR-177).
+ * Span type filter: an IN subquery on tenant and trace id together (a JOIN repeats a trace per
+ * matching span; ADR-177). The type comes from span_analytics where it is complete, and from
+ * the stored_spans map elsewhere.
  */
 function translateSpanTypeFilter({
   values,
   spanTimePredicate = "",
+  spanAnalytics = STORED_SPANS_SOURCE,
 }: SubqueryFilterInput): FilterTranslation {
   const ts = tableAliases.trace_summaries;
   const paramName = genParamName("spanTypes");
+  const branch = ({ light, bound }: { light: boolean; bound: string }) => `
+      SELECT TenantId, TraceId FROM ${light ? "span_analytics" : "stored_spans"}
+      WHERE ${tenantSet()}
+        ${spanTimePredicate}${bound}
+        AND ${light ? "SpanType" : "SpanAttributes['langwatch.span.type']"} IN ({${paramName}:Array(String)})`;
+  const params: Record<string, unknown> = { [paramName]: values };
+  let subquery: string;
+  if (spanAnalytics.kind === "split") {
+    const fromParam = genParamName("spanAnalyticsFrom");
+    params[fromParam] = spanAnalytics.fromMs;
+    const from = `fromUnixTimestamp64Milli({${fromParam}:Int64})`;
+    subquery = `${branch({ light: true, bound: ` AND StartTime >= ${from}` })}
+      UNION ALL${branch({ light: false, bound: ` AND StartTime < ${from}` })}`;
+  } else {
+    subquery = branch({ light: spanAnalytics.kind === "span_analytics", bound: "" });
+  }
 
   return {
-    whereClause: `(${ts}.TenantId, ${ts}.TraceId) IN (
-      SELECT TenantId, TraceId FROM stored_spans
-      WHERE ${tenantSet()}
-        ${spanTimePredicate}
-        AND SpanAttributes['langwatch.span.type'] IN ({${paramName}:Array(String)})
+    whereClause: `(${ts}.TenantId, ${ts}.TraceId) IN (${subquery}
     )`,
     requiredJoins: [],
-    params: { [paramName]: values },
+    params,
   };
 }
 
@@ -580,9 +607,8 @@ function translateEventTypeFilter({
 }
 
 /**
- * Translate event metric key filter. Uses paired arrayExists to correlate
- * Events.Name with Events.Attributes at the same index — this prevents false
- * positives where event type matches at one index but key matches at another.
+ * Event metric key filter: paired arrayExists keeps name and attributes at one index. Keys
+ * match by `hasAny(mapKeys(...))`; a lambda over them copies each event's map once per key.
  */
 function translateEventMetricKeyFilter({
   values,
@@ -603,14 +629,14 @@ function translateEventMetricKeyFilter({
     // Correlate event name and attributes at the same array index
     metricKeyCondition = `arrayExists(
       (name, attrs) -> name = {${eventTypeParam}:String}
-        AND arrayExists(k -> mapContains(attrs, k), {${keysParam}:Array(String)}),
+        AND hasAny(mapKeys(attrs), {${keysParam}:Array(String)}),
       "Events.Name",
       "Events.Attributes"
     )`;
   } else {
     // No event type filter, just check attributes
     metricKeyCondition = `arrayExists(
-      x -> arrayExists(k -> mapContains(x, k), {${keysParam}:Array(String)}),
+      x -> hasAny(mapKeys(x), {${keysParam}:Array(String)}),
       "Events.Attributes"
     )`;
   }
@@ -725,7 +751,7 @@ function translateAnnotationFilter(values: string[]): FilterTranslation {
     };
   }
 
-  // Both or neither - no filtering
+  // Both states selected is every row; any other value was refused in `translateFilter`.
   return { whereClause: "1=1", requiredJoins: [], params: {} };
 }
 
@@ -796,16 +822,20 @@ function translateNestedFilter({
   field,
   value,
   spanTimePredicate,
+  spanAnalytics,
 }: {
   field: FilterField;
   value: Record<string, string[]> | Record<string, Record<string, string[]>>;
   spanTimePredicate?: string;
+  spanAnalytics?: SpanAnalyticsSource;
 }): FilterTranslation[] {
   const translations: FilterTranslation[] = [];
 
   for (const [key, subValue] of Object.entries(value)) {
     if (Array.isArray(subValue)) {
-      translations.push(translateFilter({ field, values: subValue, key, spanTimePredicate }));
+      translations.push(
+        translateFilter({ field, values: subValue, key, spanTimePredicate, spanAnalytics }),
+      );
       continue;
     }
     if (typeof subValue !== "object") continue;
@@ -813,7 +843,14 @@ function translateNestedFilter({
     for (const [subkey, subSubValue] of Object.entries(subValue)) {
       if (Array.isArray(subSubValue)) {
         translations.push(
-          translateFilter({ field, values: subSubValue, key, subkey, spanTimePredicate }),
+          translateFilter({
+            field,
+            values: subSubValue,
+            key,
+            subkey,
+            spanTimePredicate,
+            spanAnalytics,
+          }),
         );
       }
     }
@@ -829,7 +866,10 @@ export function translateAllFilters(
   filters: Partial<
     Record<string, string[] | Record<string, string[]> | Record<string, Record<string, string[]>>>
   >,
-  { spanTimePredicate }: { spanTimePredicate?: string } = {},
+  {
+    spanTimePredicate,
+    spanAnalytics,
+  }: { spanTimePredicate?: string; spanAnalytics?: SpanAnalyticsSource } = {},
 ): FilterTranslation {
   const translations: FilterTranslation[] = [];
 
@@ -841,7 +881,12 @@ export function translateAllFilters(
     if (Array.isArray(value)) {
       // Simple array filter
       translations.push(
-        translateFilter({ field: field as FilterField, values: value, spanTimePredicate }),
+        translateFilter({
+          field: field as FilterField,
+          values: value,
+          spanTimePredicate,
+          spanAnalytics,
+        }),
       );
     } else if (typeof value === "object") {
       translations.push(
@@ -849,6 +894,7 @@ export function translateAllFilters(
           field: field as FilterField,
           value,
           spanTimePredicate,
+          spanAnalytics,
         }),
       );
     }

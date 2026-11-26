@@ -32,6 +32,70 @@ describe("parseCommand", () => {
     });
   });
 
+  describe("when a turn line carries images", () => {
+    /** @scenario "A turn's images reach pi as image input" */
+    it("parses each image's name, media type and base64 data", () => {
+      const line = JSON.stringify({
+        type: "turn",
+        turnId: "t1",
+        prompt: "what is this?",
+        images: [
+          { name: "pasted-7bd830.png", mediaType: "image/png", data: "iVBORw0KGgo=" },
+          { mediaType: "image/jpeg", data: "/9j/4AAQ" },
+        ],
+      });
+      expect(parseCommand(line)).toEqual({
+        type: "turn",
+        turnId: "t1",
+        prompt: "what is this?",
+        images: [
+          { name: "pasted-7bd830.png", mediaType: "image/png", data: "iVBORw0KGgo=" },
+          { mediaType: "image/jpeg", data: "/9j/4AAQ" },
+        ],
+      });
+    });
+
+    it("drops malformed images and keeps the turn", () => {
+      const line = JSON.stringify({
+        type: "turn",
+        turnId: "t1",
+        prompt: "hi",
+        images: [
+          null,
+          "x",
+          { mediaType: "text/plain", data: "aGk=" },
+          { mediaType: "image/png", data: "" },
+          { mediaType: "image/png" },
+          { mediaType: "image/gif", data: "R0lGOD", name: 7 },
+        ],
+      });
+      expect(parseCommand(line)).toEqual({
+        type: "turn",
+        turnId: "t1",
+        prompt: "hi",
+        images: [{ mediaType: "image/gif", data: "R0lGOD" }],
+      });
+      expect(parseCommand('{"type":"turn","turnId":"t1","prompt":"hi","images":"no"}')).toEqual({
+        type: "turn",
+        turnId: "t1",
+        prompt: "hi",
+      });
+    });
+
+    it("parses a turn line tens of MiB long", () => {
+      const data = "A".repeat(27 * 1024 * 1024);
+      const parsed = parseCommand(
+        JSON.stringify({
+          type: "turn",
+          turnId: "t1",
+          prompt: "hi",
+          images: [{ mediaType: "image/png", data }],
+        }),
+      );
+      expect(parsed?.type === "turn" && parsed.images?.[0]?.data.length).toBe(data.length);
+    });
+  });
+
   describe("when abort, shutdown_imminent and ping lines", () => {
     it("parses them", () => {
       expect(parseCommand('{"type":"abort","turnId":"t1"}')).toEqual({

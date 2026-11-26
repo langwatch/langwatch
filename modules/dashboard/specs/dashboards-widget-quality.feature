@@ -21,7 +21,7 @@ Feature: Dashboards widget quality: template widgets read the completeness repor
 
   @unit
   Scenario: Widget quality: an average cost divides by the traces with a price
-    Given a cost per success, per call or per resolved conversation
+    Given a cost per request without an error, per call or per resolved conversation
     Then it divides by the share of traces whose price is known
     And a model with no price never pulls the average down
 
@@ -29,13 +29,13 @@ Feature: Dashboards widget quality: template widgets read the completeness repor
   Scenario: Widget quality: a model with no price shows its own row with a dash
     Given a cost list by model or by source
     When the completeness report names a model with no price
-    Then the model has its own "no price" row with a dash for its cost, never "$0.00"
+    Then the model has its own "price unknown" row with a dash for its cost, never "$0.00"
 
   @unit
-  Scenario: Widget quality: a source with no runs reads No runs, never $0.00
+  Scenario: Widget quality: a source with no runs reads Nothing ran, never $0.00
     Given the "Production vs testing" widget
     When a source such as Experiments sent no traces in the period
-    Then its row reads "No runs"
+    Then its row reads "Nothing ran"
 
   # ---------------------------------------------------------------------------
   # Time series

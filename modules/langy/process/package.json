@@ -69,6 +69,7 @@
     "@langwatch/scenario-contract": "workspace:*",
     "@langwatch/secret-contract": "workspace:*",
     "@langwatch/secrets": "workspace:*",
+    "@langwatch/stored-object-contract": "workspace:*",
     "@langwatch/time": "workspace:*",
     "@langwatch/trace-contract": "workspace:*",
     "@langwatch/user-contract": "workspace:*",

@@ -399,6 +399,10 @@
       "types": "./dist/components/forms/segmented-control.d.ts",
       "default": "./src/components/forms/segmented-control.tsx"
     },
+    "./project-picker": {
+      "types": "./dist/components/scope/project-picker.d.ts",
+      "default": "./src/components/scope/project-picker.tsx"
+    },
     "./provider-scope-chips": {
       "types": "./dist/components/scope/provider-scope-chips.d.ts",
       "default": "./src/components/scope/provider-scope-chips.tsx"
@@ -410,6 +414,10 @@
     "./scope-filter": {
       "types": "./dist/components/scope/scope-filter.d.ts",
       "default": "./src/components/scope/scope-filter.tsx"
+    },
+    "./scope-name-badge": {
+      "types": "./dist/components/scope/scope-name-badge.d.ts",
+      "default": "./src/components/scope/scope-name-badge.tsx"
     },
     "./option-list": {
       "types": "./dist/components/forms/option-list.d.ts",
@@ -546,6 +554,10 @@
     "./resource-tile": {
       "types": "./dist/components/layout/resource-tile.d.ts",
       "default": "./src/components/layout/resource-tile.tsx"
+    },
+    "./resize-handle": {
+      "types": "./dist/components/layout/resize-handle.d.ts",
+      "default": "./src/components/layout/resize-handle.tsx"
     },
     "./scroll-fade": {
       "types": "./dist/components/layout/scroll-fade.d.ts",

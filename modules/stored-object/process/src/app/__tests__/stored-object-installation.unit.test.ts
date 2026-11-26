@@ -1,5 +1,4 @@
 import type { AuthzApi } from "@langwatch/authz-contract";
-import type { DataRetentionApi } from "@langwatch/data-retention-contract";
 import { createApp } from "@langwatch/process";
 import { memoryStores } from "@langwatch/process-stores";
 import { StoredObjectApi, StoredObjectNotFoundError } from "@langwatch/stored-object-contract";
@@ -37,10 +36,7 @@ function installation(role: "api" | "worker" | "tasks") {
       },
     })
     .withStores(memoryStores())
-    .provide({
-      authz: createApiFixture<AuthzApi>(),
-      "data-retention": createApiFixture<DataRetentionApi>(),
-    })
+    .provide({ authz: createApiFixture<AuthzApi>() })
     .withObservability((observability) => observability.withLogging(unavailable("logger")));
 }
 

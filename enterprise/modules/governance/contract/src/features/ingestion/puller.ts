@@ -125,6 +125,11 @@ export type NormalizedPullEvent = z.infer<typeof normalizedPullEventSchema>;
 export type PullResult = {
   events: NormalizedPullEvent[];
   /**
+   * Events the adapter wrote to storage itself instead of returning in `events`. Counted with
+   * them, so a source fed this way still reads as receiving events. Optional: absent reads as 0.
+   */
+  writtenCount?: number;
+  /**
    * The cursor to persist. Advanced past everything this run consumed —
    * INCLUDING input it deliberately skipped — or the incoming cursor unchanged
    * when the run made no progress.
@@ -295,3 +300,80 @@ export interface PulledUsageSourceAttributionSchema extends Named<
 export const pulledUsageSourceAttributionSchema: PulledUsageSourceAttributionSchema =
   pulledUsageSourceAttributionSchemaDefinition;
 export type PulledUsageSourceAttribution = z.infer<typeof pulledUsageSourceAttributionSchema>;
+
+/** An AWS region code such as `eu-west-1` or `us-gov-west-1`. */
+const AWS_REGION_PATTERN = /^[a-z]{2}(-gov)?-[a-z]+-\d$/;
+
+export const AWS_BEDROCK_AGENTS_ADAPTER_ID = "aws_bedrock_agents" as const;
+/** List only: Bedrock Agents and AgentCore runtimes per region, signed by an AWS connection. */
+const awsBedrockAgentsPullConfigSchemaDefinition = z.object({
+  adapter: z.literal(AWS_BEDROCK_AGENTS_ADAPTER_ID),
+  /** The organisation's `GovernanceAwsConnection` the listing signs with. */
+  awsConnectionId: z.string().trim().min(1),
+  regions: z
+    .array(z.string().regex(AWS_REGION_PATTERN, "is not an AWS region code"))
+    .min(1)
+    .max(20),
+  schedule: z.string().default("0 * * * *"),
+});
+export interface AwsBedrockAgentsPullConfigSchema extends Named<
+  typeof awsBedrockAgentsPullConfigSchemaDefinition
+> {}
+export const awsBedrockAgentsPullConfigSchema: AwsBedrockAgentsPullConfigSchema =
+  awsBedrockAgentsPullConfigSchemaDefinition;
+export type AwsBedrockAgentsPullConfig = z.infer<typeof awsBedrockAgentsPullConfigSchema>;
+
+export const GCP_VERTEX_AGENT_ENGINE_ADAPTER_ID = "gcp_vertex_agent_engine" as const;
+const vertexAgentEngineTargetSchemaDefinition = z.object({
+  projectId: z.string().trim().min(1),
+  location: z.string().regex(/^[a-z]+-[a-z]+\d+$/, "is not a Google Cloud location"),
+});
+export interface VertexAgentEngineTargetSchema extends Named<
+  typeof vertexAgentEngineTargetSchemaDefinition
+> {}
+export const vertexAgentEngineTargetSchema: VertexAgentEngineTargetSchema =
+  vertexAgentEngineTargetSchemaDefinition;
+export type VertexAgentEngineTarget = z.infer<typeof vertexAgentEngineTargetSchema>;
+
+/** List only: Vertex AI Agent Engine reasoning engines per project and location. */
+const gcpVertexAgentEnginePullConfigSchemaDefinition = z.object({
+  adapter: z.literal(GCP_VERTEX_AGENT_ENGINE_ADAPTER_ID),
+  targets: z.array(vertexAgentEngineTargetSchema).min(1).max(20),
+  schedule: z.string().default("0 * * * *"),
+});
+export interface GcpVertexAgentEnginePullConfigSchema extends Named<
+  typeof gcpVertexAgentEnginePullConfigSchemaDefinition
+> {}
+export const gcpVertexAgentEnginePullConfigSchema: GcpVertexAgentEnginePullConfigSchema =
+  gcpVertexAgentEnginePullConfigSchemaDefinition;
+export type GcpVertexAgentEnginePullConfig = z.infer<typeof gcpVertexAgentEnginePullConfigSchema>;
+
+export const ARD_REGISTRY_ADAPTER_ID = "ard_registry" as const;
+/** List only: the urn:air entries an Agentic Resource Discovery (v0.91) registry publishes. */
+const ardRegistryPullConfigSchemaDefinition = z.object({
+  adapter: z.literal(ARD_REGISTRY_ADAPTER_ID),
+  /** A domain or an https URL; the manifest is read at its origin + `/.well-known/ard.json`. */
+  registryUrl: z.string().trim().min(1),
+  /** The registry's search endpoint, read page by page when named. */
+  searchUrl: z.string().trim().url().optional(),
+  schedule: z.string().default("0 * * * *"),
+});
+export interface ArdRegistryPullConfigSchema extends Named<
+  typeof ardRegistryPullConfigSchemaDefinition
+> {}
+export const ardRegistryPullConfigSchema: ArdRegistryPullConfigSchema =
+  ardRegistryPullConfigSchemaDefinition;
+export type ArdRegistryPullConfig = z.infer<typeof ardRegistryPullConfigSchema>;
+
+/** Source types that only list agents: their scheduled run lists them and never pulls usage. */
+export const LIST_ONLY_SOURCE_TYPES = [
+  AWS_BEDROCK_AGENTS_ADAPTER_ID,
+  GCP_VERTEX_AGENT_ENGINE_ADAPTER_ID,
+  ARD_REGISTRY_ADAPTER_ID,
+] as const;
+export type ListOnlySourceType = (typeof LIST_ONLY_SOURCE_TYPES)[number];
+const LIST_ONLY: ReadonlySet<string> = new Set(LIST_ONLY_SOURCE_TYPES);
+
+export function isListOnlySourceType({ sourceType }: { sourceType: string }): boolean {
+  return LIST_ONLY.has(sourceType);
+}

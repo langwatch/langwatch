@@ -1,10 +1,10 @@
 import type { AuthzDenialReason, PermissionDecision } from "@langwatch/authorization";
 import type { AuthzApi } from "@langwatch/authz-contract";
-import type { DataRetentionApi } from "@langwatch/data-retention-contract";
 import { memoryObjectStorage } from "@langwatch/process-stores";
 import {
   StoredObjectNotFoundError,
   type StoredObjectDeliveryCapability,
+  type StoredObjectFileRow,
   type StoredObjectOwnerResolver,
   type StoredObjectStorageDestination,
 } from "@langwatch/stored-object-contract";
@@ -31,7 +31,6 @@ import type {
 } from "../../rules/stored-object-file-access.rules.ts";
 import { StoredObjectDelivery } from "../../services/stored-object-delivery.service.ts";
 import { StoredObjectUploadSignerService } from "../../services/stored-object-upload-signer.service.ts";
-import type { StoredObjectRetention } from "../../services/stored-object-upload.service.ts";
 import type { StoredObjectPermissions } from "../../services/stored-object.service.ts";
 import type { StoredObjectFileReader } from "../../services/stored-objects.service.ts";
 import { StoredObjectModule, type StoredObjectInfrastructure } from "../stored-object.app.ts";
@@ -106,6 +105,14 @@ export class MemoryStoredObjectStorage extends StoredObjectBytesRepository {
   async probe(): Promise<void> {
     this.probes += 1;
   }
+
+  async uploadsThroughProcess(): Promise<boolean> {
+    return this.signed === "through-process";
+  }
+
+  async signCheckupUpload(): Promise<void> {
+    await this.signUpload();
+  }
 }
 
 /** Seals under the process's random key, as the memory tier does. */
@@ -148,13 +155,20 @@ export class FixedStoredObjectDelivery extends StoredObjectDelivery {
 export class MemoryStoredObjectFiles implements StoredObjectFileReader {
   head: StoredObjectProbe = { status: "not_found" };
   read: StoredObjectFileStreamRead | null = null;
+  /** How many reads opened the object's bytes. */
+  opened = 0;
 
   async headById(): Promise<StoredObjectProbe> {
     return this.head;
   }
 
+  async findRowById(): Promise<StoredObjectFileRow | null> {
+    return this.read?.row ?? null;
+  }
+
   async getById(): Promise<StoredObjectFileStreamRead> {
     if (!this.read) throw new StoredObjectNotFoundError();
+    this.opened += 1;
     return this.read;
   }
 }
@@ -191,7 +205,6 @@ export function createStoredObjectTestApp(
     parts?: Partial<StoredObjectInfrastructure>;
     permissions?: StoredObjectPermissions;
     images?: ExternalImageChannel;
-    retention?: StoredObjectRetention;
   }> = {},
 ): StoredObjectModule {
   const permissions = input.permissions ?? new GrantedStoredObjectPermissions();
@@ -200,8 +213,6 @@ export function createStoredObjectTestApp(
     permissions: createApiFixture<AuthzApi>({
       getDecision: (args) => permissions.getDecision(args),
     }),
-    retention:
-      input.retention ?? createApiFixture<DataRetentionApi>({ getRetentionDays: async () => 30 }),
     repositories:
       input.repositories ??
       MemoryStoredObjectRepositories.create({ objectStorage: memoryObjectStorage() }),

@@ -26,7 +26,7 @@ Feature: Helm install routing and disruption budgets
       Given the app Ingress is enabled with class "envoy" and a cert-manager annotation
       And ingress.gateway.host is "gateway.acme.com" with TLS secret "gateway-tls"
       When the chart renders
-      Then a second Ingress routes /v1 and /health on that host to the gateway Service
+      Then a second Ingress routes /v1, /a2a and /health on that host to the gateway Service
       And it has ingressClassName "envoy", the app annotations and the TLS secret
       And it carries no ingress-nginx annotation
       And the control plane is given "https://gateway.acme.com" as the gateway public URL

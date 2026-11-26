@@ -301,7 +301,7 @@ Feature: Langy lets me stop a turn for real, continue where it left off, and rej
   @integration
   Scenario: Stop is available the moment I send
     Given I send a message to Langy
-    Then the composer shows Stop while the turn is still starting up
+    Then Stop shows on the working row above the composer while the turn is still starting up
     And I do not have to wait for Langy to answer before I can stop it
 
   @unit @integration
@@ -398,11 +398,11 @@ Feature: Langy lets me stop a turn for real, continue where it left off, and rej
     Then a Continue affordance is shown on that stopped turn
 
   @integration @unimplemented
-  Scenario: Continuing does not spend a second daily pull-request permit for the same intent
+  Scenario: Continuing does not count the same pull request twice against the daily cap
     # Tracked: not shipped — depends on Continue existing at all.
-    Given a turn that reserved the daily pull-request permit before I stopped it
+    Given a turn that opened a pull request before I stopped it
     When I continue that stopped turn
-    Then the continuation does not reserve a second permit for the same intent
+    Then that pull request counts once against my daily cap
 
   # ===========================================================================
   # (3) Refresh and carry on from where it was streaming

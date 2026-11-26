@@ -295,8 +295,10 @@ export class PromptWriteService {
     // This prevents undefined values from overwriting existing database values
     if (configDataUpdates.prompt !== undefined || configDataUpdates.messages !== undefined) {
       const normalizedUpdate = normalizeSystemMessage(configDataUpdates);
-      configDataUpdates.prompt = normalizedUpdate.prompt;
-      configDataUpdates.messages = normalizedUpdate.messages;
+      if (normalizedUpdate.prompt !== undefined) configDataUpdates.prompt = normalizedUpdate.prompt;
+      if (normalizedUpdate.messages !== undefined) {
+        configDataUpdates.messages = normalizedUpdate.messages;
+      }
     }
 
     const updatedConfig = await this.repository.updateConfigAndCreateVersion({

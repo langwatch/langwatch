@@ -49,13 +49,15 @@ export class MemoryStoredObjectOwnerLinkRepository implements StoredObjectOwnerL
     return this.#live(input).length;
   }
 
-  /** Whether any owner holds the object at `now`; synchronous, so a twin delete is one step. */
-  holds(input: {
-    tenantId: StoredObjectProjectId;
-    objectId: StoredObjectId;
-    now: Instant;
-  }): boolean {
-    return this.#live(input).length > 0;
+  /**
+   * Whether any owner holds the object at `now`, for the memory record twin only; synchronous, so
+   * its conditional delete is one step as the Postgres statement is. Not part of the repository.
+   */
+  static holds(
+    links: MemoryStoredObjectOwnerLinkRepository,
+    input: { tenantId: StoredObjectProjectId; objectId: StoredObjectId; now: Instant },
+  ): boolean {
+    return links.#live(input).length > 0;
   }
 
   async deleteForTenant(input: { tenantId: StoredObjectProjectId }): Promise<void> {

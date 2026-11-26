@@ -5,8 +5,10 @@
 
 import { describe, expect, it } from "vitest";
 
+import { NUMBERS } from "../../templates/model/widget-code-parts.ts";
 import { OUTCOME_JUDGE } from "../widgets/flight-deck-costs-queries.ts";
 import { FLIGHT_DECK_COSTS_BUILDS } from "../widgets/flight-deck-costs-widgets.ts";
+import { TESTING_SPEND } from "../widgets/running-costs-code.ts";
 
 function build(id: string) {
   const found = FLIGHT_DECK_COSTS_BUILDS[id];
@@ -20,7 +22,12 @@ describe("given the Flight Deck cockpit widgets", () => {
   /** @scenario "AC20 Flight Deck: This period sets four figures against the period before" */
   it("sets resolved, conversations, checks and cost per resolved against the period before", () => {
     const { code, queries } = build("ck-kpis");
-    for (const label of ["Resolved", "Conversations", "Checks passing", "AI cost per resolved"]) {
+    for (const label of [
+      "Resolved conversations",
+      "Conversations",
+      "Automatic checks passed",
+      "AI cost per resolved conversation",
+    ]) {
       expect(code).toContain(`label="${label}"`);
     }
     expect(code).toContain("<Change ");
@@ -31,7 +38,7 @@ describe("given the Flight Deck cockpit widgets", () => {
     expect(queries.checks).toContain("FROM trace_evaluation_metrics");
     expect(queries.checks).toContain("countIf(TraceOccurredAt >= ");
     expect(queries.checks).not.toContain("JOIN");
-    expect(code).toContain('"Not measured"');
+    expect(code).toContain('"Not scored yet"');
     expect(code).toContain('LW.navigate("onlineEvaluations"');
   });
 
@@ -70,7 +77,7 @@ describe("given the Flight Deck cockpit widgets", () => {
       "growingReason(reasons.data)",
       "kappa: kappa(row)",
       "step.data[0]",
-      "Nothing got worse in this period.",
+      "Nothing got worse against the previous period.",
     ].map((text) => code.indexOf(text));
     expect(order.every((index) => index > 0)).toBe(true);
     expect(order.toSorted((a, b) => a - b)).toEqual(order);
@@ -92,8 +99,8 @@ describe("given the Flight Deck cockpit widgets", () => {
     expect(queries.gap).toContain("minIf(g.trace_id, g.gaps > 0) AS trace_id");
     expect(queries.gap).not.toContain("anyIf(");
     expect(queries.gap).toContain("ORDER BY gaps DESC");
-    expect(code).toContain("<TraceLink id={top.trace_id} />");
-    expect(code).toContain("conversations asked for something my agent cannot do.");
+    expect(code).toContain('LW.navigate("trace", { traceId: top.trace_id })');
+    expect(code).toContain("this and your agent could not do it.");
   });
 
   /** @scenario "AC24 Flight Deck: An outcome widget tells a quiet period from a missing judge" */
@@ -102,10 +109,10 @@ describe("given the Flight Deck cockpit widgets", () => {
       const { code, queries } = build(id);
       expect(queries.seen, id).toContain("subtractDays(now(), 90)");
       expect(code, id).toMatch(
-        /<OutcomeEmpty quiet="No (conversation outcomes|calls with an outcome) in this period\." \/>/,
+        /<OutcomeEmpty quiet="No (conversations|calls) were scored in this period\." \/>/,
       );
       expect(code, id).toContain("if (seen.data.length > 0) return <Note>{quiet}</Note>;");
-      expect(code, id).toContain(`Add the ${OUTCOME_JUDGE}`);
+      expect(code, id).toContain("Have your app send how each conversation ended");
       expect(code.indexOf('LW.useChartQuery("seen"'), id).toBeGreaterThan(
         code.indexOf("function SeenOrSetup"),
       );
@@ -120,7 +127,7 @@ describe("given the Flight Deck cockpit widgets", () => {
     expect(queries.changes).toContain("LastUsedPromptVersionId");
     expect(queries.changes).toContain("MetadataPromptVersion AS name");
     expect(queries.changes).not.toContain("Attributes[");
-    expect(code).toContain("markers={changes.data.map(markerOf)}");
+    expect(code).toContain("markers={changes.data.map((row) => markerOf(row, names))}");
   });
 
   /** @scenario "AC26 Flight Deck: Task success is the share of calls that got the job done, per language" */
@@ -129,7 +136,7 @@ describe("given the Flight Deck cockpit widgets", () => {
     expect(queries.trend).toContain(", MetadataLanguage AS language");
     expect(queries.trend).not.toContain("Attributes[");
     expect(queries.trend).toContain("countIf(outcome = 'resolved') AS done");
-    expect(code).toContain('label={"Task success: " + row.language}');
+    expect(code).toContain('label={languageName(row.language) + ": calls that got the job done"}');
   });
 
   /** @scenario "AC27 Flight Deck: Accepted, edited or regenerated reads each output's action" */
@@ -151,7 +158,7 @@ describe("given the Running costs widgets", () => {
     expect(queries.month).toContain("subtractDays(now(), 7)");
     expect(queries.month).toContain("uniqExact(toDate(OccurredAt))");
     expect(code).toContain("const pace = ratio(m.last_7_days, m.days_with_data);");
-    expect(code).toContain('label="Cost per success"');
+    expect(code).toContain('label="Cost per resolved conversation"');
   });
 
   /** @scenario "AC29 Running costs: Production vs testing splits spend by where it came from" */
@@ -161,7 +168,50 @@ describe("given the Running costs widgets", () => {
       expect(queries.main).toContain(source);
     }
     expect(queries.main).toContain("'evaluations' AS source\n  FROM evaluation_metrics");
-    expect(code).toContain('<Headline value={pct(ratio(test, total), 0)} label="test traffic" />');
+    expect(code).toContain('label="of AI spend goes on testing"');
+  });
+
+  /** @scenario "AC29b Running costs: the testing share counts only the rows that are tests" */
+  it("counts checks, simulated tests, playground and workflows as testing, never your app or other", () => {
+    // oxlint-disable-next-line no-implied-eval
+    const testingSpend = new Function(`${NUMBERS}\n${TESTING_SPEND}\nreturn testingSpend;`)() as (
+      costOf: (key: string) => number | null,
+      total: number | null,
+      tracesOf: (key: string) => number,
+    ) => number | null;
+    const noTests = (key: string) => (key === "production" || key === "other" ? 10 : 0);
+    const spend: Record<string, number | null> = {
+      production: 96,
+      evaluations: null,
+      simulations: 0,
+      experiments: null,
+      other: 4,
+    };
+    const costOf = (key: string) => spend[key] ?? null;
+
+    expect(testingSpend(costOf, 100, noTests)).toBe(0);
+    expect(
+      testingSpend(
+        (key) => ({ ...spend, evaluations: 3, experiments: 2 })[key] ?? null,
+        105,
+        noTests,
+      ),
+    ).toBe(5);
+    expect(testingSpend(costOf, null, noTests)).toBeNull();
+    // Simulated tests ran on a model with no price: their spend is unknown, never 0%.
+    const unpricedTests = (key: string) => (key === "simulations" ? null : costOf(key));
+    expect(testingSpend(unpricedTests, 100, (key) => (key === "simulations" ? 4 : 0))).toBeNull();
+    expect(testingSpend(unpricedTests, 100, noTests)).toBe(0);
+    const { code } = build("cost-by-source");
+    expect(code).toContain("const test = testingSpend(costOf, total, tracesOf);");
+    expect(code).not.toContain('total - (costOf("production")');
+  });
+
+  /** @scenario "AC29b Running costs: the testing share counts only the rows that are tests" */
+  it("keeps the chart a readable height above its rows of sources", () => {
+    const { code } = build("cost-by-source");
+    expect(code).toContain("minHeight: 140");
+    expect(FLIGHT_DECK_COSTS_BUILDS["cost-by-source"]?.rows).toBeGreaterThanOrEqual(10);
   });
 
   /** @scenario "AC30 Running costs: Wasted spend counts each production trace once" */
@@ -174,7 +224,7 @@ describe("given the Running costs widgets", () => {
     expect(queries.main).toContain("sumIf(rows, failed) AS failed_traces");
     expect(queries.main).toContain("NOT failed AND repeats = 0 AND retries > 0");
     expect(queries.main).not.toContain("Origin IN");
-    expect(code).toContain('" of production spend"');
+    expect(code).toContain('" of what your agent cost"');
   });
 
   /** @scenario "AC31 Running costs: Cost per call shows speech as not priced" */

@@ -6,7 +6,7 @@ The server half of [stored-object](../README.md). Stored objects: uploads and st
 
 ## Installation
 
-`defineProcessModule("stored-object").withRepositories(storedObjectRepositories).withChannels(storedObjectChannels).withApi(StoredObjectModule).withTransports(storedObjectRest, storedObjectFileRest, storedObjectImageProxyRest, storedObjectTrpcTransport).withEventing(storedObjectRetentionEventing).withMigrations(…)`, `src/stored-object.module.ts:19`.
+`defineProcessModule("stored-object").withRepositories(storedObjectRepositories).withChannels(storedObjectChannels).withApi(StoredObjectModule).withTransports(storedObjectRest, storedObjectFileRest, storedObjectImageProxyRest, storedObjectTrpcTransport).withEventing(storedObjectRetentionEventing).withEventing(storedObjectEventing).withMigrations(…)`, `src/stored-object.module.ts:19`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -14,7 +14,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 The complete process capability exposed by the stored-object feature.
 
-Peers call these through the token, declared at `../contract/src/stored-object.api.ts:118`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/stored-object.api.ts:123`; nothing else in this package is public.
 
 #### `storeFromBytes`
 
@@ -371,12 +371,12 @@ interface Response {
 
 Contract `../contract/src/stored-object.trpc.ts:62`, router `src/transport/stored-object.trpc.ts:12`.
 
-| Procedure                     | Kind     | Gate                                                        | Input                                   | Output                                   |
-| ----------------------------- | -------- | ----------------------------------------------------------- | --------------------------------------- | ---------------------------------------- |
-| `storedObjects.headById`      | query    | Permission `traces:view or scenarios:view or datasets:view` | `storedObjectHeadInputSchema`           | `storedObjectHeadSchema`                 |
-| `storedObjects.getReadUrl`    | query    | Permission `traces:view or scenarios:view or datasets:view` | `storedObjectReadUrlInputSchema`        | `storedObjectReadUrlSchema`              |
-| `storedObjects.createUpload`  | mutation | Permission `project:update`                                 | `storedObjectsCreateUploadInputSchema`  | `storedObjectsCreateUploadOutputSchema`  |
-| `storedObjects.confirmUpload` | mutation | Permission `project:update`                                 | `storedObjectsConfirmUploadInputSchema` | `storedObjectsConfirmUploadOutputSchema` |
+| Procedure                     | Kind     | Gate                                                                      | Input                                   | Output                                   |
+| ----------------------------- | -------- | ------------------------------------------------------------------------- | --------------------------------------- | ---------------------------------------- |
+| `storedObjects.headById`      | query    | Permission `traces:view or scenarios:view or datasets:view or langy:view` | `storedObjectHeadInputSchema`           | `storedObjectHeadSchema`                 |
+| `storedObjects.getReadUrl`    | query    | Permission `traces:view or scenarios:view or datasets:view or langy:view` | `storedObjectReadUrlInputSchema`        | `storedObjectReadUrlSchema`              |
+| `storedObjects.createUpload`  | mutation | Permission `project:update`                                               | `storedObjectsCreateUploadInputSchema`  | `storedObjectsCreateUploadOutputSchema`  |
+| `storedObjects.confirmUpload` | mutation | Permission `project:update`                                               | `storedObjectsConfirmUploadInputSchema` | `storedObjectsConfirmUploadOutputSchema` |
 
 ```typescript
 // storedObjects.headById
@@ -429,6 +429,14 @@ type Output = z.infer<typeof storedObjectsConfirmUploadOutputSchema>; // ../cont
 None: this module declares no websocket, rawsocket or rawhttp door.
 
 ## Workers
+
+### Pipeline `stored_object_maintenance` (aggregate `global`)
+
+Declared at `src/eventing/stored-object-maintenance.pipeline.ts:41`.
+
+| Kind            | Name                     | Handles                                                                            | Declared at                                             |
+| --------------- | ------------------------ | ---------------------------------------------------------------------------------- | ------------------------------------------------------- |
+| process manager | `storedObjectUploadReap` | every 15 min (`UPLOAD_REAP_INTERVAL_MS = 15 * 60 * 1000`); intents `reap` (outbox) | `src/eventing/stored-object-maintenance.pipeline.ts:46` |
 
 ### Pipeline `stored_object_retention` (aggregate `global`)
 

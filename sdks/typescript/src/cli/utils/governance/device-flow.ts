@@ -175,7 +175,7 @@ export async function startDeviceCode(
 }
 
 /**
- * Fingerprint stamped on the CLI session so /me/devices can render "Mac
+ * Fingerprint stamped on the CLI session so the Devices tab can render "Mac
  * (rchaves.local)" and one device can be revoked without logging out every
  * device. Contract: `auth-cli-device-flow.api.ts#clientInfoSchema`.
  */

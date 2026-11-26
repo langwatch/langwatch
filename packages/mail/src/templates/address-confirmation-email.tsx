@@ -65,5 +65,8 @@ export const sendAddressConfirmationEmail = async ({
   ...props
 }: AddressConfirmationEmailProps & { mailer: MailSender }) => {
   const { subject, html } = await renderMailTemplate(addressConfirmationEmailTemplate, props);
-  await sendEmail({ mailer, content: { to: props.email, subject, html } });
+  await sendEmail({
+    mailer,
+    content: { to: props.email, subject, html, template: addressConfirmationEmailTemplate.id },
+  });
 };

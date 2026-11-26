@@ -281,8 +281,9 @@ export class ModelProviderUnavailableError extends HandledError {
   }
 }
 
-/** Configuration refusals: the project's settings decide them, so no retry can succeed. */
+/** Refusals no retry can fix: project settings or a provider's content filter decide them. */
 const PERMANENT_AI_CALL_CODES: ReadonlySet<string> = new Set([
+  "ai_content_filtered",
   "model_execution_unavailable",
   "model_not_configured",
   "model_provider_disabled",
@@ -841,6 +842,57 @@ export class AiCallFailedError extends HandledError {
   /** Never `originalErrorMessage`: a provider's text can echo a key, and the key may be ours. */
   toResponseBody(): {
     code: typeof AI_CALL_FAILED_CAUSE;
+    featureKey: string;
+    featureDisplayName: string;
+    role: ModelRole;
+  } {
+    return {
+      code: this.cause,
+      featureKey: this.featureKey,
+      featureDisplayName: this.featureDisplayName,
+      role: this.role,
+    };
+  }
+}
+
+/**
+ * The provider's content filter refused the text it was asked to work on (Azure answers 400
+ * `content_filter`). The model settings are fine and a retry gets the same answer.
+ */
+export const AI_CONTENT_FILTERED_CAUSE = "AI_CONTENT_FILTERED" as const;
+
+export class AiContentFilteredError extends HandledError {
+  declare readonly code: "ai_content_filtered";
+  readonly cause = AI_CONTENT_FILTERED_CAUSE;
+  readonly featureKey: string;
+  readonly role: ModelRole;
+  readonly featureDisplayName: string;
+
+  constructor({
+    featureKey,
+    role,
+    featureDisplayName,
+  }: {
+    featureKey: string;
+    role: ModelRole;
+    featureDisplayName: string;
+  }) {
+    super("ai_content_filtered", `The provider's content filter refused "${featureKey}".`, {
+      httpStatus: 422,
+      fault: "provider",
+      retryable: false,
+      meta: { featureKey, role, featureDisplayName },
+      ...remediation("ai_content_filtered"),
+    });
+    this.name = "AiContentFilteredError";
+    this.featureKey = featureKey;
+    this.role = role;
+    this.featureDisplayName = featureDisplayName;
+  }
+
+  /** Read by the global model-failure interceptor, so a caller with no onError still reports it. */
+  toResponseBody(): {
+    code: typeof AI_CONTENT_FILTERED_CAUSE;
     featureKey: string;
     featureDisplayName: string;
     role: ModelRole;

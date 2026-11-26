@@ -38,6 +38,8 @@ export interface EventingClickHouseReplayStatement {
   tenantId: string;
   sql: string;
   params?: Record<string, unknown> | undefined;
+  /** ClickHouse settings for this statement alone. */
+  settings?: Record<string, string | number> | undefined;
   /** Set when the statement genuinely spans tenants; see the member's tenant-scope guard. */
   SKIP_TENANT_CHECK?: true | undefined;
   /** Set when the read must walk every partition; see the member's cold-scan warning. */

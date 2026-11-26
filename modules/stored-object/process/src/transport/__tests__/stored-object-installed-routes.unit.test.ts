@@ -2,7 +2,6 @@ import { ProjectMissingCredentialsError } from "@langwatch/api";
 import type { RestIdentity } from "@langwatch/api/hosting";
 import { BearerIdentity, RestHost } from "@langwatch/api/rest";
 import type { AuthzApi } from "@langwatch/authz-contract";
-import type { DataRetentionApi } from "@langwatch/data-retention-contract";
 import type { Logger } from "@langwatch/observability";
 import { createApp } from "@langwatch/process";
 import { memoryStores } from "@langwatch/process-stores";
@@ -48,7 +47,7 @@ function installed({ authz }: Scripted) {
     .withObservability((observability) =>
       observability.withLogging(createApiFixture<Logger>({ warn: () => undefined })),
     )
-    .provide({ authz, "data-retention": createApiFixture<DataRetentionApi>() })
+    .provide({ authz })
     .boot();
 }
 

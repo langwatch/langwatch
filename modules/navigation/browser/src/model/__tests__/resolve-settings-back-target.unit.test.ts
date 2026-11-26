@@ -58,7 +58,7 @@ describe("resolveSettingsBackTarget", () => {
           reachableProducts: ["me"],
           projectSlug: null,
         }),
-      ).toEqual({ label: "Back to Me", href: "/me" });
+      ).toEqual({ label: "Back to Coding agents", href: "/coding-agents" });
     });
   });
 

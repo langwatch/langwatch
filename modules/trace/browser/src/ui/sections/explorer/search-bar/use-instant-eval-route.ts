@@ -12,13 +12,16 @@ import {
   type ExplorerInstantEvalOptInAccess,
   combineQueries,
   instantEvalChipText,
+  instantEvalChipsOf,
   instantEvalRunKey,
+  queryWithInstantEvalChipRetargeted,
   queryWithoutInstantEvalChips,
 } from "@langwatch/trace-contract";
 import { type RefObject, useCallback, useRef, useState } from "react";
 
 import { useFilterStore, useViewStore } from "../../../../behavior/explorer.store.ts";
 import { api } from "../../../../behavior/trace-api.ts";
+import { unmarkNewlyTyped } from "../../../../features/instant-eval/behavior/instant-eval-run.store.ts";
 import type { InstantEvalRoutePayload } from "../../../../model/instant-eval-route.ts";
 import { explainAnyError } from "../../errors/index.ts";
 import type { InstantEvalConfirmation } from "../instant-eval-confirm-dialog.tsx";
@@ -122,8 +125,38 @@ function routeRunKey({
   });
 }
 
+/**
+ * The typed text, its chip re-spelled for the run's target when a lens switch
+ * since Enter would read it as another one; undefined when no chip reads so.
+ */
+function typedQueryForLens({
+  payload,
+  lensId,
+}: {
+  payload: InstantEvalRoutePayload;
+  lensId: string | undefined;
+}): string | undefined {
+  const { typedQuery, target } = payload;
+  if (typedQuery === undefined) return undefined;
+  const question = payload.question.instructions;
+  const wanted = question.replace(/\s+/g, " ").trim();
+  const readsAsTarget = (queryText: string) =>
+    instantEvalChipsOf({ queryText, lensId }).some(
+      (chip) => chip.target === target && chip.question.replace(/\s+/g, " ").trim() === wanted,
+    );
+  if (readsAsTarget(typedQuery)) return typedQuery;
+  const respelled = queryWithInstantEvalChipRetargeted({
+    queryText: typedQuery,
+    question,
+    target,
+    lensId,
+  });
+  return readsAsTarget(respelled) ? respelled : undefined;
+}
+
 /** The bar's query with the route's eval chip in it: what a refusal leaves for the reader. */
 function pendingChipQuery(payload: InstantEvalRoutePayload): string {
+  if (payload.typedQuery !== undefined) return payload.typedQuery;
   return combineQueries({
     base: payload.otherQuery,
     addition: instantEvalChipText({
@@ -193,7 +226,13 @@ function useInstantEvalOutcome(): {
     pendingRef.current = null;
     setConfirmation(null);
     setRefusal(null);
-    if (pending) applyQueryText(pending.payload.fallbackQuery);
+    if (!pending) return;
+    // Declined or closed, as Skip: a mark this submit made goes, one made earlier stays.
+    unmarkNewlyTyped({
+      projectId: useFilterStore.getState().projectId ?? "",
+      questions: pending.payload.newlyTypedQuestions,
+    });
+    applyQueryText(pending.payload.fallbackQuery);
   }, [applyQueryText]);
 
   const refuse = useCallback(
@@ -254,15 +293,17 @@ function useInstantEvalStarter({
     ({ payload, key, runId }: PendingRoute & { runId: string }) => {
       const lensId = useViewStore.getState().activeLensId;
       registerEvalRun({ key, runId });
+      // A chip typed by hand goes back as typed, so a `NOT` in front of it stays.
       applyQueryText(
-        combineQueries({
-          base: payload.otherQuery,
-          addition: instantEvalChipText({
-            question: payload.question.instructions,
-            target: payload.target,
-            lensId,
+        typedQueryForLens({ payload, lensId }) ??
+          combineQueries({
+            base: payload.otherQuery,
+            addition: instantEvalChipText({
+              question: payload.question.instructions,
+              target: payload.target,
+              lensId,
+            }),
           }),
-        }),
       );
       if (!payload.modelTrouble) return;
       // Against the text the store settled on: the strip shows while the bar holds it.
@@ -422,8 +463,13 @@ function useInstantEvalSwitch({
     return refused;
   }, [heldRef, pendingRef, refusedRef, seqRef, setRefusal]);
 
+  // Closed, as Skip or a decline: a mark this submit made goes, one made earlier stays.
   const dismissRefusal = useCallback(() => {
-    skipRefusal();
+    const refused = skipRefusal();
+    unmarkNewlyTyped({
+      projectId: useFilterStore.getState().projectId ?? "",
+      questions: refused?.newlyTypedQuestions,
+    });
   }, [skipRefusal]);
 
   return {
@@ -494,8 +540,12 @@ export function useInstantEvalRoute({
   }, [pendingRef, startRun]);
 
   const { refusedRef } = outcome;
+  // A later Enter drops this submit's marks; a resubmit marks them again.
   const abandonPendingRun = useCallback(() => {
     seqRef.current += 1;
+    const projectId = useFilterStore.getState().projectId ?? "";
+    unmarkNewlyTyped({ projectId, questions: pendingRef.current?.payload.newlyTypedQuestions });
+    unmarkNewlyTyped({ projectId, questions: refusedRef.current?.newlyTypedQuestions });
     pendingRef.current = null;
     refusedRef.current = null;
     setConfirmation(null);

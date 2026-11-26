@@ -251,6 +251,13 @@ Feature: Trace media blob extraction at the ingestion edge
     When a span with inline media is ingested
     Then the bytes are stored for the "trace_content" purpose with the span's trace as owner
     So that Stored Objects keeps them until that trace's retention ends
+
+  @unit
+  Scenario: Trace media names the project's trace retention when it is stored
+    When trace media is stored for a project that keeps traces for 30 days
+    Then the store names a 30-day retention for the trace's link
+    And scenario event media, which follows no retention category, names none
+
   @integration
   Scenario: The same bytes in two attributes of one span are stored once
     Given a span that carries the same image both in its chat content and in a
