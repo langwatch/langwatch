@@ -102,7 +102,7 @@ function anonymize(content: string, findings: readonly Finding[]): string {
 /** How the fake meets one call: answers, fails, holds until released, or answers after `slowMs`. */
 export type FakeTurn = "answer" | "fail" | "throttle" | "hold" | "lie" | { slowMs: number };
 
-type HeldCall = { release: () => void };
+type HeldCall = { release: () => void; throttle: () => void };
 
 /**
  * A stand-in for the PII redaction model that prepares each text as its Presidio route does
@@ -170,9 +170,15 @@ export function fakePiiModel({
           input.signal.removeEventListener("abort", onAbort);
           if (!settled) resolve(settle(answer(input.texts, false)));
         };
+        const throttle = () => {
+          input.signal.removeEventListener("abort", onAbort);
+          const throttled = new Error("Rate exceeded");
+          throttled.name = "TooManyRequestsException";
+          if (!settled) reject(settle(throttled));
+        };
         input.signal.addEventListener("abort", onAbort);
         if (typeof turn === "object") setTimeout(finish, turn.slowMs);
-        else held.push({ release: finish });
+        else held.push({ release: finish, throttle });
       });
     },
   };

@@ -171,6 +171,22 @@ describe("PiiRedactionModelService, running a split span's calls (ADR-207)", () 
   );
 
   /** @scenario "A split call's timeout or throttle never stops short batches reaching the model" */
+  it("opens the split breaker on a throttle that lands after the span already went to Presidio", async () => {
+    const { clear, presidio, splitModel, fallbacks } = setup({ turns: ["hold", "fail"] });
+    const texts = [filler(3_000), filler(3_000, 50_000), filler(3_000, 90_000)];
+    presidio.answerWith(presidioAnswer(3));
+    expect(await clear(texts)).toEqual([PRESIDIO_MASK, PRESIDIO_MASK, PRESIDIO_MASK]);
+
+    splitModel.held[0]?.throttle();
+    await Promise.resolve();
+    presidio.answerWith(presidioAnswer(3));
+    await clear(texts);
+
+    expect(splitModel.calls).toHaveLength(2);
+    expect(fallbacks.at(-1)).toBe("breaker_open");
+  });
+
+  /** @scenario "A split call's timeout or throttle never stops short batches reaching the model" */
   it("opens the split breaker on a throttle that lands after a sibling call already failed", async () => {
     const { clear, presidio, splitModel, fallbacks } = setup({ turns: ["fail", "throttle"] });
     const texts = [filler(3_000), filler(3_000, 50_000), filler(3_000, 90_000)];
