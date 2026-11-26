@@ -3,6 +3,7 @@
  * What entitlement's Free scenario run notices tell Customer.io and PostHog.
  * @see specs/licensing/cloud-free-creation-caps.feature
  */
+import { Temporal } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -87,7 +88,17 @@ describe("fireScenarioRunCapPostHog", () => {
           month: "2026-11",
           $groups: { organization: "org-1" },
         },
+        uuid: expect.any(String),
+        timestamp: Temporal.Instant.fromEpochMilliseconds(threshold.occurredAt),
       })),
     );
+  });
+
+  it("gives each member a uuid that a redelivery repeats and no other member shares", () => {
+    const first = fireScenarioRunCapPostHog(threshold).map(({ uuid }) => uuid);
+    const again = fireScenarioRunCapPostHog(threshold).map(({ uuid }) => uuid);
+
+    expect(again).toEqual(first);
+    expect(new Set(first).size).toBe(2);
   });
 });

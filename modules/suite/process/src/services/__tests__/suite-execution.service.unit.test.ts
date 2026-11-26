@@ -4,7 +4,10 @@ import type {
   ResolvedScenarioRunParametersForScenario,
   ScenarioApi,
 } from "@langwatch/scenario-contract";
-import type { StartSuiteRunCommandData } from "@langwatch/suite-contract";
+import type {
+  CompleteSuiteRunItemCommandData,
+  StartSuiteRunCommandData,
+} from "@langwatch/suite-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
@@ -45,12 +48,16 @@ function harness(
   } = {},
 ) {
   const started: StartSuiteRunCommandData[] = [];
+  const closed: CompleteSuiteRunItemCommandData[] = [];
   const queued: QueueSimulationRunInput[] = [];
   let dispatched = 0;
   const service = SuiteExecutionService.create({
     commands: {
       startSuiteRun: async (data) => {
         started.push(data);
+      },
+      completeSuiteRunItem: async (data) => {
+        closed.push(data);
       },
     },
     scenarios: createApiFixture<ScenarioApi>({
@@ -69,7 +76,7 @@ function harness(
     }),
   });
 
-  return { service, started, queued };
+  return { service, started, queued, closed };
 }
 
 type ExecuteInput = Parameters<SuiteExecutionService["execute"]>[0];
@@ -341,11 +348,25 @@ describe("SuiteExecutionService", () => {
       expect(queued).toHaveLength(2);
     });
 
+    /** @scenario Running a scenario from the app past the run cap opens the upgrade prompt */
+    it("closes each slot the cap refused as an error, so the batch reaches its total", async () => {
+      const { service, started, queued, closed } = harness({ runCapAt: 2 });
+
+      await expect(service.execute(input({ repeatCount: 3 }))).rejects.toBeInstanceOf(
+        LimitExceededError,
+      );
+      expect(started[0]?.total).toBe(queued.length + closed.length);
+      expect(closed).toHaveLength(1);
+      expect(closed[0]).toMatchObject({ status: "ERROR", batchRunId: started[0]?.batchRunId });
+      expect(queued.map((run) => run.scenarioRunId)).not.toContain(closed[0]?.scenarioRunId);
+    });
+
     it("keeps swallowing a refusal that is not the run cap", async () => {
-      const { service, queued } = harness({ refuseAt: [1] });
+      const { service, queued, closed } = harness({ refuseAt: [1] });
 
       await expect(service.execute(input({ repeatCount: 3 }))).resolves.toBeDefined();
       expect(queued).toHaveLength(2);
+      expect(closed).toEqual([]);
     });
   });
 });

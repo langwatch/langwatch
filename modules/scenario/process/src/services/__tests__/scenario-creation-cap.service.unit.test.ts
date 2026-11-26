@@ -112,6 +112,7 @@ describe("ScenarioCreationCapService", () => {
         });
 
         await expect(service.assertRunStartAllowed(runStarted("d"))).rejects.toMatchObject({
+          code: "resource_limit_exceeded",
           meta: { limitType: "scenarioRuns", current: 100, max: 100 },
         });
       });

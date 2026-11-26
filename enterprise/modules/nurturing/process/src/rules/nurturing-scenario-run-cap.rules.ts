@@ -12,6 +12,7 @@ import { Temporal } from "@langwatch/time";
 
 import type { PostHogEventInput } from "../channels/posthog.channel.ts";
 import { fireCodingOrApp, isCodingOrAppSignal } from "./nurturing-coding-delivery.rules.ts";
+import { postHogUuidFor } from "./nurturing-guided-onboarding-service.rules.ts";
 
 type ScenarioRunCapKind = "scenario_runs_threshold_reached" | "scenario_run_grace_ended";
 type ScenarioRunCapSignal = NurturingSignalOf<ScenarioRunCapKind>;
@@ -89,13 +90,20 @@ export function fireScenarioRunCapCustomerIo(signal: ScenarioRunCapSignal): CioB
   }));
 }
 
-/** One PostHog event per member, grouped under the organization. */
+/** One PostHog event per member, grouped under the organization; a redelivery keeps its uuid. */
 export function fireScenarioRunCapPostHog(signal: ScenarioRunCapSignal): PostHogEventInput[] {
   const properties = {
     ...propertiesOf(signal),
     $groups: { organization: signal.organizationId },
   };
-  return signal.memberUserIds.map((userId) => ({ userId, event: signal.kind, properties }));
+  const timestamp = Temporal.Instant.fromEpochMilliseconds(signal.occurredAt);
+  return signal.memberUserIds.map((userId) => ({
+    userId,
+    event: signal.kind,
+    properties,
+    uuid: postHogUuidFor(`${signal.sourceEventId}:${userId}`),
+    timestamp,
+  }));
 }
 
 function isScenarioRunCapSignal(signal: NurturingSignal): signal is ScenarioRunCapSignal {

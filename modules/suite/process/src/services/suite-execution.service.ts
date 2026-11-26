@@ -317,14 +317,41 @@ export class SuiteExecutionService implements SuiteExecution {
       }),
     );
     SuiteExecutionService.logRejected({ items, enqueued, suiteId: input.suiteId, batchRunId });
-    // The cap crossed part way through: the queued runs stand, the caller still gets the refusal.
-    const capRefusal = enqueued.find(
-      (result): result is PromiseRejectedResult =>
-        result.status === "rejected" && result.reason instanceof LimitExceededError,
-    );
-    if (capRefusal) throw capRefusal.reason;
+    // The cap crossed part way through: the queued runs stand, each refused slot closes as an error
+    // so the batch still reaches its total, and the caller gets the refusal.
+    const capRefusal = enqueued.find(isCapRefusal);
+    if (capRefusal) {
+      const refused = items.filter((_, index) => isCapRefusal(enqueued[index]));
+      await this.closeCapRefused({ projectId: input.projectId, batchRunId, items: refused });
+      throw capRefusal.reason;
+    }
 
     return items.filter((_, index) => enqueued[index]?.status === "fulfilled");
+  }
+
+  private async closeCapRefused({
+    projectId,
+    batchRunId,
+    items,
+  }: {
+    projectId: string;
+    batchRunId: string;
+    items: readonly SuiteExecutionItem[];
+  }): Promise<void> {
+    const occurredAt = nowInstant().epochMilliseconds;
+    await Promise.all(
+      items.map((item) =>
+        this.commands.completeSuiteRunItem({
+          tenantId: projectId,
+          batchRunId,
+          scenarioRunId: item.scenarioRunId,
+          scenarioId: item.scenarioId,
+          status: "ERROR",
+          error: "The plan's monthly scenario run cap refused this run.",
+          occurredAt,
+        }),
+      ),
+    );
   }
 
   /** A partial enqueue is otherwise invisible: the batch reads smaller with no record of why. */
@@ -361,4 +388,10 @@ export class SuiteExecutionService implements SuiteExecution {
   private static withTargetParameters(runParameters: SuiteTarget["runParameters"]) {
     return hasParameterOverrides(runParameters) ? { targetParameters: runParameters } : {};
   }
+}
+
+function isCapRefusal(
+  result: PromiseSettledResult<unknown> | undefined,
+): result is PromiseRejectedResult {
+  return result?.status === "rejected" && result.reason instanceof LimitExceededError;
 }

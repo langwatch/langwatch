@@ -42,6 +42,7 @@ function execute(
       startSuiteRun: async () => {
         tracking.started = true;
       },
+      completeSuiteRunItem: async () => {},
     },
     scenarios: declaringScenarios(tracking.queued),
   });

@@ -16,12 +16,16 @@ import { BillableEventsMeterClickHouseRepository } from "../../repositories/clic
 import { DAY_MS, scenarioRunMonthOf } from "../../rules/scenario-run-cap.rules.ts";
 import { ScenarioRunCapService } from "../scenario-run-cap.service.ts";
 
-/** `TEST_CLICKHOUSE_URL` names its own database; `CI_CLICKHOUSE_URL` is the job's migrated one. */
+/**
+ * `TEST_CLICKHOUSE_URL` names its own database; the native test server
+ * (`LANGWATCH_TEST_CLICKHOUSE_URL`) and the CI job's server carry the migrated `test_langwatch`.
+ */
 function testClickHouseUrl(): URL | null {
-  const configured = process.env.TEST_CLICKHOUSE_URL ?? process.env.CI_CLICKHOUSE_URL;
-  if (!configured) return null;
-  const url = new URL(configured);
-  if (!process.env.TEST_CLICKHOUSE_URL) url.pathname = "/test_langwatch";
+  if (process.env.TEST_CLICKHOUSE_URL) return new URL(process.env.TEST_CLICKHOUSE_URL);
+  const server = process.env.LANGWATCH_TEST_CLICKHOUSE_URL || process.env.CI_CLICKHOUSE_URL;
+  if (!server) return null;
+  const url = new URL(server);
+  url.pathname = "/test_langwatch";
   return url;
 }
 
