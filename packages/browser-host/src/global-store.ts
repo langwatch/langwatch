@@ -91,9 +91,9 @@ function hydrate<S>({
 }
 
 /**
- * Declare a slice. `create` receives `set` and `get` scoped to this slice, as in zustand.
- * `persist` keeps picked preferences, never server data, under `key` (default `name`) for the
- * signed-in reader only; sign-out forgets them. Declaring a name twice replaces it.
+ * Declare a slice; `create` gets `set` and `get` scoped to it. `persist` keeps picked preferences
+ * (never server data) under `key` (default `name`) for the signed-in reader only; sign-out forgets
+ * them, and `revive` cleans what storage held on first read and on sign-in. A name twice replaces.
  */
 export function defineSlice<S extends object>({
   name,

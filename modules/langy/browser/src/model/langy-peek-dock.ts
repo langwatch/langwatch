@@ -1,4 +1,4 @@
-import { FLOATING_PANEL_INSET, resolveFloatingPanelWidth } from "./langy-panel-layout.ts";
+import { FLOATING_PANEL_INSET } from "./langy-panel-layout.ts";
 
 /**
  * Keeps the mounted panel itself visible as a small rest or near sliver. Unmounting
@@ -72,7 +72,7 @@ interface PeekProximityInput {
   /** The previous verdict — what the hysteresis pivots on. */
   wasNear: boolean;
   /** Floating only: the card's resolved width, which the user may have dragged. */
-  floatingWidthPx?: number;
+  floatingWidthPx: number;
 }
 
 /**
@@ -115,10 +115,10 @@ function restingPeekRect({
   viewportHeight: number;
   mode: "floating" | "sidebar";
   dodgeLeft: boolean;
-  floatingWidthPx?: number;
+  floatingWidthPx: number;
 }): { left: number; right: number; top: number; bottom: number } {
   if (mode === "floating") {
-    const width = floatingWidthPx ?? resolveFloatingPanelWidth(viewportWidth);
+    const width = floatingWidthPx;
     const left = dodgeLeft ? FLOATING_PANEL_INSET : viewportWidth - FLOATING_PANEL_INSET - width;
     return {
       left,

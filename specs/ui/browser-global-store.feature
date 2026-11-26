@@ -20,6 +20,12 @@ Feature: One global UI store, namespaced by module
     When it is written and the module is declared again
     Then the kept keys are restored and the rest start from their initial value
 
+  @unit
+  Scenario: A saved value is cleaned as it is read back
+    Given a persisted slice that declared how to clean what storage held
+    When the saved value is read back on a reload or when a reader signs in
+    Then the slice starts from the cleaned value, so a bad saved value never reaches it
+
   @unit @integration
   Scenario: A persisted preference belongs to the reader who chose it
     Given a reader kept a preference in a persisted slice

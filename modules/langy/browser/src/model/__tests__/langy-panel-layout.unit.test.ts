@@ -3,7 +3,6 @@ import { describe, expect, it } from "vitest";
 
 import {
   APP_HEADER_HEIGHT,
-  FLOATING_PANEL_CSS_WIDTH,
   FLOATING_PANEL_INSET,
   FLOATING_PANEL_MAX_WIDTH,
   INSPECTOR_TUCK,
@@ -38,6 +37,7 @@ describe("resolveInspectorFrame", () => {
         floating: true,
         dockShellClaimed: false,
         panelHeightPx: 487,
+        panelWidthPx: FLOATING_PANEL_MAX_WIDTH,
       });
 
       expect(frame.height).toBe("487px");
@@ -52,10 +52,11 @@ describe("resolveInspectorFrame", () => {
         floating: true,
         dockShellClaimed: false,
         panelHeightPx: 487,
+        panelWidthPx: FLOATING_PANEL_MAX_WIDTH,
       });
 
       expect(frame.right).toBe(
-        `calc(${FLOATING_PANEL_CSS_WIDTH} + ${FLOATING_PANEL_INSET * 2 - INSPECTOR_TUCK}px)`,
+        `calc(${FLOATING_PANEL_MAX_WIDTH}px + ${FLOATING_PANEL_INSET * 2 - INSPECTOR_TUCK}px)`,
       );
     });
 
@@ -64,6 +65,7 @@ describe("resolveInspectorFrame", () => {
         floating: true,
         dockShellClaimed: false,
         panelHeightPx: null,
+        panelWidthPx: FLOATING_PANEL_MAX_WIDTH,
       });
 
       expect(frame.height).not.toBeNull();
@@ -77,6 +79,7 @@ describe("resolveInspectorFrame", () => {
         floating: false,
         dockShellClaimed: true,
         panelHeightPx: null,
+        panelWidthPx: SIDEBAR_PANEL_WIDTH,
       });
 
       expect(frame.top).toBe(`${APP_HEADER_HEIGHT}px`);
@@ -90,6 +93,7 @@ describe("resolveInspectorFrame", () => {
         floating: false,
         dockShellClaimed: false,
         panelHeightPx: null,
+        panelWidthPx: SIDEBAR_PANEL_WIDTH,
       });
 
       expect(frame.top).toBe("0px");

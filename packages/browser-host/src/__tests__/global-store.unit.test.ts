@@ -11,7 +11,11 @@ import { clearReaderUiStorage, setUiStorageReader } from "../storage.ts";
 
 type Counter = { count: number; label: string; bump: () => void };
 
-const counterSlice = (name: string, persist = false) => {
+const counterSlice = (
+  name: string,
+  persist = false,
+  revive?: (saved: Partial<Counter>) => Partial<Counter>,
+) => {
   const slice = defineSlice<Counter>({
     name,
     create: (set) => ({
@@ -19,7 +23,7 @@ const counterSlice = (name: string, persist = false) => {
       label: "initial",
       bump: () => set((state) => ({ count: state.count + 1 })),
     }),
-    persist: persist ? { partialize: ({ count }) => ({ count }) } : void 0,
+    persist: persist ? { partialize: ({ count }) => ({ count }), revive } : void 0,
   });
   return slice;
 };
@@ -82,6 +86,36 @@ describe("given a persisted slice", () => {
       expect(
         JSON.parse(window.localStorage.getItem("langwatch:user:user-a:trace:explorer") ?? "{}"),
       ).toEqual({ state: { count: 1 }, version: 0 });
+    });
+  });
+
+  describe("when storage holds a value the slice must clean", () => {
+    const keepWholeCounts = (saved: Partial<Counter>): Partial<Counter> => ({
+      count: typeof saved.count === "number" && saved.count >= 0 ? saved.count : 0,
+    });
+    const store = ({ reader, count }: { reader: string; count: unknown }) =>
+      window.localStorage.setItem(
+        `langwatch:user:${reader}:trace:explorer`,
+        JSON.stringify({ state: { count }, version: 0 }),
+      );
+
+    /** @scenario "A saved value is cleaned as it is read back" */
+    it("revives the saved value when the slice is declared", () => {
+      store({ reader: "user-a", count: -5 });
+      expect(counterSlice("trace:explorer", true, keepWholeCounts).getState().count).toBe(0);
+
+      store({ reader: "user-a", count: 7 });
+      expect(counterSlice("trace:explorer", true, keepWholeCounts).getState().count).toBe(7);
+    });
+
+    /** @scenario "A saved value is cleaned as it is read back" */
+    it("revives the saved value when a reader signs in", () => {
+      const slice = counterSlice("trace:explorer", true, keepWholeCounts);
+      store({ reader: "user-b", count: "lots" });
+
+      setUiStorageReader("user-b");
+
+      expect(slice.getState().count).toBe(0);
     });
   });
 

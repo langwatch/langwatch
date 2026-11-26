@@ -52,7 +52,7 @@ describe("ResizeHandle", () => {
   });
 
   describe("when the handle sits on the left edge", () => {
-    /** @scenario "Dragging the edge reports a width between the minimum and the maximum" */
+    /** @scenario "Dragging a left-edge handle to the left widens the column" */
     it("widens as the pointer moves left", () => {
       const { onChange, handle } = renderHandle({ value: 300, edge: "left" });
 
@@ -75,7 +75,7 @@ describe("ResizeHandle", () => {
   });
 
   describe("when a drag ends", () => {
-    /** @scenario "Dragging the edge reports a width between the minimum and the maximum" */
+    /** @scenario "The width is reported once when a moved drag is released" */
     it("reports the final width once, and the dragging state around it", () => {
       const { onDragEnd, onDraggingChange, handle } = renderHandle();
 
@@ -88,6 +88,7 @@ describe("ResizeHandle", () => {
       expect(onDraggingChange.mock.calls).toEqual([[true], [false]]);
     });
 
+    /** @scenario "Losing pointer capture ends the drag" */
     it("ends the drag when the pointer capture is lost, without a width if it never moved", () => {
       const { onDragEnd, onDraggingChange, handle } = renderHandle();
 
@@ -95,6 +96,16 @@ describe("ResizeHandle", () => {
       fireEvent.lostPointerCapture(handle, { pointerId: 1 });
 
       expect(onDraggingChange.mock.calls).toEqual([[true], [false]]);
+      expect(onDragEnd).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "The width is reported once when a moved drag is released" */
+    it("reports no width for a click without movement", () => {
+      const { onDragEnd, handle } = renderHandle();
+
+      fireEvent.pointerDown(handle, { button: 0, clientX: 212, pointerId: 1 });
+      fireEvent.pointerUp(handle, { clientX: 212, pointerId: 1 });
+
       expect(onDragEnd).not.toHaveBeenCalled();
     });
   });

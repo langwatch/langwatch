@@ -908,7 +908,7 @@ export const useLangyStore = defineSlice<LangyState>({
       set((state) => ({
         panelWidths: {
           ...state.panelWidths,
-          ...parseStoredPanelWidths({ [placement]: Math.round(width) }),
+          [placement]: Math.round(width),
         },
       })),
     resetPanelWidth: (placement) =>

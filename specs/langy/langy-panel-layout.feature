@@ -131,11 +131,11 @@ Feature: Langy panel layout modes
     And on a phone the drawer still fills the screen as a sheet
 
   @regression @integration
-  Scenario: A drawer opening beside a widened dock sits flush against it
+  Scenario: A drawer opening beside a widened dock keeps the default gap
     Given I widened the docked Langy panel beyond its default width
     When a right-anchored drawer opens
     Then the panel drops to its default width beside the drawer
-    And the drawer sits against the panel with no empty strip between them
+    And the gap between them stays the default 12px strip rather than growing with the dock width
 
   @integration
   Scenario: The docked companion keeps its own Minimise

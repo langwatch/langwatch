@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { resolveFloatingPanelWidth } from "../langy-panel-layout.ts";
 import {
   clampPanelWidth,
   parseStoredPanelWidths,
@@ -41,6 +42,20 @@ describe("resolvePanelWidthBounds", () => {
   });
 });
 
+describe("the floating default on narrow viewports", () => {
+  /** @scenario "The width stays within a usable range" */
+  it.each([500, 600, 700])(
+    "is the card's own default and within bounds at %ipx",
+    (viewportWidth) => {
+      const width = resolvePanelWidth({ placement: "floating", viewportWidth, stored: undefined });
+      const { min, max } = resolvePanelWidthBounds({ placement: "floating", viewportWidth });
+      expect(width).toBe(Math.round(resolveFloatingPanelWidth(viewportWidth)));
+      expect(width).toBeGreaterThanOrEqual(min);
+      expect(width).toBeLessThanOrEqual(max);
+    },
+  );
+});
+
 describe("clampPanelWidth", () => {
   /** @scenario "The width stays within a usable range" */
   it("stops at the minimum and the maximum", () => {
@@ -62,7 +77,7 @@ describe("resolvePanelWidth", () => {
   it("re-clamps a stored width to a narrower window without losing the choice", () => {
     const stored = 700;
     expect(resolvePanelWidth({ placement: "floating", viewportWidth: 1_440, stored })).toBe(700);
-    expect(resolvePanelWidth({ placement: "floating", viewportWidth: 800, stored })).toBe(480);
+    expect(resolvePanelWidth({ placement: "floating", viewportWidth: 800, stored })).toBe(592);
     expect(stored).toBe(700);
   });
 });

@@ -14,7 +14,7 @@ export function useLangyPeekProximity({
   enabled: boolean;
   mode: "floating" | "sidebar";
   dodgeLeft: boolean;
-  floatingWidthPx?: number;
+  floatingWidthPx: number;
 }): boolean {
   const [near, setNear] = useState(false);
 

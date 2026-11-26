@@ -71,7 +71,7 @@ describe("langyPeekDock geometry", () => {
 });
 
 describe("langyPeekDock proximity", () => {
-  const viewport = { viewportWidth: 1440, viewportHeight: 900 };
+  const viewport = { viewportWidth: 1440, viewportHeight: 900, floatingWidthPx: 432 };
 
   describe("given the floating peek rests bottom-right", () => {
     const base = {

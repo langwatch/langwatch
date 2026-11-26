@@ -1,6 +1,7 @@
 import {
   FLOATING_PANEL_MIN_WIDTH,
   FLOATING_PANEL_VIEWPORT_GUTTER,
+  FLOATING_PANEL_VIEWPORT_SHARE,
   resolveFloatingPanelWidth,
   SIDEBAR_PANEL_WIDTH,
 } from "./langy-panel-layout.ts";
@@ -22,7 +23,11 @@ export interface LangyPanelWidthBounds {
 
 const SIDEBAR_MIN_WIDTH = 320;
 const LIMITS = {
-  floating: { min: FLOATING_PANEL_MIN_WIDTH, cap: 760, viewportShare: 0.6 },
+  floating: {
+    min: FLOATING_PANEL_MIN_WIDTH,
+    cap: 760,
+    viewportShare: FLOATING_PANEL_VIEWPORT_SHARE,
+  },
   sidebar: { min: SIDEBAR_MIN_WIDTH, cap: 640, viewportShare: 0.5 },
 } as const;
 

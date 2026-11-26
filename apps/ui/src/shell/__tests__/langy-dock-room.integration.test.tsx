@@ -33,7 +33,7 @@ describe("given the docked Langy panel was widened", () => {
     cleanup();
   });
 
-  /** @scenario "A drawer opening beside a widened dock sits flush against it" */
+  /** @scenario "A drawer opening beside a widened dock keeps the default gap" */
   it("a drawer yields the default-width inset while the page keeps the live width", () => {
     let pageInset = -1;
     render(
@@ -49,8 +49,9 @@ describe("given the docked Langy panel was widened", () => {
     );
 
     expect(pageInset).toBe(langyShellDockInset(WIDENED_PX));
-    expect(screen.getByTestId("drawer-inset")).toHaveTextContent(
-      String(langyShellDockInset(LANGY_DOCK_WIDTH_PX) + 8),
-    );
+    // The gap stays the default strip: the drawer's inset never grows with the widened dock.
+    const drawerInset = Number(screen.getByTestId("drawer-inset").textContent);
+    expect(drawerInset).toBe(langyShellDockInset(LANGY_DOCK_WIDTH_PX) + 8);
+    expect(drawerInset).not.toBe(langyShellDockInset(WIDENED_PX) + 8);
   });
 });
