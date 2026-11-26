@@ -314,15 +314,31 @@ describe("LicenseDetailDrawer", () => {
   });
 
   describe("given retiring the unused key fails for another reason", () => {
+    /** The registry after the failure: the replacement and the unused key it replaced, live. */
+    const leftOver = () => [
+      replacementOf(license({ instanceId: null }), { instanceId: null, hasPendingDelivery: false }),
+      license({ instanceId: null }),
+    ];
+
+    beforeEach(() => {
+      state.chain = [license({ instanceId: null })];
+      state.reissue.mockImplementation(async () => {
+        state.chain = leftOver();
+        return { licenseKey: SIGNED };
+      });
+      state.revoke.mockRejectedValueOnce(new Error("network down"));
+    });
+
     /** @scenario "Retiring an unused key that failed for another reason keeps the new key for the customer" */
     it("reports the failure and still offers the new key to send to the customer", async () => {
-      state.chain = [license()];
-      state.revoke.mockRejectedValue(new Error("network down"));
-      const { host } = openDrawer({ id: "il_1" });
+      const { host, view } = openDrawer({ id: "il_1" });
 
       extendByTwoWeeks();
 
       expect(await screen.findByTestId("send-key")).toBeTruthy();
+      view.rerenderWithOpsHost(
+        <LicenseDetailDrawer licenseId="il_1" onClose={vi.fn()} onRevoke={vi.fn()} />,
+      );
       expect(host.recording.failures.map((failure) => failure.fallbackTitle)).toContain(
         "The new key is signed, but the unused one still works: revoke it",
       );
@@ -333,19 +349,43 @@ describe("LicenseDetailDrawer", () => {
 
     /** @scenario "An unused key a failed retirement left working can be ended from the drawer" */
     it("ends the unused key on a second try and stops saying it still works", async () => {
-      state.chain = [license()];
-      state.revoke.mockRejectedValueOnce(new Error("network down"));
-      openDrawer({ id: "il_1" });
+      const { view } = openDrawer({ id: "il_1" });
       extendByTwoWeeks();
+      await screen.findByTestId("send-key");
+      view.rerenderWithOpsHost(
+        <LicenseDetailDrawer licenseId="il_1" onClose={vi.fn()} onRevoke={vi.fn()} />,
+      );
       await screen.findByTestId("unused-key-left");
-      state.revoke.mockResolvedValue({});
+      state.revoke.mockImplementation(async ({ id }: { id: string }) => {
+        state.chain = state.chain.map((row) =>
+          row.id === id ? { ...row, status: "revoked" as const } : row,
+        );
+        return {};
+      });
 
       fireEvent.click(screen.getByRole("button", { name: "End the unused key" }));
 
-      await waitFor(() => expect(screen.queryByTestId("unused-key-left")).toBeNull());
-      expect(state.revoke).toHaveBeenLastCalledWith(
-        expect.objectContaining({ id: "il_1", unusedOnly: true }),
+      await waitFor(() =>
+        expect(state.revoke).toHaveBeenLastCalledWith(
+          expect.objectContaining({ id: "il_1", unusedOnly: true }),
+        ),
       );
+      view.rerenderWithOpsHost(
+        <LicenseDetailDrawer licenseId="il_1" onClose={vi.fn()} onRevoke={vi.fn()} />,
+      );
+      expect(screen.queryByTestId("unused-key-left")).toBeNull();
+    });
+
+    /** @scenario "An unused key left working still shows after the drawer is opened again" */
+    it("says the unused key still works when the drawer opens on such a chain", () => {
+      state.chain = leftOver();
+
+      openDrawer({ id: "il_2" });
+
+      expect(screen.getByTestId("unused-key-left").textContent).toContain(
+        "The unused key still works.",
+      );
+      expect(screen.getByRole("button", { name: "End the unused key" })).toBeTruthy();
     });
   });
 

@@ -128,8 +128,8 @@ export class MemoryOrganizationLicenseRepository implements OrganizationLicenseR
     license: StoredLicense;
     replacing: string | null;
   }>): Promise<boolean> {
-    const held = this.own.get(organizationId);
-    if (held !== void 0 && held.license.licenseKey !== replacing) return false;
+    const held = this.licenseOf(organizationId);
+    if (held === void 0 || held.licenseKey !== replacing) return false;
     this.own.set(organizationId, { license: { ...license }, updatedAt: nowInstant() });
     return true;
   }

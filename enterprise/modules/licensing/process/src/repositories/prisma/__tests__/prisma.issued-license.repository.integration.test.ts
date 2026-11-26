@@ -294,6 +294,21 @@ describe.skipIf(!TEST_DATABASE_URL)("the license registry on Postgres", () => {
     expect(boundRow?.revokedAt).toBeNull();
   });
 
+  /** @scenario "An install that binds while its unused key is being ended gets a fresh key" */
+  it("lets go of a managed key only while the row still holds that key", async () => {
+    const { license } = await issue("ACME Release Key");
+    const repository = PrismaIssuedLicenseRepository.create(prisma, SEALING);
+    await repository.update(license.id, { virtualKeyId: "vk-ended" });
+
+    expect(await repository.releaseVirtualKey({ id: license.id, virtualKeyId: "vk-other" })).toBe(
+      false,
+    );
+    expect(await repository.releaseVirtualKey({ id: license.id, virtualKeyId: "vk-ended" })).toBe(
+      true,
+    );
+    expect((await repository.findById(license.id))?.virtualKeyId).toBeNull();
+  });
+
   /** @scenario "Two instances racing to bind leave exactly one bound" */
   it("binds the first of two installs and refuses the one waiting on the row", async () => {
     const { license } = await issue("ACME Bind Race");

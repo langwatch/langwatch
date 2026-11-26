@@ -23,6 +23,8 @@ export interface LicenseChainState {
   live: License[];
   /** No live license of the chain is bound; a retired one may still name the old install. */
   unbound: boolean;
+  /** Replaced keys no install used that still work, because ending them failed. */
+  leftover: License[];
 }
 
 const isLive = (license: License) => license.status === "active" || license.status === "expired";
@@ -37,7 +39,8 @@ export function licenseChainState({ licenses }: { licenses: License[] }): Licens
     ? (licenses.find((license) => isLive(license) && !license.hasPendingDelivery) ?? head)
     : head;
   const unbound = live.every((license) => license.instanceId === null);
-  return { licenses, head, inUse, pending, live, unbound };
+  const leftover = unbound ? live.filter((license) => license.id !== head.id) : [];
+  return { licenses, head, inUse, pending, live, unbound, leftover };
 }
 
 /** When the next daily sync is due, worked out from the last one; nothing stored. */

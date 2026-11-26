@@ -182,6 +182,70 @@ function contractCases(backend: Backend): void {
     ]);
   });
 
+  it("compares a delivery with the organization's key while no row holds one", async () => {
+    const repository = await backend.seed({ [id("a")]: { licenseKey: "column-key" } });
+    const license = { licenseKey: "delivered", expiresAt: EXPIRES, validatedAt: null };
+
+    await expect(
+      repository.replaceLicense({ organizationId: id("a"), license, replacing: null }),
+    ).resolves.toBe(false);
+    await expect(
+      repository.replaceLicense({ organizationId: id("a"), license, replacing: "column-key" }),
+    ).resolves.toBe(true);
+
+    await expect(repository.getOrganizationLicense(id("a"))).resolves.toEqual({
+      licenseKey: "delivered",
+    });
+  });
+
+  describe("given organization's column is written after licensing's own row", () => {
+    const license = (licenseKey: string) => ({ licenseKey, expiresAt: EXPIRES, validatedAt: null });
+    const columnWrittenLater = async () => {
+      const repository = await backend.seed({ [id("a")]: { licenseKey: null } });
+      await repository.saveLicense({ organizationId: id("a"), license: license("row-key") });
+      await backend.writeColumns({
+        organizationId: id("a"),
+        columns: { licenseKey: "column-key", updatedAt: LATER },
+      });
+      return repository;
+    };
+
+    /** @scenario "A delivered license is compared with the license the install reads" */
+    it("accepts a delivery that replaces the column's key", async () => {
+      const repository = await columnWrittenLater();
+
+      await expect(
+        repository.replaceLicense({
+          organizationId: id("a"),
+          license: license("delivered"),
+          replacing: "column-key",
+        }),
+      ).resolves.toBe(true);
+      await expect(repository.findLicense({ organizationId: id("a") })).resolves.toEqual([
+        license("delivered"),
+      ]);
+    });
+
+    /** @scenario "A licence column written while a sync is out keeps the delivered license out" */
+    it("refuses a delivery that read the row's key before the column changed", async () => {
+      const repository = await columnWrittenLater();
+
+      await expect(
+        repository.replaceLicense({
+          organizationId: id("a"),
+          license: license("delivered"),
+          replacing: "row-key",
+        }),
+      ).resolves.toBe(false);
+      await expect(repository.getOrganizationLicense(id("a"))).resolves.toEqual({
+        licenseKey: "column-key",
+      });
+      await expect(repository.findLicense({ organizationId: id("a") })).resolves.toEqual([
+        license("row-key"),
+      ]);
+    });
+  });
+
   it("restores the row read before a write, and deletes one that was not there", async () => {
     const repository = await backend.seed({
       [id("a")]: { licenseKey: null },

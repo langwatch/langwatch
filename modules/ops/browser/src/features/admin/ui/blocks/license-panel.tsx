@@ -112,7 +112,6 @@ function SignedKeyNote({ signed }: { signed: SignedKey | null }) {
           every later change arrives by itself.
         </Text>
         <SignedLicenseOnce licenseKey={signed.licenseKey} />
-        <UnusedKeyLeft ids={signed.unusedKeysLeft} />
       </VStack>
     );
   }
@@ -124,15 +123,14 @@ function SignedKeyNote({ signed }: { signed: SignedKey | null }) {
   );
 }
 
-/** The unused key a failed retirement left working, with the action that ends it. */
-function UnusedKeyLeft({ ids }: { ids: string[] }) {
+/** A replaced key no install used that still works, read from the chain, and its End action. */
+function UnusedKeyLeft({ chain }: { chain: LicenseChainState }) {
   const { endUnusedKeys } = useLicenseChanges();
-  const [ended, setEnded] = useState(false);
   const [ending, setEnding] = useState(false);
-  if (ids.length === 0 || ended) return null;
+  if (chain.leftover.length === 0) return null;
   const end = async () => {
     setEnding(true);
-    setEnded(await endUnusedKeys({ ids }));
+    await endUnusedKeys({ ids: chain.leftover.map((license) => license.id) });
     setEnding(false);
   };
   return (
@@ -170,7 +168,7 @@ function extendedNote({ signed, install }: { signed: SignedKey; install: string 
   if (!signed.forCustomer) {
     return `${install ?? "The install"} picks it up on its next sync. Nothing to send.`;
   }
-  return signed.unusedKeysLeft.length > 0
+  return signed.unusedKeyLeft
     ? "Send the new key to the customer. The unused key still works: end it below."
     : "Send the new key to the customer. The unused one no longer works.";
 }
@@ -337,6 +335,7 @@ export function LicensePanel({
         <ServiceBadges services={head.services} />
       </TermRow>
       <SignedKeyNote signed={signed} />
+      <UnusedKeyLeft chain={chain} />
       <Text fontSize="xs" color="fg.muted">
         {changes.install
           ? "Changes here reach the install on its next daily sync. Nothing to send."

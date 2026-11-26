@@ -164,6 +164,28 @@ export class PrismaIssuedLicenseRepository implements IssuedLicenseRepository {
     return updated === 1;
   }
 
+  async releaseVirtualKey({
+    id,
+    virtualKeyId,
+  }: {
+    id: string;
+    virtualKeyId: string;
+  }): Promise<boolean> {
+    const updated = await this.prisma.$executeRaw`
+      ${skipTenantCheck({
+        // A license is addressed by its own primary key. The row names the organization it was
+        // issued to rather than belonging to one.
+        SKIP_TENANT_CHECK: true,
+      })}
+      UPDATE "IssuedLicense"
+         SET "virtualKeyId" = NULL,
+             "updatedAt" = now()
+       WHERE "id" = ${id}
+         AND "virtualKeyId" = ${virtualKeyId}
+    `;
+    return updated === 1;
+  }
+
   async revokeUnbound({
     id,
     at,

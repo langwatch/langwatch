@@ -444,11 +444,19 @@ Feature: License registry
     Then both the replacement and the license the install holds are revoked
 
   @unit
-  Scenario: An unused-key revoke whose key retirement failed finishes on retry
-    Given an unused-key revoke marked the license revoked
-    And ending its managed key failed
-    When the operator retries the revoke
-    Then the managed key is ended and the license reads as revoked
+  Scenario: An unused-key revoke ends the managed key before it marks the license
+    Given a license no install has used holds a managed key
+    When ending its managed key fails
+    Then the license is not marked revoked and stays live
+    And revoking it again ends the key and marks the license
+
+  @unit
+  Scenario: An install that binds while its unused key is being ended gets a fresh key
+    Given an unused-key revoke ended the license's managed key
+    And an install bound the license before the revoke marked it
+    When the revoke's conditional write is refused
+    Then the license stays live and bound, and lets go of the ended key
+    And the install's next sync provisions a new managed key
 
   @integration
   Scenario: Retiring an unused key that failed for another reason keeps the new key for the customer
@@ -463,6 +471,12 @@ Feature: License registry
     Given retiring the unused key failed after an operator signed a replacement
     When the operator chooses End the unused key
     Then the registry ends the key and the drawer stops saying it still works
+
+  @integration
+  Scenario: An unused key left working still shows after the drawer is opened again
+    Given no install holds a license whose replaced key still works
+    When an operator opens the license in the drawer
+    Then the drawer says the unused key still works and offers End the unused key
 
   @integration
   Scenario: Revoking reaches a replacement signed after the dialog opened

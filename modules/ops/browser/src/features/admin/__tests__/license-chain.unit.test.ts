@@ -44,6 +44,16 @@ describe("licenseChainState", () => {
     expect(licenseChainState({ licenses: [row({ instanceId: null })] })?.unbound).toBe(true);
   });
 
+  /** @scenario "An unused key left working still shows after the drawer is opened again" */
+  it("names the replaced keys of an unbound chain that are still live, never the newest", () => {
+    const newest = row({ id: "il_2", instanceId: null });
+    const replaced = row({ id: "il_1", instanceId: null });
+    const state = licenseChainState({ licenses: [newest, replaced] });
+
+    expect(state?.leftover.map((license) => license.id)).toEqual(["il_1"]);
+    expect(licenseChainState({ licenses: [row({ id: "il_2" }), row({})] })?.leftover).toEqual([]);
+  });
+
   /** @scenario "After a binding reset the drawer treats the chain as unused" */
   it("reads a reset chain as unbound though a superseded license names the old install", () => {
     const state = licenseChainState({

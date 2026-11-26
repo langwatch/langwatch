@@ -193,9 +193,9 @@ export class LicenseRegistryService {
   }
 
   /**
-   * Revokes a key no install used, in one conditional write a racing bind cannot
-   * also win. The row goes first: an unbound row's key reaches no install. A retry
-   * on a revoked unbound row retires the key again, so a failed retirement ends.
+   * Revokes a key no install used. The key ends first, so a failure leaves the license live
+   * to revoke again. The row is then marked in one conditional write a racing bind cannot
+   * also win; if the bind won, the row lets go of the ended key for a fresh one next sync.
    */
   private async revokeUnused({
     row,
@@ -206,27 +206,30 @@ export class LicenseRegistryService {
     operatorId: string;
     reason: string;
   }): Promise<IssuedLicenseView> {
-    if (!isRevokedUnbound(row)) {
-      this.refuseIfSettled(row);
-      const revoked = await this.options.repository.revokeUnbound({
-        id: row.id,
-        at: this.options.now(),
-        revokedById: operatorId,
-        revokedReason: reason,
-      });
-      if (!revoked) await this.refuseLostRevoke(row.id);
-    }
+    this.refuseIfSettled(row);
+    if (row.instanceId !== null) throw new LicenseInUseError();
     await this.retireManagedKey({ row, actorId: operatorId });
+    const revoked = await this.options.repository.revokeUnbound({
+      id: row.id,
+      at: this.options.now(),
+      revokedById: operatorId,
+      revokedReason: reason,
+    });
+    if (!revoked) await this.refuseLostRevoke(row);
     const updated = await this.getRow(row.id);
     await this.syncBudget(updated, operatorId);
     return this.toView(updated);
   }
 
-  /** Why an unused-key revoke lost its write; a row it finds revoked and unbound is fine. */
-  private async refuseLostRevoke(id: string): Promise<void> {
-    const current = await this.getRow(id);
-    if (isRevokedUnbound(current)) return;
-    this.refuseIfSettled(current);
+  /** An unused-key revoke lost its write to a bind or another settle: say which. */
+  private async refuseLostRevoke(row: IssuedLicenseRecord): Promise<never> {
+    if (row.virtualKeyId) {
+      await this.options.repository.releaseVirtualKey({
+        id: row.id,
+        virtualKeyId: row.virtualKeyId,
+      });
+    }
+    this.refuseIfSettled(await this.getRow(row.id));
     throw new LicenseInUseError();
   }
 
@@ -560,9 +563,4 @@ export interface LicenseCustomers {
   findById(id: string): Promise<{ id: string; name: string } | null>;
   /** Organization creates a missing row and marks it a self-hosted customer from this fact. */
   recordSelfHostedCustomerLicensed(params: { id: string; name: string }): Promise<void>;
-}
-
-/** Revoked while no install held it: its key reaches nothing, so retiring it again is safe. */
-function isRevokedUnbound(row: IssuedLicenseRecord): boolean {
-  return row.revokedAt !== null && row.instanceId === null;
 }

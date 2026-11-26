@@ -284,6 +284,20 @@ Feature: License sync
     When the first sync stores the license its answer carried
     Then the store is a single write that keeps the newer license
 
+  @integration
+  Scenario: A delivered license is compared with the license the install reads
+    Given organization's licence column was written after licensing's own row
+    And a sync started from the key in that column
+    When the sync stores the license its answer carried
+    Then the store is accepted, because the column's key is the one the install reads
+
+  @integration
+  Scenario: A licence column written while a sync is out keeps the delivered license out
+    Given a sync started from the organization's key
+    And organization's licence column changed to another key while the answer was out
+    When the sync stores the license its answer carried
+    Then the store is refused and the newer column's key stays
+
   @unit
   Scenario: A sync never carries a license that a delivery retired while it looked
     Given LangWatch extended the license, and extended it again before the install synced

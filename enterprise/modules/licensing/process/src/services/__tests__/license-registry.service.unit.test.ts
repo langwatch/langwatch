@@ -380,8 +380,8 @@ describe("the license registry", () => {
     expect((await repository.findById(license.id))?.revokedAt).toEqual(NOW);
   });
 
-  /** @scenario "An unused-key revoke whose key retirement failed finishes on retry" */
-  it("retires the key again when the row was revoked but its key was not ended", async () => {
+  /** @scenario "An unused-key revoke ends the managed key before it marks the license" */
+  it("leaves the license live when ending its key fails, and finishes on the next revoke", async () => {
     const { registry, repository, managedKeys } = harness();
     const { license } = await registry.issue(issueInput());
     await repository.update(license.id, { virtualKeyId: "vk-unused" });
@@ -392,11 +392,34 @@ describe("the license registry", () => {
     const unused = { id: license.id, operatorId: "op", reason: "unused", unusedOnly: true };
 
     await expect(registry.revoke(unused)).rejects.toThrow("gateway unreachable");
+    expect((await repository.findById(license.id))?.revokedAt).toBeNull();
     managedKeys.retire = retire;
     const retried = await registry.revoke(unused);
 
     expect(retried.status).toBe("revoked");
     expect(managedKeys.retired).toEqual(["vk-unused"]);
+  });
+
+  /** @scenario "An install that binds while its unused key is being ended gets a fresh key" */
+  it("keeps a license an install bound mid-revoke live, and lets go of the ended key", async () => {
+    const { registry, repository, managedKeys } = harness();
+    const { license } = await registry.issue(issueInput());
+    await repository.update(license.id, { virtualKeyId: "vk-unused" });
+    const retire = managedKeys.retire.bind(managedKeys);
+    managedKeys.retire = async (params) => {
+      await retire(params);
+      await repository.bindInstance({ id: license.id, instanceId: "install-1", at: NOW });
+    };
+
+    await expect(
+      registry.revoke({ id: license.id, operatorId: "op", reason: "unused", unusedOnly: true }),
+    ).rejects.toMatchObject({ code: "license_in_use" });
+
+    const row = await repository.findById(license.id);
+    expect(managedKeys.retired).toEqual(["vk-unused"]);
+    expect(row?.revokedAt).toBeNull();
+    expect(row?.instanceId).toBe("install-1");
+    expect(row?.virtualKeyId).toBeNull();
   });
 
   /** @scenario "Reissuing a license" */

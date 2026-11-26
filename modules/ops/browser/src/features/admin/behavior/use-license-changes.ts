@@ -22,9 +22,9 @@ type Retirement = "retired" | "in_use" | "failed";
 /**
  * A key a change signed. `forCustomer` when no install holds the chain, so the
  * customer pastes the new one; otherwise an install picks it up over sync.
- * `unusedKeysLeft` names the licenses whose unused key retiring did not end.
+ * `unusedKeyLeft` when retiring the unused key failed and it still works.
  */
-export type SignedKey = { licenseKey: string; forCustomer: boolean; unusedKeysLeft: string[] };
+export type SignedKey = { licenseKey: string; forCustomer: boolean; unusedKeyLeft: boolean };
 
 export type ReplacementChange = {
   /** ISO 8601. The instant the replacement's term ends. */
@@ -120,11 +120,11 @@ export function useLicenseChanges() {
     return {
       licenseKey,
       forCustomer: chain.unbound && retirement !== "in_use",
-      unusedKeysLeft: retirement === "failed" ? chain.live.map((license) => license.id) : [],
+      unusedKeyLeft: retirement === "failed",
     };
   }
 
-  /** Ends unused keys a first attempt left working; the registry finishes a half-done revoke. */
+  /** Ends replaced keys no install used that a first attempt left working. */
   async function endUnusedKeys({ ids }: { ids: string[] }): Promise<boolean> {
     const ended = await eachLicense({
       licenses: ids.map((id) => ({ id })),
