@@ -14,11 +14,11 @@ A PR may be treated as **low risk** only if:
   - Integrations with third‑party systems or external APIs.
 
 - It is limited to:
-  - UI text, layout, or styling.
-  - Documentation, comments, or code formatting.
-  - Claude Code agent configuration (`.claude/` directory).
+  - Documentation (`*.md`, `*.mdx`, `docs/`).
   - BDD feature specs (`specs/` directory).
-  - Other configuration or code that is explicitly documented as low risk and easy to revert.
+  - Images.
+
+Automation enforces that list as a path allowlist before any AI evaluation. A file at the repository root, under `.github/`, `.claude/`, `cmd/` or `tools/`, or any `CLAUDE.md` or `AGENTS.md`, is never low risk.
 
 If you are unsure, do **not** use `low-risk-change`; request a normal review instead.
 
@@ -32,7 +32,16 @@ If you are unsure, do **not** use `low-risk-change`; request a normal review ins
    - All required CI checks are green.
    - The target branch is protected (no direct pushes; status checks required).
 
-PRs that do not meet these conditions must follow the normal review and approval process.
+PRs that do not meet these conditions follow the reviewed path below.
+
+## PRs That Are Not Low Risk (`needs-ack`)
+
+A PR that does not qualify gets the `needs-ack` label and a comment saying why it is risky. Automation approves it, with no human review, once:
+
+- The automated review bot's latest review of the head commit has no P0/P1 (blocking) finding.
+- All required CI checks are green.
+
+The daily change report lists merged `needs-ack` PRs so a human acknowledges each risky change after it ships. A PR that changes or renames what the review job runs or reads from the PR (a file at the repository root, anything under `.github/`, `.claude/`, `cmd/` or `tools/`, or any `CLAUDE.md` or `AGENTS.md`) is never approved this way and needs a human approval.
 
 ## Firefighting Label
 

@@ -507,6 +507,10 @@ jobs:
         if: ${{ !cancelled() && needs.changes.outputs.relevant == 'true' }}
         run: node --test --experimental-strip-types .github/scripts/pr-impact-map-categories.test.ts
 
+      - name: Test the PR auto-approve decision tree
+        if: ${{ !cancelled() && needs.changes.outputs.relevant == 'true' }}
+        run: node --test --experimental-strip-types .github/scripts/pr-auto-approve-decision.test.ts
+
       # The nightly suite's reports and its workflow promises (specs/ci/nightly-suite.feature).
       - name: Test the nightly suite's scripts
         if: ${{ !cancelled() && needs.changes.outputs.relevant == 'true' }}

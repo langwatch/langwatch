@@ -1,0 +1,142 @@
+name: Auto-approve reviewed PRs (needs-ack)
+
+# Approves a PR that pr-auto-approve.yml did not approve as low risk, once the
+# `pr` workflow (CI + langwatch/langwatch-pr-review-bot) or `pr-conventions`
+# has finished on its head commit: the review bot's latest review of that
+# commit has no P0/P1 finding and every required status check is green. A PR
+# that is not `low-risk-change` also gets the `needs-ack` label, which the
+# daily change report lists for acknowledgement. The decision tree is in
+# .github/scripts/pr-auto-approve-decision.cjs and the header of
+# pr-auto-approve.yml; spec: specs/ci/pr-auto-approve.feature
+#
+# workflow_run, like pull_request_target, runs this file and its checkout from
+# the default branch, so a PR cannot edit the job that approves it.
+
+# The required checks come from these two workflows, so the decision re-runs
+# when either finishes (a pr conventions re-run on a description edit, say).
+# check_suite would not do: GitHub never fires it for suites GitHub Actions
+# created, and every required check here is one.
+on:
+  workflow_run:
+    workflows: [pr, pr-conventions]
+    types: [completed]
+
+permissions:
+  contents: read
+
+# One group per head commit, queued, never cancelled: a cancelled approval
+# is never retried, and a queued run for the same head finds the approval and
+# stops.
+concurrency:
+  group: pr-reviewed-approve-${{ github.event.workflow_run.head_sha }}
+  cancel-in-progress: false
+
+jobs:
+  approve-reviewed:
+    timeout-minutes: 5
+    if: >-
+      github.event_name == 'workflow_run' &&
+      github.event.workflow_run.event == 'pull_request' &&
+      github.event.workflow_run.head_repository.full_name == github.repository
+    runs-on: ubuntu-latest
+    permissions:
+      checks: read # the head commit's check runs
+      contents: read # the base branch rules naming the required checks
+      pull-requests: write # labels and the approving review
+      statuses: read # required checks reported as commit statuses
+    steps:
+      # The default branch, never the PR head: the decision code must not be
+      # something the PR it judges can edit.
+      - name: Checkout decision script (default branch)
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+          sparse-checkout: .github/scripts
+
+      - name: Decide and approve
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          RUN_HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+        with:
+          script: |
+            const { BOT_LOGIN, NEEDS_ACK_LABEL, decideReviewedApproval } = require(
+              `${process.env.GITHUB_WORKSPACE}/.github/scripts/pr-auto-approve-decision.cjs`
+            );
+            const { owner, repo } = context.repo;
+            const runHeadSha = process.env.RUN_HEAD_SHA;
+
+            const associated = await github.paginate(
+              github.rest.repos.listPullRequestsAssociatedWithCommit,
+              { owner, repo, commit_sha: runHeadSha }
+            );
+            const prs = associated.filter(
+              (pr) => pr.state === "open" && pr.head.sha === runHeadSha && pr.head.repo?.full_name === `${owner}/${repo}`
+            );
+            if (prs.length === 0) core.info(`No open PR has head ${runHeadSha}; nothing to do.`);
+
+            for (const { number } of prs) {
+              const { data: pr } = await github.rest.pulls.get({ owner, repo, pull_number: number });
+              const reviews = await github.paginate(github.rest.pulls.listReviews, {
+                owner, repo, pull_number: number,
+              });
+              // listFiles stops at 3000 files; a capped list cannot prove the
+              // review pipeline is untouched, so the decision fails closed. A
+              // rename counts under both names, so moving a file out of the
+              // pipeline still needs a human.
+              const changed = await github.paginate(github.rest.pulls.listFiles, {
+                owner, repo, pull_number: number, per_page: 100,
+              });
+              const files = changed.flatMap((file) =>
+                file.previous_filename ? [file.filename, file.previous_filename] : [file.filename]
+              );
+              // Rulesets only: classic branch protection's required checks are
+              // not listed here. An empty list is never green, so a branch
+              // without a ruleset fails closed.
+              const rules = await github.paginate("GET /repos/{owner}/{repo}/rules/branches/{branch}", {
+                owner, repo, branch: pr.base.ref, per_page: 100,
+              });
+              const required = [...new Set(rules
+                .filter((rule) => rule.type === "required_status_checks")
+                .flatMap((rule) => rule.parameters?.required_status_checks ?? [])
+                .map((check) => check.context))];
+              const checkRuns = await github.paginate(github.rest.checks.listForRef, {
+                owner, repo, ref: pr.head.sha, per_page: 100,
+              });
+              const { data: combined } = await github.rest.repos.getCombinedStatusForRef({
+                owner, repo, ref: pr.head.sha, per_page: 100,
+              });
+
+              const decision = decideReviewedApproval({
+                runHeadSha,
+                prHeadSha: pr.head.sha,
+                labels: pr.labels.map((label) => label.name),
+                reviews,
+                files,
+                filesComplete: changed.length >= pr.changed_files,
+                required,
+                checkRuns,
+                statuses: combined.statuses,
+              });
+              core.info(`PR #${number}: ${decision.approve ? "approve" : "no approval"} (${decision.reason}).`);
+              if (!decision.approve) continue;
+
+              // Label before approving: if the review call fails, the PR still
+              // carries the flag the daily change report reads.
+              if (decision.needsAck) {
+                await github.rest.issues.addLabels({
+                  owner, repo, issue_number: number, labels: [NEEDS_ACK_LABEL],
+                });
+              }
+              await github.rest.pulls.createReview({
+                owner,
+                repo,
+                pull_number: number,
+                commit_id: pr.head.sha,
+                event: "APPROVE",
+                body: decision.needsAck
+                  ? `Approved by automation: the review bot found no P0/P1 on ${pr.head.sha.slice(0, 7)} and the required checks are green. Not low risk: labelled \`${NEEDS_ACK_LABEL}\` for acknowledgement in the daily change report.`
+                  : `Approved by automation: the review bot found no P0/P1 on ${pr.head.sha.slice(0, 7)} and the required checks are green.`,
+              });
+              core.info(`PR #${number} approved by ${BOT_LOGIN}${decision.needsAck ? `, labelled ${NEEDS_ACK_LABEL}` : ""}.`);
+            }
