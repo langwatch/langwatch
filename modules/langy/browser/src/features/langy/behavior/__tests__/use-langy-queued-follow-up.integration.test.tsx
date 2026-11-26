@@ -5,7 +5,7 @@
  * @see modules/langy/specs/langy-queue-while-busy.feature
  */
 import { act, renderHook } from "@testing-library/react";
-import { beforeEach, describe, expect, it, onTestFinished, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, onTestFinished, vi } from "vitest";
 
 import { useLangyStore } from "../../../../behavior/langy.store.ts";
 import {
@@ -88,6 +88,11 @@ function renderPanel({
 
 const sentTexts = (sendMessage: ReturnType<typeof vi.fn>) =>
   sendMessage.mock.calls.map(([message]) => message.parts[0].text);
+
+afterEach(() => {
+  useLangyMessageQueue.setState({ messages: [], held: {} });
+  useLangyStore.setState({ turnPhase: "idle", draft: "" });
+});
 
 beforeEach(() => {
   useLangyStore.setState({
