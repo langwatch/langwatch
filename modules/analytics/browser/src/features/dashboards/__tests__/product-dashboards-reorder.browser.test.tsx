@@ -7,7 +7,7 @@
 import type { UiProcedureCall } from "@langwatch/browser/testing-transport";
 import { cleanup, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, onTestFinished } from "vitest";
 
 import { StubAnalyticsHost } from "../../../testing.tsx";
 import { ProductDashboardsSection } from "../ui/sections/product-dashboards-section.tsx";
@@ -100,6 +100,12 @@ describe("a product's Dashboards section, reordered", () => {
     const alpha = screen.getByRole("link", { name: "Alpha" }).getBoundingClientRect();
     const from = gamma.getBoundingClientRect();
     const start = { x: from.left + 40, y: from.top + from.height / 2 };
+    // Read once dispatch is over: a click left unprevented makes the browser follow the link.
+    const dropClicks: boolean[] = [];
+    const recordClick = (event: MouseEvent) =>
+      setTimeout(() => dropClicks.push(event.defaultPrevented), 0);
+    window.addEventListener("click", recordClick, { capture: true });
+    onTestFinished(() => window.removeEventListener("click", recordClick, { capture: true }));
     await user.pointer([
       { keys: "[MouseLeft>]", target: gamma, coords: start },
       { target: gamma, coords: { x: start.x, y: start.y - 10 } },
@@ -116,6 +122,7 @@ describe("a product's Dashboards section, reordered", () => {
       expect(await listed()).toEqual(["My dashboard", "Gamma", "Alpha", "Beta"]),
     );
     await waitFor(() => expect(savedOrders(calls)).toEqual([["gamma", "alpha", "beta"]]));
+    await waitFor(() => expect(dropClicks).toEqual([true]));
     expect(host.navigations).toEqual([]);
   });
 

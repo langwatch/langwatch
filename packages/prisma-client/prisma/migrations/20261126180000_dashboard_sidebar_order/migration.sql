@@ -1,3 +1,5 @@
+-- IRREVERSIBLE: creates the "DashboardSidebarOrder" table, holding members' saved sidebar orders.
+-- A rollback leaves it in place; dropping it is an operator step confirmed in Ops.
 -- Each member's own order of a product sidebar's Dashboards section, per organization.
 CREATE TABLE IF NOT EXISTS "DashboardSidebarOrder" (
     "id" TEXT NOT NULL,

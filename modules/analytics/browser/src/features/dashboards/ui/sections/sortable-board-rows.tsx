@@ -22,7 +22,13 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { type KeyboardEventHandler, type PointerEventHandler, type ReactNode, useRef } from "react";
+import {
+  type KeyboardEventHandler,
+  type PointerEventHandler,
+  type ReactNode,
+  useEffect,
+  useRef,
+} from "react";
 
 import type { SidebarRowDrag } from "../blocks/sidebar-link-row.tsx";
 import { RowDragHandle } from "../elements/row-drag-handle.tsx";
@@ -75,6 +81,8 @@ export function SortableBoardRows({
   );
   const nameOf = (id: unknown) => names.get(String(id)) ?? "the dashboard";
   const clickGuard = useRef<(() => void) | undefined>(void 0);
+  // dnd-kit ends no drag when the context unmounts mid-drag, so let the guard go here too.
+  useEffect(() => () => clickGuard.current?.(), []);
   const onDragEnd = ({ active, over }: DragEndEvent) => {
     clickGuard.current?.();
     if (!over || active.id === over.id) return;

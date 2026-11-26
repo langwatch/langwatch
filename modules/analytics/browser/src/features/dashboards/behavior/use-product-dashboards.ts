@@ -17,8 +17,11 @@ export function useProductDashboards({ product }: { product: DashboardHomeProduc
   allBoards: readonly LibraryBoard[];
   /** False while the list loads or after it failed, so the section draws nothing. */
   isLoaded: boolean;
-  /** Stores the movable boards' new order; the section shows it before the server answers. */
-  reorder: (shownIds: readonly string[]) => void;
+  /**
+   * Stores the movable boards' new order; the section shows it before the server answers.
+   * Unset until the stored order loads, so a save cannot drop another project's slots.
+   */
+  reorder: ((shownIds: readonly string[]) => void) | undefined;
 } {
   const host = useAnalyticsHost();
   const organizationId = host.organizationId() ?? "";
@@ -44,13 +47,13 @@ export function useProductDashboards({ product }: { product: DashboardHomeProduc
 
   const reorder = (shownIds: readonly string[]) => {
     const dashboardIds = nextSidebarOrder({ stored, shown: shownIds });
-    const previous = order.data;
     utils.boards.sidebarOrder.setData(orderInput, { dashboardIds });
     save.mutate(
       { ...orderInput, dashboardIds },
       {
+        // Read back what the server holds, so overlapping failed saves cannot leave a guess.
         onError: (error) => {
-          utils.boards.sidebarOrder.setData(orderInput, previous);
+          void utils.boards.sidebarOrder.invalidate(orderInput);
           host.failed({ error, fallbackTitle: "Couldn't save the order of your dashboards" });
         },
       },
@@ -59,5 +62,10 @@ export function useProductDashboards({ product }: { product: DashboardHomeProduc
 
   // A failed order read lists the boards by name rather than hiding the section.
   const isOrderSettled = order.data !== void 0 || order.isError;
-  return { boards, allBoards, isLoaded: list.data !== void 0 && isOrderSettled, reorder };
+  return {
+    boards,
+    allBoards,
+    isLoaded: list.data !== void 0 && isOrderSettled,
+    reorder: order.data !== void 0 ? reorder : void 0,
+  };
 }

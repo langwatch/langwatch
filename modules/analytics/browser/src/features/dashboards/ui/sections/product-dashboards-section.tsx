@@ -117,8 +117,8 @@ function BoardRows({
   onDuplicate: ((board: LibraryBoard) => void) | undefined;
   onMove: (board: LibraryBoard) => void;
   onDelete: (board: LibraryBoard) => void;
-  /** The movable boards' ids in their new order, after a drag. */
-  onReorder: (ids: readonly string[]) => void;
+  /** The movable boards' ids in their new order, after a drag; unset, no row moves. */
+  onReorder: ((ids: readonly string[]) => void) | undefined;
 }) {
   const host = useAnalyticsHost();
   if (boards.length === 0) {
@@ -130,12 +130,13 @@ function BoardRows({
   }
   const hiddenCount = boards.length - PRODUCT_BOARDS_SHOWN_MAX;
   const shownRows = isShowingAll ? boards : boards.slice(0, PRODUCT_BOARDS_SHOWN_MAX);
-  // My dashboard stays first; every other row moves.
-  const isFixed = (board: LibraryBoard) => isOwnMyDashboard({ board, userId: host.userId() });
+  // My dashboard stays first; every other row moves once the stored order has loaded.
+  const isFixed = (board: LibraryBoard) =>
+    !onReorder || isOwnMyDashboard({ board, userId: host.userId() });
   const movableIds = boards.filter((board) => !isFixed(board)).map((board) => board.id);
   const names = new Map(boards.map((board) => [board.id, board.name]));
   return (
-    <SortableBoardRows ids={movableIds} names={names} onReorder={onReorder}>
+    <SortableBoardRows ids={movableIds} names={names} onReorder={(ids) => onReorder?.(ids)}>
       <RowList label={LABEL}>
         {shownRows.map((board) => {
           const row = {
