@@ -108,6 +108,16 @@ Feature: Topic clustering runs on langevals
     Then it answers with a 4xx carrying a stable code and fixed copy
     And the provider's own words, which can quote the key, are not in the answer
 
+  # litellm raises a missing key as a server error, so a project whose provider
+  # had no key saved failed every run as ours, after one embedding call per trace.
+  @unit
+  Scenario: A model provider with no API key is answered as the customer's to fix
+    Given a batch or incremental clustering run whose clustering or embeddings model needs an API key
+    And the request carries no API key and no endpoint for it, and langevals has none of its own
+    When langevals answers
+    Then it answers with a 422 carrying the model_provider_auth_failed code
+    And no model or embeddings call is made
+
   @unit
   Scenario: A failure of ours is still answered as a server error
     Given a batch or incremental clustering run that fails for any other reason

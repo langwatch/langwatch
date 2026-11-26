@@ -28,7 +28,11 @@ from scipy.spatial.distance import cdist
 import numpy as np
 
 from langevals_topic_clustering.utils import fill_embeddings
-from langevals_topic_clustering.failures import configured_model, failure_answer
+from langevals_topic_clustering.failures import (
+    configured_model,
+    failure_answer,
+    require_api_key,
+)
 from langevals_topic_clustering._logger import get_logger, set_log_context, clear_log_context
 
 logger = get_logger("topic_clustering.incremental")
@@ -264,6 +268,8 @@ def setup_endpoints(app: FastAPI):
             )
 
             model = configured_model(params.litellm_params, params.deployment_name)
+            require_api_key(params.litellm_params)
+            require_api_key(params.embeddings_litellm_params)
 
             logger.info("Generating embeddings for new traces", step="1/3")
             traces_with_embeddings = fill_embeddings(

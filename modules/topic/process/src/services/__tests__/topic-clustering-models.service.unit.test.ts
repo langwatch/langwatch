@@ -4,6 +4,7 @@
  */
 import type { ModelProviderApi, ModelProviderExecution } from "@langwatch/model-provider-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { CLUSTERING_ERROR_CODES } from "@langwatch/topic-contract";
 import { describe, expect, it } from "vitest";
 
 import { ModelProviderTopicClusteringModelsService } from "../topic-clustering-models.service.ts";
@@ -80,7 +81,12 @@ describe("topic clustering's models, read through the model provider", () => {
     ])("refuses naming the provider when it is %s", async (_state, providers, message) => {
       const { models } = modelsOver({ providers });
 
-      await expect(models.resolveEmbeddingsModel(PROJECT)).rejects.toThrow(message);
+      const refusal = models.resolveEmbeddingsModel(PROJECT);
+
+      await expect(refusal).rejects.toThrow(message);
+      await expect(refusal).rejects.toMatchObject({
+        code: CLUSTERING_ERROR_CODES.MODEL_NOT_CONFIGURED,
+      });
     });
   });
 });
