@@ -204,7 +204,7 @@ Stripe holds spend no admin accepted, and a held price or a tripped breaker can 
 correction. A pending total can sit above that spend only when it was written before this rule
 shipped or the ledger was corrected down, and decision 11 maps the meter in test mode only.
 
-Two limits are the shared meter reporter's, the same for the events, Instant Evals and PII meters,
+Three limits are the shared meter reporter's, the same for the events, Instant Evals and PII meters,
 and this ADR leaves them as they are. First, a pending total is replayed whenever the next report
 runs, with no bound on its age. Stripe keeps an identifier for 24 hours, so a replay after that
 counts the send twice if Stripe had taken it. That needs a day with no report after the cut-off
@@ -212,12 +212,16 @@ send, or an operator clearing a tripped breaker more than a day later: five fail
 every report of that meter until one succeeds. Second, a negative correction is sent whenever its
 report runs, with no check on the invoice. One held back by a missing price or a tripped breaker
 past the end of the billing period lands after Stripe finalised the invoice, which keeps the
-excess. Both are accepted here because neither is new, a PII total reaches Stripe only for a
+excess. Third, a delta's identifier is built from the organisation, the month and its two totals,
+so a delta corrected away and then reached again within Stripe's 24 hours (0 to 5,000, 5,000 to 0,
+0 to 5,000) is refused as a repeat and read as sent: the month is under-reported, never
+over-charged. All three are accepted here because none is new, a PII total reaches Stripe only for a
 subscription that carries the PII price (decision 10; a pending total is only written after that
 check), and decision 11 maps the meter in test mode only, so no live PII total exists yet. The
 follow-up, before the meter is mapped live: reconcile a pending total older than the window against
-Stripe's meter summaries before replaying it, and credit a correction that lands after the invoice
-was finalised.
+Stripe's meter summaries before replaying it, credit a correction that lands after the invoice
+was finalised, and give each new delta an identifier of its own (a stored sequence) while a retry
+keeps its original one.
 
 ## Consequences
 
