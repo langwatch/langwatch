@@ -120,9 +120,15 @@ export const CustomModelInputSection = ({
   ground,
   showRegistryLink = true,
 }: {
-  state: UseModelProviderFormState;
-  actions: UseModelProviderFormActions;
-  provider: MaybeStoredModelProvider;
+  state: Pick<UseModelProviderFormState, "customModels" | "customEmbeddingsModels">;
+  actions: Pick<
+    UseModelProviderFormActions,
+    | "addCustomModel"
+    | "removeCustomModel"
+    | "addCustomEmbeddingsModel"
+    | "removeCustomEmbeddingsModel"
+  >;
+  provider: Pick<MaybeStoredModelProvider, "provider">;
   /** `card` keeps the card ground the onboarding page gives its dialogs. */
   ground?: "card";
   /** Whether to show the "See all models" link and registry modal. Defaults to true. */
@@ -255,6 +261,7 @@ export const CustomModelInputSection = ({
           open={registryModalOpen}
           onClose={() => setRegistryModalOpen(false)}
           provider={provider.provider}
+          providerModels={provider.provider === "custom" ? allCustomModels : undefined}
           ground={ground}
         />
       )}

@@ -124,6 +124,7 @@ helm_uninstall() {
     sleep 2; attempts=$((attempts + 1))
   done
   if kubectl --context "$KUBE_CTX" get namespace "${NAMESPACE}" &>/dev/null; then
+    kubectl --context "$KUBE_CTX" -n "${NAMESPACE}" get all 2>/dev/null || true
     fail "namespace ${NAMESPACE} still exists after ${wait_seconds}s, aborting to prevent flakes"
   fi
 }

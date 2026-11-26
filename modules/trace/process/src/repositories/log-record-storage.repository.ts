@@ -6,6 +6,9 @@ export type StoredLogRecordRow = CanonicalTraceLogRecord;
 // Ceiling on log rows one trace read materialises to avoid OOM in marathon sessions.
 export const TRACE_LOG_READ_CAP = 2000;
 
+/** One trace a batched log read asks for, with its partition-pruning hint. */
+export type TraceLogReadTarget = { traceId: string; occurredAtMs?: number };
+
 export abstract class LogRecordStorageRepository {
   /**
    * Reads every legacy `stored_log_records` row correlated to one trace, oldest first, capped at
@@ -33,6 +36,23 @@ export abstract class LogRecordStorageRepository {
     traceId: string;
     occurredAtMs?: number;
     limit?: number;
+  }): Promise<StoredLogRecordRow[]>;
+
+  /**
+   * {@link findLogsByTraceId} for many traces in one statement, each capped at `limitPerTrace`
+   * rows. The window spans every trace's hint, so one read prunes partitions for the whole batch.
+   */
+  abstract findLogsByTraceIds(params: {
+    tenantId: string;
+    traces: readonly TraceLogReadTarget[];
+    limitPerTrace?: number;
+  }): Promise<StoredLogRecordRow[]>;
+
+  /** {@link findLogRecordsByTraceId} for many traces in one statement. */
+  abstract findLogRecordsByTraceIds(params: {
+    tenantId: string;
+    traces: readonly TraceLogReadTarget[];
+    limitPerTrace?: number;
   }): Promise<StoredLogRecordRow[]>;
 
   /**
@@ -77,6 +97,22 @@ export class NullLogRecordStorageRepository implements LogRecordStorageRepositor
     traceId: string;
     occurredAtMs?: number;
     limit?: number;
+  }): Promise<StoredLogRecordRow[]> {
+    return [];
+  }
+
+  async findLogsByTraceIds(_params: {
+    tenantId: string;
+    traces: readonly TraceLogReadTarget[];
+    limitPerTrace?: number;
+  }): Promise<StoredLogRecordRow[]> {
+    return [];
+  }
+
+  async findLogRecordsByTraceIds(_params: {
+    tenantId: string;
+    traces: readonly TraceLogReadTarget[];
+    limitPerTrace?: number;
   }): Promise<StoredLogRecordRow[]> {
     return [];
   }
