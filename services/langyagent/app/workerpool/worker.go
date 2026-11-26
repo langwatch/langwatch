@@ -314,7 +314,7 @@ func (w *Worker) LastLLMError() (herr.E, bool) {
 // resumeToken (ADR-048) is the opaque checkpoint from a prior turn that handed
 // off on shutdown; empty on a normal cold start. It is forwarded verbatim to
 // the agent, never parsed by the manager.
-func (w *Worker) PostMessage(ctx context.Context, system, prompt, historySeed, resumeToken string) error {
+func (w *Worker) PostMessage(ctx context.Context, system, prompt, historySeed, resumeToken string, images []domain.TurnImage) error {
 	w.mu.Lock()
 	if !w.promptDelivered && historySeed != "" {
 		prompt = historySeed + "\n\n" + prompt
@@ -328,6 +328,7 @@ func (w *Worker) PostMessage(ctx context.Context, system, prompt, historySeed, r
 		System:      system,
 		Prompt:      prompt,
 		ResumeToken: resumeToken,
+		Images:      images,
 	})
 	if err == nil {
 		w.mu.Lock()

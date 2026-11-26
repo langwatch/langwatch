@@ -9,6 +9,7 @@ import {
   LANGY_CONVERSATION_EVENT_TYPES,
   LANGY_CONVERSATION_PROCESSING_EVENT_TYPES,
   LANGY_CONVERSATION_STATUS,
+  type LangyAttachmentRef,
   type LangyCredentials,
   type LangyTurnAdmissionCapability,
   LangyTurnErrors,
@@ -76,6 +77,7 @@ interface LangyWorkerDispatch {
     credentials: LangyCredentials;
     modelOverride?: string;
     resumeToken?: string;
+    imageRefs?: readonly LangyAttachmentRef[];
   }): Promise<unknown>;
 }
 interface LangyTurnHandoffRecord {
@@ -90,6 +92,7 @@ interface LangyTurnHandoffRecord {
   credentials: LangyCredentials;
   runToken: string;
   resumeToken?: string;
+  imageRefs?: readonly LangyAttachmentRef[];
 }
 type LangyTurnHandoffRecordLookup =
   | { kind: "hit"; handoff: LangyTurnHandoffRecord }
@@ -306,6 +309,7 @@ async function redriveTurn({
     credentials: handoff.credentials,
     ...(handoff.modelOverride ? { modelOverride: handoff.modelOverride } : {}),
     ...(handoff.resumeToken ? { resumeToken: handoff.resumeToken } : {}),
+    ...(handoff.imageRefs?.length ? { imageRefs: handoff.imageRefs } : {}),
   });
 }
 
