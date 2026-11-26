@@ -531,6 +531,20 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
     Then the query answers 200
     And the query reaches the database with the key's own reach
 
+  @regression @unit
+  Scenario: A project-bound access token runs a LangWatchQL query as its person
+    Given a person's project-bound access token, the hosted MCP's OAuth sign-in
+    When the key door hands it to the query surface
+    Then it is accepted as that person, not refused as an invalid credential
+    And its run, schema and reference are judged by that person's analytics:view on the bound project
+
+  @regression @unit
+  Scenario: A project-bound access token reads only the project it is bound to
+    Given a person's access token bound to one project of an organization with several
+    When it runs over every project it can read, or names another project
+    Then its scope is the bound project alone
+    And a run naming another project is refused as not found
+
   @integration
   Scenario: Results carry typed columns, rows, execution statistics, and diagnostics
     Given an authenticated API client

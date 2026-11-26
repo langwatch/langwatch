@@ -30,6 +30,19 @@ describe("the LangWatchQL key reach", () => {
       ).toMatchObject(API_KEY);
     });
 
+    /** @scenario "A project-bound access token runs a LangWatchQL query as its person" */
+    it("accepts a project-bound access token as its person", () => {
+      const token = {
+        kind: "cliAccessToken",
+        userId: "user-1",
+        organizationId: "org-1",
+        projectId: "project-1",
+        teamId: "team-1",
+      } as const;
+
+      expect(langWatchQLKeyReachSchema.parse(token)).toEqual(token);
+    });
+
     it("still refuses a key carrying a field the door never resolves", () => {
       expect(() => langWatchQLKeyReachSchema.parse({ ...API_KEY, smuggled: true })).toThrow(
         /smuggled/,

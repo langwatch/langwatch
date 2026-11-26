@@ -28,10 +28,8 @@ import {
   type SeatRefusal,
   type ShellRoute,
 } from "../model/resolve-shell-route.ts";
-import {
-  SHELL_SIDEBAR_WIDTH_COMPACT,
-  SHELL_SIDEBAR_WIDTH_EXPANDED,
-} from "../model/shell-layout.ts";
+import { SHELL_SIDEBAR_WIDTH_COMPACT, shellSidebarWidth } from "../model/shell-layout.ts";
+import { useSidebarWidthStore } from "./sidebar-width.store.ts";
 import { useIsMobileViewport } from "./use-is-mobile-viewport.ts";
 import { useOpenBoard } from "./use-open-board.ts";
 import { useOrganizationDashboardsArea } from "./use-organization-dashboards-area.ts";
@@ -94,6 +92,7 @@ export function useNavigationShellState({
   const hasOrganizationLibrary = useOrganizationLibrary();
   const board = useOpenBoard({ enabled: hasOrganizationLibrary === true });
   const projectAddressDestination = useProjectAddressDestination();
+  const rememberedWidth = useSidebarWidthStore((state) => state.rememberedWidth);
 
   const user = host.currentUser();
   const project = host.project();
@@ -158,7 +157,9 @@ export function useNavigationShellState({
     showDevelopmentIndicator: showsDevelopmentIndicator(host.deployment()),
     isCompactSidebar,
     isMobile,
-    menuWidth: isCompactSidebar ? SHELL_SIDEBAR_WIDTH_COMPACT : SHELL_SIDEBAR_WIDTH_EXPANDED,
+    menuWidth: isCompactSidebar
+      ? SHELL_SIDEBAR_WIDTH_COMPACT
+      : `${shellSidebarWidth({ remembered: rememberedWidth })}px`,
   };
 }
 
