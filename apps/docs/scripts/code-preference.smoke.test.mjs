@@ -50,6 +50,7 @@ await it("switches filenames and copied code together and remembers the language
           if (tries > 0) await page.waitForTimeout(100);
           copied = await page.evaluate(() => navigator.clipboard.readText());
         }
+        assert.match(copied, /import \{ OpenAI \}/);
         assert.match(copied, /async function chat/);
         assert.doesNotMatch(copied, /from openai import/);
         await page.reload();
