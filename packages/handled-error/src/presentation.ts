@@ -5184,10 +5184,6 @@ const presentations = {
       return "Attach the image again, then send.";
     },
   },
-  invalid_images: {
-    title: "Langy can't take those images",
-    describe: () => "Attach at most four PNG, JPEG, GIF or WebP images of 5 MB or less, then send.",
-  },
   langy_empty_message: {
     title: "Nothing to send",
     describe: () => "Type a message first.",
