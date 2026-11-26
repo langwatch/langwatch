@@ -6,8 +6,8 @@ import {
   PII_REDACTION_MODEL_PRICE,
   PII_REDACTION_MODEL_PRICE_UNIT,
   STRICT_BILLING_NOTE,
-  STRICT_FALLBACK_NOTE,
   includedFor,
+  strictFallbackNote,
   strictFreeNote,
 } from "../../model/pii-redaction-level-offer.ts";
 
@@ -19,9 +19,12 @@ import {
 export function PiiRedactionModelPrice({
   free,
   licensed = false,
+  split = false,
 }: {
   free: boolean;
   licensed?: boolean;
+  /** Long spans go to the model in parts (ADR-207): the small print names the split limit. */
+  split?: boolean;
 }) {
   return (
     <HStack gap={1.5} wrap="wrap" align="center" data-testid="pii-redaction-model-price">
@@ -36,7 +39,7 @@ export function PiiRedactionModelPrice({
         content={
           <VStack align="start" gap={1.5}>
             <Text>{free ? strictFreeNote({ licensed }) : STRICT_BILLING_NOTE}</Text>
-            <Text>{STRICT_FALLBACK_NOTE}</Text>
+            <Text>{strictFallbackNote({ split, free })}</Text>
           </VStack>
         }
       >

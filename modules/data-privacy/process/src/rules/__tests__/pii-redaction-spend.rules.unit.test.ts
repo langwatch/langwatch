@@ -107,7 +107,7 @@ describe("piiRedactionSpendFact", () => {
         projectId: "project_1",
         texts: ["call Ana", "hello"],
         recordKey: "trace-1:span-1",
-        durationMs: 1_000,
+        callDurationsMs: [1_000],
         free: false,
         occurredAt: 1_700_000_000_000,
       }),

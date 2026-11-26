@@ -1,5 +1,3 @@
-import { createHash } from "node:crypto";
-
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { RecordSpanCommandData } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
@@ -9,36 +7,45 @@ import { describe, expect, it, vi } from "vitest";
  * Spec: specs/trace-processing/trace-media-blob-extraction.feature
  * Fake TraceMediaStore content-addresses bytes; dedups via isDuplicate on second write.
  */
-import { TraceEdgeMediaExtractionService } from "../trace-edge-media-extraction.service.ts";
-import { type EdgeMediaExtractionDeps } from "../trace-edge-media-extraction.service.ts";
-import type { TraceMediaStore } from "../trace-stored-media-store.service.ts";
+import { type EdgeMediaExtractionDeps } from "../trace-edge-media-payload.service.ts";
+import { TraceMediaExtractionService } from "../trace-media-extraction.service.ts";
+import type { TraceMediaStore } from "../trace-media-store.service.ts";
+import {
+  type EdgeMediaExtractionLogger,
+  TraceSpanMediaExtractionService,
+} from "../trace-span-media-extraction.service.ts";
+import { fakeStoredObjects } from "./support/fake-stored-objects.support.ts";
 
 function flags(enabled = true): FeatureFlagApi {
   return { isEnabled: async () => enabled } as never;
 }
 
-function fakeStore(): { service: TraceMediaStore; calls: number } {
-  const byHash = new Map<string, string>();
-  const state = { calls: 0 };
-  const service: TraceMediaStore = {
-    storeFromBytes: async ({ mediaType, bytes }) => {
-      const hash = createHash("sha256").update(bytes).digest("hex");
-      const existing = byHash.get(hash);
-      if (existing) {
-        return { id: existing, mediaType, isDuplicate: true };
-      }
-      state.calls++;
-      const id = `so-${hash.slice(0, 12)}`;
-      byHash.set(hash, id);
-      return { id, mediaType, isDuplicate: false };
-    },
-  };
+/** The real store over a Stored Objects fake that reuses by content, as ADR-002 decides. */
+function fakeStore() {
+  const objects = fakeStoredObjects();
   return {
-    service,
+    service: objects.store(),
+    owners: objects.owners,
     get calls() {
-      return state.calls;
+      return objects.writes;
     },
   };
+}
+
+function maybeExtractSpanMedia({
+  data,
+  deps,
+  logger,
+}: {
+  data: RecordSpanCommandData;
+  deps: EdgeMediaExtractionDeps;
+  logger: EdgeMediaExtractionLogger;
+}): Promise<RecordSpanCommandData> {
+  return TraceSpanMediaExtractionService.create({
+    extraction: TraceMediaExtractionService.create({ store: deps.store }),
+    telemetry: deps.telemetry,
+    logger,
+  }).extractFromSpan({ data, policy: deps });
 }
 
 function silentLogger() {
@@ -77,14 +84,27 @@ function baseDeps(overrides: Partial<EdgeMediaExtractionDeps> = {}): EdgeMediaEx
   return {
     featureFlags: flags(),
     hasContentDropRules: async () => false,
+    telemetry: { failOpen: vi.fn() },
+    store: fakeStore().service,
     ...overrides,
   };
+}
+
+function imageSpan() {
+  const messages = [
+    { role: "user", content: [{ type: "image_url", image_url: { url: PNG_DATA_URI } }] },
+  ];
+  return baseSpan([{ key: "langwatch.input", value: { stringValue: JSON.stringify(messages) } }]);
+}
+
+function storedIdOf(data: RecordSpanCommandData): string | undefined {
+  return /\/api\/files\/project-1\/([^"?]+)/.exec(data.span.attributes[0]!.value.stringValue!)?.[1];
 }
 
 const PNG_DATA_URI =
   "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=";
 
-describe("TraceEdgeMediaExtractionService.maybeExtractSpanMedia", () => {
+describe("TraceSpanMediaExtractionService.extractFromSpan", () => {
   describe("given a data-URI image inside an image_url part", () => {
     /** @scenario "A data-URI image inside an image_url part is externalized" */
     it("externalizes the PNG bytes and rewrites the part to a stored reference", async () => {
@@ -100,9 +120,9 @@ describe("TraceEdgeMediaExtractionService.maybeExtractSpanMedia", () => {
       ]);
       const command = baseCommand(span);
 
-      const result = await TraceEdgeMediaExtractionService.create().maybeExtractSpanMedia({
+      const result = await maybeExtractSpanMedia({
         data: command,
-        deps: baseDeps({ service }),
+        deps: baseDeps({ store: service }),
         logger: silentLogger(),
       });
 
@@ -128,9 +148,9 @@ describe("TraceEdgeMediaExtractionService.maybeExtractSpanMedia", () => {
       ]);
       const command = baseCommand(span);
 
-      const result = await TraceEdgeMediaExtractionService.create().maybeExtractSpanMedia({
+      const result = await maybeExtractSpanMedia({
         data: command,
-        deps: baseDeps({ service }),
+        deps: baseDeps({ store: service }),
         logger: silentLogger(),
       });
 
@@ -165,9 +185,9 @@ describe("TraceEdgeMediaExtractionService.maybeExtractSpanMedia", () => {
       ]);
       const command = baseCommand(span);
 
-      const result = await TraceEdgeMediaExtractionService.create().maybeExtractSpanMedia({
+      const result = await maybeExtractSpanMedia({
         data: command,
-        deps: baseDeps({ service }),
+        deps: baseDeps({ store: service }),
         logger: silentLogger(),
       });
 
@@ -194,9 +214,9 @@ describe("TraceEdgeMediaExtractionService.maybeExtractSpanMedia", () => {
       ]);
       const command = baseCommand(span);
 
-      const result = await TraceEdgeMediaExtractionService.create().maybeExtractSpanMedia({
+      const result = await maybeExtractSpanMedia({
         data: command,
-        deps: baseDeps({ service }),
+        deps: baseDeps({ store: service }),
         logger: silentLogger(),
       });
 
@@ -228,9 +248,9 @@ describe("TraceEdgeMediaExtractionService.maybeExtractSpanMedia", () => {
       ];
       const command = baseCommand(span);
 
-      const result = await TraceEdgeMediaExtractionService.create().maybeExtractSpanMedia({
+      const result = await maybeExtractSpanMedia({
         data: command,
-        deps: baseDeps({ service }),
+        deps: baseDeps({ store: service }),
         logger: silentLogger(),
       });
 
@@ -262,9 +282,9 @@ describe("TraceEdgeMediaExtractionService.maybeExtractSpanMedia", () => {
       ]);
       const command = baseCommand(span);
 
-      const result = await TraceEdgeMediaExtractionService.create().maybeExtractSpanMedia({
+      const result = await maybeExtractSpanMedia({
         data: command,
-        deps: baseDeps({ service }),
+        deps: baseDeps({ store: service }),
         logger: silentLogger(),
       });
 
@@ -289,9 +309,9 @@ describe("TraceEdgeMediaExtractionService.maybeExtractSpanMedia", () => {
       ]);
       const command = baseCommand(span);
 
-      const result = await TraceEdgeMediaExtractionService.create().maybeExtractSpanMedia({
+      const result = await maybeExtractSpanMedia({
         data: command,
-        deps: baseDeps({ service }),
+        deps: baseDeps({ store: service }),
         logger: silentLogger(),
       });
 
@@ -301,49 +321,91 @@ describe("TraceEdgeMediaExtractionService.maybeExtractSpanMedia", () => {
     });
   });
 
-  describe("given the same bytes already stored under the project", () => {
-    /** @scenario "The same recording on a scenario event and on a trace is stored once" */
-    it("resolves the trace span's reference to the same stored object id with no second write", async () => {
+  describe("given a recording another trace already stored", () => {
+    /** @scenario "The same recording on two traces is stored once" */
+    it("resolves to the same stored object with no second write and links both traces", async () => {
       const store = fakeStore();
-      const { service } = store;
-      // Both calls go through the real extraction path (content-addressed
-      // by bytes) — the first stands in for the scenario event's earlier
-      // write, the second for the byte-identical recording arriving on a
-      // trace span.
-      const messages = [
-        {
-          role: "user",
-          content: [{ type: "image_url", image_url: { url: PNG_DATA_URI } }],
-        },
-      ];
-      const firstSpan = baseSpan([
-        { key: "langwatch.input", value: { stringValue: JSON.stringify(messages) } },
-      ]);
-      const firstResult = await TraceEdgeMediaExtractionService.create().maybeExtractSpanMedia({
-        data: baseCommand(firstSpan),
-        deps: baseDeps({ service }),
+      const deps = baseDeps({ store: store.service });
+      const first = await maybeExtractSpanMedia({
+        data: baseCommand(imageSpan()),
+        deps,
         logger: silentLogger(),
       });
+      const otherTrace = imageSpan();
+      otherTrace.traceId = "trace-2";
+      const second = await maybeExtractSpanMedia({
+        data: baseCommand(otherTrace),
+        deps,
+        logger: silentLogger(),
+      });
+
       expect(store.calls).toBe(1);
-      const firstId = /\/api\/files\/project-1\/([^"?]+)/.exec(
-        firstResult.span.attributes[0]!.value.stringValue!,
-      )?.[1];
+      expect(storedIdOf(second)).toBe(storedIdOf(first));
+      expect(store.owners.map((owner) => owner.ownerId)).toEqual(["trace-1", "trace-2"]);
+    });
+  });
 
-      const secondSpan = baseSpan([
-        { key: "langwatch.input", value: { stringValue: JSON.stringify(messages) } },
-      ]);
-      secondSpan.spanId = "span-2";
-      const secondResult = await TraceEdgeMediaExtractionService.create().maybeExtractSpanMedia({
-        data: baseCommand(secondSpan),
-        deps: baseDeps({ service }),
+  describe("given a span whose export the SDK retries", () => {
+    /** @scenario "A re-exported span reuses the media it stored the first time" */
+    it("resolves the retried span to the same stored object with no second write", async () => {
+      const store = fakeStore();
+      const deps = baseDeps({ store: store.service });
+      const first = await maybeExtractSpanMedia({
+        data: baseCommand(imageSpan()),
+        deps,
+        logger: silentLogger(),
+      });
+      const retried = await maybeExtractSpanMedia({
+        data: baseCommand(imageSpan()),
+        deps,
         logger: silentLogger(),
       });
 
-      expect(store.calls).toBe(1); // no second write
-      const secondId = /\/api\/files\/project-1\/([^"?]+)/.exec(
-        secondResult.span.attributes[0]!.value.stringValue!,
-      )?.[1];
-      expect(secondId).toBe(firstId);
+      expect(store.calls).toBe(1);
+      expect(storedIdOf(retried)).toBe(storedIdOf(first));
+    });
+  });
+
+  describe("given a span with inline media", () => {
+    /** @scenario "Extracted media is stored on behalf of the span's trace" */
+    it("stores the bytes for the trace_content purpose with the span's trace as owner", async () => {
+      const store = fakeStore();
+      await maybeExtractSpanMedia({
+        data: baseCommand(imageSpan()),
+        deps: baseDeps({ store: store.service }),
+        logger: silentLogger(),
+      });
+
+      expect(store.owners).toEqual([
+        expect.objectContaining({
+          purpose: "trace_content",
+          ownerKind: "trace",
+          ownerId: "trace-1",
+        }),
+      ]);
+    });
+  });
+
+  describe("given a span that started 20 days before it is ingested", () => {
+    /** @scenario "A late span's media is retained from the span's start" */
+    it("stores the bytes with the span's start time as the retention start", async () => {
+      const store = fakeStore();
+      const startedAtMs = Date.now() - 20 * 86_400_000;
+      const span = {
+        ...imageSpan(),
+        startTimeUnixNano: String(BigInt(startedAtMs) * 1_000_000n),
+        endTimeUnixNano: String(BigInt(startedAtMs + 1_000) * 1_000_000n),
+      };
+
+      await maybeExtractSpanMedia({
+        data: baseCommand(span),
+        deps: baseDeps({ store: store.service }),
+        logger: silentLogger(),
+      });
+
+      expect(store.owners).toEqual([
+        expect.objectContaining({ ownerId: "trace-1", retainFromMs: startedAtMs }),
+      ]);
     });
   });
 
@@ -364,9 +426,9 @@ describe("TraceEdgeMediaExtractionService.maybeExtractSpanMedia", () => {
       ]);
       const command = baseCommand(span);
 
-      const result = await TraceEdgeMediaExtractionService.create().maybeExtractSpanMedia({
+      const result = await maybeExtractSpanMedia({
         data: command,
-        deps: baseDeps({ service }),
+        deps: baseDeps({ store: service }),
         logger: silentLogger(),
       });
 
@@ -384,6 +446,8 @@ describe("TraceEdgeMediaExtractionService.maybeExtractSpanMedia", () => {
     /** @scenario "A storage failure falls back to inline ingestion (fail-open)" */
     it("stages the span with its original inline payload and logs the failure", async () => {
       const failingService: TraceMediaStore = {
+        purpose: "trace_content",
+        ownerKind: "trace",
         storeFromBytes: async () => {
           throw new Error("store unavailable");
         },
@@ -400,9 +464,9 @@ describe("TraceEdgeMediaExtractionService.maybeExtractSpanMedia", () => {
       const telemetry = { failOpen: vi.fn() };
       const logger = silentLogger();
 
-      const result = await TraceEdgeMediaExtractionService.create().maybeExtractSpanMedia({
+      const result = await maybeExtractSpanMedia({
         data: command,
-        deps: baseDeps({ service: failingService, telemetry }),
+        deps: baseDeps({ store: failingService, telemetry }),
         logger,
       });
 
@@ -427,9 +491,9 @@ describe("TraceEdgeMediaExtractionService.maybeExtractSpanMedia", () => {
       const span = baseSpan([{ key: "langwatch.input", value: { stringValue: original } }]);
       const command = baseCommand(span);
 
-      const result = await TraceEdgeMediaExtractionService.create().maybeExtractSpanMedia({
+      const result = await maybeExtractSpanMedia({
         data: command,
-        deps: baseDeps({ service, hasContentDropRules: async () => true }),
+        deps: baseDeps({ store: service, hasContentDropRules: async () => true }),
         logger: silentLogger(),
       });
 
@@ -453,9 +517,9 @@ describe("TraceEdgeMediaExtractionService.maybeExtractSpanMedia", () => {
       const span = baseSpan([{ key: "langwatch.input", value: { stringValue: original } }]);
       const command = baseCommand(span);
 
-      const result = await TraceEdgeMediaExtractionService.create().maybeExtractSpanMedia({
+      const result = await maybeExtractSpanMedia({
         data: command,
-        deps: baseDeps({ service, featureFlags: flags(false) }),
+        deps: baseDeps({ store: service, featureFlags: flags(false) }),
         logger: silentLogger(),
       });
 
@@ -480,9 +544,9 @@ describe("TraceEdgeMediaExtractionService.maybeExtractSpanMedia", () => {
         { key: "langwatch.input", value: { stringValue: JSON.stringify(messages) } },
       ]);
       const command = baseCommand(span);
-      const deps = baseDeps({ service });
+      const deps = baseDeps({ store: service });
 
-      const firstPass = await TraceEdgeMediaExtractionService.create().maybeExtractSpanMedia({
+      const firstPass = await maybeExtractSpanMedia({
         data: command,
         deps,
         logger: silentLogger(),
@@ -491,7 +555,7 @@ describe("TraceEdgeMediaExtractionService.maybeExtractSpanMedia", () => {
 
       // Simulates a group-queue retry re-running the hook over the
       // already-rewritten command (idempotent PUT, no marker left to find).
-      const secondPass = await TraceEdgeMediaExtractionService.create().maybeExtractSpanMedia({
+      const secondPass = await maybeExtractSpanMedia({
         data: firstPass,
         deps,
         logger: silentLogger(),

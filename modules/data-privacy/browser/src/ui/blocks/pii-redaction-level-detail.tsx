@@ -15,10 +15,13 @@ export function PiiRedactionLevelDetail({
   level,
   free,
   licensed = false,
+  split = false,
 }: {
   level: PiiLevel;
   free: boolean;
   licensed?: boolean;
+  /** Long spans go to the model in parts (ADR-207): the small print names the split limit. */
+  split?: boolean;
 }) {
   const shown = organizationPiiLevel(level);
   if (!shown) return null;
@@ -33,7 +36,7 @@ export function PiiRedactionLevelDetail({
             <Badge size="sm" variant="subtle" colorPalette="green">
               {PII_REDACTION_MODEL_NAME}
             </Badge>
-            <PiiRedactionModelPrice free={free} licensed={licensed} />
+            <PiiRedactionModelPrice free={free} licensed={licensed} split={split} />
           </>
         ) : (
           <Badge size="sm" variant="subtle" colorPalette="gray">

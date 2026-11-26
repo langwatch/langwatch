@@ -169,12 +169,36 @@ Feature: A PII redaction model call is priced per character, written to the spen
 
     @unit
     Scenario: A span over the model's length cap is redacted by Presidio and priced for nobody
-      Given an organization with a Strict project, on the free list or not
+      Given an organization with a Strict project, on the free list or not, and splitting off
       When it sends a span of 12,000 characters
       Then Presidio redacts the span and the model is not called
       And no priced fact is recorded
-      # Splitting a long text across model calls is tasks#1226, not built: such a span
-      # costs nothing today.
+
+    @unit
+    Scenario: A split span is priced once on its characters, never on its overlap
+      Given a paying Cloud organization with a Strict project and splitting on (ADR-207)
+      When the model answers a span of 20,000 characters in several split calls
+      Then one priced fact is recorded with 20,000 characters and the price of 20,000 characters
+      And our cost on it is the duration charge of every call plus one request fee per call
+
+    @unit
+    Scenario: The same split span redacted twice is one request
+      Given a split span whose redaction runs twice because its ingestion was retried
+      When the model answers both times
+      Then both priced facts carry the same request id, the one an unsplit call of the same texts would carry
+
+    @unit
+    Scenario: A split span with a failed call is priced for nobody
+      Given a split span one of whose calls fails
+      When Presidio redacts it instead
+      Then no priced fact is recorded
+
+    @unit
+    Scenario: A span over 32,000 characters is redacted by Presidio and priced for nobody
+      Given an organization with a Strict project and splitting on
+      When it sends a span of 40,000 characters
+      Then Presidio redacts the span and no model is called
+      And no priced fact is recorded
 
     @unit
     Scenario: An organization that declined Strict at a price stays on Essential and is never priced

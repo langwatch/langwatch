@@ -45,6 +45,7 @@ export type StoredObjectRecordPageQuery = Readonly<{
   tenantId: StoredObjectProjectId;
   afterId?: StoredObjectId;
   status?: StoredObjectRecordStatus | readonly StoredObjectRecordStatus[];
+  purpose?: string;
   expiresBefore?: Instant;
   limit: number;
 }>;
@@ -73,6 +74,15 @@ export interface StoredObjectRecordRepository {
 
   findPage(input: StoredObjectRecordPageQuery): Promise<StoredObjectRecord[]>;
 
+  /** Up to `limit` available rows with these bytes for one purpose and media type, oldest first. */
+  findReusable(input: {
+    tenantId: StoredObjectProjectId;
+    purpose: string;
+    sha256: string;
+    mediaType: string;
+    limit: number;
+  }): Promise<StoredObjectRecord[]>;
+
   /** Rows of one purpose across every tenant, ordered by tenant then id, after the cursor. */
   findPageByPurpose(input: {
     purpose: string;
@@ -89,4 +99,23 @@ export interface StoredObjectRecordRepository {
 
   /** Removes the row; a row that is not there is not an error. */
   delete(input: { tenantId: StoredObjectProjectId; id: StoredObjectId }): Promise<void>;
+
+  /**
+   * Logically deletes and expires an available row no owner link holds at `now` in one
+   * statement, so a link landing first keeps it (ADR-002 §4) and the reaper retries its
+   * bytes. Answers whether it deleted.
+   */
+  markDeletedIfUnheld(input: {
+    tenantId: StoredObjectProjectId;
+    id: StoredObjectId;
+    now: Instant;
+  }): Promise<boolean>;
+
+  /** Adds the audience to an available row that lacks it; any other row is left as it is. */
+  addAudience(input: {
+    tenantId: StoredObjectProjectId;
+    id: StoredObjectId;
+    audience: StoredObjectDeliveryAudience;
+    at: Instant;
+  }): Promise<void>;
 }

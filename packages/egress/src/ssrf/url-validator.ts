@@ -9,6 +9,7 @@ import {
   BLOCKED_METADATA_HOSTS,
   ON_PREMISE_SUFFIXES,
 } from "./blocked-hosts.ts";
+import { EgressDestinationRefusedError } from "./destination-refusal.ts";
 
 /**
  * Which addresses a process may open a connection to, and what it must connect to once it has
@@ -200,7 +201,10 @@ function validateNotMetadataEndpoint(ctx: ValidationContext): void {
       { url: ctx.logUrl, hostname: ctx.hostname, reason: "metadata_endpoint" },
       "SSRF attempt blocked: cloud metadata endpoint",
     );
-    throw new Error("Access to cloud metadata endpoints is not allowed for security reasons");
+    throw new EgressDestinationRefusedError(
+      "metadata_endpoint",
+      "Access to cloud metadata endpoints is not allowed for security reasons",
+    );
   }
 }
 
@@ -220,7 +224,8 @@ function validateAddressesNotMetadata(ctx: ValidationContext, addresses: string[
       },
       "SSRF attempt blocked: hostname resolves to a cloud metadata endpoint",
     );
-    throw new Error(
+    throw new EgressDestinationRefusedError(
+      "metadata_endpoint",
       "This hostname resolves to a cloud metadata endpoint, which is not allowed for security reasons",
     );
   }
@@ -232,7 +237,8 @@ function validateNotBlockedCloudDomain(ctx: ValidationContext): void {
       { url: ctx.logUrl, hostname: ctx.hostname, reason: "cloud_internal_domain" },
       "SSRF attempt blocked: cloud provider internal domain",
     );
-    throw new Error(
+    throw new EgressDestinationRefusedError(
+      isOnPremiseDomain(ctx.hostname) ? "on_premise_domain" : "cloud_internal_domain",
       "Access to cloud provider internal domains is not allowed for security reasons",
     );
   }
@@ -245,7 +251,8 @@ function validateNotPrivateIpLiteral(ctx: ValidationContext, blockLocal: boolean
       { url: ctx.logUrl, hostname: ctx.hostname, ipVersion, reason: "private_ip_literal" },
       "SSRF attempt blocked: private or localhost IP address",
     );
-    throw new Error(
+    throw new EgressDestinationRefusedError(
+      "private_address",
       "Access to private or localhost IP addresses is not allowed for security reasons",
     );
   }
@@ -271,7 +278,8 @@ function validateResolvedAddresses(
       },
       "SSRF attempt blocked: hostname resolves to private IP",
     );
-    throw new Error(
+    throw new EgressDestinationRefusedError(
+      "private_address",
       "This hostname resolves to a private or localhost IP address, which is not allowed for security reasons",
     );
   }
@@ -348,7 +356,8 @@ function handleDnsFailure(
     },
     "DNS resolution failed during SSRF check - blocking request",
   );
-  throw new Error(
+  throw new EgressDestinationRefusedError(
+    "unresolvable_host",
     `Unable to resolve hostname "${hostname}". Please verify the URL is correct and the server is reachable.`,
   );
 }
@@ -379,11 +388,12 @@ function parseHttpUrl(url: string): URL {
   try {
     parsedUrl = new URL(url);
   } catch {
-    throw new Error("Invalid URL format");
+    throw new EgressDestinationRefusedError("invalid_url", "Invalid URL format");
   }
 
   if (parsedUrl.protocol !== "http:" && parsedUrl.protocol !== "https:") {
-    throw new Error(
+    throw new EgressDestinationRefusedError(
+      "invalid_url",
       `Unsupported protocol: ${parsedUrl.protocol} — only http and https are allowed`,
     );
   }
@@ -433,7 +443,8 @@ export function createSsrfUrlValidator(policy: SsrfPolicy): SsrfUrlValidator {
         return buildUnresolvedResult(ctx, "no-records");
       }
       logger.error({ url: logUrl, hostname }, "No DNS records found - blocking request");
-      throw new Error(
+      throw new EgressDestinationRefusedError(
+        "unresolvable_host",
         `Unable to resolve hostname "${hostname}". Please verify the URL is correct.`,
       );
     }

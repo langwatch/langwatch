@@ -748,6 +748,13 @@ describe("TraceIngestionService.handleOtlpTraceRequest edge media fail-open seri
             } as never,
             hasContentDropRules: async () => false,
             telemetry: TraceEdgeMediaTelemetryService.create(),
+            store: {
+              purpose: "trace_content",
+              ownerKind: "trace",
+              storeFromBytes: async () => {
+                throw new Error("unused");
+              },
+            },
           },
           logger: { info: vi.fn(), warn: vi.fn() },
         }),

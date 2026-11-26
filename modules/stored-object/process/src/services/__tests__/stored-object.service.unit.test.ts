@@ -11,6 +11,7 @@ import {
   MemoryStoredObjectStorage,
   createStoredObjectTestSigner,
 } from "../../app/__tests__/stored-object.fixture.ts";
+import { MemoryStoredObjectOwnerLinkRepository } from "../../repositories/memory/memory.stored-object-owner-link.repository.ts";
 import { MemoryStoredObjectRecordRepository } from "../../repositories/memory/memory.stored-object-record.repository.ts";
 import { StoredObjectService } from "../stored-object.service.ts";
 
@@ -20,6 +21,7 @@ function fixture() {
   const legacy = new MemoryStoredObjectFiles();
   const service = StoredObjectService.create({
     records,
+    ownerLinks: MemoryStoredObjectOwnerLinkRepository.create(),
     permissions: new GrantedStoredObjectPermissions(),
     storage,
     signer: createStoredObjectTestSigner(),
