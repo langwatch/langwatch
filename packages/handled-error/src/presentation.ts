@@ -6581,6 +6581,11 @@ const presentations = {
     title: "Conversation not found",
     describe: () => "This conversation link isn't one we can open. Start a new chat to keep going.",
   },
+  invalid_images: {
+    title: "Those images can't be sent",
+    describe: () =>
+      "Attach a PNG, JPEG, GIF or WebP image of 5 MB or less, at most four per message.",
+  },
   agent_session_not_found: {
     title: "The session was lost",
     describe: () => "Start a new message to continue.",
