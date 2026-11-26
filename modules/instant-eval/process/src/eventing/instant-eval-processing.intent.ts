@@ -279,7 +279,7 @@ function rethrowWhileRetried({
   context: Record<string, unknown>;
 }): void {
   const maxAttempts = deps.maxAttempts ?? INSTANT_EVAL_MAX_ATTEMPTS;
-  // An error the outbox will not retry retires the message now: the last chance to fail the run.
+  // An error the outbox will not retry retires the message now: the last chance to record it.
   if (intentContext.attempt < maxAttempts && !isOutboxRetryRefused(error)) {
     logger.warn(
       { ...context, attempt: intentContext.attempt, error: instantEvalErrorText(error) },
