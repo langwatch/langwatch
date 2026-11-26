@@ -1,4 +1,4 @@
-import { nowInstant, Temporal } from "@langwatch/time";
+import { Temporal } from "@langwatch/time";
 import type { TraceAttributeMatch } from "@langwatch/trace-contract";
 
 import { TraceUsageCountRepository } from "../trace-usage-count.repository.ts";
@@ -55,10 +55,12 @@ export class MemoryTraceUsageCountRepository extends TraceUsageCountRepository {
       .slice(0, input.limit);
   }
 
-  async countTracesInLastDay(input: { tenantId: string }): Promise<number> {
-    const sinceMs = nowInstant().epochMilliseconds - DAY_MS;
-    return new Set(this.#since({ tenantId: input.tenantId, sinceMs }).map((trace) => trace.traceId))
-      .size;
+  async countTracesOnUtcDay(input: { tenantId: string; day: number }): Promise<number> {
+    const fromMs = input.day * DAY_MS;
+    const onDay = this.#since({ tenantId: input.tenantId, sinceMs: fromMs }).filter(
+      (trace) => (trace.occurredAtMs ?? -1) < fromMs + DAY_MS,
+    );
+    return new Set(onDay.map((trace) => trace.traceId)).size;
   }
 
   async hasTraceWithAttribute(input: {

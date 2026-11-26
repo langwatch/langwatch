@@ -103,7 +103,9 @@ export class RunawayContainmentService {
       return true;
     }
 
-    const projectTraces = await this.runaway.countProjectTraces24h(input.projectId);
+    // Traffic over the same UTC day the breached counter covers (#8893): a
+    // replayed backlog is compared with its own day's traces, not with today's.
+    const projectTraces = await this.runaway.countProjectTracesOnDay(input.projectId, input.day);
 
     return (
       projectTraces >= RUNAWAY_MIN_PROJECT_TRACES &&

@@ -5,6 +5,7 @@ import { TraceUsageCountRepository } from "../trace-usage-count.repository.ts";
 
 type TotalRow = { total: string | number };
 type HitRow = { hit: number };
+const DAY_MS = 24 * 60 * 60 * 1_000;
 /** How far before a window a counted trace may have started, and been seen first. */
 const FIRST_SEEN_LOOKBACK_MS = 31 * 24 * 60 * 60 * 1_000;
 
@@ -64,8 +65,9 @@ export class TraceUsageCountClickHouseRepository extends TraceUsageCountReposito
     return result.rows.map((row) => row.traceId);
   }
 
-  /** Main's automation runaway count: exact distinct traces over the trailing 24 hours. */
-  async countTracesInLastDay(input: { tenantId: string }): Promise<number> {
+  /** The automation runaway count: exact distinct traces that occurred on one UTC day. */
+  async countTracesOnUtcDay(input: { tenantId: string; day: number }): Promise<number> {
+    const fromMs = input.day * DAY_MS;
     const result = await this.#clickhouse.query<TotalRow>({
       tenantId: input.tenantId,
       table: "trace_summaries",
@@ -73,9 +75,10 @@ export class TraceUsageCountClickHouseRepository extends TraceUsageCountReposito
         SELECT toString(count(DISTINCT TraceId)) AS total
         FROM trace_summaries
         WHERE TenantId = {tenantId:String}
-          AND OccurredAt >= now() - INTERVAL 24 HOUR
+          AND OccurredAt >= fromUnixTimestamp64Milli({from:UInt64})
+          AND OccurredAt < fromUnixTimestamp64Milli({to:UInt64})
       `,
-      params: { tenantId: input.tenantId },
+      params: { tenantId: input.tenantId, from: fromMs, to: fromMs + DAY_MS },
     });
 
     return Number.parseInt(String(result.rows[0]?.total ?? "0"), 10);
