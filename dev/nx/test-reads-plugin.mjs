@@ -71,7 +71,12 @@ export const reads = {
     "services/langyagent/internal/assets/AGENTS.md",
     "pnpm-workspace.yaml",
   ],
-  "@langwatch/skills": ["services/langyagent/**/*", "docs/**/*", "feature-map.json"],
+  "@langwatch/skills": [
+    "services/langyagent/**/*",
+    "docs/**/*",
+    "feature-map.json",
+    "apps/docs/specs/published-urls.txt",
+  ],
   langwatch: [
     "skills/**/*",
     "packages/redaction/**/*",
