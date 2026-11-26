@@ -14,6 +14,12 @@ caller (ADR-207) and stays one priced batch: decisions 2, 6 and 12 say how.
 **Revised 2026-11-26:** usage is billed only from the moment the PII redaction price line was
 added to the Stripe subscription, never from the month's first day (decision 15).
 
+**Revised 2026-11-26:** no organization is priced until an organization admin accepts the price
+(decision 15). An organization already on Strict when the flag goes on stays on Presidio, unbilled,
+until an admin switches it to the model; billing counts only spend from the acceptance on. The free
+list is now read when the batch is routed, and an unreadable one sends the batch to Presidio
+(decision 7, which recorded nothing and logged the full price before).
+
 > One line: every strict batch the PII redaction model answers is priced in data-privacy at a
 > published rate per character and recorded as a priced fact; gateway writes it to
 > `gateway_spend` as request type `pii_redaction`; billing reports the month's dollars on a
@@ -76,9 +82,12 @@ added to the Stripe subscription, never from the month's first day (decision 15)
    overlap and the extra request fees show in our cost, never in the price.
 7. **A free list records at price zero.** Organizations on `release_pii_redaction_model_free` get a
    priced fact with a price of zero and the cost kept. The release flag still says who may use
-   the model; the free list says who pays nothing. A free list that cannot be read records
-   nothing and logs the full price at error: a recorded fact fixes its request id's price for
-   good, so a guessed zero would stay, and a guessed full price could charge a free org.
+   the model; the free list says who pays nothing. Routing reads the free list once a minute per
+   organization and hands the recorder whether the call is priced; the recorder reads no flag, so
+   a change to the list during a call never prices that call. A free list that cannot be read
+   sends the batch to Presidio as `routing_error`, priced for nobody: a recorded fact fixes its
+   request id's price for good, so a guessed zero would stay, and a guessed full price could charge
+   a free org.
 8. **The spend is outside gateway budgets.** The debits process skips `pii_redaction`
    outcomes, so a spent AI budget never turns redaction off.
 9. **A meter of its own, reported only once Stripe holds it.** `langwatch_pii_redaction_usd`,
@@ -123,6 +132,20 @@ added to the Stripe subscription, never from the month's first day (decision 15)
     The rule, its replacement handling and its trade-offs are ADR-174 decision 26, shared by
     both usage meters.
 
+    **Only an organization whose admin accepted the price is priced.** On Cloud, a Strict batch of
+    an organization with the flag reaches the model when the organization is on the free list
+    (unpriced) or an organization admin accepted the price (priced); otherwise it stays on
+    Presidio, counted and logged as `not_accepted`, and nothing is recorded. The acceptance is the
+    organization's own record (`Organization.piiRedactionModelAcceptedAt` and
+    `piiRedactionModelAcceptedByUserId`, as Instant Evals' consent), written by data-privacy's
+    `acceptPiiRedactionModel` under `organization:manage` through `OrganizationApi`; the first
+    acceptance is kept and the product never withdraws it. The settings page records it when an
+    admin confirms the price: picking Strict, switching a rule-based Strict to the model, or saving
+    a Strict rule. Routing reads it once a minute per organization, so an acceptance reaches the
+    model within a minute. Billing counts an organization's PII spend only from the moment of the
+    acceptance: none without one, none in a month that ended before it. Self-hosted is unchanged:
+    the licence decides and no call is priced.
+
 ## Rationale / Trade-offs
 
 Pricing in code (Instant Evals) over a count priced in Stripe (billable events) was the
@@ -152,11 +175,18 @@ at the same rate per character: the customer on Strict pays for the model on the
 The model's routing reads the flag and the level, never the subscription. A Strict project of an
 organization with the flag is priced whatever its plan, and the meter holds the usage until the
 subscription carries the price (decision 10). What stops a customer who does not want to pay is
-the settings page, which asks before it turns Strict on at a price and keeps the level it had when
-it is cancelled; Essential never reaches the model or Presidio. The cost: an organization, team or
-project already on Strict (then Presidio) when the flag goes on is priced from its next span with
-no question asked. Before turning the flag on for an organization, the operator checks its
-levels, or puts it on the free list first.
+the acceptance (decision 15): the settings page asks an admin before it turns Strict on at a
+price and keeps the level it had when it is cancelled; Essential never reaches the model or
+Presidio. An organization, team or project already on Strict (then Presidio) when the flag goes on
+stays there, unbilled, and the page shows it rule-based with a switch to the model. The cost: such
+an organization keeps the rule-based detection until an admin acts, and nothing but the page tells
+it (the owner, 2026-11-26: no prompt, no email). A team or project admin cannot accept for the
+organization, so a Strict rule they save waits on an organization admin.
+
+Billing reads the acceptance from `Organization` through its own repository rather than asking
+`OrganizationApi`: organization depends on billing, so the reverse edge would close a peer cycle,
+and billing is already a named reader of the table. The read is separate from billing's cached
+organization lookup, so that cache's shape and key stay as they are.
 
 ## Consequences
 
