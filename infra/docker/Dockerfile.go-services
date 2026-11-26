@@ -17,7 +17,7 @@
 # command itself; once every deployment does too, one image serves both names.
 
 # The Lambda Web Adapter.
-FROM public.ecr.aws/awsguru/aws-lambda-adapter:0.9.1 AS lambda-adapter
+FROM public.ecr.aws/awsguru/aws-lambda-adapter:1.1.0 AS lambda-adapter
 
 # ─── Go build ─────────────────────────────────────────────────────────────────
 # Pin the build stage to the host arch (BUILDPLATFORM) and let Go cross-compile
