@@ -48,12 +48,12 @@ Feature: Batch Evaluation Results Visualization
     Then images are rendered inline in the dataset cells
     And images have appropriate max dimensions for the table
 
-  @unimplemented
+  @integration
   Scenario: Truncate long text in dataset cells
     Given a dataset cell contains text longer than 10000 characters
     When the results table renders
-    Then the text is truncated with a "(truncated)" indicator
-    And I can click to expand and see more of the content
+    Then the collapsed cell draws only the start of the text
+    And I can click to expand and see the first 10000 characters with a "(truncated)" indicator
 
   # ============================================================================
   # Data Display - Target Columns

@@ -5,16 +5,20 @@
 
 import { Badge, Box, HStack, Portal, Text, VStack } from "@langwatch/design-system/primitives";
 import { isTextLikelyOverflowing } from "@langwatch/design-system/text-overflow";
-import { useCallback, useRef, useState } from "react";
+import { useRef, useState } from "react";
 
+import { collapsedPreviewOf } from "../../../model/batch-evaluation-results.row-height.ts";
 import type {
   BatchComparisonColumn,
   BatchComparisonVerdict,
 } from "../batch-evaluation-results.types.ts";
-import { useEscapeKey } from "./presentation.tsx";
+import { expandedPositionOf, useEscapeKey } from "./presentation.tsx";
 
 /** Collapsed cell height cap. Long reasoning is faded out beyond this. */
 const CELL_MAX_HEIGHT = 140;
+
+/** A collapsed winner cell draws only the start of the output and the reasoning. */
+const previewOf = (text: string): string => collapsedPreviewOf({ text, rowHeight: "m" }).preview;
 
 type WinnerVisual = {
   label: string;
@@ -75,24 +79,12 @@ export function ComparisonWinnerCell({
     width: 0,
   });
 
-  const handleExpand = useCallback(() => {
-    if (cellRef.current) {
-      const rect = cellRef.current.getBoundingClientRect();
-      const td = cellRef.current.closest("td");
-      const tdWidth = td?.getBoundingClientRect().width ?? rect.width;
-      const expandedWidth = Math.max(rect.width, tdWidth) + 24;
-      const safetyMargin = 32;
-      const viewportWidth = window.innerWidth;
-      let left = rect.left - 12;
-      if (left + expandedWidth > viewportWidth - safetyMargin) {
-        left = viewportWidth - expandedWidth - safetyMargin;
-      }
-      setExpandedPosition({ top: rect.top, left, width: expandedWidth });
-    }
+  const handleExpand = (): void => {
+    if (cellRef.current) setExpandedPosition(expandedPositionOf(cellRef.current));
     setIsExpanded(true);
-  }, []);
+  };
 
-  const handleCollapse = useCallback(() => setIsExpanded(false), []);
+  const handleCollapse = (): void => setIsExpanded(false);
 
   useEscapeKey({ enabled: isExpanded, onEscape: handleCollapse });
 
@@ -154,7 +146,7 @@ export function ComparisonWinnerCell({
             wordBreak="break-word"
             data-testid="comparison-winner-output"
           >
-            {winnerOutput}
+            {expanded ? winnerOutput : previewOf(winnerOutput)}
           </Text>
         </Box>
       )}
@@ -166,7 +158,7 @@ export function ComparisonWinnerCell({
           wordBreak="break-word"
           data-testid="comparison-winner-reasoning"
         >
-          {reasoning}
+          {expanded ? reasoning : previewOf(reasoning)}
         </Text>
       )}
       {expanded && (
