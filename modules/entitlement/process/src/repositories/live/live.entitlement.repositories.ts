@@ -1,6 +1,7 @@
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 
 import { BillableEventsMeterClickHouseRepository } from "../clickhouse/clickhouse.billable-events-meter.repository.ts";
+import { ClickHouseBillableEventsTtlRepository } from "../clickhouse/clickhouse.billable-events-ttl.repository.ts";
 import { TraceCountClickHouseRepository } from "../clickhouse/clickhouse.trace-count.repository.ts";
 import type { EntitlementRepositories } from "../entitlement.repositories.ts";
 import { MemoryUsageCacheRepository } from "../memory/memory.usage-cache.repository.ts";
@@ -21,6 +22,7 @@ export class LiveEntitlementRepositories {
       ...PostgresEntitlementRepositories.create({ prisma }),
       billableEvents: BillableEventsMeterClickHouseRepository.create(clickhouse),
       traces: TraceCountClickHouseRepository.create(clickhouse),
+      billableEventsTtl: ClickHouseBillableEventsTtlRepository.create(clickhouse),
       usageCounts: MemoryUsageCacheRepository.create(),
       usageDecisions: MemoryUsageCacheRepository.create(),
     };
