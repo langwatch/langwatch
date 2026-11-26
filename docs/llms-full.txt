@@ -30935,7 +30935,9 @@ The **coding-agent usage** card summarizes the last 30 days across your assistan
 
 ## Subscription accounts
 
-If your agents run on subscription logins, such as a few Claude Max accounts shared by many agents, the **Subscription accounts** section shows one card per account for the last seven days: the agents and top model that ran on it, the tokens it used so far this week, its cost, and the usage percent the account last reported, with when it was read and when it resets. A card says **Out of usage until** a time while the account is limited. The section appears on your personal page and on a project's Sessions page.
+If your agents run on subscription logins, such as a few Claude Max accounts shared by many agents, the **Subscription accounts** section shows one card per account for the last seven days. The section appears on your personal page and on a project's Sessions page.
+
+Each card shows the agents and top model that ran on the account, the tokens it used so far this week, its cost, and the usage percent the account last reported, with when it was read and when it resets. A card says **Out of usage until** a time while the account is limited.
 
 The percent is the figure the provider reported for the account. Providers publish no token allowance for these plans, so LangWatch never estimates a percent from tokens, and an account that reported none shows no percent.
 

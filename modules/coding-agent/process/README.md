@@ -68,7 +68,7 @@ getUsageTotals(input: CodingAgentUsageTotalsInput): Promise<CodingAgentUsageTota
 
 #### `readAccountBurndownForViewer`
 
-The trailing week per subscription account; its cost follows `cost:view`.
+The trailing week per subscription account, over the same projects as the sessions list (an aggregate project spans its members). Its cost follows `cost:view`.
 
 ```typescript
 readAccountBurndownForViewer(input: { projectId: string; authorization: Authorization }, by: CodingAgentViewer): Promise<CodingAgentAccountBurndownPage>;
