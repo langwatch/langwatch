@@ -11,7 +11,7 @@ export interface SpendKeyLabelInput {
 /** The label of each request type whose spend rows carry no virtual key of their own. */
 const KEYLESS_REQUEST_TYPE_LABELS: ReadonlyMap<string, string> = new Map([
   ["instant_eval", "Instant Evals"],
-  ["instant_eval_decision_model", "Instant Evals (own model)"],
+  ["instant_eval_decision_model", "Own model"],
   ["pii_redaction", "PII redaction"],
 ]);
 
