@@ -91944,7 +91944,7 @@ Creating (and updating) validates the queries file's shape and the widget's JS/T
 
 ## Dashboards and their widgets
 
-A dashboard is the page widgets live on. **Use an existing dashboard** when the user is on one, named one, or one clearly fits; **create one** only when they ask for a new dashboard, or none fits and they agree.
+A dashboard is the page widgets live on. The dashboard the user is on arrives in your context with its id: a chart they ask for there goes on that board, even when they say "now a chart of..." or "another dashboard" without naming one. If they name a different existing dashboard, the chart goes on that one. **Create a board** only when they ask for a separate or new board by name ("make a new dashboard called X"), or they are on no board and none fits. When you do create one, say so in the first line of your reply and name it, so they know where to look.
 
 ```bash
 langwatch dashboard list -f json                          # ids, names, widget counts
@@ -91963,7 +91963,7 @@ langwatch dashboard widget delete <dashboardId> <widgetId>
 
 `add` places the widget at the dashboard's next free row — edit it from the widget's menu on that dashboard. `langwatch analytics-report list` lists the old Analytics Reports, which hold no widgets.
 
-**Which dashboard:** place on the dashboard in the user's context (the one they are on, or one they named). If no dashboard is in context, ask which one with the `question` tool, one option per dashboard from `langwatch dashboard list` with its id in `ref`. Never choose a dashboard for the user.
+**Which dashboard:** place on the dashboard the user named; if they named none, on the dashboard they are on. If no dashboard is in context, ask which one with the `question` tool, one option per dashboard from `langwatch dashboard list` with its id in `ref`. If that list is empty, create a board named after what they asked for and say so in the first line of your reply. Never choose between existing dashboards for the user.
 
 - **Never pick a dashboard for the user.** When more than one dashboard fits, ask with the `question` tool (a choices card): one option per dashboard from `langwatch dashboard list`, its id in `ref`.
 - **Confirm before any delete** of a dashboard or widget with a choices card (`Delete "NAME"?` with Delete and Keep), and run the command only on Delete. Deleting a dashboard takes its widgets with it.
