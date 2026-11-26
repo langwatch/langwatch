@@ -12,15 +12,9 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 ## Module API (`DigestApi`)
 
-The weekly digest. The operator controls admit Cloud admin staff through `OpsApi.admitCloudAdmin`, so they answer not_found where cloud ops is off (§3.5); the token operations serve the public unsubscribe address, whose signed token is the authorization.
+The weekly digest, sent to every organization's members. The operator controls admit Cloud admin staff through `OpsApi.admitCloudAdmin`, so they answer not_found where cloud ops is off (§3.5); the token operations serve the public unsubscribe address, whose signed token is the authorization.
 
 Peers call these through the token, declared at `../contract/src/digest.api.ts:20`; nothing else in this package is public.
-
-#### `setEnrolled`
-
-```typescript
-setEnrolled(input: DigestSetEnrolledInput & Operated): Promise<DigestSettings>;
-```
 
 #### `setArmed`
 
@@ -34,6 +28,22 @@ Mails the member's week to the operator alone; no send is recorded.
 
 ```typescript
 sendTest(input: DigestSendTestInput & Operated): Promise<void>;
+```
+
+#### `getPreference`
+
+The signed-in person's own choice; the caller names themselves, never anyone else.
+
+```typescript
+getPreference(input: Readonly<{ userId: string }>): Promise<DigestPreference>;
+```
+
+#### `setPreference`
+
+Opts the signed-in person in or out of every organization's digest at once.
+
+```typescript
+setPreference(input: Readonly<{ userId: string } & DigestPreference>): Promise<DigestPreference>;
 ```
 
 #### `isSubscribed`
@@ -122,25 +132,14 @@ type Response = unknown;
 
 Contract `../contract/src/digest.trpc.ts:13`, router `src/transport/digest.trpc.ts:21`.
 
-| Procedure            | Kind     | Gate                             | Input                          | Output                     |
-| -------------------- | -------- | -------------------------------- | ------------------------------ | -------------------------- |
-| `digest.setEnrolled` | mutation | Platform permission `ops:manage` | `digestSetEnrolledInputSchema` | `digestSettingsSchema`     |
-| `digest.setArmed`    | mutation | Platform permission `ops:manage` | `digestSetArmedInputSchema`    | `digestSettingsSchema`     |
-| `digest.sendTest`    | mutation | Platform permission `ops:manage` | `digestSendTestInputSchema`    | `digestAcknowledgedSchema` |
+| Procedure                | Kind     | Gate                                 | Input                       | Output                     |
+| ------------------------ | -------- | ------------------------------------ | --------------------------- | -------------------------- |
+| `digest.setArmed`        | mutation | Platform permission `ops:manage`     | `digestSetArmedInputSchema` | `digestSettingsSchema`     |
+| `digest.sendTest`        | mutation | Platform permission `ops:manage`     | `digestSendTestInputSchema` | `digestAcknowledgedSchema` |
+| `digest.getMyPreference` | query    | none: the session user's own opt-out | `digestNoInputSchema`       | `digestPreferenceSchema`   |
+| `digest.setMyPreference` | mutation | none: the session user's own opt-out | `digestPreferenceSchema`    | `digestPreferenceSchema`   |
 
 ```typescript
-// digest.setEnrolled
-// Input: digestSetEnrolledInputSchema, ../contract/src/digest.ts:34
-interface Input {
-  organizationId: string;
-  enrolled: boolean;
-}
-// Output: digestSettingsSchema, ../contract/src/digest.ts:23
-interface Output {
-  armed: boolean;
-  enrolledOrganizationIds: string[];
-}
-
 // digest.setArmed
 // Input: digestSetArmedInputSchema, ../contract/src/digest.ts:42
 interface Input {
@@ -157,6 +156,20 @@ interface Input {
 // Output: digestAcknowledgedSchema, ../contract/src/digest.ts:62
 interface Output {
   ok: true;
+}
+
+// digest.getMyPreference
+// Input: digestNoInputSchema, ../contract/src/digest.ts
+type Input = Record<string, never>;
+// Output: digestPreferenceSchema, ../contract/src/digest.ts
+interface Output {
+  subscribed: boolean;
+}
+
+// digest.setMyPreference
+// Input and output: digestPreferenceSchema, ../contract/src/digest.ts
+interface Input {
+  subscribed: boolean;
 }
 ```
 

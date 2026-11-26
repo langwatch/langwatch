@@ -63,15 +63,24 @@ const percentOf = ({ part, whole }: { part: number; whole: number }): number =>
   whole > 0 ? (part * 100) / whole : 0;
 
 /**
- * A person's week: the `DigestSend` row's id, so only the first claim of a week lands, the send
- * aggregate's id, and the send an unsubscribe records it came from.
+ * A person's week in one organization: the `DigestSend` row's id, so only the first claim of it
+ * lands, the send aggregate's id, and the send an unsubscribe records it came from. The
+ * organization is part of it, so a person in three organizations has three distinct sends.
  */
-export function digestSendKey({ userId, isoWeek }: { userId: string; isoWeek: string }): string {
-  return `${userId}:${isoWeek}`;
+export function digestSendKey({
+  userId,
+  organizationId,
+  isoWeek,
+}: {
+  userId: string;
+  organizationId: string;
+  isoWeek: string;
+}): string {
+  return `${userId}:${organizationId}:${isoWeek}`;
 }
 
 /** The idempotency key a member's week is sent under: a retry is not a second email. */
-export function digestMessageId(week: { userId: string; isoWeek: string }): string {
+export function digestMessageId(week: Parameters<typeof digestSendKey>[0]): string {
   return `digest:${digestSendKey(week)}`;
 }
 
@@ -91,29 +100,6 @@ export function pickFocusProject(week: OrganizationWeek): ProjectWeekState | und
   return week.projects.toSorted(
     (left, right) => right.traces - left.traces || right.scenarios.runs - left.scenarios.runs,
   )[0];
-}
-
-/** What a member's week in one organization amounts to: traces of the projects shown plus their own sessions. */
-export function weekActivity({ week, userId }: { week: OrganizationWeek; userId: string }): number {
-  const user = week.users.get(userId);
-  return (
-    week.projects.reduce((total, { traces }) => total + traces, 0) +
-    (user ? userWeekTotals(user).sessions : 0)
-  );
-}
-
-/**
- * Which organization's week a person in several enrolled ones is sent: the one with the most
- * activity, the lowest organization id on a tie, so every attempt at the week agrees. None when
- * there are no candidates.
- */
-export function pickHomeOrganization(
-  candidates: readonly Readonly<{ organizationId: string; activity: number }>[],
-): string | undefined {
-  return candidates.toSorted(
-    (left, right) =>
-      right.activity - left.activity || left.organizationId.localeCompare(right.organizationId),
-  )[0]?.organizationId;
 }
 
 /** The week with only the projects a member may view, in this week's folds and its history. */

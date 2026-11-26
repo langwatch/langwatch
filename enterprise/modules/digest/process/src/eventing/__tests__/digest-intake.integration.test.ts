@@ -15,7 +15,6 @@ import {
   installDigest,
   type InstalledDigest,
   MEMBER,
-  ORGANIZATION,
   OWNER_FACTS,
   PROJECT,
   SENT_WEEK,
@@ -37,13 +36,6 @@ beforeEach(() => {
 afterEach(async () => {
   await digest.close();
 });
-
-const enrol = () =>
-  digest.repositories.audience.setEnrolled({
-    organizationId: ORGANIZATION,
-    enrolled: true,
-    by: "operator-1",
-  });
 
 /** One span as trace records it; `personal` plants an address and a name in its free text. */
 function spanRecorded({
@@ -199,11 +191,9 @@ const scenarioFinished = ({
   });
 
 describe("the digest fold intake", () => {
-  describe("when spans are received for an enrolled project across two traces, one with an error", () => {
+  describe("when spans are received for a project across two traces, one with an error", () => {
     /** @scenario "Trace spans fold into the project's week as they arrive" */
     it("holds 2 traces, 1 error and the summed tokens and cost in the week the spans started", async () => {
-      await enrol();
-
       await spanRecorded({ traceId: "trace-a", spanId: "a-root", root: true });
       await spanRecorded({ traceId: "trace-a", spanId: "a-child", root: false });
       await spanRecorded({ traceId: "trace-b", spanId: "b-root", root: true, error: true });
@@ -220,8 +210,6 @@ describe("the digest fold intake", () => {
   describe("when coding-agent facts are contributed for a person's project across three sessions", () => {
     /** @scenario "Coding-agent facts fold into the person's week" */
     it("holds 3 sessions and the summed tokens, cost and lines", async () => {
-      await enrol();
-
       await threeCodingAgentSessions();
 
       await vi.waitFor(async () => {
@@ -239,11 +227,9 @@ describe("the digest fold intake", () => {
     });
   });
 
-  describe("when scenario runs finish, passing and failing, in an enrolled project", () => {
+  describe("when scenario runs finish, passing and failing, in a project", () => {
     /** @scenario "Scenario outcomes fold into the project's week" */
     it("holds the passed and failed counts", async () => {
-      await enrol();
-
       await scenarioFinished({ scenarioRunId: "run-1", verdict: "success" });
       await scenarioFinished({ scenarioRunId: "run-2", verdict: "success" });
       await scenarioFinished({ scenarioRunId: "run-3", verdict: "failure" });
@@ -262,8 +248,6 @@ describe("the digest fold intake", () => {
   describe("when facts carrying an address and a name are folded", () => {
     /** @scenario "A fold holds numbers and ids, never personal data" */
     it("stores no email address and no name in any fold row", async () => {
-      await enrol();
-
       await spanRecorded({ traceId: "trace-a", spanId: "a-root", root: true, personal: true });
       await scenarioFinished({
         scenarioRunId: "run-1",

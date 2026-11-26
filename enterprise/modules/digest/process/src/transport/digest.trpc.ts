@@ -1,11 +1,12 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
- * The weekly digest's operator controls: the platform door hides them from non-staff and refuses
+ * The weekly digest's operator controls and each person's own opt-out. The operator door hides them from non-staff and refuses
  * staff lacking ops:manage, as Cloud admin's other writes; the cloud-ops capability is the app's.
  */
 import {
   defineMiddlewareContext,
   defineTrpcRouter,
+  type TrpcHandlerActor,
   type TrpcRouterDeclaration,
 } from "@langwatch/api/trpc";
 import { DigestApi, digestTrpc } from "@langwatch/enterprise-digest-contract";
@@ -17,13 +18,15 @@ export const operatorContext = defineMiddlewareContext("opsOperator", opsOperato
 /** Cloud admin staff hold ops:view at the platform; anyone else is answered not-found. */
 const STAFF = { at: "platform", hiddenWithout: "ops:view" } as const;
 
+/** Why the preference pair asks for no permission. */
+const OWN_PREFERENCE = "operates on the session user's own opt-out, so no tenant scope applies";
+
+/** The real person behind the session: staff impersonating someone never change that person's choice. */
+const personOf = (actor: TrpcHandlerActor): string =>
+  (actor.type === "user" ? actor.impersonatorId : undefined) ?? actor.id;
+
 export const digestTrpcTransport: TrpcRouterDeclaration<DigestApi, typeof digestTrpc> =
   defineTrpcRouter(DigestApi, digestTrpc)
-    .procedure("setEnrolled")
-    .withMiddlewareContext(operatorContext)
-    .withPermission("ops:manage", STAFF)
-    .handle(({ app, input }, operator) => app.setEnrolled({ ...input, operator }))
-
     .procedure("setArmed")
     .withMiddlewareContext(operatorContext)
     .withPermission("ops:manage", STAFF)
@@ -36,4 +39,14 @@ export const digestTrpcTransport: TrpcRouterDeclaration<DigestApi, typeof digest
       await app.sendTest({ ...input, operator });
       return { ok: true as const };
     })
+
+    .procedure("getMyPreference")
+    .noPermission({ reason: OWN_PREFERENCE })
+    .handle(({ app, actor }) => app.getPreference({ userId: personOf(actor) }))
+
+    .procedure("setMyPreference")
+    .noPermission({ reason: OWN_PREFERENCE })
+    .handle(({ app, actor, input }) =>
+      app.setPreference({ userId: personOf(actor), subscribed: input.subscribed }),
+    )
     .build();

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 import type { DigestTemplateId } from "@langwatch/enterprise-digest-contract";
 
-/** One person's email for one week, claimed just before it is handed to our own mailer. */
+/** One person's email for one week of one organization, claimed just before it is handed to our own mailer. */
 export type DigestSendRecord = Readonly<{
   userId: string;
   organizationId: string;
@@ -11,9 +11,9 @@ export type DigestSendRecord = Readonly<{
 }>;
 
 export interface DigestSendRepository {
-  isSent(input: { userId: string; isoWeek: string }): Promise<boolean>;
+  isSent(input: { userId: string; organizationId: string; isoWeek: string }): Promise<boolean>;
   /**
-   * Takes the person's week, once: true for the one caller whose row was written, false for
+   * Takes the person's week in the organization, once: true for the one caller whose row was written, false for
    * every caller after it. Only the claimer sends, so a retry never mails a second time.
    */
   claim(input: DigestSendRecord): Promise<boolean>;

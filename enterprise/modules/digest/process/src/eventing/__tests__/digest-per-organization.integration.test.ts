@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
  * @vitest-environment node
- * The weekly send where a person sits in several enrolled organizations, where a picked template
- * cannot be built, where the person is deactivated, and where one organization cannot be read.
+ * The weekly send where a person sits in several organizations (one email each), where a picked
+ * template cannot be built, where the person is deactivated, and where one organization cannot
+ * be read.
  * @see enterprise/modules/digest/specs/digest.feature
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -14,6 +15,7 @@ import {
   installDigest,
   type InstalledDigest,
   MEMBER,
+  NEXT_WAKE_AT,
   ORGANIZATION,
   OTHER_MEMBER,
   OTHER_ORGANIZATION,
@@ -32,12 +34,10 @@ afterEach(async () => {
   await digest.close();
 });
 
-const enrol = (organizationId: string) =>
-  digest.repositories.audience.setEnrolled({ organizationId, enrolled: true, by: "operator-1" });
 const arm = () => digest.repositories.audience.setArmed({ armed: true });
 
 const sendIn = ({ userId, organizationId }: { userId: string; organizationId: string }) =>
-  digest.carryOut({ userId, organizationId, isoWeek: SENT_WEEK, homeOrganizationId: null });
+  digest.carryOut({ userId, organizationId, isoWeek: SENT_WEEK });
 
 /** The week's trace count an email shows; only the traces-week template shows one. */
 const tracesOf = (mail: RenderedDigestMail): number | undefined =>
@@ -62,8 +62,7 @@ async function memberInBothOrganizations({
   traces: Readonly<{ first: number; second: number }>;
 }) {
   digest.world.otherMembers = [{ userId: MEMBER, role: "MEMBER", disabledAt: null }];
-  await enrol(ORGANIZATION);
-  await enrol(OTHER_ORGANIZATION);
+  digest.world.organizations = [ORGANIZATION, OTHER_ORGANIZATION];
   await arm();
   await digest.seedProjectWeek({
     organizationId: ORGANIZATION,
@@ -77,98 +76,87 @@ async function memberInBothOrganizations({
   });
 }
 
-describe("a member of two enrolled organizations", () => {
-  describe("when one organization's week was busier for them", () => {
-    /** @scenario "A member of two enrolled organizations is sent the busier one's week" */
-    it.each([
-      ["the first one's send runs first", [ORGANIZATION, OTHER_ORGANIZATION]],
-      ["the second one's send runs first", [OTHER_ORGANIZATION, ORGANIZATION]],
-    ] as const)("sends only the busier one's email whichever order %s", async (_, order) => {
+describe("a member of two organizations", () => {
+  describe("when the week is planned and every send is handled", () => {
+    /** @scenario "A member of two organizations is sent one email per organization" */
+    it("sends one email per organization, each about that organization alone and naming it", async () => {
       await memberInBothOrganizations({ traces: { first: 1_200, second: 5_000 } });
+      await digest.plan();
+      const planned = (await asked(4)) as { userId: string; organizationId: string }[];
 
-      for (const organizationId of order) await sendIn({ userId: MEMBER, organizationId });
+      for (const send of planned) await digest.carryOut(send);
 
-      expect(digest.mail.map((mail) => [mail.to, tracesOf(mail)])).toEqual([
-        [emailOf(MEMBER), 5_000],
+      const ofMember = digest.mail.filter((mail) => mail.to === emailOf(MEMBER));
+      expect(ofMember.map((mail) => tracesOf(mail)).toSorted()).toEqual([1_200, 5_000]);
+      expect(ofMember.map((mail) => mail.idempotencyKey).toSorted()).toEqual([
+        `digest:${MEMBER}:${ORGANIZATION}:${SENT_WEEK}`,
+        `digest:${MEMBER}:${OTHER_ORGANIZATION}:${SENT_WEEK}`,
       ]);
+      const subjects = ofMember.map((mail) => mail.email.subject);
+      expect(new Set(subjects).size).toBe(2);
+      expect(subjects.some((subject) => subject.startsWith("Acme: "))).toBe(true);
+      expect(subjects.some((subject) => subject.startsWith(`Org ${OTHER_ORGANIZATION}: `))).toBe(
+        true,
+      );
+      for (const organizationId of [ORGANIZATION, OTHER_ORGANIZATION]) {
+        expect(
+          await digest.repositories.sends.isSent({
+            userId: MEMBER,
+            organizationId,
+            isoWeek: SENT_WEEK,
+          }),
+        ).toBe(true);
+      }
     });
   });
 
-  describe("when both organizations were equally busy", () => {
-    /** @scenario "A member of two enrolled organizations is sent the busier one's week" */
-    it("sends the one with the lowest organization id", async () => {
-      await memberInBothOrganizations({ traces: { first: 2_000, second: 2_000 } });
+  describe("when the same organization's send of the week is handled again", () => {
+    /** @scenario "The resend of the same member, organization and week is dropped" */
+    it("sends it once, and a second plan asks nothing more", async () => {
+      await memberInBothOrganizations({ traces: { first: 1_200, second: 5_000 } });
+      await digest.plan();
+      const planned = (await asked(4)) as { userId: string; organizationId: string }[];
+      const mine = planned.find(
+        (send) => send.userId === MEMBER && send.organizationId === OTHER_ORGANIZATION,
+      );
 
-      for (const organizationId of [OTHER_ORGANIZATION, ORGANIZATION]) {
+      await digest.carryOut(mine);
+      await digest.carryOut(mine);
+      await digest.plan({ at: NEXT_WAKE_AT, isoWeek: SENT_WEEK });
+
+      expect(digest.mail.filter((mail) => mail.to === emailOf(MEMBER))).toHaveLength(1);
+      expect(await digest.leaseSends()).toEqual([]);
+    });
+  });
+
+  describe("when they opted out", () => {
+    /** @scenario "An opted-out member receives none, in any organization" */
+    it("sends them nothing from either organization", async () => {
+      await memberInBothOrganizations({ traces: { first: 1_200, second: 5_000 } });
+      await digest.repositories.audience.unsubscribe({
+        userId: MEMBER,
+        sendId: "settings",
+        at: Date.now(),
+      });
+
+      for (const organizationId of [ORGANIZATION, OTHER_ORGANIZATION]) {
         await sendIn({ userId: MEMBER, organizationId });
       }
 
-      expect(digest.mail).toHaveLength(1);
-      expect(ORGANIZATION < OTHER_ORGANIZATION).toBe(true);
-      expect(await digest.repositories.sends.isSent({ userId: MEMBER, isoWeek: SENT_WEEK })).toBe(
-        true,
-      );
+      expect(digest.mail.filter((mail) => mail.to === emailOf(MEMBER))).toEqual([]);
     });
   });
 
-  describe("when they were removed from the busier organization", () => {
-    /** @scenario "A member of two enrolled organizations is sent the busier one's week" */
+  describe("when they were removed from one organization", () => {
+    /** @scenario "A member of two organizations is sent one email per organization" */
     it("sends the one they are still in", async () => {
       await memberInBothOrganizations({ traces: { first: 1_200, second: 5_000 } });
       digest.world.otherMembers = [];
 
       await sendIn({ userId: MEMBER, organizationId: ORGANIZATION });
+      await sendIn({ userId: MEMBER, organizationId: OTHER_ORGANIZATION });
 
       expect(digest.mail.map((mail) => tracesOf(mail))).toEqual([1_200]);
-    });
-  });
-
-  describe("when the ranking changes between the plan and the sends", () => {
-    /** MEMBER's two planned send intents, by asking organization. */
-    async function plannedSendsOfMember() {
-      await digest.plan();
-      const planned = (await asked(4)) as { userId: string; organizationId: string }[];
-      const ofMember = (organizationId: string) =>
-        planned.find((send) => send.userId === MEMBER && send.organizationId === organizationId);
-      return { first: ofMember(ORGANIZATION), second: ofMember(OTHER_ORGANIZATION) };
-    }
-
-    /** @scenario "The home organization is chosen once, when the week is planned" */
-    it("sends exactly one email, from the organization busier at plan time", async () => {
-      await memberInBothOrganizations({ traces: { first: 5_000, second: 1_200 } });
-      const { first, second } = await plannedSendsOfMember();
-      expect([first, second]).toEqual([
-        expect.objectContaining({ homeOrganizationId: ORGANIZATION }),
-        expect.objectContaining({ homeOrganizationId: ORGANIZATION }),
-      ]);
-
-      // Ranked at send time, each send would answer "not me": the second before the change,
-      // the first after it.
-      await digest.carryOut(second);
-      await digest.seedProjectWeek({
-        organizationId: OTHER_ORGANIZATION,
-        projectId: OTHER_PROJECT,
-        traces: 9_000,
-      });
-      await digest.carryOut(first);
-
-      expect(digest.mail.map((mail) => [mail.to, tracesOf(mail)])).toEqual([
-        [emailOf(MEMBER), 5_000],
-      ]);
-    });
-
-    /** @scenario "The home organization is chosen once, when the week is planned" */
-    it("sends the other organization's email when they left the planned home", async () => {
-      await memberInBothOrganizations({ traces: { first: 1_200, second: 5_000 } });
-      const { first } = await plannedSendsOfMember();
-      expect(first).toEqual(expect.objectContaining({ homeOrganizationId: OTHER_ORGANIZATION }));
-      digest.world.otherMembers = [];
-
-      await digest.carryOut(first);
-
-      expect(digest.mail.map((mail) => [mail.to, tracesOf(mail)])).toEqual([
-        [emailOf(MEMBER), 1_200],
-      ]);
     });
   });
 });
@@ -176,7 +164,6 @@ describe("a member of two enrolled organizations", () => {
 describe("when the picked template cannot be built", () => {
   /** @scenario "A pick that cannot be built falls through to the next eligible template" */
   it("sends the next eligible template instead of nothing", async () => {
-    await enrol(ORGANIZATION);
     await arm();
     // The admin is eligible for plan-pressure first, which needs a name the module lacks.
     digest.world.usage = { currentMonthMessagesCount: 900, maxMonthlyUsageLimit: 1_000 };
@@ -196,7 +183,6 @@ describe("when the picked template cannot be built", () => {
 describe("when a member's profile is deactivated", () => {
   /** @scenario "A deactivated person is sent nothing" */
   it("mails them nothing and records no send", async () => {
-    await enrol(ORGANIZATION);
     await arm();
     digest.world.usage = { currentMonthMessagesCount: 900, maxMonthlyUsageLimit: 1_000 };
     digest.world.deactivated.add(ADMIN);
@@ -204,17 +190,20 @@ describe("when a member's profile is deactivated", () => {
     await sendIn({ userId: ADMIN, organizationId: ORGANIZATION });
 
     expect(digest.mail).toEqual([]);
-    expect(await digest.repositories.sends.isSent({ userId: ADMIN, isoWeek: SENT_WEEK })).toBe(
-      false,
-    );
+    expect(
+      await digest.repositories.sends.isSent({
+        userId: ADMIN,
+        organizationId: ORGANIZATION,
+        isoWeek: SENT_WEEK,
+      }),
+    ).toBe(false);
   });
 });
 
-describe("when one enrolled organization cannot be read", () => {
+describe("when one organization cannot be read", () => {
   beforeEach(async () => {
-    // The failing one is listed first: set order is enrolment order.
-    await enrol(OTHER_ORGANIZATION);
-    await enrol(ORGANIZATION);
+    // The failing one is listed first, so the ones after it show it does not stall them.
+    digest.world.organizations = [OTHER_ORGANIZATION, ORGANIZATION];
     await arm();
     digest.world.failingOrganizations.add(OTHER_ORGANIZATION);
   });

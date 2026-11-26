@@ -76,7 +76,7 @@ import { buildDigestPipeline } from "../digest.pipeline.ts";
 
 export const ORGANIZATION = "org-1";
 export const PROJECT = "project-1";
-/** A second organization a test may enrol, with its own project and members. */
+/** A second organization, with its own project and members once a test gives it some. */
 export const OTHER_ORGANIZATION = "org-2";
 export const OTHER_PROJECT = "project-2";
 export const ADMIN = "user-admin";
@@ -152,6 +152,8 @@ export function digestWorld() {
   ];
   return {
     members,
+    /** Every organization the organization module lists; the digest includes all of them. */
+    organizations: [ORGANIZATION] as string[],
     /** The second organization's members; it has none until a test gives it some. */
     otherMembers: [] as WorldMember[],
     /** Organizations whose member list cannot be read, as a deleted one's would not be. */
@@ -209,13 +211,11 @@ export function installDigest(
   });
 
   const source = DigestSourceService.create({
-    audience: repositories.audience,
     projects: createApiFixture<
-      Pick<ProjectApi, "listIdsByOrganization" | "findPersonalWorkspaceOwner">
+      Pick<ProjectApi, "findOrganizationId" | "findPersonalWorkspaceOwner">
     >(
       {
-        listIdsByOrganization: async ({ organizationId }) =>
-          organizationId === ORGANIZATION ? world.projects : [],
+        findOrganizationId: async (projectId) => organizationOfProject(projectId),
         findPersonalWorkspaceOwner: async ({ scopeId }) => {
           const ownerUserId = world.personalOwners.get(scopeId);
           return ownerUserId ? { ownerUserId } : null;
@@ -225,8 +225,11 @@ export function installDigest(
     ),
     recordProject: (activity) => commands.recordProject(activity),
     recordUser: (activity) => commands.recordUser(activity),
-    now,
   });
+  const organizationOfProject = (projectId: string): string | undefined => {
+    if (projectId === OTHER_PROJECT) return OTHER_ORGANIZATION;
+    return world.projects.includes(projectId) ? ORGANIZATION : undefined;
+  };
   const membersIn = (organizationId: string): readonly WorldMember[] => {
     if (organizationId === ORGANIZATION) return world.members;
     if (organizationId === OTHER_ORGANIZATION) return world.otherMembers;
@@ -261,9 +264,9 @@ export function installDigest(
           return member;
         },
         findProvisioningSummary: async (organizationId) =>
-          !world.unnamedOrganizations.has(organizationId)
-            ? { id: ORGANIZATION, name: "Acme", slug: "acme", createdAt: Temporal.Now.instant() }
-            : null,
+          !world.unnamedOrganizations.has(organizationId) ? summaryOf(organizationId) : null,
+        listProvisioningSummaries: async () =>
+          world.organizations.map((organizationId) => summaryOf(organizationId)),
       },
       "OrganizationApi",
     ),
@@ -514,6 +517,16 @@ class FailsAfterAcceptingMailChannel extends DigestMailChannel {
     this.#failNext = false;
     throw new Error("the connection closed after the mailer accepted the email");
   }
+}
+
+/** An organization as the organization module summarises it; the first is Acme, any other is named after its id. */
+function summaryOf(id: string) {
+  return {
+    id,
+    name: id === ORGANIZATION ? "Acme" : `Org ${id}`,
+    slug: id,
+    createdAt: Temporal.Now.instant(),
+  };
 }
 
 /** A project as the project module names it; every project sits on the one team. */

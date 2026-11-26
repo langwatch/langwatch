@@ -37,7 +37,8 @@ function mail(overrides: Partial<PlanPressureMail> = {}): PlanPressureMail {
     templateId: "digest-plan-pressure",
     props: PLAN_PRESSURE,
     oneClickUnsubscribeUrl: ONE_CLICK,
-    idempotencyKey: "digest:user-member:2026-W46",
+    organizationName: null,
+    idempotencyKey: "digest:user-member:org-1:2026-W46",
     test: false,
     ...overrides,
   };
@@ -51,11 +52,26 @@ describe("renderDigestMail", () => {
       expect(rendered.email).toMatchObject({
         to: "member@example.test",
         unsubscribe: { url: ONE_CLICK },
-        idempotencyKey: "digest:user-member:2026-W46",
+        idempotencyKey: "digest:user-member:org-1:2026-W46",
       });
       expect(rendered.email.subject).not.toBe("");
       expect(rendered.email.subject.startsWith("[Test]")).toBe(false);
       expect(rendered.email.html).toContain("<html");
+    });
+  });
+
+  describe("when the email is about a named organization", () => {
+    /** @scenario "A member of two organizations is sent one email per organization" */
+    it("leads the subject with the organization's name, ahead of a test's marker", async () => {
+      const plain = await renderDigestMail({ mail: mail(), renderer });
+      const named = await renderDigestMail({ mail: mail({ organizationName: "Acme" }), renderer });
+      const test = await renderDigestMail({
+        mail: mail({ organizationName: "Acme", test: true, idempotencyKey: undefined }),
+        renderer,
+      });
+
+      expect(named.email.subject).toBe(`Acme: ${plain.email.subject}`);
+      expect(test.email.subject).toBe(`[Test] Acme: ${plain.email.subject}`);
     });
   });
 

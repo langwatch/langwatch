@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
- * The weekly send: an hourly plan over the enrolled cohort and one outbox intent per member.
+ * The weekly send: an hourly plan over every organization and one outbox intent per member and organization.
  * Spec: enterprise/modules/digest/specs/digest.feature
  */
 import {
@@ -34,7 +34,7 @@ import {
   sendDigestIntentSchema,
 } from "./digest-send.process.ts";
 
-/** A plan asks one send per member: a few calls each, well inside the lease. */
+/** A plan asks one send per member and organization: a few calls each, well inside the lease. */
 const PLAN_LEASE_MS = 10 * 60 * 1000;
 /** One member's send reads the week's folds and mails the picked template once. */
 const SEND_LEASE_MS = 2 * 60 * 1000;

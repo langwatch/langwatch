@@ -11,9 +11,8 @@ import {
 } from "./digest-send.events.ts";
 
 /**
- * Keyed by the person and week, so a plan carried out twice asks each member once. The aggregate
- * sits under the asking organization's tenant: a member of two enrolled organizations has two,
- * and the `DigestSend` claim keeps their email to one.
+ * Keyed by the person, organization and week, so a plan carried out twice asks each member of
+ * each organization once. A member of two organizations has two aggregates and two emails.
  */
 export const RequestDigestSendCommand = defineCommand({
   commandType: REQUEST_DIGEST_SEND_COMMAND_TYPE,
@@ -22,6 +21,5 @@ export const RequestDigestSendCommand = defineCommand({
   aggregateType: DIGEST_SEND_AGGREGATE_TYPE,
   schema: digestSendRequestedEventDataSchema,
   aggregateId: digestSendKey,
-  idempotencyKey: ({ organizationId, userId, isoWeek }) =>
-    `${organizationId}:${digestSendKey({ userId, isoWeek })}:send_requested`,
+  idempotencyKey: (request) => `${digestSendKey(request)}:send_requested`,
 });

@@ -35,10 +35,9 @@ const GRANTS: Readonly<Record<string, readonly string[]>> = {
   "user-staff": ["ops:view", "ops:manage"],
 };
 
-const ENROL = { organizationId: "org_acme", enrolled: true };
 const ARM = { armed: true };
 const TEST_SEND = { organizationId: "org_acme", userId: "user_member" };
-const SETTINGS: DigestSettings = { armed: false, enrolledOrganizationIds: [] };
+const SETTINGS: DigestSettings = { armed: false };
 
 const root = TrpcRootDefinition.forContext<Context>().create({});
 
@@ -92,16 +91,20 @@ function door(app: DigestApi) {
 function recordingDigest(reached: string[]) {
   return door(
     createApiFixture<DigestApi>({
-      setEnrolled: async ({ operator }) => {
-        reached.push(`setEnrolled:${operator?.id}`);
-        return SETTINGS;
-      },
       setArmed: async ({ operator }) => {
         reached.push(`setArmed:${operator?.id}`);
         return SETTINGS;
       },
       sendTest: async ({ operator }) => {
         reached.push(`sendTest:${operator?.id}`);
+      },
+      getPreference: async ({ userId }) => {
+        reached.push(`getPreference:${userId}`);
+        return { subscribed: true };
+      },
+      setPreference: async ({ userId, subscribed }) => {
+        reached.push(`setPreference:${userId}:${subscribed}`);
+        return { subscribed };
       },
     }),
   );
@@ -154,7 +157,6 @@ describe("the digest's operator controls at the platform door", () => {
 
       const stranger = digest("user-stranger");
       const refusals = await Promise.all([
-        stranger.setEnrolled(ENROL).catch((error: unknown) => error),
         stranger.setArmed(ARM).catch((error: unknown) => error),
         stranger.sendTest(TEST_SEND).catch((error: unknown) => error),
       ]);
@@ -177,7 +179,6 @@ describe("the digest's operator controls at the platform door", () => {
       const viewer = recordingDigest(reached)("user-viewer");
 
       const refusals = await Promise.all([
-        viewer.setEnrolled(ENROL).catch((error: unknown) => error),
         viewer.setArmed(ARM).catch((error: unknown) => error),
         viewer.sendTest(TEST_SEND).catch((error: unknown) => error),
       ]);
@@ -195,15 +196,10 @@ describe("the digest's operator controls at the platform door", () => {
       const reached: string[] = [];
       const staff = recordingDigest(reached)("user-staff");
 
-      await expect(staff.setEnrolled(ENROL)).resolves.toEqual(SETTINGS);
       await expect(staff.setArmed(ARM)).resolves.toEqual(SETTINGS);
       await expect(staff.sendTest(TEST_SEND)).resolves.toEqual({ ok: true });
 
-      expect(reached).toEqual([
-        "setEnrolled:user-staff",
-        "setArmed:user-staff",
-        "sendTest:user-staff",
-      ]);
+      expect(reached).toEqual(["setArmed:user-staff", "sendTest:user-staff"]);
     });
   });
 
@@ -214,7 +210,6 @@ describe("the digest's operator controls at the platform door", () => {
       const staff = call("user-staff");
 
       const refusals = [
-        await staff.setEnrolled(ENROL).catch((error: unknown) => error),
         await staff.setArmed(ARM).catch((error: unknown) => error),
         await staff.sendTest(TEST_SEND).catch((error: unknown) => error),
       ];
@@ -222,10 +217,54 @@ describe("the digest's operator controls at the platform door", () => {
       expect(refusals.map(codeOf)).toEqual(
         refusals.map(() => ({ trpc: "NOT_FOUND", code: "not_found" })),
       );
-      expect(askedOps).toEqual(["user-staff", "user-staff", "user-staff"]);
-      expect(await repositories.audience.findEnrolled()).toEqual([]);
+      expect(askedOps).toEqual(["user-staff", "user-staff"]);
       expect((await repositories.audience.getSettings()).armed).toBe(false);
       expect(mail.sent).toEqual([]);
+    });
+  });
+});
+
+describe("the digest's own-preference procedures", () => {
+  describe("when a signed-in person who is not staff reads and sets their choice", () => {
+    /** @scenario "A person turns the weekly digest off and on in their settings" */
+    it("reaches the application as themselves, with no staff grant needed", async () => {
+      const reached: string[] = [];
+      const pat = recordingDigest(reached)("user-pat");
+
+      await expect(pat.getMyPreference({})).resolves.toEqual({ subscribed: true });
+      await expect(pat.setMyPreference({ subscribed: false })).resolves.toEqual({
+        subscribed: false,
+      });
+
+      expect(reached).toEqual(["getPreference:user-pat", "setPreference:user-pat:false"]);
+    });
+
+    /** @scenario "A person turns the weekly digest off and on in their settings" */
+    it("cannot name another person: the input carries no user", async () => {
+      const reached: string[] = [];
+      const pat = recordingDigest(reached)("user-pat");
+
+      await pat.setMyPreference({ subscribed: false, userId: "user-sam" } as never);
+
+      expect(reached).toEqual(["setPreference:user-pat:false"]);
+    });
+  });
+
+  describe("when nobody is signed in", () => {
+    it("refuses with 401 before the application", async () => {
+      const reached: string[] = [];
+      const anonymous = recordingDigest(reached)(null);
+
+      const refusals = await Promise.all([
+        anonymous.getMyPreference({}).catch((error: unknown) => error),
+        anonymous.setMyPreference({ subscribed: false }).catch((error: unknown) => error),
+      ]);
+
+      expect(refusals.map((refusal) => codeOf(refusal).trpc)).toEqual([
+        "UNAUTHORIZED",
+        "UNAUTHORIZED",
+      ]);
+      expect(reached).toEqual([]);
     });
   });
 });

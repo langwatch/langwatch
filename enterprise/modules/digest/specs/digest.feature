@@ -1,13 +1,15 @@
 Feature: Weekly digest emails
-  LangWatch Cloud sends each person one weekly email about their week's usage, picked from five
-  templates by what their data shows, and sent through our own mailer. Operators choose the cohort
-  and arm the send in Cloud admin; nothing is sent until they do. Anyone can unsubscribe in one
-  click; an unsubscribe is recorded.
+  LangWatch Cloud sends each person a weekly email for each organization they are in, about that
+  organization's week alone and naming it, picked from five templates by what their data shows,
+  and sent through our own mailer. Every organization is in: there is no enrolment. Operators arm
+  the send in Cloud admin; nothing is sent until they do. A person opts out once, for every
+  organization, in one click from the email or with a switch in their settings; an unsubscribe is
+  recorded.
   Design: dev/docs/plans/weekly-digest.md
 
   # Built: the pick, the folds' redelivery rule, the weekly send through our own mailer, the
-  # one-click unsubscribe and its rate limit, the operators' switches and clearing digest rows on
-  # user erasure. The other folds' peer intake, click tracking and its rate limit, the "what's
+  # one-click unsubscribe and its rate limit, the operators' switch and clearing digest rows on
+  # user erasure, and the settings switch. The other folds' peer intake, click tracking and its rate limit, the "what's
   # new" card and the Cloud admin gallery and its metrics are @unimplemented.
 
   # Picking a template
@@ -129,8 +131,14 @@ Feature: Weekly digest emails
     Then the project's week counts it once
 
   @integration
-  Scenario: A project of an organization not enrolled folds nothing
-    Given a project whose organization is not enrolled
+  Scenario: A project of an organization that was never enrolled folds
+    Given a project whose organization was never enrolled
+    When its evaluation completes
+    Then its week is folded under its organization
+
+  @integration
+  Scenario: A project that belongs to no organization folds nothing
+    Given a project that names no organization
     When its evaluation completes
     Then no week is folded for it
 
@@ -154,21 +162,21 @@ Feature: Weekly digest emails
     Then no email is sent
 
   @integration
-  Scenario: Nothing is sent while no organization is enrolled
-    Given the send is armed and no organization is enrolled
+  Scenario: An organization that was never enrolled is sent to
+    Given the send is armed and an organization that was never enrolled with three members
     When the scheduled wake runs
-    Then no email is sent
+    Then each member receives an email for it
 
   @integration
-  Scenario: Each enrolled member gets one email a week
-    Given the send is armed and an enrolled organization with three members
+  Scenario: Each member gets one email a week
+    Given the send is armed and an organization with three members
     When the scheduled wake runs twice
     Then each member receives exactly one email for this ISO week
     And every email carries an RFC 8058 one-click unsubscribe
 
   @integration
   Scenario: Arming before Monday 08:00 UTC sends last week once, from 08:00
-    Given an enrolled organization with three members
+    Given an organization with three members
     When the send is armed at 03:00 UTC on a Monday and the wake runs every hour
     Then nothing is planned before 08:00
     And from 08:00 each member receives exactly one email, for last week
@@ -195,7 +203,7 @@ Feature: Weekly digest emails
 
   @integration
   Scenario: An organization admin near the plan limit is sent the plan's numbers
-    Given the send is armed and an enrolled organization at 90% of its monthly limit
+    Given the send is armed and an organization at 90% of its monthly limit
     When the week's emails are sent
     Then its admin's email is digest-plan-pressure with the usage, the count and the limit
     And its other members' emails are not
@@ -214,14 +222,8 @@ Feature: Weekly digest emails
     Then that member receives none
 
   @integration
-  Scenario: A member of an organization unenrolled after planning is skipped
-    Given the week's sends are planned for an enrolled organization
-    When the organization is unenrolled before its sends are handled
-    Then its members receive none
-
-  @integration
   Scenario: A member who left or was disabled after planning is skipped
-    Given the week's sends are planned for an enrolled organization
+    Given the week's sends are planned for an organization
     When a member leaves it, or is disabled, before their send is handled
     Then that member receives none
 
@@ -241,7 +243,7 @@ Feature: Weekly digest emails
 
   @integration
   Scenario: Disarming after the week is planned sends nothing more
-    Given the week's sends are planned for an enrolled organization
+    Given the week's sends are planned for an organization
     When the send is disarmed before its sends are handled
     Then no member receives one
 
@@ -253,18 +255,24 @@ Feature: Weekly digest emails
     Then that member receives none and no send is recorded for them
 
   @integration
-  Scenario: A member of two enrolled organizations is sent the busier one's week
-    Given a member of two enrolled organizations
-    When both organizations' sends are handled, in either order
-    Then they receive one email, from the organization where their week had the most activity
-    And on equal activity from the organization with the lowest id
+  Scenario: A member of two organizations is sent one email per organization
+    Given a member of two organizations, each with its own week
+    When the week is planned and both organizations' sends are handled
+    Then they receive two emails, one per organization
+    And each shows only that organization's week and names it in the subject
+    And the two sends carry distinct keys: digest:{userId}:{organizationId}:{isoWeek}
 
   @integration
-  Scenario: The home organization is chosen once, when the week is planned
-    Given a member of two enrolled organizations, one busier for them when the week is planned
-    When the other organization becomes busier before both sends are handled
-    Then they receive exactly one email, from the organization that was busier at plan time
-    And if they leave that organization before its send, the other organization's send mails them
+  Scenario: The resend of the same member, organization and week is dropped
+    Given a member's send for one organization was handled
+    When the same send is handled again, or the week is planned again
+    Then they receive that organization's email once
+
+  @integration
+  Scenario: An opted-out member receives none, in any organization
+    Given a member of two organizations who opted out
+    When both organizations' sends are handled
+    Then they receive none
 
   @integration
   Scenario: A pick that cannot be built falls through to the next eligible template
@@ -287,7 +295,7 @@ Feature: Weekly digest emails
 
   @integration
   Scenario: One unreadable organization does not stall the others' plan
-    Given two enrolled organizations, the first of which cannot be read
+    Given two organizations, the first of which cannot be read
     When the scheduled wake runs
     Then the other organization's sends are asked
     And the week stays unplanned so the next wake retries the unreadable one
@@ -303,7 +311,21 @@ Feature: Weekly digest emails
   @integration
   Scenario: One-click unsubscribe from the mail client
     When a POST with a valid unsubscribe token arrives
-    Then the member is unsubscribed and the send it came from is recorded
+    Then the member is unsubscribed from every organization's digest and the send it came from is recorded
+
+  @integration
+  Scenario: The email's footer link opens the person's email preferences
+    When a digest email is sent
+    Then its footer link is /settings/profile#email-preferences
+    And its List-Unsubscribe header is still the signed one-click address
+
+  @integration
+  Scenario: A person turns the weekly digest off and on in their settings
+    Given a signed-in person on their Profile page
+    When they turn the Weekly digest switch off and on again
+    Then each choice is saved as their one opt-out, the same one the unsubscribe link writes
+    And a failed save leaves the switch where it was and says so
+    And the call names no user: it is always the signed-in person's own
 
   @integration
   Scenario: A forged or tampered unsubscribe token is refused
@@ -382,52 +404,45 @@ Feature: Weekly digest emails
   @unit
   Scenario: The digest admin is refused where cloud ops is off
     Given ops's cloud-ops capability is off
-    When staff on the ops list enrol an organization
+    When staff on the ops list arm the send
     Then the call is refused with not_found
 
   @unit
   Scenario: Only operators on the ops list use the digest admin
     Given a signed-in user who is not on the ops back-office list
-    When they enrol an organization
+    When they arm the send
     Then the call is refused with not_found
 
   @unit
   Scenario: Someone who is not staff is answered not-found by the digest admin door
     Given a signed-in person who is not Cloud admin staff
-    When they enrol an organization, arm the send or send a test
+    When they arm the send or send a test
     Then each call is refused with not_found and the digest is never reached
 
   @unit
   Scenario: A digest admin write needs ops:manage, not ops:view
     Given Cloud admin staff who hold ops:view but not ops:manage
-    When they enrol an organization, arm the send or send a test
+    When they arm the send or send a test
     Then each call is refused with permission_denied and the digest is never reached
 
   @unit
   Scenario: Staff holding ops:manage reach the digest as themselves
     Given Cloud admin staff who hold ops:manage
-    When they enrol an organization, arm the send or send a test
+    When they arm the send or send a test
     Then each call reaches the digest, naming them as the operator
 
   @unit
   Scenario: The digest asks ops to admit the operator behind every admin control
     Given Cloud admin staff the platform door admits, where ops's cloud-ops capability is off
-    When they enrol an organization, arm the send or send a test
-    Then each call is refused with not_found and nothing is enrolled, armed or sent
-
-  @unit
-  Scenario: An operator enrols and unenrols organizations
-    Given an operator ops admits to manage the digest
-    When they enrol two organizations and then unenrol one
-    Then each call answers the settings with the enrolled organizations sorted
-    And only the organization still enrolled is enrolled
+    When they arm the send or send a test
+    Then each call is refused with not_found and nothing is armed or sent
 
   @unit
   Scenario: An operator arms and disarms the weekly send
-    Given an operator ops admits to manage the digest, and an enrolled organization
+    Given an operator ops admits to manage the digest
     When they arm the send and then disarm it
     Then each call answers the settings with the switch as set
-    And the stored switch matches it, with the enrolment unchanged
+    And the stored switch matches it
 
   @integration @unimplemented
   Scenario: The gallery previews a person's email for every eligible template
@@ -443,48 +458,41 @@ Feature: Weekly digest emails
 
   @integration
   Scenario: Sending a test goes only to the operator
-    When an operator sends themself a test of a member's email
+    When an operator sends themself a test of a member's email for an organization
     Then only the operator receives it
     And no DigestSend row is written
 
   @integration
-  Scenario: A test send respects enrolment
-    Given an organization that is not enrolled
-    When an operator sends themself a test of a member's email
-    Then the call is refused with digest_organization_not_enrolled
-    And no email is sent
-
-  @integration
   Scenario: A test send respects a member's opt-out
-    Given an enrolled organization and a member who unsubscribed
+    Given an organization and a member who unsubscribed
     When an operator sends themself a test of that member's email
     Then the call is refused with digest_member_unsubscribed
     And no email is sent
 
   @integration
   Scenario: A test send of someone who is not a member is refused
-    Given an enrolled organization
+    Given an organization
     When an operator sends themself a test of a person who is not its member
     Then the call is refused with digest_member_not_found
     And no email is sent
 
   @integration
   Scenario: A test send to an operator with no email address is refused
-    Given an enrolled organization
+    Given an organization
     When an operator whose account has no email address sends themself a test of a member's email
     Then the call is refused with digest_operator_address_missing
     And no email is sent
 
   @integration
   Scenario: A test send of a member whose pick has nothing to show is refused
-    Given an enrolled organization and a member whose pick has nothing to show this week
+    Given an organization and a member whose pick has nothing to show this week
     When an operator sends themself a test of that member's email
     Then the call is refused with digest_nothing_to_send
     And no email is sent
 
   @integration
   Scenario: A test email's unsubscribe link names the operator, not the member
-    Given an enrolled organization
+    Given an organization
     When an operator sends themself a test of a member's email
     And the test email's one-click unsubscribe is followed
     Then the operator is unsubscribed and the member is not

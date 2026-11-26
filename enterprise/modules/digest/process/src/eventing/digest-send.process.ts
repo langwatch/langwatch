@@ -1,14 +1,15 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
  * The weekly send's two processes. An hourly wake from Monday 08:00 UTC hands the outbox one
- * plan of last week; the plan asks one send per enrolled member, and each ask becomes one
- * `sendDigest` intent keyed by the person and week within the asking organization, so a second
- * ask or wake queues nothing more. Across organizations the send's claim keeps it to one email.
+ * plan of last week; the plan asks one send per member of every organization, and each ask
+ * becomes one `sendDigest` intent keyed by the person, organization and week, so a second ask or
+ * wake queues nothing more and a person in two organizations has two.
  * Spec: enterprise/modules/digest/specs/digest.feature
  */
 import type { EventHandler, IntentSpec, WakeHandler } from "@langwatch/eventing";
 import { z } from "zod";
 
+import { digestMessageId } from "../rules/digest-email.rules.ts";
 import { plannableWeek } from "../rules/digest-week.rules.ts";
 import {
   type DigestSendRequest,
@@ -56,12 +57,12 @@ export const digestPlanWake: WakeHandler<DigestPlanState, PlanIntents> = (_state
   return { state, intents: [context.intent("planWeek", `plan:${context.at}`, plan)] };
 };
 
-/** One person's week: the first ask becomes the `sendDigest`; its key dedupes a redelivery. */
+/** One person's week in one organization: the first ask becomes the `sendDigest`; its key dedupes a redelivery. */
 export const digestSendRequested: EventHandler<
   DigestMemberSendState,
   DigestSendRequest,
   MemberSendIntents
 > = (state, data, context) => ({
   state: { requestedAt: state.requestedAt ?? context.at },
-  intents: [context.intent("sendDigest", `send:${data.userId}:${data.isoWeek}`, data)],
+  intents: [context.intent("sendDigest", digestMessageId(data), data)],
 });

@@ -52,20 +52,6 @@ export class DigestOperatorAddressMissingError extends HandledError {
   }
 }
 
-/** A test was asked for an organization that is not enrolled in the digest. */
-export class DigestOrganizationNotEnrolledError extends HandledError {
-  declare readonly code: "digest_organization_not_enrolled";
-
-  constructor(organizationId: string) {
-    super("digest_organization_not_enrolled", "This organization is not enrolled in the digest.", {
-      meta: { organizationId },
-      httpStatus: 409,
-      fault: "customer",
-    });
-    this.name = "DigestOrganizationNotEnrolledError";
-  }
-}
-
 /** A test was asked for a member who opted out of the digest. */
 export class DigestMemberUnsubscribedError extends HandledError {
   declare readonly code: "digest_member_unsubscribed";

@@ -16,23 +16,10 @@ export type DigestTemplateId = z.infer<typeof digestTemplateIdSchema>;
 const digestSettingsSchemaDefinition = z.object({
   /** The weekly send's master switch; off until an operator arms it. */
   armed: z.boolean(),
-  /** The organizations whose members are sent to; none until an operator enrols one. */
-  enrolledOrganizationIds: z.array(z.string()),
 });
 export interface DigestSettingsSchema extends Named<typeof digestSettingsSchemaDefinition> {}
 export const digestSettingsSchema: DigestSettingsSchema = digestSettingsSchemaDefinition;
 export type DigestSettings = z.infer<typeof digestSettingsSchema>;
-
-const digestSetEnrolledInputSchemaDefinition = z.object({
-  organizationId: z.string().min(1),
-  enrolled: z.boolean(),
-});
-export interface DigestSetEnrolledInputSchema extends Named<
-  typeof digestSetEnrolledInputSchemaDefinition
-> {}
-export const digestSetEnrolledInputSchema: DigestSetEnrolledInputSchema =
-  digestSetEnrolledInputSchemaDefinition;
-export type DigestSetEnrolledInput = z.infer<typeof digestSetEnrolledInputSchema>;
 
 const digestSetArmedInputSchemaDefinition = z.object({ armed: z.boolean() });
 export interface DigestSetArmedInputSchema extends Named<
@@ -41,6 +28,17 @@ export interface DigestSetArmedInputSchema extends Named<
 export const digestSetArmedInputSchema: DigestSetArmedInputSchema =
   digestSetArmedInputSchemaDefinition;
 export type DigestSetArmedInput = z.infer<typeof digestSetArmedInputSchema>;
+
+/** A call that names nothing: the signed-in person is the only subject there is. */
+const digestNoInputSchemaDefinition = z.object({});
+export interface DigestNoInputSchema extends Named<typeof digestNoInputSchemaDefinition> {}
+export const digestNoInputSchema: DigestNoInputSchema = digestNoInputSchemaDefinition;
+
+/** Whether a person receives the digest: one choice covering every organization they are in. */
+const digestPreferenceSchemaDefinition = z.object({ subscribed: z.boolean() });
+export interface DigestPreferenceSchema extends Named<typeof digestPreferenceSchemaDefinition> {}
+export const digestPreferenceSchema: DigestPreferenceSchema = digestPreferenceSchemaDefinition;
+export type DigestPreference = z.infer<typeof digestPreferenceSchema>;
 
 /** The member whose last week the operator who asks is sent, exactly as it would go out. */
 const digestSendTestInputSchemaDefinition = z.object({

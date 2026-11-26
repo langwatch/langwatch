@@ -98,7 +98,7 @@ export const projectWeekKey = ({
 }): string => `project:${projectId}:${isoWeek}`;
 
 /**
- * A person's week within one organization: a member of two enrolled organizations has a fold in
+ * A person's week within one organization: a member of two organizations has a fold in
  * each, read by that organization alone.
  */
 export const userWeekKey = ({

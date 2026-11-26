@@ -11,7 +11,7 @@ export class MemoryDigestSendRepository implements DigestSendRepository {
 
   private constructor() {}
 
-  isSent(week: { userId: string; isoWeek: string }): Promise<boolean> {
+  isSent(week: { userId: string; organizationId: string; isoWeek: string }): Promise<boolean> {
     return Promise.resolve(this.#sends.has(digestSendKey(week)));
   }
 
