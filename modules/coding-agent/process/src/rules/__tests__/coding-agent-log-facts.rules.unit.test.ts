@@ -666,5 +666,20 @@ describe("liftLogContribution", () => {
       expect(facts["langwatch.account.usage.percent"]).toBe(31);
       expect(facts["langwatch.account.usage.window"]).toBe("five_hour");
     });
+
+    it("lifts the agent's own account id from the resource as the fallback key", () => {
+      const { lift, dispatched } = makeLift();
+
+      lift(
+        canonicalLogRecord({
+          attributes: { "event.name": "claude_code.api_request", "session.id": "sess-uuid" },
+          resourceAttributes: { "user.account_uuid": "5a6b7c8d-0000-4000-8000-000000000001" },
+        }),
+      );
+
+      expect(dispatched[0]!.facts["user.account_uuid"]).toBe(
+        "5a6b7c8d-0000-4000-8000-000000000001",
+      );
+    });
   });
 });

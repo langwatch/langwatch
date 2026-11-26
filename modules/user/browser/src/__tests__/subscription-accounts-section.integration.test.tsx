@@ -8,6 +8,7 @@ import type {
   CodingAgentAccountBurndownPage,
 } from "@langwatch/coding-agent-contract";
 import { DesignSystemProvider } from "@langwatch/design-system/provider";
+import { nowEpochMs } from "@langwatch/time";
 import { cleanup, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -15,9 +16,11 @@ type QueryState = {
   data?: CodingAgentAccountBurndownPage;
   isLoading: boolean;
   isError: boolean;
+  refetch: () => unknown;
 };
 
-let queryState: QueryState = { isLoading: true, isError: false };
+const refetch = vi.fn();
+let queryState: QueryState = { isLoading: true, isError: false, refetch };
 
 vi.mock("../behavior/personal-workspace-api.ts", () => ({
   api: {
@@ -69,7 +72,16 @@ function account(over: Partial<CodingAgentAccountBurndown> = {}): CodingAgentAcc
 }
 
 function renderWith(accounts: CodingAgentAccountBurndown[]) {
-  queryState = { isLoading: false, isError: false, data: { fromMs: 0, toMs: 0, accounts } };
+  queryState = {
+    isLoading: false,
+    isError: false,
+    refetch,
+    data: { fromMs: 0, toMs: 0, accounts },
+  };
+  return renderSection();
+}
+
+function renderSection() {
   return render(
     <DesignSystemProvider forcedTheme="light">
       <SubscriptionAccountsSection projectId="p1" />
@@ -110,12 +122,22 @@ describe("SubscriptionAccountsSection", () => {
             window: "five_hour",
             resetsAtMs: null,
             readAtMs: null,
-            limitedUntilMs: Date.parse("2026-11-26T15:00:00.000Z"),
+            limitedUntilMs: nowEpochMs() + 60 * 60 * 1000,
           },
         }),
       ]);
 
-      expect(screen.getByText(/Out of usage until (\d{2}:\d{2}|.*26 Nov)/)).toBeTruthy();
+      expect(screen.getByText(/Out of usage until (\d{2}:\d{2}|.* \d+ \w{3}, )/)).toBeTruthy();
+    });
+
+    it("drops the badge once the limit has passed", () => {
+      renderWith([
+        account({
+          reading: { ...account().reading!, limitedUntilMs: nowEpochMs() - 60_000 },
+        }),
+      ]);
+
+      expect(screen.queryByText(/Out of usage until/)).toBeNull();
     });
   });
 
@@ -127,6 +149,13 @@ describe("SubscriptionAccountsSection", () => {
       expect(screen.getByText("No usage figure reported yet")).toBeTruthy();
       expect(screen.queryByTestId("subscription-account-meter")).toBeNull();
     });
+
+    it("still shows the reset the account reported", () => {
+      renderWith([account({ reading: { ...account().reading!, percent: null } })]);
+
+      expect(screen.getByText("No usage figure reported yet")).toBeTruthy();
+      expect(screen.getByText(/Resets .*28 Nov/)).toBeTruthy();
+    });
   });
 
   describe("given a viewer who may not see costs", () => {
@@ -135,6 +164,30 @@ describe("SubscriptionAccountsSection", () => {
 
       expect(screen.queryByText("$21.00")).toBeNull();
       expect(screen.getByText("21.0K")).toBeTruthy();
+    });
+  });
+
+  describe("given the read failed", () => {
+    it("offers a retry when nothing loaded", () => {
+      queryState = { isLoading: false, isError: true, refetch };
+      renderSection();
+
+      screen.getByText("Retry").click();
+      expect(screen.getByText("Couldn't load subscription accounts")).toBeTruthy();
+      expect(refetch).toHaveBeenCalled();
+    });
+
+    it("keeps the cards when a refresh fails", () => {
+      queryState = {
+        isLoading: false,
+        isError: true,
+        refetch,
+        data: { fromMs: 0, toMs: 0, accounts: [account()] },
+      };
+      renderSection();
+
+      expect(screen.getByText("ACME Max 1")).toBeTruthy();
+      expect(screen.getByText("Couldn't refresh subscription accounts")).toBeTruthy();
     });
   });
 

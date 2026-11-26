@@ -33,6 +33,9 @@ export const CODING_AGENT_ACCOUNT_KEYS: readonly string[] = [
   ACCOUNT_LIMITED_UNTIL_ATTRIBUTE,
 ];
 
+/** The agents' own account ids, used as the account key when no launcher names one. */
+export const AGENT_ACCOUNT_ID_KEYS: readonly string[] = ["user.account_uuid", "user.account_id"];
+
 /** The account facts a resource carries, for the keys the record itself left unset. */
 export function resourceAccountFacts({
   facts,
@@ -43,7 +46,7 @@ export function resourceAccountFacts({
 }): Record<string, string | number> {
   const lifted: Record<string, string | number> = {};
   if (resourceAttributes === null) return lifted;
-  for (const key of CODING_AGENT_ACCOUNT_KEYS) {
+  for (const key of [...CODING_AGENT_ACCOUNT_KEYS, ...AGENT_ACCOUNT_ID_KEYS]) {
     if (facts[key] !== undefined) continue;
     const value = resourceAttributes[key];
     if (typeof value === "string" && value.trim() !== "") lifted[key] = value;

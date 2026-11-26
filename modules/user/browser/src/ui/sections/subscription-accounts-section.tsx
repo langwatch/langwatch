@@ -4,12 +4,20 @@ import { Chip } from "@langwatch/design-system/chip";
 import { DailyBarChart } from "@langwatch/design-system/daily-bar-chart";
 import { MeterBar } from "@langwatch/design-system/meter-bar";
 import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
-import { HStack, SimpleGrid, Skeleton, Text, VStack } from "@langwatch/design-system/primitives";
+import {
+  Button,
+  HStack,
+  SimpleGrid,
+  Skeleton,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { formatBudgetUsd } from "@langwatch/gateway-contract";
 import { docsUrl } from "@langwatch/handled-error/docs-url";
 import { nowEpochMs } from "@langwatch/time";
 import { KeyRound } from "lucide-react";
 import numeral from "numeral";
+import { useEffect, useState } from "react";
 
 import { api } from "../../behavior/personal-workspace-api.ts";
 import {
@@ -53,6 +61,7 @@ function SubscriptionAccountsBody({
     isLoading: boolean;
     isError: boolean;
     data?: { accounts: CodingAgentAccountBurndown[] };
+    refetch: () => unknown;
   };
 }) {
   if (query.isLoading) {
@@ -64,12 +73,8 @@ function SubscriptionAccountsBody({
       </SimpleGrid>
     );
   }
-  if (query.isError) {
-    return (
-      <Text fontSize="sm" color="fg.error">
-        Couldn&apos;t load subscription accounts
-      </Text>
-    );
+  if (query.isError && query.data === undefined) {
+    return <LoadFailed message="Couldn't load subscription accounts" onRetry={query.refetch} />;
   }
   const accounts = query.data?.accounts ?? [];
   if (accounts.length === 0) {
@@ -87,6 +92,9 @@ function SubscriptionAccountsBody({
 
   return (
     <VStack align="stretch" gap={3}>
+      {query.isError && (
+        <LoadFailed message="Couldn't refresh subscription accounts" onRetry={query.refetch} />
+      )}
       <SimpleGrid columns={{ base: 1, lg: Math.min(3, accounts.length) }} gap={3}>
         {accounts.map((account) => (
           <AccountCard key={account.accountId} account={account} />
@@ -100,13 +108,39 @@ function SubscriptionAccountsBody({
   );
 }
 
+function LoadFailed({ message, onRetry }: { message: string; onRetry: () => unknown }) {
+  return (
+    <HStack gap={3}>
+      <Text fontSize="sm" color="fg.error">
+        {message}
+      </Text>
+      <Button size="xs" variant="outline" onClick={() => void onRetry()}>
+        Retry
+      </Button>
+    </HStack>
+  );
+}
+
+/** The limit's end while it is still ahead; re-renders when it passes so the badge goes away. */
+function useActiveLimit(limitedUntilMs: number | null): number | null {
+  const [nowMs, setNowMs] = useState(nowEpochMs);
+  const isActive = limitedUntilMs !== null && limitedUntilMs > nowMs;
+  useEffect(() => {
+    if (!isActive || limitedUntilMs === null) return;
+    const timer = setTimeout(() => setNowMs(nowEpochMs()), limitedUntilMs - nowMs + 1000);
+    return () => clearTimeout(timer);
+  }, [isActive, limitedUntilMs, nowMs]);
+
+  return isActive ? limitedUntilMs : null;
+}
+
 function AccountCard({ account }: { account: CodingAgentAccountBurndown }) {
   const about = [
     account.agents.map(agentLabel).join(", "),
     account.topModels[0],
     accountSourceLabel(account.source),
   ].filter((part): part is string => Boolean(part));
-  const limitedUntilMs = account.reading?.limitedUntilMs ?? null;
+  const limitedUntilMs = useActiveLimit(account.reading?.limitedUntilMs ?? null);
 
   return (
     <Card
@@ -136,18 +170,25 @@ function AccountCard({ account }: { account: CodingAgentAccountBurndown }) {
 function UsageReading({ account }: { account: CodingAgentAccountBurndown }) {
   const reading = account.reading;
   const percent = reading?.percent ?? null;
+  const when = [
+    reading?.readAtMs ? `As of ${formatAccountMoment(reading.readAtMs)}` : null,
+    reading?.resetsAtMs ? `Resets ${formatAccountMoment(reading.resetsAtMs)}` : null,
+  ].filter((part): part is string => part !== null);
   if (reading === null || percent === null) {
     return (
-      <Text fontSize="sm" color="fg.muted">
-        No usage figure reported yet
-      </Text>
+      <VStack align="stretch" gap={1}>
+        <Text fontSize="sm" color="fg.muted">
+          No usage figure reported yet
+        </Text>
+        {when.length > 0 && (
+          <Text fontSize="xs" color="fg.muted">
+            {when.join(" · ")}
+          </Text>
+        )}
+      </VStack>
     );
   }
   const window = usageWindowLabel(reading.window);
-  const when = [
-    reading.readAtMs !== null ? `As of ${formatAccountMoment(reading.readAtMs)}` : null,
-    reading.resetsAtMs !== null ? `Resets ${formatAccountMoment(reading.resetsAtMs)}` : null,
-  ].filter((part): part is string => part !== null);
 
   return (
     <VStack align="stretch" gap={1.5}>
