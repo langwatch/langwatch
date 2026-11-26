@@ -268,6 +268,14 @@ Feature: Trace media blob extraction at the ingestion edge
       externalized keep their references (no orphaned bytes), and the drop is
       logged and counted rather than silent
 
+  @unit
+  Scenario: A recording that takes longer to store than the span's deadline is kept
+    Given a span whose one inline recording is large enough that storing it
+      outlasts the span's extraction deadline but not the per-store ceiling
+    When the span is ingested
+    Then the recording is stored and the attribute carries its reference
+    And no store starts after the deadline, and a store past the ceiling stays inline
+
   @integration
   Scenario: The receiver publishes the edge media fail-open series
     Given a project whose feature-flag store cannot be read

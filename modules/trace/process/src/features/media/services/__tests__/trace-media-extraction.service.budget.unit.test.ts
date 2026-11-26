@@ -86,7 +86,34 @@ describe("extraction budget", () => {
     });
   });
 
-  describe("given a store still in flight when the span's deadline passes", () => {
+  describe("given a large store still in flight when the span's deadline passes", () => {
+    /** @scenario A recording that takes longer to store than the span's deadline is kept */
+    it("waits for it within the store ceiling and keeps its reference", async () => {
+      const store: TraceMediaStore = {
+        purpose: "trace_content",
+        ownerKind: "trace",
+        storeFromBytes: async () => {
+          await new Promise((resolve) => setTimeout(resolve, 80));
+          return { id: "so-large", isDuplicate: false };
+        },
+      };
+      const extraction = extractionOver(store);
+      const budget = { ...extraction.createExtractionBudget(), deadlineAt: Date.now() + 20 };
+
+      const result = await extraction.extractFromValue({
+        value: contentWith(1),
+        budget,
+        ...PARAMS,
+      });
+
+      expect(budget.droppedByDeadline).toBe(0);
+      expect(result.refs.map((ref) => ref.id)).toEqual(["so-large"]);
+      const parts = (result.value as { content: { image_url: { url: string } }[] }[])[0]!.content;
+      expect(parts[0]!.image_url.url).toMatch(/^\/api\/files\//);
+    });
+  });
+
+  describe("given a store still in flight past the store ceiling", () => {
     /** @scenario Extraction cost inside the collector request is bounded */
     it("leaves that part inline, counts it as a deadline drop and ignores its late answer", async () => {
       let finishLate: () => void = () => {};
@@ -102,7 +129,11 @@ describe("extraction budget", () => {
         },
       };
       const extraction = extractionOver(store);
-      const budget = { ...extraction.createExtractionBudget(), deadlineAt: Date.now() + 50 };
+      const budget = {
+        ...extraction.createExtractionBudget(),
+        deadlineAt: Date.now() + 50,
+        storeCeilingMs: 50,
+      };
 
       const result = await extraction.extractFromValue({
         value: contentWith(2),

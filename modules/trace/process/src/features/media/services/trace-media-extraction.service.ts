@@ -23,8 +23,11 @@ import type { TraceMediaStore } from "./trace-media-store.service.ts";
 /** At most this many parts are stored per span; the rest stay inline and the drop is counted. */
 export const MAX_MEDIA_PARTS_PER_SPAN = 16;
 
-/** Wall-clock budget for one span, well under SDK export deadlines. */
+/** Wall-clock budget for one span, well under SDK export deadlines: no store starts past it. */
 const EXTRACTION_DEADLINE_MS = 5_000;
+
+/** How long one started store may run, so an hour-long recording lands while a stuck one ends. */
+const STORE_CEILING_MS = 30_000;
 
 /** Storage calls in flight at once during the store phase. */
 const CONCURRENT_STORES = 4;
@@ -41,6 +44,7 @@ export type ExtractedRef = Readonly<{
 /** The cost budget shared by every value of one span, so cap and deadline are per span. */
 export interface ExtractionBudget {
   deadlineAt: number;
+  storeCeilingMs: number;
   remainingParts: number;
   droppedByCap: number;
   droppedByDeadline: number;
@@ -110,6 +114,7 @@ export class TraceMediaExtractionService {
   createExtractionBudget(now: number = nowInstant().epochMilliseconds): ExtractionBudget {
     return {
       deadlineAt: now + EXTRACTION_DEADLINE_MS,
+      storeCeilingMs: STORE_CEILING_MS,
       remainingParts: MAX_MEDIA_PARTS_PER_SPAN,
       droppedByCap: 0,
       droppedByDeadline: 0,
@@ -261,10 +266,11 @@ export class TraceMediaExtractionService {
   }
 
   /**
-   * One store raced against the time left to the deadline. A late store stays inline and
-   * counts as a deadline drop; whatever it answers later is ignored. A failure stays inline.
+   * One started store raced against the store ceiling, not the span's deadline (which only stops
+   * new stores). A store past the ceiling stays inline and counts as a deadline drop; whatever it
+   * answers later is ignored. A failure stays inline.
    */
-  private async storeBeforeDeadline(input: {
+  private async storeWithinCeiling(input: {
     site: MediaSite;
     projectId: string;
     ownerId: string;
@@ -273,8 +279,7 @@ export class TraceMediaExtractionService {
     const { budget } = input;
     let timer: ReturnType<typeof setTimeout> | undefined;
     const late = new Promise<"late">((resolve) => {
-      const leftMs = Math.max(0, budget.deadlineAt - nowInstant().epochMilliseconds);
-      timer = setTimeout(() => resolve("late"), leftMs);
+      timer = setTimeout(() => resolve("late"), budget.storeCeilingMs);
     });
     try {
       const outcome = await Promise.race([this.storeSite(input), late]);
@@ -321,7 +326,7 @@ export class TraceMediaExtractionService {
 
       const wave = takeable.slice(i, i + CONCURRENT_STORES);
       const results = await Promise.all(
-        wave.map((site) => this.storeBeforeDeadline({ site, projectId, ownerId, budget })),
+        wave.map((site) => this.storeWithinCeiling({ site, projectId, ownerId, budget })),
       );
       for (const result of results) {
         if (result.ref) refs.push(result.ref);
