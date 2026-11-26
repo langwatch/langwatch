@@ -216,6 +216,33 @@ describe("a workbench the reader's role cannot change", () => {
         expect(mocks.showErrorToast).toHaveBeenCalledTimes(1);
         expect(mocks.fetchSSE).not.toHaveBeenCalled();
       });
+
+      it("does not send a save that was queued while the refused one was in flight", async () => {
+        let refuse: (error: unknown) => void = () => undefined;
+        mocks.mutateAsync.mockReturnValueOnce(
+          new Promise((_resolve, reject) => {
+            refuse = reject;
+          }),
+        );
+        renderWithDesignSystem(
+          <Wrapper>
+            <AutosaveProbe />
+          </Wrapper>,
+        );
+
+        await editACell("first");
+        let outcomes: string[] = [];
+        await act(async () => {
+          const first = autosave?.saveNow();
+          await editACell("second");
+          const queued = autosave?.saveNow();
+          refuse(liteMemberSaveRefusal());
+          outcomes = (await Promise.all([first, queued])).map(String);
+        });
+
+        expect(mocks.mutateAsync).toHaveBeenCalledTimes(1);
+        expect(outcomes).toEqual(["failed", "failed"]);
+      });
     });
   });
 
