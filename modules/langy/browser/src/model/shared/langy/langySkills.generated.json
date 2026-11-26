@@ -167,6 +167,13 @@
 		"userPrompt": "Set up online evaluations for my agent"
 	},
 	{
+		"id": "owasp-red-team",
+		"label": "OWASP red team",
+		"description": "Apply the OWASP red team pack to an existing AI agent as code. Copies a ready pytest or vitest suite with one multi-turn attack per OWASP risk (LLM Top 10 2025 and Agentic Top 10), wires it to the agent, fills one config block and runs it, with results in LangWatch. Use when a security review asks for OWASP coverage, or before shipping an agent with tools.",
+		"category": "recipe",
+		"userPrompt": "Red team my agent against the OWASP Top 10 for LLM and agentic applications"
+	},
+	{
 		"id": "prompt-optimization",
 		"label": "Prompt optimization",
 		"description": "Improve a prompt on the evaluations workbench through a measured loop. Score the baseline first, then duplicate the target column, form a hypothesis from failing rows, edit the copy's prompt draft, run, compare pass rate and cost, and repeat until the numbers hold. Use when the user asks to optimize or improve a prompt, when they arrive from the workbench's \"Optimize this prompt\" menu item, or when they want their bot to answer better. Bootstraps a missing dataset or evaluator first.",
