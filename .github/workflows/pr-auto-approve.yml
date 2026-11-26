@@ -24,9 +24,10 @@ name: Auto-approve for validated Low-Risk or Firefighting Check
 #   2. Any approval on current head_sha → no-op (idempotency).
 #   3. `firefighting` label present → no-op (step 3 above owns it).
 #   4. PR changes (or renames away) what the review job may run or read from
-#      the PR head (root files, .github/, .claude/, cmd/, tools/, any
-#      CLAUDE.md or AGENTS.md) → no-op: a human must approve, because such a
-#      PR could forge the review bot's verdict.
+#      the PR head (root files, .github/, cmd/, tools/, pkg/ciscan/, and at
+#      any depth .claude/, CLAUDE.md, AGENTS.md, go.mod, go.sum) → no-op:
+#      a human must approve, because such a PR could forge the review bot's
+#      verdict.
 #   5. Review bot's latest review on head_sha is not a clean COMMENT
 #      (REQUEST_CHANGES = P0/P1, infra error, dismissed, none) → no-op.
 #   6. Any required status check not green on head_sha → no-op.
@@ -554,7 +555,7 @@ jobs:
               });
 
               const nextStep = touchesReviewPipeline(files)
-                ? "This PR changes what the review job runs or reads from the PR head (a root-level file, `.github/`, `.claude/`, `cmd/`, `tools/`, a `CLAUDE.md` or an `AGENTS.md`), so the review bot's verdict cannot vouch for it: **a human must approve it.**"
+                ? "This PR changes what the review job runs or reads from the PR head (a root-level file, `.github/`, `cmd/`, `tools/`, `pkg/ciscan/`, or a `.claude/` directory, `CLAUDE.md`, `AGENTS.md`, `go.mod` or `go.sum` at any depth), so the review bot's verdict cannot vouch for it: **a human must approve it.**"
                 : "Automation approves it once the review bot's review of the head commit has no P0/P1 finding and the required checks are green. No human review is needed; the daily change report lists it for acknowledgement.";
               await github.rest.issues.createComment({
                 owner: context.repo.owner,

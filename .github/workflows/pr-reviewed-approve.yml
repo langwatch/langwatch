@@ -60,7 +60,7 @@ jobs:
           RUN_HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
         with:
           script: |
-            const { BOT_LOGIN, NEEDS_ACK_LABEL, decideReviewedApproval } = require(
+            const { BOT_LOGIN, NEEDS_ACK_LABEL, decideReviewedApproval, requiredChecksFrom } = require(
               `${process.env.GITHUB_WORKSPACE}/.github/scripts/pr-auto-approve-decision.cjs`
             );
             const { owner, repo } = context.repo;
@@ -90,20 +90,19 @@ jobs:
               const files = changed.flatMap((file) =>
                 file.previous_filename ? [file.filename, file.previous_filename] : [file.filename]
               );
-              // Rulesets only: classic branch protection's required checks are
-              // not listed here. An empty list is never green, so a branch
-              // without a ruleset fails closed.
+              // Rulesets and classic branch protection both gate the merge, so
+              // both name required checks. An empty list is never green, so a
+              // branch with neither fails closed.
               const rules = await github.paginate("GET /repos/{owner}/{repo}/rules/branches/{branch}", {
                 owner, repo, branch: pr.base.ref, per_page: 100,
               });
-              const required = [...new Set(rules
-                .filter((rule) => rule.type === "required_status_checks")
-                .flatMap((rule) => rule.parameters?.required_status_checks ?? [])
-                .map((check) => check.context))];
+              const { data: base } = await github.rest.repos.getBranch({ owner, repo, branch: pr.base.ref });
+              const required = requiredChecksFrom(rules, base.protection);
               const checkRuns = await github.paginate(github.rest.checks.listForRef, {
                 owner, repo, ref: pr.head.sha, per_page: 100,
               });
-              const { data: combined } = await github.rest.repos.getCombinedStatusForRef({
+              // The list, not the combined status: it names who created each status.
+              const statuses = await github.paginate(github.rest.repos.listCommitStatusesForRef, {
                 owner, repo, ref: pr.head.sha, per_page: 100,
               });
 
@@ -116,7 +115,7 @@ jobs:
                 filesComplete: changed.length >= pr.changed_files,
                 required,
                 checkRuns,
-                statuses: combined.statuses,
+                statuses,
               });
               core.info(`PR #${number}: ${decision.approve ? "approve" : "no approval"} (${decision.reason}).`);
               if (!decision.approve) continue;

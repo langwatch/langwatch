@@ -7,10 +7,13 @@ import { describe, it } from "node:test";
 type Review = { id: number; user: { login: string }; state: string; commit_id: string; body: string };
 type Decision = { approve: boolean; reason: string; needsAck: boolean };
 
-const { decideReviewedApproval, lowRiskPathsOnly, untrustedLine } = createRequire(import.meta.url)(
-  "./pr-auto-approve-decision.cjs",
-) as {
+type RequiredCheck = { context: string; appId?: number };
+
+const { decideReviewedApproval, lowRiskPathsOnly, requiredChecksFrom, untrustedLine } = createRequire(
+  import.meta.url,
+)("./pr-auto-approve-decision.cjs") as {
   decideReviewedApproval: (input: Record<string, unknown>) => Decision;
+  requiredChecksFrom: (rules: object[], protection?: object) => RequiredCheck[];
   lowRiskPathsOnly: (files: string[]) => boolean;
   untrustedLine: (text: string) => string;
 };
@@ -18,7 +21,11 @@ const { decideReviewedApproval, lowRiskPathsOnly, untrustedLine } = createRequir
 const HEAD = "a".repeat(40);
 const OLD = "b".repeat(40);
 const BOT = "github-actions[bot]";
-const REQUIRED = ["pr conventions", "codeql-complete", "ci-complete", "review"];
+const ACTIONS_APP = 15368;
+const NAMES = ["pr conventions", "codeql-complete", "ci-complete", "review"];
+const REQUIRED: RequiredCheck[] = NAMES.map((context) =>
+  context === "review" ? { context, appId: ACTIONS_APP } : { context },
+);
 
 const botReview = (id: number, state: string, extra = "", commit = HEAD): Review => ({
   id,
@@ -28,12 +35,20 @@ const botReview = (id: number, state: string, extra = "", commit = HEAD): Review
   body: `**@LangWatchReviewBot** findings${extra}`,
 });
 
-const greenRuns = REQUIRED.map((name, index) => ({
+const greenRuns = NAMES.map((name, index) => ({
   id: index + 1,
   name,
+  app: { id: ACTIONS_APP, slug: "github-actions" },
   status: "completed",
   conclusion: name === "codeql-complete" ? "skipped" : "success",
 }));
+
+const status = (context: string, state: string, id = 1, creator = BOT) => ({
+  id,
+  context,
+  state,
+  creator: { login: creator },
+});
 
 const decide = (overrides: Record<string, unknown> = {}): Decision =>
   decideReviewedApproval({
@@ -105,22 +120,42 @@ describe("reviewed-approval decision", () => {
   });
 
   /** @scenario "A required check that failed or has not finished means no approval" */
-  it("reads the newest check run per name and falls back to commit statuses", () => {
+  it("reads the newest run or status per name and source, pinned to the required app", () => {
     const rerunGreen = [
       ...greenRuns.map((run) => (run.name === "review" ? { ...run, conclusion: "failure" } : run)),
-      { id: 99, name: "review", status: "completed", conclusion: "success" },
+      { id: 99, name: "review", app: { id: ACTIONS_APP }, status: "completed", conclusion: "success" },
     ];
     assert.equal(decide({ checkRuns: rerunGreen }).approve, true);
 
+    const masked = [
+      ...greenRuns.map((run) => (run.name === "ci-complete" ? { ...run, conclusion: "failure" } : run)),
+      { id: 98, name: "ci-complete", app: { id: 1 }, status: "completed", conclusion: "success" },
+    ];
+    assert.match(decide({ checkRuns: masked }).reason, /ci-complete \(failure\)/, "another app's run cannot mask it");
+
+    const pinned = [
+      ...greenRuns.filter((run) => run.name !== "review"),
+      { id: 97, name: "review", app: { id: 1 }, status: "completed", conclusion: "success" },
+    ];
+    assert.equal(decide({ checkRuns: pinned }).approve, false, "a check pinned to an app reads only its runs");
+    assert.equal(
+      decide({ checkRuns: pinned, statuses: [status("review", "success", 1, "someone[bot]")] }).approve,
+      false,
+      "a check pinned to an app reads only the statuses its bot created",
+    );
+    assert.equal(decide({ checkRuns: pinned, statuses: [status("review", "success")] }).approve, true);
+
     const asStatus = greenRuns.filter((run) => run.name !== "pr conventions");
     assert.equal(
-      decide({ checkRuns: asStatus, statuses: [{ context: "pr conventions", state: "success" }] }).approve,
+      decide({ checkRuns: asStatus, statuses: [status("pr conventions", "success")] }).approve,
       true,
     );
     assert.equal(
-      decide({ checkRuns: asStatus, statuses: [{ context: "pr conventions", state: "pending" }] }).approve,
+      decide({ checkRuns: asStatus, statuses: [status("pr conventions", "pending")] }).approve,
       false,
     );
+    const statusRetried = [status("pr conventions", "failure", 1), status("pr conventions", "success", 2)];
+    assert.equal(decide({ checkRuns: asStatus, statuses: statusRetried }).approve, true, "the newest status counts");
   });
 
   /** @scenario "A PR that changes the review pipeline needs a human" */
@@ -139,6 +174,10 @@ describe("reviewed-approval decision", () => {
       "CLAUDE.md",
       "langwatch/src/AGENTS.md",
       "services/CLAUDE.md",
+      "langwatch/.claude/settings.json",
+      "pkg/go.mod",
+      "services/go.sum",
+      "pkg/ciscan/scan.go",
     ]) {
       const decision = decide({ files: ["langwatch/src/a.ts", path] });
       assert.equal(decision.approve, false, path);
@@ -164,11 +203,55 @@ describe("reviewed-approval decision", () => {
   });
 });
 
+describe("required checks", () => {
+  /** @scenario "Required checks come from rulesets and branch protection, each from its own app" */
+  it("come from rulesets and branch protection, keeping the app each one is pinned to", () => {
+    const rules = [
+      { type: "pull_request", parameters: {} },
+      {
+        type: "required_status_checks",
+        parameters: {
+          required_status_checks: [{ context: "ci-complete" }, { context: "review", integration_id: ACTIONS_APP }],
+        },
+      },
+    ];
+    const protection = {
+      required_status_checks: {
+        checks: [
+          { context: "build", app_id: ACTIONS_APP },
+          { context: "review", app_id: ACTIONS_APP },
+          { context: "lint", app_id: null },
+        ],
+      },
+    };
+    assert.deepEqual(requiredChecksFrom(rules, protection), [
+      { context: "ci-complete", appId: undefined },
+      { context: "review", appId: ACTIONS_APP },
+      { context: "build", appId: ACTIONS_APP },
+      { context: "lint", appId: undefined },
+    ]);
+    assert.deepEqual(requiredChecksFrom([], undefined), []);
+  });
+});
+
 describe("low-risk path allowlist", () => {
   /** @scenario "Low risk needs every path on the allowlist, whatever the model says" */
   it("allows only documentation, specs and images outside the review pipeline", () => {
-    assert.equal(lowRiskPathsOnly(["docs/guide.mdx", "specs/ci/x.feature", "langwatch/public/logo.svg"]), true);
+    assert.equal(
+      lowRiskPathsOnly([
+        "docs/guide.mdx",
+        "docs/images/logo.svg",
+        "dev/docs/adr/x.md",
+        "specs/ci/x.feature",
+        "langwatch/README.md",
+        "langwatch/public/logo.png",
+      ]),
+      true,
+    );
     assert.equal(lowRiskPathsOnly(["langwatch/src/server/foo.md", "langwatch/src/server/foo.ts"]), false);
+    assert.equal(lowRiskPathsOnly(["langwatch/src/server/prompt.md"]), false, "not every .md is documentation");
+    assert.equal(lowRiskPathsOnly(["skills/tracing/SKILL.md"]), false, "a skill ships as agent instructions");
+    assert.equal(lowRiskPathsOnly(["langwatch/public/logo.svg"]), false, "an svg outside docs/ can carry script");
     assert.equal(lowRiskPathsOnly(["README.md"]), false, "root-level files are review pipeline");
     assert.equal(lowRiskPathsOnly(["langwatch/CLAUDE.md"]), false);
     assert.equal(lowRiskPathsOnly([".claude/agents/x.md"]), false);

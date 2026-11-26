@@ -48,9 +48,17 @@ Feature: Automation approves reviewed pull requests and flags the risky ones
     Then automation does not approve
 
   @unit
+  Scenario: Required checks come from rulesets and branch protection, each from its own app
+    Given the base branch names required checks in a ruleset and in branch protection, some pinned to an app
+    And another app reports a passing run under a required check's name
+    When the reviewed-approval decision runs
+    Then every named check must pass on a run from the app it is pinned to
+    And another app's run cannot stand in for it
+
+  @unit
   Scenario: A PR that changes the review pipeline needs a human
     Given the review bot passed the head commit and every required check is green
-    And the PR changes or renames a root-level file, anything under .github/, .claude/, cmd/ or tools/, or a CLAUDE.md or AGENTS.md
+    And the PR changes or renames a root-level file, anything under .github/, cmd/, tools/ or pkg/ciscan/, or a .claude/ directory, CLAUDE.md, AGENTS.md, go.mod or go.sum at any depth
     When the reviewed-approval decision runs
     Then automation does not approve
 
@@ -70,7 +78,7 @@ Feature: Automation approves reviewed pull requests and flags the risky ones
 
   @unit
   Scenario: Low risk needs every path on the allowlist, whatever the model says
-    Given a PR that changes a path other than documentation, specs or images, or one in the review pipeline
+    Given a PR that changes a path other than docs/, dev/docs/, specs/, a README or a raster image, or one in the review pipeline
     When the low-risk evaluation runs
     Then the PR does not qualify as low risk without asking the model
 

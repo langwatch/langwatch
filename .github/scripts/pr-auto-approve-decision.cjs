@@ -16,19 +16,25 @@ const INFRA_ERROR_MARKER = "<!-- review-infra-error -->";
 
 // The review job in pr.yml runs code and config from the PR head (setup-go,
 // `go run ./cmd/waitforchecks`, npm and Claude Code in the checkout) with a
-// token that can post reviews as github-actions[bot]. A PR that edits any of
-// it could forge the review bot's verdict, so the match fails closed: every
-// root-level file (.npmrc, go.work, package.json, ...), .github/, .claude/,
-// cmd/, tools/, and a CLAUDE.md or AGENTS.md at any depth.
-const REVIEW_PIPELINE_PATH = /^(?:[^/]+$|\.github\/|\.claude\/|cmd\/|tools\/)|(?:^|\/)(?:CLAUDE|AGENTS)\.md$/;
+// token that can post reviews as github-actions[bot]; so does
+// migration-order.yml (`go run ./cmd/migrationorder`, which compiles
+// pkg/ciscan). A PR that edits any of it could forge the review bot's verdict,
+// so the match fails closed: every root-level file (.npmrc, go.work,
+// package.json, ...), .github/, cmd/, tools/, pkg/ciscan/, and at any depth a
+// .claude/ directory, a CLAUDE.md or AGENTS.md, or a go.mod/go.sum (go.work
+// builds those tools from every workspace module's requirements).
+const REVIEW_PIPELINE_PATH =
+  /^(?:[^/]+$|\.github\/|cmd\/|tools\/|pkg\/ciscan\/)|(?:^|\/)(?:\.claude\/|(?:CLAUDE|AGENTS)\.md$|go\.(?:mod|sum)$)/;
 
 // Same rule as tools/waitforchecks: these conclusions do not fail a check.
 const PASSING_CONCLUSIONS = new Set(["success", "skipped", "neutral"]);
 
 // The only paths the low-risk path may approve on, whatever the model says:
-// documentation, BDD specs and images. The model's verdict alone is
-// persuadable by the PR it reads, so it can only narrow this list.
-const LOW_RISK_PATH = /^(?:docs|specs)\/|\.(?:md|mdx|png|jpe?g|gif|svg|webp)$/;
+// docs/, dev/docs/, specs/, a README, and raster images. Not every .md: a
+// SKILL.md or prompt file ships as agent instructions. Not .svg outside docs/:
+// it can carry script. The model's verdict alone is persuadable by the PR it
+// reads, so it can only narrow this list.
+const LOW_RISK_PATH = /^(?:docs|dev\/docs|specs)\/|(?:^|\/)README\.mdx?$|\.(?:png|jpe?g|gif|webp)$/;
 
 /** True when any changed path is one the review job executes from the PR head. */
 const touchesReviewPipeline = (files) => files.some((file) => REVIEW_PIPELINE_PATH.test(file));
@@ -60,31 +66,72 @@ const reviewBotVerdict = (reviews, headSha) => {
 };
 
 /**
+ * The required checks the base branch names, from rulesets and from classic
+ * branch protection (GitHub enforces both), as { context, appId }. appId is
+ * the app that must report it, or undefined when any source counts.
+ *
+ * @param {object[]} rules       rules/branches/{branch} payload
+ * @param {object} [protection]  repos.getBranch().protection
+ */
+const requiredChecksFrom = (rules, protection) => {
+  const fromRules = rules
+    .filter((rule) => rule.type === "required_status_checks")
+    .flatMap((rule) => rule.parameters?.required_status_checks ?? [])
+    .map((check) => ({ context: check.context, appId: check.integration_id ?? undefined }));
+  const fromProtection = (protection?.required_status_checks?.checks ?? []).map((check) => ({
+    context: check.context,
+    appId: check.app_id ?? undefined,
+  }));
+  const unique = new Map();
+  for (const check of [...fromRules, ...fromProtection]) unique.set(`${check.context}\0${check.appId}`, check);
+  return [...unique.values()];
+};
+
+/** The newest item (highest id) per key. */
+const newestBy = (items, keyOf) => {
+  const newest = new Map();
+  for (const item of items) {
+    const seen = newest.get(keyOf(item));
+    if (!seen || item.id > seen.id) newest.set(keyOf(item), item);
+  }
+  return [...newest.values()];
+};
+
+/**
  * Whether every required check is finished and passing on the head commit, as
- * a check run (newest per name) or a commit status. A required check with no
- * result yet is pending; an empty required list is never green.
+ * check runs and commit statuses. Each is read newest per name and source (app
+ * or status creator), and every source's latest result must pass, so a
+ * same-name result from another source cannot stand in for the real one. A
+ * check pinned to an app reads only that app's runs and the statuses its bot
+ * created. A required check with no result yet is pending; an empty required
+ * list is never green.
+ *
+ * @param {{ context: string, appId?: number }[]} required  from requiredChecksFrom
+ * @param {object[]} checkRuns  checks.listForRef payload for the head sha
+ * @param {object[]} statuses   repos.listCommitStatusesForRef payload (it names each creator)
  */
 const requiredChecksVerdict = (required, checkRuns, statuses) => {
-  const runs = new Map();
-  for (const run of checkRuns) {
-    const seen = runs.get(run.name);
-    if (!seen || run.id > seen.id) runs.set(run.name, run);
-  }
-  const states = new Map(statuses.map((status) => [status.context, status.state]));
+  const runs = newestBy(checkRuns, (run) => `${run.name}\0${run.app?.id}`);
+  const latestStatuses = newestBy(statuses, (status) => `${status.context}\0${status.creator?.login}`);
+  const appBots = new Map(checkRuns.filter((run) => run.app?.slug).map((run) => [run.app.id, `${run.app.slug}[bot]`]));
 
   const pending = [];
   const failed = [];
-  for (const name of required) {
-    const run = runs.get(name);
-    const state = states.get(name);
-    if (run) {
-      if (run.status !== "completed") pending.push(name);
-      else if (!PASSING_CONCLUSIONS.has(run.conclusion)) failed.push(`${name} (${run.conclusion})`);
-    } else if (state && state !== "pending") {
-      if (state !== "success") failed.push(`${name} (${state})`);
-    } else {
-      pending.push(name);
-    }
+  for (const { context, appId } of required) {
+    const results = [
+      ...runs
+        .filter((run) => run.name === context && (appId === undefined || run.app?.id === appId))
+        .map((run) => (run.status !== "completed" ? "pending" : run.conclusion)),
+      ...latestStatuses
+        .filter(
+          (status) =>
+            status.context === context && (appId === undefined || status.creator?.login === appBots.get(appId)),
+        )
+        .map((status) => (status.state === "success" ? "success" : status.state)),
+    ];
+    const failing = results.find((result) => result !== "pending" && !PASSING_CONCLUSIONS.has(result));
+    if (failing) failed.push(`${context} (${failing})`);
+    else if (results.length === 0 || results.includes("pending")) pending.push(context);
   }
 
   return { green: required.length > 0 && pending.length === 0 && failed.length === 0, pending, failed };
@@ -101,9 +148,9 @@ const requiredChecksVerdict = (required, checkRuns, statuses) => {
  * @param {object[]} input.reviews    pulls.listReviews payload
  * @param {string[]} input.files      changed paths (pulls.listFiles)
  * @param {boolean} input.filesComplete false when the file list was capped
- * @param {string[]} input.required   status check names the base branch rules require
+ * @param {{ context: string, appId?: number }[]} input.required  requiredChecksFrom output
  * @param {object[]} input.checkRuns  checks.listForRef payload for the head sha
- * @param {object[]} input.statuses   combined-status statuses for the head sha
+ * @param {object[]} input.statuses   repos.listCommitStatusesForRef payload for the head sha
  */
 const decideReviewedApproval = (input) => {
   const { runHeadSha, prHeadSha, labels, reviews, files, filesComplete, required, checkRuns, statuses } =
@@ -154,6 +201,7 @@ module.exports = {
   NEEDS_ACK_LABEL,
   decideReviewedApproval,
   lowRiskPathsOnly,
+  requiredChecksFrom,
   requiredChecksVerdict,
   reviewBotVerdict,
   touchesReviewPipeline,

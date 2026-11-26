@@ -14,11 +14,11 @@ A PR may be treated as **low risk** only if:
   - Integrations with third‑party systems or external APIs.
 
 - It is limited to:
-  - Documentation (`*.md`, `*.mdx`, `docs/`).
+  - Documentation (`docs/`, `dev/docs/`, any `README.md`).
   - BDD feature specs (`specs/` directory).
-  - Images.
+  - Raster images (`.png`, `.jpg`, `.gif`, `.webp`; `.svg` only under `docs/`).
 
-Automation enforces that list as a path allowlist before any AI evaluation. A file at the repository root, under `.github/`, `.claude/`, `cmd/` or `tools/`, or any `CLAUDE.md` or `AGENTS.md`, is never low risk.
+Automation enforces that list as a path allowlist before any AI evaluation. Other `.md` files are not on it: a `SKILL.md` or prompt file ships as agent instructions. The review pipeline is never low risk: a file at the repository root, anything under `.github/`, `cmd/`, `tools/` or `pkg/ciscan/`, or at any depth a `.claude/` directory, `CLAUDE.md`, `AGENTS.md`, `go.mod` or `go.sum`.
 
 If you are unsure, do **not** use `low-risk-change`; request a normal review instead.
 
@@ -39,9 +39,9 @@ PRs that do not meet these conditions follow the reviewed path below.
 A PR that does not qualify gets the `needs-ack` label and a comment saying why it is risky. Automation approves it, with no human review, once:
 
 - The automated review bot's latest review of the head commit has no P0/P1 (blocking) finding.
-- All required CI checks are green.
+- All required CI checks are green, as named by the rulesets and the branch protection on the base branch.
 
-The daily change report lists merged `needs-ack` PRs so a human acknowledges each risky change after it ships. A PR that changes or renames what the review job runs or reads from the PR (a file at the repository root, anything under `.github/`, `.claude/`, `cmd/` or `tools/`, or any `CLAUDE.md` or `AGENTS.md`) is never approved this way and needs a human approval.
+The daily change report lists merged `needs-ack` PRs so a human acknowledges each risky change after it ships. A PR that changes or renames the review pipeline (the paths listed above) is never approved this way and needs a human approval.
 
 ## Firefighting Label
 
