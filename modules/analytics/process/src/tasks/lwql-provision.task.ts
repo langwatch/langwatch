@@ -998,7 +998,7 @@ async function runLwqlProvisioningTask({
 /**
  * One private server's ClickHouse half, after the shared converge and under its lock, so two
  * replicas never interleave; no PostgreSQL work. Config's `lwql_postgres` holds the login, and
- * a server without it stays refused.
+ * a server without it stays refused. The access model follows the shared run's mode (ADR-200).
  */
 export async function convergeLwqlPrivateClickHouse({
   database,
@@ -1035,10 +1035,14 @@ export async function convergeLwqlPrivateRepository({
   }
   const configStoreEntities = await repository.inventoryConfigStore({ names });
   const includeAppFunctions = await appFunctionsProvisionable(repository);
-  await clusterGuard.assertSafe({
-    query: (sql) => repository.queryRows(sql),
-    source: plan.settings,
-  });
+  // Rendered: the reader comes from the server's users.d, so no access entity is written here.
+  const mode = selfProvisioning.accessModelMode({ source: plan.settings });
+  if (mode === "sql") {
+    await clusterGuard.assertSafe({
+      query: (sql) => repository.queryRows(sql),
+      source: plan.settings,
+    });
+  }
   const statements = selfProvisioning.clickHouseStatements({
     names,
     restrictedPassword: request.connection.password,
@@ -1047,6 +1051,7 @@ export async function convergeLwqlPrivateRepository({
     // The scoped copies are the only relation the per-customer login reads.
     schema: LWQL_SCOPED_SCHEMA,
     includeAppFunctions,
+    mode,
     externalCollection: LWQL_RENDERED_NAMED_COLLECTION,
     postgresKeyMap: true,
   });

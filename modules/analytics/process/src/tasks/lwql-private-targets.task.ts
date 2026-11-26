@@ -20,6 +20,7 @@ import {
   readPrivateRoute,
   readServerAddress,
 } from "../rules/lwql-private-route.rules.ts";
+import type { LangWatchQLNames } from "../services/langwatch-ql-access-model.service.ts";
 import { LangWatchQLSqlTextService } from "../services/langwatch-ql-sql-text.service.ts";
 import type { LwqlConvergencePlan } from "./lwql-provision.task.ts";
 
@@ -36,6 +37,26 @@ const SINGLE_NODE_BYPASS = "LWQL_ACCESS_MODEL_SQL_SINGLE_NODE";
 export interface LwqlPrivateEndpoint {
   readonly organizationId?: string;
   readonly url: string;
+}
+
+/** A private server's names: its database, its organisation's reader and the tenant setting. */
+export function privateNamesOf({
+  database,
+  reader,
+  tenantSetting,
+}: {
+  database: string;
+  reader: LwqlPrivateReader;
+  tenantSetting: string;
+}): LangWatchQLNames {
+  return {
+    database,
+    restrictedUser: reader.username,
+    settingsProfile: reader.settingsProfile,
+    // A PostgreSQL-engine table over the scoped project keys: no key row lives on this server.
+    keyMapTable: LWQL_PROJECT_KEYS_VIEW,
+    tenantSetting,
+  };
 }
 
 /**
@@ -74,14 +95,7 @@ export function privatePlanOf({
       // The shared Postgres is never named to a customer's server; its login is the config's.
       endpoint: { host: "", port: 0, database: "" },
     },
-    names: {
-      ...shared.names,
-      database,
-      restrictedUser: reader.username,
-      settingsProfile: reader.settingsProfile,
-      // A PostgreSQL-engine table over the scoped project keys: no key row lives on this server.
-      keyMapTable: LWQL_PROJECT_KEYS_VIEW,
-    },
+    names: privateNamesOf({ database, reader, tenantSetting: shared.names.tenantSetting }),
     settings,
     sourceDatabase: () => database,
     openRepository: () =>

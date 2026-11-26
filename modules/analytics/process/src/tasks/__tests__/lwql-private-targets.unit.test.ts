@@ -417,6 +417,83 @@ describe("given a private ClickHouse without a lwql_postgres collection", () => 
   });
 });
 
+/** A private server of two replicas with local access storage, as the cluster guard reads it. */
+function twoReplicaRepository() {
+  const held = repositoryHolding({ available: ["lwql_postgres"] });
+  const queried: string[] = [];
+  const repository = {
+    ...(held.repository as object),
+    queryRows: async (sql: string) => {
+      queried.push(sql);
+      if (sql.includes("system.clusters")) return [{ host_count: "2" }];
+      if (sql.includes("system.replicas")) return [{ max_total_replicas: "2" }];
+      return [];
+    },
+  };
+  return { repository: repository as never, statements: held.statements, queried };
+}
+
+const PRIVATE_PLAN = {
+  ...SHARED_PLAN,
+  names: {
+    ...SHARED_PLAN.names,
+    database: "acme_db",
+    restrictedUser: "langwatch_lwql_0123456789ab",
+    settingsProfile: "langwatch_lwql_0123456789ab_profile",
+    keyMapTable: "lwql_project_keys",
+  },
+  sourceDatabase: () => "acme_db",
+  schema: "lwql_scoped",
+};
+
+const ACCESS_ENTITY = /^(CREATE (SETTINGS PROFILE|USER|ROLE|ROW POLICY|QUOTA)|ALTER USER|GRANT) /;
+
+describe("given a rendered access model and a two-replica private ClickHouse", () => {
+  /** @scenario "In rendered mode a private ClickHouse gets its views and engine tables but no access entity" */
+  it("writes no access entity, asks no cluster guard, and binds the key map and engine tables to lwql_postgres", async () => {
+    const { repository, statements, queried } = twoReplicaRepository();
+
+    await convergeLwqlPrivateRepository({ repository, plan: { ...PRIVATE_PLAN, settings: {} } });
+
+    expect(statements.filter((statement) => ACCESS_ENTITY.test(statement))).toEqual([]);
+    expect(queried.some((sql) => sql.includes("system.user_directories"))).toBe(false);
+    const all = statements.join("\n");
+    expect(all).toContain(
+      "CREATE OR REPLACE TABLE acme_db.lwql_project_keys (KeyHash String, TenantId String) " +
+        "ENGINE = PostgreSQL(lwql_postgres, table='lwql_project_keys', schema='lwql_scoped')",
+    );
+    expect(all).toMatch(/CREATE OR REPLACE VIEW acme_db\.traces/);
+    expect(all).not.toMatch(/NAMED COLLECTION/);
+  });
+});
+
+describe("given a sql access model and a private ClickHouse", () => {
+  /** @scenario "In sql mode a private ClickHouse keeps the SQL access entities and the cluster guard" */
+  it("refuses a two-replica server without replicated access storage before any statement", async () => {
+    const { repository, statements } = twoReplicaRepository();
+    const plan = { ...PRIVATE_PLAN, settings: { LWQL_ACCESS_MODEL_MODE: "sql" } };
+
+    await expect(convergeLwqlPrivateRepository({ repository, plan })).rejects.toThrow(
+      /multi-host cluster/,
+    );
+    expect(statements).toEqual([]);
+  });
+
+  /** @scenario "In sql mode a private ClickHouse keeps the SQL access entities and the cluster guard" */
+  it("creates the reader, its profile, row policies and grants by statement on a single host", async () => {
+    const { repository, statements } = repositoryHolding({ available: ["lwql_postgres"] });
+    const plan = { ...PRIVATE_PLAN, settings: { LWQL_ACCESS_MODEL_MODE: "sql" } };
+
+    await convergeLwqlPrivateRepository({ repository, plan });
+
+    const user = PRIVATE_PLAN.names.restrictedUser;
+    expect(statements.some((s) => s.startsWith(`CREATE USER OR REPLACE ${user} `))).toBe(true);
+    expect(statements.some((s) => s.startsWith("CREATE SETTINGS PROFILE OR REPLACE"))).toBe(true);
+    expect(statements.some((s) => s.startsWith("CREATE ROW POLICY OR REPLACE"))).toBe(true);
+    expect(statements.some((s) => s.startsWith("GRANT SELECT"))).toBe(true);
+  });
+});
+
 const PRIVATE_NAMES = {
   database: "acme_db",
   restrictedUser: "langwatch_lwql_0123456789ab",

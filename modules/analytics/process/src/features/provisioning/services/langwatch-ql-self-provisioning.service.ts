@@ -12,7 +12,10 @@ import type { LwqlCollectionState } from "../../../repositories/langwatch-ql-pro
 import { flooredViewName, flooredViewNames } from "../../../rules/lwql-dedup-floor.rules.ts";
 import { traceIdsViewName, traceIdsViewNames } from "../../../rules/lwql-dedup-trace-ids.rules.ts";
 import { LWQL_VIEW_CATALOG } from "../../../rules/lwql-view-catalog.rules.ts";
-import { LangWatchQLAccessModelDefinitionService } from "../../../services/langwatch-ql-access-model-definition.service.ts";
+import {
+  LangWatchQLAccessModelDefinitionService,
+  type LwqlAccessModelDefinition,
+} from "../../../services/langwatch-ql-access-model-definition.service.ts";
 import {
   LangWatchQLAccessModelService,
   type LangWatchQLNames,
@@ -265,15 +268,15 @@ export class LangWatchQLSelfProvisioningService {
         only,
       });
     }
-    const definition = accessModelDefinition.build({
-      names,
-      passwordSha256Hex: createHash("sha256").update(restrictedPassword).digest("hex"),
-      namedCollection:
-        externalCollection === undefined
-          ? collectionBinding.namedCollectionValues({ names, postgres, mode })
-          : NO_NAMED_COLLECTION_VALUES,
-      sourceDatabase,
-    });
+    const definition =
+      externalCollection === undefined
+        ? accessModelDefinition.build({
+            names,
+            passwordSha256Hex: createHash("sha256").update(restrictedPassword).digest("hex"),
+            namedCollection: collectionBinding.namedCollectionValues({ names, postgres, mode }),
+            sourceDatabase,
+          })
+        : this.externalCollectionAccessModel({ names, restrictedPassword, sourceDatabase });
     const structural = accessModel.setupStatements({
       names,
       sourceDatabase,
@@ -313,6 +316,27 @@ export class LangWatchQLSelfProvisioningService {
       ...views,
       ...accessModelDefinition.renderDdl(definition),
     ];
+  }
+
+  /**
+   * The access model of a server whose own config holds the PostgreSQL collection: the private
+   * SQL path and the private render read this one, so the users.d file matches the statements.
+   */
+  externalCollectionAccessModel({
+    names,
+    restrictedPassword,
+    sourceDatabase,
+  }: {
+    names: LangWatchQLNames;
+    restrictedPassword: string;
+    sourceDatabase: string;
+  }): LwqlAccessModelDefinition {
+    return accessModelDefinition.build({
+      names,
+      passwordSha256Hex: createHash("sha256").update(restrictedPassword).digest("hex"),
+      namedCollection: NO_NAMED_COLLECTION_VALUES,
+      sourceDatabase,
+    });
   }
 
   /** One engine table per PostgreSQL dataset, each on the collection `collectionFor` picks. */

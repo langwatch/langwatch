@@ -254,12 +254,17 @@ export class LangWatchQLAccessModelDefinitionService {
   /** The users.d and config.d files a config-store ClickHouse merges at boot. */
   renderUsersConfig(definition: LwqlAccessModelDefinition): RenderedConfigFile[] {
     return [
-      { relativePath: LWQL_USERS_D_RELATIVE_PATH, contents: this.renderUsersD(definition) },
+      this.renderUsersFile(definition),
       {
         relativePath: LWQL_CONFIG_D_RELATIVE_PATH,
         contents: this.renderNamedCollectionConfig(definition),
       },
     ];
+  }
+
+  /** The users.d file alone, for a server whose own config already holds the collection. */
+  renderUsersFile(definition: LwqlAccessModelDefinition): RenderedConfigFile {
+    return { relativePath: LWQL_USERS_D_RELATIVE_PATH, contents: this.renderUsersD(definition) };
   }
 
   renderUsersD(definition: LwqlAccessModelDefinition): string {
