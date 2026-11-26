@@ -6,7 +6,6 @@ import type {
 import type { EvaluationLifecycleCompletedEventData } from "@langwatch/evaluation-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { SimulationRunFinishedEventData } from "@langwatch/scenario-contract";
-import type { NormalizedSpan } from "@langwatch/trace-contract";
 
 import type {
   ProjectActivity,
@@ -18,7 +17,6 @@ import {
   extractRepository,
   metricSeries,
   scenarioFact,
-  spanFact,
 } from "../rules/digest-activity.rules.ts";
 import { isoWeekOf } from "../rules/digest-week.rules.ts";
 
@@ -46,16 +44,6 @@ export class DigestSourceService {
   readonly #owners = new Map<string, Promise<string | null>>();
 
   private constructor(private readonly deps: Deps) {}
-
-  spanRecorded(span: NormalizedSpan): Promise<void> {
-    return this.#project({
-      projectId: span.tenantId,
-      // The span's own start, as the client reported it, decides its week (ADR-001, Runtime).
-      occurredAt: span.startTimeUnixMs,
-      sourceKey: `span:${span.traceId}:${span.spanId}`,
-      fact: spanFact(span),
-    });
-  }
 
   evaluationCompleted(data: EvaluationLifecycleCompletedEventData): Promise<void> {
     return this.#project({

@@ -3082,6 +3082,9 @@ importers:
 
   enterprise/modules/digest/process:
     dependencies:
+      '@langwatch/analytics-contract':
+        specifier: workspace:*
+        version: link:../../../../modules/analytics/contract
       '@langwatch/api':
         specifier: workspace:*
         version: link:../../../../packages/api

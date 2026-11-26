@@ -25,10 +25,6 @@ import {
   SIMULATION_RUN_EVENT_TYPES,
   simulationRunFinishedEventDataSchema,
 } from "@langwatch/scenario-contract";
-import {
-  recordTraceSpanEventDataSchema,
-  SPAN_RECORDED_EVENT_TYPE,
-} from "@langwatch/trace-contract";
 import { USER_ERASED_EVENT_TYPE, userErasedEventDataSchema } from "@langwatch/user-contract";
 
 import type { DigestModule } from "../app/digest.app.ts";
@@ -54,11 +50,7 @@ const REDELIVERY_WINDOW_MS = 60 * 60 * 1000;
 
 type Source = Pick<
   DigestSourceService,
-  | "spanRecorded"
-  | "evaluationCompleted"
-  | "scenarioFinished"
-  | "codingAgentSpan"
-  | "codingAgentMetric"
+  "evaluationCompleted" | "scenarioFinished" | "codingAgentSpan" | "codingAgentMetric"
 >;
 
 function digestActivity(deps: {
@@ -85,11 +77,6 @@ function digestActivity(deps: {
       .withEvents([projectActivityRecordedEventSchema, userActivityRecordedEventSchema])
       .withPostgresProjection(projectWeekProjection({ store: deps.projectWeeks }))
       .withPostgresProjection(userWeekProjection({ store: deps.userWeeks }))
-      .withPeerSubscriber("spanRecorded", {
-        eventType: SPAN_RECORDED_EVENT_TYPE,
-        data: recordTraceSpanEventDataSchema,
-        handle: (data) => deps.source.spanRecorded(data.span),
-      })
       .withPeerSubscriber("evaluationCompleted", {
         eventType: EVALUATION_LIFECYCLE_COMPLETED_EVENT_TYPE,
         data: evaluationLifecycleCompletedEventDataSchema,

@@ -7,9 +7,7 @@ import {
   countCapped,
   emptyProjectWeek,
   emptyUserWeek,
-  latencyBucketOf,
   MAX_EVALUATORS,
-  MAX_MODELS,
   MAX_REPOSITORIES,
   MAX_SERIES,
   MAX_SESSIONS,
@@ -44,40 +42,11 @@ export function applyProjectActivity({
   };
   const fact = activity.fact;
   switch (fact.kind) {
-    case "span":
-      return applySpan({ state: next, fact });
     case "evaluation":
       return applyEvaluation({ state: next, fact });
     case "scenario":
       return applyScenario({ state: next, fact });
   }
-}
-
-function applySpan({
-  state,
-  fact,
-}: {
-  state: ProjectWeekState;
-  fact: FactOf<"span">;
-}): ProjectWeekState {
-  // Models count calls, not traces: the LLM call is usually a child span, rarely the root.
-  const usage = {
-    ...state,
-    tokens: state.tokens + fact.tokens,
-    costUsd: state.costUsd + fact.costUsd,
-    models: fact.model
-      ? countCapped({ counts: state.models, key: fact.model, cap: MAX_MODELS })
-      : state.models,
-  };
-  // Errors and latency are per trace, read off its root span, so neither can outgrow `traces`.
-  if (!fact.root) return usage;
-  const bucket = latencyBucketOf(fact.durationMs);
-  return {
-    ...usage,
-    traces: state.traces + 1,
-    errors: state.errors + (fact.error ? 1 : 0),
-    latency: state.latency.map((count, index) => (index === bucket ? count + 1 : count)),
-  };
 }
 
 function applyEvaluation({

@@ -4,6 +4,7 @@
  * The operator's switches through the real digest, with ops admitting the operator: each answers
  * the settings as they now stand and leaves the audience so. Spec: digest.feature.
  */
+import type { AnalyticsApi } from "@langwatch/analytics-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { OpsApi, OpsOperator } from "@langwatch/ops-contract";
@@ -25,6 +26,7 @@ async function digestAdmittingOperators() {
   const repositories = MemoryDigestRepositories.create();
   const digest = await DigestModule.create({
     dependencies: {
+      analytics: createApiFixture<AnalyticsApi>({}, "AnalyticsApi"),
       authz: createApiFixture<AuthzApi>({}, "AuthzApi"),
       ops: createApiFixture<OpsApi>(
         {

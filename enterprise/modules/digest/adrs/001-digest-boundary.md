@@ -70,9 +70,8 @@ template rules (first eligible template wins), the switch, the send and the opt-
 
 Peers, through `*Api` only: `OpsApi` (admission), `OrganizationApi` (every organization, its members, admins and name), `ProjectApi` (a project's organization, a personal project's
 owner, a project's name, slug and team), `AuthzApi` (which projects a member may view),
-`UserApi` (the address an email goes to, and whether the person an unsubscribe link names still
-exists) and `EntitlementApi` (the month's usage, read once per send). The folds listen to trace,
-evaluation, scenario and coding-agent events through peer subscribers. A peer subscriber on
+`AnalyticsApi` (trace numbers per project and week), `UserApi` (the address an email goes to, and whether the person an unsubscribe link names still
+exists) and `EntitlementApi` (the month's usage, read once per send). The folds listen to evaluation, scenario and coding-agent events; a week's trace numbers are read from `AnalyticsApi` (ADR-002) through peer subscribers. A peer subscriber on
 user's `lw.user.erased` clears digest rows on user erasure: the person's `DigestSubscription`,
 `DigestSend` and `DigestUserWeek` rows, in every organization, as nurturing does.
 

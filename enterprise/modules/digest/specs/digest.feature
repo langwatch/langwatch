@@ -76,16 +76,23 @@ Feature: Weekly digest emails
   # Folding the week
 
   @integration
-  Scenario: Trace spans fold into the project's week as they arrive
+  Scenario: Trace spans are read from analytics, never folded
     Given spans received for a project across two traces, one with an error
-    When the digest subscriber has handled their events
-    Then the project's week holds 2 traces, 1 error and the summed tokens and cost
+    When the digest subscriber has had its chance to handle their events
+    Then the project's week holds no span numbers and analytics was not asked
 
-  @integration @unimplemented
-  Scenario: A burst of spans for one project drains as batched appends
-    Given 500 spans received for one project within a second
-    When the digest subscriber has handled them
-    Then the project's week counts all 500 and fewer than 500 appends were made
+  @integration
+  Scenario: Trace numbers are read from analytics, never folded
+    Given analytics answers a project's week with its traces, errors, tokens, cost, durations and models
+    When a member's traces email is built
+    Then it shows exactly those numbers, the change on the week before's traces
+    And each project's week is read once however many members are sent to
+
+  @integration
+  Scenario: A quiet week sends nothing
+    Given analytics answers a project's week with no traces
+    When a member's send is handled
+    Then no email is sent and no model breakdown is asked for
 
   @integration
   Scenario: Coding-agent facts fold into the person's week
@@ -99,13 +106,6 @@ Feature: Weekly digest emails
     When their digest-coding-agent-week email is built
     Then its totals are the sums of the series it kept, each shown as "at least"
     And a week whose series all fit shows its totals without "at least"
-
-  @unit
-  Scenario: A span counts under the model that answered it
-    Given a span that names the model it asked for and the model that answered
-    When it is folded into the project's week
-    Then it counts under the model that answered
-    And a span whose answering model is blank counts under the model it asked for
 
   @unit
   Scenario: A coding-agent repository is named with its owner when one was reported

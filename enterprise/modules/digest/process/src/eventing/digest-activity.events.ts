@@ -30,15 +30,6 @@ export const projectActivitySchema = z.object({
   projectId: z.string().min(1),
   fact: z.discriminatedUnion("kind", [
     z.object({
-      kind: z.literal("span"),
-      root: z.boolean(),
-      error: z.boolean(),
-      tokens: z.number().nonnegative(),
-      costUsd: z.number().nonnegative(),
-      durationMs: z.number().nonnegative(),
-      model: z.string().nullable(),
-    }),
-    z.object({
       kind: z.literal("evaluation"),
       evaluatorType: z.string().nullable(),
       outcome: outcomeSchema,

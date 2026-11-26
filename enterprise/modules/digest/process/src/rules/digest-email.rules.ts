@@ -11,7 +11,6 @@ import type {
 import type { DigestTemplateInput, DigestTemplatePick } from "./digest-template.rules.ts";
 import {
   BASELINE_WEEKS,
-  latencyPercentile,
   nextMonthLabel,
   type OutcomeCounts,
   type ProjectWeekState,
@@ -357,8 +356,8 @@ function tracesWeekNumbers({
     errors: focus.errors,
     costUsd: focus.costUsd,
     tokens: Math.round(focus.tokens),
-    p50Milliseconds: latencyPercentile({ latency: focus.latency, percentile: 50 }),
-    p95Milliseconds: latencyPercentile({ latency: focus.latency, percentile: 95 }),
+    p50Milliseconds: Math.round(focus.p50Ms),
+    p95Milliseconds: Math.round(focus.p95Ms),
     topModels: Object.entries(focus.models)
       .toSorted(([, left], [, right]) => right - left)
       .slice(0, TOP_ROWS)

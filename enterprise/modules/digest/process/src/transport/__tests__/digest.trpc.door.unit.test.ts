@@ -1,3 +1,10 @@
+/**
+ * @vitest-environment node
+ * The digest's operator controls behind the platform door (Q42): non-staff are answered
+ * not-found, staff lacking ops:manage are refused by name, anonymous is 401; past the door the
+ * app still asks ops to admit the operator on every control. Spec: digest.feature.
+ */
+import type { AnalyticsApi } from "@langwatch/analytics-contract";
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 import {
   bindTrpcMiddlewareContext,
@@ -5,12 +12,6 @@ import {
   TrpcRootDefinition,
   type TrpcRuntimeMembers,
 } from "@langwatch/api/trpc";
-/**
- * @vitest-environment node
- * The digest's operator controls behind the platform door (Q42): non-staff are answered
- * not-found, staff lacking ops:manage are refused by name, anonymous is 401; past the door the
- * app still asks ops to admit the operator on every control. Spec: digest.feature.
- */
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { DigestApi, DigestSettings } from "@langwatch/enterprise-digest-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
@@ -117,6 +118,7 @@ async function digestWithCloudOpsOff() {
   const mail = MemoryDigestMailChannel.create();
   const app = await DigestModule.create({
     dependencies: {
+      analytics: createApiFixture<AnalyticsApi>({}, "AnalyticsApi"),
       authz: createApiFixture<AuthzApi>({}, "AuthzApi"),
       ops: createApiFixture<OpsApi>(
         {

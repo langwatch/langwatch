@@ -4,6 +4,11 @@
  * the peers it asks scripted and the mail channel's memory tier recording every email. The
  * plan and send intents are carried out the way the outbox carries them out.
  */
+import {
+  type AnalyticsApi,
+  type AnalyticsSeries,
+  buildSeriesName,
+} from "@langwatch/analytics-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import {
   METRIC_FACTS_CONTRIBUTED_EVENT_TYPE,
@@ -57,10 +62,11 @@ import { DigestMailChannel, type RenderedDigestMail } from "../../channels/diges
 import { MemoryDigestMailChannel } from "../../channels/memory/memory.digest-mail.channel.ts";
 import { MemoryDigestAudienceRepository } from "../../repositories/memory/memory.digest-audience.repository.ts";
 import { MemoryDigestRepositories } from "../../repositories/memory/memory.digest.repositories.ts";
-import { emptyProjectWeek } from "../../rules/digest-week.rules.ts";
+import { emptyProjectWeek, isoWeekOf } from "../../rules/digest-week.rules.ts";
 import { DigestCommandsService } from "../../services/digest-commands.service.ts";
 import { DigestSendService } from "../../services/digest-send.service.ts";
 import { DigestSourceService } from "../../services/digest-source.service.ts";
+import { DigestTraceReadService } from "../../services/digest-trace-read.service.ts";
 import { DigestUnsubscribeService } from "../../services/digest-unsubscribe.service.ts";
 import { DigestUserErasureService } from "../../services/digest-user-erasure.service.ts";
 import { DigestWeekService } from "../../services/digest-week.service.ts";
@@ -172,6 +178,21 @@ export function digestWorld() {
     clockOffsetMs: 0,
     /** The deployment's public origin, read on each send so a test can misconfigure it. */
     publicBaseUrl: BASE_URL,
+    /** What analytics answers for a project's week, by `projectId:isoWeek`; absent is a quiet week. */
+    traceNumbers: new Map<
+      string,
+      {
+        traces: number;
+        errors?: number;
+        tokens?: number;
+        costUsd?: number;
+        p50Ms?: number;
+        p95Ms?: number;
+        models?: Record<string, number>;
+      }
+    >(),
+    /** Every analytics read the digest made, as `projectId:isoWeek:grouped?`. */
+    analyticsReads: [] as string[],
     /** The person behind each personal project, by project id; a shared project has none. */
     personalOwners: new Map<string, string>(),
   };
@@ -236,7 +257,60 @@ export function installDigest(
     return [];
   };
   const knownProject = (id: string) => world.projects.includes(id) || id === OTHER_PROJECT;
+  const analytics = createApiFixture<Pick<AnalyticsApi, "getTimeseries">>(
+    {
+      getTimeseries: async (input) => {
+        const key = `${input.projectId}:${isoWeekOf(input.startDate)}`;
+        world.analyticsReads.push(input.groupBy ? `${key}:grouped` : key);
+        const numbers = world.traceNumbers.get(key);
+        const named = (values: Record<string, number>) =>
+          Object.fromEntries(
+            input.series.map((series: AnalyticsSeries, index: number) => [
+              buildSeriesName(series, index),
+              values[seriesLabel(series)] ?? 0,
+            ]),
+          );
+        if (input.groupBy) {
+          const groups = Object.fromEntries(
+            Object.entries(numbers?.models ?? {}).map(([model, count]) => [
+              model,
+              named({ traces: count }),
+            ]),
+          );
+          return {
+            previousPeriod: [],
+            currentPeriod: [{ date: "full", [input.groupBy]: groups }],
+          };
+        }
+        return {
+          previousPeriod: [],
+          currentPeriod: [
+            {
+              date: "full",
+              ...named({
+                traces: numbers?.traces ?? 0,
+                errors: numbers?.errors ?? 0,
+                tokens: numbers?.tokens ?? 0,
+                cost: numbers?.costUsd ?? 0,
+                median: numbers?.p50Ms ?? 0,
+                p95: numbers?.p95Ms ?? 0,
+              }),
+            },
+          ],
+        };
+      },
+    },
+    "AnalyticsApi",
+  );
   const weeks = DigestWeekService.create({
+    projects: createApiFixture<Pick<ProjectApi, "listIdsByOrganization">>(
+      {
+        listIdsByOrganization: async ({ organizationId }) =>
+          organizationId === OTHER_ORGANIZATION ? [OTHER_PROJECT] : world.projects,
+      },
+      "ProjectApi",
+    ),
+    traces: DigestTraceReadService.create({ analytics, now }),
     projectWeeks: repositories.projectWeeks,
     userWeeks: repositories.userWeeks,
     entitlement: createApiFixture<WeekDeps["entitlement"]>(
@@ -459,8 +533,9 @@ export function installDigest(
       projectId: string;
       isoWeek?: string;
       traces: number;
-    }) =>
-      repositories.projectWeeks.store(
+    }) => {
+      world.traceNumbers.set(`${projectId}:${isoWeek}`, { traces });
+      return repositories.projectWeeks.store(
         {
           state: { ...emptyProjectWeek(), organizationId, projectId, isoWeek, traces },
           cursor: { acceptedAt: 0, eventId: `seed-${organizationId}-${projectId}-${isoWeek}` },
@@ -474,7 +549,8 @@ export function installDigest(
           tenantId: createTenantId(projectId),
           key: `seed:${organizationId}:${projectId}:${isoWeek}`,
         },
-      ),
+      );
+    },
     projectWeek: async ({ isoWeek }: { isoWeek: string }) => {
       const folds = await repositories.projectWeeks.findWeeks({
         isoWeeks: [isoWeek],
@@ -527,6 +603,14 @@ function summaryOf(id: string) {
     slug: id,
     createdAt: Temporal.Now.instant(),
   };
+}
+
+/** Which of the totals call's series a request series is, so the stub answers each its number. */
+function seriesLabel(series: AnalyticsSeries): string {
+  if (series.metric === "metadata.trace_id") return series.filters ? "errors" : "traces";
+  if (series.metric === "performance.total_tokens") return "tokens";
+  if (series.metric === "performance.total_cost") return "cost";
+  return series.aggregation === "p95" ? "p95" : "median";
 }
 
 /** A project as the project module names it; every project sits on the one team. */

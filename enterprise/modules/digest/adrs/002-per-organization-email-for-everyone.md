@@ -37,8 +37,14 @@ per organization, and that the email's link opens the person's email preferences
 
 - Every member of every organization is asked a send each week; a quiet one is skipped when
   handled. The plan's cost grows with total membership, not with enrolled organizations.
-- Every span, evaluation and coding-agent fact mints a digest job, since the enqueue filter that
-  kept jobs to the cohort has no cohort to filter on.
+- **Spans are not folded.** A fold per span across all traffic is a Postgres write per span, so
+  the week's trace numbers (traces, errors, tokens, cost, median and 95th-percentile duration, and
+  traces per model) are read from `AnalyticsApi.getTimeseries` when an email is composed: two
+  reads per project and week (a model breakdown only for a project that had traces), remembered
+  for ten minutes so the members of an organization share them, plus one read of the week before
+  for the change. Models count traces, not model calls as the fold did. Evaluation, scenario and
+  coding-agent facts are still folded (analytics cannot group evaluations by evaluator type, which
+  the email names); each is one digest job, so their volume is the thing to watch once armed.
 - `DigestSend` rows written under ADR-001 have ids `userId:isoWeek` and no longer match the new
   ids; the module shipped disarmed, so none are expected. Existing `DigestCohortOrganization`
   rows are ignored, and the table is left in place to drop in a later migration.

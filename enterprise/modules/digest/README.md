@@ -36,6 +36,7 @@ Anything else digest needs belongs to another module and is reached through its 
 | --------------- | ----------------- | ------------------------------------------------------- |
 | `authz`         | `AuthzApi`        | [authz](../../../modules/authz/README.md)               |
 | `entitlement`   | `EntitlementApi`  | [entitlement](../../../modules/entitlement/README.md)   |
+| `analytics`     | `AnalyticsApi`    | [analytics](../../../modules/analytics/README.md)       |
 | `ops`           | `OpsApi`          | [ops](../../../modules/ops/README.md)                   |
 | `organizations` | `OrganizationApi` | [organization](../../../modules/organization/README.md) |
 | `projects`      | `ProjectApi`      | [project](../../../modules/project/README.md)           |

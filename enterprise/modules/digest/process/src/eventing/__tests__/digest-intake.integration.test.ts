@@ -191,19 +191,24 @@ const scenarioFinished = ({
   });
 
 describe("the digest fold intake", () => {
-  describe("when spans are received for a project across two traces, one with an error", () => {
-    /** @scenario "Trace spans fold into the project's week as they arrive" */
-    it("holds 2 traces, 1 error and the summed tokens and cost in the week the spans started", async () => {
+  describe("when spans are received across two traces, one with an error", () => {
+    /** @scenario "Trace spans are read from analytics, never folded" */
+    it("folds nothing for them and asks analytics nothing", async () => {
       await spanRecorded({ traceId: "trace-a", spanId: "a-root", root: true });
       await spanRecorded({ traceId: "trace-a", spanId: "a-child", root: false });
       await spanRecorded({ traceId: "trace-b", spanId: "b-root", root: true, error: true });
-
+      // A fold that did run would have landed by the time a later fact of the same pipeline has.
+      await scenarioFinished({ scenarioRunId: "run-1", verdict: "success" });
       await vi.waitFor(async () => {
-        expect((await digest.projectWeek({ isoWeek: SENT_WEEK }))?.tokens).toBe(45);
+        expect((await digest.projectWeek({ isoWeek: SENT_WEEK }))?.scenarios.runs).toBe(1);
       });
-      const week = await digest.projectWeek({ isoWeek: SENT_WEEK });
-      expect(week).toMatchObject({ traces: 2, errors: 1, tokens: 45 });
-      expect(week?.costUsd).toBeCloseTo(0.3);
+
+      expect(await digest.projectWeek({ isoWeek: SENT_WEEK })).toMatchObject({
+        traces: 0,
+        errors: 0,
+        tokens: 0,
+      });
+      expect(digest.world.analyticsReads).toEqual([]);
     });
   });
 
@@ -260,7 +265,6 @@ describe("the digest fold intake", () => {
         const week = await digest.userWeek({ isoWeek: SENT_WEEK, userId: MEMBER });
         expect(week && userWeekTotals(week).sessions).toBe(3);
         expect((await digest.projectWeek({ isoWeek: SENT_WEEK }))?.scenarios.runs).toBe(1);
-        expect((await digest.projectWeek({ isoWeek: SENT_WEEK }))?.traces).toBe(1);
       });
       const rows = JSON.stringify([
         await digest.projectWeek({ isoWeek: SENT_WEEK }),

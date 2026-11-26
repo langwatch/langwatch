@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
+import { AnalyticsApi } from "@langwatch/analytics-contract";
 import { AuthzApi } from "@langwatch/authz-contract";
 import {
   DigestApi,
@@ -29,6 +30,7 @@ import { DigestOperatorsService } from "../services/digest-operators.service.ts"
 import { DigestSendService } from "../services/digest-send.service.ts";
 import { DigestSettingsService } from "../services/digest-settings.service.ts";
 import { DigestSourceService } from "../services/digest-source.service.ts";
+import { DigestTraceReadService } from "../services/digest-trace-read.service.ts";
 import { DigestUnsubscribeService } from "../services/digest-unsubscribe.service.ts";
 import { DigestUserErasureService } from "../services/digest-user-erasure.service.ts";
 import { DigestWeekService } from "../services/digest-week.service.ts";
@@ -48,13 +50,15 @@ type DigestSetup = FeatureSetup<
 export class DigestModule implements DigestApiContract {
   static readonly contract = DigestApi;
   static readonly dependencies = {
+    /** The week's trace numbers per project, read when an email is composed. */
+    analytics: AnalyticsApi,
     /** Which of the week's projects each member may view; the email shows no other. */
     authz: AuthzApi,
     /** Admits Cloud admin staff, and answers not_found where cloud ops is off. */
     ops: OpsApi,
     /** Every organization, who its members are, which are admins, and its name. */
     organizations: OrganizationApi,
-    /** A project's organization, a personal project's owner, a project's name. */
+    /** An organization's projects and each project's organization, a personal project's owner, a project's name. */
     projects: ProjectApi,
     /**
      * The address each email goes to, read at send time and never stored; and whether the
@@ -121,6 +125,8 @@ export class DigestModule implements DigestApiContract {
       recordUser: (activity) => commands.recordUser(activity),
     });
     const weeks = DigestWeekService.create({
+      projects: dependencies.projects,
+      traces: DigestTraceReadService.create({ analytics: dependencies.analytics, now: nowEpochMs }),
       projectWeeks: repositories.projectWeeks,
       userWeeks: repositories.userWeeks,
       entitlement: dependencies.entitlement,

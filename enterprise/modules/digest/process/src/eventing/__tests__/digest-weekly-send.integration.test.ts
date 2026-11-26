@@ -898,7 +898,7 @@ describe("the digest fold", () => {
       const weeks = ["2026-W41", "2026-W42", "2026-W43", "2026-W44", "2026-W45", "2026-W46"];
       const current = isoWeekOf(WAKE_AT);
       for (const [index, isoWeek] of [...weeks, current].entries()) {
-        await digest.recordProject(spanIn({ isoWeek, sourceKey: `span-${index}` }));
+        await digest.recordProject(scenarioIn({ isoWeek, sourceKey: `span-${index}` }));
       }
       await vi.waitFor(async () => {
         const kept = await digest.repositories.projectWeeks.findWeeks({
@@ -949,18 +949,8 @@ function codingAgentFact({
   });
 }
 
-/** One root span on the project's week, through digest's own record command. */
-function spanIn({
-  isoWeek,
-  sourceKey,
-  error = false,
-  model = null,
-}: {
-  isoWeek: string;
-  sourceKey: string;
-  error?: boolean;
-  model?: string | null;
-}) {
+/** One passed scenario run on the project's week, through digest's own record command. */
+function scenarioIn({ isoWeek, sourceKey }: { isoWeek: string; sourceKey: string }) {
   return {
     tenantId: PROJECT,
     occurredAt: IN_SENT_WEEK,
@@ -968,14 +958,6 @@ function spanIn({
     organizationId: ORGANIZATION,
     isoWeek,
     sourceKey,
-    fact: {
-      kind: "span" as const,
-      root: true,
-      error,
-      tokens: 15,
-      costUsd: 0.5,
-      durationMs: 80,
-      model,
-    },
+    fact: { kind: "scenario" as const, scenarioId: null, outcome: "passed" as const },
   };
 }

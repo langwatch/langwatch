@@ -9,9 +9,6 @@ import { describe, expect, it } from "vitest";
 import {
   countCapped,
   isoWeekOf,
-  latencyBucketOf,
-  latencyPercentile,
-  LATENCY_BUCKETS_MS,
   oldestKeptWeek,
   plannableWeek,
   sendableWeek,
@@ -126,25 +123,6 @@ describe("weekLabel()", () => {
   });
 });
 
-describe("latencyPercentile()", () => {
-  describe("when nothing was timed", () => {
-    it("is zero", () => {
-      expect(latencyPercentile({ latency: [0, 0, 0], percentile: 95 })).toBe(0);
-    });
-  });
-
-  describe("when most traces are fast and a few are slow", () => {
-    it("reads each percentile as the upper bound of the bucket it lands in", () => {
-      const latency = LATENCY_BUCKETS_MS.map(() => 0).concat(0);
-      latency[0] = 90;
-      latency[5] = 10;
-
-      expect(latencyPercentile({ latency, percentile: 50 })).toBe(100);
-      expect(latencyPercentile({ latency, percentile: 95 })).toBe(5_000);
-    });
-  });
-});
-
 describe("countCapped()", () => {
   describe("when the map already holds `cap` keys", () => {
     const full = { a: 1, b: 2 };
@@ -161,24 +139,6 @@ describe("countCapped()", () => {
   describe("when the map has room", () => {
     it("adds a new key", () => {
       expect(countCapped({ counts: { a: 1 }, key: "b", cap: 2 })).toEqual({ a: 1, b: 1 });
-    });
-  });
-});
-
-describe("latencyBucketOf()", () => {
-  it.each([
-    [0, 0],
-    [100, 0],
-    [101, 1],
-    [250, 1],
-    [60_000, LATENCY_BUCKETS_MS.length - 1],
-  ])("places %d ms in bucket %d, a bound inside its own bucket", (durationMs, bucket) => {
-    expect(latencyBucketOf(durationMs)).toBe(bucket);
-  });
-
-  describe("when a duration passes the last bound", () => {
-    it("lands in the overflow bucket", () => {
-      expect(latencyBucketOf(60_001)).toBe(LATENCY_BUCKETS_MS.length);
     });
   });
 });

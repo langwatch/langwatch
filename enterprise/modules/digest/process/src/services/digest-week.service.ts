@@ -1,16 +1,28 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 import type { UsageStats } from "@langwatch/entitlement-contract";
+import type { ProjectApi } from "@langwatch/project-contract";
 
 import type {
   DigestProjectWeekRepository,
   DigestUserWeekRepository,
 } from "../repositories/digest-week.repository.ts";
 import { derivePlanUsage, type OrganizationWeek } from "../rules/digest-email.rules.ts";
-import { BASELINE_WEEKS, oldestKeptWeek, weeksBefore } from "../rules/digest-week.rules.ts";
+import {
+  BASELINE_WEEKS,
+  emptyProjectWeek,
+  oldestKeptWeek,
+  type ProjectWeekState,
+  weeksBefore,
+} from "../rules/digest-week.rules.ts";
+import type { DigestTraceReadService } from "./digest-trace-read.service.ts";
 
 type Deps = Readonly<{
   projectWeeks: Pick<DigestProjectWeekRepository, "findWeeks" | "deleteBefore">;
   userWeeks: Pick<DigestUserWeekRepository, "findWeeks" | "deleteBefore">;
+  /** The organization's projects: the ones whose traces are read for its week. */
+  projects: Pick<ProjectApi, "listIdsByOrganization">;
+  /** Trace numbers per project and week, read from analytics rather than folded. */
+  traces: Pick<DigestTraceReadService, "projectWeek">;
   /** `EntitlementApi.getUsage`, read for the two numbers the plan-pressure pick needs. */
   entitlement: Readonly<{
     getUsage(input: {
@@ -38,17 +50,41 @@ export class DigestWeekService {
     isoWeek: string;
   }): Promise<OrganizationWeek> {
     const before = weeksBefore({ isoWeek, count: BASELINE_WEEKS });
-    const [folds, users, usage] = await Promise.all([
+    const [folds, users, usage, projectIds] = await Promise.all([
       this.deps.projectWeeks.findWeeks({ isoWeeks: [isoWeek, ...before], organizationId }),
       this.deps.userWeeks.findWeeks({ isoWeeks: [isoWeek], organizationId }),
       this.deps.entitlement.getUsage({ organizationId }),
+      this.deps.projects.listIdsByOrganization({ organizationId }),
     ]);
+    // Trace numbers are read for the week sent and the one before it (its change is shown); the
+    // older baseline weeks only ever read scenario outcomes, which stay folded.
+    const [previous] = before;
+    const traceWeeks = [isoWeek, ...(previous ? [previous] : [])];
+    const withTraces = async (week: string) =>
+      Promise.all(
+        projectIds.map(async (projectId): Promise<ProjectWeekState> => {
+          const fold = folds.find((row) => row.projectId === projectId && row.isoWeek === week);
+          const traces = await this.deps.traces.projectWeek({ projectId, isoWeek: week });
+          return {
+            ...(fold ?? emptyProjectWeek()),
+            projectId,
+            organizationId,
+            isoWeek: week,
+            ...traces,
+          };
+        }),
+      );
+    const [current, ...earlier] = await Promise.all(traceWeeks.map(withTraces));
+    const read = new Set(traceWeeks);
     return {
       organizationId,
       isoWeek,
       planUsage: derivePlanUsage(usage) ?? null,
-      projects: folds.filter((fold) => fold.isoWeek === isoWeek),
-      history: folds.filter((fold) => fold.isoWeek !== isoWeek),
+      projects: current ?? [],
+      history: [
+        ...earlier.flat(),
+        ...folds.filter((fold) => fold.isoWeek !== isoWeek && !read.has(fold.isoWeek)),
+      ],
       users: new Map(users.map((user) => [user.userId, user])),
     };
   }
