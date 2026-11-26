@@ -9,7 +9,11 @@ import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 
-import { listPublishedSkills } from "../_lib/feature-skills.ts";
+import {
+  copySkillAssets,
+  listPublishedSkills,
+  type PublishedSkill,
+} from "../_lib/feature-skills.ts";
 import { inlineMdx } from "../_lib/mdx-inline.ts";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -23,10 +27,11 @@ function cleanTarget(targetDir: string): void {
   }
 }
 
-function writeSkill(targetDir: string, name: string, src: string): void {
+function writeSkill(targetDir: string, name: string, skill: PublishedSkill): void {
   const dir = path.join(targetDir, name);
   fs.mkdirSync(dir, { recursive: true });
-  fs.writeFileSync(path.join(dir, "SKILL.md"), inlineMdx(src));
+  fs.writeFileSync(path.join(dir, "SKILL.md"), inlineMdx(skill.src));
+  copySkillAssets({ skill, toDir: dir });
 }
 
 export function sync(targetDir: string): void {
@@ -56,7 +61,7 @@ export function sync(targetDir: string): void {
       console.log(`  ⊘ ${target} (gated by ${skill.featureFlag}, not published)`);
       continue;
     }
-    writeSkill(targetDir, target, skill.src);
+    writeSkill(targetDir, target, skill);
     console.log(`  ✓ ${target}`);
   }
 

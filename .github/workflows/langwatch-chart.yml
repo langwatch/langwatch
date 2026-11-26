@@ -193,8 +193,16 @@ jobs:
           render() {
             local name="$1"
             shift
-            if helm template lw . "$@" >/dev/null 2>"${RUNNER_TEMP}/${name}.err"; then
-              echo "ok    ${name}"
+            if helm template lw . "$@" >"${RUNNER_TEMP}/${name}.out" 2>"${RUNNER_TEMP}/${name}.err"; then
+              # Helm reads YAML numbers as float64, so `quote` on 18000000
+              # renders "1.8e+07" and an integer parser refuses it.
+              if grep -nE '"[0-9.]+e[+-][0-9]+"' "${RUNNER_TEMP}/${name}.out" >"${RUNNER_TEMP}/${name}.err"; then
+                echo "FAIL  ${name}: a number rendered in exponent form (pipe it through int64)"
+                sed 's/^/        /' "${RUNNER_TEMP}/${name}.err"
+                failed+=("${name}")
+              else
+                echo "ok    ${name}"
+              fi
             else
               echo "FAIL  ${name}"
               sed 's/^/        /' "${RUNNER_TEMP}/${name}.err"
