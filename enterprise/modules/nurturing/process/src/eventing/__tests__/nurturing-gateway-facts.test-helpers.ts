@@ -405,6 +405,7 @@ export async function gatewayFactsOver({
   });
   const pipeline = buildNurturingPipeline({
     deliver: (input) => delivery.deliver(input),
+    organizationMembers: async () => [],
     guidedTurnFailed: async () => undefined,
     usageReportReceived: async () => undefined,
     evaluationsCompleted: async () => undefined,
