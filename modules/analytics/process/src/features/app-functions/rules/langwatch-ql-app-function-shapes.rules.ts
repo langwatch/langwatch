@@ -60,6 +60,12 @@ export interface LangWatchQLAppFunctionParameter {
   readonly description: string;
 }
 
+/**
+ * What a thread-keyed function reads: only its threads' trace ids, or the
+ * traces themselves with their content.
+ */
+export type LangWatchQLThreadRead = "thread-trace-ids" | "thread-traces";
+
 /** One app function, completely. */
 export interface LangWatchQLAppFunctionDefinition {
   /** The name a caller writes, and the global ClickHouse function name. */
@@ -76,6 +82,8 @@ export interface LangWatchQLAppFunctionDefinition {
   /** Fixed arity, one signature. */
   readonly parameters: readonly LangWatchQLAppFunctionParameter[];
   readonly keyKind: LangWatchQLAppFunctionKeyKind;
+  /** What a thread-keyed function reads; every thread-keyed entry declares it. */
+  readonly reads?: LangWatchQLThreadRead;
   /** ClickHouse type of the hydrated column, which the result re-declares. */
   readonly returns: string;
   readonly encoding: LangWatchQLAppFunctionEncoding;
