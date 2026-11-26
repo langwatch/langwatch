@@ -241,6 +241,42 @@ describe("StoredObjectService.storeFromBytes owner links", () => {
     });
   });
 
+  describe("given the project keeps traces for 30 days and the store names a retention start", () => {
+    /** @scenario "A store whose retention started earlier links the owner from that start" */
+    it("links trace t1 until 30 days after a start 20 days ago", async () => {
+      const { store, liveOn, memoryLinks } = fixture({ retentionDays: 30 });
+
+      const { reference } = await store({
+        ownerId: "t1",
+        retainFromMs: dayOf(-20).epochMilliseconds,
+      });
+
+      await expect(liveOn({ id: reference.id, day: 9.99 })).resolves.toBe(1);
+      await expect(liveOn({ id: reference.id, day: 10 })).resolves.toBe(0);
+      await memoryLinks.retime({
+        tenantId: PROJECT,
+        objectIds: [reference.id as StoredObjectId],
+        days: 25,
+        at: DAY_0,
+      });
+      await expect(liveOn({ id: reference.id, day: 4.99 })).resolves.toBe(1);
+      await expect(liveOn({ id: reference.id, day: 5 })).resolves.toBe(0);
+    });
+
+    /** @scenario "A retention start in the future links the owner from now" */
+    it("links trace t1 until 30 days from now", async () => {
+      const { store, liveOn } = fixture({ retentionDays: 30 });
+
+      const { reference } = await store({
+        ownerId: "t1",
+        retainFromMs: dayOf(5).epochMilliseconds,
+      });
+
+      await expect(liveOn({ id: reference.id, day: 29.99 })).resolves.toBe(1);
+      await expect(liveOn({ id: reference.id, day: 30 })).resolves.toBe(0);
+    });
+  });
+
   describe("given trace t1 holds an object until day 30", () => {
     let held: ReturnType<typeof fixture>;
     let objectId: string;

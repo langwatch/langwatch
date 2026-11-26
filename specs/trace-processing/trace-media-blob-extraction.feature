@@ -45,6 +45,12 @@ Feature: Trace media blob extraction at the ingestion edge
   #   that trace's retention ends, and deleted once no linked trace still holds
   #   it (stored-object ADR-002). Retroactive retention changes re-time the
   #   links; pins do not, as they do not change a trace's retention either.
+  #   Trace media stored before links existed gets a link to the trace that
+  #   stored it from a background release step, so it expires the same way.
+  #
+  # Default: the flag is ON for cloud and self-hosted alike. Self-hosted writes
+  #   to the local-filesystem store unless S3 or Azure is configured; a store
+  #   that refuses writes keeps the media inline (fail-open), as before.
   #
   # Related: specs/features/scenarios/externalize-event-byte-content.feature
   #   (scenario edge extraction), specs/trace-processing/large-trace-blob-offload.feature
@@ -54,6 +60,59 @@ Feature: Trace media blob extraction at the ingestion edge
     Given a project with object storage configured (S3 or the local-filesystem fallback)
     And the feature flag "release_trace_media_extraction" is enabled for the project
     And the project has no data-privacy content-drop rules
+
+  # ===========================================================================
+  # Track 0: on by default, large recordings survive
+  # ===========================================================================
+
+  @unit
+  Scenario: Media extraction is on by default with no configuration
+    Given a deployment with no operator rule for "release_trace_media_extraction"
+    When the ingestion edge resolves the flag for any project
+    Then it resolves to on, for cloud and self-hosted alike
+
+  @unit
+  Scenario: A Helm install with no durable store keeps trace media inline
+    Given a Helm install with neither app.dataplane nor the local-filesystem volume enabled
+    When the chart renders the app and worker environment
+    Then it sets RELEASE_TRACE_MEDIA_EXTRACTION to 0
+    And trace media stays inline in ClickHouse instead of landing on a disk lost on restart
+
+  @unit
+  Scenario: The Docker Compose stack keeps stored media on a volume the app and workers share
+    Given the self-hosted Docker Compose stack
+    When the app and the workers start
+    Then both mount the same named stored-objects volume at the local-filesystem root
+
+  @integration
+  Scenario: A recording larger than the 8 MiB attribute cap survives ingestion
+    Given an OTLP span whose "langwatch.input" carries an inline audio part
+      whose base64 value is larger than 8 MiB
+    When the span is ingested and recorded
+    Then the recorded attribute carries a stored-object reference instead of the base64
+    And the attribute is not listed in "langwatch.truncated_attributes"
+    And the stored bytes are the whole recording
+
+  @integration
+  Scenario: A trace export carrying an hour of compressed audio reaches extraction
+    Given the trace receiver on its default body cap of 64 MiB
+    When an exporter sends one trace export of about 40 MiB of base64 audio, past the old 10 MiB limit
+    Then the receiver accepts it and hands the whole export to trace ingestion
+
+  @integration
+  Scenario: A trace export over the deployment's body cap is refused
+    Given a deployment that sets "OTLP_TRACES_MAX_BODY_BYTES" below the default
+    When an exporter sends a trace export larger than that setting, plain or compressed
+    Then the export is refused as too large
+    And nothing is handed to trace ingestion
+
+  @unit
+  Scenario: A stored media reference survives secret redaction
+    Given the project's PII redaction level is essential, which redacts secrets
+    And a span's audio was replaced with a "/api/files/<projectId>/<storedObjectId>" reference
+    When the worker redacts the span's text
+    Then the reference is kept whole, whatever shape the project id has
+    And a key-shaped value beside it is still redacted
 
   # ===========================================================================
   # Track 1 — extraction shapes
@@ -98,6 +157,13 @@ Feature: Trace media blob extraction at the ingestion edge
     When the span is ingested
     Then the nested JSON string is rewritten in place with the externalized reference
     And the surrounding typed-value envelope is preserved byte-for-byte otherwise
+
+  @unit
+  Scenario: Media inside a nested JSON string larger than 50 MiB is still found
+    Given a span attribute whose value is a JSON string of messages larger than 50 MiB
+      carrying an inline audio part
+    When the media walk looks for inline media
+    Then it finds the audio part inside the nested JSON string
 
   @integration
   Scenario: Media carried on span events is externalized like span attributes
@@ -192,6 +258,12 @@ Feature: Trace media blob extraction at the ingestion edge
     When a span with inline media is ingested
     Then the bytes are stored for the "trace_content" purpose with the span's trace as owner
     So that Stored Objects keeps them until that trace's retention ends
+
+  @integration
+  Scenario: A late span's media is retained from the span's start
+    When a span that started 20 days ago is ingested with inline media
+    Then the bytes are stored with the span's start time as the retention start
+    So that the media expires with the span's trace rows, which expire from that start
 
   @unit
   Scenario: Trace media names the project's trace retention when it is stored

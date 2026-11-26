@@ -630,6 +630,14 @@
     "needsOldWritersGone": true
   },
   {
+    "id": "trace:link-unowned-trace-media",
+    "kind": "tenant",
+    "mode": "background",
+    "owner": "trace",
+    "description": "Links audio and images stored from traces before owner links existed to their trace, so they are deleted with it.",
+    "needsOldWritersGone": true
+  },
+  {
     "id": "trace:track-updated-at-index-materialisation",
     "kind": "data",
     "mode": "background",

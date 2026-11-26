@@ -117,11 +117,12 @@ export class StoredObjectUploadService {
       purpose: input.purpose,
       sha256: sha256Of(chunks),
       mediaType: input.mediaType,
+      limit: 8,
     });
     for (const candidate of reusable) {
       if (candidate.byteLength !== byteLength) continue;
-      if (!(await this.holdsBytes(candidate))) continue;
       if (owners.length > 0 && !(await this.isLinked(candidate))) continue;
+      if (!(await this.holdsBytes(candidate))) continue;
       await this.link({ objectId: candidate.id, owners });
       // A delete may win between the read and the link (ADR-002 §4): never answer it.
       const current =
@@ -210,6 +211,10 @@ export class StoredObjectUploadService {
       throw new Error(`purpose ${input.purpose} needs the owner's retentionDays`);
     }
     const now = this.options.now();
+    const anchor = StoredObjectUploadService.retentionAnchorOf({
+      now,
+      retainFromMs: input.retainFromMs,
+    });
 
     return [
       {
@@ -217,17 +222,27 @@ export class StoredObjectUploadService {
         ownerKind: input.ownerKind,
         ownerId: input.ownerId,
         // Indefinite retention holds with no end; `now + 0` would end it at once.
-        retainUntil: days === INDEFINITE_RETENTION_DAYS ? null : now.add({ hours: days * 24 }),
-        createdAt: now,
+        retainUntil: days === INDEFINITE_RETENTION_DAYS ? null : anchor.add({ hours: days * 24 }),
+        createdAt: anchor,
         updatedAt: now,
       },
     ];
   }
 
-  /**
-   * An object stored before owner links holds none, and its older owners hold it unrecorded:
-   * linking it would let the sweep delete it under them, so it is never reused (ADR-002).
-   */
+  /** The caller's retention start, so a late span's media ends with its trace; never past now. */
+  private static retentionAnchorOf({
+    now,
+    retainFromMs,
+  }: {
+    now: Instant;
+    retainFromMs: number | undefined;
+  }): Instant {
+    const usable = retainFromMs !== undefined && Number.isFinite(retainFromMs);
+    if (!usable || retainFromMs >= now.epochMilliseconds) return now;
+    return Temporal.Instant.fromEpochMilliseconds(Math.trunc(retainFromMs));
+  }
+
+  /** A pre-link object's owner holds it unrecorded: a link lets the sweep take it (ADR-002). */
   private async isLinked(candidate: StoredObjectRecord): Promise<boolean> {
     const links = await this.options.ownerLinks.countAll({
       tenantId: candidate.tenantId,

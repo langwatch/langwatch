@@ -28,7 +28,6 @@ type StoredObjectRetentionServiceOptions = Readonly<{
   sweepTenantLimit?: number;
   sweepPageSize?: number;
   sweepBudgetMs?: number;
-  retimePageSize?: number;
 }>;
 
 export type StoredObjectSweepReport = Readonly<{
@@ -91,7 +90,7 @@ export class StoredObjectRetentionService {
     isRaise?: boolean;
   }): Promise<void> {
     const days = input.retentionDays === INDEFINITE_RETENTION_DAYS ? null : input.retentionDays;
-    const limit = this.options.retimePageSize ?? RETIME_PAGE_SIZE;
+    const limit = RETIME_PAGE_SIZE;
     const at = this.options.now();
     for (const purpose of purposesIn(input.category)) {
       let afterId: StoredObjectId | undefined;
@@ -129,7 +128,12 @@ export class StoredObjectRetentionService {
     for (const tenantId of input.tenants) {
       if (this.#elapsedMs(startedAt) >= budgetMs) return [];
       try {
-        const page = await this.#sweepPage({ tenantId, now: startedAt, pageSize });
+        const page = await this.#sweepPage({
+          tenantId,
+          now: startedAt,
+          pageSize,
+          failures: tally.failures,
+        });
         tally.removedLinks += page.removedLinks;
         tally.deletedObjects += page.deletedObjects;
         if (page.isFull && page.removedLinks > 0) next.push(tenantId);
@@ -145,6 +149,7 @@ export class StoredObjectRetentionService {
     tenantId: StoredObjectProjectId;
     now: Instant;
     pageSize: number;
+    failures: unknown[];
   }): Promise<{ removedLinks: number; deletedObjects: number; isFull: boolean }> {
     const page = await this.options.ownerLinks.findExpired({
       tenantId: input.tenantId,
@@ -157,11 +162,16 @@ export class StoredObjectRetentionService {
     let deletedObjects = 0;
     for (const id of objectIds) {
       const query = { tenantId: input.tenantId, id };
-      if (await this.#deleteIfUnheld({ ...query, now: input.now })) {
-        deletedObjects += 1;
-        gone.push(id);
-      } else {
-        ((await this.#isAvailable(query)) ? held : gone).push(id);
+      // A failed object keeps its links for the next run; the rest of the page goes on.
+      try {
+        if (await this.#deleteIfUnheld({ ...query, now: input.now })) {
+          deletedObjects += 1;
+          gone.push(id);
+        } else {
+          ((await this.#isAvailable(query)) ? held : gone).push(id);
+        }
+      } catch (error) {
+        input.failures.push(error);
       }
     }
     const { tenantId, now: before } = input;

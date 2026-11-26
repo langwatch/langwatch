@@ -74,12 +74,13 @@ export interface StoredObjectRecordRepository {
 
   findPage(input: StoredObjectRecordPageQuery): Promise<StoredObjectRecord[]>;
 
-  /** Available rows holding these exact bytes for one purpose and media type, oldest first. */
+  /** Up to `limit` available rows with these bytes for one purpose and media type, oldest first. */
   findReusable(input: {
     tenantId: StoredObjectProjectId;
     purpose: string;
     sha256: string;
     mediaType: string;
+    limit: number;
   }): Promise<StoredObjectRecord[]>;
 
   /** Rows of one purpose across every tenant, ordered by tenant then id, after the cursor. */

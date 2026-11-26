@@ -153,6 +153,7 @@ export class PrismaStoredObjectRecordRepository implements StoredObjectRecordRep
     purpose: string;
     sha256: string;
     mediaType: string;
+    limit: number;
   }): Promise<StoredObjectRecord[]> {
     const rows = await this.prisma.storedObject.findMany({
       where: {
@@ -163,6 +164,7 @@ export class PrismaStoredObjectRecordRepository implements StoredObjectRecordRep
         status: "available",
       },
       orderBy: { id: "asc" },
+      take: input.limit,
     });
 
     return rows.map((row) => fromRow(row));
