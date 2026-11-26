@@ -254,6 +254,29 @@ describe("given a change of the organization's level", () => {
     });
   });
 
+  describe("when the prompt records the organization's acceptance", () => {
+    /** @scenario Accepting the price from the picker switches the organization to the model */
+    it("says the acceptance covers every Strict rule in the organization", () => {
+      const asking = levelChangeConfirmation({
+        from: "essential",
+        to: "strict",
+        free: false,
+        acceptance: "can-accept",
+      });
+      expect(asking?.description).toBe(
+        "Strict uses the LangWatch PII Redaction Model at $0.50 per 1M characters excl. VAT, pay as you go. This covers every Strict rule in your organization: each one moves to the model and is billed. Turn it on?",
+      );
+      expect(
+        levelChangeConfirmation({
+          from: "essential",
+          to: "strict",
+          free: false,
+          acceptance: "accepted",
+        })?.description,
+      ).not.toContain("every Strict rule");
+    });
+  });
+
   describe("when the organization is free", () => {
     it("turns Strict on without asking", () => {
       expect(levelChangeConfirmation({ from: "essential", to: "strict", free: true })).toBeNull();

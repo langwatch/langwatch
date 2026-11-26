@@ -171,20 +171,27 @@ type LevelChangeConfirmation = {
   confirmLabel: string;
 };
 
+/** A confirmation that records the acceptance moves every Strict rule of the organization. */
+const ACCEPTANCE_COVERS =
+  "This covers every Strict rule in your organization: each one moves to the model and is billed. ";
+
 export function levelChangeConfirmation({
   from,
   to,
   free,
+  acceptance,
 }: {
   from: PiiLevel;
   to: OrganizationPiiLevel;
   free: boolean;
+  acceptance?: ModelAcceptance;
 }): LevelChangeConfirmation | null {
   const replacesCustom = from === "custom" ? "This replaces your custom PII settings. " : "";
   if (to === "strict" && !free) {
+    const covers = acceptance === "can-accept" ? ACCEPTANCE_COVERS : "";
     return {
       title: "Turn on Strict?",
-      description: `${replacesCustom}Strict uses the ${PII_REDACTION_MODEL_NAME} at ${PII_REDACTION_MODEL_PRICE} ${PII_REDACTION_MODEL_PRICE_UNIT}. Turn it on?`,
+      description: `${replacesCustom}Strict uses the ${PII_REDACTION_MODEL_NAME} at ${PII_REDACTION_MODEL_PRICE} ${PII_REDACTION_MODEL_PRICE_UNIT}. ${covers}Turn it on?`,
       confirmLabel: "Turn on Strict",
     };
   }
@@ -225,7 +232,7 @@ export function ruleSaveConfirmation({
 }): LevelChangeConfirmation | null {
   if (offer?.kind !== "model" || offer.free || acceptance === "awaiting-admin") return null;
   if (after.pii?.level !== "strict" || before?.pii?.level === "strict") return null;
-  return levelChangeConfirmation({ from: "essential", to: "strict", free: false });
+  return levelChangeConfirmation({ from: "essential", to: "strict", free: false, acceptance });
 }
 
 /** How the picker names a level it does not offer: "Off", or "Custom (2 types)". */

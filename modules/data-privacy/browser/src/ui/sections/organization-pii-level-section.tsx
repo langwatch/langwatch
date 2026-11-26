@@ -101,7 +101,7 @@ export function OrganizationPiiLevelSection({
   const shown = picked && picked.over === stored ? picked.level : stored;
   const ownRule = organizationRule({ rules: snapshot.rules, organizationId });
   const confirmationFor = (level: OrganizationPiiLevel) =>
-    levelChangeConfirmation({ from: storedPii.level, to: level, free });
+    levelChangeConfirmation({ from: storedPii.level, to: level, free, acceptance });
   const confirmation = asking
     ? confirmationFor(asking.kind === "switch" ? "strict" : asking.level)
     : null;

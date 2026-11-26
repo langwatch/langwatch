@@ -81,7 +81,7 @@ describe("given a Cloud organization on the model flag whose price no admin acce
 
       const dialog = await screen.findByRole("dialog", { name: "Turn on Strict?" });
       expect(dialog.textContent).toContain(
-        "Strict uses the LangWatch PII Redaction Model at $0.50 per 1M characters excl. VAT, pay as you go. Turn it on?",
+        "Strict uses the LangWatch PII Redaction Model at $0.50 per 1M characters excl. VAT, pay as you go. This covers every Strict rule in your organization: each one moves to the model and is billed. Turn it on?",
       );
       expect(api.acceptPiiRedactionModel).not.toHaveBeenCalled();
 

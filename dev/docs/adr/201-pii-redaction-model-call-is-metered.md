@@ -178,7 +178,9 @@ subscription carries the price (decision 10). What stops a customer who does not
 the acceptance (decision 15): the settings page asks an admin before it turns Strict on at a
 price and keeps the level it had when it is cancelled; Essential never reaches the model or
 Presidio. An organization, team or project already on Strict (then Presidio) when the flag goes on
-stays there, unbilled, and the page shows it rule-based with a switch to the model. The cost: such
+stays there, unbilled, and the page shows it rule-based. The switch to the model sits on the
+organization card only, because one acceptance covers every Strict rule in the organization; a team
+or project rule on Strict moves once an organization admin accepts there. The cost: such
 an organization keeps the rule-based detection until an admin acts, and nothing but the page tells
 it (the owner, 2026-11-26: no prompt, no email). A team or project admin cannot accept for the
 organization, so a Strict rule they save waits on an organization admin.

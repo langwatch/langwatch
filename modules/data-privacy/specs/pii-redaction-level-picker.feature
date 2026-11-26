@@ -254,6 +254,7 @@ Feature: The organization picks its PII redaction level on the Data Privacy page
     And the organization's PII level resolves to Strict and no organization admin accepted the price
     When an admin presses "Switch to the PII Redaction Model"
     Then a confirmation names the LangWatch PII Redaction Model and its price
+    And it says the acceptance covers every Strict rule in the organization
     And nothing is accepted until the admin confirms
     When the admin confirms
     Then the organization's acceptance of the price is recorded
