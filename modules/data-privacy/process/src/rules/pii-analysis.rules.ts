@@ -1,4 +1,8 @@
-import { formatPiiMarker, PRESIDIO_STRICT_ENTITIES } from "@langwatch/redaction";
+import {
+  formatPiiMarker,
+  normalizePresidioMarkers,
+  PRESIDIO_STRICT_ENTITIES,
+} from "@langwatch/redaction";
 import {
   matchesPiiException,
   type ProtectedRange,
@@ -98,7 +102,7 @@ const DLP_NAME_AND_PLACE_INFO_TYPES: ReadonlySet<string> = new Set([
 ]);
 
 /** Presidio's findings as the analysis service serializes them in `raw_response.results`. */
-const presidioFindingsSchema = z.array(
+export const presidioFindingsSchema = z.array(
   z.object({
     entity_type: z.string(),
     start: z.number().int(),
@@ -107,7 +111,7 @@ const presidioFindingsSchema = z.array(
   }),
 );
 
-type PresidioFinding = z.infer<typeof presidioFindingsSchema>[number];
+export type PresidioFinding = z.infer<typeof presidioFindingsSchema>[number];
 
 /** A spared redaction: the new text, nothing left to redact, or findings that cannot be placed. */
 type SparedRedaction =
@@ -147,7 +151,7 @@ export function redactSparingNamesAndPlaces({
 }
 
 /** Overlapping findings merged into one span each, labelled by the higher-scoring finding. */
-function mergeOverlapping(findings: readonly PresidioFinding[]): PresidioFinding[] {
+export function mergeOverlapping(findings: readonly PresidioFinding[]): PresidioFinding[] {
   const merged: PresidioFinding[] = [];
   for (const finding of findings.toSorted((a, b) => a.start - b.start)) {
     const last = merged.at(-1);
@@ -165,7 +169,7 @@ function mergeOverlapping(findings: readonly PresidioFinding[]): PresidioFinding
 }
 
 /** DLP counts codepoints; a text without surrogate pairs indexes the same either way. */
-function codepointToCodeUnitConverter(text: string): (cp: number) => number {
+export function codepointToCodeUnitConverter(text: string): (cp: number) => number {
   if (!/[\uD800-\uDFFF]/.test(text)) return (cp) => cp;
   const offsets: number[] = [];
   let codeUnit = 0;
@@ -215,4 +219,31 @@ export function maskGoogleDlpFindings(input: {
     }
   }
   return { redacted, masked };
+}
+
+/**
+ * How one analysed input was cleared from its answer. A flagged input whose findings cannot be
+ * placed keeps the service's own full redaction rather than going unredacted.
+ */
+export function clearingOfAnswer({
+  input,
+  rawResponse,
+  spareNamesAndPlaces,
+}: {
+  input: string;
+  rawResponse: unknown;
+  spareNamesAndPlaces: boolean;
+}): PiiClearing {
+  const response = typeof rawResponse === "object" && rawResponse !== null ? rawResponse : {};
+  if (spareNamesAndPlaces) {
+    const spared = redactSparingNamesAndPlaces({
+      text: input,
+      findings: "results" in response ? response.results : undefined,
+    });
+    if (spared.kind !== "unplaceable") return spared;
+  }
+  const anonymized = "anonymized" in response ? response.anonymized : undefined;
+  return typeof anonymized === "string" && anonymized
+    ? { kind: "redacted", text: normalizePresidioMarkers(anonymized) }
+    : { kind: "unchanged" };
 }

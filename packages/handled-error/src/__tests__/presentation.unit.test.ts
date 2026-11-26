@@ -277,16 +277,18 @@ describe("explainHandledError", () => {
       );
     });
 
-    it("names simulations for a scenario set refusal", () => {
+    /** @scenario "The run refusal tells the caller how to upgrade" */
+    it("names the monthly run allowance and the upgrade for a scenario run refusal", () => {
       const { description } = explainHandledError(
         shape({
           code: "resource_limit_exceeded",
           httpStatus: 403,
-          meta: { limitType: "scenarioSets", current: 3, max: 3 },
+          meta: { limitType: "scenarioRuns", current: 100, max: 100 },
         }),
       );
 
-      expect(description).toContain("3 simulations");
+      expect(description).toContain("100 scenario runs a month");
+      expect(description).toContain("Upgrade your plan");
     });
 
     /** @scenario The suite cap refusal names suites */
@@ -1253,6 +1255,54 @@ describe("model_provider_invalid", () => {
     const { title } = explainHandledError(shape({ code: "model_provider_invalid" }));
 
     expect(title).toBe("That provider can't be saved");
+  });
+});
+
+describe("provider_endpoint_refused", () => {
+  const explain = (refusal: string) =>
+    explainHandledError(
+      shape({ code: "provider_endpoint_refused", meta: { provider: "openai", refusal } }),
+    );
+
+  /** @scenario "A base URL refused by the outbound policy is reported as refused, not as unreachable" */
+  it("says the outbound policy refused a cloud domain and that a DNS name of your own works", () => {
+    const { title, description } = explain("cloud_internal_domain");
+
+    expect(title).toBe("This instance doesn't send requests to that base URL");
+    expect(description).toContain("outbound policy");
+    expect(description).toContain("DNS name of your own");
+    expect(`${title} ${description}`).not.toMatch(
+      /couldn't reach|network connection|nothing answered/i,
+    );
+  });
+
+  /** @scenario "A private base URL refused by the outbound policy names the setting that allows it" */
+  it.each(["private_address", "on_premise_domain"])(
+    "names ALLOWED_PROXY_HOSTS for a %s refusal",
+    (refusal) => {
+      expect(explain(refusal).description).toContain("ALLOWED_PROXY_HOSTS");
+    },
+  );
+
+  /** @scenario "A private base URL refused by the outbound policy names the setting that allows it" */
+  it("never offers ALLOWED_PROXY_HOSTS for a refusal it cannot lift", () => {
+    expect(explain("cloud_internal_domain").description).not.toContain("ALLOWED_PROXY_HOSTS");
+    expect(explain("metadata_endpoint").description).not.toContain("ALLOWED_PROXY_HOSTS");
+  });
+});
+
+describe("model_provider_invalid with a policy refusal", () => {
+  /** @scenario "A save refused for its base URL says why in the form" */
+  it("explains the refusal the same way the probe does, and that nothing was saved", () => {
+    const { description } = explainHandledError(
+      shape({
+        code: "model_provider_invalid",
+        meta: { reason: "endpoint_not_allowed", refusal: "cloud_internal_domain" },
+      }),
+    );
+
+    expect(description).toContain("nothing was saved");
+    expect(description).toContain("DNS name of your own");
   });
 });
 

@@ -7,6 +7,7 @@ import { Readable } from "node:stream";
 
 import { DeleteObjectCommand, GetObjectCommand, PutObjectCommand } from "@aws-sdk/client-s3";
 import { createTestLogger } from "@langwatch/test-harness";
+import { DEFAULT_OTLP_TRACES_MAX_BODY_BYTES } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import {
@@ -24,6 +25,8 @@ import {
   TraceBlobStoreService,
   MAX_SPOOL_BYTES,
   SpoolDestinationUnsupportedError,
+  spoolReadCapBytes,
+  SpoolTooLargeError,
   type SpoolStorage,
 } from "../trace-blob-store.service.ts";
 
@@ -187,6 +190,25 @@ describe("putSpool — given a span payload body", () => {
       });
 
       expect(objectStore.write).toHaveBeenCalledTimes(1);
+    });
+  });
+});
+
+describe("putSpool — given a body larger than the read cap", () => {
+  describe("when putSpool is called", () => {
+    /** @scenario "A span whose command would spool past the read cap is refused at the edge" */
+    it("refuses it and writes no object", async () => {
+      const objectStore = fakeObjectStore(S3_DESTINATION);
+      const store = TraceBlobStoreService.create({
+        legacySpool: S3TraceLegacySpoolChannel.create({ resolveS3Client: forbiddenS3Resolver }),
+        spoolStorage: spoolStorageFor(objectStore),
+        maxSpoolBytes: 1024,
+      });
+
+      await expect(
+        store.putSpool({ ...spoolCoords, body: Buffer.alloc(1025) }),
+      ).rejects.toBeInstanceOf(SpoolTooLargeError);
+      expect(objectStore.write).not.toHaveBeenCalled();
     });
   });
 });
@@ -554,6 +576,34 @@ describe("getSpool — given a v1 object larger than the read cap", () => {
       await expect(store.getSpool({ spoolRef: legacyKey, ...spoolCoords })).rejects.toThrow(
         StreamTooLargeError,
       );
+    });
+  });
+});
+
+describe("getSpool — given a spooled span from an export at the body cap", () => {
+  describe("when getSpool reads an object over 50 MiB under the deployment's cap", () => {
+    /** @scenario "A spooled span from an export at the body cap reads back whole" */
+    it("returns the whole object", async () => {
+      const maxBodyBytes = DEFAULT_OTLP_TRACES_MAX_BODY_BYTES;
+      const size = MAX_SPOOL_BYTES + 10 * 1024 * 1024;
+      const objectStore = fakeObjectStore(S3_DESTINATION);
+      objectStore.read.mockImplementationOnce(async () =>
+        Readable.from(
+          (function* () {
+            for (let sent = 0; sent < size; sent += 1024 * 1024) yield Buffer.alloc(1024 * 1024);
+          })(),
+        ),
+      );
+      const store = TraceBlobStoreService.create({
+        legacySpool: S3TraceLegacySpoolChannel.create({ resolveS3Client: forbiddenS3Resolver }),
+        spoolStorage: spoolStorageFor(objectStore),
+        maxSpoolBytes: spoolReadCapBytes({ maxBodyBytes }),
+      });
+
+      const body = await store.getSpool({ spoolRef: SPOOL_REF_V2, ...spoolCoords });
+
+      expect(body.byteLength).toBe(size);
+      expect(spoolReadCapBytes({ maxBodyBytes })).toBe(2 * maxBodyBytes);
     });
   });
 });

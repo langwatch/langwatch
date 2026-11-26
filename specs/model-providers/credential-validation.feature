@@ -371,6 +371,38 @@ Feature: Credential Validation
     Then I am told the endpoint redirects somewhere else
     And I am not told the provider could not be reached
 
+  # A base URL the instance's outbound policy refuses was never asked at all.
+  # Calling that unreachable sends an operator to debug a network that works;
+  # what they need is to know a policy refused it, and which setting, if any,
+  # lifts the refusal.
+
+  @unit
+  Scenario: A base URL refused by the outbound policy is reported as refused, not as unreachable
+    Given a base URL on a cloud provider domain such as an AWS load balancer name
+    When validation runs
+    Then I am told the instance's outbound policy refused the base URL
+    And I am told to point a DNS name of my own at the endpoint instead
+    And I am not told the provider could not be reached
+
+  @unit
+  Scenario: A private base URL refused by the outbound policy names the setting that allows it
+    Given the instance blocks local calls and a base URL that resolves to a private address
+    When validation runs
+    Then I am told an administrator can allow the host with ALLOWED_PROXY_HOSTS
+
+  @integration
+  Scenario: A base URL refused by the outbound policy offers no Save anyway
+    Given validation reported the base URL as refused by the outbound policy
+    When I look at the save button
+    Then it still says Save, since saving that base URL is refused too
+
+  @integration
+  Scenario: A save refused for its base URL says why in the form
+    Given the save of a provider is refused because its base URL is not allowed
+    When the refusal comes back
+    Then the form shows why the base URL cannot be used
+    And the provider form stays open
+
   @unit
   Scenario: The API key is never sent in a URL
     Given a key to check

@@ -1,4 +1,10 @@
 import {
+  SCENARIO_RUN_GRACE_ENDED_EVENT_TYPE,
+  SCENARIO_RUNS_COUNTED_EVENT_TYPE,
+  SCENARIO_RUNS_THRESHOLD_REACHED_EVENT_TYPE,
+  scenarioRunGraceEndedEventDataSchema,
+  scenarioRunsCountedEventDataSchema,
+  scenarioRunsThresholdReachedEventDataSchema,
   limitClearedEventDataSchema,
   limitReachedEventDataSchema,
   monthCountedEventDataSchema,
@@ -39,11 +45,32 @@ export const usageThresholdCrossedEventSchema = z.object({
   version: z.literal(USAGE_EVENT_VERSION),
   data: usageThresholdCrossedEventDataSchema,
 });
+export const scenarioRunsCountedEventSchema = z.object({
+  ...EventSchema.shape,
+  type: z.literal(SCENARIO_RUNS_COUNTED_EVENT_TYPE),
+  version: z.literal(USAGE_EVENT_VERSION),
+  data: scenarioRunsCountedEventDataSchema,
+});
+export const scenarioRunsThresholdReachedEventSchema = z.object({
+  ...EventSchema.shape,
+  type: z.literal(SCENARIO_RUNS_THRESHOLD_REACHED_EVENT_TYPE),
+  version: z.literal(USAGE_EVENT_VERSION),
+  data: scenarioRunsThresholdReachedEventDataSchema,
+});
+export const scenarioRunGraceEndedEventSchema = z.object({
+  ...EventSchema.shape,
+  type: z.literal(SCENARIO_RUN_GRACE_ENDED_EVENT_TYPE),
+  version: z.literal(USAGE_EVENT_VERSION),
+  data: scenarioRunGraceEndedEventDataSchema,
+});
 export type UsageEvent =
   | z.infer<typeof monthCountedEventSchema>
   | z.infer<typeof limitReachedEventSchema>
   | z.infer<typeof limitClearedEventSchema>
-  | z.infer<typeof usageThresholdCrossedEventSchema>;
+  | z.infer<typeof usageThresholdCrossedEventSchema>
+  | z.infer<typeof scenarioRunsCountedEventSchema>
+  | z.infer<typeof scenarioRunsThresholdReachedEventSchema>
+  | z.infer<typeof scenarioRunGraceEndedEventSchema>;
 
 export const countMonthCommandDataSchema = z.object({
   tenantId: z.string().min(1),
@@ -65,3 +92,22 @@ export const recordUsageWarningCommandDataSchema = z.object({
   tenantId: z.string().min(1),
 });
 export type RecordUsageWarningCommandData = z.infer<typeof recordUsageWarningCommandDataSchema>;
+
+export const countScenarioRunsCommandDataSchema = countMonthCommandDataSchema;
+export type CountScenarioRunsCommandData = z.infer<typeof countScenarioRunsCommandDataSchema>;
+
+export const recordScenarioRunsThresholdCommandDataSchema = z.object({
+  ...scenarioRunsThresholdReachedEventDataSchema.shape,
+  tenantId: z.string().min(1),
+});
+export type RecordScenarioRunsThresholdCommandData = z.infer<
+  typeof recordScenarioRunsThresholdCommandDataSchema
+>;
+
+export const recordScenarioRunGraceEndedCommandDataSchema = z.object({
+  ...scenarioRunGraceEndedEventDataSchema.shape,
+  tenantId: z.string().min(1),
+});
+export type RecordScenarioRunGraceEndedCommandData = z.infer<
+  typeof recordScenarioRunGraceEndedCommandDataSchema
+>;

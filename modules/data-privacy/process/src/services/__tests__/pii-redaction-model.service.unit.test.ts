@@ -253,7 +253,9 @@ function setup({
       metrics: { modelFellBack: (reason) => fallbacks.push(reason) },
       log: {
         info: (fields, message) => usage.push({ level: "info", fields, message }),
-        warn: (fields, message) => usage.push({ level: "warn", fields, message }),
+        warn: (fields, message) => {
+          if ("outcome" in fields) usage.push({ level: "warn", fields, message });
+        },
       },
       now: () => Date.now(),
     }),

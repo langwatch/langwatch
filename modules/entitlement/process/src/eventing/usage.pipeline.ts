@@ -25,6 +25,14 @@ import {
   REFUSED_ORGANIZATIONS_PROCESS_NAME,
   refusedOrganizationWake,
 } from "./refused-organizations.process.ts";
+import { scenarioRunCountSubscriber } from "./scenario-run-count.subscriber.ts";
+import {
+  initialScenarioRunNoticesState,
+  SCENARIO_RUN_NOTICES_PROCESS_NAME,
+  scenarioRunGraceWake,
+  scenarioRunNoticesStateSchema,
+  scenarioRunsCounted,
+} from "./scenario-run-notices.process.ts";
 import {
   TRACE_USAGE_MONTH_IDS_SUBSCRIBER_NAME,
   TRACE_USAGE_SPAN_SUBSCRIBER_NAME,
@@ -34,11 +42,22 @@ import {
 import { usageMeterCountSubscriber } from "./usage-meter-count.subscriber.ts";
 import {
   CountMonthCommand,
+  CountScenarioRunsCommand,
   RecordLimitDecisionCommand,
+  RecordScenarioRunGraceEndedCommand,
+  RecordScenarioRunsThresholdCommand,
   RecordUsageWarningCommand,
 } from "./usage.commands.ts";
 import {
   type CountMonthCommandData,
+  type CountScenarioRunsCommandData,
+  type RecordScenarioRunGraceEndedCommandData,
+  recordScenarioRunGraceEndedCommandDataSchema,
+  type RecordScenarioRunsThresholdCommandData,
+  recordScenarioRunsThresholdCommandDataSchema,
+  scenarioRunGraceEndedEventSchema,
+  scenarioRunsCountedEventSchema,
+  scenarioRunsThresholdReachedEventSchema,
   countMonthCommandDataSchema,
   limitClearedEventSchema,
   limitReachedEventSchema,
@@ -57,12 +76,18 @@ export type UsagePipelineDefinition = StaticPipelineDefinition<
   | { name: "countMonth"; payload: CountMonthCommandData }
   | { name: "recordLimitDecision"; payload: RecordLimitDecisionCommandData }
   | { name: "recordUsageWarning"; payload: RecordUsageWarningCommandData }
+  | { name: "countScenarioRuns"; payload: CountScenarioRunsCommandData }
+  | { name: "recordScenarioRunsThreshold"; payload: RecordScenarioRunsThresholdCommandData }
+  | { name: "recordScenarioRunGraceEnded"; payload: RecordScenarioRunGraceEndedCommandData }
 >;
 
 export type UsageSenders = Readonly<{
   countMonth: (data: CountMonthCommandData) => Promise<void>;
   recordLimitDecision: (data: RecordLimitDecisionCommandData) => Promise<void>;
   recordUsageWarning: (data: RecordUsageWarningCommandData) => Promise<void>;
+  countScenarioRuns: (data: CountScenarioRunsCommandData) => Promise<void>;
+  recordScenarioRunsThreshold: (data: RecordScenarioRunsThresholdCommandData) => Promise<void>;
+  recordScenarioRunGraceEnded: (data: RecordScenarioRunGraceEndedCommandData) => Promise<void>;
 }>;
 
 /**
@@ -71,12 +96,16 @@ export type UsageSenders = Readonly<{
  */
 export function buildUsagePipeline({
   countMonth,
+  countScenarioRuns,
+  recordScenarioRunGraceEnded,
   traceUsage,
   billableEventsMeter,
   projects,
   send,
 }: {
   countMonth: CountMonthCommand;
+  countScenarioRuns: CountScenarioRunsCommand;
+  recordScenarioRunGraceEnded: RecordScenarioRunGraceEndedCommand;
   traceUsage: Pick<TraceUsageService, "recordTraces">;
   billableEventsMeter: AppendStore<BillableEventRecord> | undefined;
   projects: Pick<TenancyRepository, "getProjectPlacement">;
@@ -91,6 +120,9 @@ export function buildUsagePipeline({
       limitReachedEventSchema,
       limitClearedEventSchema,
       usageThresholdCrossedEventSchema,
+      scenarioRunsCountedEventSchema,
+      scenarioRunsThresholdReachedEventSchema,
+      scenarioRunGraceEndedEventSchema,
     ])
     // Usage's stored names (Alex, 2026-10-06); jobs queued under `usage:` drain into these lanes.
     .withUpcasts({
@@ -124,6 +156,25 @@ export function buildUsagePipeline({
     })
     .withCommand("recordLimitDecision", RecordLimitDecisionCommand)
     .withCommand("recordUsageWarning", RecordUsageWarningCommand)
+    .withCommandInstance({
+      name: "countScenarioRuns",
+      handlerClass: CountScenarioRunsCommand,
+      instance: countScenarioRuns,
+      options: {
+        delay: 30_000,
+        deduplication: {
+          makeId: (p: CountScenarioRunsCommandData) =>
+            `scenario-runs:${p.organizationId}:${p.month}`,
+          ttlMs: 35_000,
+        },
+      },
+    })
+    .withCommand("recordScenarioRunsThreshold", RecordScenarioRunsThresholdCommand)
+    .withCommandInstance({
+      name: "recordScenarioRunGraceEnded",
+      handlerClass: RecordScenarioRunGraceEndedCommand,
+      instance: recordScenarioRunGraceEnded,
+    })
     .withPeerSubscriber(TRACE_USAGE_SPAN_SUBSCRIBER_NAME, traceUsageSpanSubscriber(traceUsage))
     .withPeerSubscriber(
       TRACE_USAGE_MONTH_IDS_SUBSCRIBER_NAME,
@@ -143,8 +194,29 @@ export function buildUsagePipeline({
           .keyBy((event) => event.aggregateId)
           .onWake(refusedOrganizationWake),
       )
+      .withProcessManager(SCENARIO_RUN_NOTICES_PROCESS_NAME, (pm) =>
+        pm
+          .state(scenarioRunNoticesStateSchema, initialScenarioRunNoticesState)
+          .intent(
+            "recordScenarioRunsThreshold",
+            recordScenarioRunsThresholdCommandDataSchema,
+            (data) => send().recordScenarioRunsThreshold(data),
+          )
+          .intent(
+            "recordScenarioRunGraceEnded",
+            recordScenarioRunGraceEndedCommandDataSchema,
+            (data) => send().recordScenarioRunGraceEnded(data),
+          )
+          .on(scenarioRunsCountedEventSchema, scenarioRunsCounted)
+          .keyBy((event) => event.aggregateId)
+          .onWake(scenarioRunGraceWake),
+      )
       .withGlobalMapProjection(BillableEventsMeterProjection.create(billableEventsMeter).build(), [
         usageMeterCountSubscriber({ projects, countMonth: (data) => send().countMonth(data) }),
+        scenarioRunCountSubscriber({
+          projects,
+          countScenarioRuns: (data) => send().countScenarioRuns(data),
+        }),
       ])
       // Cloud only: main's meter dispatch, renamed. Its body is the reactor's, so no transform.
       .withLaneAliases([

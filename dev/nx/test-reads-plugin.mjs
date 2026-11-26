@@ -53,6 +53,7 @@ export const reads = {
     "apps/*/package.json",
     "charts/langwatch/**/*",
     "docs/self-hosting/**/*",
+    "infra/compose.yml",
     "packages/clickhouse-migrations/migrations/00023_create_stored_objects.sql",
     ".env.example",
   ],

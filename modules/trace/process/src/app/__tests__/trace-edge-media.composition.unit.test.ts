@@ -71,7 +71,7 @@ function compose({
       }),
       fallbackVisibilityDays: 14,
     },
-    dataRetention: createApiFixture<DataRetentionApi>(),
+    dataRetention: createApiFixture<DataRetentionApi>({ getRetentionDays: async () => 30 }),
     modelProviders: createApiFixture<ModelProviderApi>(),
     projects: createApiFixture<ProjectApi>(),
     share: createApiFixture<ShareApi>(),
