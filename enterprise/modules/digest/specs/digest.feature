@@ -89,6 +89,37 @@ Feature: Weekly digest emails
     And each project's week is read once however many members are sent to
 
   @integration
+  Scenario: An email counts only the live, shared or own projects the recipient may view
+    Given an organization with a project, another member's personal project, an archived project and a governance project
+    When an admin of the organization is sent the week
+    Then the email shows the shared project alone and analytics is not asked about the others
+    And a member is still shown their own personal project
+
+  @integration
+  Scenario: A failed read of last week drops the change line, not the email
+    Given analytics cannot answer the week before the sent one
+    When a member is sent the week
+    Then the email is sent without its change on last week
+
+  @integration
+  Scenario: A failed read of the sent week fails the send for a retry
+    Given analytics cannot answer the sent week
+    When a member's send is handled
+    Then it fails, no email is sent and the week is not claimed
+
+  @integration
+  Scenario: Analytics is read a few reads at a time
+    Given an organization with thirty projects
+    When a member is sent the week
+    Then no more than eight analytics reads run at once
+
+  @integration
+  Scenario: Each organization is planned as its own intent, a page of ids at a time
+    Given three organizations whose ids are paged one at a time
+    When the hourly plan runs
+    Then one plan is asked for each organization
+
+  @integration
   Scenario: A quiet week sends nothing
     Given analytics answers a project's week with no traces
     When a member's send is handled
@@ -106,6 +137,12 @@ Feature: Weekly digest emails
     When their digest-coding-agent-week email is built
     Then its totals are the sums of the series it kept, each shown as "at least"
     And a week whose series all fit shows its totals without "at least"
+
+  @unit
+  Scenario: Impersonating staff can see a person's email choice but not change it
+    Given staff impersonating a person
+    When they read and set the person's weekly digest preference
+    Then the read shows the person's own choice and the write is refused
 
   @unit
   Scenario: A coding-agent repository is named with its owner when one was reported
@@ -298,7 +335,7 @@ Feature: Weekly digest emails
     Given two organizations, the first of which cannot be read
     When the scheduled wake runs
     Then the other organization's sends are asked
-    And the week stays unplanned so the next wake retries the unreadable one
+    And the unreadable one's own plan fails and is retried alone, without asking the first twice
 
   @integration @unimplemented
   Scenario: Every link in a sent email is a tracked redirect

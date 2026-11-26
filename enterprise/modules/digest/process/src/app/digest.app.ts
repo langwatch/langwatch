@@ -125,7 +125,6 @@ export class DigestModule implements DigestApiContract {
       recordUser: (activity) => commands.recordUser(activity),
     });
     const weeks = DigestWeekService.create({
-      projects: dependencies.projects,
       traces: DigestTraceReadService.create({ analytics: dependencies.analytics, now: nowEpochMs }),
       projectWeeks: repositories.projectWeeks,
       userWeeks: repositories.userWeeks,
@@ -144,6 +143,7 @@ export class DigestModule implements DigestApiContract {
       unsubscribes,
       publicBaseUrl: config.publicBaseUrl,
       requestSend: (request) => commands.requestSend(request),
+      requestOrganizationPlan: (request) => commands.requestOrganizationPlan(request),
       now: nowEpochMs,
     });
     return new DigestModule({

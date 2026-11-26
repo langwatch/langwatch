@@ -49,7 +49,7 @@ export const userActivitySchema = z.object({
   userId: z.string().min(1),
   sessionId: z.string().min(1),
   repository: z.string().nullable(),
-  /** One metric series' converged total (replaces, never adds), or none for a span fact. */
+  /** One metric series' converged total (replaces, never adds), or none for a coding-agent span fact. */
   series: z
     .object({
       seriesId: z.string().min(1),

@@ -12,14 +12,24 @@ import {
 
 import type { DigestModule } from "../app/digest.app.ts";
 import type { DigestRepositories } from "../repositories/digest.repositories.ts";
-import { RequestDigestSendCommand } from "./digest-send.commands.ts";
+import {
+  RequestDigestOrganizationPlanCommand,
+  RequestDigestSendCommand,
+} from "./digest-send.commands.ts";
 import {
   DIGEST_SEND_AGGREGATE_TYPE,
   DIGEST_SEND_PIPELINE_NAME,
+  DigestOrganizationPlanRequestedEventSchema,
   DigestSendRequestedEventSchema,
 } from "./digest-send.events.ts";
 import {
   DIGEST_MEMBER_SEND_INITIAL_STATE,
+  DIGEST_ORGANIZATION_PLAN_INITIAL_STATE,
+  DIGEST_ORGANIZATION_PLAN_PROCESS_NAME,
+  digestOrganizationPlanRequested,
+  digestOrganizationPlanStateSchema,
+  type PlanOrganizationIntent,
+  planOrganizationIntentSchema,
   DIGEST_MEMBER_SEND_PROCESS_NAME,
   DIGEST_PLAN_INITIAL_STATE,
   DIGEST_PLAN_INTERVAL_MS,
@@ -34,8 +44,12 @@ import {
   sendDigestIntentSchema,
 } from "./digest-send.process.ts";
 
-/** A plan asks one send per member and organization: a few calls each, well inside the lease. */
+/** The week's plan only pages organization ids and asks one plan each: well inside the lease. */
 const PLAN_LEASE_MS = 10 * 60 * 1000;
+/** One organization's plan reads its roster and asks one send per member. */
+const ORGANIZATION_PLAN_LEASE_MS = 10 * 60 * 1000;
+const ORGANIZATION_PLAN_MAX_ATTEMPTS = 5;
+const ORGANIZATION_PLANS_AT_ONCE = 2;
 /** One member's send reads the week's folds and mails the picked template once. */
 const SEND_LEASE_MS = 2 * 60 * 1000;
 const SEND_MAX_ATTEMPTS = 5;
@@ -44,6 +58,7 @@ const SENDS_AT_ONCE = 4;
 /** What the two intents carry out; late-bound to the services the module composes. */
 export interface DigestSendRunner {
   planWeek(input: PlanWeekIntent): Promise<void>;
+  planOrganization(input: PlanOrganizationIntent): Promise<void>;
   sendDigest(input: SendDigestIntent): Promise<void>;
 }
 
@@ -57,8 +72,9 @@ function digestSend(deps: { runner: DigestSendRunner; weeks: DigestWeekSweeper }
     name: DIGEST_SEND_PIPELINE_NAME,
     aggregate: defineAggregate({ type: DIGEST_SEND_AGGREGATE_TYPE }),
   })
-    .withEvents([DigestSendRequestedEventSchema])
+    .withEvents([DigestSendRequestedEventSchema, DigestOrganizationPlanRequestedEventSchema])
     .withCommand("requestSend", RequestDigestSendCommand)
+    .withCommand("requestOrganizationPlan", RequestDigestOrganizationPlanCommand)
     .withProcessManager(DIGEST_PLAN_PROCESS_NAME, (pm) =>
       pm
         .state(digestPlanStateSchema, DIGEST_PLAN_INITIAL_STATE)
@@ -70,6 +86,20 @@ function digestSend(deps: { runner: DigestSendRunner; weeks: DigestWeekSweeper }
           await deps.runner.planWeek(plan);
         })
         .outbox({ leaseDurationMs: PLAN_LEASE_MS, concurrency: 1, batchSize: 1, maxAttempts: 3 }),
+    )
+    .withProcessManager(DIGEST_ORGANIZATION_PLAN_PROCESS_NAME, (pm) =>
+      pm
+        .state(digestOrganizationPlanStateSchema, DIGEST_ORGANIZATION_PLAN_INITIAL_STATE)
+        .intent("planOrganization", planOrganizationIntentSchema, (plan) =>
+          deps.runner.planOrganization(plan),
+        )
+        .on(DigestOrganizationPlanRequestedEventSchema, digestOrganizationPlanRequested)
+        .outbox({
+          leaseDurationMs: ORGANIZATION_PLAN_LEASE_MS,
+          maxAttempts: ORGANIZATION_PLAN_MAX_ATTEMPTS,
+          concurrency: ORGANIZATION_PLANS_AT_ONCE,
+          batchSize: ORGANIZATION_PLANS_AT_ONCE,
+        }),
     )
     .withProcessManager(DIGEST_MEMBER_SEND_PROCESS_NAME, (pm) =>
       pm

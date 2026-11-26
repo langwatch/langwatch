@@ -6,7 +6,6 @@
 import {
   defineMiddlewareContext,
   defineTrpcRouter,
-  type TrpcHandlerActor,
   type TrpcRouterDeclaration,
 } from "@langwatch/api/trpc";
 import { DigestApi, digestTrpc } from "@langwatch/enterprise-digest-contract";
@@ -20,10 +19,6 @@ const STAFF = { at: "platform", hiddenWithout: "ops:view" } as const;
 
 /** Why the preference pair asks for no permission. */
 const OWN_PREFERENCE = "operates on the session user's own opt-out, so no tenant scope applies";
-
-/** The real person behind the session: staff impersonating someone never change that person's choice. */
-const personOf = (actor: TrpcHandlerActor): string =>
-  (actor.type === "user" ? actor.impersonatorId : undefined) ?? actor.id;
 
 export const digestTrpcTransport: TrpcRouterDeclaration<DigestApi, typeof digestTrpc> =
   defineTrpcRouter(DigestApi, digestTrpc)
@@ -42,11 +37,16 @@ export const digestTrpcTransport: TrpcRouterDeclaration<DigestApi, typeof digest
 
     .procedure("getMyPreference")
     .noPermission({ reason: OWN_PREFERENCE })
-    .handle(({ app, actor }) => app.getPreference({ userId: personOf(actor) }))
+    // Read-only under impersonation: the person's own choice, shown, never changed.
+    .handle(({ app, actor }) => app.getPreference({ userId: actor.id }))
 
     .procedure("setMyPreference")
     .noPermission({ reason: OWN_PREFERENCE })
     .handle(({ app, actor, input }) =>
-      app.setPreference({ userId: personOf(actor), subscribed: input.subscribed }),
+      app.setPreference({
+        userId: actor.id,
+        subscribed: input.subscribed,
+        impersonatorId: actor.type === "user" ? actor.impersonatorId : undefined,
+      }),
     )
     .build();

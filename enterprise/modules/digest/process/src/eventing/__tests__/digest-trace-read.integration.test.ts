@@ -93,4 +93,94 @@ describe("a member's traces email", () => {
       expect(digest.world.analyticsReads.some((read) => read.endsWith(":grouped"))).toBe(false);
     });
   });
+
+  describe("when an admin is sent the week of an organization with projects they must not see", () => {
+    const PERSONAL = "project-personal";
+    const ARCHIVED = "project-archived";
+    const GOVERNANCE = "project-governance";
+    /** @scenario "An email counts only the live, shared or own projects the recipient may view" */
+    it("shows and reads none of another member's personal, archived or governance projects", async () => {
+      digest.world.projects = [PROJECT, PERSONAL, ARCHIVED, GOVERNANCE];
+      digest.world.personalOwners.set(PERSONAL, MEMBER);
+      digest.world.archivedProjects.add(ARCHIVED);
+      digest.world.governanceProjects.add(GOVERNANCE);
+      digest.world.traceNumbers.set(`${PROJECT}:${SENT_WEEK}`, { traces: 1_100 });
+      for (const hidden of [PERSONAL, ARCHIVED, GOVERNANCE]) {
+        digest.world.traceNumbers.set(`${hidden}:${SENT_WEEK}`, { traces: 99_999 });
+      }
+
+      await sendTo(ADMIN);
+
+      expect(digest.mail.map((mail) => mail.props)).toEqual([
+        expect.objectContaining({ traces: 1_100 }),
+      ]);
+      expect(digest.world.analyticsReads.join(" ")).not.toMatch(/personal|archived|governance/);
+    });
+
+    /** @scenario "An email counts only the live, shared or own projects the recipient may view" */
+    it("still shows a member their own personal project", async () => {
+      digest.world.projects = [PROJECT, PERSONAL];
+      digest.world.personalOwners.set(PERSONAL, MEMBER);
+      digest.world.traceNumbers.set(`${PROJECT}:${SENT_WEEK}`, { traces: 1_100 });
+      digest.world.traceNumbers.set(`${PERSONAL}:${SENT_WEEK}`, { traces: 1_300 });
+
+      await sendTo(MEMBER);
+
+      expect(digest.mail.map((mail) => mail.props)).toEqual([
+        expect.objectContaining({ traces: 1_300 }),
+      ]);
+    });
+  });
+
+  describe("when the week before cannot be read", () => {
+    /** @scenario "A failed read of last week drops the change line, not the email" */
+    it("still sends the week, without its change on last week", async () => {
+      digest.world.traceNumbers.set(`${PROJECT}:${SENT_WEEK}`, { traces: 1_500 });
+      digest.world.failingAnalytics.add(`${PROJECT}:2026-W45`);
+
+      await sendTo(MEMBER);
+
+      const [mail] = digest.mail;
+      expect(mail?.props).toMatchObject({ traces: 1_500 });
+      expect(mail?.props).not.toHaveProperty("changePercent");
+    });
+  });
+
+  describe("when the sent week cannot be read", () => {
+    /** @scenario "A failed read of the sent week fails the send for a retry" */
+    it("sends nothing and claims nothing, so the retry can still send", async () => {
+      digest.world.failingAnalytics.add(`${PROJECT}:${SENT_WEEK}`);
+
+      await expect(sendTo(MEMBER)).rejects.toThrow("analytics cannot read");
+
+      expect(digest.mail).toEqual([]);
+      expect(
+        await digest.repositories.sends.isSent({
+          userId: MEMBER,
+          organizationId: ORGANIZATION,
+          isoWeek: SENT_WEEK,
+        }),
+      ).toBe(false);
+    });
+  });
+
+  describe("when an organization has many projects", () => {
+    /** @scenario "Analytics is read a few reads at a time" */
+    it("never runs more than eight reads at once", async () => {
+      const many = Array.from({ length: 30 }, (_, index) => `project-${index + 10}`);
+      digest.world.projects = [PROJECT, ...many];
+      digest.world.readDelayMs = 5;
+      for (const project of digest.world.projects) {
+        digest.world.traceNumbers.set(`${project}:${SENT_WEEK}`, {
+          traces: 1_010,
+          models: { a: 1_010 },
+        });
+      }
+
+      await sendTo(MEMBER);
+
+      expect(digest.world.mostReadsAtOnce).toBeGreaterThan(1);
+      expect(digest.world.mostReadsAtOnce).toBeLessThanOrEqual(8);
+    });
+  });
 });

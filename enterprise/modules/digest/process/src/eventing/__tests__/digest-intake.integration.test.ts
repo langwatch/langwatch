@@ -6,7 +6,6 @@
  * and the projection the way it does in the worker.
  * @see enterprise/modules/digest/specs/digest.feature
  */
-import { NormalizedSpanKind, NormalizedStatusCode } from "@langwatch/trace-contract";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { userWeekTotals } from "../../rules/digest-week.rules.ts";
@@ -36,62 +35,6 @@ beforeEach(() => {
 afterEach(async () => {
   await digest.close();
 });
-
-/** One span as trace records it; `personal` plants an address and a name in its free text. */
-function spanRecorded({
-  spanId,
-  traceId,
-  root,
-  error = false,
-  personal = false,
-}: {
-  spanId: string;
-  traceId: string;
-  root: boolean;
-  error?: boolean;
-  personal?: boolean;
-}) {
-  return digest.ownerFact({
-    fact: OWNER_FACTS.span,
-    tenantId: PROJECT,
-    aggregateId: traceId,
-    occurredAt: IN_SENT_WEEK,
-    data: {
-      ingressEventId: `ingress-${spanId}`,
-      span: {
-        id: `row-${spanId}`,
-        traceId,
-        spanId,
-        tenantId: PROJECT,
-        parentSpanId: root ? null : `${traceId}-root`,
-        parentTraceId: null,
-        parentIsRemote: null,
-        sampled: true,
-        startTimeUnixMs: IN_SENT_WEEK,
-        endTimeUnixMs: IN_SENT_WEEK + 80,
-        durationMs: 80,
-        name: personal ? `${PERSONAL_NAME}'s chat` : "chat",
-        kind: NormalizedSpanKind.INTERNAL,
-        resourceAttributes: personal ? { "user.email": PERSONAL_EMAIL } : {},
-        spanAttributes: {
-          "gen_ai.usage.input_tokens": 10,
-          "gen_ai.usage.output_tokens": 5,
-          ...(personal ? { "enduser.name": PERSONAL_NAME, "user.email": PERSONAL_EMAIL } : {}),
-        },
-        events: [],
-        links: [],
-        statusMessage: personal ? `${PERSONAL_NAME} was refused` : null,
-        statusCode: error ? NormalizedStatusCode.ERROR : NormalizedStatusCode.OK,
-        instrumentationScope: { name: "sdk", version: null },
-        droppedAttributesCount: 0,
-        droppedEventsCount: 0,
-        droppedLinksCount: 0,
-        cost: 0.1,
-        nonBilledCost: null,
-      },
-    },
-  });
-}
 
 const personalFacts = { "user.email": PERSONAL_EMAIL, "user.name": PERSONAL_NAME };
 
@@ -191,27 +134,6 @@ const scenarioFinished = ({
   });
 
 describe("the digest fold intake", () => {
-  describe("when spans are received across two traces, one with an error", () => {
-    /** @scenario "Trace spans are read from analytics, never folded" */
-    it("folds nothing for them and asks analytics nothing", async () => {
-      await spanRecorded({ traceId: "trace-a", spanId: "a-root", root: true });
-      await spanRecorded({ traceId: "trace-a", spanId: "a-child", root: false });
-      await spanRecorded({ traceId: "trace-b", spanId: "b-root", root: true, error: true });
-      // A fold that did run would have landed by the time a later fact of the same pipeline has.
-      await scenarioFinished({ scenarioRunId: "run-1", verdict: "success" });
-      await vi.waitFor(async () => {
-        expect((await digest.projectWeek({ isoWeek: SENT_WEEK }))?.scenarios.runs).toBe(1);
-      });
-
-      expect(await digest.projectWeek({ isoWeek: SENT_WEEK })).toMatchObject({
-        traces: 0,
-        errors: 0,
-        tokens: 0,
-      });
-      expect(digest.world.analyticsReads).toEqual([]);
-    });
-  });
-
   describe("when coding-agent facts are contributed for a person's project across three sessions", () => {
     /** @scenario "Coding-agent facts fold into the person's week" */
     it("holds 3 sessions and the summed tokens, cost and lines", async () => {
@@ -253,7 +175,6 @@ describe("the digest fold intake", () => {
   describe("when facts carrying an address and a name are folded", () => {
     /** @scenario "A fold holds numbers and ids, never personal data" */
     it("stores no email address and no name in any fold row", async () => {
-      await spanRecorded({ traceId: "trace-a", spanId: "a-root", root: true, personal: true });
       await scenarioFinished({
         scenarioRunId: "run-1",
         verdict: "failure",

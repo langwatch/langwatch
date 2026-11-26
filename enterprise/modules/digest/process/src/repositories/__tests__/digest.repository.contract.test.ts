@@ -153,7 +153,7 @@ const projectWeekKind: WeekKind<ProjectWeekState> = {
     projectId: `project-of-${organizationId}`,
     organizationId,
     isoWeek,
-    traces: count,
+    scenarios: { runs: count, passed: 0, failed: 0 },
   }),
 };
 

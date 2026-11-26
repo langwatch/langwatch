@@ -94,4 +94,14 @@ describe("a person's own digest preference", () => {
     await digest.setPreference({ userId: "user_pat", subscribed: true });
     expect(await digest.getPreference({ userId: "user_pat" })).toEqual({ subscribed: true });
   });
+
+  /** @scenario "Impersonating staff can see a person's email choice but not change it" */
+  it("refuses a change made while impersonating, and leaves the choice as it was", async () => {
+    const { digest } = await digestAdmittingOperators();
+
+    await expect(
+      digest.setPreference({ userId: "user_pat", subscribed: false, impersonatorId: "user_staff" }),
+    ).rejects.toMatchObject({ code: "digest_impersonation_refused" });
+    expect(await digest.getPreference({ userId: "user_pat" })).toEqual({ subscribed: true });
+  });
 });

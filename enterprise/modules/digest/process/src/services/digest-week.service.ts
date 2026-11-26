@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 import type { UsageStats } from "@langwatch/entitlement-contract";
-import type { ProjectApi } from "@langwatch/project-contract";
+import { createLogger } from "@langwatch/observability";
 
 import type {
   DigestProjectWeekRepository,
@@ -11,18 +11,18 @@ import {
   BASELINE_WEEKS,
   emptyProjectWeek,
   oldestKeptWeek,
-  type ProjectWeekState,
+  type ProjectWeek,
   weeksBefore,
 } from "../rules/digest-week.rules.ts";
 import type { DigestTraceReadService } from "./digest-trace-read.service.ts";
 
+const logger = createLogger("langwatch:digest");
+
 type Deps = Readonly<{
   projectWeeks: Pick<DigestProjectWeekRepository, "findWeeks" | "deleteBefore">;
   userWeeks: Pick<DigestUserWeekRepository, "findWeeks" | "deleteBefore">;
-  /** The organization's projects: the ones whose traces are read for its week. */
-  projects: Pick<ProjectApi, "listIdsByOrganization">;
   /** Trace numbers per project and week, read from analytics rather than folded. */
-  traces: Pick<DigestTraceReadService, "projectWeek">;
+  traces: Pick<DigestTraceReadService, "getProjectWeek" | "getPreviousTraces">;
   /** `EntitlementApi.getUsage`, read for the two numbers the plan-pressure pick needs. */
   entitlement: Readonly<{
     getUsage(input: {
@@ -32,8 +32,8 @@ type Deps = Readonly<{
 }>;
 
 /**
- * The week folds: reads one organization's finished week (its folds, and the one plan read the
- * send makes), and sweeps every organization's folds no send still reads.
+ * The week folds: reads one organization's finished week (its folds, its trace numbers, and the
+ * one plan read the send makes), and sweeps every organization's folds no send still reads.
  */
 export class DigestWeekService {
   static create(deps: Deps): DigestWeekService {
@@ -42,49 +42,71 @@ export class DigestWeekService {
 
   private constructor(private readonly deps: Deps) {}
 
+  /**
+   * The week of `projectIds` alone: the caller names the projects the recipient may see, so
+   * analytics is never asked about one they may not.
+   */
   async organizationWeek({
     organizationId,
     isoWeek,
+    projectIds,
   }: {
     organizationId: string;
     isoWeek: string;
+    projectIds: readonly string[];
   }): Promise<OrganizationWeek> {
     const before = weeksBefore({ isoWeek, count: BASELINE_WEEKS });
-    const [folds, users, usage, projectIds] = await Promise.all([
+    const [lastWeek] = before;
+    const visible = new Set(projectIds);
+    const [folds, users, usage] = await Promise.all([
       this.deps.projectWeeks.findWeeks({ isoWeeks: [isoWeek, ...before], organizationId }),
       this.deps.userWeeks.findWeeks({ isoWeeks: [isoWeek], organizationId }),
       this.deps.entitlement.getUsage({ organizationId }),
-      this.deps.projects.listIdsByOrganization({ organizationId }),
     ]);
-    // Trace numbers are read for the week sent and the one before it (its change is shown); the
-    // older baseline weeks only ever read scenario outcomes, which stay folded.
-    const [previous] = before;
-    const traceWeeks = [isoWeek, ...(previous ? [previous] : [])];
-    const withTraces = async (week: string) =>
-      Promise.all(
-        projectIds.map(async (projectId): Promise<ProjectWeekState> => {
-          const fold = folds.find((row) => row.projectId === projectId && row.isoWeek === week);
-          const traces = await this.deps.traces.projectWeek({ projectId, isoWeek: week });
-          return {
-            ...(fold ?? emptyProjectWeek()),
-            projectId,
-            organizationId,
-            isoWeek: week,
-            ...traces,
-          };
+    const mine = folds.filter(({ projectId }) => visible.has(projectId));
+    const projects = await Promise.all(
+      projectIds.map(async (projectId): Promise<ProjectWeek> => {
+        const fold = mine.find((row) => row.projectId === projectId && row.isoWeek === isoWeek);
+        const traces = await this.deps.traces.getProjectWeek({
+          organizationId,
+          projectId,
+          isoWeek,
+        });
+        return { ...(fold ?? emptyProjectWeek()), projectId, organizationId, isoWeek, ...traces };
+      }),
+    );
+    // Only a project with traces this week shows a change, so only it needs last week's count; a
+    // read that fails leaves that project without one, and the email goes without the change line.
+    const previousTraces = new Map<string, number>();
+    await Promise.all(
+      projects
+        .filter(({ traces }) => traces > 0)
+        .map(async ({ projectId }) => {
+          if (!lastWeek) return;
+          try {
+            previousTraces.set(
+              projectId,
+              await this.deps.traces.getPreviousTraces({
+                organizationId,
+                projectId,
+                isoWeek: lastWeek,
+              }),
+            );
+          } catch (error) {
+            logger.warn(
+              { error, organizationId, projectId },
+              "the digest could not read last week",
+            );
+          }
         }),
-      );
-    const [current, ...earlier] = await Promise.all(traceWeeks.map(withTraces));
-    const read = new Set(traceWeeks);
+    );
     return {
       organizationId,
       isoWeek,
       planUsage: derivePlanUsage(usage) ?? null,
-      projects: current ?? [],
-      history: [
-        ...earlier.flat(),
-        ...folds.filter((fold) => fold.isoWeek !== isoWeek && !read.has(fold.isoWeek)),
-      ],
+      projects,
+      history: mine.filter((fold) => fold.isoWeek !== isoWeek),
+      previousTraces,
       users: new Map(users.map((user) => [user.userId, user])),
     };
   }

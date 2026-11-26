@@ -17,7 +17,10 @@ import type { ProjectApi } from "@langwatch/project-contract";
 import type { UserApi } from "@langwatch/user-contract";
 
 import type { DigestMailChannel } from "../channels/digest-mail.channel.ts";
-import type { DigestSendRequest } from "../eventing/digest-send.events.ts";
+import type {
+  DigestOrganizationPlanRequest,
+  DigestSendRequest,
+} from "../eventing/digest-send.events.ts";
 import type { DigestAudienceRepository } from "../repositories/digest-audience.repository.ts";
 import type { DigestSendRepository } from "../repositories/digest-send.repository.ts";
 import {
@@ -28,7 +31,6 @@ import {
   type DigestTemplateProps,
   type OrganizationWeek,
   pickFocusProject,
-  weekVisibleTo,
 } from "../rules/digest-email.rules.ts";
 import {
   DIGEST_EMAIL_PREFERENCES_PATH,
@@ -52,6 +54,7 @@ type Membership = Readonly<{ kind: "active"; admin: boolean }> | Readonly<{ kind
 const logger = createLogger("langwatch:digest");
 
 const MEMBER_PAGE = 500;
+const ORGANIZATION_PAGE = 200;
 
 type Deps = Readonly<{
   audience: DigestAudienceRepository;
@@ -68,11 +71,14 @@ type Deps = Readonly<{
       userId: string;
     }): Promise<Pick<OrganizationRestMemberSummary, "role" | "disabledAt">>;
     findProvisioningSummary: OrganizationApi["findProvisioningSummary"];
-    /** Every organization but the install's hidden system one. */
-    listProvisioningSummaries: OrganizationApi["listProvisioningSummaries"];
+    /** Organization ids a page at a time, the install's hidden system one left out. */
+    listAllIds: OrganizationApi["listAllIds"];
   }>;
   /** A project's name, and each project's team, which is what its access is decided on. */
-  projects: Pick<ProjectApi, "findSummaryById" | "listNamesByIds">;
+  projects: Pick<
+    ProjectApi,
+    "findSummaryById" | "listNamesByIds" | "findLiveNonGovernanceIdsByOrganization"
+  >;
   /** Which of the week's projects a member may view; the email shows no other. */
   access: Pick<AuthzApi, "canBatchByIds">;
   /** The address an email goes to, read when it is sent and never stored. */
@@ -84,6 +90,9 @@ type Deps = Readonly<{
   /** The deployment's public origin; absent, a send refuses by name, since no link could work. */
   publicBaseUrl: string | undefined;
   requestSend: (request: DigestSendRequest & { occurredAt: number }) => Promise<void>;
+  requestOrganizationPlan: (
+    request: DigestOrganizationPlanRequest & { occurredAt: number },
+  ) => Promise<void>;
   now: () => number;
 }>;
 
@@ -110,7 +119,8 @@ export class DigestSendService {
 
   /**
    * The hourly wake's plan, after the week service's sweep: for the week the slot may send, armed
-   * and not yet planned, ask a send for every member of every organization.
+   * and not yet planned, ask one plan per organization, a page of ids at a time. Each plan is its
+   * own intent, so the walk here is short and one organization failing holds up no other.
    */
   async planWeek({ isoWeek, at }: { isoWeek: string; at: number }): Promise<void> {
     // Only the week the plan's own slot may send: before Monday 08:00 that is none (ADR-001).
@@ -119,25 +129,37 @@ export class DigestSendService {
     const settings = await this.deps.audience.getSettings();
     if (!settings.armed) return;
     if (settings.lastPlannedWeek !== null && settings.lastPlannedWeek >= isoWeek) return;
-    const organizations = await this.deps.organizations.listProvisioningSummaries();
-    let failed = 0;
-    // One organization failing (a deleted one, say) must not keep the rest from being asked.
-    for (const { id: organizationId } of organizations) {
-      try {
-        for (const { userId } of await this.members({ organizationId })) {
-          await this.deps.requestSend({ userId, organizationId, isoWeek, occurredAt: at });
-        }
-      } catch (error) {
-        failed += 1;
-        logger.error(
-          { error, organizationId, isoWeek },
-          "the digest could not plan an organization",
-        );
+    let after: string | undefined;
+    do {
+      const page = await this.deps.organizations.listAllIds({
+        after,
+        limit: ORGANIZATION_PAGE,
+      });
+      for (const organizationId of page.ids) {
+        await this.deps.requestOrganizationPlan({ organizationId, isoWeek, occurredAt: at });
       }
+      after = page.next ?? undefined;
+    } while (after !== undefined);
+    // A request is keyed by organization and week, so a wake that failed partway asks the rest
+    // next hour and the organizations already asked are not planned twice.
+    await this.deps.audience.markPlanned({ isoWeek });
+  }
+
+  /**
+   * One organization's plan: a send asked for each member. A failure is retried by the outbox,
+   * and a member already asked is not asked twice, so only this organization is walked again.
+   */
+  async planOrganization({
+    organizationId,
+    isoWeek,
+  }: {
+    organizationId: string;
+    isoWeek: string;
+  }): Promise<void> {
+    const occurredAt = this.deps.now();
+    for (const { userId } of await this.members({ organizationId })) {
+      await this.deps.requestSend({ userId, organizationId, isoWeek, occurredAt });
     }
-    // Left unplanned so the next wake tries the failed ones again; a request is keyed by
-    // organization, person and week, so the members that went through are not asked twice.
-    if (failed === 0) await this.deps.audience.markPlanned({ isoWeek });
   }
 
   /**
@@ -164,10 +186,7 @@ export class DigestSendService {
     const user = await this.deps.users.findById({ id: userId });
     if (!user?.email) return skip("member has no email address");
     if (user.deactivatedAt !== null) return skip("member is deactivated");
-    const week = await this.#visibleWeek({
-      week: await this.deps.weeks.organizationWeek({ organizationId, isoWeek }),
-      userId,
-    });
+    const week = await this.#weekOf({ organizationId, isoWeek, userId });
     const composed = await this.#compose({
       week,
       member: { userId, admin: membership.admin },
@@ -222,10 +241,7 @@ export class DigestSendService {
     if (!operator?.email) throw new DigestOperatorAddressMissingError();
     const isoWeek = sendableWeek(this.deps.now());
     // The member's own view: the operator sees what the member would be sent.
-    const week = await this.#visibleWeek({
-      week: await this.deps.weeks.organizationWeek({ organizationId, isoWeek }),
-      userId,
-    });
+    const week = await this.#weekOf({ organizationId, isoWeek, userId });
     const composed = await this.#compose({
       week,
       member,
@@ -284,27 +300,47 @@ export class DigestSendService {
     }
   }
 
-  /** The week as the member may see it: only the projects they hold `project:view` on. */
-  async #visibleWeek({
-    week,
+  /**
+   * The member's week: only the live projects they may see are asked of, so analytics is never
+   * read for one they may not. Archived and governance projects are never theirs to see here, and
+   * a personal workspace is its owner's alone, whatever an admin's role could otherwise view.
+   */
+  async #weekOf({
+    organizationId,
+    isoWeek,
     userId,
   }: {
-    week: OrganizationWeek;
+    organizationId: string;
+    isoWeek: string;
     userId: string;
   }): Promise<OrganizationWeek> {
-    if (week.projects.length === 0) return week;
-    const identities = await this.deps.projects.listNamesByIds({
-      projectIds: week.projects.map(({ projectId }) => projectId),
+    const projectIds = await this.#visibleProjectIds({ organizationId, userId });
+    return this.deps.weeks.organizationWeek({ organizationId, isoWeek, projectIds });
+  }
+
+  async #visibleProjectIds({
+    organizationId,
+    userId,
+  }: {
+    organizationId: string;
+    userId: string;
+  }): Promise<string[]> {
+    const liveIds = await this.deps.projects.findLiveNonGovernanceIdsByOrganization({
+      organizationId,
     });
+    if (liveIds.length === 0) return [];
+    const identities = (await this.deps.projects.listNamesByIds({ projectIds: liveIds })).filter(
+      ({ isPersonal, ownerUserId }) => !isPersonal || ownerUserId === userId,
+    );
+    if (identities.length === 0) return [];
     const decided = await this.deps.access.canBatchByIds({
       principal: { type: "user", id: userId },
       permission: "project:view",
-      organizationId: week.organizationId,
+      organizationId,
       teams: [...new Set(identities.map(({ teamId }) => teamId))].map((teamId) => ({ teamId })),
       projects: identities.map(({ id, teamId }) => ({ projectId: id, teamId })),
     });
-    const visible = identities.filter(({ id }) => decided.projects.get(id) === true);
-    return weekVisibleTo({ week, visibleProjectIds: new Set(visible.map(({ id }) => id)) });
+    return identities.filter(({ id }) => decided.projects.get(id) === true).map(({ id }) => id);
   }
 
   /** The member's pick and its props, with an unsubscribe signed for whoever receives it. */

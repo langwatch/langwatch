@@ -122,7 +122,7 @@ export function applyUserActivity({
 
 /**
  * Counts a session's repository once, on the first fact that names one: a metric fact carries
- * none, so it may well land before the span that does.
+ * none, so it may well land before the coding-agent span that does.
  */
 function applyRepository({
   state,

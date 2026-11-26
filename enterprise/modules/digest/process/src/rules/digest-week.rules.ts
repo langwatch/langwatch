@@ -108,18 +108,27 @@ export const projectWeekStateSchema = z.object({
   projectId: z.string(),
   organizationId: z.string(),
   isoWeek: z.string(),
-  traces: z.number(),
-  errors: z.number(),
-  tokens: z.number(),
-  costUsd: z.number(),
-  /** Median and 95th-percentile trace duration, read from analytics. */
-  p50Ms: z.number().default(0),
-  p95Ms: z.number().default(0),
-  models: z.record(z.string(), z.number()),
   evaluators: z.record(z.string(), outcomeCountsSchema),
   scenarios: outcomeCountsSchema,
 });
+/** What the project's folds hold: outcomes only, since trace numbers are read from analytics. */
 export type ProjectWeekState = z.infer<typeof projectWeekStateSchema>;
+
+/** What analytics says a project's traces did in one week; never stored. */
+export type TraceWeek = Readonly<{
+  traces: number;
+  errors: number;
+  tokens: number;
+  costUsd: number;
+  /** Median and 95th-percentile trace duration. */
+  p50Ms: number;
+  p95Ms: number;
+  /** Traces per model, the most used first. */
+  models: Readonly<Record<string, number>>;
+}>;
+
+/** A project's week as an email reads it: its outcome folds and its trace numbers. */
+export type ProjectWeek = ProjectWeekState & TraceWeek;
 
 export const userWeekStateSchema = z.object({
   userId: z.string(),
@@ -150,13 +159,6 @@ export function emptyProjectWeek(): ProjectWeekState {
     projectId: "",
     organizationId: "",
     isoWeek: "",
-    traces: 0,
-    errors: 0,
-    tokens: 0,
-    costUsd: 0,
-    p50Ms: 0,
-    p95Ms: 0,
-    models: {},
     evaluators: {},
     scenarios: noOutcomes(),
   };

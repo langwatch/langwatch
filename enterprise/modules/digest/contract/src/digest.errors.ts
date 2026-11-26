@@ -106,3 +106,17 @@ export class DigestUnsubscribeRateLimitedError extends HandledError {
     this.name = "DigestUnsubscribeRateLimitedError";
   }
 }
+
+/** Staff impersonating a person may look at their email choice but never change it. */
+export class DigestImpersonationRefusedError extends HandledError {
+  declare readonly code: "digest_impersonation_refused";
+
+  constructor() {
+    super(
+      "digest_impersonation_refused",
+      "An email preference can't be changed while impersonating someone.",
+      { httpStatus: 403, fault: "customer" },
+    );
+    this.name = "DigestImpersonationRefusedError";
+  }
+}

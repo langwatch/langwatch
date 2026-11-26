@@ -3,10 +3,13 @@ import { defineCommand } from "@langwatch/eventing";
 
 import { digestSendKey } from "../rules/digest-email.rules.ts";
 import {
+  DIGEST_ORGANIZATION_PLAN_REQUESTED_EVENT_TYPE,
   DIGEST_SEND_AGGREGATE_TYPE,
+  digestOrganizationPlanRequestedEventDataSchema,
   DIGEST_SEND_EVENT_VERSION,
   DIGEST_SEND_REQUESTED_EVENT_TYPE,
   digestSendRequestedEventDataSchema,
+  REQUEST_DIGEST_ORGANIZATION_PLAN_COMMAND_TYPE,
   REQUEST_DIGEST_SEND_COMMAND_TYPE,
 } from "./digest-send.events.ts";
 
@@ -22,4 +25,15 @@ export const RequestDigestSendCommand = defineCommand({
   schema: digestSendRequestedEventDataSchema,
   aggregateId: digestSendKey,
   idempotencyKey: (request) => `${digestSendKey(request)}:send_requested`,
+});
+
+/** Keyed by organization and week, so a plan asked twice plans each organization once. */
+export const RequestDigestOrganizationPlanCommand = defineCommand({
+  commandType: REQUEST_DIGEST_ORGANIZATION_PLAN_COMMAND_TYPE,
+  eventType: DIGEST_ORGANIZATION_PLAN_REQUESTED_EVENT_TYPE,
+  eventVersion: DIGEST_SEND_EVENT_VERSION,
+  aggregateType: DIGEST_SEND_AGGREGATE_TYPE,
+  schema: digestOrganizationPlanRequestedEventDataSchema,
+  aggregateId: (request) => `plan:${request.organizationId}:${request.isoWeek}`,
+  idempotencyKey: (request) => `plan:${request.organizationId}:${request.isoWeek}:plan_requested`,
 });

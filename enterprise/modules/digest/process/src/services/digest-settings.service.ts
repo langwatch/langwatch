@@ -1,5 +1,9 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
-import type { DigestPreference, DigestSettings } from "@langwatch/enterprise-digest-contract";
+import {
+  DigestImpersonationRefusedError,
+  type DigestPreference,
+  type DigestSettings,
+} from "@langwatch/enterprise-digest-contract";
 
 import type { DigestAudienceRepository } from "../repositories/digest-audience.repository.ts";
 
@@ -35,7 +39,12 @@ export class DigestSettingsService {
   async setPreference({
     userId,
     subscribed,
-  }: { userId: string } & DigestPreference): Promise<DigestPreference> {
+    impersonatorId,
+  }: {
+    userId: string;
+    impersonatorId?: string | undefined;
+  } & DigestPreference): Promise<DigestPreference> {
+    if (impersonatorId) throw new DigestImpersonationRefusedError();
     if (subscribed) {
       await this.deps.audience.resubscribe({ userId });
     } else {

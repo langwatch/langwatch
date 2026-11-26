@@ -24,8 +24,13 @@ export interface DigestApi {
 
   /** The signed-in person's own choice; the caller names themselves, never anyone else. */
   getPreference(input: Readonly<{ userId: string }>): Promise<DigestPreference>;
-  /** Opts the signed-in person in or out of every organization's digest at once. */
-  setPreference(input: Readonly<{ userId: string } & DigestPreference>): Promise<DigestPreference>;
+  /**
+   * Opts the signed-in person in or out of every organization's digest at once. Staff
+   * impersonating them (`impersonatorId`) are refused with `digest_impersonation_refused`.
+   */
+  setPreference(
+    input: Readonly<{ userId: string; impersonatorId?: string | undefined } & DigestPreference>,
+  ): Promise<DigestPreference>;
 
   /**
    * Whether the person the token names still receives the digest. Each of the three token

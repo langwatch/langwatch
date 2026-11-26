@@ -181,36 +181,37 @@ None: this module declares no websocket, rawsocket or rawhttp door.
 
 ### Pipeline `digest_send` (aggregate `digest_send`)
 
-Declared at `src/eventing/digest-send.pipeline.ts:56`. Events: `DigestSendRequestedEventSchema`.
+Declared at `src/eventing/digest-send.pipeline.ts:71`. Events: `DigestSendRequestedEventSchema`, `DigestOrganizationPlanRequestedEventSchema`.
 
-| Kind            | Name               | Handles                                                                             | Declared at                               |
-| --------------- | ------------------ | ----------------------------------------------------------------------------------- | ----------------------------------------- |
-| command         | `requestSend`      | –                                                                                   | `src/eventing/digest-send.pipeline.ts:61` |
-| process manager | `digestWeeklyPlan` | every 1 h (`DIGEST_PLAN_INTERVAL_MS = 60 * 60 * 1000`); intents `planWeek` (outbox) | `src/eventing/digest-send.pipeline.ts:62` |
-| process manager | `digestMemberSend` | intents `sendDigest` (outbox)                                                       | `src/eventing/digest-send.pipeline.ts:74` |
+| Kind            | Name                      | Handles                                                                             | Declared at                                |
+| --------------- | ------------------------- | ----------------------------------------------------------------------------------- | ------------------------------------------ |
+| command         | `requestSend`             | –                                                                                   | `src/eventing/digest-send.pipeline.ts:76`  |
+| command         | `requestOrganizationPlan` | –                                                                                   | `src/eventing/digest-send.pipeline.ts:77`  |
+| process manager | `digestWeeklyPlan`        | every 1 h (`DIGEST_PLAN_INTERVAL_MS = 60 * 60 * 1000`); intents `planWeek` (outbox) | `src/eventing/digest-send.pipeline.ts:78`  |
+| process manager | `digestOrganizationPlan`  | intents `planOrganization` (outbox)                                                 | `src/eventing/digest-send.pipeline.ts:90`  |
+| process manager | `digestMemberSend`        | intents `sendDigest` (outbox)                                                       | `src/eventing/digest-send.pipeline.ts:104` |
 
 ### Pipeline `digest` (aggregate `digest_week`)
 
-Declared at `src/eventing/digest.pipeline.ts:82`. Events: `projectActivityRecordedEventSchema`, `userActivityRecordedEventSchema`.
+Declared at `src/eventing/digest.pipeline.ts:73`. Events: `projectActivityRecordedEventSchema`, `userActivityRecordedEventSchema`.
 
 | Kind                | Name                                                    | Handles                                                                                                                | Declared at                           |
 | ------------------- | ------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- | ------------------------------------- |
-| command             | `recordProjectActivity`                                 | –                                                                                                                      | `src/eventing/digest.pipeline.ts:128` |
-| command             | `recordUserActivity`                                    | –                                                                                                                      | `src/eventing/digest.pipeline.ts:129` |
-| peer subscriber     | `spanRecorded`                                          | `lw.trace.span_recorded` from [trace](../../../../modules/trace/README.md)                                             | `src/eventing/digest.pipeline.ts:90`  |
-| peer subscriber     | `evaluationCompleted`                                   | `lw.evaluation.lifecycle_completed` from [evaluation](../../../../modules/evaluation/README.md)                        | `src/eventing/digest.pipeline.ts:96`  |
-| peer subscriber     | `scenarioRunFinished`                                   | `lw.simulation_run.finished` from [scenario](../../../../modules/scenario/README.md)                                   | `src/eventing/digest.pipeline.ts:104` |
-| peer subscriber     | `codingAgentSpanFacts`                                  | `lw.obs.coding_agent_session.span_facts_contributed` from [coding-agent](../../../../modules/coding-agent/README.md)   | `src/eventing/digest.pipeline.ts:110` |
-| peer subscriber     | `codingAgentMetricFacts`                                | `lw.obs.coding_agent_session.metric_facts_contributed` from [coding-agent](../../../../modules/coding-agent/README.md) | `src/eventing/digest.pipeline.ts:116` |
-| peer subscriber     | `userErased`                                            | `lw.user.erased` from [user](../../../../modules/user/README.md)                                                       | `src/eventing/digest.pipeline.ts:123` |
-| Postgres projection | `≈ projectWeekProjection({ store: deps.projectWeeks })` | –                                                                                                                      | `src/eventing/digest.pipeline.ts:87`  |
-| Postgres projection | `≈ userWeekProjection({ store: deps.userWeeks })`       | –                                                                                                                      | `src/eventing/digest.pipeline.ts:88`  |
+| command             | `recordProjectActivity`                                 | –                                                                                                                      | `src/eventing/digest.pipeline.ts:107` |
+| command             | `recordUserActivity`                                    | –                                                                                                                      | `src/eventing/digest.pipeline.ts:108` |
+| peer subscriber     | `evaluationCompleted`                                   | `lw.evaluation.lifecycle_completed` from [evaluation](../../../../modules/evaluation/README.md)                        | `src/eventing/digest.pipeline.ts:80`  |
+| peer subscriber     | `scenarioRunFinished`                                   | `lw.simulation_run.finished` from [scenario](../../../../modules/scenario/README.md)                                   | `src/eventing/digest.pipeline.ts:85`  |
+| peer subscriber     | `codingAgentSpanFacts`                                  | `lw.obs.coding_agent_session.span_facts_contributed` from [coding-agent](../../../../modules/coding-agent/README.md)   | `src/eventing/digest.pipeline.ts:91`  |
+| peer subscriber     | `codingAgentMetricFacts`                                | `lw.obs.coding_agent_session.metric_facts_contributed` from [coding-agent](../../../../modules/coding-agent/README.md) | `src/eventing/digest.pipeline.ts:96`  |
+| peer subscriber     | `userErased`                                            | `lw.user.erased` from [user](../../../../modules/user/README.md)                                                       | `src/eventing/digest.pipeline.ts:102` |
+| Postgres projection | `≈ projectWeekProjection({ store: deps.projectWeeks })` | –                                                                                                                      | `src/eventing/digest.pipeline.ts:78`  |
+| Postgres projection | `≈ userWeekProjection({ store: deps.userWeeks })`       | –                                                                                                                      | `src/eventing/digest.pipeline.ts:79`  |
 
 ## Configuration
 
 | Kind   | Leaf            | Environment variable | Declared at                          |
 | ------ | --------------- | -------------------- | ------------------------------------ |
-| secret | `unsubscribe`   | `NEXTAUTH_SECRET`    | `src/app/digest.app.ts:69`           |
+| secret | `unsubscribe`   | `NEXTAUTH_SECRET`    | `src/app/digest.app.ts:73`           |
 | config | `publicBaseUrl` | `BASE_HOST`          | `../contract/src/digest.config.ts:5` |
 
 <!-- readme:generated:end -->

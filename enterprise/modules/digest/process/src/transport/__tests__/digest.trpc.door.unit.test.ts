@@ -79,13 +79,17 @@ function door(app: DigestApi) {
   const mountOptions = {
     middlewareContext: [bindTrpcMiddlewareContext(operatorContext, (ctx: Context) => ctx.operator)],
   };
-  const as = (id: string | null) => ({
-    actor: id ? ({ type: "user", id } as const) : null,
+  const as = (id: string | null, impersonatorId?: string) => ({
+    actor: id
+      ? ({ type: "user", id, ...(impersonatorId ? { impersonatorId } : {}) } as const)
+      : null,
     operator: id ? { id, email: `${id}@langwatch.test` } : null,
   });
 
-  return (id: string | null) =>
-    runtime.mount(digestTrpcTransport, () => app, mountOptions).createCaller(as(id));
+  return (id: string | null, impersonatorId?: string) =>
+    runtime
+      .mount(digestTrpcTransport, () => app, mountOptions)
+      .createCaller(as(id, impersonatorId));
 }
 
 /** An app that records each control it is asked, and by which operator. */
@@ -103,8 +107,10 @@ function recordingDigest(reached: string[]) {
         reached.push(`getPreference:${userId}`);
         return { subscribed: true };
       },
-      setPreference: async ({ userId, subscribed }) => {
-        reached.push(`setPreference:${userId}:${subscribed}`);
+      setPreference: async ({ userId, subscribed, impersonatorId }) => {
+        reached.push(
+          `setPreference:${userId}:${subscribed}${impersonatorId ? `:by ${impersonatorId}` : ""}`,
+        );
         return { subscribed };
       },
     }),
@@ -249,6 +255,22 @@ describe("the digest's own-preference procedures", () => {
       await pat.setMyPreference({ subscribed: false, userId: "user-sam" } as never);
 
       expect(reached).toEqual(["setPreference:user-pat:false"]);
+    });
+  });
+
+  describe("when staff impersonate a person", () => {
+    /** @scenario "Impersonating staff can see a person's email choice but not change it" */
+    it("reads the person's own choice and names the impersonator on a write", async () => {
+      const reached: string[] = [];
+      const staff = recordingDigest(reached)("user-pat", "user-staff");
+
+      await staff.getMyPreference({});
+      await staff.setMyPreference({ subscribed: false });
+
+      expect(reached).toEqual([
+        "getPreference:user-pat",
+        "setPreference:user-pat:false:by user-staff",
+      ]);
     });
   });
 

@@ -13,6 +13,7 @@ import {
   BASELINE_WEEKS,
   nextMonthLabel,
   type OutcomeCounts,
+  type ProjectWeek,
   type ProjectWeekState,
   userWeekTotals,
   type UserWeekState,
@@ -46,9 +47,14 @@ export type OrganizationWeek = Readonly<{
   isoWeek: string;
   planUsage: PlanUsage | null;
   /** Each project's fold for the week. */
-  projects: readonly ProjectWeekState[];
+  projects: readonly ProjectWeek[];
   /** Each project's folds for the weeks before it, as far back as the baseline reads. */
   history: readonly ProjectWeekState[];
+  /**
+   * Each project's traces the week before; a project absent from it has none to compare, either
+   * because the read failed or because there were none.
+   */
+  previousTraces: ReadonlyMap<string, number>;
   users: ReadonlyMap<string, UserWeekState>;
 }>;
 
@@ -95,25 +101,10 @@ export function derivePlanUsage(
 }
 
 /** The project the email is about: the busiest by traces, then by scenario runs. */
-export function pickFocusProject(week: OrganizationWeek): ProjectWeekState | undefined {
+export function pickFocusProject(week: OrganizationWeek): ProjectWeek | undefined {
   return week.projects.toSorted(
     (left, right) => right.traces - left.traces || right.scenarios.runs - left.scenarios.runs,
   )[0];
-}
-
-/** The week with only the projects a member may view, in this week's folds and its history. */
-export function weekVisibleTo({
-  week,
-  visibleProjectIds,
-}: {
-  week: OrganizationWeek;
-  visibleProjectIds: ReadonlySet<string>;
-}): OrganizationWeek {
-  return {
-    ...week,
-    projects: week.projects.filter(({ projectId }) => visibleProjectIds.has(projectId)),
-    history: week.history.filter(({ projectId }) => visibleProjectIds.has(projectId)),
-  };
 }
 
 function baselineOf({
@@ -337,19 +328,16 @@ function tracesWeekNumbers({
   focus,
 }: {
   week: OrganizationWeek;
-  focus: ProjectWeekState;
+  focus: ProjectWeek;
 }): Omit<DigestTracesWeekProps, keyof CommonProps | "whatsNew" | "projectName" | "tracesUrl"> {
-  const [lastWeek] = weeksBefore({ isoWeek: week.isoWeek, count: 1 });
-  const previous = week.history.find(
-    (fold) => fold.projectId === focus.projectId && fold.isoWeek === lastWeek,
-  );
+  const previous = week.previousTraces.get(focus.projectId);
   return {
     traces: focus.traces,
-    ...(previous && previous.traces > 0
+    ...(previous !== undefined && previous > 0
       ? {
           changePercent: percentOf({
-            part: focus.traces - previous.traces,
-            whole: previous.traces,
+            part: focus.traces - previous,
+            whole: previous,
           }),
         }
       : {}),

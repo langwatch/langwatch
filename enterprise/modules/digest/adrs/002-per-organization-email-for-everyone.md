@@ -39,12 +39,25 @@ per organization, and that the email's link opens the person's email preferences
   handled. The plan's cost grows with total membership, not with enrolled organizations.
 - **Spans are not folded.** A fold per span across all traffic is a Postgres write per span, so
   the week's trace numbers (traces, errors, tokens, cost, median and 95th-percentile duration, and
-  traces per model) are read from `AnalyticsApi.getTimeseries` when an email is composed: two
-  reads per project and week (a model breakdown only for a project that had traces), remembered
-  for ten minutes so the members of an organization share them, plus one read of the week before
-  for the change. Models count traces, not model calls as the fold did. Evaluation, scenario and
-  coding-agent facts are still folded (analytics cannot group evaluations by evaluator type, which
-  the email names); each is one digest job, so their volume is the thing to watch once armed.
+  traces per model) are read from `AnalyticsApi.getTimeseries` when an email is composed, for the
+  projects the recipient may see only: live, non-governance ones, a personal workspace only for its
+  owner, then those the recipient holds `project:view` on. A project's week costs two reads (the
+  totals, and a model breakdown only if it had traces) plus one traces-only read of the week
+  before for the change; the change line is dropped, and the email still sent, when that last
+  read fails. The window ends one millisecond before the next Monday, as analytics' bounds are
+  inclusive in some of its tables and exclusive in others. A read is remembered per
+  organization, project and week in each process for thirty minutes (single flight, the oldest
+  entry evicted at the cap) and at most eight reads run at once per process; across workers the
+  same project's week may be read once per worker, so a plan's load is bounded by workers times
+  projects, not by members. Models count traces, not model calls as the fold did.
+  Evaluation, scenario and coding-agent facts are still folded (analytics cannot group evaluations
+  by evaluator type, which the email names); each is one digest job, so their volume is the thing
+  to watch once armed.
+- **The plan is one intent per organization.** The hourly plan only pages organization ids and
+  asks one `planOrganization` intent per organization, keyed by organization and week; that
+  intent asks one send per member, and a failure retries through the outbox for that organization
+  alone. The week is marked planned once every organization has been asked; an organization whose
+  intent exhausts its attempts is not planned again that week.
 - `DigestSend` rows written under ADR-001 have ids `userId:isoWeek` and no longer match the new
   ids; the module shipped disarmed, so none are expected. Existing `DigestCohortOrganization`
   rows are ignored, and the table is left in place to drop in a later migration.

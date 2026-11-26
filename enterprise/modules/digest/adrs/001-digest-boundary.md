@@ -71,7 +71,7 @@ template rules (first eligible template wins), the switch, the send and the opt-
 Peers, through `*Api` only: `OpsApi` (admission), `OrganizationApi` (every organization, its members, admins and name), `ProjectApi` (a project's organization, a personal project's
 owner, a project's name, slug and team), `AuthzApi` (which projects a member may view),
 `AnalyticsApi` (trace numbers per project and week), `UserApi` (the address an email goes to, and whether the person an unsubscribe link names still
-exists) and `EntitlementApi` (the month's usage, read once per send). The folds listen to evaluation, scenario and coding-agent events; a week's trace numbers are read from `AnalyticsApi` (ADR-002) through peer subscribers. A peer subscriber on
+exists) and `EntitlementApi` (the month's usage, read once per send). The folds listen to evaluation, scenario and coding-agent events through peer subscribers; a week's trace numbers are read from `AnalyticsApi` (ADR-002). A peer subscriber on
 user's `lw.user.erased` clears digest rows on user erasure: the person's `DigestSubscription`,
 `DigestSend` and `DigestUserWeek` rows, in every organization, as nurturing does.
 
@@ -145,9 +145,9 @@ sent. Clicks are not tracked: links in the email go straight to their targets.
 A person in several organizations is sent one email a week for each, about that organization's
 week alone, with the organization's name leading the subject so they tell apart. There is no
 ranking: each organization's send stands on its own. A pick that cannot be built falls through to
-the next eligible template. A deactivated profile is not mailed. A plan that could not read one
-organization leaves the week unplanned, so the next hourly wake retries it; requests already made
-are keyed and not repeated.
+the next eligible template. A deactivated profile is not mailed. Each organization is planned
+as its own intent (ADR-002), so one that cannot be read fails and retries alone; requests already
+made are keyed and not repeated.
 
 Resubscribing uses the same purpose-bound, expiring token as unsubscribing; it only restores an
 email the person chose to receive. Accepted. The pages are served `no-store` with

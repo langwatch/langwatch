@@ -219,19 +219,31 @@ describe("when one organization cannot be read", () => {
   });
 
   /** @scenario "One unreadable organization does not stall the others' plan" */
-  it("leaves the week unplanned so the next wake retries it, without asking the rest twice", async () => {
+  it("fails only its own plan, which the outbox retries without asking the rest twice", async () => {
     await digest.plan();
     await asked(3);
-    expect((await digest.repositories.audience.getSettings()).lastPlannedWeek).toBeNull();
+    expect(digest.world.failedPlans).toEqual([OTHER_ORGANIZATION]);
+    expect((await digest.repositories.audience.getSettings()).lastPlannedWeek).toBe(SENT_WEEK);
 
     digest.world.failingOrganizations.clear();
     digest.world.otherMembers = [{ userId: OTHER_MEMBER, role: "MEMBER", disabledAt: null }];
-    await digest.plan();
+    await digest.planOrganization({ organizationId: OTHER_ORGANIZATION });
 
-    // Only the organization that failed is asked now; the first one's requests are deduped.
     expect(await asked(1)).toEqual([
       expect.objectContaining({ organizationId: OTHER_ORGANIZATION, userId: OTHER_MEMBER }),
     ]);
-    expect((await digest.repositories.audience.getSettings()).lastPlannedWeek).toBe(SENT_WEEK);
+  });
+});
+
+describe("when the plan covers several organizations", () => {
+  /** @scenario "Each organization is planned as its own intent, a page of ids at a time" */
+  it("asks one plan per organization, however the ids are paged", async () => {
+    digest.world.organizations = [ORGANIZATION, OTHER_ORGANIZATION, "org-3"];
+    await arm();
+
+    await digest.plan();
+
+    expect(digest.world.requestedPlans).toBe(3);
+    expect(digest.world.failedPlans).toEqual([]);
   });
 });
