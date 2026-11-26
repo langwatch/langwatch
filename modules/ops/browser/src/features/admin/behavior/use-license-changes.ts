@@ -20,11 +20,11 @@ const UNUSED_KEY_REASON = "Replaced by a new key before any install used it";
 type Retirement = "retired" | "in_use" | "failed";
 
 /**
- * A key a change signed. `forCustomer` when no install holds the chain and the
- * unused key was retired, so the customer pastes the new one; otherwise an
- * install picks it up over sync.
+ * A key a change signed. `forCustomer` when no install holds the chain, so the
+ * customer pastes the new one; otherwise an install picks it up over sync.
+ * `unusedKeysLeft` names the licenses whose unused key retiring did not end.
  */
-export type SignedKey = { licenseKey: string; forCustomer: boolean };
+export type SignedKey = { licenseKey: string; forCustomer: boolean; unusedKeysLeft: string[] };
 
 export type ReplacementChange = {
   /** ISO 8601. The instant the replacement's term ends. */
@@ -117,7 +117,23 @@ export function useLicenseChanges() {
     licenseKey: string;
   }): Promise<SignedKey> {
     const retirement = await retireUnused({ chain });
-    return { licenseKey, forCustomer: chain.unbound && retirement !== "in_use" };
+    return {
+      licenseKey,
+      forCustomer: chain.unbound && retirement !== "in_use",
+      unusedKeysLeft: retirement === "failed" ? chain.live.map((license) => license.id) : [],
+    };
+  }
+
+  /** Ends unused keys a first attempt left working; the registry finishes a half-done revoke. */
+  async function endUnusedKeys({ ids }: { ids: string[] }): Promise<boolean> {
+    const ended = await eachLicense({
+      licenses: ids.map((id) => ({ id })),
+      step: (id) => retire.mutateAsync({ id, reason: UNUSED_KEY_REASON, unusedOnly: true }),
+      showError,
+      failureTitle: "The unused key still works",
+    });
+    await refresh();
+    return ended;
   }
 
   /**
@@ -164,6 +180,7 @@ export function useLicenseChanges() {
   return {
     signReplacement,
     afterSigning,
+    endUnusedKeys,
     saveTerms,
     resetInstanceBinding,
     isSigning: reissue.isPending || retire.isPending,

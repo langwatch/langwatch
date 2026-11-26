@@ -169,9 +169,9 @@ export class LicenseRefreshService {
     const host = this.deps.host;
     if (!host) return { outcome: "unchanged" };
 
-    const [credential] = await this.deps.install.findCredential(organizationId);
-    if (!credential) return { outcome: "unchanged" };
-    const [held = null] = await this.deps.install.findOwnLicenseKey(organizationId);
+    const [held] = await this.deps.install.findHeldCredential(organizationId);
+    if (!held) return { outcome: "unchanged" };
+    const { credential } = held;
 
     const answer = await host.syncLicense({
       credential,
@@ -180,7 +180,7 @@ export class LicenseRefreshService {
     });
     if (!answer.license) return { outcome: "unchanged" };
 
-    return this.deliver({ organizationId, license: answer.license, replacing: held });
+    return this.deliver({ organizationId, license: answer.license, replacing: held.ownKey });
   }
 
   private async countSeats(

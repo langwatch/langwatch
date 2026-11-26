@@ -456,6 +456,13 @@ Feature: License registry
     And an operator signs a replacement
     When retiring the unused key fails for a reason other than an install binding it
     Then the drawer still offers the new key for the customer to paste
+    And it says the unused key still works
+
+  @integration
+  Scenario: An unused key a failed retirement left working can be ended from the drawer
+    Given retiring the unused key failed after an operator signed a replacement
+    When the operator chooses End the unused key
+    Then the registry ends the key and the drawer stops saying it still works
 
   @integration
   Scenario: Revoking reaches a replacement signed after the dialog opened

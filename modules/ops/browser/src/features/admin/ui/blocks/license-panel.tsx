@@ -112,6 +112,7 @@ function SignedKeyNote({ signed }: { signed: SignedKey | null }) {
           every later change arrives by itself.
         </Text>
         <SignedLicenseOnce licenseKey={signed.licenseKey} />
+        <UnusedKeyLeft ids={signed.unusedKeysLeft} />
       </VStack>
     );
   }
@@ -120,6 +121,29 @@ function SignedKeyNote({ signed }: { signed: SignedKey | null }) {
     <Button size="xs" variant="plain" alignSelf="start" onClick={() => setShowKey(true)}>
       Install can't sync? Show the signed key
     </Button>
+  );
+}
+
+/** The unused key a failed retirement left working, with the action that ends it. */
+function UnusedKeyLeft({ ids }: { ids: string[] }) {
+  const { endUnusedKeys } = useLicenseChanges();
+  const [ended, setEnded] = useState(false);
+  const [ending, setEnding] = useState(false);
+  if (ids.length === 0 || ended) return null;
+  const end = async () => {
+    setEnding(true);
+    setEnded(await endUnusedKeys({ ids }));
+    setEnding(false);
+  };
+  return (
+    <HStack gap={2} wrap="wrap" data-testid="unused-key-left">
+      <Text fontSize="sm" color="fg.muted">
+        The unused key still works.
+      </Text>
+      <Button size="xs" variant="outline" loading={ending} onClick={() => void end()}>
+        End the unused key
+      </Button>
+    </HStack>
   );
 }
 
@@ -139,6 +163,16 @@ function HistoryToggle({
       {`License history (${chain.licenses.length})`}
     </Button>
   );
+}
+
+/** What an extension leaves to do, as the toast says it. */
+function extendedNote({ signed, install }: { signed: SignedKey; install: string | null }): string {
+  if (!signed.forCustomer) {
+    return `${install ?? "The install"} picks it up on its next sync. Nothing to send.`;
+  }
+  return signed.unusedKeysLeft.length > 0
+    ? "Send the new key to the customer. The unused key still works: end it below."
+    : "Send the new key to the customer. The unused one no longer works.";
 }
 
 /** Extend term and Change seats, each a replacement of the chain's newest license. */
@@ -168,9 +202,7 @@ function usePanelChanges({
     onDone();
     toaster.create({
       title: `Term extended to ${formatDay(expiresAt)}`,
-      description: signed.forCustomer
-        ? "Send the new key to the customer. The unused one no longer works."
-        : `${install ?? "The install"} picks it up on its next sync. Nothing to send.`,
+      description: extendedNote({ signed, install }),
       type: "success",
       duration: 5000,
     });

@@ -326,6 +326,26 @@ describe("LicenseDetailDrawer", () => {
       expect(host.recording.failures.map((failure) => failure.fallbackTitle)).toContain(
         "The new key is signed, but the unused one still works: revoke it",
       );
+      expect(screen.getByTestId("unused-key-left").textContent).toContain(
+        "The unused key still works.",
+      );
+    });
+
+    /** @scenario "An unused key a failed retirement left working can be ended from the drawer" */
+    it("ends the unused key on a second try and stops saying it still works", async () => {
+      state.chain = [license()];
+      state.revoke.mockRejectedValueOnce(new Error("network down"));
+      openDrawer({ id: "il_1" });
+      extendByTwoWeeks();
+      await screen.findByTestId("unused-key-left");
+      state.revoke.mockResolvedValue({});
+
+      fireEvent.click(screen.getByRole("button", { name: "End the unused key" }));
+
+      await waitFor(() => expect(screen.queryByTestId("unused-key-left")).toBeNull());
+      expect(state.revoke).toHaveBeenLastCalledWith(
+        expect.objectContaining({ id: "il_1", unusedOnly: true }),
+      );
     });
   });
 
