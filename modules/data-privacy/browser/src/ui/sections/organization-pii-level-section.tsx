@@ -23,7 +23,12 @@ import {
 } from "../../model/pii-redaction-level-offer.ts";
 import { OrganizationPiiLevelPicker } from "../blocks/organization-pii-level-picker.tsx";
 
-type Pick = { level: OrganizationPiiLevel; over: OrganizationPiiLevel | null };
+/** A pick shown before its save lands, for the organization it was made for. */
+type Pick = {
+  organizationId: string;
+  level: OrganizationPiiLevel;
+  over: OrganizationPiiLevel | null;
+};
 
 /** What the price prompt is open for, and for which organization: a level picked, or the switch. */
 type Asking = { organizationId: string } & (
@@ -56,15 +61,31 @@ async function confirmChoice({
   await save(choice.level);
 }
 
-/** A pick shown at once, until the stored level moves (a save landed, or a rule changed it). */
-function useOptimisticPick(stored: string | undefined) {
+/**
+ * A pick shown at once, until the stored level moves (a save landed, or a rule changed it). Only
+ * the organization it was made for shows it, so a save finishing after the page moved on never
+ * shows on the next one.
+ */
+function useOptimisticPick({
+  organizationId,
+  stored,
+}: {
+  organizationId: string | undefined;
+  stored: string | undefined;
+}) {
   const [picked, setPicked] = useState<Pick | null>(null);
   const [seen, setSeen] = useState(stored);
   if (seen !== stored) {
     setSeen(stored);
     setPicked(null);
   }
-  return [picked, setPicked] as const;
+  return {
+    picked: picked?.organizationId === organizationId ? picked : null,
+    show: (pick: Pick) => setPicked(pick),
+    /** Drops a failed save's pick, unless a pick for another organization replaced it. */
+    drop: (forOrganization: string) =>
+      setPicked((current) => (current?.organizationId === forOrganization ? null : current)),
+  };
 }
 
 /**
@@ -98,9 +119,12 @@ export function OrganizationPiiLevelSection({
   onSaved: () => void;
 }) {
   const setForScope = dataPrivacyApi.dataPrivacy.setForScope.useMutation();
-  const [picked, setPicked] = useOptimisticPick(snapshot.effectiveOrganization?.pii.level);
-  const [asking, setAsking] = useState<Asking | null>(null);
   const organizationId = snapshot.available.organization?.id ?? host.scope().organizationId;
+  const optimistic = useOptimisticPick({
+    organizationId,
+    stored: snapshot.effectiveOrganization?.pii.level,
+  });
+  const [asking, setAsking] = useState<Asking | null>(null);
   // A prompt opened for one organization is dismissed once the page shows another.
   if (asking && asking.organizationId !== organizationId) setAsking(null);
   if (!organizationId || !snapshot.effectiveOrganization) return null;
@@ -108,6 +132,7 @@ export function OrganizationPiiLevelSection({
 
   const storedPii = snapshot.effectiveOrganization.pii;
   const stored = organizationPiiLevel(storedPii.level);
+  const picked = optimistic.picked;
   const shown = picked && picked.over === stored ? picked.level : stored;
   const ownRule = organizationRule({ rules: snapshot.rules, organizationId });
   const confirmationFor = (level: OrganizationPiiLevel) =>
@@ -117,7 +142,7 @@ export function OrganizationPiiLevelSection({
     : null;
 
   const save = async (level: OrganizationPiiLevel) => {
-    setPicked({ level, over: stored });
+    optimistic.show({ organizationId, level, over: stored });
     try {
       await setForScope.mutateAsync({
         projectId,
@@ -128,7 +153,7 @@ export function OrganizationPiiLevelSection({
       onSaved();
       host.succeeded({ title: `Organization on ${level === "strict" ? "Strict" : "Essential"}` });
     } catch (error) {
-      setPicked(null);
+      optimistic.drop(organizationId);
       host.failed({ error, fallbackTitle: "Couldn't change the organization's PII level" });
     }
   };

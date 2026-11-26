@@ -297,6 +297,33 @@ describe("given a Cloud organization on the model flag whose price no admin acce
     });
   });
 
+  describe("when the page moves to another organization while an acceptance is on its way", () => {
+    /** @scenario An acceptance given on the page holds only for its own organization */
+    it("saves the first organization's pick and leaves the other's shown level alone", async () => {
+      const acceptance = acceptanceOnItsWay();
+      const { rerender } = page({ flagOn: true });
+
+      await userEvent.setup().click(levelRadio("Strict"));
+      await confirmStrict();
+      await waitFor(() => expect(api.acceptPiiRedactionModel).toHaveBeenCalled());
+
+      api.snapshot = snapshotWith({ accepted: false, organizationId: "org-2" });
+      rerender();
+      acceptance.resolve();
+
+      await waitFor(() =>
+        expect(api.setForScope).toHaveBeenCalledWith(
+          expect.objectContaining({
+            scope: { scopeType: "ORGANIZATION", scopeId: "org-1" },
+            config: { pii: { level: "strict" } },
+          }),
+        ),
+      );
+      await waitFor(() => expect(levelRadio("Essential")).toBeEnabled());
+      expect(pickedLevel()).toBe("Essential");
+    });
+  });
+
   describe("when the page moves to a project of another organization", () => {
     /** @scenario An acceptance given on the page holds only for its own organization */
     it("shows Strict there as rule-based again, with the switch", async () => {

@@ -307,6 +307,7 @@ Feature: The organization picks its PII redaction level on the Data Privacy page
     When the page shows a project of another organization whose price no admin accepted
     Then Strict there is still rule-based, with the switch to the model
     And a price prompt opened for one organization is dismissed when the page shows another, accepting nothing
+    And an acceptance finishing after the move saves its own organization's pick and leaves the shown level alone
 
   @unit
   Scenario: Only an organization admin can accept the price
