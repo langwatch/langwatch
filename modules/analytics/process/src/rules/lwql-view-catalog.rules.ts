@@ -1120,7 +1120,7 @@ const TRACE_METRICS: UngatedViewDefinition = {
         "Version of the last managed prompt the trace used, by the rule traces.LastUsedPromptVersionId follows; the two can differ for a trace whose prompt span arrived late. Empty when the trace used none, or was last folded before this column existed.",
       sourceColumns: ["LastUsedPromptVersionId"],
     },
-    // Folded (goose 00134) so the Release check reads releases with no map (ADR-004).
+    // Folded (goose 00135) so the Release check reads releases with no map (ADR-004).
     {
       name: "AppVersion",
       type: "String",
