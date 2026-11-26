@@ -116,6 +116,7 @@ Reusable framework decisions live with their packages:
 | [199](./199-clickhouse-serverless-backups-run-in-the-ch-config-sidecar.md)            | clickhouse-serverless backups run in the ch-config sidecar, decided by pure functions                                      | Accepted                  |
 | [201](./201-pii-redaction-model-call-is-metered.md)                                   | A PII redaction model call is priced per character and metered like Instant Evals                                          | Proposed                  |
 | [205](./205-billing-only-is-a-flagged-membership.md)                                  | Billing only is a flagged Lite membership, not a new organization role                                                     | Proposed                  |
+| [206](./206-nx-remote-cache-in-s3.md)                                                 | Nx remote cache in S3, trusted by who wrote it                                                                             | Accepted                  |
 | [207](./207-a-long-strict-span-is-split-across-model-calls-by-the-caller.md)          | A long Strict span is split across PII redaction model calls by the caller                                                 | Accepted                  |
 
 Package-local decisions are indexed beside their owners. The framework
