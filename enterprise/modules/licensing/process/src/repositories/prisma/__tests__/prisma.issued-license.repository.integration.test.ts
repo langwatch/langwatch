@@ -294,7 +294,7 @@ describe.skipIf(!TEST_DATABASE_URL)("the license registry on Postgres", () => {
     expect(boundRow?.revokedAt).toBeNull();
   });
 
-  /** @scenario "A live license lets go of a managed key once the key is ended" */
+  /** @scenario "Only a live license lets go of an ended managed key" */
   it("lets go of an ended key on the live license naming it, never on a revoked one", async () => {
     const live = (await issue("ACME Release Key")).license;
     const revoked = (await issue("ACME Revoked Key")).license;

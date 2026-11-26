@@ -188,6 +188,11 @@ export class LicenseRegistryService {
       revokedReason: input.reason,
       pendingDeliveryLicense: null,
     });
+    await this.retireKeyAttachedMeanwhile({
+      before: row,
+      after: updated,
+      actorId: input.operatorId,
+    });
     await this.syncBudget(updated, input.operatorId);
     return this.toView(updated);
   }
@@ -217,6 +222,7 @@ export class LicenseRegistryService {
     });
     if (!revoked) await this.refuseLostRevoke(row);
     const updated = await this.getRow(row.id);
+    await this.retireKeyAttachedMeanwhile({ before: row, after: updated, actorId: operatorId });
     await this.syncBudget(updated, operatorId);
     return this.toView(updated);
   }
@@ -507,6 +513,23 @@ export class LicenseRegistryService {
       organizationId: row.organizationId,
       actorId,
     });
+  }
+
+  /**
+   * A key that attached between ending the old one and marking the row. Once the row is
+   * revoked no key can attach (attachVirtualKey requires an active row), so this is the last.
+   */
+  private async retireKeyAttachedMeanwhile({
+    before,
+    after,
+    actorId,
+  }: {
+    before: IssuedLicenseRecord;
+    after: IssuedLicenseRecord;
+    actorId: string;
+  }): Promise<void> {
+    if (after.virtualKeyId === null || after.virtualKeyId === before.virtualKeyId) return;
+    await this.retireManagedKey({ row: after, actorId });
   }
 
   private async getRow(id: string): Promise<IssuedLicenseRecord> {

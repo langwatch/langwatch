@@ -400,6 +400,26 @@ describe("the license registry", () => {
     expect(managedKeys.retired).toEqual(["vk-unused"]);
   });
 
+  /** @scenario "A revoke ends a key that attached while it ran" */
+  it("ends a key gateway attached between ending the old one and marking the row", async () => {
+    const { registry, repository, managedKeys } = harness();
+    const { license } = await registry.issue(issueInput());
+    await repository.bindInstance({ id: license.id, instanceId: "install-1", at: NOW });
+    await repository.update(license.id, { virtualKeyId: "vk-old" });
+    const retire = managedKeys.retire.bind(managedKeys);
+    managedKeys.retire = async (params) => {
+      await retire(params);
+      if (params.virtualKeyId === "vk-old") {
+        await repository.update(license.id, { virtualKeyId: "vk-new" });
+      }
+    };
+
+    const revoked = await registry.revoke({ id: license.id, operatorId: "op", reason: "leaked" });
+
+    expect(revoked.status).toBe("revoked");
+    expect(managedKeys.retired).toEqual(["vk-old", "vk-new"]);
+  });
+
   /** @scenario "An install that binds while its unused key is being ended gets a fresh key" */
   it("keeps a license an install bound mid-revoke live, and lets go of the ended key", async () => {
     const { registry, repository, managedKeys } = harness();

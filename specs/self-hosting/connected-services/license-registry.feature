@@ -458,14 +458,19 @@ Feature: License registry
     Then the license stays live and bound, and lets go of the ended key
     And the install's next sync provisions a new managed key
 
-  @unit @integration
-  Scenario: A live license lets go of a managed key once the key is ended
-    Given a managed key was ended and its retirement recorded as licensing's fact
-    And a live license still names that key, because the write after it never happened
-    When licensing applies its own fact
-    Then the live license no longer names the key, and its install's next call provisions a new one
-    And a revoked license keeps the key it names
-    And applying the fact again changes nothing
+  @integration
+  Scenario: Only a live license lets go of an ended managed key
+    Given a live license and a revoked license each name a managed key that was ended
+    When licensing lets go of each ended key
+    Then the live license no longer names its key
+    And the revoked license keeps the key it names
+
+  @unit
+  Scenario: A revoke ends a key that attached while it ran
+    Given an operator revokes a bound license and its managed key is ended
+    And gateway attaches a new key for that install before the revoke marks the row
+    When the revoke marks the license revoked
+    Then the new key is ended too
 
   @integration
   Scenario: Retiring an unused key that failed for another reason keeps the new key for the customer

@@ -551,4 +551,43 @@ describe.skipIf(!TEST_DATABASE_URL)("given the licence Postgres repository", () 
     const row = await prisma.organizationLicense.findUniqueOrThrow({ where: { organizationId } });
     expect(row.licenseKey).toBe("key-b");
   });
+
+  /** @scenario "A delivery that waited on organization's row is stamped after it" */
+  it("stamps a delivery that waited on organization's lock after that write", async () => {
+    const organizationId = `${prefix}waited`;
+    await prisma.organization.create({
+      data: {
+        id: organizationId,
+        name: organizationId,
+        slug: organizationId,
+        license: "key-a",
+        updatedAt: new Date("2020-01-01T00:00:00.000Z"),
+      },
+    });
+    await prisma.organizationLicense.create({
+      data: { organizationId, licenseKey: "key-a", updatedAt: new Date("2026-01-01T00:00:00Z") },
+    });
+    const repository = PrismaOrganizationLicenseRepository.create(prisma);
+    const deliveries: Promise<boolean>[] = [];
+
+    await prisma.$transaction(async (transaction) => {
+      await transaction.organization.update({
+        where: { id: organizationId },
+        data: { updatedAt: new Date(Date.now() + 3_600_000) },
+      });
+      deliveries.push(
+        repository.replaceLicense({
+          organizationId,
+          license: { licenseKey: "delivered", expiresAt: EXPIRES, validatedAt: null },
+          replacing: "key-a",
+        }),
+      );
+      await new Promise((resolve) => setTimeout(resolve, 300));
+    });
+
+    await expect(Promise.all(deliveries)).resolves.toEqual([true]);
+    await expect(repository.getOrganizationLicense(organizationId)).resolves.toEqual({
+      licenseKey: "delivered",
+    });
+  });
 });

@@ -305,6 +305,13 @@ Feature: License sync
     When the delivery's write runs after that write commits
     Then the delivery is refused, because the key it would replace is B, not A
 
+  @integration
+  Scenario: A delivery that waited on organization's row is stamped after it
+    Given organization's column and licensing's row both hold key A, the row newer
+    And an organization write holds the row's lock and stamps it later than the delivery began
+    When the delivery replacing A runs once that write commits
+    Then the delivered row is newer than organization's column, so the install reads the delivered key
+
   @unit
   Scenario: A sync never carries a license that a delivery retired while it looked
     Given LangWatch extended the license, and extended it again before the install synced

@@ -182,14 +182,6 @@ export class ConnectCredentialService {
   }
 
   /**
-   * Licensing's own fact that a managed key was ended. A live license still naming
-   * it lets go, so its install's next call provisions a new key. Safe to repeat.
-   */
-  async releaseEndedKey({ virtualKeyId }: { virtualKeyId: string }): Promise<void> {
-    await this.options.repository.releaseVirtualKey({ virtualKeyId });
-  }
-
-  /**
    * Gateway's answer to an issued fact. The attach admits the key only while the
    * row has none and is this install's active license; a key that lost is ended,
    * and the attached key is never ended here. Safe to repeat.
