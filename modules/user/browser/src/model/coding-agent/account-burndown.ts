@@ -68,6 +68,13 @@ export function formatAccountMoment(ms: number): string {
   return `${weekday} ${format(ms, "d MMM, HH:mm")}`;
 }
 
+/** When an account is out of usage until: the time alone when that is later today. */
+export function formatLimitMoment(ms: number, nowMs: number): string {
+  if (format(ms, "yyyy-MM-dd") === format(nowMs, "yyyy-MM-dd")) return format(ms, "HH:mm");
+
+  return formatAccountMoment(ms);
+}
+
 /** "26 Nov" for a `2026-11-26` UTC day. */
 export function formatAccountDay(day: string): string {
   return format(`${day}T12:00:00Z`, "d MMM", { timeZone: "UTC" });

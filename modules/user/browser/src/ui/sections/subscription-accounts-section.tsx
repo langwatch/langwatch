@@ -7,6 +7,7 @@ import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { HStack, SimpleGrid, Skeleton, Text, VStack } from "@langwatch/design-system/primitives";
 import { formatBudgetUsd } from "@langwatch/gateway-contract";
 import { docsUrl } from "@langwatch/handled-error/docs-url";
+import { nowEpochMs } from "@langwatch/time";
 import { KeyRound } from "lucide-react";
 import numeral from "numeral";
 
@@ -17,6 +18,7 @@ import {
   cumulativeTokens,
   formatAccountDay,
   formatAccountMoment,
+  formatLimitMoment,
   formatUsagePercent,
   usageWindowLabel,
 } from "../../model/coding-agent/account-burndown.ts";
@@ -115,7 +117,10 @@ function AccountCard({ account }: { account: CodingAgentAccountBurndown }) {
       description={about.join(" · ")}
       badge={
         limitedUntilMs !== null ? (
-          <Chip tone="red" value={`Out of usage until ${formatAccountMoment(limitedUntilMs)}`} />
+          <Chip
+            tone="red"
+            value={`Out of usage until ${formatLimitMoment(limitedUntilMs, nowEpochMs())}`}
+          />
         ) : undefined
       }
       badgePlacement="end"

@@ -115,7 +115,7 @@ describe("SubscriptionAccountsSection", () => {
         }),
       ]);
 
-      expect(screen.getByText(/Out of usage until .*26 Nov/)).toBeTruthy();
+      expect(screen.getByText(/Out of usage until (\d{2}:\d{2}|.*26 Nov)/)).toBeTruthy();
     });
   });
 
