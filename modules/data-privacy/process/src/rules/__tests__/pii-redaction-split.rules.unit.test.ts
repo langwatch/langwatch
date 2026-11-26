@@ -120,6 +120,16 @@ describe("planSpan", () => {
   });
 
   /** @scenario "A piece the model could reshape sends the whole span to Presidio" */
+  it("starts the next piece on a whole emoji, not the space after it", () => {
+    const text = `${"x".repeat(3_698)}😀${" ".repeat(250)}${"b".repeat(50)} ${"y".repeat(5_000)}`;
+    const pieces = splitCalls([text]).flatMap((call) => call.pieces);
+
+    for (const piece of pieces) {
+      expect(isPlaceablePiece(text.slice(piece.start, piece.end))).toBe(true);
+    }
+  });
+
+  /** @scenario "A piece the model could reshape sends the whole span to Presidio" */
   it("moves past a whitespace run longer than a piece instead of cutting it again", () => {
     const text = `a${" ".repeat(8_000)}b`;
 

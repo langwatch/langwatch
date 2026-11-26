@@ -130,7 +130,7 @@ function cutText({ text, index }: { text: string; index: number }): SplitPiece[]
 /**
  * Where the piece after [start, end) starts, always past `start`: the word holding (or ending
  * before) the character 200 before `end`, else that character inside a long word. Within 1,000
- * of `end` only; a whitespace run that long has nothing across it, so the next starts after it.
+ * of `end` only: a value never spans 800 spaces, so after such a run the next starts past it.
  */
 function nextStart({ text, start, end }: { text: string; start: number; end: number }): number {
   const overlapAt = end - PII_REDACTION_MODEL_PIECE_OVERLAP;
@@ -143,7 +143,8 @@ function nextStart({ text, start, end }: { text: string; start: number; end: num
   while (word > floor && !isPythonSpace(text[word - 1])) word--;
   if (isPythonSpace(text[word - 1])) return word;
   const code = text.charCodeAt(at);
-  return code >= 0xdc00 && code <= 0xdfff ? at + 1 : at;
+  if (code < 0xdc00 || code > 0xdfff) return at;
+  return at - 1 > start ? at - 1 : at + 1;
 }
 
 /**
