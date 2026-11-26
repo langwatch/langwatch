@@ -278,6 +278,21 @@ Feature: Instant Evals are metered on the gateway spend spine, reported to Strip
       When the month is reported
       Then no Instant Eval meter event is sent
 
+    @unit
+    Scenario: Instant Eval spend confirmed after the month's last trace is reported
+      Given an organization whose last trace this month was already reported
+      And a judged run whose spend gateway confirms after it, with no later trace
+      When billing receives the confirmed spend
+      Then the month's report runs and the Instant Eval meter receives the month's total
+      # ADR-174 decision 20: one billing subscriber on gateway's confirmed spend covers runs,
+      # judged queries, the routed judge and hosted Connect spend.
+
+    @unit
+    Scenario: Instant Evals no longer nudges the billing report itself
+      Given a hosted Connect call whose spend is recorded
+      Then Instant Evals dispatches nothing to billing
+      # Billing reports the month from gateway's confirmed spend instead.
+
   Rule: A free organization may spend one dollar in total
 
     @unit
