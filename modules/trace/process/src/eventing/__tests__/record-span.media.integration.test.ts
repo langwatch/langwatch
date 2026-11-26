@@ -23,6 +23,7 @@ import {
   TRACE_CONTENT_MEDIA,
   TraceMediaStoreService,
 } from "../../features/media/services/trace-media-store.service.ts";
+import { TraceSpanMediaExtractionService } from "../../features/media/services/trace-span-media-extraction.service.ts";
 import { MAX_RECORDED_ATTRIBUTE_VALUE_BYTES } from "../../rules/trace-attribute-cap.rules.ts";
 import { EventingRecordSpanAdapter } from "../record-span.commands.ts";
 
@@ -90,11 +91,13 @@ async function ingest({ data }: { data: RecordSpanCommandData }): Promise<{
     },
     "stored objects",
   );
-  const staged = await TraceMediaExtractionService.create({
-    store: TraceMediaStoreService.create({
-      storedObjects,
-      purpose: TRACE_CONTENT_MEDIA,
-      retention: { getRetentionDays: async () => 30 },
+  const staged = await TraceSpanMediaExtractionService.create({
+    extraction: TraceMediaExtractionService.create({
+      store: TraceMediaStoreService.create({
+        storedObjects,
+        purpose: TRACE_CONTENT_MEDIA,
+        retention: { getRetentionDays: async () => 30 },
+      }),
     }),
     telemetry: { failOpen: () => {} },
     logger: createTestLogger().logger,

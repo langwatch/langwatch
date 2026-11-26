@@ -71,6 +71,7 @@ export function buildStoredObjectRetentionPipeline({
           projectId: fact.projectId,
           category: fact.category,
           retentionDays: fact.retentionDays,
+          isRaise: fact.mode === "raise",
         });
       },
     })

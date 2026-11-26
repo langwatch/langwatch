@@ -1,10 +1,8 @@
-import { createLogger } from "@langwatch/observability";
 import type { StoredObjectApi } from "@langwatch/stored-object-contract";
 import { SpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
 
 import { coerceContentToArray } from "../../conversation/rules/trace-content-array.rules.ts";
-import { TraceEdgeMediaTelemetryService } from "./trace-edge-media-telemetry.service.ts";
 import {
   type ExtractedRef,
   TraceMediaExtractionService,
@@ -25,8 +23,6 @@ export class TraceScenarioEventMediaService {
     return new TraceScenarioEventMediaService(
       TraceMediaExtractionService.create({
         store: TraceMediaStoreService.create({ storedObjects, purpose: SCENARIO_EVENT_MEDIA }),
-        telemetry: TraceEdgeMediaTelemetryService.create(),
-        logger: createLogger("langwatch:stored-objects:content-extractor"),
       }),
     );
   }

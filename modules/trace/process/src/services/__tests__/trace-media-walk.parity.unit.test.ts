@@ -38,8 +38,6 @@ function makeFakeService(): TraceMediaStore {
 function extractPart(part: unknown) {
   return TraceMediaExtractionService.create({
     store: makeFakeService(),
-    telemetry: { failOpen: vi.fn() },
-    logger: { info: vi.fn(), warn: vi.fn() },
   }).extractFromPart({ part, projectId: "proj-1", ownerId: "trace-1" });
 }
 

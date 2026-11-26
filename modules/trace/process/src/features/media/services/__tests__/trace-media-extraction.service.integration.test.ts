@@ -8,11 +8,12 @@ import { describe, expect, it, vi } from "vitest";
  * Fake TraceMediaStore content-addresses bytes; dedups via isDuplicate on second write.
  */
 import { type EdgeMediaExtractionDeps } from "../trace-edge-media-payload.service.ts";
+import { TraceMediaExtractionService } from "../trace-media-extraction.service.ts";
+import type { TraceMediaStore } from "../trace-media-store.service.ts";
 import {
   type EdgeMediaExtractionLogger,
-  TraceMediaExtractionService,
-} from "../trace-media-extraction.service.ts";
-import type { TraceMediaStore } from "../trace-media-store.service.ts";
+  TraceSpanMediaExtractionService,
+} from "../trace-span-media-extraction.service.ts";
 import { fakeStoredObjects } from "./support/fake-stored-objects.support.ts";
 
 function flags(enabled = true): FeatureFlagApi {
@@ -40,8 +41,8 @@ function maybeExtractSpanMedia({
   deps: EdgeMediaExtractionDeps;
   logger: EdgeMediaExtractionLogger;
 }): Promise<RecordSpanCommandData> {
-  return TraceMediaExtractionService.create({
-    store: deps.store,
+  return TraceSpanMediaExtractionService.create({
+    extraction: TraceMediaExtractionService.create({ store: deps.store }),
     telemetry: deps.telemetry,
     logger,
   }).extractFromSpan({ data, policy: deps });
@@ -103,7 +104,7 @@ function storedIdOf(data: RecordSpanCommandData): string | undefined {
 const PNG_DATA_URI =
   "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=";
 
-describe("TraceMediaExtractionService.extractFromSpan", () => {
+describe("TraceSpanMediaExtractionService.extractFromSpan", () => {
   describe("given a data-URI image inside an image_url part", () => {
     /** @scenario "A data-URI image inside an image_url part is externalized" */
     it("externalizes the PNG bytes and rewrites the part to a stored reference", async () => {

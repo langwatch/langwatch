@@ -5,6 +5,7 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 
 import {
   TRACE_CONTENT_MEDIA,
+  type TraceMediaRetention,
   type TraceMediaStore,
   type TraceMediaStorePurpose,
   TraceMediaStoreService,
@@ -73,7 +74,9 @@ export function fakeStoredObjects(): {
       TraceMediaStoreService.create({
         storedObjects,
         purpose,
-        retention: { getRetentionDays: async () => 30 },
+        retention: createApiFixture<TraceMediaRetention>({
+          getRetentionDays: async () => 30,
+        }),
       }),
     get writes() {
       return writes;

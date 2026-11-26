@@ -120,6 +120,7 @@ export class StoredObjectUploadService {
     });
     for (const candidate of reusable) {
       if (candidate.byteLength !== byteLength) continue;
+      if (!(await this.holdsBytes(candidate))) continue;
       if (owners.length > 0 && !(await this.isLinked(candidate))) continue;
       await this.link({ objectId: candidate.id, owners });
       // A delete may win between the read and the link (ADR-002 §4): never answer it.
@@ -137,6 +138,16 @@ export class StoredObjectUploadService {
     await this.linkOrDiscard({ record, owners });
 
     return { reference: storedObjectReferenceOf(record), isDuplicate: false };
+  }
+
+  /** A row whose bytes are gone is never reused: the caller's bytes are written fresh instead. */
+  private async holdsBytes(candidate: StoredObjectRecord): Promise<boolean> {
+    const address = candidate.storage;
+    if (!address) return false;
+
+    return StoredObjectUploadService.storageCall(() =>
+      this.options.storage.exists({ projectId: candidate.tenantId, address }),
+    );
   }
 
   /** Writes the bytes under a fresh id, then the row; the bytes go if the row cannot be written. */

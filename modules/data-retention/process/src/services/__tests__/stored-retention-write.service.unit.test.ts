@@ -36,7 +36,12 @@ describe("StoredRetentionWriteService", () => {
       await service.raiseStoredRetention({ projectId: "project-1", category: "traces" });
 
       expect(sent).toEqual([
-        expect.objectContaining({ projectId: "project-1", category: "traces", retentionDays: 90 }),
+        expect.objectContaining({
+          projectId: "project-1",
+          category: "traces",
+          retentionDays: 90,
+          mode: "raise",
+        }),
       ]);
     });
   });

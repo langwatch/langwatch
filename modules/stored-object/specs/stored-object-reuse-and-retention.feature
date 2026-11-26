@@ -33,6 +33,12 @@ Feature: Stored-object reuse by content and owner-linked retention
     Then a new object is written and reported as not a duplicate
 
   @unit
+  Scenario: An object whose bytes are gone is never reused
+    Given the project's only object with these bytes has lost its provider bytes
+    When the bytes are stored again
+    Then a new object is written and reported as not a duplicate
+
+  @unit
   Scenario: A reuse adds the caller's audience
     Given an available object whose audiences omit the caller's audience
     When the caller stores the same bytes for the same purpose
@@ -148,6 +154,18 @@ Feature: Stored-object reuse by content and owner-linked retention
     Then the second object is deleted and its links removed
     And the first object keeps its links, the run fails, and a later run deletes it
 
+  @unit
+  Scenario: The sweep's tenant list starts with the longest-waiting ended link
+    Given more tenants with ended links than one run takes
+    When the sweep runs every hour while the first tenants keep getting new ended links
+    Then the tenant whose ended link waited longest is taken first, so no tenant waits forever
+
+  @unit
+  Scenario: A re-time during the sweep still lets the sweep delete the object
+    Given an object whose ended link the sweep found while another owner still held it
+    When a retention change ends that other link before the sweep removes the ended links
+    Then the sweep deletes the object in the same run
+
   # ===========================================================================
   # Retention changes
   # ===========================================================================
@@ -169,6 +187,12 @@ Feature: Stored-object reuse by content and owner-linked retention
     Given trace media linked on day 0 under a 7-day trace retention
     When the project applies a 90-day trace retention to its existing data
     Then every "trace_content" link of the project ends 90 days after it was created
+
+  @unit
+  Scenario: A raise never shortens a media link
+    Given trace media linked on day 0 until day 90, and the trace policy is now 30 days
+    When the project's stored rows are raised to the 30-day policy
+    Then the link still ends on day 90
 
   @unit
   Scenario: A retention change in another category leaves trace media alone

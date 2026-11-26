@@ -80,11 +80,15 @@ export class StoredObjectRetentionService {
     return purposesIn(category).length > 0;
   }
 
-  /** Each link on the category's objects ends `retentionDays` after it began. */
+  /**
+   * Each link on the category's objects ends `retentionDays` after it began. A raise only
+   * lengthened the rows, so it moves a link's end later and never earlier.
+   */
   async followRetention(input: {
     projectId: StoredObjectProjectId;
     category: RetentionCategory;
     retentionDays: number;
+    isRaise?: boolean;
   }): Promise<void> {
     const days = input.retentionDays === INDEFINITE_RETENTION_DAYS ? null : input.retentionDays;
     const limit = this.options.retimePageSize ?? RETIME_PAGE_SIZE;
@@ -103,6 +107,7 @@ export class StoredObjectRetentionService {
           tenantId: input.projectId,
           objectIds: page.map((value) => value.id),
           days,
+          onlyLater: input.isRaise === true,
           at,
         });
         isFullPage = page.length >= limit;
@@ -154,12 +159,15 @@ export class StoredObjectRetentionService {
     });
     const objectIds = [...new Set(page.map((link) => link.objectId))];
     let deletedObjects = 0;
+    const held: StoredObjectId[] = [];
     const settled: StoredObjectId[] = [];
     for (const id of objectIds) {
       // A failed object keeps its links for the next run; the rest of the page goes on.
       try {
         if (await this.#deleteIfUnheld({ tenantId: input.tenantId, id, now: input.now })) {
           deletedObjects += 1;
+        } else {
+          held.push(id);
         }
         settled.push(id);
       } catch (error) {
@@ -174,6 +182,16 @@ export class StoredObjectRetentionService {
             objectIds: settled,
             before: input.now,
           });
+    // A retime between the check and the delete can end a held object's last link: ask again.
+    for (const id of held) {
+      try {
+        if (await this.#deleteIfUnheld({ tenantId: input.tenantId, id, now: input.now })) {
+          deletedObjects += 1;
+        }
+      } catch (error) {
+        input.failures.push(error);
+      }
+    }
 
     return { removedLinks, deletedObjects, isFull: page.length >= input.pageSize };
   }
