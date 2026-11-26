@@ -3,9 +3,8 @@ import { describe, expect, it, vi } from "vitest";
 /**
  * @vitest-environment node
  *
- * Unit tests for TraceContentExtractionService.extractInlineMediaFromEvent.
+ * Unit tests for TraceScenarioEventMediaService.extractInlineMediaFromEvent.
  */
-import { TraceContentExtractionService } from "../trace-content-extraction.service.ts";
 
 // ---------------------------------------------------------------------------
 // Hoisted mocks — must be declared before any imports that trigger module load
@@ -24,7 +23,42 @@ vi.mock("@langwatch/observability", () => ({
 // Imports after mocks
 // ---------------------------------------------------------------------------
 
-import type { TraceMediaStore } from "../../../media/services/trace-stored-media-store.service.ts";
+import type { StoredObjectApi } from "@langwatch/stored-object-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+
+import { TraceScenarioEventMediaService } from "../trace-scenario-event-media.service.ts";
+
+/** The store call as a test observes it: Stored Object's input, the old store's answer. */
+type FakeStoreFromBytes = (input: {
+  projectId: string;
+  purpose: string;
+  ownerKind: string;
+  ownerId: string;
+  mediaType: string;
+  bytes: Buffer;
+}) => Promise<{ id: string; mediaType: string; isDuplicate: boolean }>;
+
+type TraceMediaStore = { storeFromBytes: FakeStoreFromBytes };
+
+/** Runs the scenario operation over a Stored Object stand-in answering through `service`. */
+function extractFromEvent({ event, service }: { event: unknown; service: TraceMediaStore }) {
+  const storedObjects = createApiFixture<StoredObjectApi>({
+    storeFromBytes: async (input) => {
+      const stored = await service.storeFromBytes(input as never);
+      return {
+        reference: { id: stored.id, mediaType: stored.mediaType },
+        isDuplicate: stored.isDuplicate,
+      } as never;
+    },
+  });
+  return TraceScenarioEventMediaService.create(storedObjects).extractInlineMediaFromEvent({
+    event,
+    projectId: BASE_PARAMS.projectId,
+    ownerKind: "scenario_run",
+    ownerId: BASE_PARAMS.ownerId,
+    purpose: "scenario_event",
+  });
+}
 
 // ---------------------------------------------------------------------------
 // Test helpers
@@ -78,7 +112,7 @@ function makeEventWithContent(content: unknown): unknown {
 // Tests
 // ---------------------------------------------------------------------------
 
-describe("TraceContentExtractionService.extractInlineMediaFromEvent", () => {
+describe("TraceScenarioEventMediaService.extractInlineMediaFromEvent", () => {
   describe("when an event has no message content", () => {
     it("returns the event unchanged and no refs", async () => {
       const service = makeService();
@@ -91,12 +125,11 @@ describe("TraceContentExtractionService.extractInlineMediaFromEvent", () => {
         scenarioSetId: "default",
       };
 
-      const { rewrittenEvent, refs } =
-        await TraceContentExtractionService.create().extractInlineMediaFromEvent({
-          ...BASE_PARAMS,
-          event,
-          service,
-        });
+      const { rewrittenEvent, refs } = await extractFromEvent({
+        ...BASE_PARAMS,
+        event,
+        service,
+      });
 
       expect(rewrittenEvent).toBe(event);
       expect(refs).toHaveLength(0);
@@ -109,12 +142,11 @@ describe("TraceContentExtractionService.extractInlineMediaFromEvent", () => {
       const service = makeService();
       const event = makeEventWithContent([{ type: "text", text: "Hello, world!" }]);
 
-      const { rewrittenEvent, refs } =
-        await TraceContentExtractionService.create().extractInlineMediaFromEvent({
-          ...BASE_PARAMS,
-          event,
-          service,
-        });
+      const { rewrittenEvent, refs } = await extractFromEvent({
+        ...BASE_PARAMS,
+        event,
+        service,
+      });
 
       expect(refs).toHaveLength(0);
       expect(service.storeFromBytes).not.toHaveBeenCalled();
@@ -146,12 +178,11 @@ describe("TraceContentExtractionService.extractInlineMediaFromEvent", () => {
         },
       ]);
 
-      const { rewrittenEvent, refs } =
-        await TraceContentExtractionService.create().extractInlineMediaFromEvent({
-          ...BASE_PARAMS,
-          event,
-          service,
-        });
+      const { rewrittenEvent, refs } = await extractFromEvent({
+        ...BASE_PARAMS,
+        event,
+        service,
+      });
 
       // storeFromBytes must have been called with the decoded bytes
       expect(service.storeFromBytes).toHaveBeenCalledOnce();
@@ -217,12 +248,11 @@ describe("TraceContentExtractionService.extractInlineMediaFromEvent", () => {
         },
       ]);
 
-      const { rewrittenEvent, refs } =
-        await TraceContentExtractionService.create().extractInlineMediaFromEvent({
-          ...BASE_PARAMS,
-          event,
-          service,
-        });
+      const { rewrittenEvent, refs } = await extractFromEvent({
+        ...BASE_PARAMS,
+        event,
+        service,
+      });
 
       expect(service.storeFromBytes).toHaveBeenCalledTimes(2);
       expect(refs).toHaveLength(2);
@@ -262,12 +292,11 @@ describe("TraceContentExtractionService.extractInlineMediaFromEvent", () => {
         },
       ]);
 
-      const { rewrittenEvent, refs } =
-        await TraceContentExtractionService.create().extractInlineMediaFromEvent({
-          ...BASE_PARAMS,
-          event,
-          service,
-        });
+      const { rewrittenEvent, refs } = await extractFromEvent({
+        ...BASE_PARAMS,
+        event,
+        service,
+      });
 
       expect(service.storeFromBytes).toHaveBeenCalledOnce();
       expect(service.storeFromBytes).toHaveBeenCalledWith(
@@ -313,7 +342,7 @@ describe("TraceContentExtractionService.extractInlineMediaFromEvent", () => {
         },
       ]);
 
-      const { refs } = await TraceContentExtractionService.create().extractInlineMediaFromEvent({
+      const { refs } = await extractFromEvent({
         ...BASE_PARAMS,
         event,
         service,
@@ -345,7 +374,7 @@ describe("TraceContentExtractionService.extractInlineMediaFromEvent", () => {
       ]);
 
       await expect(
-        TraceContentExtractionService.create().extractInlineMediaFromEvent({
+        extractFromEvent({
           ...BASE_PARAMS,
           event,
           service,
@@ -367,12 +396,11 @@ describe("TraceContentExtractionService.extractInlineMediaFromEvent", () => {
       // the part untouched — "degraded, not broken".
       const event = makeEventWithContent([{ type: "not-a-known-shape", someField: "value" }]);
 
-      const { rewrittenEvent, refs } =
-        await TraceContentExtractionService.create().extractInlineMediaFromEvent({
-          ...BASE_PARAMS,
-          event,
-          service,
-        });
+      const { rewrittenEvent, refs } = await extractFromEvent({
+        ...BASE_PARAMS,
+        event,
+        service,
+      });
 
       expect(rewrittenEvent).toBe(event);
       expect(refs).toHaveLength(0);
@@ -403,12 +431,11 @@ describe("TraceContentExtractionService.extractInlineMediaFromEvent", () => {
         },
       ]);
 
-      const { rewrittenEvent, refs } =
-        await TraceContentExtractionService.create().extractInlineMediaFromEvent({
-          ...BASE_PARAMS,
-          event,
-          service,
-        });
+      const { rewrittenEvent, refs } = await extractFromEvent({
+        ...BASE_PARAMS,
+        event,
+        service,
+      });
 
       expect(service.storeFromBytes).toHaveBeenCalledOnce();
       expect(service.storeFromBytes).toHaveBeenCalledWith(
@@ -450,12 +477,11 @@ describe("TraceContentExtractionService.extractInlineMediaFromEvent", () => {
         },
       ]);
 
-      const { rewrittenEvent, refs } =
-        await TraceContentExtractionService.create().extractInlineMediaFromEvent({
-          ...BASE_PARAMS,
-          event,
-          service,
-        });
+      const { rewrittenEvent, refs } = await extractFromEvent({
+        ...BASE_PARAMS,
+        event,
+        service,
+      });
 
       expect(rewrittenEvent).toBe(event);
       expect(refs).toHaveLength(0);
@@ -493,12 +519,11 @@ describe("TraceContentExtractionService.extractInlineMediaFromEvent", () => {
         },
       ]);
 
-      const { rewrittenEvent, refs } =
-        await TraceContentExtractionService.create().extractInlineMediaFromEvent({
-          ...BASE_PARAMS,
-          event,
-          service,
-        });
+      const { rewrittenEvent, refs } = await extractFromEvent({
+        ...BASE_PARAMS,
+        event,
+        service,
+      });
 
       expect(service.storeFromBytes).toHaveBeenCalledOnce();
       // Raw pcm16 is WAV-wrapped at store time (44-byte RIFF header + the
@@ -554,12 +579,11 @@ describe("TraceContentExtractionService.extractInlineMediaFromEvent", () => {
         },
       ]);
 
-      const { rewrittenEvent } =
-        await TraceContentExtractionService.create().extractInlineMediaFromEvent({
-          ...BASE_PARAMS,
-          event,
-          service,
-        });
+      const { rewrittenEvent } = await extractFromEvent({
+        ...BASE_PARAMS,
+        event,
+        service,
+      });
 
       const content = (rewrittenEvent as { message: { content: unknown[] } }).message.content;
       expect(content[0]).toEqual({
@@ -596,12 +620,11 @@ describe("TraceContentExtractionService.extractInlineMediaFromEvent", () => {
         },
       ]);
 
-      const { rewrittenEvent, refs } =
-        await TraceContentExtractionService.create().extractInlineMediaFromEvent({
-          ...BASE_PARAMS,
-          event,
-          service,
-        });
+      const { rewrittenEvent, refs } = await extractFromEvent({
+        ...BASE_PARAMS,
+        event,
+        service,
+      });
 
       expect(service.storeFromBytes).toHaveBeenCalledOnce();
       expect(service.storeFromBytes).toHaveBeenCalledWith(
@@ -658,17 +681,17 @@ describe("TraceContentExtractionService.extractInlineMediaFromEvent", () => {
         },
       ]);
 
-      const { refs } = await TraceContentExtractionService.create().extractInlineMediaFromEvent({
+      const { refs } = await extractFromEvent({
         ...BASE_PARAMS,
         event,
         service,
       });
 
       expect(refs).toHaveLength(2);
-      expect(refs[0]!.id).toBe(storedId);
-      expect(refs[0]!.isDuplicate).toBe(false);
-      expect(refs[1]!.id).toBe(storedId);
-      expect(refs[1]!.isDuplicate).toBe(true);
+      expect(refs).toEqual([
+        expect.objectContaining({ id: storedId, isDuplicate: false }),
+        expect.objectContaining({ id: storedId, isDuplicate: true }),
+      ]);
     });
   });
 
@@ -705,12 +728,11 @@ describe("TraceContentExtractionService.extractInlineMediaFromEvent", () => {
         ],
       };
 
-      const { rewrittenEvent, refs } =
-        await TraceContentExtractionService.create().extractInlineMediaFromEvent({
-          ...BASE_PARAMS,
-          event,
-          service,
-        });
+      const { rewrittenEvent, refs } = await extractFromEvent({
+        ...BASE_PARAMS,
+        event,
+        service,
+      });
 
       // Exactly one inline part across the two messages was externalized.
       expect(refs).toHaveLength(1);
@@ -751,12 +773,11 @@ describe("TraceContentExtractionService.extractInlineMediaFromEvent", () => {
         },
       ]);
 
-      const { rewrittenEvent, refs } =
-        await TraceContentExtractionService.create().extractInlineMediaFromEvent({
-          ...BASE_PARAMS,
-          event,
-          service,
-        });
+      const { rewrittenEvent, refs } = await extractFromEvent({
+        ...BASE_PARAMS,
+        event,
+        service,
+      });
 
       expect(rewrittenEvent).toBe(event);
       expect(refs).toHaveLength(0);
@@ -778,12 +799,11 @@ describe("TraceContentExtractionService.extractInlineMediaFromEvent", () => {
         },
       ]);
 
-      const { rewrittenEvent, refs } =
-        await TraceContentExtractionService.create().extractInlineMediaFromEvent({
-          ...BASE_PARAMS,
-          event,
-          service,
-        });
+      const { rewrittenEvent, refs } = await extractFromEvent({
+        ...BASE_PARAMS,
+        event,
+        service,
+      });
 
       expect(rewrittenEvent).toBe(event);
       expect(refs).toHaveLength(0);
@@ -803,12 +823,11 @@ describe("TraceContentExtractionService.extractInlineMediaFromEvent", () => {
         },
       ]);
 
-      const { rewrittenEvent, refs } =
-        await TraceContentExtractionService.create().extractInlineMediaFromEvent({
-          ...BASE_PARAMS,
-          event,
-          service,
-        });
+      const { rewrittenEvent, refs } = await extractFromEvent({
+        ...BASE_PARAMS,
+        event,
+        service,
+      });
 
       expect(rewrittenEvent).toBe(event);
       expect(refs).toHaveLength(0);
@@ -837,12 +856,11 @@ describe("TraceContentExtractionService.extractInlineMediaFromEvent", () => {
         },
       ]);
 
-      const { rewrittenEvent, refs } =
-        await TraceContentExtractionService.create().extractInlineMediaFromEvent({
-          ...BASE_PARAMS,
-          event,
-          service,
-        });
+      const { rewrittenEvent, refs } = await extractFromEvent({
+        ...BASE_PARAMS,
+        event,
+        service,
+      });
 
       expect(service.storeFromBytes).toHaveBeenCalledOnce();
       expect(refs).toHaveLength(1);
@@ -880,12 +898,11 @@ describe("TraceContentExtractionService.extractInlineMediaFromEvent", () => {
         { type: "image", image: `data:image/webp;base64,${base64Payload}` },
       ]);
 
-      const { rewrittenEvent, refs } =
-        await TraceContentExtractionService.create().extractInlineMediaFromEvent({
-          ...BASE_PARAMS,
-          event,
-          service,
-        });
+      const { rewrittenEvent, refs } = await extractFromEvent({
+        ...BASE_PARAMS,
+        event,
+        service,
+      });
 
       expect(service.storeFromBytes).toHaveBeenCalledOnce();
       expect(service.storeFromBytes).toHaveBeenCalledWith(
@@ -916,12 +933,11 @@ describe("TraceContentExtractionService.extractInlineMediaFromEvent", () => {
       const service = makeService();
       const event = makeEventWithContent([{ type: "image", image: "https://example.com/cat.png" }]);
 
-      const { rewrittenEvent, refs } =
-        await TraceContentExtractionService.create().extractInlineMediaFromEvent({
-          ...BASE_PARAMS,
-          event,
-          service,
-        });
+      const { rewrittenEvent, refs } = await extractFromEvent({
+        ...BASE_PARAMS,
+        event,
+        service,
+      });
 
       expect(rewrittenEvent).toBe(event);
       expect(refs).toHaveLength(0);
@@ -954,12 +970,11 @@ describe("TraceContentExtractionService.extractInlineMediaFromEvent", () => {
         },
       ]);
 
-      const { rewrittenEvent, refs } =
-        await TraceContentExtractionService.create().extractInlineMediaFromEvent({
-          ...BASE_PARAMS,
-          event,
-          service,
-        });
+      const { rewrittenEvent, refs } = await extractFromEvent({
+        ...BASE_PARAMS,
+        event,
+        service,
+      });
 
       expect(service.storeFromBytes).toHaveBeenCalledOnce();
       expect(service.storeFromBytes).toHaveBeenCalledWith(
@@ -1008,12 +1023,11 @@ describe("TraceContentExtractionService.extractInlineMediaFromEvent", () => {
         },
       ]);
 
-      const { rewrittenEvent, refs } =
-        await TraceContentExtractionService.create().extractInlineMediaFromEvent({
-          ...BASE_PARAMS,
-          event,
-          service,
-        });
+      const { rewrittenEvent, refs } = await extractFromEvent({
+        ...BASE_PARAMS,
+        event,
+        service,
+      });
 
       expect(service.storeFromBytes).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -1038,12 +1052,11 @@ describe("TraceContentExtractionService.extractInlineMediaFromEvent", () => {
       const service = makeService();
       const event = makeEventWithContent([{ type: "file", file: { file_id: "file-abc123" } }]);
 
-      const { rewrittenEvent, refs } =
-        await TraceContentExtractionService.create().extractInlineMediaFromEvent({
-          ...BASE_PARAMS,
-          event,
-          service,
-        });
+      const { rewrittenEvent, refs } = await extractFromEvent({
+        ...BASE_PARAMS,
+        event,
+        service,
+      });
 
       expect(rewrittenEvent).toBe(event);
       expect(refs).toHaveLength(0);
@@ -1072,12 +1085,11 @@ describe("TraceContentExtractionService.extractInlineMediaFromEvent", () => {
         },
       ]);
 
-      const { rewrittenEvent, refs } =
-        await TraceContentExtractionService.create().extractInlineMediaFromEvent({
-          ...BASE_PARAMS,
-          event,
-          service,
-        });
+      const { rewrittenEvent, refs } = await extractFromEvent({
+        ...BASE_PARAMS,
+        event,
+        service,
+      });
 
       expect(service.storeFromBytes).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -1122,7 +1134,7 @@ describe("TraceContentExtractionService.extractInlineMediaFromEvent", () => {
         },
       ]);
 
-      await TraceContentExtractionService.create().extractInlineMediaFromEvent({
+      await extractFromEvent({
         ...BASE_PARAMS,
         event,
         service,
@@ -1154,7 +1166,7 @@ describe("TraceContentExtractionService.extractInlineMediaFromEvent", () => {
         },
       ]);
 
-      await TraceContentExtractionService.create().extractInlineMediaFromEvent({
+      await extractFromEvent({
         ...BASE_PARAMS,
         event,
         service,
@@ -1186,12 +1198,11 @@ describe("TraceContentExtractionService.extractInlineMediaFromEvent", () => {
         },
       ]);
 
-      const { rewrittenEvent, refs } =
-        await TraceContentExtractionService.create().extractInlineMediaFromEvent({
-          ...BASE_PARAMS,
-          event,
-          service,
-        });
+      const { rewrittenEvent, refs } = await extractFromEvent({
+        ...BASE_PARAMS,
+        event,
+        service,
+      });
 
       expect(service.storeFromBytes).toHaveBeenCalledWith(
         expect.objectContaining({ mediaType: "text/csv" }),
@@ -1216,12 +1227,11 @@ describe("TraceContentExtractionService.extractInlineMediaFromEvent", () => {
         },
       ]);
 
-      const { rewrittenEvent, refs } =
-        await TraceContentExtractionService.create().extractInlineMediaFromEvent({
-          ...BASE_PARAMS,
-          event,
-          service,
-        });
+      const { rewrittenEvent, refs } = await extractFromEvent({
+        ...BASE_PARAMS,
+        event,
+        service,
+      });
 
       expect(rewrittenEvent).toBe(event);
       expect(refs).toHaveLength(0);
@@ -1237,12 +1247,11 @@ describe("TraceContentExtractionService.extractInlineMediaFromEvent", () => {
         },
       ]);
 
-      const { rewrittenEvent, refs } =
-        await TraceContentExtractionService.create().extractInlineMediaFromEvent({
-          ...BASE_PARAMS,
-          event,
-          service,
-        });
+      const { rewrittenEvent, refs } = await extractFromEvent({
+        ...BASE_PARAMS,
+        event,
+        service,
+      });
 
       expect(rewrittenEvent).toBe(event);
       expect(refs).toHaveLength(0);
@@ -1270,7 +1279,7 @@ describe("TraceContentExtractionService.extractInlineMediaFromEvent", () => {
         },
       ]);
 
-      await TraceContentExtractionService.create().extractInlineMediaFromEvent({
+      await extractFromEvent({
         ...BASE_PARAMS,
         event,
         service,
@@ -1305,12 +1314,11 @@ describe("TraceContentExtractionService.extractInlineMediaFromEvent", () => {
         },
       ]);
 
-      const { rewrittenEvent, refs } =
-        await TraceContentExtractionService.create().extractInlineMediaFromEvent({
-          ...BASE_PARAMS,
-          event,
-          service,
-        });
+      const { rewrittenEvent, refs } = await extractFromEvent({
+        ...BASE_PARAMS,
+        event,
+        service,
+      });
 
       expect(service.storeFromBytes).toHaveBeenCalledWith(
         expect.objectContaining({
