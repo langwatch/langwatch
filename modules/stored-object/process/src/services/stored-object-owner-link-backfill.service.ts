@@ -1,20 +1,18 @@
 import { INDEFINITE_RETENTION_DAYS } from "@langwatch/data-retention-contract";
 import {
-  STORED_OBJECT_PURPOSES,
+  type LinkUnownedStoredObjectsInput,
+  type LinkUnownedStoredObjectsResult,
+  purposePolicyOf,
   storedObjectProjectIdSchema,
 } from "@langwatch/stored-object-contract";
-import type { TenantMigrationOutcome } from "@langwatch/system-migrations";
 import { type Instant, nowInstant } from "@langwatch/time";
-import { defineMigrationStep, type TenantMigrationStep } from "@langwatch/upgrade/step";
 
 import type { StoredObjectOwnerLinkRepository } from "../repositories/stored-object-owner-link.repository.ts";
 import type { StoredObjectRecordRepository } from "../repositories/stored-object-record.repository.ts";
-import type { StoredObjectRetention } from "./stored-object-upload.service.ts";
 
 type StoredObjectOwnerLinkBackfillServiceOptions = Readonly<{
   records: StoredObjectRecordRepository;
   ownerLinks: StoredObjectOwnerLinkRepository;
-  retention: StoredObjectRetention;
   pageSize?: number;
   now?: () => Instant;
 }>;
@@ -37,61 +35,13 @@ export class StoredObjectOwnerLinkBackfillService {
     this.now = options.now ?? nowInstant;
   }
 
-  /** Waits until no old image serves: an old image stores retained purposes without a link. */
-  step(): TenantMigrationStep {
-    return defineMigrationStep({
-      id: "stored-object:link-unowned-retained-objects",
-      kind: "tenant",
-      mode: "background",
-      tenants: "project",
-      needsOldWritersGone: true,
-      title: "Stored Objects owner links for media stored before them",
-      description:
-        "Links audio and images stored from traces before owner links existed to their trace, so they are deleted with it.",
-      requiresOperatorConfirmation: false,
-      runsAutomaticallyOnSelfHosted: true,
-      enrolledAutomatically: true,
-      migrateTenant: (args) => this.migrateTenant(args),
-    });
-  }
-
-  async migrateTenant({
-    tenantId,
-    signal,
-  }: {
-    tenantId: string;
-    signal?: AbortSignal;
-  }): Promise<TenantMigrationOutcome> {
-    const projectId = storedObjectProjectIdSchema.parse(tenantId);
-    const counts = { scanned: 0, linked: 0 };
-    for (const [purpose, policy] of Object.entries(STORED_OBJECT_PURPOSES)) {
-      if (!policy.retentionCategory) continue;
-      const days = await this.options.retention.getRetentionDays({
-        projectId,
-        category: policy.retentionCategory,
-      });
-      const page = await this.linkPurpose({ projectId, purpose, days, signal });
-      counts.scanned += page.scanned;
-      counts.linked += page.linked;
+  /** Objects that already hold a link are left alone, so a second run links nothing. */
+  async linkUnowned(input: LinkUnownedStoredObjectsInput): Promise<LinkUnownedStoredObjectsResult> {
+    if (purposePolicyOf(input.purpose).retentionCategory === undefined) {
+      throw new Error(`purpose ${input.purpose} follows no retention category`);
     }
-
-    return {
-      status: "finalized",
-      report: { kind: "stored_object_owner_links_backfilled", ...counts },
-    };
-  }
-
-  private async linkPurpose({
-    projectId,
-    purpose,
-    days,
-    signal,
-  }: {
-    projectId: ReturnType<typeof storedObjectProjectIdSchema.parse>;
-    purpose: string;
-    days: number;
-    signal?: AbortSignal | undefined;
-  }): Promise<{ scanned: number; linked: number }> {
+    const projectId = storedObjectProjectIdSchema.parse(input.projectId);
+    const days = input.retentionDays;
     const counts = { scanned: 0, linked: 0 };
     const limit = this.options.pageSize ?? 250;
     let afterId: string | undefined;
@@ -99,13 +49,12 @@ export class StoredObjectOwnerLinkBackfillService {
     do {
       const page = await this.options.records.findPage({
         tenantId: projectId,
-        purpose,
+        purpose: input.purpose,
         status: "available",
         limit,
         ...(afterId ? { afterId } : {}),
       });
       for (const record of page) {
-        this.assertActive(signal);
         counts.scanned += 1;
         const links = await this.options.ownerLinks.countAll({
           tenantId: projectId,
@@ -130,11 +79,5 @@ export class StoredObjectOwnerLinkBackfillService {
     } while (isFullPage && afterId);
 
     return counts;
-  }
-
-  private assertActive(signal?: AbortSignal): void {
-    if (signal?.aborted) {
-      throw signal.reason ?? new Error("Stored Objects owner link backfill aborted");
-    }
   }
 }

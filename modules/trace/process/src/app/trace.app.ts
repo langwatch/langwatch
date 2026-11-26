@@ -338,6 +338,10 @@ import { TraceBlobStoreService } from "../features/media/services/trace-blob-sto
 import { TraceEdgeMediaPayloadService } from "../features/media/services/trace-edge-media-payload.service.ts";
 import { TraceEdgeMediaTelemetryService } from "../features/media/services/trace-edge-media-telemetry.service.ts";
 import {
+  TraceMediaOwnerLinkBackfillService,
+  type TraceMediaOwnerLinkOutcome,
+} from "../features/media/services/trace-media-owner-link-backfill.service.ts";
+import {
   TRACE_CONTENT_MEDIA,
   TraceMediaStoreService,
 } from "../features/media/services/trace-media-store.service.ts";
@@ -1111,6 +1115,10 @@ export class TraceModule implements TraceApi, CollectorApp {
         setup.dependencies.dataRetention.getResolvedForProject({ projectId: tenantId }),
     };
     app.#otlpTracesMaxBodyBytes = setup.config.otlpTracesMaxBodyBytes;
+    app.#mediaOwnerLinks = TraceMediaOwnerLinkBackfillService.create({
+      storedObjects: setup.dependencies.storedObjects,
+      retention: setup.dependencies.dataRetention,
+    });
     app.#collectorEvaluations = TraceCollectorEvaluationsService.create({ role });
     const authorizeFoldRead = foldReadAuthorizer({
       authz: setup.dependencies.authz,
@@ -1481,6 +1489,7 @@ export class TraceModule implements TraceApi, CollectorApp {
   #milestones: TraceProjectMilestonesService | null = null;
   #traceMonthIds: TraceMonthIdsMigrationService | null = null;
   #evaluationOutcomesBackfill: TraceEvaluationOutcomesMigrationService | null = null;
+  #mediaOwnerLinks: TraceMediaOwnerLinkBackfillService | null = null;
   #retention: RetentionPolicyResolver | null = null;
   #otlpTracesMaxBodyBytes = DEFAULT_OTLP_TRACES_MAX_BODY_BYTES;
   #collectorEvaluations: TraceCollectorEvaluationsService | null = null;
@@ -1536,6 +1545,17 @@ export class TraceModule implements TraceApi, CollectorApp {
       throw new TraceCapabilityUnavailableError("this process", "the month trace ids migration");
     }
     return this.#traceMonthIds.sendMonthTraceIds(input);
+  }
+
+  /** Links one project's trace media stored before owner links, for the upgrade step. */
+  linkUnownedTraceMedia(input: {
+    tenantId: string;
+    signal?: AbortSignal;
+  }): Promise<TraceMediaOwnerLinkOutcome> {
+    if (!this.#mediaOwnerLinks) {
+      throw new TraceCapabilityUnavailableError("this process", "the trace media owner links");
+    }
+    return this.#mediaOwnerLinks.linkProject(input);
   }
 
   /** Records the last 62 days of evaluation outcomes on their traces, for the upgrade step. */

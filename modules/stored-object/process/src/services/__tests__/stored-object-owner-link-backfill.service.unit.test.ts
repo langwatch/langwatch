@@ -51,13 +51,16 @@ function fixture({ days, rows }: { days: number; rows: StoredObjectRecord[] }) {
   const ownerLinks = MemoryStoredObjectOwnerLinkRepository.create();
   const records = MemoryStoredObjectRecordRepository.create(rows, ownerLinks);
   const clock = { now: dayOf(10) };
-  const migration = StoredObjectOwnerLinkBackfillService.create({
+  const backfill = StoredObjectOwnerLinkBackfillService.create({
     records,
     ownerLinks,
-    retention: { getRetentionDays: async () => days },
     pageSize: 2,
     now: () => clock.now,
   });
+  const migration = {
+    linkProject: () =>
+      backfill.linkUnowned({ projectId: PROJECT, purpose: "trace_content", retentionDays: days }),
+  };
   const sweeper = StoredObjectRetentionService.create({
     records,
     ownerLinks,
@@ -88,9 +91,9 @@ describe("given trace media stored before owner links in a project that keeps tr
     it("links each available trace object to its owner until 30 days after its creation", async () => {
       const { migration, linksOf, countOf } = fixture({ days: 30, rows: rows() });
 
-      const outcome = await migration.migrateTenant({ tenantId: PROJECT });
+      const outcome = await migration.linkProject();
 
-      expect(outcome).toMatchObject({ status: "finalized", report: { scanned: 3, linked: 3 } });
+      expect(outcome).toEqual({ scanned: 3, linked: 3 });
       expect(await linksOf("so_old")).toEqual([
         expect.objectContaining({
           ownerKind: "trace",
@@ -107,7 +110,7 @@ describe("given trace media stored before owner links in a project that keeps tr
     /** @scenario "Trace media stored before owner links is linked to the trace that stored it" */
     it("lets the sweep delete an object once its trace's retention has passed", async () => {
       const { migration, sweeper, records, clock } = fixture({ days: 30, rows: rows() });
-      await migration.migrateTenant({ tenantId: PROJECT });
+      await migration.linkProject();
 
       clock.now = dayOf(31);
       await sweeper.sweep();
@@ -124,11 +127,11 @@ describe("given trace media stored before owner links in a project that keeps tr
     /** @scenario "Trace media stored before owner links is linked to the trace that stored it" */
     it("links nothing on a second run", async () => {
       const { migration } = fixture({ days: 30, rows: rows() });
-      await migration.migrateTenant({ tenantId: PROJECT });
+      await migration.linkProject();
 
-      const second = await migration.migrateTenant({ tenantId: PROJECT });
+      const second = await migration.linkProject();
 
-      expect(second).toMatchObject({ report: { scanned: 3, linked: 0 } });
+      expect(second).toEqual({ scanned: 3, linked: 0 });
     });
   });
 
@@ -146,12 +149,25 @@ describe("given trace media stored before owner links in a project that keeps tr
         updatedAt: dayOf(60),
       });
 
-      await migration.migrateTenant({ tenantId: PROJECT });
+      await migration.linkProject();
 
       expect(await linksOf("so_old")).toEqual([
         expect.objectContaining({ ownerId: "newer-trace", retainUntil: dayOf(90) }),
       ]);
     });
+  });
+});
+
+describe("given a purpose that follows no retention category", () => {
+  it("refuses to link its objects", async () => {
+    const backfill = StoredObjectOwnerLinkBackfillService.create({
+      records: MemoryStoredObjectRecordRepository.create(),
+      ownerLinks: MemoryStoredObjectOwnerLinkRepository.create(),
+    });
+
+    await expect(
+      backfill.linkUnowned({ projectId: PROJECT, purpose: "scenario_event", retentionDays: 30 }),
+    ).rejects.toThrow("follows no retention category");
   });
 });
 
@@ -164,7 +180,7 @@ describe("given trace media stored before owner links in a project that keeps tr
         rows: [record({ id: "so_forever" })],
       });
 
-      await migration.migrateTenant({ tenantId: PROJECT });
+      await migration.linkProject();
       clock.now = dayOf(10_000);
       await sweeper.sweep();
 

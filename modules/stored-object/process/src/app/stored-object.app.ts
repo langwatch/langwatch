@@ -10,6 +10,8 @@ import {
   storedObjectConfig,
   type WriteStoredObjectUploadInput,
   type DeleteProjectStoredObjectsResult,
+  type LinkUnownedStoredObjectsInput,
+  type LinkUnownedStoredObjectsResult,
   type ImageProxyRequest,
   type ReadStoredObjectResult,
   type StoreStoredObjectFromBytesInput,
@@ -58,6 +60,7 @@ import {
   StoredObjectFileReadService,
   type StoredObjectFileAllowance,
 } from "../services/stored-object-file-read.service.ts";
+import { StoredObjectOwnerLinkBackfillService } from "../services/stored-object-owner-link-backfill.service.ts";
 import { StoredObjectOwnerUnresolvedService } from "../services/stored-object-owner-unresolved.service.ts";
 import { StoredObjectRetentionService } from "../services/stored-object-retention.service.ts";
 import { StoredObjectUploadSignerService } from "../services/stored-object-upload-signer.service.ts";
@@ -162,6 +165,10 @@ export class StoredObjectModule implements StoredObjectApi, StoredObjectFileApi 
 
     return new StoredObjectModule({
       storage,
+      ownerLinkBackfill: StoredObjectOwnerLinkBackfillService.create({
+        records: repositories.records,
+        ownerLinks: repositories.ownerLinks,
+      }),
       retention: StoredObjectRetentionService.create({
         records: repositories.records,
         ownerLinks: repositories.ownerLinks,
@@ -182,6 +189,7 @@ export class StoredObjectModule implements StoredObjectApi, StoredObjectFileApi 
   }
 
   readonly #storage: StoredObjectService;
+  readonly #ownerLinkBackfill: StoredObjectOwnerLinkBackfillService;
   readonly #retention: StoredObjectRetentionService;
   readonly #owners: StoredObjectOwnerResolver;
   readonly #permissions: AuthzApi;
@@ -191,6 +199,7 @@ export class StoredObjectModule implements StoredObjectApi, StoredObjectFileApi 
 
   private constructor(parts: {
     storage: StoredObjectService;
+    ownerLinkBackfill: StoredObjectOwnerLinkBackfillService;
     retention: StoredObjectRetentionService;
     owners: StoredObjectOwnerResolver;
     permissions: AuthzApi;
@@ -198,6 +207,7 @@ export class StoredObjectModule implements StoredObjectApi, StoredObjectFileApi 
     images: ImageProxyService;
   }) {
     this.#storage = parts.storage;
+    this.#ownerLinkBackfill = parts.ownerLinkBackfill;
     this.#retention = parts.retention;
     this.#owners = parts.owners;
     this.#permissions = parts.permissions;
@@ -354,6 +364,12 @@ export class StoredObjectModule implements StoredObjectApi, StoredObjectFileApi 
 
   deleteOwnedBy(input: { projectId: string }): Promise<DeleteProjectStoredObjectsResult> {
     return this.#storage.deleteOwnedBy(input);
+  }
+
+  linkUnownedObjects(
+    input: LinkUnownedStoredObjectsInput,
+  ): Promise<LinkUnownedStoredObjectsResult> {
+    return this.#ownerLinkBackfill.linkUnowned(input);
   }
 
   getStorageDestination(input: { projectId: string }): Promise<StoredObjectStorageDestination> {
