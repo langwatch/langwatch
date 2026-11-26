@@ -264,7 +264,7 @@ export function clearSplitSpan({
   });
 }
 
-/** The model masks every text it processes; only an empty one comes back without it. */
+/** The model masks every text it processes; only a blank one comes back without it, or empty. */
 function lacksMaskedText({
   texts,
   whole,
@@ -274,7 +274,7 @@ function lacksMaskedText({
 }): boolean {
   return [...whole].some(
     ([index, answer]) =>
-      typeof answer.anonymized !== "string" &&
+      (typeof answer.anonymized !== "string" || answer.anonymized === "") &&
       !Array.from(texts[index] ?? "").every((char) => isPythonSpace(char)),
   );
 }

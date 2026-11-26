@@ -309,10 +309,14 @@ describe("clearSplitSpan", () => {
 
   /** @scenario "A piece whose findings do not rebuild the model's own masked piece sends the whole span to Presidio" */
   it("refuses a whole text the model answered without its masked text, unless it is blank", () => {
-    const answer = (text: string, findings: unknown): PieceAnswer => ({
+    const answer = (
+      text: string,
+      findings: unknown,
+      anonymized: string | null = null,
+    ): PieceAnswer => ({
       piece: { text: 0, start: 0, end: text.length, whole: true },
       findings,
-      anonymized: null,
+      anonymized,
     });
     const found = [{ entity_type: "PERSON", start: 6, end: 11, score: 0.9 }];
 
@@ -322,9 +326,13 @@ describe("clearSplitSpan", () => {
     expect(
       clearSplitSpan({ texts: ["hello Maria"], answers: [answer("hello Maria", undefined)] }),
     ).toBe("unplaceable");
+    expect(
+      clearSplitSpan({ texts: ["hello Maria"], answers: [answer("hello Maria", found, "")] }),
+    ).toBe("unplaceable");
     expect(clearSplitSpan({ texts: ["  \n"], answers: [answer("  \n", undefined)] })).toEqual([
       null,
     ]);
+    expect(clearSplitSpan({ texts: ["  \n"], answers: [answer("  \n", [], "")] })).toEqual([null]);
   });
 
   /** @scenario "A whole text in a split call keeps the model's own masked text" */
