@@ -6,8 +6,8 @@ Feature: Experimentation resources are OSS (Apache 2.0) and uncapped
   Apache 2.0. They carry NO creation limit on any license or self-hosted
   deployment, with or without a license, and none on paid cloud plans.
 
-  One exception, on the cloud Free plan only: scenarios, simulations (scenario
-  sets) and custom evaluators are capped at 3 each. See
+  One exception, on the cloud Free plan only: scenarios and custom evaluators
+  are capped at 3 each, and scenario runs at 100 a month after a 14 day grace. See
   cloud-free-creation-caps.feature.
 
   Commercial value is captured elsewhere: traces/messages volume, member
@@ -21,7 +21,7 @@ Feature: Experimentation resources are OSS (Apache 2.0) and uncapped
   I want to create unlimited prompts, evaluators, scenarios, and other
   experimentation resources
   So that I can build and iterate without a creation cap
-  (cloud Free keeps its 3 scenario, simulation and custom evaluator caps)
+  (cloud Free keeps its 3 scenario and custom evaluator caps and its run cap)
 
   Background:
     Given an organization "org-123" exists
@@ -68,7 +68,7 @@ Feature: Experimentation resources are OSS (Apache 2.0) and uncapped
   Scenario: Creation-limit enforcement applies to member seats and the cloud Free caps
     Given the organization is on the free plan
     Then creation limits are still enforced for "members" and "membersLite"
-    And on the cloud Free plan for "scenarios", "scenarioSets" and "evaluators"
+    And on the cloud Free plan for "scenarios", "evaluators" and the monthly "scenarioRuns"
     But creation limits are not enforced for projects, teams, or any other experimentation resource
 
   @unit

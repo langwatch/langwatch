@@ -28,6 +28,7 @@ const persistCapDependencies = {
     resolvePlanNextStep: vi.fn(),
     assertWithinUsageLimit: vi.fn(),
     getUsageMonthBreakdown: vi.fn(),
+    assertScenarioRunAllowed: vi.fn(),
   },
   config: {
     free: 100,
