@@ -878,6 +878,7 @@ export interface LwqlPrismaRows {
     readonly scope: "DashboardScope";
     readonly organizationId: "String?";
     readonly homeProduct: "String";
+    readonly myDashboardOfUserId: "String?";
     readonly excludedOrigins: "Json?";
     readonly createdAt: "DateTime";
     readonly updatedAt: "DateTime";

@@ -38992,11 +38992,14 @@ Click an evaluator chip to open its **Result** block. **Status** is the verdict 
 
 ## Judge with Instant Evals
 
-On LangWatch Cloud, once Instant Evals is switched on for your organization, the judge model picker lists **Instant Evals** first. It runs on LangWatch's key, so it needs no model provider or key of your own. A self-hosted install cannot judge with it yet. How Instant Evals is switched on, and who processes the text, is in [Where the judged text goes](/features/instant-evals/limits-and-cost#where-the-judged-text-goes).
+On LangWatch Cloud, once Instant Evals is switched on for your organization, the judge model picker lists **Instant Evals** first. That model runs on LangWatch's key, so it needs no model provider or key of your own.
+
+The decision models on your own keys follow it, as in [Run Instant Evals on your own decision model](/features/instant-evals/own-model). A self-hosted install can judge only on its own decision model. How Instant Evals is switched on, and who processes the text, is in [Where the judged text goes](/features/instant-evals/limits-and-cost#where-the-judged-text-goes).
 
 - **What it reads.** Your prompt, plus the input, output and contexts you mapped, each as its own section. Your input, output and contexts share the room the judge has. A short one stays whole; a long one keeps its beginning and its end, so a long input never pushes out a short output.
 - **What it returns.** The Boolean, Score and Category judges keep their usual result. A Score judge on Instant Evals shows a minimum and a maximum: a whole-number range of at most ten values, such as 1 to 5 (but not 0 to 1), is asked as it is, and any other range is asked on 1 to 10 and mapped back onto yours. With no range set, the score is between 0 and 1.
-- **What it costs.** Each judged call is one Instant Evals row on the [billing events](/ai-gateway/billing-events) ledger, and the result's cost is its price. A call that judged no text records no row and no cost. An organization that is not billed per use can spend 1 USD on Instant Evals in total, shared with Instant Evals runs and judged queries; past it, the judge returns an error with `instant_eval_free_budget_exhausted` instead of a verdict.
+- **What it costs on LangWatch's model.** Each judged call is one Instant Evals row on the [billing events](/ai-gateway/billing-events) ledger, and the result's cost is its price. A call that judged no text records no row and no cost. An organization that is not billed per use can spend 1 USD on Instant Evals in total, shared with Instant Evals runs and judged queries; past it, the judge returns an error with `instant_eval_free_budget_exhausted` instead of a verdict.
+- **What it costs on your own decision model.** Your provider bills the call and LangWatch does not, so the result's cost is zero. The billing events ledger still records its tokens, with **Instant Evals (own model)** in the **Virtual key** column. These calls do not count toward the 1 USD.
 
 ## Calibrate the judge
 
@@ -69376,7 +69379,8 @@ On LangWatch Cloud, an organization that has the model turned on sees an **Essen
 - **Price:** $0.50 per 1M characters, excluding VAT, pay as you go. A span of 1,000 characters costs $0.0005.
 - **What is billed:** each span, log record or metric point the model answers, by the characters it was sent, even when it finds no personal data. Essential detection runs first, so a phone number is already masked and counted as its marker. A metric's attributes are sent again with every export, and each export is billed.
 - **No free amount and no minimum:** billing starts at the first character of the month, and a short span costs only its characters: 50 characters cost $0.000025.
-- **Fallbacks are free:** a span with over 8,000 characters left after Essential detection, or one sent while the model is unavailable, goes to the rule-based detector (Presidio) and can then go to Google Cloud DLP. It is not charged. Long spans are not split across model calls yet.
+- **Long spans:** where long-span splitting is on for your organization, a span of 8,001 to 32,000 characters is sent to the model in several overlapping parts. It is billed once, on its own characters; the overlap between parts is free.
+- **Fallbacks are free:** a span with over 32,000 characters left after Essential detection (over 8,000 where splitting is not on), one the model cannot split safely (such as escaped JSON) or with no free slot, or one sent while the model is unavailable, goes to the rule-based detector (Presidio) and can then go to Google Cloud DLP. It is not charged.
 - **How it is billed:** monthly, as its own line on a Growth plan paid in US dollars. Each answered record is one `pii_redaction` row on the [billing events](/ai-gateway/billing-events) ledger. A [gateway budget](/ai-gateway/budgets) does not cap it, so a spent budget never turns redaction off.
 - **Choosing it:** the page asks you to confirm the price before it turns Strict on. Cancel and the organization keeps its current level; Essential never calls the model and is never charged. An organization that has Strict included sees it as "Included for your organization", with no price.
 

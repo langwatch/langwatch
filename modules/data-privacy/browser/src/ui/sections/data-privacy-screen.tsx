@@ -164,6 +164,7 @@ function DataPrivacyPage({ host, projectId }: { host: DataPrivacyHostApi; projec
           <OrganizationPiiLevelSection
             free={piiRedactionModelOffer.free}
             licensed={piiRedactionModelOffer.licensed}
+            split={piiRedactionModelOffer.split}
             host={host}
             projectId={projectId}
             snapshot={snapshot}

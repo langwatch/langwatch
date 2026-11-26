@@ -44,7 +44,9 @@ function renderDrawer({ piiRedactionModelOffered }: { piiRedactionModelOffered: 
       effectiveOrganization={baseline}
       projectId="proj-1"
       isSaving={false}
-      piiRedactionModelOffer={piiRedactionModelOffered ? { kind: "model", free: false } : null}
+      piiRedactionModelOffer={
+        piiRedactionModelOffered ? { kind: "model", free: false, split: false } : null
+      }
       onSave={vi.fn()}
       scopePicker={() => <div data-testid="scope-picker" />}
     />,

@@ -1,14 +1,14 @@
 /**
  * Product sidebar "Dashboards" section: My dashboard, then the product's boards, each with the
- * library's "⋮" menu on hover. "No dashboards yet" when empty, in every product. "Browse
- * templates" only in LLM Ops: templates read its data.
+ * library's "⋮" menu on hover. "No dashboards yet" when empty, in every product. The templates
+ * live on a new board, so the section has no templates entry.
  * @see modules/dashboard/specs/dashboards-organization-area.feature
  */
 
 import type { ProductDashboardsProps } from "@langwatch/analytics-client";
 import { SidebarSectionLabel } from "@langwatch/design-system/app-shell";
 import { Box, Button, HStack, Text, VStack } from "@langwatch/design-system/primitives";
-import { LayoutDashboard, LayoutTemplate, Lock } from "lucide-react";
+import { LayoutDashboard, Lock } from "lucide-react";
 import { type ReactNode, useState } from "react";
 
 import { useAnalyticsHost } from "../../../../model/analytics-host.ts";
@@ -20,7 +20,7 @@ import { useLibraryCreate, useLibraryDuplicate } from "../../behavior/use-librar
 import { useProductDashboards } from "../../behavior/use-product-dashboards.ts";
 import { useSavedDashboards } from "../../behavior/use-saved-dashboards.ts";
 import { type StoreProject, useStoreProject } from "../../behavior/use-store-project.ts";
-import { dashboardTemplatesPath, DRAFT_SEGMENT, draftBoardPath } from "../../model/boards.ts";
+import { DRAFT_SEGMENT, draftBoardPath } from "../../model/boards.ts";
 import {
   type LibraryBoard,
   libraryBoardPath,
@@ -73,15 +73,6 @@ export function ProductDashboardsSection({ product }: ProductDashboardsProps) {
           onMove={setPendingMove}
           onDelete={setPendingDelete}
         />
-      )}
-      {projectSlug && product === "llm-ops" && (
-        <RowList label="Templates">
-          <SidebarLinkRow
-            name="Browse templates"
-            href={dashboardTemplatesPath({ projectSlug })}
-            icon={<LayoutTemplate size={SIDEBAR_ROW_ICON_SIZE} />}
-          />
-        </RowList>
       )}
       {isNewDialogOpen && (
         <ProductNewDashboard
@@ -202,17 +193,41 @@ function BoardRow({
   );
 }
 
-/** The new board in view, listed while nothing is stored; its own row takes over once it is. */
+/**
+ * The new board in view, listed while nothing is stored; its own row takes over once it is. Its
+ * "⋮" offers Rename, which stores it under that name, and Delete, which throws it away.
+ */
 function DraftRow({ projectSlug }: { projectSlug: string }) {
+  const host = useAnalyticsHost();
   const saved = useSavedDashboards();
   const draft = useDraftBoard({ takenNames: saved.boards.map(({ name }) => name) });
+  const [isRenaming, setIsRenaming] = useState(false);
   if (draft.savedId !== void 0) return null;
+  const renaming = {
+    onCommit: (name: string) => {
+      setIsRenaming(false);
+      draft.materialise({ name }).catch((error: unknown) => {
+        host.failed({ error, fallbackTitle: "Couldn't rename the dashboard" });
+      });
+    },
+    onCancel: () => setIsRenaming(false),
+  };
   return (
     <SidebarLinkRow
       name={draft.board.name}
       href={draftBoardPath({ projectSlug })}
-      icon={<LayoutDashboard size={14} />}
+      icon={<LayoutDashboard size={SIDEBAR_ROW_ICON_SIZE} />}
       isActive
+      menu={
+        <BoardMenu
+          name={draft.board.name}
+          actions={{
+            onRename: () => setIsRenaming(true),
+            ...(draft.isStoring ? {} : { remove: { onDelete: draft.discard } }),
+          }}
+        />
+      }
+      renaming={isRenaming ? renaming : void 0}
     />
   );
 }

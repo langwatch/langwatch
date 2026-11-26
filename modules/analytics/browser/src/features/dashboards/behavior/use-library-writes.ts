@@ -5,7 +5,11 @@
  */
 
 import { useUiAnalytics } from "@langwatch/browser-host/analytics";
-import type { DashboardHomeProduct, DashboardScope } from "@langwatch/dashboard-contract";
+import type {
+  DashboardHomeProduct,
+  DashboardProject,
+  DashboardScope,
+} from "@langwatch/dashboard-contract";
 import { toaster } from "@langwatch/design-system/toaster";
 
 import { analyticsApi } from "../../../behavior/analytics-api.ts";
@@ -17,7 +21,10 @@ import { useBoardFromTemplate } from "./use-board-from-template.ts";
 import { useStartLibraryDraft } from "./use-draft-board.ts";
 import { useStoreProject } from "./use-store-project.ts";
 
-/** The dialog's Create opens the new board unsaved; its first edit stores it (AC162). */
+/**
+ * The dialog's Create opens the new board unsaved; its first edit stores it (AC162). It is kept
+ * in the project the dialog picked, else the store project.
+ */
 export function useLibraryCreate() {
   const { storeProject } = useStoreProject();
   const startDraft = useStartLibraryDraft();
@@ -26,13 +33,15 @@ export function useLibraryCreate() {
     name,
     scope,
     homeProduct,
+    project = storeProject,
   }: {
     name: string;
     scope: DashboardScope;
     homeProduct: DashboardHomeProduct;
+    project?: DashboardProject;
   }) => {
-    if (!storeProject) return Promise.resolve(false);
-    startDraft({ project: storeProject, name, scope, homeProduct });
+    if (!project) return Promise.resolve(false);
+    startDraft({ project, name, scope, homeProduct });
     return Promise.resolve(true);
   };
 

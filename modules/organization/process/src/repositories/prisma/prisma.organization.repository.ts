@@ -662,15 +662,37 @@ export class PrismaOrganizationRepository extends OrganizationRepository {
     expiresAt: Instant;
     validatedAt: Instant | null;
   }): Promise<void> {
-    const { count } = await this.database.organization.updateMany({
-      where: { id: input.organizationId },
-      data: {
-        license: input.licenseKey,
-        licenseExpiresAt: toDate(input.expiresAt),
-        licenseLastValidatedAt: input.validatedAt && toDate(input.validatedAt),
-      },
+    // The organization row is locked first, as licensing's conditional write does, and
+    // licensing's row is read under a share lock, so a key it stores meanwhile is seen.
+    const found = await this.database.$transaction(async (transaction) => {
+      const organizations = await transaction.$queryRaw<{ id: string }[]>`
+        ${skipTenantCheck({
+          // An organization is addressed by its own primary key.
+          SKIP_TENANT_CHECK: true,
+        })}
+        SELECT "id" FROM "Organization" WHERE "id" = ${input.organizationId} FOR UPDATE
+      `;
+      if (organizations.length === 0) return false;
+      const held = await transaction.$queryRaw<{ licenseKey: string | null }[]>`
+        ${skipTenantCheck({
+          // Licensing's row is keyed by the organization's own primary key.
+          SKIP_TENANT_CHECK: true,
+        })}
+        SELECT "licenseKey" FROM "OrganizationLicense"
+         WHERE "organizationId" = ${input.organizationId} FOR SHARE
+      `;
+      if (held[0]?.licenseKey !== input.licenseKey) return true;
+      await transaction.organization.update({
+        where: { id: input.organizationId },
+        data: {
+          license: input.licenseKey,
+          licenseExpiresAt: toDate(input.expiresAt),
+          licenseLastValidatedAt: input.validatedAt && toDate(input.validatedAt),
+        },
+      });
+      return true;
     });
-    if (count === 0) throw new OrganizationNotFoundError();
+    if (!found) throw new OrganizationNotFoundError();
   }
 
   async clearLicense(input: { organizationId: string }): Promise<void> {

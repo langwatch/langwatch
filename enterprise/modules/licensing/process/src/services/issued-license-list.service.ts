@@ -11,7 +11,10 @@ import type {
 } from "../repositories/issued-license.repository.ts";
 import { INTERNAL_LICENSE_EMAIL_SUFFIXES } from "../rules/issued-license.rules.ts";
 
-/** Pages the registry for the console, with how many licenses each filter choice would list. */
+/** How far a chain is followed each way; a renewal a year is decades of chain. */
+const MAX_CHAIN = 100;
+
+/** Reads the registry for the console: filtered pages with their counts, and reissue chains. */
 export class IssuedLicenseListService {
   static create(options: {
     repository: IssuedLicenseRepository;
@@ -43,15 +46,37 @@ export class IssuedLicenseListService {
     const statusPart = status ? byStatus(status === "active") : {};
     const audiencePart = audience ? byAudience(audience === "internal") : {};
     const { repository } = this.options;
+    // A reissue chain lists and counts once, as its newest license.
+    const heads: IssuedLicenseQuery = { search, chainHeadsOnly: true };
     // Each count keeps the other filter, so it says what choosing it would list.
     const [{ rows, total }, active, inactive, customer, internal, all] = await Promise.all([
-      repository.listAll({ page, pageSize, search, ...statusPart, ...audiencePart }),
-      repository.countAll({ search, ...audiencePart, ...byStatus(true) }),
-      repository.countAll({ search, ...audiencePart, ...byStatus(false) }),
-      repository.countAll({ search, ...statusPart, ...byAudience(false) }),
-      repository.countAll({ search, ...statusPart, ...byAudience(true) }),
-      repository.countAll({ search }),
+      repository.listAll({ page, pageSize, ...heads, ...statusPart, ...audiencePart }),
+      repository.countAll({ ...heads, ...audiencePart, ...byStatus(true) }),
+      repository.countAll({ ...heads, ...audiencePart, ...byStatus(false) }),
+      repository.countAll({ ...heads, ...statusPart, ...byAudience(false) }),
+      repository.countAll({ ...heads, ...statusPart, ...byAudience(true) }),
+      repository.countAll(heads),
     ]);
     return { rows, total, counts: { active, inactive, customer, internal, all } };
+  }
+
+  /** The licenses one reissue chain holds, newest first, followed both ways from `start`. */
+  async findChain({ start }: { start: IssuedLicenseRecord }): Promise<IssuedLicenseRecord[]> {
+    const { repository } = this.options;
+    const older: IssuedLicenseRecord[] = [];
+    for (let row = start; row.replacesId && older.length < MAX_CHAIN;) {
+      const replaced = await repository.findById(row.replacesId);
+      if (!replaced) break;
+      older.push(replaced);
+      row = replaced;
+    }
+    const newer: IssuedLicenseRecord[] = [];
+    for (let row = start; newer.length < MAX_CHAIN;) {
+      const replacement = await repository.findByReplacesId(row.id);
+      if (!replacement) break;
+      newer.unshift(replacement);
+      row = replacement;
+    }
+    return [...newer, start, ...older];
   }
 }

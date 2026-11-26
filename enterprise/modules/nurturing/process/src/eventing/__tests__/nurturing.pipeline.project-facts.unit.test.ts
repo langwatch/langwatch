@@ -48,6 +48,7 @@ import { MemoryNurturingTraceDayRepository } from "../../repositories/memory/mem
 import { MemoryNurturingTracedProjectRepository } from "../../repositories/memory/memory.nurturing-traced-project.repository.ts";
 import { MemoryNurturingClaimRepository } from "../../repositories/memory/memory.nurturing.repositories.ts";
 import { unplacedMemberFacts } from "../../services/__tests__/nurturing-member-facts.test-helpers.ts";
+import { peopleWithEmails } from "../../services/__tests__/nurturing-person-email.test-helpers.ts";
 import { NurturingDeliveryService } from "../../services/nurturing-delivery.service.ts";
 import { NurturingMemberFactsService } from "../../services/nurturing-member-facts.service.ts";
 import { NurturingUserErasureService } from "../../services/nurturing-user-erasure.service.ts";
@@ -78,6 +79,7 @@ function nurturingOverCopies() {
       release: async (key: string) => void seen.delete(key),
     },
     customerIo: NurturingService.create({
+      users: peopleWithEmails(),
       channel: HttpCustomerIoChannel.create({
         config: { customerIoApiKey: "key", customerIoRegion: "us" },
         fetchFn: customerIoFetch,
@@ -98,6 +100,7 @@ function nurturingOverCopies() {
   });
   const pipeline = buildNurturingPipeline({
     deliver: (input) => delivery.deliver(input),
+    organizationMembers: async () => [],
     guidedTurnFailed: (data) => delivery.deliverGuidedTurnFailed(data),
     usageReportReceived: (input) => delivery.deliverUsageReport(input),
     evaluationsCompleted: async () => undefined,

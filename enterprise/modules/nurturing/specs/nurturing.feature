@@ -68,6 +68,29 @@ Feature: Nurturing sends the signals its owners record
     When a signal is delivered
     Then nothing is claimed and nothing is sent
 
+  # Customer.io runs on multiple identifiers: a profile born with only an id fails every email
+  # automation ("undefined variable: customer.email"). The address is read fresh, never stored.
+  @unit
+  Scenario: Every Customer.io identify carries the person's email, or is not sent
+    Given nurturing sends Customer.io identifies for one person or a batch of members
+    When the user module holds a person's email
+    Then that person's identify carries it, the batch's addresses read in one query
+    And a person with no email, or one the user module does not know, gets no identify
+
+  @unit
+  Scenario: A Customer.io track goes behind an identify that carries the person's email
+    Given a Customer.io track creates the person's profile when none exists
+    When nurturing tracks an event for a person
+    Then the same request first identifies them with their email
+    And a person with no email is tracked nothing
+
+  @unit
+  Scenario: A Customer.io track is held back when its identify is not taken
+    Given a Customer.io track for a person with an email
+    When Customer.io does not take the identify
+    Then the track is not sent
+    And an OrThrow caller is rejected with the failure, while a fire-and-forget caller resolves and reports it
+
   @unit
   Scenario: A Customer.io outage is logged and the delivery completes
     Given Customer.io answers every call with a server error
@@ -265,7 +288,7 @@ Feature: Nurturing sends the signals its owners record
   Scenario: A minted account is identified to PostHog and Customer.io, with no signed_up
     Given user records "lw.user.created" for an account minted by any path
     When the fact is delivered, once or many times
-    Then PostHog and Customer.io each learn the person once, the address and name read fresh from UserApi
+    Then PostHog and Customer.io each learn the person once, the address, name and first name read fresh from UserApi
     And no signed_up milestone is tracked
 
   @unit
@@ -294,3 +317,15 @@ Feature: Nurturing sends the signals its owners record
     When nurturing's pipeline is built
     Then it tombstones that key for one release
     And the first-trace and trace-received signals still reach nurturing through trace's "projectMetadata" lane, queued beside it under its unchanged key
+
+  @unit
+  Scenario: A sign-up is identified with the first name when the name looks like one
+    Given a person signs up with the name "Jane Doe"
+    When the sign-up is identified to Customer.io
+    Then the person's traits carry first_name "Jane"
+
+  @unit
+  Scenario: A sign-up with an email-like or one-letter name sends no first name
+    Given a person signs up with the name "jane@acme.com", "J", "J Doe", "jdoe42", "j_doe", "jane.doe" or no name at all
+    When the sign-up is identified to Customer.io
+    Then the person's traits carry no first_name

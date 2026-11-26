@@ -252,9 +252,16 @@ export const isSandboxCredentialFault = ({
 }): boolean => credentialFault({ code: presentation.code, toolName }) === "sandbox";
 
 /**
+ * Whether the turn's GitHub connect card speaks for this failure: the sandbox had no GitHub
+ * access, the manager's gate stopped the turn on it, and that card says what to do.
+ */
+export const isAnsweredByGitHubConnectCard = (presentation: LangyToolErrorPresentation): boolean =>
+  presentation.code !== undefined && normalizeCode(presentation.code) === GITHUB_NOT_CONNECTED_CODE;
+
+/**
  * Whether the reader has to act, so the failure keeps its card. A credential failure
  * keeps it on a local tool and folds in the sandbox; an access-denial code, a terminal
- * github-not-connected, 401 or 403 keep it. A terminal not-found folds.
+ * 401 or 403 keep it. A terminal not-found and a missing GitHub connection fold.
  */
 export const readerMustAct = ({
   presentation,
@@ -266,10 +273,10 @@ export const readerMustAct = ({
   const { code, httpStatus, terminal } = presentation;
   const fault = credentialFault({ code, toolName });
   if (fault !== null) return fault === "local";
+  if (isAnsweredByGitHubConnectCard(presentation)) return false;
   const normalised = code === undefined ? undefined : normalizeCode(code);
   if (normalised !== undefined && ACCESS_DENIAL_CODES.has(normalised)) return true;
   if (!terminal) return false;
-  if (normalised === GITHUB_NOT_CONNECTED_CODE) return true;
   return httpStatus !== undefined && ACCESS_STATUSES.has(httpStatus);
 };
 
@@ -415,9 +422,9 @@ function serializedReasons(
 }
 
 /**
- * Rewrites `gh`'s "please run: gh auth login" from the sandbox — telling the customer to log
- * into a machine they cannot open — into the real fix: install the LangWatch GitHub App. Local
- * tools are left alone, since gh's own instruction is correct on the developer's own machine.
+ * Rewrites the sandbox `gh`'s "please run: gh auth login" (a machine the customer cannot open)
+ * into what happened: Langy has no GitHub access. The turn's connect card carries the fix. Local
+ * tools keep gh's words, which are correct on the developer's own machine.
  */
 function githubAppNotInstalled({
   toolName,
@@ -430,22 +437,9 @@ function githubAppNotInstalled({
   if (toolName?.startsWith(LOCAL_TOOL_PREFIX)) return null;
   if (!/\bgh auth login\b/i.test(raw)) return null;
 
-  const copy = explainHandledError({
-    code: GITHUB_NOT_CONNECTED_CODE,
-    meta: {},
-    httpStatus: 409,
-    fault: "customer",
-    retryable: false,
-    tips: [],
-    docsUrl: undefined,
-    traceId: undefined,
-    reasons: [],
-  });
-
   return {
-    title: copy.title,
-    message: copy.description,
-    tips: ["Install it from Settings, under Integrations."],
+    title: "GitHub is not connected",
+    message: "Langy has no GitHub access here, so this step could not run.",
     code: GITHUB_NOT_CONNECTED_CODE,
     terminal: true,
     raw,

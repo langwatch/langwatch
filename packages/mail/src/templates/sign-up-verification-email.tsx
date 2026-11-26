@@ -60,8 +60,5 @@ export const sendSignUpVerificationEmail = async ({
   ...props
 }: SignUpVerificationEmailProps & { mailer: MailSender }) => {
   const { subject, html } = await renderMailTemplate(signUpVerificationEmailTemplate, props);
-  await sendEmail({
-    mailer,
-    content: { to: props.email, subject, html, template: signUpVerificationEmailTemplate.id },
-  });
+  await sendEmail({ mailer, content: { to: props.email, subject, html } });
 };

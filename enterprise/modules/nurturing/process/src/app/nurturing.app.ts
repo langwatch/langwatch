@@ -5,9 +5,6 @@ import {
   nurturingSecrets,
   type NurturingServerConfig,
   type NurturingSignal,
-  type TransactionalEmail,
-  type TransactionalEmailOutcome,
-  transactionalEmailSchema,
 } from "@langwatch/enterprise-nurturing-contract";
 import type { EventingCommands } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
@@ -33,7 +30,6 @@ import { NurturingMemberFactsService } from "../services/nurturing-member-facts.
 import { NurturingMilestonesService } from "../services/nurturing-milestones.service.ts";
 import { NurturingOrganizationCreatedService } from "../services/nurturing-organization-created.service.ts";
 import { NurturingOrganizationUsageService } from "../services/nurturing-organization-usage.service.ts";
-import { NurturingTransactionalEmailService } from "../services/nurturing-transactional-email.service.ts";
 import { NurturingUserErasureService } from "../services/nurturing-user-erasure.service.ts";
 import { NurturingService } from "../services/nurturing.service.ts";
 
@@ -58,7 +54,6 @@ export class NurturingModule implements NurturingApi {
   readonly #delivery: NurturingDeliveryService;
   readonly #organizationUsage: NurturingOrganizationUsageService | undefined;
   readonly #organizationCreated: NurturingOrganizationCreatedService | undefined;
-  readonly #transactionalEmail: NurturingTransactionalEmailService;
   #commands: EventingCommands<NurturingPipeline> | undefined;
 
   private constructor({
@@ -66,19 +61,16 @@ export class NurturingModule implements NurturingApi {
     delivery,
     organizationUsage,
     organizationCreated,
-    transactionalEmail,
   }: Readonly<{
     pipeline: NurturingPipeline;
     delivery: NurturingDeliveryService;
     organizationUsage: NurturingOrganizationUsageService | undefined;
     organizationCreated: NurturingOrganizationCreatedService | undefined;
-    transactionalEmail: NurturingTransactionalEmailService;
   }>) {
     this.#pipeline = pipeline;
     this.#delivery = delivery;
     this.#organizationUsage = organizationUsage;
     this.#organizationCreated = organizationCreated;
-    this.#transactionalEmail = transactionalEmail;
   }
 
   static async create({
@@ -88,7 +80,7 @@ export class NurturingModule implements NurturingApi {
     resources,
   }: NurturingSetup): Promise<NurturingModule> {
     const customerIo = channels.customerIo
-      ? NurturingService.create({ channel: channels.customerIo })
+      ? NurturingService.create({ channel: channels.customerIo, users: dependencies.users })
       : void 0;
     const { posthog } = channels;
     if (posthog) resources.own("Nurturing PostHog client", () => posthog.close());
@@ -187,6 +179,8 @@ export class NurturingModule implements NurturingApi {
     return new NurturingModule({
       pipeline: buildNurturingPipeline({
         deliver: (input) => delivery.deliver(input),
+        organizationMembers: async (organizationId) =>
+          (await dependencies.organizations.getAllMembers({ organizationId })).map(({ id }) => id),
         guidedTurnFailed: (data) => delivery.deliverGuidedTurnFailed(data),
         usageReportReceived: (input) => delivery.deliverUsageReport(input),
         evaluationsCompleted: (input) => milestones.evaluationsCompleted(input),
@@ -203,10 +197,6 @@ export class NurturingModule implements NurturingApi {
       delivery,
       organizationUsage,
       organizationCreated,
-      transactionalEmail: NurturingTransactionalEmailService.create({
-        channel: channels.customerIoTransactional,
-        users: dependencies.users,
-      }),
     });
   }
 
@@ -264,10 +254,6 @@ export class NurturingModule implements NurturingApi {
       occurredAt: signal.occurredAt,
       signal,
     });
-  }
-
-  sendTransactionalEmail(email: TransactionalEmail): Promise<TransactionalEmailOutcome> {
-    return this.#transactionalEmail.send(transactionalEmailSchema.parse(email));
   }
 
   /** The nurturing pipeline this module registers, built once by {@link create}. */

@@ -4,6 +4,8 @@ export type LangWatchQLPlacement = Readonly<{
   recordedPrivate: boolean;
   /** The router resolved one of its private routes, rather than the shared server. */
   routedPrivately: boolean;
+  /** The organisation whose private route it resolved; null on the shared server. */
+  organizationId: string | null;
   /** The credential-free origin of the server its rows resolve to; null where there is none. */
   origin: string | null;
 }>;

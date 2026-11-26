@@ -26,6 +26,7 @@ function declaringScenarios(queued: QueueSimulationRunInput[]): ScenarioApi {
         scenarioVersion: 1,
       }));
     },
+    assertSimulationRunAllowed: async () => {},
     queueSimulationRun: async (input) => {
       queued.push(input);
     },
@@ -41,6 +42,7 @@ function execute(
       startSuiteRun: async () => {
         tracking.started = true;
       },
+      completeSuiteRunItem: async () => {},
     },
     scenarios: declaringScenarios(tracking.queued),
   });

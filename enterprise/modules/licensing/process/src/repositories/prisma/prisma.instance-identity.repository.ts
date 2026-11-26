@@ -76,8 +76,8 @@ export class PrismaInstanceIdentityRepository implements InstanceIdentityReposit
   }
 
   /**
-   * One statement on the fixed key, which Prisma runs as Postgres's native
-   * `INSERT ... ON CONFLICT (id) DO UPDATE`: racing first writes land on one row.
+   * Prisma's upsert reads, then inserts, so a racing first write can lose the primary key with
+   * P2002. The row then exists, and the second attempt takes the update branch.
    */
   private async upsertRow({
     instanceIdIfMissing,
@@ -86,11 +86,18 @@ export class PrismaInstanceIdentityRepository implements InstanceIdentityReposit
     instanceIdIfMissing: string;
     data: RowWrite;
   }): Promise<void> {
-    await this.prisma.instanceIdentity.upsert({
-      where: { id: ROW_ID },
-      create: { id: ROW_ID, instanceId: instanceIdIfMissing, ...data },
-      update: data,
-    });
+    const upsert = () =>
+      this.prisma.instanceIdentity.upsert({
+        where: { id: ROW_ID },
+        create: { id: ROW_ID, instanceId: instanceIdIfMissing, ...data },
+        update: data,
+      });
+    try {
+      await upsert();
+    } catch (error) {
+      if ((error as { code?: unknown } | null)?.code !== "P2002") throw error;
+      await upsert();
+    }
   }
 }
 

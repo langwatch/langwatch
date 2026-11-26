@@ -233,7 +233,10 @@ export class SuiteModule implements SuiteApi {
    */
   private static infrastructureOver(input: {
     agents: Pick<AgentApiType, "getPresence">;
-    scenarios: Pick<ScenarioApiType, "resolveRunParametersForScenarios" | "queueSimulationRun">;
+    scenarios: Pick<
+      ScenarioApiType,
+      "assertSimulationRunAllowed" | "resolveRunParametersForScenarios" | "queueSimulationRun"
+    >;
     commands: SuiteRunCommands;
     resolveRunModels?: SuiteRunModelsResolver;
     resolveRunEvaluators?: SuiteRunEvaluatorsResolver;
@@ -706,7 +709,8 @@ export interface SuiteExecution {
   }): Promise<SuiteRunResult>;
 }
 
-/** The suite run's own start command; each scenario run is queued by the scenario owner. */
+/** The suite run's start command, and the item close for a run the cap refused to queue. */
 export interface SuiteRunCommands {
   startSuiteRun(data: StartSuiteRunCommandData): Promise<void>;
+  completeSuiteRunItem(data: CompleteSuiteRunItemCommandData): Promise<void>;
 }
