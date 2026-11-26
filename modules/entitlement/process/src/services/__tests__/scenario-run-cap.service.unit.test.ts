@@ -44,12 +44,15 @@ function serviceOver({
   firstRunAt,
   failing = false,
   clock = () => now,
+  onSettle = () => undefined,
 }: {
   plan: Plan;
   runs: number;
   firstRunAt: number | null;
   failing?: boolean;
   clock?: () => number;
+  /** Runs as pending run keys are settled against the meter, before it answers. */
+  onSettle?: () => void;
 }) {
   const meter = failing ? new UnreachableMeter() : MemoryBillableEventsMeterRepository.create();
   const { startDate } = scenarioRunMonthOf(now);
@@ -69,8 +72,10 @@ function serviceOver({
     },
     hasDeduplicationKey: (input: Parameters<typeof meter.hasDeduplicationKey>[0]) =>
       meter.hasDeduplicationKey(input),
-    findDeduplicationKeys: (input: Parameters<typeof meter.findDeduplicationKeys>[0]) =>
-      meter.findDeduplicationKeys(input),
+    findDeduplicationKeys: (input: Parameters<typeof meter.findDeduplicationKeys>[0]) => {
+      onSettle();
+      return meter.findDeduplicationKeys(input);
+    },
   };
   const service = ScenarioRunCapService.create({
     meter: counting,
@@ -213,6 +218,40 @@ describe("ScenarioRunCapService", () => {
     ).resolves.toBeUndefined();
     await expect(
       service.assertRunAllowed({ organizationId: "org-1", runKey: runKey("failed") }),
+    ).rejects.toMatchObject({
+      code: "resource_limit_exceeded",
+      meta: { limitType: "scenarioRuns", current: 100, max: 100 },
+    });
+  });
+
+  /** @scenario A queued run that never starts frees its slot */
+  it("still counts a pending run whose start reaches the meter while the count is read", async () => {
+    let at = now;
+    let meteredA = () => undefined as void;
+    const { service, meter } = serviceOver({
+      plan: free,
+      runs: 99,
+      firstRunAt: now - 20 * DAY_MS,
+      clock: () => at,
+      onSettle: () => meteredA(),
+    });
+    const runKey = (id: string) => ({ projectId: "project-1", deduplicationKey: `key-${id}` });
+    await service.assertRunAllowed({ organizationId: "org-1", runKey: runKey("a") });
+    meteredA = () => {
+      meteredA = () => undefined;
+      meter.rows.push({
+        organizationId: "org-1",
+        tenantId: "project-1",
+        eventId: "run-a",
+        eventType: STARTED,
+        deduplicationKey: "key-a",
+        eventTimestamp: at,
+      });
+    };
+    at = now + 31_000;
+
+    await expect(
+      service.assertRunAllowed({ organizationId: "org-1", runKey: runKey("b") }),
     ).rejects.toMatchObject({
       code: "resource_limit_exceeded",
       meta: { limitType: "scenarioRuns", current: 100, max: 100 },

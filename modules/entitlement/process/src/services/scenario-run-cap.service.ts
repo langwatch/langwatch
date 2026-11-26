@@ -174,6 +174,8 @@ export class ScenarioRunCapService {
     if (cached && isFresh && firstKnown) {
       return { runs: known.meterRuns + pending.size, firstRunAt: firstKnown };
     }
+    // Settled before the count: a run metered in between is then counted twice, never dropped.
+    await this.#settlePending({ organizationId, pending, now });
     const [meterRuns, firstRunAt] = await Promise.all([
       this.deps.meter.countEventType({ organizationId, ...RUN_STARTS, startDate, endDate }),
       firstKnown !== undefined
@@ -181,7 +183,6 @@ export class ScenarioRunCapService {
         : this.deps.meter.findFirstEventAt({ organizationId, ...RUN_STARTS }),
     ]);
     if (firstRunAt !== null) this.#firstRuns.set(organizationId, firstRunAt);
-    await this.#settlePending({ organizationId, pending, now });
     this.#monthRuns.set(organizationId, {
       month,
       meterRuns,
