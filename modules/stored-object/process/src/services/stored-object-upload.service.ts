@@ -236,9 +236,8 @@ export class StoredObjectUploadService {
     now: Instant;
     retainFromMs: number | undefined;
   }): Instant {
-    if (retainFromMs === undefined || !Number.isFinite(retainFromMs)) return now;
-    if (retainFromMs >= now.epochMilliseconds) return now;
-
+    const usable = retainFromMs !== undefined && Number.isFinite(retainFromMs);
+    if (!usable || retainFromMs >= now.epochMilliseconds) return now;
     return Temporal.Instant.fromEpochMilliseconds(Math.trunc(retainFromMs));
   }
 

@@ -164,7 +164,15 @@ Feature: Stored-object reuse by content and owner-linked retention
   Scenario: A re-time during the sweep still lets the sweep delete the object
     Given an object whose ended link the sweep found while another owner still held it
     When a retention change ends that other link before the sweep removes the ended links
-    Then the sweep deletes the object in the same run
+    Then the object keeps one ended link, never none
+    And the next sweep deletes the object and removes its links
+
+  @unit
+  Scenario: A sweep that fails before deleting an object never strands it
+    Given an object whose only link has ended
+    When the sweep fails while deleting the object
+    Then the object keeps its ended link, so it is never left available with no link
+    And the next sweep deletes the object
 
   # ===========================================================================
   # Retention changes

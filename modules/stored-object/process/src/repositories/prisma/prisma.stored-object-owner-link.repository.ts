@@ -125,8 +125,25 @@ export class PrismaStoredObjectOwnerLinkRepository implements StoredObjectOwnerL
     tenantId: StoredObjectProjectId;
     objectIds: readonly StoredObjectId[];
     before: Instant;
+    keepingLastLink?: boolean;
   }): Promise<number> {
     if (input.objectIds.length === 0) return 0;
+    if (input.keepingLastLink === true) {
+      // A live link the statement's snapshot sees is not ended, so it is never removed here.
+      return this.prisma.$executeRaw`
+        DELETE FROM "StoredObjectOwner" AS l
+         WHERE l."tenantId" = ${input.tenantId}
+           AND l."objectId" = ANY(${[...input.objectIds]}::text[])
+           AND l."retainUntil" <= ${toDate(input.before)}
+           AND EXISTS (
+             SELECT 1
+               FROM "StoredObjectOwner" AS live
+              WHERE live."tenantId" = l."tenantId"
+                AND live."objectId" = l."objectId"
+                AND (live."retainUntil" IS NULL OR live."retainUntil" > ${toDate(input.before)})
+           )
+      `;
+    }
     const { count } = await this.prisma.storedObjectOwner.deleteMany({
       where: {
         tenantId: input.tenantId,

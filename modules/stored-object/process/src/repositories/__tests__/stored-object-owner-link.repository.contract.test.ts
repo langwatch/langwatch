@@ -247,6 +247,29 @@ describe.each(backends)(
         expect(ended).not.toContain(ACME);
       });
 
+      /** @scenario "A re-time during the sweep still lets the sweep delete the object" */
+      it("keeps every ended link of an object no live link holds when asked to keep the last", async () => {
+        const repository = create();
+        const SECOND = "so_cccccccc" as StoredObjectId;
+        await repository.raise(link({ ownerId: "t1", retainUntil: day(1) }));
+        await repository.raise(link({ ownerId: "t2", retainUntil: day(9) }));
+        await repository.raise(link({ objectId: SECOND, ownerId: "t1", retainUntil: day(1) }));
+
+        await expect(
+          repository.deleteExpired({
+            tenantId: ACME,
+            objectIds: [OBJECT, SECOND],
+            before: day(2),
+            keepingLastLink: true,
+          }),
+        ).resolves.toBe(1);
+        const left = await repository.findExpired({ tenantId: ACME, before: day(100), limit: 10 });
+        expect(left.map((value) => [value.objectId, value.ownerId])).toEqual([
+          [OBJECT, "t2"],
+          [SECOND, "t1"],
+        ]);
+      });
+
       /** @scenario "The sweep's tenant list starts with the longest-waiting ended link" */
       it("lists the tenant whose ended link waited longest first, whatever its id", async () => {
         const repository = create();

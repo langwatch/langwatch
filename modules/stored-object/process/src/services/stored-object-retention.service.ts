@@ -158,42 +158,48 @@ export class StoredObjectRetentionService {
       limit: input.pageSize,
     });
     const objectIds = [...new Set(page.map((link) => link.objectId))];
-    let deletedObjects = 0;
+    const gone: StoredObjectId[] = [];
     const held: StoredObjectId[] = [];
-    const settled: StoredObjectId[] = [];
+    let deletedObjects = 0;
     for (const id of objectIds) {
+      const query = { tenantId: input.tenantId, id };
       // A failed object keeps its links for the next run; the rest of the page goes on.
       try {
-        if (await this.#deleteIfUnheld({ tenantId: input.tenantId, id, now: input.now })) {
+        if (await this.#deleteIfUnheld({ ...query, now: input.now })) {
           deletedObjects += 1;
+          gone.push(id);
         } else {
-          held.push(id);
+          ((await this.#isAvailable(query)) ? held : gone).push(id);
         }
-        settled.push(id);
       } catch (error) {
         input.failures.push(error);
       }
     }
+    const { tenantId, now: before } = input;
     const removedLinks =
-      settled.length === 0
-        ? 0
-        : await this.options.ownerLinks.deleteExpired({
-            tenantId: input.tenantId,
-            objectIds: settled,
-            before: input.now,
-          });
-    // A retime between the check and the delete can end a held object's last link: ask again.
-    for (const id of held) {
-      try {
-        if (await this.#deleteIfUnheld({ tenantId: input.tenantId, id, now: input.now })) {
-          deletedObjects += 1;
-        }
-      } catch (error) {
-        input.failures.push(error);
-      }
-    }
+      (await this.options.ownerLinks.deleteExpired({ tenantId, objectIds: gone, before })) +
+      // A retime after the check may have ended every link: one stays, so a later pass finds it.
+      (await this.options.ownerLinks.deleteExpired({
+        tenantId,
+        objectIds: held,
+        before,
+        keepingLastLink: true,
+      }));
 
-    return { removedLinks, deletedObjects, isFull: page.length >= input.pageSize };
+    return {
+      removedLinks,
+      deletedObjects,
+      isFull: page.length >= input.pageSize,
+    };
+  }
+
+  async #isAvailable(input: {
+    tenantId: StoredObjectProjectId;
+    id: StoredObjectId;
+  }): Promise<boolean> {
+    const row = await this.options.records.findById(input);
+
+    return row?.status === "available";
   }
 
   #elapsedMs(startedAt: Instant): number {

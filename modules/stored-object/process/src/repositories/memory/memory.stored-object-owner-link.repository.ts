@@ -108,12 +108,21 @@ export class MemoryStoredObjectOwnerLinkRepository implements StoredObjectOwnerL
     tenantId: StoredObjectProjectId;
     objectIds: readonly StoredObjectId[];
     before: Instant;
+    keepingLastLink?: boolean;
   }): Promise<number> {
+    const isHeld = (objectId: StoredObjectId) =>
+      [...this.#links.values()].some(
+        (link) =>
+          link.tenantId === input.tenantId &&
+          link.objectId === objectId &&
+          !hasEndedBy({ link, before: input.before }),
+      );
+    const removable = input.objectIds.filter((id) => !input.keepingLastLink || isHeld(id));
     let deleted = 0;
     for (const [linkKey, link] of this.#links) {
       if (
         link.tenantId === input.tenantId &&
-        input.objectIds.includes(link.objectId) &&
+        removable.includes(link.objectId) &&
         hasEndedBy({ link, before: input.before })
       ) {
         this.#links.delete(linkKey);
