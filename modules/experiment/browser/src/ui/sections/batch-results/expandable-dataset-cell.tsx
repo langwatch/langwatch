@@ -48,7 +48,7 @@ export function ExpandableDatasetCell({
   const [isExpanded, setIsExpanded] = useState(false);
   const [hasCopied, setHasCopied] = useState(false);
   const cellRef = useRef<HTMLDivElement>(null);
-  const { isRevealed, revealHandlers } = useHoverReveal();
+  const { isRevealed, revealHandlers } = useHoverReveal({ onExpand: () => handleExpand() });
   const [expandedPosition, setExpandedPosition] = useState({
     top: 0,
     left: 0,
@@ -188,8 +188,9 @@ export function ExpandableDatasetCell({
       <Box
         ref={cellRef}
         position="relative"
-        css={{ "&:hover .cell-action-btn": { opacity: 1 } }}
+        css={{ "&:hover .cell-action-btn, &:focus-within .cell-action-btn": { opacity: 1 } }}
         {...revealHandlers}
+        aria-label={`${columnName} value, press Enter to expand`}
       >
         <VStack align="stretch" height="100%" gap={0}>
           {isRevealed && renderCopyButton(false)}

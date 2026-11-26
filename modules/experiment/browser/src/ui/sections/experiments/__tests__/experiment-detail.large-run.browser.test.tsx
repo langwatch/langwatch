@@ -65,7 +65,7 @@ const answered = (data: unknown) => ({
   refetch: vi.fn(),
 });
 
-/** Every read the page makes, answered from the fixtures above; a read not listed has no data. */
+/** Every read the page makes, answered from the fixtures above; an unlisted enabled read throws. */
 const readsByProcedure: Record<string, (input: { runId?: string }) => unknown> = {
   getExperimentBySlugOrId: () => experiment,
   getExperimentBatchEvaluationRuns: () => ({
@@ -83,9 +83,15 @@ const readsByProcedure: Record<string, (input: { runId?: string }) => unknown> =
   getExperimentBatchEvaluationRun: ({ runId }) => (runId === "run-1" ? largeRun : undefined),
 };
 
+const readOf = (procedure: string, input: { runId?: string }): unknown => {
+  const read = readsByProcedure[procedure];
+  if (!read) throw new Error(`experiment page test: no fixture for the ${procedure} read`);
+  return read(input);
+};
+
 const procedureOf = (procedure: string) => ({
   useQuery: (input: { runId?: string }, options?: { enabled?: boolean }) =>
-    answered(options?.enabled === false ? undefined : readsByProcedure[procedure]?.(input)),
+    answered(options?.enabled === false ? undefined : readOf(procedure, input)),
   useMutation: () => ({ mutate: vi.fn(), mutateAsync: vi.fn(), isPending: false }),
   useSubscription: () => undefined,
 });
@@ -173,7 +179,14 @@ describe("the results page of a large run", () => {
       scroller!.scrollTop = scroller!.scrollHeight / 2;
       scroller!.dispatchEvent(new Event("scroll"));
 
-      await waitFor(() => expect(container.querySelector('tbody tr[data-index="0"]')).toBeNull());
+      await waitFor(() => {
+        expect(container.querySelector('tbody tr[data-index="0"]')).toBeNull();
+        const indexes = [...drawnRows(container)].map((row) =>
+          Number(row.getAttribute("data-index")),
+        );
+        expect(indexes.some((index) => index > 500)).toBe(true);
+      });
+      expect(drawnRows(container).length).toBeGreaterThan(0);
       expect(drawnRows(container).length).toBeLessThan(100);
     });
   });

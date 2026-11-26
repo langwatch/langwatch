@@ -168,6 +168,25 @@ describe("BatchTargetCell", () => {
       expect(screen.getByTestId("copy-output-target-1")).toBeInTheDocument();
     });
 
+    /** @scenario "A results cell draws its actions only once it is pointed at" */
+    it("draws its actions on keyboard focus and expands on Enter", async () => {
+      const user = userEvent.setup();
+      renderWithDesignSystem(
+        <BatchTargetCell
+          targetOutput={createTargetOutput({ output: { output: "x\n".repeat(400) }, cost: 0.05 })}
+        />,
+      );
+
+      await user.tab();
+
+      expect(screen.getByTestId("target-cell-target-1")).toHaveFocus();
+      expect(screen.getByTestId("copy-output-target-1")).toBeInTheDocument();
+
+      await user.keyboard("{Enter}");
+
+      expect(screen.getByTestId("expanded-cell-backdrop")).toBeInTheDocument();
+    });
+
     /** @scenario "A collapsed results cell draws only the start of a long output" */
     it("draws a short preview collapsed, the full value expanded, and copies all of it", async () => {
       const pages = Array.from({ length: 400 }, (_, line) => `| ${line} | record ${line} |`);

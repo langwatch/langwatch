@@ -17,7 +17,7 @@ Feature: Experiment pages stay responsive on large runs and many experiments
     Given a target output and a dataset value of several pages each
     When the results table renders them collapsed
     Then each cell draws at most a short preview of its value
-    And expanding the cell draws the full value
+    And expanding the cell draws the first 10,000 characters, with a "(truncated)" indicator when there are more
     And copying the cell copies the full value
 
   @integration
@@ -26,6 +26,7 @@ Feature: Experiment pages stay responsive on large runs and many experiments
     When the results table renders it and nothing has pointed at it
     Then the cell draws no cost, latency, trace or copy action
     And pointing at the cell draws them
+    And moving keyboard focus to the cell draws them too, and Enter expands it
 
   @unit
   Scenario: A collapsed preview stops at the line or character budget of its row height

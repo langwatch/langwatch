@@ -31,6 +31,7 @@ import type { BatchEvaluatorResult, BatchTargetOutput } from "../batch-evaluatio
 import {
   type BatchCellFailure,
   type DescribeBatchCellFailure,
+  expandedPositionOf,
   formatLatency,
   type RenderBatchEvaluatorResult,
   type RenderTracePeek,
@@ -91,19 +92,6 @@ const cellFailureOf = ({
   if (described) return described;
   const { error } = targetOutput;
   return error ? { title: error, description: "", raw: error } : null;
-};
-
-/**
- * Where the expanded overlay opens: over this value's own position (a diff-mode td holds
- * several values), at least the td's width, and pulled left rather than past the viewport.
- */
-const expandedPositionOf = (cell: HTMLDivElement) => {
-  const rect = cell.getBoundingClientRect();
-  const tdWidth = cell.closest("td")?.getBoundingClientRect().width ?? rect.width;
-  const width = Math.max(rect.width, tdWidth) + 24;
-  const safetyMargin = 32;
-  const maxLeft = window.innerWidth - width - safetyMargin;
-  return { top: rect.top, left: Math.min(rect.left - 12, maxLeft), width };
 };
 
 const useExpandedCell = () => {
@@ -501,7 +489,7 @@ export function BatchTargetCell({
   ...rest
 }: BatchTargetCellProps) {
   const { cellRef, isExpanded, position, expand, close } = useExpandedCell();
-  const { isRevealed, revealHandlers } = useHoverReveal();
+  const { isRevealed, revealHandlers } = useHoverReveal({ onExpand: expand });
   // {output: "hello"} reads "hello"; {pizza: false} reads as formatted JSON.
   const output = formatTargetOutput(targetOutput.output);
   const { hasCopied, copy } = useCopyText(output);
@@ -535,8 +523,9 @@ export function BatchTargetCell({
         position="relative"
         align="stretch"
         gap={2}
-        css={{ "&:hover .cell-action-btn": { opacity: 1 } }}
+        css={{ "&:hover .cell-action-btn, &:focus-within .cell-action-btn": { opacity: 1 } }}
         {...revealHandlers}
+        aria-label={`Result for ${targetOutput.targetId}, press Enter to expand`}
         data-testid={`target-cell-${targetOutput.targetId}`}
       >
         <CellBody {...body} expanded={false} showActions={isRevealed} />

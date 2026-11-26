@@ -32,11 +32,11 @@ export const evaluationsListRowOf = (
   workbenchState: workbenchTaskOf(experiment.workbenchState),
 });
 
-/** A saved workbench state reduced to its task; null when the experiment has none. */
+/** A saved workbench state reduced to its task; null when the state is empty or falsy. */
 const workbenchTaskOf = (
   state: Experiment["workbenchState"],
 ): ExperimentEvaluationsListRow["workbenchState"] => {
-  if (state === null || state === undefined) return null;
+  if (!state) return null;
   if (typeof state !== "object" || Array.isArray(state)) return {};
   return typeof state.task === "string" ? { task: state.task } : {};
 };

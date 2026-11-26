@@ -48,7 +48,7 @@ Feature: Batch Evaluation Results Visualization
     Then images are rendered inline in the dataset cells
     And images have appropriate max dimensions for the table
 
-  @unimplemented
+  @integration
   Scenario: Truncate long text in dataset cells
     Given a dataset cell contains text longer than 10000 characters
     When the results table renders
