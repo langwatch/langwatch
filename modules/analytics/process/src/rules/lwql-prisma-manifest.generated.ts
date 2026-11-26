@@ -2722,6 +2722,15 @@ export interface LwqlPrismaRows {
     readonly createdAt: "DateTime";
     readonly updatedAt: "DateTime";
   };
+  readonly StoredObjectOwner: {
+    readonly tenantId: "String";
+    readonly objectId: "String";
+    readonly ownerKind: "String";
+    readonly ownerId: "String";
+    readonly retainUntil: "DateTime?";
+    readonly createdAt: "DateTime";
+    readonly updatedAt: "DateTime";
+  };
   readonly DiscoveredPerson: {
     readonly id: "String";
     readonly organizationId: "String";

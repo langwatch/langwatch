@@ -222,7 +222,7 @@ Public: an <img> fires with no credential; every address is fenced by the SSRF e
 Answers at `/api/image-proxy`.
 
 ```typescript
-// Query: imageProxyQuerySchema, ../contract/src/stored-object-file-route.ts:108
+// Query: imageProxyQuerySchema, ../contract/src/stored-object-file-route.ts:113
 interface Query {
   url?: string;
 }

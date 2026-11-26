@@ -243,5 +243,4 @@ export class TraceMediaExtractionService {
 
     return stored;
   }
-
 }
