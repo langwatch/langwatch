@@ -5,7 +5,7 @@
  */
 
 import { Box, Link as ChakraLink, Text } from "@langwatch/design-system/primitives";
-import type { ReactNode } from "react";
+import type { CSSProperties, PointerEventHandler, ReactNode } from "react";
 
 import { useAnalyticsHost } from "../../../../model/analytics-host.ts";
 import { opensElsewhere } from "../../../../ui/elements/analytics-link.tsx";
@@ -53,6 +53,26 @@ const MENU_ROW = {
   },
 };
 
+/**
+ * A row the reader may drag: the list's sortable ref and motion, the pointer start on the whole
+ * row, and the keyboard `handle`, drawn over the icon while the row is hovered or the handle has
+ * focus.
+ */
+export type SidebarRowDrag = {
+  ref: (node: HTMLElement | null) => void;
+  style: CSSProperties;
+  onPointerDown: PointerEventHandler<HTMLElement> | undefined;
+  handle: ReactNode;
+};
+
+/** The handle replaces the icon while the row is hovered, or while the handle has focus. */
+const DRAG_ROW = {
+  "&:hover [data-row-icon], &:has([data-drag-handle]:focus-visible) [data-row-icon]": {
+    opacity: 0,
+  },
+  "&:hover [data-drag-handle], & [data-drag-handle]:focus-visible": { opacity: 1 },
+};
+
 /** The name edited in place: Enter or leaving the field saves it, Escape cancels. */
 export type SidebarRowRenaming = { onCommit: (name: string) => void; onCancel: () => void };
 
@@ -64,6 +84,7 @@ export function SidebarLinkRow({
   isActive = false,
   menu,
   renaming,
+  drag,
 }: {
   name: string;
   href: string;
@@ -76,6 +97,8 @@ export function SidebarLinkRow({
   /** A board's `BoardMenu`, beside the link rather than in it, so opening it never navigates. */
   menu?: ReactNode;
   renaming?: SidebarRowRenaming | undefined;
+  /** Makes the row draggable in a sortable list; absent on a row that stays in place. */
+  drag?: SidebarRowDrag | undefined;
 }) {
   if (renaming) {
     return (
@@ -91,9 +114,16 @@ export function SidebarLinkRow({
       </Box>
     );
   }
+  const { handle, ...dragRow } = drag ?? {};
+  const css = { ...(menu ? MENU_ROW.css : {}), ...(drag ? DRAG_ROW : {}) };
   return (
-    <Box as="li" listStyleType="none" width="full" position="relative" {...(menu ? MENU_ROW : {})}>
+    <Box as="li" listStyleType="none" width="full" position="relative" css={css} {...dragRow}>
       <RowLink name={name} href={href} icon={icon} iconTitle={iconTitle} isActive={isActive} />
+      {handle && (
+        <Box position="absolute" top={0} bottom={0} left="4px" display="flex" alignItems="center">
+          {handle}
+        </Box>
+      )}
       {menu && (
         <Box position="absolute" top={0} bottom={0} right={1} display="flex" alignItems="center">
           {menu}
@@ -136,6 +166,8 @@ function RowLink({
           flexShrink={0}
           color={sidebarRowIconColor({ isActive })}
           title={iconTitle}
+          transition="opacity 0.15s"
+          data-row-icon=""
           aria-hidden
         >
           {icon}
