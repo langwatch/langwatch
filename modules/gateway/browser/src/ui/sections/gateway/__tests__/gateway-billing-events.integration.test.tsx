@@ -175,9 +175,7 @@ describe("BillingEventsPage", () => {
       isFetching: false,
     });
     renderPage();
-    expect(screen.getByTestId("billing-events-table")).toHaveTextContent(
-      "Own model",
-    );
+    expect(screen.getByTestId("billing-events-table")).toHaveTextContent("Own model");
   });
 
   /** @scenario A spend row with no virtual key and the pii redaction request type reads as PII redaction */
