@@ -24,6 +24,7 @@ import type {
   ModelDefaultScope,
   ModelDefaultSnapshot,
   ModelProvider,
+  ModelProviderSave,
   ModelProviderAlternateResolution,
   ModelProviderCodexGatewayRefresh,
   ModelProviderCodexGatewayRefreshInput,
@@ -256,13 +257,13 @@ export interface ModelProviderApi {
     input: ModelProviderPlaygroundRequest,
   ): Promise<ModelProviderPlaygroundCompletion>;
   /** Stores or replaces a provider row and answers it with its credentials masked. */
-  upsert(input: ModelProviderWriteRequest, by: ModelProviderCaller): Promise<ModelProvider>;
+  upsert(input: ModelProviderWriteRequest, by: ModelProviderCaller): Promise<ModelProviderSave>;
   /**
    * The write a project credential makes, which names no person to attribute
    * it to and no person to authorize it against: the key's own project
    * permission is the whole gate. Answers the row with its credentials masked.
    */
-  upsertUnattributed(input: ModelProviderWriteRequest): Promise<ModelProvider>;
+  upsertUnattributed(input: ModelProviderWriteRequest): Promise<ModelProviderSave>;
   delete(input: ModelProviderDeleteRequest, by: ModelProviderCaller): Promise<void>;
   /**
    * Probes a credential the caller supplied, after checking they may write
