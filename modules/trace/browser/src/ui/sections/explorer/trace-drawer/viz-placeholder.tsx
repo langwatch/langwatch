@@ -175,6 +175,10 @@ const TABS: VizTabDef[] = [
   },
 ];
 
+const TABS_WITHOUT_AGENTS = TABS.filter((t) => t.value !== "agents");
+const TAB_IDS = TABS.map((t) => t.value);
+const TAB_IDS_WITHOUT_AGENTS = TABS_WITHOUT_AGENTS.map((t) => t.value);
+
 /**
  * The tab row. When the container is too narrow for every tab, the ones that
  * would clip fold into an overflow menu after the visible tabs.
@@ -191,8 +195,8 @@ function VizTabStrip({
   showsAgents: boolean;
 }) {
   const tabScrollerRef = useRef<HTMLDivElement>(null);
-  const tabs = showsAgents ? TABS : TABS.filter((t) => t.value !== "agents");
-  const tabIds = tabs.map((t) => t.value);
+  const tabs = showsAgents ? TABS : TABS_WITHOUT_AGENTS;
+  const tabIds = showsAgents ? TAB_IDS : TAB_IDS_WITHOUT_AGENTS;
   const hiddenTabIds = useOverflowVisibility({
     scrollerRef: tabScrollerRef,
     items: tabIds,

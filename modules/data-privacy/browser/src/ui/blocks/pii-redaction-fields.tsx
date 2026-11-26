@@ -138,6 +138,7 @@ export function PiiRedactionFields({
           level={effectiveLevel}
           free={piiRedactionModelOffer.free}
           licensed={piiRedactionModelOffer.licensed}
+          split={piiRedactionModelOffer.split}
         />
       )}
       {piiRedactionModelOffer?.kind === "rule-based" && effectiveLevel === "strict" && (

@@ -164,6 +164,37 @@ describe("useProviderFormSubmit()", () => {
     vi.clearAllMocks();
   });
 
+  describe("given the save is refused because the base URL is not allowed", () => {
+    /** @scenario "A save refused for its base URL says why in the form" */
+    it("shows why beside the credential fields instead of failing silently", async () => {
+      mockUpdateMutateAsync.mockRejectedValueOnce({
+        data: {
+          error: {
+            code: "model_provider_invalid",
+            httpStatus: 400,
+            meta: { reason: "endpoint_not_allowed", refusal: "cloud_internal_domain" },
+          },
+        },
+      });
+      const { result } = renderSubmitHook({
+        snapshot: buildSnapshot({ useAsDefaultProvider: false }),
+      });
+
+      await act(async () => {
+        await result.current.submit();
+      });
+
+      expect(result.current.errors.customKeysRoot).toContain("outbound policy");
+      expect(result.current.errors.customKeysRoot).toContain("nothing was saved");
+      expect(result.current.isSaving).toBe(false);
+      expect(mockToasterCreate).not.toHaveBeenCalled();
+
+      act(() => result.current.clearErrors());
+
+      expect(result.current.errors.customKeysRoot).toBeUndefined();
+    });
+  });
+
   describe("given useAsDefaultProvider is true and provider is azure", () => {
     describe("when projectDefaultModel belongs to a different provider (openai/gpt-5.2)", () => {
       beforeEach(async () => {
