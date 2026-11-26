@@ -9,12 +9,19 @@ import { cleanup, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("@langwatch/browser-host/drawer", () => ({ useDrawer: () => ({ openDrawer: vi.fn() }) }));
+const opened = vi.hoisted(() => ({
+  drawer: vi.fn(),
+  targetEditor: vi.fn(),
+  evaluatorMappings: vi.fn(),
+}));
+vi.mock("@langwatch/browser-host/drawer", () => ({
+  useDrawer: () => ({ openDrawer: opened.drawer }),
+}));
 vi.mock("../../../../behavior/experiments-v3/use-open-target-editor.ts", () => ({
-  useOpenTargetEditor: () => ({ openTargetEditor: vi.fn() }),
+  useOpenTargetEditor: () => ({ openTargetEditor: opened.targetEditor }),
 }));
 vi.mock("../../../../behavior/experiments-v3/use-open-evaluator-mappings.ts", () => ({
-  useOpenEvaluatorMappings: () => vi.fn(),
+  useOpenEvaluatorMappings: () => opened.evaluatorMappings,
 }));
 vi.mock("../../../../behavior/experiments-v3/use-prompt-template-fields.ts", () => ({
   usePromptTemplateFields: () => ({}),
@@ -76,7 +83,11 @@ describe("the workbench for a role that cannot change it", () => {
         ),
       ).toBeInTheDocument();
       await userEvent.click(run);
+      // A denied click starts nothing: no run, and no drawer asking for a target or mapping.
       expect(execute).not.toHaveBeenCalled();
+      expect(opened.drawer).not.toHaveBeenCalled();
+      expect(opened.targetEditor).not.toHaveBeenCalled();
+      expect(opened.evaluatorMappings).not.toHaveBeenCalled();
       const notice = screen.getByTestId("workbench-view-only-banner");
       expect(notice).toHaveTextContent(/role can.t run evaluations/i);
       // Saving still works for this role, so the notice does not say edits stay in the tab.

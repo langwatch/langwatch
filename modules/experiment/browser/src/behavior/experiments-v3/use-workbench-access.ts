@@ -12,15 +12,26 @@ const useHostReader = readSlice<WorkflowHostSlice | null>({
   absent: null,
 });
 
-type AccessRefusal = { refused: boolean; markRefused: () => void; reset: () => void };
+type AccessRefusal = {
+  refused: boolean;
+  visit: number;
+  markRefused: ({ visit }: { visit: number }) => void;
+  reset: () => void;
+};
 
-/** Set once the server refused a save for the reader's role; cleared when the page closes. */
+/**
+ * Set once the server refused a save for the reader's role; cleared when the page closes.
+ * A refusal only counts for the visit that sent the save, so a late answer can't carry over.
+ */
 export const useWorkbenchAccessRefusal = defineSlice<AccessRefusal>({
   name: "experiment:workbench-access-refusal",
-  create: (set) => ({
+  create: (set, get) => ({
     refused: false,
-    markRefused: () => set({ refused: true }),
-    reset: () => set({ refused: false }),
+    visit: 0,
+    markRefused: ({ visit }) => {
+      if (get().visit === visit) set({ refused: true });
+    },
+    reset: () => set({ refused: false, visit: get().visit + 1 }),
   }),
 });
 

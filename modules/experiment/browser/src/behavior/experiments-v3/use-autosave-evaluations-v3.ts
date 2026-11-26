@@ -139,17 +139,21 @@ const handleAutosaveFailure = ({
   error,
   snapshot,
   projectId,
+  visit,
 }: {
   analytics: UiAnalytics;
   error: unknown;
   snapshot: string;
   projectId: string | undefined;
+  visit: number;
 }): RefusalOutcome => {
   const state = useEvaluationsV3Store.getState();
   if (isAccessRefusal(error)) {
     // The role, not the edit, is refused: every later save would be too.
+    const refusal = useWorkbenchAccessRefusal.getState();
+    if (refusal.visit !== visit) return "failed";
     state.setAutosaveStatus("evaluation", "idle");
-    useWorkbenchAccessRefusal.getState().markRefused();
+    refusal.markRefused({ visit });
     showErrorToast({ error, fallbackTitle: "Couldn't save the experiment" });
     return "failed";
   }
@@ -255,6 +259,7 @@ const attemptSave = async ({
   // Read when the save starts, so a save queued behind a role refusal sends nothing.
   if (!readWorkbenchAccess().maySave) return "failed";
   if (state.staleWorkbench) return "refused";
+  const { visit } = useWorkbenchAccessRefusal.getState();
   const persisted = buildPersistedState(state);
   const snapshot = JSON.stringify(persisted);
   if (snapshot === lastSavedRef.current) return "unchanged";
@@ -277,6 +282,7 @@ const attemptSave = async ({
       error,
       snapshot,
       projectId,
+      visit,
     });
     if (outcome !== "adopted") return outcome;
     // Retried once only: looping would spin against whoever is actually ahead.

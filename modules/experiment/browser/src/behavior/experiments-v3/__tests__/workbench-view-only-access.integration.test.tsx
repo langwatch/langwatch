@@ -243,6 +243,35 @@ describe("a workbench the reader's role cannot change", () => {
         expect(mocks.mutateAsync).toHaveBeenCalledTimes(1);
         expect(outcomes).toEqual(["failed", "failed"]);
       });
+
+      it("leaves the next visit editable when a refusal from an earlier visit answers late", async () => {
+        let refuse: (error: unknown) => void = () => undefined;
+        mocks.mutateAsync.mockReturnValueOnce(
+          new Promise((_resolve, reject) => {
+            refuse = reject;
+          }),
+        );
+        renderWithDesignSystem(
+          <Wrapper>
+            <AutosaveProbe />
+          </Wrapper>,
+        );
+
+        await editACell("first");
+        let first: Promise<unknown> | undefined;
+        act(() => {
+          first = autosave?.saveNow();
+        });
+        // The reader leaves and opens the workbench again before the server answers.
+        useWorkbenchAccessRefusal.getState().reset();
+        await act(async () => {
+          refuse(liteMemberSaveRefusal());
+          await first;
+        });
+
+        expect(useWorkbenchAccessRefusal.getState().refused).toBe(false);
+        expect(mocks.showErrorToast).not.toHaveBeenCalled();
+      });
     });
   });
 
