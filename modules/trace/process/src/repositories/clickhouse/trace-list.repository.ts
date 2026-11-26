@@ -21,6 +21,7 @@ import {
   type EventMetricValues,
   EVENT_METRIC_SEP,
   latestTraceVersionOnly,
+  TRACE_CONVERSATION_ID_CLICKHOUSE_EXPRESSION,
 } from "@langwatch/trace-contract";
 import { z } from "zod";
 
@@ -350,7 +351,7 @@ export class TraceListClickHouseRepository implements TraceListRepository {
             TenantId,
             Attributes['langwatch.span.name'] AS AttrSpanName,
             Attributes['service.name'] AS AttrServiceName,
-            Attributes['gen_ai.conversation.id'] AS AttrConversationId,
+            ${TRACE_CONVERSATION_ID_CLICKHOUSE_EXPRESSION} AS AttrConversationId,
             Attributes['langwatch.user_id'] AS AttrUserId,
             Attributes['langwatch.origin'] AS AttrOrigin,
             Attributes['langwatch.cost.non_billable'] AS AttrNonBillable,

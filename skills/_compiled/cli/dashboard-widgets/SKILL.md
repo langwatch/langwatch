@@ -30,10 +30,10 @@ Never guess dataset or column names. The schema command lists every view your cr
 ```bash
 langwatch dashboard widget schema -f json > schema.json
 jq -r '.views[] | "\(.name) (\(.timeColumn)): \(.description)"' schema.json
-jq '.views[] | select(.name | endswith(".trace_metrics"))' schema.json
+jq '.views[] | select(.name == "trace_metrics")' schema.json
 ```
 
-Read the view's grain, its time column, and which columns are `available` to you. A view's full name carries the database this deployment serves it from (`langwatch.trace_metrics` on LangWatch Cloud, `analytics.trace_metrics` on some self-hosted installs): write the name exactly as `schema.json` gives it. The examples below use the Cloud spelling. The views most questions need:
+Read the view's grain, its time column, and which columns are `available` to you. Write a view by its bare name, as `schema.json` gives it (`trace_metrics`, never `langwatch.trace_metrics`), so one query runs on LangWatch Cloud and on every self-hosted install. The views most questions need:
 
 - `trace_metrics`: one row per trace with cost, latency, tokens, the user, conversation and `Source` (the origin). Traces, cost, latency and usage questions start here.
 - `evaluation_metrics` and `trace_evaluation_metrics`: evaluation and online evaluation outcomes.
@@ -58,7 +58,7 @@ Every query reads the dashboard's own period: bound the view's time column with 
 [
   {
     "name": "cost_by_model",
-    "sql": "SELECT Model AS model, sum(CostSum) AS cost FROM langwatch.model_usage_by_minute WHERE BucketStart >= {dashboard_context_period_start:DateTime} AND BucketStart < {dashboard_context_period_end:DateTime} GROUP BY model ORDER BY cost DESC LIMIT 10",
+    "sql": "SELECT Model AS model, sum(CostSum) AS cost FROM model_usage_by_minute WHERE BucketStart >= {dashboard_context_period_start:DateTime} AND BucketStart < {dashboard_context_period_end:DateTime} GROUP BY model ORDER BY cost DESC LIMIT 10",
     "parameters": []
   }
 ]
@@ -136,7 +136,7 @@ Creating (and updating) validates the queries file's shape and the widget's JS/T
 
 ## Dashboards and their widgets
 
-A dashboard is the page widgets live on. **Use an existing dashboard** when the user is on one, named one, or one clearly fits; **create one** only when they ask for a new dashboard, or none fits and they agree.
+A dashboard is the page widgets live on. The dashboard the user is on arrives in your context with its id: a chart they ask for there goes on that board, even when they say "now a chart of..." or "another dashboard" without naming one. If they name a different existing dashboard, the chart goes on that one. **Create a board** only when they ask for a separate or new board by name ("make a new dashboard called X"), or they are on no board and none fits. When you do create one, say so in the first line of your reply and name it, so they know where to look.
 
 ```bash
 langwatch dashboard list -f json                          # ids, names, widget counts
@@ -155,7 +155,7 @@ langwatch dashboard widget delete <dashboardId> <widgetId>
 
 `add` places the widget at the dashboard's next free row — edit it from the widget's menu on that dashboard. `langwatch analytics-report list` lists the old Analytics Reports, which hold no widgets.
 
-**Which dashboard:** place on the dashboard in the user's context (the one they are on, or one they named). If no dashboard is in context, ask which one with the `question` tool, one option per dashboard from `langwatch dashboard list` with its id in `ref`. Never choose a dashboard for the user.
+**Which dashboard:** place on the dashboard the user named; if they named none, on the dashboard they are on. If no dashboard is in context, ask which one with the `question` tool, one option per dashboard from `langwatch dashboard list` with its id in `ref`. If that list is empty, create a board named after what they asked for and say so in the first line of your reply. Never choose between existing dashboards for the user.
 
 - **Never pick a dashboard for the user.** When more than one dashboard fits, ask with the `question` tool (a choices card): one option per dashboard from `langwatch dashboard list`, its id in `ref`.
 - **Confirm before any delete** of a dashboard or widget with a choices card (`Delete "NAME"?` with Delete and Keep), and run the command only on Delete. Deleting a dashboard takes its widgets with it.
@@ -218,7 +218,7 @@ export default function Widget() {
 [
   {
     "name": "daily_traces",
-    "sql": "SELECT toStartOfDay(OccurredAt) AS day, uniqExact(TraceId) AS traces FROM langwatch.trace_metrics WHERE OccurredAt >= {dashboard_context_period_start:DateTime} AND OccurredAt < {dashboard_context_period_end:DateTime} AND Source IN {dashboard_context_sources:Array(String)} GROUP BY day ORDER BY day",
+    "sql": "SELECT toStartOfDay(OccurredAt) AS day, uniqExact(TraceId) AS traces FROM trace_metrics WHERE OccurredAt >= {dashboard_context_period_start:DateTime} AND OccurredAt < {dashboard_context_period_end:DateTime} AND Source IN {dashboard_context_sources:Array(String)} GROUP BY day ORDER BY day",
     "parameters": []
   }
 ]

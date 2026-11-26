@@ -27,13 +27,44 @@ export const monitorPerformanceQuerySchema: MonitorPerformanceQuerySchema =
   monitorPerformanceQuerySchemaDefinition;
 export type MonitorPerformanceQuery = z.infer<typeof monitorPerformanceQuerySchema>;
 
-const onlineEvaluationPerformanceSchemaDefinition = z.object({
+/** One label a category evaluator produced, and its part of the period. */
+const labelShareSchemaDefinition = z.object({
+  label: z.string(),
+  count: z.number().int(),
+  /** Fraction of the period's labelled results, 0 to 1. */
+  share: z.number(),
+  /** True for the entry grouping every label past the ones shown. */
+  grouped: z.boolean(),
+});
+export interface LabelShareSchema extends Named<typeof labelShareSchemaDefinition> {}
+export const labelShareSchema: LabelShareSchema = labelShareSchemaDefinition;
+export type LabelShare = z.infer<typeof labelShareSchema>;
+
+const averagedPerformanceSchemaDefinition = z.object({
   monitorId: z.string(),
   metric: z.enum(["score", "pass_rate"]),
   points: z.array(z.number()),
   current: z.number().nullable(),
   previous: z.number().nullable(),
 });
+
+/**
+ * A classifier writes only labels, so its period reads as a distribution.
+ * `current` and `previous` are the leading label's share; `points` stays empty.
+ */
+const labelPerformanceSchemaDefinition = z.object({
+  monitorId: z.string(),
+  metric: z.literal("label"),
+  labels: z.array(labelShareSchema),
+  points: z.array(z.number()),
+  current: z.number().nullable(),
+  previous: z.number().nullable(),
+});
+
+const onlineEvaluationPerformanceSchemaDefinition = z.discriminatedUnion("metric", [
+  averagedPerformanceSchemaDefinition,
+  labelPerformanceSchemaDefinition,
+]);
 export interface OnlineEvaluationPerformanceSchema extends Named<
   typeof onlineEvaluationPerformanceSchemaDefinition
 > {}

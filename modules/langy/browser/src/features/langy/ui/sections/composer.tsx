@@ -1,13 +1,9 @@
 import { useUiDeployment } from "@langwatch/browser-host/capabilities";
 import { Menu } from "@langwatch/design-system/menu";
-import { Box, chakra, HStack, Spinner, Text, Textarea } from "@langwatch/design-system/primitives";
+import { Box, chakra, HStack, Text, Textarea } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { useReducedMotion } from "@langwatch/design-system/use-reduced-motion";
-import {
-  LANGY_ATTACHMENT_MEDIA_TYPES,
-  type LangyAttachment,
-  type LangyTurnPhase,
-} from "@langwatch/langy-contract";
+import { LANGY_ATTACHMENT_MEDIA_TYPES, type LangyAttachment } from "@langwatch/langy-contract";
 import {
   Bot,
   Check,
@@ -25,12 +21,10 @@ import {
   MessagesSquare,
   Plus,
   Send,
-  Square,
   Waypoints,
   Workflow,
   Zap,
 } from "lucide-react";
-import { AnimatePresence, motion } from "motion/react";
 import type React from "react";
 import { memo, useCallback, useEffect, useRef, useState } from "react";
 
@@ -73,7 +67,6 @@ export const COMPOSER_ANCHOR_ATTR = "data-langy-composer";
 
 // The send/stop control crossfades between phases (send ⇄ stop ⇄ stopping)
 // rather than hard-swapping — a small scale+fade keyed on the phase.
-const MotionSwap = motion.create(Box);
 
 // The palette each sigil opens when it is typed at a word boundary. A key
 // outside this map types as the ordinary character it is.
@@ -134,7 +127,7 @@ function useComposerFocusHandoff({
 }
 
 /** While a turn runs and nothing is waiting on the reader. */
-export const MID_TURN_PLACEHOLDER = "Langy is working. You can send when it stops.";
+export const MID_TURN_PLACEHOLDER = "Langy is working. Send a message and it goes next.";
 
 /** While a card is holding the turn for the reader's answer (ADR-129). */
 export const AWAITING_ANSWER_PLACEHOLDER = "Answer the card above to keep going.";
@@ -171,6 +164,7 @@ function ComposerRail({
   onModelChange,
   locked,
   turnActive,
+  attachDisabled,
   onAttach,
 }: {
   hero: boolean;
@@ -181,6 +175,8 @@ function ComposerRail({
   /** Disabled, or a turn is in flight: nothing on the rail can change. */
   locked: boolean;
   turnActive: boolean;
+  /** Images can still be attached mid-turn: a message sent then is queued with them. */
+  attachDisabled: boolean;
   /** Absent where images can't be attached: the rail shows no attach button. */
   onAttach?: (files: readonly File[]) => void;
 }) {
@@ -199,7 +195,7 @@ function ComposerRail({
       // The hero stays bare: see the note on the context summary in ComposerImpl.
       display={hero ? "none" : "flex"}
     >
-      {onAttach ? <AttachImageButton onAttach={onAttach} disabled={locked} /> : null}
+      {onAttach ? <AttachImageButton onAttach={onAttach} disabled={attachDisabled} /> : null}
       <Box flex={1} minWidth={0} />
       <HStack gap={2} flexShrink={0} align="center">
         <LangyModelPill
@@ -261,7 +257,6 @@ function ComposerImpl({
   langyDefaultModel,
   onModelChange,
   onSend,
-  onStop,
   variant = "floating",
   disabled,
   contextChips = [],
@@ -281,9 +276,8 @@ function ComposerImpl({
   /** Model selected by the project's Langy routing configuration. */
   langyDefaultModel?: string | null;
   onModelChange: (model: string) => void;
+  /** Sends, or queues the message while a turn runs; Stop is on the working line. */
   onSend: (input: string) => void;
-  /** Stop the in-flight turn (the panel owns the real backend stop, ADR-078). */
-  onStop: () => void;
   /**
    * Floating is a card; sidebar is already bounded and stays deliberately
    * flat; hero is the home page's, sitting on glass over a moving canvas.
@@ -324,11 +318,8 @@ function ComposerImpl({
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   // The draft subscription lives in ComposerInputRow, NOT here.
   const setDraft = useLangyStore((s) => s.setDraft);
-  // The turn phase is the SINGLE source for the send/stop affordance (ADR-078):
-  // `idle` lets the composer send; `active`/`stopping` disable sending and show
-  // Stop. Gating on the durable phase — not the client stream's flaky isBusy —
-  // is what stops a second send slipping through the instant the first token
-  // arrives and 409-ing the in-flight turn. You can still TYPE the next message.
+  // The turn phase (ADR-078) locks the model and the palettes mid-turn. Send stays: a message
+  // sent then is queued by the panel and goes as the next turn.
   const turnPhase = useLangyStore((s) => s.turnPhase);
   const turnActive = turnPhase !== "idle";
 
@@ -505,7 +496,6 @@ function ComposerImpl({
             awaitingAnswer={awaitingAnswer}
             terminalConnected={terminalConnected}
             onSend={onSend}
-            onStop={onStop}
             openPalette={openPalette}
             onAttach={attachImages}
             textareaRef={textareaRef}
@@ -526,6 +516,7 @@ function ComposerImpl({
             onModelChange={onModelChange}
             locked={disabled || turnActive}
             turnActive={turnActive}
+            attachDisabled={disabled}
             onAttach={attachImages}
           />
         </Box>
@@ -703,7 +694,6 @@ const ComposerInputRow = memo(function ComposerInputRow({
   awaitingAnswer,
   terminalConnected,
   onSend,
-  onStop,
   openPalette,
   onAttach,
   textareaRef,
@@ -714,7 +704,6 @@ const ComposerInputRow = memo(function ComposerInputRow({
   awaitingAnswer: boolean;
   terminalConnected: boolean;
   onSend: (input: string) => void;
-  onStop: () => void;
   openPalette: (mode: PaletteMode) => void;
   onAttach?: (files: readonly File[]) => void;
   textareaRef: React.RefObject<HTMLTextAreaElement | null>;
@@ -732,7 +721,7 @@ const ComposerInputRow = memo(function ComposerInputRow({
   const ranges = markerRangesIn({ text: input, markers: images.filter((image) => image.label) });
   const overlayRef = useRef<HTMLDivElement>(null);
   useDraftImagesFollowText({ text: input });
-  const canSend = turnPhase === "idle" && !!input.trim() && !disabled && imagesAllowSend(images);
+  const canSend = !!input.trim() && !disabled && imagesAllowSend(images);
 
   const onTextareaKeyDown = composerKeyHandler({
     input,
@@ -818,74 +807,10 @@ const ComposerInputRow = memo(function ComposerInputRow({
           <DraftChipsOverlay overlayRef={overlayRef} hero={hero} text={input} ranges={ranges} />
         ) : null}
       </Box>
-      <ComposerSendControl
-        turnPhase={turnPhase}
-        canSend={canSend}
-        onSend={() => onSend(input)}
-        onStop={onStop}
-      />
+      <SubmitTurnButton canSend={canSend} onSend={() => onSend(input)} />
     </HStack>
   );
 });
-
-/**
- * Send, or Stop while a turn is in flight (no queue). Stop persists through
- * the "stopping" window — after the client abort, until the backend confirms
- * the terminal — then flips back to Send.
- */
-function ComposerSendControl({
-  turnPhase,
-  canSend,
-  onSend,
-  onStop,
-}: {
-  turnPhase: LangyTurnPhase;
-  canSend: boolean;
-  onSend: () => void;
-  onStop: () => void;
-}) {
-  const reduceMotion = useReducedMotion();
-  return (
-    <AnimatePresence mode="wait" initial={false}>
-      <MotionSwap
-        key={turnPhase}
-        display="flex"
-        flexShrink={0}
-        initial={reduceMotion ? false : { opacity: 0, scale: 0.7 }}
-        animate={{ opacity: 1, scale: 1 }}
-        exit={reduceMotion ? { opacity: 0 } : { opacity: 0, scale: 0.7 }}
-        transition={{ duration: 0.13, ease: "easeOut" }}
-      >
-        {turnPhase === "idle" ? (
-          <SubmitTurnButton canSend={canSend} onSend={onSend} />
-        ) : (
-          <StopTurnButton isStopping={turnPhase === "stopping"} onStop={onStop} />
-        )}
-      </MotionSwap>
-    </AnimatePresence>
-  );
-}
-
-function StopTurnButton({ isStopping, onStop }: { isStopping: boolean; onStop: () => void }) {
-  return (
-    <SendButton
-      aria-label={isStopping ? "Stopping" : "Stop"}
-      onClick={onStop}
-      disabled={isStopping}
-      background={isStopping ? "bg.muted" : "red.solid"}
-      color={isStopping ? "fg.muted" : "red.contrast"}
-      cursor={isStopping ? "default" : "pointer"}
-    >
-      {isStopping ? (
-        <Spinner size="xs" borderWidth="1.5px" />
-      ) : (
-        // The square is symmetric, so it needs no optical correction —
-        // unlike the plane below.
-        <Square size={12} />
-      )}
-    </SendButton>
-  );
-}
 
 function SubmitTurnButton({ canSend, onSend }: { canSend: boolean; onSend: () => void }) {
   return (

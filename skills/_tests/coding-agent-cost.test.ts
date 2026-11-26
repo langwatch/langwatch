@@ -84,7 +84,8 @@ describe("the coding-agent-cost skill", () => {
       const queries = sqlBlocks(rendered);
       expect(queries.length).toBeGreaterThanOrEqual(4);
       for (const query of queries) {
-        expect(query).toContain("langwatch.coding_session_events");
+        expect(query).toContain("FROM coding_session_events");
+        expect(query).not.toContain("langwatch.coding_session_events");
         expect(query).toContain("TimeUnixMs >= now() - INTERVAL 30 DAY");
       }
     });
