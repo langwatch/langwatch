@@ -361,22 +361,22 @@ Feature: A PII redaction model call is priced per character, written to the spen
       # Stripe forgets an identifier after a day; waiting for the price could count it twice.
 
     @unit
-    Scenario: A pending PII redaction total above the spend the acceptance covers is never sent
+    Scenario: A pending PII redaction total above the spend the acceptance covers is replayed, then corrected down
       Given a PII redaction meter event whose send was cut off before it was confirmed
       And its total is above the spend recorded from the organization's acceptance on
-      When the month is reported
-      Then the pending total is dropped and never sent
-      And the month reports only the spend from the acceptance on, under that total's own identifier
-      And an organization that never accepted sends nothing
-      # A total written by a release that billed without an acceptance (ADR-201 decision 15).
+      When the month is reported twice
+      Then the pending total is sent again under its own identifier and kept as reported
+      And the next report sends the negative difference down to the spend from the acceptance on
+      And an organization that never accepted ends the month at zero
+      # Stripe may already hold the cut-off send; only its own identifier tells Stripe not to count it twice.
 
     @unit
-    Scenario: A pending PII redaction total that cannot be checked against the acceptance is held
+    Scenario: A pending PII redaction total is replayed without waiting for the spend to be read
       Given a PII redaction meter event whose send was cut off before it was confirmed
-      And the spend from the organization's acceptance on cannot be read
+      And the spend from the organization's acceptance on cannot be read, or its read fails
       When the month is reported
-      Then nothing is sent and the pending total is kept for the next report
-      And a read that fails counts toward the meter's circuit breaker
+      Then the pending total is sent again under its own identifier at once
+      # Waiting for the read could outlast the day Stripe keeps an identifier, and count it twice.
 
     @unit
     Scenario: Usage is reported once the subscription carries the PII redaction price

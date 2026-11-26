@@ -1804,8 +1804,17 @@ describe("ReportUsageForMonthCommand: the PII redaction price", () => {
     const at = { organizationId: "org-1", billingMonth: "2026-02" };
     const meter = "langwatch_pii_redaction_usd";
 
-    /** Leaves 5,000 units pending over a real checkpoint store, then reports February once. */
-    async function replayPending({ eligible }: { eligible: BillableEventsTotalResult }) {
+    /**
+     * Leaves 5,000 units pending, as a send Stripe took whose confirm then failed, over a real
+     * checkpoint store, then reports February `runs` times.
+     */
+    async function replayPending({
+      eligible,
+      runs = 1,
+    }: {
+      eligible: BillableEventsTotalResult | Error;
+      runs?: number;
+    }) {
       const checkpoints = MemoryBillingCheckpointRepository.create(MemoryBillingStore.create());
       await checkpoints.writeIntent({
         ...at,
@@ -1814,19 +1823,23 @@ describe("ReportUsageForMonthCommand: the PII redaction price", () => {
         pendingReportedTotal: 5_000,
       });
       mockOrganizations.getOrganizationForBilling.mockResolvedValue(usageBilledOrg());
-      mockQueryPiiRedactionSpendTotal.mockResolvedValue(eligible);
+      if (eligible instanceof Error) mockQueryPiiRedactionSpendTotal.mockRejectedValue(eligible);
+      else mockQueryPiiRedactionSpendTotal.mockResolvedValue(eligible);
       mockReportUsageDelta.mockResolvedValue([{ reported: true }]);
       const handler = await createHandler({ billingCheckpoints: checkpoints });
 
-      await handler.handle(makeCommand());
+      for (let run = 0; run < runs; run++) await handler.handle(makeCommand());
 
       return {
         sent: mockReportUsageDelta.mock.calls
           .flatMap(([input]) => input.events)
-          .filter((event) => event.eventName === meter),
+          .filter((event) => event.eventName === meter)
+          .map(({ identifier, value }) => ({ identifier, value })),
         checkpoint: await checkpoints.findCheckpoint({ ...at, meter }),
       };
     }
+
+    const replayed = { identifier: `org-1:2026-02:${meter}:from:0:to:5000`, value: 0.5 };
 
     /** @scenario "A pending PII redaction total is replayed even while the price is missing" */
     it("replays it under its own identifier while the acceptance's spend covers it", async () => {
@@ -1834,77 +1847,47 @@ describe("ReportUsageForMonthCommand: the PII redaction price", () => {
         eligible: { outcome: "counted", total: 7_000 },
       });
 
-      expect(sent).toEqual([
-        expect.objectContaining({ identifier: `org-1:2026-02:${meter}:from:0:to:5000` }),
-      ]);
+      expect(sent).toEqual([replayed]);
       expect(checkpoint).toMatchObject({ lastReportedTotal: 5_000, pendingReportedTotal: null });
     });
 
-    /** @scenario "A pending PII redaction total above the spend the acceptance covers is never sent" */
-    it("drops it and reports only the spend from the acceptance on", async () => {
+    /** @scenario "A pending PII redaction total above the spend the acceptance covers is replayed, then corrected down" */
+    it("replays it under its own identifier, then corrects the month down to the accepted spend", async () => {
       const { sent, checkpoint } = await replayPending({
         eligible: { outcome: "counted", total: 2_000 },
+        runs: 2,
       });
 
       expect(sent).toEqual([
-        expect.objectContaining({
-          identifier: `org-1:2026-02:${meter}:from:0:to:2000`,
-          value: 0.2,
-        }),
+        replayed,
+        { identifier: `org-1:2026-02:${meter}:from:5000:to:2000`, value: -0.3 },
       ]);
       expect(checkpoint).toMatchObject({ lastReportedTotal: 2_000, pendingReportedTotal: null });
-      expect(mockLogger.warn).toHaveBeenCalledWith(
-        expect.objectContaining({ meter, pendingTotal: 5_000, eligibleTotal: 2_000 }),
-        expect.stringContaining("dropping"),
-      );
     });
 
-    /** @scenario "A pending PII redaction total above the spend the acceptance covers is never sent" */
-    it("sends nothing for an organization that never accepted, and clears it", async () => {
+    /** @scenario "A pending PII redaction total above the spend the acceptance covers is replayed, then corrected down" */
+    it("replays it, then corrects the month to zero for an organization that never accepted", async () => {
       const { sent, checkpoint } = await replayPending({
         eligible: { outcome: "counted", total: 0 },
+        runs: 2,
       });
 
-      expect(sent).toEqual([]);
+      expect(sent).toEqual([
+        replayed,
+        { identifier: `org-1:2026-02:${meter}:from:5000:to:0`, value: -0.5 },
+      ]);
       expect(checkpoint).toMatchObject({ lastReportedTotal: 0, pendingReportedTotal: null });
     });
 
-    /** @scenario "A pending PII redaction total that cannot be checked against the acceptance is held" */
-    it("sends nothing and keeps it while the spend cannot be read", async () => {
-      const { sent, checkpoint } = await replayPending({ eligible: { outcome: "unavailable" } });
+    /** @scenario "A pending PII redaction total is replayed without waiting for the spend to be read" */
+    it.each([
+      ["cannot be read", { outcome: "unavailable" } as const],
+      ["read throws", new Error("ledger unreachable")],
+    ])("replays it at once when the spend %s", async (_case, eligible) => {
+      const { sent, checkpoint } = await replayPending({ eligible });
 
-      expect(sent).toEqual([]);
-      expect(checkpoint).toMatchObject({ lastReportedTotal: 0, pendingReportedTotal: 5_000 });
-      expect(mockSelfDispatch).not.toHaveBeenCalled();
-    });
-  });
-
-  describe("given a pending PII redaction total whose spend read always throws", () => {
-    /** @scenario "A pending PII redaction total that cannot be checked against the acceptance is held" */
-    it("counts each failed read, keeps the pending total and stops at the breaker", async () => {
-      const at = { organizationId: "org-1", billingMonth: "2026-02" };
-      const meter = "langwatch_pii_redaction_usd";
-      const checkpoints = MemoryBillingCheckpointRepository.create(MemoryBillingStore.create());
-      await checkpoints.writeIntent({
-        ...at,
-        meter,
-        lastReportedTotal: 0,
-        pendingReportedTotal: 5_000,
-      });
-      mockOrganizations.getOrganizationForBilling.mockResolvedValue(usageBilledOrg());
-      mockQueryPiiRedactionSpendTotal.mockRejectedValue(new Error("ledger unreachable"));
-      const handler = await createHandler({ billingCheckpoints: checkpoints });
-
-      for (let run = 0; run < 8; run++) await handler.handle(makeCommand());
-
-      expect(mockQueryPiiRedactionSpendTotal).toHaveBeenCalledTimes(5);
-      expect(mockSelfDispatch).toHaveBeenCalledTimes(5);
-      expect(mockReportUsageDelta).not.toHaveBeenCalled();
-      expect(await checkpoints.findCheckpoint({ ...at, meter })).toMatchObject({
-        lastReportedTotal: 0,
-        pendingReportedTotal: 5_000,
-        consecutiveFailures: 5,
-      });
+      expect(sent).toEqual([replayed]);
+      expect(checkpoint).toMatchObject({ lastReportedTotal: 5_000, pendingReportedTotal: null });
     });
   });
 
