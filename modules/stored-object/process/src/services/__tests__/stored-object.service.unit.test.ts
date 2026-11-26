@@ -1,5 +1,3 @@
-import type { DataRetentionApi } from "@langwatch/data-retention-contract";
-import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 /** @vitest-environment node */
 import { Readable } from "node:stream";
 
@@ -24,7 +22,6 @@ function fixture() {
   const service = StoredObjectService.create({
     records,
     ownerLinks: MemoryStoredObjectOwnerLinkRepository.create(),
-    retention: createApiFixture<DataRetentionApi>({ getRetentionDays: async () => 30 }),
     permissions: new GrantedStoredObjectPermissions(),
     storage,
     signer: createStoredObjectTestSigner(),

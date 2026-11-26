@@ -3,14 +3,12 @@
  * Reuse by content and owner links, over the memory backends.
  * @see modules/stored-object/specs/stored-object-reuse-and-retention.feature
  */
-import type { DataRetentionApi } from "@langwatch/data-retention-contract";
 import { memoryObjectStorage, type ObjectStorage } from "@langwatch/process-stores";
 import type {
   StoreStoredObjectFromBytesInput,
   StoredObjectId,
   StoredObjectProjectId,
 } from "@langwatch/stored-object-contract";
-import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { type Instant, Temporal } from "@langwatch/time";
 import { beforeEach, describe, expect, it } from "vitest";
 
@@ -39,7 +37,7 @@ function fixture(input: { retentionDays?: number } = {}) {
   const records = MemoryStoredObjectRecordRepository.create();
   const memoryLinks = MemoryStoredObjectOwnerLinkRepository.create();
   const clock = { now: DAY_0 };
-  const retention = { days: input.retentionDays ?? 30, asked: 0 };
+  const retention = { days: input.retentionDays ?? 30 };
   const inner = memoryObjectStorage();
   const writes: string[] = [];
   const objectStorage: ObjectStorage = {
@@ -73,13 +71,6 @@ function fixture(input: { retentionDays?: number } = {}) {
   const service = StoredObjectService.create({
     records,
     ownerLinks,
-    retention: createApiFixture<DataRetentionApi>({
-      getRetentionDays: async ({ category }) => {
-        retention.asked += 1;
-        expect(category).toBe("traces");
-        return retention.days;
-      },
-    }),
     permissions: new GrantedStoredObjectPermissions(),
     storage: ObjectStorageStoredObjectBytesRepository.create({ objectStorage }),
     signer: createStoredObjectTestSigner(),
@@ -100,6 +91,7 @@ function fixture(input: { retentionDays?: number } = {}) {
       mediaType: "image/png",
       audience: "traces:view",
       bytes: PNG,
+      retentionDays: retention.days,
       ...overrides,
     });
   }
@@ -263,13 +255,21 @@ describe("StoredObjectService.storeFromBytes owner links", () => {
 
   describe("when bytes are stored for a purpose with no retention category", () => {
     /** @scenario "A purpose with no retention category writes no links" */
-    it("writes no link and never asks for a retention", async () => {
-      const { store, retention, liveOn } = fixture();
+    it("writes no link", async () => {
+      const { store, liveOn } = fixture();
 
       const { reference } = await store({ purpose: "scenario_event", audience: "scenarios:view" });
 
       await expect(liveOn({ id: reference.id, day: 0 })).resolves.toBe(0);
-      expect(retention.asked).toBe(0);
+    });
+  });
+
+  describe("when bytes are stored for a retained purpose without the owner's retention", () => {
+    it("refuses before writing anything", async () => {
+      const { store, writes } = fixture();
+
+      await expect(store({ retentionDays: undefined })).rejects.toThrow("retentionDays");
+      expect(writes).toEqual([]);
     });
   });
 

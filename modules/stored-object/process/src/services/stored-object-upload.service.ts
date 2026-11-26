@@ -5,10 +5,7 @@
  */
 import { createHash } from "node:crypto";
 
-import {
-  type DataRetentionApi,
-  INDEFINITE_RETENTION_DAYS,
-} from "@langwatch/data-retention-contract";
+import { INDEFINITE_RETENTION_DAYS } from "@langwatch/data-retention-contract";
 import { HandledError, ValidationError } from "@langwatch/handled-error";
 import type { ObjectDigest } from "@langwatch/process-stores/members";
 import {
@@ -56,16 +53,12 @@ import { storedObjectReferenceOf } from "../rules/stored-object-view.rules.ts";
 import { StoredObjectUploadReceiveService } from "./stored-object-upload-receive.service.ts";
 import type { StoredObjectUploadSignerService } from "./stored-object-upload-signer.service.ts";
 
-/** The one retention question a store asks: how long its category keeps the project's data. */
-export type StoredObjectRetention = Pick<DataRetentionApi, "getRetentionDays">;
-
 /** An owner link before it names its object. */
 type StoredObjectOwnerClaim = Omit<StoredObjectOwnerLink, "objectId">;
 
 type StoredObjectUploadServiceOptions = Readonly<{
   records: StoredObjectRecordRepository;
   ownerLinks: StoredObjectOwnerLinkRepository;
-  retention: StoredObjectRetention;
   storage: StoredObjectBytesRepository;
   signer: StoredObjectUploadSignerService;
   maximumUploadBytes: number;
@@ -117,7 +110,7 @@ export class StoredObjectUploadService {
         ? this.options.maximumUploadBytes
         : purposeByteLimitOf(purposePolicyOf(input.purpose), input.maxBytes);
     const { chunks, byteLength } = await this.measured(input.bytes, ceiling);
-    const owners = await this.ownerClaimsOf(input);
+    const owners = this.ownerClaimsOf(input);
     const reusable = await this.options.records.findReusable({
       tenantId: input.projectId,
       purpose: input.purpose,
@@ -198,16 +191,12 @@ export class StoredObjectUploadService {
   }
 
   /** The caller's link if its purpose declares a retention category (ADR-002 §3), else none. */
-  private async ownerClaimsOf(
-    input: StoreStoredObjectFromBytesInput,
-  ): Promise<StoredObjectOwnerClaim[]> {
-    const category = purposePolicyOf(input.purpose).retentionCategory;
-    if (category === undefined) return [];
-
-    const days = await this.options.retention.getRetentionDays({
-      projectId: input.projectId,
-      category,
-    });
+  private ownerClaimsOf(input: StoreStoredObjectFromBytesInput): StoredObjectOwnerClaim[] {
+    if (purposePolicyOf(input.purpose).retentionCategory === undefined) return [];
+    const days = input.retentionDays;
+    if (days === undefined) {
+      throw new Error(`purpose ${input.purpose} needs the owner's retentionDays`);
+    }
     const now = this.options.now();
 
     return [

@@ -1209,6 +1209,7 @@ export class TraceModule implements TraceApi, CollectorApp {
             store: TraceMediaStoreService.create({
               storedObjects: options.storedObjects,
               purpose: TRACE_CONTENT_MEDIA,
+              retention: options.dataRetention,
             }),
           },
           logger: createLogger("langwatch:traces:edge-media-extraction"),

@@ -3,14 +3,12 @@
  * The owner-link sweep and the retroactive re-time, over the memory backends.
  * @see modules/stored-object/specs/stored-object-reuse-and-retention.feature
  */
-import type { DataRetentionApi } from "@langwatch/data-retention-contract";
 import { memoryObjectStorage } from "@langwatch/process-stores";
 import type {
   StoreStoredObjectFromBytesInput,
   StoredObjectId,
   StoredObjectProjectId,
 } from "@langwatch/stored-object-contract";
-import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { type Instant, Temporal } from "@langwatch/time";
 import { beforeEach, describe, expect, it } from "vitest";
 
@@ -74,9 +72,6 @@ function fixture(input: { sweepPageSize?: number; sweepBudgetMs?: number } = {})
   const service = StoredObjectService.create({
     records,
     ownerLinks,
-    retention: createApiFixture<DataRetentionApi>({
-      getRetentionDays: async () => retention.days,
-    }),
     permissions: new GrantedStoredObjectPermissions(),
     storage,
     signer: createStoredObjectTestSigner(),
@@ -111,6 +106,7 @@ function fixture(input: { sweepPageSize?: number; sweepBudgetMs?: number } = {})
       mediaType: "image/png",
       audience: "traces:view",
       bytes: PNG,
+      retentionDays: retention.days,
       ...overrides,
     });
   }

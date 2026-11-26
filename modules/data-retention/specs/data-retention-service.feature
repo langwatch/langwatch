@@ -127,6 +127,12 @@ Feature: Data Retention service boundary
     And no fact is recorded when the update is refused
 
   @unit
+  Scenario: Raising or applying stored retention records the same fact
+    Given a project's stored rows are raised or rewritten to its resolved retention
+    When the rewrite lands
+    Then a "retention_applied_to_existing_data" fact names the project, the category and the resolved days
+
+  @unit
   Scenario: The memory and Postgres data retention repositories answer alike
     Given the same retention policies and trace pins written to each backend
     When the same reads and writes run against every backend

@@ -32,7 +32,11 @@ export class StoredRetentionWriteService {
 
   private constructor(private readonly retention: StoredRetentionRewriter) {}
 
-  static create({ retention }: { retention: StoredRetentionRewriter }): StoredRetentionWriteService {
+  static create({
+    retention,
+  }: {
+    retention: StoredRetentionRewriter;
+  }): StoredRetentionWriteService {
     return new StoredRetentionWriteService(retention);
   }
 

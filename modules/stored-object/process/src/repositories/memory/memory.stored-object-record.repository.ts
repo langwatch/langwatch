@@ -11,7 +11,7 @@ import type {
   StoredObjectRecordRepository,
   StoredObjectRecordStatus,
 } from "../stored-object-record.repository.ts";
-import type { MemoryStoredObjectOwnerLinkRepository } from "./memory.stored-object-owner-link.repository.ts";
+import { MemoryStoredObjectOwnerLinkRepository } from "./memory.stored-object-owner-link.repository.ts";
 
 /**
  * The same answers as the Prisma repository, over one Map keyed by tenant and id. The
@@ -172,7 +172,13 @@ export class MemoryStoredObjectRecordRepository implements StoredObjectRecordRep
     }
     const value = this.#values.get(key(input));
     if (value?.status !== "available") return false;
-    if (this.#ownerLinks.holds({ tenantId: input.tenantId, objectId: input.id, now: input.now })) {
+    if (
+      MemoryStoredObjectOwnerLinkRepository.holds(this.#ownerLinks, {
+        tenantId: input.tenantId,
+        objectId: input.id,
+        now: input.now,
+      })
+    ) {
       return false;
     }
     this.#values.set(key(input), {

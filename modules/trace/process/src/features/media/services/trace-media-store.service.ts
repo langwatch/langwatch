@@ -1,6 +1,8 @@
-import type {
-  StoredObjectApi,
-  StoredObjectDeliveryAudience,
+import type { DataRetentionApi } from "@langwatch/data-retention-contract";
+import {
+  purposePolicyOf,
+  type StoredObjectApi,
+  type StoredObjectDeliveryAudience,
 } from "@langwatch/stored-object-contract";
 
 /** Where one kind of extracted media is held, and who may read it back. */
@@ -39,21 +41,27 @@ export interface TraceMediaStore {
   }): Promise<{ id: string; isDuplicate: boolean }>;
 }
 
+/** How long the owner keeps its data, asked only for purposes that follow a retention category. */
+export type TraceMediaRetention = Pick<DataRetentionApi, "getRetentionDays">;
+
 /** Trace media held by Stored Object, one instance per purpose. */
 export class TraceMediaStoreService implements TraceMediaStore {
   static create({
     storedObjects,
     purpose,
+    retention,
   }: {
     storedObjects: StoredObjectApi;
     purpose: TraceMediaStorePurpose;
+    retention?: TraceMediaRetention;
   }): TraceMediaStoreService {
-    return new TraceMediaStoreService(storedObjects, purpose);
+    return new TraceMediaStoreService(storedObjects, purpose, retention);
   }
 
   private constructor(
     private readonly storedObjects: StoredObjectApi,
     private readonly target: TraceMediaStorePurpose,
+    private readonly retention: TraceMediaRetention | undefined,
   ) {}
 
   get purpose(): string {
@@ -70,6 +78,7 @@ export class TraceMediaStoreService implements TraceMediaStore {
     mediaType: string;
     bytes: Buffer;
   }): Promise<{ id: string; isDuplicate: boolean }> {
+    const retentionDays = await this.retentionDaysOf(input.projectId);
     const stored = await this.storedObjects.storeFromBytes({
       projectId: input.projectId,
       filename: this.target.filename,
@@ -79,8 +88,18 @@ export class TraceMediaStoreService implements TraceMediaStore {
       purpose: this.target.purpose,
       ownerKind: this.target.ownerKind,
       ownerId: input.ownerId,
+      ...(retentionDays === undefined ? {} : { retentionDays }),
     });
 
     return { id: stored.reference.id, isDuplicate: stored.isDuplicate };
+  }
+
+  /** The owner's retention, which Stored Object links the media for (its ADR-002 §3). */
+  private async retentionDaysOf(projectId: string): Promise<number | undefined> {
+    const category = purposePolicyOf(this.target.purpose).retentionCategory;
+    if (category === undefined) return undefined;
+    if (!this.retention) throw new Error(`${this.target.purpose} media needs data-retention`);
+
+    return this.retention.getRetentionDays({ projectId, category });
   }
 }

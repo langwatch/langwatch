@@ -68,7 +68,11 @@ export function fakeStoredObjects(): {
   return {
     storedObjects,
     store: (purpose = TRACE_CONTENT_MEDIA) =>
-      TraceMediaStoreService.create({ storedObjects, purpose }),
+      TraceMediaStoreService.create({
+        storedObjects,
+        purpose,
+        retention: { getRetentionDays: async () => 30 },
+      }),
     get writes() {
       return writes;
     },

@@ -4,9 +4,7 @@
  */
 import { createHash } from "node:crypto";
 
-import type { DataRetentionApi } from "@langwatch/data-retention-contract";
 import { memoryObjectStorage } from "@langwatch/process-stores";
-import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { STORED_OBJECT_UPLOAD_REQUEST_BODY } from "@langwatch/stored-object-contract";
 import { Temporal } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
@@ -31,7 +29,6 @@ function fixture() {
   const service = StoredObjectService.create({
     records,
     ownerLinks: MemoryStoredObjectOwnerLinkRepository.create(),
-    retention: createApiFixture<DataRetentionApi>({ getRetentionDays: async () => 30 }),
     permissions: new GrantedStoredObjectPermissions(),
     storage: ObjectStorageStoredObjectBytesRepository.create({
       objectStorage: memoryObjectStorage(),
@@ -280,6 +277,7 @@ describe("StoredObjectService uploads", () => {
         ownerKind: "trace",
         ownerId: "trace_1",
         bytes: RECEIPT,
+        retentionDays: 30,
       } as const;
 
       const first = await service.storeFromBytes(input);

@@ -52,10 +52,7 @@ import { StoredObjectCleanupService } from "./stored-object-cleanup.service.ts";
 import type { StoredObjectDelivery } from "./stored-object-delivery.service.ts";
 import { StoredObjectFileReadService } from "./stored-object-file-read.service.ts";
 import type { StoredObjectUploadSignerService } from "./stored-object-upload-signer.service.ts";
-import {
-  type StoredObjectRetention,
-  StoredObjectUploadService,
-} from "./stored-object-upload.service.ts";
+import { StoredObjectUploadService } from "./stored-object-upload.service.ts";
 import type { StoredObjectFileReader } from "./stored-objects.service.ts";
 
 /** The peer decision a probe asks once the row names its purpose. */
@@ -71,7 +68,6 @@ type StoredObjectServiceOptions = Readonly<{
   records: StoredObjectRecordRepository;
   ownerLinks: StoredObjectOwnerLinkRepository;
   permissions: StoredObjectPermissions;
-  retention: StoredObjectRetention;
   storage: StoredObjectBytesRepository;
   delivery: StoredObjectDelivery;
   signer: StoredObjectUploadSignerService;
@@ -115,7 +111,6 @@ export class StoredObjectService {
     this.uploads = StoredObjectUploadService.create({
       records: options.records,
       ownerLinks: options.ownerLinks,
-      retention: options.retention,
       storage: options.storage,
       signer: options.signer,
       maximumUploadBytes: options.maximumUploadBytes,

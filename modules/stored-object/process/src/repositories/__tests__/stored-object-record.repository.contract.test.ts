@@ -224,7 +224,9 @@ describe.each(backends)(
             next: { ...pending, status: "available", generation: 1 },
           }),
         ).resolves.toBe(true);
-        await expect(repository.findById({ tenantId: ACME, id: pending.id })).resolves.toMatchObject({
+        await expect(
+          repository.findById({ tenantId: ACME, id: pending.id }),
+        ).resolves.toMatchObject({
           status: "available",
           generation: 1,
         });
@@ -252,7 +254,9 @@ describe.each(backends)(
             next: { ...pending, status: "available", generation: 2 },
           }),
         ).resolves.toBe(false);
-        await expect(repository.findById({ tenantId: ACME, id: pending.id })).resolves.toMatchObject({
+        await expect(
+          repository.findById({ tenantId: ACME, id: pending.id }),
+        ).resolves.toMatchObject({
           status: "failed",
           generation: 1,
         });
@@ -269,7 +273,9 @@ describe.each(backends)(
             next: { ...theirs, tenantId: ACME, status: "available", generation: 1 },
           }),
         ).resolves.toBe(false);
-        await expect(repository.findById({ tenantId: OTHER, id: theirs.id })).resolves.toMatchObject({
+        await expect(
+          repository.findById({ tenantId: OTHER, id: theirs.id }),
+        ).resolves.toMatchObject({
           status: "pending",
         });
       });
