@@ -179,6 +179,7 @@ export class HttpLangyWorkerChannel extends LangyWorker {
     credentials,
     modelOverride,
     resumeToken,
+    images,
   }: LangyWorkerDispatchInput): Promise<LangyDispatchOutcome> {
     return this.tracer.withActiveSpan(
       "langy.chat.dispatch_turn",
@@ -208,6 +209,7 @@ export class HttpLangyWorkerChannel extends LangyWorker {
               credentials,
               ...(modelOverride ? { modelOverride } : {}),
               ...(resumeToken ? { resumeToken } : {}),
+              ...(images?.length ? { images } : {}),
             }),
             signal: AbortSignal.timeout(AGENT_DISPATCH_TIMEOUT_MS),
           });

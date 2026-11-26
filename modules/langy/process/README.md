@@ -14,7 +14,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 The portable, callable Langy capability shared by process transports.
 
-Peers call these through the token, declared at `../contract/src/langy.api.ts:299`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/langy.api.ts:305`; nothing else in this package is public.
 
 #### `ingestInternalTurnResult`
 
@@ -402,6 +402,20 @@ getConversationMessages(input: LangyPanelCall<typeof langyPanelConversationInput
 
 ```typescript
 archiveConversation(input: LangyPanelCall<typeof langyPanelConversationInputSchema>): Promise<{ success: boolean }>;
+```
+
+#### `createAttachmentUpload`
+
+Refuses a file that is not an image Langy reads, or is too large, before it uploads.
+
+```typescript
+createAttachmentUpload(input: LangyAttachmentUploadInput): Promise<LangyAttachmentUpload>;
+```
+
+#### `confirmAttachmentUpload`
+
+```typescript
+confirmAttachmentUpload(input: LangyAttachmentConfirmInput): Promise<LangyAttachment>;
 ```
 
 #### `renameConversation`
@@ -959,7 +973,7 @@ type Response = unknown;
 
 ### `langy`
 
-Contract `../contract/src/langy.trpc.ts:58`, router `src/transport/langy.trpc.ts:33`.
+Contract `../contract/src/langy.trpc.ts:64`, router `src/transport/langy.trpc.ts:33`.
 
 | Procedure                        | Kind         | Gate                      | Input                                     | Output                                |
 | -------------------------------- | ------------ | ------------------------- | ----------------------------------------- | ------------------------------------- |
@@ -968,6 +982,8 @@ Contract `../contract/src/langy.trpc.ts:58`, router `src/transport/langy.trpc.ts
 | `langy.detail`                   | query        | Permission `langy:view`   | `langyPanelConversationInputSchema`       | inline                                |
 | `langy.messages`                 | query        | Permission `langy:view`   | `langyPanelConversationInputSchema`       | `langyConversationMessagesDtoSchema`  |
 | `langy.deleteConversation`       | mutation     | Permission `langy:delete` | `langyPanelConversationInputSchema`       | `langyConversationDeletedSchema`      |
+| `langy.createAttachmentUpload`   | mutation     | Permission `langy:create` | `langyAttachmentUploadInputSchema`        | `langyAttachmentUploadSchema`         |
+| `langy.confirmAttachmentUpload`  | mutation     | Permission `langy:create` | `langyAttachmentConfirmInputSchema`       | `langyAttachmentSchema`               |
 | `langy.renameConversation`       | mutation     | Permission `langy:update` | `langyRenameInputSchema`                  | `langyConversationDetailSchema`       |
 | `langy.forkConversation`         | mutation     | Permission `langy:create` | `langyForkInputSchema`                    | `langyConversationDetailSchema`       |
 | `langy.createConversation`       | mutation     | Permission `langy:create` | `langyPanelCreateConversationInputSchema` | `langyTurnStartedSchema`              |
@@ -1023,7 +1039,7 @@ interface Input {
   projectId: string;
   conversationId: string;
 }
-// Output: inline, ../contract/src/langy.trpc.ts:70
+// Output: inline, ../contract/src/langy.trpc.ts:76
 type Output = {
   id: string;
   title: string | null;
@@ -1044,6 +1060,37 @@ type Input = z.infer<typeof langyPanelConversationInputSchema>; // ../contract/s
 // Output: langyConversationDeletedSchema, ../contract/src/langy.dtos.ts:198
 interface Output {
   success: boolean;
+}
+
+// langy.createAttachmentUpload
+// Input: langyAttachmentUploadInputSchema, ../contract/src/langy-attachments.ts:52
+interface Input {
+  projectId: string;
+  filename: string;
+  mediaType: string;
+  byteLength: number;
+}
+// Output: langyAttachmentUploadSchema, ../contract/src/langy-attachments.ts:66
+interface Output {
+  objectId: string;
+  uploadUrl: string;
+  method: "PUT";
+  headers?: Record<string, string>;
+}
+
+// langy.confirmAttachmentUpload
+// Input: langyAttachmentConfirmInputSchema, ../contract/src/langy-attachments.ts:77
+interface Input {
+  projectId: string;
+  objectId: string;
+}
+// Output: langyAttachmentSchema, ../contract/src/langy-attachments.ts:89
+interface Output {
+  objectId: string;
+  url: string;
+  filename: string;
+  mediaType: string;
+  byteLength: number;
 }
 
 // langy.renameConversation
@@ -1280,7 +1327,7 @@ type Output = z.infer<typeof langyStreamFrameSchema>; // ../contract/src/langy.s
 
 ### `langyEgress`
 
-Contract `../contract/src/langy.trpc.ts:192`, router `src/transport/langy.trpc.ts:228`.
+Contract `../contract/src/langy.trpc.ts:207`, router `src/transport/langy.trpc.ts:236`.
 
 | Procedure         | Kind     | Gate                      | Input                       | Output                   |
 | ----------------- | -------- | ------------------------- | --------------------------- | ------------------------ |
@@ -1310,7 +1357,7 @@ type Output = z.infer<typeof langyEgressStateSchema>; // ../contract/src/langy-t
 
 ### `setupSkills`
 
-Contract `../contract/src/langy.trpc.ts:208`, router `src/transport/setup-skills.trpc.ts:10`.
+Contract `../contract/src/langy.trpc.ts:223`, router `src/transport/setup-skills.trpc.ts:10`.
 
 | Procedure               | Kind  | Gate                      | Input  | Output |
 | ----------------------- | ----- | ------------------------- | ------ | ------ |
@@ -1318,12 +1365,12 @@ Contract `../contract/src/langy.trpc.ts:208`, router `src/transport/setup-skills
 
 ```typescript
 // setupSkills.getPrompt
-// Input: inline, ../contract/src/langy.trpc.ts:210
+// Input: inline, ../contract/src/langy.trpc.ts:225
 interface Input {
   projectId: string;
   skill: string;
 }
-// Output: inline, ../contract/src/langy.trpc.ts:211
+// Output: inline, ../contract/src/langy.trpc.ts:226
 interface Output {
   body: string;
 }
@@ -1363,7 +1410,7 @@ Declared at `src/eventing/langy-maintenance.pipeline.ts:37`.
 
 | Kind   | Leaf                 | Environment variable        | Declared at                          |
 | ------ | -------------------- | --------------------------- | ------------------------------------ |
-| secret | `–`                  | `LANGY_INTERNAL_SECRET`     | `src/app/langy.app.ts:297`           |
+| secret | `–`                  | `LANGY_INTERNAL_SECRET`     | `src/app/langy.app.ts:307`           |
 | config | `agentUrl`           | `LANGY_AGENT_URL`           | `../contract/src/langy.config.ts:18` |
 | config | `workerCallbackUrl`  | `LANGY_WORKER_CALLBACK_URL` | `../contract/src/langy.config.ts:19` |
 | config | `workerGatewayUrl`   | `LANGY_WORKER_GATEWAY_URL`  | `../contract/src/langy.config.ts:20` |
