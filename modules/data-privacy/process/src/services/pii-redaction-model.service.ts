@@ -323,10 +323,18 @@ export class PiiRedactionModelService {
     if (!admission) return fallBack("breaker_open");
 
     const startedAt = this.now();
-    const outcome = await this.#runSplitCalls({ input, calls, slots });
+    // A sibling's timeout or throttle after the span ended still opens the breaker.
+    const late = { settled: false, unavailable: false };
+    const onUnavailable = () => {
+      late.unavailable = true;
+      if (late.settled) this.#openBreaker("split");
+    };
+    const outcome = await this.#runSplitCalls({ input, calls, slots, onUnavailable });
     const durationMs = this.now() - startedAt;
+    late.settled = true;
     if (outcome.kind === "failed") {
-      this.#settle({ kind: "split", admission, unavailable: outcome.reason !== "error" });
+      const unavailable = outcome.reason !== "error" || late.unavailable;
+      this.#settle({ kind: "split", admission, unavailable });
       this.metrics.modelFellBack(outcome.reason);
       this.log.warn(
         {
@@ -371,10 +379,12 @@ export class PiiRedactionModelService {
     input,
     calls,
     slots,
+    onUnavailable,
   }: {
     input: ModelClearInput;
     calls: readonly SplitCall[];
     slots: number;
+    onUnavailable: () => void;
   }): Promise<SplitOutcome> {
     const split = this.split;
     if (!split) return Promise.resolve({ kind: "failed", reason: "error" });
@@ -387,6 +397,7 @@ export class PiiRedactionModelService {
         callDurationsMs: [],
         ended: false,
         now: this.now,
+        onUnavailable,
         answer: (splitCall) =>
           split.answers({
             texts: splitCall.pieces.map((piece) => pieceTextOf({ texts: input.texts, piece })),
@@ -511,6 +522,8 @@ type SplitRun = {
   readonly now: () => number;
   readonly answer: (call: SplitCall) => Promise<{ findings: unknown; anonymized: unknown }[]>;
   readonly end: (outcome: SplitOutcome) => void;
+  /** A call timed out or was throttled, even after the span ended: the breaker must hear it. */
+  readonly onUnavailable: () => void;
 };
 
 function pieceTextOf({ texts, piece }: { texts: readonly string[]; piece: SplitPiece }): string {
@@ -552,6 +565,7 @@ async function runSplitCall({
     return true;
   } catch (error) {
     const reason = failureOutcomeOf(error);
+    if (reason !== "error") run.onUnavailable();
     run.end({ kind: "failed", reason, error });
     const holdMs = startedAt + PII_REDACTION_MODEL_ABORTED_SLOT_HOLD_MS - run.now();
     if (reason === "timeout" && holdMs > 0) await new Promise((wake) => setTimeout(wake, holdMs));

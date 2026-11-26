@@ -122,15 +122,28 @@ function cutText({ text, index }: { text: string; index: number }): SplitPiece[]
     }
     end = cutBefore({ text, start });
     pieces.push({ text: index, start, end, whole: false });
-    const overlapAt = end - PII_REDACTION_MODEL_PIECE_OVERLAP;
-    let word = overlapAt;
-    while (word > start && !isPythonSpace(text[word - 1])) word--;
-    start = skipSpaces({
-      text,
-      from: word > start ? word : offLowSurrogate({ text, at: overlapAt }),
-    });
+    start = nextStart({ text, start, end });
   }
   return pieces;
+}
+
+/**
+ * Where the piece after [start, end) starts, always past `start`: the word holding (or ending
+ * before) the character 200 before `end`, else that character inside a long word. Within 1,000
+ * of `end` only; a whitespace run that long has nothing across it, so the next starts after it.
+ */
+function nextStart({ text, start, end }: { text: string; start: number; end: number }): number {
+  const overlapAt = end - PII_REDACTION_MODEL_PIECE_OVERLAP;
+  const floor = Math.max(start + 1, end - PII_REDACTION_MODEL_PIECE_CHARACTERS / 4);
+  if (overlapAt < floor) return skipSpaces({ text, from: end });
+  let at = overlapAt;
+  while (at > floor && isPythonSpace(text[at])) at--;
+  if (isPythonSpace(text[at])) return skipSpaces({ text, from: overlapAt });
+  let word = at;
+  while (word > floor && !isPythonSpace(text[word - 1])) word--;
+  if (isPythonSpace(text[word - 1])) return word;
+  const code = text.charCodeAt(at);
+  return code >= 0xdc00 && code <= 0xdfff ? at + 1 : at;
 }
 
 /**
@@ -261,12 +274,17 @@ export function splitFindingsCount({
   for (const answer of answers) {
     const parsed = presidioFindingsSchema.safeParse(answer.findings);
     if (!parsed.success) continue;
-    const shift = answer.piece.whole ? 0 : answer.piece.start;
-    found[answer.piece.text]?.push(
+    const { piece } = answer;
+    // A cut piece's code points become the text's code units, as when it was masked.
+    const toCodeUnit = piece.whole
+      ? (offset: number) => offset
+      : codepointToCodeUnitConverter((texts[piece.text] ?? "").slice(piece.start, piece.end));
+    const shift = piece.whole ? 0 : piece.start;
+    found[piece.text]?.push(
       ...parsed.data.map((finding) => ({
         ...finding,
-        start: finding.start + shift,
-        end: finding.end + shift,
+        start: toCodeUnit(finding.start) + shift,
+        end: toCodeUnit(finding.end) + shift,
       })),
     );
   }

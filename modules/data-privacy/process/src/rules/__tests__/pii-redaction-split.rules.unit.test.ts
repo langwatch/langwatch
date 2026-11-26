@@ -10,6 +10,7 @@ import {
   type PieceAnswer,
   planSpan,
   type SplitCall,
+  splitFindingsCount,
   splitModelTargetOf,
 } from "../pii-redaction-split.rules.ts";
 
@@ -108,6 +109,26 @@ describe("planSpan", () => {
     }
   });
 
+  /** @scenario "A name, an address or an IBAN across a cut is masked whole and nothing found is left unmasked" */
+  it("keeps 200 characters of overlap when the cut falls after a long whitespace run", () => {
+    const text = `${"x".repeat(3_700)}${" ".repeat(250)}${"b".repeat(50)} ${"y".repeat(5_000)}`;
+    const pieces = splitCalls([text]).flatMap((call) => call.pieces);
+
+    for (const [i, piece] of pieces.slice(1).entries()) {
+      expect(pieces[i]!.end - piece.start).toBeGreaterThanOrEqual(200);
+    }
+  });
+
+  /** @scenario "A piece the model could reshape sends the whole span to Presidio" */
+  it("moves past a whitespace run longer than a piece instead of cutting it again", () => {
+    const text = `a${" ".repeat(8_000)}b`;
+
+    expect(splitCalls([text]).flatMap((call) => call.pieces)).toEqual([
+      { text: 0, start: 0, end: 1, whole: false },
+      { text: 0, start: 8_001, end: 8_002, whole: false },
+    ]);
+  });
+
   /** @scenario "A piece the model could reshape sends the whole span to Presidio" */
   it("starts no piece on a space after a piece that is mostly one long word", () => {
     const text = `${"w".repeat(3_900)} ${"ab ".repeat(3_000)}`;
@@ -162,6 +183,33 @@ describe("isPlaceablePiece", () => {
     expect(isPlaceablePiece("\u0085Maria")).toBe(false);
     expect(isPlaceablePiece("Maria ")).toBe(false);
     expect(isPlaceablePiece("call 😀 Maria now")).toBe(true);
+  });
+});
+
+describe("splitFindingsCount", () => {
+  /** @scenario "A split span's usage line counts its calls" */
+  it("counts a name two pieces both found once, after an emoji earlier in the text", () => {
+    const text = `${"😀".repeat(300)}${"x".repeat(3_250)}Alice${"y".repeat(5_000)}`;
+    const finding = (start: number) => ({
+      entity_type: "PERSON",
+      start,
+      end: start + 5,
+      score: 0.9,
+    });
+    const answers: PieceAnswer[] = [
+      {
+        piece: { text: 0, start: 0, end: 3_900, whole: false },
+        findings: [finding(3_550)],
+        anonymized: "",
+      },
+      {
+        piece: { text: 0, start: 3_800, end: text.length, whole: false },
+        findings: [finding(50)],
+        anonymized: "",
+      },
+    ];
+
+    expect(splitFindingsCount({ texts: [text], answers })).toBe(1);
   });
 });
 

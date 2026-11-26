@@ -128,7 +128,8 @@ export class PresidioRedactionService {
           ? (result.raw_response ?? {})
           : {};
       return {
-        findings: "results" in response ? response.results : [],
+        // No list is not an empty one: a whole text then keeps the model's own masked text.
+        findings: "results" in response ? response.results : undefined,
         anonymized: "anonymized" in response ? response.anonymized : null,
       };
     });

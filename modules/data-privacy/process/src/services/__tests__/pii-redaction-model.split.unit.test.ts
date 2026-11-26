@@ -15,6 +15,7 @@ import {
 import { MemoryGoogleDlpChannel } from "../../channels/memory/memory.google-dlp.channel.ts";
 import { MemoryPresidioChannel } from "../../channels/memory/memory.presidio.channel.ts";
 import { MemoryDataPrivacyProjectScopeRepository } from "../../repositories/memory/memory.data-privacy-project-scope.repository.ts";
+import { clearingOfAnswer } from "../../rules/pii-analysis.rules.ts";
 import {
   PII_REDACTION_MODEL_BREAKER_COOLDOWN_MS,
   PII_REDACTION_MODEL_TIMEOUT_MS,
@@ -25,6 +26,7 @@ import {
   piiRedactionSpendRequestId,
 } from "../../rules/pii-redaction-spend.rules.ts";
 import {
+  clearSplitSpan,
   PII_REDACTION_MODEL_PIECE_CHARACTERS,
   planSpan,
   type SplitCall,
@@ -463,6 +465,55 @@ describe("PiiRedactionModelService, a long batch with a split model set (ADR-207
       expect(splitModel.calls.length).toBeGreaterThan(splitCalls);
     },
   );
+
+  /** @scenario "A split call's timeout or throttle never stops short batches reaching the model" */
+  it("opens the split breaker on a throttle that lands after a sibling call already failed", async () => {
+    const { clear, presidio, splitModel, fallbacks } = setup({ turns: ["fail", "throttle"] });
+    const texts = [filler(3_000), filler(3_000, 50_000), filler(3_000, 90_000)];
+    presidio.answerWith(presidioAnswer(3));
+    await clear(texts);
+    expect(splitModel.calls).toHaveLength(2);
+
+    presidio.answerWith(presidioAnswer(3));
+    await clear(texts);
+
+    expect(splitModel.calls).toHaveLength(2);
+    expect(fallbacks.at(-1)).toBe("breaker_open");
+  });
+
+  /** @scenario "A whole text in a split call keeps the model's own masked text" */
+  it("keeps the model's own mask on a spared whole text when the answer lists no findings", async () => {
+    const split = PresidioRedactionService.create({
+      presidio: {
+        detect: async () => ({
+          kind: "detected",
+          results: [{ status: "processed", raw_response: { anonymized: "<DATE_TIME>" } }],
+        }),
+      },
+      metrics,
+      timeoutMs: PII_REDACTION_MODEL_TIMEOUT_MS,
+      method: "pii_redaction_model",
+    });
+    const singleCallClearing = clearingOfAnswer({
+      input: "June 12",
+      rawResponse: { anonymized: "<DATE_TIME>" },
+      spareNamesAndPlaces: true,
+    });
+    const [answer] = await split.answers({
+      texts: ["June 12"],
+      piiRedactionLevel: "STRICT",
+      signal: new AbortController().signal,
+    });
+
+    expect(
+      clearSplitSpan({
+        texts: ["June 12"],
+        answers: [{ piece: { text: 0, start: 0, end: 7, whole: true }, ...answer! }],
+        spareNamesAndPlaces: [true],
+      }),
+    ).toEqual([singleCallClearing.kind === "redacted" ? singleCallClearing.text : ""]);
+    expect(singleCallClearing.kind).toBe("redacted");
+  });
 
   /** @scenario "A split span's usage line counts its calls" */
   it("leaves one usage line with the outcome ok, the findings and the number of calls", async () => {
