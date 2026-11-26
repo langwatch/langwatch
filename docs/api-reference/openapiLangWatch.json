@@ -16811,6 +16811,10 @@
                       }
                     ]
                   },
+                  "timeZone": {
+                    "type": "string",
+                    "description": "The IANA time zone {dashboard_context_timezone:String} is bound to, such as America/Los_Angeles; UTC when absent."
+                  },
                   "projectId": {
                     "description": "Reads this one project, which the key must hold analytics:view on. Send projectId or projects, not both.",
                     "type": "string",

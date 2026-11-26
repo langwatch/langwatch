@@ -25,6 +25,8 @@ class PostApiV1QueryBody:
         parameters (PostApiV1QueryBodyParameters | Unset):
         time_window (PostApiV1QueryBodyTimeWindow | Unset):
         granularity_seconds (Literal[1] | Literal[3600] | Literal[604800] | Literal[60] | Literal[86400] | Unset):
+        time_zone (str | Unset): The IANA time zone {dashboard_context_timezone:String} is bound to, such as
+            America/Los_Angeles; UTC when absent.
         project_id (str | Unset): Reads this one project, which the key must hold analytics:view on. Send projectId or
             projects, not both.
         projects (list[str] | str | Unset): The projects to read, each one the key holds analytics:view on, or the
@@ -41,6 +43,7 @@ class PostApiV1QueryBody:
     parameters: PostApiV1QueryBodyParameters | Unset = UNSET
     time_window: PostApiV1QueryBodyTimeWindow | Unset = UNSET
     granularity_seconds: Literal[1] | Literal[3600] | Literal[604800] | Literal[60] | Literal[86400] | Unset = UNSET
+    time_zone: str | Unset = UNSET
     project_id: str | Unset = UNSET
     projects: list[str] | str | Unset = UNSET
     sources: list[PostApiV1QueryBodySourcesItem] | Unset = UNSET
@@ -62,6 +65,8 @@ class PostApiV1QueryBody:
             granularity_seconds = UNSET
         else:
             granularity_seconds = self.granularity_seconds
+
+        time_zone = self.time_zone
 
         project_id = self.project_id
 
@@ -94,6 +99,8 @@ class PostApiV1QueryBody:
             field_dict["timeWindow"] = time_window
         if granularity_seconds is not UNSET:
             field_dict["granularitySeconds"] = granularity_seconds
+        if time_zone is not UNSET:
+            field_dict["timeZone"] = time_zone
         if project_id is not UNSET:
             field_dict["projectId"] = project_id
         if projects is not UNSET:
@@ -157,6 +164,8 @@ class PostApiV1QueryBody:
 
         granularity_seconds = _parse_granularity_seconds(d.pop("granularitySeconds", UNSET))
 
+        time_zone = d.pop("timeZone", UNSET)
+
         project_id = d.pop("projectId", UNSET)
 
         def _parse_projects(data: object) -> list[str] | str | Unset:
@@ -188,6 +197,7 @@ class PostApiV1QueryBody:
             parameters=parameters,
             time_window=time_window,
             granularity_seconds=granularity_seconds,
+            time_zone=time_zone,
             project_id=project_id,
             projects=projects,
             sources=sources,
