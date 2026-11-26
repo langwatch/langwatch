@@ -128,7 +128,6 @@ export function OrganizationPiiLevelSection({
   // A prompt opened for one organization is dismissed once the page shows another.
   if (asking && asking.organizationId !== organizationId) setAsking(null);
   if (!organizationId || !snapshot.effectiveOrganization) return null;
-  const askingHere = asking?.organizationId === organizationId ? asking : null;
 
   const storedPii = snapshot.effectiveOrganization.pii;
   const stored = organizationPiiLevel(storedPii.level);
@@ -137,8 +136,8 @@ export function OrganizationPiiLevelSection({
   const ownRule = organizationRule({ rules: snapshot.rules, organizationId });
   const confirmationFor = (level: OrganizationPiiLevel) =>
     levelChangeConfirmation({ from: storedPii.level, to: level, free, acceptance });
-  const confirmation = askingHere
-    ? confirmationFor(askingHere.kind === "switch" ? "strict" : askingHere.level)
+  const confirmation = asking
+    ? confirmationFor(asking.kind === "switch" ? "strict" : asking.level)
     : null;
 
   const save = async (level: OrganizationPiiLevel) => {
@@ -162,7 +161,7 @@ export function OrganizationPiiLevelSection({
     <>
       <OrganizationPiiLevelPicker
         level={shown}
-        pendingLevel={askingHere?.kind === "level" ? askingHere.level : null}
+        pendingLevel={asking?.kind === "level" ? asking.level : null}
         otherLevelLabel={otherPiiLevelLabel({
           level: storedPii.level,
           entityCount: storedPii.entities.length,
@@ -188,7 +187,7 @@ export function OrganizationPiiLevelSection({
         open={confirmation !== null}
         onClose={() => setAsking(null)}
         onConfirm={() => {
-          const choice = askingHere;
+          const choice = asking;
           setAsking(null);
           if (!choice) return;
           const accept = () => onAccept({ organizationId: choice.organizationId });
