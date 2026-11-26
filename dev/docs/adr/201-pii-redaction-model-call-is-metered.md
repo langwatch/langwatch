@@ -143,8 +143,11 @@ list is now read when the batch is routed, and an unreadable one sends the batch
     admin confirms the price: picking Strict, switching a rule-based Strict to the model, or saving
     a Strict rule. Routing reads it once a minute per organization, so an acceptance reaches the
     model within a minute. Billing counts an organization's PII spend only from the moment of the
-    acceptance: none without one, none in a month that ended before it. Self-hosted is unchanged:
-    the licence decides and no call is priced.
+    acceptance: none without one, none in a month that ended before it. A pending meter total (a
+    send cut off before Stripe confirmed it) is replayed only while the spend from the acceptance on
+    still covers it; one above it is dropped and the month reported from the acceptance on, and one
+    that spend cannot be read for is held. Self-hosted is unchanged: the licence decides and no
+    call is priced.
 
 ## Rationale / Trade-offs
 
@@ -189,6 +192,13 @@ Billing reads the acceptance from `Organization` through its own repository rath
 `OrganizationApi`: organization depends on billing, so the reverse edge would close a peer cycle,
 and billing is already a named reader of the table. The read is separate from billing's cached
 organization lookup, so that cache's shape and key stay as they are.
+
+A pending PII total above the spend the acceptance covers is dropped rather than replayed and
+corrected by the next report, so no report sends spend no admin accepted. The cost: if the cut-off
+send had in fact reached Stripe, that amount stays there and the fresh report sends the accepted
+spend beside it. The warning names both totals so an operator can check Stripe. A pending total can
+sit above that spend only when it was written before this rule shipped or the ledger was corrected
+down, and decision 11 maps the meter in test mode only.
 
 ## Consequences
 

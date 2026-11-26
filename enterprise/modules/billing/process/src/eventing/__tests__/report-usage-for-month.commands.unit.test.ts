@@ -13,6 +13,7 @@ import type { BillingCheckpointRepository } from "../../repositories/billing-che
 import { MemoryBillingCheckpointRepository } from "../../repositories/memory/memory.billing-checkpoint.repository.ts";
 import { MemoryBillingStore } from "../../repositories/memory/memory.billing.store.ts";
 import type { PriceLine } from "../../rules/price-line.rules.ts";
+import type { BillableEventsTotalResult } from "../../rules/billing-month.rules.ts";
 
 // ---------------------------------------------------------------------------
 // Hoisted mocks
@@ -1796,6 +1797,85 @@ describe("ReportUsageForMonthCommand: the PII redaction price", () => {
         eventName: "langwatch_pii_redaction_usd",
         identifier: "org-1:2026-02:langwatch_pii_redaction_usd:from:0:to:5000",
       });
+    });
+  });
+
+  describe("given a PII redaction total an earlier run left pending", () => {
+    const at = { organizationId: "org-1", billingMonth: "2026-02" };
+    const meter = "langwatch_pii_redaction_usd";
+
+    /** Leaves 5,000 units pending over a real checkpoint store, then reports February once. */
+    async function replayPending({ eligible }: { eligible: BillableEventsTotalResult }) {
+      const checkpoints = MemoryBillingCheckpointRepository.create(MemoryBillingStore.create());
+      await checkpoints.writeIntent({
+        ...at,
+        meter,
+        lastReportedTotal: 0,
+        pendingReportedTotal: 5_000,
+      });
+      mockOrganizations.getOrganizationForBilling.mockResolvedValue(usageBilledOrg());
+      mockQueryPiiRedactionSpendTotal.mockResolvedValue(eligible);
+      mockReportUsageDelta.mockResolvedValue([{ reported: true }]);
+      const handler = await createHandler({ billingCheckpoints: checkpoints });
+
+      await handler.handle(makeCommand());
+
+      return {
+        sent: mockReportUsageDelta.mock.calls
+          .flatMap(([input]) => input.events)
+          .filter((event) => event.eventName === meter),
+        checkpoint: await checkpoints.findCheckpoint({ ...at, meter }),
+      };
+    }
+
+    /** @scenario "A pending PII redaction total is replayed even while the price is missing" */
+    it("replays it under its own identifier while the acceptance's spend covers it", async () => {
+      const { sent, checkpoint } = await replayPending({
+        eligible: { outcome: "counted", total: 7_000 },
+      });
+
+      expect(sent).toEqual([
+        expect.objectContaining({ identifier: `org-1:2026-02:${meter}:from:0:to:5000` }),
+      ]);
+      expect(checkpoint).toMatchObject({ lastReportedTotal: 5_000, pendingReportedTotal: null });
+    });
+
+    /** @scenario "A pending PII redaction total above the spend the acceptance covers is never sent" */
+    it("drops it and reports only the spend from the acceptance on", async () => {
+      const { sent, checkpoint } = await replayPending({
+        eligible: { outcome: "counted", total: 2_000 },
+      });
+
+      expect(sent).toEqual([
+        expect.objectContaining({
+          identifier: `org-1:2026-02:${meter}:from:0:to:2000`,
+          value: 0.2,
+        }),
+      ]);
+      expect(checkpoint).toMatchObject({ lastReportedTotal: 2_000, pendingReportedTotal: null });
+      expect(mockLogger.warn).toHaveBeenCalledWith(
+        expect.objectContaining({ meter, pendingTotal: 5_000, eligibleTotal: 2_000 }),
+        expect.stringContaining("dropping"),
+      );
+    });
+
+    /** @scenario "A pending PII redaction total above the spend the acceptance covers is never sent" */
+    it("sends nothing for an organization that never accepted, and clears it", async () => {
+      const { sent, checkpoint } = await replayPending({
+        eligible: { outcome: "counted", total: 0 },
+      });
+
+      expect(sent).toEqual([]);
+      expect(checkpoint).toMatchObject({ lastReportedTotal: 0, pendingReportedTotal: null });
+    });
+
+    /** @scenario "A pending PII redaction total that cannot be checked against the acceptance is held" */
+    it("sends nothing and keeps it while the spend cannot be read", async () => {
+      const { sent, checkpoint } = await replayPending({ eligible: { outcome: "unavailable" } });
+
+      expect(sent).toEqual([]);
+      expect(checkpoint).toMatchObject({ lastReportedTotal: 0, pendingReportedTotal: 5_000 });
+      expect(mockSelfDispatch).not.toHaveBeenCalled();
     });
   });
 

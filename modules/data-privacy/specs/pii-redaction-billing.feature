@@ -354,10 +354,28 @@ Feature: A PII redaction model call is priced per character, written to the spen
     @unit
     Scenario: A pending PII redaction total is replayed even while the price is missing
       Given a PII redaction meter event whose send was cut off before it was confirmed
+      And the spend from the organization's acceptance on still covers its total
       And a subscription that no longer carries the PII redaction price
       When the month is reported
       Then the pending total is sent again under its own identifier
       # Stripe forgets an identifier after a day; waiting for the price could count it twice.
+
+    @unit
+    Scenario: A pending PII redaction total above the spend the acceptance covers is never sent
+      Given a PII redaction meter event whose send was cut off before it was confirmed
+      And its total is above the spend recorded from the organization's acceptance on
+      When the month is reported
+      Then the pending total is dropped and never sent
+      And the month reports only the spend from the acceptance on, under that total's own identifier
+      And an organization that never accepted sends nothing
+      # A total written by a release that billed without an acceptance (ADR-201 decision 15).
+
+    @unit
+    Scenario: A pending PII redaction total that cannot be checked against the acceptance is held
+      Given a PII redaction meter event whose send was cut off before it was confirmed
+      And the spend from the organization's acceptance on cannot be read
+      When the month is reported
+      Then nothing is sent and the pending total is kept for the next report
 
     @unit
     Scenario: Usage is reported once the subscription carries the PII redaction price
