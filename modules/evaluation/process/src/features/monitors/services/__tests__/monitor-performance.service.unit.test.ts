@@ -10,6 +10,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   MonitorPerformanceRepository,
+  type EvaluatorOutcomeRow,
   type MonitorPerformanceBucket,
 } from "../../../../repositories/monitor-performance.repository.ts";
 import { MonitorPerformanceService } from "../monitor-performance.service.ts";
@@ -23,6 +24,10 @@ class InMemoryMonitorPerformanceRepository extends MonitorPerformanceRepository 
 
   async findBuckets(): Promise<MonitorPerformanceBucket[]> {
     return this.buckets;
+  }
+
+  async findOutcomeRows(): Promise<EvaluatorOutcomeRow[]> {
+    return [];
   }
 }
 
