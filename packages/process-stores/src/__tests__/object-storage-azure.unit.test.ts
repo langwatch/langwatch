@@ -64,10 +64,11 @@ describe("given object storage on Azure Blob with an account key", () => {
   });
 
   afterEach(async () => {
+    server.closeAllConnections();
     await new Promise((resolve) => server.close(resolve));
   });
 
-  const backend = () =>
+  const backend = (input: { idleMs?: number } = {}) =>
     azureBackend({
       credentials: resolveAzureCredentials({
         accountName: "devstoreaccount1",
@@ -76,6 +77,7 @@ describe("given object storage on Azure Blob with an account key", () => {
         endpoint,
       }),
       clock,
+      ...input,
     });
 
   describe("when a module writes a body", () => {
@@ -101,6 +103,20 @@ describe("given object storage on Azure Blob with an account key", () => {
         },
       });
       expect(received[0]?.headers.authorization).toMatch(/^SharedKey devstoreaccount1:.+=$/);
+    });
+  });
+
+  describe("when Azure stops answering a write", () => {
+    it("cuts the call once its socket idles, instead of holding the body forever", async () => {
+      server.removeAllListeners("request");
+      server.on("request", () => {});
+
+      await expect(
+        backend({ idleMs: 50 }).write(at, text("hello"), {
+          byteLength: 5,
+          contentType: "text/plain",
+        }),
+      ).rejects.toThrow("Azure Blob PUT idled for 50 ms");
     });
   });
 
