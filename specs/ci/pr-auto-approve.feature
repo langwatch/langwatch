@@ -58,7 +58,7 @@ Feature: Automation approves reviewed pull requests and flags the risky ones
   @unit
   Scenario: A PR that changes the review pipeline needs a human
     Given the review bot passed the head commit and every required check is green
-    And the PR changes or renames a root-level file, anything under .github/, cmd/, tools/ or pkg/ciscan/, or a .claude/ directory, CLAUDE.md, AGENTS.md, go.mod or go.sum at any depth
+    And the PR changes or renames a root-level file, anything under .github/, cmd/, tools/ or pkg/ciscan/, or a .claude/ directory, .mcp.json, CLAUDE.md, AGENTS.md, go.mod or go.sum at any depth
     When the reviewed-approval decision runs
     Then automation does not approve
 

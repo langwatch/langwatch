@@ -18,7 +18,7 @@ A PR may be treated as **low risk** only if:
   - BDD feature specs (`specs/` directory).
   - Raster images (`.png`, `.jpg`, `.gif`, `.webp`; `.svg` only under `docs/`).
 
-Automation enforces that list as a path allowlist before any AI evaluation. Other `.md` files are not on it: a `SKILL.md` or prompt file ships as agent instructions. The review pipeline is never low risk: a file at the repository root, anything under `.github/`, `cmd/`, `tools/` or `pkg/ciscan/`, or at any depth a `.claude/` directory, `CLAUDE.md`, `AGENTS.md`, `go.mod` or `go.sum`.
+Automation enforces that list as a path allowlist before any AI evaluation. Other `.md` files are not on it: a `SKILL.md` or prompt file ships as agent instructions. The review pipeline is never low risk: a file at the repository root, anything under `.github/`, `cmd/`, `tools/` or `pkg/ciscan/`, or at any depth a `.claude/` directory, `.mcp.json`, `CLAUDE.md`, `AGENTS.md`, `go.mod` or `go.sum`.
 
 If you are unsure, do **not** use `low-risk-change`; request a normal review instead.
 
