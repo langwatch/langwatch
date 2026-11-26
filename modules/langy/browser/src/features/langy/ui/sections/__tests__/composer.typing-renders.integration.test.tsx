@@ -57,7 +57,6 @@ function renderComposer(onSend: (input: string) => void = () => {}) {
         modelOptions={["openai/gpt-5-mini"]}
         onModelChange={() => {}}
         onSend={onSend}
-        onStop={() => {}}
         disabled={false}
       />
     </DesignSystemProvider>,

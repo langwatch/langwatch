@@ -88,6 +88,53 @@ export function listPublishedSkills(skillsRoot: string): PublishedSkill[] {
   return out;
 }
 
+/** Folders and files a local install or test run leaves in a skill folder. */
+const LEFTOVER_PARTS = new Set(["__pycache__", "node_modules", "coverage", "dist"]);
+const LOCKFILES = new Set([
+  "package-lock.json",
+  "pnpm-lock.yaml",
+  "yarn.lock",
+  "bun.lockb",
+  "bun.lock",
+  "uv.lock",
+  "poetry.lock",
+  "Pipfile.lock",
+]);
+
+/** False for leftovers: dot paths, caches, installs, coverage, build output and lockfiles. */
+export function isShippableAsset(rel: string): boolean {
+  const parts = rel.split(/[\\/]/);
+  return (
+    !LOCKFILES.has(parts.at(-1) ?? "") &&
+    parts.every(
+      (part) => !part.startsWith(".") && !LEFTOVER_PARTS.has(part) && !part.endsWith(".pyc"),
+    )
+  );
+}
+
+/**
+ * Files a skill ships beside its SKILL.md (templates a coding agent copies),
+ * as sorted paths relative to the skill's folder. Every consumer copies them.
+ */
+export function listSkillAssets(skill: PublishedSkill): string[] {
+  const dir = path.dirname(skill.src);
+  return fs
+    .readdirSync(dir, { recursive: true, withFileTypes: true })
+    .filter((e) => e.isFile())
+    .map((e) => path.relative(dir, path.join(e.parentPath, e.name)))
+    .filter((rel) => rel !== "SKILL.mdx" && isShippableAsset(rel))
+    .toSorted();
+}
+
+/** Copies a skill's assets into the folder its SKILL.md was written to. */
+export function copySkillAssets({ skill, toDir }: { skill: PublishedSkill; toDir: string }): void {
+  const fromDir = path.dirname(skill.src);
+  for (const rel of listSkillAssets(skill)) {
+    fs.mkdirSync(path.dirname(path.join(toDir, rel)), { recursive: true });
+    fs.copyFileSync(path.join(fromDir, rel), path.join(toDir, rel));
+  }
+}
+
 export function listNativeSkills(skillsRoot: string): PublishedSkill[] {
   return [
     ...listPublishedSkills(skillsRoot),

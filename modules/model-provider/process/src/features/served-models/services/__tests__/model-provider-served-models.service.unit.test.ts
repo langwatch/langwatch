@@ -18,6 +18,10 @@ class ScriptedModelList extends ModelProviderModelList {
     super();
   }
 
+  findListedModels(): Promise<null> {
+    return Promise.resolve(null);
+  }
+
   findServedModelIds(): Promise<string[]> {
     this.asked += 1;
     return this.answer();

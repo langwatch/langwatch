@@ -10,6 +10,9 @@ const noVendorBases = {
   databricksWorkspaceBase: undefined,
   dataverseEnvironmentBase: undefined,
   bedrockAgentEndpoint: undefined,
+  bedrockAgentCoreControlEndpoint: undefined,
+  googleOauthTokenBase: undefined,
+  vertexAiApiBase: undefined,
 };
 
 describe("where an issued personal key tells its holder to send traffic", () => {

@@ -4,7 +4,11 @@
  * @see specs/langy/langy-conversation-title.feature
  */
 
-import { extractLangyTextFromParts, LANGY_TITLE_GENERATION } from "@langwatch/langy-contract";
+import {
+  extractLangyTextFromParts,
+  LANGY_TITLE_GENERATION,
+  withImageChipsAsNames,
+} from "@langwatch/langy-contract";
 import {
   GUIDED_KICKOFF_CONVERSATION_TITLE,
   GUIDED_ONBOARDING_KICKOFF_PART_TYPE,
@@ -74,7 +78,7 @@ export function placeholderTitleOf(parts: readonly unknown[] | undefined): strin
 
 /** Bring a raw title into the one style. Empty string means "no title". */
 export function normalizeLangyConversationTitle(raw: string): string {
-  let out = unwrap(raw);
+  let out = unwrap(withImageChipsAsNames(raw));
   out = out.replace(/\s+/g, " ").trim();
   out = truncateOnWordBoundary(out, LANGY_TITLE_GENERATION.MAX_TITLE_CHARS);
   out = stripTrailingPunctuation(out);

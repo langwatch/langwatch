@@ -71,6 +71,11 @@ Feature: Running LangWatchQL from the CLI
     Then the printed table's headers are the result's column names
 
   @unit
+  Scenario: The format flag has the same short spelling as every other command
+    When a statement is run with "-f json"
+    Then the result is printed as JSON, the same as with "--format json"
+
+  @unit
   Scenario: The jsonl format prints one object per row
     When the caller runs a statement with the jsonl format
     Then each line is one row as a JSON object

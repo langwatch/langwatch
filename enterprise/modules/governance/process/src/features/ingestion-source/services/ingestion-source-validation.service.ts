@@ -13,6 +13,7 @@ import type { ProjectApi } from "@langwatch/project-contract";
 
 import {
   findPullConfigComplaints,
+  findPullConfigFieldErrors,
   findPullCredentialComplaints,
 } from "../../ingestion-pull/rules/pull-config-shape.rules.ts";
 import { isSameEnvironment } from "../../microsoft/rules/dataverse-environment-service.rules.ts";
@@ -120,7 +121,10 @@ export class IngestionSourceValidationService {
       return;
     }
 
-    throw new GovernanceValidationError(complaints.join(" "), { formErrors: complaints });
+    throw new GovernanceValidationError(complaints.join(" "), {
+      formErrors: complaints,
+      fieldErrors: findPullConfigFieldErrors(parserConfig),
+    });
   }
 
   /**

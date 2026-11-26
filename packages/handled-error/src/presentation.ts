@@ -3458,6 +3458,19 @@ const presentations = {
     describe: () =>
       "Open the chart on the group project to see it, or set the report or alert up on a member project.",
   },
+  analytics_filter_key_required: {
+    title: "This filter needs a key",
+    describe: (error) =>
+      `"${safeProse(str(error, "filterField", "This filter"))}" filters by a key, ` +
+      "such as a metadata key or a metric, so a plain list can't be applied. " +
+      "Pick the key, then the values.",
+  },
+  analytics_filter_value_unsupported: {
+    title: "This filter value isn't one of its options",
+    describe: (error) =>
+      `"${safeProse(str(error, "filterField", "This filter"))}" accepts only its option values, ` +
+      "such as true or false. Pick one of the options listed for it.",
+  },
   analytics_series_percentage_unsupported: {
     // A percentage is the series divided by the same measurement without the
     // series' own filters. A per-entity measurement (average per user, sum per
@@ -5169,6 +5182,16 @@ const presentations = {
     title: "This conversation belongs to someone else",
     describe: () => "You can view shared conversations but only the owner can continue them.",
   },
+  langy_attachment_refused: {
+    title: "Langy can't take that file",
+    describe: (error) => {
+      const reason = str(error, "reason", "");
+      if (reason === "not_an_image") return "Attach a PNG, JPEG, GIF or WebP image.";
+      if (reason === "too_large") return "Attach an image of 5 MB or less.";
+      if (reason === "too_many") return "Send at most four images in one message.";
+      return "Attach the image again, then send.";
+    },
+  },
   langy_empty_message: {
     title: "Nothing to send",
     describe: () => "Type a message first.",
@@ -6570,6 +6593,10 @@ const presentations = {
   invalid_conversation_id: {
     title: "Conversation not found",
     describe: () => "This conversation link isn't one we can open. Start a new chat to keep going.",
+  },
+  invalid_images: {
+    title: "These images can't be sent",
+    describe: () => "Attach fewer or smaller images in a supported format and try again.",
   },
   agent_session_not_found: {
     title: "The session was lost",
