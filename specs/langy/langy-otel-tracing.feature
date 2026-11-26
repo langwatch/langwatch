@@ -172,6 +172,29 @@ Feature: Langy agent activity is traced into the user's project
     And the worker cannot choose whether its calls are mirrored
 
   @unit
+  Scenario: The mirror receives each turn's root with its outcome
+    Given a customer organization at the default content tier
+    When a turn ends, successfully or with a failure
+    Then the mirror project receives the turn's root span with its outcome
+    And the root keeps the trace and span ids the turn's model calls name as parent
+    And the mirrored root names the customer organization and project it came from
+    And the customer's own copy of the root carries neither
+
+  @unit
+  Scenario: A skipped customer's turn root never reaches the mirror
+    Given a customer organization at the skip tier
+    When a turn ends
+    Then the customer's project receives the turn's root span
+    And nothing about the turn reaches the mirror project
+
+  @unit
+  Scenario: Mirrored model calls name the customer they came from
+    Given a customer organization at the default content tier
+    When the gateway records a Langy turn's model call
+    Then the mirror copy of the call names the source organization and project on its resource
+    And the customer's own copy of the call carries neither
+
+  @unit
   Scenario: An install with no mirror sends model calls without the mirror's markers
     Given an install with no mirror project configured
     When the gateway records a Langy turn's model call

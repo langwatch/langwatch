@@ -134,6 +134,21 @@ export const disambiguateNames = (names: string[]): string[] => {
   });
 };
 
+export type ExpandedCellPosition = { top: number; left: number; width: number };
+
+/**
+ * Where a cell's expanded overlay opens: over the cell itself (several values can share one td),
+ * at least as wide as its td, and pulled left when it would run off the viewport.
+ */
+export const expandedPositionOf = (cell: HTMLElement): ExpandedCellPosition => {
+  const rect = cell.getBoundingClientRect();
+  const tdWidth = cell.closest("td")?.getBoundingClientRect().width ?? rect.width;
+  const width = Math.max(rect.width, tdWidth) + 24;
+  const rightLimit = window.innerWidth - 32;
+  const left = Math.min(rect.left - 12, rightLimit - width);
+  return { top: rect.top, left, width };
+};
+
 export const useEscapeKey = ({
   enabled,
   onEscape,

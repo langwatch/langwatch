@@ -19,10 +19,19 @@ export const revealsBoardMenu = {
   css: { "&:hover .board-menu, &:has(:focus-visible) .board-menu": { opacity: 1 } },
 };
 
-export function BoardMenu({ name, actions }: { name: string; actions: BoardMenuActions }) {
+export function BoardMenu({
+  name,
+  actions,
+  isAlwaysShown = false,
+}: {
+  name: string;
+  actions: BoardMenuActions;
+  /** A table row shows its "⋮" at rest; a sidebar row only on hover or focus. */
+  isAlwaysShown?: boolean;
+}) {
   const { onRename, move, onDuplicate, duplicateLabel = "Duplicate", remove } = actions;
   return (
-    <MenuFrame name={name}>
+    <MenuFrame name={name} isAlwaysShown={isAlwaysShown}>
       {onRename && (
         <Menu.Item value="rename" onClick={onRename}>
           <MenuRow icon={<Pencil size={13} />}>Rename</MenuRow>
@@ -72,12 +81,20 @@ function DeleteItem({ onDelete }: { onDelete: (() => void) | undefined }) {
   );
 }
 
-function MenuFrame({ name, children }: { name: string; children: ReactNode }) {
+function MenuFrame({
+  name,
+  isAlwaysShown,
+  children,
+}: {
+  name: string;
+  isAlwaysShown: boolean;
+  children: ReactNode;
+}) {
   return (
     <Box
       className="board-menu"
       display="flex"
-      opacity={0}
+      opacity={isAlwaysShown ? 1 : 0}
       transition="opacity 0.2s"
       css={{ "&:has([aria-expanded=true])": { opacity: 1 } }}
     >

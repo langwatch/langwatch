@@ -214,7 +214,7 @@ Feature: Organization-wide Dashboards area
   Scenario: The library lists the boards I may see, with who sees each and its owner
     When I open "/dashboards"
     Then the header reads "Dashboards" with "Every dashboard you can see, by product."
-    And one group, "LLM Ops · <count>", lists boards with no project first, then the rest by project
+    And its table lists the LLM Ops boards with no project first, then the rest by project
     And each row names who sees it: the project's name, "Organization", or "Only me"
     And each row names its owner, "You" for mine, else its author's name
     And every board opens at "/dashboards/<id>", a Project board included (owner, 2026-11-23)
@@ -253,18 +253,51 @@ Feature: Organization-wide Dashboards area
     Then the copy, "<name> copy", is stored in my store project at the board's scope and opens
     # Evidence: the quoted delete, update and create answers, and screenshots of the toasts
 
+  # Request from the dashboards team, 2026-11-26: "a better design and search / filtering setup
+  # on the dashboards table". One table replaces the per-product groups; Product is a column and
+  # a filter, so the folding groups and their "Show N more" are gone from the library.
   @integration
-  Scenario: The library lists every board I may see, grouped by product
+  Scenario: The library lists every board I may see in one table
     Given boards homed in LLM Ops, Coding agents, Gateway and Governance
     When I open "/dashboards"
     Then the header reads "Dashboards" with "Every dashboard you can see, by product."
-    And each product that has at least one board I may see has a group headed "<Product> · <count>", in the rail's order: Coding agents, LLM Ops, Gateway, Governance
-    And a product with none has no group
-    And within a group, boards with no project come first, then by project name, then by board name
-    And each row names who sees it: the project's name, "Organization", or "Only me" with a lock
-    And each row names its owner, "You" for mine
+    And one table lists them with the columns Name, Product, Shared with, Owner and Updated
+    And the rows follow the rail's product order: Coding agents, LLM Ops, Gateway, Governance
+    And within a product, boards with no project come first, then by project name, then by board name
+    And a row shows the board's description under its name, when it has one
+    And "Shared with" names the project, "Organization", or "Only me" with a lock
+    And "Owner" reads "You" for mine
     And a project name too long for its column, such as "Checkout conversion and refunds EU", ends with "…" and shows in full on hover
     # Evidence: haven browser screenshots of the library, light and dark, plus one hover
+
+  @unit @integration
+  Scenario: The library's search finds a board by its name, description, project or owner
+    Given boards named "Refund rate" and "Latency", one described as "Weekly refunds review"
+    When I type "refund" in "Search dashboards"
+    Then only the boards whose name, description, project name or owner name holds "refund" are listed, whatever the case
+    And the toolbar says how many of all the boards it shows, such as "2 of 5 dashboards"
+    # Evidence: haven browser screenshot with the search typed
+
+  @unit @integration
+  Scenario: The library's filters narrow it by product, owner and who sees it
+    Given boards in several products, some mine and some another member's, at each scope
+    Then the toolbar offers product chips: "All" and each product that has a board, each with its count
+    And "Created by" offers Anyone and Me, and "Shared with" offers Anyone, Only me, Project and Organization
+    When I pick "Gateway", "Me" and "Organization"
+    Then only my Organization boards homed in Gateway are listed
+    And the search and the filters narrow the list together
+    And "Clear filters" shows while any is set, and puts the search and every filter back
+    And with nothing matching, the library says "No dashboards match these filters" and offers "Clear filters"
+    # Evidence: haven browser screenshot with filters picked, and one of no match
+
+  @unit @integration
+  Scenario: The library sorts by name or by last change
+    When I press the "Name" column header
+    Then the boards are listed by name, A to Z, and pressing it again lists them Z to A
+    When I press the "Updated" column header
+    Then the most recently changed board comes first, and pressing it again puts the oldest first
+    And until I press a header the rows keep the product order
+    # Evidence: haven browser screenshot of the table sorted by Updated
 
   @integration
   Scenario: The library leaves out what I may not see
@@ -275,23 +308,6 @@ Feature: Organization-wide Dashboards area
     And an Organization board whose project I cannot read is listed with no project named
     And an Organization board of an archived project is not listed
     # Evidence: the quoted boards.listInOrganization answer for that member
-
-  @integration
-  Scenario: A long group shows 8 boards, then "Show N more" and "Show less"
-    Given 11 boards homed in LLM Ops
-    Then the LLM Ops group shows 8 boards, and a "Show 3 more" that opens the rest in place
-    And then it reads "Show less", which folds the group back to 8
-    And a group of 8 boards or fewer offers neither
-    # Evidence: haven browser screenshots before and after each click
-
-  @integration
-  Scenario: A long group stays open or folded after a reload
-    Given 11 boards homed in LLM Ops
-    When I press "Show 3 more" and reload the library
-    Then the LLM Ops group still lists all 11 boards and reads "Show less"
-    When I press "Show less" and reload the library
-    Then the group shows 8 and a "Show 3 more" again
-    # Evidence: haven browser screenshots after each reload
 
   @integration @unimplemented
   Scenario: A library row's menu offers what I may do
@@ -473,7 +489,7 @@ Feature: Organization-wide Dashboards area
   Scenario: The LLM Ops section in a project lists the same boards, filtered
     Given LLM Ops-homed boards owned by "Shop" and by "Ops", some Project, some Organization, some Only me, one starred
     When I am in LLM Ops in "Shop"
-    Then its Dashboards section shows My dashboard, then the "Shop" Project boards, every Organization board and my Only me boards homed in LLM Ops, by name, a starred one among them
+    Then its Dashboards section shows My dashboard, then the "Shop" Project boards, every Organization board and my Only me boards homed in LLM Ops, in my own order and the rest by name, a starred one among them
     And it has no From LangWatch group
     And it lists no Project board of "Ops" and no board homed in another product
     And every board it lists is also in the library
@@ -822,7 +838,7 @@ Feature: Organization-wide Dashboards area
   Scenario: Each product's sidebar lists its own boards
     Given boards homed in each product
     When I am in Coding agents, Gateway or Governance
-    Then the sidebar has a "Dashboards" section with that product's boards I may see, by name, 8 then "Show N more" and "Show less"
+    Then the sidebar has a "Dashboards" section with that product's boards I may see, in my own order and the rest by name, 8 then "Show N more" and "Show less"
     And its "+" opens the create dialog with that product fixed
     And a board is listed only when its owning project has Dashboards on and I may read it, or it is my personal board
     And a member who can reach Dashboards in no project of "Acme" sees no section
@@ -847,6 +863,64 @@ Feature: Organization-wide Dashboards area
     And Rename edits the name in place in the row, and Enter saves it in the project that owns the board
     # Evidence: haven browser screenshots of a row at rest, hovered and with its menu open, and of
     # the open board's row at rest after a click, light and dark
+
+  # Request from the dashboards team, 2026-11-26: "we should be able to reorganize the order of
+  # the dashboards on the sidebar by dragging". The order is each member's own, per organization
+  # and product: a section mixes Project, Organization and Only me boards of several projects,
+  # so no shared order fits every member, and arranging one's own sidebar needs no edit rights.
+  @unit @integration
+  Scenario: Drag a board to reorder a product's Dashboards section
+    Given the LLM Ops Dashboards section lists My dashboard, "Alpha", "Beta" and "Gamma"
+    When I drag "Gamma" above "Alpha"
+    Then the section lists My dashboard, "Gamma", "Alpha" and "Beta" at once, and again after a reload
+    And My dashboard stays first and cannot be dragged
+    And dragging a row and letting go does not open its board
+    # Evidence: haven browser screenshots of the section before and after the drag
+
+  @integration
+  Scenario: Reorder a product's Dashboards section from the keyboard
+    Given the LLM Ops Dashboards section lists My dashboard, "Alpha", "Beta" and "Gamma"
+    When I move focus to the "Reorder Gamma" handle, press Space, ArrowUp twice and Space
+    Then the section lists My dashboard, "Gamma", "Alpha" and "Beta", and the move is announced
+    And Escape while moving puts the board back where it was and saves nothing
+    # Evidence: haven browser screenshot with the handle focused
+
+  @integration
+  Scenario: A reorder the server refuses puts back the last saved order
+    Given my saved LLM Ops order is "Gamma", "Alpha" and "Beta"
+    When I move "Beta" above "Gamma" and the save fails
+    Then the section lists My dashboard, "Gamma", "Alpha" and "Beta" again with no new read
+    And it says "Couldn't save the order of your dashboards"
+    And when an earlier save is refused while a later one is still out, the later order stays and shows once it is saved
+
+  @integration
+  Scenario: Quick reorders are saved in the order I made them
+    Given the LLM Ops Dashboards section lists My dashboard, "Alpha", "Beta" and "Gamma"
+    When I move "Gamma" up and then "Alpha" down while the first save is still out
+    Then the second order is sent only after the first save is answered
+    And the order I made last is the one stored and shown
+
+  @unit
+  Scenario: A board my order does not name is listed after the ones it does, by name
+    Given my order in LLM Ops names "Beta" then "Alpha"
+    When a board "Aardvark" is made in LLM Ops
+    Then the section lists My dashboard, "Beta", "Alpha" and then "Aardvark"
+    And a board in my order that I can no longer see is skipped
+
+  @unit
+  Scenario: Reordering in one project keeps the place of boards listed only in another
+    Given my LLM Ops order holds a Project board of "Ops" between two Organization boards
+    When I swap the two Organization boards while in "Shop"
+    Then the "Ops" board keeps its place between them in my order
+
+  @integration
+  Scenario: The sidebar order is stored per member, organization and product
+    When I save an order for LLM Ops in "Acme"
+    Then the boards.sidebarOrder read answers it to me and to nobody else
+    And my Gateway order and my order in another organization are unchanged
+    And the write needs only organization:view in "Acme"
+    And an order of more than 500 boards, or one naming an id twice, is refused as malformed and stores nothing
+    # Evidence: the quoted boards.sidebarOrder and boards.reorderSidebar answers
 
   # Owner, 2026-11-24: "when I'm on a dashboard page it doesn't really show as selected on the
   # menu", and "why are dashboard menu items smaller and with less padding than other items?"

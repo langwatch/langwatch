@@ -19,6 +19,8 @@ import {
   dashboardScopeImpactSchema,
   dashboardScopeProjectsSchema,
   dashboardScopeSchema,
+  dashboardSidebarOrderIdsSchema,
+  dashboardSidebarOrderSchema,
   dashboardStarSchema,
   organizationBoardSchema,
   starredDashboardSchema,
@@ -155,5 +157,23 @@ export const boardTrpc = defineTrpcContract("boards")
   /** Rewrites the member's star order from the stars given, in the order given. */
   .mutation("reorderStars")
   .withInput(z.object({ ...projectScopeSchema.shape, stars: z.array(dashboardStarSchema) }))
+  .withOutput(dashboardReorderResponseSchema)
+
+  /** The member's own order of a product sidebar's Dashboards section here; none is empty. */
+  .query("sidebarOrder")
+  .withInput(
+    z.object({ ...organizationScopeSchema.shape, homeProduct: dashboardHomeProductSchema }),
+  )
+  .withOutput(dashboardSidebarOrderSchema)
+
+  /** Stores the member's own order of a product sidebar's Dashboards section, as given. */
+  .mutation("reorderSidebar")
+  .withInput(
+    z.object({
+      ...organizationScopeSchema.shape,
+      homeProduct: dashboardHomeProductSchema,
+      dashboardIds: dashboardSidebarOrderIdsSchema,
+    }),
+  )
   .withOutput(dashboardReorderResponseSchema)
   .build();

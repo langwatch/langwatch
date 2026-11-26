@@ -45,6 +45,13 @@ export type MemberStars = Readonly<{
   sharedProjectIds?: readonly string[];
 }>;
 
+/** Whose sidebar order this is: one member, in one organization, for one product's section. */
+export type SidebarOrderKey = Readonly<{
+  organizationId: string;
+  userId: string;
+  homeProduct: DashboardHomeProduct;
+}>;
+
 /**
  * The Dashboards area's boards (DashboardsV2) and each member's stars on them. A write naming a
  * board the project does not own is refused; a read answers absence.
@@ -98,6 +105,10 @@ export interface BoardRepository {
   removeStar(input: { projectId: string; userId: string; star: DashboardStar }): Promise<void>;
   /** Sets each given star's position from the order given; other stars are untouched. */
   reorderStars(input: MemberStars & { stars: DashboardStar[] }): Promise<void>;
+  /** The member's own order of a product sidebar's section; empty when none is stored. */
+  findSidebarOrder(input: SidebarOrderKey): Promise<string[]>;
+  /** Replaces the member's own order of a product sidebar's section. */
+  setSidebarOrder(input: SidebarOrderKey & { dashboardIds: readonly string[] }): Promise<void>;
   /** How many members other than this one starred the board. */
   countOtherStars(input: {
     projectId: string;

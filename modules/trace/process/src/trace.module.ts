@@ -24,6 +24,7 @@ import { traceCollectorEvaluationsEventing } from "./features/ingestion/eventing
 import { traceIngestSourceBillingEventing } from "./features/ingestion/eventing/trace-ingest-source-billing.pipeline.ts";
 import { TRACE_ID_INDEXES } from "./repositories/clickhouse/clickhouse.trace-id-indexes.database.ts";
 import { traceRepositories } from "./repositories/trace-repositories.registry.ts";
+import { APP_VERSION_REPLAY_STEP_ID } from "./rules/app-version.rules.ts";
 import {
   MANAGED_PROMPT_VERSION_REPLAY_STEP_ID,
   MANAGED_VERSION_REPLAY_HOURS,
@@ -177,6 +178,10 @@ export const traceProcessModule: PublishedProcessModule<"trace", TraceApi, Trace
         after: [recordEvaluationOutcomes, replayTraceAnalytics],
         replayer,
       });
+      const managedPromptVersion = managedPromptVersionReplayStep({
+        replayer,
+        after: [replayTraceAnalytics, replayEvaluationAnalytics],
+      });
       return [
         // An old image stores trace media without a link, so wait until none serves.
         defineMigrationStep({
@@ -256,9 +261,16 @@ export const traceProcessModule: PublishedProcessModule<"trace", TraceApi, Trace
         }),
         recordEvaluationOutcomes,
         replayEvaluationAnalytics,
-        managedPromptVersionReplayStep({
+        managedPromptVersion,
+        defineProjectionReplayStep({
+          id: APP_VERSION_REPLAY_STEP_ID,
+          description:
+            "Refolds the last 62 days of trace analytics rows so they carry the application version each trace ran on.",
+          lane: TRACE_ANALYTICS_PROJECTION_NAME,
+          since: nowInstant().subtract({ hours: WIDGET_COLUMNS_REPLAY_HOURS }).toString(),
+          needsOldWritersGone: true,
+          after: [replayTraceAnalytics, replayEvaluationAnalytics, managedPromptVersion],
           replayer,
-          after: [replayTraceAnalytics, replayEvaluationAnalytics],
         }),
       ];
     })

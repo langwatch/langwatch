@@ -6,7 +6,11 @@
 import { describe, expect, it } from "vitest";
 
 import type { LibraryBoard } from "../model/organization-library.ts";
-import { productSidebarBoards, sharingTitle } from "../model/product-dashboards.ts";
+import {
+  nextSidebarOrder,
+  productSidebarBoards,
+  sharingTitle,
+} from "../model/product-dashboards.ts";
 
 const SHOP = { id: "proj-shop", slug: "shop", name: "Shop" };
 const OPS = { id: "proj-ops", slug: "ops", name: "Ops" };
@@ -21,6 +25,7 @@ const board = (overrides: Partial<LibraryBoard> & Pick<LibraryBoard, "id">): Lib
   homeProduct: "gateway",
   project: SHOP,
   openProject: SHOP,
+  updatedAt: "2026-11-20T10:00:00.000Z",
   ...overrides,
 });
 
@@ -79,5 +84,58 @@ describe("sharingTitle", () => {
     { scope: "ORGANIZATION", title: "Shared with the organization" },
   ] as const)("says who sees a $scope board", ({ scope, title }) => {
     expect(sharingTitle({ scope, project: SHOP })).toBe(title);
+  });
+});
+
+describe("given the member's own order of a section", () => {
+  const llmOps = (overrides: Partial<LibraryBoard> & Pick<LibraryBoard, "id">) =>
+    board({ homeProduct: "llm-ops", ...overrides });
+  const listed = (boards: readonly LibraryBoard[], order: readonly string[]) =>
+    productSidebarBoards({ boards, product: "llm-ops", userId: ME, projectId: SHOP.id, order }).map(
+      ({ id }) => id,
+    );
+  const sectionBoards = [
+    llmOps({ id: "mine", name: "My dashboard", createdById: ME }),
+    llmOps({ id: "alpha", name: "Alpha" }),
+    llmOps({ id: "beta", name: "Beta" }),
+    llmOps({ id: "gamma", name: "Gamma" }),
+  ];
+
+  /** @scenario "Drag a board to reorder a product's Dashboards section" */
+  it("lists the boards in the saved order with My dashboard kept first", () => {
+    const order = nextSidebarOrder({ stored: [], shown: ["gamma", "alpha", "beta"] });
+
+    expect(listed(sectionBoards, order)).toEqual(["mine", "gamma", "alpha", "beta"]);
+    expect(listed(sectionBoards, ["gamma", "mine"])[0]).toBe("mine");
+  });
+
+  /** @scenario "A board my order does not name is listed after the ones it does, by name" */
+  it("lists a board the order does not name after the named ones, by name, and skips gone ids", () => {
+    const boards = [...sectionBoards, llmOps({ id: "aardvark", name: "Aardvark" })];
+
+    expect(listed(boards, ["gone", "beta", "alpha"])).toEqual([
+      "mine",
+      "beta",
+      "alpha",
+      "aardvark",
+      "gamma",
+    ]);
+  });
+});
+
+describe("nextSidebarOrder", () => {
+  /** @scenario "Reordering in one project keeps the place of boards listed only in another" */
+  it("keeps the slot of a board the project in view does not show", () => {
+    const stored = ["org-a", "ops-project", "org-b"];
+
+    expect(nextSidebarOrder({ stored, shown: ["org-b", "org-a"] })).toEqual([
+      "org-b",
+      "ops-project",
+      "org-a",
+    ]);
+  });
+
+  it("appends shown boards the stored order never named", () => {
+    expect(nextSidebarOrder({ stored: ["a"], shown: ["c", "a", "b"] })).toEqual(["c", "a", "b"]);
   });
 });
