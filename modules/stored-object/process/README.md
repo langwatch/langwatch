@@ -14,7 +14,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 The complete process capability exposed by the stored-object feature.
 
-Peers call these through the token, declared at `../contract/src/stored-object.api.ts:136`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/stored-object.api.ts:141`; nothing else in this package is public.
 
 #### `storeFromBytes`
 
