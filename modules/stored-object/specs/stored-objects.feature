@@ -237,7 +237,7 @@ Feature: Stored Objects service and API
     And it may pass readiness only after its startup migration checks succeed
     And it does not run a second migration or serve from a partial import
 
-  @unit
+  @regression @unit
   Scenario: A project id that starts with a dash or an underscore is a valid stored-object scope
     Given a project whose generated id starts with "-" or "_"
     When its trace media is stored or linked to its trace
