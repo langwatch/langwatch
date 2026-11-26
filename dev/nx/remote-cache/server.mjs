@@ -129,16 +129,21 @@ export const createCacheServer = ({
 }) =>
   createServer(route({ scope, store, maxUploadBytes, log, state: { tainted: false } }, token, id));
 
+// An S3 GET answer as a store read: the object, null for an object that is not there,
+// or a thrown error for anything else, which a read takes as a miss and the taint marker
+// as present. The cache roles have no s3:ListBucket, so a missing key answers 403.
+export const s3Read = (res) => {
+  if (res.statusCode === 200) return { body: res, length: res.headers["content-length"] };
+  res.resume();
+  if (res.statusCode === 404 || res.statusCode === 403) return null;
+  throw new Error(`S3 answered ${res.statusCode}`);
+};
+
 const s3Store = ({ bucket, region, credentials }) => ({
   get: async (key) => {
     const creds = await credentials();
-    if (!creds) return null;
-    const res = await getObject({ bucket, region, credentials: creds, key });
-    if (res.statusCode !== 200) {
-      res.resume();
-      return null;
-    }
-    return { body: res, length: res.headers["content-length"] };
+    if (!creds) throw new Error("no AWS credentials");
+    return s3Read(await getObject({ bucket, region, credentials: creds, key }));
   },
   put: async (key, body, length, { overwrite = false } = {}) => {
     const creds = await credentials();

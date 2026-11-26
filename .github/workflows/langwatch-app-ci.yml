@@ -536,6 +536,8 @@ jobs:
       # The shared Nx task cache in S3, before the first nx call (nx-remote-cache action).
       - uses: ./.github/actions/nx-remote-cache
         if: ${{ !cancelled() && needs.changes.outputs.relevant == 'true' }}
+        with:
+          account-id: ${{ secrets.NX_CACHE_AWS_ACCOUNT_ID }}
 
       # The parity scanner moved into @langwatch/architecture-enforcer with the
       # rest of the repository-wide checks.
@@ -1111,6 +1113,8 @@ jobs:
 
       # The shared Nx task cache in S3, before the first nx call (nx-remote-cache action).
       - uses: ./.github/actions/nx-remote-cache
+        with:
+          account-id: ${{ secrets.NX_CACHE_AWS_ACCOUNT_ID }}
 
       - uses: ./.github/actions/prepare-generated-files
 
@@ -1425,6 +1429,8 @@ jobs:
 
       # The shared Nx task cache in S3, before the first nx call (nx-remote-cache action).
       - uses: ./.github/actions/nx-remote-cache
+        with:
+          account-id: ${{ secrets.NX_CACHE_AWS_ACCOUNT_ID }}
 
       - name: Prepare files
         run: pnpm start:prepare:files && pnpm ensure:built

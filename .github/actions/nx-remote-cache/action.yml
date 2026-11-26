@@ -5,6 +5,12 @@
 name: nx-remote-cache
 description: Point Nx at the shared S3 task cache when this event may use it.
 
+inputs:
+  account-id:
+    description: The lw-dev AWS account id (secret NX_CACHE_AWS_ACCOUNT_ID). Empty leaves Nx on its local cache.
+    required: false
+    default: ""
+
 runs:
   using: composite
   steps:
@@ -16,13 +22,18 @@ runs:
         REF: ${{ github.ref }}
         SAME_REPO: ${{ github.event.pull_request.head.repo.full_name == github.repository }}
         ACTOR: ${{ github.actor }}
+        ACCOUNT_ID: ${{ inputs.account-id }}
       run: |
-        account=381491922238
         role=""
-        if [ "$REF" = refs/heads/main ] && { [ "$EVENT" = push ] || [ "$EVENT" = workflow_dispatch ]; }; then
-          role="arn:aws:iam::$account:role/langwatch-nx-cache-ci-main"
+        if [ -z "$ACCOUNT_ID" ]; then
+          echo "arn=" >> "$GITHUB_OUTPUT"
+          exit 0
+        fi
+        echo "::add-mask::$ACCOUNT_ID"
+        if [ "$REF" = refs/heads/main ] && [ "$EVENT" = push ]; then
+          role="arn:aws:iam::$ACCOUNT_ID:role/langwatch-nx-cache-ci-main"
         elif [ "$EVENT" = pull_request ] && [ "$SAME_REPO" = true ] && [ "$ACTOR" != "dependabot[bot]" ]; then
-          role="arn:aws:iam::$account:role/langwatch-nx-cache-ci-pr"
+          role="arn:aws:iam::$ACCOUNT_ID:role/langwatch-nx-cache-ci-pr"
         fi
         echo "arn=$role" >> "$GITHUB_OUTPUT"
 

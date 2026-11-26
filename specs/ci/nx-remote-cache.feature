@@ -37,7 +37,7 @@ Feature: Nx remote cache shared by CI and laptops
     Then it writes nothing
 
   Scenario: Other CI events get no remote cache
-    Given a CI run on a tag, a schedule, the merge queue or a branch push other than main
+    Given a CI run on a tag, a schedule, the merge queue, a manual run or a branch push other than main
     When the cache scope is resolved
     Then the remote cache is off
 
@@ -100,6 +100,12 @@ Feature: Nx remote cache shared by CI and laptops
     When the job ends
     Then the server's log is printed in the job
     And requests that failed raise one warning on the run
+
+  Scenario: An S3 answer that is neither the object nor a missing key never reads as no taint
+    Given a pull request job whose taint marker read gets an S3 error such as 500 or 503
+    When it stores a new task result
+    Then the result goes to its branch namespace, not pr/
+    And a missing marker (404, or 403 since the roles cannot list the bucket) means no taint
 
   Scenario: An S3 failure is a miss, never a failed run
     Given the cache server cannot reach S3 or has no credentials

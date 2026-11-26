@@ -16,7 +16,7 @@ import { gateStore } from "../remote-cache/gate.mjs";
 import { ci as runCi, ensureServer, report, serverConfig } from "../remote-cache/launch.mjs";
 import { signedHeaders } from "../remote-cache/s3.mjs";
 import { cacheScope } from "../remote-cache/scope.mjs";
-import { createCacheServer } from "../remote-cache/server.mjs";
+import { createCacheServer, s3Read } from "../remote-cache/server.mjs";
 import { setupStep } from "../remote-cache/setup.mjs";
 
 const SETUP = fileURLToPath(new URL("../remote-cache/setup.mjs", import.meta.url));
@@ -237,6 +237,13 @@ describe("Nx remote cache", () => {
     );
     assert.equal(cacheScope({ env: ci({ GITHUB_EVENT_NAME: "pull_request_target" }) }), null);
     assert.equal(cacheScope({ env: ci({ GITHUB_EVENT_NAME: "merge_group" }) }), null);
+    // Only a push writes main/: a manual run on main gets no cache.
+    assert.equal(
+      cacheScope({
+        env: ci({ GITHUB_EVENT_NAME: "workflow_dispatch", GITHUB_REF: "refs/heads/main" }),
+      }),
+      null,
+    );
   });
 
   /** @scenario "No GitHub login leaves Nx on its local cache" */
@@ -288,6 +295,30 @@ describe("Nx remote cache", () => {
       now: () => 0,
     });
     assert.equal(await expiring(), null);
+  });
+
+  /** @scenario "An S3 answer that is neither the object nor a missing key never reads as no taint" */
+  it("reads 404 and 403 as a missing object and throws on any other S3 error", async () => {
+    const { Readable } = await import("node:stream");
+    const answer = (statusCode) => Object.assign(Readable.from([]), { statusCode, headers: {} });
+    assert.equal(s3Read(answer(404)), null);
+    assert.equal(s3Read(answer(403)), null);
+    for (const status of [400, 500, 503])
+      assert.throws(() => s3Read(answer(status)), /S3 answered/);
+    assert.ok(s3Read(answer(200)).body);
+    const scope = cacheScope({
+      env: ci({ GITHUB_EVENT_NAME: "pull_request", GITHUB_HEAD_REF: "feat/x" }),
+    });
+    const store = memoryStore();
+    const failing = {
+      get: async () => s3Read(answer(503)),
+      put: store.put,
+    };
+    await withServer({ scope, store: failing }, async (port) => {
+      await call({ port, method: "PUT", path: "/v1/cache/abc", body: Buffer.from("x") });
+    });
+    assert.ok(store.objects.has("branch/feat_x/abc"));
+    assert.ok(!store.objects.has("pr/abc"));
   });
 
   /** @scenario "An entry is never replaced" */

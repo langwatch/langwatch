@@ -10,11 +10,9 @@ const branchPrefix = (branch) =>
     .replace(/[^A-Za-z0-9._-]+/g, "_")
     .slice(0, 200)}/`;
 
-const MAIN_EVENTS = new Set(["push", "workflow_dispatch"]);
-
 const ciScope = (env) => {
   const event = env.GITHUB_EVENT_NAME;
-  if (env.GITHUB_REF === "refs/heads/main" && MAIN_EVENTS.has(event)) {
+  if (env.GITHUB_REF === "refs/heads/main" && event === "push") {
     return {
       tier: "main",
       read: [{ prefix: MAIN }, { prefix: PR }],
