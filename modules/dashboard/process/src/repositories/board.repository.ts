@@ -11,7 +11,8 @@ import type {
 export type BoardRecord = Board;
 
 /** The stored summary: `graphCount` is its widgets; stars and the owner are per reader. */
-export type BoardSummaryRecord = DashboardSummary & Pick<Board, "homeProduct">;
+export type BoardSummaryRecord = DashboardSummary &
+  Pick<Board, "homeProduct" | "myDashboardOfUserId">;
 
 /** The editable fields of a stored board; an absent key is left as it is. */
 export type BoardUpdate = Readonly<{
@@ -21,6 +22,8 @@ export type BoardUpdate = Readonly<{
   scope?: DashboardScope;
   organizationId?: string;
   homeProduct?: DashboardHomeProduct;
+  /** Marks the board as this member's own My dashboard. */
+  myDashboardOfUserId?: string;
 }>;
 
 /**
@@ -61,6 +64,8 @@ export interface BoardRepository {
     createdById?: string | null;
     scope?: DashboardScope;
     homeProduct?: DashboardHomeProduct;
+    /** The member whose own My dashboard it is; null on every other board. */
+    myDashboardOfUserId?: string | null;
     /** Stamped on an Organization board, as setting that scope stamps it. */
     organizationId?: string | null;
   }): Promise<BoardRecord>;

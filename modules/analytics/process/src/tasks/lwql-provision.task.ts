@@ -4,7 +4,10 @@
  * @see specs/lwql/api.feature
  */
 
-import { parseConnectionUrl } from "@langwatch/clickhouse-migrations";
+import {
+  parseConnectionUrl,
+  resolveClickHouseMigrationTaskConfig,
+} from "@langwatch/clickhouse-migrations";
 import { createLogger } from "@langwatch/observability";
 import { PROJECT_ID_PAGE_LIMIT, type ProjectApi } from "@langwatch/project-contract";
 import { Task } from "@langwatch/task";
@@ -16,11 +19,13 @@ import {
   readAppFunctionStoreProbe,
 } from "../features/app-functions/rules/langwatch-ql-app-function-store.rules.ts";
 import {
+  LWQL_PROJECT_KEYS_VIEW,
   LWQL_SCOPED_READER_GROUP,
   LWQL_SCOPED_SCHEMA,
 } from "../features/provisioning/rules/lwql-scoped-view.rules.ts";
 import {
   LangWatchQLCollectionBindingService,
+  LWQL_RENDERED_NAMED_COLLECTION,
   type LwqlAccessModelMode,
   type LwqlCollectionProbe,
 } from "../features/provisioning/services/langwatch-ql-collection-binding.service.ts";
@@ -36,6 +41,7 @@ import {
   LangWatchQLSelfProvisioningService,
   type LwqlAppOwnedDrift,
   type LwqlSelfProvisionRequest,
+  LwqlPrivateCollectionAbsentError,
 } from "../features/provisioning/services/langwatch-ql-self-provisioning.service.ts";
 import { ClickHouseLangWatchQLProvisioningRepository } from "../repositories/clickhouse/clickhouse.langwatch-ql-provisioning.repository.ts";
 import type { LwqlProvisioningDatabase } from "../repositories/langwatch-ql-postgres.repository.ts";
@@ -55,11 +61,16 @@ import {
 } from "../rules/langwatch-ql-config-store.rules.ts";
 import {
   classifyLwqlSetupFailure,
+  findKeyPeppers,
   LWQL_CREDENTIAL_SECRETS,
   resolveLwqlSource,
 } from "../rules/lwql-default-credentials.rules.ts";
 import type { LangWatchQLNames } from "../services/langwatch-ql-access-model.service.ts";
 import { LangWatchQLSqlModeClusterGuardService } from "../services/langwatch-ql-sql-mode-cluster-guard.service.ts";
+import {
+  type LwqlPrivateEndpoint,
+  provisionLwqlPrivateTargets,
+} from "./lwql-private-targets.task.ts";
 
 const lwqlProvisioning = LangWatchQLProductionProvisioningService.create();
 const clusterGuard = LangWatchQLSqlModeClusterGuardService.create();
@@ -79,8 +90,12 @@ const logger = createLogger("langwatch:task:lwql-provision");
 type LwqlProjectKeys = Pick<ProjectApi, "listLwqlKeys">;
 
 /** Every project's LangWatchQL key, read from the project module a page at a time. */
-async function allLwqlKeys({ projects }: { projects: LwqlProjectKeys }) {
-  const keys = [];
+async function allLwqlKeys({
+  projects,
+}: {
+  projects: LwqlProjectKeys;
+}): Promise<{ id: string; lwqlKey: string }[]> {
+  const keys: { id: string; lwqlKey: string }[] = [];
   let after: string | undefined;
   do {
     const page = await projects.listLwqlKeys({ after, limit: PROJECT_ID_PAGE_LIMIT });
@@ -542,7 +557,12 @@ function postgresStatements({
           schema,
         }),
       ],
-      scoped: [...lwqlProvisioning.postgresScopedViewStatements({ schema }), ...scopedGrants],
+      scoped: [
+        ...lwqlProvisioning.postgresScopedViewStatements({ schema }),
+        ...scopedGrants,
+        // After the group's grants: a failure in the new view must not skip them.
+        ...lwqlProvisioning.postgresProjectKeysStatements({ schema }),
+      ],
     };
   }
   const shared = postgresGaps.sharedGaps({ gaps });
@@ -568,6 +588,9 @@ function postgresStatements({
         views: views(postgresGaps.scopedCopiesToRebuild({ gaps })),
       }),
       ...scopedGrants,
+      ...(postgresGaps.needsProjectKeys({ gaps })
+        ? lwqlProvisioning.postgresProjectKeysStatements({ schema })
+        : []),
     ],
   };
 }
@@ -587,7 +610,7 @@ async function warnScopedReaderGaps({
     const state = await PrismaLangWatchQLPostgresRepository.create(database).findScopedViewState({
       appSchema: schema,
       group: LWQL_SCOPED_READER_GROUP,
-      views: selfProvisioning.approvedPostgresViews(),
+      views: [...selfProvisioning.approvedPostgresViews(), LWQL_PROJECT_KEYS_VIEW],
     });
     if (!state.groupExists) return;
     if (state.scopedSchema === "absent") {
@@ -728,20 +751,27 @@ function warnDerivedSetupFailure({ error }: { error: unknown }): void {
  * (ADR-159). `failOnError` rethrows so the upgrade run fails (Alex, 2026-10-09), except under
  * derived passwords, which only warn; `only`, the reconvergence check's drift, logs at warn.
  */
-export async function convergeLwqlAccessModel({
-  database,
-  plan,
-  failOnError = false,
-  isDerived = false,
-  only,
-}: {
+export async function convergeLwqlAccessModel(input: LwqlConvergenceInput): Promise<void> {
+  await attemptLwqlConvergence(input);
+}
+
+export interface LwqlConvergenceInput {
   database: LwqlProvisioningDatabase;
   plan: LwqlConvergencePlan;
   failOnError?: boolean;
   /** The passwords came from the key pepper, not from the operator: a failure only warns. */
   isDerived?: boolean;
   only?: LwqlAppOwnedDrift;
-}): Promise<void> {
+}
+
+/** {@link convergeLwqlAccessModel}, saying whether the model converged (false: it was logged). */
+async function attemptLwqlConvergence({
+  database,
+  plan,
+  failOnError = false,
+  isDerived = false,
+  only,
+}: LwqlConvergenceInput): Promise<boolean> {
   const { names } = plan;
   try {
     const sourceDatabase = plan.sourceDatabase();
@@ -755,10 +785,11 @@ export async function convergeLwqlAccessModel({
       fn: () => convergeLocked({ database, plan, only, sourceDatabase }),
     });
     logger.info("LangWatchQL self-provisioning complete");
+    return true;
   } catch (error) {
     if (isDerived) {
       warnDerivedSetupFailure({ error });
-      return;
+      return false;
     }
     if (only) {
       logger.warn(
@@ -772,6 +803,7 @@ export async function convergeLwqlAccessModel({
       );
     }
     if (failOnError) throw error;
+    return false;
   }
 }
 
@@ -794,7 +826,7 @@ async function readPostgresGaps({
     const scoped = await repository.findScopedViewState({
       appSchema: schema,
       group: LWQL_SCOPED_READER_GROUP,
-      views,
+      views: [...views, LWQL_PROJECT_KEYS_VIEW],
     });
     return postgresGaps.findGaps({ found, scoped });
   } catch (error) {
@@ -889,6 +921,24 @@ async function withChainedSecrets({
   return resolved;
 }
 
+/** The private routes, or none: a malformed route variable warns and never fails the upgrade. */
+function privateEndpointsOf({
+  source,
+}: {
+  source: Record<string, string | undefined>;
+}): readonly LwqlPrivateEndpoint[] {
+  try {
+    return resolveClickHouseMigrationTaskConfig({ ...source }).privateEndpoints;
+  } catch (error) {
+    // The error name only: a route's text can carry its credentials.
+    logger.warn(
+      { error: error instanceof Error ? error.name : typeof error },
+      "LangWatchQL private provisioning skipped: the ClickHouse route variables could not be read",
+    );
+    return [];
+  }
+}
+
 async function runLwqlProvisioningTask({
   database,
   source: environment,
@@ -917,25 +967,90 @@ async function runLwqlProvisioningTask({
     return;
   }
 
-  await convergeLwqlAccessModel({
-    database,
-    failOnError,
-    isDerived,
-    plan: {
-      request: selfProvision,
-      names: lwqlProvisioning.names({ connection: selfProvision.connection }),
-      sourceDatabase: () =>
-        parseConnectionUrl({
-          connectionUrl: source.CLICKHOUSE_URL,
-          clusterName: source.CLICKHOUSE_CLUSTER,
-        }).database,
-      schema: lwqlProvisioning.postgresSchemaFromDatabaseUrl(source.DATABASE_URL),
-      ...connectionLimitFields(source.DATABASE_URL),
-      settings: source,
-      openRepository: () =>
-        ClickHouseLangWatchQLProvisioningRepository.open({ url: source.CLICKHOUSE_URL }),
-    },
+  const plan: LwqlConvergencePlan = {
+    request: selfProvision,
+    names: lwqlProvisioning.names({ connection: selfProvision.connection }),
+    sourceDatabase: () =>
+      parseConnectionUrl({
+        connectionUrl: source.CLICKHOUSE_URL,
+        clusterName: source.CLICKHOUSE_CLUSTER,
+      }).database,
+    schema: lwqlProvisioning.postgresSchemaFromDatabaseUrl(source.DATABASE_URL),
+    ...connectionLimitFields(source.DATABASE_URL),
+    settings: source,
+    openRepository: () =>
+      ClickHouseLangWatchQLProvisioningRepository.open({ url: source.CLICKHOUSE_URL }),
+  };
+  const isConverged = await attemptLwqlConvergence({ database, failOnError, isDerived, plan });
+  if (!isConverged) {
+    logger.warn("LangWatchQL private provisioning skipped: the shared converge did not complete");
+    return;
+  }
+  await provisionLwqlPrivateTargets({
+    endpoints: privateEndpointsOf({ source }),
+    sharedUrl: source.CLICKHOUSE_URL,
+    keyPepper: findKeyPeppers(source)[0],
+    shared: plan,
+    converge: (privatePlan) => convergeLwqlPrivateClickHouse({ database, plan: privatePlan }),
   });
+}
+
+/**
+ * One private server's ClickHouse half, after the shared converge and under its lock, so two
+ * replicas never interleave; no PostgreSQL work. Config's `lwql_postgres` holds the login, and
+ * a server without it stays refused.
+ */
+export async function convergeLwqlPrivateClickHouse({
+  database,
+  plan,
+}: {
+  database: LwqlProvisioningDatabase;
+  plan: LwqlConvergencePlan;
+}): Promise<void> {
+  await withSelfProvisionLock({
+    database,
+    connectionLimit: plan.connectionLimit,
+    fn: () =>
+      withProvisioningRepository({
+        open: plan.openRepository,
+        fn: (repository) => convergeLwqlPrivateRepository({ repository, plan }),
+      }),
+  });
+}
+
+export async function convergeLwqlPrivateRepository({
+  repository,
+  plan,
+}: {
+  repository: LangWatchQLProvisioningRepository;
+  plan: LwqlConvergencePlan;
+}): Promise<void> {
+  const { names, request } = plan;
+  const server = await repository.readCollectionState({
+    database: names.database,
+    candidates: [LWQL_RENDERED_NAMED_COLLECTION],
+  });
+  if (!server.available.includes(LWQL_RENDERED_NAMED_COLLECTION)) {
+    throw new LwqlPrivateCollectionAbsentError({ collection: LWQL_RENDERED_NAMED_COLLECTION });
+  }
+  const configStoreEntities = await repository.inventoryConfigStore({ names });
+  const includeAppFunctions = await appFunctionsProvisionable(repository);
+  await clusterGuard.assertSafe({
+    query: (sql) => repository.queryRows(sql),
+    source: plan.settings,
+  });
+  const statements = selfProvisioning.clickHouseStatements({
+    names,
+    restrictedPassword: request.connection.password,
+    sourceDatabase: plan.sourceDatabase(),
+    postgres: { endpoint: request.endpoint, readerPassword: "" },
+    // The scoped copies are the only relation the per-customer login reads.
+    schema: LWQL_SCOPED_SCHEMA,
+    includeAppFunctions,
+    externalCollection: LWQL_RENDERED_NAMED_COLLECTION,
+    postgresKeyMap: true,
+  });
+  await repository.runStatements({ configStoreEntities, failureLevel: "error", statements });
 }
 
 /**

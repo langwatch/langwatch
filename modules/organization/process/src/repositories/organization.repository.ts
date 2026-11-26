@@ -258,7 +258,11 @@ export abstract class OrganizationRepository {
     at: Instant;
     error: string | null;
   }): Promise<void>;
-  /** Throws OrganizationNotFoundError. */
+  /**
+   * Writes licensing's key only while licensing's row still holds it, checked under the
+   * organization's row lock; a newer key's own fact writes that one. Throws
+   * OrganizationNotFoundError.
+   */
   abstract setLicense(input: {
     organizationId: string;
     licenseKey: string;

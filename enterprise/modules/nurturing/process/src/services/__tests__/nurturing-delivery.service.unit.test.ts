@@ -18,6 +18,7 @@ import type { NurturingErasedUserRepository } from "../../repositories/nurturing
 import { NurturingDeliveryService } from "../nurturing-delivery.service.ts";
 import { NurturingService } from "../nurturing.service.ts";
 import { memberCopyOf, unplacedMemberFacts } from "./nurturing-member-facts.test-helpers.ts";
+import { peopleWithEmails } from "./nurturing-person-email.test-helpers.ts";
 
 const scenarioCreated: NurturingSignal = {
   kind: "scenario_created",
@@ -41,8 +42,11 @@ const firstTrace: NurturingSignal = {
   sdkFramework: "unknown",
 };
 
-/** Customer.io over a recording fetch: each call is kept as its path and body. */
-function customerIo(status = 200) {
+/**
+ * Customer.io over a recording fetch: each call is kept as its path and body. `emails` overrides
+ * the user module's addresses (null: none).
+ */
+function customerIo(status = 200, emails: Readonly<Record<string, string | null>> = {}) {
   const sent: { path: string; body: unknown }[] = [];
   const reported: Error[] = [];
   const fetchFn = vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
@@ -51,6 +55,7 @@ function customerIo(status = 200) {
     return new Response(null, { status });
   });
   const service = NurturingService.create({
+    users: peopleWithEmails({ emails: { "user-1": "jane@example.com", ...emails } }),
     channel: HttpCustomerIoChannel.create({
       config: { customerIoApiKey: "key", customerIoRegion: "us" },
       fetchFn,
@@ -58,6 +63,41 @@ function customerIo(status = 200) {
     }),
   });
   return { service, sent, reported };
+}
+
+/** The address the recording Customer.io's user module holds: user-1 is Jane, as in users(). */
+function emailOf(userId: string): string {
+  return userId === "user-1" ? "jane@example.com" : `${userId}@example.com`;
+}
+
+/**
+ * A track as nurturing sends it: the person's addressed identify in its own batch, awaited,
+ * then the track in a batch of its own (the order Customer.io does not promise within one batch).
+ */
+function trackRequests(track: Record<string, unknown> & { userId: string }) {
+  return [
+    {
+      path: "/v1/batch",
+      body: {
+        batch: [
+          { type: "identify", userId: track.userId, traits: { email: emailOf(track.userId) } },
+        ],
+      },
+    },
+    {
+      path: "/v1/batch",
+      body: { batch: [expect.objectContaining({ type: "track", ...track })] },
+    },
+  ];
+}
+
+/** The tracks among recorded requests: each one rides its own batch (see trackRequests). */
+function tracksOf(sent: readonly { path: string; body: unknown }[]) {
+  return sent.filter(
+    ({ path, body }) =>
+      path === "/v1/batch" &&
+      (body as { batch: { type: string }[] }).batch.some(({ type }) => type === "track"),
+  );
 }
 
 /** Lets the fire-and-forget sends settle before the assertions read them. */
@@ -145,14 +185,11 @@ describe("NurturingDeliveryService", () => {
         { userId: "user-1", event: "scenario_created", properties: { projectId: "project-1" } },
       ]);
       expect(cio.sent).toEqual([
-        {
-          path: "/v1/track",
-          body: expect.objectContaining({
-            userId: "user-1",
-            event: "scenario_created",
-            properties: { scenario_id: "scenario-1", project_id: "project-1" },
-          }),
-        },
+        ...trackRequests({
+          userId: "user-1",
+          event: "scenario_created",
+          properties: { scenario_id: "scenario-1", project_id: "project-1" },
+        }),
       ]);
     });
   });
@@ -177,7 +214,7 @@ describe("NurturingDeliveryService", () => {
       await settle();
 
       expect(posthog.tracked).toHaveLength(1);
-      expect(cio.sent).toHaveLength(1);
+      expect(tracksOf(cio.sent)).toHaveLength(1);
     });
   });
 
@@ -240,20 +277,19 @@ describe("NurturingDeliveryService", () => {
               sdk_language: "python",
               sdk_framework: "unknown",
               first_trace_at: 1_792_664_000,
+              email: "admin-1@example.com",
             },
           }),
         },
-        {
-          path: "/v1/track",
-          body: expect.objectContaining({
-            event: "first_trace_integrated",
-            properties: {
-              sdk_language: "python",
-              sdk_framework: "unknown",
-              project_id: "project-1",
-            },
-          }),
-        },
+        ...trackRequests({
+          userId: "admin-1",
+          event: "first_trace_integrated",
+          properties: {
+            sdk_language: "python",
+            sdk_framework: "unknown",
+            project_id: "project-1",
+          },
+        }),
         {
           path: "/v1/batch",
           body: {
@@ -261,7 +297,11 @@ describe("NurturingDeliveryService", () => {
               {
                 type: "identify",
                 userId: "admin-1",
-                traits: { has_traces: true, last_trace_at: 1_792_664_000 },
+                traits: {
+                  has_traces: true,
+                  last_trace_at: 1_792_664_000,
+                  email: "admin-1@example.com",
+                },
               },
             ],
           },
@@ -400,15 +440,16 @@ describe("NurturingDeliveryService", () => {
       expect(cio.sent).toEqual([
         {
           path: "/v1/identify",
-          body: expect.objectContaining({ userId: "user-1", traits: { workflow_count: 2 } }),
-        },
-        {
-          path: "/v1/track",
           body: expect.objectContaining({
-            event: "workflow_created",
-            properties: { workflow_id: "workflow-1", project_id: "project-1" },
+            userId: "user-1",
+            traits: { workflow_count: 2, email: "jane@example.com" },
           }),
         },
+        ...trackRequests({
+          userId: "user-1",
+          event: "workflow_created",
+          properties: { workflow_id: "workflow-1", project_id: "project-1" },
+        }),
       ]);
     });
   });
@@ -544,8 +585,16 @@ describe("NurturingDeliveryService", () => {
           path: "/v1/batch",
           body: {
             batch: [
-              { type: "identify", userId: "user-1", traits: { has_subscription: true } },
-              { type: "identify", userId: "user-2", traits: { has_subscription: true } },
+              {
+                type: "identify",
+                userId: "user-1",
+                traits: { has_subscription: true, email: "jane@example.com" },
+              },
+              {
+                type: "identify",
+                userId: "user-2",
+                traits: { has_subscription: true, email: "user-2@example.com" },
+              },
             ],
           },
         },
@@ -679,12 +728,17 @@ describe("NurturingDeliveryService", () => {
       const sent: string[] = [];
       const reported: Error[] = [];
       const service = NurturingService.create({
+        users: peopleWithEmails(),
         channel: HttpCustomerIoChannel.create({
           config: { customerIoApiKey: "key", customerIoRegion: "us" },
-          fetchFn: async (url) => {
+          fetchFn: async (url, init) => {
             const path = new URL(url instanceof Request ? url.url : url).pathname;
             sent.push(path);
-            return new Response(null, { status: path === "/v1/track" ? 500 : 200 });
+            const body = typeof init?.body === "string" ? JSON.parse(init.body) : {};
+            const tracks = (body.batch ?? []).some(
+              (call: { type: string }) => call.type === "track",
+            );
+            return new Response(null, { status: tracks ? 500 : 200 });
           },
           errorReporter: { capture: (error) => reported.push(error) },
         }),
@@ -707,7 +761,7 @@ describe("NurturingDeliveryService", () => {
       ).resolves.toBeUndefined();
       await settle();
 
-      expect(sent).toEqual(expect.arrayContaining(["/v1/identify", "/v1/track"]));
+      expect(sent).toEqual(expect.arrayContaining(["/v1/identify", "/v1/batch"]));
       expect(reported.length).toBeGreaterThan(0);
 
       // The failed track keeps its hourly limit: a second session sends nothing more.
@@ -735,14 +789,61 @@ describe("NurturingDeliveryService", () => {
           path: "/v1/identify",
           body: expect.objectContaining({
             userId: "user-app-active",
-            traits: { last_active_at: expect.any(Number) },
+            traits: { last_active_at: expect.any(Number), email: "user-app-active@example.com" },
           }),
         },
-        {
-          path: "/v1/track",
-          body: expect.objectContaining({ userId: "user-app-active", event: "app_active" }),
-        },
+        ...trackRequests({ userId: "user-app-active", event: "app_active" }),
       ]);
+    });
+  });
+
+  describe("when a rule decides an id-only identify", () => {
+    const session = {
+      kind: "session_started",
+      ...source,
+      hasOrganization: true,
+      sourceEventId: "event-60",
+    } as const;
+
+    /** @scenario "Every Customer.io identify carries the person's email, or is not sent" */
+    it("reaches Customer.io with the person's email, read fresh", async () => {
+      const { cio, delivery } = deliveryOverBothSinks();
+
+      await delivery.deliver({
+        key: "session_started:event-60",
+        signal: { ...session, userId: "user-with-email" },
+      });
+      await settle();
+
+      expect(cio.sent[0]).toEqual({
+        path: "/v1/identify",
+        body: {
+          userId: "user-with-email",
+          traits: { last_active_at: expect.any(Number), email: "user-with-email@example.com" },
+        },
+      });
+    });
+
+    /** @scenario "Every Customer.io identify carries the person's email, or is not sent" */
+    it("sends a person with no email no identify and no track", async () => {
+      const cio = customerIo(200, { "user-no-email": null });
+      const delivery = NurturingDeliveryService.create({
+        erasedUsers: MemoryNurturingErasedUserRepository.create(),
+        claims: claims(),
+        users: users(),
+        memberFacts: unplacedMemberFacts(),
+        members: MemoryNurturingOrganizationMemberRepository.create(),
+        customerIo: cio.service,
+        posthog: undefined,
+      });
+
+      await delivery.deliver({
+        key: "session_started:event-61",
+        signal: { ...session, sourceEventId: "event-61", userId: "user-no-email" },
+      });
+      await settle();
+
+      expect(cio.sent).toEqual([]);
     });
   });
 
@@ -750,13 +851,19 @@ describe("NurturingDeliveryService", () => {
     const at = { tenantId: "project-1", occurredAt: 1_792_664_000_123 };
     const seconds = 1_792_664_000;
 
+    /** The identify and group traits sent; a track's batches (see trackRequests) are not one. */
     async function identifiedTraits(signal: NurturingSignal): Promise<unknown[]> {
       const { cio, delivery } = deliveryOverBothSinks();
       await delivery.deliver({ key: `${signal.kind}:${signal.sourceEventId}`, signal });
       await settle();
       return cio.sent.flatMap(({ path, body }) => {
         if (path === "/v1/batch") {
-          return (body as { batch: { traits: unknown }[] }).batch.map(({ traits }) => traits);
+          const { batch } = body as { batch: { type: string; traits: unknown }[] };
+          if (batch.some(({ type }) => type === "track")) return [];
+          // The address-only identify that precedes a track is not a fact.
+          return batch
+            .map(({ traits }) => traits)
+            .filter((traits) => Object.keys(traits as object).join() !== "email");
         }
         if (path !== "/v1/identify" && path !== "/v1/group") return [];
         return [(body as { traits: unknown }).traits];
@@ -773,7 +880,9 @@ describe("NurturingDeliveryService", () => {
         projectId: "project-1",
       });
 
-      expect(traits).toEqual([{ has_traces: true, last_trace_at: seconds }]);
+      expect(traits).toEqual([
+        { has_traces: true, last_trace_at: seconds, email: "admin-1@example.com" },
+      ]);
     });
 
     /** @scenario "Customer.io date attributes are sent as Unix seconds" */
@@ -787,10 +896,15 @@ describe("NurturingDeliveryService", () => {
       } as const;
 
       expect(await identifiedTraits({ ...run, sourceEventId: "run-40", first: true })).toEqual([
-        { has_simulations: true, simulation_count: 1, first_simulation_at: seconds },
+        {
+          has_simulations: true,
+          simulation_count: 1,
+          first_simulation_at: seconds,
+          email: "admin-1@example.com",
+        },
       ]);
       expect(await identifiedTraits({ ...run, sourceEventId: "run-41", first: false })).toEqual([
-        { simulation_count: 1, last_simulation_at: seconds },
+        { simulation_count: 1, last_simulation_at: seconds, email: "admin-1@example.com" },
       ]);
     });
 
@@ -807,10 +921,19 @@ describe("NurturingDeliveryService", () => {
 
       expect(
         await identifiedTraits({ ...evaluation, sourceEventId: "eval-40", first: true }),
-      ).toEqual([{ has_evaluations: true, evaluation_count: 1, first_evaluation_at: seconds }]);
+      ).toEqual([
+        {
+          has_evaluations: true,
+          evaluation_count: 1,
+          first_evaluation_at: seconds,
+          email: "admin-1@example.com",
+        },
+      ]);
       expect(
         await identifiedTraits({ ...evaluation, sourceEventId: "eval-41", first: false }),
-      ).toEqual([{ evaluation_count: 1, last_evaluation_at: seconds }]);
+      ).toEqual([
+        { evaluation_count: 1, last_evaluation_at: seconds, email: "admin-1@example.com" },
+      ]);
     });
 
     /** @scenario "Customer.io date attributes are sent as Unix seconds" */
@@ -825,7 +948,12 @@ describe("NurturingDeliveryService", () => {
 
       expect(cio.sent[0]?.body).toEqual(
         expect.objectContaining({
-          traits: { email: "jane@example.com", name: "Jane Doe", createdAt: seconds },
+          traits: {
+            email: "jane@example.com",
+            name: "Jane Doe",
+            first_name: "Jane",
+            createdAt: seconds,
+          },
         }),
       );
       expect(posthog.identified).toEqual([
@@ -892,14 +1020,12 @@ describe("NurturingDeliveryService", () => {
           }),
         },
       ]);
-      expect(cio.sent.filter((call) => call.path === "/v1/track")).toEqual([
-        {
-          path: "/v1/track",
-          body: expect.objectContaining({
-            userId: "user-1",
-            event: "self_hosted_license_expiring",
-          }),
-        },
+      expect(cio.sent.filter((call) => call.path === "/v1/batch")).toEqual([
+        ...trackRequests({
+          userId: "user-1",
+          event: "self_hosted_license_expiring",
+          properties: { instance_id: "instance-1" },
+        }),
       ]);
     });
   });
@@ -1016,16 +1142,14 @@ describe("NurturingDeliveryService", () => {
           path: "/v1/identify",
           body: expect.objectContaining({
             userId: "admin-1",
-            traits: expect.objectContaining({ evaluation_count: 7 }),
+            traits: expect.objectContaining({ evaluation_count: 7, email: "admin-1@example.com" }),
           }),
         },
-        {
-          path: "/v1/track",
-          body: expect.objectContaining({
-            event: "evaluation_ran",
-            properties: { evaluation_id: "eval-3", score: 1, passed: true, count: 3 },
-          }),
-        },
+        ...trackRequests({
+          userId: "admin-1",
+          event: "evaluation_ran",
+          properties: { evaluation_id: "eval-3", score: 1, passed: true, count: 3 },
+        }),
       ]);
       expect(posthog.tracked).toEqual([
         {
@@ -1121,7 +1245,7 @@ describe("NurturingDeliveryService", () => {
         },
       ]);
       expect(cio.sent.filter((call) => call.path === "/v1/identify")).toHaveLength(1);
-      expect(cio.sent.filter((call) => call.path === "/v1/track")).toHaveLength(1);
+      expect(tracksOf(cio.sent)).toHaveLength(1);
     });
 
     /** @scenario "An evaluation signal recorded before it named its organization updates no Company" */
@@ -1153,18 +1277,22 @@ describe("NurturingDeliveryService", () => {
       await settle();
 
       expect(cio.sent.filter((call) => call.path === "/v1/group")).toHaveLength(1);
-      expect(cio.sent.filter((call) => call.path !== "/v1/group").slice(0, 2)).toEqual([
-        {
-          path: "/v1/identify",
-          body: expect.objectContaining({
-            traits: expect.objectContaining({ has_evaluations: true, evaluation_count: 2 }),
+      const sent = cio.sent.filter((call) => call.path !== "/v1/group");
+      expect(sent[0]).toEqual({
+        path: "/v1/identify",
+        body: expect.objectContaining({
+          traits: expect.objectContaining({
+            has_evaluations: true,
+            evaluation_count: 2,
+            email: "admin-1@example.com",
           }),
-        },
-        {
-          path: "/v1/track",
-          body: expect.objectContaining({ userId: "admin-1", event: "first_evaluation_created" }),
-        },
-      ]);
+        }),
+      });
+      expect(sent).toEqual(
+        expect.arrayContaining(
+          trackRequests({ userId: "admin-1", event: "first_evaluation_created" }),
+        ),
+      );
     });
   });
 

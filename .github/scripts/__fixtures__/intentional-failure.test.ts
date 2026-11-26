@@ -1,7 +1,7 @@
 /**
- * CI CANARY FIXTURE — DO NOT FIX THIS TEST. It proves the CI failure-detection
- * pipeline (vitest exit code + extract-failures.sh) works: ci-self-test
- * captures this failure and asserts detection succeeded. If it passes, ci-self-test breaks.
+ * CI CANARY FIXTURE: DO NOT FIX THIS TEST. The app checks job's CI self-test
+ * expects it to fail, proving vitest's exit code and extract-failures.sh still
+ * report a failing test.
  */
 
 import { expect, test } from "vitest";

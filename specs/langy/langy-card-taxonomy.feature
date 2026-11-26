@@ -121,7 +121,7 @@ Feature: Langy's cards read at the right attention weight
   # Known limit: a local tool's plain-text login error with a non-zero exit is not yet read as a failure.
   @integration
   Scenario: A failure no retry can fix keeps its card
-    Given a step refused because access was refused or GitHub is not connected, or a local tool whose tool error or JSON error document says it is not logged in
+    Given a step refused because access was refused, or a local tool whose tool error or JSON error document says it is not logged in
     When I read the turn, while it runs or after it answered
     Then that failure keeps its card in the conversation
 
@@ -133,6 +133,16 @@ Feature: Langy's cards read at the right attention weight
     When I read the turn, while it runs or after it answered
     Then that failure is a row in the folded record of the work, not a card
     And opening it says the failure is on Langy's side, not the reader's access
+
+  # The manager's gate stops the turn on the same call, and the turn's GitHub connect card
+  # is the one place that says what to do. A second card would repeat it, and on an
+  # instance with no GitHub App it would point at a setting that does not exist.
+  @integration
+  Scenario: A sandbox step that needs GitHub folds while the connect card asks
+    Given a sandbox step that failed because Langy has no GitHub access
+    When I read the turn, while it runs, after it answered, or when it ended on that step
+    Then that failure is a row in the folded record of the work, not a card
+    And opening it says Langy has no GitHub access here, without its own install tip or gh's login instruction
 
   @integration
   Scenario: A refused access keeps its card even when a retry might work
