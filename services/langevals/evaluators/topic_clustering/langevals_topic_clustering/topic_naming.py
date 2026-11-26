@@ -23,7 +23,9 @@ from langevals_topic_clustering.refusals import is_auth_refusal
 T = TypeVar("T")
 
 # A missing or refused key fails every retry and every batch the same way.
-_retry_unless_refused = retry_if_exception(lambda error: not is_auth_refusal(error))
+_retry_unless_refused = retry_if_exception(
+    lambda error: isinstance(error, Exception) and not is_auth_refusal(error)
+)
 
 logger = get_logger("topic_clustering.naming")
 

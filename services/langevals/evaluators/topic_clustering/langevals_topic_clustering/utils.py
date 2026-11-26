@@ -101,6 +101,8 @@ def generate_embeddings_threaded(
                 except Exception as e:
                     if is_auth_refusal(e):
                         logger.warning("Embedding refused for its key, not retrying", error_type=type(e).__name__)
+                        for pending in futures:
+                            pending.cancel()
                         raise
                     embeddings.append(None)
                     errors += 1
@@ -206,11 +208,11 @@ def generate_embeddings(
             try:
                 embeddings += future.result()
             except Exception as e:
+                # A missing or refused key fails every later call the same way.
+                if is_auth_refusal(e):
+                    logger.warning("Embedding refused for its key, not retrying", error_type=type(e).__name__)
+                    raise
                 if batch_size > 1:
-                    # A missing or refused key fails every per-input call the same way.
-                    if is_auth_refusal(e):
-                        logger.warning("Embedding authentication failed, not retrying", error=str(e))
-                        raise
                     # Still limited after its retries: one call per input would only add load.
                     if isinstance(e, litellm.exceptions.RateLimitError):
                         logger.warning("Embedding still rate limited after retries", error=str(e))

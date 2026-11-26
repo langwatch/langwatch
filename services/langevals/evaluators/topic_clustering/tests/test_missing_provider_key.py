@@ -18,6 +18,8 @@ from fastapi.testclient import TestClient
 
 import langevals_topic_clustering.batch_clustering as batch_clustering
 import langevals_topic_clustering.incremental_clustering as incremental_clustering
+import langevals_topic_clustering.utils as utils
+from langevals_topic_clustering.refusals import is_missing_key
 
 PROVIDER_KEYS = [
     "OPENAI_API_KEY",
@@ -279,3 +281,20 @@ def test_naming_credentials_in_the_request_are_used(client, monkeypatch, provide
     for sent in provider.completion_calls:
         for name, value in litellm_params.items():
             assert sent[name] == value
+
+
+# @scenario "A model provider with no API key is answered as the customer's to fix"
+@pytest.mark.parametrize("path", ["singleton batches", "per-input fallback"])
+def test_a_missing_key_is_raised_from_every_embedding_path(monkeypatch, path):
+    calls = counted(monkeypatch, "embedding")
+    texts = [f"text {i}" for i in range(30)]
+
+    with pytest.raises(Exception) as raised:
+        if path == "singleton batches":
+            utils.generate_embeddings(texts, OPENAI_EMBEDDINGS, batch_size=1, max_workers=1)
+        else:
+            utils.generate_embeddings_threaded(texts, OPENAI_EMBEDDINGS, max_workers=1)
+
+    assert is_missing_key(raised.value)
+    # The one worker may start the next input before the refusal is read; no more.
+    assert len(calls) <= 2
