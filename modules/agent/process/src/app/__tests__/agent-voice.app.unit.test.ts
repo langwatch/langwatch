@@ -2,7 +2,7 @@
  * The voice agent a drawer finish creates, folded on its identity key.
  * @see specs/features/agents/voice-agents-v1.feature
  */
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { createAgentAppFixture } from "./agent.fixture.ts";
 
@@ -30,6 +30,26 @@ describe("given two drawer finishes for the same never-saved voice agent", () =>
           agentExternalId: voice.agentId,
         }),
       ).resolves.toBe(true);
+    });
+  });
+});
+
+describe("given two concurrent finishes for the same never-saved voice agent", () => {
+  describe("when both create the voice agent row at once", () => {
+    /** @scenario "Concurrent finish retries create exactly one agent" */
+    it("returns one id for both, the loser re-reading the winner", async () => {
+      const { app, repositories } = createAgentAppFixture();
+      const create = vi.spyOn(repositories.agents, "create");
+
+      const [first, second] = await Promise.all([
+        app.createVoiceAgent({ id: "agent_a", ...voice }),
+        app.createVoiceAgent({ id: "agent_b", ...voice }),
+      ]);
+
+      // Both passed the existence read before either write landed, so the
+      // identity-key constraint, not the read, decided the winner.
+      expect(create).toHaveBeenCalledTimes(2);
+      expect(second.id).toBe(first.id);
     });
   });
 });
