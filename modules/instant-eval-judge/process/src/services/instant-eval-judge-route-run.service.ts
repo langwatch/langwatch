@@ -11,7 +11,6 @@ import {
   isInstantEvalSpendBillable,
   type InstantEvalJudgeCostCeiling,
   type InstantEvalJudgeRoutePricing,
-  type InstantEvalJudgeReasoningEffort,
   type InstantEvalJudgeRouteGate,
   type InstantEvalJudgeRouteTable,
   type InstantEvalJudgement,
@@ -39,10 +38,9 @@ import {
   type InstantEvalJudgeRoutePlan,
 } from "../rules/instant-eval-judge-route.rules.ts";
 import { isUnsureAnswer } from "../rules/instant-eval-judge-sureness.rules.ts";
+import { InstantEvalJudgeBackendSendService } from "./instant-eval-judge-backend-send.service.ts";
 import { InstantEvalJudgeCeilingSendService } from "./instant-eval-judge-ceiling-send.service.ts";
-import { InstantEvalJudgeDecisionLegService } from "./instant-eval-judge-decision-leg.service.ts";
 import { InstantEvalJudgeGatedLegsService } from "./instant-eval-judge-gated-legs.service.ts";
-import { InstantEvalJudgeLlmLegService } from "./instant-eval-judge-llm-leg.service.ts";
 
 export type InstantEvalJudgeRouteRunDeps = Readonly<{
   table: InstantEvalJudgeRouteTable;
@@ -53,14 +51,6 @@ export type InstantEvalJudgeRouteRunDeps = Readonly<{
   limiter: InstantEvalRateLimiter;
 }>;
 
-/** One send's tokens; `isUsageUnread` when the call went out and no usage came back. */
-type Spend = {
-  backend: string;
-  inputTokens: number;
-  outputTokens: number;
-  isUsageUnread?: boolean;
-};
-
 /** One routed call's legs, the calls they paid for and what the routing reports. */
 export class InstantEvalJudgeRouteRunService {
   private readonly deps: InstantEvalJudgeRouteRunDeps;
@@ -69,6 +59,7 @@ export class InstantEvalJudgeRouteRunService {
   private readonly signal: AbortSignal | undefined;
   private readonly logger: Pick<Logger, "error">;
   private readonly ceilingSend: InstantEvalJudgeCeilingSendService | undefined;
+  private readonly backends: InstantEvalJudgeBackendSendService;
   private readonly flags: string[] = [];
   private inputTokens = 0;
   private costNanoUsd = 0;
@@ -87,6 +78,14 @@ export class InstantEvalJudgeRouteRunService {
     this.signal = input.signal;
     this.logger = input.logger;
     const { costCeiling, logger } = input;
+    this.backends = InstantEvalJudgeBackendSendService.create({
+      ...input.deps,
+      projectId: input.projectId,
+      plan: input.plan,
+      signal: input.signal,
+      logger,
+      flag: (flag) => this.flags.push(flag),
+    });
     this.ceilingSend = costCeiling
       ? InstantEvalJudgeCeilingSendService.create({ costCeiling, logger })
       : undefined;
@@ -316,7 +315,8 @@ export class InstantEvalJudgeRouteRunService {
     text?: string;
   }): Promise<Leg> {
     const { ceilingSend } = this;
-    if (!ceilingSend) return this.sendOne({ ...input, paid: (spend) => void this.paid(spend) });
+    if (!ceilingSend)
+      return this.backends.send({ ...input, paid: (spend) => void this.paid(spend) });
     const { backend, questions, text } = input;
     const { table, pricing } = this.deps;
     const heldNanoUsd = instantEvalJudgeSendWorstCaseNanoUsd({
@@ -332,7 +332,7 @@ export class InstantEvalJudgeRouteRunService {
       signal: this.signal,
       backend,
       send: (bill, unread) =>
-        this.sendOne({
+        this.backends.send({
           ...input,
           paid: (spend) => {
             bill(this.paid(spend));
@@ -349,97 +349,6 @@ export class InstantEvalJudgeRouteRunService {
   private longestPlanText(): string {
     const { text, fullText } = this.plan;
     return text.length > fullText.length ? text : fullText;
-  }
-
-  /**
-   * One backend's send. Only the caller's stop is rethrown: the leg's own timeout is a leg that
-   * failed, so the paid legs before it stay billed and the page is not retried for it.
-   */
-  private async sendOne({
-    backend,
-    questions,
-    text,
-    paid,
-  }: {
-    backend: string;
-    questions: readonly InstantEvalQuestion[];
-    text?: string | undefined;
-    paid: (spend: Spend) => void;
-  }): Promise<Leg> {
-    const config = this.deps.table.backends[backend];
-    if (!config) return { outcome: "failed", reason: "classifier_provider_unavailable" };
-    if (config.kind !== "jev" && config.kind !== "decisions") {
-      return this.askLlm({
-        backend,
-        wire: config.kind,
-        model: config.model,
-        questions,
-        timeoutMs: config.timeoutMs,
-        reasoningEffort: config.reasoningEffort,
-        maxOutputTokens: config.maxOutputTokens,
-        paid,
-      });
-    }
-    const { table, classifier, hostedDecisions, limiter } = this.deps;
-    const leg = InstantEvalJudgeDecisionLegService.create({
-      table,
-      classifier,
-      hostedDecisions,
-      limiter,
-      projectId: this.projectId,
-      plan: this.plan,
-      signal: this.signal,
-      flag: (flag) => this.flags.push(flag),
-      paid,
-    });
-    const { kind, model, timeoutMs } = config;
-    return leg.ask({ backend, kind, model, timeoutMs, questions, text });
-  }
-
-  /** One LLM call per question, in parallel; its answer is taken as sure. */
-  private async askLlm({
-    backend,
-    wire,
-    model,
-    questions,
-    timeoutMs,
-    reasoningEffort,
-    maxOutputTokens,
-    paid,
-  }: {
-    backend: string;
-    wire: "anthropic_messages" | "openai_responses";
-    model: string | undefined;
-    questions: readonly InstantEvalQuestion[];
-    timeoutMs: number;
-    reasoningEffort: InstantEvalJudgeReasoningEffort | undefined;
-    maxOutputTokens: number | undefined;
-    paid: (spend: Spend) => void;
-  }): Promise<Leg> {
-    // The table refuses an LLM backend with no model at boot; this keeps the type honest.
-    if (!model) return { outcome: "failed", reason: "classifier_not_configured" };
-    const { llmJudge, limiter } = this.deps;
-    const leg = InstantEvalJudgeLlmLegService.create({
-      llmJudge,
-      limiter,
-      projectId: this.projectId,
-      job: this.plan.job,
-      text: this.plan.fullText,
-      signal: this.signal,
-      logger: this.logger,
-      paid: (spend) => paid({ backend, ...spend }),
-    });
-    const call = {
-      wire,
-      model,
-      timeoutMs,
-      ...(reasoningEffort ? { reasoningEffort } : {}),
-      ...(maxOutputTokens === undefined ? {} : { maxOutputTokens }),
-    };
-    const { answers, reason } = await leg.ask({ call, questions });
-    if (answers.size === 0) return { outcome: "failed", reason };
-    if (answers.size < questions.length) this.flags.push(`${backend}_partial:${reason}`);
-    return { outcome: "answered", backend, answers, isTextTruncated: false, limiterWaitMs: 0 };
   }
 
   /** Bills one send into the run's spend and answers what it cost us. */

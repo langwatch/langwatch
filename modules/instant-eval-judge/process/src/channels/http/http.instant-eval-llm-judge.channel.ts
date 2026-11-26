@@ -37,6 +37,8 @@ const ANTHROPIC_VERSION = "2023-06-01";
 
 type Keys = Readonly<Partial<Record<InstantEvalLlmJudgeWire, string>>>;
 
+type SkippedAnswer = Extract<InstantEvalLlmJudgeAnswer, { outcome: "skipped" }>;
+
 export class HttpInstantEvalLlmJudgeChannel implements InstantEvalLlmJudgeChannel {
   private constructor(
     private readonly keys: Keys,
@@ -138,13 +140,13 @@ export class HttpInstantEvalLlmJudgeChannel implements InstantEvalLlmJudgeChanne
     wire: InstantEvalLlmJudgeWire;
     reason: InstantEvalSkipReason;
     status?: number;
-  }): InstantEvalLlmJudgeAnswer {
+  }): SkippedAnswer {
     this.logger.warn({ wire, reason, status }, "Instant Evals LLM leg did not answer");
     return skipped(reason);
   }
 }
 
-function skipped(reason: InstantEvalSkipReason): InstantEvalLlmJudgeAnswer {
+function skipped(reason: InstantEvalSkipReason): SkippedAnswer {
   return { outcome: "skipped", reason, inputTokens: 0, outputTokens: 0 };
 }
 
