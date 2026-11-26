@@ -143,9 +143,7 @@ export class PrismaInstanceAdminRepository extends InstanceAdminRepository {
     }
   }
 
-  /**
-   * Users order in SQL across the whole search, then the page's rows load with their memberships.
-   */
+  /** Users order in SQL across the whole search, then the page's rows load with memberships. */
   private async listUsers(params: AdminOperationParams): Promise<AdminListResult> {
     const filter = params.filter ?? {};
     const query = typeof filter.query === "string" && filter.query ? filter.query : undefined;

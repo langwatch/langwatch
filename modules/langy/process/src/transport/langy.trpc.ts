@@ -70,6 +70,14 @@ export const langyTrpcTransport: TrpcRouterDeclaration<LangyApi, typeof langyTrp
       app.archiveConversation({ ...input, caller: callerOf(actor, person) }),
     )
 
+    .procedure("createAttachmentUpload")
+    .withPermission("langy:create")
+    .handle(({ app, input }) => app.createAttachmentUpload(input))
+
+    .procedure("confirmAttachmentUpload")
+    .withPermission("langy:create")
+    .handle(({ app, input }) => app.confirmAttachmentUpload(input))
+
     .procedure("renameConversation")
     .withMiddlewareContext(sessionPersonContext)
     .withPermission("langy:update")

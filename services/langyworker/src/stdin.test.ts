@@ -33,6 +33,20 @@ describe("attachJsonlReader", () => {
     });
   });
 
+  describe("when one record spans many chunks", () => {
+    it("emits it whole once its LF arrives, and the next record after it", () => {
+      const source = makeSource();
+      const chunk = "x".repeat(64 * 1024);
+      source.push('{"data":"');
+      for (let i = 0; i < 64; i++) source.push(chunk);
+      source.push('"}\n{"a":1}');
+      expect(source.lines).toHaveLength(1);
+      expect(source.lines[0]?.length).toBe(64 * chunk.length + 11);
+      source.end();
+      expect(source.lines[1]).toBe('{"a":1}');
+    });
+  });
+
   describe("when records use CRLF", () => {
     it("strips the trailing CR", () => {
       const source = makeSource();
