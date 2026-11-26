@@ -19,18 +19,10 @@
               },
               "status": {
                 "type": "string",
-                "enum": [
-                  "passed",
-                  "failed",
-                  "inconclusive"
-                ]
+                "enum": ["passed", "failed", "inconclusive"]
               }
             },
-            "required": [
-              "requirement",
-              "reasoning",
-              "status"
-            ],
+            "required": ["requirement", "reasoning", "status"],
             "additionalProperties": false
           },
           "criterion_1": {
@@ -44,18 +36,10 @@
               },
               "status": {
                 "type": "string",
-                "enum": [
-                  "passed",
-                  "failed",
-                  "inconclusive"
-                ]
+                "enum": ["passed", "failed", "inconclusive"]
               }
             },
-            "required": [
-              "requirement",
-              "reasoning",
-              "status"
-            ],
+            "required": ["requirement", "reasoning", "status"],
             "additionalProperties": false
           },
           "criterion_2": {
@@ -69,36 +53,21 @@
               },
               "status": {
                 "type": "string",
-                "enum": [
-                  "passed",
-                  "failed",
-                  "inconclusive"
-                ]
+                "enum": ["passed", "failed", "inconclusive"]
               }
             },
-            "required": [
-              "requirement",
-              "reasoning",
-              "status"
-            ],
+            "required": ["requirement", "reasoning", "status"],
             "additionalProperties": false
           }
         },
-        "required": [
-          "criterion_0",
-          "criterion_1",
-          "criterion_2"
-        ],
+        "required": ["criterion_0", "criterion_1", "criterion_2"],
         "additionalProperties": false
       },
       "reasoning": {
         "type": "string"
       }
     },
-    "required": [
-      "criteria",
-      "reasoning"
-    ],
+    "required": ["criteria", "reasoning"],
     "additionalProperties": false
   }
 }

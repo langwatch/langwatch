@@ -19,7 +19,7 @@ const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..", ".."
  * Langy, Grok; 1,583 trace-limit cache, coalescer, entitlements, client faults; 1,585 seat peak;
  * 1,589 braids; 1,592 agent registry; 1,593 docs playground; 1,594 http-mux; 1,595 payments; 1,600
  * SIEM, kill switch, agents, run wait, Lake; 1,606 A2A, span, floor, settings; 1,607 models. */
-const CEILING = 1_607;
+const CEILING = 1_609; // 1,609 judge preview
 
 /** Every browser file that declares a module's typed procedures through `createModuleApi`. */
 function moduleApiDeclarations(): string[] {

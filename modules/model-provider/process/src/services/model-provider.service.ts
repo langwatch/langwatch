@@ -194,7 +194,9 @@ export class ModelProviderService {
     return new ModelProviderService(options);
   }
 
-  private createDecisionModels(scopes: ModelProviderScopeService): ModelProviderDecisionModelService {
+  private createDecisionModels(
+    scopes: ModelProviderScopeService,
+  ): ModelProviderDecisionModelService {
     return ModelProviderDecisionModelService.create({
       resolution: this.resolution,
       scopes,

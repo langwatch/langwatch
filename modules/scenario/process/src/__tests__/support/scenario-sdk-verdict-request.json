@@ -34,18 +34,10 @@
                     },
                     "status": {
                       "type": "string",
-                      "enum": [
-                        "passed",
-                        "failed",
-                        "inconclusive"
-                      ]
+                      "enum": ["passed", "failed", "inconclusive"]
                     }
                   },
-                  "required": [
-                    "requirement",
-                    "reasoning",
-                    "status"
-                  ],
+                  "required": ["requirement", "reasoning", "status"],
                   "additionalProperties": false
                 },
                 "the_agent_apologises": {
@@ -59,35 +51,21 @@
                     },
                     "status": {
                       "type": "string",
-                      "enum": [
-                        "passed",
-                        "failed",
-                        "inconclusive"
-                      ]
+                      "enum": ["passed", "failed", "inconclusive"]
                     }
                   },
-                  "required": [
-                    "requirement",
-                    "reasoning",
-                    "status"
-                  ],
+                  "required": ["requirement", "reasoning", "status"],
                   "additionalProperties": false
                 }
               },
-              "required": [
-                "the_agent_offers_a_refund",
-                "the_agent_apologises"
-              ],
+              "required": ["the_agent_offers_a_refund", "the_agent_apologises"],
               "additionalProperties": false
             },
             "reasoning": {
               "type": "string"
             }
           },
-          "required": [
-            "criteria",
-            "reasoning"
-          ],
+          "required": ["criteria", "reasoning"],
           "additionalProperties": false
         }
       }

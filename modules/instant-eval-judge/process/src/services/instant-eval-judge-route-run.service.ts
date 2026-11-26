@@ -402,14 +402,10 @@ export class InstantEvalJudgeRouteRunService {
     if (reading.outcome === "failed") return { outcome: "failed", reason: reading.reason };
     const answer = reading.criteria.get(criterionKey);
     if (answer === undefined) return { outcome: "failed", reason: "classifier_failed" };
+    const verdictOf = (questionId: string) =>
+      instantEvalScenarioLlmVerdictOf({ questionId, answer });
     const answers = new Map(
-      questions.map((question) => [
-        question.id,
-        {
-          verdict: instantEvalScenarioLlmVerdictOf({ questionId: question.id, answer }),
-          sureness: 1,
-        },
-      ]),
+      questions.map(({ id }) => [id, { verdict: verdictOf(id), sureness: 1 }]),
     );
     return { outcome: "answered", backend, answers, isTextTruncated: false, limiterWaitMs: 0 };
   }

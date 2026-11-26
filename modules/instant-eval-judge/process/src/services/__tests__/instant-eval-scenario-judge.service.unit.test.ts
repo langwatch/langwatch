@@ -231,7 +231,9 @@ describe("given a scenario verdict call on LangWatch Cloud", () => {
         1, 1, 1,
       ]);
       expect(
-        hostedDecisions.requests.map((request) => request.questions[0]?.id).toSorted(),
+        hostedDecisions.requests
+          .map((request) => request.questions[0]?.id ?? "")
+          .toSorted((a, b) => a.localeCompare(b)),
       ).toEqual(["criterion_0", "criterion_1", "criterion_2"]);
       expect(hostedDecisions.requests[0]?.text).toBe(
         "# Scenario\nA customer asks for a refund on a late order\n\n<transcript>user: my order is late\nassistant: I refunded it</transcript>",

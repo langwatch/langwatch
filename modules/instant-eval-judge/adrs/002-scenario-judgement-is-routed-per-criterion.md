@@ -54,11 +54,11 @@ on a decision model and sent the unsure ones to an LLM that read the judge's who
    model id rides in the request path, so the table holds it to a bare id; its key rides in a
    header, never the URL, and is read on LangWatch Cloud only. It takes no reasoning effort.
 10. **The endpoint speaks the scenario SDK's own tools (2026-11-25).** A criterion's text is the
-   one the system prompt's `<criteria>` block lists at its place, the wording the routes were
-   measured on, since SDK 1.8 sends its tool with no descriptions. The verdict answers each
-   criterion with its requirement, a short reasoning and its status, and no verdict field: the
-   SDK works it out. A verdict call that offers the one-shot `wait_for_traces` is answered with
-   that wait, free, so a verdict waits once for traces still arriving, as the SDK's own judge may.
+    one the system prompt's `<criteria>` block lists at its place, the wording the routes were
+    measured on, since SDK 1.8 sends its tool with no descriptions. The verdict answers each
+    criterion with its requirement, a short reasoning and its status, and no verdict field: the
+    SDK works it out. A verdict call that offers the one-shot `wait_for_traces` is answered with
+    that wait, free, so a verdict waits once for traces still arriving, as the SDK's own judge may.
 
 ## Consequences
 
