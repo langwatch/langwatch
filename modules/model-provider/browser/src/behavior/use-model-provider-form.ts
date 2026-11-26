@@ -396,6 +396,16 @@ export function useModelProviderForm(
     onError,
   });
 
+  const { setCustomKey: storeCustomKey } = credentialKeysHook;
+  const { clearErrors: clearSubmitErrors } = formSubmitHook;
+  const setCustomKey = useCallback(
+    (key: string, value: string) => {
+      storeCustomKey(key, value);
+      clearSubmitErrors();
+    },
+    [storeCustomKey, clearSubmitErrors],
+  );
+
   const isDirty = useMemo(
     () =>
       hasUnsavedChanges({
@@ -496,7 +506,7 @@ export function useModelProviderForm(
       setScopes,
       setScopeType,
       setUseApiGateway,
-      setCustomKey: credentialKeysHook.setCustomKey,
+      setCustomKey,
       addExtraHeader: extraHeadersHook.addExtraHeader,
       removeExtraHeader: extraHeadersHook.removeExtraHeader,
       toggleExtraHeaderConcealed: extraHeadersHook.toggleExtraHeaderConcealed,

@@ -80,6 +80,7 @@ export type CodeStepId =
   | "suite:fill-id-indexes"
   | "topic:seed-topic-model-history"
   | "topic:seed-clustering-schedules"
+  | "trace:link-unowned-trace-media"
   | "trace:track-updated-at-index-materialisation"
   | "trace:track-analytics-metadata-columns-materialisation"
   | "trace:replay-trace-analytics-widget-columns"

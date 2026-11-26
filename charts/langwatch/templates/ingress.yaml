@@ -85,14 +85,16 @@
 {{- end }}
 {{- /*
   ingress-nginx cuts a response at 60 s by default, the same as an analytics
-  query's own limit, so with className nginx the app Ingress waits 120 s.
-  ingress.annotations override these.
+  query's own limit, so with className nginx the app Ingress waits 120 s. Its
+  1m body default would refuse a trace export carrying a recording, so the body
+  size follows the trace receiver's 64 MiB default. ingress.annotations override these.
 */}}
 {{- $appAnnotations := dict }}
 {{- if eq (toString .Values.ingress.className) "nginx" }}
 {{- $appAnnotations = dict
       "nginx.ingress.kubernetes.io/proxy-read-timeout" "120"
-      "nginx.ingress.kubernetes.io/proxy-send-timeout" "120" }}
+      "nginx.ingress.kubernetes.io/proxy-send-timeout" "120"
+      "nginx.ingress.kubernetes.io/proxy-body-size" "64m" }}
 {{- end }}
 {{- $appAnnotations = mergeOverwrite $appAnnotations (deepCopy (.Values.ingress.annotations | default dict)) }}
 apiVersion: networking.k8s.io/v1

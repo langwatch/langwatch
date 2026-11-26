@@ -178,6 +178,21 @@ export const traceProcessModule: PublishedProcessModule<"trace", TraceApi, Trace
         replayer,
       });
       return [
+        // An old image stores trace media without a link, so wait until none serves.
+        defineMigrationStep({
+          id: "trace:link-unowned-trace-media",
+          kind: "tenant",
+          mode: "background",
+          tenants: "project",
+          needsOldWritersGone: true,
+          title: "Owner links for trace media stored before them",
+          description:
+            "Links audio and images stored from traces before owner links existed to their trace, so they are deleted with it.",
+          requiresOperatorConfirmation: false,
+          runsAutomaticallyOnSelfHosted: true,
+          enrolledAutomatically: true,
+          migrateTenant: (args) => app.linkUnownedTraceMedia(args),
+        }),
         defineMigrationStep({
           id: "trace:track-updated-at-index-materialisation",
           kind: "data",

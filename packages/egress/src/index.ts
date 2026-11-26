@@ -5,6 +5,11 @@ export {
   isCloudMetadataHost,
   isPrivateOrLocalhostIP,
 } from "./ssrf/url-validator.ts";
+export {
+  EgressDestinationRefusedError,
+  egressRefusalReason,
+  type EgressRefusalReason,
+} from "./ssrf/destination-refusal.ts";
 export type {
   SsrfAllowlistedResult,
   SsrfPolicy,

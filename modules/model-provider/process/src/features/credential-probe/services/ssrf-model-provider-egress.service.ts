@@ -1,9 +1,11 @@
 import {
   createSsrfUrlValidator,
+  egressRefusalReason,
   fetchValidatedDestination,
   RedirectRefusedError,
   type SsrfUrlValidator,
 } from "@langwatch/egress";
+import type { ProviderEndpointRefusal } from "@langwatch/model-provider-contract";
 
 /** One outbound probe's answer, as the credential prober reads it. */
 export type ModelProviderEgressResponse = {
@@ -31,6 +33,10 @@ export abstract class ModelProviderEgress {
     request: ModelProviderEgressRequest,
   ): Promise<ModelProviderEgressResponse>;
   abstract isRedirectRefusal(error: unknown): boolean;
+  /** Why the address policy refused the URL before anything was sent. */
+  endpointRefusal(error: unknown): ProviderEndpointRefusal | "not_refused" {
+    return egressRefusalReason(error) ?? "not_refused";
+  }
   /** Throws when the fence would refuse the URL; a saved endpoint is held to the probe's policy. */
   abstract assertDestination(url: string): Promise<void>;
 }
