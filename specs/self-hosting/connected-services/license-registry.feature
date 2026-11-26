@@ -206,6 +206,26 @@ Feature: License registry
     Then the row is revoked and records who revoked it, when and why
 
   @unit
+  Scenario: Retiring an unused key is refused once an install has bound the license
+    Given a license an install bound after the operator opened the drawer
+    When the drawer retires it as a key no install used
+    Then the registry refuses with license_in_use
+    And the license and its managed key stay live
+
+  @unit
+  Scenario: A bind and an unused-key revoke racing on one license cannot both win
+    Given a license no install has used
+    When an install binds it after the drawer's revoke read the row, before the revoke writes
+    Then the revoke is refused with license_in_use and the license stays bound and live
+    And a bind that arrives after an unused-key revoke is refused
+
+  @integration
+  Scenario: The registry revokes an unbound license and refuses to bind a revoked one in single writes
+    Given an unbound license and a bound one
+    When the unbound one is revoked as unused and an install then tries to bind it
+    Then the revoke wins, the bind is refused, and revoking the bound one as unused is refused
+
+  @unit
   Scenario: Reissuing a license
     Given an active license for "ACME" with 50 seats
     When an operator reissues it with 80 seats and a new term
@@ -237,6 +257,13 @@ Feature: License registry
     Given a license bound to an instance
     When an operator resets the instance binding
     Then the row has no instance bound
+
+  @unit
+  Scenario: After a binding reset the drawer treats the chain as unused
+    Given a chain whose live license was unbound by a reset
+    And a superseded license of it that still names the old install
+    When the drawer reads the chain
+    Then it reads as unbound, so a new key is shown to send and the unused one is retired
 
   @unit
   Scenario: Editing entitlements does not reissue the license
@@ -309,3 +336,175 @@ Feature: License registry
     When an operator opens the licenses screen
     Then each license shows its customer, seats, term, status, entitled services and whether an instance is bound
     And a license that has synced shows when it last did and the seats it reported
+
+  @unit
+  Scenario: The licenses list shows one row per reissue chain, the newest
+    Given a license that was extended, with the replacement waiting for the install
+    When an operator opens the licenses screen
+    Then the list shows one row for that customer, the replacement
+    And the status and audience counts count it once
+
+  @integration
+  Scenario: The registry lists and counts a reissue chain once
+    Given a license replaced by an unrevoked license, and another whose replacement was revoked
+    When the registry lists the licenses that are newest in their chain
+    Then the replaced license is left out and the one with the revoked replacement stays
+
+  # ============================================================================
+  # The license drawer: what the install gets, and when it gets it
+  # ============================================================================
+  # A license is a signed token with its term inside, so a new end date is a
+  # replacement (a reissue) delivered over sync, never an edit of the row.
+
+  @unit
+  Scenario: The chain of a license lists what it replaced and what replaces it
+    Given a license for "ACME" that was reissued twice
+    When an operator reads the chain of any license in it
+    Then every license in the chain is listed, the newest first
+
+  @unit
+  Scenario: The seats a customer uses are read from the license that last synced
+    Given a bound license that reported 8 seats in use
+    And a replacement for it that the install has not picked up yet
+    When billing reads the seats of that customer
+    Then it reads the replacement's seats as licensed and 8 as in use
+
+  @integration
+  Scenario: The drawer opens on the install that holds the license
+    Given a license bound to install "acme-prod" that last synced this morning
+    When an operator opens it in the drawer
+    Then the drawer names the install, when it last synced, its version, the seats in use and when the next daily sync is due
+
+  @integration
+  Scenario: Extending a trial signs a replacement the install picks up on its next sync
+    Given a bound license for "ACME" ending Dec 1 that no billing account was opened for
+    When an operator picks "+2 weeks" under Extend term and saves
+    Then a replacement is signed ending Dec 15 with the same seats
+    And no license key is shown, only a way to show it if the install cannot sync
+    And the drawer says the extension waits for the install's next sync
+
+  @integration
+  Scenario: A replacement waiting for delivery shows on the license it replaces
+    Given a bound license with a replacement the install has not picked up yet
+    When an operator opens the license in use
+    Then the drawer shows the term moving from the old end date to the new one, waiting for sync
+    And says how to get it now with Refresh license on the install
+
+  @integration
+  Scenario: A Developer seat change waiting for delivery shows as waiting for sync
+    Given a bound license with no Developer seats
+    And a replacement with 5 Developer seats the install has not picked up yet
+    When an operator opens the license in use
+    Then the seats row shows the Developer seats moving from 0 to 5, waiting for sync
+
+  @integration
+  Scenario: Extending again while a replacement waits extends the replacement
+    Given a bound license with a replacement the install has not picked up yet
+    When an operator extends the term again
+    Then the replacement is the license reissued, not the one it replaces
+
+  @integration
+  Scenario: Extending a license no install has used shows the new key and stops the unused one
+    Given a license no install has used yet
+    When an operator extends its term
+    Then the new license key is shown to send to the customer
+    And the license it replaces is revoked, since no install holds it
+
+  @integration
+  Scenario: An extension whose unused key an install bound meanwhile keeps the new key for sync
+    Given a license no install had used when the drawer opened
+    When an operator extends its term and the registry refuses to retire the old key as in use
+    Then the drawer says why the old key still works
+    And the new key is kept behind "Install can't sync?" instead of being offered to send
+
+  @integration
+  Scenario: A new end date that does not extend the term cannot be saved
+    Given an active license ending Dec 1
+    When an operator picks Nov 20 as the new end date
+    Then the save button is disabled and the form says the date must be after Dec 1
+
+  @integration
+  Scenario: An extension the registry refuses leaves the term as it was
+    Given an active license ending Dec 1
+    When an operator extends it and the registry refuses the reissue
+    Then the drawer says the license was not extended
+    And the term still reads Dec 1
+
+  @integration
+  Scenario: Revoking from the drawer also revokes the replacement waiting for delivery
+    Given a bound license with a replacement the install has not picked up yet
+    When an operator revokes the license from the drawer
+    Then both the license and its replacement are revoked
+
+  @integration
+  Scenario: Revoking from the table also revokes the license the install still holds
+    Given a bound license with a replacement the install has not picked up yet
+    And the licenses table lists the chain as its replacement
+    When an operator revokes that row from the table
+    Then both the replacement and the license the install holds are revoked
+
+  @unit
+  Scenario: An unused-key revoke ends the managed key before it marks the license
+    Given a license no install has used holds a managed key
+    When ending its managed key fails
+    Then the license is not marked revoked and stays live
+    And revoking it again ends the key and marks the license
+
+  @unit
+  Scenario: An install that binds while its unused key is being ended gets a fresh key
+    Given an unused-key revoke ended the license's managed key
+    And an install bound the license before the revoke marked it
+    When the revoke's conditional write is refused
+    Then the license stays live and bound, and lets go of the ended key
+    And the install's next sync provisions a new managed key
+
+  @integration
+  Scenario: Only a live license lets go of an ended managed key
+    Given a live license and a revoked license each name a managed key that was ended
+    When licensing lets go of each ended key
+    Then the live license no longer names its key
+    And the revoked license keeps the key it names
+
+  @unit @integration
+  Scenario: A revoke ends a key that attached while it ran
+    Given an operator revokes a bound license
+    And gateway attaches a new key for that install before the revoke marks the row
+    When the revoke tries to mark the license
+    Then the mark is refused because the license names another key
+    And the new key is ended before the license is marked revoked
+    And if ending the new key fails, the license stays live and revoking again finishes the job
+
+  @integration
+  Scenario: Retiring an unused key that failed for another reason keeps the new key for the customer
+    Given no install holds the license
+    And an operator signs a replacement
+    When retiring the unused key fails for a reason other than an install binding it
+    Then the drawer still offers the new key for the customer to paste
+    And it says the unused key still works
+
+  @integration
+  Scenario: An unused key a failed retirement left working can be ended from the drawer
+    Given retiring the unused key failed after an operator signed a replacement
+    When the operator chooses End the unused key
+    Then the registry ends the key and the drawer stops saying it still works
+
+  @integration
+  Scenario: An unused key left working still shows after the drawer is opened again
+    Given no install holds a license whose replaced key still works
+    When an operator opens the license in the drawer
+    Then the drawer says the unused key still works and offers End the unused key
+
+  @integration
+  Scenario: Revoking reaches a replacement signed after the dialog opened
+    Given the revoke dialog is open on a license
+    And another operator signs a replacement for it
+    When the operator confirms the revoke
+    Then the new replacement is revoked too
+
+  @integration
+  Scenario: A revoke that failed part way finishes on retry without repeating a revoked license
+    Given a chain of three live licenses
+    And revoking failed after the first of them was revoked
+    When the operator confirms the revoke again
+    Then the license already revoked is not sent again
+    And the rest of the chain is revoked, the selected license last

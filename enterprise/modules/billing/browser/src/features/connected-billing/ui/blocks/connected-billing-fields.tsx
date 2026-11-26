@@ -26,17 +26,20 @@ export function ConnectedBillingFields({
   form,
   onChange,
   showPaymentFields,
+  seatsFromLicense = false,
 }: {
   form: BillingForm;
   onChange: (form: BillingForm) => void;
   showPaymentFields: boolean;
+  /** The seats are the license's, changed under Change seats, never here. */
+  seatsFromLicense?: boolean;
 }) {
   const set: SetField = ({ key, value }) => onChange({ ...form, [key]: value });
   return (
     <VStack align="start" gap={3} width="full">
       <SimpleGrid columns={2} gap={3} width="full">
         <Field.Root>
-          <Field.Label>Term starts</Field.Label>
+          <Field.Label>Paid term starts</Field.Label>
           <Input
             type="date"
             value={form.termStartsAt}
@@ -44,7 +47,7 @@ export function ConnectedBillingFields({
           />
         </Field.Root>
         <Field.Root>
-          <Field.Label>Term ends</Field.Label>
+          <Field.Label>Paid term ends</Field.Label>
           <Input
             type="date"
             value={form.termEndsAt}
@@ -56,9 +59,11 @@ export function ConnectedBillingFields({
           <Input
             type="number"
             min={1}
+            readOnly={seatsFromLicense}
             value={form.seats}
             onChange={(event) => set({ key: "seats", value: event.target.value })}
           />
+          {seatsFromLicense ? <Field.HelperText>From the license.</Field.HelperText> : null}
         </Field.Root>
         <Field.Root>
           <Field.Label>Seat rate per year</Field.Label>

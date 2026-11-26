@@ -52,9 +52,16 @@ function thresholdProperties(sent: readonly CioBatchCall[]) {
   );
 }
 
-/** Everything Customer.io was told of a key: a call's traits or properties, no recipient. */
+/** Everything Customer.io was told of a key: a call's traits or properties, no recipient or address. */
 const attributesOf = (sent: readonly CioBatchCall[]) =>
-  JSON.stringify(sent.map((call) => (call.type === "track" ? call.properties : call.traits)));
+  JSON.stringify(
+    sent.map((call) => {
+      if (call.type === "track") return call.properties;
+      if (call.type === "group") return call.traits;
+      const { email: _address, ...traits } = call.traits;
+      return traits;
+    }),
+  );
 
 const KEY_PROPERTIES = {
   key_name: "Jane's key",
@@ -72,7 +79,11 @@ describe("gateway's key facts in nurturing", () => {
       await facts.deliverFact(created());
 
       expect(facts.sent).toEqual([
-        { type: "identify", userId: "user-holder", traits: { has_virtual_key: true } },
+        {
+          type: "identify",
+          userId: "user-holder",
+          traits: { has_virtual_key: true, email: "user-holder@example.com" },
+        },
         {
           type: "track",
           userId: "user-holder",

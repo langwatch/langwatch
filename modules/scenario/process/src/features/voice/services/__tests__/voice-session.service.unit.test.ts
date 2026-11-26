@@ -58,6 +58,7 @@ function build(
   );
   const service = VoiceSessionService.create({
     infrastructure,
+    askRunCap: async () => {},
     authz: createApiFixture<AuthzApi>({
       hasPermission: async ({ permission }) => {
         asked.push(permission);

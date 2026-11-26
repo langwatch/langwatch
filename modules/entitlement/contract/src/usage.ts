@@ -63,6 +63,23 @@ export interface SeatLimitInfoSchema extends Named<typeof seatLimitInfoSchemaDef
 export const seatLimitInfoSchema: SeatLimitInfoSchema = seatLimitInfoSchemaDefinition;
 export type SeatLimitInfo = z.infer<typeof seatLimitInfoSchema>;
 
+/**
+ * A capped plan's scenario runs this UTC month. `graceEndsAt` is null before the first run;
+ * while the grace runs, `inGrace` is true and the cap is not applied.
+ */
+const scenarioRunUsageSchemaDefinition = z
+  .object({
+    current: z.number().nullable(),
+    max: z.number(),
+    inGrace: z.boolean(),
+    graceEndsAt: z.number().nullable(),
+    message: z.string(),
+  })
+  .strict();
+export interface ScenarioRunUsageSchema extends Named<typeof scenarioRunUsageSchemaDefinition> {}
+export const scenarioRunUsageSchema: ScenarioRunUsageSchema = scenarioRunUsageSchemaDefinition;
+export type ScenarioRunUsage = z.infer<typeof scenarioRunUsageSchema>;
+
 /** One organization's usage for the current period, and the plan it is measured against. */
 const usageStatsSchemaDefinition = z
   .object({
@@ -83,6 +100,8 @@ const usageStatsSchemaDefinition = z
     messageLimitInfo: messageLimitInfoSchema,
     seatLimitInfo: seatLimitInfoSchema,
     usageUnit: usageUnitSchema,
+    /** Null on a plan with no scenario run cap. */
+    scenarioRuns: scenarioRunUsageSchema.nullable(),
   })
   .strict();
 export interface UsageStatsSchema extends Named<typeof usageStatsSchemaDefinition> {}

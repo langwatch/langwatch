@@ -328,6 +328,148 @@ describe("the license registry", () => {
     expect(managedKeys.retired).toEqual(["vk-live"]);
   });
 
+  /** @scenario "Retiring an unused key is refused once an install has bound the license" */
+  it("refuses to retire an unused key an install has bound, and keeps it live", async () => {
+    const { registry, repository, managedKeys } = harness();
+    const { license } = await registry.issue(issueInput());
+    await repository.update(license.id, { virtualKeyId: "vk-live", instanceId: "install-1" });
+
+    await expect(
+      registry.revoke({
+        id: license.id,
+        operatorId: "operator-2",
+        reason: "unused",
+        unusedOnly: true,
+      }),
+    ).rejects.toMatchObject({ code: "license_in_use" });
+
+    expect((await repository.findById(license.id))?.revokedAt).toBeNull();
+    expect(managedKeys.retired).toEqual([]);
+  });
+
+  /** @scenario "A bind and an unused-key revoke racing on one license cannot both win" */
+  it("refuses the revoke when a bind lands between its read and its write", async () => {
+    const { registry, repository, managedKeys } = harness();
+    const { license } = await registry.issue(issueInput());
+    const revokeUnbound = repository.revokeUnbound.bind(repository);
+    repository.revokeUnbound = async (params) => {
+      await repository.bindInstance({ id: license.id, instanceId: "install-1", at: NOW });
+      return revokeUnbound(params);
+    };
+
+    await expect(
+      registry.revoke({ id: license.id, operatorId: "op", reason: "unused", unusedOnly: true }),
+    ).rejects.toMatchObject({ code: "license_in_use" });
+
+    const row = await repository.findById(license.id);
+    expect(row?.instanceId).toBe("install-1");
+    expect(row?.revokedAt).toBeNull();
+    expect(managedKeys.retired).toEqual([]);
+  });
+
+  /** @scenario "A bind and an unused-key revoke racing on one license cannot both win" */
+  it("refuses a bind that arrives after an unused-key revoke", async () => {
+    const { registry, repository } = harness();
+    const { license } = await registry.issue(issueInput());
+
+    await registry.revoke({ id: license.id, operatorId: "op", reason: "unused", unusedOnly: true });
+
+    expect(
+      await repository.bindInstance({ id: license.id, instanceId: "install-1", at: NOW }),
+    ).toBe(false);
+    expect((await repository.findById(license.id))?.revokedAt).toEqual(NOW);
+  });
+
+  /** @scenario "An unused-key revoke ends the managed key before it marks the license" */
+  it("leaves the license live when ending its key fails, and finishes on the next revoke", async () => {
+    const { registry, repository, managedKeys } = harness();
+    const { license } = await registry.issue(issueInput());
+    await repository.update(license.id, { virtualKeyId: "vk-unused" });
+    const retire = managedKeys.retire.bind(managedKeys);
+    managedKeys.retire = async () => {
+      throw new Error("gateway unreachable");
+    };
+    const unused = { id: license.id, operatorId: "op", reason: "unused", unusedOnly: true };
+
+    await expect(registry.revoke(unused)).rejects.toThrow("gateway unreachable");
+    expect((await repository.findById(license.id))?.revokedAt).toBeNull();
+    managedKeys.retire = retire;
+    const retried = await registry.revoke(unused);
+
+    expect(retried.status).toBe("revoked");
+    expect(managedKeys.retired).toEqual(["vk-unused"]);
+  });
+
+  describe("given gateway attaches a key while a bound license is being revoked", () => {
+    const attachingOnce = async () => {
+      const setup = harness();
+      const { license } = await setup.registry.issue(issueInput());
+      await setup.repository.bindInstance({ id: license.id, instanceId: "install-1", at: NOW });
+      const revokeHolding = setup.repository.revokeHolding.bind(setup.repository);
+      let attached = false;
+      setup.repository.revokeHolding = async (params) => {
+        if (!attached) {
+          attached = true;
+          await setup.repository.update(license.id, { virtualKeyId: "vk-new" });
+        }
+        return revokeHolding(params);
+      };
+      const revoke = () =>
+        setup.registry.revoke({ id: license.id, operatorId: "op", reason: "leaked" });
+      return { ...setup, license, revoke };
+    };
+
+    /** @scenario "A revoke ends a key that attached while it ran" */
+    it("ends the new key before it marks the license revoked", async () => {
+      const { revoke, managedKeys } = await attachingOnce();
+
+      const revoked = await revoke();
+
+      expect(revoked.status).toBe("revoked");
+      expect(managedKeys.retired).toEqual(["vk-new"]);
+    });
+
+    /** @scenario "A revoke ends a key that attached while it ran" */
+    it("leaves the license live when ending the new key fails, and a retry finishes", async () => {
+      const { revoke, managedKeys, repository, license } = await attachingOnce();
+      const retire = managedKeys.retire.bind(managedKeys);
+      managedKeys.retire = async () => {
+        throw new Error("gateway unreachable");
+      };
+
+      await expect(revoke()).rejects.toThrow("gateway unreachable");
+      const live = await repository.findById(license.id);
+      expect(live?.revokedAt).toBeNull();
+      expect(live?.virtualKeyId).toBe("vk-new");
+
+      managedKeys.retire = retire;
+      expect((await revoke()).status).toBe("revoked");
+      expect(managedKeys.retired).toEqual(["vk-new"]);
+    });
+  });
+
+  /** @scenario "An install that binds while its unused key is being ended gets a fresh key" */
+  it("keeps a license an install bound mid-revoke live, and lets go of the ended key", async () => {
+    const { registry, repository, managedKeys } = harness();
+    const { license } = await registry.issue(issueInput());
+    await repository.update(license.id, { virtualKeyId: "vk-unused" });
+    const retire = managedKeys.retire.bind(managedKeys);
+    managedKeys.retire = async (params) => {
+      await retire(params);
+      await repository.bindInstance({ id: license.id, instanceId: "install-1", at: NOW });
+    };
+
+    await expect(
+      registry.revoke({ id: license.id, operatorId: "op", reason: "unused", unusedOnly: true }),
+    ).rejects.toMatchObject({ code: "license_in_use" });
+
+    const row = await repository.findById(license.id);
+    expect(managedKeys.retired).toEqual(["vk-unused"]);
+    expect(row?.revokedAt).toBeNull();
+    expect(row?.instanceId).toBe("install-1");
+    expect(row?.virtualKeyId).toBeNull();
+  });
+
   /** @scenario "Reissuing a license" */
   it("signs a replacement that points at the license it replaces", async () => {
     const { registry, repository } = harness();
@@ -657,6 +799,28 @@ describe("changing the seats of a running license", () => {
 });
 
 describe("the seats a connected customer holds", () => {
+  /** @scenario "The seats a customer uses are read from the license that last synced" */
+  it("reads the seats in use off the license that synced while its replacement waits", async () => {
+    const { registry, repository } = harness();
+    const { license } = await registry.issue(issueInput({ maxMembers: 25 }));
+    await repository.update(license.id, {
+      instanceId: "acme-prod",
+      lastSyncAt: Temporal.Instant.from("2026-06-01T06:00:00.000Z"),
+      reportedMembers: 8,
+    });
+    await registry.reissue({
+      id: license.id,
+      expiresAt: Temporal.Instant.from("2027-06-01T00:00:00.000Z"),
+      operatorId: "operator-9",
+    });
+
+    await expect(registry.getConnectedSeats("org-acme")).resolves.toMatchObject({
+      licensed: 25,
+      reported: 8,
+      lastSyncAt: "2026-06-01T06:00:00Z",
+    });
+  });
+
   it("reads nothing licensed and nothing reported for a customer with no license", async () => {
     const { registry } = harness();
 
@@ -704,6 +868,59 @@ describe("the seats a connected customer holds", () => {
       reported: 47,
       lastSyncAt: "2026-06-02T06:00:00Z",
       managedVirtualKeyId: "vk-managed",
+    });
+  });
+});
+
+describe("the chain a license belongs to", () => {
+  /** @scenario "The chain of a license lists what it replaced and what replaces it" */
+  it("lists every license of the chain, the newest first, from any of them", async () => {
+    const { registry, repository } = harness();
+    const { license: first } = await registry.issue(issueInput());
+    const { license: second } = await registry.reissue({
+      id: first.id,
+      expiresAt: Temporal.Instant.from("2027-02-01T00:00:00.000Z"),
+      operatorId: "operator-1",
+    });
+    await repository.update(first.id, { supersededAt: NOW });
+    const { license: third } = await registry.reissue({
+      id: second.id,
+      expiresAt: Temporal.Instant.from("2027-03-01T00:00:00.000Z"),
+      operatorId: "operator-1",
+    });
+    const unrelated = await registry.issue(issueInput());
+
+    for (const id of [first.id, second.id, third.id]) {
+      const { licenses } = await registry.getChain({ id });
+      expect(licenses.map((license) => license.id)).toEqual([third.id, second.id, first.id]);
+    }
+    const alone = await registry.getChain({ id: unrelated.license.id });
+    expect(alone.licenses.map((license) => license.id)).toEqual([unrelated.license.id]);
+  });
+
+  /** @scenario "The licenses list shows one row per reissue chain, the newest" */
+  it("lists and counts an extended license once, as the replacement waiting for the install", async () => {
+    const { registry } = harness();
+    const { license: first } = await registry.issue(issueInput());
+    const before = await registry.list({ page: 0, pageSize: 25 });
+    const { license: replacement } = await registry.reissue({
+      id: first.id,
+      expiresAt: Temporal.Instant.from("2027-02-01T00:00:00.000Z"),
+      operatorId: "operator-1",
+    });
+
+    const after = await registry.list({ page: 0, pageSize: 25 });
+
+    expect(after.licenses.map((license) => license.id)).toEqual([replacement.id]);
+    expect(after.total).toBe(1);
+    expect(after.counts).toEqual(before.counts);
+  });
+
+  it("refuses a license that is not in the registry", async () => {
+    const { registry } = harness();
+
+    await expect(registry.getChain({ id: "missing" })).rejects.toMatchObject({
+      code: "issued_license_not_found",
     });
   });
 });

@@ -262,7 +262,7 @@ const SEAT_LIMIT_LABELS: Record<string, string> = {
 /** Creation caps the cloud Free plan sets, named as the pricing page does. */
 const CREATION_LIMIT_LABELS: Record<string, string> = {
   scenarios: "scenarios",
-  scenarioSets: "simulations",
+  scenarioRuns: "scenario runs a month",
   evaluators: "custom evaluators",
   testSuites: "suites",
 };
@@ -708,9 +708,9 @@ const presentations = {
       "This project doesn't have the SQL workbench enabled yet. Ask your administrator to switch it on.",
   },
   lwql_not_provisioned: {
-    title: "Custom SQL isn't set up where this data lives",
+    title: "Dashboards aren't available for this data yet",
     describe: () =>
-      "Custom SQL isn't set up yet on the server that holds this organisation's data. Ask your workspace administrator, or contact support.",
+      "Dashboards and custom SQL aren't available yet for the data this organisation keeps on its own server. Nothing is wrong with your account, and trying again won't help. Your workspace administrator or LangWatch support can tell you when it will be switched on.",
   },
   saved_workbench_chart_already_exists: {
     title: "That chart id is already taken",
@@ -2076,6 +2076,11 @@ const presentations = {
     title: "That end date has already passed",
     describe: () => "A license can only end on a future date. Pick a later one and try again.",
   },
+  license_in_use: {
+    title: "An install is using this license",
+    describe: () =>
+      "An install started using this license, so its key keeps working. The new license reaches that install on its next sync.",
+  },
   license_signing_key_not_pem: {
     title: "That doesn't look like a private key",
     describe: () => "Paste the whole key, including its BEGIN and END lines.",
@@ -2978,6 +2983,11 @@ const presentations = {
     describe: (error) => {
       const limitType = str(error, "limitType", "");
       const creationLabel = CREATION_LIMIT_LABELS[str(error, "countedAs", "") || limitType];
+      if (limitType === "scenarioRuns") {
+        const max = num(error, "max", 0);
+        const included = max > 0 ? `${max} ${creationLabel}` : "a monthly number of scenario runs";
+        return `Your plan includes ${included} and this month's are used. Upgrade your plan to keep running scenarios, or wait for the count to start again next month.`;
+      }
       if (creationLabel) {
         const max = num(error, "max", 0);
         const included = max > 0 ? `${max} ${creationLabel}` : creationLabel;

@@ -24,7 +24,15 @@ export type LangyAskRequest = {
   /** Scopes a draft: left unsent, it is dropped once what it is about leaves the screen. */
   about?: LangyDraftAbout;
   context?: readonly LangyAskContext[];
+  /**
+   * Where the question was asked, such as `dashboard:<id>`: a later question from the same place
+   * continues the conversation the earlier one started while it is recent and still open.
+   */
+  askedFrom?: string;
 };
+
+/** How long a conversation started from one place takes that place's next question. */
+export const LANGY_FOLLOW_UP_WINDOW_MS = 6 * 60 * 60 * 1000;
 
 /**
  * The docked panel's width on the right edge, so an asking module's own drawer can stop

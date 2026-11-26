@@ -62,6 +62,7 @@ export class MemoryBoardRepository implements BoardRepository {
     createdById?: string | null;
     scope?: DashboardScope;
     homeProduct?: DashboardHomeProduct;
+    myDashboardOfUserId?: string | null;
     organizationId?: string | null;
   }): Promise<BoardRecord> {
     const board = boardSchema.parse({
@@ -72,6 +73,7 @@ export class MemoryBoardRepository implements BoardRepository {
       scope: input.scope ?? "PROJECT",
       homeProduct: input.homeProduct ?? DEFAULT_DASHBOARD_HOME_PRODUCT,
       organizationId: input.organizationId ?? null,
+      myDashboardOfUserId: input.myDashboardOfUserId ?? null,
       createdAt: this.#database.now(),
       updatedAt: this.#database.now(),
     });

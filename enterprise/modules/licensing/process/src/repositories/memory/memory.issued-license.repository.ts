@@ -106,9 +106,18 @@ export class MemoryIssuedLicenseRepository implements IssuedLicenseRepository {
     return this.matching(query).length;
   }
 
-  private matching({ search, status, emailSuffixes }: IssuedLicenseQuery): IssuedLicenseRecord[] {
+  private matching({
+    search,
+    status,
+    emailSuffixes,
+    chainHeadsOnly,
+  }: IssuedLicenseQuery): IssuedLicenseRecord[] {
     const term = search?.trim().toLowerCase();
+    const replaced = new Set(
+      this.all().flatMap((row) => (row.replacesId && !row.revokedAt ? [row.replacesId] : [])),
+    );
     return this.all()
+      .filter((row) => !chainHeadsOnly || !replaced.has(row.id))
       .filter((row) => (term ? matches(row, term) : true))
       .filter((row) => !status || activeAtInstant(row, status.at) === status.active)
       .filter(
@@ -142,8 +151,66 @@ export class MemoryIssuedLicenseRepository implements IssuedLicenseRepository {
     at: Instant;
   }): Promise<boolean> {
     const row = this.rows.get(id);
-    if (!row || row.instanceId !== null) return false;
+    if (!row || row.instanceId !== null || row.revokedAt !== null) return false;
     this.rows.set(id, { ...row, instanceId, instanceBoundAt: at });
+    return true;
+  }
+
+  async releaseVirtualKey({ virtualKeyId }: { virtualKeyId: string }): Promise<boolean> {
+    const holders = [...this.rows.values()].filter(
+      (row) => row.virtualKeyId === virtualKeyId && row.revokedAt === null,
+    );
+    for (const row of holders) this.rows.set(row.id, { ...row, virtualKeyId: null });
+    return holders.length > 0;
+  }
+
+  async revokeHolding({
+    id,
+    virtualKeyId,
+    at,
+    revokedById,
+    revokedReason,
+  }: {
+    id: string;
+    virtualKeyId: string | null;
+    at: Instant;
+    revokedById: string;
+    revokedReason: string;
+  }): Promise<boolean> {
+    const row = this.rows.get(id);
+    if (!row || row.virtualKeyId !== virtualKeyId || row.revokedAt !== null) return false;
+    this.rows.set(id, {
+      ...row,
+      revokedAt: at,
+      revokedById,
+      revokedReason,
+      pendingDeliveryLicense: null,
+      updatedAt: at,
+    });
+    return true;
+  }
+
+  async revokeUnbound({
+    id,
+    at,
+    revokedById,
+    revokedReason,
+  }: {
+    id: string;
+    at: Instant;
+    revokedById: string;
+    revokedReason: string;
+  }): Promise<boolean> {
+    const row = this.rows.get(id);
+    if (!row || row.instanceId !== null || row.revokedAt !== null) return false;
+    this.rows.set(id, {
+      ...row,
+      revokedAt: at,
+      revokedById,
+      revokedReason,
+      pendingDeliveryLicense: null,
+      updatedAt: at,
+    });
     return true;
   }
 

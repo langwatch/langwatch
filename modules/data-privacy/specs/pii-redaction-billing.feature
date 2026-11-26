@@ -221,7 +221,7 @@ Feature: A PII redaction model call is priced per character, written to the spen
 
   Rule: The spend page names a PII redaction row by what it is
 
-    @unit
+    @unit @integration
     Scenario: A spend row with no virtual key and the pii redaction request type reads as PII redaction
       Given a spend row of request type pii_redaction
       When the spend page names its key
@@ -353,6 +353,20 @@ Feature: A PII redaction model call is priced per character, written to the spen
       Given an organization with no active subscription and PII redaction spend this month
       When the month is reported
       Then no meter event is sent
+
+    @unit
+    Scenario: PII redaction spend confirmed after the month's last trace is reported
+      Given an organization whose last trace this month was already reported
+      And a redaction whose spend gateway confirms after it, with no later trace
+      When billing receives the confirmed spend
+      Then the month's report runs and the PII redaction meter receives the month's total
+
+    @integration
+    Scenario: PII redaction spend after the month's last trace reaches the Stripe simulator
+      Given a usage-billed organization whose last trace this month was already reported
+      And gateway confirms a pii_redaction spend whose row lands after the first report ran
+      When the follow-up report runs, with no later trace
+      Then the simulator's usage for langwatch_pii_redaction_usd equals the month's price in dollars
 
     @integration
     Scenario: The month's PII redaction total reaches the Stripe simulator
