@@ -445,6 +445,8 @@ export interface LwqlPrismaRows {
     readonly connectServicesDisabled: "String[]";
     readonly instantEvalsEnabledAt: "DateTime?";
     readonly instantEvalsEnabledByUserId: "String?";
+    readonly piiRedactionModelAcceptedAt: "DateTime?";
+    readonly piiRedactionModelAcceptedByUserId: "String?";
     readonly connectLastSyncAt: "DateTime?";
     readonly connectLastSyncError: "String?";
   };

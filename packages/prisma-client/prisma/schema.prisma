@@ -1417,6 +1417,13 @@ model Organization {
   /// The member who switched them on, so the audit trail names a person and
   /// not just a moment.
   instantEvalsEnabledByUserId String?
+  /// When an organization admin accepted the PII Redaction Model's price, the
+  /// organization's consent to be billed for it on LangWatch Cloud (ADR-201
+  /// decision 15). Null until then: Strict stays on the rule-based detector,
+  /// unbilled, and billing counts no PII redaction spend from before it.
+  piiRedactionModelAcceptedAt DateTime?
+  /// The admin who accepted it, so the record names a person.
+  piiRedactionModelAcceptedByUserId String?
   /// When the last license sync succeeded.
   connectLastSyncAt       DateTime?
   /// The code of the failure the last sync ended on, cleared on the next
