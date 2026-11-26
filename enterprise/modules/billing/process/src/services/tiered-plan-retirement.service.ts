@@ -6,20 +6,15 @@
 import { createLogger } from "@langwatch/observability";
 
 import type { StripeSubscriptionsChannel } from "../channels/stripe-subscriptions.channel.ts";
+import type { BillingWebhookOrganizationRepository } from "../repositories/billing-webhook-organization.repository.ts";
 import type {
   BillingWebhookSubscriptionRepository,
   SubscriptionWithOrg,
 } from "../repositories/billing-webhook-subscription.repository.ts";
-import type { BillingSubscriptionStatus } from "../rules/billing-stripe-shapes.rules.ts";
+import { ENDED_SUBSCRIPTION_STATUSES } from "../rules/billing-stripe-shapes.rules.ts";
 import type { BillingLifecycleAnnouncerService } from "./billing-lifecycle-announcer.service.ts";
 
 const logger = createLogger("langwatch:billing:tieredPlanRetirement");
-
-/** Stripe statuses after which a subscription bills nothing more. */
-const ENDED_AT_STRIPE: ReadonlySet<BillingSubscriptionStatus> = new Set([
-  "canceled",
-  "incomplete_expired",
-]);
 
 /** Retiring a superseded plan failed; the caller fails the delivery after its other steps. */
 export class SupersededPlanRetirementError extends Error {
@@ -33,6 +28,7 @@ export class SupersededPlanRetirementError extends Error {
 
 type TieredPlanRetirementDeps = {
   subscriptions: Pick<BillingWebhookSubscriptionRepository, "findSupersededBySeatEvent" | "cancel">;
+  organizations: Pick<BillingWebhookOrganizationRepository, "isOnSeatEventPricing">;
   stripeSubscriptions: Pick<StripeSubscriptionsChannel, "getSubscription" | "cancelSubscription">;
   /** Records the pricing-model fact organization reacts to; absent where nothing composes one. */
   announcer?: Pick<BillingLifecycleAnnouncerService, "pricingModelChanged">;
@@ -46,30 +42,22 @@ export class TieredPlanRetirementService {
   private constructor(private readonly deps: TieredPlanRetirementDeps) {}
 
   /**
-   * Safe to run again: Stripe goes first and its own status says what already ended, so a
-   * failure leaves the row for Stripe's redelivery to find. Throws after trying every plan.
+   * Safe to run again: the organization's own pricing and Stripe's own status say what is left,
+   * so a failure leaves it for Stripe's redelivery to find. Throws after trying every plan.
    */
-  async retire({
-    seat,
-    firstActivation,
-  }: {
-    seat: SubscriptionWithOrg;
-    firstActivation: boolean;
-  }): Promise<void> {
-    const superseded = await this.deps.subscriptions.findSupersededBySeatEvent({
-      organizationId: seat.organizationId,
-      excludeSubscriptionId: seat.id,
+  async retire({ seat }: { seat: SubscriptionWithOrg }): Promise<void> {
+    const { superseded, onSeatPricing } = await this.remaining(seat).catch((err: unknown) => {
+      throw new SupersededPlanRetirementError({ failures: [err] });
     });
-    if (superseded.length === 0 && !firstActivation) return;
+    if (superseded.length === 0 && onSeatPricing) return;
 
     // Organization sets the pricing model from the fact; a refused fact fails before any row moves.
-    try {
-      await this.deps.announcer?.pricingModelChanged({
-        organizationId: seat.organizationId,
-        pricingModel: "SEAT_EVENT",
-      });
-    } catch (err) {
-      throw new SupersededPlanRetirementError({ failures: [err] });
+    if (!onSeatPricing) {
+      await this.deps.announcer
+        ?.pricingModelChanged({ organizationId: seat.organizationId, pricingModel: "SEAT_EVENT" })
+        .catch((err: unknown) => {
+          throw new SupersededPlanRetirementError({ failures: [err] });
+        });
     }
 
     const failures: unknown[] = [];
@@ -88,16 +76,27 @@ export class TieredPlanRetirementService {
     if (failures.length > 0) throw new SupersededPlanRetirementError({ failures });
   }
 
+  private async remaining(seat: SubscriptionWithOrg) {
+    const [superseded, onSeatPricing] = await Promise.all([
+      this.deps.subscriptions.findSupersededBySeatEvent({
+        organizationId: seat.organizationId,
+        excludeSubscriptionId: seat.id,
+      }),
+      this.deps.organizations.isOnSeatEventPricing(seat.organizationId),
+    ]);
+    return { superseded, onSeatPricing };
+  }
+
   /** Cancels with proration unless Stripe already ended it, including by a parallel delivery. */
   private async cancelAtStripe(subscriptionId: string): Promise<void> {
     const current = await this.deps.stripeSubscriptions.getSubscription({ subscriptionId });
-    if (ENDED_AT_STRIPE.has(current.status)) return;
+    if (ENDED_SUBSCRIPTION_STATUSES.has(current.status)) return;
 
     try {
       await this.deps.stripeSubscriptions.cancelSubscription({ subscriptionId, prorate: true });
     } catch (err) {
       const after = await this.deps.stripeSubscriptions.getSubscription({ subscriptionId });
-      if (!ENDED_AT_STRIPE.has(after.status)) throw err;
+      if (!ENDED_SUBSCRIPTION_STATUSES.has(after.status)) throw err;
     }
   }
 }

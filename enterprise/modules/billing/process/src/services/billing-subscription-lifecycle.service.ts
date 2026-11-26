@@ -90,6 +90,7 @@ export class BillingSubscriptionLifecycleService {
     this.overPlan = options.overPlan;
     this.retirement = TieredPlanRetirementService.create({
       subscriptions: options.subscriptionRepository,
+      organizations: options.organizationRepository,
       stripeSubscriptions: options.stripeSubscriptions,
       ...(options.announcer ? { announcer: options.announcer } : {}),
     });
@@ -249,10 +250,7 @@ export class BillingSubscriptionLifecycleService {
       await this.announceSubscriptionStarted(updatedSubscription);
     }
     if (isGrowthSeatEventPlan(updatedSubscription.plan)) {
-      await this.retirement.retire({
-        seat: updatedSubscription,
-        firstActivation: shouldNotify,
-      });
+      await this.retirement.retire({ seat: updatedSubscription });
     }
   }
 
@@ -396,7 +394,7 @@ export class BillingSubscriptionLifecycleService {
     }
     // Every paid Growth invoice checks, so the order Stripe's messages arrive in cannot skip it.
     if (isGrowthSeatEventPlan(updatedSubscription.plan)) {
-      await this.retirement.retire({ seat: updatedSubscription, firstActivation });
+      await this.retirement.retire({ seat: updatedSubscription });
     }
   }
 

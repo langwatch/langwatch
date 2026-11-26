@@ -18,6 +18,11 @@ function organizationDouble(rows: Record<string, unknown>[] = []) {
         const found = rows.find((row) => row.id === args.where.id);
         return found ? { id: found.id, name: found.name } : null;
       },
+      findUniqueOrThrow: async (args) => {
+        const found = rows.find((row) => row.id === args.where.id);
+        if (!found) throw new Error(`No organization ${String(args.where.id)}`);
+        return { pricingModel: found.pricingModel };
+      },
       update: async (args) => {
         updates.push({ where: args.where, data: args.data });
         return {};
@@ -56,6 +61,22 @@ describe("PrismaBillingWebhookOrganizationRepository", () => {
         name: "Acme",
       });
       await expect(adapter.findNameById("organization-2")).resolves.toBeNull();
+    });
+  });
+
+  describe("when the webhook asks whether an organization is on seat pricing", () => {
+    /** @scenario "An organization left on tiered pricing with no old plan is moved to seat pricing by its next Growth payment" */
+    it("answers from the organization's pricing model, and refuses one that is gone", async () => {
+      const { adapter } = organizationDouble([
+        { id: "organization-seat", pricingModel: "SEAT_EVENT" },
+        { id: "organization-tiered", pricingModel: "TIERED" },
+      ]);
+
+      await expect(adapter.isOnSeatEventPricing("organization-seat")).resolves.toBe(true);
+      await expect(adapter.isOnSeatEventPricing("organization-tiered")).resolves.toBe(false);
+      await expect(adapter.isOnSeatEventPricing("organization-gone")).rejects.toThrow(
+        "No organization organization-gone",
+      );
     });
   });
 });

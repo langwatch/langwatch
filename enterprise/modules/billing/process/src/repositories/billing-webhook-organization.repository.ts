@@ -6,4 +6,7 @@ export abstract class BillingWebhookOrganizationRepository {
   abstract findByStripeCustomerId(stripeCustomerId: string): Promise<{ id: string } | null>;
 
   abstract findNameById(organizationId: string): Promise<{ id: string; name: string } | null>;
+
+  /** Whether organization already bills the organization on seat-event pricing. */
+  abstract isOnSeatEventPricing(organizationId: string): Promise<boolean>;
 }

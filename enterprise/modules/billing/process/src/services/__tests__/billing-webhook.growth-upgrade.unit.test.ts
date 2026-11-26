@@ -57,6 +57,8 @@ type Harness = {
   pricingModels: string[];
   activations: string[];
   checkoutsPaid: string[];
+  /** The next `pricingModelChanged` throws this, as a refused fact would. */
+  refusePricingFact: (error: Error) => void;
 };
 
 /** A tiered organization with a Growth seat row and its old tiered row, as a test lays them out. */
@@ -64,17 +66,19 @@ function harness({
   growth,
   tiered,
   tieredAtStripe = "active",
+  pricingModel = "TIERED",
 }: {
   growth: Partial<BillingSubscriptionRecord>;
   tiered: Partial<BillingSubscriptionRecord> | null;
   tieredAtStripe?: BillingSubscriptionStatus;
+  pricingModel?: "TIERED" | "SEAT_EVENT";
 }): Harness {
   const store = MemoryBillingStore.create();
   store.organizations.set(ORG, {
     id: ORG,
     name: "ACME",
     stripeCustomerId: null,
-    pricingModel: "TIERED",
+    pricingModel,
     currency: "EUR",
     selfHostedCustomer: false,
     teamIds: [],
@@ -90,9 +94,16 @@ function harness({
   const pricingModels: string[] = [];
   const activations: string[] = [];
   const checkoutsPaid: string[] = [];
+  let pricingRefusal: Error | null = null;
   const announcer = createApiFixture<BillingLifecycleAnnouncerService>({
-    pricingModelChanged: async ({ pricingModel }) => {
+    // Organization applies the fact to the row it owns, as its subscriber does.
+    pricingModelChanged: async ({ organizationId, pricingModel }) => {
+      const refusal = pricingRefusal;
+      pricingRefusal = null;
+      if (refusal) throw refusal;
       pricingModels.push(pricingModel);
+      const organization = store.organizations.get(organizationId);
+      if (organization) store.organizations.set(organizationId, { ...organization, pricingModel });
     },
     subscriptionActivated: async ({ subscriptionId }) => {
       activations.push(subscriptionId);
@@ -121,7 +132,17 @@ function harness({
     },
     announcer,
   });
-  return { webhook, stripe, store, pricingModels, activations, checkoutsPaid };
+  return {
+    webhook,
+    stripe,
+    store,
+    pricingModels,
+    activations,
+    checkoutsPaid,
+    refusePricingFact: (error) => {
+      pricingRefusal = error;
+    },
+  };
 }
 
 const checkoutCompleted = () =>
@@ -300,10 +321,11 @@ describe("given a tiered organization upgrading to Growth seats", () => {
       growth: { status: "ACTIVE", stripeSubscriptionId: GROWTH_STRIPE },
       tiered: { status: "ACTIVE", stripeSubscriptionId: TIERED_STRIPE },
     });
-    stuck.stripe.cancelSubscription = async () => {
-      stuck.stripe.seed(atStripe(TIERED_STRIPE, "canceled"));
-      throw new Error("This subscription is already canceled");
-    };
+    stuck.stripe.refuse({
+      operation: "cancelSubscription",
+      error: new Error("This subscription is already canceled"),
+      endedElsewhere: true,
+    });
 
     const [result] = await deliverTogether(stuck, [paymentSucceeded("in_renewal")]);
 
@@ -326,11 +348,12 @@ describe("given a tiered organization upgrading to Growth seats", () => {
     expect(rowOf(stuck, TIERED_ROW)?.status).toBe("CANCELLED");
   });
 
-  /** @scenario "A Growth renewal with no old plan left changes nothing" */
+  /** @scenario "A Growth renewal on seat pricing with no old plan left changes nothing" */
   it("changes nothing on a Growth renewal with no old plan left", async () => {
     const settled = harness({
       growth: { status: "ACTIVE", stripeSubscriptionId: GROWTH_STRIPE },
       tiered: null,
+      pricingModel: "SEAT_EVENT",
     });
 
     const [result] = await deliverTogether(settled, [paymentSucceeded("in_renewal")]);
@@ -338,5 +361,45 @@ describe("given a tiered organization upgrading to Growth seats", () => {
     expect(result?.status).toBe("ok");
     expect(settled.stripe.cancellations).toEqual([]);
     expect(settled.pricingModels).toEqual([]);
+  });
+
+  /** @scenario "An organization left on tiered pricing with no old plan is moved to seat pricing by its next Growth payment" */
+  it("moves an organization left on tiered pricing to seat pricing on its next Growth payment", async () => {
+    const leftBehind = harness({
+      growth: { status: "ACTIVE", stripeSubscriptionId: GROWTH_STRIPE },
+      tiered: { status: "CANCELLED", stripeSubscriptionId: TIERED_STRIPE },
+      tieredAtStripe: "canceled",
+    });
+
+    const [result] = await deliverTogether(leftBehind, [paymentSucceeded("in_renewal")]);
+
+    expect(result?.status).toBe("ok");
+    expect(leftBehind.pricingModels).toEqual(["SEAT_EVENT"]);
+    expect(leftBehind.stripe.cancellations).toEqual([]);
+  });
+
+  /** @scenario "A checkout whose pricing-model change is refused still records the rest of the checkout and is retried" */
+  it("records the rest of a checkout whose pricing-model change is refused, then retries it", async () => {
+    const upgrade = harness({
+      growth: {},
+      tiered: { status: "ACTIVE", stripeSubscriptionId: TIERED_STRIPE },
+    });
+    upgrade.refusePricingFact(new Error("the lifecycle pipeline refused the fact"));
+
+    const [first] = await deliverTogether(upgrade, [checkoutCompleted()]);
+
+    expect(first?.status).toBe("error");
+    expect(upgrade.checkoutsPaid).toEqual([GROWTH_ROW]);
+    expect(upgrade.activations).toEqual([GROWTH_ROW]);
+    expect(rowOf(upgrade, TIERED_ROW)?.status).toBe("ACTIVE");
+
+    const [redelivery] = await deliverTogether(upgrade, [checkoutCompleted()]);
+
+    expect(redelivery?.status).toBe("ok");
+    expect(upgrade.pricingModels).toEqual(["SEAT_EVENT"]);
+    expect(upgrade.stripe.cancellations).toEqual([
+      { subscriptionId: TIERED_STRIPE, prorate: true },
+    ]);
+    expect(upgrade.activations).toEqual([GROWTH_ROW]);
   });
 });

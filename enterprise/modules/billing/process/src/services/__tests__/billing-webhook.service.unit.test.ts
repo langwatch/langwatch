@@ -52,6 +52,7 @@ const createMockOrganizationRepository = (): {
 } => ({
   findByStripeCustomerId: vi.fn(),
   findNameById: vi.fn(),
+  isOnSeatEventPricing: vi.fn().mockResolvedValue(false),
 });
 
 const ORGANIZATION_ROW_COMMANDS = [
