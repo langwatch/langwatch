@@ -872,6 +872,7 @@ export const EditModelProviderForm = ({
     customKeys: state.customKeys,
     model: probedModel,
     resetKey: providerId,
+    refusalCode: apiKeyValidationErrorCode,
   });
 
   const reportRefusal = useEffectEvent((code: string) =>
