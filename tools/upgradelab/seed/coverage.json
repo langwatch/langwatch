@@ -91,7 +91,7 @@
     "entitlement:materialise-billable-events-ttl": {
       "status": "pending",
       "seed": "unplanned",
-      "note": "needs billable_events rows written before the 13-month TTL existed, as the previous release wrote them"
+      "note": "needs billable events older than 13 months, written by the previous release before the TTL"
     },
     "evaluator:backfill-versions": {
       "status": "pending",

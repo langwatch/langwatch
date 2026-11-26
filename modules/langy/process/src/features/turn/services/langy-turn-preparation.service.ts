@@ -155,7 +155,7 @@ export class LangyTurnPreparationService {
 
   /** A RUNNING read for a turn whose live edge already ended waits for its fold. */
   private async settleEndedTurnFold(
-    args: Parameters<LangyTurnPreparationService["prepareAndDispatch"]>[0],
+    args: PrepareArgs,
     results: Awaited<ReturnType<LangyTurnPreparationService["readPreparation"]>>,
   ): Promise<Awaited<ReturnType<LangyTurnPreparationService["readPreparation"]>>> {
     const [current, ...rest] = results;
@@ -172,7 +172,7 @@ export class LangyTurnPreparationService {
   }
 
   private requireRunnableTurn(
-    args: Parameters<LangyTurnPreparationService["prepareAndDispatch"]>[0],
+    args: PrepareArgs,
     [currentResult, , runTokenResult, modelsAllowedResult]: Awaited<
       ReturnType<LangyTurnPreparationService["readPreparation"]>
     >,
@@ -235,7 +235,7 @@ export class LangyTurnPreparationService {
   }
 
   private async probeWorker(
-    args: Parameters<LangyTurnPreparationService["prepareAndDispatch"]>[0],
+    args: PrepareArgs,
     disabledSkillIds: Promise<string[]> | string[],
   ): Promise<boolean> {
     return args.worker.probe(
@@ -267,7 +267,7 @@ export class LangyTurnPreparationService {
   }
 
   private buildPreparedTurn(
-    args: Parameters<LangyTurnPreparationService["prepareAndDispatch"]>[0],
+    args: PrepareArgs,
     [, handoffResult, , , memoryResult, overrideResult, uiActionsOpenResult]: Awaited<
       ReturnType<LangyTurnPreparationService["readPreparation"]>
     >,
@@ -341,7 +341,7 @@ export class LangyTurnPreparationService {
     runToken,
     imageRefs,
   }: {
-    args: Parameters<LangyTurnPreparationService["prepareAndDispatch"]>[0];
+    args: PrepareArgs;
     prepared: ReturnType<LangyTurnPreparationService["buildPreparedTurn"]>;
     runToken: string;
     imageRefs: readonly LangyAttachmentRef[];
@@ -386,7 +386,7 @@ export class LangyTurnPreparationService {
   }
 
   private async acceptPreparedTurn(
-    args: Parameters<LangyTurnPreparationService["prepareAndDispatch"]>[0],
+    args: PrepareArgs,
     prepared: ReturnType<LangyTurnPreparationService["buildPreparedTurn"]>,
     mintedRunToken: string | null,
   ) {
@@ -448,12 +448,14 @@ export class LangyTurnPreparationService {
     runToken,
     imageRefs,
   }: {
-    args: Parameters<LangyTurnPreparationService["prepareAndDispatch"]>[0];
+    args: PrepareArgs;
     prepared: ReturnType<LangyTurnPreparationService["buildPreparedTurn"]>;
     runToken: string;
     imageRefs: readonly LangyAttachmentRef[];
   }) {
-    if (!(await args.attempt.commit())) return;
+    if (!(await args.attempt.commit())) {
+      return;
+    }
 
     void args.worker
       .dispatch({

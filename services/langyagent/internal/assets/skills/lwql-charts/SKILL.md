@@ -38,7 +38,7 @@ A chart that should follow the dashboard's period selector declares the reserved
 SELECT
   toStartOfInterval(OccurredAt, INTERVAL {dashboard_context_granularity_seconds:UInt32} SECOND) AS bucket,
   count() AS traces
-FROM analytics.traces
+FROM traces
 WHERE OccurredAt >= {dashboard_context_period_start:DateTime} AND OccurredAt < {dashboard_context_period_end:DateTime}
 GROUP BY bucket
 ORDER BY bucket
