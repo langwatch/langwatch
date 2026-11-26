@@ -88,7 +88,7 @@ describe("the Dashboards library's creation", () => {
     /** @scenario "Create from the library with a name, product and who can see it" */
     it("starts in LLM Ops at Project, and resets who can see it per product", async () => {
       const { dialog, user } = await openDialog();
-      const product = dialog.getByRole("combobox");
+      const product = dialog.getByRole("combobox", { name: "Product" });
 
       expect(product).toHaveValue("llm-ops");
       expect(dialog.getByRole("radio", { name: /Project/ })).toBeChecked();
@@ -112,7 +112,7 @@ describe("the Dashboards library's creation", () => {
     it("opens the new board unsaved, whichever product is picked", async () => {
       const { host, calls, dialog, user } = await openDialog();
 
-      await user.selectOptions(dialog.getByRole("combobox"), "gateway");
+      await user.selectOptions(dialog.getByRole("combobox", { name: "Product" }), "gateway");
       await user.click(dialog.getByRole("button", { name: "Create" }));
 
       await waitFor(() => expect(host.navigations).toEqual(["/dashboards/new"]));
@@ -134,6 +134,42 @@ describe("the Dashboards library's creation", () => {
       await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
       expect(inputsTo(calls, "boards.create")).toEqual([]);
       expect(inputsTo(calls, "boards.createAtScope")).toEqual([]);
+    });
+  });
+
+  describe("when the member picks the project of a new Project dashboard", () => {
+    const openDialog = async () => {
+      const rendered = renderLibrary({ storeProjects: [ALPHA, IN_VIEW] });
+      await rendered.user.click(await screen.findByRole("button", { name: "New dashboard" }));
+      const dialog = within(await screen.findByRole("dialog"));
+      return { ...rendered, dialog };
+    };
+
+    /** @scenario "In the library, a Project board's project is picked under Project" */
+    it("shows my last-used project under Project, and keeps the board in the one picked", async () => {
+      const { dialog, user } = await openDialog();
+      const picker = dialog.getByTestId("new-dashboard-project");
+
+      const trigger = within(picker).getByRole("combobox");
+      expect(trigger.textContent).toContain(IN_VIEW.name);
+      expect(dialog.getByText(`Everyone in ${IN_VIEW.name}`)).toBeVisible();
+
+      await user.click(trigger);
+      await user.click(await screen.findByRole("option", { name: new RegExp(ALPHA.name) }));
+      expect(dialog.getByText(`Everyone in ${ALPHA.name}`)).toBeVisible();
+      await user.click(dialog.getByRole("button", { name: "Create" }));
+
+      expect(await heldIn()).toBe(ALPHA.id);
+    });
+
+    /** @scenario "In the library, a Project board's project is picked under Project" */
+    it("shows no project picker for Organization or Only me", async () => {
+      const { dialog, user } = await openDialog();
+
+      await user.click(dialog.getByRole("radio", { name: /Organization/ }));
+      expect(dialog.queryByTestId("new-dashboard-project")).toBeNull();
+      await user.click(dialog.getByRole("radio", { name: /Only me/ }));
+      expect(dialog.queryByTestId("new-dashboard-project")).toBeNull();
     });
   });
 
@@ -173,6 +209,43 @@ describe("the Dashboards library's creation", () => {
       await waitFor(() =>
         expect(made).toEqual([
           { name: "Untitled dashboard 2", scope: "ORGANIZATION", homeProduct: "gateway" },
+        ]),
+      );
+    });
+
+    /** @scenario A product's "+" inside a project offers no project picker */
+    it("keeps an LLM Ops board in the project in view, with no project picker", async () => {
+      const made: unknown[] = [];
+      renderDashboards({
+        element: (
+          <NewDashboardDialog
+            product="llm-ops"
+            takenNamesIn={() => []}
+            projectName={IN_VIEW.name}
+            organizationName="Acme"
+            mayShare
+            isCreating={false}
+            onCreate={(input) => {
+              made.push(input);
+              return Promise.resolve(true);
+            }}
+            onClose={() => void 0}
+          />
+        ),
+        host: new StubAnalyticsHost(),
+      });
+      const dialog = within(await screen.findByRole("dialog"));
+
+      expect(dialog.getByRole("radio", { name: /Project/ })).toBeChecked();
+      expect(dialog.getByText(`Everyone in ${IN_VIEW.name}`)).toBeVisible();
+      expect(dialog.queryByTestId("new-dashboard-project")).toBeNull();
+      await userEvent
+        .setup({ pointerEventsCheck: 0 })
+        .click(dialog.getByRole("button", { name: "Create" }));
+
+      await waitFor(() =>
+        expect(made).toEqual([
+          { name: "Untitled dashboard 1", scope: "PROJECT", homeProduct: "llm-ops" },
         ]),
       );
     });

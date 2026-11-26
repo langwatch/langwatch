@@ -4,9 +4,10 @@
  * whichever client reported it.
  */
 
-import type {
-  IssuedLicenseStatus,
-  IssuedLicenseView,
+import {
+  IssuedLicenseNotActiveError,
+  type IssuedLicenseStatus,
+  type IssuedLicenseView,
 } from "@langwatch/enterprise-licensing-contract";
 import { Temporal, type Instant } from "@langwatch/time";
 
@@ -31,6 +32,14 @@ export function statusOfIssuedLicense(
   if (row.supersededAt) return "superseded";
   if (Temporal.Instant.compare(now, row.expiresAt) >= 0) return "expired";
   return "active";
+}
+
+/** A license whose fate is settled admits no change; an expired one still may. */
+export function refuseIfSettled({ row, now }: { row: IssuedLicenseRecord; now: Instant }): void {
+  const status = statusOfIssuedLicense(row, now);
+  if (status === "revoked" || status === "superseded") {
+    throw new IssuedLicenseNotActiveError(status);
+  }
 }
 
 /** The derived status, the held license dropped, and every instant on the wire. */

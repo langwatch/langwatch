@@ -312,9 +312,9 @@ func TestChartSkills_PlaceOnTheDashboardInContextOrAsk(t *testing.T) {
 	// A widget goes on a Dashboards dashboard; a saved chart on an Analytics Report.
 	wants := map[string][]string{
 		"dashboard-widgets": {
-			"dashboard in the user's context",
+			"place on the dashboard the user named; if they named none, on the dashboard they are on",
 			"ask which one with the `question` tool",
-			"Never choose a dashboard for the user.",
+			"Never choose between existing dashboards for the user.",
 		},
 		"lwql-charts": {
 			"Analytics Report in the user's context",

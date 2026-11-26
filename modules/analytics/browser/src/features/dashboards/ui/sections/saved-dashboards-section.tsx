@@ -134,11 +134,16 @@ function BoardRow({
       actions={{
         ...starActionsFor({ favourites, star, index, shown }),
         isRenaming,
-        // My dashboard keeps its name and cannot be deleted; its scope is not locked.
+        // My dashboard cannot be deleted, and keeps its name only until it is marked theirs.
         ...(access.scopeLock === "none"
           ? { scope: { value: board.scope, names, onPick: (to) => onScope({ board, names, to }) } }
           : {}),
-        ...(access.canEdit ? { rename: isMine ? {} : { onStart: () => onRenaming(true) } } : {}),
+        ...(access.canEdit
+          ? {
+              rename:
+                isMine && !board.myDashboardOfUserId ? {} : { onStart: () => onRenaming(true) },
+            }
+          : {}),
         ...(access.canDuplicate
           ? {
               duplicate: {
@@ -203,6 +208,8 @@ function DraftRow({
           store({ edit: { name }, fallbackTitle: "Couldn't rename the dashboard" });
         },
         onRenameCancel: () => onRenaming(false),
+        // Nothing is stored yet, so Delete only throws the new board away.
+        ...(draft.isStoring ? {} : { remove: { onDelete: draft.discard } }),
       }}
     />
   );

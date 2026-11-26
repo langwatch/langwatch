@@ -28,6 +28,8 @@ export type SavedBoard = {
   /** The product whose sidebar lists it, which decides whose data it reads (ADR-002, D2). */
   homeProduct: DashboardHomeProduct;
   organizationId: string | null;
+  /** The member whose own My dashboard it is; absent from an older server. */
+  myDashboardOfUserId?: string | null;
   /** The owning project, named only where the board is listed in another project. */
   ownerProject: DashboardProject | null;
   /** Whether the member reading the list has starred it. */
@@ -46,6 +48,7 @@ function savedBoardOf({
   scope,
   homeProduct,
   organizationId,
+  myDashboardOfUserId,
   ownerProject,
   isStarred,
   updatedAt,
@@ -59,6 +62,7 @@ function savedBoardOf({
     scope,
     homeProduct,
     organizationId,
+    myDashboardOfUserId,
     ownerProject,
     isStarred,
     updatedAt,
@@ -134,6 +138,8 @@ export function useSavedDashboards() {
     isLoading: list.data === void 0 && !list.isError,
     /** A held list being read again: a board just made elsewhere may not be in it yet. */
     isRefreshing: list.isFetching,
+    /** Reads the list again now, for a board the address names that the held list lacks. */
+    reread: () => list.refetch(),
     loadError: list.error,
     isDeleting: remove.isPending,
     renameBoard,

@@ -142,6 +142,14 @@ Admits a statement, or throws the refusal. The verdict is what a caller storing 
 validateLangWatchQL(input: LangWatchQLValidationInput): LangWatchQLAcceptedStatement;
 ```
 
+#### `validateLangWatchQLForRun`
+
+Admits a statement for a run about to start: the placement gate, then the project's route, then the statement judged against the route's database. A saved statement uses `validateLangWatchQL`, which needs no route.
+
+```typescript
+validateLangWatchQLForRun(input: LangWatchQLValidationInput): Promise<LangWatchQLAcceptedStatement>;
+```
+
 #### `describeLangWatchQLJudgements`
 
 The judged columns a hydration plan asks for, in the catalogue's own vocabulary. Derived here because the catalogue is LangWatchQL's: which option of an eval function is its threshold, range or list is its answer.
@@ -328,7 +336,7 @@ Authenticated: Any API key reaches the projects it holds analytics:view on: the 
 Answers at `/api/v1/query`.
 
 ```typescript
-type Body = z.infer<typeof lwqlKeyStatementSchema>; // ../contract/src/features/lwql/analytics-lwql.schemas.ts:284
+type Body = z.infer<typeof lwqlKeyStatementSchema>; // ../contract/src/features/lwql/analytics-lwql.schemas.ts:277
 type Response = z.infer<typeof lwqlResultSchema>; // ../contract/src/analytics.input-schemas.ts:205
 ```
 
@@ -399,7 +407,6 @@ interface Input {
     end: string | number | unknown;
   };
   granularitySeconds?: 1 | 60 | 3600 | 86400 | 604800;
-  timeZone?: string;
 }
 type Output = z.infer<typeof lwqlValidationResultSchema>; // ../contract/src/features/lwql/analytics-lwql.trpc.ts:100
 
@@ -514,11 +521,11 @@ Declared at `src/eventing/analytics-lwql-reconvergence.pipeline.ts:57`.
 
 | Kind   | Leaf                              | Environment variable                      | Declared at                              |
 | ------ | --------------------------------- | ----------------------------------------- | ---------------------------------------- |
-| secret | `lwqlClickHousePassword`          | `LWQL_CLICKHOUSE_PASSWORD`                | `src/app/analytics.app.ts:555`           |
-| secret | `lwqlPostgresReaderPassword`      | `LWQL_POSTGRES_READER_PASSWORD`           | `src/app/analytics.app.ts:556`           |
-| secret | `queryHashKey`                    | `API_KEY_PEPPER`                          | `src/app/analytics.app.ts:557`           |
-| secret | `queryHashKeyFallback`            | `CREDENTIALS_SECRET`                      | `src/app/analytics.app.ts:558`           |
-| secret | `queryHashKeyLastFallback`        | `NEXTAUTH_SECRET`                         | `src/app/analytics.app.ts:559`           |
+| secret | `lwqlClickHousePassword`          | `LWQL_CLICKHOUSE_PASSWORD`                | `src/app/analytics.app.ts:570`           |
+| secret | `lwqlPostgresReaderPassword`      | `LWQL_POSTGRES_READER_PASSWORD`           | `src/app/analytics.app.ts:571`           |
+| secret | `queryHashKey`                    | `API_KEY_PEPPER`                          | `src/app/analytics.app.ts:572`           |
+| secret | `queryHashKeyFallback`            | `CREDENTIALS_SECRET`                      | `src/app/analytics.app.ts:573`           |
+| secret | `queryHashKeyLastFallback`        | `NEXTAUTH_SECRET`                         | `src/app/analytics.app.ts:574`           |
 | config | `langwatchQl.url`                 | `LWQL_CLICKHOUSE_URL`                     | `../contract/src/analytics.config.ts:17` |
 | config | `langwatchQl.username`            | `LWQL_CLICKHOUSE_USER`                    | `../contract/src/analytics.config.ts:18` |
 | config | `langwatchQl.database`            | `LWQL_DATABASE`                           | `../contract/src/analytics.config.ts:19` |

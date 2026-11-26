@@ -109,6 +109,9 @@
     "CONNECTED_HOSTED_USAGE_QUARTERLY": {
       "test": "price_1UHNqNIMsTw08cuduqNIf6LU"
     },
+    "GROWTH_INSTANT_EVAL_USD": {
+      "test": "price_1UHJZnIMsTw08cudkPOesmTR"
+    },
     "GROWTH_PII_REDACTION_USD": {
       "test": "price_1Uat9tIMsTw08cudpWWrZG4a"
     },
@@ -129,6 +132,9 @@
     "BILLABLE_EVENTS": {
       "test": "mtr_test_61UBL0fe0hM4Csg7x41IMsTw08cudQaG",
       "live": "mtr_61UBLon1Ka5iWAcoH41IMsTw08cudD7o"
+    },
+    "INSTANT_EVAL_USD": {
+      "test": "mtr_test_61VQhX7VvSuMKn9zw41IMsTw08cudDIe"
     },
     "PII_REDACTION_USD": {
       "test": "mtr_test_61VkH7EXYKEdkxaxI41IMsTw08cudVay"
@@ -1801,6 +1807,24 @@
       "nickname": "Growth Events - USD Annual",
       "lookupKey": "GROWTH_EVENTS_USD_ANNUAL",
       "metadata": {}
+    },
+    "price_1UHJZnIMsTw08cudkPOesmTR": {
+      "id": "price_1UHJZnIMsTw08cudkPOesmTR",
+      "active": true,
+      "livemode": false,
+      "product": "prod_VHtMZYIlwTT0nH",
+      "unitAmount": 100,
+      "currency": "usd",
+      "type": "recurring",
+      "recurring": {
+        "interval": "month",
+        "intervalCount": 1
+      },
+      "nickname": "Growth Instant Evals, 1.00 USD per USD judged",
+      "lookupKey": "GROWTH_INSTANT_EVAL_USD",
+      "metadata": {
+        "langwatch_key": "GROWTH_INSTANT_EVAL_USD"
+      }
     },
     "price_1UHNqNIMsTw08cuduqNIf6LU": {
       "id": "price_1UHNqNIMsTw08cuduqNIf6LU",

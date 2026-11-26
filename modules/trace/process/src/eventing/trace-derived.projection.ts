@@ -48,6 +48,7 @@ import {
   type TraceSummaryData,
   trimAttributesForAnalytics,
   UNSTORABLE_SPAN_SKIPPED,
+  traceFoldReadAnchorMs,
 } from "@langwatch/trace-contract";
 
 import { LOG_FILL_ONLY_KEYS } from "../features/derivation/services/trace-attribute-accumulation.service.ts";
@@ -364,7 +365,7 @@ export class TraceAnalyticsFoldProjection
     refoldOnStoreMiss: true,
     trustAbsentMiss: true,
     refoldOnOutOfOrder: false,
-    readWindow: { widthMs: TRACE_ANALYTICS_READ_WINDOW_MS },
+    readWindow: { widthMs: TRACE_ANALYTICS_READ_WINDOW_MS, anchorOf: traceFoldReadAnchorMs },
     coalesceMaxBatch: TRACE_ANALYTICS_COALESCE_MAX_BATCH,
     // Order-insensitive (refoldOnOutOfOrder false): a redriven event folds late, not wrong (§9).
     onExhausted: "dead-letter",

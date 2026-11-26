@@ -1,5 +1,44 @@
 # Changelog
 
+## [3.30.0](https://github.com/langwatch/langwatch/compare/langwatch@v3.29.0...langwatch@v3.30.0) (2026-11-26)
+
+
+### Features
+
+* **entitlement:** bill OTel log records and metric series-hours as events ([#9514](https://github.com/langwatch/langwatch/issues/9514)) ([8615bb5](https://github.com/langwatch/langwatch/commit/8615bb55b732eb1cd63ed3d237ab177ab25a84ce))
+* **evaluations:** show a category evaluator's label distribution in the list ([#7938](https://github.com/langwatch/langwatch/issues/7938)) ([eed0551](https://github.com/langwatch/langwatch/commit/eed0551853e811066e6233aac029a42c3cb9bece))
+* **langy:** paste, drop or attach images in the composer and send them to the model ([#9946](https://github.com/langwatch/langwatch/issues/9946)) ([3aa3ce0](https://github.com/langwatch/langwatch/commit/3aa3ce0cdbff8f5b3ef527da51fdcfd480a4c578))
+* **langy:** queue messages sent while Langy works and move Stop to the working row ([#9964](https://github.com/langwatch/langwatch/issues/9964)) ([dac66a2](https://github.com/langwatch/langwatch/commit/dac66a28257a3ad2a0c01fcb1a8adcf9b0761b69))
+* **model-providers:** import custom provider models from /v1/models on save ([#8511](https://github.com/langwatch/langwatch/issues/8511)) ([5539d56](https://github.com/langwatch/langwatch/commit/5539d5694d1d6682797a92274d10fbeb9d777106))
+* **navigation:** drag the sidebar's edge to widen it and read long names ([#9917](https://github.com/langwatch/langwatch/issues/9917)) ([9f6959e](https://github.com/langwatch/langwatch/commit/9f6959eca8c1b8296dba1f395d6085fd48d635d5))
+* **release:** keep one release-note entry per commit on release branches ([#7469](https://github.com/langwatch/langwatch/issues/7469)) ([a1f5058](https://github.com/langwatch/langwatch/commit/a1f50587b3079994c91102e56d9ec61b8f21cad3))
+* **skills:** owasp red team pack for code scenario tests ([#9637](https://github.com/langwatch/langwatch/issues/9637)) ([257ddea](https://github.com/langwatch/langwatch/commit/257ddeaebf87b20805d8112f9c9f43bdc297b872))
+
+
+### Bug Fixes
+
+* **analytics:** keep the LWQL default credentials test comment within five lines ([#9955](https://github.com/langwatch/langwatch/issues/9955)) ([9da7861](https://github.com/langwatch/langwatch/commit/9da7861b6e52be9b75862b324cd113c6de686da9))
+* **analytics:** refuse a filter value the query cannot apply ([#7937](https://github.com/langwatch/langwatch/issues/7937)) ([5e59fe9](https://github.com/langwatch/langwatch/commit/5e59fe93cf13a1f72f5342541ebae9b9861548d0))
+* **charts:** langyagent renders large whole numbers as digits, never 1.8e+07 ([#9908](https://github.com/langwatch/langwatch/issues/9908)) ([9eed02e](https://github.com/langwatch/langwatch/commit/9eed02eea6cc1d5660f2f71e25afb82b524b38c5))
+* **charts:** render integer tunables as digits in every chart, not floats ([#9965](https://github.com/langwatch/langwatch/issues/9965)) ([3d478cb](https://github.com/langwatch/langwatch/commit/3d478cb15bfc4c919421cbe38fab77e28ffc4878))
+* clear main's lint findings (back office spelling, ceilings, oxlint, READMEs) ([#9928](https://github.com/langwatch/langwatch/issues/9928)) ([df19a7e](https://github.com/langwatch/langwatch/commit/df19a7e920f9b09304ba1e9d4e1e49a5e863ad1c))
+* **coding-agent:** file a Claude Code turn under its session when a subagent span lands first ([#9045](https://github.com/langwatch/langwatch/issues/9045)) ([fa47148](https://github.com/langwatch/langwatch/commit/fa47148ea7a579d9d99f0f82bfa11ea93dc2347b))
+* **handled-error:** give invalid_images customer copy so main builds again ([#9970](https://github.com/langwatch/langwatch/issues/9970)) ([3d3ad36](https://github.com/langwatch/langwatch/commit/3d3ad36ee659d61a329f472fc19e02c6ad4fa8f2))
+* **handled-error:** keep one invalid_images presentation so main builds again ([#9972](https://github.com/langwatch/langwatch/issues/9972)) ([11976f0](https://github.com/langwatch/langwatch/commit/11976f0a56322b6d549da6920cbcaca4064fa6ae))
+* **langy:** keep the turn preparation service under its line ceiling ([#9973](https://github.com/langwatch/langwatch/issues/9973)) ([54ad803](https://github.com/langwatch/langwatch/commit/54ad80311e9c178e74398ce290aa80ae04dfcbc7))
+* **langy:** put a chart on the board the user is on, and open a board Langy makes ([#9956](https://github.com/langwatch/langwatch/issues/9956)) ([2a5d783](https://github.com/langwatch/langwatch/commit/2a5d783cc18a4ac8696b1bc7414e6cc49583b898))
+* **lwql,docs:** bare view names, keyset cursor aliases, SSO tier wording ([#8842](https://github.com/langwatch/langwatch/issues/8842)) ([f053227](https://github.com/langwatch/langwatch/commit/f05322776206d953afaf33a3ab05aa3275e5d974))
+* **model-provider:** price each model in one billing unit so a request is never charged twice ([#9907](https://github.com/langwatch/langwatch/issues/9907)) ([34e21cc](https://github.com/langwatch/langwatch/commit/34e21cc14e1f1bd5ebff7ad9fe5a6faef89de213))
+* **redaction:** redact national-format phone numbers from common regions ([#9006](https://github.com/langwatch/langwatch/issues/9006)) ([566e044](https://github.com/langwatch/langwatch/commit/566e044575e26730bba49e98a817d2ba26e75043))
+* **trace,analytics:** stop LWQL extraction queries fanning out into one log read per trace ([#8844](https://github.com/langwatch/langwatch/issues/8844)) ([e5c7e23](https://github.com/langwatch/langwatch/commit/e5c7e23a24a5636d0aed02c5a8933b9778a9e7fd))
+* **trace:** keep backfilled traces in dashboards by anchoring fold reads on the trace's own time ([#9966](https://github.com/langwatch/langwatch/issues/9966)) ([e488755](https://github.com/langwatch/langwatch/commit/e488755313ab5048e700fc3d5aba4a78fc58b749))
+* **traces-v2:** conversation pill filter matches the value the pill shows ([#7454](https://github.com/langwatch/langwatch/issues/7454)) ([29b9568](https://github.com/langwatch/langwatch/commit/29b95683bfb61ae0da1ee86dfa84f4064964222d))
+
+
+### Documentation
+
+* **ops:** regenerate the process README ([#9960](https://github.com/langwatch/langwatch/issues/9960)) ([eeff2ca](https://github.com/langwatch/langwatch/commit/eeff2ca4355be737d448af2a1a91127955649d18))
+
 ## [3.29.0](https://github.com/langwatch/langwatch/compare/langwatch@v3.28.0...langwatch@v3.29.0) (2026-11-25)
 
 

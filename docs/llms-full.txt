@@ -38992,11 +38992,14 @@ Click an evaluator chip to open its **Result** block. **Status** is the verdict 
 
 ## Judge with Instant Evals
 
-On LangWatch Cloud, once Instant Evals is switched on for your organization, the judge model picker lists **Instant Evals** first. It runs on LangWatch's key, so it needs no model provider or key of your own. A self-hosted install cannot judge with it yet. How Instant Evals is switched on, and who processes the text, is in [Where the judged text goes](/features/instant-evals/limits-and-cost#where-the-judged-text-goes).
+On LangWatch Cloud, once Instant Evals is switched on for your organization, the judge model picker lists **Instant Evals** first. That model runs on LangWatch's key, so it needs no model provider or key of your own.
+
+The decision models on your own keys follow it, as in [Run Instant Evals on your own decision model](/features/instant-evals/own-model). A self-hosted install can judge only on its own decision model. How Instant Evals is switched on, and who processes the text, is in [Where the judged text goes](/features/instant-evals/limits-and-cost#where-the-judged-text-goes).
 
 - **What it reads.** Your prompt, plus the input, output and contexts you mapped, each as its own section. Your input, output and contexts share the room the judge has. A short one stays whole; a long one keeps its beginning and its end, so a long input never pushes out a short output.
 - **What it returns.** The Boolean, Score and Category judges keep their usual result. A Score judge on Instant Evals shows a minimum and a maximum: a whole-number range of at most ten values, such as 1 to 5 (but not 0 to 1), is asked as it is, and any other range is asked on 1 to 10 and mapped back onto yours. With no range set, the score is between 0 and 1.
-- **What it costs.** Each judged call is one Instant Evals row on the [billing events](/ai-gateway/billing-events) ledger, and the result's cost is its price. A call that judged no text records no row and no cost. An organization that is not billed per use can spend 1 USD on Instant Evals in total, shared with Instant Evals runs and judged queries; past it, the judge returns an error with `instant_eval_free_budget_exhausted` instead of a verdict.
+- **What it costs on LangWatch's model.** Each judged call is one Instant Evals row on the [billing events](/ai-gateway/billing-events) ledger, and the result's cost is its price. A call that judged no text records no row and no cost. An organization that is not billed per use can spend 1 USD on Instant Evals in total, shared with Instant Evals runs and judged queries; past it, the judge returns an error with `instant_eval_free_budget_exhausted` instead of a verdict.
+- **What it costs on your own decision model.** Your provider bills the call and LangWatch does not, so the result's cost is zero. The billing events ledger still records its tokens, with **Instant Evals (own model)** in the **Virtual key** column. These calls do not count toward the 1 USD.
 
 ## Calibrate the judge
 
@@ -77923,7 +77926,7 @@ spec:
   source:
     repoURL: https://langwatch.github.io/langwatch
     chart: langwatch
-    targetRevision: 3.29.0 # x-release-please-version
+    targetRevision: 3.30.0 # x-release-please-version
     helm:
       releaseName: langwatch
       values: |
@@ -77978,7 +77981,7 @@ spec:
   sources:
     - repoURL: https://langwatch.github.io/langwatch
       chart: langwatch
-      targetRevision: 3.29.0 # x-release-please-version
+      targetRevision: 3.30.0 # x-release-please-version
       helm:
         releaseName: langwatch
         valueFiles:
@@ -78393,7 +78396,7 @@ For air-gapped or private environments, mirror the images to your own registry:
 ```bash
 # The release you are mirroring. Every tag below follows it, so set it once.
 # Pick the version from https://github.com/langwatch/langwatch/releases
-VERSION=3.29.0 # x-release-please-version
+VERSION=3.30.0 # x-release-please-version
 REGISTRY=registry.example.com
 
 for image in langwatch langwatch_nlp langevals; do
@@ -78409,13 +78412,13 @@ Then configure the Helm chart, giving every tag the version you mirrored:
 images:
   app:
     repository: registry.example.com/langwatch/langwatch
-    tag: "3.29.0" # x-release-please-version
+    tag: "3.30.0" # x-release-please-version
   langwatch_nlp:
     repository: registry.example.com/langwatch/langwatch_nlp
-    tag: "3.29.0" # x-release-please-version
+    tag: "3.30.0" # x-release-please-version
   langevals:
     repository: registry.example.com/langwatch/langevals
-    tag: "3.29.0" # x-release-please-version
+    tag: "3.30.0" # x-release-please-version
 ```
 
 Mirror and override the bundled services the same way: `gateway.image.repository`, `langyagent.image.repository`, `clickhouse.image.repository`, `postgresql.image.repository`, `redis.image.repository`, `prometheus.server.image.repository`, `cronjobs.image.repository` and `app.storedObjects.localFilesystem.serializeUpgradesImage` (the image the stored-objects upgrade hooks run).
@@ -83445,7 +83448,7 @@ helm search repo langwatch/langwatch --versions
 # x-release-please-start-version
 helm upgrade langwatch langwatch/langwatch \
   --namespace langwatch \
-  --version 3.29.0 \
+  --version 3.30.0 \
   -f values-production.yaml
 # x-release-please-end
 ```
@@ -91988,7 +91991,7 @@ Creating (and updating) validates the queries file's shape and the widget's JS/T
 
 ## Dashboards and their widgets
 
-A dashboard is the page widgets live on. **Use an existing dashboard** when the user is on one, named one, or one clearly fits; **create one** only when they ask for a new dashboard, or none fits and they agree.
+A dashboard is the page widgets live on. The dashboard the user is on arrives in your context with its id: a chart they ask for there goes on that board, even when they say "now a chart of..." or "another dashboard" without naming one. If they name a different existing dashboard, the chart goes on that one. **Create a board** only when they ask for a separate or new board by name ("make a new dashboard called X"), or they are on no board and none fits. When you do create one, say so in the first line of your reply and name it, so they know where to look.
 
 ```bash
 langwatch dashboard list -f json                          # ids, names, widget counts
@@ -92007,7 +92010,7 @@ langwatch dashboard widget delete <dashboardId> <widgetId>
 
 `add` places the widget at the dashboard's next free row — edit it from the widget's menu on that dashboard. `langwatch analytics-report list` lists the old Analytics Reports, which hold no widgets.
 
-**Which dashboard:** place on the dashboard in the user's context (the one they are on, or one they named). If no dashboard is in context, ask which one with the `question` tool, one option per dashboard from `langwatch dashboard list` with its id in `ref`. Never choose a dashboard for the user.
+**Which dashboard:** place on the dashboard the user named; if they named none, on the dashboard they are on. If no dashboard is in context, ask which one with the `question` tool, one option per dashboard from `langwatch dashboard list` with its id in `ref`. If that list is empty, create a board named after what they asked for and say so in the first line of your reply. Never choose between existing dashboards for the user.
 
 - **Never pick a dashboard for the user.** When more than one dashboard fits, ask with the `question` tool (a choices card): one option per dashboard from `langwatch dashboard list`, its id in `ref`.
 - **Confirm before any delete** of a dashboard or widget with a choices card (`Delete "NAME"?` with Delete and Keep), and run the command only on Delete. Deleting a dashboard takes its widgets with it.

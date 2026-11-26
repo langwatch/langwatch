@@ -453,9 +453,7 @@ export class LangyTurnPreparationService {
     runToken: string;
     imageRefs: readonly LangyAttachmentRef[];
   }) {
-    if (!(await args.attempt.commit())) {
-      return;
-    }
+    if (!(await args.attempt.commit())) return;
 
     void args.worker
       .dispatch({

@@ -114,16 +114,7 @@ export const sendJoinRequestArrivedEmail = async ({
   idempotencyKey?: string;
 }) => {
   const { subject, html } = await renderMailTemplate(joinRequestArrivedTemplate, props);
-  await sendEmail({
-    mailer,
-    content: {
-      to: props.adminEmail,
-      subject,
-      html,
-      idempotencyKey,
-      template: joinRequestArrivedTemplate.id,
-    },
-  });
+  await sendEmail({ mailer, content: { to: props.adminEmail, subject, html, idempotencyKey } });
 };
 
 /* ── The one nudge, on the seventh day. ──────────────────────────────────── */
@@ -199,16 +190,7 @@ export const sendJoinRequestReminderEmail = async ({
   adminEmail: string;
 }) => {
   const { subject, html } = await renderMailTemplate(joinRequestReminderTemplate, props);
-  await sendEmail({
-    mailer,
-    content: {
-      to: adminEmail,
-      subject,
-      html,
-      idempotencyKey,
-      template: joinRequestReminderTemplate.id,
-    },
-  });
+  await sendEmail({ mailer, content: { to: adminEmail, subject, html, idempotencyKey } });
 };
 
 /* ── You are in. Sent to the requester. ──────────────────────────────────── */
@@ -302,16 +284,7 @@ export const sendJoinRequestApprovedEmail = async ({
   idempotencyKey?: string;
 }) => {
   const { subject, html } = await renderMailTemplate(joinRequestApprovedTemplate, props);
-  await sendEmail({
-    mailer,
-    content: {
-      to: props.requesterEmail,
-      subject,
-      html,
-      idempotencyKey,
-      template: joinRequestApprovedTemplate.id,
-    },
-  });
+  await sendEmail({ mailer, content: { to: props.requesterEmail, subject, html, idempotencyKey } });
 };
 
 /* ── It was not approved. No reason, nobody named. ───────────────────────── */
@@ -364,16 +337,7 @@ export const sendJoinRequestRejectedEmail = async ({
   idempotencyKey?: string;
 }) => {
   const { subject, html } = await renderMailTemplate(joinRequestRejectedTemplate, props);
-  await sendEmail({
-    mailer,
-    content: {
-      to: props.requesterEmail,
-      subject,
-      html,
-      idempotencyKey,
-      template: joinRequestRejectedTemplate.id,
-    },
-  });
+  await sendEmail({ mailer, content: { to: props.requesterEmail, subject, html, idempotencyKey } });
 };
 
 /* ── Nobody answered in time. ────────────────────────────────────────────── */
@@ -450,16 +414,7 @@ export const sendJoinRequestExpiredEmail = async ({
   requesterEmail: string;
 }) => {
   const { subject, html } = await renderMailTemplate(joinRequestExpiredTemplate, props);
-  await sendEmail({
-    mailer,
-    content: {
-      to: requesterEmail,
-      subject,
-      html,
-      idempotencyKey,
-      template: joinRequestExpiredTemplate.id,
-    },
-  });
+  await sendEmail({ mailer, content: { to: requesterEmail, subject, html, idempotencyKey } });
 };
 
 /* ── A colleague walked straight in on the domain setting. ───────────────── */
@@ -568,14 +523,5 @@ export const sendDomainAutoJoinedEmail = async ({
   idempotencyKey?: string;
 }) => {
   const { subject, html } = await renderMailTemplate(domainAutoJoinedTemplate, props);
-  await sendEmail({
-    mailer,
-    content: {
-      to: props.adminEmail,
-      subject,
-      html,
-      idempotencyKey,
-      template: domainAutoJoinedTemplate.id,
-    },
-  });
+  await sendEmail({ mailer, content: { to: props.adminEmail, subject, html, idempotencyKey } });
 };

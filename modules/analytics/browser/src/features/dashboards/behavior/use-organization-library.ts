@@ -25,6 +25,7 @@ export function useOrganizationLibrary() {
   return {
     organizationId,
     storeProject,
+    storeProjects: store.storeProjects,
     mayShare: store.mayShare,
     boards: (list.data ?? []).map(libraryBoardOf),
     namesInStore,
