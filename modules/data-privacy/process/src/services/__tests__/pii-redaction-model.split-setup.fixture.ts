@@ -59,6 +59,106 @@ export function planSpanCalls(texts: readonly string[]): readonly SplitCall[] {
   return plan.kind === "split" ? plan.calls : [];
 }
 
+/** What a test reads back: fallbacks, usage lines, priced facts, call contexts, flag reads. */
+function observations() {
+  return {
+    fallbacks: [] as PiiRedactionModelFallbackReason[],
+    usage: [] as PiiRedactionModelUsage[],
+    priced: [] as PiiRedactionSpendPricedEventData[],
+    contexts: [] as ModelCallContext[],
+    splitFlagReads: 0,
+  };
+}
+type Observations = ReturnType<typeof observations>;
+
+/** The one model channel; the two fakes only keep each context's calls and turns apart. */
+function modelChannel({
+  single,
+  splitModel,
+  split,
+  seen,
+}: {
+  single: ReturnType<typeof fakePiiModel>;
+  splitModel: ReturnType<typeof fakePiiModel>;
+  split: boolean;
+  seen: Observations;
+}): PresidioChannel {
+  const splitting: SplittingPresidioChannel = {
+    splits: true,
+    detect: (input, options) => {
+      const context = options?.context ?? "single";
+      if (input.texts.length > 0) seen.contexts.push(context);
+      return { single, split: splitModel }[context].channel.detect(input);
+    },
+  };
+  return split ? splitting : single.channel;
+}
+
+/** The service graph under test: Presidio, the model over `channel`, and DLP. */
+function analysisOver({
+  presidio,
+  channel,
+  slots,
+  splitFlag,
+  seen,
+}: {
+  presidio: MemoryPresidioChannel;
+  channel: PresidioChannel;
+  slots: ConcurrencyLimiter | undefined;
+  splitFlag: boolean;
+  seen: Observations;
+}) {
+  return PiiAnalysisService.create({
+    presidio: PresidioRedactionService.create({
+      presidio,
+      metrics,
+      timeoutMs: DATA_PRIVACY_PRESIDIO_TIMEOUT_MS,
+    }),
+    model: PiiRedactionModelService.create({
+      model: PresidioRedactionService.create({
+        presidio: channel,
+        metrics,
+        timeoutMs: PII_REDACTION_MODEL_TIMEOUT_MS,
+        method: "pii_redaction_model",
+      }),
+      splitSlots: slots,
+      featureFlags: createApiFixture<FeatureFlagApi>({
+        isEnabled: async (key) => {
+          if (key !== PII_REDACTION_MODEL_SPLIT_FLAG) return true;
+          seen.splitFlagReads++;
+          return splitFlag;
+        },
+      }),
+      scopes: DataPrivacyProjectScopeService.create({
+        repository: MemoryDataPrivacyProjectScopeRepository.create({
+          projects: [dataPrivacyTestPlacement()],
+        }),
+      }),
+      selfHosted: false,
+      entitlements: createApiFixture<EntitlementApi>({}),
+      spend: PiiRedactionSpendService.create({
+        selfHosted: false,
+        requestIdKey: KEY,
+        featureFlags: createApiFixture<FeatureFlagApi>({ isEnabled: async () => false }),
+        recordSpendPriced: async (fact) => {
+          seen.priced.push(fact);
+        },
+      }),
+      metrics: { modelFellBack: (reason) => seen.fallbacks.push(reason) },
+      log: {
+        info: (fields) => seen.usage.push(fields),
+        warn: (fields) => seen.usage.push(fields),
+      },
+      now: () => Date.now(),
+    }),
+    dlp: GoogleDlpRedactionService.create({
+      dlp: MemoryGoogleDlpChannel.create(),
+      disabled: false,
+      metrics,
+    }),
+  });
+}
+
 export function setup({
   planted = [],
   turns = [],
@@ -77,71 +177,9 @@ export function setup({
   const presidio = MemoryPresidioChannel.create({ endpoint: "http://langevals:5562" });
   const single = fakePiiModel({ planted });
   const splitModel = fakePiiModel({ planted, turns });
-  const fallbacks: PiiRedactionModelFallbackReason[] = [];
-  const usage: PiiRedactionModelUsage[] = [];
-  const priced: PiiRedactionSpendPricedEventData[] = [];
-  const contexts: ModelCallContext[] = [];
-  let splitFlagReads = 0;
-  // The one model channel; the two fakes only keep each context's calls and turns apart.
-  const splitting: SplittingPresidioChannel = {
-    splits: true,
-    detect: (input, options) => {
-      const context = options?.context ?? "single";
-      if (input.texts.length > 0) contexts.push(context);
-      return { single, split: splitModel }[context].channel.detect(input);
-    },
-  };
-  const channel: PresidioChannel = split ? splitting : single.channel;
-
-  const analysis = PiiAnalysisService.create({
-    presidio: PresidioRedactionService.create({
-      presidio,
-      metrics,
-      timeoutMs: DATA_PRIVACY_PRESIDIO_TIMEOUT_MS,
-    }),
-    model: PiiRedactionModelService.create({
-      model: PresidioRedactionService.create({
-        presidio: channel,
-        metrics,
-        timeoutMs: PII_REDACTION_MODEL_TIMEOUT_MS,
-        method: "pii_redaction_model",
-      }),
-      splitSlots: slots,
-      featureFlags: createApiFixture<FeatureFlagApi>({
-        isEnabled: async (key) => {
-          if (key !== PII_REDACTION_MODEL_SPLIT_FLAG) return true;
-          splitFlagReads++;
-          return splitFlag;
-        },
-      }),
-      scopes: DataPrivacyProjectScopeService.create({
-        repository: MemoryDataPrivacyProjectScopeRepository.create({
-          projects: [dataPrivacyTestPlacement()],
-        }),
-      }),
-      selfHosted: false,
-      entitlements: createApiFixture<EntitlementApi>({}),
-      spend: PiiRedactionSpendService.create({
-        selfHosted: false,
-        requestIdKey: KEY,
-        featureFlags: createApiFixture<FeatureFlagApi>({ isEnabled: async () => false }),
-        recordSpendPriced: async (fact) => {
-          priced.push(fact);
-        },
-      }),
-      metrics: { modelFellBack: (reason) => fallbacks.push(reason) },
-      log: {
-        info: (fields) => usage.push(fields),
-        warn: (fields) => usage.push(fields),
-      },
-      now: () => Date.now(),
-    }),
-    dlp: GoogleDlpRedactionService.create({
-      dlp: MemoryGoogleDlpChannel.create(),
-      disabled: false,
-      metrics,
-    }),
-  });
+  const seen = observations();
+  const channel = modelChannel({ single, splitModel, split, seen });
+  const analysis = analysisOver({ presidio, channel, slots, splitFlag, seen });
 
   const clear = (
     texts: string[],
@@ -154,20 +192,17 @@ export function setup({
       projectId: PROJECT_ID,
       ...extra,
     });
-  const presidioCalls = () => presidio.batches.filter((batch) => batch.texts.length > 0);
-
-  const flagReads = () => splitFlagReads;
   return {
     clear,
     presidio,
-    presidioCalls,
+    presidioCalls: () => presidio.batches.filter((batch) => batch.texts.length > 0),
     single,
     splitModel,
-    contexts,
-    flagReads,
-    fallbacks,
-    usage,
-    priced,
+    contexts: seen.contexts,
+    flagReads: () => seen.splitFlagReads,
+    fallbacks: seen.fallbacks,
+    usage: seen.usage,
+    priced: seen.priced,
   };
 }
 

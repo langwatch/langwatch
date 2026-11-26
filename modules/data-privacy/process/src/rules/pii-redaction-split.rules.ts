@@ -310,15 +310,17 @@ function placedFindings({
   const pieceText = text.slice(answer.piece.start, answer.piece.end);
   const parsed = presidioFindingsSchema.safeParse(answer.findings);
   if (!isPlaceablePiece(pieceText) || !parsed.success) return "unplaceable";
+  // Checked in code points first: the converter clamps an offset past the piece's end.
+  const codePoints = Array.from(pieceText).length;
+  if (parsed.data.some((f) => f.start < 0 || f.end > codePoints || f.start >= f.end)) {
+    return "unplaceable";
+  }
   const toCodeUnit = codepointToCodeUnitConverter(pieceText);
   const findings = parsed.data.map((finding) => ({
     ...finding,
     start: toCodeUnit(finding.start),
     end: toCodeUnit(finding.end),
   }));
-  if (findings.some((f) => f.start < 0 || f.end > pieceText.length || f.start >= f.end)) {
-    return "unplaceable";
-  }
   const rebuilt = masked({ text: pieceText, findings, marker: (entity) => `<${entity}>` });
   if (rebuilt !== answer.anonymized) return "unplaceable";
   return findings.map((finding) => ({

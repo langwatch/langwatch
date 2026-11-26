@@ -123,6 +123,9 @@ describe("planSpan", () => {
     for (const piece of pieces) {
       expect(isPlaceablePiece(text.slice(piece.start, piece.end))).toBe(true);
     }
+    // The next piece starts on the emoji's high surrogate, never on its low one or the space.
+    expect(pieces[1]?.start).toBe(3_698);
+    expect(text.codePointAt(3_698)).toBe(0x1f600);
   });
 
   /** @scenario "A piece the model could reshape sends the whole span to Presidio" */
@@ -268,6 +271,20 @@ describe("clearSplitSpan", () => {
     ];
 
     expect(clearSplitSpan({ texts: [text], answers })).toEqual([`hi 😀 ${PERSON} ok`]);
+  });
+
+  /** @scenario "A piece whose findings do not rebuild the model's own masked piece sends the whole span to Presidio" */
+  it("refuses a finding that ends past the piece, even where the emoji conversion would clamp it", () => {
+    const text = "hi 😀 Maria";
+    const answers: PieceAnswer[] = [
+      {
+        piece: { text: 0, start: 0, end: text.length, whole: false },
+        findings: [{ entity_type: "PERSON", start: 5, end: 11, score: 0.9 }],
+        anonymized: "hi 😀 <PERSON>",
+      },
+    ];
+
+    expect(clearSplitSpan({ texts: [text], answers })).toBe("unplaceable");
   });
 
   /** @scenario "A spared text in a split span keeps its names and places but still masks an IBAN they overlap" */
