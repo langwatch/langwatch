@@ -1443,6 +1443,8 @@ jobs:
 
   langwatch-app-complete:
     timeout-minutes: 5
+    # Reads only its needs' results, so its token gets no scopes.
+    permissions: {}
     needs: [
         changes,
         # `affected` decides test-unit's matrix, and test-unit is an allowed

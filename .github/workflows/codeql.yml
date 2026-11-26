@@ -200,6 +200,8 @@ jobs:
 
   codeql-complete:
     timeout-minutes: 5
+    # Reads only its needs' results, so its token gets no scopes.
+    permissions: {}
     needs: [changes, analyze]
     # `changes` is skipped on draft PRs; treat that as complete too.
     if: always()
