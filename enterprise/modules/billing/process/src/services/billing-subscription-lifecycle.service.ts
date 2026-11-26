@@ -27,32 +27,16 @@ import type {
   SubscriptionWithOrg,
 } from "../repositories/billing-webhook-subscription.repository.ts";
 import type { BillingSubscriptionRecord } from "../repositories/subscription.repository.ts";
-import type { BillingSubscriptionStatus } from "../rules/billing-stripe-shapes.rules.ts";
 import { BestEffortService } from "./best-effort.service.ts";
 import type { BillingLifecycleAnnouncerService } from "./billing-lifecycle-announcer.service.ts";
 import type { OverPlanService } from "./over-plan.service.ts";
 import type { SubscriptionItemCalculatorService } from "./subscription-item-calculator.service.ts";
+import { TieredPlanRetirementService } from "./tiered-plan-retirement.service.ts";
 
 const logger = createLogger("langwatch:billing:subscriptionLifecycle");
 
 /** Stripe reads its own writes eventually; a webhook can arrive before the write settles. */
 const STRIPE_EVENTUAL_CONSISTENCY_DELAY_MS = 2000;
-
-/** Stripe statuses after which a subscription bills nothing more. */
-const ENDED_AT_STRIPE: ReadonlySet<BillingSubscriptionStatus> = new Set([
-  "canceled",
-  "incomplete_expired",
-]);
-
-/** Retiring a superseded plan failed; the caller fails the delivery after its other steps. */
-export class SupersededPlanRetirementError extends Error {
-  constructor({ failures }: { failures: unknown[] }) {
-    super("Failed to retire the tiered plans a Growth seat subscription supersedes", {
-      cause: failures.length === 1 ? failures[0] : new AggregateError(failures),
-    });
-    this.name = "SupersededPlanRetirementError";
-  }
-}
 
 const waitForStripeConsistency = () =>
   new Promise((resolve) => setTimeout(resolve, STRIPE_EVENTUAL_CONSISTENCY_DELAY_MS));
@@ -93,6 +77,7 @@ export class BillingSubscriptionLifecycleService {
   private readonly announcer: BillingSubscriptionLifecycleOptions["announcer"];
   private readonly overPlan: BillingSubscriptionLifecycleOptions["overPlan"];
   private readonly bestEffort = BestEffortService.create();
+  private readonly retirement: TieredPlanRetirementService;
 
   private constructor(options: BillingSubscriptionLifecycleOptions) {
     this.subscriptionRepository = options.subscriptionRepository;
@@ -103,6 +88,11 @@ export class BillingSubscriptionLifecycleService {
     this.host = options.host;
     this.announcer = options.announcer;
     this.overPlan = options.overPlan;
+    this.retirement = TieredPlanRetirementService.create({
+      subscriptions: options.subscriptionRepository,
+      stripeSubscriptions: options.stripeSubscriptions,
+      ...(options.announcer ? { announcer: options.announcer } : {}),
+    });
   }
 
   async handleSubscriptionDeleted({
@@ -259,7 +249,7 @@ export class BillingSubscriptionLifecycleService {
       await this.announceSubscriptionStarted(updatedSubscription);
     }
     if (isGrowthSeatEventPlan(updatedSubscription.plan)) {
-      await this.retireSupersededPlans({
+      await this.retirement.retire({
         seat: updatedSubscription,
         firstActivation: shouldNotify,
       });
@@ -406,7 +396,7 @@ export class BillingSubscriptionLifecycleService {
     }
     // Every paid Growth invoice checks, so the order Stripe's messages arrive in cannot skip it.
     if (isGrowthSeatEventPlan(updatedSubscription.plan)) {
-      await this.retireSupersededPlans({ seat: updatedSubscription, firstActivation });
+      await this.retirement.retire({ seat: updatedSubscription, firstActivation });
     }
   }
 
@@ -452,63 +442,6 @@ export class BillingSubscriptionLifecycleService {
       );
 
       return false;
-    }
-  }
-
-  /**
-   * Stops the tiered plans an active Growth seat subscription replaces. Safe to run again: Stripe
-   * goes first and its own status says what already ended, so a failure leaves the row for
-   * Stripe's redelivery to find. Spec: enterprise/modules/billing/specs/stripe-webhook.feature
-   */
-  private async retireSupersededPlans({
-    seat,
-    firstActivation,
-  }: {
-    seat: SubscriptionWithOrg;
-    firstActivation: boolean;
-  }): Promise<void> {
-    const superseded = await this.subscriptionRepository.findSupersededBySeatEvent({
-      organizationId: seat.organizationId,
-      excludeSubscriptionId: seat.id,
-    });
-    if (superseded.length === 0 && !firstActivation) return;
-
-    // Organization sets the pricing model from the fact; a refused fact fails before any row moves.
-    try {
-      await this.announcer?.pricingModelChanged({
-        organizationId: seat.organizationId,
-        pricingModel: "SEAT_EVENT",
-      });
-    } catch (err) {
-      throw new SupersededPlanRetirementError({ failures: [err] });
-    }
-
-    const failures: unknown[] = [];
-    for (const old of superseded) {
-      try {
-        await this.cancelAtStripe(old.stripeSubscriptionId);
-        await this.subscriptionRepository.cancel({ id: old.id });
-      } catch (err) {
-        logger.error(
-          { stripeSubscriptionId: old.stripeSubscriptionId, err },
-          "[stripeWebhook] Failed to cancel a superseded tiered subscription; the delivery will be retried",
-        );
-        failures.push(err);
-      }
-    }
-    if (failures.length > 0) throw new SupersededPlanRetirementError({ failures });
-  }
-
-  /** Cancels with proration unless Stripe already ended it, including by a parallel delivery. */
-  private async cancelAtStripe(subscriptionId: string): Promise<void> {
-    const current = await this.stripeSubscriptions.getSubscription({ subscriptionId });
-    if (ENDED_AT_STRIPE.has(current.status)) return;
-
-    try {
-      await this.stripeSubscriptions.cancelSubscription({ subscriptionId, prorate: true });
-    } catch (err) {
-      const after = await this.stripeSubscriptions.getSubscription({ subscriptionId });
-      if (!ENDED_AT_STRIPE.has(after.status)) throw err;
     }
   }
 

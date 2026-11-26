@@ -23,9 +23,9 @@ import {
 import {
   BillingSubscriptionLifecycleService,
   type LicenseClearer,
-  SupersededPlanRetirementError,
 } from "./billing-subscription-lifecycle.service.ts";
 import type { SubscriptionItemCalculatorService } from "./subscription-item-calculator.service.ts";
+import { SupersededPlanRetirementError } from "./tiered-plan-retirement.service.ts";
 
 const logger = createLogger("langwatch:billing:checkoutCompletion");
 
