@@ -18,6 +18,17 @@ import type {
 import { OCSF_ACTIVITY, OCSF_SEVERITY } from "../rules/ocsf-codes.rules.ts";
 import type { GovernanceDiagnosticsSink } from "./governance-policy.service.ts";
 
+/**
+ * How far before a pass's window a trace may have first been seen and still be read by it. The
+ * pass asks for traces on their last-update time, which on its own gives ClickHouse nothing to skip
+ * old weekly partitions on, so every minute it walked the whole history, cold storage included
+ * (#9354). A trace's `OccurredAt` is its frozen storage anchor, the first time it was seen, so a
+ * floor of `window start - this` skips partitions without losing a trace that is still taking
+ * updates. A trace updated more than this long after it first appeared is not re-read; its facts
+ * were written when it was last inside the bound, and a late span that old is not expected.
+ */
+export const GOVERNANCE_TRACE_FACTS_OCCURRED_LOOKBACK_MS = 7 * 24 * 60 * 60 * 1000;
+
 /** The trace summary fields a governance-origin trace's KPI and OCSF rows are built from. */
 export type GovernanceTraceSummary = Pick<
   TraceSummaryData,
@@ -96,7 +107,12 @@ export class GovernanceTraceFactsService {
             endDate: toMs,
             pageSize: SUMMARY_PAGE_SIZE,
           },
-          options: { dateField: "updated", scrollId: scrollId ?? null, filterWhere },
+          options: {
+            dateField: "updated",
+            scrollId: scrollId ?? null,
+            filterWhere,
+            occurredAtFloorMs: fromMs - GOVERNANCE_TRACE_FACTS_OCCURRED_LOOKBACK_MS,
+          },
         });
         written += (await this.record({ tenantId, summaries: page.summaries })).written;
         scrollId = page.scrollId;

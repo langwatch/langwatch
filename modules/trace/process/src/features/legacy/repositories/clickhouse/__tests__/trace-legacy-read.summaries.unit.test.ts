@@ -2,6 +2,7 @@
  * @vitest-environment node
  * Spec: modules/trace/specs/trace-summaries-list.feature
  */
+import { detectColdScan } from "@langwatch/clickhouse-client";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
@@ -86,6 +87,55 @@ describe("TraceLegacyReadClickHouseRepository.findTraceSummaries", () => {
       lastTimestamp: 5000,
       lastTraceId: "trace-1",
     });
+  });
+
+  /** @scenario "A summaries-only list on the updated axis can bound the partitions it reads" */
+  it("carries the occurrence floor on every statement, so none is a cold scan", async () => {
+    const { repository, query } = compose([
+      [{ TraceId: "trace-1" }],
+      [traceSummaryRow({ ts_UpdatedAt: "5000", ts_OccurredAt: "4000" })],
+    ]);
+
+    await repository.findTraceSummaries(window, {
+      dateField: "updated",
+      filterWhere: FILTER,
+      occurredAtFloorMs: 604_800_123.9,
+    });
+
+    const statements = query.mock.calls.map((call) => call[0]);
+    expect(statements).toHaveLength(2);
+    for (const statement of statements) {
+      // The outer scan and the latest-version subquery each prune on their own.
+      const bounds = statement.query.match(/OccurredAt >= fromUnixTimestamp64Milli\(\{occurredFloor:UInt64\}\)/g);
+      expect(bounds?.length).toBeGreaterThanOrEqual(2);
+      expect(statement.query_params).toMatchObject({ occurredFloor: 604_800_123 });
+      expect(detectColdScan(statement.query)).toBeNull();
+    }
+  });
+
+  /** @scenario "A summaries-only list reads every partition when no floor is given" */
+  it("adds no occurrence bound when no floor is given, so the statements are unchanged", async () => {
+    const { repository, query } = compose([
+      [{ TraceId: "trace-1" }],
+      [traceSummaryRow({ ts_UpdatedAt: "5000", ts_OccurredAt: "4000" })],
+    ]);
+
+    await repository.findTraceSummaries(window, { dateField: "updated", filterWhere: FILTER });
+
+    for (const call of query.mock.calls) {
+      expect(call[0].query).not.toContain("occurredFloor");
+      expect(call[0].query_params).not.toHaveProperty("occurredFloor");
+    }
+    // The cold scan is what the floor exists to remove: the unbounded statements still warn.
+    expect(detectColdScan(query.mock.calls.at(0)?.at(0)?.query ?? "")).toBe("trace_summaries");
+  });
+
+  it("ignores a floor on the occurred axis, whose window already bounds OccurredAt", async () => {
+    const { repository, query } = compose([[]]);
+
+    await repository.findTraceSummaries(window, { occurredAtFloorMs: 5_000 });
+
+    expect(query.mock.calls.at(0)?.at(0)?.query).not.toContain("occurredFloor");
   });
 
   /** @scenario "A summaries-only list read that fails is refused, not answered empty" */

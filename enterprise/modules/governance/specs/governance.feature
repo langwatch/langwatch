@@ -250,6 +250,16 @@ Feature: Enterprise governance package boundary
       Then the pass fails and the same traces are read again by a later pass
       And each trace still leaves one KPI row and one OCSF row
 
+    # The pass reads on the last-update time, which is not what the trace table is partitioned
+    # by, so without a bound on when a trace first occurred every pass walks every weekly
+    # partition, cold storage included (#9354). A trace updated more than a week after it
+    # first appeared is not re-read; its facts were written when it was last inside the bound.
+    @unit
+    Scenario: The governance trace facts pass bounds its read by when traces first occurred
+      Given governance pulls governance-origin trace summaries for a window
+      When the pass reads each tenant's pages
+      Then every page asks for traces that first occurred no more than a week before the window began
+
     @unit
     Scenario: Governance pulls each minute's updated traces with an overlap behind the last pass
       Given the worker hosts the governance activity monitor
