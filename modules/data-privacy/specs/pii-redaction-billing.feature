@@ -304,7 +304,7 @@ Feature: A PII redaction model call is priced per character, written to the spen
       And PII redaction spend this month
       When the month is reported
       Then no PII redaction meter event is sent and its checkpoint is not advanced
-      And the first report after the price is added carries the month from zero
+      And the first report after the price is added reads the spend from the moment the line was added
       And a warning names the organization, the meter and the amount held
       # Stripe drops a meter event no subscription item prices, so sending it would lose the charge.
 

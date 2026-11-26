@@ -12,6 +12,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { BillingCheckpointRepository } from "../../repositories/billing-checkpoint.repository.ts";
 import { MemoryBillingCheckpointRepository } from "../../repositories/memory/memory.billing-checkpoint.repository.ts";
 import { MemoryBillingStore } from "../../repositories/memory/memory.billing.store.ts";
+import type { PriceLine } from "../../rules/price-line.rules.ts";
 
 // ---------------------------------------------------------------------------
 // Hoisted mocks
@@ -54,7 +55,13 @@ const {
 
   const connectedUsageCeilingFn = vi.fn(async () => null);
   const subscriptionCarriesPriceFn =
-    vi.fn<(input: { stripeCustomerId: string; price: string }) => Promise<boolean>>();
+    vi.fn<
+      (input: {
+        stripeCustomerId: string;
+        price: string;
+        billingMonth: string;
+      }) => Promise<PriceLine>
+    >();
 
   const billingCheckpointsPort = {
     findCheckpoint: vi.fn(),
@@ -114,6 +121,9 @@ let instantEvalMeterProvisioned = true;
 let piiRedactionMeterProvisioned = true;
 /** The prices the customer's subscription has no line on; every other price it carries. */
 let missingPrices: string[] = [];
+/** A line with no creation time: priced, and the month keeps its other bounds. */
+const CARRIED: PriceLine = { carried: true, addedAtMs: null };
+const lineFor = (carried: boolean): PriceLine => (carried ? CARRIED : { carried: false });
 
 function makeCommand(
   organizationId = "org-1",
@@ -261,8 +271,8 @@ function resetMocks() {
   mockQueryInstantEvalSpendTotal.mockResolvedValue({ outcome: "unavailable" });
   mockQueryPiiRedactionSpendTotal.mockResolvedValue({ outcome: "unavailable" });
   missingPrices = [];
-  mockSubscriptionCarriesPrice.mockImplementation(
-    async ({ price }) => !missingPrices.includes(price),
+  mockSubscriptionCarriesPrice.mockImplementation(async ({ price }) =>
+    lineFor(!missingPrices.includes(price)),
   );
 }
 
@@ -722,6 +732,7 @@ describe("ReportUsageForMonthCommand", () => {
       expect(mockSubscriptionCarriesPrice).toHaveBeenCalledWith({
         stripeCustomerId: "cus_123",
         price: "GROWTH_INSTANT_EVAL_USD",
+        billingMonth: "2026-02",
       });
       expect(mockBillingCheckpoints.writeIntent).not.toHaveBeenCalled();
       expect(mockBillingCheckpoints.confirm).not.toHaveBeenCalled();
@@ -775,14 +786,20 @@ describe("ReportUsageForMonthCommand", () => {
       expect(sent).toEqual(["langwatch_billable_events"]);
     });
 
-    /** @scenario "The first report after the Instant Evals price is added carries the month from zero" */
-    it("carries the month from zero on the first report after the price is added", async () => {
+    /** @scenario "The first report after the Instant Evals price is added bills only from the line" */
+    it("reads the month from the line, not its first day, on the first report after it is added", async () => {
+      const lineAddedAtMs = Date.UTC(2026, 1, 12, 15);
       const handler = await createHandler();
 
       await handler.handle(makeCommand());
-      missingPrices = [];
+      mockSubscriptionCarriesPrice.mockResolvedValue({ carried: true, addedAtMs: lineAddedAtMs });
       await handler.handle(makeCommand());
 
+      expect(mockQueryInstantEvalSpendTotal).toHaveBeenLastCalledWith({
+        organizationId: "org-1",
+        billingMonth: "2026-02",
+        usageBilledSinceMs: lineAddedAtMs,
+      });
       expect(mockReportUsageDelta).toHaveBeenCalledTimes(1);
       expect(mockReportUsageDelta.mock.calls[0]?.[0].events[0]).toMatchObject({
         eventName: "langwatch_instant_eval_usd",
@@ -798,7 +815,7 @@ describe("ReportUsageForMonthCommand", () => {
       // A euro subscription's lines; the Instant Evals price is in dollars, so it is never one.
       const euroLines = ["GROWTH_SEAT_EUR_MONTHLY", "GROWTH_EVENTS_EUR_MONTHLY"];
       mockSubscriptionCarriesPrice.mockImplementation(async ({ price }) =>
-        euroLines.includes(price),
+        lineFor(euroLines.includes(price)),
       );
       mockOrganizations.getOrganizationForBilling.mockResolvedValue(usageBilledOrg());
       mockBillingCheckpoints.findCheckpoint.mockResolvedValue(null);
@@ -812,6 +829,7 @@ describe("ReportUsageForMonthCommand", () => {
       expect(mockSubscriptionCarriesPrice).toHaveBeenCalledWith({
         stripeCustomerId: "cus_123",
         price: "GROWTH_INSTANT_EVAL_USD",
+        billingMonth: "2026-02",
       });
       const sent = mockReportUsageDelta.mock.calls.map(([input]) => input.events[0].eventName);
       expect(sent).toEqual(["langwatch_billable_events"]);
@@ -835,6 +853,7 @@ describe("ReportUsageForMonthCommand", () => {
       expect(mockSubscriptionCarriesPrice).toHaveBeenCalledWith({
         stripeCustomerId: "cus_123",
         price: "GROWTH_INSTANT_EVAL_USD",
+        billingMonth: "2026-02",
       });
       expect(mockReportUsageDelta).toHaveBeenCalledTimes(1);
       expect(mockReportUsageDelta.mock.calls[0]?.[0]).toMatchObject({
@@ -861,7 +880,7 @@ describe("ReportUsageForMonthCommand", () => {
     it("sends no Instant Eval event, leaves its checkpoint alone and schedules another report", async () => {
       mockSubscriptionCarriesPrice.mockImplementation(async ({ price }) => {
         if (price === "GROWTH_INSTANT_EVAL_USD") throw new Error("stripe unavailable");
-        return true;
+        return CARRIED;
       });
       mockOrganizations.getOrganizationForBilling.mockResolvedValue(usageBilledOrg());
       mockBillingCheckpoints.findCheckpoint.mockResolvedValue(null);
@@ -892,7 +911,7 @@ describe("ReportUsageForMonthCommand", () => {
       const checkpoints = MemoryBillingCheckpointRepository.create(store);
       mockSubscriptionCarriesPrice.mockImplementation(async ({ price }) => {
         if (price === "GROWTH_INSTANT_EVAL_USD") throw new Error("No such customer");
-        return true;
+        return CARRIED;
       });
       mockOrganizations.getOrganizationForBilling.mockResolvedValue(usageBilledOrg());
       mockQueryInstantEvalSpendTotal.mockResolvedValue({ outcome: "counted", total: 3_000 });
@@ -930,10 +949,10 @@ describe("ReportUsageForMonthCommand", () => {
       const checkpoints = MemoryBillingCheckpointRepository.create(store);
       let instantReads = 0;
       mockSubscriptionCarriesPrice.mockImplementation(async ({ price }) => {
-        if (price !== "GROWTH_INSTANT_EVAL_USD") return true;
+        if (price !== "GROWTH_INSTANT_EVAL_USD") return CARRIED;
         instantReads += 1;
         if (instantReads <= 4) throw new Error("Stripe unavailable");
-        return priced;
+        return lineFor(priced);
       });
       mockOrganizations.getOrganizationForBilling.mockResolvedValue(usageBilledOrg());
       mockQueryInstantEvalSpendTotal.mockResolvedValue({ outcome: "counted", total: 0 });
@@ -1224,6 +1243,7 @@ describe("ReportUsageForMonthCommand", () => {
       expect(mockSubscriptionCarriesPrice).toHaveBeenCalledWith({
         stripeCustomerId: "cus_123",
         price: "GROWTH_PII_REDACTION_USD",
+        billingMonth: "2026-02",
       });
       expect(mockReportUsageDelta).not.toHaveBeenCalled();
       expect(mockBillingCheckpoints.writeIntent).not.toHaveBeenCalled();
@@ -1231,7 +1251,9 @@ describe("ReportUsageForMonthCommand", () => {
       expect(mockSelfDispatch).not.toHaveBeenCalled();
     });
 
-    it("carries the month from zero on the first report after the price is added", async () => {
+    /** @scenario "Usage is held while the subscription carries no PII redaction price" */
+    it("reads the month from the line, not its first day, on the first report after it is added", async () => {
+      const lineAddedAtMs = Date.UTC(2026, 1, 12, 15);
       mockOrganizations.getOrganizationForBilling.mockResolvedValue(usageBilledOrg());
       mockBillingCheckpoints.findCheckpoint.mockResolvedValue(null);
       mockQueryPiiRedactionSpendTotal.mockResolvedValue({ outcome: "counted", total: 5_000 });
@@ -1240,9 +1262,14 @@ describe("ReportUsageForMonthCommand", () => {
 
       missingPrices = ["GROWTH_PII_REDACTION_USD"];
       await handler.handle(makeCommand());
-      missingPrices = [];
+      mockSubscriptionCarriesPrice.mockResolvedValue({ carried: true, addedAtMs: lineAddedAtMs });
       await handler.handle(makeCommand());
 
+      expect(mockQueryPiiRedactionSpendTotal).toHaveBeenLastCalledWith({
+        organizationId: "org-1",
+        billingMonth: "2026-02",
+        usageBilledSinceMs: lineAddedAtMs,
+      });
       expect(mockReportUsageDelta).toHaveBeenCalledTimes(1);
       expect(mockReportUsageDelta.mock.calls[0]?.[0].events[0]).toMatchObject({
         eventName: "langwatch_pii_redaction_usd",
@@ -1293,7 +1320,7 @@ describe("ReportUsageForMonthCommand", () => {
     it("sends no PII redaction event, leaves its checkpoint alone and schedules another report", async () => {
       mockSubscriptionCarriesPrice.mockImplementation(async ({ price }) => {
         if (price === "GROWTH_PII_REDACTION_USD") throw new Error("stripe unavailable");
-        return true;
+        return CARRIED;
       });
       mockOrganizations.getOrganizationForBilling.mockResolvedValue(usageBilledOrg());
       mockBillingCheckpoints.findCheckpoint.mockResolvedValue(null);
@@ -1779,7 +1806,7 @@ describe("ReportUsageForMonthCommand: the PII redaction price", () => {
       const checkpoints = MemoryBillingCheckpointRepository.create(store);
       mockSubscriptionCarriesPrice.mockImplementation(async ({ price }) => {
         if (price === "GROWTH_PII_REDACTION_USD") throw new Error("No such customer");
-        return true;
+        return CARRIED;
       });
       mockOrganizations.getOrganizationForBilling.mockResolvedValue(usageBilledOrg());
       mockQueryPiiRedactionSpendTotal.mockResolvedValue({ outcome: "counted", total: 5_000 });

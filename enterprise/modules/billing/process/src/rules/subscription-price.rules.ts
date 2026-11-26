@@ -11,14 +11,14 @@ import type {
 } from "./billing-stripe-shapes.rules.ts";
 
 /** Statuses whose metered items Stripe still invoices; any other subscription bills nothing. */
-const INVOICED_STATUSES: ReadonlySet<BillingSubscription["status"]> = new Set([
+export const INVOICED_STATUSES: ReadonlySet<BillingSubscription["status"]> = new Set([
   "active",
   "past_due",
   "trialing",
 ]);
 
 /** A line on the catalogue's price, or on any price carrying its name: a re-price keeps a key. */
-function isLineOn({
+export function isLineOn({
   item,
   priceName,
   priceId,

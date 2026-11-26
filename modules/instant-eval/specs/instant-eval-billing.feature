@@ -224,10 +224,11 @@ Feature: Instant Evals are metered on the gateway spend spine, reported to Strip
       Then the Instant Eval meter event's value is 5.0428
 
     @unit
-    Scenario: The first report after the Instant Evals price is added carries the month from zero
+    Scenario: The first report after the Instant Evals price is added bills only from the line
       Given an organization whose usage was held for want of the Instant Evals price
       When the price is added to its subscription and the month is reported
-      Then the Instant Eval meter event carries the month's total from zero
+      Then the spend is read from the moment the line was added, never the month's first day
+      # All charges start from the day the line is added (ADR-174 decision 26).
 
     # Up to the free dollar used before upgrading never reaches the first invoice (ADR-174 decision 23, proposed in v22).
     @unit

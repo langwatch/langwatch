@@ -559,4 +559,33 @@ describe("Billing's subscription shapes over the provider", () => {
       { priceId: null, quantity: null },
     ]);
   });
+
+  /** @scenario "The line's creation and the subscription's end are read off Stripe" */
+  it("reads when each line was created and when the subscription ended", async () => {
+    const stripe = stripeDouble({
+      subscriptions: {
+        retrieve: async () => ({
+          ...ACTIVE,
+          status: "canceled",
+          ended_at: 1_700_500_000,
+          items: {
+            data: [
+              {
+                id: "si_instant",
+                created: 1_700_000_000,
+                price: { id: "price_instant", unit_amount: null, recurring: { interval: "month" } },
+              },
+            ],
+          },
+        }),
+      },
+    });
+
+    const subscription = await HttpStripeSubscriptionsChannel.create({ stripe }).getSubscription({
+      subscriptionId: "sub_1",
+    });
+
+    expect(subscription.endedAt).toBe(1_700_500_000);
+    expect(subscription.items[0]?.createdAt).toBe(1_700_000_000);
+  });
 });
