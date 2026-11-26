@@ -100,8 +100,8 @@ export function fireJoinedOrganization(
 
 /**
  * Decides the calls for a person who accepted an invite into an existing organization: known
- * traces reach them, and no traces says nothing. The email has one home: signed_up's send,
- * never here (Alex, "ids only").
+ * traces reach them, and no traces says nothing. Ids only: NurturingService adds the email,
+ * read fresh, to every identify it sends.
  */
 export function fireInviteAccepted({
   signal,
@@ -156,7 +156,7 @@ function seatAndCompanyCalls({
 
 /**
  * Decides the calls for a person the SSO domain match added: a new person, so every milestone
- * starts false but the traces nurturing knows of. No email here: it has one home, signed_up's send.
+ * starts false but the traces nurturing knows of. No email here: NurturingService adds it, read fresh.
  */
 export function fireSsoAutoAdded({
   signal,

@@ -743,9 +743,9 @@ const presentations = {
       "This project doesn't have the SQL workbench enabled yet. Ask your administrator to switch it on.",
   },
   lwql_not_provisioned: {
-    title: "Custom SQL isn't set up where this data lives",
+    title: "Dashboards aren't available for this data yet",
     describe: () =>
-      "Custom SQL isn't set up yet on the server that holds this organisation's data. Ask your workspace administrator, or contact support.",
+      "Dashboards and custom SQL aren't available yet for the data this organisation keeps on its own server. Nothing is wrong with your account, and trying again won't help. Your workspace administrator or LangWatch support can tell you when it will be switched on.",
   },
   saved_workbench_chart_already_exists: {
     title: "That chart id is already taken",
@@ -2128,6 +2128,11 @@ const presentations = {
   license_expiry_in_past: {
     title: "That end date has already passed",
     describe: () => "A license can only end on a future date. Pick a later one and try again.",
+  },
+  license_in_use: {
+    title: "An install is using this license",
+    describe: () =>
+      "An install started using this license, so its key keeps working. The new license reaches that install on its next sync.",
   },
   license_signing_key_not_pem: {
     title: "That doesn't look like a private key",

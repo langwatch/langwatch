@@ -310,6 +310,8 @@ describe.skipIf(!databaseUrl)("the Dashboards v2 split migration", () => {
           excludedOrigins: null,
           // Added after the split; its default homes every copied board in LLM Ops (ADR-002, 8).
           homeProduct: DEFAULT_DASHBOARD_HOME_PRODUCT,
+          // Added after the split; dashboard:mark-my-dashboards fills it, never the split.
+          myDashboardOfUserId: null,
           createdAt: source?.createdAt,
           updatedAt: source?.updatedAt,
         });

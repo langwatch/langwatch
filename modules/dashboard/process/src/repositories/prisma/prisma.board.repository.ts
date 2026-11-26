@@ -74,6 +74,7 @@ const boardRow = (row: DashboardsV2): BoardRecord =>
     scope: row.scope,
     organizationId: row.organizationId,
     homeProduct: homeProductOf(row.homeProduct),
+    myDashboardOfUserId: row.myDashboardOfUserId,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   });
@@ -146,6 +147,7 @@ export class PrismaBoardRepository
     createdById?: string | null;
     scope?: DashboardScope;
     homeProduct?: DashboardHomeProduct;
+    myDashboardOfUserId?: string | null;
     organizationId?: string | null;
   }): Promise<BoardRecord> {
     return boardRow(

@@ -41,13 +41,15 @@ const queryForTimeZone = (timeZone: string): string => `
     sum(ifNull(Score, 0)) AS ScoreSum,
     count(Score) AS ScoreCount,
     sum(ifNull(Passed, 0)) AS PassSum,
-    count(Passed) AS PassCount
+    count(Passed) AS PassCount,
+    sumMap([ifNull(Label, '')], [toUInt64(1)]) AS LabelCounts
   FROM (
     SELECT
       evaluations.EvaluatorId AS EvaluatorId,
       evaluations.Status AS Status,
       evaluations.Score AS Score,
       evaluations.Passed AS Passed,
+      evaluations.Label AS Label,
       traces.TraceOccurredAt AS TraceOccurredAt
     FROM (
       SELECT
@@ -67,12 +69,13 @@ const queryForTimeZone = (timeZone: string): string => `
         tupleElement(Latest, 2) AS EvaluatorId,
         tupleElement(Latest, 3) AS Status,
         tupleElement(Latest, 4) AS Score,
-        tupleElement(Latest, 5) AS Passed
+        tupleElement(Latest, 5) AS Passed,
+        tupleElement(Latest, 6) AS Label
       FROM (
         SELECT
           TenantId,
           EvaluationId,
-          argMax(tuple(TraceId, EvaluatorId, Status, Score, Passed), UpdatedAt) AS Latest
+          argMax(tuple(TraceId, EvaluatorId, Status, Score, Passed, Label), UpdatedAt) AS Latest
         FROM evaluation_runs
         WHERE TenantId = {tenantId:String}
           AND EvaluatorId IN {evaluatorIds:Array(String)}
@@ -97,6 +100,20 @@ type ClickHouseMonitorPerformanceRow = {
   ScoreCount: string;
   PassSum: string;
   PassCount: string;
+  /** sumMap's answer: the labels seen and, in step, how often each was seen. */
+  LabelCounts: [string[], (number | string)[]];
+};
+
+/** Unlabelled results land under the empty key; that key is not a label. */
+const toLabelCounts = (
+  counts: ClickHouseMonitorPerformanceRow["LabelCounts"] | undefined,
+): Record<string, number> => {
+  const [labels, occurrences] = counts ?? [[], []];
+  return Object.fromEntries(
+    labels.flatMap((label, index) =>
+      label === "" ? [] : [[label, Number(occurrences[index] ?? 0)] as const],
+    ),
+  );
 };
 
 /** Private parity query for the online-evaluation performance chart. */
@@ -140,6 +157,7 @@ export class ClickHouseMonitorPerformanceRepository extends MonitorPerformanceRe
           scoreCount: Number(row.ScoreCount),
           passSum: Number(row.PassSum),
           passCount: Number(row.PassCount),
+          labelCounts: toLabelCounts(row.LabelCounts),
         }),
       );
     } catch (error) {

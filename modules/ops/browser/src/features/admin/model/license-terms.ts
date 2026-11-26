@@ -20,6 +20,7 @@ export interface License {
   source: string;
   revokedAt: string | null;
   revokedReason: string | null;
+  supersededAt: string | null;
   replacesId: string | null;
   services: string[];
   seatRateCents: number | null;

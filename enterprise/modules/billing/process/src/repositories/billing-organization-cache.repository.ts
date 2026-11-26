@@ -11,7 +11,8 @@ const ONE_MINUTE_MS = 60 * 1000;
  * every pod, so they stay pinned here and the store is injected.
  */
 export const BILLING_ORG_CACHE_TTL_MS = ONE_MINUTE_MS;
-export const BILLING_ORG_CACHE_PREFIX = "ttlcache:billing:orgData:";
+// The version moves with the cached lookup's shape, so an older release's entry is never read.
+export const BILLING_ORG_CACHE_PREFIX = "ttlcache:billing:orgData:v2:";
 
 /**
  * The shared read-through cache for billing organization lookups.

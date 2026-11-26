@@ -28,6 +28,8 @@ const (
 	storagePrice = "price_1UZwpSIMsTw08cud1AbkINGw"
 	// GROWTH_PII_REDACTION_USD, 100 usd cents per dollar on the PII redaction meter
 	piiRedactionPrice = "price_1Uat9tIMsTw08cudpWWrZG4a"
+	// GROWTH_INSTANT_EVAL_USD, 100 usd cents per dollar on the Instant Evals meter
+	instantEvalPrice = "price_1UHJZnIMsTw08cudkPOesmTR"
 )
 
 var epoch = time.Date(2026, 10, 1, 12, 0, 0, 0, time.UTC)
@@ -391,6 +393,37 @@ func TestRenewalBillsUsage(t *testing.T) {
 	inv := list["data"].([]any)[0].(map[string]any)
 	// 2 seats x 3200 + (1500-1000) events x 2
 	if inv["billing_reason"] != "subscription_cycle" || inv["total"].(float64) != 7400 || inv["status"] != "paid" {
+		t.Fatalf("renewal invoice %v", inv)
+	}
+}
+
+// The catalog's own Instant Evals price, not a hand-seeded one: proves the mapping and the meter together.
+// @scenario "A renewal bills the dollars judged on the catalog's Instant Evals price"
+func TestRenewalBillsInstantEvalUsage(t *testing.T) {
+	g := newRig(t)
+	_, cus := g.stripe(http.MethodPost, "/v1/customers", "name=Acme")
+	customer := cus["id"].(string)
+	form := url.Values{
+		"mode": {"subscription"}, "customer": {customer}, "success_url": {"http://app/ok"},
+		"line_items[0][price]": {seatPrice}, "line_items[0][quantity]": {"2"},
+		"line_items[1][price]": {instantEvalPrice},
+	}
+	status, sess := g.stripe(http.MethodPost, "/v1/checkout/sessions", form.Encode())
+	if status != http.StatusOK {
+		t.Fatalf("checkout with the catalog's Instant Evals price: %d %v", status, sess)
+	}
+	_, done := g.control(http.MethodPost, "/_sim/api/checkout/"+sess["id"].(string)+"/complete", "")
+	subID := done["subscription"].(string)
+
+	status, out := g.stripe(http.MethodPost, "/v1/billing/meter_events", "event_name=langwatch_instant_eval_usd&payload[stripe_customer_id]="+customer+"&payload[value]=1.2345&identifier=ie1")
+	if status != http.StatusOK {
+		t.Fatalf("%d %v", status, out)
+	}
+	g.control(http.MethodPost, "/_sim/api/clock/advance", `{"seconds":2764800}`)
+	_, invoices := g.stripe(http.MethodGet, "/v1/invoices", "subscription="+subID+"&limit=1")
+	inv := invoices["data"].([]any)[0].(map[string]any)
+	// 2 seats x 3200 + 1.2345 dollars x 100 cents, to the cent
+	if inv["billing_reason"] != "subscription_cycle" || inv["total"].(float64) != 6523 {
 		t.Fatalf("renewal invoice %v", inv)
 	}
 }

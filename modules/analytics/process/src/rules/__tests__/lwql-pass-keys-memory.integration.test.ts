@@ -20,8 +20,11 @@ const ROWS_PER_PART = 66_000;
 /** Rows per insert block, so seeding never holds a large block on a shared server. */
 const INSERT_BLOCK_ROWS = "2000";
 const ATTRIBUTE_KEYS = 25;
-/** The single read peaked near 1.9 GiB on two million traces; ids-first passes near 32 MiB here. */
-const MEMORY_CAP_BYTES = "100000000";
+/**
+ * The passes peak at up to 75 MiB (ADR-006, `max_threads = 4`) and the single read at 700 to 800
+ * MiB: 200 MB leaves the passes about 2.5x headroom and still refuses the single read.
+ */
+const MEMORY_CAP_BYTES = "200000000";
 const SAMPLE_BUCKETS = 3;
 const START = "2026-08-01 00:00:00";
 /** A 14-day window inside the 60 days the traces span. */

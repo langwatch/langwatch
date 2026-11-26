@@ -10,6 +10,7 @@ import {
   type LangyDraftImage,
   useLangyComposerImages,
 } from "../../../composer/behavior/langy-composer-images.store.ts";
+import { useLangyMessageQueue } from "../../../composer/behavior/langy-message-queue.store.ts";
 import {
   RecordingAnalyticsProvider,
   RecordingUiAnalytics,
@@ -56,7 +57,8 @@ function render() {
 }
 
 beforeEach(() => {
-  useLangyStore.setState({ draft: "" });
+  useLangyMessageQueue.setState({ messages: [], held: {} });
+  useLangyStore.setState({ draft: "", turnPhase: "idle" });
   useLangyComposerImages.setState({ images: [], lastSent: [] });
 });
 

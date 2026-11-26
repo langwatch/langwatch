@@ -389,6 +389,37 @@ describe("whether the install as a whole is connected", () => {
   });
 });
 
+describe("the credential a sync starts from", () => {
+  /** @scenario "Two syncs that race to store a delivered license leave the newer one" */
+  it("names the organization's own key beside the credential it came from", async () => {
+    const own = licenseNaming(["managed_models"]);
+    const { service } = install({ license: own });
+
+    expect(await service.findHeldCredential(ORGANIZATION)).toEqual([
+      {
+        credential: { token: cryptography.getLicenseToken(own), instanceId: "instance-1" },
+        ownKey: own,
+      },
+    ]);
+  });
+
+  /** @scenario "Two syncs that race to store a delivered license leave the newer one" */
+  it("names no own key where the credential comes from the instance-wide licence", async () => {
+    const instanceLicense = licenseNaming(["managed_models"]);
+    const { service } = install({ license: null, instanceLicense });
+
+    expect(await service.findHeldCredential(ORGANIZATION)).toEqual([
+      {
+        credential: {
+          token: cryptography.getLicenseToken(instanceLicense),
+          instanceId: "instance-1",
+        },
+        ownKey: null,
+      },
+    ]);
+  });
+});
+
 describe("the hosted provider slot of the install's own gateway", () => {
   /** @scenario "The install adds the LangWatch provider only when Connect and the service are on" */
   it("records the slot set while managed models is on, and serves the token only on licensing's read", async () => {

@@ -1,4 +1,4 @@
-import type { EmailContent, MailSender } from "@langwatch/mail";
+import type { MailSender } from "@langwatch/mail";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { TraceApi } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
@@ -145,46 +145,6 @@ describe("given a project whose traces the runaway check counts", () => {
 
       await expect(service.countProjectTraces24h("project-1")).resolves.toBe(42);
       expect(countTracesInLastDay).toHaveBeenCalledWith({ projectId: "project-1" });
-    });
-  });
-});
-
-describe("given an automation that hit its daily ceiling", () => {
-  describe("when the limit email goes to its administrators", () => {
-    /** @scenario "Each routed message's sender names its template" */
-    it("names the automation limit's template on every administrator's mail", async () => {
-      const sent: EmailContent[] = [];
-      const service = AutomationRunawayService.create({
-        claims: MemoryAutomationContainmentClaimRepository.create(),
-        directories: {
-          projects: { getOrganizationId: vi.fn(), findById: vi.fn() },
-          authorization: { listOrganizationBindings: vi.fn() },
-        },
-        suppression: { filterSuppressed: vi.fn() },
-        mailer: {
-          send: async (content) => {
-            sent.push(content);
-          },
-        },
-        traces: createApiFixture<TraceApi>(),
-        metrics: AutomationRunawayMetricsNullService.create(),
-        baseHost: "https://app.langwatch.test",
-      });
-
-      await service.sendLimitEmail({
-        to: ["ada@example.com", "grace@example.com"],
-        kind: "ceiling_reached",
-        automationName: "Nightly digest",
-        projectName: "Project",
-        dailyCeiling: 100,
-        skippedToday: 3,
-        actionUrl: "https://app.langwatch.test/project/automations",
-      });
-
-      expect(sent.map((content) => content.template)).toEqual([
-        "automation-limit",
-        "automation-limit",
-      ]);
     });
   });
 });

@@ -126,6 +126,7 @@ jobs:
       actions: write
     outputs:
       e2e: ${{ steps.e2e-paths.outputs.e2e }}
+      behavioral: ${{ steps.e2e-paths.outputs.behavioral }}
     defaults:
       run:
         working-directory: charts/langwatch
@@ -163,6 +164,14 @@ jobs:
               - "infra/clickhouse-serverless/**"
               - ".dockerignore"
               - "pnpm-workspace.yaml"
+            # The behavioral suites read the rendered langwatch chart. A config
+            # declaration or Dockerfile change still runs every render
+            # assertion above, and main runs them on every merge.
+            behavioral:
+              - "charts/langwatch/**"
+              - "charts/lib/**"
+              - ".github/workflows/langwatch-chart.yml"
+              - "pnpm-lock.yaml"
       - uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5
         with:
           version: v3.12.0
@@ -452,10 +461,13 @@ jobs:
   behavioral:
     name: "behavioral (rendered-output assertions)"
     # Skipped on a draft or release-please PR, like the e2e legs below, unless labelled
-    # `ci:full`. No `changes` gate to read `heavy` from, so the check is inline.
+    # `ci:full`, and on a pull request that changes neither the chart nor the
+    # modules these suites test (render's behavioral filter).
+    needs: render
     if: >-
       (github.event_name != 'pull_request' || (github.event.pull_request.draft == false && !(startsWith(github.head_ref, 'release-please--') && github.event.pull_request.user.login == 'langwatch-agent'))
        || contains(github.event.pull_request.labels.*.name, 'ci:full'))
+      && (github.event_name != 'pull_request' || needs.render.outputs.behavioral == 'true' || contains(github.event.pull_request.labels.*.name, 'ci:full'))
     runs-on: ubuntu-latest
     # Read the checkout; write only to prune this pull request's older cache copies.
     permissions:

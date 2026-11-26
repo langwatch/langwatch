@@ -19,16 +19,25 @@ import {
   dashboardsPath,
   draftBoardPath,
   DRAFT_SEGMENT,
+  ORGANIZATION_DASHBOARDS_PATH,
   organizationBoardPath,
   untitledBoardName,
   withQueryString,
 } from "../model/boards.ts";
 import { dashboardCreated } from "../model/dashboard-usage-events.ts";
-import { withBlockPickerOpen } from "./use-block-picker-address.ts";
+import { WIDGET_PICKER_QUERY_KEY, withBlockPickerOpen } from "./use-block-picker-address.ts";
 import type { SavedBoard } from "./use-saved-dashboards.ts";
 
-/** What a draft's first edit, or one made while it is being stored, carries. */
-export type DraftEdit = { name?: string; description?: string | null; pin?: boolean };
+/**
+ * What a draft's first edit, or one made while it is being stored, carries. `templateId`: the
+ * template the edit applies, which the stored board's product event names.
+ */
+export type DraftEdit = {
+  name?: string;
+  description?: string | null;
+  pin?: boolean;
+  templateId?: string;
+};
 
 /** Where a draft lives and what it is stored as; the dialog picks them, "+" takes defaults. */
 type DraftFrame = {
@@ -276,7 +285,11 @@ async function storeDraft({
     at.scope === "PROJECT"
       ? await utils.client.boards.create.mutate(made)
       : await utils.client.boards.createAtScope.mutate({ ...made, scope: at.scope });
-  analytics.track(dashboardCreated({ createdFrom: "blank" }));
+  analytics.track(
+    edit.templateId === void 0
+      ? dashboardCreated({ createdFrom: "blank" })
+      : dashboardCreated({ createdFrom: "template", templateId: edit.templateId }),
+  );
   if (isHeld(at)) useDraftStore.setState({ savedId: created.id });
   // A cleared description stays cleared; a pin taken off while this ran is not written.
   const description = edit.description === void 0 ? at.description : edit.description;
@@ -293,7 +306,9 @@ async function storeDraft({
   const route = host.route();
   if (isHeld(at) && route.params.dashboardId === DRAFT_SEGMENT) {
     const path = storedBoardPath({ writer, at, dashboardId: created.id });
-    host.navigate(withQueryString({ path, query: route.query }), { replace: true });
+    // "Add a widget" made or asked the first edit and is closing; its key must not reopen it.
+    const query = { ...route.query, [WIDGET_PICKER_QUERY_KEY]: void 0 };
+    host.navigate(withQueryString({ path, query }), { replace: true });
   }
   return created.id;
 }
@@ -385,6 +400,25 @@ export function useDraftBoard({ takenNames }: { takenNames: readonly string[] })
     materialise: (edit: DraftEdit = {}): Promise<string> => materialiseDraft({ writer, edit }),
     /** Whether the last store was refused, so an unchanged edit is still worth sending. */
     refused: held.refused,
+    /** Whether its first edit is being stored right now, when it can no longer be thrown away. */
+    isStoring: held.saving !== void 0 && held.savedId === void 0,
+    /**
+     * Throws the draft away before anything is stored, and leaves for where boards open: the
+     * project's dashboards, or Dashboards when it was opened there.
+     */
+    discard: () => {
+      const at = useDraftStore.getState();
+      if (at.projectId === projectId && at.saving !== void 0) return;
+      // A draft held for another project keeps that project's frame: leave by this one's address.
+      const fromOrganization = at.projectId === projectId && at.atOrganization;
+      restartDraft(projectId);
+      host.navigate(
+        fromOrganization
+          ? ORGANIZATION_DASHBOARDS_PATH
+          : dashboardsPath({ projectSlug: writer.projectSlug }),
+        { replace: true },
+      );
+    },
     /** Takes the pin off a draft not stored yet; it stores nothing. */
     unpin: () => {
       if (useDraftStore.getState().projectId === projectId) useDraftStore.setState({ pin: false });

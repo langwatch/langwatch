@@ -157,7 +157,7 @@ export default function LicensesView() {
       <LicenseDetailDrawer
         licenseId={openId}
         onClose={() => setOpenId(null)}
-        onRevoke={(license) => setRevoking(license)}
+        onRevoke={setRevoking}
       />
       <LicenseIssueDrawer open={creating} onClose={() => setCreating(false)} />
       <LicenseRevokeDialog license={revoking} onClose={() => setRevoking(null)} />

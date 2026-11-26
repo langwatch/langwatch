@@ -1178,6 +1178,11 @@ const registry = {
   },
 
   // ---- licensing ----
+  license_in_use: {
+    tips: [
+      "Reload the license: it now shows the install, and the new license waits for its next sync",
+    ],
+  },
   license_signing_key_not_pem: {
     tips: [
       "Provide the whole private key, including its BEGIN and END lines (PRIVATE KEY, RSA PRIVATE KEY and EC PRIVATE KEY are all accepted)",

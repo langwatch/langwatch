@@ -10,6 +10,10 @@ import type {
   MonitorPerformanceBucket,
   MonitorPerformanceRepository,
 } from "../../../repositories/monitor-performance.repository.ts";
+import {
+  labelDistribution,
+  readsAsLabels,
+} from "../../../rules/monitor-label-distribution.rules.ts";
 
 export class MonitorPerformanceService {
   static create(options: { repository: MonitorPerformanceRepository }): MonitorPerformanceService {
@@ -50,6 +54,14 @@ export class MonitorPerformanceService {
 
     return monitors.map((monitor) => {
       const monitorBuckets = bucketsByEvaluator.get(monitor.id) ?? [];
+      if (readsAsLabels({ buckets: monitorBuckets, isGuardrail: monitor.isGuardrail })) {
+        return {
+          monitorId: monitor.id,
+          metric: "label" as const,
+          points: [],
+          ...labelDistribution({ buckets: monitorBuckets }),
+        };
+      }
       const current = monitorBuckets
         .filter((bucket) => bucket.period === "current")
         .map((bucket) => this.metricTotal(bucket, monitor.isGuardrail));
@@ -59,7 +71,7 @@ export class MonitorPerformanceService {
 
       return {
         monitorId: monitor.id,
-        metric: monitor.isGuardrail ? "pass_rate" : "score",
+        metric: monitor.isGuardrail ? ("pass_rate" as const) : ("score" as const),
         points: current.filter((total) => total.count > 0).map((total) => total.sum / total.count),
         current: this.average(current),
         previous: this.average(previous),
