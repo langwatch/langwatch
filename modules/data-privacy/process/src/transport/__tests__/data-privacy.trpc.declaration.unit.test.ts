@@ -12,13 +12,13 @@ import { dataPrivacyTrpcTransport } from "../data-privacy.trpc.ts";
 
 type DeclaredAccess = string | { kind: string };
 
-/** Mounts the declaration and records the access each procedure asked for. */
-function declaredAccess(): DeclaredAccess[] {
-  const declared: DeclaredAccess[] = [];
+/** Mounts the declaration and records the access each procedure asked for, by its name. */
+function declaredAccess(): ReadonlyMap<string, DeclaredAccess> {
+  const declared = new Map<string, DeclaredAccess>();
 
   const runtime: TrpcProcedureFactory<object> = {
-    procedure: ({ access }) => {
-      declared.push(access.kind === "permission" ? access.permission : access);
+    procedure: ({ procedure, access }) => {
+      declared.set(procedure, access.kind === "permission" ? access.permission : access);
 
       return {};
     },
@@ -42,10 +42,10 @@ describe("the data privacy tRPC declaration", () => {
     /** @scenario "Only an organization admin can accept the price" */
     it("keeps the wire names, kinds and access decisions", () => {
       const access = declaredAccess();
-      const table = Object.entries(dataPrivacyTrpc.members).map(([name, member], index) => [
+      const table = Object.entries(dataPrivacyTrpc.members).map(([name, member]) => [
         name,
         member.kind,
-        kindOf(access[index]),
+        kindOf(access.get(`${dataPrivacyTrpc.namespace}.${name}`)),
       ]);
 
       expect(table).toEqual([
