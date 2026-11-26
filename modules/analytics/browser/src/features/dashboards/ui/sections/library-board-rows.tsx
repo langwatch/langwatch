@@ -10,6 +10,7 @@ import { useAnalyticsHost } from "../../../../model/analytics-host.ts";
 import { useBoardMenuActions } from "../../behavior/use-board-menu-actions.ts";
 import { useLibraryBoardEdits } from "../../behavior/use-library-board-edits.ts";
 import {
+  HOME_PRODUCT_LABELS,
   libraryBoardPath,
   type LibraryBoard,
   ownerLabel,
@@ -51,10 +52,13 @@ export function LibraryBoardRow({
   return (
     <LibraryRow
       name={board.name}
+      description={board.description}
       href={libraryBoardPath(board)}
+      product={HOME_PRODUCT_LABELS[board.homeProduct]}
       whoSees={whoSees(board)}
       isPrivate={board.scope === "PRIVATE"}
       owner={ownerLabel({ board, userId })}
+      updatedAt={board.updatedAt}
       actions={actions}
       renaming={isRenaming ? renaming : void 0}
     />

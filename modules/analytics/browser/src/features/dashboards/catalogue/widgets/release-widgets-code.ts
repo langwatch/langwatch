@@ -261,7 +261,7 @@ function verdict(row) {
     return (
       <Panel>
         <Note>
-          No new prompt version or model in this period, so nothing to compare.
+          No new release, prompt version or model in this period, so nothing to compare.
         </Note>
       </Panel>
     );

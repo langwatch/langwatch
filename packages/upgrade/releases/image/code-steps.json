@@ -702,6 +702,14 @@
     "needsOldWritersGone": true
   },
   {
+    "id": "trace:replay-trace-analytics-app-version",
+    "kind": "data",
+    "mode": "background",
+    "owner": "trace",
+    "description": "Refolds the last 62 days of trace analytics rows so they carry the application version each trace ran on.",
+    "needsOldWritersGone": true
+  },
+  {
     "id": "trace:fill-id-indexes",
     "kind": "data",
     "mode": "background",

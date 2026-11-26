@@ -18,6 +18,7 @@ import type {
   TraceAnalyticsRow,
   TraceEvaluationOutcome,
 } from "../../eventing/trace-derived.projection.ts";
+import { traceAnalyticsAppVersion } from "../../rules/app-version.rules.ts";
 import {
   type TraceAnalyticsWrittenMetadataColumns,
   traceAnalyticsMetadataColumns,
@@ -104,6 +105,9 @@ type ClickHouseTraceAnalyticsWriteRecord = {
 } & TraceAnalyticsWrittenMetadataColumns & {
     // ── The managed prompt version the trace last used (migration 00133) ──
     LastUsedPromptVersionId: string;
+
+    // ── The application version the trace ran on (migration 00135) ──
+    AppVersion: string;
 
     // ── Read-back state (ADR-066, migration 00056) ─────────────────────────
     SpanCount: number;
@@ -559,6 +563,7 @@ export class TraceAnalyticsClickHouseRepository extends TraceAnalyticsProjection
       ...traceAnalyticsWrittenMetadataColumns(
         row.metadataColumns ?? traceAnalyticsMetadataColumns(row.attributes),
       ),
+      AppVersion: traceAnalyticsAppVersion(row.attributes),
       LastUsedPromptVersionId: row.lastUsedPromptVersionId ?? "",
 
       SpanCount: Math.max(0, Math.round(row.spanCount)),

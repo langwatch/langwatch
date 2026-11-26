@@ -1,100 +1,99 @@
 /**
- * One row of the `/dashboards` library: the board's name linking to it, who sees it, its owner
- * and the board's "⋮" menu (`board-menu.tsx`) with what this member may do.
+ * One row of the `/dashboards` library's table: the board's name linking to it with its
+ * description below, its product, who sees it, its owner, when it last changed and the board's
+ * "⋮" menu (`board-menu.tsx`) with what this member may do.
  */
 
-import { Box, Grid, HStack, Link as ChakraLink, Text } from "@langwatch/design-system/primitives";
+import { FormattedDate } from "@langwatch/design-system/formatted-date";
+import { ListTable } from "@langwatch/design-system/list-table";
+import { HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import { Lock } from "lucide-react";
-import type { ReactNode } from "react";
 
 import { useAnalyticsHost } from "../../../../model/analytics-host.ts";
-import { opensElsewhere } from "../../../../ui/elements/analytics-link.tsx";
 import type { BoardMenuActions } from "../../model/organization-library.ts";
 import { InlineTextField } from "../elements/inline-text-field.tsx";
-import { BoardMenu, revealsBoardMenu } from "./board-menu.tsx";
-
-/** Name, who sees it, owner, menu: the columns every row lines up on. */
-const ROW_COLUMNS = "minmax(0, 1fr) 150px 96px 28px";
+import { BoardMenu } from "./board-menu.tsx";
 
 /** The name edited in place: Enter or leaving the field saves it, Escape cancels. */
 export type LibraryRowRenaming = { onCommit: (name: string) => void; onCancel: () => void };
 
+/** The columns every row fills, in order, for the header to name. */
+export const LIBRARY_COLUMNS = {
+  product: { label: "Product", width: "9rem" },
+  whoSees: { label: "Shared with", width: "11rem" },
+  owner: { label: "Owner", width: "9rem" },
+  updated: { label: "Updated", width: "8rem" },
+} as const;
+
 export function LibraryRow({
   name,
+  description,
   href,
+  product,
   whoSees,
   isPrivate = false,
   owner,
+  updatedAt,
   actions,
   renaming,
 }: {
   name: string;
+  description: string | null;
   /** Absent when no project the member reads can open the board. */
   href: string | undefined;
+  product: string;
   whoSees: string;
   isPrivate?: boolean;
   owner: string | undefined;
+  updatedAt: string;
   actions: BoardMenuActions;
   renaming?: LibraryRowRenaming | undefined;
 }) {
-  // While renaming the menu is gone, so closing it cannot hand focus back and end the edit.
-  const hasMenu = renaming === void 0;
-  const frame = { name, href, whoSees, isPrivate, owner, renaming };
-  return <RowFrame {...frame}>{hasMenu && <BoardMenu name={name} actions={actions} />}</RowFrame>;
-}
-
-function RowFrame({
-  name,
-  href,
-  whoSees,
-  isPrivate = false,
-  owner,
-  renaming,
-  children,
-}: {
-  name: string;
-  href: string | undefined;
-  whoSees: string;
-  isPrivate?: boolean;
-  owner: string | undefined;
-  renaming?: LibraryRowRenaming | undefined;
-  children: ReactNode;
-}) {
   return (
-    <Grid
-      as="li"
-      listStyleType="none"
-      templateColumns={ROW_COLUMNS}
-      alignItems="center"
-      gap={3}
-      paddingX={3}
-      paddingY={2}
-      textStyle="bodySm"
-      {...revealsBoardMenu}
-    >
-      {renaming ? (
-        <InlineTextField
-          value={name}
-          label="Dashboard name"
-          size="xs"
-          textStyle="bodySm"
-          onCommit={renaming.onCommit}
-          onCancel={renaming.onCancel}
-        />
-      ) : (
-        <NameCell name={name} href={href} />
-      )}
-      <HStack gap={1} minWidth={0} color="fg.muted" textStyle="caption">
-        {isPrivate && <Lock size={11} aria-label="Only me" />}
-        <Text as="span" truncate title={whoSees}>
-          {whoSees}
-        </Text>
-      </HStack>
-      <Text truncate color="fg.muted" textStyle="caption">
+    <ListTable.Row>
+      <ListTable.Cell minWidth="14rem">
+        {renaming ? (
+          <InlineTextField
+            value={name}
+            label="Dashboard name"
+            size="xs"
+            textStyle="bodySm"
+            onCommit={renaming.onCommit}
+            onCancel={renaming.onCancel}
+          />
+        ) : (
+          <VStack align="start" gap={0.5} minWidth={0}>
+            <NameCell name={name} href={href} />
+            {description && (
+              <Text textStyle="caption" color="fg.muted" lineClamp={1} title={description}>
+                {description}
+              </Text>
+            )}
+          </VStack>
+        )}
+      </ListTable.Cell>
+      <ListTable.Cell tone="muted" truncate width={LIBRARY_COLUMNS.product.width}>
+        {product}
+      </ListTable.Cell>
+      <ListTable.Cell tone="muted" width={LIBRARY_COLUMNS.whoSees.width} maxWidth="11rem">
+        <HStack gap={1} minWidth={0}>
+          {isPrivate && <Lock size={11} aria-label="Only me" />}
+          <Text as="span" truncate title={whoSees}>
+            {whoSees}
+          </Text>
+        </HStack>
+      </ListTable.Cell>
+      <ListTable.Cell tone="muted" truncate width={LIBRARY_COLUMNS.owner.width}>
         {owner}
-      </Text>
-      <Box>{children}</Box>
-    </Grid>
+      </ListTable.Cell>
+      <ListTable.Cell tone="muted" nowrap width={LIBRARY_COLUMNS.updated.width}>
+        <FormattedDate value={updatedAt} display="relative" />
+      </ListTable.Cell>
+      <ListTable.ActionCell>
+        {/* Gone while renaming, so closing it cannot hand focus back and end the edit. */}
+        {!renaming && <BoardMenu name={name} actions={actions} isAlwaysShown />}
+      </ListTable.ActionCell>
+    </ListTable.Row>
   );
 }
 
@@ -103,29 +102,14 @@ function NameCell({ name, href }: { name: string; href: string | undefined }) {
   const host = useAnalyticsHost();
   if (!href) {
     return (
-      <Text truncate fontWeight="medium" color="fg">
+      <Text truncate fontWeight="medium" color="fg" title={name}>
         {name}
       </Text>
     );
   }
   return (
-    <ChakraLink
-      href={href}
-      display="block"
-      minWidth={0}
-      overflow="hidden"
-      textOverflow="ellipsis"
-      whiteSpace="nowrap"
-      title={name}
-      fontWeight="medium"
-      color="fg"
-      onClick={(event) => {
-        if (opensElsewhere(event)) return;
-        event.preventDefault();
-        host.navigate(href);
-      }}
-    >
+    <ListTable.RowAction href={href} onNavigate={() => host.navigate(href)}>
       {name}
-    </ChakraLink>
+    </ListTable.RowAction>
   );
 }

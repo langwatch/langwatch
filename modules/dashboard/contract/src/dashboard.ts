@@ -67,6 +67,31 @@ export type DashboardHomeProduct = z.infer<typeof dashboardHomeProductSchema>;
 /** Where a board is homed when nobody says, and every board made before homes existed. */
 export const DEFAULT_DASHBOARD_HOME_PRODUCT: DashboardHomeProduct = "llm-ops";
 
+/** The most boards one member's sidebar order may name. */
+export const DASHBOARD_SIDEBAR_ORDER_MAX = 500;
+
+/** Board ids in a member's own sidebar order, each named once. */
+const dashboardSidebarOrderIdsSchemaDefinition = z
+  .array(dashboardIdSchema)
+  .max(DASHBOARD_SIDEBAR_ORDER_MAX)
+  .refine((ids) => new Set(ids).size === ids.length, { message: "Each board is named once" });
+export interface DashboardSidebarOrderIdsSchema extends Named<
+  typeof dashboardSidebarOrderIdsSchemaDefinition
+> {}
+export const dashboardSidebarOrderIdsSchema: DashboardSidebarOrderIdsSchema =
+  dashboardSidebarOrderIdsSchemaDefinition;
+
+/** One member's order of a product sidebar's Dashboards section in one organization. */
+const dashboardSidebarOrderSchemaDefinition = z
+  .object({ dashboardIds: z.array(dashboardIdSchema) })
+  .strict();
+export interface DashboardSidebarOrderSchema extends Named<
+  typeof dashboardSidebarOrderSchemaDefinition
+> {}
+export const dashboardSidebarOrderSchema: DashboardSidebarOrderSchema =
+  dashboardSidebarOrderSchemaDefinition;
+export type DashboardSidebarOrder = z.infer<typeof dashboardSidebarOrderSchema>;
+
 const dashboardSchemaDefinition = z
   .object({
     id: dashboardIdSchema,

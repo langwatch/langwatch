@@ -6560,6 +6560,11 @@
           "name": "LastUsedPromptVersionId",
           "type": "String",
           "comment": ""
+        },
+        {
+          "name": "AppVersion",
+          "type": "String",
+          "comment": ""
         }
       ]
     },

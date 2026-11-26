@@ -71,11 +71,6 @@
       "note": "retention rules set per heavy organization",
       "cells": ["C1", "C3"]
     },
-    "dashboard:mark-my-dashboards": {
-      "status": "pending",
-      "seed": "unplanned",
-      "note": "needs each member's My dashboard as the previous release wrote it, before the mark"
-    },
     "dataset:move-content-to-object-storage": {
       "status": "pending",
       "seed": "product-seeds:dataset",
@@ -359,6 +354,11 @@
       "cells": ["C2"],
       "note": "SSO connection and SCIM state by SQL"
     },
+    "stored-object:import-clickhouse-index": {
+      "status": "seeded",
+      "seed": "traffic:otlp",
+      "note": "the step form of the stored objects clickhouse import system migration; declared in its migrations file, not the module file"
+    },
     "suite:replay-scenario-facts-for-open-runs": {
       "status": "seeded",
       "seed": "product-seeds:suite",
@@ -397,6 +397,11 @@
       "status": "pending",
       "seed": "unplanned",
       "note": "needs traces with managed prompt versions written by the old release; no seed carries them yet"
+    },
+    "trace:replay-trace-analytics-app-version": {
+      "status": "pending",
+      "seed": "unplanned",
+      "note": "needs traces with service.version or metadata.version written by the old release; no seed carries them yet"
     },
     "trace:replay-span-analytics": {
       "status": "seeded",

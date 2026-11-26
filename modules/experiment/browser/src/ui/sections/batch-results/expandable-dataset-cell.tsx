@@ -5,15 +5,17 @@
 import { Box, Button, HStack, Portal, Text, VStack } from "@langwatch/design-system/primitives";
 import { isTextLikelyOverflowing } from "@langwatch/design-system/text-overflow";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { useCallback, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { LuCheck, LuCopy } from "react-icons/lu";
 
+import { useHoverReveal } from "../../../behavior/batch-evaluation-results/use-hover-reveal.ts";
 import {
   COLLAPSED_CELL_HEIGHT_PX,
+  collapsedPreviewOf,
   DEFAULT_ROW_HEIGHT,
   type RowHeight,
 } from "../../../model/batch-evaluation-results.row-height.ts";
-import { useEscapeKey } from "./presentation.tsx";
+import { expandedPositionOf, useEscapeKey } from "./presentation.tsx";
 
 // Max characters to display for performance
 const MAX_DISPLAY_CHARS = 10000;
@@ -46,6 +48,7 @@ export function ExpandableDatasetCell({
   const [isExpanded, setIsExpanded] = useState(false);
   const [hasCopied, setHasCopied] = useState(false);
   const cellRef = useRef<HTMLDivElement>(null);
+  const { isRevealed, revealHandlers } = useHoverReveal({ onExpand: () => handleExpand() });
   const [expandedPosition, setExpandedPosition] = useState({
     top: 0,
     left: 0,
@@ -56,50 +59,23 @@ export function ExpandableDatasetCell({
 
   // Use a heuristic to determine if content likely overflows
   // This avoids useEffect + scrollHeight measurement which causes flicker during virtualization
-  const isLikelyOverflowing = isTextLikelyOverflowing(rawContent);
+  const collapsed = collapsedPreviewOf({ text: rawContent, rowHeight });
+  const isLikelyOverflowing = collapsed.isCut || isTextLikelyOverflowing(rawContent);
 
-  // Handler to expand
-  const handleExpand = useCallback(() => {
-    if (cellRef.current) {
-      // Use the cell ref's own position (works correctly in diff mode where multiple
-      // values share the same td, each value should expand from its own position)
-      const rect = cellRef.current.getBoundingClientRect();
-      // Also get the td width to use as min width
-      const td = cellRef.current.closest("td");
-      const tdWidth = td?.getBoundingClientRect().width ?? rect.width;
-
-      const expandedWidth = Math.max(rect.width, tdWidth) + 24;
-      const safetyMargin = 32;
-      const viewportWidth = window.innerWidth;
-
-      // Adjust left position if it would overflow the viewport
-      let left = rect.left - 12;
-      if (left + expandedWidth > viewportWidth - safetyMargin) {
-        left = viewportWidth - expandedWidth - safetyMargin;
-      }
-
-      setExpandedPosition({
-        top: rect.top,
-        left,
-        width: expandedWidth,
-      });
-    }
+  const handleExpand = (): void => {
+    if (cellRef.current) setExpandedPosition(expandedPositionOf(cellRef.current));
     setIsExpanded(true);
-  }, []);
+  };
 
-  // Handler to close expanded
-  const handleClose = useCallback(() => {
-    setIsExpanded(false);
-  }, []);
+  const handleClose = (): void => setIsExpanded(false);
 
   useEscapeKey({ enabled: isExpanded, onEscape: handleClose });
 
-  // Copy to clipboard
-  const handleCopy = useCallback(() => {
+  const handleCopy = (): void => {
     void navigator.clipboard.writeText(rawContent);
     setHasCopied(true);
     setTimeout(() => setHasCopied(false), 2000);
-  }, [rawContent]);
+  };
 
   // Truncate if too long
   const isTruncated = rawContent.length > MAX_DISPLAY_CHARS;
@@ -142,12 +118,7 @@ export function ExpandableDatasetCell({
           onClick={isLikelyOverflowing ? handleExpand : undefined}
         >
           <Text textStyle="bodySm" whiteSpace="pre-wrap" wordBreak="break-word">
-            {displayContent}
-            {isTruncated && (
-              <Box as="span" color="fg.subtle" textStyle="micro" marginLeft={1}>
-                (truncated)
-              </Box>
-            )}
+            {collapsed.preview}
           </Text>
         </Box>
 
@@ -214,9 +185,15 @@ export function ExpandableDatasetCell({
   return (
     <>
       {/* Normal collapsed view */}
-      <Box ref={cellRef} position="relative" css={{ "&:hover .cell-action-btn": { opacity: 1 } }}>
+      <Box
+        ref={cellRef}
+        position="relative"
+        css={{ "&:hover .cell-action-btn, &:focus-within .cell-action-btn": { opacity: 1 } }}
+        {...revealHandlers}
+        aria-label={`${columnName} value, press Enter to expand`}
+      >
         <VStack align="stretch" height="100%" gap={0}>
-          {renderCopyButton(false)}
+          {isRevealed && renderCopyButton(false)}
           {renderContent(false)}
         </VStack>
       </Box>

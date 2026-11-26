@@ -619,7 +619,7 @@ Feature: Dashboards v2 polish and bring-your-own-AI
   @unit
   Scenario: AC68 Release check: production is compared before and after the newest change
     Given the "ship-rollout" widget
-    Then it compares up to 7 days after the newest prompt or model change with the same days a week earlier
+    Then it compares up to 7 days after the newest release, prompt or model change with the same days a week earlier
     And it shows the error rate, p95 response time and cost per trace on both sides
     And the checks passed after the change are reweighted to the topic mix before it
     And with no change in the period it says there is nothing to compare around
