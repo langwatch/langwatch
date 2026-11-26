@@ -140,6 +140,20 @@ describe("SubscriptionAccountsSection", () => {
 
       expect(screen.queryByText(/Out of usage until/)).toBeNull();
     });
+
+    it("keeps every re-check timer within what setTimeout can wait for a limit weeks away", () => {
+      const timers = vi.spyOn(globalThis, "setTimeout");
+      renderWith([
+        account({
+          reading: { ...account().reading!, limitedUntilMs: nowEpochMs() + 60 * 86_400_000 },
+        }),
+      ]);
+
+      expect(screen.getByText(/Out of usage until/)).toBeTruthy();
+      const delays = timers.mock.calls.map(([, delay]) => delay ?? 0);
+      timers.mockRestore();
+      expect(delays.every((delay) => delay <= 2_147_483_647)).toBe(true);
+    });
   });
 
   describe("given an account that reported no percent", () => {

@@ -1,17 +1,14 @@
 import type { CodingAgentAccountDay } from "@langwatch/coding-agent-contract";
 import { format, toZonedDateTime } from "@langwatch/time";
 
+import { ASSISTANT_PRESETS } from "./assistant-presets.ts";
+
 const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] as const;
 
-const AGENT_LABELS: Readonly<Record<string, string>> = {
-  claude_code: "Claude Code",
-  claude_cowork: "Claude Cowork",
-  codex: "Codex",
-  gemini_cli: "Gemini CLI",
-  opencode: "opencode",
-  copilot: "Copilot",
-  grok: "Grok",
-  pi: "pi",
+/** Agent ids the telemetry sends that the assistant presets spell another way. */
+const PRESET_OF_AGENT: Readonly<Record<string, keyof typeof ASSISTANT_PRESETS>> = {
+  gemini_cli: "gemini",
+  copilot: "github_copilot",
 };
 
 const WINDOW_LABELS: Readonly<Record<string, string>> = {
@@ -43,7 +40,10 @@ export function cumulativeTokens(days: readonly CodingAgentAccountDay[]): number
 }
 
 export function agentLabel(agent: string): string {
-  return AGENT_LABELS[agent] ?? agent;
+  const preset = PRESET_OF_AGENT[agent] ?? agent;
+  return Object.hasOwn(ASSISTANT_PRESETS, preset)
+    ? ASSISTANT_PRESETS[preset as keyof typeof ASSISTANT_PRESETS].label
+    : agent;
 }
 
 export function usageWindowLabel(window: string | null): string | null {

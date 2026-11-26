@@ -44,7 +44,6 @@ export abstract class CodingAgentSessionEventRepository {
    * a session for a pull request even after its own row moved to another
    * repository. Returns distinct (tenantId, sessionId) pairs; caller fetches rows.
    */
-
   abstract findSessionsByStampedBranch(input: {
     tenantIds: string[];
     repositoryHost: string;

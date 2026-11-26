@@ -217,13 +217,35 @@ function parsePercent(value: FactValue): number | undefined {
   return Math.min(100, Math.max(0, parsed));
 }
 
-/** An ISO 8601 instant, or epoch milliseconds; anything else is not reported. */
+/** The instants a usage report may name, 2000-01-01 to 2100-01-01 UTC, so the column holds it. */
+const EARLIEST_INSTANT_MS = 946_684_800_000;
+const LATEST_INSTANT_MS = 4_102_444_800_000;
+
+/** Epoch seconds, milliseconds, microseconds or nanoseconds, told apart by size. */
+function epochMsOf(value: number): number {
+  if (value >= 1e17) return Math.trunc(value / 1e6);
+  if (value >= 1e14) return Math.trunc(value / 1e3);
+  if (value < 1e11) return Math.trunc(value * 1e3);
+  return Math.trunc(value);
+}
+
+function isInInstantRange(ms: number): boolean {
+  return ms >= EARLIEST_INSTANT_MS && ms < LATEST_INSTANT_MS;
+}
+
+/** An ISO 8601 instant or an epoch number in any unit, inside the range; else not reported. */
 function parseInstant(value: FactValue): number | undefined {
-  if (typeof value === "number") return Number.isFinite(value) && value > 0 ? value : void 0;
-  if (typeof value !== "string" || value.trim() === "") return void 0;
-  try {
-    return Temporal.Instant.from(value.trim()).epochMilliseconds;
-  } catch {
-    return void 0;
+  let ms: number;
+  if (typeof value === "number") {
+    if (!Number.isFinite(value) || value <= 0) return void 0;
+    ms = epochMsOf(value);
+  } else {
+    if (typeof value !== "string" || value.trim() === "") return void 0;
+    try {
+      ms = Temporal.Instant.from(value.trim()).epochMilliseconds;
+    } catch {
+      return void 0;
+    }
   }
+  return isInInstantRange(ms) ? ms : void 0;
 }

@@ -51,7 +51,7 @@ function build(groups: AccountUsageGroupRow[], canSeeCosts = true) {
   return buildAccountBurndowns({ groups, days, canSeeCosts, nowMs: NOW_MS });
 }
 
-describe("accountWeekWindow", () => {
+describe("accountColumnsOf", () => {
   describe("given a report with only a window and a read time", () => {
     it("stores no reading, so an older full reading stays the newest", () => {
       const columns = accountColumnsOf({
@@ -76,6 +76,36 @@ describe("accountWeekWindow", () => {
     });
   });
 
+  describe("given instants in other units or out of range", () => {
+    it("reads seconds and nanoseconds as the same instant in milliseconds", () => {
+      const atMs = Date.parse("2026-11-28T09:00:00.000Z");
+      const inSeconds = accountColumnsOf({
+        "langwatch.account.id": ACCOUNT,
+        "langwatch.account.usage.resets_at": atMs / 1000,
+      });
+      const inNanos = accountColumnsOf({
+        "langwatch.account.id": ACCOUNT,
+        "langwatch.account.limited_until": atMs * 1_000_000,
+      });
+      expect(inSeconds.accountUsageResetsAtMs).toBe(atMs);
+      expect(inNanos.accountLimitedUntilMs).toBe(atMs);
+    });
+
+    it("drops an instant no clock could mean instead of failing the write", () => {
+      const columns = accountColumnsOf({
+        "langwatch.account.id": ACCOUNT,
+        "langwatch.account.usage.percent": 10,
+        "langwatch.account.usage.resets_at": "9999-12-31T00:00:00.000Z",
+        "langwatch.account.limited_until": Number.MAX_SAFE_INTEGER,
+      });
+      expect(columns.accountUsageResetsAtMs).toBeNull();
+      expect(columns.accountLimitedUntilMs).toBeNull();
+      expect(columns.accountUsagePercent).toBe(10);
+    });
+  });
+});
+
+describe("accountWeekWindow", () => {
   it("covers seven UTC days ending today, oldest first", () => {
     const window = accountWeekWindow(NOW_MS);
 

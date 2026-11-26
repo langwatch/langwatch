@@ -118,12 +118,16 @@ function SubscriptionAccountsBody({
 }
 
 /** The limit's end while it is still ahead; re-renders when it passes so the badge goes away. */
+/** setTimeout runs a longer delay at once, so a far limit re-checks at this cap instead. */
+const MAX_TIMER_DELAY_MS = 2_147_483_647;
+
 function useActiveLimit(limitedUntilMs: number | null): number | null {
   const [nowMs, setNowMs] = useState(nowEpochMs);
   const isActive = limitedUntilMs !== null && limitedUntilMs > nowMs;
   useEffect(() => {
     if (!isActive || limitedUntilMs === null) return;
-    const timer = setTimeout(() => setNowMs(nowEpochMs()), limitedUntilMs - nowMs + 1000);
+    const delayMs = Math.min(limitedUntilMs - nowMs + 1000, MAX_TIMER_DELAY_MS);
+    const timer = setTimeout(() => setNowMs(nowEpochMs()), delayMs);
     return () => clearTimeout(timer);
   }, [isActive, limitedUntilMs, nowMs]);
 

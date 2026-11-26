@@ -4,6 +4,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  agentLabel,
   cumulativeTokens,
   formatLimitMoment,
   formatUsagePercent,
@@ -43,5 +44,12 @@ describe("account burndown formatting", () => {
 
       expect(formatLimitMoment(untilMs, nowMs)).toBe("Fri 27 Nov, 08:00");
     });
+  });
+
+  it("names agents as the assistant presets do, and falls back to the raw id", () => {
+    expect(agentLabel("claude_code")).toBe("Claude Code");
+    expect(agentLabel("gemini_cli")).toBe("Gemini");
+    expect(agentLabel("copilot")).toBe("GitHub Copilot");
+    expect(agentLabel("some_new_agent")).toBe("some_new_agent");
   });
 });
