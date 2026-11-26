@@ -39,18 +39,10 @@ const INSTRUCTIONS: LangWatchQLAppFunctionParameter = {
  */
 const EXAMPLE_TEXT = "llm_readable_thread(ConversationId, 8000)";
 
-function evalExample({
-  database,
-  call,
-  alias,
-}: {
-  database: string;
-  call: string;
-  alias: string;
-}): string {
+function evalExample({ call, alias }: { call: string; alias: string }): string {
   return (
     `SELECT ConversationId, ${call} AS ${alias}\n` +
-    `FROM ${database}.trace_metrics\n` +
+    `FROM trace_metrics\n` +
     `WHERE OccurredAt >= subtractDays(now(), 7) AND ConversationId != ''\n` +
     `GROUP BY ConversationId\n` +
     `ORDER BY ConversationId\n` +
@@ -94,9 +86,8 @@ export const LWQL_EVAL_FUNCTION_CATALOG: readonly LangWatchQLAppFunctionDefiniti
     returns: "Nullable(Float64)",
     encoding: "text",
     gates: [],
-    example: (database) =>
+    example: () =>
       evalExample({
-        database,
         call: `eval(${EXAMPLE_TEXT}, 'The customer sounds annoyed')`,
         alias: "annoyed",
       }),
@@ -122,9 +113,8 @@ export const LWQL_EVAL_FUNCTION_CATALOG: readonly LangWatchQLAppFunctionDefiniti
     returns: "Nullable(Float64)",
     encoding: "text",
     gates: [],
-    example: (database) =>
+    example: () =>
       evalExample({
-        database,
         call:
           `eval_criteria(${EXAMPLE_TEXT}, 'The customer sounds annoyed', ` +
           `['sarcasm, repetition or a raised voice count', 'a calm complaint does not count'])`,
@@ -151,9 +141,8 @@ export const LWQL_EVAL_FUNCTION_CATALOG: readonly LangWatchQLAppFunctionDefiniti
     returns: "Nullable(UInt8)",
     encoding: "text",
     gates: [],
-    example: (database) =>
+    example: () =>
       evalExample({
-        database,
         call: `eval_passed(${EXAMPLE_TEXT}, 'The customer sounds annoyed', 0.7)`,
         alias: "annoyed",
       }),
@@ -187,9 +176,8 @@ export const LWQL_EVAL_FUNCTION_CATALOG: readonly LangWatchQLAppFunctionDefiniti
     returns: "Nullable(Float64)",
     encoding: "text",
     gates: [],
-    example: (database) =>
+    example: () =>
       evalExample({
-        database,
         call:
           `eval_score(${EXAMPLE_TEXT}, ` +
           `'How satisfied is the customer, from 1 for angry to 5 for delighted', 1, 5)`,
@@ -206,8 +194,7 @@ export const LWQL_EVAL_FUNCTION_CATALOG: readonly LangWatchQLAppFunctionDefiniti
     returns: "Nullable(String)",
     encoding: "text",
     gates: [],
-    example: (database) =>
-      evalExample({ database, call: categoryCall("eval_category"), alias: "intent" }),
+    example: () => evalExample({ call: categoryCall("eval_category"), alias: "intent" }),
   },
   {
     name: "eval_category_probs",
@@ -220,9 +207,8 @@ export const LWQL_EVAL_FUNCTION_CATALOG: readonly LangWatchQLAppFunctionDefiniti
     returns: "Nullable(String)",
     encoding: "json",
     gates: [],
-    example: (database) =>
+    example: () =>
       evalExample({
-        database,
         call: categoryCall("eval_category_probs"),
         alias: "intent_probabilities",
       }),
