@@ -62,6 +62,19 @@ Feature: Stored-object reuse by content and owner-linked retention
     Then the object is linked to owner trace "t1" until 30 days from now
 
   @unit
+  Scenario: A store whose retention started earlier links the owner from that start
+    Given the project keeps traces for 30 days
+    When trace "t1" stores bytes on day 0 for a span that started on day -20
+    Then the object is linked to owner trace "t1" until day 10
+    And a later re-time counts from day -20
+
+  @unit
+  Scenario: A retention start in the future links the owner from now
+    Given the project keeps traces for 30 days
+    When trace "t1" stores bytes on day 0 for a span that starts on day 5
+    Then the object is linked to owner trace "t1" until day 30
+
+  @unit
   Scenario: A reuse links the new owner without shortening the first
     Given trace "t1" holds an object until day 30
     When trace "t2" stores the same bytes and its retention ends on day 10
@@ -135,6 +148,13 @@ Feature: Stored-object reuse by content and owner-linked retention
     And the run fails naming the failure, and a later run finishes the first tenant
 
   @unit
+  Scenario: One object's failure does not stop the sweep for the rest of its tenant
+    Given two objects of one tenant with expired links, and the first object's row cannot be updated
+    When the sweep runs
+    Then the second object is deleted and its links removed
+    And the first object keeps its links, the run fails, and a later run deletes it
+
+  @unit
   Scenario: The sweep's tenant list starts with the longest-waiting ended link
     Given more tenants with ended links than one run takes
     When the sweep runs every hour while the first tenants keep getting new ended links
@@ -197,3 +217,24 @@ Feature: Stored-object reuse by content and owner-linked retention
   Scenario: Deleting a project's objects removes their links
     When the project's stored objects are deleted
     Then none of the project's owner links remain
+
+  # ===========================================================================
+  # Objects stored before owner links
+  # ===========================================================================
+
+  @unit
+  Scenario: Trace media stored before owner links is linked to the trace that stored it
+    Given available "trace_content" objects that hold no owner link, in a project that keeps traces for 30 days
+    When the background step "trace:link-unowned-trace-media" runs for the project
+    Then each object is linked to the owner it was stored for, until 30 days after its creation
+    And the sweep deletes it once that time has passed
+    And a project that keeps traces forever links its objects with no end
+    And an object that already holds a link, a deleted object or a purpose with no retention category is left alone
+    And a second run links nothing
+
+  @unit
+  Scenario: A trace retention change during the trace media backfill fails the step by name
+    Given a project whose trace retention changes while "trace:link-unowned-trace-media" links its media
+    When the step finishes its pass
+    Then the step fails, naming the project and both retentions
+    And it asks for the project's trace retention to be applied to existing data again

@@ -54,7 +54,13 @@ export function retentionFixture(
   const sweepPages = {
     msEach: 0,
     refuseTenant: undefined as StoredObjectProjectId | undefined,
+    refuseObject: undefined as StoredObjectId | undefined,
     beforeDelete: undefined as (() => Promise<unknown>) | undefined,
+  };
+  const markDeletedIfUnheld = records.markDeletedIfUnheld.bind(records);
+  records.markDeletedIfUnheld = async (query) => {
+    if (query.id === sweepPages.refuseObject) throw new Error("the row update failed");
+    return markDeletedIfUnheld(query);
   };
   const ownerLinks: StoredObjectOwnerLinkRepository = {
     raise: async (link) => {

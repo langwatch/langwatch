@@ -5,6 +5,7 @@ import { Tooltip } from "@langwatch/design-system/tooltip";
 import { parseEvaluationResult } from "@langwatch/evaluator-contract";
 import { useId, useState } from "react";
 
+import { collapsedPreviewOf } from "../../../model/batch-evaluation-results.row-height.ts";
 import {
   EVALUATION_STATUS_TONES,
   getStatusLabel,
@@ -84,7 +85,9 @@ export function EvaluatorResultCell({ result }: { result: unknown }) {
             whiteSpace="pre-wrap"
             wordBreak="break-word"
           >
-            {parsed.details}
+            {showJson
+              ? parsed.details
+              : collapsedPreviewOf({ text: parsed.details, rowHeight: "s" }).preview}
           </Text>
         </Tooltip>
       )}

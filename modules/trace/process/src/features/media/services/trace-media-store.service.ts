@@ -38,6 +38,8 @@ export interface TraceMediaStore {
     ownerId: string;
     mediaType: string;
     bytes: Buffer;
+    /** When the owner's retention started, in epoch ms; absent means now. */
+    retainFromMs?: number;
   }): Promise<{ id: string; isDuplicate: boolean }>;
 }
 
@@ -77,6 +79,8 @@ export class TraceMediaStoreService implements TraceMediaStore {
     ownerId: string;
     mediaType: string;
     bytes: Buffer;
+    /** When the owner's retention started, in epoch ms; absent means now. */
+    retainFromMs?: number;
   }): Promise<{ id: string; isDuplicate: boolean }> {
     const retentionDays = await this.retentionDaysOf(input.projectId);
     const stored = await this.storedObjects.storeFromBytes({
@@ -89,6 +93,7 @@ export class TraceMediaStoreService implements TraceMediaStore {
       ownerKind: this.target.ownerKind,
       ownerId: input.ownerId,
       ...(retentionDays === undefined ? {} : { retentionDays }),
+      ...(input.retainFromMs === undefined ? {} : { retainFromMs: input.retainFromMs }),
     });
 
     return { id: stored.reference.id, isDuplicate: stored.isDuplicate };

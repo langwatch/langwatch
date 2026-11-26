@@ -5,7 +5,11 @@
 
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { type OtlpKeyValue, type OtlpSpan } from "@langwatch/otlp/trace-request";
-import { type RecordSpanCommandData, containsMediaMarkers } from "@langwatch/trace-contract";
+import {
+  type RecordSpanCommandData,
+  containsMediaMarkers,
+  storableSpanTimesOf,
+} from "@langwatch/trace-contract";
 
 import type { TraceEdgeMediaTelemetry } from "./trace-edge-media-telemetry.service.ts";
 import type {
@@ -113,7 +117,10 @@ export class TraceSpanMediaExtractionService {
     const projectId = data.tenantId;
     const refs: ExtractedRef[] = [];
     const budget = this.extraction.createExtractionBudget();
-    const walk = { projectId, ownerId: span.traceId, refs, budget };
+    // Trace rows expire from the span's start, so its media is retained from there too.
+    const times = storableSpanTimesOf(span);
+    const retainFromMs = "times" in times ? times.times.startTimeUnixMs : undefined;
+    const walk = { projectId, ownerId: span.traceId, retainFromMs, refs, budget };
     const attributes = await this.rewriteAttributeList({ attributes: span.attributes, ...walk });
 
     let eventsChanged = false;
@@ -148,12 +155,14 @@ export class TraceSpanMediaExtractionService {
     attributes,
     projectId,
     ownerId,
+    retainFromMs,
     refs,
     budget,
   }: {
     attributes: OtlpKeyValue[];
     projectId: string;
     ownerId: string;
+    retainFromMs: number | undefined;
     refs: ExtractedRef[];
     budget: ExtractionBudget;
   }): Promise<OtlpKeyValue[]> {
@@ -166,6 +175,7 @@ export class TraceSpanMediaExtractionService {
           value: stringValue,
           projectId,
           ownerId,
+          retainFromMs,
           budget,
         });
         if (typeof result.value === "string" && result.value !== stringValue) {

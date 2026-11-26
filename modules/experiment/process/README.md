@@ -1119,7 +1119,7 @@ interface Output {
 interface Input {
   projectId: string;
 }
-// Output: experimentUpdateFrameSchema, ../contract/src/experiment.responses.ts:177
+// Output: experimentUpdateFrameSchema, ../contract/src/experiment.responses.ts:190
 interface Output {
   event: unknown;
   timestamp?: number;
@@ -1195,7 +1195,7 @@ interface Input {
   pageOffset?: number;
   pageSize?: number;
 }
-type Output = z.infer<typeof experimentEvaluationsListPageSchema>; // ../contract/src/experiment.responses.ts:140
+type Output = z.infer<typeof experimentEvaluationsListPageSchema>; // ../contract/src/experiment.responses.ts:152
 
 // experiments.getLastExperiment
 type Input = z.infer<typeof projectScopeSchema>; // ../contract/src/experiment.trpc.ts:30
@@ -1207,7 +1207,7 @@ interface Input {
   projectId: string;
   experimentId: string;
 }
-// Output: experimentArchivedSchema, ../contract/src/experiment.responses.ts:154
+// Output: experimentArchivedSchema, ../contract/src/experiment.responses.ts:167
 interface Output {
   success: true;
 }
@@ -1220,7 +1220,7 @@ interface Input {
   sourceProjectId: string;
   copyDatasets?: boolean;
 }
-type Output = z.infer<typeof experimentCopiedSchema>; // ../contract/src/experiment.responses.ts:165
+type Output = z.infer<typeof experimentCopiedSchema>; // ../contract/src/experiment.responses.ts:178
 
 // experiments.getExperimentDSPyRuns
 // Input: inline, ../contract/src/experiment.trpc.ts:265
@@ -1246,7 +1246,7 @@ interface Input {
   projectId: string;
   experimentId: string;
 }
-type Output = z.infer<typeof experimentRunListSchema>; // ../contract/src/experiment.responses.ts:146
+type Output = z.infer<typeof experimentRunListSchema>; // ../contract/src/experiment.responses.ts:159
 
 // experiments.getExperimentBatchEvaluationRun
 // Input: inline, ../contract/src/experiment.trpc.ts:294

@@ -14,7 +14,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 The complete process capability exposed by the stored-object feature.
 
-Peers call these through the token, declared at `../contract/src/stored-object.api.ts:123`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/stored-object.api.ts:141`; nothing else in this package is public.
 
 #### `storeFromBytes`
 
@@ -76,6 +76,14 @@ getStorageUsageByProject(input: { projectId: StoredObjectProjectId; purpose?: st
 
 ```typescript
 deleteOwnedBy(input: { projectId: StoredObjectProjectId; }): Promise<DeleteProjectStoredObjectsResult>;
+```
+
+#### `linkUnownedObjects`
+
+The owner's upgrade step: links objects stored before owner links (ADR-002 Consequences).
+
+```typescript
+linkUnownedObjects(input: LinkUnownedStoredObjectsInput): Promise<LinkUnownedStoredObjectsResult>;
 ```
 
 #### `headById`

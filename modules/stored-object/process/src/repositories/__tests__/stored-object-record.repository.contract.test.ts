@@ -402,9 +402,18 @@ describe.each(backends)(
           purpose: "trace_content",
           sha256: "a".repeat(64),
           mediaType: "application/octet-stream",
+          limit: 8,
+        });
+        const first = await repository.findReusable({
+          tenantId: ACME,
+          purpose: "trace_content",
+          sha256: "a".repeat(64),
+          mediaType: "application/octet-stream",
+          limit: 1,
         });
 
         expect(found.map((value) => value.id)).toEqual(["so_aaaaaaaa", "so_bbbbbbbb"]);
+        expect(first.map((value) => value.id)).toEqual(["so_aaaaaaaa"]);
       });
     });
 

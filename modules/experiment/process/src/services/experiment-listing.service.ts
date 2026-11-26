@@ -11,10 +11,13 @@ import {
   type ExperimentEvaluationsListPage,
   type ExperimentIdOrSlugInput,
 } from "@langwatch/experiment-contract";
-import { workflowWithoutHttpAgentSecrets } from "@langwatch/workflow-contract";
 
 import type { ExperimentWorkflowLinkService } from "../features/workflow/services/experiment-workflow-link.service.ts";
-import { extractDatasetId, pickLatestRun } from "../rules/experiment-evaluations-list.rules.ts";
+import {
+  evaluationsListRowOf,
+  extractDatasetId,
+  pickLatestRun,
+} from "../rules/experiment-evaluations-list.rules.ts";
 import type { ExperimentService } from "./experiment.service.ts";
 
 export type ExperimentListingServiceOptions = {
@@ -53,12 +56,18 @@ export class ExperimentListingService {
     const pageOffset = input.pageOffset ?? 0;
     const pageSize = input.pageSize ?? 25;
 
-    // Every active experiment with its workflow join, then filter and paginate
-    // in memory: JSON-path filtering on `task` inside `workbenchState` is
+    // Filter and paginate in memory: JSON-path filtering on `task` inside `workbenchState` is
     // unreliable, so the count and the page slice run off the same array.
-    const allExperiments = await Promise.all(
-      (await this.options.experiments.list({ projectId: input.projectId })).map(
-        async (experiment) => {
+    const nonLegacyExperiments = (
+      await this.options.experiments.list({ projectId: input.projectId })
+    ).filter((experiment) => !isLegacyOnlineEvaluationWorkbenchState(experiment.workbenchState));
+    const totalHits = nonLegacyExperiments.length;
+    const pagedExperiments = nonLegacyExperiments.slice(pageOffset, pageOffset + pageSize);
+
+    // Only the page's workflows are read, and only for the dataset their entry node names.
+    const datasetIdByExperimentId = new Map(
+      await Promise.all(
+        pagedExperiments.map(async (experiment) => {
           const workflow = experiment.workflowId
             ? await this.options.links.findWorkflow({
                 id: experiment.workflowId,
@@ -66,22 +75,11 @@ export class ExperimentListingService {
                 includeVersion: true,
               })
             : null;
-
-          return { ...experiment, workflow: workflow && workflowWithoutHttpAgentSecrets(workflow) };
-        },
+          return [experiment.id, extractDatasetId(workflow?.currentVersion?.dsl)] as const;
+        }),
       ),
     );
-    const nonLegacyExperiments = allExperiments.filter(
-      (experiment) => !isLegacyOnlineEvaluationWorkbenchState(experiment.workbenchState),
-    );
-    const totalHits = nonLegacyExperiments.length;
-
-    // Pagination is applied after excluding legacy online evaluations.
-    const pagedExperiments = nonLegacyExperiments.slice(pageOffset, pageOffset + pageSize);
-
-    const datasetIds = pagedExperiments
-      .map((experiment) => extractDatasetId(experiment.workflow?.currentVersion?.dsl))
-      .filter((id): id is string => !!id);
+    const datasetIds = [...datasetIdByExperimentId.values()].filter((id): id is string => !!id);
 
     const datasetsById = Object.fromEntries(
       (await this.options.dataset.getByIds({ projectId: input.projectId, datasetIds })).map(
@@ -101,15 +99,16 @@ export class ExperimentListingService {
         const primaryMetric = latestRun
           ? Object.values(latestRun.summary.evaluations)[0]
           : undefined;
+        const datasetId = datasetIdByExperimentId.get(experiment.id);
 
         return {
-          ...experiment,
+          ...evaluationsListRowOf(experiment),
           runsSummary: {
             count: runs.length,
             primaryMetric,
             latestRun: { timestamps: latestRun?.timestamps },
           },
-          dataset: datasetsById[extractDatasetId(experiment.workflow?.currentVersion?.dsl) ?? ""],
+          dataset: datasetId ? datasetsById[datasetId] : undefined,
           updatedAt: latestRun?.timestamps.createdAt ?? experiment.updatedAt.getTime(),
         };
       })

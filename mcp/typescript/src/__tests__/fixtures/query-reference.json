@@ -1630,6 +1630,14 @@
               "unit": null,
               "gates": [],
               "available": true
+            },
+            {
+              "name": "AppVersion",
+              "type": "String",
+              "description": "The application version the trace ran on: the resource attribute service.version, else metadata.version, else metadata.app_version. Empty when the trace sent none, or was last folded before this column existed.",
+              "unit": null,
+              "gates": [],
+              "available": true
             }
           ],
           "exampleSql": "SELECT TraceId, OccurredAt, UpdatedAt\nFROM trace_metrics\nWHERE OccurredAt >= subtractDays(now(), 7)\nORDER BY OccurredAt DESC\nLIMIT 100"

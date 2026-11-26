@@ -46,8 +46,12 @@ ownerKind, ownerId, retainUntil, createdAt, updatedAt)`, records who holds
    when the link exists, moving its `createdAt` to the latest store with it. A
    reuse adds a link; it never shortens another's.
 3. **The purpose declares its retention category.** `trace_content` follows
-   `traces`. `retainUntil` is now plus the project's resolved days for that
-   category. The caller names those days on the store (`retentionDays`): trace
+   `traces`. `retainUntil` is the link's start plus the project's resolved
+   days for that category. The start is now, or the caller's `retainFromMs`
+   when earlier: trace passes the span's start time, since its rows expire
+   from there, so a late or backfilled span's media ends with them. The link's
+   `createdAt` is that start, which a re-time counts from. The caller names
+   those days on the store (`retentionDays`): trace
    asks data-retention, so Stored Objects holds no peer that could close a
    cycle through data-retention's own peers. Purposes with no category write no
    links and are never swept, so every object stored before this change, and
@@ -81,11 +85,15 @@ ownerKind, ownerId, retainUntil, createdAt, updatedAt)`, records who holds
 - Trace media lives exactly as long as the longest-retained trace that
   references it, and follows retroactive retention changes in both
   directions.
-- Objects extracted before this change carry no link and are never swept;
-  they are the few projects that opted into the flag early. They are never
-  reused for a retained purpose either: a link on one would let the sweep
-  delete it under the older traces that hold it unrecorded. Their bytes are
-  written once more.
+- Objects extracted before this change carry no link; they are the few
+  projects that opted into the flag early. At store time they are never
+  reused for a retained purpose: a link on one would let the sweep delete it
+  under the older trace that holds it unrecorded, so their bytes are written
+  once more. Before reuse every store minted its own object, so the owner on
+  the row is the only one holding it. A background step in trace,
+  `trace:link-unowned-trace-media`, asks data-retention for the project's
+  trace retention and has Stored Objects link each such object to that owner
+  until the retention ends, counted from the object's creation.
 - Neither module gains a peer. Stored Objects reads data-retention's fact and
   contract constants only; a store for a retained purpose without
   `retentionDays` is a programming error and throws.

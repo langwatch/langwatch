@@ -2,7 +2,7 @@ import { isNotFoundError as isNotFound } from "@langwatch/browser-host/errors";
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 import { useRouter } from "@langwatch/browser-host/use-router";
 import { PageLayout } from "@langwatch/design-system/page-layout";
-import { Alert, Box } from "@langwatch/design-system/primitives";
+import { Alert, Box, VStack } from "@langwatch/design-system/primitives";
 
 import { experimentApi } from "../../../behavior/experiment-api.ts";
 import { useLegacyBatchEvaluations } from "../../../behavior/experiments/use-legacy-batch-evaluations.ts";
@@ -97,10 +97,12 @@ export default function ExperimentPage() {
     experiment.data.type === ExperimentType.BATCH_EVALUATION_V2 ||
     experiment.data.type === ExperimentType.EVALUATIONS_V3
   ) {
+    // The page fills the shell's column so the results table scrolls inside it and draws only
+    // the rows in view; an auto-height page lets the table grow to every row of the run.
     return (
-      <Box width="full">
+      <VStack width="full" flex={1} minHeight={0} gap={0} align="stretch">
         <BatchEvaluationResults project={project} experiment={experiment.data} />
-      </Box>
+      </VStack>
     );
   }
 
