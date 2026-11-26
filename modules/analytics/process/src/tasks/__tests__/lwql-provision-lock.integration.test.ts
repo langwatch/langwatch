@@ -1,7 +1,7 @@
 /**
- * The self-provision advisory lock under a real Postgres: the lock transaction runs on real
- * connections, the ClickHouse side is the real repository over a recording port, and the
- * Postgres DDL is skipped so the shared test database keeps no LangWatchQL views.
+ * The self-provision advisory lock under a real Postgres of its own: the key is global per
+ * database, so a shared test database lets a sibling suite's converge hold it mid-assertion.
+ * The ClickHouse side is the real repository over a recording port; the Postgres DDL is skipped.
  * @see specs/lwql/api.feature
  * @vitest-environment node
  */
@@ -9,18 +9,21 @@
 import { createLogger } from "@langwatch/observability";
 import {
   PrismaConfigService,
+  type PrismaConnection,
   PrismaConnectionService,
   PrismaQueryGuard,
   type PrismaQueryContext,
   type PrismaQueryExecutor,
 } from "@langwatch/prisma-client";
-import { afterAll, describe, expect, it } from "vitest";
+import { PostgreSqlContainer, type StartedPostgreSqlContainer } from "@testcontainers/postgresql";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { LangWatchQLProductionProvisioningService } from "../../features/provisioning/services/langwatch-ql-production-provisioning.service.ts";
 import {
   LangWatchQLSelfProvisioningService,
   type LwqlSelfProvisionRequest,
 } from "../../features/provisioning/services/langwatch-ql-self-provisioning.service.ts";
+import { TEST_POSTGRES_IMAGE } from "../../langwatch-ql/__tests__/lwql-clickhouse-harness.ts";
 import { ClickHouseLangWatchQLProvisioningRepository } from "../../repositories/clickhouse/clickhouse.langwatch-ql-provisioning.repository.ts";
 import type { LwqlProvisioningDatabase } from "../../repositories/langwatch-ql-postgres.repository.ts";
 import { convergeLwqlAccessModel, type LwqlConvergencePlan } from "../lwql-provision.task.ts";
@@ -31,13 +34,9 @@ class AllowTestQueries extends PrismaQueryGuard {
   }
 }
 
-const databaseUrl = process.env.DATABASE_URL;
-const connection = databaseUrl
-  ? PrismaConnectionService.create({
-      guard: new AllowTestQueries(),
-      logger: createLogger("lwql-provision-lock-test"),
-    }).connect(PrismaConfigService.create().resolve({ databaseUrl, log: ["error"] }))
-  : null;
+let container: StartedPostgreSqlContainer | null = null;
+let databaseUrl = "";
+let connection: PrismaConnection | null = null;
 
 /** The key the task's lock hashes; the task keeps it private, so the probe names it too. */
 const LOCK_KEY_PROBE =
@@ -51,7 +50,7 @@ const delay = (milliseconds: number) =>
   new Promise<void>((resolve) => setTimeout(resolve, milliseconds));
 
 function client() {
-  if (connection === null) throw new Error("DATABASE_URL is required for the lock tests");
+  if (connection === null) throw new Error("the lock suite's Postgres has not started");
   return connection.client;
 }
 
@@ -119,11 +118,24 @@ function podPlan({
   };
 }
 
+beforeAll(async () => {
+  container = await new PostgreSqlContainer(TEST_POSTGRES_IMAGE)
+    .withLabels({ "langwatch.test": "true", "langwatch.test.type": "integration" })
+    .withStartupTimeout(120_000)
+    .start();
+  databaseUrl = container.getConnectionUri();
+  connection = PrismaConnectionService.create({
+    guard: new AllowTestQueries(),
+    logger: createLogger("lwql-provision-lock-test"),
+  }).connect(PrismaConfigService.create().resolve({ databaseUrl, log: ["error"] }));
+}, 180_000);
+
 afterAll(async () => {
   await connection?.closeOnce();
+  await container?.stop();
 });
 
-describe.skipIf(!databaseUrl)("LangWatchQL self-provision lock", () => {
+describe("LangWatchQL self-provision lock", () => {
   describe("given two pods run the convergence at the same time", () => {
     /** @scenario "Concurrent self-provision runs are serialized by the advisory lock" */
     it("never overlaps the two locked bodies and finishes one before the other starts", async () => {
