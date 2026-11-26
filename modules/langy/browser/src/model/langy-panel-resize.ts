@@ -1,3 +1,5 @@
+import { clampWidth } from "@langwatch/design-system/resize-handle";
+
 import {
   FLOATING_PANEL_MIN_WIDTH,
   FLOATING_PANEL_VIEWPORT_GUTTER,
@@ -19,10 +21,6 @@ export interface LangyPanelWidthBounds {
   /** What a double-click restores. */
   default: number;
 }
-
-/** One arrow press; Shift takes the larger step. */
-export const PANEL_RESIZE_STEP_PX = 16;
-export const PANEL_RESIZE_LARGE_STEP_PX = 64;
 
 const SIDEBAR_MIN_WIDTH = 320;
 const LIMITS = {
@@ -71,7 +69,7 @@ export function clampPanelWidth({
   width: number;
 }): number {
   const { min, max } = resolvePanelWidthBounds({ placement, viewportWidth });
-  return Math.round(Math.min(max, Math.max(min, width)));
+  return clampWidth({ width, min, max });
 }
 
 /** The width to render: the user's stored choice, re-clamped to this viewport, else the default. */
@@ -86,25 +84,6 @@ export function resolvePanelWidth({
 }): number {
   if (stored === undefined) return resolvePanelWidthBounds({ placement, viewportWidth }).default;
   return clampPanelWidth({ placement, viewportWidth, width: stored });
-}
-
-/** The width one keyboard step away from `current`. */
-export function stepPanelWidth({
-  placement,
-  viewportWidth,
-  current,
-  direction,
-  large,
-}: {
-  placement: LangyResizablePlacement;
-  viewportWidth: number;
-  current: number;
-  direction: "wider" | "narrower";
-  large: boolean;
-}): number {
-  const step = large ? PANEL_RESIZE_LARGE_STEP_PX : PANEL_RESIZE_STEP_PX;
-  const delta = direction === "wider" ? step : -step;
-  return clampPanelWidth({ placement, viewportWidth, width: current + delta });
 }
 
 /** Whatever the storage held, reduced to the widths that are usable numbers. */

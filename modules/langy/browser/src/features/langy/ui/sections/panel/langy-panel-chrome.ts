@@ -3,7 +3,6 @@ import {
   FLOATING_PANEL_INSET,
   LANGY_TRANSITION,
   PANEL_LAYOUT_TRANSITION,
-  SIDEBAR_PANEL_WIDTH,
 } from "../../../../../model/langy-panel-layout.ts";
 
 /** How much of the viewport the floating card may claim once its conversation has earned it. */
@@ -24,7 +23,7 @@ const FLOATING_CLOSED = {
 const SIDEBAR_CLOSED = {
   opacity: 0,
   scale: 1,
-  x: SIDEBAR_PANEL_WIDTH,
+  x: "100%",
   y: 0,
   visibility: "hidden",
 } as const;

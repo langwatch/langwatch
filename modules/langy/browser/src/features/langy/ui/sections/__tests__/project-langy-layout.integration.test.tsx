@@ -246,6 +246,7 @@ beforeEach(() => {
     panelMode: "floating",
     dockShellClaims: 0,
     dockShifted: false,
+    panelWidths: {},
   });
   sidecarMounts.count = 0;
   deepLinkReads.count = 0;
@@ -510,6 +511,23 @@ describe("ProjectLangyLayout", () => {
         useLangyStore.getState().closePanel();
       });
       expect(screen.getByTestId("drawer-end-inset").textContent).toBe("0");
+    });
+
+    /** @scenario Dragging the free edge resizes the panel */
+    it("widens the reservation with the dock and publishes the width for the shell", async () => {
+      renderAt("/demo/traces");
+      act(() => {
+        useLangyStore.setState({ panelMode: "sidebar" });
+      });
+      await openLangy();
+      expect(getComputedStyle(dockWrapper() as HTMLElement).paddingRight).toBe("392px");
+
+      act(() => {
+        useLangyStore.getState().setPanelWidth({ placement: "sidebar", width: 480 });
+      });
+
+      expect(getComputedStyle(dockWrapper() as HTMLElement).paddingRight).toBe("480px");
+      expect(useLangyStore.getState().dockWidthPx).toBe(480);
     });
 
     /** @scenario "Closing the dock returns the page to full width" */

@@ -6,9 +6,6 @@ import { LANGY_DOCK_WIDTH_PX } from "@langwatch/langy-contract";
  */
 export const SIDEBAR_PANEL_WIDTH = LANGY_DOCK_WIDTH_PX;
 
-/** What the page reserves for the flush full-height dock (no-shell pages). */
-export const LANGY_DOCKED_OFFSET = SIDEBAR_PANEL_WIDTH;
-
 /**
  * The strip of page ground between the content card and the docked panel when
  * an app shell claims the dock, the gray breathing room that makes the panel

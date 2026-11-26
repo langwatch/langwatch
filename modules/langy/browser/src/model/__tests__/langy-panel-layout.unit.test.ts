@@ -1,4 +1,4 @@
-import { LANGY_SHELL_DOCK_INSET } from "@langwatch/langy-contract";
+import { LANGY_SHELL_DOCK_GUTTER_PX, langyShellDockInset } from "@langwatch/langy-contract";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -8,7 +8,6 @@ import {
   FLOATING_PANEL_MAX_WIDTH,
   INSPECTOR_TUCK,
   LANGY_DOCK_GAP,
-  LANGY_DOCKED_OFFSET,
   resolveFloatingPanelWidth,
   resolveInspectorFrame,
   SIDEBAR_PANEL_WIDTH,
@@ -101,6 +100,8 @@ describe("resolveInspectorFrame", () => {
 
 describe("the room a claiming app shell keeps for the dock", () => {
   it("is the docked panel's width plus the gap between the two cards", () => {
-    expect(LANGY_SHELL_DOCK_INSET).toBe(LANGY_DOCKED_OFFSET + LANGY_DOCK_GAP);
+    expect(LANGY_SHELL_DOCK_GUTTER_PX).toBe(LANGY_DOCK_GAP);
+    expect(langyShellDockInset(SIDEBAR_PANEL_WIDTH)).toBe(SIDEBAR_PANEL_WIDTH + LANGY_DOCK_GAP);
+    expect(langyShellDockInset(480)).toBe(480 + LANGY_DOCK_GAP);
   });
 });

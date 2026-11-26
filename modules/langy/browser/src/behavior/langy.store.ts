@@ -33,7 +33,11 @@ import {
   continuesAskOrigin,
   type LangyAskOrigin,
 } from "../model/langy-ask-origin.ts";
-import type { LangyPanelWidths, LangyResizablePlacement } from "../model/langy-panel-resize.ts";
+import {
+  type LangyPanelWidths,
+  type LangyResizablePlacement,
+  parseStoredPanelWidths,
+} from "../model/langy-panel-resize.ts";
 import type { LangyProgressSample } from "../model/values/langy-turn.ts";
 
 export type {
@@ -901,7 +905,12 @@ export const useLangyStore = defineSlice<LangyState>({
 
     panelWidths: {},
     setPanelWidth: ({ placement, width }) =>
-      set((state) => ({ panelWidths: { ...state.panelWidths, [placement]: Math.round(width) } })),
+      set((state) => ({
+        panelWidths: {
+          ...state.panelWidths,
+          ...parseStoredPanelWidths({ [placement]: Math.round(width) }),
+        },
+      })),
     resetPanelWidth: (placement) =>
       set((state) => {
         const kept = { ...state.panelWidths };
@@ -1151,6 +1160,8 @@ export const useLangyStore = defineSlice<LangyState>({
   // Durable across sessions, so a refresh puts the user back where they were: the panel's
   // open state, its layout, developer mode and WHICH CONVERSATION was open.
   persist: {
+    // Stored widths are cleaned here, once, so renders can trust them.
+    revive: (saved) => ({ ...saved, panelWidths: parseStoredPanelWidths(saved.panelWidths) }),
     partialize: (state) => ({
       isOpen: state.savedOpenBeforeLink ?? state.isOpen,
       devMode: state.devMode,

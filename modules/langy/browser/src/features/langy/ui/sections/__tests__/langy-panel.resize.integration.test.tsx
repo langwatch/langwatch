@@ -1,5 +1,6 @@
 /**
- * The panel's free edge is a drag handle: mouse, keyboard and double-click set its width.
+ * The panel's free edge is a drag handle: mouse, keyboard and double-click set its width,
+ * and a drag is saved once, when it ends.
  * @vitest-environment jsdom
  * Spec: specs/langy/langy-panel-layout.feature
  */
@@ -132,6 +133,7 @@ import {
   type LangyRouteReading,
 } from "../../../../../model/langy-host.ts";
 import { LangyProvider } from "../../../../tools/ui/sections/langy-page-context.tsx";
+import { useLangyDockWidthPx } from "../../../behavior/panel/use-langy-panel-layout.ts";
 import { LangySidecar } from "../langy-panel.tsx";
 
 vi.mock("@langwatch/feature-flag-client", () => ({
@@ -186,8 +188,30 @@ const Wrapper = ({ children }: { children: ReactNode }) => (
   </DesignSystemProvider>
 );
 
+/** The room the page reserves beside the dock; the layout reads the same hook for its padding. */
+function DockRoomProbe() {
+  return <output data-testid="dock-room">{useLangyDockWidthPx()}</output>;
+}
+
 function renderPanel() {
-  return render(<LangySidecar />, { wrapper: Wrapper });
+  return render(
+    <>
+      <LangySidecar />
+      <DockRoomProbe />
+    </>,
+    { wrapper: Wrapper },
+  );
+}
+
+/** How many times the stored widths changed while `act` ran. */
+function storeWrites(act: () => void): number {
+  let writes = 0;
+  const unsubscribe = useLangyStore.subscribe((state, previous) => {
+    if (state.panelWidths !== previous.panelWidths) writes++;
+  });
+  act();
+  unsubscribe();
+  return writes;
 }
 
 const HANDLE = { name: "Resize Langy panel" };
@@ -217,17 +241,37 @@ afterEach(() => {
 
 describe("given the floating Langy panel is open", () => {
   /** @scenario Dragging the free edge resizes the panel */
-  it("grows by the distance the handle is dragged toward the page", async () => {
+  it("grows by the distance the handle is dragged toward the page, saved once on release", async () => {
     renderPanel();
     const handle = await screen.findByRole("separator", HANDLE);
     expect(widthOf(handle)).toBe(432);
 
-    pointer("pointerDown", handle, 600);
-    pointer("pointerMove", handle, 500);
-    pointer("pointerUp", handle, 500);
+    const writes = storeWrites(() => {
+      pointer("pointerDown", handle, 600);
+      pointer("pointerMove", handle, 550);
+      pointer("pointerMove", handle, 500);
+      expect(widthOf(handle)).toBe(532);
+      expect(useLangyStore.getState().panelWidths).toEqual({});
+      pointer("pointerUp", handle, 500);
+    });
 
+    expect(writes).toBe(1);
     expect(widthOf(handle)).toBe(532);
     expect(useLangyStore.getState().panelWidths).toEqual({ floating: 532 });
+  });
+
+  /** @scenario Dragging the free edge resizes the panel */
+  it("grows toward the right when the card has dodged to the left corner", async () => {
+    currentDrawerRef.current = "traceV2Details";
+    renderPanel();
+    const handle = await screen.findByRole("separator", HANDLE);
+
+    pointer("pointerDown", handle, 100);
+    pointer("pointerMove", handle, 160);
+    pointer("pointerUp", handle, 160);
+
+    expect(widthOf(handle)).toBe(492);
+    expect(useLangyStore.getState().panelWidths).toEqual({ floating: 492 });
   });
 
   /** @scenario The width stays within a usable range */
@@ -244,25 +288,26 @@ describe("given the floating Langy panel is open", () => {
   });
 
   /** @scenario The handle resizes from the keyboard */
-  it("steps with the arrow keys, further with Shift", async () => {
+  it("steps with the arrow keys, saving each step", async () => {
     renderPanel();
     const handle = await screen.findByRole("separator", HANDLE);
     expect(handle).toHaveAttribute("aria-orientation", "vertical");
 
     fireEvent.keyDown(handle, { key: "ArrowLeft" });
     expect(widthOf(handle)).toBe(448);
-    fireEvent.keyDown(handle, { key: "ArrowLeft", shiftKey: true });
-    expect(widthOf(handle)).toBe(512);
+    fireEvent.keyDown(handle, { key: "ArrowLeft" });
+    expect(widthOf(handle)).toBe(464);
     fireEvent.keyDown(handle, { key: "ArrowRight" });
-    expect(widthOf(handle)).toBe(496);
+    expect(widthOf(handle)).toBe(448);
+    expect(useLangyStore.getState().panelWidths).toEqual({ floating: 448 });
   });
 
   /** @scenario Double-clicking the handle restores the default width */
   it("returns to the default width on double-click and forgets the choice", async () => {
     renderPanel();
     const handle = await screen.findByRole("separator", HANDLE);
-    fireEvent.keyDown(handle, { key: "ArrowLeft", shiftKey: true });
-    expect(widthOf(handle)).toBe(496);
+    fireEvent.keyDown(handle, { key: "ArrowLeft" });
+    expect(widthOf(handle)).toBe(448);
 
     fireEvent.doubleClick(handle);
 
@@ -281,15 +326,23 @@ describe("given the floating Langy panel is open", () => {
 
 describe("given the docked Langy panel is open", () => {
   /** @scenario Dragging the free edge resizes the panel */
-  it("steps from the dock's own default width", async () => {
+  it("drags from the dock's own default width and the page reservation follows on release", async () => {
     useLangyStore.setState({ panelMode: "sidebar" });
     renderPanel();
     const handle = await screen.findByRole("separator", HANDLE);
     expect(widthOf(handle)).toBe(392);
+    expect(screen.getByTestId("dock-room")).toHaveTextContent("392");
 
-    fireEvent.keyDown(handle, { key: "ArrowLeft", shiftKey: true });
+    const writes = storeWrites(() => {
+      pointer("pointerDown", handle, 600);
+      pointer("pointerMove", handle, 540);
+      pointer("pointerUp", handle, 540);
+    });
 
-    expect(widthOf(handle)).toBe(456);
+    expect(writes).toBe(1);
+    expect(widthOf(handle)).toBe(452);
+    expect(useLangyStore.getState().panelWidths).toEqual({ sidebar: 452 });
+    expect(screen.getByTestId("dock-room")).toHaveTextContent("452");
   });
 });
 

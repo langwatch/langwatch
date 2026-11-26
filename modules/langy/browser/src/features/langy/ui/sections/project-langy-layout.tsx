@@ -93,7 +93,8 @@ function LangyShiftedRoot({ showLangy, children }: { showLangy: boolean; childre
     return () => setDockShifted(false);
   }, [shifted, setDockShifted]);
   // The user can drag the dock wider; the shell reads the width from the store to keep its room.
-  useEffect(() => {
+  // Published before paint so the shell's room never lags the panel by a frame.
+  useLayoutEffect(() => {
     setDockWidthPx(dockWidthPx);
   }, [dockWidthPx, setDockWidthPx]);
   const reservation = dockReservation({ shifted, shellClaimed });

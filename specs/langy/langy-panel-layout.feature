@@ -159,8 +159,15 @@ Feature: Langy panel layout modes
   Scenario: Dragging the free edge resizes the panel
     Given the Langy panel is open in sidebar mode or floating mode
     When I drag the panel's resize handle toward the page
-    Then the panel grows by the distance I dragged
+    Then the panel follows the pointer and grows by the distance I dragged
+    And the width is saved once, when I release the handle
     And the docked sidebar's page reservation follows the new width
+
+  @integration
+  Scenario: A floating card that dodged to the left corner is dragged from its right edge
+    Given a drawer is open and the floating card has moved to the left corner
+    When I drag the card's resize handle toward the page
+    Then the card grows by the distance I dragged
 
   @unit
   Scenario: The width stays within a usable range
@@ -179,7 +186,7 @@ Feature: Langy panel layout modes
   Scenario: The handle resizes from the keyboard
     Given the resize handle has focus
     When I press the arrow key that points toward the page
-    Then the panel grows by one step, and a larger step with Shift
+    Then the panel grows by one step and is saved
     And the arrow key pointing away shrinks it
     And the handle reports its current, minimum and maximum width as a separator
 

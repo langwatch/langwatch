@@ -210,15 +210,12 @@ export interface LangySliceSurface {
   releaseDockShell: () => void;
 }
 
-/**
- * The room a claiming app shell keeps right of its content card while the dock is open:
- * the docked panel's width plus the strip of page ground between the two cards.
- */
-export const LANGY_SHELL_DOCK_INSET = 392 + 12;
+/** The strip of page ground between the shell's content card and the docked panel. */
+export const LANGY_SHELL_DOCK_GUTTER_PX = 12;
 
-/** The shell's reserved room for a dock of this width: the width plus the page-ground strip. */
+/** The room a claiming app shell keeps right of its content card for a dock of this width. */
 export function langyShellDockInset(dockWidthPx: number): number {
-  return dockWidthPx + (LANGY_SHELL_DOCK_INSET - LANGY_DOCK_WIDTH_PX);
+  return dockWidthPx + LANGY_SHELL_DOCK_GUTTER_PX;
 }
 
 /**

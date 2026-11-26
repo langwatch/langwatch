@@ -1,13 +1,14 @@
 import { Box, chakra } from "@langwatch/design-system/primitives";
+import { ResizeHandle } from "@langwatch/design-system/resize-handle";
 import { motion } from "motion/react";
-import { type ComponentProps, type ReactNode, type RefObject } from "react";
+import { type ComponentProps, type ReactNode, type RefObject, useEffect, useState } from "react";
 
 import { useLangyStore } from "../../../../../behavior/langy.store.ts";
+import { resolvePanelWidthBounds } from "../../../../../model/langy-panel-resize.ts";
 import {
   FLOATING_PEEK_NEAR_PX,
   SIDEBAR_PEEK_NEAR_PX,
 } from "../../../../../model/langy-peek-dock.ts";
-import { LangyResizeHandle } from "../../../../../ui/elements/langy-resize-handle.tsx";
 import { LangyWave } from "../../../../../ui/elements/langy-wave.tsx";
 import { PANEL_ROOT_ATTR } from "../../../../composer/model/composer-morph-geometry.ts";
 import type { useLangyContextDropZone } from "../../../../context-target/behavior/use-langy-context-drop-zone.ts";
@@ -15,7 +16,6 @@ import type {
   useLangyPanelPeek,
   useLangyPanelPlacement,
 } from "../../../behavior/panel/use-langy-panel-layout.ts";
-import { useLangyPanelResize } from "../../../behavior/panel/use-langy-panel-resize.ts";
 import type { useLangyExternalLinkGuard } from "../use-langy-external-link-guard.ts";
 import {
   panelMotionState,
@@ -87,13 +87,23 @@ export function LangyPanelFrame({
   const markPanelShown = useLangyStore((s) => s.markPanelShown);
   // The free edge is the one facing the page: left, unless the card dodged to the left corner.
   const edge = placement.floatingDodgesDrawer ? "right" : "left";
-  const resize = useLangyPanelResize({
-    placement: floating ? "floating" : "sidebar",
-    edge,
-    widthPx: placement.panelWidthPx,
+  const sizing = floating ? "floating" : "sidebar";
+  const resizable = isOpen && !peek.peeking && !isDrawerCompanion;
+  const setPanelWidth = useLangyStore((s) => s.setPanelWidth);
+  const resetPanelWidth = useLangyStore((s) => s.resetPanelWidth);
+  const bounds = resolvePanelWidthBounds({
+    placement: sizing,
     viewportWidth: placement.viewportWidth,
   });
-  const resizable = isOpen && !peek.peeking && !isDrawerCompanion;
+  // A drag follows the pointer in local state and is saved once, when it ends.
+  const [resizing, setResizing] = useState(false);
+  const [dragWidth, setDragWidth] = useState<number | null>(null);
+  useEffect(() => {
+    if (resizable) return;
+    setResizing(false);
+    setDragWidth(null);
+  }, [resizable]);
+  const widthPx = resizable && dragWidth !== null ? dragWidth : placement.panelWidthPx;
   return (
     <MotionBox
       ref={panelRef}
@@ -101,9 +111,9 @@ export function LangyPanelFrame({
       {...guardProps}
       className="langy-root"
       // A drag moves the panel's own edge; the spring would trail the pointer.
-      layout={resize.resizing ? false : "position"}
+      layout={resizing ? false : "position"}
       position="fixed"
-      width={`${placement.panelWidthPx}px`}
+      width={`${widthPx}px`}
       zIndex={isDrawerCompanion ? 1600 : 1200}
       background={isDrawerCompanion ? "bg.card/80" : "bg.card"}
       borderStyle="solid"
@@ -134,7 +144,7 @@ export function LangyPanelFrame({
       onAnimationComplete={() => {
         if (isOpen) markPanelShown();
       }}
-      css={panelSizeCss({ floating, reduceMotion, resizing: resize.resizing })}
+      css={panelSizeCss({ floating, reduceMotion, resizing })}
       {...panelPlacementChrome({
         floating,
         isDrawerCompanion,
@@ -144,7 +154,22 @@ export function LangyPanelFrame({
       })}
     >
       {resizable ? (
-        <LangyResizeHandle edge={edge} active={resize.resizing} {...resize.handleProps} />
+        <ResizeHandle
+          label="Resize Langy panel"
+          edge={edge}
+          value={widthPx}
+          min={bounds.min}
+          max={bounds.max}
+          onChange={(width) =>
+            resizing ? setDragWidth(width) : setPanelWidth({ placement: sizing, width })
+          }
+          onDraggingChange={setResizing}
+          onDragEnd={(width) => {
+            setPanelWidth({ placement: sizing, width });
+            setDragWidth(null);
+          }}
+          onReset={() => resetPanelWidth(sizing)}
+        />
       ) : null}
       {children}
     </MotionBox>

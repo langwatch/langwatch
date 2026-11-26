@@ -2,12 +2,9 @@ import { describe, expect, it } from "vitest";
 
 import {
   clampPanelWidth,
-  PANEL_RESIZE_LARGE_STEP_PX,
-  PANEL_RESIZE_STEP_PX,
   parseStoredPanelWidths,
   resolvePanelWidth,
   resolvePanelWidthBounds,
-  stepPanelWidth,
 } from "../langy-panel-resize.ts";
 
 /** @scenario The width stays within a usable range */
@@ -63,26 +60,6 @@ describe("resolvePanelWidth", () => {
     expect(resolvePanelWidth({ placement: "floating", viewportWidth: 1_440, stored })).toBe(700);
     expect(resolvePanelWidth({ placement: "floating", viewportWidth: 800, stored })).toBe(480);
     expect(stored).toBe(700);
-  });
-});
-
-describe("stepPanelWidth", () => {
-  const base = { placement: "sidebar", viewportWidth: 1_440, current: 400 } as const;
-
-  it("moves one step, or a large step", () => {
-    expect(stepPanelWidth({ ...base, direction: "wider", large: false })).toBe(
-      400 + PANEL_RESIZE_STEP_PX,
-    );
-    expect(stepPanelWidth({ ...base, direction: "narrower", large: true })).toBe(
-      400 - PANEL_RESIZE_LARGE_STEP_PX,
-    );
-  });
-
-  it("stays inside the bounds", () => {
-    expect(stepPanelWidth({ ...base, current: 640, direction: "wider", large: true })).toBe(640);
-    expect(stepPanelWidth({ ...base, current: 320, direction: "narrower", large: false })).toBe(
-      320,
-    );
   });
 });
 

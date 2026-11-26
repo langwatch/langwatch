@@ -12,7 +12,8 @@ import { useLangyStore } from "./behavior/langy/langy.store.ts";
 
 function LangyDockRoom({ render }: { render: (inset: number) => ReactNode }) {
   const dockShifted = useLangyStore((store) => store.dockShifted);
-  const dockInset = langyShellDockInset(useLangyStore((store) => store.dockWidthPx));
+  const dockWidthPx = useLangyStore((store) => store.dockWidthPx);
+  const dockInset = langyShellDockInset(dockWidthPx);
   const claimDockShell = useLangyStore((store) => store.claimDockShell);
   const releaseDockShell = useLangyStore((store) => store.releaseDockShell);
   useLayoutEffect(() => {

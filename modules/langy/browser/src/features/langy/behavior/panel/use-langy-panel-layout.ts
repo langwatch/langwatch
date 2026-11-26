@@ -13,7 +13,6 @@ import {
 } from "../../../../model/langy-panel-layout.ts";
 import {
   type LangyResizablePlacement,
-  parseStoredPanelWidths,
   resolvePanelWidth,
 } from "../../../../model/langy-panel-resize.ts";
 import { type LangyPeekPhase, resolvePeekTranslate } from "../../../../model/langy-peek-dock.ts";
@@ -42,7 +41,7 @@ function useResolvedPanelWidth({
   return resolvePanelWidth({
     placement,
     viewportWidth,
-    stored: parseStoredPanelWidths(stored)[placement],
+    stored: stored[placement],
   });
 }
 
