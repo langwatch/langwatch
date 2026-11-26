@@ -121,6 +121,7 @@ const SIMULATION_KEYS = [
   "command:recordEvaluations",
   "command:recordHooks",
   "command:recordRedTeamReport",
+  "command:refreshMetadata",
   "command:startRun",
   "command:textMessageEnd",
   "command:textMessageStart",

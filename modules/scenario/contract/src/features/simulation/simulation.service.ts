@@ -3,6 +3,7 @@ import type {
   SimulationDeleteRun,
   SimulationRecordAgentInstance,
   SimulationRecordCutAtLimit,
+  SimulationRefreshMetadata,
   SimulationRecordHooks,
   SimulationRecordRedTeamReport,
   SimulationFinishRun,
@@ -178,6 +179,7 @@ export abstract class SimulationService {
   abstract deleteRun(input: SimulationDeleteRun): Promise<void>;
   abstract recordAgentInstance(input: SimulationRecordAgentInstance): Promise<void>;
   abstract recordCutAtLimit(input: SimulationRecordCutAtLimit): Promise<void>;
+  abstract refreshMetadata(input: SimulationRefreshMetadata): Promise<void>;
   abstract recordHooks(input: SimulationRecordHooks): Promise<void>;
   abstract recordRedTeamReport(input: SimulationRecordRedTeamReport): Promise<void>;
 }

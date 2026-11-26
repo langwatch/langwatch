@@ -27,6 +27,7 @@ import {
   SimulationRunAgentInstanceRecordedEventSchema,
   SimulationRunCutAtLimitRecordedEventSchema,
   SimulationRunHooksRecordedEventSchema,
+  SimulationRunMetadataRefreshedEventSchema,
   SimulationRunRedTeamReportRecordedEventSchema,
   SimulationRunDeletedEventSchema,
   SimulationSetArchivedEventSchema,
@@ -134,6 +135,7 @@ function buildSimulationProcessingPipelineDefinition(
       SimulationRunAgentInstanceRecordedEventSchema,
       SimulationRunCutAtLimitRecordedEventSchema,
       SimulationRunHooksRecordedEventSchema,
+      SimulationRunMetadataRefreshedEventSchema,
       SimulationRunRedTeamReportRecordedEventSchema,
       SimulationRunDeletedEventSchema,
       SimulationSetArchivedEventSchema,
@@ -197,6 +199,7 @@ function buildSimulationProcessingPipelineDefinition(
     .withCommand("recordAgentInstance", commands.recordAgentInstance)
     .withCommand("recordCutAtLimit", commands.recordCutAtLimit)
     .withCommand("recordHooks", commands.recordHooks)
+    .withCommand("refreshMetadata", commands.refreshMetadata)
     .withCommand("recordRedTeamReport", commands.recordRedTeamReport)
     .withCommandInstance({
       name: "computeRunMetrics",

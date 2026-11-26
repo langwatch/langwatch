@@ -6,12 +6,14 @@
 import { createTenantId, type Event, type EventSubscriberDefinition } from "@langwatch/eventing";
 import {
   SCENARIO_EVALUATIONS_JOB,
+  SIMULATION_PROCESSING_EVENT_TYPES,
   type RunScenarioEvaluationsDeps,
 } from "@langwatch/scenario-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { SPAN_RECEIVED_EVENT_TYPE, type TraceSummaryData } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 
+import { SimulationCommandDispatcherService } from "../../features/simulation/services/simulation-command-dispatcher.service.ts";
 import { ComputeRunMetricsCommand } from "../compute-run-metrics.commands.ts";
 import { FinishRunCommand } from "../finish-run.commands.ts";
 import { QueueRunCommand } from "../queue-run.commands.ts";
@@ -117,6 +119,30 @@ describe("the simulation processing pipeline", () => {
       expect(names).toContain("finishRun");
       expect(names).toContain("recordEvaluations");
       expect([...pipeline.processManagers.keys()]).toContain(SCENARIO_EVALUATIONS_PROCESS_NAME);
+    });
+    it("registers a sender for every write the command dispatcher sends", async () => {
+      const registered = build().commands.map((command) => command.definition.name);
+      const dispatcher = SimulationCommandDispatcherService.create();
+      dispatcher.connect(
+        Object.fromEntries(registered.map((name) => [name, { send: async () => undefined }])),
+      );
+      const writes = Object.getOwnPropertyNames(
+        SimulationCommandDispatcherService.prototype,
+      ).filter((name) => name !== "constructor" && name !== "connect");
+      const unregistered: string[] = [];
+      for (const write of writes) {
+        const method: unknown = Reflect.get(dispatcher, write);
+        if (typeof method !== "function") continue;
+        await Promise.resolve(Reflect.apply(method, dispatcher, [{}])).catch(() =>
+          unregistered.push(write),
+        );
+      }
+      expect(writes).toContain("refreshMetadata");
+      expect(unregistered).toEqual([]);
+    });
+    it("declares every simulation_processing event type", () => {
+      const declared = [...build().eventSchemas.keys()];
+      expect(declared).toEqual(expect.arrayContaining([...SIMULATION_PROCESSING_EVENT_TYPES]));
     });
 
     /** @scenario "Trace data that has not arrived yet is retried with a growing delay" */

@@ -122,6 +122,11 @@ export interface VoiceSessionInfrastructure {
     record: CallRecord;
     scenario: { scenarioId: string; scenarioSetId: string };
     turnTraceIds: readonly string[];
+    /** True when this write is a retry completing a half-written run (#7973
+     *  AC2). The first attempt's started event already set the metadata and is
+     *  first-wins, so this attempt's source / audioUrl / cutoff reach the run
+     *  through a refresh event instead (#8032). */
+    isRedrive?: boolean;
   }): Promise<void>;
   /** Asks the Free run cap before a fresh "Call it myself" run is written, and counts it.
    *  Throws `LimitExceededError` (`scenarioRuns`) past the cap. */
@@ -441,6 +446,9 @@ async function finishVoiceSession(
     record,
     turnTraceIds,
     scenario: scenarioContext,
+    // A half-written run already present means this is the retry completing it; its
+    // metadata reaches the run through a refresh event, as started is first-wins.
+    isRedrive: Boolean(existing),
   });
 
   return {
