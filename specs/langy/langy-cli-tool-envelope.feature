@@ -127,18 +127,18 @@ Feature: Langy recognises its own CLI behind a shell tool call
       Then the card shows the platform's sentence naming the seat
       And it tells the reader to ask whoever manages seats, not for a permission
 
-    # The sandbox's `gh` has no login when the GitHub App is not installed, and
-    # it says so in its own words: "To get started with GitHub CLI, please run:
+    # The sandbox's `gh` has no login when Langy has no GitHub access, and it
+    # says so in its own words: "To get started with GitHub CLI, please run:
     # gh auth login". That is a shell the customer cannot reach. The manager's
-    # gate names the same condition, but it reads settled frames, so this card
-    # is already on screen by the time the turn stops.
+    # gate stops the turn on the same call, and the turn's GitHub connect card
+    # says what to do, so the step only records that GitHub was missing.
     @unit
     Scenario: The sandbox's own gh never tells the customer to log in
       When Langy's sandbox tool call fails because gh has no login
-      Then the card says the LangWatch GitHub App is not installed
-      And the card carries the code for a missing GitHub App
-      And the card points at Settings, under Integrations
-      And the card never repeats the instruction to run gh auth login
+      Then the step says Langy has no GitHub access here
+      And the step carries the code for a missing GitHub connection
+      And the step names no fix of its own, since the connect card owns it
+      And the step never repeats the instruction to run gh auth login
 
     @unit
     Scenario: The developer's own gh keeps its own instruction
