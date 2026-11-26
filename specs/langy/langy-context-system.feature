@@ -63,6 +63,48 @@ Feature: Langy captures what I am viewing as turn context
     And the add-context control offers no dashboard chip
 
   @integration
+  Scenario: A new board not yet stored offers no board as context
+    Given I am on a new dashboard that holds nothing yet
+    Then the composer shows no dashboard chip
+
+  @integration
+  Scenario: A board opened in the organization's Dashboards area attaches itself too
+    Given I am viewing a dashboard at its Dashboards address, outside any project
+    Then the composer already shows a context chip for that dashboard
+
+  @integration
+  Scenario: A board the page names attaches itself even when the address does not
+    Given the board on screen tells Langy which board it is
+    And the address names no board
+    Then the composer already shows the board's chip
+
+  @integration
+  Scenario: A removed board chip comes back when I return to that board
+    Given I removed the chip of the dashboard I was viewing
+    When I go to another page and come back to that dashboard
+    Then the composer shows the dashboard chip again
+    And while I stay on the dashboard after removing it, the chip stays removed
+
+  @unit
+  Scenario: Langy reads the board on screen as the place a chart goes
+    Given the turn carries the dashboard I am viewing
+    When Langy's context is written
+    Then it names that dashboard as the board a chart I ask for goes on
+    And it says a separate board is for when I name one
+
+  @e2e
+  Scenario: A chart asked for on a board lands on that board
+    Given I am on the board "Usage"
+    When I say "ok now another dashboard, I want a weekly burndown chart of tokens"
+    Then Langy adds a widget to "Usage" or asks which board I mean
+    And no new board is made without my say
+
+  @e2e
+  Scenario: Asking for a new dashboard makes one
+    When I say "create a new dashboard called Weekly usage"
+    Then Langy makes a board named "Weekly usage"
+
+  @integration
   Scenario: A context chip can be removed
     Given the composer shows a context chip for a trace
     When I remove the trace chip

@@ -85,6 +85,29 @@ describe("renderLangyTurnContext - the live UI-action line", () => {
   });
 });
 
+describe("renderLangyTurnContext - the board on screen", () => {
+  /** @scenario "Langy reads the board on screen as the place a chart goes" */
+  it("names the board as where a chart goes, and a separate board as the user's call", () => {
+    const block = renderLangyTurnContext({
+      context: {
+        pageContext: [
+          {
+            kind: "dashboard",
+            ref: 'dashboard "How many tokens" (id dash_42)',
+            label: "dashboard: How many tokens · 30d · 1d",
+          },
+        ],
+      },
+      isUiActionSurfaceOpen: false,
+    });
+
+    expect(block).toContain("the dashboard they are on");
+    expect(block).toContain("a chart they ask for here goes on it");
+    expect(block).toContain("unless they name a separate board");
+    expect(block).toContain("dash_42");
+  });
+});
+
 describe("the daily-insights skill, which a scheduled run's brief names", () => {
   describe("given the skills a turn withholds from the model", () => {
     /** @scenario "The daily-insights skill is never withheld from a turn" */

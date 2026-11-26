@@ -30,6 +30,7 @@ import { NurturingMemberFactsService } from "../nurturing-member-facts.service.t
 import { NoCustomerIoChannelError } from "../nurturing-plan-sync.service.ts";
 import { NurturingService } from "../nurturing.service.ts";
 import { memberCopyOf } from "./nurturing-member-facts.test-helpers.ts";
+import { peopleWithEmails } from "./nurturing-person-email.test-helpers.ts";
 
 /** Customer.io over a recording fetch: each accepted request's batch, and the refused ones. */
 function recordingCustomerIo() {
@@ -45,6 +46,7 @@ function recordingCustomerIo() {
     return new Response(null, { status: 200 });
   });
   const service = NurturingService.create({
+    users: peopleWithEmails(),
     channel: HttpCustomerIoChannel.create({
       config: { customerIoApiKey: "key", customerIoRegion: "us" },
       fetchFn,
@@ -129,14 +131,14 @@ async function liveRequestsOf(
   return cio;
 }
 
-/** Every request a fact sends for a plan: the admin's group call, then both members. */
+/** Every request a fact sends for a plan: the admin's group call, then both members, with their emails. */
 const requestsFor = ({ plan, hasSubscription }: { plan: string; hasSubscription: boolean }) => {
   const traits = { has_subscription: hasSubscription, plan };
   return [
     [{ type: "group", userId: "admin-1", groupId: "org-1", traits: { plan } }],
     [
-      { type: "identify", userId: "user-1", traits },
-      { type: "identify", userId: "user-2", traits },
+      { type: "identify", userId: "user-1", traits: { ...traits, email: "user-1@example.com" } },
+      { type: "identify", userId: "user-2", traits: { ...traits, email: "user-2@example.com" } },
     ],
   ];
 };
@@ -174,7 +176,7 @@ describe("NurturingDeliveryService, delivering billing's subscription_changed fa
 
       const { sent } = await liveRequestsOf(subscriptionChangedFactFixture(), members);
 
-      const traits = { has_subscription: true, plan: "launch" };
+      const traits = { has_subscription: true, plan: "launch", email: "user-1@example.com" };
       expect(sent).toEqual([
         [{ type: "group", userId: "admin-1", groupId: "org-1", traits: { plan: "launch" } }],
         [{ type: "identify", userId: "user-1", traits }],
@@ -194,7 +196,7 @@ describe("NurturingDeliveryService, delivering billing's subscription_changed fa
         erasedUsers,
       );
 
-      const traits = { has_subscription: true, plan: "launch" };
+      const traits = { has_subscription: true, plan: "launch", email: "user-1@example.com" };
       expect(sent).toEqual([
         [{ type: "group", userId: "admin-1", groupId: "org-1", traits: { plan: "launch" } }],
         [{ type: "identify", userId: "user-1", traits }],
@@ -311,8 +313,16 @@ describe("NurturingDeliveryService, delivering billing's subscription_changed fa
 
       expect(sent).toEqual([
         [
-          { type: "identify", userId: "user-1", traits: { has_subscription: true } },
-          { type: "identify", userId: "user-2", traits: { has_subscription: true } },
+          {
+            type: "identify",
+            userId: "user-1",
+            traits: { has_subscription: true, email: "user-1@example.com" },
+          },
+          {
+            type: "identify",
+            userId: "user-2",
+            traits: { has_subscription: true, email: "user-2@example.com" },
+          },
         ],
       ]);
     });

@@ -1,7 +1,6 @@
 import type { InstanceIdentity, PrismaClient } from "@langwatch/prisma-client/generated";
 import { fromDate, type Instant, toDate } from "@langwatch/time";
 
-import { isUniqueViolation } from "../../rules/issued-license.rules.ts";
 import type {
   InstanceIdentityRecord,
   InstanceIdentityRepository,
@@ -77,9 +76,8 @@ export class PrismaInstanceIdentityRepository implements InstanceIdentityReposit
   }
 
   /**
-   * An upsert on the fixed key. Prisma does not always run it as one native
-   * `ON CONFLICT` statement, so a racing first write that loses the insert
-   * updates the row the winner created.
+   * Prisma's upsert reads, then inserts, so a racing first write can lose the primary key with
+   * P2002. The row then exists, and the second attempt takes the update branch.
    */
   private async upsertRow({
     instanceIdIfMissing,
@@ -88,15 +86,17 @@ export class PrismaInstanceIdentityRepository implements InstanceIdentityReposit
     instanceIdIfMissing: string;
     data: RowWrite;
   }): Promise<void> {
-    try {
-      await this.prisma.instanceIdentity.upsert({
+    const upsert = () =>
+      this.prisma.instanceIdentity.upsert({
         where: { id: ROW_ID },
         create: { id: ROW_ID, instanceId: instanceIdIfMissing, ...data },
         update: data,
       });
+    try {
+      await upsert();
     } catch (error) {
-      if (!isUniqueViolation(error)) throw error;
-      await this.prisma.instanceIdentity.update({ where: { id: ROW_ID }, data });
+      if ((error as { code?: unknown } | null)?.code !== "P2002") throw error;
+      await upsert();
     }
   }
 }

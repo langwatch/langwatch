@@ -81,7 +81,7 @@ describe("the log level services start at", () => {
         logsDir,
       });
 
-      const file = join(logsDir, "prepare:langevals.log");
+      const file = join(logsDir, "prepare-langevals.log");
       await expect
         .poll(() => readFileSync(file, "utf8"))
         .toBe("Resolved 212 packages\nInstalled 3\n");

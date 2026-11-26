@@ -9,7 +9,7 @@ Feature: PR token usage comment
   The workflow only reads and comments: it never gates a merge.
 
   Background:
-    Given the pr-token-usage workflow runs on pull_request events
+    Given the pr workflow's checks job runs the usage comment on pull_request events
     And it identifies its own comment by the hidden marker "<!-- pr-token-usage -->"
 
   Scenario: A comment is posted when usage exists for the pull request
