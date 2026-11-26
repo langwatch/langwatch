@@ -17,6 +17,12 @@ import type { TraceApi } from "@langwatch/trace-contract";
 
 import { pageOf, rangeOf } from "../rules/staff-access-function.rules.ts";
 import { isoText } from "../rules/staff-access.rules.ts";
+import type { StaffAccessActivityFunctionReadsService } from "./staff-access-activity-function-reads.service.ts";
+import type { StaffAccessBillingFunctionReadsService } from "./staff-access-billing-function-reads.service.ts";
+import type { StaffAccessLangyFunctionReadsService } from "./staff-access-langy-function-reads.service.ts";
+import type { StaffAccessPeopleFunctionReadsService } from "./staff-access-people-function-reads.service.ts";
+import type { StaffAccessPlatformFunctionReadsService } from "./staff-access-platform-function-reads.service.ts";
+import type { StaffAccessTelemetryFunctionReadsService } from "./staff-access-telemetry-function-reads.service.ts";
 
 type ReadsDeps = Readonly<{
   organizations: Pick<OrganizationApi, "listProvisioningSummaries" | "getOpsSnapshot">;
@@ -28,20 +34,31 @@ type ReadsDeps = Readonly<{
   apiKeys: Pick<ApiKeyApi, "findKeyFactsForOrganization">;
   ops: Pick<OpsApi, "countQueueGroupsForTenants">;
   auth: Pick<AuthApi, "findSignInFacts">;
+  telemetry: Pick<StaffAccessTelemetryFunctionReadsService, "reads">;
+  langy: Pick<StaffAccessLangyFunctionReadsService, "reads">;
+  people: Pick<StaffAccessPeopleFunctionReadsService, "reads">;
+  activity: Pick<StaffAccessActivityFunctionReadsService, "reads">;
+  platform: Pick<StaffAccessPlatformFunctionReadsService, "reads">;
+  billing: Pick<StaffAccessBillingFunctionReadsService, "reads">;
 }>;
 
-type Run<Name extends StaffAccessFunctionName> = (input: {
+/** One function's read: `organizationId` is the approved organization, empty off `org` scope. */
+export type StaffAccessFunctionRun<Name extends StaffAccessFunctionName> = (input: {
   input: StaffAccessFunctionInput<Name>;
   organizationId: string;
   at: Instant;
 }) => Promise<StaffAccessFunctionOutput<Name>>;
+export type StaffAccessFunctionRuns<Names extends StaffAccessFunctionName> = {
+  [Name in Names]: StaffAccessFunctionRun<Name>;
+};
+type Run<Name extends StaffAccessFunctionName> = StaffAccessFunctionRun<Name>;
 
 /**
  * Each ops function's read, through the owning module's `*Api` (ARCHITECTURE.md §3): staff
  * access reads no other module's tables. An `org` function reads only the approved organization.
  */
 export class StaffAccessFunctionReadsService {
-  private readonly reads: { [Name in StaffAccessFunctionName]: Run<Name> };
+  private readonly reads: StaffAccessFunctionRuns<StaffAccessFunctionName>;
 
   private constructor(private readonly deps: ReadsDeps) {
     this.reads = {
@@ -54,6 +71,12 @@ export class StaffAccessFunctionReadsService {
       "org.usage_limits": (call) => this.usageLimits(call),
       "org.api_keys": (call) => this.apiKeys(call),
       "queues.tenant": (call) => this.tenantQueues(call),
+      ...deps.telemetry.reads,
+      ...deps.langy.reads,
+      ...deps.people.reads,
+      ...deps.activity.reads,
+      ...deps.platform.reads,
+      ...deps.billing.reads,
     };
   }
 

@@ -46,16 +46,22 @@ import { TraceApi } from "@langwatch/trace-contract";
 import { UserApi } from "@langwatch/user-contract";
 
 import type { StaffAccessRepositories } from "../repositories/staff-access.repositories.ts";
+import { StaffAccessActivityFunctionReadsService } from "../services/staff-access-activity-function-reads.service.ts";
 import { StaffAccessAvailabilityService } from "../services/staff-access-availability.service.ts";
+import { StaffAccessBillingFunctionReadsService } from "../services/staff-access-billing-function-reads.service.ts";
 import { StaffAccessDoorService } from "../services/staff-access-door.service.ts";
 import { StaffAccessFunctionReadsService } from "../services/staff-access-function-reads.service.ts";
 import { StaffAccessFunctionService } from "../services/staff-access-function.service.ts";
 import { StaffAccessGateService } from "../services/staff-access-gate.service.ts";
+import { StaffAccessLangyFunctionReadsService } from "../services/staff-access-langy-function-reads.service.ts";
 import { StaffAccessNoticeService } from "../services/staff-access-notice.service.ts";
 import { StaffAccessOpsReadService } from "../services/staff-access-ops-read.service.ts";
+import { StaffAccessPeopleFunctionReadsService } from "../services/staff-access-people-function-reads.service.ts";
+import { StaffAccessPlatformFunctionReadsService } from "../services/staff-access-platform-function-reads.service.ts";
 import { StaffAccessRequestService } from "../services/staff-access-request.service.ts";
 import { StaffAccessRequesterService } from "../services/staff-access-requester.service.ts";
 import { StaffAccessSessionService } from "../services/staff-access-session.service.ts";
+import { StaffAccessTelemetryFunctionReadsService } from "../services/staff-access-telemetry-function-reads.service.ts";
 
 type StaffAccessSetup = FeatureSetup<
   typeof StaffAccessModule.dependencies,
@@ -178,6 +184,12 @@ export class StaffAccessModule implements StaffAccessApiContract {
         apiKeys: dependencies.apiKeys,
         ops: dependencies.ops,
         auth: dependencies.auth,
+        telemetry: StaffAccessTelemetryFunctionReadsService.create({}),
+        langy: StaffAccessLangyFunctionReadsService.create({}),
+        people: StaffAccessPeopleFunctionReadsService.create({}),
+        activity: StaffAccessActivityFunctionReadsService.create({}),
+        platform: StaffAccessPlatformFunctionReadsService.create({}),
+        billing: StaffAccessBillingFunctionReadsService.create({}),
       }),
       now,
     });
