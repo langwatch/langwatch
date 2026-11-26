@@ -27,7 +27,7 @@ const {
   mockQueryInstantEvalSpendTotal,
   mockQueryPiiRedactionSpendTotal,
   mockConnectedUsageCeiling,
-  mockSubscriptionCarriesPrice,
+  mockSubscriptionPriceLine,
   mockLogger,
 } = vi.hoisted(() => {
   const reportUsageDeltaFn = vi.fn();
@@ -54,7 +54,7 @@ const {
   };
 
   const connectedUsageCeilingFn = vi.fn(async () => null);
-  const subscriptionCarriesPriceFn =
+  const subscriptionPriceLineFn =
     vi.fn<
       (input: {
         stripeCustomerId: string;
@@ -81,7 +81,7 @@ const {
     mockQueryInstantEvalSpendTotal: queryInstantEvalSpendTotalFn,
     mockQueryPiiRedactionSpendTotal: queryPiiRedactionSpendTotalFn,
     mockConnectedUsageCeiling: connectedUsageCeilingFn,
-    mockSubscriptionCarriesPrice: subscriptionCarriesPriceFn,
+    mockSubscriptionPriceLine: subscriptionPriceLineFn,
     mockLogger: loggerInstance,
   };
 });
@@ -121,7 +121,7 @@ let instantEvalMeterProvisioned = true;
 let piiRedactionMeterProvisioned = true;
 /** The prices the customer's subscription has no line on; every other price it carries. */
 let missingPrices: string[] = [];
-/** A line with no creation time: priced, and the month keeps its other bounds. */
+/** A priced line that carries no read start, so the month keeps its other bounds. */
 const CARRIED: PriceLine = { carried: true, addedAtMs: null };
 const lineFor = (carried: boolean): PriceLine => (carried ? CARRIED : { carried: false });
 
@@ -212,7 +212,7 @@ async function createHandler({
     isInstantEvalMeterProvisioned: () => instantEvalMeterProvisioned,
     queryPiiRedactionSpendTotal: mockQueryPiiRedactionSpendTotal,
     isPiiRedactionMeterProvisioned: () => piiRedactionMeterProvisioned,
-    subscriptionPriceLine: mockSubscriptionCarriesPrice,
+    subscriptionPriceLine: mockSubscriptionPriceLine,
     selfDispatch: mockSelfDispatch,
     organizationCache: missingOrganizationCache,
     errorReporter: errorReporter as any,
@@ -271,7 +271,7 @@ function resetMocks() {
   mockQueryInstantEvalSpendTotal.mockResolvedValue({ outcome: "unavailable" });
   mockQueryPiiRedactionSpendTotal.mockResolvedValue({ outcome: "unavailable" });
   missingPrices = [];
-  mockSubscriptionCarriesPrice.mockImplementation(async ({ price }) =>
+  mockSubscriptionPriceLine.mockImplementation(async ({ price }) =>
     lineFor(!missingPrices.includes(price)),
   );
 }
@@ -729,7 +729,7 @@ describe("ReportUsageForMonthCommand", () => {
       await handler.handle(makeCommand());
 
       expect(mockReportUsageDelta).not.toHaveBeenCalled();
-      expect(mockSubscriptionCarriesPrice).toHaveBeenCalledWith({
+      expect(mockSubscriptionPriceLine).toHaveBeenCalledWith({
         stripeCustomerId: "cus_123",
         price: "GROWTH_INSTANT_EVAL_USD",
         billingMonth: "2026-02",
@@ -792,7 +792,7 @@ describe("ReportUsageForMonthCommand", () => {
       const handler = await createHandler();
 
       await handler.handle(makeCommand());
-      mockSubscriptionCarriesPrice.mockResolvedValue({ carried: true, addedAtMs: lineAddedAtMs });
+      mockSubscriptionPriceLine.mockResolvedValue({ carried: true, addedAtMs: lineAddedAtMs });
       await handler.handle(makeCommand());
 
       expect(mockQueryInstantEvalSpendTotal).toHaveBeenLastCalledWith({
@@ -814,7 +814,7 @@ describe("ReportUsageForMonthCommand", () => {
     it("sends no Instant Eval event and leaves its checkpoint alone", async () => {
       // A euro subscription's lines; the Instant Evals price is in dollars, so it is never one.
       const euroLines = ["GROWTH_SEAT_EUR_MONTHLY", "GROWTH_EVENTS_EUR_MONTHLY"];
-      mockSubscriptionCarriesPrice.mockImplementation(async ({ price }) =>
+      mockSubscriptionPriceLine.mockImplementation(async ({ price }) =>
         lineFor(euroLines.includes(price)),
       );
       mockOrganizations.getOrganizationForBilling.mockResolvedValue(usageBilledOrg());
@@ -826,7 +826,7 @@ describe("ReportUsageForMonthCommand", () => {
 
       await handler.handle(makeCommand());
 
-      expect(mockSubscriptionCarriesPrice).toHaveBeenCalledWith({
+      expect(mockSubscriptionPriceLine).toHaveBeenCalledWith({
         stripeCustomerId: "cus_123",
         price: "GROWTH_INSTANT_EVAL_USD",
         billingMonth: "2026-02",
@@ -850,7 +850,7 @@ describe("ReportUsageForMonthCommand", () => {
 
       await handler.handle(makeCommand());
 
-      expect(mockSubscriptionCarriesPrice).toHaveBeenCalledWith({
+      expect(mockSubscriptionPriceLine).toHaveBeenCalledWith({
         stripeCustomerId: "cus_123",
         price: "GROWTH_INSTANT_EVAL_USD",
         billingMonth: "2026-02",
@@ -878,7 +878,7 @@ describe("ReportUsageForMonthCommand", () => {
   describe("given a subscription whose Instant Evals price cannot be read", () => {
     /** @scenario "A subscription that cannot be read holds the Instant Eval usage and retries" */
     it("sends no Instant Eval event, leaves its checkpoint alone and schedules another report", async () => {
-      mockSubscriptionCarriesPrice.mockImplementation(async ({ price }) => {
+      mockSubscriptionPriceLine.mockImplementation(async ({ price }) => {
         if (price === "GROWTH_INSTANT_EVAL_USD") throw new Error("stripe unavailable");
         return CARRIED;
       });
@@ -909,7 +909,7 @@ describe("ReportUsageForMonthCommand", () => {
     it("stops reading and scheduling after five failed reads", async () => {
       const store = MemoryBillingStore.create();
       const checkpoints = MemoryBillingCheckpointRepository.create(store);
-      mockSubscriptionCarriesPrice.mockImplementation(async ({ price }) => {
+      mockSubscriptionPriceLine.mockImplementation(async ({ price }) => {
         if (price === "GROWTH_INSTANT_EVAL_USD") throw new Error("No such customer");
         return CARRIED;
       });
@@ -919,7 +919,7 @@ describe("ReportUsageForMonthCommand", () => {
 
       for (let run = 0; run < 8; run++) await handler.handle(makeCommand());
 
-      const reads = mockSubscriptionCarriesPrice.mock.calls.filter(
+      const reads = mockSubscriptionPriceLine.mock.calls.filter(
         ([input]) => input.price === "GROWTH_INSTANT_EVAL_USD",
       );
       expect(reads).toHaveLength(5);
@@ -948,7 +948,7 @@ describe("ReportUsageForMonthCommand", () => {
       const store = MemoryBillingStore.create();
       const checkpoints = MemoryBillingCheckpointRepository.create(store);
       let instantReads = 0;
-      mockSubscriptionCarriesPrice.mockImplementation(async ({ price }) => {
+      mockSubscriptionPriceLine.mockImplementation(async ({ price }) => {
         if (price !== "GROWTH_INSTANT_EVAL_USD") return CARRIED;
         instantReads += 1;
         if (instantReads <= 4) throw new Error("Stripe unavailable");
@@ -1240,7 +1240,7 @@ describe("ReportUsageForMonthCommand", () => {
 
       await handler.handle(makeCommand());
 
-      expect(mockSubscriptionCarriesPrice).toHaveBeenCalledWith({
+      expect(mockSubscriptionPriceLine).toHaveBeenCalledWith({
         stripeCustomerId: "cus_123",
         price: "GROWTH_PII_REDACTION_USD",
         billingMonth: "2026-02",
@@ -1262,7 +1262,7 @@ describe("ReportUsageForMonthCommand", () => {
 
       missingPrices = ["GROWTH_PII_REDACTION_USD"];
       await handler.handle(makeCommand());
-      mockSubscriptionCarriesPrice.mockResolvedValue({ carried: true, addedAtMs: lineAddedAtMs });
+      mockSubscriptionPriceLine.mockResolvedValue({ carried: true, addedAtMs: lineAddedAtMs });
       await handler.handle(makeCommand());
 
       expect(mockQueryPiiRedactionSpendTotal).toHaveBeenLastCalledWith({
@@ -1318,7 +1318,7 @@ describe("ReportUsageForMonthCommand", () => {
   describe("given a subscription Stripe cannot read", () => {
     /** @scenario "A subscription that cannot be read holds the usage and retries" */
     it("sends no PII redaction event, leaves its checkpoint alone and schedules another report", async () => {
-      mockSubscriptionCarriesPrice.mockImplementation(async ({ price }) => {
+      mockSubscriptionPriceLine.mockImplementation(async ({ price }) => {
         if (price === "GROWTH_PII_REDACTION_USD") throw new Error("stripe unavailable");
         return CARRIED;
       });
@@ -1709,10 +1709,10 @@ describe("ReportUsageForMonthCommand", () => {
 
       await handler.handle(makeCommand());
 
-      expect(mockSubscriptionCarriesPrice).not.toHaveBeenCalledWith(
+      expect(mockSubscriptionPriceLine).not.toHaveBeenCalledWith(
         expect.objectContaining({ price: "GROWTH_INSTANT_EVAL_USD" }),
       );
-      expect(mockSubscriptionCarriesPrice).not.toHaveBeenCalledWith(
+      expect(mockSubscriptionPriceLine).not.toHaveBeenCalledWith(
         expect.objectContaining({ price: "CONNECTED_HOSTED_USAGE_QUARTERLY" }),
       );
       expect(hostedUsageEvent()?.value).toBe(9);
@@ -1804,7 +1804,7 @@ describe("ReportUsageForMonthCommand: the PII redaction price", () => {
     it("stops reading and scheduling after five failed reads", async () => {
       const store = MemoryBillingStore.create();
       const checkpoints = MemoryBillingCheckpointRepository.create(store);
-      mockSubscriptionCarriesPrice.mockImplementation(async ({ price }) => {
+      mockSubscriptionPriceLine.mockImplementation(async ({ price }) => {
         if (price === "GROWTH_PII_REDACTION_USD") throw new Error("No such customer");
         return CARRIED;
       });
@@ -1814,7 +1814,7 @@ describe("ReportUsageForMonthCommand: the PII redaction price", () => {
 
       for (let run = 0; run < 8; run++) await handler.handle(makeCommand());
 
-      const reads = mockSubscriptionCarriesPrice.mock.calls.filter(
+      const reads = mockSubscriptionPriceLine.mock.calls.filter(
         ([input]) => input.price === "GROWTH_PII_REDACTION_USD",
       );
       expect(reads).toHaveLength(5);

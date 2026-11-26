@@ -537,14 +537,16 @@ export class ReportUsageForMonthCommandHandler implements CommandHandler<
     billableEvents: number | undefined;
     lastReportedTotal: number;
     consecutiveFailures: number;
-  }): Promise<{ gate: "priced"; usageBilledSinceMs: number | null } | { gate: "held" | "failed" }> {
+  }): Promise<
+    { outcome: "priced"; usageBilledSinceMs: number | null } | { outcome: "held" | "failed" }
+  > {
     const { meter, organizationId, billingMonth, stripeCustomerId, contract } = input;
     let line: PriceLine;
     try {
       line = await meter.priceLine({ stripeCustomerId, contract, billingMonth });
     } catch (error) {
       await this.recordPriceReadFailure({ ...input, error: toError(error) });
-      return { gate: "failed" };
+      return { outcome: "failed" };
     }
     if (line.carried) {
       const since = meterBilledSince({
@@ -552,7 +554,7 @@ export class ReportUsageForMonthCommandHandler implements CommandHandler<
         lineAddedAtMs: line.addedAtMs,
       });
       return {
-        gate: "priced",
+        outcome: "priced",
         usageBilledSinceMs: since.outcome === "since" ? since.startMs : null,
       };
     }
@@ -575,7 +577,7 @@ export class ReportUsageForMonthCommandHandler implements CommandHandler<
       logger.debug(fields, "subscription has no price for this meter and nothing to hold");
     }
     await this.clearReadFailures(input);
-    return { gate: "held" };
+    return { outcome: "held" };
   }
 
   /** A read that worked and sent nothing ends a run of failed reads, so they stay consecutive. */
@@ -706,7 +708,7 @@ export class ReportUsageForMonthCommandHandler implements CommandHandler<
         lastReportedTotal,
         consecutiveFailures,
       });
-      if (gate.gate !== "priced") return gate.gate === "failed";
+      if (gate.outcome !== "priced") return gate.outcome === "failed";
       billedSinceMs = gate.usageBilledSinceMs;
     }
 
