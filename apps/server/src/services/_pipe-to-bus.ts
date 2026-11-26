@@ -7,10 +7,6 @@ import { execa, type Options as ExecaOptions, type ResultPromise } from "execa";
 import type { EventBus } from "./event-bus.ts";
 
 /**
- * Runs one install step, writing its output to `<logsDir>/<logFileName(service)>` and, line by line, to
- * the bus: the terminal shows it only when verbose (spec 11-terminal-output).
- */
-/**
  * The log file for an install step. Step names like `prepare:langevals` carry a colon, which
  * Windows file systems and actions/upload-artifact refuse, so every such character becomes `-`.
  */
@@ -18,6 +14,10 @@ export function logFileName(service: string): string {
   return `${service.replace(/[\\/:*?"<>|\r\n]/g, "-")}.log`;
 }
 
+/**
+ * Runs one install step, writing its output to `<logsDir>/<logFileName(service)>` and, line by
+ * line, to the bus: the terminal shows it only when verbose (spec 11-terminal-output).
+ */
 export async function execAndPipe({
   bus,
   service,
