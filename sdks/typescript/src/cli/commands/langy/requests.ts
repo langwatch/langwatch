@@ -200,11 +200,27 @@ export interface ControlApi {
 
 const REQUESTS_PATH = "/api/v1/langy/control/requests";
 
-/** The control routes, over the credentials the command resolved. */
+/** What the command says when the login reaches no project it can use Langy in. */
+export const NO_PROJECT_YET_MESSAGE =
+  "Your LangWatch login does not reach a project where you can use Langy, so this folder is not shared. If you just created your account, its workspace may still be setting up: wait a moment, then run `langwatch langy --share-control` again. Otherwise, ask an admin of your organization for access to a project.";
+
+/** The first project a `project_required` refusal lists as reachable by the key. */
+function firstReachableProject(body: unknown): string | undefined {
+  const { meta } = (body ?? {}) as { meta?: { projects?: unknown } };
+  if (!Array.isArray(meta?.projects)) return undefined;
+  const [first] = meta.projects as { id?: unknown }[];
+  return typeof first?.id === "string" && first.id !== "" ? first.id : undefined;
+}
+
+/**
+ * The control routes, over the credentials the command resolved. A login that names no project
+ * (a new account's workspace still being set up) lists on a project its key reaches, and answers
+ * a request on that request's own project.
+ */
 export function createControlApi({
   endpoint,
   apiKey,
-  projectId,
+  projectId: resolvedProjectId,
   fetchImpl = langwatchFetch,
 }: {
   endpoint: string;
@@ -212,22 +228,24 @@ export function createControlApi({
   projectId?: string;
   fetchImpl?: typeof fetch;
 }): ControlApi {
-  const headers = {
-    ...buildAuthHeaders({
-      apiKey,
-      ...(projectId === undefined ? {} : { projectId }),
-    }),
+  let projectId = resolvedProjectId;
+  const listedProjects = new Map<string, string>();
+  const projectOfRequest = (requestId: string): string | undefined =>
+    resolvedProjectId ?? listedProjects.get(requestId) ?? projectId;
+  const headers = (project: string | undefined) => ({
+    ...buildAuthHeaders({ apiKey, ...(project === undefined ? {} : { projectId: project }) }),
     "Content-Type": "application/json",
     "User-Agent": `langwatch-cli/${LANGWATCH_SDK_VERSION}`,
-  };
+  });
 
   const call = async (
     urlPath: string,
     init: { method: string; body?: string },
+    project: string | undefined = projectId,
   ): Promise<unknown> => {
     const response = await fetchImpl(`${endpoint}${urlPath}`, {
       method: init.method,
-      headers,
+      headers: headers(project),
       ...(init.body === undefined ? {} : { body: init.body }),
     });
     const text = await response.text();
@@ -236,6 +254,16 @@ export function createControlApi({
       body = text === "" ? null : JSON.parse(text);
     } catch {
       body = null;
+    }
+    const isProjectRequired =
+      response.status === 400 && (body as { code?: unknown } | null)?.code === "project_required";
+    if (isProjectRequired) {
+      const reachable = project === undefined ? firstReachableProject(body) : undefined;
+      if (reachable === undefined) {
+        throw new ShareControlError(NO_PROJECT_YET_MESSAGE, { status: response.status });
+      }
+      projectId = reachable;
+      return call(urlPath, init, reachable);
     }
     if (!response.ok) {
       throw new ShareControlError(
@@ -251,17 +279,24 @@ export function createControlApi({
       const body = (await call(REQUESTS_PATH, { method: "GET" })) as {
         requests?: ControlRequest[];
       } | null;
-      return Array.isArray(body?.requests) ? body.requests : [];
+      const requests = Array.isArray(body?.requests) ? body.requests : [];
+      for (const request of requests) {
+        if (request.projectId) listedProjects.set(request.id, request.projectId);
+      }
+      return requests;
     },
     approve: async ({ requestId, workspace }) =>
-      (await call(`${REQUESTS_PATH}/${encodeURIComponent(requestId)}/approve`, {
-        method: "POST",
-        body: JSON.stringify({ workspace }),
-      })) as ApprovedControl,
+      (await call(
+        `${REQUESTS_PATH}/${encodeURIComponent(requestId)}/approve`,
+        { method: "POST", body: JSON.stringify({ workspace }) },
+        projectOfRequest(requestId),
+      )) as ApprovedControl,
     cancel: async ({ requestId }) => {
-      await call(`${REQUESTS_PATH}/${encodeURIComponent(requestId)}/cancel`, {
-        method: "POST",
-      });
+      await call(
+        `${REQUESTS_PATH}/${encodeURIComponent(requestId)}/cancel`,
+        { method: "POST" },
+        projectOfRequest(requestId),
+      );
     },
   };
 }
