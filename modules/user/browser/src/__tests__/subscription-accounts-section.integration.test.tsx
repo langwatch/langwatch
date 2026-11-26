@@ -191,6 +191,22 @@ describe("SubscriptionAccountsSection", () => {
       expect(screen.getByText("ACME Max 1")).toBeTruthy();
       expect(screen.getByText("Couldn't refresh subscription accounts")).toBeTruthy();
     });
+
+    it("shows the failed refresh beside an empty week", () => {
+      queryState = {
+        isLoading: false,
+        isError: true,
+        error: new Error("boom"),
+        refetch,
+        data: { fromMs: 0, toMs: 0, accounts: [] },
+      };
+      renderSection();
+
+      expect(screen.getByText("No subscription accounts this week")).toBeTruthy();
+      expect(screen.getByText("Couldn't refresh subscription accounts")).toBeTruthy();
+      screen.getByText("Try again").click();
+      expect(refetch).toHaveBeenCalled();
+    });
   });
 
   describe("given no account this week", () => {

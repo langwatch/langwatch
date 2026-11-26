@@ -78,28 +78,32 @@ function SubscriptionAccountsBody({
     );
   }
   const accounts = query.data?.accounts ?? [];
+  const refreshFailed = query.isError && (
+    <HandledErrorAlert
+      error={query.error}
+      fallbackTitle="Couldn't refresh subscription accounts"
+      onRetry={() => void query.refetch()}
+    />
+  );
   if (accounts.length === 0) {
     return (
-      <NoDataInfoBlock
-        size="inline"
-        bordered={false}
-        icon={<KeyRound />}
-        title="No subscription accounts this week"
-        description="Claude Code and Codex send the account they run on. A launcher can name it with the langwatch.account attributes."
-        next={[{ kind: "docs", label: "Subscription accounts", href: docsUrl(DOCS_PATH) }]}
-      />
+      <VStack align="stretch" gap={3}>
+        {refreshFailed}
+        <NoDataInfoBlock
+          size="inline"
+          bordered={false}
+          icon={<KeyRound />}
+          title="No subscription accounts this week"
+          description="Claude Code and Codex send the account they run on. A launcher can name it with the langwatch.account attributes."
+          next={[{ kind: "docs", label: "Subscription accounts", href: docsUrl(DOCS_PATH) }]}
+        />
+      </VStack>
     );
   }
 
   return (
     <VStack align="stretch" gap={3}>
-      {query.isError && (
-        <HandledErrorAlert
-          error={query.error}
-          fallbackTitle="Couldn't refresh subscription accounts"
-          onRetry={() => void query.refetch()}
-        />
-      )}
+      {refreshFailed}
       <SimpleGrid columns={{ base: 1, lg: Math.min(3, accounts.length) }} gap={3}>
         {accounts.map((account) => (
           <AccountCard key={account.accountId} account={account} />
