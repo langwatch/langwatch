@@ -7593,6 +7593,9 @@ importers:
       '@langwatch/ksuid':
         specifier: workspace:*
         version: link:../../../packages/ksuid
+      '@langwatch/limiter':
+        specifier: workspace:*
+        version: link:../../../packages/limiter
       '@langwatch/module':
         specifier: workspace:*
         version: link:../../../packages/module
