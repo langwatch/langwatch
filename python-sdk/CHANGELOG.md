@@ -14,13 +14,9 @@
 ### Bug Fixes
 
 * **errors:** the wire message is the code, on every transport ([#5984](https://github.com/langwatch/langwatch/issues/5984)) ([31ad81c](https://github.com/langwatch/langwatch/commit/31ad81c2bf1272ad412bf8af4b1a11342f35d020))
-* **security:** anchor python-sdk transitive security floors (engineio, socketio) ([dacf9ef](https://github.com/langwatch/langwatch/commit/dacf9ef399ccd49234a30ac3cc75e3069d27bee4))
 * **security:** bump jupyter-server to 2.20.0 (CVE-2026-44727 critical XSS) ([#5210](https://github.com/langwatch/langwatch/issues/5210)) ([d9d92a7](https://github.com/langwatch/langwatch/commit/d9d92a7e4d1a49fb11ce8bc984236790f2fe118f))
-* **security:** bump jupyter-server to 2.20.0 (CVE-2026-44727) ([d9d92a7](https://github.com/langwatch/langwatch/commit/d9d92a7e4d1a49fb11ce8bc984236790f2fe118f))
-* **security:** move python-sdk examples group to langchain-openai/text-splitters 1.x ([294dd2d](https://github.com/langwatch/langwatch/commit/294dd2d2fdfe9f018cfce57fe542f9e1ca319d32))
 * **security:** move python-sdk examples to langchain-openai/text-splitters 1.x ([#5677](https://github.com/langwatch/langwatch/issues/5677)) ([294dd2d](https://github.com/langwatch/langwatch/commit/294dd2d2fdfe9f018cfce57fe542f9e1ca319d32))
 * **security:** python-sdk transitive security floors (python-engineio, python-socketio) ([#5084](https://github.com/langwatch/langwatch/issues/5084)) ([dacf9ef](https://github.com/langwatch/langwatch/commit/dacf9ef399ccd49234a30ac3cc75e3069d27bee4))
-* **security:** raise litellm to &gt;=1.84.0 in mcp-server and python-sdk ([cb44747](https://github.com/langwatch/langwatch/commit/cb447477d21feb9448445505bbe088f4b54776dc))
 * **security:** raise litellm to &gt;=1.84.0 in mcp-server and python-sdk (CRITICAL) ([#5230](https://github.com/langwatch/langwatch/issues/5230)) ([cb44747](https://github.com/langwatch/langwatch/commit/cb447477d21feb9448445505bbe088f4b54776dc))
 * **security:** raise python-sdk bleach and onnx transitive floors ([#5542](https://github.com/langwatch/langwatch/issues/5542)) ([6abdc66](https://github.com/langwatch/langwatch/commit/6abdc6608ca8414a789e81e2b3c6f2aa42e03095))
 
@@ -46,10 +42,8 @@
 * **deps-dev:** bump jupyterlab from 4.5.8 to 4.6.0 in /python-sdk ([#5187](https://github.com/langwatch/langwatch/issues/5187)) ([f836db0](https://github.com/langwatch/langwatch/commit/f836db04df66e79674bf83cb1319c22a0693ab50))
 * **deps-dev:** bump jupyterlab from 4.6.0 to 4.6.1 in /python-sdk ([#5484](https://github.com/langwatch/langwatch/issues/5484)) ([31e457a](https://github.com/langwatch/langwatch/commit/31e457a173c24d968d57704093812e6fd60522df))
 * **deps-dev:** bump langchain from 1.0.3 to 1.3.11 in /python-sdk ([#5236](https://github.com/langwatch/langwatch/issues/5236)) ([d37cc7e](https://github.com/langwatch/langwatch/commit/d37cc7eeee61f505819423e9fee8195e510490bb))
-* **deps-dev:** bump langchain-community ([9fa042f](https://github.com/langwatch/langwatch/commit/9fa042f43440a6ae9725f7f5da37beba6e598c13))
 * **deps-dev:** bump langchain-community from 0.3.31 to 0.4.2 in /python-sdk in the langchain group across 1 directory ([#5690](https://github.com/langwatch/langwatch/issues/5690)) ([9fa042f](https://github.com/langwatch/langwatch/commit/9fa042f43440a6ae9725f7f5da37beba6e598c13))
 * **deps-dev:** bump langchain-google-vertexai from 3.2.3 to 3.2.4 in /python-sdk ([#4918](https://github.com/langwatch/langwatch/issues/4918)) ([3863509](https://github.com/langwatch/langwatch/commit/386350937e705868a0cbf7790ef7b1d5b46bf7f1))
-* **deps-dev:** bump langchain-google-vertexai in /python-sdk ([3863509](https://github.com/langwatch/langwatch/commit/386350937e705868a0cbf7790ef7b1d5b46bf7f1))
 * **deps-dev:** bump langgraph from 1.2.6 to 1.2.7 in /python-sdk ([#5487](https://github.com/langwatch/langwatch/issues/5487)) ([66e8756](https://github.com/langwatch/langwatch/commit/66e8756bf5fcf2cb4d9c9731abe62b4ae4f768ab))
 * **deps-dev:** bump langsmith from 0.8.3 to 0.9.3 in /python-sdk ([#5262](https://github.com/langwatch/langwatch/issues/5262)) ([13e5649](https://github.com/langwatch/langwatch/commit/13e5649461a809e27c264ba869f59555d9d6c6e8))
 * **deps-dev:** bump litellm from 1.89.3 to 1.89.4 in /python-sdk ([#5337](https://github.com/langwatch/langwatch/issues/5337)) ([d40d70e](https://github.com/langwatch/langwatch/commit/d40d70ef370fd6eb59bdac3acb6b15cfa9fa30eb))
@@ -57,11 +51,7 @@
 * **deps-dev:** bump litellm from 1.90.0 to 1.90.1 in /python-sdk ([#5491](https://github.com/langwatch/langwatch/issues/5491)) ([46ef24f](https://github.com/langwatch/langwatch/commit/46ef24f63901e1d45d54065ac83287de43fc0ebc))
 * **deps-dev:** bump openai from 2.43.0 to 2.44.0 in /python-sdk ([#5339](https://github.com/langwatch/langwatch/issues/5339)) ([49e665d](https://github.com/langwatch/langwatch/commit/49e665d138820dd1bba9549a72f428e4a36dff87))
 * **deps-dev:** bump openinference-instrumentation-dspy from 0.1.33 to 0.1.37 in /python-sdk ([#4327](https://github.com/langwatch/langwatch/issues/4327)) ([9480f68](https://github.com/langwatch/langwatch/commit/9480f687dd1ab0833ec133072d4fab4623be3926))
-* **deps-dev:** bump openinference-instrumentation-dspy in /python-sdk ([9480f68](https://github.com/langwatch/langwatch/commit/9480f687dd1ab0833ec133072d4fab4623be3926))
-* **deps-dev:** bump openinference-instrumentation-litellm ([b5c6a06](https://github.com/langwatch/langwatch/commit/b5c6a0690e87e5ef348aea5a43fb7c05a22f0915))
 * **deps-dev:** bump openinference-instrumentation-litellm from 0.1.24 to 0.1.34 in /python-sdk ([#4261](https://github.com/langwatch/langwatch/issues/4261)) ([b5c6a06](https://github.com/langwatch/langwatch/commit/b5c6a0690e87e5ef348aea5a43fb7c05a22f0915))
-* **deps-dev:** bump opentelemetry-instrumentation-langchain ([d48ad16](https://github.com/langwatch/langwatch/commit/d48ad16a5487b769e2f2d330a496cdb5b5bad74c))
-* **deps-dev:** bump opentelemetry-instrumentation-langchain ([a4d5ae3](https://github.com/langwatch/langwatch/commit/a4d5ae310dee467dea0f7a6288ac780972bf95f3))
 * **deps-dev:** bump opentelemetry-instrumentation-langchain from 0.60.0 to 0.61.0 in /python-sdk ([#4695](https://github.com/langwatch/langwatch/issues/4695)) ([a4d5ae3](https://github.com/langwatch/langwatch/commit/a4d5ae310dee467dea0f7a6288ac780972bf95f3))
 * **deps-dev:** bump opentelemetry-instrumentation-langchain from 0.61.0 to 0.62.1 in /python-sdk ([#5414](https://github.com/langwatch/langwatch/issues/5414)) ([d48ad16](https://github.com/langwatch/langwatch/commit/d48ad16a5487b769e2f2d330a496cdb5b5bad74c))
 * **deps-dev:** bump pandas from 2.3.1 to 2.3.3 in /python-sdk ([#4305](https://github.com/langwatch/langwatch/issues/4305)) ([7521d4a](https://github.com/langwatch/langwatch/commit/7521d4ae02dbdcfdf741ce7268e5939471e72bac))
@@ -78,19 +68,12 @@
 * **deps:** bump mcp from 1.27.0 to 1.28.1 in /python-sdk ([#5859](https://github.com/langwatch/langwatch/issues/5859)) ([cb4c35f](https://github.com/langwatch/langwatch/commit/cb4c35f8751d3b66fe874647e1247cdd3414f7ba))
 * **deps:** bump mistune from 3.2.1 to 3.3.0 in /python-sdk ([#5686](https://github.com/langwatch/langwatch/issues/5686)) ([e6684e0](https://github.com/langwatch/langwatch/commit/e6684e080ce17cf740a586e51127f9d0323293d9))
 * **deps:** bump openinference-instrumentation-haystack from 0.1.24 to 0.1.34 in /python-sdk ([#4359](https://github.com/langwatch/langwatch/issues/4359)) ([ada2504](https://github.com/langwatch/langwatch/commit/ada250413e3cb8001893cd3b751ac2dd7d21f742))
-* **deps:** bump openinference-instrumentation-haystack in /python-sdk ([ada2504](https://github.com/langwatch/langwatch/commit/ada250413e3cb8001893cd3b751ac2dd7d21f742))
-* **deps:** bump openinference-instrumentation-langchain ([54ff667](https://github.com/langwatch/langwatch/commit/54ff66722b14c179320228a65a55f9d43093bdb1))
 * **deps:** bump openinference-instrumentation-langchain from 0.1.50 to 0.1.66 in /python-sdk ([#4373](https://github.com/langwatch/langwatch/issues/4373)) ([449780f](https://github.com/langwatch/langwatch/commit/449780f39968f09fc1169c5928194d50030c3dcf))
 * **deps:** bump openinference-instrumentation-langchain from 0.1.66 to 0.1.67 in /python-sdk in the opentelemetry group across 1 directory ([#5720](https://github.com/langwatch/langwatch/issues/5720)) ([54ff667](https://github.com/langwatch/langwatch/commit/54ff66722b14c179320228a65a55f9d43093bdb1))
-* **deps:** bump openinference-instrumentation-langchain in /python-sdk ([449780f](https://github.com/langwatch/langwatch/commit/449780f39968f09fc1169c5928194d50030c3dcf))
 * **deps:** bump openinference-semantic-conventions from 0.1.29 to 0.1.30 in /python-sdk ([#4484](https://github.com/langwatch/langwatch/issues/4484)) ([10003be](https://github.com/langwatch/langwatch/commit/10003bef44c4f4b46a74ded5c93c5ae93cd806e3))
-* **deps:** bump openinference-semantic-conventions in /python-sdk ([10003be](https://github.com/langwatch/langwatch/commit/10003bef44c4f4b46a74ded5c93c5ae93cd806e3))
 * **deps:** bump opentelemetry-exporter-otlp-proto-http from 1.42.1 to 1.43.0 in /python-sdk ([#5335](https://github.com/langwatch/langwatch/issues/5335)) ([6730aaf](https://github.com/langwatch/langwatch/commit/6730aaf1a599fb0771d8cf760fcbfdaf0f893c52))
-* **deps:** bump opentelemetry-exporter-otlp-proto-http in /python-sdk ([6730aaf](https://github.com/langwatch/langwatch/commit/6730aaf1a599fb0771d8cf760fcbfdaf0f893c52))
 * **deps:** bump opentelemetry-instrumentation-crewai from 0.60.0 to 0.61.0 in /python-sdk ([#4693](https://github.com/langwatch/langwatch/issues/4693)) ([5227811](https://github.com/langwatch/langwatch/commit/5227811aa1b4897e426dc36aa49e1eaaf76254f5))
 * **deps:** bump opentelemetry-instrumentation-crewai from 0.61.0 to 0.62.1 in /python-sdk ([#5412](https://github.com/langwatch/langwatch/issues/5412)) ([078b53b](https://github.com/langwatch/langwatch/commit/078b53b1ce3c871c3b5afa64b58488f6f7732787))
-* **deps:** bump opentelemetry-instrumentation-crewai in /python-sdk ([078b53b](https://github.com/langwatch/langwatch/commit/078b53b1ce3c871c3b5afa64b58488f6f7732787))
-* **deps:** bump opentelemetry-instrumentation-crewai in /python-sdk ([5227811](https://github.com/langwatch/langwatch/commit/5227811aa1b4897e426dc36aa49e1eaaf76254f5))
 * **deps:** bump python-liquid from 2.2.0 to 2.2.2 in /python-sdk ([#5245](https://github.com/langwatch/langwatch/issues/5245)) ([165c0fd](https://github.com/langwatch/langwatch/commit/165c0fd012b7f590a423b9b9a697c1a85a0cf2ea))
 * **deps:** bump pyyaml from 6.0.2 to 6.0.3 in /python-sdk ([#4356](https://github.com/langwatch/langwatch/issues/4356)) ([5f620de](https://github.com/langwatch/langwatch/commit/5f620decbe11db924f0e9b6ded81642329292c39))
 * **deps:** bump ruff from 0.15.0 to 0.15.19 in /python-sdk ([#5261](https://github.com/langwatch/langwatch/issues/5261)) ([ac8a43c](https://github.com/langwatch/langwatch/commit/ac8a43c8c3f11d5e4b05b6bdc0e6c01ad3519fec))
@@ -136,7 +119,6 @@
 
 ### Miscellaneous
 
-* **deps:** bump cryptography ([d5dc5ab](https://github.com/langwatch/langwatch/commit/d5dc5ab5456a192148dbd6e27974c105e601bbbf))
 * **deps:** bump cryptography from 45.0.6 to 46.0.7 in /python-sdk in the uv group across 1 directory ([#3889](https://github.com/langwatch/langwatch/issues/3889)) ([d5dc5ab](https://github.com/langwatch/langwatch/commit/d5dc5ab5456a192148dbd6e27974c105e601bbbf))
 * **deps:** bump opentelemetry-api from 1.40.0 to 1.42.1 in /python-sdk ([#4318](https://github.com/langwatch/langwatch/issues/4318)) ([3129823](https://github.com/langwatch/langwatch/commit/312982302afc14446c5d4b08129c7567363a5a3d))
 
@@ -152,31 +134,21 @@
 
 * **ci:** harden Python SDK e2e tests against transient backend failures ([#3666](https://github.com/langwatch/langwatch/issues/3666)) ([5fdedaa](https://github.com/langwatch/langwatch/commit/5fdedaa342da563eb080e98738956eb5e9b7adaa))
 * **ci:** split OpenAI keys per workflow + drop sdk examples to gpt-5-mini ([#3641](https://github.com/langwatch/langwatch/issues/3641)) ([6b58467](https://github.com/langwatch/langwatch/commit/6b58467aa3063e10393ca34cc997b9585abb0c31))
-* **deps:** restore urllib3 2.6.3 in python-sdk (regression from rebase) ([c52b6ad](https://github.com/langwatch/langwatch/commit/c52b6ad37c612219146dfc3f7e4c3c096576827c))
 * **deps:** upgrade aiohttp, starlette, pillow, lxml ([#3564](https://github.com/langwatch/langwatch/issues/3564)) ([498847e](https://github.com/langwatch/langwatch/commit/498847e43c3088ef68b357c6b04d02d1005a5f9a))
-* **deps:** upgrade aiohttp, starlette, pillow, lxml (Python heavy) ([498847e](https://github.com/langwatch/langwatch/commit/498847e43c3088ef68b357c6b04d02d1005a5f9a))
 * **deps:** upgrade black to 26.3.1 (CVE: arbitrary file write) ([#3678](https://github.com/langwatch/langwatch/issues/3678)) ([b4f9fe6](https://github.com/langwatch/langwatch/commit/b4f9fe65032e55b38f40fc76547c5074f5344aa3))
-* **deps:** upgrade black to 26.3.1 in python-sdk (CVE, Dependabot [#556](https://github.com/langwatch/langwatch/issues/556)) ([2283a88](https://github.com/langwatch/langwatch/commit/2283a88b0c86c629d60b430cb1aa40d6814d081f))
 * **deps:** upgrade black to 26.3.1 in python-sdk (Dependabot [#556](https://github.com/langwatch/langwatch/issues/556)) ([#3766](https://github.com/langwatch/langwatch/issues/3766)) ([2283a88](https://github.com/langwatch/langwatch/commit/2283a88b0c86c629d60b430cb1aa40d6814d081f))
 * **deps:** upgrade GitPython, protobuf, nbconvert (Dependabot) ([#3655](https://github.com/langwatch/langwatch/issues/3655)) ([060a3ae](https://github.com/langwatch/langwatch/commit/060a3aef67aebb822baed7853b2688455933f432))
-* **deps:** upgrade GitPython, protobuf, nbconvert to resolve security alerts ([060a3ae](https://github.com/langwatch/langwatch/commit/060a3aef67aebb822baed7853b2688455933f432))
-* **deps:** upgrade langsmith sdk security floors ([2e18927](https://github.com/langwatch/langwatch/commit/2e18927c0c1c1fdec24c2bba17e5f094e56a9deb))
 * **deps:** upgrade LangSmith SDK security floors ([#4041](https://github.com/langwatch/langwatch/issues/4041)) ([2e18927](https://github.com/langwatch/langwatch/commit/2e18927c0c1c1fdec24c2bba17e5f094e56a9deb))
 * **deps:** upgrade mcp Python SDK to &gt;= 1.23.0 (DNS rebinding) ([#3707](https://github.com/langwatch/langwatch/issues/3707)) ([2689e8a](https://github.com/langwatch/langwatch/commit/2689e8ad9d9f0262623a66c1e1a36c9e59db76c4))
 * **deps:** upgrade mcp to 1.27.0 in python-sdk (Dependabot [#329](https://github.com/langwatch/langwatch/issues/329)) ([#3767](https://github.com/langwatch/langwatch/issues/3767)) ([550eb90](https://github.com/langwatch/langwatch/commit/550eb90c6159c785a6f8b9e6083914b776c7987e))
 * **deps:** upgrade picomatch, merge, jupyterlab, notebook (Dependabot) ([#3658](https://github.com/langwatch/langwatch/issues/3658)) ([bf8cd9a](https://github.com/langwatch/langwatch/commit/bf8cd9ad47150e65f27e383d7f4d3659374d00b8))
 * **deps:** upgrade pyasn1, filelock, Pygments, nltk (Python patches) ([#3561](https://github.com/langwatch/langwatch/issues/3561)) ([27152ca](https://github.com/langwatch/langwatch/commit/27152ca723b2e31aa3ac760847b17d8e3dfc3714))
 * **deps:** upgrade PyJWT, pillow, onnx (Dependabot) ([#3656](https://github.com/langwatch/langwatch/issues/3656)) ([5eb44a3](https://github.com/langwatch/langwatch/commit/5eb44a3618930847a38abb38345a8d424b6c3021))
-* **deps:** upgrade PyJWT, pillow, onnx to resolve security alerts ([5eb44a3](https://github.com/langwatch/langwatch/commit/5eb44a3618930847a38abb38345a8d424b6c3021))
 * **deps:** upgrade python-liquid to 2.2.0 — filesystem loader path escape ([#3986](https://github.com/langwatch/langwatch/issues/3986)) ([6c390e3](https://github.com/langwatch/langwatch/commit/6c390e301185c81afd59cd64ed7c489789b6b86c))
-* **deps:** upgrade python-liquid to 2.2.0 — filesystem loader path escape (alerts [#1066](https://github.com/langwatch/langwatch/issues/1066)-[#1068](https://github.com/langwatch/langwatch/issues/1068)) ([6c390e3](https://github.com/langwatch/langwatch/commit/6c390e301185c81afd59cd64ed7c489789b6b86c))
 * **deps:** upgrade tornado to 6.5.5 (Dependabot [#555](https://github.com/langwatch/langwatch/issues/555)) ([#3651](https://github.com/langwatch/langwatch/issues/3651)) ([7541e89](https://github.com/langwatch/langwatch/commit/7541e897fa29db23f534da1a9567a2750c90566a))
-* **deps:** upgrade tornado to 6.5.5 to resolve DoS vulnerability (CVE) ([7541e89](https://github.com/langwatch/langwatch/commit/7541e897fa29db23f534da1a9567a2750c90566a))
 * **deps:** upgrade tornado, urllib3, cryptography (Dependabot) ([#3657](https://github.com/langwatch/langwatch/issues/3657)) ([f8a2e9a](https://github.com/langwatch/langwatch/commit/f8a2e9a5cf6b836524bc2a170d589e1a01ad3921))
-* **deps:** upgrade tornado, urllib3, cryptography to resolve security alerts ([f8a2e9a](https://github.com/langwatch/langwatch/commit/f8a2e9a5cf6b836524bc2a170d589e1a01ad3921))
 * **deps:** upgrade urllib3 to 2.6.3 in python-sdk (alerts [#343](https://github.com/langwatch/langwatch/issues/343), [#331](https://github.com/langwatch/langwatch/issues/331), [#330](https://github.com/langwatch/langwatch/issues/330)) ([#3843](https://github.com/langwatch/langwatch/issues/3843)) ([c52b6ad](https://github.com/langwatch/langwatch/commit/c52b6ad37c612219146dfc3f7e4c3c096576827c))
 * **deps:** upgrade urllib3 to 2.7.0 — decompression-bomb bypass, header forwarding ([#3985](https://github.com/langwatch/langwatch/issues/3985)) ([071cea7](https://github.com/langwatch/langwatch/commit/071cea7c0a4fb094bc6f5a911eefbdc1bb8766c4))
-* **deps:** upgrade urllib3 to 2.7.0 — decompression-bomb bypass, header forwarding (alerts [#1071](https://github.com/langwatch/langwatch/issues/1071)-[#1082](https://github.com/langwatch/langwatch/issues/1082)) ([071cea7](https://github.com/langwatch/langwatch/commit/071cea7c0a4fb094bc6f5a911eefbdc1bb8766c4))
 * **python-sdk:** retry evaluator calls on gateway/edge transient failures ([#3993](https://github.com/langwatch/langwatch/issues/3993)) ([03306ab](https://github.com/langwatch/langwatch/commit/03306abf57be5ad357ffbfc2a5677c837e2b59d2))
 * **python-sdk:** scope disable_sending to trace lifetime ([#3981](https://github.com/langwatch/langwatch/issues/3981) root cause, supersedes [#3979](https://github.com/langwatch/langwatch/issues/3979)) ([#4148](https://github.com/langwatch/langwatch/issues/4148)) ([64d8e2d](https://github.com/langwatch/langwatch/commit/64d8e2decbef3e0ff7a7533eac7c3d3020908336))
 * **python-sdk:** surface masked server errors + log loaded prompts once ([#4197](https://github.com/langwatch/langwatch/issues/4197)) ([5da291d](https://github.com/langwatch/langwatch/commit/5da291d07d025cb68da2392bb6616c3c22c51de9))
@@ -185,7 +157,6 @@
 * **sdk:** dedicated TracerProvider isolation for coexistence with other OTel SDKs ([#4204](https://github.com/langwatch/langwatch/issues/4204)) ([d5c9cfd](https://github.com/langwatch/langwatch/commit/d5c9cfd0ca55b7d31f08207970fb446ddda4fe85))
 * **security:** upgrade high-severity pip dependencies (excluding langchain-core) ([#3929](https://github.com/langwatch/langwatch/issues/3929)) ([f2d5de6](https://github.com/langwatch/langwatch/commit/f2d5de6bf619d188c46947f76812a2c3b3ecf39a))
 * **security:** upgrade jupyter-server to 2.18.2 ([#3894](https://github.com/langwatch/langwatch/issues/3894)) ([a1c403e](https://github.com/langwatch/langwatch/commit/a1c403e50be320469fc607fccb3eb7cb0e847cf4))
-* **security:** upgrade jupyter-server to 2.18.2 (CVE-2026-35397, CVE-2026-40110) ([a1c403e](https://github.com/langwatch/langwatch/commit/a1c403e50be320469fc607fccb3eb7cb0e847cf4))
 * **traces:** parse JSON-string langwatch.input when extracting primary I/O ([#3419](https://github.com/langwatch/langwatch/issues/3419)) ([1e87641](https://github.com/langwatch/langwatch/commit/1e87641060b872d9f924e1a583328f33590bd3ca))
 
 
@@ -194,20 +165,15 @@
 * **ci:** sign release images with cosign and publish CycloneDX SBOMs ([#4155](https://github.com/langwatch/langwatch/issues/4155)) ([9b65850](https://github.com/langwatch/langwatch/commit/9b65850561d81384b5bb4e14e5a63b2d9de5405f))
 * **deps-dev:** bump faiss-cpu from 1.12.0 to 1.13.2 in /python-sdk ([#2096](https://github.com/langwatch/langwatch/issues/2096)) ([636ac8d](https://github.com/langwatch/langwatch/commit/636ac8dcff63fe89836d8d7bf0762885601f4e21))
 * **deps-dev:** bump fonttools from 4.62.0 to 4.62.1 in /python-sdk ([#3729](https://github.com/langwatch/langwatch/issues/3729)) ([d4bc026](https://github.com/langwatch/langwatch/commit/d4bc0265e6ab27b105ae3736941a22ddb3b64fb3))
-* **deps-dev:** bump openinference-instrumentation-litellm ([312deb7](https://github.com/langwatch/langwatch/commit/312deb7119bb69a97cfd8c4b07aa63c83aa4473b))
 * **deps-dev:** bump openinference-instrumentation-litellm from 0.1.24 to 0.1.30 in /python-sdk ([#3732](https://github.com/langwatch/langwatch/issues/3732)) ([312deb7](https://github.com/langwatch/langwatch/commit/312deb7119bb69a97cfd8c4b07aa63c83aa4473b))
-* **deps-dev:** bump openinference-instrumentation-openai ([ed63c26](https://github.com/langwatch/langwatch/commit/ed63c2616eba94d587d153102705f9cd8ffbdc51))
 * **deps-dev:** bump openinference-instrumentation-openai from 0.1.30 to 0.1.45 in /python-sdk ([#3726](https://github.com/langwatch/langwatch/issues/3726)) ([ed63c26](https://github.com/langwatch/langwatch/commit/ed63c2616eba94d587d153102705f9cd8ffbdc51))
 * **deps-dev:** bump streamlit from 1.48.1 to 1.57.0 in /python-sdk ([#2087](https://github.com/langwatch/langwatch/issues/2087)) ([21a1d24](https://github.com/langwatch/langwatch/commit/21a1d2467c9f6c2113e9b589ae0ffd738655cb1e))
 * **deps:** bump opentelemetry-api from 1.36.0 to 1.40.0 in /python-sdk ([#2090](https://github.com/langwatch/langwatch/issues/2090)) ([9d6bbc3](https://github.com/langwatch/langwatch/commit/9d6bbc37a933ac1842ba25632fffd4dae511d442))
 * **deps:** bump opentelemetry-instrumentation-crewai from 0.47.5 to 0.53.0 in /python-sdk ([#2094](https://github.com/langwatch/langwatch/issues/2094)) ([44dc407](https://github.com/langwatch/langwatch/commit/44dc40742f4ed78040b831a22db31368846676d6))
-* **deps:** bump opentelemetry-instrumentation-crewai in /python-sdk ([44dc407](https://github.com/langwatch/langwatch/commit/44dc40742f4ed78040b831a22db31368846676d6))
 * **deps:** bump the pip group across 9 directories with 2 updates ([#3895](https://github.com/langwatch/langwatch/issues/3895)) ([fb10e26](https://github.com/langwatch/langwatch/commit/fb10e26a2636ec968127c9669a843a801e52d807))
 * **python-sdk:** single-footer shadow Release-As 0.23.0 ([1002978](https://github.com/langwatch/langwatch/commit/10029788f52d3c0640ac6fe7660f22f7916f941c))
-* release as 3.2.1 ([ca9d7a9](https://github.com/langwatch/langwatch/commit/ca9d7a9231a7b3d9d8cf9a28a48fa494b1daeb4b))
 * release as 3.2.1 (override release-please from 3.3.0) ([#3615](https://github.com/langwatch/langwatch/issues/3615)) ([ca9d7a9](https://github.com/langwatch/langwatch/commit/ca9d7a9231a7b3d9d8cf9a28a48fa494b1daeb4b))
 * relicense langwatch from BSL 1.1 to Apache 2.0 (+ ee/ for enterprise modules) ([#4085](https://github.com/langwatch/langwatch/issues/4085)) ([23b9dcd](https://github.com/langwatch/langwatch/commit/23b9dcd051806e0d2162b377a7e1b4c3fecb3ed5))
-* scope Release-As to langwatch, restore other components ([e259e79](https://github.com/langwatch/langwatch/commit/e259e796b50e4d060e5c7f42cad1927f1da8a83d))
 * **security:** add dependency age gates ([#3523](https://github.com/langwatch/langwatch/issues/3523)) ([78f5b20](https://github.com/langwatch/langwatch/commit/78f5b2059228748d19fb4bf74118c9bee6c474f9))
 
 ## [0.22.0](https://github.com/langwatch/langwatch/compare/python-sdk@v0.21.0...python-sdk@v0.22.0) (2026-04-21)
@@ -334,7 +300,6 @@
 
 ### Bug Fixes
 
-* handle NaN/Infinity in JSON serialization for batch evaluation payloads ([#1557](https://github.com/langwatch/langwatch/issues/1557)) ([072c347](https://github.com/langwatch/langwatch/commit/072c347ca3ba7c148ae19d0d9e3fc80f6d6c84fc))
 * handle NaN/Infinity in JSON serialization for batch evaluation payloads ([#1558](https://github.com/langwatch/langwatch/issues/1558)) ([072c347](https://github.com/langwatch/langwatch/commit/072c347ca3ba7c148ae19d0d9e3fc80f6d6c84fc))
 
 
@@ -343,10 +308,8 @@
 * **deps-dev:** bump chainlit from 2.8.3 to 2.9.6 in /python-sdk ([#1508](https://github.com/langwatch/langwatch/issues/1508)) ([5cdb91a](https://github.com/langwatch/langwatch/commit/5cdb91a628442b747eb776978156c5531ab80f61))
 * **deps-dev:** bump json-repair from 0.49.0 to 0.57.1 in /python-sdk ([#1507](https://github.com/langwatch/langwatch/issues/1507)) ([eb681e5](https://github.com/langwatch/langwatch/commit/eb681e5d5d341aee61fc9eed7236d9d40168c6ff))
 * **deps-dev:** bump openinference-instrumentation-dspy from 0.1.28 to 0.1.33 in /python-sdk ([#1505](https://github.com/langwatch/langwatch/issues/1505)) ([1280b4c](https://github.com/langwatch/langwatch/commit/1280b4cab9e67ce2976837a6244588d8cfdfd814))
-* **deps-dev:** bump openinference-instrumentation-dspy in /python-sdk ([1280b4c](https://github.com/langwatch/langwatch/commit/1280b4cab9e67ce2976837a6244588d8cfdfd814))
 * **deps-dev:** bump python-dotenv from 1.0.1 to 1.2.1 in /python-sdk ([#1509](https://github.com/langwatch/langwatch/issues/1509)) ([01d4a17](https://github.com/langwatch/langwatch/commit/01d4a171ae4b6253d82e157d477ecac58d3de25f))
 * **deps-dev:** update uvicorn requirement from &lt;0.40.0,&gt;=0.38.0 to &gt;=0.38.0,&lt;0.41.0 in /python-sdk ([#1445](https://github.com/langwatch/langwatch/issues/1445)) ([a26937d](https://github.com/langwatch/langwatch/commit/a26937df10f8dd39f93c79532d42a681fffb73d9))
-* **deps-dev:** update uvicorn requirement in /python-sdk ([a26937d](https://github.com/langwatch/langwatch/commit/a26937df10f8dd39f93c79532d42a681fffb73d9))
 
 ## [0.11.0](https://github.com/langwatch/langwatch/compare/python-sdk@v0.10.2...python-sdk@v0.11.0) (2026-02-12)
 
@@ -355,7 +318,6 @@
 
 * add library to help catch trace parity dift betwen ElasicSearch and ClickHouse ([#1426](https://github.com/langwatch/langwatch/issues/1426)) ([bce70bf](https://github.com/langwatch/langwatch/commit/bce70bfe453a9202414e17afa8018786fe3d225f))
 * add public REST API for evaluators ([#1540](https://github.com/langwatch/langwatch/issues/1540)) ([46f4064](https://github.com/langwatch/langwatch/commit/46f4064c32dee33be58eee54f98c810a0da57cee))
-* add public REST API for evaluators (/api/evaluators) ([46f4064](https://github.com/langwatch/langwatch/commit/46f4064c32dee33be58eee54f98c810a0da57cee))
 * pass thread_id through execute_component to LangWatch tracing ([ac986cc](https://github.com/langwatch/langwatch/commit/ac986cc3ca0e5e37fa8e71ae304e2cad63cb6b14))
 
 
@@ -499,7 +461,6 @@
 
 ### Features
 
-* upgrade to dspy v3 ([9833bbb](https://github.com/langwatch/langwatch/commit/9833bbb2b1e1c210350dbea6c502a8f0e624badc))
 * upgrade to DSPy v3 🎉 ([#752](https://github.com/langwatch/langwatch/issues/752)) ([9833bbb](https://github.com/langwatch/langwatch/commit/9833bbb2b1e1c210350dbea6c502a8f0e624badc))
 
 
