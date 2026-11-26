@@ -147,6 +147,14 @@
     "description": "Saves version 1 of every dataset that has rows and no version history yet."
   },
   {
+    "id": "entitlement:materialise-billable-events-ttl",
+    "kind": "data",
+    "mode": "background",
+    "owner": "entitlement",
+    "description": "Applies the 13-month retention to billable events written before it, deleting older rows.",
+    "needsOldWritersGone": false
+  },
+  {
     "id": "evaluation:fill-id-indexes",
     "kind": "data",
     "mode": "background",

@@ -189,6 +189,14 @@ export class LangWatchQLHydrationComputeService {
     const [first, second] = parts;
     if (first === undefined) return LWQL_NOT_RESOLVED;
 
+    if (definition.reads === "thread-trace-ids") {
+      const traceIds =
+        traces.traceIdsByThread.get(first) ??
+        threadTraceIds({ traces: traces.byThread.get(first) ?? [] });
+      if (traceIds.length === 0) return LWQL_NOT_RESOLVED;
+      return { value: traceIds, isTruncated: false, isResolved: true };
+    }
+
     if (definition.keyKind === "thread") {
       return this.#computeThreadValue({
         definition,
@@ -220,15 +228,6 @@ export class LangWatchQLHydrationComputeService {
   }): Promise<LangWatchQLComputedValue> {
     if (threadTraces.length === 0) return LWQL_NOT_RESOLVED;
     const { name } = definition;
-
-    if (name === "thread_traces") {
-      return {
-        value: threadTraceIds({ traces: threadTraces }),
-        isTruncated: false,
-        isResolved: true,
-      };
-    }
-
     const isSteps = name === "llm_readable_thread";
     const isBounded = name === "conversation_bounded" || isSteps;
     const ordered = threadTracesUntil({
