@@ -33,7 +33,7 @@ describe("MemoryBillingReportOrganizationRepository, the PII redaction model's a
     const repository = repositoryWith(Temporal.Instant.from("2026-02-10T09:30:00Z"));
 
     await expect(
-      repository.findPiiRedactionModelAcceptedAt({ organizationId: "org_1" }),
+      repository.findPiiRedactionModelAcceptedAtMs({ organizationId: "org_1" }),
     ).resolves.toBe(Date.parse("2026-02-10T09:30:00Z"));
   });
 
@@ -42,10 +42,10 @@ describe("MemoryBillingReportOrganizationRepository, the PII redaction model's a
     const repository = repositoryWith(null);
 
     await expect(
-      repository.findPiiRedactionModelAcceptedAt({ organizationId: "org_1" }),
+      repository.findPiiRedactionModelAcceptedAtMs({ organizationId: "org_1" }),
     ).resolves.toBeNull();
     await expect(
-      repository.findPiiRedactionModelAcceptedAt({ organizationId: "org_none" }),
+      repository.findPiiRedactionModelAcceptedAtMs({ organizationId: "org_none" }),
     ).resolves.toBeNull();
   });
 });

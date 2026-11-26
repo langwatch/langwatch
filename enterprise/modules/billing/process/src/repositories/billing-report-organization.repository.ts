@@ -44,7 +44,7 @@ export abstract class BillingReportOrganizationRepository {
    * the PII redaction meter counts spend from then on only (ADR-201 decision 15). Null when no
    * admin accepted it, and for an unknown organization.
    */
-  abstract findPiiRedactionModelAcceptedAt(input: {
+  abstract findPiiRedactionModelAcceptedAtMs(input: {
     organizationId: string;
   }): Promise<number | null>;
 }

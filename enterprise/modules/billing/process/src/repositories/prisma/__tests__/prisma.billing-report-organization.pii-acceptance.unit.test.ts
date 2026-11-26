@@ -33,7 +33,7 @@ describe("PrismaBillingReportOrganizationRepository, the PII redaction model's a
       });
 
       await expect(
-        repository.findPiiRedactionModelAcceptedAt({ organizationId: "org_1" }),
+        repository.findPiiRedactionModelAcceptedAtMs({ organizationId: "org_1" }),
       ).resolves.toBe(Date.parse("2026-02-10T09:30:00.000Z"));
       expect(asked).toEqual([
         { where: { id: "org_1" }, select: { piiRedactionModelAcceptedAt: true } },
@@ -50,7 +50,7 @@ describe("PrismaBillingReportOrganizationRepository, the PII redaction model's a
       const { repository } = repositoryOver(row);
 
       await expect(
-        repository.findPiiRedactionModelAcceptedAt({ organizationId: "org_1" }),
+        repository.findPiiRedactionModelAcceptedAtMs({ organizationId: "org_1" }),
       ).resolves.toBeNull();
     });
   });

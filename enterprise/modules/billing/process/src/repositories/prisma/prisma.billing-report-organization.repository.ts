@@ -112,7 +112,7 @@ export class PrismaBillingReportOrganizationRepository extends BillingReportOrga
     };
   }
 
-  async findPiiRedactionModelAcceptedAt({
+  async findPiiRedactionModelAcceptedAtMs({
     organizationId,
   }: {
     organizationId: string;

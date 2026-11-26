@@ -1066,7 +1066,7 @@ export class BillingModule
       isSpendSourceAvailable: () => repositories.gatewaySpend.isSpendSourceAvailable(),
       listProjectIds: ({ organizationId }) => projects.findProjectIds(organizationId),
       findPiiRedactionModelAcceptedAtMs: (input) =>
-        repositories.reportOrganizations.findPiiRedactionModelAcceptedAt(input),
+        repositories.reportOrganizations.findPiiRedactionModelAcceptedAtMs(input),
       sumSpendNanoUsdByRequestType: (input) =>
         repositories.gatewaySpend.sumSpendNanoUsdByRequestType(input),
     });

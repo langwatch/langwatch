@@ -83,7 +83,7 @@ export class MemoryBillingReportOrganizationRepository extends BillingReportOrga
     };
   }
 
-  async findPiiRedactionModelAcceptedAt({
+  async findPiiRedactionModelAcceptedAtMs({
     organizationId,
   }: {
     organizationId: string;

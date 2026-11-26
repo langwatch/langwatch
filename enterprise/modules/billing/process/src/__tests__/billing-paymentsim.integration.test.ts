@@ -476,7 +476,7 @@ describe.skipIf(!goPresent)(
         isSpendSourceAvailable: () => true,
         listProjectIds: async () => [`${organizationId}-project-1`, `${organizationId}-project-2`],
         findPiiRedactionModelAcceptedAtMs: (input) =>
-          reportOrganizations.findPiiRedactionModelAcceptedAt(input),
+          reportOrganizations.findPiiRedactionModelAcceptedAtMs(input),
         sumSpendNanoUsdByRequestType: async (input) => {
           ledgerReads.push({ requestType: input.requestType });
           windowStarts.push(input.fromMs);
