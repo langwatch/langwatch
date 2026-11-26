@@ -18,10 +18,8 @@ export class PiiRedactionModelAcceptanceService {
 
   private constructor(private readonly organizations: OrganizationAcceptances) {}
 
-  /** A project in no organization has nobody to accept the price, so it reads as not accepted. */
-  async isAccepted({ organizationId }: { organizationId: string | null }): Promise<boolean> {
-    if (organizationId === null) return false;
-    return this.organizations.isPiiRedactionModelAccepted({ organizationId });
+  isAccepted(input: { organizationId: string }): Promise<boolean> {
+    return this.organizations.isPiiRedactionModelAccepted(input);
   }
 
   /** The door authorized the admin on this organization; the first acceptance is the one kept. */
