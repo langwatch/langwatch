@@ -22,6 +22,7 @@ import { NurturingDeliveryService } from "../nurturing-delivery.service.ts";
 import { NurturingGuidedOnboardingBackfillService } from "../nurturing-guided-onboarding-backfill.service.ts";
 import { NurturingService } from "../nurturing.service.ts";
 import { unplacedMemberFacts } from "./nurturing-member-facts.test-helpers.ts";
+import { peopleWithEmails } from "./nurturing-person-email.test-helpers.ts";
 
 /** Every call Customer.io was handed, single or batched, in the order; refuses batches on ask. */
 class RecordingChannel extends CustomerIoChannel {
@@ -51,7 +52,7 @@ async function settle(): Promise<void> {
 
 async function deliveryWithGuidedOrganization() {
   const channel = new RecordingChannel();
-  const customerIo = NurturingService.create({ channel });
+  const customerIo = NurturingService.create({ users: peopleWithEmails(), channel });
   const claims = MemoryNurturingClaimRepository.create();
   const members = MemoryNurturingOrganizationMemberRepository.create();
   await members.recordMembershipChange({
@@ -100,7 +101,11 @@ describe("NurturingDeliveryService for guided onboarding", () => {
       await settle();
 
       expect(channel.sent).toEqual([
-        { type: "identify", userId: "user-1", traits: { onboarding_variant: "guided" } },
+        {
+          type: "identify",
+          userId: "user-1",
+          traits: { onboarding_variant: "guided", email: "user-1@example.com" },
+        },
         {
           type: "group",
           userId: "user-1",
@@ -123,7 +128,11 @@ describe("NurturingDeliveryService for guided onboarding", () => {
       await delivery.deliver({ key, signal: variantAssigned });
 
       expect(channel.sent).toEqual([
-        { type: "identify", userId: "user-1", traits: { onboarding_variant: "guided" } },
+        {
+          type: "identify",
+          userId: "user-1",
+          traits: { onboarding_variant: "guided", email: "user-1@example.com" },
+        },
         {
           type: "group",
           userId: "user-1",
