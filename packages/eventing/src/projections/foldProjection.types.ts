@@ -114,7 +114,12 @@ export interface FoldProjectionOptions<E extends Event = Event> {
   // time; unwindowed retry is the correctness net. Omit for non-partitioned reads.
   // `fallbackLookbackStepsMs`: on a miss, re-read reaching each step back from the event,
   // narrowest first, instead of one unbounded read; a miss at the widest is final.
-  readWindow?: { widthMs: number; fallbackLookbackStepsMs?: readonly number[] };
+  readWindow?: {
+    widthMs: number;
+    fallbackLookbackStepsMs?: readonly number[];
+    /** The business time to centre on when occurredAt is an arrival time; else occurredAt. */
+    anchorOf?: (event: E) => number | undefined;
+  };
   // Re-fold from event log on store miss; transitional only for rows predating
   // read-back columns. See ADR-066; requires eventLoaderUpTo and RedisCachedFoldStore.
   refoldOnStoreMiss?: boolean;
