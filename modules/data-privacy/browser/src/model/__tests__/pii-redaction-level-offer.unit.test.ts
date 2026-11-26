@@ -13,6 +13,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   levelChangeConfirmation,
+  levelChangeStep,
   organizationPiiLevel,
   organizationRule,
   PII_REDACTION_MODEL_PRICE_UNIT,
@@ -27,6 +28,7 @@ import {
 } from "../pii-redaction-level-offer.ts";
 
 type Licence = Parameters<typeof piiRedactionModelOfferOf>[0]["licence"];
+const readPrice = async () => {};
 
 describe("given the deployment and the PII redaction model flags", () => {
   describe("when the deployment is self-hosted", () => {
@@ -47,6 +49,7 @@ describe("given the deployment and the PII redaction model flags", () => {
         licence,
         mayManageLicence,
         currency: "USD",
+        readPrice,
       });
 
     /** @scenario The Strict offer on a self-hosted deployment follows the license and the model flag */
@@ -123,6 +126,7 @@ describe("given the deployment and the PII redaction model flags", () => {
           licence: "none",
           mayManageLicence: true,
           currency: "USD",
+          readPrice,
         });
       expect(cloud({ modelFlag: false, freeFlag: true })).toBeNull();
       expect(cloud({ modelFlag: true, freeFlag: false })).toEqual({
@@ -149,6 +153,7 @@ describe("given the deployment and the PII redaction model flags", () => {
         licence: "none",
         mayManageLicence: true,
         currency: "USD",
+        readPrice,
       });
       expect(cloud).toEqual({ kind: "model", free: false, split: true, currency: "USD" });
       const selfHosted = piiRedactionModelOfferOf({
@@ -159,6 +164,7 @@ describe("given the deployment and the PII redaction model flags", () => {
         licence: "enterprise",
         mayManageLicence: true,
         currency: "USD",
+        readPrice,
       });
       expect(selfHosted).toMatchObject({ kind: "model", split: false });
     });
@@ -174,6 +180,7 @@ describe("given the deployment and the PII redaction model flags", () => {
           licence: "unknown",
           mayManageLicence: true,
           currency: "EUR",
+          readPrice,
         }),
       ).toEqual({ kind: "model", free: false, split: false, currency: "EUR" });
     });
@@ -189,8 +196,15 @@ describe("given the deployment and the PII redaction model flags", () => {
           licence: "unknown",
           mayManageLicence: true,
           currency: "unknown",
+          readPrice,
         }),
-      ).toEqual({ kind: "price-unknown" });
+      ).toEqual({
+        kind: "model",
+        free: false,
+        split: false,
+        currency: "unknown",
+        readPrice,
+      });
     });
 
     it("offers Strict as included to a free organization whatever the currency reading", () => {
@@ -203,6 +217,7 @@ describe("given the deployment and the PII redaction model flags", () => {
           licence: "unknown",
           mayManageLicence: true,
           currency: "unknown",
+          readPrice,
         }),
       ).toEqual({ kind: "model", free: true, split: false, licensed: false });
     });
@@ -303,6 +318,21 @@ describe("given the organization's resolved PII level", () => {
 describe("given a change of the organization's level", () => {
   const priced = { kind: "model", free: false, split: false, currency: "USD" } as const;
   const included = { kind: "model", free: true, split: false, licensed: false } as const;
+  const priceUnknown = { ...priced, currency: "unknown", readPrice } as const;
+
+  describe("when Strict is picked before the subscription's currency is read", () => {
+    /** @scenario "Before the price is read the page still offers the level picker, quoting no price" */
+    it("waits for the price, while a change to Essential still asks only to replace Custom", () => {
+      expect(levelChangeStep({ from: "essential", to: "strict", model: priceUnknown })).toEqual({
+        kind: "wait",
+      });
+      expect(levelChangeStep({ from: "strict", to: "essential", model: priceUnknown })).toEqual({
+        kind: "save",
+      });
+      const replace = levelChangeStep({ from: "custom", to: "essential", model: priceUnknown });
+      expect(replace.kind === "ask" && replace.confirmation.confirmLabel).toBe("Replace");
+    });
+  });
 
   describe("when Essential turns into Strict for a paying organization", () => {
     it("asks with the model and its price", () => {
@@ -399,6 +429,7 @@ describe("given the fallback note", () => {
 
 describe("given a rule saved from the drawer", () => {
   const model = { kind: "model", free: false, split: false, currency: "USD" } as const;
+  const priceUnknown = { ...model, currency: "unknown", readPrice } as const;
   const turnsStrictOn = {
     before: { pii: { level: "essential" as const } },
     after: { pii: { level: "strict" as const } },
@@ -425,7 +456,7 @@ describe("given a rule saved from the drawer", () => {
   describe("when it turns Strict on before the subscription's currency is read", () => {
     /** @scenario "A Strict rule save waits for the subscription's currency" */
     it("waits rather than saving unasked, and its message quotes no price", () => {
-      expect(ruleSaveStep({ offer: { kind: "price-unknown" }, ...turnsStrictOn })).toEqual({
+      expect(ruleSaveStep({ offer: priceUnknown, ...turnsStrictOn })).toEqual({
         kind: "wait",
       });
       expect(RULE_SAVE_WAITING.description).not.toMatch(/[$€]/);
@@ -437,9 +468,7 @@ describe("given a rule saved from the drawer", () => {
     const strict = { pii: { level: "strict" as const } };
     const save = { kind: "save" };
     expect(ruleSaveStep({ offer: model, before: strict, after: strict })).toEqual(save);
-    expect(
-      ruleSaveStep({ offer: { kind: "price-unknown" }, before: strict, after: strict }),
-    ).toEqual(save);
+    expect(ruleSaveStep({ offer: priceUnknown, before: strict, after: strict })).toEqual(save);
     expect(
       ruleSaveStep({
         offer: { kind: "model", free: true, split: false, licensed: false },

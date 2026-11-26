@@ -1,4 +1,4 @@
-import { HStack, IconButton, Text, VStack } from "@langwatch/design-system/primitives";
+import { Button, HStack, IconButton, Text, VStack } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { Info } from "lucide-react";
 
@@ -18,6 +18,18 @@ import {
  * the billing and fallback notes behind an (i).
  */
 export function PiiRedactionModelPrice({ model }: { model: PiiRedactionModel }) {
+  if (!model.free && model.currency === "unknown") {
+    return (
+      <HStack gap={1.5} wrap="wrap" align="center" data-testid="pii-redaction-model-price">
+        <Text fontSize="sm" fontWeight="600">
+          Price not loaded
+        </Text>
+        <Button size="2xs" variant="ghost" onClick={() => void model.readPrice()}>
+          Try again
+        </Button>
+      </HStack>
+    );
+  }
   const { free, split } = model;
   const licensed = model.free && model.licensed;
   return (

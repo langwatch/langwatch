@@ -258,6 +258,17 @@ Feature: The organization picks its PII redaction level on the Data Privacy page
     Then the confirmation asks at "€0.425 per 1M characters"
 
   @unit @integration
+  Scenario: Before the price is read the page still offers the level picker, quoting no price
+    Given release_pii_redaction_model_enabled is on for "acme"
+    And the subscription's plan has not answered, or its read failed
+    When an admin opens the Data Privacy page for project "web-app"
+    Then the picker offers Essential and Strict, and Strict reads "Price not loaded" with Try again
+    And the rule drawer at Strict shows the LangWatch PII Redaction Model with no price
+    And Try again reads the plan again
+    And picking Strict waits for the price, then asks at it once the plan answers
+    And changing to Essential asks only what it asked before
+
+  @unit @integration
   Scenario: A Strict rule save waits for the subscription's currency
     Given release_pii_redaction_model_enabled is on for "acme"
     And the subscription's plan has not answered, or its read failed

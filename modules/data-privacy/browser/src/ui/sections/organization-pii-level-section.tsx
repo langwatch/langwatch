@@ -10,12 +10,13 @@ import { useState } from "react";
 import { dataPrivacyApi } from "../../behavior/data-privacy-api.ts";
 import type { DataPrivacyHostApi } from "../../model/data-privacy-host.ts";
 import {
-  levelChangeConfirmation,
+  levelChangeStep,
   organizationPiiLevel,
   organizationRule,
   type OrganizationPiiLevel,
   otherPiiLevelLabel,
   type PiiRedactionModel,
+  ruleSaveDialog,
   withOrganizationPiiLevel,
 } from "../../model/pii-redaction-level-offer.ts";
 import { OrganizationPiiLevelPicker } from "../blocks/organization-pii-level-picker.tsx";
@@ -51,6 +52,7 @@ export function OrganizationPiiLevelSection({
   const setForScope = dataPrivacyApi.dataPrivacy.setForScope.useMutation();
   const [picked, setPicked] = useOptimisticPick(snapshot.effectiveOrganization?.pii.level);
   const [asking, setAsking] = useState<OrganizationPiiLevel | null>(null);
+  const [readingPrice, setReadingPrice] = useState(false);
   const organizationId = snapshot.available.organization?.id ?? host.scope().organizationId;
   if (!organizationId || !snapshot.effectiveOrganization) return null;
 
@@ -58,9 +60,26 @@ export function OrganizationPiiLevelSection({
   const stored = organizationPiiLevel(storedPii.level);
   const shown = picked && picked.over === stored ? picked.level : stored;
   const ownRule = organizationRule({ rules: snapshot.rules, organizationId });
-  const confirmationFor = (level: OrganizationPiiLevel) =>
-    levelChangeConfirmation({ from: storedPii.level, to: level, model });
-  const confirmation = asking ? confirmationFor(asking) : null;
+  const stepFor = (level: OrganizationPiiLevel) =>
+    levelChangeStep({ from: storedPii.level, to: level, model });
+  // Read live: a pick waiting for the price asks with it once the plan answers.
+  const step = asking ? stepFor(asking) : null;
+  const confirmation = ruleSaveDialog(step);
+  const readPrice = async () => {
+    if (model.free || model.currency !== "unknown") return;
+    setReadingPrice(true);
+    try {
+      await model.readPrice();
+    } finally {
+      setReadingPrice(false);
+    }
+  };
+  const pick = (level: OrganizationPiiLevel) => {
+    const next = stepFor(level).kind;
+    if (next === "save") return void save(level);
+    setAsking(level);
+    if (next === "wait") void readPrice();
+  };
 
   const save = async (level: OrganizationPiiLevel) => {
     setPicked({ level, over: stored });
@@ -91,18 +110,20 @@ export function OrganizationPiiLevelSection({
         model={model}
         canWrite={snapshot.available.organization !== null}
         isSaving={setForScope.isPending}
-        onPick={(level) => (confirmationFor(level) ? setAsking(level) : void save(level))}
+        onPick={pick}
       />
       <ConfirmDialog
         open={confirmation !== null}
         onClose={() => setAsking(null)}
         onConfirm={() => {
+          if (step?.kind === "wait") return void readPrice();
           if (asking) void save(asking);
           setAsking(null);
         }}
         title={confirmation?.title ?? ""}
         description={confirmation?.description ?? ""}
         confirmLabel={confirmation?.confirmLabel}
+        loading={step?.kind === "wait" && readingPrice}
         tone="default"
       />
     </>

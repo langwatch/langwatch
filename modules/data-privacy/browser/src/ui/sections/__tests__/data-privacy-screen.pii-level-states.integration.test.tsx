@@ -293,6 +293,45 @@ describe("given the Data Privacy page", () => {
     });
   });
 
+  describe("when the page opens before the subscription's currency is read", () => {
+    /** @scenario "Before the price is read the page still offers the level picker, quoting no price" */
+    it("offers the picker with no price, reads the plan on Try again, and asks once it answers", async () => {
+      const { answerPlan, mounted } = page({ flagOn: true, billingCurrency: "unknown" });
+      const user = userEvent.setup();
+
+      const price = screen.getByTestId("pii-redaction-model-price");
+      expect(price.textContent).toContain("Price not loaded");
+      expect(price.textContent).not.toMatch(/[$€]/);
+      await user.click(within(price).getByRole("button", { name: "Try again" }));
+      expect(mounted().refreshes).toBe(1);
+
+      await user.click(levelRadio("Strict"));
+      const waiting = await screen.findByRole("dialog", { name: "Turn on Strict?" });
+      expect(waiting.textContent).toContain("hasn't loaded yet");
+      expect(mounted().refreshes).toBe(2);
+      expect(api.setForScope).not.toHaveBeenCalled();
+
+      answerPlan("EUR");
+      const dialog = await screen.findByRole("dialog", { name: "Turn on Strict?" });
+      await waitFor(() => expect(dialog.textContent).toContain("€0.425 per 1M characters"));
+      await user.click(within(dialog).getByRole("button", { name: "Turn on Strict" }));
+
+      await waitFor(() => expect(api.setForScope).toHaveBeenCalledTimes(1));
+    });
+
+    /** @scenario "Before the price is read the page still offers the level picker, quoting no price" */
+    it("shows the model in the drawer at Strict with no price", async () => {
+      api.snapshot = snapshotWith({ rules: [projectRuleWith({ pii: { level: "strict" } })] });
+      page({ flagOn: true, billingCurrency: "unknown", query: { rule: "PROJECT:proj-1:false" } });
+
+      const drawer = await screen.findByRole("dialog");
+      expect(within(drawer).getByText("LangWatch PII Redaction Model")).toBeInTheDocument();
+      const price = within(drawer).getByTestId("pii-redaction-model-price");
+      expect(price.textContent).toContain("Price not loaded");
+      expect(price.textContent).not.toMatch(/[$€]/);
+    });
+  });
+
   describe("when the model flag turns off while a Strict save waits for the price", () => {
     /** @scenario "A Strict rule save waits for the subscription's currency" */
     it("saves the rule without asking, as a save with the flag off does", async () => {
