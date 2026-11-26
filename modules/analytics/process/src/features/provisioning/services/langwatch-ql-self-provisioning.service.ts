@@ -12,10 +12,7 @@ import type { LwqlCollectionState } from "../../../repositories/langwatch-ql-pro
 import { flooredViewName, flooredViewNames } from "../../../rules/lwql-dedup-floor.rules.ts";
 import { traceIdsViewName, traceIdsViewNames } from "../../../rules/lwql-dedup-trace-ids.rules.ts";
 import { LWQL_VIEW_CATALOG } from "../../../rules/lwql-view-catalog.rules.ts";
-import {
-  LangWatchQLAccessModelDefinitionService,
-  type LwqlAccessModelDefinition,
-} from "../../../services/langwatch-ql-access-model-definition.service.ts";
+import { LangWatchQLAccessModelDefinitionService } from "../../../services/langwatch-ql-access-model-definition.service.ts";
 import {
   LangWatchQLAccessModelService,
   type LangWatchQLNames,
@@ -36,12 +33,12 @@ import {
 } from "./langwatch-ql-clickhouse-drift.service.ts";
 import {
   LangWatchQLCollectionBindingService,
-  LWQL_RENDERED_NAMED_COLLECTION,
   type LwqlAccessModelMode,
   type LwqlPostgresEndpoint,
   type LwqlPostgresSettings,
   NO_COLLECTION_STATE,
 } from "./langwatch-ql-collection-binding.service.ts";
+import { LangWatchQLExternalCollectionAccessModelService } from "./langwatch-ql-external-collection-access-model.service.ts";
 import type { LwqlPostgresGap } from "./langwatch-ql-postgres-gaps.service.ts";
 import {
   DEFAULT_POSTGRES_READER_LIMITS,
@@ -62,16 +59,7 @@ const postgresMapping = LangWatchQLPostgresMappingService.create();
 const postgresViews = LangWatchQLPostgresViewsService.create();
 const viewProvisioning = LangWatchQLViewProvisioningService.create();
 const collectionBinding = LangWatchQLCollectionBindingService.create();
-
-/** What an external collection leaves in the definition: never rendered, so never a password. */
-const NO_NAMED_COLLECTION_VALUES = {
-  collection: LWQL_RENDERED_NAMED_COLLECTION,
-  host: "",
-  port: 0,
-  database: "",
-  user: "",
-  password: "",
-};
+const externalCollectionAccessModel = LangWatchQLExternalCollectionAccessModelService.create();
 
 /** The SaaS-convention names every self-provisioning distribution shares. */
 export const LWQL_SELF_PROVISION_DEFAULTS = {
@@ -276,7 +264,7 @@ export class LangWatchQLSelfProvisioningService {
             namedCollection: collectionBinding.namedCollectionValues({ names, postgres, mode }),
             sourceDatabase,
           })
-        : this.externalCollectionAccessModel({ names, restrictedPassword, sourceDatabase });
+        : externalCollectionAccessModel.build({ names, restrictedPassword, sourceDatabase });
     const structural = accessModel.setupStatements({
       names,
       sourceDatabase,
@@ -316,27 +304,6 @@ export class LangWatchQLSelfProvisioningService {
       ...views,
       ...accessModelDefinition.renderDdl(definition),
     ];
-  }
-
-  /**
-   * The access model of a server whose own config holds the PostgreSQL collection: the private
-   * SQL path and the private render read this one, so the users.d file matches the statements.
-   */
-  externalCollectionAccessModel({
-    names,
-    restrictedPassword,
-    sourceDatabase,
-  }: {
-    names: LangWatchQLNames;
-    restrictedPassword: string;
-    sourceDatabase: string;
-  }): LwqlAccessModelDefinition {
-    return accessModelDefinition.build({
-      names,
-      passwordSha256Hex: createHash("sha256").update(restrictedPassword).digest("hex"),
-      namedCollection: NO_NAMED_COLLECTION_VALUES,
-      sourceDatabase,
-    });
   }
 
   /** One engine table per PostgreSQL dataset, each on the collection `collectionFor` picks. */

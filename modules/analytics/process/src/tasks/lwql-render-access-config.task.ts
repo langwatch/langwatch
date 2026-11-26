@@ -14,6 +14,7 @@ import { createLogger } from "@langwatch/observability";
 import { Task } from "@langwatch/task";
 
 import { LangWatchQLCollectionBindingService } from "../features/provisioning/services/langwatch-ql-collection-binding.service.ts";
+import { LangWatchQLExternalCollectionAccessModelService } from "../features/provisioning/services/langwatch-ql-external-collection-access-model.service.ts";
 import { LangWatchQLProductionProvisioningService } from "../features/provisioning/services/langwatch-ql-production-provisioning.service.ts";
 import {
   LangWatchQLSelfProvisioningService,
@@ -38,6 +39,7 @@ const logger = createLogger("langwatch:tasks:lwql-render-access-config");
 const accessModelDefinition = LangWatchQLAccessModelDefinitionService.create();
 const production = LangWatchQLProductionProvisioningService.create();
 const selfProvisioning = LangWatchQLSelfProvisioningService.create();
+const externalCollectionAccessModel = LangWatchQLExternalCollectionAccessModelService.create();
 const collectionBinding = LangWatchQLCollectionBindingService.create();
 const sqlText = LangWatchQLSqlTextService.create();
 
@@ -110,7 +112,7 @@ export function lwqlPrivateAccessModelDefinitionFromSource({
     reader,
     tenantSetting: source.LWQL_TENANT_SETTING ?? LWQL_CONNECTION_DEFAULTS.tenantSetting,
   });
-  return selfProvisioning.externalCollectionAccessModel({
+  return externalCollectionAccessModel.build({
     names,
     restrictedPassword: reader.password,
     sourceDatabase: database,
