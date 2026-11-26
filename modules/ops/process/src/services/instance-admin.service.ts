@@ -121,7 +121,7 @@ export class InstanceAdminService {
   private refuseUnknownUserSort(input: AdminOperationInput): void {
     if (input.resource !== "user" || input.method !== "getList") return;
     const field = input.params.sort?.field;
-    if (field === undefined || adminUserSortFieldSchema.safeParse(field).success) return;
+    if (field === undefined || adminUserSortFieldSchema.validate(field)) return;
     throw new ValidationError("The users list cannot be sorted by that field", {
       meta: {
         fieldErrors: { sort: [`Sort by one of: ${adminUserSortFieldSchema.options.join(", ")}.`] },

@@ -271,6 +271,8 @@
         "**/e2e/**",
         "packages/test-harness/**",
         "skills/_tests/**",
+        // Test templates users copy into their own repositories.
+        "skills/recipes/*/templates/**",
       ],
       "rules": { "node/no-process-env": "off" },
     },
