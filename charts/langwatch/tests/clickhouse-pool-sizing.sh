@@ -23,10 +23,10 @@ render_component() {
 
 env_value() {
   local block="$1" name="$2"
-  printf '%s' "$block" | awk -v name="$name" '
+  awk -v name="$name" '
     $0 ~ "name: " name "$" { found=1; next }
     found && /value:/ { gsub(/"/, "", $2); print $2; exit }
-  '
+  ' <<<"$block"
 }
 
 expect_env() {

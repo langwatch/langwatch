@@ -3,7 +3,11 @@ import { Menu } from "@langwatch/design-system/menu";
 import { Box, chakra, HStack, Spinner, Text, Textarea } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { useReducedMotion } from "@langwatch/design-system/use-reduced-motion";
-import type { LangyTurnPhase } from "@langwatch/langy-contract";
+import {
+  LANGY_ATTACHMENT_MEDIA_TYPES,
+  type LangyAttachment,
+  type LangyTurnPhase,
+} from "@langwatch/langy-contract";
 import {
   Bot,
   Check,
@@ -33,6 +37,22 @@ import { memo, useCallback, useEffect, useRef, useState } from "react";
 import { type LangyContextChip, useLangyStore } from "../../../../behavior/langy.store.ts";
 import { LANGY_ANSWER_HERE_OR_TERMINAL } from "../../../../model/langy-local-waits.ts";
 import type { LangySkill } from "../../../../model/shared/langy/langy-skills.ts";
+import {
+  imagesAllowSend,
+  useLangyComposerImages,
+} from "../../../composer/behavior/langy-composer-images.store.ts";
+import { useLangyImageAttach } from "../../../composer/behavior/use-langy-image-attach.ts";
+import {
+  type MarkerRange,
+  markerDeletion,
+  markerRangesIn,
+  markersMissingFrom,
+  snapCaret,
+  textPiecesOf,
+  withoutMarker,
+} from "../../../composer/model/langy-image-markers.ts";
+import { LangyDraftImageChip } from "../../../composer/ui/elements/langy-image-chip.tsx";
+import { LangyImageThumb } from "../../../composer/ui/elements/langy-image-thumb.tsx";
 import { describeChipContext } from "../../../context-target/behavior/langy-chip-context.ts";
 import { useLangyContextTargetStore } from "../../../context-target/behavior/langy-context-target.store.ts";
 import { LangyComposerPalette, type PaletteMode } from "../elements/langy-composer-palette.tsx";
@@ -142,7 +162,7 @@ function composerGutter({ hero, floating }: { hero: boolean; floating: boolean }
   return floating ? 3 : 3.5;
 }
 
-/** The bottom rail: the per-send model picker and the `#` and `/` palette buttons. */
+/** The bottom rail: the attach button and the per-send model picker. */
 function ComposerRail({
   hero,
   model,
@@ -151,7 +171,7 @@ function ComposerRail({
   onModelChange,
   locked,
   turnActive,
-  openPalette,
+  onAttach,
 }: {
   hero: boolean;
   model: string;
@@ -161,15 +181,13 @@ function ComposerRail({
   /** Disabled, or a turn is in flight: nothing on the rail can change. */
   locked: boolean;
   turnActive: boolean;
-  openPalette: (mode: PaletteMode) => void;
+  /** Absent where images can't be attached: the rail shows no attach button. */
+  onAttach?: (files: readonly File[]) => void;
 }) {
   return (
     <HStack
       gap={1}
-      // ONE row, centers on one line: the model pill (28px control) and
-      // the sigil buttons share the rail, so the sigils carry the same
-      // control height (see SigilButton) and the row centers explicitly
-      // rather than by luck.
+      // ONE row: the attach button and the model pill share the 28px control height.
       align="center"
       // ...and it STAYS one row.
       flexWrap="nowrap"
@@ -179,11 +197,10 @@ function ComposerRail({
       paddingBottom={2}
       paddingTop={0}
       // The hero stays bare: see the note on the context summary in ComposerImpl.
-      display={hero ? "none" : undefined}
+      display={hero ? "none" : "flex"}
     >
+      {onAttach ? <AttachImageButton onAttach={onAttach} disabled={locked} /> : null}
       <Box flex={1} minWidth={0} />
-      {/* Real buttons that name each shortcut and open it, so the shortcut teaches itself.
-          Kept apart so they don't read as one control at the rail's 4px gap. */}
       <HStack gap={2} flexShrink={0} align="center">
         <LangyModelPill
           model={model}
@@ -196,20 +213,6 @@ function ComposerRail({
           // choice that wouldn't take.
           disabled={locked}
           disabledReason={turnLock({ turnActive })}
-        />
-        <SigilButton
-          sigil="#"
-          label="Context"
-          hint="Add something from this page. Press #"
-          onClick={() => openPalette("context")}
-          disabled={locked}
-        />
-        <SigilButton
-          sigil="/"
-          label="Skills"
-          hint="Pick what Langy should do. Press /"
-          onClick={() => openPalette("skills")}
-          disabled={locked}
         />
       </HStack>
     </HStack>
@@ -269,6 +272,7 @@ function ComposerImpl({
   awaitingAnswer = false,
   terminalConnected = false,
   cardRef,
+  uploadImage,
 }: {
   /** The model Langy will use for the next send. "" = let the server pick. */
   model: string;
@@ -309,6 +313,8 @@ function ComposerImpl({
    * there too and the placeholder names both places.
    */
   terminalConnected?: boolean;
+  /** Stores one image for the draft; without it the composer takes no images. */
+  uploadImage?: (file: File) => Promise<LangyAttachment>;
 }) {
   const floating = variant === "floating";
   const hero = variant === "hero";
@@ -327,6 +333,7 @@ function ComposerImpl({
   const turnActive = turnPhase !== "idle";
 
   useComposerFocusHandoff({ textareaRef, hero });
+  const attachImages = useLangyImageAttach({ textareaRef, uploadImage });
 
   // The rainbow sheen is an ACTIVITY signal, not an invitation.
 
@@ -438,6 +445,15 @@ function ComposerImpl({
           }}
           transition="border-color 150ms ease, box-shadow 150ms ease"
           overflow="hidden"
+          onDragOver={(event: React.DragEvent) => {
+            if (event.dataTransfer.types.includes("Files")) event.preventDefault();
+          }}
+          onDrop={(event: React.DragEvent) => {
+            const files = [...event.dataTransfer.files];
+            if (files.length === 0 || disabled || !attachImages) return;
+            event.preventDefault();
+            attachImages(files);
+          }}
         >
           {/* `/` or `#` turns the top of the card into a real combobox. It is
               the SAME rounded surface — the composer becomes a command bar
@@ -476,6 +492,8 @@ function ComposerImpl({
             />
           )}
 
+          <ComposerImagesRow />
+
           {/* Send/stop sits directly beside the field so it reads as the field's own action.
               `align="flex-end"` pins the button to the bottom of a growing textarea, except in
               the hero (which has no context summary or model rail for bearings): there the row
@@ -489,6 +507,7 @@ function ComposerImpl({
             onSend={onSend}
             onStop={onStop}
             openPalette={openPalette}
+            onAttach={attachImages}
             textareaRef={textareaRef}
           />
 
@@ -507,7 +526,7 @@ function ComposerImpl({
             onModelChange={onModelChange}
             locked={disabled || turnActive}
             turnActive={turnActive}
-            openPalette={openPalette}
+            onAttach={attachImages}
           />
         </Box>
       </Box>
@@ -582,6 +601,101 @@ export function composerPlaceholder({
   return turnActive ? MID_TURN_PLACEHOLDER : idle;
 }
 
+/** A key that deletes into a chip takes the whole chip; any other key goes on to the field. */
+function chipKeyHandler({
+  input,
+  ranges,
+  onInputChange,
+  otherwise,
+}: {
+  input: string;
+  ranges: readonly MarkerRange[];
+  onInputChange: (text: string) => void;
+  otherwise: (event: React.KeyboardEvent<HTMLTextAreaElement>) => void;
+}) {
+  return (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    const field = event.currentTarget;
+    const deletion = markerDeletion({
+      text: input,
+      ranges,
+      start: field.selectionStart,
+      end: field.selectionEnd,
+      key: event.key,
+    });
+    if (!deletion) return otherwise(event);
+    event.preventDefault();
+    onInputChange(deletion.text);
+    requestAnimationFrame(() => field.setSelectionRange(deletion.caret, deletion.caret));
+  };
+}
+
+function pasteFiles({
+  event,
+  onAttach,
+}: {
+  event: React.ClipboardEvent<HTMLTextAreaElement>;
+  onAttach?: (files: readonly File[]) => void;
+}) {
+  const files = [...event.clipboardData.files];
+  if (files.length === 0 || !onAttach) return;
+  event.preventDefault();
+  onAttach(files);
+}
+
+function keepCaretOutOfChips({
+  field,
+  ranges,
+}: {
+  field: HTMLTextAreaElement;
+  ranges: readonly MarkerRange[];
+}) {
+  if (field.selectionStart !== field.selectionEnd) return;
+  const caret = snapCaret({ ranges, caret: field.selectionStart });
+  if (caret !== field.selectionStart) field.setSelectionRange(caret, caret);
+}
+
+/** The draft drawn over the field with its chips, laid out exactly as the field's own text. */
+function DraftChipsOverlay({
+  overlayRef,
+  hero,
+  text,
+  ranges,
+}: {
+  overlayRef: React.RefObject<HTMLDivElement | null>;
+  hero: boolean;
+  text: string;
+  ranges: readonly MarkerRange[];
+}) {
+  return (
+    <Box
+      ref={overlayRef}
+      aria-hidden
+      data-testid="langy-composer-overlay"
+      position="absolute"
+      inset={0}
+      overflow="hidden"
+      pointerEvents="none"
+      paddingX={3}
+      paddingTop={hero ? 0 : 2.5}
+      paddingBottom={hero ? 0 : 0.5}
+      fontSize="sm"
+      lineHeight="1.5"
+      color="fg"
+      whiteSpace="pre-wrap"
+      overflowWrap="break-word"
+    >
+      {textPiecesOf({ text, ranges }).map((piece, index) =>
+        piece.kind === "chip" ? (
+          <LangyDraftImageChip key={piece.key} label={piece.label} />
+        ) : (
+          <span key={`text:${index}`}>{piece.text}</span>
+        ),
+      )}
+      {"\u200b"}
+    </Box>
+  );
+}
+
 const ComposerInputRow = memo(function ComposerInputRow({
   hero,
   disabled,
@@ -591,6 +705,7 @@ const ComposerInputRow = memo(function ComposerInputRow({
   onSend,
   onStop,
   openPalette,
+  onAttach,
   textareaRef,
 }: {
   hero: boolean;
@@ -601,6 +716,7 @@ const ComposerInputRow = memo(function ComposerInputRow({
   onSend: (input: string) => void;
   onStop: () => void;
   openPalette: (mode: PaletteMode) => void;
+  onAttach?: (files: readonly File[]) => void;
   textareaRef: React.RefObject<HTMLTextAreaElement | null>;
 }) {
   const input = useLangyStore((s) => s.draft);
@@ -612,7 +728,11 @@ const ComposerInputRow = memo(function ComposerInputRow({
   // paragraph. Measured from the field itself rather than guessed from the
   // text's length, which would be wrong at every width.
   const [multiline, setMultiline] = useState(false);
-  const canSend = turnPhase === "idle" && !!input.trim() && !disabled;
+  const images = useLangyComposerImages((s) => s.images);
+  const ranges = markerRangesIn({ text: input, markers: images.filter((image) => image.label) });
+  const overlayRef = useRef<HTMLDivElement>(null);
+  useDraftImagesFollowText({ text: input });
+  const canSend = turnPhase === "idle" && !!input.trim() && !disabled && imagesAllowSend(images);
 
   const onTextareaKeyDown = composerKeyHandler({
     input,
@@ -625,6 +745,13 @@ const ComposerInputRow = memo(function ComposerInputRow({
     onSend,
   });
 
+  const onKeyDownWithChips = chipKeyHandler({
+    input,
+    ranges,
+    onInputChange,
+    otherwise: onTextareaKeyDown,
+  });
+
   return (
     <HStack
       gap={1.5}
@@ -634,49 +761,63 @@ const ComposerInputRow = memo(function ComposerInputRow({
       paddingY={hero ? "7px" : 0}
       paddingBottom={hero ? "7px" : 1}
     >
-      <Textarea
-        ref={textareaRef}
-        data-testid="langy-composer-input"
-        value={input}
-        onChange={(e) => {
-          onInputChange(e.target.value);
-          if (hero) setMultiline(e.target.scrollHeight > 30);
-        }}
-        onKeyDown={onTextareaKeyDown}
-        placeholder={composerPlaceholder({
-          awaitingAnswer,
-          terminalConnected,
-          turnActive,
-          idle: placeholder,
-        })}
-        disabled={disabled}
-        rows={1}
-        autoresize
-        maxHeight="120px"
-        minHeight="20px"
-        flex={1}
-        minWidth={0}
-        paddingX={3}
-        // Symmetric in the hero so the single line sits on the row's
-        // centre; the panel keeps its asymmetric pair, which is tuned to
-        // the rail sitting directly underneath it.
-        paddingTop={hero ? 0 : 2.5}
-        paddingBottom={hero ? 0 : 0.5}
-        border="none"
-        background="transparent"
-        // Denser than the panel's body scale: the composer is a control, not
-        // reading matter, and a wider panel made 14px input read shouty.
-        fontSize="sm"
-        lineHeight="1.5"
-        color="fg"
-        resize="none"
-        // Block (not the default inline-block) so the textarea has no
-        // baseline descender gap under it — that phantom ~5px was the
-        // "dead band" between the placeholder and the model rail.
-        display="block"
-        _focus={{ outline: "none", boxShadow: "none" }}
-        _focusVisible={{ outline: "none", boxShadow: "none" }}
-      />
+      <Box position="relative" flex={1} minWidth={0}>
+        <Textarea
+          ref={textareaRef}
+          data-testid="langy-composer-input"
+          value={input}
+          onChange={(e) => {
+            onInputChange(e.target.value);
+            if (hero) setMultiline(e.target.scrollHeight > 30);
+          }}
+          onKeyDown={onKeyDownWithChips}
+          onPaste={(event) => pasteFiles({ event, onAttach: disabled ? undefined : onAttach })}
+          onSelect={(event) => keepCaretOutOfChips({ field: event.currentTarget, ranges })}
+          onScroll={(event) => {
+            if (overlayRef.current) overlayRef.current.scrollTop = event.currentTarget.scrollTop;
+          }}
+          placeholder={composerPlaceholder({
+            awaitingAnswer,
+            terminalConnected,
+            turnActive,
+            idle: placeholder,
+          })}
+          disabled={disabled}
+          rows={1}
+          autoresize
+          maxHeight="120px"
+          minHeight="20px"
+          flex={1}
+          minWidth={0}
+          paddingX={3}
+          // Symmetric in the hero so the single line sits on the row's
+          // centre; the panel keeps its asymmetric pair, which is tuned to
+          // the rail sitting directly underneath it.
+          paddingTop={hero ? 0 : 2.5}
+          paddingBottom={hero ? 0 : 0.5}
+          border="none"
+          background="transparent"
+          // Denser than the panel's body scale: the composer is a control, not
+          // reading matter, and a wider panel made 14px input read shouty.
+          fontSize="sm"
+          lineHeight="1.5"
+          color="fg"
+          resize="none"
+          // Block (not the default inline-block) so the textarea has no
+          // baseline descender gap under it — that phantom ~5px was the
+          // "dead band" between the placeholder and the model rail.
+          display="block"
+          // With chips drawn, the overlay paints the text and the field keeps only its caret.
+          {...(ranges.length > 0
+            ? { color: "transparent", caretColor: "var(--chakra-colors-fg)" }
+            : {})}
+          _focus={{ outline: "none", boxShadow: "none" }}
+          _focusVisible={{ outline: "none", boxShadow: "none" }}
+        />
+        {ranges.length > 0 ? (
+          <DraftChipsOverlay overlayRef={overlayRef} hero={hero} text={input} ranges={ranges} />
+        ) : null}
+      </Box>
       <ComposerSendControl
         turnPhase={turnPhase}
         canSend={canSend}
@@ -770,48 +911,27 @@ function SubmitTurnButton({ canSend, onSend }: { canSend: boolean; onSend: () =>
   );
 }
 
-/**
- * A key, named. Deliberately shows the glyph rather than an icon: the point of
- * the control is to teach the keystroke, and an icon teaches nothing about
- * which key to press.
- */
-function SigilButton({
-  sigil,
-  label,
-  hint,
-  onClick,
-  disabled = false,
+/** The rail's `+`: picks images from disk; paste and drop reach the same attach. */
+function AttachImageButton({
+  onAttach,
+  disabled,
 }: {
-  sigil: string;
-  label: string;
-  hint: string;
-  onClick: () => void;
-  /**
-   * Greyed while a turn is in flight, alongside the model picker.
-   */
-  disabled?: boolean;
+  onAttach: (files: readonly File[]) => void;
+  disabled: boolean;
 }) {
+  const inputRef = useRef<HTMLInputElement>(null);
   return (
-    <Tooltip content={hint} openDelay={300} showArrow>
+    <Tooltip content="Attach an image" openDelay={300} showArrow>
       <chakra.button
         type="button"
-        aria-label={hint}
-        onClick={onClick}
+        aria-label="Attach an image"
+        data-testid="langy-composer-attach"
+        onClick={() => inputRef.current?.click()}
         disabled={disabled}
-        aria-disabled={disabled}
-        _disabled={{
-          opacity: 0.45,
-          cursor: "not-allowed",
-          background: "transparent",
-        }}
-        display="inline-flex"
-        alignItems="center"
-        gap={1}
-        // The model pill's control height, so the rail's controls share one
-        // vertical center instead of a 22px button hanging beside a 28px pill.
+        display="grid"
+        placeItems="center"
+        width="28px"
         height="28px"
-        paddingLeft={1}
-        paddingRight={1.5}
         borderRadius="md"
         borderWidth={0}
         background="transparent"
@@ -819,26 +939,74 @@ function SigilButton({
         cursor="pointer"
         flexShrink={0}
         _hover={{ background: "bg.muted", color: "fg" }}
+        _disabled={{ opacity: 0.45, cursor: "not-allowed", background: "transparent" }}
       >
-        <chakra.span
-          display="grid"
-          placeItems="center"
-          minWidth="15px"
-          height="15px"
-          borderRadius="sm"
-          borderWidth="1px"
-          borderStyle="solid"
-          borderColor="border.emphasized"
-          textStyle="micro"
-          fontFamily="mono"
-          lineHeight="1"
-        >
-          {sigil}
-        </chakra.span>
-        <Text textStyle="2xs">{label}</Text>
+        <Plus size={15} />
+        <chakra.input
+          ref={inputRef}
+          type="file"
+          accept={LANGY_ATTACHMENT_MEDIA_TYPES.join(",")}
+          multiple
+          display="none"
+          data-testid="langy-composer-attach-input"
+          onChange={(event: React.ChangeEvent<HTMLInputElement>) => {
+            const files = [...(event.currentTarget.files ?? [])];
+            event.currentTarget.value = "";
+            if (files.length > 0) onAttach(files);
+          }}
+        />
       </chakra.button>
     </Tooltip>
   );
+}
+
+/** The draft's images above its text: a thumbnail each, with a button that removes it. */
+function ComposerImagesRow() {
+  const images = useLangyComposerImages((s) => s.images);
+  if (images.length === 0) return null;
+  const removeImage = (key: string) => {
+    const image = useLangyComposerImages.getState().images.find((one) => one.key === key);
+    if (image?.label) {
+      const draft = useLangyStore.getState().draft;
+      useLangyStore.getState().setDraft(withoutMarker({ text: draft, label: image.label }));
+    }
+    useLangyComposerImages.getState().remove([key]);
+  };
+  return (
+    <HStack
+      data-testid="langy-composer-images"
+      gap={2.5}
+      flexWrap="wrap"
+      paddingX={3}
+      paddingTop={3}
+      paddingBottom={0.5}
+    >
+      {images.map((image) => (
+        <LangyImageThumb
+          key={image.key}
+          name={image.fileName}
+          src={image.previewUrl}
+          status={image.status}
+          error={image.error}
+          onRemove={() => removeImage(image.key)}
+          onRetry={image.retry}
+        />
+      ))}
+    </HStack>
+  );
+}
+
+/** An image whose chip left the text leaves the draft; an emptied draft takes every image. */
+function useDraftImagesFollowText({ text }: { text: string }) {
+  useEffect(() => {
+    const { images, remove } = useLangyComposerImages.getState();
+    if (images.length === 0) return;
+    if (text === "") {
+      remove(images.map((image) => image.key));
+      return;
+    }
+    remove(markersMissingFrom({ text, markers: images.filter((image) => image.label) }));
+  }, [text]);
 }
 
 /** One quiet summary replaces the old wrapping pile of context/skill pills. */

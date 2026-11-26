@@ -71,7 +71,12 @@ export const reads = {
     "services/langyagent/internal/assets/AGENTS.md",
     "pnpm-workspace.yaml",
   ],
-  "@langwatch/skills": ["services/langyagent/**/*", "docs/**/*", "feature-map.json"],
+  "@langwatch/skills": [
+    "services/langyagent/**/*",
+    "docs/**/*",
+    "feature-map.json",
+    "apps/docs/specs/published-urls.txt",
+  ],
   langwatch: [
     "skills/**/*",
     "packages/redaction/**/*",
@@ -190,6 +195,8 @@ export const reads = {
     "pnpm-lock.yaml",
     "pyproject.toml",
     "uv.lock",
+    ".python-version",
+    "sdks/python/.python-version",
     "tsconfig*.json",
     "pnpm-workspace.yaml",
   ],
