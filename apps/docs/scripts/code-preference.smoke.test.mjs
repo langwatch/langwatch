@@ -45,14 +45,17 @@ await it("switches filenames and copied code together and remembers the language
           .filter({ has: page.locator("[data-docs-code-title]", { hasText: "chat.ts" }) })
           .first();
         await frame.getByRole("button", { name: "Copy code", exact: true }).click();
-        let copied = "";
-        for (let tries = 0; tries < 50 && !copied.includes("import { OpenAI }"); tries++) {
-          if (tries > 0) await page.waitForTimeout(100);
-          copied = await page.evaluate(() => navigator.clipboard.readText());
-        }
-        assert.match(copied, /import \{ OpenAI \}/);
-        assert.match(copied, /async function chat/);
-        assert.doesNotMatch(copied, /from openai import/);
+        await page.waitForFunction(() =>
+          navigator.clipboard.readText().then((text) => text.includes("import { OpenAI }")),
+        );
+        assert.match(
+          await page.evaluate(() => navigator.clipboard.readText()),
+          /async function chat/,
+        );
+        assert.doesNotMatch(
+          await page.evaluate(() => navigator.clipboard.readText()),
+          /from openai import/,
+        );
         await page.reload();
         await page.waitForFunction(
           () =>
