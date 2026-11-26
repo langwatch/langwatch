@@ -29,6 +29,17 @@ export const projectActivitySchema = z.object({
   ...envelope,
   projectId: z.string().min(1),
   fact: z.discriminatedUnion("kind", [
+    // Spans are no longer folded (ADR-002), but facts queued or stored under this version before
+    // that still parse; the fold ignores them.
+    z.object({
+      kind: z.literal("span"),
+      root: z.boolean(),
+      error: z.boolean(),
+      tokens: z.number().nonnegative(),
+      costUsd: z.number().nonnegative(),
+      durationMs: z.number().nonnegative(),
+      model: z.string().nullable(),
+    }),
     z.object({
       kind: z.literal("evaluation"),
       evaluatorType: z.string().nullable(),

@@ -282,6 +282,7 @@ export const APP_ERROR_CODES = [
   "developer_seat_no_shared_access",
   "developer_seat_restricted",
   "developer_seats_unavailable",
+  "digest_impersonation_refused",
   "digest_link_invalid",
   "digest_links_unavailable",
   "digest_member_not_found",

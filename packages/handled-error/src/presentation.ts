@@ -4825,6 +4825,10 @@ const presentations = {
     describe: () =>
       "Only active members of this organization can get a test digest. Pick someone else.",
   },
+  digest_impersonation_refused: {
+    title: "Can't change this while impersonating",
+    describe: () => "Email preferences belong to the person. Stop impersonating to change them.",
+  },
   digest_link_invalid: {
     title: "This link isn't valid",
     describe: () => "It may have expired or been changed. Use the link from the latest email.",

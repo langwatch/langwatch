@@ -64,7 +64,7 @@ type Deps = Readonly<{
   now: () => number;
 }>;
 
-type Remembered<Value> = { at: number; value: Promise<Value> };
+type Remembered<Value> = { at: number; settled: boolean; value: Promise<Value> };
 
 /**
  * A project's trace numbers for a week, read from analytics when an email needs them instead of
@@ -115,21 +115,32 @@ export class DigestTraceReadService {
     read: () => Promise<Value>,
   ): Promise<Value> {
     const key = `${organizationId}:${projectId}:${isoWeek}`;
-    const now = this.deps.now();
     const known = store.get(key);
-    if (known && now - known.at < REMEMBER_MS) return known.value;
+    // A pending read is always shared; the TTL applies to settled results only.
+    if (known && (!known.settled || this.deps.now() - known.at < REMEMBER_MS)) return known.value;
     store.delete(key);
-    // The oldest goes first (a Map iterates in insertion order), so a full store sheds one.
-    if (store.size >= MAX_REMEMBERED) {
-      const oldest = store.keys().next();
-      if (!oldest.done) store.delete(oldest.value);
-    }
+    if (store.size >= MAX_REMEMBERED) this.#evictOldestSettled(store);
     const value = read();
-    store.set(key, { at: now, value });
-    value.catch(() => {
-      if (store.get(key)?.value === value) store.delete(key);
-    });
+    const entry: Remembered<Value> = { at: this.deps.now(), settled: false, value };
+    store.set(key, entry);
+    value
+      .then(() => {
+        entry.settled = true;
+        entry.at = this.deps.now();
+      })
+      .catch(() => {
+        if (store.get(key) === entry) store.delete(key);
+      });
     return value;
+  }
+
+  /** The oldest settled entry goes (a Map iterates in insertion order); pending ones never do. */
+  #evictOldestSettled<Value>(store: Map<string, Remembered<Value>>): void {
+    for (const [key, entry] of store) {
+      if (!entry.settled) continue;
+      store.delete(key);
+      return;
+    }
   }
 
   async #limited<Value>(read: () => Promise<Value>): Promise<Value> {
@@ -145,13 +156,13 @@ export class DigestTraceReadService {
     }
   }
 
-  /** `[start, end]` of the week; the end is the last millisecond, so no bound counts Monday twice. */
+  /** `[start, end)` of the week: analytics' `endDate` is exclusive, so the next week starts where this ends. */
   #window({ projectId, isoWeek }: { projectId: string; isoWeek: string }) {
     const startDate = weekStartOf(isoWeek);
     return {
       projectId,
       startDate,
-      endDate: startDate + WEEK_MS - 1,
+      endDate: startDate + WEEK_MS,
       timeZone: "UTC",
       timeScale: "full" as const,
       shouldSkipPreviousPeriod: true,

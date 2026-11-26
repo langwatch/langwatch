@@ -18,26 +18,52 @@ const stored = vi.hoisted(() => {
   return {
     subscribed: true,
     failNextSave: false,
+    failReadBack: false,
+    failFirstRead: false,
     saves: [] as boolean[],
     subscribe: (listener: () => void) => {
       listeners.add(listener);
       return () => listeners.delete(listener);
     },
-    changed: () => listeners.forEach((listener) => listener()),
+    version: 0,
+    changed: () => {
+      stored.version += 1;
+      listeners.forEach((listener) => listener());
+    },
   };
 });
 
 vi.mock("../../../behavior/personal-workspace-api.ts", async () => {
   const { useSyncExternalStore } = await import("react");
   const api = {
-    useUtils: () => ({ digest: { getMyPreference: { invalidate: async () => stored.changed() } } }),
+    useUtils: () => ({
+      digest: {
+        getMyPreference: {
+          fetch: async () => {
+            if (stored.failReadBack) throw new Error("read down");
+            stored.changed();
+            return { subscribed: stored.subscribed };
+          },
+        },
+      },
+    }),
     digest: {
       getMyPreference: {
-        useQuery: () => ({
-          data: {
-            subscribed: useSyncExternalStore(stored.subscribe, () => stored.subscribed),
-          },
-        }),
+        useQuery: () => {
+          const subscribed = useSyncExternalStore(stored.subscribe, () => stored.subscribed);
+          useSyncExternalStore(stored.subscribe, () => stored.version);
+          if (stored.failFirstRead) {
+            return {
+              data: undefined,
+              isError: true,
+              refetch: async () => {
+                stored.failFirstRead = false;
+                stored.changed();
+              },
+            };
+          }
+          return { data: { subscribed }, isError: false, refetch: async () => {} };
+        },
       },
       setMyPreference: {
         useMutation: () => ({
@@ -58,6 +84,8 @@ vi.mock("../../../behavior/personal-workspace-api.ts", async () => {
 beforeEach(() => {
   stored.subscribed = true;
   stored.failNextSave = false;
+  stored.failReadBack = false;
+  stored.failFirstRead = false;
   stored.saves = [];
 });
 
@@ -112,6 +140,35 @@ describe("given the email preferences band on the Profile page", () => {
       );
       await waitFor(() => expect(isOn()).toBe(true));
       expect(stored.saves).toEqual([]);
+    });
+  });
+
+  describe("when the save works but the read-back fails", () => {
+    /** @scenario "A person turns the weekly digest off and on in their settings" */
+    it("keeps showing the saved choice", async () => {
+      stored.failReadBack = true;
+      renderWithPersonalWorkspaceHost(<EmailPreferencesSection />, {
+        host: fakePersonalWorkspaceHost(),
+      });
+
+      await userEvent.click(weeklyDigest());
+
+      await waitFor(() => expect(stored.saves).toEqual([false]));
+      expect(isOn()).toBe(false);
+    });
+  });
+
+  describe("when the stored choice cannot be read", () => {
+    /** @scenario "A person turns the weekly digest off and on in their settings" */
+    it("offers Try again, which reads it", async () => {
+      stored.failFirstRead = true;
+      renderWithPersonalWorkspaceHost(<EmailPreferencesSection />, {
+        host: fakePersonalWorkspaceHost(),
+      });
+
+      await userEvent.click(screen.getByRole("button", { name: "Try again" }));
+
+      await waitFor(() => expect(isOn()).toBe(true));
     });
   });
 });

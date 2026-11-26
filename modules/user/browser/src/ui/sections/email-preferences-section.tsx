@@ -4,7 +4,7 @@
  * Spec: enterprise/modules/digest/specs/digest.feature
  */
 
-import { Skeleton } from "@langwatch/design-system/primitives";
+import { Button, HStack, Skeleton, Text } from "@langwatch/design-system/primitives";
 import { SettingsSection } from "@langwatch/design-system/settings-section";
 import { Switch } from "@langwatch/design-system/switch";
 import { ToggleRow } from "@langwatch/design-system/toggle-row";
@@ -25,8 +25,9 @@ export function EmailPreferencesSection() {
   const preference = api.digest.getMyPreference.useQuery({});
   const setPreference = api.digest.setMyPreference.useMutation();
   const utils = api.useUtils();
-  // What the person just chose, shown until the stored choice is read back: a failed save
-  // returns the switch to what is stored.
+  // What the person just chose, shown until the stored choice is read back successfully, so a
+  // failed read-back never flips the switch to a stale value; a failed save returns it to
+  // what is stored.
   const [chosen, setChosen] = useState<boolean | null>(null);
 
   const change = async (subscribed: boolean) => {
@@ -35,9 +36,16 @@ export function EmailPreferencesSection() {
       await setPreference.mutateAsync({ subscribed });
     } catch (error) {
       host.failed({ error, fallbackTitle: "Couldn't save your email preference" });
+      setChosen(null);
+      return;
     }
-    await utils.digest.getMyPreference.invalidate();
-    setChosen(null);
+    try {
+      // `invalidate` swallows a failed refetch; `fetch` rejects, so the choice stays shown.
+      await utils.digest.getMyPreference.fetch({}, { staleTime: 0 });
+      setChosen(null);
+    } catch {
+      // The save went through; the next successful read corrects the display.
+    }
   };
 
   return (
@@ -49,7 +57,7 @@ export function EmailPreferencesSection() {
       data-testid="email-preferences-settings-section"
     >
       {preference.data === undefined ? (
-        <Skeleton height="48px" borderRadius="md" />
+        <PreferencePending failed={preference.isError} onRetry={() => void preference.refetch()} />
       ) : (
         <ToggleRow
           label="Weekly digest"
@@ -58,12 +66,25 @@ export function EmailPreferencesSection() {
         >
           <Switch
             checked={chosen ?? preference.data.subscribed}
-            disabled={chosen !== null}
+            disabled={setPreference.isPending}
             onCheckedChange={({ checked }) => void change(checked)}
             inputProps={{ "aria-label": "Weekly digest", "data-testid": "weekly-digest-switch" }}
           />
         </ToggleRow>
       )}
     </SettingsSection>
+  );
+}
+
+/** A skeleton while the choice loads; an inline retry when it could not be read. */
+function PreferencePending({ failed, onRetry }: { failed: boolean; onRetry: () => void }) {
+  if (!failed) return <Skeleton height="48px" borderRadius="md" />;
+  return (
+    <HStack justify="space-between" gap={3}>
+      <Text textStyle="sm">Couldn't load your email preference.</Text>
+      <Button size="xs" variant="outline" onClick={onRetry}>
+        Try again
+      </Button>
+    </HStack>
   );
 }

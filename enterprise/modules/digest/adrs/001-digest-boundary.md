@@ -97,8 +97,9 @@ baseline are swept every hour.
   through peer fold projections. A fold's `apply` is synchronous, but turning an owner's fact
   into digest's needs reads: the project's organization, and for a coding-agent fact
   the personal project's owner (`ProjectApi`). A peer fold also takes no enqueue filter, so
-  every span on the platform mints a job, which is the cost of being on for everyone: a second append
-  per fact, and a memoised project-to-organization lookup.
+  every coding-agent span-facts contribution mints a job, which is the cost of being on for everyone:
+  a second append per fact, and a memoised project-to-organization lookup. Platform spans mint
+  none (ADR-002).
 - A fact's week is the time its owner gives it: a span's start as the client reported it, an
   evaluation's completion, a run's finish. A fact that arrives after its week's emails went out
   is not in them, and a client's clock skew or a backfill can put a span in another week.

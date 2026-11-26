@@ -14,7 +14,11 @@ import {
   type UserWeekState,
   userWeekTotals,
 } from "../../rules/digest-week.rules.ts";
-import type { ProjectActivity, UserActivity } from "../digest-activity.events.ts";
+import {
+  type ProjectActivity,
+  projectActivitySchema,
+  type UserActivity,
+} from "../digest-activity.events.ts";
 import { applyProjectActivity, applyUserActivity } from "../digest-week.projection.ts";
 
 const seriesActivity = (seriesId: string): UserActivity => ({
@@ -139,5 +143,32 @@ describe("applyProjectActivity()", () => {
 
       expect(week.evaluators["evaluator-0"]).toEqual({ runs: 2, passed: 2, failed: 0 });
     });
+  });
+});
+
+describe("a span fact stored before spans stopped being folded", () => {
+  const stored = {
+    tenantId: "org-1",
+    occurredAt: 0,
+    organizationId: "org-1",
+    isoWeek: "2026-W47",
+    sourceKey: "span-1",
+    projectId: "project-1",
+    fact: {
+      kind: "span",
+      root: true,
+      error: false,
+      tokens: 10,
+      costUsd: 0.1,
+      durationMs: 5,
+      model: "gpt-5",
+    },
+  };
+
+  it("still parses, and folds to nothing", () => {
+    const activity: ProjectActivity = projectActivitySchema.parse(stored);
+    const state = emptyProjectWeek();
+
+    expect(applyProjectActivity({ state, activity })).toEqual(state);
   });
 });

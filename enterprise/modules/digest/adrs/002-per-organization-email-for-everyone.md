@@ -44,8 +44,8 @@ per organization, and that the email's link opens the person's email preferences
   owner, then those the recipient holds `project:view` on. A project's week costs two reads (the
   totals, and a model breakdown only if it had traces) plus one traces-only read of the week
   before for the change; the change line is dropped, and the email still sent, when that last
-  read fails. The window ends one millisecond before the next Monday, as analytics' bounds are
-  inclusive in some of its tables and exclusive in others. A read is remembered per
+  read fails. The window is half-open, as analytics' `endDate` is
+  exclusive: the next week starts where this one ends. A read is remembered per
   organization, project and week in each process for thirty minutes (single flight, the oldest
   entry evicted at the cap) and at most eight reads run at once per process; across workers the
   same project's week may be read once per worker, so a plan's load is bounded by workers times
