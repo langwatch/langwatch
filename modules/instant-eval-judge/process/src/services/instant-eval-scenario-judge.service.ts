@@ -231,6 +231,9 @@ export class InstantEvalScenarioJudgeService {
           model: config.model,
           timeoutMs: config.timeoutMs,
           ...(config.reasoningEffort ? { reasoningEffort: config.reasoningEffort } : {}),
+          ...(config.maxOutputTokens === undefined
+            ? {}
+            : { maxOutputTokens: config.maxOutputTokens }),
           system,
           user,
           tools,

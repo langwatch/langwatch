@@ -22,10 +22,10 @@ import {
   type InstantEvalScenarioVerdictReading,
 } from "../rules/instant-eval-scenario-judge.rules.ts";
 
-/** Which backend sends the judge's own call: its wire, model, time allowance and effort. */
+/** Which backend sends the judge's own call: its wire, model, time, effort and output cap. */
 export type InstantEvalScenarioLlmVerdictCall = Pick<
   InstantEvalLlmToolCallRequest,
-  "wire" | "model" | "timeoutMs" | "reasoningEffort"
+  "wire" | "model" | "timeoutMs" | "reasoningEffort" | "maxOutputTokens"
 >;
 
 type ScenarioLlmVerdict =

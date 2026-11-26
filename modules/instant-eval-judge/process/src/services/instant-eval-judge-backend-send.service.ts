@@ -125,11 +125,15 @@ export class InstantEvalJudgeBackendSendService {
   }): Promise<Leg> {
     // The table refuses an LLM backend with no model at boot; this keeps the type honest.
     if (!model) return { outcome: "failed", reason: "classifier_not_configured" };
+    const call = {
+      wire,
+      model,
+      timeoutMs,
+      ...(reasoningEffort ? { reasoningEffort } : {}),
+      ...(maxOutputTokens === undefined ? {} : { maxOutputTokens }),
+    };
     const { scenario } = this.input;
-    if (scenario) {
-      const call = { wire, model, timeoutMs, ...(reasoningEffort ? { reasoningEffort } : {}) };
-      return this.readScenarioVerdict({ scenario, backend, call, questions, paid });
-    }
+    if (scenario) return this.readScenarioVerdict({ scenario, backend, call, questions, paid });
     const { llmJudge, limiter, projectId, plan, signal, logger } = this.input;
     const leg = InstantEvalJudgeLlmLegService.create({
       llmJudge,
@@ -141,13 +145,6 @@ export class InstantEvalJudgeBackendSendService {
       logger,
       paid: (spend) => paid({ backend, ...spend }),
     });
-    const call = {
-      wire,
-      model,
-      timeoutMs,
-      ...(reasoningEffort ? { reasoningEffort } : {}),
-      ...(maxOutputTokens === undefined ? {} : { maxOutputTokens }),
-    };
     const { answers, reason } = await leg.ask({ call, questions });
     if (answers.size === 0) return { outcome: "failed", reason };
     if (answers.size < questions.length) this.input.flag(`${backend}_partial:${reason}`);

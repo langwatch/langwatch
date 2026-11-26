@@ -153,3 +153,39 @@ describe("HttpInstantEvalLlmJudgeChannel.call", () => {
     expect(answer).toMatchObject({ outcome: "skipped", reason: "classifier_not_configured" });
   });
 });
+
+describe("HttpInstantEvalLlmJudgeChannel.call, given a backend's own output cap", () => {
+  function capturing(origin: string, path: string, reply: Record<string, unknown>) {
+    const sent: { body?: Record<string, unknown> } = {};
+    agent
+      .get(origin)
+      .intercept({ path, method: "POST" })
+      .reply(200, (options) => {
+        sent.body = JSON.parse(sentText(options.body)) as Record<string, unknown>;
+        return reply;
+      });
+    return sent;
+  }
+
+  /** @scenario "The judge's own calls carry the backend's output cap" */
+  it("sends that cap on a reasoning OpenAI call and an Anthropic call, not the default", async () => {
+    const openAi = capturing("https://api.openai.com", "/v1/responses", {
+      output: [{ type: "function_call", name: "finish_test", arguments: "{}" }],
+      usage: { input_tokens: 1, output_tokens: 1 },
+    });
+    const anthropic = capturing("https://api.anthropic.com", "/v1/messages", {
+      content: [{ type: "tool_use", name: "finish_test", input: {} }],
+      usage: { input_tokens: 1, output_tokens: 1 },
+    });
+
+    await llm().call({
+      ...request("openai_responses"),
+      reasoningEffort: "high",
+      maxOutputTokens: 1_100,
+    });
+    await llm().call({ ...request("anthropic_messages"), maxOutputTokens: 500 });
+
+    expect(openAi.body?.max_output_tokens).toBe(1_100);
+    expect(anthropic.body?.max_tokens).toBe(500);
+  });
+});

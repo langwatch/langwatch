@@ -732,6 +732,60 @@ describe("given a scenario turn decision call", () => {
   });
 });
 
+describe("given an LLM backend that sets its own output cap", () => {
+  const table = syntheticScenarioRouteTable({
+    backends: {
+      "llm-a": {
+        kind: "openai_responses",
+        model: "llm-model-a",
+        reasoningEffort: "high",
+        maxOutputTokens: 1_100,
+      },
+    },
+  });
+
+  describe("when an unsure criterion escalates to it", () => {
+    /** @scenario "The judge's own calls carry the backend's output cap" */
+    it("sends the judge's own verdict call with that cap", async () => {
+      const { service, llmJudge } = harness({
+        table,
+        probabilities: { ...SURE, criterion_0: 0.6 },
+        toolCall: () => finishTest({ criterion_0: "true" }),
+      });
+
+      await service.judge(scenarioJudgeCall());
+
+      expect(llmJudge.calls).toHaveLength(1);
+      expect(llmJudge.calls[0]).toMatchObject({
+        forcedTool: "finish_test",
+        reasoningEffort: "high",
+        maxOutputTokens: 1_100,
+      });
+    });
+  });
+
+  describe("when it is the turn decision backend", () => {
+    /** @scenario "The judge's own calls carry the backend's output cap" */
+    it("sends the judge's turn decision call with that cap", async () => {
+      const { service, llmJudge } = harness({
+        table,
+        toolCall: () => ({
+          outcome: "answered",
+          tool: "continue_test",
+          input: {},
+          inputTokens: 500,
+          outputTokens: 10,
+        }),
+      });
+
+      await service.judge(scenarioJudgeCall({ phase: "decision" }));
+
+      expect(llmJudge.calls).toHaveLength(1);
+      expect(llmJudge.calls[0]).toMatchObject({ reasoningEffort: "high", maxOutputTokens: 1_100 });
+    });
+  });
+});
+
 describe("given a scenario judge call that may not be answered", () => {
   describe("when the installation is not LangWatch Cloud", () => {
     /** @scenario "A scenario judgement off LangWatch Cloud is refused and sends nothing" */

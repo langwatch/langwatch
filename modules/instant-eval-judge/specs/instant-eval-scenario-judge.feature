@@ -224,6 +224,12 @@ Feature: A scenario judgement answered by the judge router
     Then the judge's own verdict call names that effort
     And a backend that sets none sends a call that names none
 
+  @unit @regression
+  Scenario: The judge's own calls carry the backend's output cap
+    Given an LLM backend whose table entry sets its own output cap
+    When the judge's own verdict call or its turn decision call is sent on it
+    Then the request carries that cap, not the wire's default
+
   @unit
   Scenario: A Gemini backend answers the judge's own call as a forced function call
     Given a backend of kind gemini_generate_content naming its model

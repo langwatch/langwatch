@@ -119,6 +119,7 @@ export class HttpInstantEvalLlmJudgeChannel implements InstantEvalLlmJudgeChanne
     signal?: AbortSignal,
   ): Promise<InstantEvalLlmToolCallAnswer> {
     const { wire, model, system, user, tools, forcedTool, timeoutMs, reasoningEffort } = request;
+    const { maxOutputTokens } = request;
     const apiKey = this.keys[wire];
     if (!apiKey || !model) return skipped("classifier_not_configured");
     const fitted = prepareInstantEvalText({
@@ -131,6 +132,7 @@ export class HttpInstantEvalLlmJudgeChannel implements InstantEvalLlmJudgeChanne
       model,
       prompt,
       ...(reasoningEffort ? { reasoningEffort } : {}),
+      ...(maxOutputTokens === undefined ? {} : { maxOutputTokens }),
     });
     const sent = await this.post({ wire, model, apiKey, body, signal, timeoutMs });
     if (sent.outcome === "skipped") return sent;

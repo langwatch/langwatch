@@ -70,6 +70,8 @@ export interface InstantEvalLlmToolCallRequest {
   readonly timeoutMs: number;
   /** From the route table's backend; absent, the request names no effort. */
   readonly reasoningEffort?: InstantEvalJudgeReasoningEffort;
+  /** From the route table's backend; absent, the wire's default output cap. */
+  readonly maxOutputTokens?: number;
 }
 
 /** The tool called with its arguments and the tokens billed, or a skip that may still bill. */
