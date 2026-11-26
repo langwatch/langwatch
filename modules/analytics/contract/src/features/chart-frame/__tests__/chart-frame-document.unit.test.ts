@@ -6,7 +6,11 @@
 
 import { describe, expect, it } from "vitest";
 
-import { assertChartFrameNonce, buildChartFrameDocument } from "../chart-frame-document.ts";
+import {
+  assertChartFrameNonce,
+  buildChartFrameDocument,
+  CHART_FRAME_BASE_STYLE,
+} from "../chart-frame-document.ts";
 import { CHART_FRAME_BUILTIN_MODULES } from "../chart-frame-import-specifier.ts";
 
 const INLINE_SCRIPT = /<script(?![^>]*\bsrc=)([^>]*)>/g;
@@ -119,5 +123,33 @@ describe("the chart frame document", () => {
     expect(document).toContain('<div id="lw-root"></div>');
     expect(document).not.toContain("lw:widget-source");
     expect(document).toContain("lw:init");
+  });
+});
+
+describe("the chart frame's base style", () => {
+  /** @scenario "The frame scrolls a widget taller or wider than its card" */
+  it("makes the body the card's scroll container", () => {
+    expect(CHART_FRAME_BASE_STYLE).toMatch(/html \{ height: 100%; overflow: hidden;/);
+    expect(CHART_FRAME_BASE_STYLE).toMatch(/height: 100%;[^}]*overflow: auto;/);
+    expect(buildChartFrameDocument()).toContain(CHART_FRAME_BASE_STYLE);
+  });
+
+  /** @scenario "The frame's scrollbar stays visible" */
+  it("styles the body's scrollbar so overlay-scrollbar systems still draw one", () => {
+    expect(CHART_FRAME_BASE_STYLE).toContain(
+      "body::-webkit-scrollbar { width: 8px; height: 8px; }",
+    );
+    expect(CHART_FRAME_BASE_STYLE).toMatch(/body::-webkit-scrollbar-thumb \{\s*background: var\(/);
+  });
+
+  /** @scenario "A shadow marks each edge with more content behind it" */
+  it("draws a shadow on every edge, each hidden by a cover that scrolls with the content", () => {
+    const edges = (attachment: string) =>
+      [...CHART_FRAME_BASE_STYLE.matchAll(/\) (top|bottom|left|right) \/[^,]* no-repeat (\w+)/g)]
+        .filter(([, , kind]) => kind === attachment)
+        .map(([, edge]) => edge);
+
+    expect(edges("scroll")).toEqual(["top", "bottom", "left", "right"]);
+    expect(edges("local")).toEqual(["top", "bottom", "left", "right"]);
   });
 });
