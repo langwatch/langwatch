@@ -17,6 +17,12 @@ export const LWQL_SCOPED_SCHEMA = "lwql_scoped";
  */
 export const LWQL_SCOPED_READER_GROUP = "lwql_scoped_reader";
 
+/**
+ * The scoped copy of each project's key capability, which a private ClickHouse reads for its row
+ * policies in place of a key-map table: only the capability and the project id, never the key.
+ */
+export const LWQL_PROJECT_KEYS_VIEW = "lwql_project_keys";
+
 const QUOTED_SCOPED_SCHEMA = `"${LWQL_SCOPED_SCHEMA}"`;
 
 /** Prefix of the per-organization role; the suffix is the md5 of the organization id. */

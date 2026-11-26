@@ -364,7 +364,7 @@ describe("the LLM Ops sidebar's Dashboards section", () => {
       expect(inputsTo(calls, "boards.star")).toEqual([
         { projectId: "proj-1", star: { kind: "board", dashboardId: "board-new" } },
       ]);
-      expect(host.replacements).toEqual(["/test-project/dashboards/board-new?addBlock=open"]);
+      expect(host.replacements).toEqual(["/test-project/dashboards/board-new"]);
     });
   });
 
@@ -453,7 +453,7 @@ describe("the LLM Ops sidebar's Dashboards section", () => {
       expect(host.failures.map(({ error }) => readHandledError(error)?.code)).toEqual([
         "dashboard_not_found",
       ]);
-      expect(host.replacements).toEqual(["/test-project/dashboards/board-new?addBlock=open"]);
+      expect(host.replacements).toEqual(["/test-project/dashboards/board-new"]);
     });
   });
 

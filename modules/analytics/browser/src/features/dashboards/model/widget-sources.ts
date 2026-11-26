@@ -152,20 +152,22 @@ export function widgetCardSourcesLine(allQueries: readonly Sourced[]): string {
 }
 
 /**
- * "Project: Alpha" while no query stores projects (the board's project reads), else "Projects:"
- * and the picked names in order. A project the reader cannot read is not named; "" when none is.
+ * The picked projects, "Project: Alpha" or "Projects: Beta, Alpha" in order, only where they
+ * differ from what the board reads: its project, or every project (`boardProjectId` null). A
+ * project the reader cannot read is not named; "" when none is.
  */
 export function widgetProjectsLine({
   queries,
-  boardProjectName,
+  boardProjectId,
   readable,
 }: {
   queries: readonly Pick<DashboardWidgetQuery, "projects">[];
-  boardProjectName: string;
+  boardProjectId: string | null;
   readable: readonly { id: string; name: string }[];
 }): string {
   const picked = [...new Set(queries.flatMap((query) => query.projects ?? []))];
-  if (picked.length === 0) return boardProjectName === "" ? "" : `Project: ${boardProjectName}`;
+  if (picked.length === 0) return "";
+  if (picked.length === 1 && picked[0] === boardProjectId) return "";
   const names = picked.flatMap((id) => readable.find((project) => project.id === id)?.name ?? []);
   if (names.length === 0) return "";
 

@@ -5,11 +5,12 @@
  */
 
 import type { ChartAskSubject } from "@langwatch/analytics-contract/chart-frame-protocol";
-import { useState } from "react";
+import { useContext, useState } from "react";
 
 import { useReadableProjects } from "../../../../behavior/use-readable-projects.ts";
 import { useAnalyticsHost } from "../../../../model/analytics-host.ts";
 import type { WidgetFace } from "../../../../model/dashboard-widget/widget-completeness.ts";
+import { WidgetReadsEveryProjectContext } from "../../../dashboard-widget/behavior/use-dashboard-widget-executor.ts";
 import { DashboardWidgetFrameOverWindow } from "../../../dashboard-widget/ui/sections/dashboard-widget-frame.tsx";
 import { useWidgetClipboard } from "../../behavior/use-widget-clipboard.ts";
 import { useWidgetCsvExport } from "../../behavior/use-widget-csv-export.ts";
@@ -130,6 +131,7 @@ export function BoardWidgetCard({
 }) {
   const host = useAnalyticsHost();
   const readable = useReadableProjects({ projectId: host.project()?.id ?? "" });
+  const readsEveryProject = useContext(WidgetReadsEveryProjectContext);
   const clipboard = useWidgetClipboard({ dashboardId });
   const csvExport = useWidgetCsvExport({ board: boardName, widget: widget.name });
   const viewRef = useWidgetViewed({ widgetSource: widget.definition.source?.kind ?? "unknown" });
@@ -152,7 +154,7 @@ export function BoardWidgetCard({
     sourcesLine: widgetCardSourcesLine(widget.definition.queries),
     projectsLine: widgetProjectsLine({
       queries: widget.definition.queries,
-      boardProjectName: host.project()?.name ?? "",
+      boardProjectId: readsEveryProject ? null : (host.project()?.id ?? null),
       readable,
     }),
     limits,
