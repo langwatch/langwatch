@@ -72,6 +72,7 @@ jobs:
 ` + prReviewBotWaitStep + `      - uses: langwatch/langwatch-pr-review-bot@7ff0638fa8cb21fb3f94f8a12b893c6d5446e521 # main 2026-09-22
         with:
           slack_notify: "false"
+          approve: "true"
           review_timeout_minutes: 20
           claude_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           langwatch_ingest_key: ${{ secrets.LANGWATCH_INGEST_KEY }}
@@ -300,6 +301,24 @@ func TestPRReviewBotRunsTheWaitBeforeTheBot(t *testing.T) {
 	require.NoError(t, err)
 	require.NotEmpty(t, problems)
 	assert.Contains(t, strings.Join(problems, "\n"), "runs the bot before the wait")
+}
+
+// @scenario "A review with no blocking finding approves the PR"
+func TestPRReviewBotRequiresTheBotToApprove(t *testing.T) {
+	for name, approve := range map[string]string{
+		"missing": "",
+		"off":     "          approve: \"false\"\n",
+	} {
+		t.Run(name, func(t *testing.T) {
+			workflow := strings.Replace(goodPRReviewBotWorkflow, "          approve: \"true\"\n", approve, 1)
+			require.NotEqual(t, goodPRReviewBotWorkflow, workflow)
+
+			problems, err := ciguard.PRReviewBot(writePRReviewBotWorkflow(t, workflow))
+
+			require.NoError(t, err)
+			assert.Contains(t, strings.Join(problems, "\n"), `does not pass approve: "true"`)
+		})
+	}
 }
 
 // A wait that cannot fail, or can be skipped, lets the bot run on a red change.
