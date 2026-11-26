@@ -40,10 +40,10 @@ getPreference(input: Readonly<{ userId: string }>): Promise<DigestPreference>;
 
 #### `setPreference`
 
-Opts the signed-in person in or out of every organization's digest at once.
+Opts the signed-in person in or out of every organization's digest at once. Staff impersonating them (`impersonatorId`) are refused with `digest_impersonation_refused`.
 
 ```typescript
-setPreference(input: Readonly<{ userId: string } & DigestPreference>): Promise<DigestPreference>;
+setPreference(input: Readonly<{ userId: string; impersonatorId?: string | undefined } & DigestPreference>): Promise<DigestPreference>;
 ```
 
 #### `isSubscribed`
@@ -90,7 +90,7 @@ Public: RFC 8058 one-click unsubscribe from the weekly digest: the email arrives
 Answers at `/api/digest/unsubscribe`.
 
 ```typescript
-// Query: digestTokenQuerySchema, ../contract/src/digest.ts:67
+// Query: digestTokenQuerySchema, ../contract/src/digest.ts:65
 interface Query {
   token: string;
 }
@@ -107,7 +107,7 @@ Public: RFC 8058 one-click unsubscribe from the weekly digest: the email arrives
 Answers at `/api/digest/unsubscribe`.
 
 ```typescript
-type Query = z.infer<typeof digestTokenQuerySchema>; // ../contract/src/digest.ts:67
+type Query = z.infer<typeof digestTokenQuerySchema>; // ../contract/src/digest.ts:65
 // Response: inline, src/transport/digest-unsubscribe.rest.ts:76
 type Response = unknown;
 ```
@@ -121,7 +121,7 @@ Public: RFC 8058 one-click unsubscribe from the weekly digest: the email arrives
 Answers at `/api/digest/resubscribe`.
 
 ```typescript
-type Query = z.infer<typeof digestTokenQuerySchema>; // ../contract/src/digest.ts:67
+type Query = z.infer<typeof digestTokenQuerySchema>; // ../contract/src/digest.ts:65
 // Response: inline, src/transport/digest-unsubscribe.rest.ts:94
 type Response = unknown;
 ```
@@ -130,47 +130,48 @@ type Response = unknown;
 
 ### `digest`
 
-Contract `../contract/src/digest.trpc.ts:13`, router `src/transport/digest.trpc.ts:21`.
+Contract `../contract/src/digest.trpc.ts:17`, router `src/transport/digest.trpc.ts:24`.
 
-| Procedure                | Kind     | Gate                                 | Input                       | Output                     |
-| ------------------------ | -------- | ------------------------------------ | --------------------------- | -------------------------- |
-| `digest.setArmed`        | mutation | Platform permission `ops:manage`     | `digestSetArmedInputSchema` | `digestSettingsSchema`     |
-| `digest.sendTest`        | mutation | Platform permission `ops:manage`     | `digestSendTestInputSchema` | `digestAcknowledgedSchema` |
-| `digest.getMyPreference` | query    | none: the session user's own opt-out | `digestNoInputSchema`       | `digestPreferenceSchema`   |
-| `digest.setMyPreference` | mutation | none: the session user's own opt-out | `digestPreferenceSchema`    | `digestPreferenceSchema`   |
+| Procedure                | Kind     | Gate                                                                                  | Input                       | Output                     |
+| ------------------------ | -------- | ------------------------------------------------------------------------------------- | --------------------------- | -------------------------- |
+| `digest.setArmed`        | mutation | Platform permission `ops:manage`                                                      | `digestSetArmedInputSchema` | `digestSettingsSchema`     |
+| `digest.sendTest`        | mutation | Platform permission `ops:manage`                                                      | `digestSendTestInputSchema` | `digestAcknowledgedSchema` |
+| `digest.getMyPreference` | query    | No permission: operates on the session user's own opt-out, so no tenant scope applies | `digestNoInputSchema`       | `digestPreferenceSchema`   |
+| `digest.setMyPreference` | mutation | No permission: operates on the session user's own opt-out, so no tenant scope applies | `digestPreferenceSchema`    | `digestPreferenceSchema`   |
 
 ```typescript
 // digest.setArmed
-// Input: digestSetArmedInputSchema, ../contract/src/digest.ts:42
+// Input: digestSetArmedInputSchema, ../contract/src/digest.ts:29
 interface Input {
   armed: boolean;
 }
-type Output = z.infer<typeof digestSettingsSchema>; // ../contract/src/digest.ts:23
+// Output: digestSettingsSchema, ../contract/src/digest.ts:21
+interface Output {
+  armed: boolean;
+}
 
 // digest.sendTest
-// Input: digestSendTestInputSchema, ../contract/src/digest.ts:54
+// Input: digestSendTestInputSchema, ../contract/src/digest.ts:52
 interface Input {
   organizationId: string;
   userId: string;
 }
-// Output: digestAcknowledgedSchema, ../contract/src/digest.ts:62
+// Output: digestAcknowledgedSchema, ../contract/src/digest.ts:60
 interface Output {
   ok: true;
 }
 
 // digest.getMyPreference
-// Input: digestNoInputSchema, ../contract/src/digest.ts
-type Input = Record<string, never>;
-// Output: digestPreferenceSchema, ../contract/src/digest.ts
+// Input: digestNoInputSchema, ../contract/src/digest.ts:35
+type Input = Record<string, unknown>;
+// Output: digestPreferenceSchema, ../contract/src/digest.ts:40
 interface Output {
   subscribed: boolean;
 }
 
 // digest.setMyPreference
-// Input and output: digestPreferenceSchema, ../contract/src/digest.ts
-interface Input {
-  subscribed: boolean;
-}
+type Input = z.infer<typeof digestPreferenceSchema>; // ../contract/src/digest.ts:40
+type Output = z.infer<typeof digestPreferenceSchema>; // ../contract/src/digest.ts:40
 ```
 
 ## Sockets

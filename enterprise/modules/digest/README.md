@@ -11,7 +11,7 @@ Weekly digest emails, on for every organization: folds each organization's week,
 | Classification | enterprise (`modules/catalogue.json`)                                                            |
 | Subjects       | digest                                                                                           |
 | Halves         | [contract](contract) · [process](process/README.md)                                              |
-| Api token      | `DigestApi` = `moduleApi<DigestApi>()("digest")`, `contract/src/digest.api.ts:42` (7 operations) |
+| Api token      | `DigestApi` = `moduleApi<DigestApi>()("digest")`, `contract/src/digest.api.ts:47` (7 operations) |
 | Installed by   | api, worker, tasks (process)                                                                     |
 
 ## What digest owns
@@ -34,9 +34,9 @@ Anything else digest needs belongs to another module and is reached through its 
 
 | Name            | Token             | Module                                                  |
 | --------------- | ----------------- | ------------------------------------------------------- |
+| `analytics`     | `AnalyticsApi`    | [analytics](../../../modules/analytics/README.md)       |
 | `authz`         | `AuthzApi`        | [authz](../../../modules/authz/README.md)               |
 | `entitlement`   | `EntitlementApi`  | [entitlement](../../../modules/entitlement/README.md)   |
-| `analytics`     | `AnalyticsApi`    | [analytics](../../../modules/analytics/README.md)       |
 | `ops`           | `OpsApi`          | [ops](../../../modules/ops/README.md)                   |
 | `organizations` | `OrganizationApi` | [organization](../../../modules/organization/README.md) |
 | `projects`      | `ProjectApi`      | [project](../../../modules/project/README.md)           |
