@@ -3,7 +3,8 @@ import { z } from "zod";
 
 import { hasControlCharacters } from "./safe-media-types.ts";
 
-const OPAQUE_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:-]*$/;
+// Generated project ids (nanoid alphabet) may start with "-" or "_".
+const OPAQUE_ID_PATTERN = /^[A-Za-z0-9_-][A-Za-z0-9._:-]*$/;
 
 function opaqueIdSchema(label: string): z.ZodString {
   return z
