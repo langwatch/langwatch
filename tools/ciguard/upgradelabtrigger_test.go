@@ -24,7 +24,7 @@ jobs:
   changes:
     outputs:
       go: ${{ steps.filter.outputs.go }}
-      upgradelab: ${{ steps.filter.outputs.upgradelab }}
+      upgradelab: ${{ steps.filter.outputs.upgradelab || steps.force.outputs.go }}
     steps:
       - uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
         id: filter
@@ -37,6 +37,9 @@ jobs:
               - 'enterprise/modules/*/process/src/*.module.ts'
               - 'modules/*/process/src/migrations/*.ts'
               - 'enterprise/modules/*/process/src/migrations/*.ts'
+  test:
+    needs: changes
+    if: ${{ needs.changes.outputs.go == 'true' && needs.changes.outputs.heavy == 'true' }}
   upgradelab:
     needs: changes
     if: ${{ needs.changes.outputs.upgradelab == 'true' && !(needs.changes.outputs.go == 'true' && needs.changes.outputs.heavy == 'true') }}
@@ -71,12 +74,8 @@ func TestUpgradelabTriggerHoldsOnThisRepository(t *testing.T) {
 	assert.Empty(t, upgradelabProblems(t, goodGoCI))
 }
 
-// @scenario "A step-declaring path missing from go-ci's trigger or filter is reported"
+// @scenario "A step-declaring path missing from go-ci's upgradelab filter is reported"
 func TestUpgradelabTriggerReportsMissingGlobs(t *testing.T) {
-	trigger := withoutLine(t, goodGoCI, `      - "enterprise/modules/*/process/src/*.module.ts"`)
-	assert.Equal(t, []string{goCIWorkflow + ": on.pull_request.paths misses enterprise/modules/*/process/src/*.module.ts, so a pull request declaring a step there starts no run"},
-		upgradelabProblems(t, trigger))
-
 	filter := withoutLine(t, goodGoCI, `              - 'modules/*/process/src/*.module.ts'`)
 	assert.Equal(t, []string{goCIWorkflow + ": the upgradelab filter misses modules/*/process/src/*.module.ts, so the coverage test skips on it"},
 		upgradelabProblems(t, filter))
@@ -84,7 +83,7 @@ func TestUpgradelabTriggerReportsMissingGlobs(t *testing.T) {
 
 // @scenario "A changes job that does not output the upgradelab filter is reported"
 func TestUpgradelabTriggerReportsMissingOutput(t *testing.T) {
-	workflow := withoutLine(t, goodGoCI, `      upgradelab: ${{ steps.filter.outputs.upgradelab }}`)
+	workflow := withoutLine(t, goodGoCI, `      upgradelab: ${{ steps.filter.outputs.upgradelab || steps.force.outputs.go }}`)
 	problems := upgradelabProblems(t, workflow)
 	require.Len(t, problems, 1)
 	assert.Contains(t, problems[0], "the changes job must output upgradelab")
@@ -98,6 +97,13 @@ func TestUpgradelabTriggerReportsDraftGap(t *testing.T) {
 	problems := upgradelabProblems(t, workflow)
 	require.Len(t, problems, 1)
 	assert.Contains(t, problems[0], "the upgradelab job's if must require both")
+
+	testGate := strings.Replace(goodGoCI,
+		"if: ${{ needs.changes.outputs.go == 'true' && needs.changes.outputs.heavy == 'true' }}",
+		"if: ${{ needs.changes.outputs.go == 'true' }}", 1)
+	problems = upgradelabProblems(t, testGate)
+	require.Len(t, problems, 1, "a test job gate the upgradelab job no longer negates is reported")
+	assert.Contains(t, problems[0], "!(needs.changes.outputs.go == 'true')")
 
 	noRun := withoutLine(t, goodGoCI, "      - run: go test ./tools/upgradelab/...")
 	problems = upgradelabProblems(t, noRun)

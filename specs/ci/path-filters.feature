@@ -72,15 +72,15 @@ Feature: CI path filters skip unnecessary workflows on non-code changes
   # filter skipped it on a pull request that declared a step in one.
   @unit
   Scenario: A pull request declaring a migration step runs upgradelab's coverage test
-    Given go-ci starts on, and its upgradelab filter lists, every path that declares a step
+    Given go-ci's upgradelab filter lists every path that declares a step, and the path-filter guard's R1 holds "on.pull_request.paths" to it
     And the changes job outputs that filter as "upgradelab"
     When a pull request changes only a module file that declares a step
     Then the upgradelab job runs "go test ./tools/upgradelab/..."
 
   @unit
-  Scenario: A step-declaring path missing from go-ci's trigger or filter is reported
-    When go-ci's "on.pull_request.paths" or its upgradelab filter leaves out a step-declaring path
-    Then the upgradelab-trigger guard names the path and the list that misses it
+  Scenario: A step-declaring path missing from go-ci's upgradelab filter is reported
+    When go-ci's upgradelab filter leaves out a step-declaring path
+    Then the upgradelab-trigger guard names the path
 
   @unit
   Scenario: A changes job that does not output the upgradelab filter is reported
@@ -90,7 +90,7 @@ Feature: CI path filters skip unnecessary workflows on non-code changes
   @unit
   Scenario: An upgradelab job that skips while the full test job also skips is reported
     Given the full test job runs only when Go changed and the pull request is not a draft
-    When the upgradelab job skips whenever Go changed, or stops running the upgradelab tests
+    When the upgradelab job's if stops negating the test job's own if, or stops running the upgradelab tests
     Then the upgradelab-trigger guard fails, because a draft touching Go and a module file would run the coverage test nowhere
 
   @unit

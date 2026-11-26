@@ -149,7 +149,6 @@ type Job struct {
 // it.
 type PullRequest struct {
 	Types []string `yaml:"types"`
-	Paths []string `yaml:"paths"`
 }
 
 // On models the workflow `on:` triggers the guards read. Only pull_request is

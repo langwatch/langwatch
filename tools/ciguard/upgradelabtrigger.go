@@ -14,17 +14,17 @@ import (
 // Spec: specs/ci/path-filters.feature
 
 const (
-	goCIWorkflow       = ".github/workflows/go-ci.yaml"
-	upgradelabKey      = "upgradelab"
-	upgradelabOutput   = "steps.filter.outputs.upgradelab"
-	upgradelabTestRun  = "go test ./tools/upgradelab/..."
-	upgradelabWhenSet  = "needs.changes.outputs.upgradelab == 'true'"
-	upgradelabSkipFull = "!(needs.changes.outputs.go == 'true' && needs.changes.outputs.heavy == 'true')"
+	goCIWorkflow      = ".github/workflows/go-ci.yaml"
+	upgradelabKey     = "upgradelab"
+	upgradelabOutput  = "steps.filter.outputs.upgradelab"
+	upgradelabTestRun = "go test ./tools/upgradelab/..."
+	upgradelabWhenSet = "needs.changes.outputs.upgradelab == 'true'"
 )
 
 // UpgradelabTrigger checks that a pull request declaring a migration step runs upgradelab's
-// coverage test: go-ci starts on every step-declaring path, its changes job filters and outputs
-// them under `upgradelab`, and the upgradelab job runs the tests unless the full test job does.
+// coverage test: go-ci's changes job filters and outputs every step-declaring path under
+// `upgradelab`, and the upgradelab job runs the tests unless the full test job runs.
+// The path-filter guard's R1 already holds on.pull_request.paths to that filter.
 func UpgradelabTrigger(root string) ([]string, error) {
 	workflow, err := ciscan.Load(root, goCIWorkflow)
 	if err != nil {
@@ -35,12 +35,11 @@ func UpgradelabTrigger(root string) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	problems := missingGlobs(workflow.On.PullRequest.Paths, "on.pull_request.paths", "a pull request declaring a step there starts no run")
-	problems = append(problems, missingGlobs(filter, "the upgradelab filter", "the coverage test skips on it")...)
+	problems := missingGlobs(filter)
 	if !strings.Contains(changes.Outputs[upgradelabKey], upgradelabOutput) {
 		problems = append(problems, fmt.Sprintf("%s: the changes job must output upgradelab from %s", goCIWorkflow, upgradelabOutput))
 	}
-	return append(problems, upgradelabJobProblems(workflow.Jobs[upgradelabKey])...), nil
+	return append(problems, upgradelabJobProblems(workflow.Jobs[upgradelabKey], workflow.Jobs["test"])...), nil
 }
 
 // upgradelabFilter is the `upgradelab` key of the changes job's paths filter.
@@ -60,27 +59,35 @@ func upgradelabFilter(changes ciscan.Job) ([]string, error) {
 	return nil, nil
 }
 
-// missingGlobs names each step-declaring glob the list leaves out.
-func missingGlobs(list []string, where, consequence string) []string {
+// missingGlobs names each step-declaring glob the upgradelab filter leaves out.
+func missingGlobs(filter []string) []string {
 	var problems []string
 	for _, glob := range seed.StepDeclarationGlobs {
-		if !slices.Contains(list, glob) {
-			problems = append(problems, fmt.Sprintf("%s: %s misses %s, so %s", goCIWorkflow, where, glob, consequence))
+		if !slices.Contains(filter, glob) {
+			problems = append(problems, fmt.Sprintf("%s: the upgradelab filter misses %s, so the coverage test skips on it", goCIWorkflow, glob))
 		}
 	}
 	return problems
 }
 
 // upgradelabJobProblems reports an upgradelab job that skips when the full test job does not
-// run, or that no longer runs the upgradelab tests.
-func upgradelabJobProblems(job ciscan.Job) []string {
+// run (its if must negate the test job's own gate), or that no longer runs the upgradelab tests.
+func upgradelabJobProblems(job, test ciscan.Job) []string {
 	var problems []string
-	if !strings.Contains(job.If, upgradelabWhenSet) || !strings.Contains(job.If, upgradelabSkipFull) {
-		problems = append(problems, fmt.Sprintf("%s: the upgradelab job's if must require both %s and %s", goCIWorkflow, upgradelabWhenSet, upgradelabSkipFull))
+	skipFull := "!(" + expressionBody(test.If) + ")"
+	if !strings.Contains(job.If, upgradelabWhenSet) || !strings.Contains(job.If, skipFull) {
+		problems = append(problems, fmt.Sprintf("%s: the upgradelab job's if must require both %s and %s", goCIWorkflow, upgradelabWhenSet, skipFull))
 	}
 	runs := slices.ContainsFunc(job.Steps, func(step ciscan.Step) bool { return step.Run == upgradelabTestRun })
 	if !runs {
 		problems = append(problems, fmt.Sprintf("%s: the upgradelab job must run %s", goCIWorkflow, upgradelabTestRun))
 	}
 	return problems
+}
+
+// expressionBody is a job `if:` without its `${{ }}` wrapper.
+func expressionBody(condition string) string {
+	body := strings.TrimSpace(condition)
+	body = strings.TrimSuffix(strings.TrimPrefix(body, "${{"), "}}")
+	return strings.TrimSpace(body)
 }

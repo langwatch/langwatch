@@ -12,7 +12,7 @@ on:
     # No `labeled`: a label starts no run, and `ci:full` counts from the next push.
     types: [opened, synchronize, reopened, ready_for_review]
     # The union of the `go`, `upgradelab` and `ciguards` filters below, plus go.work: a pull
-    # request with no Go and no workflow change starts no run. No check from
+    # request with no Go, no workflow and no step-declaring module change starts no run. No check from
     # this workflow is required, so it has no aggregator.
     paths:
       - "**/*.go"
@@ -63,7 +63,7 @@ jobs:
       # a checkout added to langwatch-app-ci touches no .go file.
       ciguards: ${{ steps.filter.outputs.ciguards || steps.force.outputs.go }}
       # A module's declared steps feed one upgradelab test, not the whole Go suite.
-      upgradelab: ${{ steps.filter.outputs.upgradelab }}
+      upgradelab: ${{ steps.filter.outputs.upgradelab || steps.force.outputs.go }}
       # Draft PRs keep lint + vet (seconds) and skip the race-detector test
       # run and the build. Both come back on ready_for_review.
       # A PR labelled `ci:full` runs it all, draft or not.
