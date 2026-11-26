@@ -520,6 +520,7 @@ jobs:
           retention-days: 7
 
   alls-green:
+    timeout-minutes: 5
     if: always()
     needs: [smoke]
     runs-on: ubuntu-latest

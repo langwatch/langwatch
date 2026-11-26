@@ -18,6 +18,16 @@ on:
     # on `heavy` below would never get their first non-draft run.
     # No `labeled`: a label starts no run, and `ci:full` counts from the next push.
     types: [opened, synchronize, reopened, ready_for_review]
+    # The `relevant` filter below: a pull request outside the SDK starts no run.
+    # No check from this workflow is required, so it has no aggregator.
+    paths:
+      - "sdks/python/**"
+      - ".github/workflows/sdk-python-ci.yml"
+      - "uv.lock"
+      - "pyproject.toml"
+      - ".python-version"
+  # Only an `approved-ci` label runs anything here: it is how a fork's PR gets
+  # the suite. Every other label skips the whole run, so it takes no runner.
   pull_request_target:
     types: [labeled]
   merge_group:
@@ -32,6 +42,7 @@ concurrency:
 
 jobs:
   changes:
+    timeout-minutes: 5
     # Skips the whole run for a pull_request_target label other than `approved-ci`.
     # That event exists only to let `approved-ci` run a fork's PR.
     if: (github.event_name != 'pull_request_target' || github.event.label.name == 'approved-ci')
@@ -386,18 +397,3 @@ jobs:
       - name: Build package
         working-directory: sdks/python
         run: uv run python -m build
-
-  # One required check for the whole workflow. Reports success if every
-  # upstream job either passed or was legitimately skipped (paths didn't
-  # match). Reports failure if any upstream job failed. Uses `alls-green`
-  # because GitHub's default `needs:` semantics treat skipped needs as
-  # satisfied — that's the silent-success footgun we want to avoid.
-  sdk-python-complete:
-    needs: [changes, test, interpreters, build]
-    if: always() && (github.event_name != 'pull_request_target' || github.event.label.name == 'approved-ci')
-    runs-on: ubuntu-latest
-    steps:
-      - uses: re-actors/alls-green@05ac9388f0aebcb5727afa17fcccfecd6f8ec5fe # v1.2.2
-        with:
-          jobs: ${{ toJSON(needs) }}
-          allowed-skips: test, interpreters, build
