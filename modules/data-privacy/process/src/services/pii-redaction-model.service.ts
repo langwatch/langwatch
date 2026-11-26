@@ -222,7 +222,21 @@ export class PiiRedactionModelService {
     if (plan.kind === "split") {
       return this.#clearSplit({ input, organizationId, projectId, call, calls: plan.calls });
     }
+    return this.#clearSingle({ input, organizationId, projectId, call });
+  }
 
+  /** A batch of 8,000 characters or less in one call, as before ADR-207. */
+  async #clearSingle({
+    input,
+    organizationId,
+    projectId,
+    call,
+  }: {
+    input: ModelClearInput;
+    organizationId: string;
+    projectId: string;
+    call: Omit<PiiRedactionModelUsage, "findings" | "outcome" | "durationMs">;
+  }): Promise<(string | null)[] | null> {
     const admission = this.#admit("single");
     if (!admission) {
       this.metrics.modelFellBack("breaker_open");
