@@ -232,7 +232,12 @@ export class TraceProcessingRuntimeAdapter {
           occurredAtMs,
         });
         if (summary?.attributes["langwatch.origin"]) return;
-        await resolveOrigin({ id: traceId, tenantId, traceId });
+        await resolveOrigin({
+          id: traceId,
+          tenantId,
+          traceId,
+          ...(summary?.storageAnchorMs ? { traceAnchorMs: summary.storageAnchorMs } : {}),
+        });
       },
       trackedEventSync: createTrackedEventSyncHandler({
         recordTrackedEvent: this.input.recordTrackedEvent,

@@ -16,8 +16,8 @@ import type {
   StoredObjectSource,
 } from "../stored-object-record.repository.ts";
 
-/** The model delegate, and raw SQL for the one sweep that spans every tenant. */
-type StoredObjectRecordDatabase = Pick<PrismaClient, "storedObject" | "$queryRaw">;
+/** The model delegate, and raw SQL for the tenant sweep and the guarded transition. */
+type StoredObjectRecordDatabase = Pick<PrismaClient, "storedObject" | "$queryRaw" | "$executeRaw">;
 
 /**
  * Declared rather than inherited from `PrismaRepository.for`: the upload reaper's
@@ -66,22 +66,45 @@ export class PrismaStoredObjectRecordRepository implements StoredObjectRecordRep
     return result.count === 1;
   }
 
+  /**
+   * SQL, not `updateMany`: Prisma compiles that to an id subquery, and a racing write parked on
+   * the row lock re-checks only the id, so a confirm and the reaper could both win.
+   */
   async transition(input: {
     expected: Pick<StoredObjectRecord, "status" | "generation">;
     next: StoredObjectRecord;
   }): Promise<boolean> {
-    const { tenantId, id, ...data } = toRow(input.next);
-    const result = await this.prisma.storedObject.updateMany({
-      where: {
-        tenantId,
-        id,
-        status: input.expected.status,
-        generation: input.expected.generation,
-      },
-      data,
-    });
+    const row = toRow(input.next);
+    const updated = await this.prisma.$executeRaw`
+      UPDATE "StoredObject"
+         SET "status" = ${row.status},
+             "purpose" = ${row.purpose},
+             "ownerKind" = ${row.ownerKind},
+             "ownerId" = ${row.ownerId},
+             "filename" = ${row.filename},
+             "sha256" = ${row.sha256},
+             "sizeBytes" = ${row.sizeBytes},
+             "mediaType" = ${row.mediaType},
+             "mediaTypeVerified" = ${row.mediaTypeVerified},
+             "storageProvider" = ${row.storageProvider},
+             "storageDestinationId" = ${row.storageDestinationId},
+             "storageProviderRelativeId" = ${row.storageProviderRelativeId},
+             "generation" = ${row.generation},
+             "audiences" = ${JSON.stringify(row.audiences)}::jsonb,
+             "expiresAt" = ${row.expiresAt},
+             "availableAt" = ${row.availableAt},
+             "deletedAt" = ${row.deletedAt},
+             "source" = ${row.source},
+             "legacyFingerprint" = ${row.legacyFingerprint},
+             "createdAt" = ${row.createdAt},
+             "updatedAt" = ${row.updatedAt}
+       WHERE "tenantId" = ${row.tenantId}
+         AND "id" = ${row.id}
+         AND "status" = ${input.expected.status}
+         AND "generation" = ${input.expected.generation}
+    `;
 
-    return result.count === 1;
+    return updated === 1;
   }
 
   async countActive(input: {

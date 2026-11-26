@@ -1,13 +1,16 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 import { createHash } from "node:crypto";
 
-import type {
-  AgentRegistryEntry,
-  AgentRegistryEvent,
-  AgentRegistryEventType,
-  AgentRegistryTool,
+import {
+  type AgentRegistryEntry,
+  type AgentRegistryEvent,
+  type AgentRegistryEventType,
+  type AgentRegistryPosture,
+  type AgentRegistryTool,
+  agentRegistryEntrySchema,
 } from "@langwatch/enterprise-governance-contract";
 import { Temporal, type Instant } from "@langwatch/time";
+import { z } from "zod";
 
 import type { RegistryDraft } from "./registry-entry.rules.ts";
 
@@ -17,6 +20,8 @@ export type StoredRegistryEntry = {
   sourceKey: string;
   fingerprint: string;
   entry: AgentRegistryEntry;
+  /** False for a row stored before the dormant flag existed; absent reads as stored with it. */
+  dormancyBaselined?: boolean;
 };
 
 /** A row to write: the entry as it now stands. */
@@ -61,7 +66,39 @@ function canonical(value: unknown): unknown {
   return value;
 }
 
-/** What makes a version: everything but the registry's own dates and counters. */
+export function registryPostureOf({
+  shadow,
+  dormant,
+}: Pick<AgentRegistryEntry, "shadow" | "dormant">): AgentRegistryPosture {
+  if (shadow) return "shadow";
+  return dormant ? "dormant" : "governed";
+}
+
+const legacyFieldsSchema = z.object({
+  dormant: z.boolean().default(false),
+  platform: z.string().nullable().default(null),
+  labels: z.record(z.string(), z.string()).default({}),
+  owner_label: z.string().nullable().default(null),
+});
+
+/**
+ * A stored entry or event payload as the entry schema reads it now. A row written before the
+ * posture fields existed reads as what it was: not dormant, no platform, labels or owner tag.
+ */
+export const storedRegistryEntrySchema = z
+  .looseObject({ shadow: z.boolean(), ...legacyFieldsSchema.shape })
+  .transform((record) => ({ ...record, posture: registryPostureOf(record) }))
+  .pipe(agentRegistryEntrySchema);
+
+export function storedRegistryEntryOf(value: unknown): AgentRegistryEntry {
+  return storedRegistryEntrySchema.parse(value);
+}
+
+/**
+ * What makes a version: everything but the registry's own dates and counters. Posture follows
+ * from shadow and dormant; the fields added with it count only once set, so an entry stored
+ * before them keeps its fingerprint and a deploy versions no agent.
+ */
 function registryFingerprint(entry: AgentRegistryEntry): string {
   const {
     id: _id,
@@ -70,10 +107,21 @@ function registryFingerprint(entry: AgentRegistryEntry): string {
     last_seen_at: _lastSeen,
     updated_at: _updated,
     removed_at: _removed,
+    posture: _posture,
+    dormant,
+    platform,
+    labels,
+    owner_label: ownerLabel,
     ...material
   } = entry;
+  const added = {
+    ...(dormant ? { dormant } : {}),
+    ...(platform !== null ? { platform } : {}),
+    ...(Object.keys(labels).length > 0 ? { labels } : {}),
+    ...(ownerLabel !== null ? { owner_label: ownerLabel } : {}),
+  };
   return createHash("sha256")
-    .update(JSON.stringify(canonical(material)))
+    .update(JSON.stringify(canonical({ ...material, ...added })))
     .digest("hex");
 }
 
@@ -132,12 +180,15 @@ function entryOf({
   const {
     sourceKey: _sourceKey,
     matchIds: _matchIds,
+    sourceCreatedAt: _sourceCreatedAt,
+    dormancyUnsettled: _dormancyUnsettled,
     firstSeenAt: _first,
     lastSeenAt,
     ...described
   } = draft;
   return {
     ...described,
+    posture: registryPostureOf(draft),
     id,
     status: "active",
     version,
@@ -196,11 +247,12 @@ function laterSighting({ held, read }: { held: string | null; read: string | nul
 
 /** A held agent observed again: a new version on a material change, else at most a last-seen move. */
 function planObserved(
-  draft: RegistryDraft,
+  read: RegistryDraft,
   held: StoredRegistryEntry,
   context: PlanContext,
 ): RegistryChangeSet {
   const previous = held.entry;
+  const draft = read.dormancyUnsettled ? { ...read, dormant: previous.dormant } : read;
   const nextVersion = previous.version + 1;
   const merged = mergeTools({
     previous: previous.tools,
@@ -208,7 +260,7 @@ function planObserved(
     version: nextVersion,
     now: context.now,
   });
-  const read = entryOf({
+  const observed = entryOf({
     id: held.id,
     draft,
     version: nextVersion,
@@ -216,10 +268,22 @@ function planObserved(
     firstSeenAt: previous.first_seen_at,
     updatedAt: context.at,
   });
-  const { lastSeenAt } = laterSighting({ held: previous.last_seen_at, read: read.last_seen_at });
-  const candidate = { ...read, last_seen_at: lastSeenAt };
+  const { lastSeenAt } = laterSighting({
+    held: previous.last_seen_at,
+    read: observed.last_seen_at,
+  });
+  const candidate = { ...observed, last_seen_at: lastSeenAt };
   const fingerprint = registryFingerprint(candidate);
   const row = { id: held.id, sourceKey: held.sourceKey, fingerprint, isNew: false };
+  if (isDormancyBaseline({ held, candidate })) {
+    const entry: AgentRegistryEntry = {
+      ...previous,
+      dormant: true,
+      posture: registryPostureOf({ shadow: previous.shadow, dormant: true }),
+      last_seen_at: candidate.last_seen_at,
+    };
+    return { writes: [{ ...row, fingerprint: registryFingerprint(entry), entry }], events: [] };
+  }
 
   if (fingerprint === held.fingerprint && previous.status === "active") {
     if (candidate.last_seen_at === previous.last_seen_at) return { writes: [], events: [] };
@@ -241,6 +305,28 @@ function planObserved(
     events.push(event({ ...facts, type: "governance.agent.tool_deprecated", tool }, context));
   }
   return { writes: [{ ...row, entry: candidate }], events };
+}
+
+/**
+ * A row stored before the dormant flag existed takes its first dormant flag as a baseline, not a
+ * change: written with the flag and its fingerprint, same version, no event, so a deploy versions
+ * and announces no agent for a dormancy it never saw happen.
+ */
+function isDormancyBaseline({
+  held,
+  candidate,
+}: {
+  held: StoredRegistryEntry;
+  candidate: AgentRegistryEntry;
+}): boolean {
+  const previous = held.entry;
+  return (
+    held.dormancyBaselined === false &&
+    previous.status === "active" &&
+    candidate.dormant &&
+    !previous.dormant &&
+    registryFingerprint({ ...candidate, dormant: false }) === held.fingerprint
+  );
 }
 
 /** Whether another reconcile committed to these rows after `readAt`. */
