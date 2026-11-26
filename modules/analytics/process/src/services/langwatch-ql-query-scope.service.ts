@@ -76,14 +76,11 @@ export class LangWatchQLQueryScopeService {
     // A key that reads exactly one project defaults to it; one that reads several must say which.
     // Two readable projects settle that, so the scan stops there instead of reading the rest.
     const mustDefault = requireProjects && named === undefined && reach.kind !== "project";
-    const readable =
-      reach.kind === "project"
-        ? [await this.ownProject({ projectId: reach.projectId, requested: named })]
-        : await this.readableProjects({
-            reach,
-            only: named,
-            stopAfter: mustDefault ? 2 : undefined,
-          });
+    const readable = await this.readableOf({
+      reach,
+      named,
+      stopAfter: mustDefault ? 2 : undefined,
+    });
     if (mustDefault && readable.length === 0) {
       throw new LangWatchQLProjectsUnreadableError();
     }
@@ -130,6 +127,10 @@ export class LangWatchQLQueryScopeService {
     const named = dedupeInOrder(projectIds);
     if (reach.kind === "project") {
       await this.ownProject({ projectId: reach.projectId, requested: named });
+      return;
+    }
+    if (reach.kind === "cliAccessToken") {
+      await this.boundProject({ reach, requested: named });
       return;
     }
     // The widget cap: 100 projects per query, 8 queries per widget (LWQL_MAX_WIDGET_PROJECTS).
@@ -249,6 +250,9 @@ export class LangWatchQLQueryScopeService {
    */
   async holdsQueryPermission({ reach }: { reach: LangWatchQLKeyReach }): Promise<boolean> {
     if (reach.kind === "project") return true;
+    if (reach.kind === "cliAccessToken") {
+      return this.protections.keyPermitted({ credential: reach, permission: "analytics:view" });
+    }
     if (!reach.resolvedProject) return false;
 
     return this.protections.keyPermitted({
@@ -262,6 +266,54 @@ export class LangWatchQLQueryScopeService {
       },
       permission: "analytics:view",
     });
+  }
+
+  /** The projects a run reads, by the kind of credential the door resolved. */
+  private async readableOf({
+    reach,
+    named,
+    stopAfter,
+  }: {
+    reach: LangWatchQLKeyReach;
+    named: readonly string[] | undefined;
+    stopAfter: number | undefined;
+  }): Promise<ReadableProject[]> {
+    if (reach.kind === "project") {
+      return [await this.ownProject({ projectId: reach.projectId, requested: named })];
+    }
+    if (reach.kind === "cliAccessToken") return this.boundProject({ reach, requested: named });
+
+    return this.readableProjects({ reach, only: named, stopAfter });
+  }
+
+  /**
+   * An access token reads its bound project alone, as its person, when that person holds
+   * `analytics:view` there; a project it cannot read is as missing as any other.
+   * @throws {LangWatchQLProjectNotFoundError} for any named project it cannot read.
+   */
+  private async boundProject({
+    reach,
+    requested,
+  }: {
+    reach: Extract<LangWatchQLKeyReach, { kind: "cliAccessToken" }>;
+    requested?: readonly string[] | undefined;
+  }): Promise<ReadableProject[]> {
+    if (requested?.some((id) => id !== reach.projectId))
+      throw new LangWatchQLProjectNotFoundError();
+    const [listed, permitted] = await Promise.all([
+      this.dependencies.projects.listByOrganization({
+        organizationId: reach.organizationId,
+        page: 1,
+        limit: 1,
+        projectIds: [reach.projectId],
+      }),
+      this.protections.keyPermitted({ credential: reach, permission: "analytics:view" }),
+    ]);
+    const project = listed.data.find(({ id }) => id === reach.projectId);
+    const readable = project && permitted ? [{ project, credential: reach }] : [];
+    if (requested?.length && readable.length === 0) throw new LangWatchQLProjectNotFoundError();
+
+    return readable;
   }
 
   /** A legacy project key reaches exactly its own project, with no RBAC fan-out. */

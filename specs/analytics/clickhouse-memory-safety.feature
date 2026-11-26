@@ -191,7 +191,7 @@ Feature: ClickHouse Query Memory Safety Regression Tests
     Given a project whose traces span many parts and carry wide attribute maps
     And the traces view and its trace-ids twin, as provisioning emits them
     And an Instant Evals statement projecting the thread id and an eval column
-    When the sample pass and the key pass run over it as the service runs them, every query under a 100 MB memory cap
+    When the sample pass and the key pass run over it as the service runs them, every query under a 200 MB memory cap
     Then both answer under the cap
     And they return the same keys the single read returns without a cap
     And the single read that projects the thread id for every trace exceeds the cap

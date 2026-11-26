@@ -63,7 +63,7 @@ The AI Gateway uses three more secrets, `LW_GATEWAY_INTERNAL_SECRET`, `LW_GATEWA
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `ADMIN_EMAILS` | Comma-separated emails of the operators who can open the Ops pages (`/ops`), such as feature flags and migrations. Matching ignores case. Set it on both the app and the workers. | - |
-| `AUTH_PROVIDER` | Deployment-wide sign-in provider. `email` means the deployment issues its own passwords. `NEXTAUTH_PROVIDER` is the deprecated name and still works | `email` |
+| `AUTH_PROVIDER` | Deployment-wide sign-in provider. `email` means the deployment issues its own passwords. `NEXTAUTH_PROVIDER` is the deprecated name and still works. Any other provider needs an [Enterprise license](/self-hosting/licensing#sso-requires-a-license); without one the deployment stays in email mode | `email` |
 | `LOCAL_PASSWORDS_ENABLED` | `on` keeps local passwords available next to a configured identity provider | `off` |
 | `PASSKEYS_ENABLED` | `off` removes passkey sign-in and its routes. Registered passkeys are kept | `on` |
 | `MFA_ENROLLMENT_OPEN` | `on` turns on two-step verification | `off` |

@@ -77,23 +77,23 @@ Feature: Langy composer, feedback, and card polish
     Then the message is sent
     And pressing the slash key at a word boundary opens the skills palette instead of typing a slash
 
-  Rule: The composer takes no queue, and says so
+  Rule: A message sent during a turn goes next, and the field says so
 
-    A message cannot be sent while a turn is in flight. The customer may still
-    write one, and it waits in the field. The field has to say that, because a
-    refused Enter looks the same as a broken one.
+    The customer can send while a turn is in flight: the panel queues the message
+    and Langy picks it up when the turn ends (modules/langy/specs/langy-queue-while-busy.feature).
+    The field says that, so a message sent mid-turn is not a surprise.
 
     @integration
-    Scenario: The message field says a message waits while Langy works
+    Scenario: The message field says a message goes next while Langy works
       Given a Langy turn is in flight
       When the customer looks at the message field
-      Then it says Langy is working and the message sends when it stops
+      Then it says Langy is working and a message sent now goes next
 
     @integration
     Scenario: The message field says the same while the turn is stopping
       Given a Langy turn that the customer asked to stop
       When the customer looks at the message field
-      Then it says Langy is working and the message sends when it stops
+      Then it says Langy is working and a message sent now goes next
 
     @integration
     Scenario: The message field points at the card while one is waiting
@@ -114,11 +114,10 @@ Feature: Langy composer, feedback, and card polish
       And it does not say to answer a card
 
     @integration
-    Scenario: Enter during a turn keeps the message instead of sending it
+    Scenario: Enter during a turn sends the message on to be queued
       Given a Langy turn is in flight
       When the customer types a message and presses Enter
-      Then no message is sent
-      And the message is still in the field
+      Then the message is handed to the panel, which queues it for the next turn
 
     @unit
     Scenario: A failed send gives back only what the customer typed
@@ -128,7 +127,7 @@ Feature: Langy composer, feedback, and card polish
       And it gets nothing back when the customer has started writing something else
 
     @integration
-    Scenario: The kept message sends once the turn ends
-      Given a message typed during a turn that has now ended
+    Scenario: A message typed during a turn sends once the customer presses Enter
+      Given a message typed, but not sent, during a turn that has now ended
       When the customer presses Enter
       Then that message is sent

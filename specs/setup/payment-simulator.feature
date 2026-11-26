@@ -102,6 +102,13 @@ Feature: paymentsim, a local stand-in for Stripe
       Then a subscription_cycle invoice bills the seats and the usage above the free tier, and is paid
 
     @unit
+    Scenario: A renewal bills the dollars judged on the catalog's Instant Evals price
+      Given paymentsim started with the billing contract's stripe-catalog.json
+      And a dollar subscription with two seats and the catalog's Instant Evals price
+      When 1.2345 dollars are sent to the Instant Evals meter and the clock moves past the period end
+      Then the renewal invoice bills the seats and 123 cents for Instant Evals
+
+    @unit
     Scenario: A forced payment failure fires invoice.payment_failed and marks the subscription past due
       Given the customer's next charge is set to fail
       When the clock moves past the period end

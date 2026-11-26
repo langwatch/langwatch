@@ -1,5 +1,6 @@
 import { useChat } from "@ai-sdk/react";
 import { isHandledByGlobalHandler } from "@langwatch/browser-host/errors";
+import { type UiRouter, useRouter } from "@langwatch/browser-host/use-router";
 import type { LangyMessageDto } from "@langwatch/langy-contract";
 import type { UIMessage } from "ai";
 import { useCallback, useEffect, useRef } from "react";
@@ -8,7 +9,11 @@ import { api } from "../../../behavior/langy-api.ts";
 import { isLangyTranscriptMessage } from "../../transcript/model/langy-transcript.ts";
 import { toEngineMessage } from "../model/langy-engine-parts.ts";
 import type { createLangyChatTransport } from "./logic/langy-chat-transport.ts";
-import { settledWriteOf } from "./logic/langy-write-refresh.ts";
+import {
+  createdBoardDestination,
+  type LangySettledWrite,
+  settledWriteOf,
+} from "./logic/langy-write-refresh.ts";
 
 /**
  * At most one transcript re-render per window while a turn streams. Unthrottled, every chunk is a
@@ -153,6 +158,29 @@ function toEngineHistory(history: LangyMessageDto[]): UIMessage[] {
 }
 
 /**
+ * Refresh what one settled write touched; a board it made opens when the reader is on a
+ * dashboards page, so the new board is not missed.
+ */
+function applySettledWrite({
+  write,
+  utils,
+  router,
+}: {
+  write: LangySettledWrite;
+  utils: ReturnType<typeof api.useUtils>;
+  router: UiRouter;
+}): void {
+  for (const name of write.routers) void utils[name].invalidate();
+  if (!write.createdBoard) return;
+  const destination = createdBoardDestination({
+    board: write.createdBoard,
+    pathname: router.pathname,
+    origin: globalThis.location?.origin ?? "",
+  });
+  if (destination && destination !== router.pathname) void router.push(destination);
+}
+
+/**
  * Invalidate the app queries a settled Langy write touched, once per tool call, so an open page
  * shows what Langy made without a reload. Answers the call that marks the calls of a conversation
  * the user opens as already refreshed.
@@ -165,15 +193,16 @@ function useRefreshAppListsOnWrite({
   utils: ReturnType<typeof api.useUtils>;
 }): (hydrated: UIMessage[]) => void {
   const refreshedCallsRef = useRef(new Set<string>());
+  const router = useRouter();
 
   useEffect(() => {
     for (const part of messages.flatMap((message) => message.parts)) {
       const write = settledWriteOf(part);
       if (!write || refreshedCallsRef.current.has(write.callId)) continue;
       refreshedCallsRef.current.add(write.callId);
-      for (const router of write.routers) void utils[router].invalidate();
+      applySettledWrite({ write, utils, router });
     }
-  }, [messages, utils]);
+  }, [messages, utils, router]);
 
   return useCallback((hydrated: UIMessage[]) => {
     for (const part of hydrated.flatMap((message) => message.parts)) {

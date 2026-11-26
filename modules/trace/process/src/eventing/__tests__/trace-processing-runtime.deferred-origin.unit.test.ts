@@ -1,6 +1,7 @@
 /**
  * @vitest-environment node
  * Spec: specs/traces/explicit-application-origin.feature
+ * Spec: specs/trace-processing/backfilled-trace-read-anchor.feature
  */
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { TraceSummaryData } from "@langwatch/trace-contract";
@@ -78,6 +79,22 @@ describe("the composed deferredOriginResolution subscriber", () => {
           origin: "application",
           reason: "deferred_fallback",
         }),
+      );
+    });
+  });
+
+  describe("when the stored summary of a backfilled trace has no origin", () => {
+    /** @scenario "The deferred origin is stamped with the trace's storage anchor" */
+    it("stamps the origin event with the trace's storage anchor, not the time it ran", async () => {
+      const storageAnchorMs = SPAN_OCCURRED_AT - 9 * 24 * 60 * 60 * 1000;
+      const { subscriber, resolveOrigin } = compose({
+        storedSummary: { ...summaryWith(), storageAnchorMs },
+      });
+
+      await fireArmedJob(subscriber);
+
+      expect(resolveOrigin).toHaveBeenCalledWith(
+        expect.objectContaining({ origin: "application", occurredAt: storageAnchorMs }),
       );
     });
   });
