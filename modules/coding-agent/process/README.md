@@ -12,7 +12,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 ## Module API (`CodingAgentApi`)
 
-Peers call these through the token, declared at `../contract/src/coding-agent.api.ts:63`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/coding-agent.api.ts:64`; nothing else in this package is public.
 
 #### `findBySessionId`
 
@@ -64,6 +64,14 @@ readSessionEventsPage(input: CodingAgentSessionEventsPageInput): Promise<CodingA
 
 ```typescript
 getUsageTotals(input: CodingAgentUsageTotalsInput): Promise<CodingAgentUsageTotals>;
+```
+
+#### `readAccountBurndownForViewer`
+
+The trailing week per subscription account; its cost follows `cost:view`.
+
+```typescript
+readAccountBurndownForViewer(input: { projectId: string; authorization: Authorization }, by: CodingAgentViewer): Promise<CodingAgentAccountBurndownPage>;
 ```
 
 #### `listRecent`
@@ -202,11 +210,11 @@ Permission `traces:view`. Declared at `src/transport/coding-agent.rest.ts:68`.
 Answers at `/api/coding-agent/sessions/:sessionId/events`, `/api/v1/coding-agent/sessions/:sessionId/events`; also, undocumented, `/api/coding-agent/2026-08-07/sessions/:sessionId/events`, `/api/v1/coding-agent/2026-08-07/sessions/:sessionId/events`, `/api/coding-agent/latest/sessions/:sessionId/events`, `/api/v1/coding-agent/latest/sessions/:sessionId/events`.
 
 ```typescript
-// Params: codingAgentSessionEventsRestParamsSchema, ../contract/src/coding-agent.ts:357
+// Params: codingAgentSessionEventsRestParamsSchema, ../contract/src/coding-agent.ts:363
 interface Params {
   sessionId: string;
 }
-// Query: codingAgentSessionEventsRestQuerySchema, ../contract/src/coding-agent.ts:402
+// Query: codingAgentSessionEventsRestQuerySchema, ../contract/src/coding-agent.ts:408
 interface Query {
   limit?: number;
   kinds?: string;
@@ -214,7 +222,7 @@ interface Query {
   to?: number;
   cursor?: string;
 }
-type Response = z.infer<typeof codingAgentSessionEventsRestResponseSchema>; // ../contract/src/coding-agent.ts:412
+type Response = z.infer<typeof codingAgentSessionEventsRestResponseSchema>; // ../contract/src/coding-agent.ts:418
 ```
 
 ### `codingAgentRollupRest`
@@ -243,11 +251,12 @@ type Response = z.infer<typeof pullRequestUsageResponseSchema>; // src/rules/pul
 
 ### `codingAgents`
 
-Contract `../contract/src/coding-agent.trpc.ts:27`, router `src/transport/coding-agent.trpc.ts:29`.
+Contract `../contract/src/coding-agent.trpc.ts:28`, router `src/transport/coding-agent.trpc.ts:29`.
 
 | Procedure                        | Kind  | Gate                     | Input                                         | Output                                                    |
 | -------------------------------- | ----- | ------------------------ | --------------------------------------------- | --------------------------------------------------------- |
 | `codingAgents.usageTotals`       | query | Permission `traces:view` | `codingAgentTrpcUsageTotalsInputSchema`       | `codingAgentUsageTotalsSchema`                            |
+| `codingAgents.accountBurndown`   | query | Permission `traces:view` | `codingAgentTrpcProjectScopeSchema`           | `codingAgentAccountBurndownPageSchema`                    |
 | `codingAgents.recentSessions`    | query | Permission `traces:view` | `codingAgentTrpcRecentSessionsInputSchema`    | inline                                                    |
 | `codingAgents.sessionsList`      | query | Permission `traces:view` | `codingAgentTrpcProjectScopeSchema`           | inline                                                    |
 | `codingAgents.pullRequestUsage`  | query | Permission `traces:view` | `codingAgentTrpcProjectScopeSchema`           | `codingAgentPersonalPullRequestUsageWithConnectionSchema` |
@@ -265,7 +274,7 @@ interface Input {
   fromMs?: number;
   toMs?: number;
 }
-// Output: codingAgentUsageTotalsSchema, ../contract/src/coding-agent.ts:497
+// Output: codingAgentUsageTotalsSchema, ../contract/src/coding-agent.ts:503
 interface Output {
   sessionCount: number;
   costUsd: number;
@@ -277,6 +286,13 @@ interface Output {
   pullRequests: number;
 }
 
+// codingAgents.accountBurndown
+// Input: codingAgentTrpcProjectScopeSchema, ../contract/src/coding-agent-trpc.schemas.ts:15
+interface Input {
+  projectId: string;
+}
+type Output = z.infer<typeof codingAgentAccountBurndownPageSchema>; // ../contract/src/coding-agent-account-burndown.ts:117
+
 // codingAgents.recentSessions
 // Input: codingAgentTrpcRecentSessionsInputSchema, ../contract/src/coding-agent-trpc.schemas.ts:62
 interface Input {
@@ -285,18 +301,15 @@ interface Input {
   toMs?: number;
   limit?: number;
 }
-// Output: codingAgentSessionSchema.array() (inline, ../contract/src/coding-agent.trpc.ts:37)
+// Output: codingAgentSessionSchema.array() (inline, ../contract/src/coding-agent.trpc.ts:44)
 
 // codingAgents.sessionsList
-// Input: codingAgentTrpcProjectScopeSchema, ../contract/src/coding-agent-trpc.schemas.ts:15
-interface Input {
-  projectId: string;
-}
-// Output: codingAgentSessionListRowSchema.array() (inline, ../contract/src/coding-agent.trpc.ts:43)
+type Input = z.infer<typeof codingAgentTrpcProjectScopeSchema>; // ../contract/src/coding-agent-trpc.schemas.ts:15
+// Output: codingAgentSessionListRowSchema.array() (inline, ../contract/src/coding-agent.trpc.ts:50)
 
 // codingAgents.pullRequestUsage
 type Input = z.infer<typeof codingAgentTrpcProjectScopeSchema>; // ../contract/src/coding-agent-trpc.schemas.ts:15
-type Output = z.infer<typeof codingAgentPersonalPullRequestUsageWithConnectionSchema>; // ../contract/src/coding-agent.ts:887
+type Output = z.infer<typeof codingAgentPersonalPullRequestUsageWithConnectionSchema>; // ../contract/src/coding-agent.ts:893
 
 // codingAgents.pullRequestDetail
 // Input: codingAgentTrpcPullRequestDetailInputSchema, ../contract/src/coding-agent-trpc.schemas.ts:74
@@ -306,15 +319,15 @@ interface Input {
   repositoryFullName: string;
   prNumber: number;
 }
-type Output = z.infer<typeof codingAgentPullRequestDetailSchema>; // ../contract/src/coding-agent.ts:796
+type Output = z.infer<typeof codingAgentPullRequestDetailSchema>; // ../contract/src/coding-agent.ts:802
 
 // codingAgents.session
-// Input: inline, ../contract/src/coding-agent.trpc.ts:60
+// Input: inline, ../contract/src/coding-agent.trpc.ts:67
 interface Input {
   projectId: string;
   traceId: string;
 }
-// Output: codingAgentSessionSchema.nullable() (inline, ../contract/src/coding-agent.trpc.ts:61)
+// Output: codingAgentSessionSchema.nullable() (inline, ../contract/src/coding-agent.trpc.ts:68)
 
 // codingAgents.lastTurn
 // Input: codingAgentTrpcSessionScopeSchema, ../contract/src/coding-agent-trpc.schemas.ts:26
@@ -322,7 +335,7 @@ interface Input {
   projectId: string;
   sessionId: string;
 }
-// Output: inline, ../contract/src/coding-agent.trpc.ts:67
+// Output: inline, ../contract/src/coding-agent.trpc.ts:74
 type Output = {
   traceId: string;
   occurredAtMs: number;
@@ -381,8 +394,8 @@ Declared at `src/eventing/coding-agent-project-milestones.pipeline.ts:18`. Event
 
 | Kind   | Leaf                    | Environment variable               | Declared at                                |
 | ------ | ----------------------- | ---------------------------------- | ------------------------------------------ |
-| secret | `repositoryKey`         | `CREDENTIALS_SECRET`               | `src/app/coding-agent.app.ts:158`          |
-| secret | `repositoryKeyFallback` | `NEXTAUTH_SECRET`                  | `src/app/coding-agent.app.ts:159`          |
+| secret | `repositoryKey`         | `CREDENTIALS_SECRET`               | `src/app/coding-agent.app.ts:160`          |
+| secret | `repositoryKeyFallback` | `NEXTAUTH_SECRET`                  | `src/app/coding-agent.app.ts:161`          |
 | config | `foldCacheTtlSeconds`   | `LANGWATCH_FOLD_CACHE_TTL_SECONDS` | `../contract/src/coding-agent.config.ts:4` |
 
 <!-- readme:generated:end -->

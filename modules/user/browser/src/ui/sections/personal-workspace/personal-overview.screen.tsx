@@ -44,6 +44,7 @@ import { ConnectYourAgentButton } from "../connect-your-agent-button.tsx";
 import { PersonalRecentTracesTable } from "../personal-recent-traces-table.tsx";
 import { PersonalWorkspaceLayout } from "../personal-workspace-layout.tsx";
 import { PersonalWorkspaceViewOnlyNotice } from "../personal-workspace-view-only-notice.tsx";
+import { SubscriptionAccountsSection } from "../subscription-accounts-section.tsx";
 import { TraceIngestSection } from "../trace-ingest-section.tsx";
 
 // /coding-agents/usage frequently surfaces sub-cent spend; defer to the shared
@@ -287,6 +288,8 @@ export function PersonalOverviewScreen() {
               <EmptyState message="No coding-agent usage yet" />
             )}
           </SectionCard>
+
+          {personalProjectId && <SubscriptionAccountsSection projectId={personalProjectId} />}
 
           <SectionCard title="Recent activity" flushContent>
             {personalProjectId && personalProjectSlug ? (

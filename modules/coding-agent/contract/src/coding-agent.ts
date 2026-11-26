@@ -1,6 +1,8 @@
 import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
+import { codingAgentAccountColumnsSchema } from "./coding-agent-account-burndown.ts";
+
 const countByNameSchema = z.record(z.string(), z.number());
 // The legacy service deliberately accepts non-finite limits and clamps them
 // to its safe page size. Keep that behaviour at the new boundary.
@@ -225,12 +227,16 @@ export const codingAgentSessionEventSchema: CodingAgentSessionEventSchema =
   codingAgentSessionEventSchemaDefinition;
 
 /**
- * One durable row in the ordered coding-agent session-event read model. `aiUnits` is what the
- * call consumed in its agent's AI units (migration 00123), a count beside the dollar figure;
- * written for the pull-request read, not part of the events answer.
+ * One durable row in the ordered coding-agent session-event read model. `aiUnits` (00123) and
+ * the account columns (00136) are written for the pull-request and subscription-account reads,
+ * not part of the events answer.
  */
 const codingAgentSessionEventRecordSchemaDefinition = codingAgentSessionEventSchema
-  .safeExtend({ tenantId: z.string(), aiUnits: z.number() })
+  .safeExtend({
+    tenantId: z.string(),
+    aiUnits: z.number(),
+    ...codingAgentAccountColumnsSchema.shape,
+  })
   .strict();
 export interface CodingAgentSessionEventRecordSchema extends Named<
   typeof codingAgentSessionEventRecordSchemaDefinition

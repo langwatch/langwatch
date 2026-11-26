@@ -8,7 +8,10 @@ import { randomUUID } from "node:crypto";
 import type { ClickHouseClient } from "@clickhouse/client";
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import { vendorQueryClient } from "@langwatch/clickhouse-client/testing";
-import type { CodingAgentSessionEventRecord } from "@langwatch/coding-agent-contract";
+import {
+  type CodingAgentSessionEventRecord,
+  NO_ACCOUNT_COLUMNS,
+} from "@langwatch/coding-agent-contract";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { CODING_AGENT_ID_INDEXES } from "../clickhouse.coding-agent-id-indexes.database.ts";
@@ -82,6 +85,7 @@ function eventRecord(
     repositoryOwner: "",
     repositoryName: "",
     branch: "",
+    ...NO_ACCOUNT_COLUMNS,
     ...over,
   };
 }

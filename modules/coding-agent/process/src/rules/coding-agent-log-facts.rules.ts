@@ -10,6 +10,7 @@ import {
   LOGS_REQUIRE_SESSION_KEY_AGENT_IDS,
   normalizeEventName,
   pickDeclaredCodingAgent,
+  resourceAccountFacts,
   SESSION_NAME_FACT_KEY,
   SESSION_TITLE_FACT_KEY,
   SESSION_TITLE_FALLBACK_FACT_KEY,
@@ -174,6 +175,8 @@ function stampResourceIdentity({
   if (facts["app.entrypoint"] === undefined && typeof entrypoint === "string" && entrypoint) {
     facts["app.entrypoint"] = entrypoint;
   }
+  // A launcher names the account it runs on through the resource too; the record's own wins.
+  Object.assign(facts, resourceAccountFacts({ facts, resourceAttributes }));
   // A launcher names its sessions through OTEL_RESOURCE_ATTRIBUTES; the record's own name wins.
   const sessionName = resourceAttributes?.[SESSION_NAME_FACT_KEY];
   if (facts[SESSION_NAME_FACT_KEY] === undefined && typeof sessionName === "string") {

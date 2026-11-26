@@ -48,6 +48,7 @@ describe("the codingAgents tRPC surface", () => {
         Object.entries(codingAgentTrpc.members).map(([name, member]) => [name, member.kind]),
       ).toEqual([
         ["usageTotals", "query"],
+        ["accountBurndown", "query"],
         ["recentSessions", "query"],
         ["sessionsList", "query"],
         ["pullRequestUsage", "query"],
@@ -80,6 +81,7 @@ describe("the codingAgents tRPC surface", () => {
     it("asks traces:view of every procedure, the cut traces asks", () => {
       expect(boundProcedures()).toEqual([
         { procedure: "codingAgents.usageTotals", permission: "traces:view" },
+        { procedure: "codingAgents.accountBurndown", permission: "traces:view" },
         { procedure: "codingAgents.recentSessions", permission: "traces:view" },
         { procedure: "codingAgents.sessionsList", permission: "traces:view" },
         { procedure: "codingAgents.pullRequestUsage", permission: "traces:view" },

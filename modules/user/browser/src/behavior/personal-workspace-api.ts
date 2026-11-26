@@ -5,7 +5,10 @@
 
 import { createModuleApi, type ContractApiMap } from "@langwatch/api/web";
 import type { authTrpc } from "@langwatch/auth-contract";
-import type { CodingAgentUsageTotals } from "@langwatch/coding-agent-contract";
+import type {
+  CodingAgentAccountBurndownPage,
+  CodingAgentUsageTotals,
+} from "@langwatch/coding-agent-contract";
 import type {
   personalVirtualKeysTrpc,
   routingPolicyTrpc,
@@ -142,6 +145,9 @@ type BorrowedProcedures = {
     };
   };
   codingAgents: {
+    accountBurndown: {
+      query: { input: { projectId: string }; output: CodingAgentAccountBurndownPage };
+    };
     usageTotals: {
       query: {
         input: { projectId: string; fromMs?: number; toMs?: number };

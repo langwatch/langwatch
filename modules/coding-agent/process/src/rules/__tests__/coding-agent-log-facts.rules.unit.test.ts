@@ -638,4 +638,33 @@ describe("liftLogContribution", () => {
       expect(dispatched).toHaveLength(0);
     });
   });
+
+  describe("when a launcher sets the account on the resource", () => {
+    /** @scenario a launcher sets the account once on the resource */
+    it("fills the account facts the record left unset, and the record's own value wins", () => {
+      const { lift, dispatched } = makeLift();
+
+      lift(
+        canonicalLogRecord({
+          attributes: {
+            "event.name": "claude_code.api_request",
+            "session.id": "sess-account",
+            "langwatch.account.name": "ACME Max 2",
+          },
+          resourceAttributes: {
+            "langwatch.account.id": "0f1e2d3c4b5a69788796a5b4c3d2e1f0",
+            "langwatch.account.name": "Resource name",
+            "langwatch.account.usage.percent": 31,
+            "langwatch.account.usage.window": "five_hour",
+          },
+        }),
+      );
+
+      const facts = dispatched[0]!.facts;
+      expect(facts["langwatch.account.id"]).toBe("0f1e2d3c4b5a69788796a5b4c3d2e1f0");
+      expect(facts["langwatch.account.name"]).toBe("ACME Max 2");
+      expect(facts["langwatch.account.usage.percent"]).toBe(31);
+      expect(facts["langwatch.account.usage.window"]).toBe("five_hour");
+    });
+  });
 });

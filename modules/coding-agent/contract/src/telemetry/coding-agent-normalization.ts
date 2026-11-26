@@ -4,6 +4,7 @@ import { isConversationalQuerySource, readDeclaredSessionKey } from "@langwatch/
 // compares vendor literals.
 
 import { splitLeadingContextBlocks } from "../leading-context.ts";
+import { CODING_AGENT_ACCOUNT_KEYS } from "./coding-agent-account.ts";
 import type {
   CodingAgent,
   CodingAgentEvent,
@@ -244,6 +245,8 @@ export const CODING_AGENT_CONTRIBUTION_KEYS: readonly string[] = [
   "user.email",
   "user.account_uuid",
   "user.account_id",
+  // The subscription account the agent ran on (coding-agent-account.ts).
+  ...CODING_AGENT_ACCOUNT_KEYS,
   "organization.id",
   "app.version",
   "app.entrypoint",

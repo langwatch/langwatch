@@ -1,4 +1,5 @@
 import {
+  NO_ACCOUNT_COLUMNS,
   codingAgentSessionEventRecordSchema,
   type CodingAgentSession,
   type CodingAgentSessionBranchRecord,
@@ -42,7 +43,10 @@ import type { CodingAgentBillingPolicy } from "../../services/coding-agent-cost-
 import type { CodingAgentClock } from "../../services/coding-agent-clock.service.ts";
 import type { CodingAgentStoredTraces } from "../../services/coding-agent-session-read.service.ts";
 import { CODING_AGENT_ID_INDEXES } from "../../repositories/clickhouse/clickhouse.coding-agent-id-indexes.database.ts";
-import { CodingAgentSessionEventRepository } from "../../repositories/coding-agent-session-event.repository.ts";
+import {
+  type AccountUsageGroupRow,
+  CodingAgentSessionEventRepository,
+} from "../../repositories/coding-agent-session-event.repository.ts";
 import {
   CodingAgentSessionRepository,
   type OtherSessionKind,
@@ -305,6 +309,7 @@ export function sessionEventRecord(
     repositoryOwner: "",
     repositoryName: "",
     branch: "",
+    ...NO_ACCOUNT_COLUMNS,
     ...overrides,
   });
 }
@@ -631,6 +636,10 @@ export class TestEvents extends CodingAgentSessionEventRepository {
   > {
     this.modelTotalInputs.push(input);
     return this.modelTotals.map((total) => ({ ...total, aiUnits: total.aiUnits ?? 0 }));
+  }
+
+  async summariseAccountUsage(): Promise<AccountUsageGroupRow[]> {
+    return [];
   }
 
   async findSessionsByStampedBranch(input: {

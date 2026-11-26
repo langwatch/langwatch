@@ -73,6 +73,14 @@ export interface LwqlClickHouseRows {
     readonly RepositoryName: "LowCardinality(String)";
     readonly Branch: "String";
     readonly AiUnits: "Float64";
+    readonly AccountId: "String";
+    readonly AccountName: "String";
+    readonly AccountSource: "LowCardinality(String)";
+    readonly AccountUsagePercent: "Nullable(Float64)";
+    readonly AccountUsageWindow: "LowCardinality(String)";
+    readonly AccountUsageResetsAt: "Nullable(DateTime64(3))";
+    readonly AccountUsageReadAt: "Nullable(DateTime64(3))";
+    readonly AccountLimitedUntil: "Nullable(DateTime64(3))";
   };
   readonly coding_agent_session_events_id_index: {
     readonly TenantId: "String";

@@ -1,0 +1,43 @@
+import type { CodingAgentAccountBurndownPage } from "@langwatch/coding-agent-contract";
+
+import type { CodingAgentSessionEventRepository } from "../repositories/coding-agent-session-event.repository.ts";
+import { accountWeekWindow, buildAccountBurndowns } from "../rules/coding-agent-account.rules.ts";
+import type { CodingAgentClock } from "./coding-agent-clock.service.ts";
+
+/**
+ * The trailing week of one project's subscription accounts: what each spent per UTC day, and the
+ * usage each last reported. Only reported figures are shown; nothing is derived from tokens.
+ * @see specs/coding-agent/account-burndown.feature
+ */
+export class CodingAgentAccountBurndownService {
+  static create(deps: {
+    sessionEvents: CodingAgentSessionEventRepository;
+    clock: CodingAgentClock;
+  }): CodingAgentAccountBurndownService {
+    return new CodingAgentAccountBurndownService(deps.sessionEvents, deps.clock);
+  }
+
+  private constructor(
+    private readonly sessionEvents: CodingAgentSessionEventRepository,
+    private readonly clock: CodingAgentClock,
+  ) {}
+
+  async readWeek(input: {
+    projectId: string;
+    canSeeCosts: boolean;
+  }): Promise<CodingAgentAccountBurndownPage> {
+    const nowMs = this.clock.nowMs();
+    const { fromMs, days } = accountWeekWindow(nowMs);
+    const groups = await this.sessionEvents.summariseAccountUsage({
+      tenantId: input.projectId,
+      fromMs,
+      toMs: nowMs + 1,
+    });
+
+    return {
+      fromMs,
+      toMs: nowMs,
+      accounts: buildAccountBurndowns({ groups, days, canSeeCosts: input.canSeeCosts, nowMs }),
+    };
+  }
+}
