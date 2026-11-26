@@ -53,7 +53,7 @@ export type PiiRedactionModelUsage = Readonly<{
   findings: number;
   outcome: "ok" | PiiRedactionModelFallbackReason;
   durationMs: number;
-  /** A split span only (ADR-207): how many calls the split model was sent. */
+  /** A split span only (ADR-207): how many calls it was planned into, sent or not. */
   calls?: number;
   /** On an error only: the failure's class name. */
   errorName?: string;
@@ -322,7 +322,7 @@ export class PiiRedactionModelService {
     const admission = this.#admit("split");
     if (!admission) return fallBack("breaker_open");
 
-    const startedAt = this.now();
+    const startedAt = performance.now();
     // A sibling's timeout or throttle after the span ended still opens the breaker.
     const late = { settled: false, unavailable: false };
     const onUnavailable = () => {
@@ -330,7 +330,7 @@ export class PiiRedactionModelService {
       if (late.settled) this.#openBreaker("split");
     };
     const outcome = await this.#runSplitCalls({ input, calls, slots, onUnavailable });
-    const durationMs = this.now() - startedAt;
+    const durationMs = elapsedSince(startedAt);
     late.settled = true;
     if (outcome.kind === "failed") {
       const unavailable = outcome.reason !== "error" || late.unavailable;
@@ -396,7 +396,6 @@ export class PiiRedactionModelService {
         answers: [],
         callDurationsMs: [],
         ended: false,
-        now: this.now,
         onUnavailable,
         answer: (splitCall) =>
           split.answers({
@@ -519,7 +518,6 @@ type SplitRun = {
   readonly answers: PieceAnswer[];
   readonly callDurationsMs: number[];
   ended: boolean;
-  readonly now: () => number;
   readonly answer: (call: SplitCall) => Promise<{ findings: unknown; anonymized: unknown }[]>;
   readonly end: (outcome: SplitOutcome) => void;
   /** A call timed out or was throttled, even after the span ended: the breaker must hear it. */
@@ -549,10 +547,11 @@ async function runSplitCall({
   run: SplitRun;
   splitCall: SplitCall;
 }): Promise<boolean> {
-  const startedAt = run.now();
+  // Monotonic, as the single call's: a wall-clock step never makes a duration or a hold wrong.
+  const startedAt = performance.now();
   try {
     const answered = await run.answer(splitCall);
-    run.callDurationsMs.push(run.now() - startedAt);
+    run.callDurationsMs.push(elapsedSince(startedAt));
     for (const [i, piece] of splitCall.pieces.entries()) {
       const answer = answered[i];
       // A missing answer fails the span: a default of no findings would store the piece raw.
@@ -567,7 +566,7 @@ async function runSplitCall({
     const reason = failureOutcomeOf(error);
     if (reason !== "error") run.onUnavailable();
     run.end({ kind: "failed", reason, error });
-    const holdMs = startedAt + PII_REDACTION_MODEL_ABORTED_SLOT_HOLD_MS - run.now();
+    const holdMs = startedAt + PII_REDACTION_MODEL_ABORTED_SLOT_HOLD_MS - performance.now();
     if (reason === "timeout" && holdMs > 0) await new Promise((wake) => setTimeout(wake, holdMs));
     return false;
   }

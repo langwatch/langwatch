@@ -386,7 +386,9 @@ Feature: Redacting personal data out of a span at ingestion
     And PII_REDACTION_MODEL_SPLIT_ENDPOINT names the split model's Lambda function
     When a strict batch holds between 8,001 and 32,000 characters in all its texts
     Then every call to the split model carries at most 4,000 characters
-    And a text over 4,000 characters is cut at whitespace into pieces, each repeating the last 200 characters of the one before it
+    And a text over 4,000 characters is cut at whitespace into pieces, each repeating at least the last 200 characters of the one before it
+    And a piece that would be under 2,000 characters is cut inside a word instead, the overlap covering that cut
+    And only after a whitespace run longer than 800 characters may the next piece repeat less, as no value spans it
     And texts of 4,000 characters or less are packed whole into calls
     And every finding is masked on the characters the model found it on
     And Presidio is not called

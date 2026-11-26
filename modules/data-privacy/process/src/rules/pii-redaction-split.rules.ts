@@ -245,6 +245,7 @@ export function clearSplitSpan({
     if (placed === "unplaceable") return placed;
     found[piece.text]?.push(...placed);
   }
+  if (lacksMaskedText({ texts, whole })) return "unplaceable";
   return texts.map((text, index) => {
     const spared = spareNamesAndPlaces?.[index] ?? false;
     const wholeAnswer = whole.get(index);
@@ -261,6 +262,21 @@ export function clearSplitSpan({
     );
     return kept.length === 0 ? null : masked({ text, findings: kept, marker: formatPiiMarker });
   });
+}
+
+/** The model masks every text it processes; only an empty one comes back without it. */
+function lacksMaskedText({
+  texts,
+  whole,
+}: {
+  texts: readonly string[];
+  whole: ReadonlyMap<number, PieceAnswer>;
+}): boolean {
+  return [...whole].some(
+    ([index, answer]) =>
+      typeof answer.anonymized !== "string" &&
+      !Array.from(texts[index] ?? "").every((char) => isPythonSpace(char)),
+  );
 }
 
 /** How many masked ranges a cleared split span holds, for its usage line. */

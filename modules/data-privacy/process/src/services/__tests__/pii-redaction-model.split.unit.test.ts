@@ -1,174 +1,33 @@
-import { DATA_PRIVACY_PRESIDIO_TIMEOUT_MS } from "@langwatch/data-privacy-contract";
-import type { PiiRedactionSpendPricedEventData } from "@langwatch/data-privacy-contract/pii-redaction-spend";
-import type { EntitlementApi } from "@langwatch/entitlement-contract";
-import type { PiiDetectionOutcome } from "@langwatch/evaluation-contract";
-import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
-import { ConcurrencyLimiter } from "@langwatch/limiter";
 import { formatPiiMarker } from "@langwatch/redaction";
-import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import {
-  dataPrivacyTestGraph,
-  dataPrivacyTestPlacement,
-} from "../../app/__tests__/data-privacy.fixture.ts";
-import { MemoryGoogleDlpChannel } from "../../channels/memory/memory.google-dlp.channel.ts";
-import { MemoryPresidioChannel } from "../../channels/memory/memory.presidio.channel.ts";
-import { MemoryDataPrivacyProjectScopeRepository } from "../../repositories/memory/memory.data-privacy-project-scope.repository.ts";
 import { clearingOfAnswer } from "../../rules/pii-analysis.rules.ts";
-import {
-  PII_REDACTION_MODEL_BREAKER_COOLDOWN_MS,
-  PII_REDACTION_MODEL_TIMEOUT_MS,
-} from "../../rules/pii-redaction-model.rules.ts";
+import { PII_REDACTION_MODEL_TIMEOUT_MS } from "../../rules/pii-redaction-model.rules.ts";
 import {
   piiRedactionCostNanoUsd,
-  piiRedactionRequestIdKey,
   piiRedactionSpendRequestId,
 } from "../../rules/pii-redaction-spend.rules.ts";
 import {
   clearSplitSpan,
   PII_REDACTION_MODEL_PIECE_CHARACTERS,
-  planSpan,
-  type SplitCall,
 } from "../../rules/pii-redaction-split.rules.ts";
-import { DataPrivacyProjectScopeService } from "../data-privacy-project-scope.service.ts";
-import { GoogleDlpRedactionService } from "../google-dlp-redaction.service.ts";
-import type { PiiRedactionModelFallbackReason } from "../pii-analysis-metrics-otel.service.ts";
-import { PiiAnalysisService } from "../pii-analysis.service.ts";
-import {
-  type PiiRedactionModelUsage,
-  PiiRedactionModelService,
-} from "../pii-redaction-model.service.ts";
-import { PiiRedactionSpendService } from "../pii-redaction-spend.service.ts";
 import { PresidioRedactionService } from "../presidio-redaction.service.ts";
 import {
-  type FakeTurn,
-  filler,
-  fakePiiModel,
-  type PlantedValue,
-  plantedText,
-} from "./pii-redaction-split.fixture.ts";
-
-const PROJECT_ID = dataPrivacyTestGraph.projectId;
-const ORGANIZATION_ID = dataPrivacyTestGraph.organizationId;
-const KEY = piiRedactionRequestIdKey("test-key-pepper");
-const PRESIDIO_MASK = "presidio cleared it";
-const metrics = {
-  analysisCalled: () => void 0,
-  analysisObserved: () => void 0,
-  analysisFinished: () => void 0,
-};
-
-/** Presidio's answer for a batch of `count` texts: each one cleared to {@link PRESIDIO_MASK}. */
-const presidioAnswer = (count: number): PiiDetectionOutcome => ({
-  kind: "detected",
-  results: Array.from({ length: count }, () => ({
-    status: "processed" as const,
-    raw_response: { anonymized: PRESIDIO_MASK },
-  })),
-});
-
-/** The calls the planner makes for `texts` when a split model is set. */
-function planSpanCalls(texts: readonly string[]): readonly SplitCall[] {
-  const plan = planSpan({ texts, splitting: true });
-  return plan.kind === "split" ? plan.calls : [];
-}
-
-function setup({
-  planted = [],
-  turns = [],
-  split = true,
-  slots,
-}: {
-  planted?: readonly PlantedValue[];
-  turns?: FakeTurn[];
-  split?: boolean;
-  slots?: ConcurrencyLimiter;
-} = {}) {
-  const presidio = MemoryPresidioChannel.create({ endpoint: "http://langevals:5562" });
-  const single = fakePiiModel({ planted });
-  const splitModel = fakePiiModel({ planted, turns });
-  const fallbacks: PiiRedactionModelFallbackReason[] = [];
-  const usage: PiiRedactionModelUsage[] = [];
-  const priced: PiiRedactionSpendPricedEventData[] = [];
-  const modelService = (channel: typeof single.channel) =>
-    PresidioRedactionService.create({
-      presidio: channel,
-      metrics,
-      timeoutMs: PII_REDACTION_MODEL_TIMEOUT_MS,
-      method: "pii_redaction_model",
-    });
-
-  const analysis = PiiAnalysisService.create({
-    presidio: PresidioRedactionService.create({
-      presidio,
-      metrics,
-      timeoutMs: DATA_PRIVACY_PRESIDIO_TIMEOUT_MS,
-    }),
-    model: PiiRedactionModelService.create({
-      model: modelService(single.channel),
-      split: split ? modelService(splitModel.channel) : undefined,
-      splitSlots: slots,
-      featureFlags: createApiFixture<FeatureFlagApi>({ isEnabled: async () => true }),
-      scopes: DataPrivacyProjectScopeService.create({
-        repository: MemoryDataPrivacyProjectScopeRepository.create({
-          projects: [dataPrivacyTestPlacement()],
-        }),
-      }),
-      selfHosted: false,
-      entitlements: createApiFixture<EntitlementApi>({}),
-      spend: PiiRedactionSpendService.create({
-        selfHosted: false,
-        requestIdKey: KEY,
-        featureFlags: createApiFixture<FeatureFlagApi>({ isEnabled: async () => false }),
-        recordSpendPriced: async (fact) => {
-          priced.push(fact);
-        },
-      }),
-      metrics: { modelFellBack: (reason) => fallbacks.push(reason) },
-      log: {
-        info: (fields) => usage.push(fields),
-        warn: (fields) => usage.push(fields),
-      },
-      now: () => Date.now(),
-    }),
-    dlp: GoogleDlpRedactionService.create({
-      dlp: MemoryGoogleDlpChannel.create(),
-      disabled: false,
-      metrics,
-    }),
-  });
-
-  const clear = (
-    texts: string[],
-    extra: { spareNamesAndPlaces?: boolean[]; recordKey?: string } = {},
-  ) =>
-    analysis.clearPresidio({
-      texts,
-      piiRedactionLevel: "STRICT",
-      effectivePiiLevel: "strict",
-      projectId: PROJECT_ID,
-      ...extra,
-    });
-  const presidioCalls = () => presidio.batches.filter((batch) => batch.texts.length > 0);
-
-  return { clear, presidio, presidioCalls, single, splitModel, fallbacks, usage, priced };
-}
-
-/** Lets every settled promise run its callbacks, without moving the clock. */
-const flush = () => vi.advanceTimersByTimeAsync(0);
+  PROJECT_ID,
+  ORGANIZATION_ID,
+  KEY,
+  PRESIDIO_MASK,
+  metrics,
+  presidioAnswer,
+  planSpanCalls,
+  setup,
+  piecesOf,
+} from "./pii-redaction-model.split-setup.fixture.ts";
+import { type FakeTurn, filler, plantedText } from "./pii-redaction-split.fixture.ts";
 
 afterEach(() => {
   vi.useRealTimers();
 });
-
-/** Where each call's texts sit in `text`: every sent piece located, in order. */
-function piecesOf({ text, calls }: { text: string; calls: readonly string[][] }) {
-  return calls.flat().map((piece) => {
-    const start = text.indexOf(piece);
-    return { start, end: start + piece.length };
-  });
-}
 
 describe("PiiRedactionModelService, a long batch with a split model set (ADR-207)", () => {
   /** @scenario "With a split model set, a long batch is split across model calls and masked where the model found it" */
@@ -312,175 +171,6 @@ describe("PiiRedactionModelService, a long batch with a split model set (ADR-207
     expect(cleared[1]).toBe(`{"note":"line\\n${formatPiiMarker("PERSON")}","n":NaN}`);
   });
 
-  /** @scenario "One failed split call sends the whole span to Presidio and nothing is stored unmasked" */
-  it("answers from Presidio at once when one call fails while the other is still running", async () => {
-    const { clear, presidio, splitModel } = setup({ turns: ["hold", "fail"] });
-    presidio.answerWith(presidioAnswer(1));
-
-    const cleared = await clear([filler(12_000)]);
-
-    expect(cleared).toEqual([PRESIDIO_MASK]);
-    expect(splitModel.inFlight()).toBe(1);
-    splitModel.held[0]?.release();
-  });
-
-  /** @scenario "With no free split slot, a long batch goes to Presidio at once as busy" */
-  it("sends a long batch to Presidio without waiting when both slots are taken", async () => {
-    vi.useFakeTimers();
-    const { clear, presidio, splitModel, usage } = setup({ turns: ["hold", "hold"] });
-    const holding = clear([filler(12_000)]);
-    holding.catch(() => void 0);
-    await flush();
-    presidio.answerWith(presidioAnswer(1));
-
-    const cleared = await clear([filler(9_000)]);
-
-    expect(cleared).toEqual([PRESIDIO_MASK]);
-    expect(usage.map((line) => line.outcome)).toEqual(["busy"]);
-    expect(splitModel.inFlight()).toBe(2);
-    while (splitModel.held.length > 0) splitModel.held.shift()?.release();
-    await flush();
-    await holding;
-  });
-
-  /** @scenario "A split span runs two calls at once and its later pieces on the slots it holds" */
-  it("runs two calls at once and sends each planned piece exactly once", async () => {
-    vi.useFakeTimers();
-    const text = filler(18_000);
-    const { clear, splitModel } = setup({ turns: Array<FakeTurn>(8).fill("hold") });
-    const clearing = clear([text]);
-    await flush();
-
-    while (splitModel.held.length > 0) {
-      expect(splitModel.inFlight()).toBeLessThanOrEqual(2);
-      splitModel.held.shift()?.release();
-      await flush();
-    }
-    await clearing;
-
-    expect(splitModel.maxInFlight()).toBe(2);
-    expect(splitModel.calls).toEqual(
-      planSpanCalls([text]).map((call) => call.pieces.map((p) => text.slice(p.start, p.end))),
-    );
-  });
-
-  /** @scenario "A split span runs two calls at once and its later pieces on the slots it holds" */
-  it("runs its pieces one after another on one free slot, and makes no call when they cannot fit", async () => {
-    vi.useFakeTimers();
-    const slots = new ConcurrencyLimiter({ maxConcurrent: 2, maxQueued: 0 });
-    let freeTheSlot: () => void = () => undefined;
-    const taken = slots.run({ task: () => new Promise<void>((done) => (freeTheSlot = done)) });
-    const { clear, presidio, splitModel, usage } = setup({
-      slots,
-      turns: Array<FakeTurn>(4).fill("hold"),
-    });
-    const long = filler(8_001);
-    const clearing = clear([long]);
-    await flush();
-
-    while (splitModel.held.length > 0) {
-      expect(splitModel.inFlight()).toBe(1);
-      splitModel.held.shift()?.release();
-      await flush();
-    }
-    await clearing;
-    expect(splitModel.maxInFlight()).toBe(1);
-    expect(splitModel.calls).toEqual(
-      planSpanCalls([long]).map((call) => call.pieces.map((p) => long.slice(p.start, p.end))),
-    );
-
-    const callsBefore = splitModel.calls.length;
-    presidio.answerWith(presidioAnswer(1));
-    expect(await clear([filler(32_000)])).toEqual([PRESIDIO_MASK]);
-    expect(splitModel.calls).toHaveLength(callsBefore);
-    expect(usage.at(-1)?.outcome).toBe("busy");
-    freeTheSlot();
-    await taken;
-  });
-
-  /** @scenario "An aborted split call holds its slot until the model's own deadline has passed" */
-  it("counts an aborted call's slot as taken until 60 seconds after it started", async () => {
-    vi.useFakeTimers();
-    const slots = new ConcurrencyLimiter({ maxConcurrent: 2, maxQueued: 0 });
-    const { clear, presidio } = setup({ slots, turns: ["hold", { slowMs: 30_000 }, "hold"] });
-    presidio.answerWith(presidioAnswer(1));
-    const clearing = clear([filler(8_001)]);
-
-    await vi.advanceTimersByTimeAsync(50_000);
-    expect(await clearing).toEqual([PRESIDIO_MASK]);
-    expect(slots.stats().inFlight).toBe(2);
-    await vi.advanceTimersByTimeAsync(10_000);
-    expect(slots.stats().inFlight).toBe(1);
-    await vi.advanceTimersByTimeAsync(29_999);
-    expect(slots.stats().inFlight).toBe(1);
-    await vi.advanceTimersByTimeAsync(1);
-    expect(slots.stats().inFlight).toBe(0);
-  });
-
-  /** @scenario "A split span gets 50 seconds for all its calls, then goes to Presidio" */
-  it("falls back as timeout 50 seconds after the span's first call, its second wave included", async () => {
-    vi.useFakeTimers();
-    const { clear, presidio, presidioCalls, usage, splitModel } = setup({
-      turns: [{ slowMs: 30_000 }, { slowMs: 30_000 }, "hold", "hold"],
-    });
-    presidio.answerWith(presidioAnswer(1));
-    const clearing = clear([filler(12_000)]);
-
-    await vi.advanceTimersByTimeAsync(30_000);
-    expect(splitModel.held).toHaveLength(2);
-    await vi.advanceTimersByTimeAsync(19_999);
-    expect(presidioCalls()).toHaveLength(0);
-    await vi.advanceTimersByTimeAsync(1);
-
-    expect(await clearing).toEqual([PRESIDIO_MASK]);
-    expect(usage.map((line) => line.outcome)).toEqual(["timeout"]);
-  });
-
-  /** @scenario "A split call's timeout or throttle never stops short batches reaching the model" */
-  it.each([
-    { cause: "throttle", turns: ["throttle", "answer"] as FakeTurn[], opensAtMs: 0 },
-    { cause: "timeout", turns: ["hold", "hold"] as FakeTurn[], opensAtMs: 50_000 },
-  ])(
-    "keeps short batches on the model for two minutes after a split $cause",
-    async ({ turns, opensAtMs }) => {
-      vi.useFakeTimers();
-      const { clear, presidio, single, splitModel, fallbacks } = setup({ turns });
-      presidio.answerWith(presidioAnswer(1));
-      const first = clear([filler(9_000)]);
-      await vi.advanceTimersByTimeAsync(opensAtMs);
-      await first;
-      const splitCalls = splitModel.calls.length;
-
-      await clear([filler(2_000)]);
-      expect(single.calls).toHaveLength(1);
-
-      await vi.advanceTimersByTimeAsync(PII_REDACTION_MODEL_BREAKER_COOLDOWN_MS - 1);
-      presidio.answerWith(presidioAnswer(1));
-      await clear([filler(9_000)]);
-      expect(splitModel.calls).toHaveLength(splitCalls);
-      expect(fallbacks.at(-1)).toBe("breaker_open");
-
-      await vi.advanceTimersByTimeAsync(1);
-      await clear([filler(9_000)]);
-      expect(splitModel.calls.length).toBeGreaterThan(splitCalls);
-    },
-  );
-
-  /** @scenario "A split call's timeout or throttle never stops short batches reaching the model" */
-  it("opens the split breaker on a throttle that lands after a sibling call already failed", async () => {
-    const { clear, presidio, splitModel, fallbacks } = setup({ turns: ["fail", "throttle"] });
-    const texts = [filler(3_000), filler(3_000, 50_000), filler(3_000, 90_000)];
-    presidio.answerWith(presidioAnswer(3));
-    await clear(texts);
-    expect(splitModel.calls).toHaveLength(2);
-
-    presidio.answerWith(presidioAnswer(3));
-    await clear(texts);
-
-    expect(splitModel.calls).toHaveLength(2);
-    expect(fallbacks.at(-1)).toBe("breaker_open");
-  });
-
   /** @scenario "A whole text in a split call keeps the model's own masked text" */
   it("keeps the model's own mask on a spared whole text when the answer lists no findings", async () => {
     const split = PresidioRedactionService.create({
@@ -560,6 +250,23 @@ describe("PiiRedactionModelService, pricing a split span (ADR-201 rev, ADR-207)"
     expect(priced[0]?.costNanoUsd).toBe(
       made.reduce((total, durationMs) => total + piiRedactionCostNanoUsd({ durationMs }), 0),
     );
+  });
+
+  /** @scenario "A split span is priced once on its characters, never on its overlap" */
+  it("prices every call on its own run time when the wall clock steps back mid-call", async () => {
+    vi.useFakeTimers();
+    const { clear, priced } = setup({
+      turns: [{ slowMs: 3_000 }, { slowMs: 3_000 }, { slowMs: 3_000 }],
+    });
+
+    const clearing = clear([filler(9_000)]);
+    await vi.advanceTimersByTimeAsync(1_000);
+    vi.setSystemTime(Date.now() - 60_000);
+    await vi.advanceTimersByTimeAsync(10_000);
+    await clearing;
+
+    expect(priced).toHaveLength(1);
+    expect(priced[0]?.costNanoUsd).toBe(3 * piiRedactionCostNanoUsd({ durationMs: 3_000 }));
   });
 
   /** @scenario "The same split span redacted twice is one request" */

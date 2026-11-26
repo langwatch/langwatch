@@ -7,7 +7,8 @@
 > One line: a Strict span batch of **8,001 to 32,000 characters** is cut by data-privacy into
 > **pieces of about 4,000** that the model answers in **parallel calls under a fleet-sized
 > limit**; findings are placed back **only on pieces the model cannot have reshaped**, merged
-> by widest union, extended by **the model's own name rule**, and the span is **billed once**;
+> by widest union (the model's own name rule across pieces follows, decision 7), and the span
+> is **billed once**;
 > any doubt sends the **whole span to Presidio**, as today.
 
 ## Context
@@ -44,7 +45,9 @@ and 12) so a split span stays one priced fact.
    model's own split (needs a model and infra change, and runs a span's texts in series).
 2. **Three ranges.** Up to 8,000 characters: one call, exactly as today. 8,001 to 32,000: split.
    Over 32,000: Presidio, reason `too_long`. Measured, as today, on the texts after in-process
-   Essential masking.
+   Essential masking. The ranges hold for every Strict batch the model sees, span, log record or
+   metric point: they share one route to the model today, and a long log body leaks a name as a
+   long span does. Each is priced as ADR-201 prices it.
 3. **Pieces.** A text over 4,000 characters is cut at whitespace into pieces of at most 4,000
    with 200 characters of overlap; a piece never starts or ends on a Python whitespace
    character. Texts of 4,000 or less are packed whole into calls of at most 4,000 characters.
@@ -119,7 +122,7 @@ and 12) so a split span stays one priced fact.
 | HTTP targets unchanged            | self-hosted and Kubernetes keep today's 8,000 cap                                           | target check; unit test on an HTTP target                                            |
 | billed once                       | one spend record per span, its characters counted once, overlap never                       | ADR-201 rev; 20,000-char span bills 20,000                                           |
 | short spans unharmed by long ones | a split call's throttle never opens the single-call breaker                                 | split-only breaker; unit test                                                        |
-| matches the unsplit call          | names propagate as the model's own rule does                                                | parity fixture from `namerule.go` tests                                              |
+| matches the unsplit call          | names propagate as the model's own rule does (decision 7's PR, not yet built)               | parity fixture from `namerule.go` tests                                              |
 
 ## Assumptions
 
