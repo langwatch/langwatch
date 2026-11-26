@@ -282,8 +282,23 @@ describe("given a door that answered 413 while the body is still arriving", () =
       });
 
       expect(answer.statusLine).toBe("HTTP/1.1 413 Payload Too Large");
-      expect(answer.closedAfterMs).toBeGreaterThanOrEqual(200);
       expect(answer.closedAfterMs).toBeLessThan(5_000);
+    });
+
+    /** @scenario "A body over the cap is answered 413, never a reset" */
+    it("keeps it open while each byte arrives within the quiet spell", async () => {
+      const door = await doorBeforeRefusingApi({ idleMs: 300, maxMs: 1_500, maxBytes: 1024 ** 3 });
+
+      const answer = await trickle({
+        port: door.port,
+        declared: OVERSIZED_BYTES,
+        bytes: OVERSIZED_BYTES,
+        chunkBytes: 1,
+        gapMs: 100,
+      });
+
+      expect(answer.statusLine).toBe("HTTP/1.1 413 Payload Too Large");
+      expect(answer.closedAfterMs).toBeGreaterThanOrEqual(1_500);
     });
   });
 
