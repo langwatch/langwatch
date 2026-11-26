@@ -5,6 +5,8 @@ import {
 } from "@langwatch/evaluation-contract";
 import { describe, expect, it } from "vitest";
 
+import type { SplittingPresidioChannel } from "../../channels/presidio.channel.ts";
+import type { ModelCallContext } from "../../rules/pii-redaction-model.rules.ts";
 import type {
   PiiAnalysisMetricsOtelService,
   PiiAnalysisOutcome,
@@ -42,7 +44,93 @@ function setup(answer: (input: PiiDetectionRequest) => Promise<PiiDetectionOutco
   return { requests, metrics, service };
 }
 
+/** The model's service over a channel that takes split calls, recording each call's context. */
+function splittingSetup(answer: (input: PiiDetectionRequest) => Promise<PiiDetectionOutcome>) {
+  const contexts: (ModelCallContext | undefined)[] = [];
+  const presidio: SplittingPresidioChannel = {
+    splits: true,
+    detect: (input, options) => {
+      contexts.push(options?.context);
+      return answer(input);
+    },
+  };
+  const service = PresidioRedactionService.create({
+    presidio,
+    metrics: new RecordingMetrics(),
+    timeoutMs: 60_000,
+    method: "pii_redaction_model",
+  });
+  return { contexts, service };
+}
+
+/** Two pieces of a split span, asked as one split call. */
+function askPieces(service: PresidioRedactionService) {
+  return service.answers({
+    pieces: ["Maria van der Berg", "in Utrecht"],
+    textOf: (piece) => piece,
+    piiRedactionLevel: "STRICT",
+    signal: new AbortController().signal,
+  });
+}
+
 describe("PresidioRedactionService", () => {
+  describe("when the pieces of a split span are asked (ADR-207)", () => {
+    /** @scenario "One failed split call sends the whole span to Presidio and nothing is stored unmasked" */
+    it("pairs each piece with the model's findings and masked text, sent as a split call", async () => {
+      const { contexts, service } = splittingSetup(async () => ({
+        kind: "detected",
+        results: [
+          { status: "processed", raw_response: { results: [], anonymized: "<PERSON>" } },
+          { status: "skipped" },
+        ],
+      }));
+
+      expect(await askPieces(service)).toEqual([
+        { piece: "Maria van der Berg", findings: [], anonymized: "<PERSON>" },
+        { piece: "in Utrecht", findings: undefined, anonymized: null },
+      ]);
+      expect(contexts).toEqual(["split"]);
+    });
+
+    /** @scenario "One failed split call sends the whole span to Presidio and nothing is stored unmasked" */
+    it("refuses a channel that takes no split calls, sending nothing", async () => {
+      const { requests, service } = setup(async () => ({ kind: "detected", results: [] }));
+
+      await expect(askPieces(service)).rejects.toThrow("the model's channel takes no split calls");
+      expect(requests).toHaveLength(0);
+    });
+
+    /** @scenario "One failed split call sends the whole span to Presidio and nothing is stored unmasked" */
+    it("refuses a model that is not configured, a missing result and a failed one", async () => {
+      const refusals: [PiiDetectionOutcome, string][] = [
+        [{ kind: "not_configured" }, "the model is not configured"],
+        [
+          { kind: "detected", results: [{ status: "processed", raw_response: {} }] },
+          "the model returned no result for split text 1",
+        ],
+        [
+          {
+            kind: "detected",
+            results: [
+              { status: "processed", raw_response: {} },
+              {
+                status: "error",
+                error_type: "EVALUATOR_ERROR",
+                details: "model out of memory",
+                traceback: [],
+              },
+            ],
+          },
+          "model out of memory",
+        ],
+      ];
+      for (const [outcome, message] of refusals) {
+        const { service } = splittingSetup(async () => outcome);
+        await expect(askPieces(service)).rejects.toThrow(message);
+      }
+    });
+  });
+
   describe("when it sends a batch", () => {
     /** @scenario "The analysis request is the one the service expects" */
     it("asks for the level's entities, scans within the budget and puts the rest back", async () => {

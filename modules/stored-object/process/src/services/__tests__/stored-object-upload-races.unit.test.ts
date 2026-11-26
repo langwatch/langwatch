@@ -1,11 +1,11 @@
+import { createHash } from "node:crypto";
+
 /**
  * @vitest-environment node
  * Upload lifecycle writes that race: a confirm against a write still in flight,
  * a confirm against the reaper, and a failed write against its own expiry.
  * @see modules/stored-object/specs/uploads-through-langwatch.feature
  */
-import { createHash } from "node:crypto";
-
 import { memoryObjectStorage, type ObjectStorage } from "@langwatch/process-stores";
 import type { StoredObjectUploadBody } from "@langwatch/stored-object-contract";
 import { type Instant, Temporal } from "@langwatch/time";
@@ -17,6 +17,7 @@ import {
   MemoryStoredObjectFiles,
   createStoredObjectTestSigner,
 } from "../../app/__tests__/stored-object.fixture.ts";
+import { MemoryStoredObjectOwnerLinkRepository } from "../../repositories/memory/memory.stored-object-owner-link.repository.ts";
 import { MemoryStoredObjectRecordRepository } from "../../repositories/memory/memory.stored-object-record.repository.ts";
 import { ObjectStorageStoredObjectBytesRepository } from "../../repositories/object-storage/object-storage.stored-object-bytes.repository.ts";
 import type { StoredObjectRecord } from "../../repositories/stored-object-record.repository.ts";
@@ -91,6 +92,7 @@ function fixture() {
   const clock = () => now;
   const service = StoredObjectService.create({
     records,
+    ownerLinks: MemoryStoredObjectOwnerLinkRepository.create(),
     permissions: new GrantedStoredObjectPermissions(),
     storage,
     signer: createStoredObjectTestSigner(),

@@ -1,6 +1,7 @@
 import type { StoredObjectBytesRepository } from "./stored-object-bytes.repository.ts";
 import type { StoredObjectLegacySourceRepository } from "./stored-object-legacy-source.repository.ts";
 import type { StoredObjectLegacyStorageRepository } from "./stored-object-legacy-storage.repository.ts";
+import type { StoredObjectOwnerLinkRepository } from "./stored-object-owner-link.repository.ts";
 import type { StoredObjectRateLimitRepository } from "./stored-object-rate-limit.repository.ts";
 import type { StoredObjectRecordRepository } from "./stored-object-record.repository.ts";
 import type { StoredObjectSealRepository } from "./stored-object-seal.repository.ts";
@@ -8,6 +9,8 @@ import type { StoredObjectsRepository } from "./stored-objects.repository.ts";
 
 export interface StoredObjectRepositories {
   readonly records: StoredObjectRecordRepository;
+  /** Who holds an object and until when (ADR-002 §2). */
+  readonly ownerLinks: StoredObjectOwnerLinkRepository;
   /** Where an object's bytes are placed, written and read. */
   readonly bytes: StoredObjectBytesRepository;
   /** The read-only legacy ClickHouse index (ADR-158 §5), and the bytes its rows name. */

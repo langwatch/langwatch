@@ -179,6 +179,21 @@ describe("given the Data Privacy page", () => {
     });
   });
 
+  describe("when long-span splitting is on and an admin opens the information beside the price", () => {
+    /** @scenario With long-span splitting on, the small print names the split limit and how a split span is billed */
+    it("names the split limit and says a split span is billed once, the overlap free", async () => {
+      page({ flagOn: true, splitFlag: true });
+
+      await userEvent.setup().hover(screen.getByRole("button", { name: "How Strict is billed" }));
+
+      expect(
+        await screen.findByText(
+          "If the model is unavailable or a span's text is over 32,000 characters in total, that span is redacted by our rule-based detector (Presidio) instead. If that detector fails, the text can be sent to Google Cloud DLP. A span over 8,000 characters is sent to the model in several parts and billed once on its own characters; the overlap between parts is free.",
+        ),
+      ).toBeInTheDocument();
+    });
+  });
+
   describe("when the flag is on and the organization resolves to Strict", () => {
     /** @scenario With the flag the effective summary names what runs the level */
     it("names the model in the effective summary", () => {

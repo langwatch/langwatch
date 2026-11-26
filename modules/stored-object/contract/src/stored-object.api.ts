@@ -40,6 +40,11 @@ export interface StoreStoredObjectFromBytesInput extends StoredObjectProvenance 
    * general in-process ceiling; never above the purpose's own ceiling.
    */
   maxBytes?: number;
+  /**
+   * How long the owner keeps its data in the purpose's retention category, 0 for indefinite.
+   * Required when the purpose declares one (ADR-002 §3): the caller asks data-retention.
+   */
+  retentionDays?: number;
 }
 
 export interface StoreStoredObjectFromBytesResult {

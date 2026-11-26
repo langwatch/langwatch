@@ -58,6 +58,55 @@ export type StoredObjectFileRouteFilenameQuery = z.infer<
   typeof storedObjectFileRouteFilenameQuerySchema
 >;
 
+const STORED_OBJECT_FILES_PREFIX = "/api/files/";
+
+/** One stored object as a persisted reference names it; no `projectId` on legacy id-only ones. */
+export type StoredObjectFileReference = Readonly<{
+  projectId: string | undefined;
+  storedObjectId: string;
+  filename: string | undefined;
+}>;
+
+/**
+ * The reference string a feature persists for an object: an opaque address readers exchange for a
+ * short-lived signed URL, never a delivery URL itself (ADR-002).
+ */
+export function storedObjectFileReferenceOf({
+  projectId,
+  storedObjectId,
+}: {
+  projectId: string;
+  storedObjectId: string;
+}): string {
+  return `${STORED_OBJECT_FILES_PREFIX}${projectId}/${storedObjectId}`;
+}
+
+/** Reads `/api/files/:projectId/:id[/:name]` or the legacy `/api/files/:id`; else undefined. */
+export function parseStoredObjectFileReference(
+  reference: string,
+): StoredObjectFileReference | undefined {
+  if (!reference.startsWith(STORED_OBJECT_FILES_PREFIX)) return undefined;
+  const [path = "", query = ""] = reference.slice(STORED_OBJECT_FILES_PREFIX.length).split(/[?#]/);
+  const [first, second, third] = path.split("/");
+  if (!first) return undefined;
+  const named =
+    third ??
+    query
+      .split("&")
+      .find((pair) => pair.startsWith("filename="))
+      ?.slice("filename=".length);
+  let filename: string | undefined;
+  try {
+    filename = named ? decodeURIComponent(named) : undefined;
+  } catch {
+    // A malformed escape such as `%ZZ` names no file rather than throwing a `URIError`.
+  }
+
+  return second
+    ? { projectId: first, storedObjectId: second, filename }
+    : { projectId: undefined, storedObjectId: first, filename };
+}
+
 /** `GET /api/image-proxy?url=` - an absent `url` is main's 400, not a validation refusal. */
 const imageProxyQuerySchemaDefinition = z.object({ url: z.string().optional() });
 export interface ImageProxyQuerySchema extends Named<typeof imageProxyQuerySchemaDefinition> {}
