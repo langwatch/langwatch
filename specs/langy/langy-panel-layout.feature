@@ -130,6 +130,13 @@ Feature: Langy panel layout modes
     Then the drawer's right edge sits left of the panel, with a strip of space between the two cards
     And on a phone the drawer still fills the screen as a sheet
 
+  @regression @integration
+  Scenario: A drawer opening beside a widened dock sits flush against it
+    Given I widened the docked Langy panel beyond its default width
+    When a right-anchored drawer opens
+    Then the panel drops to its default width beside the drawer
+    And the drawer sits against the panel with no empty strip between them
+
   @integration
   Scenario: The docked companion keeps its own Minimise
     Given the Langy panel is riding beside an open drawer as the docked companion

@@ -8,7 +8,11 @@ import { useLangyStore } from "../../../../behavior/langy.store.ts";
 import { useLangyConversationDeepLink } from "../../../../behavior/use-langy-conversation-deep-link.ts";
 import { useLangyPromptLink } from "../../../../behavior/use-langy-prompt-link.ts";
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
-import { LANGY_DOCK_GAP, LANGY_TRANSITION } from "../../../../model/langy-panel-layout.ts";
+import {
+  LANGY_DOCK_GAP,
+  LANGY_TRANSITION,
+  SIDEBAR_PANEL_WIDTH,
+} from "../../../../model/langy-panel-layout.ts";
 import { LangyProvider, useLangy } from "../../../tools/ui/sections/langy-page-context.tsx";
 import { useLangyDockWidthPx } from "../../behavior/panel/use-langy-panel-layout.ts";
 import { useLangyScopeReset } from "../../behavior/use-langy-scope-reset.ts";
@@ -99,13 +103,13 @@ function LangyShiftedRoot({ showLangy, children }: { showLangy: boolean; childre
   }, [dockWidthPx, setDockWidthPx]);
   const reservation = dockReservation({ shifted, shellClaimed });
   // Without a claiming shell (the Studio), a drawer still opens beside the docked panel,
-  // as on main.
+  // as on main. The panel drops to its default width beside a drawer, so yield that width.
   const yieldsToDock = showLangy && isOpen && panelMode === "sidebar" && !shellClaimed;
   useLayoutEffect(() => {
     if (!yieldsToDock) return;
-    setDrawerEndInset(dockWidthPx + LANGY_DOCK_GAP + 8);
+    setDrawerEndInset(SIDEBAR_PANEL_WIDTH + LANGY_DOCK_GAP + 8);
     return () => setDrawerEndInset(0);
-  }, [yieldsToDock, dockWidthPx]);
+  }, [yieldsToDock]);
   // The box sits in the shell's page body and passes its flex height on,
   // or full-height pages (the prompt studio) collapse to their content.
   return (
