@@ -402,6 +402,8 @@ describe("given the liveness thread holding the api's two-hour ceiling", () => {
       proxyPort: (api.address() as AddressInfo).port,
       logger,
       requestTimeoutMs: TWO_HOURS_MS,
+      // Shorter than the slow body, so the close comes from the lingering budget.
+      linger: { idleMs: 5_000, maxMs: 300, maxBytes: 1024 },
     });
     threads.push(thread);
     return thread;
