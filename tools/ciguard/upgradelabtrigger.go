@@ -17,7 +17,7 @@ const (
 	goCIWorkflow      = ".github/workflows/go-ci.yaml"
 	upgradelabKey     = "upgradelab"
 	upgradelabOutput  = "steps.filter.outputs.upgradelab"
-	upgradelabTestRun = "go test ./tools/upgradelab/..."
+	upgradelabTestRun = "go test -count=1 ./tools/upgradelab/..."
 	upgradelabWhenSet = "needs.changes.outputs.upgradelab == 'true'"
 )
 
@@ -71,12 +71,13 @@ func missingGlobs(filter []string) []string {
 }
 
 // upgradelabJobProblems reports an upgradelab job that skips when the full test job does not
-// run (its if must negate the test job's own gate), or that no longer runs the upgradelab tests.
+// run (its if must be exactly "upgradelab matched and not the test job's own gate"), or that no
+// longer runs the upgradelab tests.
 func upgradelabJobProblems(job, test ciscan.Job) []string {
 	var problems []string
-	skipFull := "!(" + expressionBody(test.If) + ")"
-	if !strings.Contains(job.If, upgradelabWhenSet) || !strings.Contains(job.If, skipFull) {
-		problems = append(problems, fmt.Sprintf("%s: the upgradelab job's if must require both %s and %s", goCIWorkflow, upgradelabWhenSet, skipFull))
+	want := upgradelabWhenSet + " && !(" + expressionBody(test.If) + ")"
+	if expressionBody(job.If) != want {
+		problems = append(problems, fmt.Sprintf("%s: the upgradelab job's if must be %s", goCIWorkflow, want))
 	}
 	runs := slices.ContainsFunc(job.Steps, func(step ciscan.Step) bool { return step.Run == upgradelabTestRun })
 	if !runs {

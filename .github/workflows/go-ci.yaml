@@ -202,7 +202,8 @@ jobs:
         with:
           go-version-file: go.work
           cache-dependency-path: "*/go.sum"
-      - run: go test ./tools/upgradelab/...
+      # -count=1: the test reads module files outside the tools module, which Go's test cache ignores.
+      - run: go test -count=1 ./tools/upgradelab/...
 
   test:
     needs: changes

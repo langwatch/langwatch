@@ -44,7 +44,7 @@ jobs:
     needs: changes
     if: ${{ needs.changes.outputs.upgradelab == 'true' && !(needs.changes.outputs.go == 'true' && needs.changes.outputs.heavy == 'true') }}
     steps:
-      - run: go test ./tools/upgradelab/...
+      - run: go test -count=1 ./tools/upgradelab/...
 `
 
 func upgradelabProblems(t *testing.T, workflow string) []string {
@@ -96,7 +96,7 @@ func TestUpgradelabTriggerReportsDraftGap(t *testing.T) {
 		"needs.changes.outputs.go != 'true'", 1)
 	problems := upgradelabProblems(t, workflow)
 	require.Len(t, problems, 1)
-	assert.Contains(t, problems[0], "the upgradelab job's if must require both")
+	assert.Contains(t, problems[0], "the upgradelab job's if must be")
 
 	testGate := strings.Replace(goodGoCI,
 		"if: ${{ needs.changes.outputs.go == 'true' && needs.changes.outputs.heavy == 'true' }}",
@@ -105,8 +105,15 @@ func TestUpgradelabTriggerReportsDraftGap(t *testing.T) {
 	require.Len(t, problems, 1, "a test job gate the upgradelab job no longer negates is reported")
 	assert.Contains(t, problems[0], "!(needs.changes.outputs.go == 'true')")
 
-	noRun := withoutLine(t, goodGoCI, "      - run: go test ./tools/upgradelab/...")
+	extraGate := strings.Replace(goodGoCI,
+		"&& needs.changes.outputs.heavy == 'true') }}",
+		"&& needs.changes.outputs.heavy == 'true') && needs.changes.outputs.heavy == 'true' }}", 1)
+	require.NotEqual(t, goodGoCI, extraGate)
+	problems = upgradelabProblems(t, extraGate)
+	require.Len(t, problems, 1, "an extra gate that skips drafts again is reported")
+
+	noRun := withoutLine(t, goodGoCI, "      - run: go test -count=1 ./tools/upgradelab/...")
 	problems = upgradelabProblems(t, noRun)
 	require.Len(t, problems, 1)
-	assert.Contains(t, problems[0], "must run go test ./tools/upgradelab/...")
+	assert.Contains(t, problems[0], "must run go test -count=1 ./tools/upgradelab/...")
 }
