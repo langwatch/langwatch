@@ -58,7 +58,14 @@ export function useProductDashboards({ product }: { product: DashboardHomeProduc
     // With no save out, the cached order is the one the server holds.
     if (!queue.isSaving) queue.confirmed = stored;
     const dashboardIds = nextSidebarOrder({ stored, shown: shownIds });
-    utils.boards.sidebarOrder.setData(orderInput, { dashboardIds });
+    // A read still out would answer over this order; a cancel puts back the state it began from.
+    const show = (ids: readonly string[]) => {
+      utils.boards.sidebarOrder.setData(orderInput, { dashboardIds: [...ids] });
+      void utils.boards.sidebarOrder
+        .cancel(orderInput)
+        .then(() => utils.boards.sidebarOrder.setData(orderInput, { dashboardIds: [...ids] }));
+    };
+    show(dashboardIds);
 
     // Once the queue is empty, the cache shows what the server confirmed.
     const send = (ids: string[]) => {
@@ -68,7 +75,7 @@ export function useProductDashboards({ product }: { product: DashboardHomeProduc
         const waiting = queue.waiting;
         queue.waiting = void 0;
         if (waiting) return send(waiting);
-        utils.boards.sidebarOrder.setData(orderInput, { dashboardIds: [...queue.confirmed] });
+        show(queue.confirmed);
       };
       save
         .mutateAsync({ ...orderInput, dashboardIds: ids })
