@@ -1,8 +1,11 @@
 /**
  * The write half of the stored-object lifecycle (ADR-158 §4): bytes arriving
- * in-process, and create, PUT to a signed URL, confirm. Every id is a fresh
- * KSUID and every digest is taken as the bytes stream.
+ * in-process, and create, PUT to a signed URL, confirm. In-process bytes reuse
+ * an available object holding the same content (ADR-002); every new id is a KSUID.
  */
+import { createHash } from "node:crypto";
+
+import { INDEFINITE_RETENTION_DAYS } from "@langwatch/data-retention-contract";
 import { HandledError, ValidationError } from "@langwatch/handled-error";
 import type { ObjectDigest } from "@langwatch/process-stores/members";
 import {
@@ -33,6 +36,10 @@ import type {
   StoredObjectStorageAddress,
 } from "../repositories/stored-object-bytes.repository.ts";
 import type {
+  StoredObjectOwnerLink,
+  StoredObjectOwnerLinkRepository,
+} from "../repositories/stored-object-owner-link.repository.ts";
+import type {
   StoredObjectRecord,
   StoredObjectRecordRepository,
 } from "../repositories/stored-object-record.repository.ts";
@@ -42,12 +49,17 @@ import {
   landedDigestOf,
   movedOn,
 } from "../rules/stored-object-lifecycle.rules.ts";
+import { pendingUploadRecord } from "../rules/stored-object-upload.rules.ts";
 import { storedObjectReferenceOf } from "../rules/stored-object-view.rules.ts";
 import { StoredObjectUploadReceiveService } from "./stored-object-upload-receive.service.ts";
 import type { StoredObjectUploadSignerService } from "./stored-object-upload-signer.service.ts";
 
+/** An owner link before it names its object. */
+type StoredObjectOwnerClaim = Omit<StoredObjectOwnerLink, "objectId">;
+
 type StoredObjectUploadServiceOptions = Readonly<{
   records: StoredObjectRecordRepository;
+  ownerLinks: StoredObjectOwnerLinkRepository;
   storage: StoredObjectBytesRepository;
   signer: StoredObjectUploadSignerService;
   maximumUploadBytes: number;
@@ -99,6 +111,56 @@ export class StoredObjectUploadService {
         ? this.options.maximumUploadBytes
         : purposeByteLimitOf(purposePolicyOf(input.purpose), input.maxBytes);
     const { chunks, byteLength } = await this.measured(input.bytes, ceiling);
+    const owners = this.ownerClaimsOf(input);
+    const reusable = await this.options.records.findReusable({
+      tenantId: input.projectId,
+      purpose: input.purpose,
+      sha256: sha256Of(chunks),
+      mediaType: input.mediaType,
+      limit: 8,
+    });
+    for (const candidate of reusable) {
+      if (candidate.byteLength !== byteLength) continue;
+      if (owners.length > 0 && !(await this.isLinked(candidate))) continue;
+      if (!(await this.holdsBytes(candidate))) continue;
+      await this.link({ objectId: candidate.id, owners });
+      // A delete may win between the read and the link (ADR-002 §4): never answer it.
+      const current =
+        owners.length > 0
+          ? await this.options.records.findById({ tenantId: candidate.tenantId, id: candidate.id })
+          : candidate;
+      if (current?.status !== "available") continue;
+      const reused = await this.withAudience({ value: current, audience: input.audience });
+
+      return { reference: storedObjectReferenceOf(reused), isDuplicate: true };
+    }
+
+    const record = await this.storeNew({ input, chunks, byteLength });
+    await this.linkOrDiscard({ record, owners });
+
+    return { reference: storedObjectReferenceOf(record), isDuplicate: false };
+  }
+
+  /** A row whose bytes are gone is never reused: the caller's bytes are written fresh instead. */
+  private async holdsBytes(candidate: StoredObjectRecord): Promise<boolean> {
+    const address = candidate.storage;
+    if (!address) return false;
+
+    return StoredObjectUploadService.storageCall(() =>
+      this.options.storage.exists({ projectId: candidate.tenantId, address }),
+    );
+  }
+
+  /** Writes the bytes under a fresh id, then the row; the bytes go if the row cannot be written. */
+  private async storeNew({
+    input,
+    chunks,
+    byteLength,
+  }: {
+    input: StoreStoredObjectFromBytesInput;
+    chunks: readonly Uint8Array[];
+    byteLength: number;
+  }): Promise<StoredObjectRecord> {
     const id = this.options.newId();
     const { address } = await StoredObjectUploadService.storageCall(() =>
       this.options.storage.place({ projectId: input.projectId, objectId: id }),
@@ -138,7 +200,117 @@ export class StoredObjectUploadService {
     };
     await this.recordOrDiscard(record, address);
 
-    return { reference: storedObjectReferenceOf(record), isDuplicate: false };
+    return record;
+  }
+
+  /** The caller's link if its purpose declares a retention category (ADR-002 §3), else none. */
+  private ownerClaimsOf(input: StoreStoredObjectFromBytesInput): StoredObjectOwnerClaim[] {
+    if (purposePolicyOf(input.purpose).retentionCategory === undefined) return [];
+    const days = input.retentionDays;
+    if (days === undefined) {
+      throw new Error(`purpose ${input.purpose} needs the owner's retentionDays`);
+    }
+    const now = this.options.now();
+    const anchor = StoredObjectUploadService.retentionAnchorOf({
+      now,
+      retainFromMs: input.retainFromMs,
+    });
+
+    return [
+      {
+        tenantId: input.projectId,
+        ownerKind: input.ownerKind,
+        ownerId: input.ownerId,
+        // Indefinite retention holds with no end; `now + 0` would end it at once.
+        retainUntil: days === INDEFINITE_RETENTION_DAYS ? null : anchor.add({ hours: days * 24 }),
+        createdAt: anchor,
+        updatedAt: now,
+      },
+    ];
+  }
+
+  /** The caller's retention start, so a late span's media ends with its trace; never past now. */
+  private static retentionAnchorOf({
+    now,
+    retainFromMs,
+  }: {
+    now: Instant;
+    retainFromMs: number | undefined;
+  }): Instant {
+    const usable = retainFromMs !== undefined && Number.isFinite(retainFromMs);
+    if (!usable || retainFromMs >= now.epochMilliseconds) return now;
+    return Temporal.Instant.fromEpochMilliseconds(Math.trunc(retainFromMs));
+  }
+
+  /** A pre-link object's owner holds it unrecorded: a link lets the sweep take it (ADR-002). */
+  private async isLinked(candidate: StoredObjectRecord): Promise<boolean> {
+    const links = await this.options.ownerLinks.countAll({
+      tenantId: candidate.tenantId,
+      objectId: candidate.id,
+    });
+
+    return links > 0;
+  }
+
+  private async link({
+    objectId,
+    owners,
+  }: {
+    objectId: StoredObjectRecord["id"];
+    owners: readonly StoredObjectOwnerClaim[];
+  }): Promise<void> {
+    for (const owner of owners) await this.options.ownerLinks.raise({ ...owner, objectId });
+  }
+
+  /** Links a new object's owners; a failed link deletes it, so no unlinked object is served. */
+  private async linkOrDiscard({
+    record,
+    owners,
+  }: {
+    record: StoredObjectRecord;
+    owners: readonly StoredObjectOwnerClaim[];
+  }): Promise<void> {
+    try {
+      await this.link({ objectId: record.id, owners });
+    } catch (error) {
+      const now = this.options.now();
+      const deleted = movedOn({
+        value: record,
+        now,
+        // Expired, the reaper retries the bytes if their removal here fails.
+        changes: { status: "deleted", deletedAt: now, expiresAt: now },
+      });
+      await StoredObjectUploadService.ignoreStorageFailure(async () => {
+        if (!(await this.options.records.transition({ expected: record, next: deleted }))) return;
+        const address = deleted.storage;
+        if (address) await this.options.storage.delete({ projectId: record.tenantId, address });
+        const cleared = { ...deleted, storage: null, expiresAt: null };
+        await this.options.records.transition({ expected: deleted, next: cleared });
+      });
+
+      throw error;
+    }
+  }
+
+  /** The row with the caller's audience added; the write changes only a row still available. */
+  private async withAudience({
+    value,
+    audience,
+  }: {
+    value: StoredObjectRecord;
+    audience: StoreStoredObjectFromBytesInput["audience"];
+  }): Promise<StoredObjectRecord> {
+    if (value.audiences.includes(audience)) return value;
+
+    const at = this.options.now();
+    await this.options.records.addAudience({
+      tenantId: value.tenantId,
+      id: value.id,
+      audience,
+      at,
+    });
+
+    return { ...value, audiences: [...value.audiences, audience], updatedAt: at };
   }
 
   async createUpload(
@@ -305,6 +477,13 @@ export class StoredObjectUploadService {
   }
 }
 
+function sha256Of(chunks: readonly Uint8Array[]): string {
+  const hash = createHash("sha256");
+  for (const chunk of chunks) hash.update(chunk);
+
+  return hash.digest("hex");
+}
+
 function assertWithinCeiling(byteLength: number, ceiling: number): void {
   if (byteLength > ceiling) throw new UploadTooLargeError(byteLength, ceiling);
 }
@@ -315,43 +494,4 @@ function refusedField(field: "purpose" | "mediaType", message: string): Validati
 
 async function* streamOf(chunks: readonly Uint8Array[]): StoredObjectByteStream {
   yield* chunks;
-}
-
-/** The row a signed upload leaves behind while its bytes are still in flight. */
-function pendingUploadRecord({
-  input,
-  id,
-  address,
-  expiresAt,
-  now,
-}: {
-  input: CreateStoredObjectUploadInput;
-  id: StoredObjectRecord["id"];
-  address: StoredObjectStorageAddress;
-  expiresAt: Instant;
-  now: Instant;
-}): StoredObjectRecord {
-  return {
-    tenantId: input.projectId,
-    id,
-    status: "pending",
-    purpose: input.purpose,
-    ownerKind: "project",
-    ownerId: input.projectId,
-    filename: input.filename,
-    sha256: "",
-    byteLength: input.byteLength,
-    mediaType: input.mediaType,
-    mediaTypeVerified: false,
-    storage: address,
-    generation: 0,
-    audiences: [purposePolicyOf(input.purpose).readPermission],
-    expiresAt,
-    availableAt: null,
-    deletedAt: null,
-    source: "canonical",
-    legacyFingerprint: null,
-    createdAt: now,
-    updatedAt: now,
-  };
 }

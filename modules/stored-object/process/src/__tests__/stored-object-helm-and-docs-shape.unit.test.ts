@@ -33,6 +33,30 @@ function readRepoFile(relativePath: string): string {
   return readFileSync(path.join(REPO_ROOT, relativePath), "utf8");
 }
 
+describe("given a self-hosted install with no durable stored-objects store", () => {
+  describe("when the Helm chart renders the env block", () => {
+    /** @scenario "A Helm install with no durable store keeps trace media inline" */
+    it("switches trace media extraction off only when neither a bucket nor the volume is on", () => {
+      const helpers = readRepoFile("charts/langwatch/templates/_helpers.tpl");
+
+      expect(helpers).toMatch(
+        /- name: LANGWATCH_LOCAL_STORAGE_PATH\n {2}value: [^\n]+\n\{\{- else \}\}\n(?:#[^\n]*\n)+- name: RELEASE_TRACE_MEDIA_EXTRACTION\n {2}value: "0"\n\{\{- end \}\}/,
+      );
+    });
+  });
+
+  describe("when the Docker Compose stack runs", () => {
+    /** @scenario "The Docker Compose stack keeps stored media on a volume the app and workers share" */
+    it("mounts one named stored-objects volume on both the app and the workers", () => {
+      const compose = readRepoFile("infra/compose.yml");
+      const mounts = compose.match(/- stored-objects:\/var\/lib\/langwatch\/objects/g) ?? [];
+
+      expect(mounts).toHaveLength(2);
+      expect(compose).toMatch(/^volumes:[\s\S]*^ {2}stored-objects:$/m);
+    });
+  });
+});
+
 describe("Helm chart deployment surface for stored-objects", () => {
   describe("when the env block emits dataplane storage variables", () => {
     /** @scenario "Helm chart emits S3_BUCKET_NAME (not legacy S3_BUCKET) so the app and stored-objects find the bucket" */

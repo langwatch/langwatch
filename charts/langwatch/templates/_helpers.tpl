@@ -1181,6 +1181,12 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 # enable dataplane with a real object-storage backend.
 - name: LANGWATCH_LOCAL_STORAGE_PATH
   value: {{ .Values.app.storedObjects.localFilesystem.path | quote }}
+{{- else }}
+# Neither a bucket nor the local-filesystem volume: stored objects would land
+# on the pods' ephemeral disk. Trace media then stays inline in ClickHouse
+# instead of being moved there and lost on the next restart.
+- name: RELEASE_TRACE_MEDIA_EXTRACTION
+  value: "0"
 {{- end }}
 
 # NextAuth secret. Lives in sharedEnv (not just the app Deployment) because

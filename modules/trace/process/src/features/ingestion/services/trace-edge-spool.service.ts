@@ -2,7 +2,10 @@ import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { Logger } from "@langwatch/observability";
 import { COMMAND_INLINE_THRESHOLD, type RecordSpanCommandData } from "@langwatch/trace-contract";
 
-import type { TraceBlobStoreService } from "../../media/services/trace-blob-store.service.ts";
+import {
+  SpoolTooLargeError,
+  type TraceBlobStoreService,
+} from "../../media/services/trace-blob-store.service.ts";
 import { TraceIngressPayload } from "./trace-span-collection.service.ts";
 
 /**
@@ -13,7 +16,8 @@ import { TraceIngressPayload } from "./trace-span-collection.service.ts";
 
 // FAIL-OPEN, deliberately. This is oversize PROTECTION, not the durability
 // boundary, so an unreachable spool degrades to the inline route rather than
-// refusing the span. The warning names what was skipped.
+// refusing the span. The warning names what was skipped. A command over the
+// read cap is the exception: it is refused, as no route could carry it.
 export class TraceEdgeSpoolService extends TraceIngressPayload {
   static create(options: {
     spool: Pick<TraceBlobStoreService, "putSpool">;
@@ -62,6 +66,8 @@ export class TraceEdgeSpoolService extends TraceIngressPayload {
       // object now; leaving them on the command would defeat the whole check.
       return { ...data, spoolRef, span: { ...data.span, attributes: [] } };
     } catch (error) {
+      // Inline would carry the same command past what the worker reads, so the span is refused.
+      if (error instanceof SpoolTooLargeError) throw error;
       this.options.logger.warn(
         { error, projectId, traceId, spanId, byteLength },
         "oversize protection skipped; queue carries full payload",
