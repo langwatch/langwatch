@@ -1103,6 +1103,7 @@ export const LWQL_POSTGRES_CATALOGUE = defineLwqlCatalog({
       ProviderConfig: { source: "providerConfig", content: "output" },
       FallbackPriorityGlobal: { source: "fallbackPriorityGlobal" },
       LangySkipPermissionsModels: { source: "langySkipPermissionsModels", content: "output" },
+      lastListedModelIds: "omit", // bookkeeping for the model import on save
       HealthStatus: { source: "healthStatus" },
       CircuitOpenedAt: { source: "circuitOpenedAt" },
       LastHealthCheckAt: { source: "lastHealthCheckAt" },

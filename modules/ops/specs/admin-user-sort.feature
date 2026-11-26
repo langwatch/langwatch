@@ -1,4 +1,4 @@
-Feature: Sorting the Back office users list
+Feature: Sorting the Admin users list
   An operator orders the users list by any of its columns. The server orders the
   whole result set, search included, before it pages, so page two continues page one.
   Organizations and Projects order by how many each user has; Status orders
@@ -22,7 +22,7 @@ Feature: Sorting the Back office users list
 
   @integration
   Scenario: Clicking a column header sorts the users table
-    Given an operator on the Back office users page
+    Given an operator on the Admin users page
     When they click a column header
     Then the list is asked sorted by that column ascending and the header shows an up arrow
     When they click the same header again
