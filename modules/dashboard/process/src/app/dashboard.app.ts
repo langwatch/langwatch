@@ -35,6 +35,7 @@ import {
   type DashboardScope,
   type DashboardScopeImpact,
   type DashboardScopeProjects,
+  type DashboardSidebarOrder,
   type DashboardStar,
   type StarredDashboard,
   type DashboardGraphCountScope,
@@ -68,6 +69,7 @@ import {
   type DashboardsRollout,
 } from "../services/dashboard-access.service.ts";
 import { DashboardScopeService } from "../services/dashboard-scope.service.ts";
+import { DashboardSidebarOrderService } from "../services/dashboard-sidebar-order.service.ts";
 import { DashboardStarService } from "../services/dashboard-star.service.ts";
 import { DashboardWidgetService } from "../services/dashboard-widget.service.ts";
 import { DashboardService, type WorkbenchAccess } from "../services/dashboard.service.ts";
@@ -161,6 +163,7 @@ export class DashboardModule implements DashboardApi {
   #boards: BoardService;
   #organizationBoards: OrganizationBoardService;
   #stars: DashboardStarService;
+  #sidebarOrders: DashboardSidebarOrderService;
   #scopes: DashboardScopeService;
   #charts: SavedWorkbenchChartService;
   #savedViews: SavedViewService;
@@ -186,6 +189,7 @@ export class DashboardModule implements DashboardApi {
       boards: BoardService;
       organizationBoards: OrganizationBoardService;
       stars: DashboardStarService;
+      sidebarOrders: DashboardSidebarOrderService;
       scopes: DashboardScopeService;
       charts: SavedWorkbenchChartService;
       savedViews: SavedViewService;
@@ -205,6 +209,7 @@ export class DashboardModule implements DashboardApi {
     this.#boards = services.boards;
     this.#organizationBoards = services.organizationBoards;
     this.#stars = services.stars;
+    this.#sidebarOrders = services.sidebarOrders;
     this.#scopes = services.scopes;
     this.#charts = services.charts;
     this.#savedViews = services.savedViews;
@@ -240,6 +245,7 @@ export class DashboardModule implements DashboardApi {
           users: setup.dependencies.users,
         }),
         stars: DashboardStarService.create({ repository: boards, access }),
+        sidebarOrders: DashboardSidebarOrderService.create({ repository: boards }),
         scopes: DashboardScopeService.create({ repository: boards, access, projects, authz }),
         charts: SavedWorkbenchChartService.create({
           repository: setup.repositories.dashboards,
@@ -386,6 +392,25 @@ export class DashboardModule implements DashboardApi {
     await this.#refuseOnAggregate(input.projectId);
 
     return this.#stars.reorderStars(input);
+  }
+
+  /** The member's own order of a product sidebar's Dashboards section in the organization. */
+  getSidebarOrder(input: {
+    organizationId: string;
+    userId: string;
+    homeProduct: DashboardHomeProduct;
+  }): Promise<DashboardSidebarOrder> {
+    return this.#sidebarOrders.getSidebarOrder(input);
+  }
+
+  /** Replaces the member's own order of a product sidebar's Dashboards section. */
+  setSidebarOrder(input: {
+    organizationId: string;
+    userId: string;
+    homeProduct: DashboardHomeProduct;
+    dashboardIds: readonly string[];
+  }): Promise<{ success: true }> {
+    return this.#sidebarOrders.setSidebarOrder(input);
   }
 
   /** Where a reader opens each of these Reports boards. */

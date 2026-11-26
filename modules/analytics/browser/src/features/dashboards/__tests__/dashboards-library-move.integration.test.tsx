@@ -57,8 +57,8 @@ describe("the Dashboards library's move", () => {
         ]),
       );
       expect(await screen.findByText('Moved "Shared board" to Gateway')).toBeVisible();
-      const gateway = await screen.findByRole("region", { name: "Gateway" });
-      expect(within(gateway).getByRole("link", { name: "Shared board" })).toBeVisible();
+      const row = (await screen.findByRole("link", { name: "Shared board" })).closest("tr");
+      await waitFor(() => expect(within(row as HTMLElement).getByText("Gateway")).toBeVisible());
       await user.click(screen.getByRole("button", { name: "Open" }));
       expect(host.navigations).toEqual(["/dashboards/board-shared"]);
     });
