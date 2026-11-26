@@ -2565,6 +2565,9 @@ model DashboardsV2 {
   /// The product whose sidebar lists it: llm-ops, me, gateway or governance (ADR-002,
   /// decision 8). Every board made before homes existed is llm-ops.
   homeProduct     String         @default("llm-ops")
+  /// The member whose own My dashboard this is, whatever it is named; null on every other
+  /// board. Rows made before the column are filled by dashboard:mark-my-dashboards.
+  myDashboardOfUserId String?
   /// Deprecated: unused since each widget query names its own sources (dashboards-v2 AC200,
   /// 2026-10-28); dropped in a later migration, once no serving release reads it.
   excludedOrigins Json?

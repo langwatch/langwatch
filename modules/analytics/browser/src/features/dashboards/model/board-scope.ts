@@ -23,6 +23,8 @@ export interface ScopedBoard {
   readonly createdById: string | null;
   readonly scope: DashboardScope;
   readonly organizationId: string | null;
+  /** The member whose own My dashboard it is; absent from an older server. */
+  readonly myDashboardOfUserId?: string | null;
 }
 
 /** The project a board is read in, the reader, and what their role grants there. */

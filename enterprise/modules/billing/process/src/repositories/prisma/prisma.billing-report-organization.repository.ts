@@ -8,6 +8,9 @@ import {
   BillingReportOrganizationRepository,
 } from "../billing-report-organization.repository.ts";
 
+/** Enough growth-seat subscriptions for any month's replacements; an organization has a handful. */
+const GROWTH_SEAT_PERIODS_READ = 50;
+
 /**
  * Only what this repository touches, so composition names the slice it needs
  * rather than the whole generated client.
@@ -33,11 +36,11 @@ type BillingReportOrganizationDatabase = Pick<
  *     questions: filtering made a non-usage-billed organization
  *     indistinguishable from an absent row, and telling them apart afterwards
  *     would have cost a second query on the path this read keeps cheap.
- *   - the subscription filter is `ACTIVE` and a growth-seat plan, because a
- *     cancelled or non-seat subscription cannot carry a meter event.
- *   - `take: 1` with `orderBy: startDate desc` reads the CURRENT one; the
- *     command only asks whether one exists, and reading them all would make a
- *     long-lived organization pay for rows it never looks at.
+ *   - the subscription filter is a growth-seat plan, ACTIVE or ended with a
+ *     start: only an ACTIVE one carries a meter event, and the ended ones
+ *     keep a month's Instant Evals window from moving when one is replaced.
+ *   - `orderBy: startDate desc` (nulls first in Postgres) puts the CURRENT
+ *     one first, and a bounded `take` spares a long-lived organization.
  *
  * The literal `"SEAT_EVENT"` rather than the generated enum member: the value
  * is the stored column's spelling, and this repository is the seam that names
@@ -66,11 +69,11 @@ export class PrismaBillingReportOrganizationRepository extends BillingReportOrga
         selfHostedCustomer: true,
         subscriptions: {
           where: {
-            status: "ACTIVE",
             plan: { in: [...GROWTH_SEAT_PLAN_TYPES] },
+            OR: [{ status: "ACTIVE" }, { endDate: { not: null }, startDate: { not: null } }],
           },
-          take: 1,
-          select: { id: true },
+          take: GROWTH_SEAT_PERIODS_READ,
+          select: { id: true, status: true, startDate: true, endDate: true },
           orderBy: { startDate: "desc" },
         },
       },
@@ -89,13 +92,24 @@ export class PrismaBillingReportOrganizationRepository extends BillingReportOrga
         : { outcome: "not_usage_billed" };
     }
 
-    const {
-      pricingModel: _pricingModel,
-      selfHostedCustomer: _selfHostedCustomer,
-      ...forBilling
-    } = organization;
+    const { id, stripeCustomerId, subscriptions } = organization;
 
-    return { outcome: "usage_billed", organization: { ...forBilling, contract: "cloud" } };
+    return {
+      outcome: "usage_billed",
+      organization: {
+        id,
+        stripeCustomerId,
+        subscriptions: subscriptions
+          .filter((subscription) => subscription.status === "ACTIVE")
+          .slice(0, 1)
+          .map((subscription) => ({ id: subscription.id })),
+        contract: "cloud",
+        growthSeatPeriods: subscriptions.map((subscription) => ({
+          startMs: subscription.startDate?.getTime() ?? null,
+          endMs: subscription.endDate?.getTime() ?? null,
+        })),
+      },
+    };
   }
 
   /**
@@ -122,6 +136,8 @@ export class PrismaBillingReportOrganizationRepository extends BillingReportOrga
         // empty, and the caller skips the organization until it does.
         subscriptions: account.usageSubscriptionId ? [{ id: account.usageSubscriptionId }] : [],
         contract: "connected",
+        // ADR-174 decision 23 (proposed in v22) covers a Cloud upgrade; a connected month is read whole.
+        growthSeatPeriods: [],
       },
     };
   }

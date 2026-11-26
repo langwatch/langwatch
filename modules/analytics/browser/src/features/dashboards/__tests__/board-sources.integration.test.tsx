@@ -414,11 +414,11 @@ describe("given a stored widget whose query stores no sources", () => {
     openBoard();
     await screen.findByTestId("sandboxed-frame");
 
-    const footer = screen.getByTestId("widget-card-footer");
+    const footer = screen.queryByTestId("widget-card-footer");
     const drawer = await openEditor(user);
     const row = within(drawer).getByTestId("query-sources");
 
-    expect(footer.textContent).toBe("Project: Test Project");
+    expect(footer).toBeNull();
     expect(within(drawer).getByText("Parameters")).toBeTruthy();
     expect(within(drawer).queryByText(/declared by you/)).toBeNull();
     expect(within(drawer).queryByText("No parameters declared yet.")).toBeNull();
@@ -501,9 +501,7 @@ describe("given a member changes a query's sources in the editor", () => {
     expect(preview).toBe("No sources picked");
     expect(server.updates()[0]?.queries[0]?.sources).toEqual([]);
     await vi.waitFor(() => expect(screen.getByTestId("no-sources-picked")).toBeTruthy());
-    expect(screen.getByTestId("widget-card-footer").textContent).toBe(
-      "Pick at least one source. · Project: Test Project",
-    );
+    expect(screen.getByTestId("widget-card-footer").textContent).toBe("Pick at least one source.");
     expect(screen.queryByTestId("sandboxed-frame")).toBeNull();
   });
 });
@@ -521,7 +519,7 @@ describe("given a member saves only a query's sources and presses Undo", () => {
     await vi.waitFor(() => expect(server.updates()).toHaveLength(1));
     await vi.waitFor(() =>
       expect(screen.getByTestId("widget-card-footer").textContent).toBe(
-        "Counts: your app and Langy · Project: Test Project",
+        "Counts: your app and Langy",
       ),
     );
 
@@ -529,9 +527,7 @@ describe("given a member saves only a query's sources and presses Undo", () => {
     await vi.waitFor(() => expect(server.updates()).toHaveLength(2));
 
     expect(server.updates()[1]?.queries[0]?.sources).toBeNull();
-    await vi.waitFor(() =>
-      expect(screen.getByTestId("widget-card-footer").textContent).toBe("Project: Test Project"),
-    );
+    await vi.waitFor(() => expect(screen.queryByTestId("widget-card-footer")).toBeNull());
   });
 
   /** @scenario "AC200k Sources: Undo puts a query's sources back, including back to none" */
@@ -566,9 +562,7 @@ describe("given a member who may not edit the board", () => {
     await user.click(await screen.findByRole("button", { name: "Actions for Traces" }));
     await screen.findByRole("menuitem", { name: "Copy widget id" });
 
-    expect(screen.getByTestId("widget-card-footer").textContent).toBe(
-      "Counts: your app and Langy · Project: Test Project",
-    );
+    expect(screen.getByTestId("widget-card-footer").textContent).toBe("Counts: your app and Langy");
     expect(screen.queryByRole("menuitem", { name: "Edit code" })).toBeNull();
   });
 });
@@ -866,11 +860,35 @@ describe("given a member changes a query's projects in the editor", () => {
 
 describe("given a card whose query names projects", () => {
   /** @scenario "AC206 Project: a card reads the board's project unless its query names others" */
-  it("names the board's project while the query stores none", async () => {
+  /** @scenario "A board in a project's own Dashboards names only other projects on its cards" */
+  it("names no project while the query stores none", async () => {
     openBoard();
     await screen.findByTestId("sandboxed-frame");
 
-    expect(screen.getByTestId("widget-card-footer").textContent).toContain("Project: Test Project");
+    expect(screen.queryByTestId("widget-card-footer")).toBeNull();
+  });
+
+  /** @scenario "A widget's card names its projects only where they differ from the board's" */
+  it("names no project for a query storing the board's project alone", async () => {
+    const own = { ...GRAPH.queries[0]!, projects: [HOME_BOARD.projectId] };
+    openBoard({ widgets: [{ ...WIDGET, graph: { ...GRAPH, queries: [own] } }] });
+    await screen.findByTestId("sandboxed-frame");
+
+    expect(screen.queryByTestId("widget-card-footer")).toBeNull();
+  });
+
+  /**
+   * @scenario "A widget's card names its projects only where they differ from the board's"
+   * @scenario "A board in a project's own Dashboards names only other projects on its cards"
+   */
+  it("names another project a query stores", async () => {
+    const other = { ...GRAPH.queries[0]!, projects: ["proj-a"] };
+    openBoard({ widgets: [{ ...WIDGET, graph: { ...GRAPH, queries: [other] } }] });
+    await screen.findByTestId("sandboxed-frame");
+
+    await vi.waitFor(() =>
+      expect(screen.getByTestId("widget-card-footer").textContent).toBe("Project: Alpha"),
+    );
   });
 
   /** @scenario "AC207b Project: a query saved with picked projects reads only those projects, in the order picked" */

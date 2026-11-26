@@ -1,7 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { useState } from "react";
 
-import { DateRangePicker } from "./date-range-picker.tsx";
+import { DateRangeFields, DateRangePicker } from "./date-range-picker.tsx";
 
 const presets = [
   { key: "1h", label: "Last 1 hour" },
@@ -60,3 +60,19 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {};
+
+/** The custom start and end alone, for a surface that lists its presets itself. */
+export const FieldsOnly: Story = {
+  render: () => {
+    const [start, setStart] = useState("2026-10-04T09:00");
+    const [end, setEnd] = useState("2026-10-11T09:00");
+    return (
+      <DateRangeFields
+        startValue={start}
+        endValue={end}
+        onStartChange={setStart}
+        onEndChange={setEnd}
+      />
+    );
+  },
+};

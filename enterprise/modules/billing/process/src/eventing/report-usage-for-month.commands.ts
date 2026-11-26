@@ -21,9 +21,12 @@ import {
   type BillableEventsTotalResult,
 } from "../rules/billing-month.rules.ts";
 import {
+  billingMonthWindowMs,
   instantEvalMeterIdentifier,
   instantEvalMeterUnitsToUsd,
+  instantEvalWindowMs,
   INSTANT_EVAL_USD_EVENT_NAME,
+  usageBilledSinceInMonth,
 } from "../rules/instant-eval-meter.rules.ts";
 import { meterEventTimestampSeconds } from "../rules/meter-event-timestamp.rules.ts";
 import {
@@ -74,6 +77,9 @@ interface BillingMeter {
     organizationId: string;
     billingMonth: string;
     billableEvents: number | undefined;
+    /** When usage billing started for the month, or null; ADR-174 decision 23 (proposed in v22). */
+    usageBilledSinceMs: number | null;
+    lastReportedTotal: number;
   }) => Promise<BillableEventsTotalResult>;
   /** The delta as the meter event carries it. */
   readonly toValue: (deltaUnits: number) => number;
@@ -120,6 +126,7 @@ export interface ReportUsageForMonthCommandDeps {
     stripeCustomerId: string;
     price: StripePriceName;
   }) => Promise<boolean>;
+  /** Queues a report: a convergence re-run, or a spend report's one follow-up. */
   selfDispatch: (data: ReportUsageForMonthCommandData) => Promise<void>;
   /** Shared organization-read cache; see `billing-organization-cache.repository.ts`. */
   organizationCache: BillingOrganizationCacheRepository;
@@ -217,6 +224,44 @@ function totalWithinContractCeiling({
 }
 
 /**
+ * A month the subscription window narrows never reports below what it already reported: the
+ * window keeps free use before an upgrade off what is still to send, never takes back what was
+ * sent (ADR-174 decision 23, proposed in v22). A whole-month read keeps its lower corrections.
+ */
+function notBelowReportedInNarrowedWindow({
+  measured,
+  organizationId,
+  billingMonth,
+  usageBilledSinceMs,
+  lastReportedTotal,
+}: {
+  measured: BillableEventsTotalResult;
+  organizationId: string;
+  billingMonth: string;
+  usageBilledSinceMs: number | null;
+  lastReportedTotal: number;
+}): BillableEventsTotalResult {
+  if (measured.outcome !== "counted") return measured;
+  const narrowed =
+    instantEvalWindowMs({ billingMonth, usageBilledSinceMs }).fromMs >
+    billingMonthWindowMs(billingMonth).fromMs;
+  if (!narrowed || measured.total >= lastReportedTotal) return measured;
+
+  logger.info(
+    {
+      organizationId,
+      billingMonth,
+      meter: INSTANT_EVAL_USD_EVENT_NAME,
+      measured: measured.total,
+      reported: lastReportedTotal,
+    },
+    "the subscription window read less than was reported; keeping the reported total",
+  );
+
+  return { ...measured, total: lastReportedTotal };
+}
+
+/**
  * Reports usage to Stripe via two-phase checkpoints and self-dispatch convergence.
  * Handles all errors internally; framework sees every job as successful.
  */
@@ -262,8 +307,23 @@ export class ReportUsageForMonthCommandHandler implements CommandHandler<
         followsCountedEvent: false,
         ceiling: ({ contract, ...args }) =>
           contract === "connected" ? deps.connectedUsageCeiling(args) : Promise.resolve(null),
-        queryTotal: ({ organizationId, billingMonth }) =>
-          deps.queryInstantEvalSpendTotal({ organizationId, billingMonth }),
+        queryTotal: async ({
+          organizationId,
+          billingMonth,
+          usageBilledSinceMs,
+          lastReportedTotal,
+        }) =>
+          notBelowReportedInNarrowedWindow({
+            measured: await deps.queryInstantEvalSpendTotal({
+              organizationId,
+              billingMonth,
+              usageBilledSinceMs,
+            }),
+            organizationId,
+            billingMonth,
+            usageBilledSinceMs,
+            lastReportedTotal,
+          }),
         toValue: instantEvalMeterUnitsToUsd,
         identifier: instantEvalMeterIdentifier,
       },
@@ -296,7 +356,8 @@ export class ReportUsageForMonthCommandHandler implements CommandHandler<
   }
 
   async handle(command: Command<ReportUsageForMonthCommandData>): Promise<never[]> {
-    const { organizationId, billingMonth, tenantId, billableEvents, countedEventId } = command.data;
+    const { organizationId, billingMonth, tenantId, billableEvents, countedEventId, trigger } =
+      command.data;
 
     // Assigned on every path that reaches the dispatch below: the catch
     // throws, so there is no third outcome to default to.
@@ -327,6 +388,8 @@ export class ReportUsageForMonthCommandHandler implements CommandHandler<
       }
 
       const org = verdict.organization;
+      const since = usageBilledSinceInMonth({ billingMonth, periods: org.growthSeatPeriods });
+      const usageBilledSinceMs = since.outcome === "since" ? since.startMs : null;
 
       // 2. Report for billing month, one meter after the other. A meter that
       // fails does not stop the next: each keeps its own checkpoint and its
@@ -340,6 +403,7 @@ export class ReportUsageForMonthCommandHandler implements CommandHandler<
             billingMonth,
             stripeCustomerId: org.stripeCustomerId,
             contract: org.contract,
+            usageBilledSinceMs,
             billableEvents,
             countedEventId,
           })) || shouldSelfDispatch;
@@ -372,6 +436,18 @@ export class ReportUsageForMonthCommandHandler implements CommandHandler<
       });
     }
 
+    // 4. A spend report cannot tell a ledger row still being written from one that is not there,
+    // so it sends exactly one follow-up; the follow-up sends none (ADR-174 decision 20).
+    if (trigger === "spend_confirmed") {
+      await this.deps.selfDispatch({
+        organizationId,
+        billingMonth,
+        tenantId,
+        occurredAt: nowInstant().epochMilliseconds,
+        trigger: "spend_follow_up",
+      });
+    }
+
     return [];
   }
 
@@ -386,6 +462,7 @@ export class ReportUsageForMonthCommandHandler implements CommandHandler<
     billingMonth: string;
     stripeCustomerId: string;
     contract: UsageBillingContract;
+    usageBilledSinceMs: number | null;
     billableEvents: number | undefined;
     countedEventId: string | undefined;
   }): Promise<boolean> {
@@ -423,6 +500,7 @@ export class ReportUsageForMonthCommandHandler implements CommandHandler<
     billingMonth: string;
     stripeCustomerId: string;
     contract: UsageBillingContract;
+    usageBilledSinceMs: number | null;
     billableEvents: number | undefined;
     lastReportedTotal: number;
     consecutiveFailures: number;
@@ -441,6 +519,8 @@ export class ReportUsageForMonthCommandHandler implements CommandHandler<
       organizationId,
       billingMonth,
       billableEvents: input.billableEvents,
+      usageBilledSinceMs: input.usageBilledSinceMs,
+      lastReportedTotal: input.lastReportedTotal,
     });
     const held = measured.outcome === "counted" ? measured.total - input.lastReportedTotal : 0;
     const fields = { organizationId, billingMonth, meter: meter.eventName };
@@ -525,6 +605,7 @@ export class ReportUsageForMonthCommandHandler implements CommandHandler<
     billingMonth,
     stripeCustomerId,
     contract,
+    usageBilledSinceMs,
     billableEvents,
     countedEventId,
   }: {
@@ -533,6 +614,7 @@ export class ReportUsageForMonthCommandHandler implements CommandHandler<
     billingMonth: string;
     stripeCustomerId: string;
     contract: UsageBillingContract;
+    usageBilledSinceMs: number | null;
     billableEvents: number | undefined;
     countedEventId: string | undefined;
   }): Promise<boolean> {
@@ -576,6 +658,7 @@ export class ReportUsageForMonthCommandHandler implements CommandHandler<
         billingMonth,
         stripeCustomerId,
         contract,
+        usageBilledSinceMs,
         billableEvents,
         lastReportedTotal,
         consecutiveFailures,
@@ -598,6 +681,7 @@ export class ReportUsageForMonthCommandHandler implements CommandHandler<
         organizationId,
         billingMonth,
         contract,
+        usageBilledSinceMs,
         billableEvents,
         countedEventId,
         checkpoint,
@@ -743,6 +827,7 @@ export class ReportUsageForMonthCommandHandler implements CommandHandler<
     organizationId,
     billingMonth,
     contract,
+    usageBilledSinceMs,
     billableEvents,
     countedEventId,
     checkpoint,
@@ -752,6 +837,7 @@ export class ReportUsageForMonthCommandHandler implements CommandHandler<
     organizationId: string;
     billingMonth: string;
     contract: UsageBillingContract;
+    usageBilledSinceMs: number | null;
     billableEvents: number | undefined;
     countedEventId: string | undefined;
     checkpoint: BillingCheckpoint | null;
@@ -769,7 +855,13 @@ export class ReportUsageForMonthCommandHandler implements CommandHandler<
     }
 
     // Normal path: the meter's total for the month.
-    const totalResult = await meter.queryTotal({ organizationId, billingMonth, billableEvents });
+    const totalResult = await meter.queryTotal({
+      organizationId,
+      billingMonth,
+      billableEvents,
+      usageBilledSinceMs,
+      lastReportedTotal,
+    });
 
     if (totalResult.outcome === "unavailable") {
       // No total to report for this meter
