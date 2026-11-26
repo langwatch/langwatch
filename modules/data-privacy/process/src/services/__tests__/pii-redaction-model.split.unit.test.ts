@@ -249,6 +249,18 @@ describe("PiiRedactionModelService, where splitting is on (ADR-207 v3)", () => {
     expect(on.fallbacks).toEqual([]);
   });
 
+  /** @scenario "Splitting is on only where the model is a Lambda function and the organization's split flag is on" */
+  it("reads the split flag only for a batch over 8,000 characters", async () => {
+    const { clear, flagReads } = setup();
+
+    await clear([filler(8_000)]);
+    const afterShort = flagReads();
+    await clear([filler(8_001)]);
+
+    expect(afterShort).toBe(0);
+    expect(flagReads()).toBe(1);
+  });
+
   /** @scenario "Split calls go to the model's one endpoint, each naming its context" */
   it("sends a short batch as one single call and a long one as split calls, on the one channel", async () => {
     const { clear, contexts, single, splitModel } = setup();

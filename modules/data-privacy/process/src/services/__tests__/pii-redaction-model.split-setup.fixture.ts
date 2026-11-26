@@ -81,6 +81,7 @@ export function setup({
   const usage: PiiRedactionModelUsage[] = [];
   const priced: PiiRedactionSpendPricedEventData[] = [];
   const contexts: ModelCallContext[] = [];
+  let splitFlagReads = 0;
   // The one model channel; the two fakes only keep each context's calls and turns apart.
   const splitting: SplittingPresidioChannel = {
     splits: true,
@@ -107,7 +108,11 @@ export function setup({
       }),
       splitSlots: slots,
       featureFlags: createApiFixture<FeatureFlagApi>({
-        isEnabled: async (key) => key !== PII_REDACTION_MODEL_SPLIT_FLAG || splitFlag,
+        isEnabled: async (key) => {
+          if (key !== PII_REDACTION_MODEL_SPLIT_FLAG) return true;
+          splitFlagReads++;
+          return splitFlag;
+        },
       }),
       scopes: DataPrivacyProjectScopeService.create({
         repository: MemoryDataPrivacyProjectScopeRepository.create({
@@ -151,7 +156,19 @@ export function setup({
     });
   const presidioCalls = () => presidio.batches.filter((batch) => batch.texts.length > 0);
 
-  return { clear, presidio, presidioCalls, single, splitModel, contexts, fallbacks, usage, priced };
+  const flagReads = () => splitFlagReads;
+  return {
+    clear,
+    presidio,
+    presidioCalls,
+    single,
+    splitModel,
+    contexts,
+    flagReads,
+    fallbacks,
+    usage,
+    priced,
+  };
 }
 
 /** Lets every settled promise run its callbacks, without moving the clock. */

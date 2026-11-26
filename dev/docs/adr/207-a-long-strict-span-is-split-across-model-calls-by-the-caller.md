@@ -74,14 +74,18 @@ and 12) so a split span stays one priced fact.
    (`http.data-privacy.channels.ts:66`). "Can split" is a type, not a flag: the Lambda channel
    implements `SplittingPresidioChannel` (it accepts `{ context: "split" }`), each invocation being
    its own execution; the HTTP channel implements only `PresidioChannel`, a pod answering one
-   request at a time, so a split call to it does not compile. The registry hands the service a
-   union of the two, and the service narrows it once. Where it cannot, the
+   request at a time, so a split call to it does not compile. The service asks `canSplit` of
+   the one channel before it plans a split, and a split call on a channel that cannot split
+   throws rather than sends. Where it cannot, the
    8,000 cap stays and longer spans keep going to Presidio. No code branches on the endpoint kind.
 9. **One endpoint; every call names its context.** Split calls go through the same channel as
    single calls: `detect(request, { context })`, `context` typed `ModelCallContext = "single" |
 "split"`. What differs by context lives in one table, `MODEL_CALL_RULES: Record<ModelCallContext,
-ModelCallRules>` (timeout, slots, breaker, usage tag), so a context without its rules does not
-   compile; nothing tests `context === "split"`. **Slots are taken, never waited for.** Split
+ModelCallRules>` (the time a batch has, and the slots), so a context without its rules does not
+   compile; each context also has its own breaker, in a record keyed by the same type; nothing
+   tests `context === "split"`. The Lambda channel names the context on each event, in the
+   `x-langwatch-pii-call-context` header (`single` when a call names none); the model ignores it
+   today, and it lets the model's own logs tell the two apart. **Slots are taken, never waited for.** Split
    calls go through the existing `ConcurrencyLimiter` (`packages/limiter`) with 2 slots per
    process and no queue. A span takes
    the free slots, up to 2, at once; with none free it falls back at once with reason `busy`, as
@@ -112,29 +116,27 @@ ModelCallRules>` (timeout, slots, breaker, usage tag), so a context without its 
 
 ## Constants
 
-| name                                       | value                                                                                     | purpose                                                    |
-| ------------------------------------------ | ----------------------------------------------------------------------------------------- | ---------------------------------------------------------- |
-| `PII_REDACTION_MODEL_MAX_BATCH_CHARACTERS` | 8,000                                                                                     | most characters a span sends in one call (unchanged)       |
-| `PII_REDACTION_MODEL_MAX_SPLIT_CHARACTERS` | 32,000                                                                                    | most characters a span may send split; over it, `too_long` |
-| `PII_REDACTION_MODEL_PIECE_CHARACTERS`     | 4,000                                                                                     | most characters in one split call                          |
-| `PII_REDACTION_MODEL_PIECE_OVERLAP`        | 200                                                                                       | characters a piece repeats from the previous one           |
-| split calls per process                    | 2, no queue; Lambda target only                                                           | in flight at once, per process                             |
-| `PII_REDACTION_MODEL_SPAN_BUDGET_MS`       | 50,000                                                                                    | all of a split span's calls, queueing included             |
-| aborted call slot hold                     | 60,000 ms from start                                                                      | the model's 55 s deadline + 5 s stop grace                 |
-| `MODEL_CALL_RULES`                         | `single`: 50 s, unlimited, single breaker; `split`: 50 s per span, 2 slots, split breaker | every per-context rule, in one table                       |
+| name                                       | value                                                                                             | purpose                                                    |
+| ------------------------------------------ | ------------------------------------------------------------------------------------------------- | ---------------------------------------------------------- |
+| `PII_REDACTION_MODEL_MAX_BATCH_CHARACTERS` | 8,000                                                                                             | most characters a span sends in one call (unchanged)       |
+| `PII_REDACTION_MODEL_MAX_SPLIT_CHARACTERS` | 32,000                                                                                            | most characters a span may send split; over it, `too_long` |
+| `PII_REDACTION_MODEL_PIECE_CHARACTERS`     | 4,000                                                                                             | most characters in one split call                          |
+| `PII_REDACTION_MODEL_PIECE_OVERLAP`        | 200                                                                                               | characters a piece repeats from the previous one           |
+| aborted call slot hold                     | 60,000 ms from start                                                                              | the model's 55 s deadline + 5 s stop grace                 |
+| `MODEL_CALL_RULES`                         | `single`: 50 s, unlimited; `split`: 50 s for all of a span's calls, 2 slots per process, no queue | the time and slots of each context, in one table           |
 
 ## Invariants
 
-| invariant                         | meaning                                                                                     | how, and its test                                                                    |
-| --------------------------------- | ------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
-| never raw                         | no text is stored with a finding the model reported left unmasked                           | all-or-nothing fallback; seam fixture asserts zero unmasked tokens                   |
-| offsets index the raw piece       | a mask lands on the characters the model found                                              | decision 5 guard; fixtures: JSON lines, `NaN` JSON, U+0085 edge, emoji before a name |
-| no worse than today               | a span under 8,000 and a span that falls back get exactly today's result                    | single-call path untouched; existing tests stay green                                |
-| wait no longer than today         | a span reaches Presidio within 50 s, as one call does now, and at once when no slot is free | span budget, no queue; fake-clock unit test                                          |
-| HTTP targets unchanged            | self-hosted and Kubernetes keep today's 8,000 cap                                           | target check; unit test on an HTTP target                                            |
-| billed once                       | one spend record per span, its characters counted once, overlap never                       | ADR-201 rev; 20,000-char span bills 20,000                                           |
-| short spans unharmed by long ones | a split call's throttle never opens the single-call breaker                                 | split-only breaker; unit test                                                        |
-| matches the unsplit call          | names propagate as the model's own rule does (decision 7's PR, not yet built)               | parity fixture from `namerule.go` tests                                              |
+| invariant                         | meaning                                                                                     | how, and its test                                                                                 |
+| --------------------------------- | ------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| never raw                         | no text is stored with a finding the model reported left unmasked                           | all-or-nothing fallback; seam fixture asserts zero unmasked tokens                                |
+| offsets index the raw piece       | a mask lands on the characters the model found                                              | decision 5 guard; fixtures: JSON lines, `NaN` JSON, U+0085 edge, emoji before a name              |
+| no worse than today               | a span under 8,000 and a span that falls back get exactly today's result                    | single-call result unchanged (its event only gains the context header); existing tests stay green |
+| wait no longer than today         | a span reaches Presidio within 50 s, as one call does now, and at once when no slot is free | span budget, no queue; fake-clock unit test                                                       |
+| HTTP targets unchanged            | self-hosted and Kubernetes keep today's 8,000 cap                                           | target check; unit test on an HTTP target                                                         |
+| billed once                       | one spend record per span, its characters counted once, overlap never                       | ADR-201 rev; 20,000-char span bills 20,000                                                        |
+| short spans unharmed by long ones | a split call's throttle never opens the single-call breaker                                 | split-only breaker; unit test                                                                     |
+| matches the unsplit call          | names propagate as the model's own rule does (decision 7's PR, not yet built)               | parity fixture from `namerule.go` tests                                                           |
 
 ## Assumptions
 

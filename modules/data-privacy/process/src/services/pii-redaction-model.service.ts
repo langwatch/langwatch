@@ -1,4 +1,5 @@
 import type { PiiLevel } from "@langwatch/data-privacy-contract";
+import { PII_REDACTION_MODEL_MAX_BATCH_CHARACTERS } from "@langwatch/data-privacy-contract/pii-redaction-spend";
 import { type EntitlementApi, isEnterpriseTier } from "@langwatch/entitlement-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { ConcurrencyLimiter } from "@langwatch/limiter";
@@ -208,7 +209,10 @@ export class PiiRedactionModelService {
       return null;
     }
     const { organizationId } = routing;
-    const splitting = await this.#isSplitting({ organizationId, projectId });
+    // Only a batch too long for one call asks whether it may split.
+    const splitting =
+      call.characters > PII_REDACTION_MODEL_MAX_BATCH_CHARACTERS &&
+      (await this.#isSplitting({ organizationId, projectId }));
     const plan = planSpan({ texts: input.texts, splitting });
     if (plan.kind === "too_long") {
       this.metrics.modelFellBack("too_long");
@@ -397,7 +401,11 @@ export class PiiRedactionModelService {
         projectId,
         organizationId,
       });
-    } catch {
+    } catch (error) {
+      logger.warn(
+        { projectId, reason: failureName(error) },
+        "PII redaction model split flag could not be read; not splitting",
+      );
       return false;
     }
   }
