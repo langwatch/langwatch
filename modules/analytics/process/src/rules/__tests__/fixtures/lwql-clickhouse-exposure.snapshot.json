@@ -153,7 +153,8 @@
     "MetadataOutcomeReason <- MetadataOutcomeReason",
     "MetadataPromptVersion <- MetadataPromptVersion",
     "MetadataEnvironment <- MetadataEnvironment",
-    "LastUsedPromptVersionId <- LastUsedPromptVersionId"
+    "LastUsedPromptVersionId <- LastUsedPromptVersionId",
+    "AppVersion <- AppVersion"
   ],
   "trace_metrics_by_minute <- trace_analytics_rollup": [
     "TenantId <- TenantId",
