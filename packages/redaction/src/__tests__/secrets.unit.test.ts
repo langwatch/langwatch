@@ -607,6 +607,13 @@ describe("redactSecretsInText, given text that only looks like secrets", () => {
 
       expect(redact(text).text).toBe(`/api/files/local-dev-project/${storedObjectId} [SECRET]`);
     });
+
+    /** @scenario "A stored media reference survives secret redaction" */
+    it("still redacts a key whose body carries some other record path", () => {
+      const key = `zyq_${BODY.slice(0, 30)}/user_profile`;
+
+      expect(redact(key)).toEqual({ text: "[SECRET]", redactedCount: 1 });
+    });
   });
 
   /** @scenario "A qualified key name is still a credential" */

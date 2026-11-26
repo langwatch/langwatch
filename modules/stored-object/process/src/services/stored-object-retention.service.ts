@@ -124,7 +124,12 @@ export class StoredObjectRetentionService {
     for (const tenantId of input.tenants) {
       if (this.#elapsedMs(startedAt) >= budgetMs) return [];
       try {
-        const page = await this.#sweepPage({ tenantId, now: startedAt, pageSize });
+        const page = await this.#sweepPage({
+          tenantId,
+          now: startedAt,
+          pageSize,
+          failures: tally.failures,
+        });
         tally.removedLinks += page.removedLinks;
         tally.deletedObjects += page.deletedObjects;
         if (page.isFull && page.removedLinks > 0) next.push(tenantId);
@@ -140,6 +145,7 @@ export class StoredObjectRetentionService {
     tenantId: StoredObjectProjectId;
     now: Instant;
     pageSize: number;
+    failures: unknown[];
   }): Promise<{ removedLinks: number; deletedObjects: number; isFull: boolean }> {
     const page = await this.options.ownerLinks.findExpired({
       tenantId: input.tenantId,
@@ -148,16 +154,26 @@ export class StoredObjectRetentionService {
     });
     const objectIds = [...new Set(page.map((link) => link.objectId))];
     let deletedObjects = 0;
+    const settled: StoredObjectId[] = [];
     for (const id of objectIds) {
-      if (await this.#deleteIfUnheld({ tenantId: input.tenantId, id, now: input.now })) {
-        deletedObjects += 1;
+      // A failed object keeps its links for the next run; the rest of the page goes on.
+      try {
+        if (await this.#deleteIfUnheld({ tenantId: input.tenantId, id, now: input.now })) {
+          deletedObjects += 1;
+        }
+        settled.push(id);
+      } catch (error) {
+        input.failures.push(error);
       }
     }
-    const removedLinks = await this.options.ownerLinks.deleteExpired({
-      tenantId: input.tenantId,
-      objectIds,
-      before: input.now,
-    });
+    const removedLinks =
+      settled.length === 0
+        ? 0
+        : await this.options.ownerLinks.deleteExpired({
+            tenantId: input.tenantId,
+            objectIds: settled,
+            before: input.now,
+          });
 
     return { removedLinks, deletedObjects, isFull: page.length >= input.pageSize };
   }

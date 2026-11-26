@@ -184,6 +184,28 @@ describe("StoredObjectRetentionService.sweep", () => {
     });
   });
 
+  describe("given two objects of one tenant with ended links, the first of which cannot be updated", () => {
+    /** @scenario "One object's failure does not stop the sweep for the rest of its tenant" */
+    it("deletes the second, keeps the first's links, fails the run, and a later run finishes", async () => {
+      const f = fixture();
+      const failing = await f.store({ ownerId: "t1" });
+      const swept = await f.store({ ownerId: "t2", bytes: new Uint8Array([1, 2, 3, 4]) });
+      f.clock.now = dayOf(31);
+      f.sweepPages.refuseObject = failing.reference.id as StoredObjectId;
+
+      await expect(f.sweeper.sweep()).rejects.toBeInstanceOf(AggregateError);
+      expect((await f.rowOf(swept.reference.id))?.status).toBe("deleted");
+      expect(await f.linksOf(swept.reference.id)).toEqual([]);
+      expect(await f.linksOf(failing.reference.id)).toHaveLength(1);
+
+      f.sweepPages.refuseObject = undefined;
+      await f.sweeper.sweep();
+
+      expect((await f.rowOf(failing.reference.id))?.status).toBe("deleted");
+      expect(await f.linksOf(failing.reference.id)).toEqual([]);
+    });
+  });
+
   describe("given a pinned trace whose media is linked until day 30", () => {
     /** @scenario "Pinning a trace does not extend its media" */
     it("deletes the media on day 31, as the pinned trace's rows are", async () => {

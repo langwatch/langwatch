@@ -12,6 +12,7 @@ import {
   type RecordSpanCommandData,
   containsMediaMarkers,
   parseBase64DataUri,
+  storableSpanTimesOf,
 } from "@langwatch/trace-contract";
 
 import { mediaPartExtractionOf } from "../rules/media-part.rules.ts";
@@ -134,10 +135,12 @@ export class TraceMediaExtractionService {
     part,
     projectId,
     ownerId,
+    retainFromMs,
   }: {
     part: unknown;
     projectId: string;
     ownerId: string;
+    retainFromMs?: number | undefined;
   }): Promise<{ part: unknown; ref: ExtractedRef | undefined }> {
     const extraction = mediaPartExtractionOf(part);
     if (extraction.kind === "none") return { part, ref: undefined };
@@ -146,6 +149,7 @@ export class TraceMediaExtractionService {
       ownerId,
       mediaType: extraction.mediaType,
       bytes: extraction.bytes,
+      ...(retainFromMs === undefined ? {} : { retainFromMs }),
     });
     const reference = storedObjectFileReferenceOf({ projectId, storedObjectId: stored.id });
 
@@ -169,17 +173,19 @@ export class TraceMediaExtractionService {
     value,
     projectId,
     ownerId,
+    retainFromMs,
     budget = this.createExtractionBudget(),
   }: {
     value: unknown;
     projectId: string;
     ownerId: string;
+    retainFromMs?: number | undefined;
     budget?: ExtractionBudget;
   }): Promise<{ value: unknown; refs: ExtractedRef[] }> {
     const sites = findMediaSites(value);
     if (sites.length === 0) return { value, refs: [] };
     const refs: ExtractedRef[] = [];
-    const stored = await this.storeSites({ sites, projectId, ownerId, budget, refs });
+    const stored = await this.storeSites({ sites, projectId, ownerId, retainFromMs, budget, refs });
     if (stored.length === 0) return { value, refs };
 
     return { value: rebuildWithReplacements(value, stored), refs };
@@ -232,13 +238,20 @@ export class TraceMediaExtractionService {
     site,
     projectId,
     ownerId,
+    retainFromMs,
   }: {
     site: MediaSite;
     projectId: string;
     ownerId: string;
+    retainFromMs?: number | undefined;
   }): Promise<SiteOutcome> {
     if (site.kind === "part") {
-      const { part, ref } = await this.extractFromPart({ part: site.node, projectId, ownerId });
+      const { part, ref } = await this.extractFromPart({
+        part: site.node,
+        projectId,
+        ownerId,
+        retainFromMs,
+      });
       if (!ref || part === site.node) return ref ? { status: "unchanged", ref } : UNCHANGED;
 
       return { status: "stored", site: { ...site, replacement: part }, ref };
@@ -252,6 +265,7 @@ export class TraceMediaExtractionService {
       part: partForDataUri(uri, parsed.mimeType, parsed.base64),
       projectId,
       ownerId,
+      retainFromMs,
     });
     if (!ref) return UNCHANGED;
 
@@ -274,6 +288,7 @@ export class TraceMediaExtractionService {
     site: MediaSite;
     projectId: string;
     ownerId: string;
+    retainFromMs?: number | undefined;
     budget: ExtractionBudget;
   }): Promise<SiteOutcome> {
     const { budget } = input;
@@ -301,12 +316,14 @@ export class TraceMediaExtractionService {
     sites,
     projectId,
     ownerId,
+    retainFromMs,
     budget,
     refs,
   }: {
     sites: MediaSite[];
     projectId: string;
     ownerId: string;
+    retainFromMs?: number | undefined;
     budget: ExtractionBudget;
     refs: ExtractedRef[];
   }): Promise<ReplacedMediaSite[]> {
@@ -326,7 +343,9 @@ export class TraceMediaExtractionService {
 
       const wave = takeable.slice(i, i + CONCURRENT_STORES);
       const results = await Promise.all(
-        wave.map((site) => this.storeWithinCeiling({ site, projectId, ownerId, budget })),
+        wave.map((site) =>
+          this.storeWithinCeiling({ site, projectId, ownerId, retainFromMs, budget }),
+        ),
       );
       for (const result of results) {
         if (result.ref) refs.push(result.ref);
@@ -343,7 +362,10 @@ export class TraceMediaExtractionService {
     const projectId = data.tenantId;
     const refs: ExtractedRef[] = [];
     const budget = this.createExtractionBudget();
-    const walk = { projectId, ownerId: span.traceId, refs, budget };
+    // Trace rows expire from the span's start, so its media is retained from there too.
+    const times = storableSpanTimesOf(span);
+    const retainFromMs = "times" in times ? times.times.startTimeUnixMs : undefined;
+    const walk = { projectId, ownerId: span.traceId, retainFromMs, refs, budget };
     const attributes = await this.rewriteAttributeList({ attributes: span.attributes, ...walk });
 
     let eventsChanged = false;
@@ -378,12 +400,14 @@ export class TraceMediaExtractionService {
     attributes,
     projectId,
     ownerId,
+    retainFromMs,
     refs,
     budget,
   }: {
     attributes: OtlpKeyValue[];
     projectId: string;
     ownerId: string;
+    retainFromMs?: number | undefined;
     refs: ExtractedRef[];
     budget: ExtractionBudget;
   }): Promise<OtlpKeyValue[]> {
@@ -396,6 +420,7 @@ export class TraceMediaExtractionService {
           value: stringValue,
           projectId,
           ownerId,
+          retainFromMs,
           budget,
         });
         if (typeof result.value === "string" && result.value !== stringValue) {

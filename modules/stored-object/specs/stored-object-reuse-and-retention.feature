@@ -56,6 +56,19 @@ Feature: Stored-object reuse by content and owner-linked retention
     Then the object is linked to owner trace "t1" until 30 days from now
 
   @unit
+  Scenario: A store whose retention started earlier links the owner from that start
+    Given the project keeps traces for 30 days
+    When trace "t1" stores bytes on day 0 for a span that started on day -20
+    Then the object is linked to owner trace "t1" until day 10
+    And a later re-time counts from day -20
+
+  @unit
+  Scenario: A retention start in the future links the owner from now
+    Given the project keeps traces for 30 days
+    When trace "t1" stores bytes on day 0 for a span that starts on day 5
+    Then the object is linked to owner trace "t1" until day 30
+
+  @unit
   Scenario: A reuse links the new owner without shortening the first
     Given trace "t1" holds an object until day 30
     When trace "t2" stores the same bytes and its retention ends on day 10
@@ -127,6 +140,13 @@ Feature: Stored-object reuse by content and owner-linked retention
     When the sweep runs
     Then the second tenant's expired objects are deleted
     And the run fails naming the failure, and a later run finishes the first tenant
+
+  @unit
+  Scenario: One object's failure does not stop the sweep for the rest of its tenant
+    Given two objects of one tenant with expired links, and the first object's row cannot be updated
+    When the sweep runs
+    Then the second object is deleted and its links removed
+    And the first object keeps its links, the run fails, and a later run deletes it
 
   # ===========================================================================
   # Retention changes

@@ -301,10 +301,10 @@ const RECORD_ID_PREFIXES = new Set([
 const PUBLIC_KEY_PREFIXES = new Set(["phc"]);
 
 /**
- * A path through a record id (`<projectId>/storedobject_…` inside a stored media reference) is an
- * address, not key material, even when its first segment has a key's shape.
+ * The tail of a stored media reference (`<projectId>/storedobject_<id>`, ending the token) is an
+ * address, not key material, even when the project id has a key's shape. Only that exact shape.
  */
-const RECORD_PATH_SEGMENT_REGEX = new RegExp(`/(?:${[...RECORD_ID_PREFIXES].join("|")})_`, "i");
+const STORED_OBJECT_PATH_TAIL_REGEX = /^[A-Za-z0-9_-]*\/storedobject_[A-Za-z0-9]{16,}$/;
 
 /** Every prefix that announces something other than a credential. */
 function isNonCredentialPrefix(prefix: string): boolean {
@@ -581,7 +581,7 @@ const VALUE_RULES: ValueRule[] = [
     ),
     accept: (groups) =>
       !isNonCredentialPrefix(groups[1] ?? "") &&
-      !RECORD_PATH_SEGMENT_REGEX.test(groups[2] ?? "") &&
+      !STORED_OBJECT_PATH_TAIL_REGEX.test(groups[2] ?? "") &&
       isKeyShapedBody(groups[2] ?? ""),
     precondition: (text) => text.includes("_") || text.includes("-"),
   },

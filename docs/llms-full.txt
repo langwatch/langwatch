@@ -57123,9 +57123,9 @@ When a message holds both a recording and text, LangWatch treats the text as the
 
 LangWatch moves the recording out of the span at ingestion. The bytes go into object storage and the message part becomes a `/api/v1/files/<projectId>/<id>` reference, around 60 characters where the base64 was.
 
-The stored bytes follow your project's trace retention: when a trace ages out, the media stored from it is deleted with it.
+The stored bytes follow your project's trace retention: once a trace ages out, an hourly cleanup deletes the media stored from it, unless a trace that is still kept uses the same bytes.
 
-A recording sent inline has to fit in one OTLP request, which LangWatch caps at 64 MiB, about an hour of compressed call audio. Inside that limit the whole recording is kept, even past the 8 MB cap on a single attribute. On self-hosted, `OTLP_TRACES_MAX_BODY_BYTES` changes the limit.
+A recording sent inline has to fit in one OTLP request, which LangWatch caps at 64 MiB, about an hour of compressed call audio. With media extraction on, the default, the whole recording is kept inside that limit, even past the 8 MiB cap on a single attribute. If extraction is off (`RELEASE_TRACE_MEDIA_EXTRACTION=0`, or a Helm install with no object storage) or the store refuses the write, the recording stays inline and is cut at that cap. On self-hosted, `OTLP_TRACES_MAX_BODY_BYTES` changes the limit.
 
 Raw, header-less audio does not play in a browser on its own. LangWatch wraps `pcm16` and G.711 payloads into a WAV container when it stores them, so the reference plays everywhere without a conversion step of your own.
 
@@ -57339,7 +57339,9 @@ A part that names only a provider-hosted file, such as an OpenAI `file_id` with 
 
 LangWatch moves the document out of the span at ingestion. The bytes go into object storage and the message part becomes a `/api/v1/files/<projectId>/<id>` reference, around 60 characters where the base64 was.
 
-The stored bytes follow your project's trace retention: when a trace ages out, the media stored from it is deleted with it.
+The stored bytes follow your project's trace retention: once a trace ages out, an hourly cleanup deletes the media stored from it, unless a trace that is still kept uses the same bytes.
+
+If media extraction is off (`RELEASE_TRACE_MEDIA_EXTRACTION=0`, or a Helm install with no object storage) or the store refuses the write, the document stays inline in the span.
 
 On read, LangWatch serves PDF files with their original media type, along with images, audio and video. Every other document type, such as CSV, JSON, Markdown and plain text, is served as a download.
 
@@ -57801,7 +57803,9 @@ Always set the media type. Without one, LangWatch leaves the bytes inline in the
 
 LangWatch moves the image out of the span at ingestion. The bytes go into object storage and the message part becomes a `/api/v1/files/<projectId>/<id>` reference, around 60 characters where the base64 was.
 
-The stored bytes follow your project's trace retention: when a trace ages out, the media stored from it is deleted with it.
+The stored bytes follow your project's trace retention: once a trace ages out, an hourly cleanup deletes the media stored from it, unless a trace that is still kept uses the same bytes.
+
+If media extraction is off (`RELEASE_TRACE_MEDIA_EXTRACTION=0`, or a Helm install with no object storage) or the store refuses the write, the image stays inline in the span.
 
 On read, LangWatch serves the original media type for images, audio, video and PDF files. Anything else is served as a download.
 
@@ -63673,9 +63677,9 @@ When a message holds both a recording and text, LangWatch treats the text as the
 
 LangWatch moves the recording out of the span at ingestion. The bytes go into object storage and the message part becomes a `/api/v1/files/<projectId>/<id>` reference, around 60 characters where the base64 was.
 
-The stored bytes follow your project's trace retention: when a trace ages out, the media stored from it is deleted with it.
+The stored bytes follow your project's trace retention: once a trace ages out, an hourly cleanup deletes the media stored from it, unless a trace that is still kept uses the same bytes.
 
-A recording sent inline has to fit in one OTLP request, which LangWatch caps at 64 MiB, about an hour of compressed call audio. Inside that limit the whole recording is kept, even past the 8 MB cap on a single attribute. On self-hosted, `OTLP_TRACES_MAX_BODY_BYTES` changes the limit.
+A recording sent inline has to fit in one OTLP request, which LangWatch caps at 64 MiB, about an hour of compressed call audio. With media extraction on, the default, the whole recording is kept inside that limit, even past the 8 MiB cap on a single attribute. If extraction is off (`RELEASE_TRACE_MEDIA_EXTRACTION=0`, or a Helm install with no object storage) or the store refuses the write, the recording stays inline and is cut at that cap. On self-hosted, `OTLP_TRACES_MAX_BODY_BYTES` changes the limit.
 
 Raw, header-less audio does not play in a browser on its own. LangWatch wraps `pcm16` and G.711 payloads into a WAV container when it stores them, so the reference plays everywhere without a conversion step of your own.
 
@@ -63820,7 +63824,9 @@ A part that names only a provider-hosted file, such as an OpenAI `file_id` with 
 
 LangWatch moves the document out of the span at ingestion. The bytes go into object storage and the message part becomes a `/api/v1/files/<projectId>/<id>` reference, around 60 characters where the base64 was.
 
-The stored bytes follow your project's trace retention: when a trace ages out, the media stored from it is deleted with it.
+The stored bytes follow your project's trace retention: once a trace ages out, an hourly cleanup deletes the media stored from it, unless a trace that is still kept uses the same bytes.
+
+If media extraction is off (`RELEASE_TRACE_MEDIA_EXTRACTION=0`, or a Helm install with no object storage) or the store refuses the write, the document stays inline in the span.
 
 On read, LangWatch serves PDF files with their original media type, along with images, audio and video. Every other document type, such as CSV, JSON, Markdown and plain text, is served as a download.
 
@@ -63955,7 +63961,9 @@ Always set the media type. Without one, LangWatch leaves the bytes inline in the
 
 LangWatch moves the image out of the span at ingestion. The bytes go into object storage and the message part becomes a `/api/v1/files/<projectId>/<id>` reference, around 60 characters where the base64 was.
 
-The stored bytes follow your project's trace retention: when a trace ages out, the media stored from it is deleted with it.
+The stored bytes follow your project's trace retention: once a trace ages out, an hourly cleanup deletes the media stored from it, unless a trace that is still kept uses the same bytes.
+
+If media extraction is off (`RELEASE_TRACE_MEDIA_EXTRACTION=0`, or a Helm install with no object storage) or the store refuses the write, the image stays inline in the span.
 
 On read, LangWatch serves the original media type for images, audio, video and PDF files. Anything else is served as a download.
 
@@ -76121,12 +76129,12 @@ The restriction applies to email and password sign-up, passkey sign-up, and firs
 
 The dataplane S3 bucket is the general file-storage layer for all externalized byte content. Current consumers:
 
-- **Stored objects**: externalized byte content (audio, image, video, document) extracted from incoming traces, scenario events and dataset uploads, served back via `GET /api/v1/files/:id`. Media lifted out of a trace is deleted when the project's trace retention ends.
+- **Stored objects**: externalized byte content (audio, image, video, document) extracted from incoming traces, scenario events and dataset uploads, served back via `GET /api/v1/files/:id`. Media lifted out of a trace is deleted by an hourly cleanup once the project's trace retention ends, unless a trace that is still kept uses the same bytes.
 - **Dataset uploads**: persists rows uploaded through the dataset UI. Shares the same `S3_BUCKET_NAME` bucket.
 
 When `S3_BUCKET_NAME` is set, all consumers use that bucket. When it is not set, stored-objects fall back to the local filesystem at `LANGWATCH_LOCAL_STORAGE_PATH`. That is fine for single-replica installs, **not** for horizontally-scaled deployments (see warning below).
 
-Trace media is moved to stored objects by default (`RELEASE_TRACE_MEDIA_EXTRACTION`, on unless set to `0`). The Helm chart sets it to `0` when neither `app.dataplane` nor the local-filesystem volume is enabled, so media stays inline in ClickHouse instead of landing on a disk that is lost on restart. A write the store refuses also keeps that media inline.
+Trace media is moved to stored objects by default (`RELEASE_TRACE_MEDIA_EXTRACTION`, on unless set to `0`). The Helm chart sets it to `0` when neither `app.dataplane` nor the local-filesystem volume is enabled, so media stays inline in ClickHouse instead of landing on a disk that is lost on restart. A write the store refuses also keeps that media inline. Inline media is cut at the 8 MiB attribute cap, so only extracted media keeps a recording longer than that whole.
 
 | Variable               | Description                                                                                                     | Default |
 | ---------------------- | --------------------------------------------------------------------------------------------------------------- | ------- |
@@ -77904,7 +77912,7 @@ spec:
   source:
     repoURL: https://langwatch.github.io/langwatch
     chart: langwatch
-    targetRevision: 3.29.0 # x-release-please-version
+    targetRevision: 3.30.0 # x-release-please-version
     helm:
       releaseName: langwatch
       values: |
@@ -77959,7 +77967,7 @@ spec:
   sources:
     - repoURL: https://langwatch.github.io/langwatch
       chart: langwatch
-      targetRevision: 3.29.0 # x-release-please-version
+      targetRevision: 3.30.0 # x-release-please-version
       helm:
         releaseName: langwatch
         valueFiles:
@@ -78374,7 +78382,7 @@ For air-gapped or private environments, mirror the images to your own registry:
 ```bash
 # The release you are mirroring. Every tag below follows it, so set it once.
 # Pick the version from https://github.com/langwatch/langwatch/releases
-VERSION=3.29.0 # x-release-please-version
+VERSION=3.30.0 # x-release-please-version
 REGISTRY=registry.example.com
 
 for image in langwatch langwatch_nlp langevals; do
@@ -78390,13 +78398,13 @@ Then configure the Helm chart, giving every tag the version you mirrored:
 images:
   app:
     repository: registry.example.com/langwatch/langwatch
-    tag: "3.29.0" # x-release-please-version
+    tag: "3.30.0" # x-release-please-version
   langwatch_nlp:
     repository: registry.example.com/langwatch/langwatch_nlp
-    tag: "3.29.0" # x-release-please-version
+    tag: "3.30.0" # x-release-please-version
   langevals:
     repository: registry.example.com/langwatch/langevals
-    tag: "3.29.0" # x-release-please-version
+    tag: "3.30.0" # x-release-please-version
 ```
 
 Mirror and override the bundled services the same way: `gateway.image.repository`, `langyagent.image.repository`, `clickhouse.image.repository`, `postgresql.image.repository`, `redis.image.repository`, `prometheus.server.image.repository`, `cronjobs.image.repository` and `app.storedObjects.localFilesystem.serializeUpgradesImage` (the image the stored-objects upgrade hooks run).
@@ -83426,7 +83434,7 @@ helm search repo langwatch/langwatch --versions
 # x-release-please-start-version
 helm upgrade langwatch langwatch/langwatch \
   --namespace langwatch \
-  --version 3.29.0 \
+  --version 3.30.0 \
   -f values-production.yaml
 # x-release-please-end
 ```

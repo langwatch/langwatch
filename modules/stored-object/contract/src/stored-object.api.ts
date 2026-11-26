@@ -45,6 +45,11 @@ export interface StoreStoredObjectFromBytesInput extends StoredObjectProvenance 
    * Required when the purpose declares one (ADR-002 §3): the caller asks data-retention.
    */
   retentionDays?: number;
+  /**
+   * When the owner's retention started, in epoch ms (a span's start time for trace media); the
+   * link runs `retentionDays` from it, never from later than now. Absent: from now.
+   */
+  retainFromMs?: number;
 }
 
 export interface StoreStoredObjectFromBytesResult {

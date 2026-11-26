@@ -259,6 +259,12 @@ Feature: Trace media blob extraction at the ingestion edge
     Then the bytes are stored for the "trace_content" purpose with the span's trace as owner
     So that Stored Objects keeps them until that trace's retention ends
 
+  @integration
+  Scenario: A late span's media is retained from the span's start
+    When a span that started 20 days ago is ingested with inline media
+    Then the bytes are stored with the span's start time as the retention start
+    So that the media expires with the span's trace rows, which expire from that start
+
   @unit
   Scenario: Trace media names the project's trace retention when it is stored
     When trace media is stored for a project that keeps traces for 30 days

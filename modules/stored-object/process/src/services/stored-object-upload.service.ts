@@ -199,6 +199,10 @@ export class StoredObjectUploadService {
       throw new Error(`purpose ${input.purpose} needs the owner's retentionDays`);
     }
     const now = this.options.now();
+    const anchor = StoredObjectUploadService.retentionAnchorOf({
+      now,
+      retainFromMs: input.retainFromMs,
+    });
 
     return [
       {
@@ -206,11 +210,25 @@ export class StoredObjectUploadService {
         ownerKind: input.ownerKind,
         ownerId: input.ownerId,
         // Indefinite retention holds with no end; `now + 0` would end it at once.
-        retainUntil: days === INDEFINITE_RETENTION_DAYS ? null : now.add({ hours: days * 24 }),
-        createdAt: now,
+        retainUntil: days === INDEFINITE_RETENTION_DAYS ? null : anchor.add({ hours: days * 24 }),
+        createdAt: anchor,
         updatedAt: now,
       },
     ];
+  }
+
+  /** The caller's retention start, so a late span's media ends with its trace; never past now. */
+  private static retentionAnchorOf({
+    now,
+    retainFromMs,
+  }: {
+    now: Instant;
+    retainFromMs: number | undefined;
+  }): Instant {
+    if (retainFromMs === undefined || !Number.isFinite(retainFromMs)) return now;
+    if (retainFromMs >= now.epochMilliseconds) return now;
+
+    return Temporal.Instant.fromEpochMilliseconds(Math.trunc(retainFromMs));
   }
 
   /**

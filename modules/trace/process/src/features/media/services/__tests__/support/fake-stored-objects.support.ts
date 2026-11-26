@@ -16,6 +16,7 @@ export type FakeOwnerLink = Readonly<{
   purpose: string;
   ownerKind: string;
   ownerId: string;
+  retainFromMs?: number;
 }>;
 
 /**
@@ -48,6 +49,7 @@ export function fakeStoredObjects(): {
         purpose: input.purpose,
         ownerKind: input.ownerKind,
         ownerId: input.ownerId,
+        ...(input.retainFromMs === undefined ? {} : { retainFromMs: input.retainFromMs }),
       });
 
       return {

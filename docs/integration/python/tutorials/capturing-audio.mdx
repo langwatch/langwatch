@@ -134,9 +134,9 @@ When a message holds both a recording and text, LangWatch treats the text as the
 
 LangWatch moves the recording out of the span at ingestion. The bytes go into object storage and the message part becomes a `/api/v1/files/<projectId>/<id>` reference, around 60 characters where the base64 was.
 
-The stored bytes follow your project's trace retention: when a trace ages out, the media stored from it is deleted with it.
+The stored bytes follow your project's trace retention: once a trace ages out, an hourly cleanup deletes the media stored from it, unless a trace that is still kept uses the same bytes.
 
-A recording sent inline has to fit in one OTLP request, which LangWatch caps at 64 MiB, about an hour of compressed call audio. Inside that limit the whole recording is kept, even past the 8 MB cap on a single attribute. On self-hosted, `OTLP_TRACES_MAX_BODY_BYTES` changes the limit.
+A recording sent inline has to fit in one OTLP request, which LangWatch caps at 64 MiB, about an hour of compressed call audio. With media extraction on, the default, the whole recording is kept inside that limit, even past the 8 MiB cap on a single attribute. If extraction is off (`RELEASE_TRACE_MEDIA_EXTRACTION=0`, or a Helm install with no object storage) or the store refuses the write, the recording stays inline and is cut at that cap. On self-hosted, `OTLP_TRACES_MAX_BODY_BYTES` changes the limit.
 
 Raw, header-less audio does not play in a browser on its own. LangWatch wraps `pcm16` and G.711 payloads into a WAV container when it stores them, so the reference plays everywhere without a conversion step of your own.
 

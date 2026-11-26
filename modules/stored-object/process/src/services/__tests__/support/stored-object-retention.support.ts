@@ -49,7 +49,16 @@ export function retentionFixture(input: { sweepPageSize?: number; sweepBudgetMs?
     if (cleanup.refuses) throw new Error("the provider refused the delete");
     await deleteBytes(target);
   };
-  const sweepPages = { msEach: 0, refuseTenant: undefined as StoredObjectProjectId | undefined };
+  const sweepPages = {
+    msEach: 0,
+    refuseTenant: undefined as StoredObjectProjectId | undefined,
+    refuseObject: undefined as StoredObjectId | undefined,
+  };
+  const markDeletedIfUnheld = records.markDeletedIfUnheld.bind(records);
+  records.markDeletedIfUnheld = async (query) => {
+    if (query.id === sweepPages.refuseObject) throw new Error("the row update failed");
+    return markDeletedIfUnheld(query);
+  };
   const ownerLinks: StoredObjectOwnerLinkRepository = {
     raise: async (link) => {
       const before = race.beforeRaise;

@@ -91,7 +91,11 @@ async function ingest({ data }: { data: RecordSpanCommandData }): Promise<{
     "stored objects",
   );
   const staged = await TraceMediaExtractionService.create({
-    store: TraceMediaStoreService.create({ storedObjects, purpose: TRACE_CONTENT_MEDIA }),
+    store: TraceMediaStoreService.create({
+      storedObjects,
+      purpose: TRACE_CONTENT_MEDIA,
+      retention: { getRetentionDays: async () => 30 },
+    }),
     telemetry: { failOpen: () => {} },
     logger: createTestLogger().logger,
   }).extractFromSpan({

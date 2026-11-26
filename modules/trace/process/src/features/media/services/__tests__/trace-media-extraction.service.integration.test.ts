@@ -385,6 +385,29 @@ describe("TraceMediaExtractionService.extractFromSpan", () => {
     });
   });
 
+  describe("given a span that started 20 days before it is ingested", () => {
+    /** @scenario "A late span's media is retained from the span's start" */
+    it("stores the bytes with the span's start time as the retention start", async () => {
+      const store = fakeStore();
+      const startedAtMs = Date.now() - 20 * 86_400_000;
+      const span = {
+        ...imageSpan(),
+        startTimeUnixNano: String(BigInt(startedAtMs) * 1_000_000n),
+        endTimeUnixNano: String(BigInt(startedAtMs + 1_000) * 1_000_000n),
+      };
+
+      await maybeExtractSpanMedia({
+        data: baseCommand(span),
+        deps: baseDeps({ store: store.service }),
+        logger: silentLogger(),
+      });
+
+      expect(store.owners).toEqual([
+        expect.objectContaining({ ownerId: "trace-1", retainFromMs: startedAtMs }),
+      ]);
+    });
+  });
+
   describe("given the same bytes in two attributes of one span", () => {
     /** @scenario "The same bytes in two attributes of one span are stored once" */
     it("references the same stored object id from both attributes with one write", async () => {

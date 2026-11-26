@@ -46,8 +46,12 @@ ownerKind, ownerId, retainUntil, createdAt, updatedAt)`, records who holds
    when the link exists, moving its `createdAt` to the latest store with it. A
    reuse adds a link; it never shortens another's.
 3. **The purpose declares its retention category.** `trace_content` follows
-   `traces`. `retainUntil` is now plus the project's resolved days for that
-   category. The caller names those days on the store (`retentionDays`): trace
+   `traces`. `retainUntil` is the link's start plus the project's resolved
+   days for that category. The start is now, or the caller's `retainFromMs`
+   when earlier: trace passes the span's start time, since its rows expire
+   from there, so a late or backfilled span's media ends with them. The link's
+   `createdAt` is that start, which a re-time counts from. The caller names
+   those days on the store (`retentionDays`): trace
    asks data-retention, so Stored Objects holds no peer that could close a
    cycle through data-retention's own peers. Purposes with no category write no
    links and are never swept, so every object stored before this change, and
