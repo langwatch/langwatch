@@ -5,6 +5,7 @@ import { Readable } from "node:stream";
 import { pathToFileURL } from "node:url";
 
 import { credentialSource } from "./credentials.mjs";
+import { gateStore } from "./gate.mjs";
 import { getObject, putObject } from "./s3.mjs";
 import { writePrefixFor } from "./scope.mjs";
 
@@ -15,6 +16,7 @@ const HASH = /^\/v1\/cache\/([A-Za-z0-9]+)$/;
 
 // The first namespace that holds the hash, in the scope's read order.
 const findEntry = async ({ scope, store, hash, log }) => {
+  await store.prepare?.(scope.read.map((read) => `${read.prefix}${hash}`)).catch(() => {});
   for (const read of scope.read) {
     const key = `${read.prefix}${hash}`;
     const hit = await store.get(key).catch((error) => {
@@ -149,11 +151,20 @@ const main = () => {
   const config = JSON.parse(process.env.LANGWATCH_NX_REMOTE_CACHE_CONFIG ?? "{}");
   delete process.env.LANGWATCH_NX_REMOTE_CACHE_CONFIG;
   const log = fileLogger(config.logFile);
-  const credentials = credentialSource({ profile: config.profile, env: process.env, log });
+  // A laptop goes through the cache gate with its GitHub token; CI signs with its role.
+  const githubToken = process.env.LANGWATCH_NX_REMOTE_CACHE_GITHUB_TOKEN;
+  delete process.env.LANGWATCH_NX_REMOTE_CACHE_GITHUB_TOKEN;
+  const store = config.gate
+    ? gateStore({ url: config.gate, token: githubToken, log })
+    : s3Store({
+        bucket: config.bucket,
+        region: config.region,
+        credentials: credentialSource({ env: process.env }),
+      });
   const server = createCacheServer({
     scope: config.scope,
     token: config.token,
-    store: s3Store({ bucket: config.bucket, region: config.region, credentials }),
+    store,
     maxUploadBytes: config.maxUploadBytes,
     log,
   });

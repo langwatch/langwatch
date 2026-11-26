@@ -16,21 +16,23 @@ Task results go to the private bucket `langwatch-dev-nx-remote-cache` in the lw-
 
 Nx talks to a small local server (`dev/nx/remote-cache/`) that speaks the HTTP protocol and reads and writes S3 with SigV4, so the workspace root needs no AWS SDK. The bucket has three namespaces:
 
-| Namespace        | Written by                                                                        | Read by                                      |
-| ---------------- | --------------------------------------------------------------------------------- | -------------------------------------------- |
-| `main/`          | CI on a push to main (role `langwatch-nx-cache-ci-main`)                          | everyone                                     |
-| `pr/`            | CI on a same-repository pull request (role `langwatch-nx-cache-ci-pr`)            | everyone                                     |
-| `branch/<name>/` | a laptop on that branch (AWS SSO), or a pull request job that used a laptop entry | laptops, and that branch's pull request jobs |
+| Namespace        | Written by                                                                                       | Read by                                               |
+| ---------------- | ------------------------------------------------------------------------------------------------ | ----------------------------------------------------- |
+| `main/`          | CI on a push to main (role `langwatch-nx-cache-ci-main`)                                         | everyone                                              |
+| `pr/`            | CI on a same-repository pull request (role `langwatch-nx-cache-ci-pr`)                           | everyone                                              |
+| `branch/<name>/` | a laptop on that branch (through the cache gate), or a pull request job that used a laptop entry | members' laptops, and that branch's pull request jobs |
 
 Main never reads `branch/`. A pull request job reads `pr/`, then `main/`, then its own `branch/`. Once a job uses a laptop entry it writes a marker in its branch namespace, and from then on every job of that branch writes `branch/` instead of `pr/`. A later job can restore GitHub Actions caches holding laptop output that never passed through the server, so the taint has to outlive the job. A result built from laptop output never reaches `pr/` and from there main. The bucket policy enforces who may write each namespace and that the main role cannot read `branch/`. An entry is written once (`If-None-Match: *`) and never replaced.
 
-A laptop turns it on by having the `lw-dev-sso` AWS profile (`aws sso login --profile lw-dev-sso`); `LANGWATCH_NX_REMOTE_CACHE=0` turns it off and `LANGWATCH_NX_REMOTE_CACHE_PROFILE` names another profile. A laptop on main only reads. With no access, or when S3 fails, Nx runs on its local cache: the server answers a miss on read and success on write, because Nx fails the run when its cache server errors.
+Laptops hold no AWS credentials. They reach S3 through the cache gate, a Lambda function URL in the same langwatch-saas root. The local server sends the developer's GitHub token (`gh auth token`) and the keys it wants; the gate checks that the token's user is a member of the `langwatch` GitHub org, keeps that answer for five minutes, rate-limits each token, and answers with presigned S3 URLs that live five minutes. A member reads `main/`, `pr/` and `branch/` and writes `branch/<name>/` only, each write URL bound to its length and to `If-None-Match: *`. Anyone else with a GitHub account reads `main/` only and writes nothing. The gate's role cannot write `main/` or `pr/`, and the bucket policy denies it there too.
+
+`pnpm dev` and `haven up` run a one-time setup (`dev/nx/remote-cache/setup.mjs`): a machine signed in to `gh` hears nothing; a person at a terminal with no login is asked once to run `gh auth login --web`, and the outcome is remembered in `~/.config/langwatch/nx-remote-cache.json`; with no terminal or no `gh` it prints one line saying the cache is off. It never stops dev. `LANGWATCH_NX_REMOTE_CACHE=0` turns the cache off and `LANGWATCH_NX_REMOTE_CACHE_GATE` names another gate. A laptop on main only reads. With no login, a refused token, or a gate or S3 that fails, Nx runs on its local cache: the server answers a miss on read and success on write, because Nx fails the run when its cache server errors.
 
 ## Rationale / Trade-offs
 
 A pull request's CI runs code that is not reviewed yet, and main trusts `pr/`. That is the same trust as merging: a person with write access to the repository. Forks get no OIDC token and cannot write. Laptops are a weaker boundary (local malware, an unpinned install script), so their entries stay out of main's reach entirely.
 
-IAM cannot tie a laptop to its own branch, so any engineer can write any `branch/` namespace. That reaches only laptops and pull request jobs, never main.
+The gate cannot tie a laptop to its own branch, so any org member can write any `branch/` namespace. That reaches only laptops and pull request jobs, never main. A GitHub token is the credential instead of an AWS session: a laptop needs no AWS account, and leaving the org ends access within five minutes. Non-members reading `main/` is deliberate: it holds what CI on main built from public source, and it makes a contributor's first build faster. The function URL takes no AWS auth, so the gate is reachable from the internet; it signs nothing for a token GitHub refuses, and its concurrency is capped.
 
 Release images build in Docker from source and do not use this cache. The merge queue gets no role either: its OIDC subject names each queue branch, and the langwatch-saas infra tests refuse a role that trusts a wildcard subject.
 
@@ -38,7 +40,7 @@ Traffic from S3 to GitHub-hosted runners is internet egress. Test results are a 
 
 ## Consequences
 
-The GitHub Actions caches stay; the remote cache only adds hits. Jobs that use it need `id-token: write` and the `nx-remote-cache` action before their first nx call. Adding a namespace or a writer means changing both `scope.mjs` and the bucket policy in langwatch-saas.
+The GitHub Actions caches stay; the remote cache only adds hits. Jobs that use it need `id-token: write` and the `nx-remote-cache` action before their first nx call. Adding a namespace or a writer means changing `scope.mjs`, the bucket policy and the gate's rules in langwatch-saas. The gate's URL is `GATE_URL` in `dev/nx/remote-cache/gate.mjs`, from the root's `gate_url` output.
 
 ## References
 

@@ -7,8 +7,9 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { cacheScope } from "./scope.mjs";
 
 // Starts (or reuses) the local cache server for a worktree and returns the two variables
-// that point Nx at it. The plugin calls it for a laptop; CI runs it as a script from the
-// nx-remote-cache action, so the role's credentials stay in the server's environment only.
+// that point Nx at it. The plugin calls it for a laptop, which goes through the cache gate
+// with its GitHub token; CI runs it as a script from the nx-remote-cache action, so the
+// role's credentials stay in the server's environment only.
 export const BUCKET = "langwatch-dev-nx-remote-cache";
 export const REGION = "eu-central-1";
 const SERVER = fileURLToPath(new URL("./server.mjs", import.meta.url));
@@ -38,10 +39,21 @@ const stop = (pid) => {
   }
 };
 
-export const ensureServer = async ({ workspaceRoot, scope, profile, env, serverEnv = env }) => {
+export const ensureServer = async ({
+  workspaceRoot,
+  scope,
+  gate = null,
+  githubToken = null,
+  env,
+  serverEnv = env,
+}) => {
   const dir = join(workspaceRoot, ".nx", "remote-cache");
   const bucket = env.LANGWATCH_NX_REMOTE_CACHE_BUCKET || BUCKET;
-  const key = createHash("sha256").update(JSON.stringify({ scope, bucket, profile })).digest("hex");
+  // The token itself stays out of the key and off disk: a new token means a new server.
+  const tokenHash = githubToken ? createHash("sha256").update(githubToken).digest("hex") : null;
+  const key = createHash("sha256")
+    .update(JSON.stringify({ scope, bucket, gate, tokenHash }))
+    .digest("hex");
   // One server per configuration: a run on another branch starts its own and never stops
   // a server an earlier run still uses. Idle servers exit on their own.
   const stateFile = join(dir, `server-${key.slice(0, 16)}.json`);
@@ -53,7 +65,7 @@ export const ensureServer = async ({ workspaceRoot, scope, profile, env, serverE
     key,
     bucket,
     region: env.LANGWATCH_NX_REMOTE_CACHE_REGION || REGION,
-    profile,
+    gate,
     token: randomBytes(24).toString("hex"),
     maxUploadBytes: Number(env.LANGWATCH_NX_REMOTE_CACHE_MAX_MB || 200) * 1024 * 1024,
     idleExitMs: 60 * 60_000,
@@ -63,7 +75,11 @@ export const ensureServer = async ({ workspaceRoot, scope, profile, env, serverE
   const child = spawn(process.execPath, [SERVER], {
     detached: true,
     stdio: "ignore",
-    env: { ...serverEnv, LANGWATCH_NX_REMOTE_CACHE_CONFIG: JSON.stringify(config) },
+    env: {
+      ...serverEnv,
+      LANGWATCH_NX_REMOTE_CACHE_CONFIG: JSON.stringify(config),
+      ...(githubToken ? { LANGWATCH_NX_REMOTE_CACHE_GITHUB_TOKEN: githubToken } : {}),
+    },
   });
   child.unref();
   for (let i = 0; i < 30; i++) {
@@ -95,7 +111,6 @@ const ci = async () => {
   const state = await ensureServer({
     workspaceRoot: process.cwd(),
     scope,
-    profile: null,
     env,
     serverEnv,
   });

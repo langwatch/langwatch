@@ -2,14 +2,16 @@
 // bound to specs/ci/nx-remote-cache.feature.
 
 import assert from "node:assert/strict";
-import { request } from "node:http";
+import { createServer, request } from "node:http";
 import { describe, it } from "node:test";
 
-import { profileFor } from "../remote-cache-plugin.mjs";
+import { laptopAccess } from "../remote-cache-plugin.mjs";
 import { credentialSource } from "../remote-cache/credentials.mjs";
+import { gateStore } from "../remote-cache/gate.mjs";
 import { signedHeaders } from "../remote-cache/s3.mjs";
 import { cacheScope } from "../remote-cache/scope.mjs";
 import { createCacheServer } from "../remote-cache/server.mjs";
+import { afterLogin, setupStep } from "../remote-cache/setup.mjs";
 
 const prefixes = (scope) => scope.read.map((r) => r.prefix);
 const ci = (extra) => ({ GITHUB_ACTIONS: "true", ...extra });
@@ -67,6 +69,55 @@ const withServer = async ({ scope, store, maxUploadBytes = 1024 }, run) => {
   const port = await listen(server);
   try {
     await run(port);
+  } finally {
+    server.close();
+  }
+};
+
+// The cache gate and S3 in one local server. "member" and "outsider" are tokens GitHub
+// accepts; any other token is refused. The gate's rules are the ones in langwatch-saas
+// infrastructure/live/dev-nx-cache/gate/index.mjs.
+const withGate = async (run) => {
+  const objects = new Map();
+  const asked = [];
+  const readBody = async (req) => {
+    const chunks = [];
+    for await (const chunk of req) chunks.push(chunk);
+    return Buffer.concat(chunks);
+  };
+  let base;
+  const server = createServer(async (req, res) => {
+    const body = await readBody(req);
+    if (req.url === "/gate") {
+      const token = (req.headers.authorization ?? "").replace("Bearer ", "");
+      const ask = JSON.parse(body.toString());
+      asked.push({ get: ask.get ?? [], put: ask.put ?? [] });
+      if (token !== "member" && token !== "outsider") return res.writeHead(401).end("{}");
+      const member = token === "member";
+      const get = {};
+      for (const key of ask.get ?? []) {
+        if (member || key.startsWith("main/")) get[key] = `${base}/s3/${key}`;
+      }
+      const put = {};
+      for (const { key } of ask.put ?? []) {
+        if (member && key.startsWith("branch/")) put[key] = `${base}/s3/${key}`;
+      }
+      return res.writeHead(200).end(JSON.stringify({ member, expiresIn: 300, get, put }));
+    }
+    const key = req.url.replace(/^\/s3\//, "");
+    if (req.method === "GET") {
+      const value = objects.get(key);
+      return value ? res.writeHead(200).end(value) : res.writeHead(403).end();
+    }
+    if (req.headers["if-none-match"] !== "*") return res.writeHead(403).end();
+    if (objects.has(key)) return res.writeHead(412).end();
+    objects.set(key, body);
+    return res.writeHead(200).end();
+  });
+  const port = await listen(server);
+  base = `http://127.0.0.1:${port}`;
+  try {
+    await run({ url: `${base}/gate`, objects, asked });
   } finally {
     server.close();
   }
@@ -180,21 +231,25 @@ describe("Nx remote cache", () => {
     assert.equal(cacheScope({ env: ci({ GITHUB_EVENT_NAME: "merge_group" }) }), null);
   });
 
-  /** @scenario "No AWS access leaves Nx on its local cache" */
-  it("needs the AWS profile and CLI on a laptop, and leaves CI to its action", () => {
-    const yes = () => true;
-    const no = () => false;
-    assert.equal(profileFor({ env: {}, profileExists: no, awsCli: yes }), null);
-    assert.equal(profileFor({ env: {}, profileExists: yes, awsCli: no }), null);
-    assert.equal(profileFor({ env: {}, profileExists: yes, awsCli: yes }), "lw-dev-sso");
+  /** @scenario "No GitHub login leaves Nx on its local cache" */
+  it("needs a gate and a GitHub token on a laptop, and leaves CI to its action", () => {
+    const token = () => "gho_x";
+    const none = () => null;
+    const gate = { LANGWATCH_NX_REMOTE_CACHE_GATE: "https://gate.example" };
+    assert.equal(laptopAccess({ env: gate, githubToken: none }), null);
     assert.equal(
-      profileFor({ env: { LANGWATCH_NX_REMOTE_CACHE: "0" }, profileExists: yes, awsCli: yes }),
+      laptopAccess({ env: { LANGWATCH_NX_REMOTE_CACHE_GATE: "" }, githubToken: token }),
       null,
     );
+    assert.deepEqual(laptopAccess({ env: gate, githubToken: token }), {
+      gate: "https://gate.example",
+      githubToken: "gho_x",
+    });
     assert.equal(
-      profileFor({ env: ci({ AWS_ACCESS_KEY_ID: "a" }), profileExists: yes, awsCli: yes }),
+      laptopAccess({ env: { ...gate, LANGWATCH_NX_REMOTE_CACHE: "0" }, githubToken: token }),
       null,
     );
+    assert.equal(laptopAccess({ env: ci(gate), githubToken: token }), null);
   });
 
   /** @scenario "An S3 failure is a miss, never a failed run" */
@@ -215,18 +270,16 @@ describe("Nx remote cache", () => {
         200,
       );
     });
-    let loads = 0;
-    const credentials = credentialSource({
-      profile: "lw-dev-sso",
-      env: {},
-      load: async () => {
-        loads++;
-        throw new Error("SSO session expired");
+    assert.equal(await credentialSource({ env: {} })(), null);
+    const expiring = credentialSource({
+      env: {
+        AWS_ACCESS_KEY_ID: "a",
+        AWS_SECRET_ACCESS_KEY: "s",
+        AWS_CREDENTIAL_EXPIRATION: new Date(60_000).toISOString(),
       },
+      now: () => 0,
     });
-    assert.equal(await credentials(), null);
-    assert.equal(await credentials(), null);
-    assert.equal(loads, 1);
+    assert.equal(await expiring(), null);
   });
 
   /** @scenario "An entry is never replaced" */
@@ -283,5 +336,119 @@ describe("Nx remote cache", () => {
       headers.authorization,
       /Signature=f0e8bdb87c964420e857bd35b5d6ed310bd44f0170aba48dd91039c6036bdb41$/,
     );
+  });
+
+  /** @scenario "A member's laptop reads every namespace and writes its branch through the gate" */
+  it("reads and writes S3 through URLs the gate signed for a member", async () => {
+    await withGate(async (gate) => {
+      gate.objects.set("pr/7", Buffer.from("from a pull request"));
+      const store = gateStore({ url: gate.url, token: "member" });
+      const scope = cacheScope({ env: {}, localBranch: "feat/x" });
+      await withServer({ scope, store }, async (port) => {
+        const hit = await call({ port, method: "GET", path: "/v1/cache/7" });
+        assert.deepEqual([hit.status, hit.body], [200, "from a pull request"]);
+        await call({ port, method: "PUT", path: "/v1/cache/8", body: Buffer.from("mine") });
+        await call({ port, method: "PUT", path: "/v1/cache/8", body: Buffer.from("again") });
+      });
+      assert.equal(gate.objects.get("branch/feat_x/8").toString(), "mine");
+      // One gate call signs every namespace a lookup tries.
+      assert.deepEqual(gate.asked[0], { get: ["branch/feat_x/7", "main/7", "pr/7"], put: [] });
+    });
+  });
+
+  /** @scenario "A laptop outside the GitHub org reads main only" */
+  it("reads only main/ and writes nothing for someone outside the org", async () => {
+    await withGate(async (gate) => {
+      gate.objects.set("main/1", Buffer.from("from main"));
+      gate.objects.set("pr/2", Buffer.from("from a pull request"));
+      const store = gateStore({ url: gate.url, token: "outsider" });
+      const scope = cacheScope({ env: {}, localBranch: "feat/x" });
+      await withServer({ scope, store }, async (port) => {
+        assert.equal((await call({ port, method: "GET", path: "/v1/cache/1" })).body, "from main");
+        assert.equal((await call({ port, method: "GET", path: "/v1/cache/2" })).status, 404);
+        const put = await call({
+          port,
+          method: "PUT",
+          path: "/v1/cache/3",
+          body: Buffer.from("x"),
+        });
+        assert.equal(put.status, 200);
+      });
+      assert.equal(gate.objects.has("branch/feat_x/3"), false);
+    });
+  });
+
+  /** @scenario "A token the gate refuses turns the cache off" */
+  it("misses and stops asking the gate after it refuses the token", async () => {
+    await withGate(async (gate) => {
+      gate.objects.set("main/1", Buffer.from("from main"));
+      const lines = [];
+      const store = gateStore({ url: gate.url, token: "expired", log: (l) => lines.push(l) });
+      const scope = cacheScope({ env: {}, localBranch: "feat/x" });
+      await withServer({ scope, store }, async (port) => {
+        assert.equal((await call({ port, method: "GET", path: "/v1/cache/1" })).status, 404);
+        assert.equal((await call({ port, method: "GET", path: "/v1/cache/1" })).status, 404);
+      });
+      assert.equal(gate.asked.length, 1);
+      assert.match(lines.join("\n"), /gh auth login/);
+    });
+  });
+
+  /** @scenario "A gate that is down is a miss, never a failed run" */
+  it("answers a miss and a stored write when the gate is down", async () => {
+    const server = createServer((_req, res) => res.writeHead(503).end());
+    const port = await listen(server);
+    const store = gateStore({ url: `http://127.0.0.1:${port}/gate`, token: "member" });
+    server.close();
+    const scope = cacheScope({ env: {}, localBranch: "feat/x" });
+    await withServer({ scope, store }, async (cachePort) => {
+      assert.equal(
+        (await call({ port: cachePort, method: "GET", path: "/v1/cache/1" })).status,
+        404,
+      );
+      const put = await call({
+        port: cachePort,
+        method: "PUT",
+        path: "/v1/cache/1",
+        body: Buffer.from("x"),
+      });
+      assert.equal(put.status, 200);
+    });
+  });
+
+  /** @scenario "Dev asks for a GitHub login once and never blocks" */
+  it("asks a person once, tells everyone else in one line, and remembers", () => {
+    const base = { env: {}, gate: "https://gate.example", ghInstalled: true, remembered: null };
+    assert.deepEqual(setupStep({ ...base, loggedIn: true, interactive: true }), {
+      action: "none",
+      remember: "on",
+    });
+    assert.deepEqual(setupStep({ ...base, loggedIn: false, interactive: true }), {
+      action: "login",
+    });
+    assert.equal(setupStep({ ...base, loggedIn: false, interactive: false }).action, "say");
+    assert.equal(setupStep({ ...base, loggedIn: false, interactive: false }).remember, undefined);
+    assert.equal(
+      setupStep({ ...base, loggedIn: false, interactive: true, remembered: "declined" }).action,
+      "none",
+    );
+    assert.deepEqual(
+      setupStep({ ...base, ghInstalled: false, loggedIn: false, interactive: true }),
+      {
+        action: "say",
+        line: setupStep({ ...base, ghInstalled: false, loggedIn: false, interactive: true }).line,
+        remember: "no-gh",
+      },
+    );
+    assert.equal(
+      setupStep({ ...base, gate: "", loggedIn: false, interactive: true }).action,
+      "none",
+    );
+    assert.equal(
+      setupStep({ ...base, env: { CI: "1" }, loggedIn: false, interactive: true }).action,
+      "none",
+    );
+    assert.deepEqual(afterLogin({ loggedIn: true }), { action: "none", remember: "on" });
+    assert.equal(afterLogin({ loggedIn: false }).remember, "declined");
   });
 });
