@@ -25,6 +25,10 @@ import {
 import { useMemo, useState } from "react";
 
 import { dataPrivacyApi } from "../../behavior/data-privacy-api.ts";
+import {
+  type AcceptPiiRedactionModel,
+  usePiiRedactionModelAcceptance,
+} from "../../behavior/use-pii-redaction-model-acceptance.ts";
 import { usePiiRedactionModelOffer } from "../../behavior/use-pii-redaction-model-offer.ts";
 import { apiKeySaveConfirmation, combineSaveConfirmations } from "../../model/audience-api-keys.ts";
 import {
@@ -40,6 +44,9 @@ import {
   ruleMatchesScopeFilter,
 } from "../../model/data-privacy-rule-filter.ts";
 import {
+  awaitsAcceptance,
+  type ModelAcceptance,
+  modelAcceptanceOf,
   type PiiRedactionModelOffer,
   ruleSaveConfirmation,
 } from "../../model/pii-redaction-level-offer.ts";
@@ -100,6 +107,17 @@ function DataPrivacyPage({ host, projectId }: { host: DataPrivacyHostApi; projec
   };
 
   const invalidate = () => utils.dataPrivacy.getSnapshot.invalidate({ projectId });
+  const acceptance = usePiiRedactionModelAcceptance({
+    snapshot: snapshotQuery.data,
+    host,
+    onAccepted: () => void invalidate(),
+  });
+  // Accepting is an organization admin's act, the same permission the organization rule needs.
+  const modelAcceptance = modelAcceptanceOf({
+    offer: piiRedactionModelOffer,
+    accepted: acceptance.accepted,
+    canAccept: Boolean(available?.organization),
+  });
 
   const removeForScope = dataPrivacyApi.dataPrivacy.removeForScope.useMutation();
   const [ruleToRemove, setRuleToRemove] = useState<DataPrivacyRule | null>(null);
@@ -166,6 +184,8 @@ function DataPrivacyPage({ host, projectId }: { host: DataPrivacyHostApi; projec
             free={piiRedactionModelOffer.free}
             licensed={piiRedactionModelOffer.licensed}
             split={piiRedactionModelOffer.split}
+            acceptance={modelAcceptance}
+            onAccept={acceptance.accept}
             host={host}
             projectId={projectId}
             snapshot={snapshot}
@@ -197,6 +217,7 @@ function DataPrivacyPage({ host, projectId }: { host: DataPrivacyHostApi; projec
             scopeFilter={scopeFilter}
             currentTeamId={teamId ?? null}
             piiRedactionModelOffer={piiRedactionModelOffer}
+            strictAwaitsAcceptance={awaitsAcceptance(modelAcceptance)}
           />
         )}
 
@@ -210,6 +231,8 @@ function DataPrivacyPage({ host, projectId }: { host: DataPrivacyHostApi; projec
             onClose={closeRuleDrawer}
             onSaved={() => void invalidate()}
             piiRedactionModelOffer={piiRedactionModelOffer}
+            acceptance={modelAcceptance}
+            onAccept={acceptance.accept}
           />
         )}
       </VStack>
@@ -238,7 +261,10 @@ function DataPrivacyLoading() {
   );
 }
 
-/** The drawer over the page's snapshot, saving one rule per picked scope. */
+/**
+ * The drawer over the page's snapshot, saving one rule per picked scope. An admin confirming
+ * Strict's price accepts it first; a reader who cannot accept it is not asked.
+ */
 function PrivacyRuleDrawerMount({
   host,
   projectId,
@@ -248,6 +274,8 @@ function PrivacyRuleDrawerMount({
   onClose,
   onSaved,
   piiRedactionModelOffer,
+  acceptance,
+  onAccept,
 }: {
   host: DataPrivacyHostApi;
   projectId: string;
@@ -257,6 +285,8 @@ function PrivacyRuleDrawerMount({
   onClose: () => void;
   onSaved: () => void;
   piiRedactionModelOffer: PiiRedactionModelOffer;
+  acceptance: ModelAcceptance;
+  onAccept: AcceptPiiRedactionModel;
 }) {
   const { organizationId, teamId } = host.scope();
   const setForScope = dataPrivacyApi.dataPrivacy.setForScope.useMutation();
@@ -289,6 +319,7 @@ function PrivacyRuleDrawerMount({
   const asksBefore = (config: DataPrivacyConfig) => {
     const price = ruleSaveConfirmation({
       offer: piiRedactionModelOffer,
+      acceptance,
       before: editingRule?.config,
       after: config,
     });
@@ -305,6 +336,12 @@ function PrivacyRuleDrawerMount({
     if (asks) setPending({ scopes, config });
     else void save(scopes, config);
   };
+  const acceptThenSave = async (scopes: PrivacyScopeEntry[], config: DataPrivacyConfig) => {
+    const organization = available.organization;
+    const asksAcceptance = acceptance === "can-accept" && organization !== null;
+    if (asksAcceptance && !(await onAccept({ organizationId: organization.id }))) return;
+    await save(scopes, config);
+  };
 
   return (
     <>
@@ -312,7 +349,7 @@ function PrivacyRuleDrawerMount({
         open={confirmation !== null}
         onClose={() => setPending(null)}
         onConfirm={() => {
-          if (pending) void save(pending.scopes, pending.config);
+          if (pending) void acceptThenSave(pending.scopes, pending.config);
           setPending(null);
         }}
         title={confirmation?.title ?? ""}
@@ -331,6 +368,7 @@ function PrivacyRuleDrawerMount({
         projectId={projectId}
         isSaving={setForScope.isPending}
         piiRedactionModelOffer={piiRedactionModelOffer}
+        piiRedactionModelAwaitsAcceptance={awaitsAcceptance(acceptance)}
         scopePicker={({ value, onChange }) => (
           <ScopeChipPicker<ScopeChipPickerScopeType>
             value={value}

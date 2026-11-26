@@ -86,6 +86,13 @@ export type StrictRuleBasedNote = keyof typeof STRICT_RULE_BASED_NOTES;
 export const STRICT_BILLED_NOTE =
   "Strict is billed from the next trace. Projects or teams with their own Strict rule keep it when the organization moves to Essential.";
 
+export const STRICT_RULE_BASED_BADGE = "Currently on rule-based (Presidio), no charge";
+export const SWITCH_TO_MODEL_LABEL = "Switch to the PII Redaction Model";
+export const STRICT_ACCEPTANCE_NOTE =
+  "Switching to the model asks an organization admin to accept its price first.";
+export const STRICT_AWAITS_ADMIN_NOTE =
+  "Strict stays rule-based (Presidio), at no charge, until an organization admin accepts the model's price.";
+
 /**
  * What the page offers for Strict: the model (free on the free list, or with the licence
  * self-hosted), the rule-based detector with a note, or null for today's page.
@@ -127,6 +134,34 @@ export function piiRedactionModelOfferOf({
   return modelFlag
     ? { kind: "model", free: true, licensed: true, split: false }
     : { kind: "rule-based", note: "turn-on" };
+}
+
+/**
+ * Where the organization stands on the model's price. On Cloud at a price, Strict runs the model
+ * only once an organization admin accepted it (ADR-201 decision 15); until then it is
+ * rule-based, at no charge. The free list, a license and the rule-based offers need none.
+ */
+export type ModelAcceptance = "not-needed" | "accepted" | "can-accept" | "awaiting-admin";
+
+export function modelAcceptanceOf({
+  offer,
+  accepted,
+  canAccept,
+}: {
+  offer: PiiRedactionModelOffer;
+  /** The snapshot's word, or an acceptance given on this page. */
+  accepted: boolean;
+  /** The reader is an organization admin, the only one the acceptance is open to. */
+  canAccept: boolean;
+}): ModelAcceptance {
+  if (offer?.kind !== "model" || offer.free) return "not-needed";
+  if (accepted) return "accepted";
+  return canAccept ? "can-accept" : "awaiting-admin";
+}
+
+/** Strict is rule-based until an admin accepts the price. */
+export function awaitsAcceptance(acceptance: ModelAcceptance): boolean {
+  return acceptance === "can-accept" || acceptance === "awaiting-admin";
 }
 
 /** The second thought a level change asks for, or null when it needs none. */
@@ -173,17 +208,22 @@ export function organizationPiiLevel(level: PiiLevel | undefined): OrganizationP
   return level === "essential" || level === "strict" ? level : null;
 }
 
-/** A rule saved at Strict where Strict is the model at a price asks first, unless it was Strict. */
+/**
+ * A rule saved at Strict where Strict is the model at a price asks first, unless it was Strict.
+ * A reader who cannot accept the price is not asked: their Strict stays rule-based, unbilled.
+ */
 export function ruleSaveConfirmation({
   offer,
+  acceptance,
   before,
   after,
 }: {
   offer: PiiRedactionModelOffer;
+  acceptance: ModelAcceptance;
   before: DataPrivacyConfig | undefined;
   after: DataPrivacyConfig;
 }): LevelChangeConfirmation | null {
-  if (offer?.kind !== "model" || offer.free) return null;
+  if (offer?.kind !== "model" || offer.free || acceptance === "awaiting-admin") return null;
   if (after.pii?.level !== "strict" || before?.pii?.level === "strict") return null;
   return levelChangeConfirmation({ from: "essential", to: "strict", free: false });
 }

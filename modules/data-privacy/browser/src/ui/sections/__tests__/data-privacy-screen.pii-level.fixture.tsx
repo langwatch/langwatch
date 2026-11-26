@@ -42,6 +42,7 @@ export const api = {
   snapshot: undefined as DataPrivacySnapshot | undefined,
   invalidate: vi.fn(async () => undefined),
   setForScope: vi.fn(async (_input: unknown) => undefined),
+  acceptPiiRedactionModel: vi.fn(async (_input: unknown) => undefined),
 };
 
 /** The binding the screen calls, answering only what the screen uses. */
@@ -56,6 +57,12 @@ export function fakeDataPrivacyApi(): Api {
       }),
       removeForScope: createApiFixture<Procedures["removeForScope"]>({
         useMutation: (() => ({ mutateAsync: vi.fn(), isPending: false })) as never,
+      }),
+      acceptPiiRedactionModel: createApiFixture<Procedures["acceptPiiRedactionModel"]>({
+        useMutation: (() => ({
+          mutateAsync: api.acceptPiiRedactionModel,
+          isPending: false,
+        })) as never,
       }),
     },
     "dataPrivacyApi.dataPrivacy",
@@ -78,11 +85,14 @@ export function snapshotWith({
   entities = [],
   rules = [],
   canWriteOrganization = true,
+  accepted = true,
 }: {
   level?: PiiLevel;
   entities?: string[];
   rules?: DataPrivacyRule[];
   canWriteOrganization?: boolean;
+  /** An organization admin accepted the PII redaction model's price. */
+  accepted?: boolean;
 } = {}): DataPrivacySnapshot {
   return {
     projectId: "proj-1",
@@ -97,6 +107,7 @@ export function snapshotWith({
     effectiveTeam: resolved(level, entities),
     effectiveOrganization: resolved(level, entities),
     rules,
+    piiRedactionModelAccepted: accepted,
   };
 }
 

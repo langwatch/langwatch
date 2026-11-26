@@ -3,26 +3,18 @@
  * Spec: modules/data-privacy/specs/pii-redaction-billing.feature
  */
 import type { PiiRedactionSpendPricedEventData } from "@langwatch/data-privacy-contract/pii-redaction-spend";
-import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { createLogger } from "@langwatch/observability";
 import { nowInstant } from "@langwatch/time";
 
-import {
-  batchCharactersOf,
-  PII_REDACTION_MODEL_FREE_FLAG,
-} from "../rules/pii-redaction-model.rules.ts";
+import { batchCharactersOf } from "../rules/pii-redaction-model.rules.ts";
 import {
   piiRedactionPriceNanoUsd,
   piiRedactionSpendFact,
 } from "../rules/pii-redaction-spend.rules.ts";
-import { ProjectLookupCacheService } from "./project-lookup-cache.service.ts";
 
 const logger = createLogger("langwatch:data-privacy:pii-redaction-spend");
 
 type SpendLogger = { error(fields: Record<string, unknown>, message: string): void };
-
-/** An organization's free-list entry is read once per minute, as its routing is. */
-const FREE_LIST_TTL_MS = 60_000;
 
 /** One call the model answered, as the model service saw it. */
 type PiiRedactionAnsweredCall = Readonly<{
@@ -33,30 +25,28 @@ type PiiRedactionAnsweredCall = Readonly<{
   recordKey?: string | undefined;
   /** Each model call's duration (ADR-201 decision 6, ADR-207): our cost sums them. */
   callDurationsMs: readonly number[];
+  /**
+   * Whether its routing priced it: false for the free list and self-hosted. Decided when the
+   * batch was routed, so no flag read after the call answered can change its price.
+   */
+  priced: boolean;
 }>;
 
-/** Whether the organization pays nothing, or that the free list could not say. */
-type FreeListRead = { kind: "read"; free: boolean } | { kind: "unread" };
-
 type PiiRedactionSpendDeps = Readonly<{
-  /** A self-hosted install runs the model itself: its calls are recorded at zero, unread. */
-  selfHosted: boolean;
   /**
    * Keys the request id, so it is no hash of the text anyone can recompute. Absent only where
    * no model is named, which never answers a call; a call reaching here without it is not billed.
    */
   requestIdKey: Uint8Array | undefined;
-  featureFlags: FeatureFlagApi;
   recordSpendPriced: (fact: PiiRedactionSpendPricedEventData) => Promise<void>;
   log: SpendLogger;
   now: () => number;
 }>;
 
+/** Records a call at the price its routing decided; it reads no flag of its own (ADR-201). */
 export class PiiRedactionSpendService {
   static create(input: {
-    selfHosted: boolean;
     requestIdKey: Uint8Array | undefined;
-    featureFlags: FeatureFlagApi;
     recordSpendPriced: (fact: PiiRedactionSpendPricedEventData) => Promise<void>;
     log?: SpendLogger;
     now?: () => number;
@@ -68,15 +58,7 @@ export class PiiRedactionSpendService {
     });
   }
 
-  /** Keyed by organization; the cache's keys are opaque. */
-  readonly #free: ProjectLookupCacheService<boolean>;
-
-  private constructor(private readonly deps: PiiRedactionSpendDeps) {
-    this.#free = ProjectLookupCacheService.create<boolean>({
-      ttlMs: FREE_LIST_TTL_MS,
-      now: deps.now,
-    });
-  }
+  private constructor(private readonly deps: PiiRedactionSpendDeps) {}
 
   /** Never throws: a call that cannot be billed is logged with its amounts, not failed. */
   async record(call: PiiRedactionAnsweredCall): Promise<void> {
@@ -88,22 +70,21 @@ export class PiiRedactionSpendService {
           projectId: call.projectId,
           priceNanoUsd: piiRedactionPriceNanoUsd({
             characters: batchCharactersOf(call.texts),
-            free: false,
+            free: !call.priced,
           }),
         },
         "PII redaction model call not billed: no key pepper to derive its request id from",
       );
       return;
     }
-    const freeList = this.deps.selfHosted
-      ? ({ kind: "read", free: true } as const)
-      : await this.#readFreeList(call);
-    if (freeList.kind === "unread") return;
-    const free = freeList.free;
     const fact = piiRedactionSpendFact({
-      ...call,
+      organizationId: call.organizationId,
+      projectId: call.projectId,
+      texts: call.texts,
+      recordKey: call.recordKey,
+      callDurationsMs: call.callDurationsMs,
       key,
-      free,
+      free: !call.priced,
       occurredAt: this.deps.now(),
     });
 
@@ -120,34 +101,6 @@ export class PiiRedactionSpendService {
         },
         "PII redaction model call not billed: its priced fact could not be recorded",
       );
-    }
-  }
-
-  /**
-   * A free list that cannot be read records nothing: a fact fixes its price for good, so a
-   * guessed zero would stay and a guessed full price could charge a free org (ADR-201).
-   */
-  async #readFreeList(call: PiiRedactionAnsweredCall): Promise<FreeListRead> {
-    try {
-      const free = await this.#free.get(call.organizationId, () =>
-        this.deps.featureFlags.isEnabled(PII_REDACTION_MODEL_FREE_FLAG, {
-          kind: "organization",
-          organizationId: call.organizationId,
-        }),
-      );
-      return { kind: "read", free };
-    } catch (error) {
-      const characters = batchCharactersOf(call.texts);
-      this.deps.log.error(
-        {
-          organizationId: call.organizationId,
-          projectId: call.projectId,
-          priceNanoUsd: piiRedactionPriceNanoUsd({ characters, free: false }),
-          errorName: error instanceof Error ? error.name : typeof error,
-        },
-        "PII redaction model call not billed: its organization's free list could not be read",
-      );
-      return { kind: "unread" };
     }
   }
 }

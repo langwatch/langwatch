@@ -109,6 +109,14 @@ export interface DataPrivacyApi {
     input: DataPrivacyScopeTarget & { config: DataPrivacyConfig } & DataPrivacyCallerInput,
   ): Promise<DataPrivacyPolicy>;
   removeScopeRule(input: DataPrivacyScopeTarget & DataPrivacyCallerInput): Promise<void>;
+  /**
+   * Records an organization admin's acceptance of the PII Redaction Model's price, which a
+   * priced Cloud organization needs before Strict runs on the model (ADR-201 decision 15). The
+   * door authorizes the organization; a second acceptance keeps the first.
+   */
+  acceptPiiRedactionModel(
+    input: { organizationId: string } & DataPrivacyCallerInput,
+  ): Promise<void>;
 
   /**
    * True when this project's resolved policy drops any span content at

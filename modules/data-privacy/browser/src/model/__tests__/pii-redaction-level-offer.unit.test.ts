@@ -13,6 +13,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   levelChangeConfirmation,
+  modelAcceptanceOf,
   organizationPiiLevel,
   organizationRule,
   PII_REDACTION_MODEL_PRICE,
@@ -324,6 +325,18 @@ describe("given a rule saved from the drawer", () => {
       expect(
         ruleSaveConfirmation({
           offer: model,
+          acceptance: "accepted",
+          before: { pii: { level: "essential" } },
+          after: { pii: { level: "strict" } },
+        })?.confirmLabel,
+      ).toBe("Turn on Strict");
+    });
+
+    it("asks an admin who has the price to accept still", () => {
+      expect(
+        ruleSaveConfirmation({
+          offer: model,
+          acceptance: "can-accept",
           before: { pii: { level: "essential" } },
           after: { pii: { level: "strict" } },
         })?.confirmLabel,
@@ -334,10 +347,13 @@ describe("given a rule saved from the drawer", () => {
   /** @scenario Saving a rule asks for the price only when it turns Strict on at a price */
   it("does not ask when nothing new is billed", () => {
     const strict = { pii: { level: "strict" as const } };
-    expect(ruleSaveConfirmation({ offer: model, before: strict, after: strict })).toBeNull();
+    expect(
+      ruleSaveConfirmation({ offer: model, acceptance: "accepted", before: strict, after: strict }),
+    ).toBeNull();
     expect(
       ruleSaveConfirmation({
         offer: { kind: "model", free: true, split: false },
+        acceptance: "not-needed",
         before: undefined,
         after: strict,
       }),
@@ -345,17 +361,58 @@ describe("given a rule saved from the drawer", () => {
     expect(
       ruleSaveConfirmation({
         offer: { kind: "rule-based", note: "licence", activate: true },
+        acceptance: "not-needed",
         before: undefined,
         after: strict,
       }),
     ).toBeNull();
-    expect(ruleSaveConfirmation({ offer: null, before: undefined, after: strict })).toBeNull();
+    expect(
+      ruleSaveConfirmation({
+        offer: null,
+        acceptance: "not-needed",
+        before: undefined,
+        after: strict,
+      }),
+    ).toBeNull();
     expect(
       ruleSaveConfirmation({
         offer: model,
+        acceptance: "accepted",
         before: undefined,
         after: { pii: { level: "essential" } },
       }),
     ).toBeNull();
+    // Strict saved by a member who cannot accept stays rule-based, so nothing is billed.
+    expect(
+      ruleSaveConfirmation({
+        offer: model,
+        acceptance: "awaiting-admin",
+        before: { pii: { level: "essential" } },
+        after: strict,
+      }),
+    ).toBeNull();
+  });
+});
+
+describe("given where the organization stands on the model's price", () => {
+  const priced = { kind: "model", free: false } as const;
+
+  /** @scenario Saving a rule asks for the price only when it turns Strict on at a price */
+  it("needs an acceptance only on Cloud at a price, until an admin gives it", () => {
+    const acceptanceOf = (
+      offer: Parameters<typeof modelAcceptanceOf>[0]["offer"],
+      accepted: boolean,
+      canAccept: boolean,
+    ) => modelAcceptanceOf({ offer, accepted, canAccept });
+
+    expect(acceptanceOf(priced, true, false)).toBe("accepted");
+    expect(acceptanceOf(priced, false, true)).toBe("can-accept");
+    expect(acceptanceOf(priced, false, false)).toBe("awaiting-admin");
+    expect(acceptanceOf({ kind: "model", free: true }, false, true)).toBe("not-needed");
+    expect(acceptanceOf({ kind: "model", free: true, licensed: true }, false, true)).toBe(
+      "not-needed",
+    );
+    expect(acceptanceOf({ kind: "rule-based", note: "turn-on" }, false, true)).toBe("not-needed");
+    expect(acceptanceOf(null, false, true)).toBe("not-needed");
   });
 });
