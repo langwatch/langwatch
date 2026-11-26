@@ -2,15 +2,12 @@ import langwatch  # +
 from langchain.tools import tool
 from langchain.chat_models import init_chat_model
 from langchain.messages import (
-    AnyMessage,
     SystemMessage,
     HumanMessage,
     ToolMessage,
 )
 from langchain_core.runnables import RunnableConfig
-from langgraph.graph import StateGraph, START, END
-from typing_extensions import TypedDict, Annotated
-import operator
+from langgraph.graph import StateGraph, MessagesState, START, END
 
 
 langwatch.setup()  # +
@@ -27,10 +24,6 @@ model = init_chat_model("gpt-4o-mini", temperature=0)
 tools = [add]
 tools_by_name = {t.name: t for t in tools}
 model_with_tools = model.bind_tools(tools)
-
-
-class MessagesState(TypedDict):
-    messages: Annotated[list[AnyMessage], operator.add]
 
 
 def llm_call(state: dict):
