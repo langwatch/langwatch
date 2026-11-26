@@ -47,7 +47,9 @@ ownerKind, ownerId, retainUntil, createdAt, updatedAt)`, records who holds
    reuse adds a link; it never shortens another's.
 3. **The purpose declares its retention category.** `trace_content` follows
    `traces`. `retainUntil` is now plus the project's resolved days for that
-   category, asked of `DataRetentionApi`. Purposes with no category write no
+   category. The caller names those days on the store (`retentionDays`): trace
+   asks data-retention, so Stored Objects holds no peer that could close a
+   cycle through data-retention's own peers. Purposes with no category write no
    links and are never swept, so every object stored before this change, and
    every other purpose, keeps today's behaviour.
 4. **Sweep by link.** A scheduled process manager in the worker takes one page
@@ -59,8 +61,9 @@ ownerKind, ownerId, retainUntil, createdAt, updatedAt)`, records who holds
    object survives) or finds the object deleted and writes fresh bytes. A
    tenant that fails leaves the run; the others finish, then the run fails.
 5. **Follow retroactive retention.** data-retention records a fact,
-   `retention_applied_to_existing_data` (project, category, days), when it
-   rewrites existing rows. A Stored Objects peer subscriber recomputes the
+   `retention_applied_to_existing_data` (project, category, days), whenever it
+   rewrites existing rows: the manual apply, and the raise and apply steps of
+   its retention extension. A Stored Objects peer subscriber recomputes the
    project's links for purposes in that category: `createdAt` plus the new
    days. Pins are not followed, matching data-retention.
 6. **References stay strings.** A rewritten span part keeps
@@ -83,8 +86,9 @@ ownerKind, ownerId, retainUntil, createdAt, updatedAt)`, records who holds
   reused for a retained purpose either: a link on one would let the sweep
   delete it under the older traces that hold it unrecorded. Their bytes are
   written once more.
-- Stored Objects gains `DataRetentionApi` as a peer. data-retention gains no
-  peer: it only records a fact.
+- Neither module gains a peer. Stored Objects reads data-retention's fact and
+  contract constants only; a store for a retained purpose without
+  `retentionDays` is a programming error and throws.
 - The pending-upload and deleted-object cleanups remain uncalled; scheduling
   them is separate work.
 - A project with indefinite trace retention writes links with no end, which
