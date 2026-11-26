@@ -1,5 +1,44 @@
 # Changelog
 
+## [3.31.0](https://github.com/langwatch/langwatch/compare/langwatch@v3.30.0...langwatch@v3.31.0) (2026-11-26)
+
+
+### Features
+
+* **billing:** map the Instant Evals meter and price in Stripe test mode ([#9853](https://github.com/langwatch/langwatch/issues/9853)) ([f6ff6a0](https://github.com/langwatch/langwatch/commit/f6ff6a0a5a8ee87ce118b81cf4752fe67c8e1aa2))
+* **data-privacy:** split long Strict spans across calls to the one model endpoint ([#9975](https://github.com/langwatch/langwatch/issues/9975)) ([991057c](https://github.com/langwatch/langwatch/commit/991057c617c8e4e9aac1fa770b7775e52e2aba09))
+* **entitlement:** cap Free scenario runs at 100 a month after a 14-day grace ([#9477](https://github.com/langwatch/langwatch/issues/9477)) ([055cc15](https://github.com/langwatch/langwatch/commit/055cc15a8b02428a291a31733a7cd1cddefd3f97))
+* **lwql:** answer dashboards for an organisation with its own ClickHouse ([#9253](https://github.com/langwatch/langwatch/issues/9253)) ([d68e858](https://github.com/langwatch/langwatch/commit/d68e858cbaffbb55f41fc6a80060b43b2cff97bd))
+* **nurturing:** send first_name trait at sign-up ([#9769](https://github.com/langwatch/langwatch/issues/9769)) ([5459aee](https://github.com/langwatch/langwatch/commit/5459aeeb7b8e0c3772e553b5126b3444df45cf70))
+* **ops:** extend a licence term from the drawer and redesign it around the install ([#9962](https://github.com/langwatch/langwatch/issues/9962)) ([2dae6de](https://github.com/langwatch/langwatch/commit/2dae6de0faebfa1d03645f3f320ca1db529a6c1c))
+* **stored-object,trace:** reuse trace media by content and delete it with its trace's retention ([#9618](https://github.com/langwatch/langwatch/issues/9618)) ([2b42a70](https://github.com/langwatch/langwatch/commit/2b42a7063b6d3d3601834b908f0a5ea1ea1ada71))
+* **trace:** store trace media by default and accept 64 MiB trace exports ([#9767](https://github.com/langwatch/langwatch/issues/9767)) ([aed8b00](https://github.com/langwatch/langwatch/commit/aed8b008f0270cd55794e5393124b2dfa25d0935))
+
+
+### Bug Fixes
+
+* **analytics:** read releases in the Release check and never count a Langy-only model ([#9903](https://github.com/langwatch/langwatch/issues/9903)) ([b865873](https://github.com/langwatch/langwatch/commit/b8658737e9d6a4d1da5bf6406307b141603d1e10))
+* **billing:** give the late-spend test organisation its growth-seat periods ([#10007](https://github.com/langwatch/langwatch/issues/10007)) ([69cf3c7](https://github.com/langwatch/langwatch/commit/69cf3c78322392733bc13a8c0a41a4c0b352fe13))
+* **billing:** report Instant Evals and PII spend confirmed after a month's last trace ([#9856](https://github.com/langwatch/langwatch/issues/9856)) ([234bc20](https://github.com/langwatch/langwatch/commit/234bc20fa09a0da24014c536fe99f51ac5df7742))
+* **billing:** start the Instant Evals month at the subscription's start ([#9855](https://github.com/langwatch/langwatch/issues/9855)) ([7a688c7](https://github.com/langwatch/langwatch/commit/7a688c7447c1d38c507992134d63b9e04031e621))
+* **dashboards:** a new dashboard starts from the full template gallery and fills itself ([#9925](https://github.com/langwatch/langwatch/issues/9925)) ([3f346f4](https://github.com/langwatch/langwatch/commit/3f346f49f69d91f2dc41d6f6ca54cd67cc42c49c))
+* **dashboards:** opening a board by link switches to its owning project ([#9912](https://github.com/langwatch/langwatch/issues/9912)) ([43f667f](https://github.com/langwatch/langwatch/commit/43f667f7bdd70749e7150682b40c863236cd4de4))
+* **dashboards:** show when a widget is bigger than its card, and size it beside Langy ([#10012](https://github.com/langwatch/langwatch/issues/10012)) ([acc131c](https://github.com/langwatch/langwatch/commit/acc131c6cdb4a07a8c812050dca6eb41ee496611))
+* **experiment:** keep the results page light for runs with long outputs ([#10020](https://github.com/langwatch/langwatch/issues/10020)) ([676dcf6](https://github.com/langwatch/langwatch/commit/676dcf678fd736575f303add5e5003507b50cf5f))
+* **experiment:** show the workbench as view only for a role that cannot save or run it ([#10019](https://github.com/langwatch/langwatch/issues/10019)) ([4a5d0bf](https://github.com/langwatch/langwatch/commit/4a5d0bfdd676d8b907055d33063c52387dcc5923))
+* **instant-evals:** own decision model judge docs and billing events label ([#9882](https://github.com/langwatch/langwatch/issues/9882)) ([cdf866d](https://github.com/langwatch/langwatch/commit/cdf866ddcbf668efaaba4c037cb499870aafc4e0))
+* **langy:** the GitHub connect card is the only ask when the sandbox has no GitHub access ([#9968](https://github.com/langwatch/langwatch/issues/9968)) ([15dd6f3](https://github.com/langwatch/langwatch/commit/15dd6f3dbdebe80938e851eb82011d737c642476))
+* **model-provider:** say a base URL was refused by the outbound policy, not that the provider was unreachable ([#9969](https://github.com/langwatch/langwatch/issues/9969)) ([374ca15](https://github.com/langwatch/langwatch/commit/374ca1512dfda2d3796071a0ec496c3fcb93a847))
+* **nurturing:** send the email with every Customer.io identify, and keep app emails on the own mailer ([#9911](https://github.com/langwatch/langwatch/issues/9911)) ([5003376](https://github.com/langwatch/langwatch/commit/5003376e4445de37ca1f4d01a2378a7b39a7f27a))
+* **server:** npx smoke builds aigateway before its release exists, and log files never carry a colon ([#9961](https://github.com/langwatch/langwatch/issues/9961)) ([e607a58](https://github.com/langwatch/langwatch/commit/e607a5877035ff8532b4a0f64190bdbacc2b10e5))
+* **trace:** stop the visualisation tab row from re-rendering forever ([#10017](https://github.com/langwatch/langwatch/issues/10017)) ([8cadd79](https://github.com/langwatch/langwatch/commit/8cadd795369c9e51a98e3aa95c0f862357f6da48))
+* **upgradelab:** list the link-unowned-trace-media step in the seed coverage ([#10018](https://github.com/langwatch/langwatch/issues/10018)) ([62ea822](https://github.com/langwatch/langwatch/commit/62ea822d4ee4c0fdb613d34951fb03ed6d037373))
+
+
+### Miscellaneous
+
+* format the chart README and regenerate stored-object READMEs ([#10022](https://github.com/langwatch/langwatch/issues/10022)) ([8d53708](https://github.com/langwatch/langwatch/commit/8d53708f74347b0bd5858a8d4687d8979d854785))
+
 ## [3.30.0](https://github.com/langwatch/langwatch/compare/langwatch@v3.29.0...langwatch@v3.30.0) (2026-11-26)
 
 
