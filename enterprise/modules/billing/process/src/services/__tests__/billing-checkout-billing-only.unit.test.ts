@@ -62,7 +62,7 @@ function subscriptionStore() {
       return { outcome: "activated", subscription: withOrg() };
     },
     cancelTrialSubscriptions: async () => {},
-    migrateToSeatEvent: async () => [],
+    findSupersededBySeatEvent: async () => [],
   });
   return { repository, current: () => row };
 }

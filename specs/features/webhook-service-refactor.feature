@@ -79,7 +79,7 @@ Feature: Stripe webhook billing event handling
     When the invoice payment succeeded event arrives
     Then old tiered subscriptions are migrated atomically
     And the corresponding Stripe subscriptions are cancelled with proration
-    And failures to cancel old Stripe subscriptions are logged but do not block the handler
+    And a failure to cancel an old Stripe subscription fails the delivery so Stripe sends it again
 
   # --- Invoice payment failed ---
 

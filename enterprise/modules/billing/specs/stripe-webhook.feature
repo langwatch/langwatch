@@ -161,3 +161,45 @@ Feature: Stripe webhook handling grants and removes plans correctly
     Given the Stripe delivery channel over the provider and over its memory twin, each holding a signing secret
     When a delivery signed with that secret, one signed with another secret and one where no secret is held arrive
     Then each tier answers the first with its event and refuses the other two
+
+  # Moving a legacy tiered organization to Growth seats activates the new subscription and must
+  # cancel the old one. Every message that shows the Growth subscription active stops the old
+  # plan, so the order Stripe delivers them in cannot leave the organization paying for both.
+
+  @unit
+  Scenario: An upgrade's checkout, subscription-active and payment messages arrive together in any order and the old plan stops
+    Given an organization on a tiered plan that pays for Growth seats
+    When Stripe's checkout-completed, subscription-active and payment-succeeded messages arrive at the same moment, in each of the six orders
+    Then the old tiered subscription is cancelled at Stripe once, with proration, and in our records
+    And the organization is moved to seat pricing
+    And the Growth subscription is active
+
+  @unit
+  Scenario: An organization already billed for both plans is healed by its next Growth payment
+    Given an organization whose Growth seat subscription is active
+    And whose old tiered subscription is still active
+    When its next Growth invoice is paid
+    Then the old tiered subscription is cancelled at Stripe and in our records
+    And the organization is moved to seat pricing
+
+  @unit
+  Scenario: Stripe refusing to cancel the old plan fails the delivery so Stripe sends it again
+    Given an organization upgrading from a tiered plan to Growth seats
+    And Stripe refuses to cancel the old tiered subscription the first time
+    When the payment-succeeded message is handled and then redelivered
+    Then the first delivery fails and the old plan stays active in our records
+    And the redelivery cancels it at Stripe once and in our records
+
+  @unit
+  Scenario: An old plan Stripe already ended is not cancelled at Stripe again
+    Given an organization whose Growth seat subscription is active
+    And whose old tiered subscription is ended at Stripe but still live in our records
+    When its next Growth invoice is paid
+    Then Stripe is not asked to cancel it
+    And it is cancelled in our records
+
+  @unit
+  Scenario: A Growth renewal with no old plan left changes nothing
+    Given an organization whose Growth seat subscription is active and that holds no other live subscription
+    When its next Growth invoice is paid
+    Then nothing is cancelled and the pricing model is not recorded again

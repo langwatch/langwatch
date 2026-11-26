@@ -37,6 +37,9 @@ const logger = createLogger("langwatch:billing:subscriptionLifecycle");
 /** Stripe reads its own writes eventually; a webhook can arrive before the write settles. */
 const STRIPE_EVENTUAL_CONSISTENCY_DELAY_MS = 2000;
 
+/** Stripe statuses after which a subscription bills nothing more. */
+const ENDED_AT_STRIPE: ReadonlySet<string> = new Set(["canceled", "incomplete_expired"]);
+
 const waitForStripeConsistency = () =>
   new Promise((resolve) => setTimeout(resolve, STRIPE_EVENTUAL_CONSISTENCY_DELAY_MS));
 
@@ -238,6 +241,12 @@ export class BillingSubscriptionLifecycleService {
     const updatedSubscription = quantitiesResult.subscription;
 
     await this.clearTrialLicenseIfPresent(updatedSubscription, "subscription updated to active");
+    if (isGrowthSeatEventPlan(updatedSubscription.plan)) {
+      await this.retireSupersededPlans({
+        seat: updatedSubscription,
+        firstActivation: shouldNotify,
+      });
+    }
     if (!shouldNotify) {
       return;
     }
@@ -377,14 +386,16 @@ export class BillingSubscriptionLifecycleService {
       return;
     }
     const updatedSubscription = activationResult.subscription;
+    const firstActivation = previousSubscription.status !== SubscriptionStatus.ACTIVE;
 
-    if (previousSubscription.status !== SubscriptionStatus.ACTIVE) {
+    if (firstActivation) {
       await this.clearTrialLicenseIfPresent(updatedSubscription, "subscription activated");
-
-      if (isGrowthSeatEventPlan(updatedSubscription.plan)) {
-        await this.migrateToSeatEventPlan(updatedSubscription);
-      }
-
+    }
+    // Every paid Growth invoice checks, so the order Stripe's messages arrive in cannot skip it.
+    if (isGrowthSeatEventPlan(updatedSubscription.plan)) {
+      await this.retireSupersededPlans({ seat: updatedSubscription, firstActivation });
+    }
+    if (firstActivation) {
       await this.announceSubscriptionStarted(updatedSubscription);
     }
   }
@@ -434,36 +445,56 @@ export class BillingSubscriptionLifecycleService {
     }
   }
 
-  /** Retires the plans this seat-event subscription supersedes, once the records agree. */
-  private async migrateToSeatEventPlan(updated: SubscriptionWithOrg): Promise<void> {
+  /**
+   * Stops the tiered plans an active Growth seat subscription replaces. Safe to run again: Stripe
+   * goes first and its own status says what already ended, so a failure leaves the row for
+   * Stripe's redelivery to find. Spec: enterprise/modules/billing/specs/stripe-webhook.feature
+   */
+  private async retireSupersededPlans({
+    seat,
+    firstActivation,
+  }: {
+    seat: SubscriptionWithOrg;
+    firstActivation: boolean;
+  }): Promise<void> {
+    const superseded = await this.subscriptionRepository.findSupersededBySeatEvent({
+      organizationId: seat.organizationId,
+      excludeSubscriptionId: seat.id,
+    });
+    if (superseded.length === 0 && !firstActivation) return;
+
     // Organization sets the pricing model from the fact; a refused fact fails before any row moves.
     await this.announcer?.pricingModelChanged({
-      organizationId: updated.organizationId,
+      organizationId: seat.organizationId,
       pricingModel: "SEAT_EVENT",
     });
-    const oldSubscriptions = await this.subscriptionRepository.migrateToSeatEvent({
-      organizationId: updated.organizationId,
-      excludeSubscriptionId: updated.id,
-    });
 
-    // Cancel in Stripe after the records are consistent, outside the transaction.
-    for (const oldSub of oldSubscriptions) {
-      if (!oldSub.stripeSubscriptionId) {
-        continue;
-      }
-
+    const failures: unknown[] = [];
+    for (const old of superseded) {
       try {
-        await this.stripeSubscriptions.cancelSubscription({
-          subscriptionId: oldSub.stripeSubscriptionId,
-          prorate: true,
-        });
+        await this.cancelAtStripe(old.stripeSubscriptionId);
+        await this.subscriptionRepository.cancel({ id: old.id });
       } catch (err) {
         logger.error(
-          { stripeSubscriptionId: oldSub.stripeSubscriptionId, err },
-          "[stripeWebhook] CRITICAL: Failed to cancel old Stripe subscription during " +
-            "upgrade. Manual intervention required.",
+          { stripeSubscriptionId: old.stripeSubscriptionId, err },
+          "[stripeWebhook] Failed to cancel a superseded tiered subscription; the delivery will be retried",
         );
+        failures.push(err);
       }
+    }
+    if (failures.length > 0) throw failures[0];
+  }
+
+  /** Cancels with proration unless Stripe already ended it, including by a parallel delivery. */
+  private async cancelAtStripe(subscriptionId: string): Promise<void> {
+    const current = await this.stripeSubscriptions.getSubscription({ subscriptionId });
+    if (ENDED_AT_STRIPE.has(current.status)) return;
+
+    try {
+      await this.stripeSubscriptions.cancelSubscription({ subscriptionId, prorate: true });
+    } catch (err) {
+      const after = await this.stripeSubscriptions.getSubscription({ subscriptionId });
+      if (!ENDED_AT_STRIPE.has(after.status)) throw err;
     }
   }
 

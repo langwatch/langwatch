@@ -33,6 +33,9 @@ type BillingOrganizationRecord = {
   stripeCustomerId: string | null;
 };
 
+/** A live tiered subscription that a Growth seat subscription replaces. */
+export type SupersededSubscription = { id: string; stripeSubscriptionId: string };
+
 export type BillingSubscriptionWithOrganization = BillingSubscriptionRecord & {
   organization: BillingOrganizationRecord;
 };
@@ -60,10 +63,11 @@ export abstract class BillingSubscriptionRepository {
   abstract recordPaymentFailure(input: { id: string; currentStatus: string }): Promise<void>;
   abstract cancel(input: { id: string }): Promise<void>;
   abstract cancelTrialSubscriptions(organizationId: string): Promise<void>;
-  abstract migrateToSeatEvent(input: {
+  /** The live tiered subscriptions a Growth seat subscription supersedes; reads only. */
+  abstract findSupersededBySeatEvent(input: {
     organizationId: string;
     excludeSubscriptionId: string;
-  }): Promise<{ stripeSubscriptionId: string | null }[]>;
+  }): Promise<SupersededSubscription[]>;
   abstract updateQuantities(input: {
     id: string;
     maxMembers: number | null;

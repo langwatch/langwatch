@@ -43,7 +43,7 @@ const createMockBillingSubscription = (): {
   recordPaymentFailure: vi.fn(),
   cancel: vi.fn(),
   cancelTrialSubscriptions: vi.fn(),
-  migrateToSeatEvent: vi.fn(),
+  findSupersededBySeatEvent: vi.fn(),
   updateQuantities: vi.fn(),
 });
 
@@ -796,9 +796,9 @@ describe("EEWebhookService", () => {
             plan: "GROWTH_SEAT_EUR_MONTHLY",
           }),
         });
-        subRepo.migrateToSeatEvent.mockResolvedValue([
-          { stripeSubscriptionId: "sub_old_1" },
-          { stripeSubscriptionId: "sub_old_2" },
+        subRepo.findSupersededBySeatEvent.mockResolvedValue([
+          { id: "sub_db_old_1", stripeSubscriptionId: "sub_old_1" },
+          { id: "sub_db_old_2", stripeSubscriptionId: "sub_old_2" },
         ]);
 
         const promise = service.handleInvoicePaymentSucceeded({
@@ -808,22 +808,25 @@ describe("EEWebhookService", () => {
         await vi.advanceTimersByTimeAsync(2000);
         await promise;
 
-        expect(subRepo.migrateToSeatEvent).toHaveBeenCalledWith({
+        expect(subRepo.findSupersededBySeatEvent).toHaveBeenCalledWith({
           organizationId: "org_123",
           excludeSubscriptionId: "sub_db_1",
         });
-        expect(localStripe.cancellations).toContainEqual({
-          subscriptionId: "sub_old_1",
-          prorate: true,
-        });
-        expect(localStripe.cancellations).toContainEqual({
-          subscriptionId: "sub_old_2",
-          prorate: true,
-        });
+        expect(localStripe.cancellations).toEqual([
+          { subscriptionId: "sub_old_1", prorate: true },
+          { subscriptionId: "sub_old_2", prorate: true },
+        ]);
+        expect(subRepo.cancel.mock.calls).toEqual([
+          [{ id: "sub_db_old_1" }],
+          [{ id: "sub_db_old_2" }],
+        ]);
       });
 
-      it("logs but does not fail when Stripe cancellation fails", async () => {
-        const localStripe = subscriptionsTwin();
+      it("fails the delivery and keeps the old row live when Stripe refuses the cancel", async () => {
+        const localStripe = subscriptionsTwin(
+          stripeSubscription(),
+          stripeSubscription({ id: "sub_old_1" }),
+        );
         localStripe.refuse({ operation: "cancelSubscription", error: new Error("Stripe error") });
         service = EEWebhookService.create({
           licenses,
@@ -847,17 +850,22 @@ describe("EEWebhookService", () => {
             plan: "GROWTH_SEAT_EUR_MONTHLY",
           }),
         });
-        subRepo.migrateToSeatEvent.mockResolvedValue([{ stripeSubscriptionId: "sub_old_1" }]);
+        subRepo.findSupersededBySeatEvent.mockResolvedValue([
+          { id: "sub_db_old_1", stripeSubscriptionId: "sub_old_1" },
+        ]);
 
         const promise = service.handleInvoicePaymentSucceeded({
           subscriptionId: "sub_stripe_1",
         });
+        const outcome = promise.then(
+          () => "resolved",
+          () => "rejected",
+        );
 
         await vi.advanceTimersByTimeAsync(2000);
-        // Should not throw
-        await promise;
 
-        expect(mockSendSlackSubscriptionEvent).toHaveBeenCalled();
+        expect(await outcome).toBe("rejected");
+        expect(subRepo.cancel).not.toHaveBeenCalled();
       });
     });
 
@@ -1730,7 +1738,7 @@ describe("EEWebhookService with the lifecycle announcer composed", () => {
         makeSubscription({ status: SubscriptionStatus.PENDING, plan: "GROWTH_SEAT_EUR_MONTHLY" }),
       );
       subRepo.activate.mockResolvedValue({ outcome: "activated", subscription: seat });
-      subRepo.migrateToSeatEvent.mockResolvedValue([]);
+      subRepo.findSupersededBySeatEvent.mockResolvedValue([]);
 
       await settled(service.handleInvoicePaymentSucceeded({ subscriptionId: "sub_stripe_1" }));
 
