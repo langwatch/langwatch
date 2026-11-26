@@ -61,8 +61,10 @@ export type EdgeMediaExtractionPolicy = Readonly<{
 }>;
 
 type SiteOutcome =
-  | Readonly<{ status: "stored"; site: ReplacedMediaSite }>
-  | Readonly<{ status: "unchanged" }>;
+  | Readonly<{ status: "stored"; site: ReplacedMediaSite; ref: ExtractedRef }>
+  | Readonly<{ status: "unchanged"; ref?: ExtractedRef }>;
+
+const UNCHANGED: SiteOutcome = { status: "unchanged" };
 
 /** A whole-string data URI routed through the part vocabulary, so audio gets the same WAV wrap. */
 function partForDataUri(uri: string, mediaType: string, base64: string): unknown {
@@ -225,32 +227,28 @@ export class TraceMediaExtractionService {
     site,
     projectId,
     ownerId,
-    refs,
   }: {
     site: MediaSite;
     projectId: string;
     ownerId: string;
-    refs: ExtractedRef[];
   }): Promise<SiteOutcome> {
     if (site.kind === "part") {
       const { part, ref } = await this.extractFromPart({ part: site.node, projectId, ownerId });
-      if (ref) refs.push(ref);
-      if (part === site.node) return { status: "unchanged" };
+      if (!ref || part === site.node) return ref ? { status: "unchanged", ref } : UNCHANGED;
 
-      return { status: "stored", site: { ...site, replacement: part } };
+      return { status: "stored", site: { ...site, replacement: part }, ref };
     }
 
     // The attribute stays a string: the whole value becomes the reference.
     const uri = site.node as string;
     const parsed = parseBase64DataUri(uri);
-    if (!parsed) return { status: "unchanged" };
+    if (!parsed) return UNCHANGED;
     const { ref } = await this.extractFromPart({
       part: partForDataUri(uri, parsed.mimeType, parsed.base64),
       projectId,
       ownerId,
     });
-    if (!ref) return { status: "unchanged" };
-    refs.push(ref);
+    if (!ref) return UNCHANGED;
 
     return {
       status: "stored",
@@ -258,7 +256,40 @@ export class TraceMediaExtractionService {
         ...site,
         replacement: storedObjectFileReferenceOf({ projectId, storedObjectId: ref.id }),
       },
+      ref,
     };
+  }
+
+  /**
+   * One store raced against the time left to the deadline. A late store stays inline and
+   * counts as a deadline drop; whatever it answers later is ignored. A failure stays inline.
+   */
+  private async storeBeforeDeadline(input: {
+    site: MediaSite;
+    projectId: string;
+    ownerId: string;
+    budget: ExtractionBudget;
+  }): Promise<SiteOutcome> {
+    const { budget } = input;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const late = new Promise<"late">((resolve) => {
+      const leftMs = Math.max(0, budget.deadlineAt - nowInstant().epochMilliseconds);
+      timer = setTimeout(() => resolve("late"), leftMs);
+    });
+    try {
+      const outcome = await Promise.race([this.storeSite(input), late]);
+      if (outcome !== "late") return outcome;
+      budget.droppedByDeadline += 1;
+
+      return UNCHANGED;
+    } catch {
+      // Per-part fail-open: this part stays inline; stored parts keep their references.
+      budget.failedParts += 1;
+
+      return UNCHANGED;
+    } finally {
+      clearTimeout(timer);
+    }
   }
 
   private async storeSites({
@@ -290,18 +321,10 @@ export class TraceMediaExtractionService {
 
       const wave = takeable.slice(i, i + CONCURRENT_STORES);
       const results = await Promise.all(
-        wave.map(async (site): Promise<SiteOutcome> => {
-          try {
-            return await this.storeSite({ site, projectId, ownerId, refs });
-          } catch {
-            // Per-part fail-open: this part stays inline; stored parts keep their references.
-            budget.failedParts += 1;
-
-            return { status: "unchanged" };
-          }
-        }),
+        wave.map((site) => this.storeBeforeDeadline({ site, projectId, ownerId, budget })),
       );
       for (const result of results) {
+        if (result.ref) refs.push(result.ref);
         if (result.status === "stored") stored.push(result.site);
       }
     }

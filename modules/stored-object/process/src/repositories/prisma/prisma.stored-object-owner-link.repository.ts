@@ -27,38 +27,29 @@ export class PrismaStoredObjectOwnerLinkRepository implements StoredObjectOwnerL
   private constructor(private readonly prisma: PrismaStoredObjectOwnerLinkDatabase) {}
 
   /**
-   * An insert that skips an existing key, then a raise conditional on the
-   * stored end being earlier: each statement is atomic, so concurrent raises
-   * settle on the latest end and none lowers another.
+   * One upsert, atomic per key: concurrent raises settle on the latest end and none lowers
+   * another. A null end on either side holds with no end; `createdAt` always moves to the
+   * latest store, so a re-time counts from it (ADR-002 §5).
    */
   async raise(link: StoredObjectOwnerLink): Promise<void> {
-    const retainUntil = link.retainUntil ? toDate(link.retainUntil) : null;
-    const { count } = await this.prisma.storedObjectOwner.createMany({
-      data: [
-        {
-          tenantId: link.tenantId,
-          objectId: link.objectId,
-          ownerKind: link.ownerKind,
-          ownerId: link.ownerId,
-          retainUntil,
-          createdAt: toDate(link.createdAt),
-          updatedAt: toDate(link.updatedAt),
-        },
-      ],
-      skipDuplicates: true,
-    });
-    if (count > 0) return;
-
-    await this.prisma.storedObjectOwner.updateMany({
-      where: {
-        tenantId: link.tenantId,
-        objectId: link.objectId,
-        ownerKind: link.ownerKind,
-        ownerId: link.ownerId,
-        retainUntil: retainUntil === null ? { not: null } : { lt: retainUntil },
-      },
-      data: { retainUntil, createdAt: toDate(link.createdAt), updatedAt: toDate(link.updatedAt) },
-    });
+    const retainUntil = link.retainUntil ? utcTimestamp(link.retainUntil) : null;
+    await this.prisma.$executeRaw`
+      INSERT INTO "StoredObjectOwner"
+        ("tenantId", "objectId", "ownerKind", "ownerId", "retainUntil", "createdAt", "updatedAt")
+      VALUES (
+        ${link.tenantId}, ${link.objectId}, ${link.ownerKind}, ${link.ownerId},
+        ${retainUntil}::timestamp, ${utcTimestamp(link.createdAt)}::timestamp,
+        ${utcTimestamp(link.updatedAt)}::timestamp
+      )
+      ON CONFLICT ("tenantId", "objectId", "ownerKind", "ownerId") DO UPDATE SET
+        "retainUntil" = CASE
+          WHEN "StoredObjectOwner"."retainUntil" IS NULL OR EXCLUDED."retainUntil" IS NULL
+            THEN NULL
+          ELSE GREATEST("StoredObjectOwner"."retainUntil", EXCLUDED."retainUntil")
+        END,
+        "createdAt" = GREATEST("StoredObjectOwner"."createdAt", EXCLUDED."createdAt"),
+        "updatedAt" = EXCLUDED."updatedAt"
+    `;
   }
 
   async countAll(input: {
@@ -170,4 +161,9 @@ export class PrismaStoredObjectOwnerLinkRepository implements StoredObjectOwnerL
          AND "objectId" = ANY(${[...input.objectIds]}::text[])
     `;
   }
+}
+
+/** A naive UTC literal: a bound `Date` would go through the session time zone (`timestamp(3)`). */
+function utcTimestamp(instant: Instant): string {
+  return instant.toString({ fractionalSecondDigits: 3 }).replace(/Z$/, "");
 }

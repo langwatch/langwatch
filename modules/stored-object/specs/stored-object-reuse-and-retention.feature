@@ -68,6 +68,13 @@ Feature: Stored-object reuse by content and owner-linked retention
     Then trace "t1" still holds the object until day 30
 
   @unit
+  Scenario: A store whose owner link fails leaves no object behind
+    Given new bytes for purpose "trace_content"
+    When writing the owner link for trace "t1" fails
+    Then the store fails
+    And the new object is deleted and its bytes removed
+
+  @unit
   Scenario: A purpose with no retention category writes no links
     When bytes are stored for purpose "scenario_event"
     Then the object has no owner links
@@ -91,6 +98,7 @@ Feature: Stored-object reuse by content and owner-linked retention
     Then the expired link is removed
     And the object is deleted and its delivery refused
     And its provider bytes are queued for cleanup
+    And bytes the provider refused to delete are removed on the upload reaper's next pass
 
   @unit
   Scenario: An object another owner still holds survives the sweep

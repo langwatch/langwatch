@@ -22,14 +22,17 @@ export class MemoryStoredObjectOwnerLinkRepository implements StoredObjectOwnerL
       this.#links.set(key(link), link);
       return;
     }
-    if (isLater({ candidate: link.retainUntil, than: existing.retainUntil })) {
-      this.#links.set(key(link), {
-        ...existing,
-        retainUntil: link.retainUntil,
-        createdAt: link.createdAt,
-        updatedAt: link.updatedAt,
-      });
-    }
+    this.#links.set(key(link), {
+      ...existing,
+      retainUntil: isLater({ candidate: link.retainUntil, than: existing.retainUntil })
+        ? link.retainUntil
+        : existing.retainUntil,
+      createdAt:
+        Temporal.Instant.compare(link.createdAt, existing.createdAt) > 0
+          ? link.createdAt
+          : existing.createdAt,
+      updatedAt: link.updatedAt,
+    });
   }
 
   async countAll(input: {
