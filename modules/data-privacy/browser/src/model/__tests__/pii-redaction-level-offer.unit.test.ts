@@ -245,7 +245,14 @@ describe("given the organization's resolved PII level", () => {
 describe("given a change of the organization's level", () => {
   describe("when Essential turns into Strict for a paying organization", () => {
     it("asks with the model and its price", () => {
-      expect(levelChangeConfirmation({ from: "essential", to: "strict", free: false })).toEqual({
+      expect(
+        levelChangeConfirmation({
+          from: "essential",
+          to: "strict",
+          free: false,
+          acceptance: "accepted",
+        }),
+      ).toEqual({
         title: "Turn on Strict?",
         description:
           "Strict uses the LangWatch PII Redaction Model at $0.50 per 1M characters excl. VAT, pay as you go. Turn it on?",
@@ -279,14 +286,26 @@ describe("given a change of the organization's level", () => {
 
   describe("when the organization is free", () => {
     it("turns Strict on without asking", () => {
-      expect(levelChangeConfirmation({ from: "essential", to: "strict", free: true })).toBeNull();
+      expect(
+        levelChangeConfirmation({
+          from: "essential",
+          to: "strict",
+          free: true,
+          acceptance: "not-needed",
+        }),
+      ).toBeNull();
     });
   });
 
   describe("when Custom turns into Essential", () => {
     it("asks before replacing the custom settings", () => {
       expect(
-        levelChangeConfirmation({ from: "custom", to: "essential", free: false })?.description,
+        levelChangeConfirmation({
+          from: "custom",
+          to: "essential",
+          free: false,
+          acceptance: "accepted",
+        })?.description,
       ).toBe("This replaces your custom PII settings with Essential.");
     });
   });
@@ -294,7 +313,12 @@ describe("given a change of the organization's level", () => {
   describe("when Custom turns into Strict for a paying organization", () => {
     it("asks once, naming both", () => {
       expect(
-        levelChangeConfirmation({ from: "custom", to: "strict", free: false })?.description,
+        levelChangeConfirmation({
+          from: "custom",
+          to: "strict",
+          free: false,
+          acceptance: "accepted",
+        })?.description,
       ).toBe(
         "This replaces your custom PII settings. Strict uses the LangWatch PII Redaction Model at $0.50 per 1M characters excl. VAT, pay as you go. Turn it on?",
       );
@@ -303,7 +327,14 @@ describe("given a change of the organization's level", () => {
 
   describe("when Strict goes back to Essential", () => {
     it("needs no confirmation", () => {
-      expect(levelChangeConfirmation({ from: "strict", to: "essential", free: false })).toBeNull();
+      expect(
+        levelChangeConfirmation({
+          from: "strict",
+          to: "essential",
+          free: false,
+          acceptance: "accepted",
+        }),
+      ).toBeNull();
     });
   });
 });

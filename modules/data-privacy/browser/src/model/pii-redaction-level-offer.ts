@@ -184,7 +184,7 @@ export function levelChangeConfirmation({
   from: PiiLevel;
   to: OrganizationPiiLevel;
   free: boolean;
-  acceptance?: ModelAcceptance;
+  acceptance: ModelAcceptance;
 }): LevelChangeConfirmation | null {
   const replacesCustom = from === "custom" ? "This replaces your custom PII settings. " : "";
   if (to === "strict" && !free) {
