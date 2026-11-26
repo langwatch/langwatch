@@ -2546,6 +2546,21 @@ model DashboardFavourite {
   @@map("DashboardFavourite")
 }
 
+/// One member's own order of a product sidebar's Dashboards section in one organization.
+model DashboardSidebarOrder {
+  id             String   @id @default(nanoid())
+  userId         String
+  organizationId String
+  /// The product whose sidebar section this orders: llm-ops, me, gateway or governance.
+  homeProduct    String
+  /// Board ids in the member's order; a board not named lists after them, by name.
+  dashboardIds   String[]
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @default(now()) @updatedAt
+
+  @@unique([userId, organizationId, homeProduct])
+}
+
 /// A Dashboards v2 board, apart from the Analytics Reports boards in Dashboard. Boards
 /// made before the split were copied here with their ids, so stars and insight
 /// pointers still name them. No relation, per the database rule.
