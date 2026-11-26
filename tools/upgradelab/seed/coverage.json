@@ -76,11 +76,6 @@
       "note": "retention rules set per heavy organization",
       "cells": ["C1", "C3"]
     },
-    "dashboard:mark-my-dashboards": {
-      "status": "pending",
-      "seed": "unplanned",
-      "note": "needs each member's My dashboard as the previous release wrote it, before the mark"
-    },
     "dataset:move-content-to-object-storage": {
       "status": "pending",
       "seed": "product-seeds:dataset",
@@ -99,11 +94,6 @@
       "note": "datasets seeded before the step get version 1; needs rows by the REST rows route"
     },
     "entitlement:materialise-billable-events-ttl": {
-      "status": "pending",
-      "seed": "unplanned",
-      "note": "needs billable events older than 13 months, written by the previous release before the TTL"
-    },
-    "dashboard:mark-my-dashboards": {
       "status": "pending",
       "seed": "unplanned",
       "note": "needs My dashboards without the owner mark, as the previous release wrote them"
