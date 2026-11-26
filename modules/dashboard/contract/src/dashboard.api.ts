@@ -19,6 +19,7 @@ import type {
   DashboardScope,
   DashboardScopeImpact,
   DashboardScopeProjects,
+  DashboardSidebarOrder,
   DashboardSourcePresence,
   DashboardStar,
   DashboardSummary,
@@ -194,6 +195,19 @@ export interface DashboardApi {
     projectId: string;
     userId: string;
     stars: DashboardStar[];
+  }): Promise<{ success: true }>;
+  /** The member's own order of a product sidebar's Dashboards section; none stored is empty. */
+  getSidebarOrder(input: {
+    organizationId: string;
+    userId: string;
+    homeProduct: DashboardHomeProduct;
+  }): Promise<DashboardSidebarOrder>;
+  /** Replaces the member's own order of a product sidebar's Dashboards section. */
+  setSidebarOrder(input: {
+    organizationId: string;
+    userId: string;
+    homeProduct: DashboardHomeProduct;
+    dashboardIds: readonly string[];
   }): Promise<{ success: true }>;
   /** Where a reader opens each of these dashboards, keyed by dashboard id. */
   getDashboardLinks(input: {

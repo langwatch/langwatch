@@ -589,6 +589,31 @@ function contractCases(backend: DashboardBackend): void {
     });
   });
 
+  describe("when a member orders a product sidebar", () => {
+    /** @scenario "The sidebar order is stored per member, organization and product" */
+    it("keeps one order per member, organization and product, replaced on each save", async () => {
+      const boards = backend.boards();
+      const key = {
+        userId: id("user"),
+        organizationId: id("org"),
+        homeProduct: "llm-ops" as const,
+      };
+
+      await expect(boards.findSidebarOrder(key)).resolves.toEqual([]);
+      await boards.setSidebarOrder({ ...key, dashboardIds: ["b", "a"] });
+      await boards.setSidebarOrder({ ...key, dashboardIds: ["c", "b", "a"] });
+
+      await expect(boards.findSidebarOrder(key)).resolves.toEqual(["c", "b", "a"]);
+      await expect(boards.findSidebarOrder({ ...key, homeProduct: "gateway" })).resolves.toEqual(
+        [],
+      );
+      await expect(boards.findSidebarOrder({ ...key, userId: id("user") })).resolves.toEqual([]);
+      await expect(boards.findSidebarOrder({ ...key, organizationId: id("org") })).resolves.toEqual(
+        [],
+      );
+    });
+  });
+
   describe("when a board is deleted from the Dashboards area", () => {
     const projectId = () => backend.projectId();
     const reportsBoard = async (name: string, boardId = id("dash")) => {

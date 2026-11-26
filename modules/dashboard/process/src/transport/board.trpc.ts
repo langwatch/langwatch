@@ -1,7 +1,7 @@
 /**
  * The server half of `boards.*`, the Dashboards area's boards. Reading and starring take
- * `analytics:view`; creating `analytics:create`, editing, scope and moving `analytics:update`,
- * removing `analytics:delete`. The service asks for a scope change's author.
+ * `analytics:view`, a member's own sidebar order `organization:view`; creating
+ * `analytics:create`, editing, scope and moving `analytics:update`, removing `analytics:delete`.
  */
 import { defineTrpcRouter, type TrpcRouterDeclaration } from "@langwatch/api/trpc";
 import { DashboardApi, boardTrpc } from "@langwatch/dashboard-contract";
@@ -177,5 +177,27 @@ export const boardTrpcTransport: TrpcRouterDeclaration<DashboardApi, typeof boar
     .withPermission("analytics:view")
     .handle(async ({ app, input, actor }) =>
       app.reorderStars({ projectId: input.projectId, userId: actor.id, stars: input.stars }),
+    )
+
+    // The member's own sidebar, so the organization floor every seat holds is enough.
+    .procedure("sidebarOrder")
+    .withPermission("organization:view")
+    .handle(async ({ app, input, actor }) =>
+      app.getSidebarOrder({
+        organizationId: input.organizationId,
+        userId: actor.id,
+        homeProduct: input.homeProduct,
+      }),
+    )
+
+    .procedure("reorderSidebar")
+    .withPermission("organization:view")
+    .handle(async ({ app, input, actor }) =>
+      app.setSidebarOrder({
+        organizationId: input.organizationId,
+        userId: actor.id,
+        homeProduct: input.homeProduct,
+        dashboardIds: input.dashboardIds,
+      }),
     )
     .build();

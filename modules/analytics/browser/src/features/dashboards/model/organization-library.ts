@@ -36,6 +36,8 @@ export type LibraryBoard = {
   readonly project: DashboardProject | null;
   /** Where the board opens; null when no project the member reads can show it. */
   readonly openProject: DashboardProject | null;
+  /** ISO 8601 off the wire, so it sorts as text. */
+  readonly updatedAt: string;
 };
 
 /** The fields a row reads off the list's answer, which carries more. */
@@ -50,6 +52,7 @@ export function libraryBoardOf({
   homeProduct,
   project,
   openProject,
+  updatedAt,
 }: LibraryBoard): LibraryBoard {
   return {
     id,
@@ -62,6 +65,7 @@ export function libraryBoardOf({
     homeProduct,
     project,
     openProject,
+    updatedAt,
   };
 }
 
@@ -73,20 +77,13 @@ export const HOME_PRODUCT_LABELS: Readonly<Record<DashboardHomeProduct, string>>
   governance: "Governance",
 };
 
-/** One product's group of boards. */
-export type LibraryGroup = {
-  readonly product: DashboardHomeProduct;
-  readonly label: string;
-  readonly boards: readonly LibraryBoard[];
-};
-
 /** Boards with no project named first, then by project name, then by board name. */
 export function byPlace(a: LibraryBoard, b: LibraryBoard): number {
   const projectOf = (board: LibraryBoard) => board.project?.name ?? "";
   return projectOf(a).localeCompare(projectOf(b)) || a.name.localeCompare(b.name);
 }
 
-/** The library's group order: the prototype's rail (its `PRODUCTS`, lib/nav/spaces.ts). */
+/** The library's product order: the prototype's rail (its `PRODUCTS`, lib/nav/spaces.ts). */
 export const LIBRARY_PRODUCT_ORDER: readonly DashboardHomeProduct[] = [
   "me",
   "llm-ops",
@@ -94,13 +91,10 @@ export const LIBRARY_PRODUCT_ORDER: readonly DashboardHomeProduct[] = [
   "governance",
 ];
 
-/** The library's groups in rail order, each product with at least one board. */
-export function libraryGroups({ boards }: { boards: readonly LibraryBoard[] }): LibraryGroup[] {
-  return LIBRARY_PRODUCT_ORDER.map((product) => ({
-    product,
-    label: HOME_PRODUCT_LABELS[product],
-    boards: boards.filter((board) => board.homeProduct === product).toSorted(byPlace),
-  })).filter((group) => group.boards.length > 0);
+/** The library's rows before a header is pressed: by product in rail order, then by place. */
+export function libraryRows({ boards }: { boards: readonly LibraryBoard[] }): LibraryBoard[] {
+  const rank = (board: LibraryBoard) => LIBRARY_PRODUCT_ORDER.indexOf(board.homeProduct);
+  return boards.toSorted((a, b) => rank(a) - rank(b) || byPlace(a, b));
 }
 
 /** The names boards homed in `product` already have, so a new one is numbered past them. */
@@ -121,11 +115,6 @@ export const DEFAULT_SCOPE_BY_PRODUCT: Readonly<Record<DashboardHomeProduct, Das
   gateway: "ORGANIZATION",
   governance: "ORGANIZATION",
 };
-
-/** A group's heading: the product and how many boards it lists. */
-export function groupHeading(group: LibraryGroup): string {
-  return `${group.label} · ${group.boards.length}`;
-}
 
 /** Who sees a board, as its row says it: the project, "Organization" or "Only me". */
 export function whoSees(board: Pick<LibraryBoard, "scope" | "project">): string {

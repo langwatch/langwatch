@@ -47,11 +47,13 @@ function render({
   listed,
   host = new StubAnalyticsHost(),
   storeProjects = [SHOP],
+  sidebarOrder = [],
 }: {
   element: ReactElement;
   listed: unknown[];
   host?: StubAnalyticsHost;
   storeProjects?: readonly (typeof SHOP)[];
+  sidebarOrder?: readonly string[];
 }) {
   const calls: UiProcedureCall[] = [];
   const answer = (call: UiProcedureCall): Promise<unknown> => {
@@ -61,6 +63,8 @@ function render({
     if (call.path === "boards.storeProjects") return Promise.resolve(storeProjects);
     if (call.path === "boards.update") return Promise.resolve({});
     if (call.path === "boards.getAll") return Promise.resolve([]);
+    if (call.path === "boards.sidebarOrder") return Promise.resolve({ dashboardIds: sidebarOrder });
+    if (call.path === "boards.reorderSidebar") return Promise.resolve({ success: true });
     return NO_PROCEDURES(call);
   };
   renderDashboards({ element, host, answer });
