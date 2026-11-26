@@ -50,6 +50,31 @@ export async function askViewerRolePermissions(
   return { "traces:view": view, "traces:update": update, "project:manage": manage };
 }
 
+/**
+ * Whether the viewer owns every project whose policy governs a read: a folded owner-only audience
+ * may be another project's. Fail-closed: no project, no owner or a lookup that throws is not.
+ */
+export async function ownsEveryGovernedProject({
+  userId,
+  projectIds,
+  ownerOf,
+  onLookupFailure,
+}: {
+  userId: string | undefined;
+  projectIds: readonly string[];
+  ownerOf: (projectId: string) => Promise<string | null | undefined>;
+  onLookupFailure: (error: unknown) => void;
+}): Promise<boolean> {
+  if (userId === undefined || projectIds.length === 0) return false;
+  try {
+    const owners = await Promise.all(projectIds.map((projectId) => ownerOf(projectId)));
+    return owners.every((owner) => owner === userId);
+  } catch (error) {
+    onLookupFailure(error);
+    return false;
+  }
+}
+
 export function isContentVisible(eff: EffectiveRestriction, viewer: ViewerFacts): boolean {
   if (!viewer.isMember && !viewer.isProjectOwner) return false;
   if (eff.disposition === "drop") return false;

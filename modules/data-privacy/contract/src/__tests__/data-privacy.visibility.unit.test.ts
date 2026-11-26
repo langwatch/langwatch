@@ -7,6 +7,7 @@ import {
   isContentVisible,
   isContentVisibleToPublic,
   needsAudienceFacts,
+  ownsEveryGovernedProject,
   viewerFactsFrom,
   type ViewerFacts,
 } from "../data-privacy.visibility.ts";
@@ -205,5 +206,73 @@ describe("viewerFactsFrom", () => {
         isViewer: true,
       });
     });
+  });
+});
+
+describe("ownsEveryGovernedProject", () => {
+  const owners: Record<string, string | null> = { a: "user-1", b: "user-1", c: "user-2", d: null };
+  const ownerOf = async (projectId: string) => owners[projectId];
+  const noFailure = () => {
+    throw new Error("no lookup was expected to fail");
+  };
+
+  it("counts the viewer as owner when they own every project the read spans", async () => {
+    await expect(
+      ownsEveryGovernedProject({
+        userId: "user-1",
+        projectIds: ["a", "b"],
+        ownerOf,
+        onLookupFailure: noFailure,
+      }),
+    ).resolves.toBe(true);
+  });
+
+  /** @scenario "Owner-only content stays hidden when a read spans a project the viewer does not own" */
+  it("does not when one spanned project belongs to someone else", async () => {
+    await expect(
+      ownsEveryGovernedProject({
+        userId: "user-1",
+        projectIds: ["a", "c"],
+        ownerOf,
+        onLookupFailure: noFailure,
+      }),
+    ).resolves.toBe(false);
+  });
+
+  it("does not when a project has no owner, or no project is named", async () => {
+    for (const projectIds of [["d"], []]) {
+      await expect(
+        ownsEveryGovernedProject({
+          userId: "user-1",
+          projectIds,
+          ownerOf,
+          onLookupFailure: noFailure,
+        }),
+      ).resolves.toBe(false);
+    }
+  });
+
+  it("does not for a caller with no user", async () => {
+    await expect(
+      ownsEveryGovernedProject({
+        userId: undefined,
+        projectIds: ["a"],
+        ownerOf,
+        onLookupFailure: noFailure,
+      }),
+    ).resolves.toBe(false);
+  });
+
+  it("fails closed and reports the failure when an owner lookup throws", async () => {
+    const failures: unknown[] = [];
+    await expect(
+      ownsEveryGovernedProject({
+        userId: "user-1",
+        projectIds: ["a"],
+        ownerOf: () => Promise.reject(new Error("projects unreadable")),
+        onLookupFailure: (error) => failures.push(error),
+      }),
+    ).resolves.toBe(false);
+    expect(failures).toHaveLength(1);
   });
 });

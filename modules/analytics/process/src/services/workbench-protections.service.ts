@@ -19,6 +19,7 @@ import {
   askViewerRolePermissions,
   isContentVisible,
   isContentVisibleToPublic,
+  ownsEveryGovernedProject,
   viewerFactsFrom,
   type ContentCategory,
   type DataPrivacyApi,
@@ -237,32 +238,26 @@ export class WorkbenchProtectionsService {
     };
   }
 
-  /**
-   * Whether the member owns every project whose policy governs the read, as the trace view
-   * reads it: the folded owner-only audience may be another project's. Unknown is not.
-   */
-  private async ownsEvery(input: {
+  /** Ownership read the one shared way; `loaded` saves re-reading the read's own project. */
+  private ownsEvery(input: {
     userId: string;
     projectIds: readonly string[];
     loaded: Project | undefined;
   }): Promise<boolean> {
-    const { userId, loaded } = input;
-    try {
-      const projects = await Promise.all(
-        input.projectIds.map((projectId) =>
-          loaded?.id === projectId
-            ? Promise.resolve(loaded)
-            : this.dependencies.projects.findById(projectId),
+    const { loaded } = input;
+    return ownsEveryGovernedProject({
+      userId: input.userId,
+      projectIds: input.projectIds,
+      ownerOf: async (projectId) =>
+        loaded?.id === projectId
+          ? loaded.ownerUserId
+          : (await this.dependencies.projects.findById(projectId))?.ownerUserId,
+      onLookupFailure: (error) =>
+        logger.error(
+          { error, projectIds: input.projectIds },
+          "project owner resolution failed; treating the member as not the owner (fail-closed)",
         ),
-      );
-      return projects.every((project) => project?.ownerUserId === userId);
-    } catch (error) {
-      logger.error(
-        { error, projectIds: input.projectIds },
-        "project owner resolution failed; treating the member as not the owner (fail-closed)",
-      );
-      return false;
-    }
+    });
   }
 
   /** The whole LangWatchQL catalogue, resolved for this principal at this project. */

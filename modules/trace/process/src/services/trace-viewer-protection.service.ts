@@ -6,6 +6,7 @@ import {
   describeAudience,
   isContentVisible,
   isContentVisibleToPublic,
+  ownsEveryGovernedProject,
   viewerFactsFrom,
   type ContentCategory,
   type ResolvedCategory,
@@ -232,31 +233,25 @@ export class TraceViewerProtectionService {
     ) as Protections["contentCategories"];
   }
 
-  /**
-   * Whether the viewer owns every project whose policy governs the read: the folded owner-only
-   * audience may be another project's. Unknown ownership is not ownership.
-   */
-  private async isProjectOwner(
+  /** Ownership read the one shared way, over every project whose policy governs the read. */
+  private isProjectOwner(
     input: Readonly<{
       projectId: string;
       userId: string | undefined;
       authorization?: Authorization;
     }>,
   ): Promise<boolean> {
-    const { userId } = input;
-    if (userId === undefined) return false;
-    try {
-      const projects = await Promise.all(
-        policyProjectIdsOf(input).map((projectId) => this.options.projects.findWithTeam(projectId)),
-      );
-      return projects.every((project) => project?.ownerUserId === userId);
-    } catch (error) {
-      this.logger.error(
-        { projectId: input.projectId, error },
-        "project owner resolution failed; treating the viewer as not the owner (fail-closed)",
-      );
-      return false;
-    }
+    return ownsEveryGovernedProject({
+      userId: input.userId,
+      projectIds: policyProjectIdsOf(input),
+      ownerOf: async (projectId) =>
+        (await this.options.projects.findWithTeam(projectId))?.ownerUserId,
+      onLookupFailure: (error) =>
+        this.logger.error(
+          { projectId: input.projectId, error },
+          "project owner resolution failed; treating the viewer as not the owner (fail-closed)",
+        ),
+    });
   }
 
   /**

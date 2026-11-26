@@ -19,22 +19,27 @@ import type { DataPrivacyDirectoryReader } from "../../app/data-privacy.app.ts";
 import { DataPrivacyPermissionsService } from "../data-privacy-permissions.service.ts";
 import { DataPrivacySnapshotService } from "../data-privacy-snapshot.service.ts";
 
-const directory: DataPrivacyDirectoryReader = {
-  findProjectLineage: async () => ({
-    projectId: "web-app",
-    name: "Web app",
-    teamId: "team-1",
-    organizationId: "org-1",
-    organizationName: "Org",
-  }),
-  findOrganizationDirectory: async () => ({
-    departments: [],
-    teams: [{ id: "team-1", name: "Platform" }],
-    projects: [{ id: "web-app", name: "Web app", teamId: "team-1" }],
-    groups: [],
-  }),
-  findScopeOrganizationId: async () => "org-1",
-};
+/** The policy reads the snapshot stands on, as `create` names them. */
+type SnapshotPolicies = Parameters<typeof DataPrivacySnapshotService.create>[0]["policies"];
+
+const directory = createApiFixture<DataPrivacyDirectoryReader>(
+  {
+    findProjectLineage: async () => ({
+      projectId: "web-app",
+      name: "Web app",
+      teamId: "team-1",
+      organizationId: "org-1",
+      organizationName: "Org",
+    }),
+    findOrganizationDirectory: async () => ({
+      departments: [],
+      teams: [{ id: "team-1", name: "Platform" }],
+      projects: [{ id: "web-app", name: "Web app", teamId: "team-1" }],
+      groups: [],
+    }),
+  },
+  "snapshot directory",
+);
 
 const adminsOnlyProjectRule: DataPrivacyPolicy = {
   id: "rule-1",
@@ -72,10 +77,13 @@ function snapshotAs(role: "admin" | "member") {
     }),
   });
   return DataPrivacySnapshotService.create({
-    policies: {
-      getResolvedForProject: async () => effective,
-      listOrganizationRules: async () => [adminsOnlyProjectRule],
-    },
+    policies: createApiFixture<SnapshotPolicies>(
+      {
+        getResolvedForProject: async () => effective,
+        listOrganizationRules: async () => [adminsOnlyProjectRule],
+      },
+      "snapshot policies",
+    ),
     directory,
     permissions: DataPrivacyPermissionsService.create({ authz }),
   }).getSnapshot({ userId: "user-1", projectId: "web-app" });

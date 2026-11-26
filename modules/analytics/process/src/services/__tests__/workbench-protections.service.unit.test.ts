@@ -367,6 +367,33 @@ describe("resolveMemberProtections", () => {
       expect(resolved.canSeeCapturedInput).toBe(false);
     });
 
+    it("hides owner-only content when the project owner read throws", async () => {
+      const ownerOnly = {
+        disposition: "restrict" as const,
+        audience: {
+          ...bothRestrictedToAdmins().categories.input.audience,
+          admins: false,
+          projectOwner: true,
+        },
+      };
+      const { dataPrivacy } = dataPrivacyResolving(async () => ({
+        ...PLATFORM_DEFAULT_DATA_PRIVACY,
+        categories: { ...PLATFORM_DEFAULT_DATA_PRIVACY.categories, input: ownerOnly },
+      }));
+      const projects = createApiFixture<ProjectApi>(
+        { findById: () => Promise.reject(new Error("projects unreadable")) },
+        "workbench projects",
+      );
+
+      const resolved = await serviceOver({
+        authz: authzAsRole("member").authz,
+        dataPrivacy,
+        projects,
+      }).resolveMemberProtections({ userId: "user-1", projectId: "project-1" });
+
+      expect(resolved.canSeeCapturedInput).toBe(false);
+    });
+
     it("hides captured content from a Viewer", async () => {
       const { dataPrivacy } = dataPrivacyResolving(async () => bothRestrictedToAdmins());
 
