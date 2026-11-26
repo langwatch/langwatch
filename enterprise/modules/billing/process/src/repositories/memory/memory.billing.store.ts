@@ -24,6 +24,8 @@ export type MemoryBillingOrganization = {
   teamIds: string[];
   signupData: Record<string, unknown>;
   sentPlanLimitAlert?: Instant | null;
+  /** When an admin accepted the PII Redaction Model's price; absent reads as never. */
+  piiRedactionModelAcceptedAt?: Instant | null;
 };
 
 /** A membership as organization's shared OrganizationUser table shows it to billing. */

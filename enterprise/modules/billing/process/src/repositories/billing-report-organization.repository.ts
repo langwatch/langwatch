@@ -38,4 +38,13 @@ export abstract class BillingReportOrganizationRepository {
   abstract getOrganizationForBilling(
     organizationId: string,
   ): Promise<BillingReportOrganizationLookup>;
+
+  /**
+   * When an organization admin accepted the PII Redaction Model's price, in epoch milliseconds:
+   * the PII redaction meter counts spend from then on only (ADR-201 decision 15). Null when no
+   * admin accepted it, and for an unknown organization.
+   */
+  abstract findPiiRedactionModelAcceptedAt(input: {
+    organizationId: string;
+  }): Promise<number | null>;
 }

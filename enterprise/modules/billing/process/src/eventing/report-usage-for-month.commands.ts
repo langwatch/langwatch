@@ -107,7 +107,7 @@ function toError(value: unknown): Error {
 }
 
 export interface ReportUsageForMonthCommandDeps {
-  organizations: BillingReportOrganizationRepository;
+  organizations: Pick<BillingReportOrganizationRepository, "getOrganizationForBilling">;
   billingCheckpoints: BillingCheckpointRepository;
   getUsageReportingService: () => UsageReportingService | undefined;
   /** The Instant Evals meter's total, read off the gateway spend ledger. */

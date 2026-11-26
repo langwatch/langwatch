@@ -83,6 +83,17 @@ export class MemoryBillingReportOrganizationRepository extends BillingReportOrga
     };
   }
 
+  async findPiiRedactionModelAcceptedAt({
+    organizationId,
+  }: {
+    organizationId: string;
+  }): Promise<number | null> {
+    return (
+      this.store.organizations.get(organizationId)?.piiRedactionModelAcceptedAt
+        ?.epochMilliseconds ?? null
+    );
+  }
+
   private connectedOrganizationForBilling(organizationId: string): BillingReportOrganizationLookup {
     const account = this.store.connectedBillingAccounts.get(organizationId);
     if (!account) return { outcome: "not_usage_billed" };
