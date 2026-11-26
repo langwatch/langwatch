@@ -11,7 +11,7 @@ Stored objects: uploads and stored bytes, their metadata, and how each is delive
 | Classification | core (`modules/catalogue.json`)                                                                                              |
 | Subjects       | stored-object                                                                                                                |
 | Halves         | [contract](contract) · [process](process/README.md)                                                                          |
-| Api token      | `StoredObjectApi` = `moduleApi<StoredObjectApi>()("stored-object")`, `contract/src/stored-object.api.ts:204` (19 operations) |
+| Api token      | `StoredObjectApi` = `moduleApi<StoredObjectApi>()("stored-object")`, `contract/src/stored-object.api.ts:209` (19 operations) |
 | Other token    | `StoredObjectFileApi`, `process/src/transport/stored-object-file.rest.ts:30`                                                 |
 | Other token    | `StoredObjectImageProxyApi`, `process/src/transport/stored-object-image-proxy.rest.ts:15`                                    |
 | Installed by   | api, worker, tasks (process)                                                                                                 |
