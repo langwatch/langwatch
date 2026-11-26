@@ -38,6 +38,14 @@ import {
 /** The shared turn helpers. Stateless: one instance for the module. */
 const LANGY_TURN_SHARED = LangyTurnSharedService.create();
 
+/** What stashing and dispatching a prepared turn both take. */
+type PreparedTurnHandoff = {
+  args: Parameters<LangyTurnPreparationService["prepareAndDispatch"]>[0];
+  prepared: ReturnType<LangyTurnPreparationService["buildPreparedTurn"]>;
+  runToken: string;
+  imageRefs: readonly LangyAttachmentRef[];
+};
+
 const logger = createLogger("langwatch:langy:turn-start");
 
 export class LangyTurnPreparationService {
@@ -351,17 +359,7 @@ export class LangyTurnPreparationService {
     };
   }
 
-  private async stashPreparedTurn({
-    args,
-    prepared,
-    runToken,
-    imageRefs,
-  }: {
-    args: Parameters<LangyTurnPreparationService["prepareAndDispatch"]>[0];
-    prepared: ReturnType<LangyTurnPreparationService["buildPreparedTurn"]>;
-    runToken: string;
-    imageRefs: readonly LangyAttachmentRef[];
-  }) {
+  private async stashPreparedTurn({ args, prepared, runToken, imageRefs }: PreparedTurnHandoff) {
     try {
       await Promise.all([
         args.accessStore.grant({
@@ -458,17 +456,7 @@ export class LangyTurnPreparationService {
     }
   }
 
-  private async dispatchPreparedTurn({
-    args,
-    prepared,
-    runToken,
-    imageRefs,
-  }: {
-    args: Parameters<LangyTurnPreparationService["prepareAndDispatch"]>[0];
-    prepared: ReturnType<LangyTurnPreparationService["buildPreparedTurn"]>;
-    runToken: string;
-    imageRefs: readonly LangyAttachmentRef[];
-  }) {
+  private async dispatchPreparedTurn({ args, prepared, runToken, imageRefs }: PreparedTurnHandoff) {
     if (!(await args.attempt.commit())) {
       return;
     }
