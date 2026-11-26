@@ -4138,6 +4138,9 @@ importers:
       '@langwatch/enterprise-saas-contract':
         specifier: workspace:*
         version: link:../../saas/contract
+      '@langwatch/entitlement-contract':
+        specifier: workspace:*
+        version: link:../../../../modules/entitlement/contract
       '@langwatch/evaluation-contract':
         specifier: workspace:*
         version: link:../../../../modules/evaluation/contract
@@ -15570,6 +15573,9 @@ importers:
       '@langwatch/data-retention-contract':
         specifier: workspace:*
         version: link:../../data-retention/contract
+      '@langwatch/enterprise-licensing-contract':
+        specifier: workspace:*
+        version: link:../../../enterprise/modules/licensing/contract
       '@langwatch/evaluator-contract':
         specifier: workspace:*
         version: link:../../evaluator/contract

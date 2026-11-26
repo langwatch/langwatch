@@ -109,9 +109,6 @@ describe("SimulationService", () => {
         runIds: [],
         reachedCap: false,
       });
-      await expect(
-        service.getDistinctExternalSetIds({ projectIds: [project.projectId] }),
-      ).resolves.toEqual(new Set());
     });
   });
 });

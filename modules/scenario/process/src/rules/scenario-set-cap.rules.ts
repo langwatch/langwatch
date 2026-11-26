@@ -5,9 +5,9 @@ import {
 } from "@langwatch/scenario-contract";
 
 /**
- * Whether a set counts as a simulation against the plan's cap. Platform-owned
- * sets (internal suite and on-platform runs, agent tests, voice calls) are
- * left out, matching what the distinct-set count leaves out.
+ * Whether a set counts as one the organization ran itself, for the simulation set it reports.
+ * Platform-owned sets (internal suite and on-platform runs, agent tests, voice calls) are left out,
+ * matching what the distinct-set count leaves out.
  */
 export function isCountedScenarioSet(scenarioSetId: string): boolean {
   return (
