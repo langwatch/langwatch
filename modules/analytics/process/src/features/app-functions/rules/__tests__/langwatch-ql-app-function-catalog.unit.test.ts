@@ -25,8 +25,6 @@ import {
   LWQL_APP_FUNCTION_KEY_KINDS,
 } from "../langwatch-ql-app-function-shapes.rules.ts";
 
-const DATABASE = "analytics";
-
 const schema = LangWatchQLSchemaService.create();
 
 /** A caller holding every content permission. */
@@ -133,13 +131,13 @@ describe("given the app-function catalog", () => {
     /** @scenario "Every catalogued function is published with a runnable example" */
     it("puts a call to its own function in every example", () => {
       for (const definition of LWQL_APP_FUNCTION_CATALOG) {
-        expect(definition.example(DATABASE), definition.name).toContain(`${definition.name}(`);
+        expect(definition.example(), definition.name).toContain(`${definition.name}(`);
       }
     });
 
     it("stays under the key cap the same function publishes", () => {
       for (const definition of LWQL_APP_FUNCTION_CATALOG) {
-        const limit = /LIMIT (\d+)/.exec(definition.example(DATABASE))?.[1];
+        const limit = /LIMIT (\d+)/.exec(definition.example())?.[1];
 
         expect(limit, `${definition.name} has no LIMIT`).toBeDefined();
         expect(Number(limit)).toBeLessThanOrEqual(lwqlAppFunctionCap(definition));
@@ -152,15 +150,15 @@ describe("given the app-function catalog", () => {
 
       expect(evals.length).toBeGreaterThan(0);
       for (const definition of evals) {
-        const example = definition.example(DATABASE);
+        const example = definition.example();
         expect(example, definition.name).toContain(`${definition.name}(llm_readable_thread(`);
         expect(example, definition.name).not.toMatch(/\bconversation(_bounded)?\(/);
       }
     });
 
-    it("qualifies its dataset with the deployment's own database", () => {
+    it("names its view bare, so the statement runs on every deployment", () => {
       for (const definition of LWQL_APP_FUNCTION_CATALOG) {
-        expect(definition.example("elsewhere"), definition.name).toContain("FROM elsewhere.");
+        expect(definition.example(), definition.name).toMatch(/\nFROM [a-z_]+\n/);
       }
     });
   });
@@ -170,7 +168,6 @@ describe("given the schema endpoint's app functions section", () => {
   describe("when the caller holds every content permission", () => {
     it("publishes one entry per catalogued function, in catalog order", () => {
       const functions = schema.describeAppFunctions({
-        database: DATABASE,
         protections: FULL,
       });
 
@@ -180,7 +177,7 @@ describe("given the schema endpoint's app functions section", () => {
     /** @scenario "Every catalogued function is published with a runnable example" */
     it("carries the signature, return type, encoding, key kind, cap and gates", () => {
       const [entry] = schema
-        .describeAppFunctions({ database: DATABASE, protections: FULL })
+        .describeAppFunctions({ protections: FULL })
         .filter((candidate) => candidate.name === "conversation_bounded");
 
       expect(entry).toMatchObject({
@@ -198,7 +195,6 @@ describe("given the schema endpoint's app functions section", () => {
 
     it("marks a JSON-returning function as JSON, so a consumer parses it back", () => {
       const functions = schema.describeAppFunctions({
-        database: DATABASE,
         protections: FULL,
       });
       const encodings = new Map(functions.map((entry) => [entry.name, entry.encoding]));
@@ -211,7 +207,7 @@ describe("given the schema endpoint's app functions section", () => {
     it("withholds an eval function until this project may judge at all", () => {
       const byName = new Map(
         schema
-          .describeAppFunctions({ database: DATABASE, protections: FULL })
+          .describeAppFunctions({ protections: FULL })
           .map((entry) => [entry.name, entry.available]),
       );
 
@@ -220,7 +216,6 @@ describe("given the schema endpoint's app functions section", () => {
         new Map(
           schema
             .describeAppFunctions({
-              database: DATABASE,
               protections: FULL,
               isInstantEvalsEnabled: true,
             })
@@ -234,7 +229,6 @@ describe("given the schema endpoint's app functions section", () => {
     /** @scenario "The schema lists a gated function rather than hiding it" */
     it("lists every gated function with available false rather than hiding it", () => {
       const functions = schema.describeAppFunctions({
-        database: DATABASE,
         protections: NONE,
       });
 
@@ -246,7 +240,6 @@ describe("given the schema endpoint's app functions section", () => {
 
     it("still offers the ungated function", () => {
       const functions = schema.describeAppFunctions({
-        database: DATABASE,
         protections: NONE,
       });
 
@@ -257,7 +250,6 @@ describe("given the schema endpoint's app functions section", () => {
   describe("when the caller holds one of two required permissions", () => {
     it("withholds a function needing both", () => {
       const functions = schema.describeAppFunctions({
-        database: DATABASE,
         protections: { catalogue: EVERY_CATALOGUE_PERMISSION, canSeeCapturedInput: true },
       });
       const byName = new Map(functions.map((entry) => [entry.name, entry.available]));

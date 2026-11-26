@@ -34,10 +34,10 @@ Never guess dataset or column names. The schema command lists every view your cr
 ```bash
 langwatch dashboard widget schema -f json > schema.json
 jq -r '.views[] | "\(.name) (\(.timeColumn)): \(.description)"' schema.json
-jq '.views[] | select(.name | endswith(".trace_metrics"))' schema.json
+jq '.views[] | select(.name == "trace_metrics")' schema.json
 ```
 
-Read the view's grain, its time column, and which columns are `available` to you. A view's full name carries the database this deployment serves it from (`langwatch.trace_metrics` on LangWatch Cloud, `analytics.trace_metrics` on some self-hosted installs): write the name exactly as `schema.json` gives it. The examples below use the Cloud spelling. The views most questions need:
+Read the view's grain, its time column, and which columns are `available` to you. Write a view by its bare name, as `schema.json` gives it (`trace_metrics`, never `langwatch.trace_metrics`), so one query runs on LangWatch Cloud and on every self-hosted install. The views most questions need:
 
 - `trace_metrics`: one row per trace with cost, latency, tokens, the user, conversation and `Source` (the origin). Traces, cost, latency and usage questions start here.
 - `evaluation_metrics` and `trace_evaluation_metrics`: evaluation and online evaluation outcomes.
@@ -62,7 +62,7 @@ Every query reads the dashboard's own period: bound the view's time column with 
 [
   {
     "name": "cost_by_model",
-    "sql": "SELECT Model AS model, sum(CostSum) AS cost FROM langwatch.model_usage_by_minute WHERE BucketStart >= {dashboard_context_period_start:DateTime} AND BucketStart < {dashboard_context_period_end:DateTime} GROUP BY model ORDER BY cost DESC LIMIT 10",
+    "sql": "SELECT Model AS model, sum(CostSum) AS cost FROM model_usage_by_minute WHERE BucketStart >= {dashboard_context_period_start:DateTime} AND BucketStart < {dashboard_context_period_end:DateTime} GROUP BY model ORDER BY cost DESC LIMIT 10",
     "parameters": []
   }
 ]
@@ -222,7 +222,7 @@ export default function Widget() {
 [
   {
     "name": "daily_traces",
-    "sql": "SELECT toStartOfDay(OccurredAt) AS day, uniqExact(TraceId) AS traces FROM langwatch.trace_metrics WHERE OccurredAt >= {dashboard_context_period_start:DateTime} AND OccurredAt < {dashboard_context_period_end:DateTime} AND Source IN {dashboard_context_sources:Array(String)} GROUP BY day ORDER BY day",
+    "sql": "SELECT toStartOfDay(OccurredAt) AS day, uniqExact(TraceId) AS traces FROM trace_metrics WHERE OccurredAt >= {dashboard_context_period_start:DateTime} AND OccurredAt < {dashboard_context_period_end:DateTime} AND Source IN {dashboard_context_sources:Array(String)} GROUP BY day ORDER BY day",
     "parameters": []
   }
 ]
