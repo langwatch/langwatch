@@ -7,7 +7,7 @@ const meta = {
   title: "Navigation and layout/Project picker",
   parameters: {
     usage: {
-      use: "Switching the current project, wherever a page offers it: the top bar and every page that borrows project's switcher.",
+      use: "Switching the current project, wherever a page offers it: the top bar and every page that borrows project's switcher. Pointing at a row (or arrowing to it) shows that project's ID with a copy button.",
       avoid:
         "Building another project menu: hand this picker the groups instead. Choosing scopes for a resource: use Scope chip picker.",
     },
@@ -15,7 +15,7 @@ const meta = {
   component: ProjectPicker,
   tags: ["autodocs"],
   args: {
-    currentProjectId: "project-web",
+    currentProjectId: "project_0000aBcDeFgHiJH1Ziwj",
     currentProjectName: "Web",
     showTeamHeaders: true,
     onOpenProject: () => void 0,
@@ -23,15 +23,20 @@ const meta = {
       {
         team: { teamId: "team-platform", orgId: "org-1", label: "Platform" },
         projects: [
-          { projectId: "project-web", label: "Web", href: "/web" },
-          { projectId: "project-api", label: "Api", href: "/api" },
+          { projectId: "project_0000aBcDeFgHiJH1Ziwj", label: "Web", href: "/web" },
+          { projectId: "project_0000kLmNoPqRsTSr4Pwe", label: "Api", href: "/api" },
         ],
       },
       {
         team: { teamId: "team-growth", orgId: "org-1", label: "Growth" },
         projects: [
-          { projectId: "project-leads", label: "Lead scorer", href: "/leads" },
-          { projectId: "project-all", label: "Everything", href: "/all", isAggregate: true },
+          { projectId: "project_0000uVwXyZaBcDLe4dSc", label: "Lead scorer", href: "/leads" },
+          {
+            projectId: "project_0000eFgHiJkLmNA11Prj",
+            label: "Everything",
+            href: "/all",
+            isAggregate: true,
+          },
         ],
       },
     ],
@@ -50,8 +55,8 @@ export const OneTeam: Story = {
       {
         team: { teamId: "team-platform", orgId: "org-1", label: "Platform" },
         projects: [
-          { projectId: "project-web", label: "Web", href: "/web" },
-          { projectId: "project-api", label: "Api", href: "/api" },
+          { projectId: "project_0000aBcDeFgHiJH1Ziwj", label: "Web", href: "/web" },
+          { projectId: "project_0000kLmNoPqRsTSr4Pwe", label: "Api", href: "/api" },
         ],
       },
     ],
@@ -69,7 +74,7 @@ export const WithCreateEntries: Story = {
           label: "Platform",
           canCreateProject: true,
         },
-        projects: [{ projectId: "project-web", label: "Web", href: "/web" }],
+        projects: [{ projectId: "project_0000aBcDeFgHiJH1Ziwj", label: "Web", href: "/web" }],
       },
     ],
   },
