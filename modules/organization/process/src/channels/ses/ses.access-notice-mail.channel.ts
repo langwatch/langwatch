@@ -1,7 +1,9 @@
 import {
   sendIdpRefusedSignInEmail,
+  sendSeatRequestAnsweredEmail,
   sendSeatRequestEmail,
   type MailSender,
+  type SeatRequestAnsweredProps,
   type SeatRequestProps,
 } from "@langwatch/mail";
 import type { NotificationService } from "@langwatch/notification-contract";
@@ -36,5 +38,9 @@ export class SesAccessNoticeMailChannel extends AccessNoticeMailChannel {
 
   sendIdpRefused(input: IdpRefusedMail & Envelope): Promise<void> {
     return sendIdpRefusedSignInEmail({ ...input, mailer: this.mailer });
+  }
+
+  sendSeatRequestAnswered(input: SeatRequestAnsweredProps & Envelope): Promise<void> {
+    return sendSeatRequestAnsweredEmail({ ...input, mailer: this.mailer });
   }
 }

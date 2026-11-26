@@ -17,6 +17,8 @@ const state = vi.hoisted(() => ({
   setBilling: [] as unknown[],
   provenance: {} as Record<string, unknown>,
   provenanceFails: false,
+  seatRequests: undefined as unknown,
+  seatAnswers: [] as { path: string; input: unknown }[],
 }));
 
 vi.mock("../../../behavior/organization-api.ts", () => {
@@ -32,7 +34,24 @@ vi.mock("../../../behavior/organization-api.ts", () => {
         authz: { listBillingMembers: invalidator },
         limits: { getUsage: invalidator },
         licenseEnforcement: { checkLimit: invalidator },
+        seatRequest: { listOpen: invalidator },
       }),
+      seatRequest: {
+        listOpen: { useQuery: () => ({ data: state.seatRequests }) },
+        ...Object.fromEntries(
+          ["approve", "approveWithSeat", "completeSeatApproval", "decline"].map((name) => [
+            name,
+            {
+              useMutation: () => ({
+                mutateAsync: async (input: unknown) => {
+                  state.seatAnswers.push({ path: name, input });
+                  return { outcome: "promoted" };
+                },
+              }),
+            },
+          ]),
+        ),
+      },
       organization: {
         getMemberById: {
           useQuery: () => ({ data: state.member, isError: false, error: null }),
@@ -120,8 +139,75 @@ describe("given a person opened from the members list", () => {
     state.provenanceFails = false;
     state.billingHolders = [];
     state.setBilling = [];
+    state.seatRequests = undefined;
+    state.seatAnswers = [];
   });
   afterEach(() => cleanup());
+
+  describe("when the person has an open seat request", () => {
+    const openRequest = {
+      requests: [
+        {
+          id: "seat-request-sam",
+          email: "sam@acme.com",
+          name: "Sam Rivera",
+          userId: "user-sam",
+          source: "requested",
+          idpRefused: false,
+          idpKind: null,
+          reason: "run the workbench",
+          openedAt: 0,
+        },
+        {
+          id: "seat-request-other",
+          email: "other@acme.com",
+          name: "Someone Else",
+          userId: "user-other",
+          source: "pending",
+          idpRefused: false,
+          idpKind: null,
+          reason: null,
+          openedAt: 0,
+        },
+      ],
+      seatFree: true,
+      approvalPath: { kind: "upgrade_plan", url: "/settings/subscription" },
+    };
+
+    /** @scenario "The member drawer shows the person's open seat request" */
+    it("shows only their request with Approve and Decline", async () => {
+      state.seatRequests = openRequest;
+      renderWithOrganizationHost(
+        <PersonDrawer userId="user-sam" />,
+        new FakeOrganizationHost({
+          currentUser: ANA,
+          grants: new Set([
+            "organization:view",
+            "organization:manage",
+            "seatRequests:view",
+            "seatRequests:manage",
+          ]),
+        }),
+      );
+
+      const section = await screen.findByTestId("person-seat-request");
+      expect(section).toHaveTextContent("run the workbench");
+      expect(section).not.toHaveTextContent("Someone Else");
+      await userEvent.click(screen.getByRole("button", { name: "Approve" }));
+      expect(state.seatAnswers).toEqual([
+        { path: "approve", input: { organizationId: "org-1", seatRequestId: "seat-request-sam" } },
+      ]);
+      expect(screen.getByRole("button", { name: "Decline" })).toBeInTheDocument();
+    });
+
+    it("stays hidden from a reader who cannot see seat requests", async () => {
+      state.seatRequests = openRequest;
+      renderDrawer();
+
+      await screen.findByTestId("person-address-state");
+      expect(screen.queryByTestId("person-seat-request")).toBeNull();
+    });
+  });
 
   describe("when an administrator toggles Billing", () => {
     /** @scenario "Admin grants and revokes Billing" */

@@ -95,6 +95,29 @@ export class PrismaInstanceAdminRepository extends InstanceAdminRepository {
     }
   }
 
+  async findActiveSubscriptionIds({
+    organizationId,
+  }: {
+    organizationId: string;
+  }): Promise<string[]> {
+    const rows = await this.database.subscription.findMany({
+      where: { organizationId, status: SubscriptionStatus.ACTIVE },
+      select: { id: true },
+    });
+    return rows.map((row) => row.id);
+  }
+
+  findSubscriptionStates({
+    ids,
+  }: {
+    ids: string[];
+  }): Promise<{ id: string; organizationId: string; status: string }[]> {
+    return this.database.subscription.findMany({
+      where: { id: { in: ids } },
+      select: { id: true, organizationId: true, status: true },
+    });
+  }
+
   async findUserById(id: string): Promise<AdminDataResult> {
     const data = await this.database.user.findUnique({ where: { id } });
     return { data };

@@ -35,6 +35,7 @@ export class MemorySeatRequestRepository implements SeatRequestRepository {
         source: input.source,
         idpRefused: input.idpRefused,
         idpKind: input.idpKind,
+        reason: input.reason ?? null,
         salesNotifiedAt: null,
         openedAt: input.at,
         resolvedAt: null,
@@ -50,6 +51,7 @@ export class MemorySeatRequestRepository implements SeatRequestRepository {
         name: existing.name ?? input.name,
         idpRefused: existing.idpRefused || input.idpRefused,
         idpKind: input.idpKind ?? existing.idpKind,
+        reason: input.reason ?? existing.reason,
       };
       this.rows[index] = request;
       return { request, outcome: "already_open" };
@@ -62,6 +64,7 @@ export class MemorySeatRequestRepository implements SeatRequestRepository {
       source: input.source,
       idpRefused: input.idpRefused,
       idpKind: input.idpKind,
+      reason: input.reason ?? null,
       openedAt: input.at,
       resolvedAt: null,
       resolvedByUserId: null,

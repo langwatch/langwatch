@@ -60,6 +60,17 @@ export abstract class BillingWebhookSubscriptionRepository {
     excludeSubscriptionId: string;
   }): Promise<CancelledSubscription[]>;
 
+  abstract findLiveUnlinkedBeside(input: {
+    pendingId: string;
+  }): Promise<BillingSubscriptionRecord[]>;
+
+  abstract findLiveLinkedBeside(input: { pendingId: string }): Promise<BillingSubscriptionRecord[]>;
+
+  abstract adoptCheckout(input: { pendingId: string; liveId: string }): Promise<void>;
+
+  /** Cancels the row only while its checkout is still PENDING; answers the rows it cancelled. */
+  abstract cancelPendingCheckout(input: { id: string }): Promise<BillingSubscriptionRecord[]>;
+
   abstract updateQuantities(input: {
     id: string;
     maxMembers: number | null;

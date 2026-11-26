@@ -32,6 +32,10 @@ export class HttpStripeInvoicesChannel extends StripeInvoicesChannel {
     });
     return { ...invoiceOf(invoice), card: cardOf(invoice) };
   }
+
+  async voidInvoice({ invoiceId }: { invoiceId: string }): Promise<void> {
+    await this.stripe.invoices.voidInvoice(invoiceId);
+  }
 }
 
 /** The card the invoice's payment tried: the attached method, else the one its last error names. */

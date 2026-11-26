@@ -10,6 +10,7 @@ import {
   LicenseBillingSectionToken,
   PaymentRecoveryBannerToken,
   SeatProrationPreviewToken,
+  SeatRoleOfferToken,
 } from "@langwatch/enterprise-billing-client";
 import { billingWebConfigSchema } from "@langwatch/enterprise-billing-contract";
 
@@ -61,5 +62,10 @@ export const billingWeb = defineBrowserModule("billing")
     load: async () => ({
       default: (await import("./ui/sections/seat-proration-preview/seat-proration-preview.tsx"))
         .SeatProrationPreview,
+    }),
+  })
+  .lends(SeatRoleOfferToken, {
+    load: async () => ({
+      default: (await import("./ui/sections/seat-role-offer/seat-role-offer.tsx")).SeatRoleOffer,
     }),
   });

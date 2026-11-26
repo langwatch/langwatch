@@ -74,9 +74,13 @@ describe("seatRequest on organization's router", () => {
   it("exposes exactly the procedure names the clients call", () => {
     expect(Object.keys(router._def.procedures).toSorted()).toEqual([
       "approve",
+      "approveWithSeat",
+      "completeSeatApproval",
       "decline",
       "listOpen",
+      "myAccessRequest",
       "myHeldMemberships",
+      "requestAccess",
     ]);
   });
 

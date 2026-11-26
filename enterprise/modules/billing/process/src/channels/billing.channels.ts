@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 import type { BillingAlertChannel } from "./billing-alert.channel.ts";
+import type { BillingFixedEmailChannel } from "./billing-fixed-email.channel.ts";
 import type { BillingStripeChannels } from "./billing-stripe.channels.ts";
 import type { ConnectedStatementMailChannel } from "./connected-statement-mail.channel.ts";
 import type { HubspotFormChannel } from "./hubspot-form.channel.ts";
@@ -11,6 +12,7 @@ import type { UsageLimitEmailChannel } from "./usage-limit-email.channel.ts";
 export interface BillingChannels {
   readonly stripe: BillingStripeChannels | undefined;
   readonly alerts: BillingAlertChannel;
+  readonly billingFixedEmail: BillingFixedEmailChannel;
   readonly hubspotForms: HubspotFormChannel;
   readonly licenseEmail: LicenseEmailChannel;
   readonly paymentRecoveryEmail: PaymentRecoveryEmailChannel;

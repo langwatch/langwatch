@@ -1,4 +1,6 @@
 import {
+  UiHostServiceUnavailableError,
+  type UiSession,
   useUiHostServices,
   useUiDeployment,
   useUiScope,
@@ -95,12 +97,26 @@ class CapabilityLicensingHost extends LicensingHostApi {
 }
 
 /**
+ * Whether the reader manages the active organization. Asked at the organization, not at the
+ * active project, where an organization admin can read as "no"; a session port that cannot
+ * answer at the organization falls back to its scope-wide answer.
+ */
+export function managesOrganization(session: UiSession): boolean {
+  try {
+    return session.hasOrganizationPermission("organization:manage");
+  } catch (error) {
+    if (!(error instanceof UiHostServiceUnavailableError)) throw error;
+    return session.hasPermission("organization:manage");
+  }
+}
+
+/**
  * The declared mount: one provider above the routed tree, plus the store-driven upgrade
  * dialog every routed page opens. Default-exported because `mounts.load` resolves it.
  */
 export default function LicensingHostMount({ children }: { children?: ReactNode }) {
   const { feedback, session } = useUiHostServices();
-  const mayManageOrganization = session.hasPermission("organization:manage");
+  const mayManageOrganization = managesOrganization(session);
   const { organizationId } = useUiScope().activeScope();
   const deployment = useUiDeployment();
   const utils = licensingApi.useUtils();

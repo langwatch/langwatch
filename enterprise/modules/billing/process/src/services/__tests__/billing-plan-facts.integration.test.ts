@@ -131,6 +131,7 @@ function billingOver(held: readonly Held[], now: () => Instant = () => AT) {
     recordSeatCheckoutPaid: recorder(),
     recordSeatCheckoutsAbandoned: recorder(),
     recordOverPlanChanged: recorder(),
+    recordSeatInvoicePaid: recorder(),
   });
   const lifecycle = BillingSubscriptionLifecycleService.create({
     subscriptionRepository: MemoryBillingWebhookSubscriptionRepository.create({

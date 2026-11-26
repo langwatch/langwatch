@@ -17,4 +17,7 @@ export abstract class StripeInvoicesChannel {
 
   /** One invoice by id; throws when Stripe cannot answer it. */
   abstract getInvoice(input: { invoiceId: string }): Promise<BillingInvoiceDetail>;
+
+  /** Voids an open invoice, dropping the subscription change it holds; throws when refused. */
+  abstract voidInvoice(input: { invoiceId: string }): Promise<void>;
 }

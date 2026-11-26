@@ -6,6 +6,7 @@ import { GrantScopeTier } from "@langwatch/authz-contract";
  * Spec: specs/members/member-access-editing.feature
  */
 import { DesignSystemProvider } from "@langwatch/design-system/provider";
+import type { SeatRoleOfferKind, SeatRoleOfferProps } from "@langwatch/enterprise-billing-client";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import type * as reactModule from "react";
@@ -25,11 +26,25 @@ const {
   mockInvalidateGetAll,
   mockInvalidateGetMemberById,
   mockInvalidateGetUsage,
+  mockInvalidateActivePlan,
+  mockRecordBlocked,
   mockToasterCreate,
   mockMemberGrantsData,
   mockListForMemberData,
   mockNextSeat,
+  mockChangeWithSeat,
+  mockCompleteChange,
+  mockUsageData,
+  mockPendingChange,
+  mockOfferKind,
 } = vi.hoisted(() => ({
+  mockChangeWithSeat: vi.fn(),
+  mockCompleteChange: vi.fn(),
+  // Seat usage as limits.getUsage answers it; undefined reads as unknown, which offers nothing.
+  mockUsageData: { current: undefined as unknown },
+  mockPendingChange: { current: null as unknown },
+  // What billing's lent seat offer reports, as the stub below reports it.
+  mockOfferKind: { current: "charge" as string },
   mockUpdateMemberRole: vi.fn(),
   mockApplyMemberGrants: vi.fn(),
   mockInvalidateListMemberGrants: vi.fn().mockResolvedValue(undefined),
@@ -38,6 +53,8 @@ const {
   mockInvalidateGetAll: vi.fn().mockResolvedValue(undefined),
   mockInvalidateGetMemberById: vi.fn().mockResolvedValue(undefined),
   mockInvalidateGetUsage: vi.fn().mockResolvedValue(undefined),
+  mockInvalidateActivePlan: vi.fn().mockResolvedValue(undefined),
+  mockRecordBlocked: vi.fn().mockResolvedValue({ recorded: true }),
   mockToasterCreate: vi.fn(),
   mockMemberGrantsData: {
     current: [] as {
@@ -71,8 +88,15 @@ vi.mock("../../../behavior/organization-api.ts", () => ({
         getAll: { invalidate: mockInvalidateGetAll },
         getScopeGraph: { invalidate: () => Promise.resolve() },
         getMemberById: { invalidate: mockInvalidateGetMemberById },
+        pendingSeatRoleChange: { invalidate: () => Promise.resolve() },
+        listHeldSeats: { invalidate: () => Promise.resolve() },
       },
       limits: { getUsage: { invalidate: mockInvalidateGetUsage } },
+      plan: { getActivePlan: { invalidate: mockInvalidateActivePlan } },
+      licenseEnforcement: {
+        checkLimit: { invalidate: () => Promise.resolve() },
+        checkAllLimits: { invalidate: () => Promise.resolve() },
+      },
     }),
     authz: {
       listMemberGrants: {
@@ -101,9 +125,60 @@ vi.mock("../../../behavior/organization-api.ts", () => ({
       updateMemberRole: {
         useMutation: () => ({ mutateAsync: mockUpdateMemberRole }),
       },
+      getMemberById: {
+        useQuery: () => ({ data: { user: { name: "Sam", email: "sam@acme.test" } } }),
+      },
+      changeMemberRoleWithSeat: {
+        useMutation: () => ({ mutateAsync: mockChangeWithSeat }),
+      },
+      completeSeatRoleChange: {
+        useMutation: () => ({ mutateAsync: mockCompleteChange }),
+      },
+      recordBlockedRoleChange: {
+        useMutation: () => ({ mutateAsync: mockRecordBlocked }),
+      },
+      pendingSeatRoleChange: {
+        useQuery: () => ({ data: mockPendingChange.current }),
+      },
+    },
+    limits: {
+      getUsage: { useQuery: () => ({ data: mockUsageData.current }) },
     },
   },
 }));
+
+vi.mock("../../../behavior/use-organization-team-project.ts", () => ({
+  useOrganizationTeamProject: () => ({
+    organization: { id: "org-1", name: "ACME", teams: [] },
+    project: undefined,
+  }),
+}));
+
+// Billing's lent offer is billing's to test; this stub reports a kind and confirms a quote.
+vi.mock("../../../behavior/lent-seat-role-offer.tsx", async () => {
+  const React = await vi.importActual<typeof reactModule>("react");
+  return {
+    SeatRoleOffer: (props: SeatRoleOfferProps) => {
+      const { onKind, onAmountDue } = props;
+      React.useEffect(() => {
+        onKind?.(mockOfferKind.current as SeatRoleOfferKind);
+        if (mockOfferKind.current === "charge") onAmountDue?.("$5.19");
+      }, [onKind, onAmountDue]);
+      return (
+        <div
+          data-testid="seat-role-offer"
+          data-state={props.state}
+          data-role={props.roleLabel}
+          data-current-role={props.currentRoleLabel}
+        >
+          <button type="button" onClick={() => props.onConfirm(1_700_000_000_000)}>
+            Buy the seat
+          </button>
+        </div>
+      );
+    },
+  };
+});
 
 // The toaster and the error toast are the host port's `succeeded`/`failed` in
 // this package, so what the editor says is asserted where it is composed. The
@@ -254,6 +329,9 @@ describe("<MemberAccessEditor/>", () => {
       teamsLeftWithoutAdmin: [],
     });
     mockApplyMemberGrants.mockResolvedValue(undefined);
+    mockUsageData.current = undefined;
+    mockPendingChange.current = null;
+    mockOfferKind.current = "charge";
   });
 
   afterEach(() => {
@@ -838,6 +916,380 @@ describe("<MemberAccessEditor/>", () => {
       renderEditor();
       const save = screen.getByRole("button", { name: /^save$/i });
       expect(save.hasAttribute("disabled")).toBe(true);
+    });
+  });
+
+  describe("given a Lite Member and every full seat in use", () => {
+    const fullSeatsTaken = {
+      membersCount: 2,
+      membersLiteCount: 1,
+      membersDeveloperCount: 0,
+      activePlan: { type: "GROWTH_SEAT_USAGE" },
+      seatLimitInfo: {
+        status: "ok",
+        members: { current: 2, max: 2, exceeded: false },
+        membersLite: { current: 1, max: 100, exceeded: false },
+        message: "",
+      },
+    };
+    const renderLite = () => renderEditor({ memberRole: OrganizationUserRole.EXTERNAL });
+    const pickAdmin = () => {
+      mockNextSeat.current = OrganizationUserRole.ADMIN;
+      fireEvent.click(screen.getByTestId("org-role-field"));
+    };
+
+    beforeEach(() => {
+      mockUsageData.current = fullSeatsTaken;
+    });
+
+    /** @scenario "The offer appears under the role when no full seat is free" */
+    it("offers the seat under the role field and drops Save", () => {
+      renderLite();
+      expect(screen.queryByTestId("seat-role-offer")).toBeNull();
+
+      pickAdmin();
+
+      const offer = screen.getByTestId("seat-role-offer");
+      expect(offer.getAttribute("data-role")).toBe("Admin");
+      expect(offer.getAttribute("data-current-role")).toBe("Lite Member");
+      expect(screen.queryByRole("button", { name: /^save$/i })).toBeNull();
+      expect(screen.getByRole("button", { name: /cancel/i })).toBeTruthy();
+    });
+
+    /** @scenario "A plan on custom terms points to support for the seat" */
+    it("drops Save while the plan's seats are changed by our team", async () => {
+      mockOfferKind.current = "support";
+      renderLite();
+      pickAdmin();
+
+      await vi.waitFor(() => {
+        expect(screen.queryByRole("button", { name: /^save$/i })).toBeNull();
+      });
+      expect(screen.getByTestId("seat-role-offer")).toBeTruthy();
+      expect(screen.getByRole("button", { name: /cancel/i })).toBeTruthy();
+    });
+
+    it("offers nothing while a full seat is free", () => {
+      mockUsageData.current = {
+        ...fullSeatsTaken,
+        seatLimitInfo: {
+          ...fullSeatsTaken.seatLimitInfo,
+          members: { current: 1, max: 2, exceeded: false },
+        },
+      };
+      renderLite();
+      pickAdmin();
+      expect(screen.queryByTestId("seat-role-offer")).toBeNull();
+      expect(screen.getByRole("button", { name: /^save$/i })).toBeTruthy();
+    });
+
+    /** @scenario "A plan without paid seats keeps Save" */
+    it("keeps Save when the plan has no paid seats", () => {
+      mockOfferKind.current = "none";
+      renderLite();
+      pickAdmin();
+      expect(screen.getByRole("button", { name: /^save$/i })).not.toBeDisabled();
+    });
+
+    /** @scenario "One click adds the seat and changes the role" */
+    it("buys the seat and changes the role in one click", async () => {
+      mockChangeWithSeat.mockResolvedValue({
+        status: "changed",
+        seatAdded: true,
+        teamsLeftWithoutAdmin: [],
+      });
+      renderLite();
+      pickAdmin();
+
+      fireEvent.click(screen.getByRole("button", { name: "Buy the seat" }));
+
+      await vi.waitFor(() => {
+        expect(screen.getByTestId("seat-role-offer").getAttribute("data-state")).toBe("done");
+      });
+      expect(mockChangeWithSeat).toHaveBeenCalledWith({
+        organizationId: "org-1",
+        userId: "user-1",
+        role: OrganizationUserRole.ADMIN,
+        quotedAt: 1_700_000_000_000,
+      });
+      expect(mockUpdateMemberRole).not.toHaveBeenCalled();
+      await vi.waitFor(() => {
+        expect(mockToasterCreate).toHaveBeenCalledWith(
+          expect.objectContaining({
+            title: "Sam is now an Admin",
+            description: "1 seat added, $5.19 paid.",
+            type: "success",
+          }),
+        );
+      });
+      expect(mockInvalidateGetUsage).toHaveBeenCalled();
+    });
+
+    /** @scenario "A payment the customer must finish waits, then applies" */
+    it("waits in the drawer with a new-tab payment link, then applies when it is paid", async () => {
+      mockChangeWithSeat.mockResolvedValue({
+        status: "payment_required",
+        changeId: "change-1",
+        url: "https://pay.example.test/invoice",
+      });
+      mockCompleteChange.mockResolvedValue({ status: "waiting", reason: null });
+      renderLite();
+      pickAdmin();
+
+      fireEvent.click(screen.getByRole("button", { name: "Buy the seat" }));
+
+      await vi.waitFor(() => {
+        expect(screen.getByTestId("seat-role-waiting")).toBeTruthy();
+      });
+      expect(screen.getByText("Waiting for the seat payment.")).toBeTruthy();
+      expect(screen.getByText("Sam becomes Admin as soon as it is paid.")).toBeTruthy();
+      const pay = screen.getByRole("link", { name: "Finish paying on Stripe" });
+      expect(pay.getAttribute("href")).toBe("https://pay.example.test/invoice");
+      expect(pay.getAttribute("target")).toBe("_blank");
+      expect(pay.getAttribute("rel")).toBe("noopener");
+
+      mockCompleteChange.mockResolvedValue({ status: "applied", reason: null });
+      // A focus while an earlier ask is still in flight is skipped, so it is sent until one lands.
+      await vi.waitFor(
+        () => {
+          fireEvent.focus(window);
+          expect(screen.getByTestId("seat-role-offer").getAttribute("data-state")).toBe("done");
+        },
+        { timeout: 5000 },
+      );
+      expect(mockCompleteChange).toHaveBeenCalledWith({
+        organizationId: "org-1",
+        changeId: "change-1",
+      });
+      await vi.waitFor(
+        () => {
+          expect(mockToasterCreate).toHaveBeenCalledWith(
+            expect.objectContaining({ title: "Sam is now an Admin", type: "success" }),
+          );
+        },
+        { timeout: 5000 },
+      );
+    });
+
+    /** @scenario "A reopened drawer resumes a change waiting on its payment" */
+    it("resumes a change still waiting on its payment", () => {
+      mockPendingChange.current = {
+        changeId: "change-1",
+        role: OrganizationUserRole.ADMIN,
+        url: "https://pay.example.test/invoice",
+        status: "waiting",
+        reason: null,
+      };
+      mockCompleteChange.mockResolvedValue({ status: "waiting", reason: null });
+      renderLite();
+      expect(screen.getByTestId("seat-role-waiting")).toBeTruthy();
+    });
+
+    /** @scenario "A failed payment changes nothing" */
+    it("says nothing changed when the payment fails, and offers the seat again", async () => {
+      mockPendingChange.current = {
+        changeId: "change-1",
+        role: OrganizationUserRole.ADMIN,
+        url: "https://pay.example.test/invoice",
+        status: "waiting",
+        reason: null,
+      };
+      mockCompleteChange.mockResolvedValue({ status: "failed", reason: null });
+      renderLite();
+
+      fireEvent.focus(window);
+
+      await vi.waitFor(() => {
+        expect(
+          screen.getByText(
+            "The payment didn't go through, so nothing changed. Sam is still a Lite Member.",
+          ),
+        ).toBeTruthy();
+      });
+      expect(screen.getByTestId("seat-role-offer").getAttribute("data-state")).toBe("offer");
+    });
+
+    /** @scenario "A bought seat refreshes the seat counts and says so once" */
+    it("re-reads the seat counts and the plan's caps, then toasts once", async () => {
+      mockChangeWithSeat.mockResolvedValue({
+        status: "changed",
+        seatAdded: true,
+        teamsLeftWithoutAdmin: [],
+      });
+      renderLite();
+      pickAdmin();
+
+      fireEvent.click(screen.getByRole("button", { name: "Buy the seat" }));
+
+      await vi.waitFor(() => {
+        expect(mockToasterCreate).toHaveBeenCalledTimes(1);
+      });
+      expect(mockInvalidateGetUsage).toHaveBeenCalled();
+      expect(mockInvalidateActivePlan).toHaveBeenCalled();
+      expect(mockInvalidateOrgWithMembers).toHaveBeenCalled();
+      expect(mockToasterCreate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          title: "Sam is now an Admin",
+          description: "1 seat added, $5.19 paid.",
+          type: "success",
+        }),
+      );
+    });
+
+    /** @scenario "A bought seat refreshes the seat counts and says so once" */
+    it("still toasts when re-reading the counts fails", async () => {
+      mockInvalidateGetUsage.mockRejectedValueOnce(new Error("network"));
+      mockChangeWithSeat.mockResolvedValue({
+        status: "changed",
+        seatAdded: true,
+        teamsLeftWithoutAdmin: [],
+      });
+      renderLite();
+      pickAdmin();
+
+      fireEvent.click(screen.getByRole("button", { name: "Buy the seat" }));
+
+      await vi.waitFor(() => {
+        expect(mockToasterCreate).toHaveBeenCalledWith(
+          expect.objectContaining({ title: "Sam is now an Admin", type: "success" }),
+        );
+      });
+    });
+
+    /** @scenario "A bought seat refreshes the seat counts and says so once" */
+    it("re-reads the counts once a waiting change applies, and toasts once", async () => {
+      mockPendingChange.current = {
+        changeId: "change-1",
+        role: OrganizationUserRole.ADMIN,
+        url: "https://pay.example.test/invoice",
+        status: "waiting",
+        reason: null,
+      };
+      mockCompleteChange.mockResolvedValue({ status: "applied", reason: null });
+      renderLite();
+
+      await vi.waitFor(
+        () => {
+          fireEvent.focus(window);
+          expect(mockToasterCreate).toHaveBeenCalled();
+        },
+        { timeout: 5000 },
+      );
+      fireEvent.focus(window);
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      expect(mockToasterCreate).toHaveBeenCalledTimes(1);
+      expect(mockInvalidateActivePlan).toHaveBeenCalled();
+    });
+
+    /** @scenario "A bought seat refreshes the seat counts and says so once" */
+    it("re-reads the counts when the seat was paid but the role refused", async () => {
+      mockPendingChange.current = {
+        changeId: "change-1",
+        role: OrganizationUserRole.ADMIN,
+        url: "https://pay.example.test/invoice",
+        status: "waiting",
+        reason: null,
+      };
+      mockCompleteChange.mockResolvedValue({ status: "seat_only", reason: "Refused." });
+      renderLite();
+
+      await vi.waitFor(
+        () => {
+          fireEvent.focus(window);
+          expect(mockInvalidateActivePlan).toHaveBeenCalled();
+        },
+        { timeout: 5000 },
+      );
+      expect(mockToasterCreate).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "A paid seat whose role change was refused says so in the drawer" */
+    it("says the seat was added and paid but the role was not changed, with the reason", async () => {
+      mockPendingChange.current = {
+        changeId: "change-1",
+        role: OrganizationUserRole.ADMIN,
+        url: "https://pay.example.test/invoice",
+        status: "waiting",
+        reason: null,
+      };
+      mockCompleteChange.mockResolvedValue({
+        status: "seat_only",
+        reason: "This member is the last admin.",
+      });
+      renderLite();
+
+      fireEvent.focus(window);
+
+      await vi.waitFor(() => {
+        expect(screen.getByTestId("seat-role-seat-only")).toBeTruthy();
+      });
+      expect(
+        screen.getByText(
+          "1 seat added and paid, but Sam's role could not be changed: this member is the last admin.",
+        ),
+      ).toBeTruthy();
+      expect(screen.getByText("The seat is free for anyone.")).toBeTruthy();
+    });
+
+    /** @scenario "Stuck billing shows the calm state with Contact support" */
+    it("shows the calm state and puts the role field back when billing is held", async () => {
+      mockChangeWithSeat.mockRejectedValue({
+        data: { error: { code: "subscription_ambiguous", httpStatus: 409, meta: {} } },
+      });
+      renderLite();
+      pickAdmin();
+
+      fireEvent.click(screen.getByRole("button", { name: "Buy the seat" }));
+
+      await vi.waitFor(() => {
+        expect(screen.getByTestId("seat-role-offer").getAttribute("data-state")).toBe("stuck");
+      });
+      expect(screen.getByTestId("org-role-field").getAttribute("data-value")).toBe(
+        OrganizationUserRole.EXTERNAL,
+      );
+      expect(mockToasterCreate).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "A seat offer refused for two live subscriptions is kept for the admin" */
+    it("shows the calm state as soon as the offer is refused and keeps the attempt once", async () => {
+      mockOfferKind.current = "blocked";
+      renderLite();
+      pickAdmin();
+
+      await vi.waitFor(() => {
+        expect(screen.getByTestId("seat-role-offer").getAttribute("data-state")).toBe("stuck");
+      });
+      expect(screen.getByTestId("org-role-field").getAttribute("data-value")).toBe(
+        OrganizationUserRole.EXTERNAL,
+      );
+      expect(mockRecordBlocked).toHaveBeenCalledWith({
+        organizationId: "org-1",
+        userId: "user-1",
+        role: OrganizationUserRole.ADMIN,
+      });
+
+      pickAdmin();
+      await vi.waitFor(() => {
+        expect(screen.getByTestId("seat-role-offer").getAttribute("data-state")).toBe("stuck");
+      });
+      expect(mockRecordBlocked).toHaveBeenCalledTimes(1);
+      expect(mockChangeWithSeat).not.toHaveBeenCalled();
+      expect(mockToasterCreate).not.toHaveBeenCalled();
+    });
+
+    it("toasts any other refusal and leaves the offer in place", async () => {
+      mockChangeWithSeat.mockRejectedValue(new Error("boom"));
+      renderLite();
+      pickAdmin();
+
+      fireEvent.click(screen.getByRole("button", { name: "Buy the seat" }));
+
+      await vi.waitFor(() => {
+        expect(mockToasterCreate).toHaveBeenCalledWith(
+          expect.objectContaining({ title: "Couldn't update this member", type: "error" }),
+        );
+      });
+      expect(screen.getByTestId("seat-role-offer").getAttribute("data-state")).toBe("offer");
     });
   });
 });

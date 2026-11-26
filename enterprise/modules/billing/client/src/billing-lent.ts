@@ -31,6 +31,27 @@ export type LicenseBillingSectionProps = {
   commitUsdCents: number;
 };
 
+/** What one more full seat costs, as billing's seat offer answers it. */
+export type SeatRoleOfferKind = "none" | "charge" | "checkout" | "blocked" | "support";
+
+/** Where the role change the offer sits under stands; the owner of the change decides. */
+export type SeatRoleOfferState = "offer" | "busy" | "done" | "stuck";
+
+/** The seat a role change needs, under the role field: specs/licensing/role-change-seat.feature */
+export type SeatRoleOfferProps = {
+  organizationId: string;
+  organizationName: string;
+  memberName: string;
+  roleLabel: string;
+  currentRoleLabel: string;
+  state: SeatRoleOfferState;
+  /** `quotedAt` is the instant the price on screen was quoted, when it was a charge. */
+  onConfirm: (quotedAt?: number) => void;
+  onKind?: (kind: SeatRoleOfferKind) => void;
+  /** Today's amount of a charge offer, for the owner's own success message. */
+  onAmountDue?: (formattedAmountDue: string) => void;
+};
+
 /** The organization a page is about; the banner reads the case and the reader's grants itself. */
 export type PaymentRecoveryBannerProps = {
   organizationId: string;
@@ -44,5 +65,7 @@ export const PaymentRecoveryBannerToken =
 export const LicenseBillingSectionToken =
   uiTokens("billing").component<LicenseBillingSectionProps>("licenseBillingSection");
 export const ContactSalesToken = uiTokens("billing").component<ContactSalesProps>("contactSales");
+export const SeatRoleOfferToken =
+  uiTokens("billing").component<SeatRoleOfferProps>("seatRoleOffer");
 export const SeatProrationPreviewToken =
   uiTokens("billing").component<SeatProrationPreviewProps>("seatProrationPreview");

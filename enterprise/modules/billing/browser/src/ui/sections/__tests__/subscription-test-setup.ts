@@ -189,6 +189,15 @@ export const mockDetectCurrency = vi.fn(() => ({
   isLoading: false,
 }));
 
+/** What `checkInvites` answers: nothing, or the refusal a member's address gets. */
+export const mockCheckInvitesMutateAsync = vi.fn(
+  async (_input: unknown): Promise<unknown> => undefined,
+);
+export const mockCheckInvites = vi.fn(() => ({
+  mutateAsync: mockCheckInvitesMutateAsync,
+  isPending: false,
+}));
+
 export const mockCreateInvitesMutate = vi.fn();
 export const mockCreateInvites = vi.fn(() => ({
   mutate: mockCreateInvitesMutate,
@@ -295,4 +304,5 @@ export function resetMocks() {
   mockPreviewDeveloperSeats.mockReturnValue({ data: undefined, isLoading: true, isError: false });
   mockSetDeveloperSeats.mockResolvedValue({ success: true });
   mockCreateInvitesMutateAsync.mockResolvedValue([{ id: "invite-1" }]);
+  mockCheckInvitesMutateAsync.mockResolvedValue(undefined);
 }

@@ -58,6 +58,10 @@ function repositoryDouble(
     cancelTrialSubscriptions: vi.fn(() => Promise.resolve()),
     migrateToSeatEvent: vi.fn(() => Promise.resolve([])),
     updateQuantities: vi.fn(() => Promise.resolve(WITH_ORGANIZATION)),
+    findLiveUnlinkedBeside: vi.fn(() => Promise.resolve([])),
+    findLiveLinkedBeside: vi.fn(() => Promise.resolve([])),
+    adoptCheckout: vi.fn(() => Promise.resolve()),
+    cancelPendingCheckout: vi.fn(() => Promise.resolve([])),
     ...overrides,
   };
 }

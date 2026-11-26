@@ -39,6 +39,8 @@ describe("shouldRetryQuery", () => {
       });
 
       it.each([
+        "seat_checkout_required",
+        "seat_change_needs_support",
         "billing_currency_unsupported",
         "billing_customer_deleted",
         "subscription_service_unavailable",

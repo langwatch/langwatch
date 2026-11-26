@@ -1,0 +1,83 @@
+import type { SeatRoleChangeStatus } from "@langwatch/organization-contract";
+
+import { paymentKey, type SeatPaymentRef } from "../../rules/seat-role-change.rules.ts";
+import type {
+  PendingSeatRoleChangeRecord,
+  PendingSeatRoleChangeRepository,
+} from "../pending-seat-role-change.repository.ts";
+
+/** The changes waiting on a seat payment, held in the process; nothing expires. */
+export class MemoryPendingSeatRoleChangeRepository implements PendingSeatRoleChangeRepository {
+  private readonly records = new Map<string, PendingSeatRoleChangeRecord>();
+  private readonly claims = new Set<string>();
+
+  static create(): MemoryPendingSeatRoleChangeRepository {
+    return new MemoryPendingSeatRoleChangeRepository();
+  }
+
+  private constructor() {}
+
+  async save(record: PendingSeatRoleChangeRecord): Promise<void> {
+    this.records.set(record.id, record);
+  }
+
+  async findById({ id }: { id: string }): Promise<PendingSeatRoleChangeRecord[]> {
+    const record = this.records.get(id);
+    return record ? [record] : [];
+  }
+
+  async findByPayment({
+    payment,
+  }: {
+    payment: SeatPaymentRef;
+  }): Promise<PendingSeatRoleChangeRecord[]> {
+    const key = paymentKey(payment);
+    return [...this.records.values()].filter((record) => paymentKey(record.payment) === key);
+  }
+
+  async findLatestForMember({
+    organizationId,
+    userId,
+  }: {
+    organizationId: string;
+    userId: string;
+  }): Promise<PendingSeatRoleChangeRecord[]> {
+    const latest = [...this.records.values()]
+      .filter((record) => record.organizationId === organizationId && record.userId === userId)
+      .toSorted((a, b) => b.createdAt - a.createdAt)[0];
+    return latest ? [latest] : [];
+  }
+
+  async findWaitingForOrganization({
+    organizationId,
+  }: {
+    organizationId: string;
+  }): Promise<PendingSeatRoleChangeRecord[]> {
+    return [...this.records.values()].filter(
+      (record) => record.organizationId === organizationId && record.status === "waiting",
+    );
+  }
+
+  async claim({ id }: { id: string }): Promise<boolean> {
+    if (this.claims.has(id)) return false;
+    this.claims.add(id);
+    return true;
+  }
+
+  async release({ id }: { id: string }): Promise<void> {
+    this.claims.delete(id);
+  }
+
+  async settle({
+    id,
+    status,
+    reason,
+  }: {
+    id: string;
+    status: Exclude<SeatRoleChangeStatus, "waiting">;
+    reason?: string;
+  }): Promise<void> {
+    const record = this.records.get(id);
+    if (record) this.records.set(id, { ...record, status, reason: reason ?? null });
+  }
+}

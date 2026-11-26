@@ -1,5 +1,8 @@
 import { type UiAnalytics, useUiAnalytics } from "@langwatch/browser-host/analytics";
-import { isNotFoundError as isTrpcNotFound } from "@langwatch/browser-host/errors";
+import {
+  isHandledByGlobalHandler,
+  isNotFoundError as isTrpcNotFound,
+} from "@langwatch/browser-host/errors";
 import { toaster } from "@langwatch/browser-host/toaster";
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 import { useRouter } from "@langwatch/browser-host/use-router";
@@ -111,6 +114,9 @@ const isEvaluationsV3BySlugQuery = (query: { queryKey: readonly unknown[] }): bo
   return Array.isArray(path) && path[0] === "experiments" && path[1] === "getEvaluationsV3BySlug";
 };
 
+/** The autosave status line when the reader's seat or plan refused the save. */
+const AUTOSAVE_REFUSED_BY_SEAT_REASON = "Not saved: your access does not include saving here";
+
 /** An unexpected autosave failure: logged, shown in the status and toasted. */
 const reportUnexpectedSaveFailure = (error: unknown): void => {
   console.error("Failed to autosave evaluations v3:", error);
@@ -152,6 +158,11 @@ const handleAutosaveFailure = ({
     }
     state.setStaleWorkbench(refusal);
     state.setAutosaveStatus("evaluation", "error", AUTOSAVE_OUT_OF_DATE_REASON);
+    return "refused";
+  }
+  // A licence refusal (a Lite Member seat, a plan limit) already opened its modal: no second toast.
+  if (isHandledByGlobalHandler(error)) {
+    state.setAutosaveStatus("evaluation", "error", AUTOSAVE_REFUSED_BY_SEAT_REASON);
     return "refused";
   }
   reportUnexpectedSaveFailure(error);

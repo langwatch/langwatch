@@ -1,3 +1,4 @@
+import { Button } from "@chakra-ui/react";
 import type { Meta, StoryObj } from "@storybook/react-vite";
 
 import { RestrictedAccess } from "./restricted-access.tsx";
@@ -22,6 +23,19 @@ export const Default: Story = {};
 
 export const NamedArea: Story = {
   args: { permission: "model-providers:manage", area: "model providers" },
+};
+
+export const WithRequestAction: Story = {
+  args: {
+    permission: "evaluations:manage",
+    area: "this feature",
+    compact: true,
+    requestAction: (
+      <Button size="sm" colorPalette="orange">
+        Request access
+      </Button>
+    ),
+  },
 };
 
 export const LongArea: Story = {

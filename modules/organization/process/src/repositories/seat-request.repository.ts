@@ -12,6 +12,8 @@ export type SeatRequestRow = Readonly<{
   source: SeatRequestSource;
   idpRefused: boolean;
   idpKind: SignInIdpKind | null;
+  /** What a member who pressed Request access was trying to do; null for arrivals. */
+  reason: string | null;
   salesNotifiedAt: number | null;
   openedAt: number;
   resolvedAt: number | null;
@@ -39,6 +41,8 @@ export abstract class SeatRequestRepository {
     source: SeatRequestSource;
     idpRefused: boolean;
     idpKind: SignInIdpKind | null;
+    /** Kept on an open request when the new opening names none. */
+    reason?: string | null;
     at: number;
     /** Only when the address has no row yet: an open or answered request is left untouched. */
     onlyIfAbsent?: boolean;

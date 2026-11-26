@@ -16,6 +16,7 @@ import {
   type SeatRepairRecord,
   type SeatRepairRow,
   type SeatSubscriptionRow,
+  type ActivePlanRow,
 } from "../seat-event-subscription.repository.ts";
 import type { MemoryBillingStore } from "./memory.billing.store.ts";
 
@@ -40,14 +41,42 @@ export class MemorySeatEventSubscriptionRepository extends SeatEventSubscription
           (subscription.status === "ACTIVE" || subscription.status === "CANCELLED"),
       )
       .toSorted((a, b) => b.createdAt.epochMilliseconds - a.createdAt.epochMilliseconds)
-      .map(({ id, status, stripeSubscriptionId, maxMembers, seatsKept, seatsKeptUntil }) => ({
+      .map(({ id, status, stripeSubscriptionId, maxMembers, seatsKept, seatsKeptUntil, plan }) => ({
         id,
         status,
         stripeSubscriptionId,
         maxMembers,
         seatsKept,
         seatsKeptUntil,
+        plan,
+        customLimits: false,
       }));
+  }
+
+  async findActivePlans({ organizationId }: { organizationId: string }): Promise<ActivePlanRow[]> {
+    return this.store.subscriptions
+      .filter(
+        (subscription) =>
+          subscription.organizationId === organizationId && subscription.status === "ACTIVE",
+      )
+      .toSorted((a, b) => b.createdAt.epochMilliseconds - a.createdAt.epochMilliseconds)
+      .map(({ id, plan, stripeSubscriptionId }) => ({
+        id,
+        plan,
+        stripeSubscriptionId,
+        customLimits: false,
+      }));
+  }
+
+  async supersedeStrayRows({ ids }: { ids: string[] }): Promise<void> {
+    this.store.subscriptions.forEach((subscription, index) => {
+      if (!ids.includes(subscription.id) || subscription.status !== "ACTIVE") return;
+      this.store.subscriptions[index] = {
+        ...subscription,
+        status: "CANCELLED",
+        endDate: nowInstant(),
+      };
+    });
   }
 
   async cancelPendingSeatCheckouts({

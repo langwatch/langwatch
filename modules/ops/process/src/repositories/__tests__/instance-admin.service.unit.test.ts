@@ -29,6 +29,8 @@ const updateProfileFake = (email = user.email) =>
 class RepositoryFake extends InstanceAdminRepository {
   execute = vi.fn();
   findUserById = vi.fn(async () => ({ data: user }));
+  findActiveSubscriptionIds = vi.fn(async () => []);
+  findSubscriptionStates = vi.fn(async () => []);
 }
 
 class AuditFake extends AdminAuditSink {

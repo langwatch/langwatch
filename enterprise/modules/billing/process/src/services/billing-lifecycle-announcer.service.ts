@@ -258,6 +258,14 @@ export class BillingLifecycleAnnouncerService {
     });
   }
 
+  /** A seat invoice was paid; organization applies a role change waiting on it. */
+  async seatInvoicePaid(input: { organizationId: string; invoiceId: string }): Promise<void> {
+    await this.#connected().recordSeatInvoicePaid.send({
+      ...this.#rowFact(input.organizationId),
+      invoiceId: input.invoiceId,
+    });
+  }
+
   /** Seat checkouts were abandoned; organization cancels the invitations it held for them. */
   async seatCheckoutsAbandoned(input: {
     organizationId: string;

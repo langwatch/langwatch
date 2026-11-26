@@ -192,3 +192,23 @@ Feature: Invitation acceptance and role recomputation
     When an administrator invites "sam" from the members screen
     Then a pending invitation is created for "sam" and its mail is sent
     And the held payment-pending invitation is gone
+
+  # organization-invitation-door.service.ts: Manage seats asks before it buys a seat for an
+  # invitation, and the Free checkout asks before it opens, so nothing is charged for a member.
+  @unit
+  Scenario: A seat bought for someone already on the team is refused before any charge
+    Given "sam" is already a member of the organization
+    When an administrator asks to buy a seat to invite "sam", in place on Growth or through the Free checkout
+    Then it is refused with already_organization_member naming "sam"
+    And no seat is charged, no checkout is opened and no invitation is held
+
+  @unit
+  Scenario: A seat bought for a new person is checked and then allowed
+    Given "lee" is not a member of the organization
+    When an administrator asks to buy a seat to invite "lee"
+    Then the members check passes and the inviter's ceiling is asked
+
+  @unit
+  Scenario: The invitation check takes one to fifty invitations
+    When an administrator asks to check no invitations, or more than fifty
+    Then the request is refused as malformed before anything is checked

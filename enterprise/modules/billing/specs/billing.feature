@@ -337,6 +337,70 @@ Feature: Enterprise billing compatibility
       And it answers the checkout url and the pending subscription's id
 
     @unit
+    Scenario: A seat checkout is refused while a linked plan it would not replace is live
+      Given the organization has an active Growth seat subscription linked to Stripe
+      When a seat checkout is asked for
+      Then it is refused with subscription_already_active
+      And no pending subscription and no checkout are opened
+
+    @unit
+    Scenario: A seat checkout still opens beside the tiered plan it supersedes
+      Given the organization has an active tiered subscription linked to Stripe
+      When a seat checkout is asked for
+      Then the checkout opens
+
+    @unit
+    Scenario: An abandoned seat checkout can no longer be paid
+      Given the organization left a seat checkout open in another tab
+      When a new seat checkout is asked for
+      Then the abandoned checkout's Stripe session is expired, so it can no longer be paid
+      And the new checkout still opens when Stripe refuses the expiry
+
+  # An Ops edit can activate a PENDING Growth row while the customer pays a checkout.
+  Rule: A paid seat checkout leaves the organization one active subscription
+
+    @unit
+    Scenario: A paid checkout lands on the active row an operator made
+      Given an operator activated an older PENDING Growth row in Ops
+      And the customer opened a new seat checkout and paid it
+      When the checkout completion arrives
+      Then the operator's row carries the Stripe subscription, the checkout's plan and seats
+      And the checkout's own row is cancelled
+      And the organization holds exactly one active subscription
+      And the invitations held against the checkout's row are opened
+
+    @integration
+    Scenario: A paid checkout links the only subscription an operator added
+      Given an operator added the organization's only subscription in Ops, with no Stripe subscription
+      And a seat change on it went to checkout
+      When the customer pays the checkout
+      Then that row carries the Stripe subscription and the checkout's plan and seats
+      And the checkout's own row is cancelled
+      And the organization holds exactly one active subscription
+      And the move onto the operator's row is audited
+
+    @unit
+    Scenario: A paid checkout on the row an operator activated starts the plan
+      Given an operator activated the checkout's own PENDING Growth row in Ops
+      When the checkout completion arrives
+      Then that row carries the Stripe subscription and is the one active subscription
+      And the organization moves to seat pricing as any first seat checkout does
+
+    @unit
+    Scenario: Two paid seat checkouts keep one plan
+      Given the organization already holds an active Growth seat plan linked to Stripe
+      When a second seat checkout is paid, from a session opened before the first was paid
+      Then the second checkout's Stripe subscription is cancelled and its paid invoice refunded
+      And its row is cancelled, so the organization holds exactly one active subscription
+      And ops are alerted to the duplicate
+
+    @unit
+    Scenario: A redelivered checkout completion changes nothing more
+      Given a checkout completion already landed on the operator's row
+      When Stripe delivers it again
+      Then the organization still holds exactly one active subscription
+
+    @unit
     Scenario: The invite checkout is organization's procedure
       Then invite.upgradeWithInvites is declared by organization with organization:manage
       And billing declares no subscription.upgradeWithInvites

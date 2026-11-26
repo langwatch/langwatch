@@ -68,10 +68,12 @@ vi.mock("@langwatch/browser-host/use-organization-team-project", () => ({
   }),
 }));
 
+const toastCreate = vi.hoisted(() => vi.fn());
+
 // Mock toaster
 vi.mock("@langwatch/browser-host/toaster", () => ({
   toaster: {
-    create: vi.fn(),
+    create: toastCreate,
   },
 }));
 
@@ -81,6 +83,7 @@ vi.mock("../../../model/posthog-error-capture.ts", () => ({
   toError: vi.fn((e) => (e instanceof Error ? e : new Error(String(e)))),
 }));
 
+import { markHandledGlobally } from "@langwatch/browser-host/errors";
 import { extractPersistedState } from "@langwatch/experiment-contract";
 // Import hook after mocks
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -234,6 +237,36 @@ describe("Autosave evaluation state", () => {
 
     // Should show error status
     expect(useEvaluationsV3Store.getState().ui.autosaveStatus.evaluation).toBe("error");
+  });
+
+  describe("when the licence reader already answered the refused save", () => {
+    /** @scenario "A refused workbench save on a Lite Member seat shows only the restriction modal" */
+    it("shows no second error toast and reports nothing", async () => {
+      renderWithDesignSystem(
+        <Wrapper>
+          <TestAutosaveComponent />
+        </Wrapper>,
+      );
+      await act(async () => {
+        vi.advanceTimersByTime(50);
+      });
+      const refusal = new Error("lite_member_restricted");
+      markHandledGlobally(refusal);
+      mockMutateAsync.mockRejectedValueOnce(refusal);
+
+      act(() => {
+        useEvaluationsV3Store
+          .getState()
+          .setCellValue({ datasetId: "test-data", row: 0, columnId: "input", value: "refused" });
+      });
+      await act(async () => {
+        vi.advanceTimersByTime(AUTOSAVE_DEBOUNCE_MS + 100);
+      });
+
+      expect(useEvaluationsV3Store.getState().ui.autosaveStatus.evaluation).toBe("error");
+      expect(toastCreate).not.toHaveBeenCalled();
+      expect(captureException).not.toHaveBeenCalled();
+    });
   });
 
   // Dataset records, prompt text and run results are customer content. The

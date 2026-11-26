@@ -110,6 +110,7 @@ function lifecycleRecording() {
     recordSeatCheckoutPaid: ignored(),
     recordSeatCheckoutsAbandoned: ignored(),
     recordOverPlanChanged: ignored(),
+    recordSeatInvoicePaid: ignored(),
   });
   return { lifecycle, audited };
 }
@@ -227,6 +228,20 @@ describe("the installed billing application", () => {
       ).rejects.toMatchObject({ code: "connected_billing_unavailable" });
       expect(asked).toEqual([]);
       expect(audited).toEqual([]);
+    });
+
+    /** @scenario "Seat billing off Cloud refuses the purchase by name" */
+    it("refuses a seat bought with a role change by its handled code", async () => {
+      const { app } = billingApp({ isSaas: false, withStripe: false });
+
+      await expect(
+        app.addFullSeat({
+          organizationId: ACME,
+          baseUrl: "https://app.example",
+          successPath: "/back",
+          customerEmail: null,
+        }),
+      ).rejects.toMatchObject({ code: "seat_billing_unavailable" });
     });
 
     it("runs no billing tick and no seat invoicing pass at all", async () => {

@@ -6,6 +6,7 @@ import type { OrganizationChannels } from "../organization.channels.ts";
 import { SesAccessNoticeMailChannel } from "../ses/ses.access-notice-mail.channel.ts";
 import { SesOrganizationInviteMailChannel } from "../ses/ses.organization-invite-mail.channel.ts";
 import { SlackSignupAnnouncementChannel } from "../slack/slack.signup-announcement.channel.ts";
+import { HttpAccessNoticePushChannel } from "./http.access-notice-push.channel.ts";
 
 /** Sign-ups go to our Slack when the webhook is set; invites go out through notification (§5). */
 export class HttpOrganizationChannels {
@@ -26,6 +27,7 @@ export class HttpOrganizationChannels {
       signupAnnouncements,
       inviteMail: SesOrganizationInviteMailChannel.create({ notifications: bound.notifications }),
       accessNoticeMail: SesAccessNoticeMailChannel.create({ notifications: bound.notifications }),
+      accessNoticePush: HttpAccessNoticePushChannel.create({ notifications: bound.notifications }),
     };
   }
 }

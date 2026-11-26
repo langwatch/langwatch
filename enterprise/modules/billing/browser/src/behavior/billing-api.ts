@@ -137,6 +137,13 @@ type BorrowedProcedures = {
         output: { url: string | null };
       };
     };
+    /** Refuses, writing nothing, invitations a seat is about to be bought for. */
+    checkInvites: {
+      mutation: {
+        input: OrganizationScope & { invites: { email: string; role: OrganizationUserRole }[] };
+        output: unknown;
+      };
+    };
     createInvites: {
       mutation: {
         input: OrganizationScope & {

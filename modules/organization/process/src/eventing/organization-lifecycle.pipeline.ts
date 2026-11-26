@@ -13,6 +13,8 @@ import {
   SEAT_CHECKOUTS_ABANDONED_EVENT_TYPE,
   seatCheckoutPaidEventDataSchema,
   seatCheckoutsAbandonedEventDataSchema,
+  SEAT_INVOICE_PAID_EVENT_TYPE,
+  seatInvoicePaidEventDataSchema,
 } from "@langwatch/enterprise-billing-contract";
 import {
   CONNECT_SERVICE_SWITCHED_EVENT_TYPE,
@@ -95,6 +97,8 @@ export type BillingFactsApplier = Pick<
   | "updatePricingModel"
   | "approvePaymentPendingInvites"
   | "cancelPaymentPendingInvites"
+  | "applySeatPaymentPaid"
+  | "failSeatPaymentsAbandoned"
 >;
 
 /** Where licensing's facts land: organization creates and writes the rows (C3c, R42). */
@@ -270,11 +274,35 @@ export function buildOrganizationLifecyclePipeline({
       handle: ({ organizationId, subscriptionId }) =>
         billingFacts.approvePaymentPendingInvites({ organizationId, subscriptionId }),
     })
+    .withPeerSubscriber("organizationBillingSeatCheckoutPaidRoleChange", {
+      eventType: SEAT_CHECKOUT_PAID_EVENT_TYPE,
+      data: seatCheckoutPaidEventDataSchema,
+      handle: ({ organizationId, subscriptionId }) =>
+        billingFacts.applySeatPaymentPaid({
+          organizationId,
+          payment: { kind: "checkout", subscriptionId },
+        }),
+    })
+    .withPeerSubscriber("organizationBillingSeatInvoicePaid", {
+      eventType: SEAT_INVOICE_PAID_EVENT_TYPE,
+      data: seatInvoicePaidEventDataSchema,
+      handle: ({ organizationId, invoiceId }) =>
+        billingFacts.applySeatPaymentPaid({
+          organizationId,
+          payment: { kind: "invoice", invoiceId },
+        }),
+    })
     .withPeerSubscriber("organizationBillingSeatCheckoutsAbandoned", {
       eventType: SEAT_CHECKOUTS_ABANDONED_EVENT_TYPE,
       data: seatCheckoutsAbandonedEventDataSchema,
       handle: ({ organizationId, subscriptionIds }) =>
         billingFacts.cancelPaymentPendingInvites({ organizationId, subscriptionIds }),
+    })
+    .withPeerSubscriber("organizationBillingSeatCheckoutsAbandonedRoleChange", {
+      eventType: SEAT_CHECKOUTS_ABANDONED_EVENT_TYPE,
+      data: seatCheckoutsAbandonedEventDataSchema,
+      handle: ({ organizationId, subscriptionIds }) =>
+        billingFacts.failSeatPaymentsAbandoned({ organizationId, subscriptionIds }),
     })
     .withPeerSubscriber("organizationAuthzMemberOffboarded", {
       eventType: AUTHZ_MEMBER_OFFBOARDED_EVENT_TYPE,

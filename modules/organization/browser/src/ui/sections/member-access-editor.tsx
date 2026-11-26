@@ -2,6 +2,7 @@
 
 import { GrantScopeTier } from "@langwatch/authz-contract";
 import { Link } from "@langwatch/browser-host/link";
+import { Banner, BannerAction } from "@langwatch/design-system/banner";
 import {
   Badge,
   Box,
@@ -17,12 +18,15 @@ import { X } from "lucide-react";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 
 import { HandledErrorAlert } from "../../behavior/handled-error-form.tsx";
+import { SeatRoleOffer } from "../../behavior/lent-seat-role-offer.tsx";
 import {
   api,
   type OrganizationApiMap,
   type RouterOutputs,
 } from "../../behavior/organization-api.ts";
 import { useOrganizationToaster, useShowErrorToast } from "../../behavior/organization-feedback.ts";
+import { useOrganizationTeamProject } from "../../behavior/use-organization-team-project.ts";
+import { useSeatRoleChange, withArticle } from "../../behavior/use-seat-role-change.ts";
 import { directoryOwnershipCopy } from "../../model/group-source.ts";
 import { BILLING_ONLY_SEAT, type InviteSeat } from "../../model/member-invite-form.ts";
 import { OrganizationUserRole, TeamUserRole } from "../../model/prisma-types.ts";
@@ -30,6 +34,7 @@ import { IdentityChip } from "../elements/identity-row.tsx";
 import {
   OrganizationUserRoleField,
   orgRoleOptions,
+  seatLabel,
 } from "../elements/organization-user-role-field.tsx";
 import {
   GrantInputRow,
@@ -187,12 +192,14 @@ export function MemberAccessEditor({
   canManage: boolean;
   isCurrentUser: boolean;
 }) {
+  const { organization } = useOrganizationTeamProject();
   const editor = useMemberAccessEditor({
     organizationId,
     userId,
     memberRole,
     memberBillingOnly,
     canManage,
+    canChangeRole: canManage && !isCurrentUser,
   });
 
   return (
@@ -209,9 +216,18 @@ export function MemberAccessEditor({
           ) : (
             <OrganizationUserRoleField<InviteSeat>
               value={editor.pendingSeat}
-              onChange={editor.setPendingSeat}
+              onChange={editor.pickSeat}
               roles={seatsOffered({ memberBillingOnly })}
             />
+          )}
+          {editor.showSeatPanel && (
+            <Box marginTop={3}>
+              <SeatRolePanel
+                organizationId={organizationId}
+                organizationName={organization?.name ?? "Your organization"}
+                editor={editor}
+              />
+            </Box>
           )}
         </Box>
       )}
@@ -256,14 +272,16 @@ export function MemberAccessEditor({
           <Button variant="outline" disabled={!editor.hasChanges} onClick={editor.reset}>
             Cancel
           </Button>
-          <Button
-            colorPalette="accent"
-            disabled={!editor.hasChanges}
-            loading={editor.isSaving}
-            onClick={() => void editor.handleSave()}
-          >
-            Save
-          </Button>
+          {editor.seatPurchaseOffered ? null : (
+            <Button
+              colorPalette="accent"
+              disabled={!editor.hasChanges}
+              loading={editor.isSaving}
+              onClick={() => void editor.handleSave()}
+            >
+              Save
+            </Button>
+          )}
         </HStack>
       )}
     </VStack>
@@ -500,12 +518,14 @@ function useMemberAccessEditor({
   memberRole,
   memberBillingOnly,
   canManage,
+  canChangeRole,
 }: {
   organizationId: string;
   userId: string;
   memberRole: OrganizationUserRole;
   memberBillingOnly: boolean;
   canManage: boolean;
+  canChangeRole: boolean;
 }) {
   const toaster = useOrganizationToaster();
   const showErrorToast = useShowErrorToast();
@@ -569,7 +589,7 @@ function useMemberAccessEditor({
     setPendingGrantAdditions(stagedRowsForLiteSeat);
   }, [pendingSeat]);
 
-  // A role change moves the member between full and Lite seats, so seat usage is re-read too.
+  // A role change moves the member between seats and may add one: usage and caps are re-read.
   const refreshAccessQueries = () =>
     Promise.all([
       queryClient.authz.listMemberGrants.invalidate(),
@@ -579,9 +599,15 @@ function useMemberAccessEditor({
       queryClient.organization.getAll.invalidate(),
       queryClient.organization.getScopeGraph.invalidate(),
       queryClient.limits.getUsage.invalidate(),
+      queryClient.plan.getActivePlan.invalidate(),
+      queryClient.licenseEnforcement.checkLimit.invalidate(),
+      queryClient.licenseEnforcement.checkAllLimits.invalidate(),
+      queryClient.organization.listHeldSeats.invalidate(),
+      queryClient.organization.pendingSeatRoleChange.invalidate(),
     ]);
 
-  const handleSave = async () => {
+  /** The staged assignment rows as one batch, after the role they were staged against. */
+  const applyStagedGrants = async () => {
     const uncommitted =
       pendingSeat === BILLING_ONLY_SEAT ? null : (grantInputRef.current?.flush() ?? null);
     const additions = newGrantAdditions({
@@ -589,7 +615,38 @@ function useMemberAccessEditor({
       held: directGrants.data ?? [],
       removals: pendingGrantRemovals,
     });
+    if (pendingGrantRemovals.size === 0 && additions.length === 0) return;
+    await applyMemberGrants.mutateAsync({
+      organizationId,
+      userId,
+      bindingIdsToDelete: [...pendingGrantRemovals],
+      bindingsToCreate: additions.map((b) => ({
+        role: b.role,
+        customRoleId: b.customRoleId,
+        scopeType: b.scopeType,
+        scopeId: b.scopeId,
+      })),
+    });
+  };
 
+  const seatPanel = useSeatRolePanel({
+    organizationId,
+    userId,
+    canChangeRole,
+    pendingSeat,
+    setPendingSeat,
+    memberSeat,
+    onChanged: async ({ teamsLeftWithoutAdmin }) => {
+      try {
+        await applyStagedGrants();
+      } finally {
+        await refreshAccessQueries();
+      }
+      return teamsLeftWithoutAdminLine(teamsLeftWithoutAdmin);
+    },
+  });
+
+  const handleSave = async () => {
     setIsSaving(true);
     try {
       let teamsLeftWithoutAdmin: { name: string }[] = [];
@@ -602,19 +659,7 @@ function useMemberAccessEditor({
         // Defaulted: an older server answers without the field, after the save succeeded.
         teamsLeftWithoutAdmin = roleResult?.teamsLeftWithoutAdmin ?? [];
       }
-      if (pendingGrantRemovals.size > 0 || additions.length > 0) {
-        await applyMemberGrants.mutateAsync({
-          organizationId,
-          userId,
-          bindingIdsToDelete: [...pendingGrantRemovals],
-          bindingsToCreate: additions.map((b) => ({
-            role: b.role,
-            customRoleId: b.customRoleId,
-            scopeType: b.scopeType,
-            scopeId: b.scopeId,
-          })),
-        });
-      }
+      await applyStagedGrants();
 
       await refreshAccessQueries();
       const withoutAdmin = teamsLeftWithoutAdminLine(teamsLeftWithoutAdmin);
@@ -649,5 +694,161 @@ function useMemberAccessEditor({
     isSaving,
     stageAddition,
     handleSave,
+    memberSeat,
+    ...seatPanel,
   };
+}
+
+/** Whether the picked role needs a full seat none is free for, and the purchase that adds one. */
+function useSeatRolePanel({
+  organizationId,
+  userId,
+  canChangeRole,
+  pendingSeat,
+  setPendingSeat,
+  memberSeat,
+  onChanged,
+}: {
+  organizationId: string;
+  userId: string;
+  canChangeRole: boolean;
+  pendingSeat: InviteSeat;
+  setPendingSeat: (seat: InviteSeat) => void;
+  memberSeat: InviteSeat;
+  onChanged: (change: { teamsLeftWithoutAdmin: { name: string }[] }) => Promise<string | undefined>;
+}) {
+  const member = api.organization.getMemberById.useQuery(
+    { organizationId, userId },
+    { enabled: canChangeRole },
+  );
+  const memberName = member.data?.user.name ?? member.data?.user.email ?? "This member";
+  const usage = api.limits.getUsage.useQuery({ organizationId }, { enabled: canChangeRole });
+  const fullSeats = usage.data?.seatLimitInfo?.members;
+  const fullSeatsTaken = fullSeats !== undefined && fullSeats.current >= fullSeats.max;
+  const needsFullSeat = takesFullSeat(pendingSeat) && !takesFullSeat(memberSeat);
+  const seat = useSeatRoleChange({
+    organizationId,
+    userId,
+    memberName,
+    enabled: canChangeRole,
+    describeRole: (role) => seatLabel({ role }),
+    onChanged,
+  });
+  const step = seat.flow.step;
+  // A refused seat leaves the role as it is, so the picker shows the role they still hold.
+  useEffect(() => {
+    if (step === "stuck") setPendingSeat(memberSeat);
+  }, [step, memberSeat, setPendingSeat]);
+
+  // An offer refused for two live subscriptions shows the calm state before any click.
+  const blockedOffer =
+    seat.offerKind === "blocked" && step === "idle" && needsFullSeat && fullSeatsTaken;
+  const blockedRole =
+    pendingSeat === OrganizationUserRole.ADMIN
+      ? OrganizationUserRole.ADMIN
+      : OrganizationUserRole.MEMBER;
+  useEffect(() => {
+    if (blockedOffer) seat.block({ role: blockedRole });
+  }, [blockedOffer, blockedRole, seat]);
+
+  const showSeatPanel = canChangeRole && ((needsFullSeat && fullSeatsTaken) || step !== "idle");
+  const offersPurchase =
+    seat.offerKind === "charge" ||
+    seat.offerKind === "checkout" ||
+    seat.offerKind === "blocked" ||
+    seat.offerKind === "support";
+  return {
+    memberName,
+    seat,
+    showSeatPanel,
+    seatPurchaseOffered: showSeatPanel && step !== "done" && offersPurchase,
+    pickSeat: (next: InviteSeat) => {
+      setPendingSeat(next);
+      if (step !== "waiting" && step !== "busy") seat.clear();
+    },
+  };
+}
+
+/** A refusal read mid-sentence: lower-cased first letter, no closing full stop. */
+function reasonClause(reason: string): string {
+  const trimmed = reason.trim().replace(/\.$/, "");
+  return trimmed.charAt(0).toLowerCase() + trimmed.slice(1);
+}
+
+/** Admin and Member take a full seat; Lite, Developer and Billing only do not. */
+function takesFullSeat(seat: InviteSeat): boolean {
+  return seat === OrganizationUserRole.ADMIN || seat === OrganizationUserRole.MEMBER;
+}
+
+type MemberAccessEditorState = ReturnType<typeof useMemberAccessEditor>;
+
+/** The seat a role change needs: billing's offer, the payment it waits on, or what happened. */
+function SeatRolePanel({
+  organizationId,
+  organizationName,
+  editor,
+}: {
+  organizationId: string;
+  organizationName: string;
+  editor: MemberAccessEditorState;
+}) {
+  const { flow } = editor.seat;
+  const role = flow.step === "idle" ? editor.pendingRole : flow.role;
+  const roleLabel = seatLabel({ role });
+  const currentRoleLabel = seatLabel({
+    role:
+      editor.memberSeat === BILLING_ONLY_SEAT ? OrganizationUserRole.EXTERNAL : editor.memberSeat,
+    billingOnly: editor.memberSeat === BILLING_ONLY_SEAT,
+  });
+  if (flow.step === "seat_only") {
+    return (
+      <Banner
+        status="warning"
+        title={`1 seat added and paid, but ${editor.memberName}'s role could not be changed: ${reasonClause(flow.reason)}.`}
+        data-testid="seat-role-seat-only"
+      >
+        The seat is free for anyone.
+      </Banner>
+    );
+  }
+  if (flow.step === "waiting") {
+    return (
+      <Banner
+        status="info"
+        title="Waiting for the seat payment."
+        data-testid="seat-role-waiting"
+        action={
+          <BannerAction asChild>
+            <a href={flow.url} target="_blank" rel="noopener">
+              Finish paying on Stripe
+            </a>
+          </BannerAction>
+        }
+      >
+        {`${editor.memberName} becomes ${roleLabel} as soon as it is paid.`}
+      </Banner>
+    );
+  }
+  const offerState =
+    flow.step === "busy" || flow.step === "done" || flow.step === "stuck" ? flow.step : "offer";
+  return (
+    <VStack align="stretch" gap={3}>
+      {flow.step === "failed" && (
+        <Text fontSize="sm" data-testid="seat-role-failed">
+          {`The payment didn't go through, so nothing changed. ${editor.memberName} is still ${withArticle(currentRoleLabel)}.`}
+        </Text>
+      )}
+      <SeatRoleOffer
+        organizationId={organizationId}
+        organizationName={organizationName}
+        memberName={editor.memberName}
+        roleLabel={roleLabel}
+        currentRoleLabel={currentRoleLabel}
+        state={offerState}
+        onConfirm={(quotedAt) => void editor.seat.start({ role, quotedAt })}
+        onKind={editor.seat.setOfferKind}
+        onAmountDue={editor.seat.setAmountDue}
+      />
+    </VStack>
+  );
 }

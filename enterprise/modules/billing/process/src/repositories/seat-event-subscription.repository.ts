@@ -11,6 +11,19 @@ export type SeatSubscriptionRow = {
   maxMembers: number | null;
   seatsKept: number | null;
   seatsKeptUntil: Instant | null;
+  /** Absent where a reader does not say; see `isCustomDeal`. */
+  plan?: string;
+  /** Whether an operator set any limit beyond seats and retention on the row. */
+  customLimits?: boolean;
+};
+
+/** An ACTIVE subscription as a seat checkout weighs it: what it is on and whether it is linked. */
+export type ActivePlanRow = {
+  id: string;
+  plan: string;
+  stripeSubscriptionId: string | null;
+  /** Whether an operator set any limit beyond seats and retention on the row. */
+  customLimits?: boolean;
 };
 
 /**
@@ -61,6 +74,10 @@ export type SeatLineClaim = { claimed: true; token: string } | { claimed: false 
 export abstract class SeatEventSubscriptionRepository {
   /** The organization's ACTIVE and CANCELLED subscriptions, newest first. */
   abstract findSeatCandidates(input: { organizationId: string }): Promise<SeatSubscriptionRow[]>;
+  /** The organization's ACTIVE subscriptions, newest first. */
+  abstract findActivePlans(input: { organizationId: string }): Promise<ActivePlanRow[]>;
+  /** Cancels these ACTIVE rows, ended now: local rows standing beside the one live in Stripe. */
+  abstract supersedeStrayRows(input: { ids: string[] }): Promise<void>;
   /** Cancels the PENDING growth-seat checkouts left behind, returning their ids. */
   abstract cancelPendingSeatCheckouts(input: { organizationId: string }): Promise<string[]>;
   abstract createPendingSeatCheckout(input: {

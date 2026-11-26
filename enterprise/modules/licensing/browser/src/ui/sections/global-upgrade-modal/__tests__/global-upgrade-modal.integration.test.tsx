@@ -10,6 +10,7 @@ import {
   SeatProrationPreviewToken,
   type SeatProrationPreviewProps,
 } from "@langwatch/enterprise-billing-client";
+import { RequestAccessToken, type RequestAccessProps } from "@langwatch/organization-client";
 import { act, cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -222,6 +223,63 @@ describe("<GlobalUpgradeModal/>", () => {
 
       expect(
         await screen.findByText("Seat management is not available in this deployment."),
+      ).toBeInTheDocument();
+    });
+  });
+
+  describe("when organization lends Request access and a Lite Member is refused", () => {
+    /** Organization's button as its declaration lends it, naming only the reason it was handed. */
+    function LentRequestAccess({ reason }: RequestAccessProps) {
+      return <button type="button">Request access to {reason}</button>;
+    }
+
+    const organizationLendsRequestAccess = {
+      ...createUiHostServicesFromHost({
+        route: () => ({ params: {}, query: {} }),
+        navigate: () => {},
+      }),
+      declarations: uiDeclarations([
+        {
+          name: "organization",
+          installation: {
+            capabilities: {},
+            lends: [
+              { token: RequestAccessToken, load: async () => ({ default: LentRequestAccess }) },
+            ],
+          },
+        },
+      ]),
+    };
+
+    const renderRefused = (resource?: string) => {
+      renderWithDesignSystem(
+        <UiHostServicesContextProvider value={organizationLendsRequestAccess}>
+          <GlobalUpgradeModal isSaaS />
+        </UiHostServicesContextProvider>,
+      );
+      act(() => {
+        useUpgradeModalStore.getState().openLiteMemberRestriction({ resource });
+      });
+    };
+
+    /** @scenario "The Lite Member refusal offers Request access" */
+    it("offers Request access first, saying what the member was trying to do", async () => {
+      renderRefused("evaluations");
+
+      const request = await screen.findByRole("button", {
+        name: "Request access to run and save experiments",
+      });
+      const buttons = screen.getAllByRole("button");
+      expect(buttons.indexOf(request)).toBeLessThan(
+        buttons.indexOf(screen.getByRole("button", { name: "Copy access request" })),
+      );
+    });
+
+    it("asks to use the feature when the refused resource has no words of its own", async () => {
+      renderRefused("somethingNew");
+
+      expect(
+        await screen.findByRole("button", { name: "Request access to use this feature" }),
       ).toBeInTheDocument();
     });
   });

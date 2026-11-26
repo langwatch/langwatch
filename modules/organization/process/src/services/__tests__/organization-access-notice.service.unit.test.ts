@@ -6,6 +6,7 @@ import { createTestLogger } from "@langwatch/test-harness";
 import { describe, expect, it } from "vitest";
 
 import { MemoryAccessNoticeMailChannel } from "../../channels/memory/memory.access-notice-mail.channel.ts";
+import { MemoryAccessNoticePushChannel } from "../../channels/memory/memory.access-notice-push.channel.ts";
 import { MemoryOrganizationAccessNoticeRepository } from "../../repositories/memory/memory.organization-access-notice.repository.ts";
 import { OrganizationAccessNoticeService } from "../organization-access-notice.service.ts";
 
@@ -27,6 +28,7 @@ function notices() {
   const service = OrganizationAccessNoticeService.create({
     notices: repository,
     mail,
+    push: MemoryAccessNoticePushChannel.create(),
     context: {
       recipients: async () => {
         if (outage.recipients) throw new Error("recipients unavailable");
@@ -39,6 +41,7 @@ function notices() {
       organizationName: async () => "ACME",
       approval: async () => ({ kind: "contact_sales" }),
     },
+    appUrl: null,
     requestsUrl: "https://app.langwatch.test/settings/members?tab=requests",
     now: () => clock.now,
     newId: () => `notice-${++ids}`,

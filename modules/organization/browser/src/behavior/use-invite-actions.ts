@@ -68,10 +68,23 @@ function unsentInvites(
 function invitesCreatedToast({
   count,
   hasEmailProvider,
+  billingOnlyEmail,
 }: {
   count: number;
   hasEmailProvider: boolean;
+  /** The one person invited as Billing only, named in the toast. */
+  billingOnlyEmail?: string;
 }) {
+  if (billingOnlyEmail) {
+    return {
+      title: `${billingOnlyEmail} was invited as Billing only`,
+      description: hasEmailProvider
+        ? "They see the plan and invoices and can upgrade, without taking a seat."
+        : "View invite link under actions menu.",
+      type: "success",
+      duration: 5000,
+    };
+  }
   return {
     title: `${count > 1 ? "Invites" : "Invite"} created successfully`,
     description: hasEmailProvider
@@ -93,6 +106,13 @@ function noInvitesCreatedToast() {
   };
 }
 
+/** The email of a batch that is one Billing only invite, which the toast names. */
+function soleBillingOnlyEmail(invites: MembersForm["invites"]): string | undefined {
+  const [only] = invites;
+  if (invites.length !== 1 || !only?.billingOnly) return undefined;
+  return only.email.toLowerCase();
+}
+
 type CreatedInvites = Parameters<typeof unsentInvites>[0];
 
 /** Reports the batch: an empty answer stays open as a failure, never as sent. */
@@ -100,11 +120,13 @@ function afterInvitesCreated({
   created,
   toaster,
   hasEmailProvider,
+  billingOnlyEmail,
   onCreated,
 }: {
   created: CreatedInvites;
   toaster: OrganizationToaster;
   hasEmailProvider: boolean;
+  billingOnlyEmail: string | undefined;
   onCreated: (unsent: { inviteCode: string; email: string }[]) => void;
 }) {
   const count = created.filter(Boolean).length;
@@ -113,7 +135,13 @@ function afterInvitesCreated({
     return;
   }
   onCreated(unsentInvites(created));
-  toaster.create(invitesCreatedToast({ count, hasEmailProvider }));
+  toaster.create(
+    invitesCreatedToast({
+      count,
+      hasEmailProvider,
+      ...(count === 1 && billingOnlyEmail ? { billingOnlyEmail } : {}),
+    }),
+  );
 }
 
 function inviteResentToast({ emailSent }: { emailSent: boolean }) {
@@ -191,6 +219,7 @@ export function useInviteActions({
   const resendInviteMutation = api.invite.resendInvite.useMutation();
 
   const performAdminInvite = (data: MembersForm) => {
+    const billingOnlyEmail = soleBillingOnlyEmail(data.invites);
     createInvitesMutation.mutate(
       {
         organizationId,
@@ -202,6 +231,7 @@ export function useInviteActions({
             created,
             toaster,
             hasEmailProvider,
+            billingOnlyEmail,
             onCreated: (unsent) => {
               onInviteCreated(unsent);
               onClose();

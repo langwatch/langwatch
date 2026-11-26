@@ -196,6 +196,76 @@ No such price",
 }
 `;
 
+exports[`given the Slack notice registry > when duplicate-active-subscriptions / an ops… is rendered > matches its stored rendering 1`] = `
+{
+  "blocks": [
+    {
+      "text": {
+        "emoji": true,
+        "text": "⚠️ More than one active subscription",
+        "type": "plain_text",
+      },
+      "type": "header",
+    },
+    {
+      "fields": [
+        {
+          "text": "*Organization*
+Acme Robotics",
+          "type": "mrkdwn",
+        },
+        {
+          "text": "*Admin*
+morgan@acme.example",
+          "type": "mrkdwn",
+        },
+        {
+          "text": "*Plan*
+Growth",
+          "type": "mrkdwn",
+        },
+        {
+          "text": "*Subscription 1*
+\`subscription_2nVvAcmeNew\`",
+          "type": "mrkdwn",
+        },
+        {
+          "text": "*Subscription 2*
+\`subscription_2nVvAcmeOld\`",
+          "type": "mrkdwn",
+        },
+      ],
+      "type": "section",
+    },
+    {
+      "elements": [
+        {
+          "action_id": "duplicate-active-subscriptions_0",
+          "style": "primary",
+          "text": {
+            "text": "Open org in admin",
+            "type": "plain_text",
+          },
+          "type": "button",
+          "url": "https://app.langwatch.ai/ops/cloud/subscriptions?q=organization_acme",
+        },
+      ],
+      "type": "actions",
+    },
+    {
+      "elements": [
+        {
+          "text": "app.langwatch.ai · <!date^1790000000^{date_short_pretty} at {time}|2026-09-21T14:13Z>",
+          "type": "mrkdwn",
+        },
+      ],
+      "type": "context",
+    },
+  ],
+  "text": "⚠️ More than one active subscription · Organization: Acme Robotics · Admin: morgan@acme.example · Plan: Growth · Subscription 1: subscription_2nVvAcmeNew · Subscription 2: subscription_2nVvAcmeOld",
+}
+`;
+
 exports[`given the Slack notice registry > when license-purchase / an annual licence is rendered > matches its stored rendering 1`] = `
 {
   "blocks": [

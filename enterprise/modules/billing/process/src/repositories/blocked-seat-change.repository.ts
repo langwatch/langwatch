@@ -1,0 +1,31 @@
+// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
+import type { BlockedSeatChangeAttempt } from "@langwatch/enterprise-billing-contract";
+import type { Instant } from "@langwatch/time";
+
+/** One refused seat change still waiting for its admin to hear billing works again. */
+export type BlockedSeatChange = Readonly<{
+  id: string;
+  organizationId: string;
+  userId: string;
+  attempt: BlockedSeatChangeAttempt;
+  seats: number;
+  createdAt: Instant;
+}>;
+
+/** The seat changes billing refused for two live subscriptions, kept until their admin is told. */
+export abstract class BlockedSeatChangeRepository {
+  abstract record(input: {
+    organizationId: string;
+    userId: string;
+    attempt: BlockedSeatChangeAttempt;
+    seats: number;
+  }): Promise<void>;
+  /** Every change whose admin has not been told yet, oldest first, across organizations. */
+  abstract findWaiting(): Promise<BlockedSeatChange[]>;
+  /** Marks every waiting change of this admin in this organization told. */
+  abstract markNotified(input: {
+    organizationId: string;
+    userId: string;
+    at: Instant;
+  }): Promise<void>;
+}

@@ -21,6 +21,7 @@ import type {
   BillingSubscriptionStatus,
 } from "../rules/billing-stripe-shapes.rules.ts";
 import { RECENT_INVOICES_LIMIT } from "../services/billing-invoices.service.ts";
+import { NO_DUPLICATE_SUBSCRIPTION_ALERTS } from "../services/duplicate-subscription-alert.service.ts";
 import { SeatEventSubscriptionService } from "../services/seat-event-subscription.service.ts";
 import { StripeCustomerCurrencyService } from "../services/stripe-customer-currency.service.ts";
 import { StripeErrorTranslatorService } from "../services/stripe-error-translator.service.ts";
@@ -93,6 +94,10 @@ const createMockRepository = (): {
   cancelTrialSubscriptions: vi.fn(),
   migrateToSeatEvent: vi.fn(),
   updateQuantities: vi.fn(),
+  findLiveUnlinkedBeside: vi.fn(),
+  findLiveLinkedBeside: vi.fn(),
+  adoptCheckout: vi.fn(),
+  cancelPendingCheckout: vi.fn(),
 });
 
 const TEST_PRICES = BillingPriceCatalogue.create("test").prices;
@@ -131,7 +136,8 @@ const createMockSeatEventService = () =>
     SeatEventSubscriptionService.create({
       stripeSubscriptions: MemoryStripeSubscriptionsChannel.create(),
       subscriptions: MemorySeatEventSubscriptionRepository.create(MemoryBillingStore.create()),
-      abandoned: { seatCheckoutsAbandoned: vi.fn() },
+      abandoned: { seatCheckoutsAbandoned: vi.fn(), audited: vi.fn() },
+      duplicates: NO_DUPLICATE_SUBSCRIPTION_ALERTS,
       prices: TEST_PRICES,
       customerCurrency: StripeCustomerCurrencyService.create({
         customers: MemoryStripeCustomersChannel.create(),

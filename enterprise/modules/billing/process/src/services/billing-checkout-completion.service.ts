@@ -1,4 +1,8 @@
-import { Currency, SubscriptionRecordNotFoundError } from "@langwatch/enterprise-billing-contract";
+import {
+  Currency,
+  SubscriptionRecordNotFoundError,
+  SubscriptionStatus,
+} from "@langwatch/enterprise-billing-contract";
 import type { StripePriceMap } from "@langwatch/enterprise-billing-contract";
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
@@ -14,6 +18,7 @@ import type { BillingWebhookHost } from "../channels/billing-webhook-host.channe
 import type { StripeSubscriptionsChannel } from "../channels/stripe-subscriptions.channel.ts";
 import type { BillingWebhookOrganizationRepository } from "../repositories/billing-webhook-organization.repository.ts";
 import type { BillingWebhookSubscriptionRepository } from "../repositories/billing-webhook-subscription.repository.ts";
+import { isCustomDeal } from "../rules/seat-checkout-guard.rules.ts";
 import { AnnualEventsBillingThresholdService } from "./annual-events-billing-threshold.service.ts";
 import type { BillingLifecycleAnnouncerService } from "./billing-lifecycle-announcer.service.ts";
 import {
@@ -24,12 +29,15 @@ import {
   BillingSubscriptionLifecycleService,
   type LicenseClearer,
 } from "./billing-subscription-lifecycle.service.ts";
+import type { DuplicateSubscriptionAlerts } from "./duplicate-subscription-alert.service.ts";
 import type { SubscriptionItemCalculatorService } from "./subscription-item-calculator.service.ts";
 
 const logger = createLogger("langwatch:billing:checkoutCompletion");
 
 const VALID_CURRENCIES_FOR_CHECKOUT = new Set<string>(Object.values(Currency));
 const maskCustomerId = (id: string) => `${id.slice(0, 7)}...${id.slice(-4)}`;
+/** Who the audit names when a checkout is moved onto the row an operator added. */
+const CHECKOUT_ADOPTION_ACTOR = "system:billing";
 
 type BillingCheckoutCompletionOptions = {
   /** Absent where no authz is composed: the checkout then grants no role. */
@@ -38,7 +46,7 @@ type BillingCheckoutCompletionOptions = {
   organizationRepository: BillingWebhookOrganizationRepository;
   stripeSubscriptions: Pick<
     StripeSubscriptionsChannel,
-    "getSubscription" | "updateSubscription" | "cancelSubscription"
+    "getSubscription" | "updateSubscription" | "cancelSubscription" | "refundLatestInvoice"
   >;
   itemCalculator: Pick<SubscriptionItemCalculatorService, "calculateQuantityForPrice"> & {
     prices: StripePriceMap;
@@ -54,7 +62,11 @@ type BillingCheckoutCompletionOptions = {
     | "checkoutCurrencySelected"
     | "seatCheckoutPaid"
     | "pricingModelChanged"
+    | "audited"
+    | "seatCheckoutsAbandoned"
   >;
+  /** Ops hear about a second paid seat checkout; absent, nobody does. */
+  duplicates?: DuplicateSubscriptionAlerts;
 };
 
 export class BillingCheckoutCompletionService {
@@ -69,9 +81,13 @@ export class BillingCheckoutCompletionService {
   private readonly starterRole: BillingStarterRoleService | undefined;
   private readonly annualThreshold: AnnualEventsBillingThresholdService;
   private readonly lifecycle: BillingSubscriptionLifecycleService;
+  private readonly stripeSubscriptions: BillingCheckoutCompletionOptions["stripeSubscriptions"];
+  private readonly duplicates: DuplicateSubscriptionAlerts | undefined;
 
   private constructor(options: BillingCheckoutCompletionOptions) {
     this.subscriptionRepository = options.subscriptionRepository;
+    this.stripeSubscriptions = options.stripeSubscriptions;
+    this.duplicates = options.duplicates;
     this.organizationRepository = options.organizationRepository;
     this.host = options.host;
     this.announcer = options.announcer;
@@ -117,6 +133,8 @@ export class BillingCheckoutCompletionService {
       selectedCurrency,
     });
 
+    if (result.duplicate) return;
+
     if (result.earlyReturn) {
       logger.error(
         {
@@ -145,6 +163,22 @@ export class BillingCheckoutCompletionService {
     }
   }
 
+  /** An expired seat checkout ends its PENDING row and tells peers the checkout was abandoned. */
+  async dispatchCheckoutExpired({
+    event,
+  }: {
+    event: Stripe.Event & { type: "checkout.session.expired" };
+  }): Promise<void> {
+    const reference = (event.data.object as Stripe.Checkout.Session).client_reference_id;
+    if (!reference?.startsWith("subscription_setup_")) return;
+    const id = reference.slice("subscription_setup_".length);
+    const cancelled = await this.subscriptionRepository.cancelPendingCheckout({ id });
+    for (const { organizationId } of cancelled) {
+      logger.info({ organizationId, subscriptionId: id }, "[stripeWebhook] Seat checkout expired");
+      await this.announcer?.seatCheckoutsAbandoned({ organizationId, subscriptionIds: [id] });
+    }
+  }
+
   async handleCheckoutCompleted({
     subscriptionId,
     clientReferenceId,
@@ -153,15 +187,33 @@ export class BillingCheckoutCompletionService {
     subscriptionId: string;
     clientReferenceId: string | null;
     selectedCurrency?: string | null;
-  }): Promise<{ earlyReturn: boolean }> {
+  }): Promise<{ earlyReturn: boolean; duplicate?: boolean }> {
     const subscriptionClientReferenceId = clientReferenceId?.replace("subscription_setup_", "");
 
     if (!subscriptionClientReferenceId) {
       return { earlyReturn: true };
     }
 
+    // A redelivery finds the row this checkout already landed on and links nothing new.
+    const alreadyLinked = await this.subscriptionRepository.findByStripeId(subscriptionId);
+    // A checkout refused as a second plan, or a plan since ended, starts nothing again.
+    if (alreadyLinked?.status === SubscriptionStatus.CANCELLED) {
+      return { earlyReturn: false, duplicate: true };
+    }
+    if (
+      !alreadyLinked &&
+      (await this.refuseSecondPlan({
+        pendingId: subscriptionClientReferenceId,
+        stripeSubscriptionId: subscriptionId,
+      }))
+    ) {
+      return { earlyReturn: false, duplicate: true };
+    }
+    const linkedId =
+      alreadyLinked?.id ?? (await this.landOnLivePlan(subscriptionClientReferenceId));
+
     const updateResult = await this.subscriptionRepository.linkStripeId({
-      id: subscriptionClientReferenceId,
+      id: linkedId,
       stripeSubscriptionId: subscriptionId,
     });
 
@@ -177,6 +229,7 @@ export class BillingCheckoutCompletionService {
     await this.lifecycle.syncInvoicePaymentSuccess({
       subscriptionId,
       throwOnMissing: true,
+      startsPlan: alreadyLinked === null,
     });
 
     const subscriptionRecord = await this.subscriptionRepository.findByStripeId(subscriptionId);
@@ -203,8 +256,9 @@ export class BillingCheckoutCompletionService {
     // Organization opens the PAYMENT_PENDING invites linked to this subscription from the fact.
     if (this.announcer && subscriptionRecord) {
       try {
+        // The invitations were held against the checkout's own row, even when it was adopted.
         await this.announcer.seatCheckoutPaid({
-          subscriptionId: subscriptionRecord.id,
+          subscriptionId: subscriptionClientReferenceId,
           organizationId: subscriptionRecord.organizationId,
         });
       } catch (err) {
@@ -226,6 +280,119 @@ export class BillingCheckoutCompletionService {
     if (failures.length > 0) throw failures[0];
 
     return { earlyReturn: false };
+  }
+
+  /**
+   * The row a paid checkout links to. An ACTIVE row with no provider link (one an operator made
+   * or activated in Ops) is the organization's live plan: the checkout lands on it, so the
+   * organization keeps one active subscription. Several such rows are left to ops.
+   */
+  private async landOnLivePlan(pendingId: string): Promise<string> {
+    const live = await this.subscriptionRepository.findLiveUnlinkedBeside({ pendingId });
+    const [only] = live;
+    if (only && isCustomDeal(only)) {
+      logger.error(
+        { organizationId: only.organizationId, pendingId, liveId: only.id },
+        "[stripeWebhook] Checkout completed beside a custom plan; it is not moved onto it, ops must settle it",
+      );
+      return pendingId;
+    }
+    if (only && live.length === 1) {
+      // Audited before the write: a refused audit fails the delivery and Stripe redelivers it.
+      await this.announcer?.audited({
+        tenantId: only.organizationId,
+        userId: CHECKOUT_ADOPTION_ACTOR,
+        action: "subscription.adoptCheckout",
+        args: { pendingId, liveId: only.id },
+        targetKind: "organization",
+        targetId: only.organizationId,
+      });
+      await this.subscriptionRepository.adoptCheckout({ pendingId, liveId: only.id });
+      logger.warn(
+        { organizationId: only.organizationId, pendingId, liveId: only.id },
+        "[stripeWebhook] Checkout landed on the organization's live unlinked subscription",
+      );
+      return only.id;
+    }
+    if (live.length > 1) {
+      logger.error(
+        { pendingId, liveIds: live.map((row) => row.id) },
+        "[stripeWebhook] Checkout completed beside several unlinked active subscriptions; ops must keep one",
+      );
+    }
+    return pendingId;
+  }
+
+  /**
+   * A checkout paid while the organization already holds a linked seat plan (a stale tab, two
+   * admins at once) would start a second plan. Its subscription is cancelled and its payment
+   * given back, its row is kept cancelled with the link, and ops are told.
+   */
+  private async refuseSecondPlan({
+    pendingId,
+    stripeSubscriptionId,
+  }: {
+    pendingId: string;
+    stripeSubscriptionId: string;
+  }): Promise<boolean> {
+    const live = await this.subscriptionRepository.findLiveLinkedBeside({ pendingId });
+    const [kept] = live;
+    if (!kept) return false;
+    const { organizationId } = kept;
+    logger.error(
+      { organizationId, pendingId, keptId: kept.id, stripeSubscriptionId },
+      "[stripeWebhook] Second seat checkout paid beside a live plan; cancelling and refunding it",
+    );
+    await this.announcer?.audited({
+      tenantId: organizationId,
+      userId: CHECKOUT_ADOPTION_ACTOR,
+      action: "subscription.refuseSecondCheckout",
+      args: { pendingId, keptId: kept.id, stripeSubscriptionId },
+      targetKind: "organization",
+      targetId: organizationId,
+    });
+    const current = await this.stripeSubscriptions.getSubscription({
+      subscriptionId: stripeSubscriptionId,
+    });
+    if (current.status !== "canceled") {
+      await this.stripeSubscriptions.cancelSubscription({
+        subscriptionId: stripeSubscriptionId,
+        prorate: false,
+      });
+    }
+    await this.giveBackPayment({ organizationId, stripeSubscriptionId });
+    await this.subscriptionRepository.linkStripeId({ id: pendingId, stripeSubscriptionId });
+    await this.subscriptionRepository.cancel({ id: pendingId });
+    await this.announcer?.seatCheckoutsAbandoned({ organizationId, subscriptionIds: [pendingId] });
+    await this.duplicates?.reportDuplicateActive({
+      organizationId,
+      subscriptionIds: [...live.map((row) => row.id), pendingId],
+    });
+    return true;
+  }
+
+  /** A refused give-back is left to ops, who the duplicate alert already names it to. */
+  private async giveBackPayment({
+    organizationId,
+    stripeSubscriptionId,
+  }: {
+    organizationId: string;
+    stripeSubscriptionId: string;
+  }): Promise<void> {
+    try {
+      const outcome = await this.stripeSubscriptions.refundLatestInvoice({
+        subscriptionId: stripeSubscriptionId,
+      });
+      logger.warn(
+        { organizationId, stripeSubscriptionId, outcome },
+        "[stripeWebhook] Second checkout's payment given back",
+      );
+    } catch (err) {
+      logger.error(
+        { organizationId, stripeSubscriptionId, err },
+        "[stripeWebhook] CRITICAL: could not refund a second seat checkout; refund it in Stripe",
+      );
+    }
   }
 
   /**

@@ -74,6 +74,7 @@ function invitationStub(create: OrganizationInvitations["create"]): Organization
     displayStatus: unreachable("displayStatus"),
     notifySeatLimitReached: unreachable("notifySeatLimitReached"),
     findUserIdByEmail: unreachable("findUserIdByEmail"),
+    assertNotAlreadyMembers: unreachable("assertNotAlreadyMembers"),
   };
 }
 

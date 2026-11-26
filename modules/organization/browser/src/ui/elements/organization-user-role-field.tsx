@@ -80,6 +80,7 @@ export function OrganizationUserRoleField<Seat extends InviteSeat = Organization
   roles,
   width = "200px",
   ariaLabel = "Organization role",
+  descriptions,
 }: {
   value: Seat;
   onChange: (role: Seat) => void;
@@ -87,11 +88,18 @@ export function OrganizationUserRoleField<Seat extends InviteSeat = Organization
   roles?: readonly Seat[];
   width?: string;
   ariaLabel?: string;
+  /** Lines that replace a seat's usual description, as the plan reads it ("Not on Free"). */
+  descriptions?: Partial<Record<InviteSeat, string>>;
 }) {
   const offered: readonly InviteSeat[] =
     roles ??
     orgRoleOptions.map((option) => option.value).filter((seat) => seat !== BILLING_ONLY_SEAT);
-  const options = orgRoleOptions.filter((option) => offered.includes(option.value));
+  const options = orgRoleOptions
+    .filter((option) => offered.includes(option.value))
+    .map((option) => ({
+      ...option,
+      description: descriptions?.[option.value] ?? option.description,
+    }));
   const roleCollection = createListCollection({ items: options });
   const isFullWidth = width === "full";
 

@@ -27,6 +27,19 @@ export const GROWTH_SEAT_PLAN_TYPES = [
   PlanTypes.GROWTH_SEAT_USD_ANNUAL,
 ] as const;
 
+/** The tiered plans a Growth seat subscription supersedes once its checkout is paid. */
+export const TIERED_PLAN_TYPES = [
+  PlanTypes.LAUNCH,
+  PlanTypes.ACCELERATE,
+  PlanTypes.LAUNCH_ANNUAL,
+  PlanTypes.ACCELERATE_ANNUAL,
+  PlanTypes.PRO,
+  PlanTypes.GROWTH,
+] as const satisfies readonly PlanTypes[];
+
+export const isTieredPlan = (plan: string): boolean =>
+  (TIERED_PLAN_TYPES as readonly string[]).includes(plan);
+
 const ANNUAL_TIERED_PLANS = new Set<PlanTypes>([
   PlanTypes.LAUNCH_ANNUAL,
   PlanTypes.ACCELERATE_ANNUAL,

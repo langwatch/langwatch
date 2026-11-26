@@ -23,7 +23,7 @@ import type {
   Grant,
   GrantRevoked,
 } from "@langwatch/authz-contract";
-import type { Plan } from "@langwatch/entitlement-contract";
+import type { Plan, SeatLimitInfo } from "@langwatch/entitlement-contract";
 import type {
   EnrichedAuditLog,
   groupTrpc,
@@ -35,7 +35,11 @@ import type {
   OrganizationInvitedMemberIds,
   OrganizationMemberRecord,
   OrganizationMemberUser,
+  ChangeMemberRoleWithSeatInput,
+  MemberRoleWithSeatResult,
   PendingInvitationsForCaller,
+  PendingSeatRoleChange,
+  SeatRoleChangeOutcome,
   ScopeGraphOrganization,
 } from "@langwatch/organization-contract";
 import type {
@@ -356,6 +360,32 @@ export type OrganizationApiMap = ContractApiMap<typeof licenseEnforcementTrpc> &
           output: { teamsLeftWithoutAdmin?: { id: string; name: string }[] };
         };
       };
+
+      /** A role change that buys its full seat: specs/licensing/role-change-seat.feature */
+      changeMemberRoleWithSeat: {
+        mutation: { input: ChangeMemberRoleWithSeatInput; output: MemberRoleWithSeatResult };
+      };
+
+      /** Applies a change waiting on its seat payment once paid; asking again changes nothing. */
+      completeSeatRoleChange: {
+        mutation: {
+          input: { organizationId: string; changeId: string };
+          output: SeatRoleChangeOutcome;
+        };
+      };
+
+      /** The member's latest change waiting on a seat payment, so a reopened drawer resumes it. */
+      pendingSeatRoleChange: {
+        query: { input: { organizationId: string; userId: string }; output: PendingSeatRoleChange };
+      };
+
+      /** Keeps a seat role change the offer refused for two live subscriptions, for its admin. */
+      recordBlockedRoleChange: {
+        mutation: {
+          input: { organizationId: string; userId: string; role: OrganizationUserRole };
+          output: { recorded: boolean };
+        };
+      };
     };
 
     invite: {
@@ -418,6 +448,8 @@ export type OrganizationApiMap = ContractApiMap<typeof licenseEnforcementTrpc> &
             membersCount: number;
             membersLiteCount: number;
             membersDeveloperCount: number;
+            /** Full and Lite seats used against the plan, as enforcement counts them. */
+            seatLimitInfo?: SeatLimitInfo;
           };
         };
       };

@@ -57,6 +57,9 @@
       "path": "../../../packages/handled-error/tsconfig.build.json"
     },
     {
+      "path": "../../../enterprise/modules/licensing/client/tsconfig.build.json"
+    },
+    {
       "path": "../../feature-flag/contract/tsconfig.build.json"
     },
     {

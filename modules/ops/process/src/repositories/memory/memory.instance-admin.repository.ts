@@ -70,6 +70,30 @@ export class MemoryInstanceAdminRepository extends InstanceAdminRepository {
     }
   }
 
+  async findActiveSubscriptionIds({
+    organizationId,
+  }: {
+    organizationId: string;
+  }): Promise<string[]> {
+    return [...this.rowsOf("subscription").values()]
+      .filter((row) => row.organizationId === organizationId && row.status === "ACTIVE")
+      .map((row) => String(row.id));
+  }
+
+  async findSubscriptionStates({
+    ids,
+  }: {
+    ids: string[];
+  }): Promise<{ id: string; organizationId: string; status: string }[]> {
+    const rows = this.rowsOf("subscription");
+    return ids.flatMap((id) => {
+      const row = rows.get(id);
+      return row
+        ? [{ id, organizationId: String(row.organizationId), status: String(row.status) }]
+        : [];
+    });
+  }
+
   async findUserById(id: string): Promise<AdminDataResult> {
     return { data: this.rowsOf("user").get(id) ?? null };
   }

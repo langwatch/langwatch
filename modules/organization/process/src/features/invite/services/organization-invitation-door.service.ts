@@ -163,7 +163,10 @@ export class OrganizationInvitationDoorService {
     return { invite: inviteOnWire(invite) };
   }
 
-  /** Asks the inviter's ceiling for these invitations and writes nothing. */
+  /**
+   * Refuses an address that already belongs to a member, then asks the inviter's ceiling, and
+   * writes nothing: a seat bought for an invitation is refused here before anything is charged.
+   */
   async checkInvitesWithinCaller(
     input: Readonly<{
       organizationId: string;
@@ -171,6 +174,10 @@ export class OrganizationInvitationDoorService {
     }>,
     by: OrganizationCaller,
   ): Promise<void> {
+    await this.deps.invitations.assertNotAlreadyMembers({
+      organizationId: input.organizationId,
+      emails: input.invites.map((invite) => invite.email),
+    });
     await this.deps.ceiling.assertWithinCaller({
       organizationId: input.organizationId,
       caller: grantCallerOf(by),

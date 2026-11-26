@@ -711,6 +711,63 @@ describe.skipIf(!goPresent)(
       expect(await instantUsage(lookalike)).toEqual([]);
     }, 30_000);
 
+    /** @scenario "Two paid seat checkouts keep one plan" */
+    it("cancels and refunds a second paid seat checkout at the provider, keeping the first plan", async () => {
+      const organizationId = "org-second-checkout";
+      const customer = (await stripe("/customers", { name: organizationId })).id;
+      store.organizations.set(organizationId, {
+        id: organizationId,
+        name: organizationId,
+        stripeCustomerId: customer,
+        pricingModel: "SEAT_EVENT",
+        currency: "USD",
+        selfHostedCustomer: false,
+        teamIds: [],
+        signupData: {},
+      });
+      const live = await subscriptions.createPending({
+        organizationId,
+        plan: "GROWTH_SEAT_USD_MONTHLY",
+      });
+      await subscriptions.updateStatus({ id: live.id, status: "ACTIVE" });
+      await subscriptions.linkStripeId({ id: live.id, stripeSubscriptionId: "sub_first_plan" });
+      const second = await subscriptions.createPending({
+        organizationId,
+        plan: "GROWTH_SEAT_USD_MONTHLY",
+      });
+      const session = await stripe("/checkout/sessions", {
+        mode: "subscription",
+        customer,
+        success_url: "http://langwatch.test/settings/subscription",
+        client_reference_id: `subscription_setup_${second.id}`,
+        "line_items[0][price]": GROWTH_SEAT_USD_MONTHLY,
+        "line_items[0][quantity]": "1",
+      });
+      const paid = z
+        .looseObject({ subscription: z.string() })
+        .parse(await control(`/checkout/${session.id}/complete`, { body: {} }));
+
+      expect(await deliver([await checkoutCompleted(customer)])).toEqual([200]);
+
+      const atProvider = z.looseObject({ status: z.string() }).parse(
+        await fetch(`${simBase}/v1/subscriptions/${paid.subscription}`, {
+          headers: { authorization: `Bearer ${SECRET_KEY}` },
+        }).then((answer) => answer.json()),
+      );
+      expect(atProvider.status).toBe("canceled");
+      const { refunds } = z
+        .object({ refunds: z.array(z.looseObject({ status: z.string(), amount: z.number() })) })
+        .parse(await control("/refunds"));
+      expect(refunds).toEqual([expect.objectContaining({ status: "succeeded" })]);
+      expect(refunds[0]?.amount).toBeGreaterThan(0);
+      const rows = store.subscriptions.filter((row) => row.organizationId === organizationId);
+      expect(rows.filter((row) => row.status === "ACTIVE").map((row) => row.id)).toEqual([live.id]);
+      expect(rows.find((row) => row.id === second.id)).toMatchObject({
+        status: "CANCELLED",
+        stripeSubscriptionId: paid.subscription,
+      });
+    }, 30_000);
+
     /** @scenario "A failed renewal payment is recorded" */
     it("records the declined renewal on the subscription", async () => {
       const { customer, organizationId } = await pendingCheckout("org-renewal-declined");

@@ -1,4 +1,4 @@
-import { PlanTypes, SubscriptionStatus } from "@langwatch/enterprise-billing-contract";
+import { SubscriptionStatus, TIERED_PLAN_TYPES } from "@langwatch/enterprise-billing-contract";
 import type {
   PrismaClient,
   PlanTypes as PrismaPlanTypes,
@@ -236,15 +236,6 @@ export class PrismaBillingSubscriptionRepository extends BillingSubscriptionRepo
     organizationId: string;
     excludeSubscriptionId: string;
   }): Promise<{ stripeSubscriptionId: string | null }[]> {
-    const TIERED_PLAN_TYPES: PlanTypes[] = [
-      PlanTypes.LAUNCH,
-      PlanTypes.ACCELERATE,
-      PlanTypes.LAUNCH_ANNUAL,
-      PlanTypes.ACCELERATE_ANNUAL,
-      PlanTypes.PRO,
-      PlanTypes.GROWTH,
-    ];
-
     return this.prisma.$transaction(async (tx) => {
       const oldSubs = await tx.subscription.findMany({
         where: {
@@ -254,7 +245,7 @@ export class PrismaBillingSubscriptionRepository extends BillingSubscriptionRepo
             not: SubscriptionStatus.CANCELLED as PrismaSubscriptionStatus,
           },
           stripeSubscriptionId: { not: null },
-          plan: { in: TIERED_PLAN_TYPES as PrismaPlanTypes[] },
+          plan: { in: [...TIERED_PLAN_TYPES] as PrismaPlanTypes[] },
         },
       });
 
@@ -273,6 +264,87 @@ export class PrismaBillingSubscriptionRepository extends BillingSubscriptionRepo
       return oldSubs.map((s) => ({
         stripeSubscriptionId: s.stripeSubscriptionId,
       }));
+    });
+  }
+
+  async findLiveUnlinkedBeside({
+    pendingId,
+  }: {
+    pendingId: string;
+  }): Promise<BillingSubscriptionRecord[]> {
+    const pending = await this.prisma.subscription.findUnique({
+      where: { id: pendingId },
+      select: { organizationId: true },
+    });
+    if (!pending) return [];
+    const rows = await this.prisma.subscription.findMany({
+      where: {
+        organizationId: pending.organizationId,
+        id: { not: pendingId },
+        status: SubscriptionStatus.ACTIVE as PrismaSubscriptionStatus,
+        stripeSubscriptionId: null,
+      },
+      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+    });
+    return rows.map(subscriptionRecordOf);
+  }
+
+  async findLiveLinkedBeside({
+    pendingId,
+  }: {
+    pendingId: string;
+  }): Promise<BillingSubscriptionRecord[]> {
+    const pending = await this.prisma.subscription.findUnique({
+      where: { id: pendingId },
+      select: { organizationId: true },
+    });
+    if (!pending) return [];
+    const rows = await this.prisma.subscription.findMany({
+      where: {
+        organizationId: pending.organizationId,
+        id: { not: pendingId },
+        status: SubscriptionStatus.ACTIVE as PrismaSubscriptionStatus,
+        stripeSubscriptionId: { not: null },
+        plan: { notIn: [...TIERED_PLAN_TYPES] as PrismaPlanTypes[] },
+      },
+      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+    });
+    return rows.map(subscriptionRecordOf);
+  }
+
+  async cancelPendingCheckout({ id }: { id: string }): Promise<BillingSubscriptionRecord[]> {
+    const { count } = await this.prisma.subscription.updateMany({
+      where: { id, status: SubscriptionStatus.PENDING as PrismaSubscriptionStatus },
+      data: {
+        status: SubscriptionStatus.CANCELLED as PrismaSubscriptionStatus,
+        endDate: toDate(nowInstant()),
+      },
+    });
+    if (count === 0) return [];
+    const row = await this.prisma.subscription.findUnique({ where: { id } });
+    return row ? [subscriptionRecordOf(row)] : [];
+  }
+
+  async adoptCheckout({ pendingId, liveId }: { pendingId: string; liveId: string }): Promise<void> {
+    await this.prisma.$transaction(async (tx) => {
+      const pending = await tx.subscription.findUniqueOrThrow({ where: { id: pendingId } });
+      await tx.subscription.update({
+        where: { id: liveId },
+        data: {
+          plan: pending.plan,
+          maxMembers: pending.maxMembers,
+          ...(pending.maxRetentionDays === null
+            ? {}
+            : { maxRetentionDays: pending.maxRetentionDays }),
+        },
+      });
+      await tx.subscription.update({
+        where: { id: pendingId },
+        data: {
+          status: SubscriptionStatus.CANCELLED as PrismaSubscriptionStatus,
+          endDate: toDate(nowInstant()),
+        },
+      });
     });
   }
 

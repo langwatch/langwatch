@@ -1,13 +1,18 @@
 /**
  * @vitest-environment jsdom
- * Approve decides between approving at once and adding a Stripe seat first.
+ * Approve decides between approving at once and buying the seat in the same click.
  * Spec: modules/organization/specs/seat-requests.feature
  */
-import type { OpenSeatRequests, SeatRequest } from "@langwatch/organization-contract";
+import type {
+  OpenSeatRequests,
+  SeatApprovalCompletion,
+  SeatApprovalWithSeat,
+  SeatRequest,
+} from "@langwatch/organization-contract";
 import "@testing-library/jest-dom/vitest";
-import { cleanup, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { renderWithOrganizationHost } from "../../testing.tsx";
 import { useSeatRequests } from "../use-seat-requests.ts";
@@ -18,6 +23,7 @@ const { calls, openSeats, state } = vi.hoisted(() => ({
   state: {
     open: undefined as unknown,
     failing: new Set<string>(),
+    answers: {} as Record<string, unknown[]>,
   },
 }));
 
@@ -33,7 +39,8 @@ vi.mock("../organization-api.ts", () => {
       mutateAsync: async (input: unknown) => {
         calls.push({ path, input });
         if (state.failing.has(path)) throw new Error(`${path} failed`);
-        return {};
+        const queued = state.answers[path];
+        return queued && queued.length > 1 ? queued.shift() : (queued?.[0] ?? {});
       },
     }),
     invalidate: async () => {
@@ -56,12 +63,13 @@ vi.mock("../organization-api.ts", () => {
 const ORG = "org-1";
 const REQUEST: SeatRequest = {
   id: "seat-request-1",
-  email: "held@acme.example",
-  name: "Held Person",
-  userId: "user-held",
-  source: "pending",
+  email: "lena@acme.example",
+  name: "Lena",
+  userId: "user-lena",
+  source: "requested",
   idpRefused: false,
   idpKind: null,
+  reason: "run the workbench",
   openedAt: 0,
 };
 
@@ -74,124 +82,207 @@ function openRequests(overrides: Partial<OpenSeatRequests>): OpenSeatRequests {
   };
 }
 
+const stripeSeats = () =>
+  openRequests({
+    approvalPath: {
+      kind: "stripe_seats",
+      currentSeats: 5,
+      newSeats: 6,
+      planType: "GROWTH_SEAT_EUR_MONTHLY",
+      seatPrice: { amount: 29, currency: "EUR" },
+    },
+  });
+
+function answer(path: string, ...answers: (SeatApprovalWithSeat | SeatApprovalCompletion)[]) {
+  state.answers[path] = answers;
+}
+
 function ApproveButton() {
-  const { approve } = useSeatRequests({ organizationId: ORG, canView: true, canManage: true });
+  const { approve, waitingId } = useSeatRequests({
+    organizationId: ORG,
+    canView: true,
+    canManage: true,
+  });
   return (
-    <button type="button" onClick={() => approve(REQUEST)}>
-      Approve
-    </button>
+    <>
+      <button type="button" onClick={() => approve(REQUEST)}>
+        Approve
+      </button>
+      {waitingId ? <p>Waiting on {waitingId}</p> : null}
+    </>
   );
 }
 
-const approvals = () => calls.filter((call) => call.path === "seatRequest.approve");
+const named = (path: string) => calls.filter((call) => call.path === path);
 const invalidations = () => calls.filter((call) => call.path.endsWith(":invalidate"));
-const expansions = () => calls.filter((call) => call.path === "subscription.addTeamMemberOrEvents");
 
 describe("useSeatRequests approve", () => {
+  let opened: ReturnType<typeof vi.spyOn>;
+  beforeEach(() => {
+    opened = vi.spyOn(window, "open").mockImplementation(() => null);
+  });
   afterEach(() => {
     cleanup();
     calls.length = 0;
     openSeats.mockReset();
     state.failing.clear();
+    state.answers = {};
+    opened.mockRestore();
+    vi.useRealTimers();
   });
 
   describe("when a full seat is free", () => {
     /** @scenario "Approve with a seat free approves at once" */
-    it("approves without opening the seats upgrade", async () => {
-      state.open = openRequests({
-        seatFree: true,
-        approvalPath: {
-          kind: "stripe_seats",
-          currentSeats: 5,
-          newSeats: 6,
-          planType: "GROWTH_SEAT_EUR_MONTHLY",
-          seatPrice: null,
-        },
-      });
+    it("approves without buying a seat", async () => {
+      state.open = { ...stripeSeats(), seatFree: true };
       renderWithOrganizationHost(<ApproveButton />);
 
       await userEvent.click(screen.getByText("Approve"));
 
-      await waitFor(() => expect(approvals()).toHaveLength(1));
-      expect(approvals()[0]!.input).toEqual({ organizationId: ORG, seatRequestId: REQUEST.id });
+      await waitFor(() => expect(named("seatRequest.approve")).toHaveLength(1));
+      expect(named("seatRequest.approve")[0]!.input).toEqual({
+        organizationId: ORG,
+        seatRequestId: REQUEST.id,
+      });
+      expect(named("seatRequest.approveWithSeat")).toHaveLength(0);
       expect(openSeats).not.toHaveBeenCalled();
-      expect(expansions()).toHaveLength(0);
     });
   });
 
-  describe("when the organization pays per seat through Stripe", () => {
-    const stripeSeats = () =>
-      openRequests({
-        approvalPath: {
-          kind: "stripe_seats",
-          currentSeats: 5,
-          newSeats: 6,
-          planType: "GROWTH_SEAT_EUR_MONTHLY",
-          seatPrice: { amount: 29, currency: "EUR" },
-        },
+  describe("when no seat is free on a live Stripe seat subscription", () => {
+    /** @scenario "Approve in one click with no seat free adds the seat without a confirmation dialog" */
+    it("approves with a seat in one click and says a seat was added", async () => {
+      state.open = stripeSeats();
+      answer("seatRequest.approveWithSeat", {
+        status: "approved",
+        outcome: "promoted",
+        seatAdded: true,
       });
+      const { host } = renderWithOrganizationHost(<ApproveButton />);
+
+      await userEvent.click(screen.getByText("Approve"));
+
+      await waitFor(() => expect(host.successes).toHaveLength(1));
+      expect(openSeats).not.toHaveBeenCalled();
+      expect(named("seatRequest.approve")).toHaveLength(0);
+      expect(named("seatRequest.approveWithSeat")[0]!.input).toEqual({
+        organizationId: ORG,
+        seatRequestId: REQUEST.id,
+      });
+      expect(host.successes[0]).toEqual(
+        expect.objectContaining({ title: "Lena has a full seat", description: "1 seat added." }),
+      );
+    });
 
     /** @scenario "Approve on a live Stripe seat subscription adds the seat, then approves" */
-    it("adds the seat on confirm and only then approves", async () => {
+    it("rereads the seat totals once the seat was added and the request approved", async () => {
       state.open = stripeSeats();
+      answer("seatRequest.approveWithSeat", {
+        status: "approved",
+        outcome: "promoted",
+        seatAdded: true,
+      });
       renderWithOrganizationHost(<ApproveButton />);
 
       await userEvent.click(screen.getByText("Approve"));
 
-      expect(approvals()).toHaveLength(0);
-      expect(openSeats).toHaveBeenCalledWith(
-        expect.objectContaining({ organizationId: ORG, currentSeats: 5, newSeats: 6 }),
+      await waitFor(() =>
+        expect(calls.map((call) => call.path)).toContain(
+          "licenseEnforcement.checkLimit:invalidate",
+        ),
       );
-      const { onConfirm } = openSeats.mock.calls[0]![0] as { onConfirm: () => Promise<void> };
-      await onConfirm();
-
-      expect(
-        calls.map((call) => call.path).filter((path) => !path.endsWith(":invalidate")),
-      ).toEqual(["subscription.addTeamMemberOrEvents", "seatRequest.approve"]);
-      expect(expansions()[0]!.input).toEqual({
-        organizationId: ORG,
-        plan: "GROWTH_SEAT_EUR_MONTHLY",
-        upgradeMembers: true,
-        upgradeTraces: false,
-        totalMembers: 6,
-        totalTraces: 0,
-      });
-    });
-
-    /** @scenario "Approve on a live Stripe seat subscription adds the seat, then approves" */
-    it("rereads the seat totals when the approval fails after the seat was bought", async () => {
-      state.open = stripeSeats();
-      state.failing.add("seatRequest.approve");
-      const { host } = renderWithOrganizationHost(<ApproveButton />);
-
-      await userEvent.click(screen.getByText("Approve"));
-      const { onConfirm } = openSeats.mock.calls[0]![0] as { onConfirm: () => Promise<void> };
-      await onConfirm();
-
-      expect(expansions()).toHaveLength(1);
       expect(calls.map((call) => call.path)).toContain("seatRequest.listOpen:invalidate");
-      expect(calls.map((call) => call.path)).toContain("licenseEnforcement.checkLimit:invalidate");
-      expect(host.failures).toEqual([
-        expect.objectContaining({ fallbackTitle: "Couldn't approve the seat request" }),
-      ]);
+      // The Users page's Team Members count reads limits.getUsage.
+      expect(calls.map((call) => call.path)).toContain("limits.getUsage:invalidate");
     });
 
     /** @scenario "A failed seat expansion approves nothing" */
-    it("shows an error and does not approve when adding the seat fails", async () => {
+    it("shows that the seat could not be added and says nothing was approved", async () => {
       state.open = stripeSeats();
-      state.failing.add("subscription.addTeamMemberOrEvents");
+      state.failing.add("seatRequest.approveWithSeat");
       const { host } = renderWithOrganizationHost(<ApproveButton />);
 
       await userEvent.click(screen.getByText("Approve"));
-      const { onConfirm } = openSeats.mock.calls[0]![0] as { onConfirm: () => Promise<void> };
-      await onConfirm();
 
-      expect(expansions()).toHaveLength(1);
-      expect(approvals()).toHaveLength(0);
-      expect(invalidations()).toHaveLength(0);
-      expect(host.failures).toEqual([
-        expect.objectContaining({ fallbackTitle: "Couldn't add the seat" }),
-      ]);
+      await waitFor(() =>
+        expect(host.failures).toEqual([
+          expect.objectContaining({ fallbackTitle: "Couldn't add the seat" }),
+        ]),
+      );
+      expect(named("seatRequest.approve")).toHaveLength(0);
+      expect(host.successes).toHaveLength(0);
+    });
+
+    /** @scenario "Approve opens the Stripe page only when Stripe needs the customer, then approves once paid" */
+    it("opens the Stripe page, waits on the payment, then approves once paid", async () => {
+      state.open = stripeSeats();
+      answer("seatRequest.approveWithSeat", {
+        status: "payment_required",
+        url: "https://invoice.stripe.example/i/1",
+        paymentRef: "ref-1",
+      });
+      answer(
+        "seatRequest.completeSeatApproval",
+        { status: "waiting" },
+        {
+          status: "approved",
+          outcome: "promoted",
+        },
+      );
+      const { host } = renderWithOrganizationHost(<ApproveButton />);
+
+      await userEvent.click(screen.getByText("Approve"));
+
+      await screen.findByText(`Waiting on ${REQUEST.id}`);
+      expect(opened).toHaveBeenCalledWith(
+        "https://invoice.stripe.example/i/1",
+        "_blank",
+        "noopener",
+      );
+      expect(host.successes).toHaveLength(0);
+
+      act(() => {
+        window.dispatchEvent(new Event("focus"));
+      });
+      await waitFor(() => expect(named("seatRequest.completeSeatApproval")).toHaveLength(1));
+      expect(host.successes).toHaveLength(0);
+
+      act(() => {
+        window.dispatchEvent(new Event("focus"));
+      });
+      await waitFor(() => expect(host.successes).toHaveLength(1));
+      expect(named("seatRequest.completeSeatApproval")[1]!.input).toEqual({
+        organizationId: ORG,
+        seatRequestId: REQUEST.id,
+        paymentRef: "ref-1",
+      });
+      expect(host.successes[0]).toEqual(expect.objectContaining({ title: "Lena has a full seat" }));
+      expect(screen.queryByText(`Waiting on ${REQUEST.id}`)).toBeNull();
+    });
+
+    it("says the seat payment was not completed when the Stripe page ended unpaid", async () => {
+      state.open = stripeSeats();
+      answer("seatRequest.approveWithSeat", {
+        status: "payment_required",
+        url: "https://invoice.stripe.example/i/1",
+        paymentRef: "ref-1",
+      });
+      answer("seatRequest.completeSeatApproval", { status: "failed" });
+      const { host } = renderWithOrganizationHost(<ApproveButton />);
+
+      await userEvent.click(screen.getByText("Approve"));
+      await screen.findByText(`Waiting on ${REQUEST.id}`);
+      act(() => {
+        window.dispatchEvent(new Event("focus"));
+      });
+
+      await waitFor(() =>
+        expect(host.failures).toEqual([
+          expect.objectContaining({ fallbackTitle: "The seat payment was not completed" }),
+        ]),
+      );
+      expect(host.successes).toHaveLength(0);
+      expect(invalidations().length).toBeGreaterThan(0);
     });
   });
 });

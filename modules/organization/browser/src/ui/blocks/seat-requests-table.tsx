@@ -18,7 +18,33 @@ const SOURCE_LABEL: Record<SeatRequest["source"], { label: string; title: string
     label: "Not signed in",
     title: "Their sign-in was refused before they reached LangWatch.",
   },
+  requested: {
+    label: "Asked for access",
+    title: "They pressed Request access when a Lite Member seat stopped them.",
+  },
 };
+
+/** "Approve and add a seat", priced when the subscription names its seat price. */
+function approveLabel({
+  seatFree,
+  approvalPath,
+}: {
+  seatFree: boolean;
+  approvalPath: SeatApprovalPath | undefined;
+}): { label: string; title?: string } {
+  if (seatFree || approvalPath?.kind !== "stripe_seats") return { label: "Approve" };
+  const price = approvalPath.seatPrice;
+  return {
+    label: "Approve and add a seat",
+    title: price
+      ? `Adds one full seat at ${formatPrice(price)} to your subscription, then approves.`
+      : "Adds one full seat to your subscription, then approves.",
+  };
+}
+
+function formatPrice({ amount, currency }: { amount: number; currency: "USD" | "EUR" }): string {
+  return new Intl.NumberFormat(undefined, { style: "currency", currency }).format(amount);
+}
 
 /** The one action that gives a seat when Approve cannot, worded for how the organization pays. */
 const PATH_ACTION: Record<
@@ -40,6 +66,8 @@ export function SeatRequestsTable({
   approvalPath,
   canManage,
   answeringId,
+  waitingId = null,
+  waitingUrl = null,
   onApprove,
   onDecline,
 }: {
@@ -48,11 +76,15 @@ export function SeatRequestsTable({
   approvalPath: SeatApprovalPath | undefined;
   canManage: boolean;
   answeringId: string | null;
+  /** The request whose seat payment is still open in Stripe's page, and that page. */
+  waitingId?: string | null;
+  waitingUrl?: string | null;
   onApprove: (request: SeatRequest) => void;
   onDecline: (request: SeatRequest) => void;
 }) {
   const growFirst =
     !seatFree && approvalPath && approvalPath.kind !== "stripe_seats" ? approvalPath : null;
+  const approveAction = approveLabel({ seatFree, approvalPath });
 
   return (
     <IdentityRowList data-testid="seat-requests-list" empty="Nobody is waiting for a seat.">
@@ -76,6 +108,11 @@ export function SeatRequestsTable({
                   tone="bad"
                 />
               )}
+              {request.reason ? (
+                <Text fontSize="xs" color="fg.muted" data-testid="seat-request-reason">
+                  Wants to {request.reason}
+                </Text>
+              ) : null}
               <Text fontSize="xs" color="fg.muted">
                 Asked {formatDay(request.openedAt)}
               </Text>
@@ -98,22 +135,45 @@ export function SeatRequestsTable({
                       {PATH_ACTION[growFirst.kind].label}
                     </Button>
                   </Link>
-                ) : (
+                ) : null}
+                {!growFirst && waitingId === request.id ? (
+                  <WaitingOnPayment url={waitingUrl} />
+                ) : null}
+                {!growFirst && waitingId !== request.id ? (
                   <Button
                     size="xs"
                     colorPalette="orange"
                     loading={answeringId === request.id}
+                    title={approveAction.title}
                     onClick={() => onApprove(request)}
                   >
-                    Approve
+                    {approveAction.label}
                   </Button>
-                )}
+                ) : null}
               </HStack>
             ) : null
           }
         />
       ))}
     </IdentityRowList>
+  );
+}
+
+/** The row's place for Approve while the seat payment is still open in Stripe's page. */
+function WaitingOnPayment({ url }: { url: string | null }) {
+  return (
+    <HStack gap={2} data-testid="seat-request-waiting">
+      <Text fontSize="xs" color="fg.muted">
+        Waiting for the seat payment
+      </Text>
+      {url ? (
+        <Link href={url} isExternal>
+          <Button size="xs" variant="outline">
+            Open the payment page
+          </Button>
+        </Link>
+      ) : null}
+    </HStack>
   );
 }
 

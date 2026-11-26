@@ -11,6 +11,7 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { nowInstant } from "@langwatch/time";
 
 import type { MemoryAccessNoticeMailChannel } from "../../../channels/memory/memory.access-notice-mail.channel.ts";
+import type { MemoryAccessNoticePushChannel } from "../../../channels/memory/memory.access-notice-push.channel.ts";
 import { MemoryOrganizationDatabase } from "../../../repositories/memory/memory.organization.database.ts";
 import { MemorySeatRequestRepository } from "../../../repositories/memory/memory.seat-request.repository.ts";
 import type { OrganizationLifecycleSenders } from "../../../services/organization-lifecycle-notice.service.ts";
@@ -52,6 +53,22 @@ export function planWith({
 
 type SalesNotice = Parameters<BillingApi["notifySalesOfSeatRequest"]>[0];
 
+/** The plan of an organization paying per seat through a live Stripe subscription. */
+export const STRIPE_SEAT_PLAN: Partial<Plan> = {
+  planSource: "subscription",
+  type: "GROWTH_SEAT_EVENT",
+  name: "Growth",
+  free: false,
+};
+
+/** How billing answers a seat purchase: added at once, or a Stripe page the customer finishes. */
+export type SeatBilling = {
+  purchase: "added" | "payment_required";
+  /** How the Stripe page stands when the approval is completed. */
+  payment: "paid" | "open" | "failed";
+  purchases: number;
+};
+
 export async function application(
   options: {
     freeFull?: number;
@@ -67,6 +84,10 @@ export async function application(
   const memory = MemoryOrganizationDatabase.create();
   const state = { plan: planWith(options) };
   const salesNotices: SalesNotice[] = [];
+  const seatBilling: SeatBilling = { purchase: "added", payment: "paid", purchases: 0 };
+  const addSeat = () => {
+    state.plan = { ...state.plan, maxMembers: state.plan.maxMembers + 1 };
+  };
   const setup = organizationModuleSetup({
     memory,
     permissions: createApiFixture<AuthzApi>(
@@ -86,6 +107,22 @@ export async function application(
       {
         notifySalesOfSeatRequest: async (input: SalesNotice) => {
           salesNotices.push(input);
+        },
+        addFullSeat: async () => {
+          seatBilling.purchases += 1;
+          if (seatBilling.purchase === "added") {
+            addSeat();
+            return { status: "added" as const };
+          }
+          return {
+            status: "payment_required" as const,
+            payment: { kind: "invoice" as const, invoiceId: "in_seat", seats: 3 },
+            url: "https://invoice.stripe.example/in_seat",
+          };
+        },
+        settleSeatPayment: async () => {
+          if (seatBilling.payment === "paid") addSeat();
+          return { status: seatBilling.payment };
         },
       },
       "BillingApi",
@@ -135,6 +172,7 @@ export async function application(
     }),
   );
   const mail = setup.channels.accessNoticeMail as MemoryAccessNoticeMailChannel;
+  const push = setup.channels.accessNoticePush as MemoryAccessNoticePushChannel;
 
   /** A person signing in by single sign-on, asking for `seat`. */
   async function arrive({
@@ -148,6 +186,22 @@ export async function application(
     memory.users.set(userId, { id: userId, name: null, email, deactivatedAt: null });
     const admission = await app.createMembership({ organizationId: ORGANIZATION_ID, userId, seat });
     return { userId, admission };
+  }
+
+  /** A Lite Member already in the organization, with no seat request on file. */
+  function liteMember({ email, name = null }: { email: string; name?: string | null }) {
+    const userId = `user-${email.split("@")[0]}`;
+    memory.users.set(userId, { id: userId, name, email, deactivatedAt: null });
+    memory.organizationUsers.push({
+      userId,
+      organizationId: ORGANIZATION_ID,
+      role: OrganizationUserRole.EXTERNAL,
+      disabledAt: null,
+      createdAt: nowInstant(),
+      updatedAt: nowInstant(),
+    });
+    const caller: OrganizationCaller = { id: userId, name, email };
+    return { userId, caller };
   }
 
   const membershipOf = (userId: string) =>
@@ -168,9 +222,12 @@ export async function application(
     memory,
     state,
     mail,
+    push,
     salesNotices,
     seatRequests,
+    seatBilling,
     arrive,
+    liteMember,
     membershipOf,
     openRequests,
   };

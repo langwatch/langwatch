@@ -5,6 +5,10 @@ import type { ScopedSecrets } from "@langwatch/secrets";
 import type { ConnectedStatement } from "../../features/connected-billing/services/connected-monthly-statement.service.ts";
 import type { LicenseEmailDelivery } from "../../features/license-purchase/services/license-purchase.service.ts";
 import { BillingAlertChannel, type BillingAlertMessage } from "../billing-alert.channel.ts";
+import {
+  BillingFixedEmailChannel,
+  type BillingFixedEmail,
+} from "../billing-fixed-email.channel.ts";
 import type { BillingChannels } from "../billing.channels.ts";
 import { ConnectedStatementMailChannel } from "../connected-statement-mail.channel.ts";
 import { HubspotFormChannel, type HubspotFormReceipt } from "../hubspot-form.channel.ts";
@@ -46,6 +50,7 @@ export class MemoryBillingChannels {
     return {
       stripe,
       alerts: MemoryBillingAlertChannel.create(),
+      billingFixedEmail: MemoryBillingFixedEmailChannel.create(),
       hubspotForms: MemoryHubspotFormChannel.create(),
       licenseEmail: MemoryLicenseEmailChannel.create(),
       paymentRecoveryEmail: MemoryPaymentRecoveryEmailChannel.create(),
@@ -138,6 +143,25 @@ export class MemoryPaymentRecoveryEmailChannel extends PaymentRecoveryEmailChann
   }
 
   async send(input: { to: string; email: PaymentRecoveryEmail }): Promise<void> {
+    if (this.refused.has(input.to)) throw new Error("The mail provider refused the address");
+    this.sent.push(input);
+  }
+}
+
+/** Records each billing-fixed email; `refuse` names addresses the provider turns down. */
+export class MemoryBillingFixedEmailChannel extends BillingFixedEmailChannel {
+  readonly sent: { to: string; email: BillingFixedEmail }[] = [];
+  readonly refused = new Set<string>();
+
+  private constructor() {
+    super();
+  }
+
+  static create(): MemoryBillingFixedEmailChannel {
+    return new MemoryBillingFixedEmailChannel();
+  }
+
+  async send(input: { to: string; email: BillingFixedEmail }): Promise<void> {
     if (this.refused.has(input.to)) throw new Error("The mail provider refused the address");
     this.sent.push(input);
   }

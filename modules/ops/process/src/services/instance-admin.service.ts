@@ -3,6 +3,8 @@ import type { LedgerActor } from "@langwatch/authorization";
 import { ValidationError } from "@langwatch/handled-error";
 import { SsoConnectionStringEditRetiredError } from "@langwatch/identity-contract";
 import {
+  AdminSubscriptionAlreadyActiveError,
+  AdminSubscriptionIdsRequiredError,
   ORGANIZATION_DATASET_ATTACHMENT_MAX_MB_REFUSAL,
   adminOperationInputSchema,
   adminUserSortFieldSchema,
@@ -153,6 +155,7 @@ export class InstanceAdminService {
     }
 
     this.refuseOutOfRangeDatasetLimit(parsed);
+    await this.refuseSecondActiveSubscription(parsed);
     const normalized = await this.normalizeOrganizationDomain(parsed);
     await this.auditMutation(normalized);
 
@@ -164,6 +167,53 @@ export class InstanceAdminService {
     }
 
     return this.repository.execute(normalized);
+  }
+
+  /**
+   * An organization holds one ACTIVE subscription. A write that would make a second one live
+   * (a new row, a reactivated one, or one moved to another organization) is refused, naming the
+   * live row to edit instead.
+   */
+  private async refuseSecondActiveSubscription(input: AdminOperationInput): Promise<void> {
+    if (input.resource !== "subscription") return;
+    if (!["create", "update", "updateMany"].includes(input.method)) return;
+    const data = input.params.data ?? {};
+    const ids = this.subscriptionWriteIds(input);
+    const stored = await this.repository.findSubscriptionStates({ ids });
+    const written =
+      input.method === "create"
+        ? [{ id: "", organizationId: data.organizationId, status: data.status }]
+        : stored.map((row) => ({
+            id: row.id,
+            organizationId: data.organizationId ?? row.organizationId,
+            status: data.status ?? row.status,
+          }));
+    const seen = new Set<string>();
+    for (const row of written) {
+      if (row.status !== "ACTIVE" || typeof row.organizationId !== "string") continue;
+      const others = (
+        await this.repository.findActiveSubscriptionIds({ organizationId: row.organizationId })
+      ).filter((id) => id !== row.id);
+      if (others.length > 0 || seen.has(row.organizationId)) {
+        throw new AdminSubscriptionAlreadyActiveError({
+          organizationId: row.organizationId,
+          activeSubscriptionIds: others,
+        });
+      }
+      seen.add(row.organizationId);
+    }
+  }
+
+  /**
+   * The stored rows a subscription write touches; a create touches none yet. A bulk edit
+   * without explicit ids is refused, so no write can reach rows the check did not read.
+   */
+  private subscriptionWriteIds(input: AdminOperationInput): string[] {
+    if (input.method === "create") return [];
+    if (input.method === "update") return [String(input.params.id ?? "")];
+    const ids: unknown = input.params.ids;
+    if (!Array.isArray(ids) || ids.length === 0) throw new AdminSubscriptionIdsRequiredError();
+    return ids.map(String);
   }
 
   /** The sharing switch goes through project's door; every other field stays a generic write. */

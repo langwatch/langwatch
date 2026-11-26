@@ -16,12 +16,19 @@ import {
   INVITE_SEATS,
   type InviteFormValues,
   invitesFromForm,
+  splitInviteEmails,
   type TeamOption,
   validateInviteEmails,
 } from "../../model/add-members-form-model.ts";
-import type { InviteSeat, MembersForm } from "../../model/member-invite-form.ts";
+import { type FreePlanInvite, freePlanSeatDescriptions } from "../../model/free-plan-invite.ts";
+import {
+  BILLING_ONLY_SEAT,
+  type InviteSeat,
+  type MembersForm,
+} from "../../model/member-invite-form.ts";
 import { OrganizationUserRole, TeamUserRole } from "../../model/prisma-types.ts";
 import { InviteEmailChips } from "../elements/invite-email-chips.tsx";
+import { LiteNotOnFreeNotice } from "../elements/lite-not-on-free-notice.tsx";
 import { OrganizationUserRoleField } from "../elements/organization-user-role-field.tsx";
 import { InviteTeamAssignments } from "./invite-team-assignments.tsx";
 
@@ -44,6 +51,10 @@ interface AddMembersFormProps {
   initialEmails?: string;
   /** The choice the form opens with; the limit dialog opens it on Billing only. */
   initialSeat?: InviteSeat;
+  /** Set on Free, where Lite is not sold: the picker says so and offers Billing only. */
+  freePlan?: FreePlanInvite & { onUpgrade: () => void };
+  /** Told each time the seat changes, so the host can hold its own send button. */
+  onSeatChange?: (seat: InviteSeat) => void;
 }
 
 export function AddMembersForm({
@@ -58,6 +69,8 @@ export function AddMembersForm({
   isInviterAdmin = true,
   initialEmails = "",
   initialSeat = OrganizationUserRole.MEMBER,
+  freePlan,
+  onSeatChange,
 }: AddMembersFormProps) {
   const firstTeamId = teamOptions[0]?.value;
   const {
@@ -84,18 +97,38 @@ export function AddMembersForm({
 
   const selectedTeams = useWatch({ control, name: "teams" });
   const orgRole = useWatch({ control, name: "orgRole" });
+  const emailsRaw = useWatch({ control, name: "emailsRaw" });
   useTeamsFollowSeat({ orgRole, selectedTeams, setValue });
+  useEffect(() => {
+    onSeatChange?.(orgRole);
+  }, [orgRole, onSeatChange]);
+
+  const submit = handleSubmit((values) => onSubmit({ invites: invitesFromForm(values) }));
+  const inviteAsBillingOnly = () => {
+    setValue("orgRole", BILLING_ONLY_SEAT);
+    void submit();
+  };
 
   return (
-    <form
-      id={formId}
-      onSubmit={handleSubmit((values) => onSubmit({ invites: invitesFromForm(values) }))}
-    >
+    <form id={formId} onSubmit={submit}>
       <VStack align="start" gap={4} width="100%">
         <VStack width="full" gap={0}>
           <InviteEmailsField control={control} errors={errors} />
-          <InviteSeatField control={control} />
+          <InviteSeatField
+            control={control}
+            {...(freePlan ? { descriptions: freePlanSeatDescriptions(freePlan) } : {})}
+          />
         </VStack>
+        {freePlan && orgRole === OrganizationUserRole.EXTERNAL && (
+          <LiteNotOnFreeNotice
+            emails={splitInviteEmails(emailsRaw)}
+            organizationName={freePlan.organizationName}
+            growthSeatPrice={freePlan.growthSeatPrice}
+            onInviteBillingOnly={inviteAsBillingOnly}
+            onUpgrade={freePlan.onUpgrade}
+            busy={isLoading}
+          />
+        )}
         <InviteTeamAssignments
           control={control}
           setValue={setValue}
@@ -150,7 +183,13 @@ function InviteEmailsField({
   );
 }
 
-function InviteSeatField({ control }: { control: Control<InviteFormValues> }) {
+function InviteSeatField({
+  control,
+  descriptions,
+}: {
+  control: Control<InviteFormValues>;
+  descriptions?: Partial<Record<InviteSeat, string>>;
+}) {
   return (
     <HorizontalFormControl
       label="Seat"
@@ -167,6 +206,7 @@ function InviteSeatField({ control }: { control: Control<InviteFormValues> }) {
             roles={INVITE_SEATS}
             width="full"
             ariaLabel="Seat"
+            descriptions={descriptions}
           />
         )}
       />

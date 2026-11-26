@@ -8,6 +8,7 @@ import Stripe from "stripe";
 
 import type { BillingChannels } from "../billing.channels.ts";
 import { HubspotFormChannel, type HubspotFormReceipt } from "../hubspot-form.channel.ts";
+import { SesBillingFixedEmailChannel } from "../ses/ses.billing-fixed-email.channel.ts";
 import { SesConnectedStatementMailChannel } from "../ses/ses.connected-statement-mail.channel.ts";
 import { SesLicenseEmailChannel } from "../ses/ses.license-email.channel.ts";
 import { SesPaymentRecoveryEmailChannel } from "../ses/ses.payment-recovery-email.channel.ts";
@@ -43,6 +44,7 @@ export class HttpBillingChannels {
     return {
       stripe,
       alerts: SlackBillingAlertChannel.create(),
+      billingFixedEmail: SesBillingFixedEmailChannel.create(mailer),
       hubspotForms: HttpHubspotFormChannel.create(),
       licenseEmail: SesLicenseEmailChannel.create(mailer),
       paymentRecoveryEmail: SesPaymentRecoveryEmailChannel.create(mailer),

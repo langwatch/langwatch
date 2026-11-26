@@ -99,6 +99,22 @@ export class MemoryBillingWebhookSubscriptionRepository extends BillingWebhookSu
     return this.subscriptions.migrateToSeatEvent(input);
   }
 
+  findLiveUnlinkedBeside(input: { pendingId: string }): Promise<BillingSubscriptionRecord[]> {
+    return this.subscriptions.findLiveUnlinkedBeside(input);
+  }
+
+  findLiveLinkedBeside(input: { pendingId: string }): Promise<BillingSubscriptionRecord[]> {
+    return this.subscriptions.findLiveLinkedBeside(input);
+  }
+
+  adoptCheckout(input: { pendingId: string; liveId: string }): Promise<void> {
+    return this.subscriptions.adoptCheckout(input);
+  }
+
+  cancelPendingCheckout(input: { id: string }): Promise<BillingSubscriptionRecord[]> {
+    return this.subscriptions.cancelPendingCheckout(input);
+  }
+
   async updateQuantities(input: {
     id: string;
     maxMembers: number | null;

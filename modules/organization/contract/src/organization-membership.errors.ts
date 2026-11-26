@@ -128,6 +128,19 @@ export class CannotRemoveSelfError extends HandledError {
   }
 }
 
+/** One seat payment waits per organization; another member's is still open. */
+export class SeatPaymentWaitingError extends HandledError {
+  declare readonly code: "seat_payment_waiting";
+
+  constructor() {
+    super("seat_payment_waiting", "Another seat is waiting on its payment", {
+      httpStatus: 409,
+      ...remediation("seat_payment_waiting"),
+    });
+    this.name = "SeatPaymentWaitingError";
+  }
+}
+
 /** No member seats available: plan limit reached, not a billing issue. */
 export class MemberSeatLimitReachedError extends HandledError {
   declare readonly code: "member_seat_limit_reached";

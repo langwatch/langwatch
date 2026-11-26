@@ -1,6 +1,6 @@
 import { Button, Center, Text } from "@chakra-ui/react";
 import { Check, Copy } from "lucide-react";
-import { useState } from "react";
+import { type ReactNode, useState } from "react";
 
 import { AccessState } from "./access-state.tsx";
 
@@ -15,6 +15,11 @@ export type RestrictedAccessProps = {
   onBack?: () => void;
   /** Who is asking, written into the copied request when known. */
   requesterName?: string;
+  /**
+   * The caller's own way to ask for access (a Request access button), drawn first. When given,
+   * copying the request becomes the secondary action.
+   */
+  requestAction?: ReactNode;
   "data-testid"?: string;
 };
 
@@ -75,6 +80,7 @@ export function RestrictedAccess({
   detail,
   description,
   onBack,
+  requestAction,
   "data-testid": testId,
 }: RestrictedAccessProps) {
   const [copied, setCopied] = useState(false);
@@ -106,7 +112,12 @@ export function RestrictedAccess({
         data-testid={testId}
         actions={
           <>
-            <Button size="sm" colorPalette="orange" onClick={() => void copyRequest()}>
+            {requestAction}
+            <Button
+              size="sm"
+              {...(requestAction ? { variant: "outline" as const } : { colorPalette: "orange" })}
+              onClick={() => void copyRequest()}
+            >
               {copied ? <Check aria-hidden /> : <Copy aria-hidden />}
               {copied ? "Request copied" : "Copy access request"}
             </Button>

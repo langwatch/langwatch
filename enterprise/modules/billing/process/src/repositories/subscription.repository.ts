@@ -64,6 +64,19 @@ export abstract class BillingSubscriptionRepository {
     organizationId: string;
     excludeSubscriptionId: string;
   }): Promise<{ stripeSubscriptionId: string | null }[]>;
+  /** The ACTIVE rows with no provider link in the checkout row's organization, the row excluded. */
+  abstract findLiveUnlinkedBeside(input: {
+    pendingId: string;
+  }): Promise<BillingSubscriptionRecord[]>;
+  /** The checkout row's organization's other ACTIVE non-tiered rows linked to Stripe. */
+  abstract findLiveLinkedBeside(input: { pendingId: string }): Promise<BillingSubscriptionRecord[]>;
+  /**
+   * The live row takes the checkout's plan, seats and retention, and the checkout row is
+   * cancelled, in one step: a paid checkout lands on the plan the organization already has.
+   */
+  abstract adoptCheckout(input: { pendingId: string; liveId: string }): Promise<void>;
+  /** Cancels the row only while its checkout is still PENDING; answers the rows it cancelled. */
+  abstract cancelPendingCheckout(input: { id: string }): Promise<BillingSubscriptionRecord[]>;
   abstract updateQuantities(input: {
     id: string;
     maxMembers: number | null;

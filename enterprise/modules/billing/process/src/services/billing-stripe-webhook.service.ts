@@ -23,6 +23,7 @@ import {
   BillingSubscriptionLifecycleService,
   type LicenseClearer,
 } from "./billing-subscription-lifecycle.service.ts";
+import type { DuplicateSubscriptionAlerts } from "./duplicate-subscription-alert.service.ts";
 import type { OverPlanService } from "./over-plan.service.ts";
 import type { PaymentRecoveryService, RecoveryInvoice } from "./payment-recovery.service.ts";
 import type { SubscriptionItemCalculatorService } from "./subscription-item-calculator.service.ts";
@@ -115,6 +116,8 @@ type WebhookServiceOptions = {
   billingRoles?: CheckoutBillingRoles;
   /** Marks a cancellation into Free with too many members; absent, none is marked. */
   overPlan?: Pick<OverPlanService, "downgraded">;
+  /** Ops hear about a second paid seat checkout; absent, nobody does. */
+  duplicates?: DuplicateSubscriptionAlerts;
 };
 
 export class EEWebhookService implements WebhookService {
@@ -128,6 +131,7 @@ export class EEWebhookService implements WebhookService {
   private readonly bestEffort = BestEffortService.create();
   private readonly lifecycle: BillingSubscriptionLifecycleService;
   private readonly checkout: BillingCheckoutCompletionService;
+  private readonly seatInvoices?: Pick<BillingLifecycleAnnouncerService, "seatInvoicePaid">;
 
   private constructor({
     subscriptionRepository,
@@ -144,6 +148,7 @@ export class EEWebhookService implements WebhookService {
     billingRoles,
     recovery,
     overPlan,
+    duplicates,
   }: WebhookServiceOptions) {
     this.subscriptionRepository = subscriptionRepository;
     this.organizationRepository = organizationRepository;
@@ -157,6 +162,7 @@ export class EEWebhookService implements WebhookService {
     this.host = host;
     this.connectedBilling = connectedBilling;
     this.recovery = recovery;
+    this.seatInvoices = announcer;
     this.checkout = BillingCheckoutCompletionService.create({
       subscriptionRepository,
       organizationRepository,
@@ -166,6 +172,7 @@ export class EEWebhookService implements WebhookService {
       host,
       ...(announcer ? { announcer } : {}),
       ...(billingRoles ? { billingRoles } : {}),
+      ...(duplicates ? { duplicates } : {}),
     });
     this.lifecycle = BillingSubscriptionLifecycleService.create({
       subscriptionRepository,
@@ -188,6 +195,11 @@ export class EEWebhookService implements WebhookService {
       if (event.type === "checkout.session.completed") {
         const purchase = await this.license.routePurchase(event);
         if (purchase.outcome === "handled") return purchase.result;
+      }
+
+      if (event.type === "checkout.session.expired") {
+        await this.checkout.dispatchCheckoutExpired({ event });
+        return { status: "ok" };
       }
 
       const settled = await this.routeSettledInvoice(event);
@@ -247,6 +259,7 @@ export class EEWebhookService implements WebhookService {
       if (renewal.outcome === "handled") return renewal.result;
       // Both paid events of one invoice arrive; only the write that closes the case mails.
       await this.recovery?.invoicePaid({ invoice: recoveryInvoiceOf(event.data.object) });
+      if (event.type === "invoice.paid") await this.announceSeatInvoicePaid(event.data.object);
       return event.type === "invoice.paid" ? { status: "ok" } : null;
     }
     if (event.type === "invoice.voided") {
@@ -256,6 +269,21 @@ export class EEWebhookService implements WebhookService {
     // Still payable, so the case stays open: no plan back without payment.
     if (event.type === "invoice.marked_uncollectible") return { status: "ok" };
     return null;
+  }
+
+  /** A paid mid-period change invoice may carry a seat a role change waits on (§9). */
+  private async announceSeatInvoicePaid(invoice: Stripe.Invoice): Promise<void> {
+    if (!this.seatInvoices || invoice.billing_reason !== "subscription_update") return;
+    const customerId =
+      typeof invoice.customer === "string" ? invoice.customer : invoice.customer?.id;
+    const organization = customerId
+      ? await this.organizationRepository.findByStripeCustomerId(customerId)
+      : null;
+    if (!organization || !invoice.id) return;
+    await this.seatInvoices.seatInvoicePaid({
+      organizationId: organization.id,
+      invoiceId: invoice.id,
+    });
   }
 
   private async routeConnectedInvoiceFinalized(

@@ -164,6 +164,10 @@ export interface OrganizationInvitations {
   ): Promise<void>;
   /** The person behind an invited address, when they already have an account. */
   findUserIdByEmail(input: Readonly<{ email: string }>): Promise<string | null>;
+  /** Refuses with `already_organization_member` when any address is already a member here. */
+  assertNotAlreadyMembers(
+    input: Readonly<{ organizationId: string; emails: readonly string[] }>,
+  ): Promise<void>;
 }
 
 /**
@@ -243,6 +247,15 @@ export class OrganizationInvitationsService implements OrganizationInvitations {
       // accept a batch naming a team outside the organization and answer 201
       // with nothing created.
       validation: input.validation,
+    });
+  }
+
+  assertNotAlreadyMembers(
+    input: Readonly<{ organizationId: string; emails: readonly string[] }>,
+  ): Promise<void> {
+    return this.options.invites.assertNotAlreadyMembers({
+      organizationId: input.organizationId,
+      emails: input.emails.map((email) => email.trim().toLowerCase()),
     });
   }
 

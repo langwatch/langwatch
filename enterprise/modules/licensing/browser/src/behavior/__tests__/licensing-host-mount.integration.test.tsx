@@ -4,6 +4,7 @@
  * Spec: specs/licensing/self-serving-license-purchase.feature
  */
 import {
+  UiHostServiceUnavailableError,
   UiHostServicesContextProvider,
   UiScope,
   UiSession,
@@ -22,7 +23,7 @@ vi.mock("../../ui/sections/global-upgrade-modal/global-upgrade-modal.tsx", () =>
 }));
 
 import { useLicensingHost } from "../../model/licensing-host.ts";
-import LicensingHostMount from "../licensing-host-mount.tsx";
+import LicensingHostMount, { managesOrganization } from "../licensing-host-mount.tsx";
 
 class TestScope extends UiScope {
   activeScope(): UiActiveScope {
@@ -94,6 +95,60 @@ describe("given the licensing host mount", () => {
       renderMount(capabilitiesWith({}));
 
       expect(screen.getByTestId("url").textContent).toBe("(none)");
+    });
+  });
+});
+
+/** An organization admin whose active project grants nothing at the organization. */
+class OrganizationAdminSession extends UiSession {
+  currentUser() {
+    return null;
+  }
+
+  hasPermission(): boolean {
+    return false;
+  }
+
+  override hasOrganizationPermission(permission: string): boolean {
+    return permission === "organization:manage";
+  }
+
+  isSettled(): boolean {
+    return true;
+  }
+}
+
+/** A session port that cannot answer at the organization. */
+class ScopeOnlySession extends UiSession {
+  currentUser() {
+    return null;
+  }
+
+  hasPermission(permission: string): boolean {
+    return permission === "organization:manage";
+  }
+
+  override hasOrganizationPermission(): boolean {
+    throw new UiHostServiceUnavailableError("session organization permission");
+  }
+
+  isSettled(): boolean {
+    return true;
+  }
+}
+
+describe("given who manages the organization", () => {
+  describe("when the active project says no but the organization says yes", () => {
+    /** @scenario "An organization admin reads as an admin wherever the active project is" */
+    it("treats them as an organization admin", () => {
+      expect(managesOrganization(new OrganizationAdminSession())).toBe(true);
+    });
+  });
+
+  describe("when the session cannot answer at the organization", () => {
+    /** @scenario "The admin check falls back when the organization cannot answer" */
+    it("uses the scope-wide answer", () => {
+      expect(managesOrganization(new ScopeOnlySession())).toBe(true);
     });
   });
 });

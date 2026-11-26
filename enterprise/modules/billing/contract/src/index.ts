@@ -1,6 +1,7 @@
 export * from "./billing.api.ts";
 export * from "./billing.errors.ts";
 export * from "./billing-types.ts";
+export * from "./blocked-seat-change.ts";
 export * from "./billing-report.commands.ts";
 export * from "./connected-billing.ts";
 export * from "./connected-billing.errors.ts";
@@ -13,6 +14,7 @@ export * from "./payment-recovery.ts";
 export * from "./plan-limits.ts";
 export * from "./plan-types.ts";
 export * from "./pricing.ts";
+export * from "./seat-purchase.ts";
 export * from "./stripe-price-catalog.ts";
 export * from "./stripe-prices.ts";
 export * from "./subscription.trpc.ts";

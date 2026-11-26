@@ -8,6 +8,7 @@ import type {
   ResourceLimitNotifierInput,
   SubscriptionPlanInput,
 } from "./billing-types.ts";
+import type { BlockedSeatChangeAttempt } from "./blocked-seat-change.ts";
 import type {
   ConnectedAddCommitRequest,
   ConnectedBillingAccountView,
@@ -19,6 +20,7 @@ import type {
 import type { RenewalCompletion } from "./connected-billing.ts";
 import type { RetentionStorageOutcome, RetentionStorageReport } from "./growth-seat-event.ts";
 import type { Currency } from "./pricing.ts";
+import type { SeatPayment, SeatPaymentStatus, SeatPurchase } from "./seat-purchase.ts";
 import type { SubscriptionBillingInterval } from "./subscription.trpc.ts";
 
 /**
@@ -108,11 +110,39 @@ export interface BillingApi {
     retentionDays?: number;
   }): Promise<{ url: string | null; subscriptionId: string }>;
   /**
+   * Keeps a seat change refused with `subscription_ambiguous` for the admin who tried; once the
+   * organization is back on one subscription that admin gets one email to finish it. `seats`:
+   * the seats the change needs beyond today's. Never throws.
+   */
+  recordBlockedSeatChange(input: {
+    organizationId: string;
+    userId: string;
+    attempt: BlockedSeatChangeAttempt;
+    seats: number;
+  }): Promise<void>;
+  /**
    * Bills the storage an organization keeps beyond the 90 days Growth includes: the metered line
    * follows the longest retention, and a measurement goes to the meter as that day's share of a
    * GB-month. Answers what it did; an organization with no Growth seat subscription is skipped.
    */
   recordRetentionStorage(input: RetentionStorageReport): Promise<RetentionStorageOutcome>;
+  /**
+   * Adds one full seat for a role change: charged to the subscription's payment method, or a
+   * payment page (the seat invoice, or a seat checkout) when the customer must act first.
+   * `successPath` is where a checkout returns. Refuses `subscription_ambiguous` untouched.
+   */
+  addFullSeat(input: {
+    organizationId: string;
+    quotedAt?: number;
+    baseUrl: string;
+    successPath: string;
+    customerEmail: string | null;
+  }): Promise<SeatPurchase>;
+  /** Whether a seat payment is paid, still open, or over; a paid one has its seat recorded. */
+  settleSeatPayment(input: {
+    organizationId: string;
+    payment: SeatPayment;
+  }): Promise<{ status: SeatPaymentStatus }>;
 }
 
 export const BillingApi = moduleApi<BillingApi>()("billing");

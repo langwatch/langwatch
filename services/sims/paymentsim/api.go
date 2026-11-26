@@ -31,6 +31,8 @@ func (s *Server) apiRoutes(mux *http.ServeMux) {
 		"DELETE /v1/subscriptions/{id}":               s.cancelSubscription,
 		"POST /v1/checkout/sessions":                  s.createSession,
 		"GET /v1/checkout/sessions/{id}/line_items":   s.sessionLines,
+		"GET /v1/checkout/sessions":                   s.listSessions,
+		"POST /v1/checkout/sessions/{id}/expire":      s.expireSession,
 		"POST /v1/billing_portal/sessions":            s.createPortal,
 		"POST /v1/invoices":                           s.createInvoice,
 		"GET /v1/invoices":                            s.listInvoices,
@@ -39,7 +41,9 @@ func (s *Server) apiRoutes(mux *http.ServeMux) {
 		"GET /v1/invoices/{id}":                       s.getInvoice,
 		"POST /v1/invoices/{id}/finalize":             s.finalizeInvoice,
 		"POST /v1/invoices/{id}/pay":                  s.payInvoice,
+		"POST /v1/invoices/{id}/void":                 s.voidInvoice,
 		"POST /v1/invoiceitems":                       s.createInvoiceItem,
+		"POST /v1/refunds":                            s.createRefund,
 		"POST /v1/billing/meter_events":               s.createMeterEvent,
 		"GET /v1/billing/meters":                      s.listMeters,
 		"GET /v1/billing/meters/{id}/event_summaries": s.meterSummaries,
@@ -225,8 +229,24 @@ func listedStatus(status, want string) bool {
 	}
 }
 
-func (s *Server) getSubscription(r *http.Request, _ params) (any, error) {
-	return s.subscription(r.PathValue("id"))
+func (s *Server) getSubscription(r *http.Request, p params) (any, error) {
+	sub, err := s.subscription(r.PathValue("id"))
+	if err != nil {
+		return nil, err
+	}
+	return s.renderSub(sub, p), nil
+}
+
+// renderSub is sub as answered: latest_invoice is the id, or the invoice under
+// expand[]=latest_invoice.
+func (s *Server) renderSub(sub *Subscription, p params) any {
+	inv := s.st.invoice(deref(sub.LatestInvoice))
+	if !p.expands("latest_invoice") || inv == nil {
+		return sub
+	}
+	out := fields(sub)
+	out["latest_invoice"] = inv
+	return out
 }
 
 func (s *Server) updateSubscription(r *http.Request, p params) (any, error) {
@@ -242,13 +262,10 @@ func (s *Server) updateSubscription(r *http.Request, p params) (any, error) {
 	if err != nil {
 		return nil, err
 	}
-	var prorations []*Line
-	if p.str("proration_behavior") == prorateAlwaysInvoice {
-		at, ok := p.integer("proration_date")
-		if !ok {
-			at = s.now().Unix()
-		}
-		prorations = s.prorationLines(sub, sub.Items.Data, items, at)
+	prorations := s.updateProrations(sub, items, p)
+	if s.willHold(sub, p, prorations) {
+		s.holdPending(sub, items, prorations)
+		items, prorations = sub.Items.Data, nil
 	}
 	sub.Items.Data = items
 	if p.has("cancel_at_period_end") {
@@ -271,7 +288,19 @@ func (s *Server) updateSubscription(r *http.Request, p params) (any, error) {
 	if len(prorations) > 0 {
 		s.invoiceProrations(sub, prorations)
 	}
-	return sub, nil
+	return s.renderSub(sub, p), nil
+}
+
+// updateProrations is what an always_invoice update bills now; other behaviors bill nothing.
+func (s *Server) updateProrations(sub *Subscription, items []*Item, p params) []*Line {
+	if p.str("proration_behavior") != prorateAlwaysInvoice {
+		return nil
+	}
+	at, ok := p.integer("proration_date")
+	if !ok {
+		at = s.now().Unix()
+	}
+	return s.prorationLines(sub, sub.Items.Data, items, at)
 }
 
 func (s *Server) cancelSubscription(r *http.Request, _ params) (any, error) {
@@ -334,6 +363,81 @@ func (s *Server) createSession(_ *http.Request, p params) (any, error) {
 	}
 	sess.URL = ptr(s.cfg.PublicURL + "/checkout/" + sess.ID)
 	s.st.sessions[sess.ID] = sess
+	return sess, nil
+}
+
+// listSessions is Stripe's session list, filtered by customer, subscription and status.
+func (s *Server) listSessions(_ *http.Request, p params) (any, error) {
+	out := []*Session{}
+	for _, sess := range s.st.sessions {
+		if (p.str("customer") == "" || deref(sess.Customer) == p.str("customer")) &&
+			(p.str("subscription") == "" || deref(sess.Subscription) == p.str("subscription")) &&
+			(p.str("status") == "" || sess.Status == p.str("status")) {
+			out = append(out, sess)
+		}
+	}
+	slices.SortFunc(out, func(a, b *Session) int {
+		return cmp.Or(cmp.Compare(b.Created, a.Created), cmp.Compare(b.ID, a.ID))
+	})
+	return page(out, func(sess *Session) string { return sess.ID }, p, "/v1/checkout/sessions")
+}
+
+// createRefund refunds a paid invoice's payment, named by payment_intent or charge, in full
+// or by amount; a payment already given back is refused as Stripe refuses it.
+func (s *Server) createRefund(_ *http.Request, p params) (any, error) {
+	intent := p.str("payment_intent")
+	if charge := p.str("charge"); intent == "" && charge != "" {
+		intent = "pi_" + strings.TrimPrefix(charge, "ch_")
+	}
+	if intent == "" {
+		return nil, invalid("payment_intent", "One of the following params should be provided for this request: payment_intent or charge.")
+	}
+	var inv *Invoice
+	for _, each := range s.st.invoices {
+		if deref(each.PaymentIntent) == intent {
+			inv = each
+		}
+	}
+	if inv == nil {
+		return nil, noSuch("payment_intent", intent)
+	}
+	refunded := int64(0)
+	for _, each := range s.st.refunds {
+		if each.PaymentIntent == intent {
+			refunded += each.Amount
+		}
+	}
+	left := inv.AmountPaid - refunded
+	amount, given := p.integer("amount")
+	if !given {
+		amount = left
+	}
+	if left <= 0 {
+		return nil, &apiError{status: http.StatusBadRequest, errType: "invalid_request_error", code: "charge_already_refunded", message: "Charge " + "ch_" + strings.TrimPrefix(intent, "pi_") + " has already been refunded."}
+	}
+	if amount <= 0 || amount > left {
+		return nil, invalid("amount", "Refund amount (%d) is greater than unrefunded amount on charge (%d)", amount, left)
+	}
+	refund := &Refund{
+		ID: s.st.id("re"), Object: "refund", Amount: amount, Charge: "ch_" + strings.TrimPrefix(intent, "pi_"),
+		Created: s.now().Unix(), Currency: inv.Currency, PaymentIntent: intent, Status: "succeeded", Invoice: ptr(inv.ID),
+	}
+	s.st.refunds = append(s.st.refunds, refund)
+	s.emit("refund.created", refund, nil)
+	return refund, nil
+}
+
+// expireSession closes an open session so it can no longer be paid, as Stripe does.
+func (s *Server) expireSession(r *http.Request, _ params) (any, error) {
+	sess := s.st.sessions[r.PathValue("id")]
+	if sess == nil {
+		return nil, noSuch("checkout.session", r.PathValue("id"))
+	}
+	if sess.Status != "open" {
+		return nil, invalid("status", "Only Checkout Sessions with a status of open can be expired.")
+	}
+	sess.Status = "expired"
+	s.emit("checkout.session.expired", sess, nil)
 	return sess, nil
 }
 
@@ -549,17 +653,61 @@ func (s *Server) payInvoice(r *http.Request, p params) (any, error) {
 	if err != nil {
 		return nil, err
 	}
-	if deref(inv.Status) != "open" {
-		return nil, invalid("", "Invoice is already %s.", deref(inv.Status))
+	if err := notOpen(inv); err != nil {
+		return nil, err
 	}
 	if p.boolean("paid_out_of_band") {
+		if sub := s.pendingSub(inv); sub != nil {
+			s.applyPending(sub)
+		}
 		s.markPaid(inv, true)
 		return inv, nil
 	}
-	if !s.charge(inv) {
-		return nil, &apiError{status: http.StatusPaymentRequired, errType: "card_error", code: "card_declined", message: "Your card was declined."}
+	if err := chargeError(s.charge(inv)); err != nil {
+		return nil, err
 	}
 	return inv, nil
+}
+
+// voidInvoice voids an open invoice; a pending update waiting on it is discarded with it.
+func (s *Server) voidInvoice(r *http.Request, _ params) (any, error) {
+	inv, err := s.findInvoice(r.PathValue("id"))
+	if err != nil {
+		return nil, err
+	}
+	if err := notOpen(inv); err != nil {
+		return nil, err
+	}
+	now := s.now().Unix()
+	if sub := s.pendingSub(inv); sub != nil {
+		s.discardPending(sub, now)
+		return inv, nil
+	}
+	inv.Status, inv.StatusTransitions.VoidedAt, inv.AmountRemaining = ptr("void"), ptr(now), 0
+	s.emit("invoice.voided", inv, nil)
+	return inv, nil
+}
+
+// notOpen refuses to pay an invoice that is not open; a paid one answers invoice_already_paid.
+func notOpen(inv *Invoice) *apiError {
+	switch deref(inv.Status) {
+	case "open":
+		return nil
+	case "paid":
+		return &apiError{status: http.StatusBadRequest, errType: "invalid_request_error", code: "invoice_already_paid", message: "Invoice is already paid."}
+	}
+	return invalid("", "Invoice is already %s.", deref(inv.Status))
+}
+
+// chargeError is Stripe's answer to a pay call stopped by the fault kind, nil when it paid.
+func chargeError(kind string) *apiError {
+	switch kind {
+	case "":
+		return nil
+	case faultRequiresAction:
+		return &apiError{status: http.StatusPaymentRequired, errType: "card_error", code: "invoice_payment_intent_requires_action", message: "This payment requires additional user action before it can be completed successfully."}
+	}
+	return &apiError{status: http.StatusPaymentRequired, errType: "card_error", code: "card_declined", message: "Your card was declined."}
 }
 
 // maxMeterAge is how far back Stripe accepts a meter event's timestamp.

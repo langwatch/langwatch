@@ -17,6 +17,7 @@ import {
   type SeatRepairRecord,
   type SeatRepairRow,
   type SeatSubscriptionRow,
+  type ActivePlanRow,
 } from "../seat-event-subscription.repository.ts";
 
 /** The repair columns of a subscription with no seat line repair pending. */
@@ -36,6 +37,31 @@ const NO_SEAT_LINE_WRITE = {
   seatLineWriteAttempts: null,
   seatLineWriteFlaggedAt: null,
 };
+
+/** The limits only an operator sets; any of them on a row makes it a custom deal. */
+const CUSTOM_LIMIT_COLUMNS = [
+  "maxProjects",
+  "maxWorkflows",
+  "maxTeams",
+  "maxPrompts",
+  "maxEvaluators",
+  "maxScenarios",
+  "maxAgents",
+  "maxExperiments",
+  "maxOnlineEvaluations",
+  "maxDatasets",
+  "maxDashboards",
+  "maxCustomGraphs",
+  "maxAutomations",
+] as const;
+const CUSTOM_LIMIT_SELECT = Object.fromEntries(
+  CUSTOM_LIMIT_COLUMNS.map((column) => [column, true]),
+) as Record<(typeof CUSTOM_LIMIT_COLUMNS)[number], true>;
+
+/** Whether any operator-only limit is set on the row. */
+function hasCustomLimits(row: Record<(typeof CUSTOM_LIMIT_COLUMNS)[number], number | null>) {
+  return CUSTOM_LIMIT_COLUMNS.some((column) => row[column] !== null);
+}
 
 /** Only what this repository touches. */
 type SeatEventSubscriptionDatabase = Pick<PrismaClient, "subscription">;
@@ -64,12 +90,41 @@ export class PrismaSeatEventSubscriptionRepository extends SeatEventSubscription
         maxMembers: true,
         seatsKept: true,
         seatsKeptUntil: true,
+        plan: true,
+        ...CUSTOM_LIMIT_SELECT,
       },
     });
     return rows.map((row) => ({
-      ...row,
+      id: row.id,
+      status: row.status,
+      stripeSubscriptionId: row.stripeSubscriptionId,
+      maxMembers: row.maxMembers,
+      seatsKept: row.seatsKept,
       seatsKeptUntil: row.seatsKeptUntil ? fromDate(row.seatsKeptUntil) : null,
+      plan: row.plan,
+      customLimits: hasCustomLimits(row),
     }));
+  }
+
+  async findActivePlans({ organizationId }: { organizationId: string }): Promise<ActivePlanRow[]> {
+    const rows = await this.prisma.subscription.findMany({
+      where: { organizationId, status: "ACTIVE" },
+      orderBy: { createdAt: "desc" },
+      select: { id: true, plan: true, stripeSubscriptionId: true, ...CUSTOM_LIMIT_SELECT },
+    });
+    return rows.map((row) => ({
+      id: row.id,
+      plan: row.plan,
+      stripeSubscriptionId: row.stripeSubscriptionId,
+      customLimits: hasCustomLimits(row),
+    }));
+  }
+
+  async supersedeStrayRows({ ids }: { ids: string[] }): Promise<void> {
+    await this.prisma.subscription.updateMany({
+      where: { id: { in: ids }, status: "ACTIVE" },
+      data: { status: "CANCELLED", endDate: toDate(nowInstant()) },
+    });
   }
 
   async cancelPendingSeatCheckouts({

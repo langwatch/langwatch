@@ -126,6 +126,19 @@ type Subscription struct {
 	Metadata           map[string]string `json:"metadata"`
 	StartDate          int64             `json:"start_date"`
 	Status             string            `json:"status"`
+	PendingUpdate      *PendingUpdate    `json:"pending_update"`
+
+	pendingInvoice string
+}
+
+// PendingUpdate is Stripe's pending_update: item changes that wait for their
+// proration invoice to be paid, and lapse at expires_at.
+type PendingUpdate struct {
+	BillingCycleAnchor *int64  `json:"billing_cycle_anchor"`
+	ExpiresAt          int64   `json:"expires_at"`
+	SubscriptionItems  []*Item `json:"subscription_items"`
+	TrialEnd           *int64  `json:"trial_end"`
+	TrialFromPlan      *bool   `json:"trial_from_plan"`
 }
 
 // Line is one invoice line.
@@ -154,6 +167,7 @@ type Period struct {
 type Transitions struct {
 	FinalizedAt *int64 `json:"finalized_at"`
 	PaidAt      *int64 `json:"paid_at"`
+	VoidedAt    *int64 `json:"voided_at"`
 }
 
 // Invoice is Stripe's invoice object.
@@ -179,6 +193,7 @@ type Invoice struct {
 	Number            *string           `json:"number"`
 	Paid              bool              `json:"paid"`
 	PaidOutOfBand     bool              `json:"paid_out_of_band"`
+	PaymentIntent     *string           `json:"payment_intent"`
 	PeriodEnd         int64             `json:"period_end"`
 	PeriodStart       int64             `json:"period_start"`
 	Status            *string           `json:"status"`
@@ -186,6 +201,19 @@ type Invoice struct {
 	Subscription      *string           `json:"subscription"`
 	Subtotal          int64             `json:"subtotal"`
 	Total             int64             `json:"total"`
+}
+
+// Refund gives back what a paid invoice's payment intent took; its charge is ch_ for the pi_.
+type Refund struct {
+	ID            string  `json:"id"`
+	Object        string  `json:"object"`
+	Amount        int64   `json:"amount"`
+	Charge        string  `json:"charge"`
+	Created       int64   `json:"created"`
+	Currency      string  `json:"currency"`
+	PaymentIntent string  `json:"payment_intent"`
+	Status        string  `json:"status"`
+	Invoice       *string `json:"-"`
 }
 
 // Session is a checkout session; its line items are read through their own list.
@@ -269,19 +297,21 @@ type state struct {
 	subscriptions map[string]*Subscription
 	invoices      []*Invoice
 	sessions      map[string]*Session
+	refunds       []*Refund
 	portals       map[string]map[string]any
 	meters        []*Meter
 	meterEvents   []meterEvent
 	grants        []map[string]any
 	idempotent    map[string]idem
 	failPayments  map[string]int
+	failKinds     map[string]string
 }
 
 func newState() *state {
 	return &state{
 		counters: map[string]int{}, products: map[string]*Product{}, customers: map[string]*Customer{},
 		subscriptions: map[string]*Subscription{}, sessions: map[string]*Session{}, portals: map[string]map[string]any{},
-		idempotent: map[string]idem{}, failPayments: map[string]int{},
+		idempotent: map[string]idem{}, failPayments: map[string]int{}, failKinds: map[string]string{},
 	}
 }
 

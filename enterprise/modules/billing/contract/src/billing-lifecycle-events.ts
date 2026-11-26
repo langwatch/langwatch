@@ -19,6 +19,7 @@ export const CHECKOUT_CURRENCY_SELECTED_EVENT_TYPE =
 export const PRICING_MODEL_CHANGED_EVENT_TYPE = "lw.billing.pricing_model_changed" as const;
 export const SEAT_CHECKOUT_PAID_EVENT_TYPE = "lw.billing.seat_checkout_paid" as const;
 export const SEAT_CHECKOUTS_ABANDONED_EVENT_TYPE = "lw.billing.seat_checkouts_abandoned" as const;
+export const SEAT_INVOICE_PAID_EVENT_TYPE = "lw.billing.seat_invoice_paid" as const;
 export const OVER_PLAN_CHANGED_EVENT_TYPE = "lw.billing.over_plan_changed" as const;
 export const BILLING_LIFECYCLE_EVENT_VERSION = "2026-09-30" as const;
 
@@ -181,6 +182,18 @@ export interface SeatCheckoutPaidEventDataSchema extends Named<
 export const seatCheckoutPaidEventDataSchema: SeatCheckoutPaidEventDataSchema =
   seatCheckoutPaidEventDataSchemaDefinition;
 export type SeatCheckoutPaidEventData = z.infer<typeof seatCheckoutPaidEventDataSchema>;
+
+/** A seat invoice was paid: a role change waiting on it applies (role-change-seat.feature). */
+const seatInvoicePaidEventDataSchemaDefinition = z.object({
+  ...organizationRowFactSchema.shape,
+  invoiceId: z.string().min(1),
+});
+export interface SeatInvoicePaidEventDataSchema extends Named<
+  typeof seatInvoicePaidEventDataSchemaDefinition
+> {}
+export const seatInvoicePaidEventDataSchema: SeatInvoicePaidEventDataSchema =
+  seatInvoicePaidEventDataSchemaDefinition;
+export type SeatInvoicePaidEventData = z.infer<typeof seatInvoicePaidEventDataSchema>;
 
 /** Seat checkouts were abandoned: the invitations held for those subscription rows close. */
 const seatCheckoutsAbandonedEventDataSchemaDefinition = z.object({

@@ -161,6 +161,7 @@ vi.mock("../../../behavior/billing-api.ts", async () => {
             refetch: vi.fn(),
           }),
         },
+        checkInvites: { useMutation: () => setup.mockCheckInvites() },
         createInvites: {
           useMutation: () => setup.mockCreateInvites(),
         },
@@ -351,12 +352,12 @@ describe("<SubscriptionPage/> seat rotation", () => {
       fireEvent.click(screen.getByTestId("user-count-link"));
       fireEvent.click(await screen.findByTestId("drawer-seats-stepper-plus"));
 
-      expect(seatSummary().getByText("5 \u2192 6")).toBeInTheDocument();
+      expect(seatSummary().getByText("1 more full seat")).toBeInTheDocument();
       expect(seatSummary().getByText("\u20ac17.98")).toBeInTheDocument();
-      expect(seatSummary().getByText("\u20ac174/mo")).toBeInTheDocument();
+      expect(seatSummary().getByText("\u20ac174/mo for 6 seats")).toBeInTheDocument();
 
-      fireEvent.click(button("Add 1 seat \u00b7 \u20ac29/mo"));
-      fireEvent.click(await screen.findByRole("button", { name: "Pay \u20ac17.98 and add" }));
+      fireEvent.click(button("Add 1 seat \u00b7 \u20ac17.98 today"));
+      fireEvent.click(await screen.findByRole("button", { name: "Pay \u20ac17.98" }));
 
       await waitFor(() =>
         expect(mutateAsync).toHaveBeenCalledWith(expect.objectContaining({ totalMembers: 6 })),
@@ -370,17 +371,16 @@ describe("<SubscriptionPage/> seat rotation", () => {
       renderSubscriptionPage();
 
       fireEvent.click(screen.getByTestId("user-count-link"));
-      fireEvent.click(await screen.findByTestId("add-invite-row"));
       fireEvent.change(await screen.findByTestId("seat-email-0"), {
         target: { value: "new@acme.example" },
       });
       fireEvent.click(screen.getByTestId("drawer-seats-stepper-plus"));
-      fireEvent.click(button("Add 1 seat \u00b7 \u20ac29/mo"));
-      fireEvent.click(await screen.findByRole("button", { name: "Pay \u20ac17.98 and add" }));
+      fireEvent.click(button("Add 1 seat \u00b7 \u20ac17.98 today"));
+      fireEvent.click(await screen.findByRole("button", { name: "Pay \u20ac17.98" }));
 
       await waitFor(() => expect(mutateAsync).toHaveBeenCalled());
       await waitFor(() =>
-        expect(screen.getByRole("button", { name: "Pay \u20ac17.98 and add" })).toBeEnabled(),
+        expect(screen.getByRole("button", { name: "Pay \u20ac17.98" })).toBeEnabled(),
       );
       expect(mockCreateInvitesMutateAsync).not.toHaveBeenCalled();
       expect(screen.getByTestId("seat-email-0")).toHaveValue("new@acme.example");
@@ -391,13 +391,12 @@ describe("<SubscriptionPage/> seat rotation", () => {
       renderSubscriptionPage();
 
       fireEvent.click(screen.getByTestId("user-count-link"));
-      fireEvent.click(await screen.findByTestId("add-invite-row"));
       fireEvent.change(await screen.findByTestId("seat-email-0"), {
         target: { value: "new@acme.example" },
       });
       fireEvent.click(screen.getByTestId("drawer-seats-stepper-plus"));
-      fireEvent.click(button("Add 1 seat \u00b7 \u20ac29/mo"));
-      fireEvent.click(await screen.findByRole("button", { name: "Pay \u20ac17.98 and add" }));
+      fireEvent.click(button("Add 1 seat \u00b7 \u20ac17.98 today"));
+      fireEvent.click(await screen.findByRole("button", { name: "Pay \u20ac17.98" }));
 
       await waitFor(() =>
         expect(mutateAsync).toHaveBeenCalledWith(expect.objectContaining({ totalMembers: 6 })),
@@ -460,12 +459,12 @@ describe("<SubscriptionPage/> seat rotation", () => {
             "Nothing to pay today: you keep 5 seats until 1 Dec, then pay for 4.",
           ),
         ).toBeInTheDocument();
-        expect(seatSummary().getByText("3 \u2192 4")).toBeInTheDocument();
+        expect(seatSummary().getByText("1 more full seat")).toBeInTheDocument();
         expect(mockPreviewProration).toHaveBeenLastCalledWith(
           expect.objectContaining({ newTotalSeats: 4 }),
         );
 
-        fireEvent.click(button("Add 1 seat \u00b7 \u20ac29/mo"));
+        fireEvent.click(button("Add 1 seat"));
         fireEvent.click(
           within(await screen.findByTestId("seat-confirm-dialog")).getByRole("button", {
             name: /Add|Confirm|Pay/,

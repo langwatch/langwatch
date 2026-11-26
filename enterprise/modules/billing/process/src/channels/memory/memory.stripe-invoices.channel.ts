@@ -70,4 +70,16 @@ export class MemoryStripeInvoicesChannel extends StripeInvoicesChannel {
     if (!invoice) throw new Error(`No such invoice: ${invoiceId}`);
     return invoice;
   }
+
+  /** The invoices voided, in order. */
+  readonly voided: string[] = [];
+
+  async voidInvoice({ invoiceId }: { invoiceId: string }): Promise<void> {
+    const refusal = this.refusals.get("voidInvoice");
+    if (refusal) throw refusal;
+    this.voided.push(invoiceId);
+    const index = this.held.findIndex((each) => each.id === invoiceId);
+    const invoice = this.held[index];
+    if (invoice) this.held[index] = { ...invoice, status: "void" };
+  }
 }

@@ -86,6 +86,49 @@ describe.skipIf(!DB_URL)("Prisma seat requests and access notices", () => {
     });
   });
 
+  describe("when a Lite Member asks, asks again, is declined and asks once more", () => {
+    /** @scenario "Asking again while a request is open answers the same request" */
+    it("keeps what she was trying to do, and takes the new reason when it reopens", async () => {
+      const ask = (id: string, at: number, reason?: string) =>
+        requests.open({
+          id,
+          organizationId,
+          email: "lena@acme.example",
+          userId: "user-lena",
+          name: "Lena Lite",
+          source: "requested",
+          idpRefused: false,
+          idpKind: null,
+          reason,
+          at,
+        });
+
+      const first = await ask(`${namespace}-lena-a`, 1_000, "run the workbench");
+      const again = await ask(`${namespace}-lena-b`, 2_000);
+
+      expect(first.request).toMatchObject({ source: "requested", reason: "run the workbench" });
+      expect(again).toMatchObject({
+        outcome: "already_open",
+        request: { id: first.request.id, reason: "run the workbench" },
+      });
+      await requests.resolve({
+        organizationId,
+        id: first.request.id,
+        status: "DECLINED",
+        resolvedByUserId: "user-ada",
+        at: 3_000,
+      });
+
+      const reopened = await ask(`${namespace}-lena-c`, 4_000, "save a prompt");
+
+      expect(reopened).toMatchObject({ outcome: "reopened", request: { reason: "save a prompt" } });
+      const [mine] = (await requests.findForUser({ userId: "user-lena" })).filter(
+        (row) => row.organizationId === organizationId,
+      );
+      expect(mine).toMatchObject({ status: "OPEN", reason: "save a prompt" });
+    });
+  });
+
   describe("when an open that only fills a gap meets a missing row and then an answered one", () => {
     /** @scenario "Arriving again never reopens a seat request that was answered" */
     it("opens the missing row, then leaves the declined row as it is", async () => {

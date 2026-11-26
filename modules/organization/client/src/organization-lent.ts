@@ -48,6 +48,12 @@ export type ProjectDepartmentFieldProps = {
 /** The card of people waiting to join needs nothing handed in: it reads scope. */
 export type PendingJoinRequestsProps = Record<string, never>;
 
+/** What a refusal hands Request access: what the reader was trying to do, in an admin's words. */
+export type RequestAccessProps = {
+  /** "run and save experiments"; the request reads "use this feature" without one. */
+  reason?: string;
+};
+
 /** What onboarding hands the held-membership gate: the screen to draw when nothing is held. */
 export type HeldMembershipGateProps = { children: ReactNode };
 
@@ -68,6 +74,8 @@ export const JoinInsteadToken = organization.component<JoinInsteadProps>("joinIn
 /** Onboarding's welcome, drawn only for somebody with no membership they cannot use. */
 export const HeldMembershipGateToken =
   organization.component<HeldMembershipGateProps>("heldMembershipGate");
+/** Request access for a Lite Member a refusal stopped; draws nothing for anybody else. */
+export const RequestAccessToken = organization.component<RequestAccessProps>("requestAccess");
 export const ProjectDepartmentFieldToken =
   organization.component<ProjectDepartmentFieldProps>("projectDepartmentField");
 export const PendingJoinRequestsToken =

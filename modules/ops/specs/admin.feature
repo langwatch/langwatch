@@ -202,6 +202,27 @@ Feature: Platform administration package boundary
     Then the write is refused with validation_error
     And no user row is written and nothing is audited
 
+  # An organization holds one active subscription; seat changes refuse two live in Stripe.
+  @unit
+  Scenario: The Back office refuses a second active subscription for an organization
+    Given an organization with an active subscription
+    When an operator creates another subscription for it as active, or reactivates a cancelled one
+    Then the write is refused with ops_subscription_already_active naming the active subscription
+    And nothing is written
+
+  @unit
+  Scenario: The Back office still edits an organization's one active subscription
+    Given an organization with an active subscription and a PENDING one
+    When an operator edits the active one's limits, or activates the PENDING one after cancelling the other
+    Then the write is saved
+
+  @unit
+  Scenario: A bulk subscription edit that names no rows is refused
+    Given an organization with an active subscription and a PENDING one
+    When an operator sends a bulk subscription edit without explicit ids
+    Then the edit is refused as malformed, naming the ids field
+    And nothing is written
+
   @unit
   Scenario: Starting an impersonation is recorded on the shared audit log
     Given an operator holding the view grant and a healthy target account

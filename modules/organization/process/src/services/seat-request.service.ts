@@ -1,15 +1,25 @@
 import type { AuthzGrantCaller } from "@langwatch/authz-contract";
-import { HandledError } from "@langwatch/handled-error";
+import {
+  type SeatPayment,
+  type SeatPaymentStatus,
+  type SeatPurchase,
+  seatPaymentSchema,
+} from "@langwatch/enterprise-billing-contract";
+import { HandledError, ValidationError } from "@langwatch/handled-error";
 import type { SignInIdpKind } from "@langwatch/identity-contract";
 import type { Logger } from "@langwatch/observability";
 import {
   type HeldMembership,
   type HeldMemberships,
+  type MyAccessRequest,
   type OpenSeatRequests,
   type OrganizationAdmission,
   OrganizationUserRole,
   type RefusedSignInOutcome,
+  type SeatApprovalCompletion,
   type SeatApprovalPath,
+  type SeatApprovalWithSeat,
+  SeatRequestFullMemberError,
   SeatRequestNotFoundError,
   type SeatRequestResolved,
   type SeatRequestSource,
@@ -72,6 +82,16 @@ export interface SeatRequestPeers {
     email: string;
     invitedBy: OrganizationPlanUser;
   }): Promise<void>;
+  /** Billing buys one more full seat; a purchase may wait on a Stripe page to finish. */
+  addFullSeat(input: {
+    organizationId: string;
+    customerEmail: string | null;
+  }): Promise<SeatPurchase>;
+  /** Whether a seat payment is paid, still open, or over; scoped to the organization's customer. */
+  settleSeatPayment(input: {
+    organizationId: string;
+    payment: SeatPayment;
+  }): Promise<{ status: SeatPaymentStatus }>;
   /** Billing's sales notice for an account-managed organization; never throws. */
   notifySales(input: {
     organizationId: string;
@@ -228,6 +248,7 @@ export class SeatRequestService {
         source: row.source,
         idpRefused: row.idpRefused,
         idpKind: row.idpKind,
+        reason: row.reason,
         openedAt: row.openedAt,
       })),
       seatFree: approval.seatFree,
@@ -236,12 +257,119 @@ export class SeatRequestService {
   }
 
   /** Gives the full seat; refuses member_seat_limit_reached while no full seat is free. */
-  approve(input: {
+  async approve(input: {
     organizationId: string;
     seatRequestId: string;
     by: OrganizationPlanUser;
   }): Promise<SeatRequestResolved> {
-    return this.approval.approve(input);
+    const request = await this.dependencies.requests.getOpen({
+      organizationId: input.organizationId,
+      id: input.seatRequestId,
+    });
+    const resolved = await this.approval.approve(input);
+    await this.tellRequester({ request, outcome: "approved" });
+    return resolved;
+  }
+
+  /**
+   * Approve that buys the one full seat it needs where the organization pays per seat in Stripe.
+   * Tried first, so only the full seat limit leads to a charge; any other path refuses as before.
+   */
+  async approveWithSeat(input: {
+    organizationId: string;
+    seatRequestId: string;
+    by: OrganizationPlanUser;
+  }): Promise<SeatApprovalWithSeat> {
+    const { organizationId } = input;
+    try {
+      const { outcome } = await this.approve(input);
+      return { status: "approved", outcome, seatAdded: false };
+    } catch (error) {
+      if (!HandledError.isHandled(error) || error.code !== "member_seat_limit_reached") throw error;
+      const { path } = await this.approvalOf({ organizationId });
+      if (path.kind !== "stripe_seats") throw error;
+    }
+    const purchase = await this.dependencies.peers.addFullSeat({
+      organizationId,
+      customerEmail: input.by.email ?? null,
+    });
+    if (purchase.status === "payment_required") {
+      return {
+        status: "payment_required",
+        url: purchase.url,
+        paymentRef: JSON.stringify(purchase.payment),
+      };
+    }
+    const { outcome } = await this.approve(input);
+    return { status: "approved", outcome, seatAdded: true };
+  }
+
+  /** After the Stripe page: approves once the seat is paid; waiting while the page is open. */
+  async completeSeatApproval(input: {
+    organizationId: string;
+    seatRequestId: string;
+    paymentRef: string;
+    by: OrganizationPlanUser;
+  }): Promise<SeatApprovalCompletion> {
+    const { organizationId, seatRequestId, by } = input;
+    const payment = parsePaymentRef(input.paymentRef);
+    await this.dependencies.requests.getOpen({ organizationId, id: seatRequestId });
+    const { status } = await this.dependencies.peers.settleSeatPayment({ organizationId, payment });
+    if (status === "open") return { status: "waiting" };
+    if (status === "failed") return { status: "failed" };
+    const { outcome } = await this.approve({ organizationId, seatRequestId, by });
+    return { status: "approved", outcome };
+  }
+
+  /**
+   * A member refused for want of a full seat asks for one. An open request answers as it is;
+   * an answered one opens again, and the admins' mail is still sent once a day at most.
+   */
+  async requestAccess({
+    organizationId,
+    userId,
+    reason,
+  }: {
+    organizationId: string;
+    userId: string;
+    reason?: string;
+  }): Promise<MyAccessRequest> {
+    const membership = await this.dependencies.members.getMembership({ organizationId, userId });
+    const isFull =
+      membership.role === OrganizationUserRole.MEMBER ||
+      membership.role === OrganizationUserRole.ADMIN;
+    if (isFull && !membership.disabledAt) throw new SeatRequestFullMemberError();
+    const email = membership.user.email?.toLowerCase();
+    if (!email) throw new SeatRequestFullMemberError();
+    await this.open({
+      organizationId,
+      email,
+      userId,
+      name: membership.user.name,
+      source: "requested",
+      idpRefused: false,
+      idpKind: null,
+      reason: reason?.trim() || null,
+    });
+    return this.myAccessRequest({ organizationId, userId });
+  }
+
+  /** The caller's own latest seat request in the organization. */
+  async myAccessRequest({
+    organizationId,
+    userId,
+  }: {
+    organizationId: string;
+    userId: string;
+  }): Promise<MyAccessRequest> {
+    const rows = await this.dependencies.requests.findForUser({ userId });
+    const row = rows.find((candidate) => candidate.organizationId === organizationId);
+    if (!row) return { status: "none", openedAt: null, resolvedAt: null };
+    return {
+      status: ACCESS_STATUS[row.status],
+      openedAt: row.openedAt,
+      resolvedAt: row.resolvedAt,
+    };
   }
 
   async decline({
@@ -262,6 +390,7 @@ export class SeatRequestService {
       at: this.dependencies.now(),
     });
     if (!declined) throw new SeatRequestNotFoundError(request.id);
+    await this.tellRequester({ request, outcome: "declined" });
     return { outcome: "declined" };
   }
 
@@ -321,6 +450,7 @@ export class SeatRequestService {
     source: SeatRequestSource;
     idpRefused: boolean;
     idpKind: SignInIdpKind | null;
+    reason?: string | null;
     onlyIfAbsent?: boolean;
   }): Promise<void> {
     const { requests, notices, now, newId } = this.dependencies;
@@ -336,7 +466,10 @@ export class SeatRequestService {
         name: input.name,
         idp: input.idpKind,
         idpRefused: input.idpRefused,
-        heldWithoutAccess: input.source !== "lite",
+        heldWithoutAccess: input.source !== "lite" && input.source !== "requested",
+        ...(input.source === "requested"
+          ? { askedFor: { reason: input.reason ?? null }, seatRequestId: opened.request.id }
+          : {}),
       })
       .catch((error: unknown) => {
         this.dependencies.logger.warn(
@@ -345,6 +478,40 @@ export class SeatRequestService {
         );
       });
     await this.tellSales({ request: opened.request });
+  }
+
+  /**
+   * The person who asked hears the answer, when LangWatch knows their account; never throws.
+   * A member who pressed Request access is also told in-app.
+   */
+  private async tellRequester({
+    request,
+    outcome,
+  }: {
+    request: SeatRequestRow;
+    outcome: "approved" | "declined";
+  }): Promise<void> {
+    if (!request.userId) return;
+    await this.dependencies.notices
+      .mailAnswer({
+        organizationId: request.organizationId,
+        seatRequestId: request.id,
+        email: request.email,
+        outcome,
+      })
+      .catch((error: unknown) => {
+        this.dependencies.logger.warn(
+          { organizationId: request.organizationId, error },
+          "could not mail the seat request answer",
+        );
+      });
+    if (request.source !== "requested") return;
+    await this.dependencies.notices.pushAnswer({
+      organizationId: request.organizationId,
+      seatRequestId: request.id,
+      userId: request.userId,
+      outcome,
+    });
   }
 
   /** Sales hear once per opening, and only where only sales can sell the seat. */
@@ -449,4 +616,23 @@ function heldReason({
   if (request?.status === "OPEN") return "seat_limit";
   if (request?.status === "DECLINED") return "access_turned_off";
   return role === OrganizationUserRole.EXTERNAL ? "seat_limit" : "access_turned_off";
+}
+/** How a stored request reads to the person who asked. */
+const ACCESS_STATUS: Record<SeatRequestRow["status"], MyAccessRequest["status"]> = {
+  OPEN: "open",
+  APPROVED: "approved",
+  DECLINED: "declined",
+};
+
+/** The payment reference `approveWithSeat` handed out, read back; anything else is refused. */
+function parsePaymentRef(paymentRef: string): SeatPayment {
+  let candidate: unknown;
+  try {
+    candidate = JSON.parse(paymentRef);
+  } catch {
+    throw new ValidationError("The seat payment reference is not one this approval handed out");
+  }
+  const parsed = seatPaymentSchema.safeParse(candidate);
+  if (!parsed.success) throw ValidationError.fromZodError(parsed.error);
+  return parsed.data;
 }

@@ -1,4 +1,5 @@
 import type { AccessNoticeMailChannel } from "./access-notice-mail.channel.ts";
+import type { AccessNoticePushChannel } from "./access-notice-push.channel.ts";
 import type { OrganizationInviteMailChannel } from "./organization-invite-mail.channel.ts";
 import type { SignupAnnouncementChannel } from "./signup-announcement.channel.ts";
 
@@ -7,4 +8,5 @@ export interface OrganizationChannels {
   readonly signupAnnouncements: SignupAnnouncementChannel | undefined;
   readonly inviteMail: OrganizationInviteMailChannel;
   readonly accessNoticeMail: AccessNoticeMailChannel;
+  readonly accessNoticePush: AccessNoticePushChannel;
 }

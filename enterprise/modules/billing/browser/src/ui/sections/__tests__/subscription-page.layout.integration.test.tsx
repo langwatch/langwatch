@@ -157,6 +157,7 @@ vi.mock("../../../behavior/billing-api.ts", async () => {
             refetch: vi.fn(),
           }),
         },
+        checkInvites: { useMutation: () => setup.mockCheckInvites() },
         createInvites: {
           useMutation: () => setup.mockCreateInvites(),
         },

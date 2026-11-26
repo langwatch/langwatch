@@ -9,6 +9,7 @@ import type { BillingProjectDirectoryRepository } from "./billing-project-direct
 import type { BillingReportOrganizationRepository } from "./billing-report-organization.repository.ts";
 import type { BillingWebhookOrganizationRepository } from "./billing-webhook-organization.repository.ts";
 import type { BillingWebhookSubscriptionRepository } from "./billing-webhook-subscription.repository.ts";
+import type { BlockedSeatChangeRepository } from "./blocked-seat-change.repository.ts";
 import type { ConnectedBillingRepository } from "./connected-billing.repository.ts";
 import type { DuplicateSubscriptionsReportRepository } from "./duplicate-subscriptions-report.repository.ts";
 import type { LicenseRenewalClaimRepository } from "./license-renewal-claim.repository.ts";
@@ -22,6 +23,8 @@ import type { BillingSubscriptionRepository } from "./subscription.repository.ts
  * The rows the billing module owns, chosen once at boot.
  */
 export interface BillingRepositories {
+  /** Seat changes refused for two live subscriptions, until their admin is told. */
+  readonly blockedSeatChanges: BlockedSeatChangeRepository;
   readonly checkpoints: BillingCheckpointRepository;
   readonly connectedBilling: ConnectedBillingRepository;
   /** Gateway's contract budget rows, through gateway's share (C3a D5, R40). */

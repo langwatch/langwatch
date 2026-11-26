@@ -51,6 +51,7 @@ export class PrismaSeatRequestRepository
             source: input.source,
             idpRefused: input.idpRefused,
             idpKind: input.idpKind,
+            reason: input.reason ?? null,
             openedAt: new Date(input.at),
           },
         });
@@ -74,6 +75,7 @@ export class PrismaSeatRequestRepository
             name: current.name ?? input.name,
             idpRefused: current.idpRefused || input.idpRefused,
             idpKind: input.idpKind ?? current.idpKind,
+            reason: input.reason ?? current.reason,
           },
         });
         return { request: rowOf(updated), outcome: "already_open" as const };
@@ -91,6 +93,7 @@ export class PrismaSeatRequestRepository
           source: input.source,
           idpRefused: input.idpRefused,
           idpKind: input.idpKind,
+          reason: input.reason ?? null,
           openedAt: new Date(input.at),
           resolvedAt: null,
           resolvedByUserId: null,
@@ -214,6 +217,7 @@ function rowOf(row: StoredSeatRequest): SeatRequestRow {
     source: row.source as SeatRequestSource,
     idpRefused: row.idpRefused,
     idpKind: parseSignInIdpKind(row.idpKind) ?? null,
+    reason: row.reason,
     salesNotifiedAt: row.salesNotifiedAt?.getTime() ?? null,
     openedAt: row.openedAt.getTime(),
     resolvedAt: row.resolvedAt?.getTime() ?? null,

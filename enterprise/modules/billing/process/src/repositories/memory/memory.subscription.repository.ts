@@ -177,6 +177,59 @@ export class MemoryBillingSubscriptionRepository extends BillingSubscriptionRepo
     return superseded.map(({ stripeSubscriptionId }) => ({ stripeSubscriptionId }));
   }
 
+  async findLiveUnlinkedBeside({
+    pendingId,
+  }: {
+    pendingId: string;
+  }): Promise<BillingSubscriptionRecord[]> {
+    const pending = this.store.subscriptions.find((subscription) => subscription.id === pendingId);
+    if (!pending) return [];
+    return this.store.subscriptions
+      .filter(
+        (subscription) =>
+          subscription.organizationId === pending.organizationId &&
+          subscription.id !== pendingId &&
+          subscription.status === ACTIVE &&
+          subscription.stripeSubscriptionId === null,
+      )
+      .toSorted((a, b) => b.createdAt.epochMilliseconds - a.createdAt.epochMilliseconds);
+  }
+
+  async findLiveLinkedBeside({
+    pendingId,
+  }: {
+    pendingId: string;
+  }): Promise<BillingSubscriptionRecord[]> {
+    const pending = this.store.subscriptions.find((subscription) => subscription.id === pendingId);
+    if (!pending) return [];
+    return this.store.subscriptions
+      .filter(
+        (subscription) =>
+          subscription.organizationId === pending.organizationId &&
+          subscription.id !== pendingId &&
+          subscription.status === ACTIVE &&
+          subscription.stripeSubscriptionId !== null &&
+          !TIERED_PLANS.includes(subscription.plan),
+      )
+      .toSorted((a, b) => b.createdAt.epochMilliseconds - a.createdAt.epochMilliseconds);
+  }
+
+  async adoptCheckout({ pendingId, liveId }: { pendingId: string; liveId: string }): Promise<void> {
+    const pending = this.store.subscriptions.find((subscription) => subscription.id === pendingId);
+    if (!pending) throw new Error(`No checkout subscription ${pendingId}`);
+    this.update(liveId, (subscription) => ({
+      ...subscription,
+      plan: pending.plan,
+      maxMembers: pending.maxMembers,
+      maxRetentionDays: pending.maxRetentionDays ?? subscription.maxRetentionDays ?? null,
+    }));
+    this.update(pendingId, (subscription) => ({
+      ...subscription,
+      status: CANCELLED,
+      endDate: nowInstant(),
+    }));
+  }
+
   async updateQuantities(input: {
     id: string;
     maxMembers: number | null;
@@ -205,6 +258,14 @@ export class MemoryBillingSubscriptionRepository extends BillingSubscriptionRepo
       return byCreated === 0 ? right.id.localeCompare(left.id) : byCreated;
     });
     return found[0] ?? null;
+  }
+
+  async cancelPendingCheckout({ id }: { id: string }): Promise<BillingSubscriptionRecord[]> {
+    const row = this.store.subscriptions.find((subscription) => subscription.id === id);
+    if (row?.status !== PENDING) return [];
+    return [
+      this.update(id, (current) => ({ ...current, status: CANCELLED, endDate: nowInstant() })),
+    ];
   }
 
   private update(

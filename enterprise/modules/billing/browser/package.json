@@ -32,6 +32,7 @@
     "@langwatch/enterprise-licensing-client": "workspace:*",
     "@langwatch/enterprise-licensing-contract": "workspace:*",
     "@langwatch/entitlement-contract": "workspace:*",
+    "@langwatch/handled-error": "workspace:*",
     "@langwatch/plans": "workspace:*",
     "@langwatch/time": "workspace:*",
     "lucide-react": "catalog:",

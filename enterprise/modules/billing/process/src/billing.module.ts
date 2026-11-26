@@ -10,6 +10,7 @@ import { defineMigrationStep } from "@langwatch/upgrade/step";
 import { BillingModule } from "./app/billing.app.ts";
 import { billingChannels } from "./channels/billing-channels.registry.ts";
 import { composeHttpBillingStripe } from "./channels/http/http.billing-stripe.channels.ts";
+import { billingFixedNoticeEventing } from "./eventing/billing-fixed-notice.pipeline.ts";
 import { billingLifecycleEventing } from "./eventing/billing-lifecycle.pipeline.ts";
 import { billingReportingEventing } from "./eventing/billing-reporting.pipeline.ts";
 import { connectedBillingEventing } from "./eventing/connected-billing.pipeline.ts";
@@ -57,6 +58,7 @@ export const billingProcessModule: PublishedProcessModule<
   .withEventing(billingReportingEventing)
   .withEventing(billingLifecycleEventing)
   .withEventing(seatLineRepairEventing)
+  .withEventing(billingFixedNoticeEventing)
   .withEventing(paymentRecoveryEventing)
   // Background, after old writers are gone: an older image records no usage-billed fact.
   .withMigrations(({ app, repositories }) => [

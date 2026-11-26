@@ -10,6 +10,7 @@ import { PrismaBillingProjectDirectoryRepository } from "./prisma.billing-projec
 import { PrismaBillingReportOrganizationRepository } from "./prisma.billing-report-organization.repository.ts";
 import { PrismaBillingWebhookOrganizationRepository } from "./prisma.billing-webhook-organization.repository.ts";
 import { PrismaBillingWebhookSubscriptionRepository } from "./prisma.billing-webhook-subscription.repository.ts";
+import { PrismaBlockedSeatChangeRepository } from "./prisma.blocked-seat-change.repository.ts";
 import { PrismaConnectedBillingRepository } from "./prisma.connected-billing.repository.ts";
 import { PrismaDuplicateSubscriptionsReportRepository } from "./prisma.duplicate-subscriptions-report.repository.ts";
 import { PrismaLicenseRenewalClaimRepository } from "./prisma.license-renewal-claim.repository.ts";
@@ -32,6 +33,7 @@ export class PostgresBillingRepositories {
     const subscriptions = PrismaBillingSubscriptionRepository.create(prisma);
 
     return {
+      blockedSeatChanges: PrismaBlockedSeatChangeRepository.create(prisma),
       checkpoints: PrismaBillingCheckpointRepository.create(prisma),
       connectedBilling: PrismaConnectedBillingRepository.create(prisma),
       contractBudgets: PrismaBillingContractBudgetRepository.create(prisma),

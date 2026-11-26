@@ -4,6 +4,7 @@ import type { SeatApprovalPath } from "@langwatch/organization-contract";
 import { Temporal } from "@langwatch/time";
 
 import type { AccessNoticeMailChannel } from "../channels/access-notice-mail.channel.ts";
+import type { AccessNoticePushChannel } from "../channels/access-notice-push.channel.ts";
 import type {
   AccessNoticeKind,
   AccessNoticeRow,
@@ -32,9 +33,12 @@ export interface AccessNoticeContext {
 type Dependencies = Readonly<{
   notices: OrganizationAccessNoticeRepository;
   mail: AccessNoticeMailChannel;
+  push: AccessNoticePushChannel;
   context: AccessNoticeContext;
   /** The Users page's People tab, or null when no public origin is set to link from. */
   requestsUrl: string | null;
+  /** Where LangWatch opens for the person who asked, or null with no public origin. */
+  appUrl: string | null;
   now: () => number;
   newId: () => string;
   logger: Logger;
@@ -44,6 +48,12 @@ type Dependencies = Readonly<{
  * The mail behind seat requests and refused sign-ins (ruling R5): each person's notice is mailed at
  * once, and the same person is noticed at most once a day per kind.
  */
+/** Where an administrator's push opens: the People tab, where seat requests are answered. */
+const SEAT_REQUESTS_PATH = "/settings/directory?tab=people";
+
+/** Where the person who asked lands once answered. */
+const APP_HOME_PATH = "/";
+
 /** The UTC day a notice counts toward, YYYY-MM-DD. */
 function dayKeyOf(at: number): string {
   return Temporal.Instant.fromEpochMilliseconds(at).toString().slice(0, 10);
@@ -66,6 +76,10 @@ export class OrganizationAccessNoticeService {
     idpRefused: boolean;
     /** A seat request left the person with no access, rather than view-only access. */
     heldWithoutAccess?: boolean;
+    /** A Lite Member pressed Request access, and what they were trying to do. */
+    askedFor?: { reason: string | null };
+    /** The seat request the notice is about; a member's own ask is also pushed in-app. */
+    seatRequestId?: string;
   }): Promise<{ recorded: boolean; mailed: boolean }> {
     const { notices, now, newId } = this.dependencies;
     const at = now();
@@ -84,9 +98,17 @@ export class OrganizationAccessNoticeService {
 
     const [claimed] = await notices.markMailed({ ids: [notice.id], at });
     if (!claimed) return { recorded: true, mailed: false };
+    if (input.askedFor && input.seatRequestId) {
+      await this.pushAsked({
+        notice,
+        seatRequestId: input.seatRequestId,
+        reason: input.askedFor.reason,
+      });
+    }
     const reached = await this.mailOne({
       notice,
       heldWithoutAccess: input.heldWithoutAccess ?? true,
+      askedFor: input.askedFor ?? null,
     }).catch((error: unknown) => {
       this.dependencies.logger.warn(
         { organizationId: notice.organizationId, kind: notice.kind, error },
@@ -109,12 +131,98 @@ export class OrganizationAccessNoticeService {
     });
   }
 
+  /** The answer to the person who asked, mailed once per answer; throws when it could not go. */
+  async mailAnswer(input: {
+    organizationId: string;
+    seatRequestId: string;
+    email: string;
+    outcome: "approved" | "declined";
+  }): Promise<void> {
+    const { context, mail, appUrl, now } = this.dependencies;
+    await mail.sendSeatRequestAnswered({
+      recipientEmail: input.email,
+      organizationName: await context.organizationName({ organizationId: input.organizationId }),
+      outcome: input.outcome,
+      appUrl,
+      idempotencyKey: `seat-request-answer:${input.seatRequestId}:${input.outcome}:${dayKeyOf(now())}`,
+    });
+  }
+
+  /** The in-app answer to the person who asked, pushed once per answer; never throws. */
+  async pushAnswer(input: {
+    organizationId: string;
+    seatRequestId: string;
+    userId: string;
+    outcome: "approved" | "declined";
+  }): Promise<void> {
+    const { context, push, logger } = this.dependencies;
+    const { organizationId, seatRequestId, outcome } = input;
+    try {
+      const organizationName = await context.organizationName({ organizationId });
+      await push.push({
+        userId: input.userId,
+        organizationId,
+        idempotencyKey: `seat-request-answer-push:${seatRequestId}:${outcome}`,
+        topic: `seat-request:${seatRequestId}`,
+        title: `Your seat request was ${outcome}`,
+        body:
+          outcome === "approved"
+            ? `You have a full seat in ${organizationName}.`
+            : `An admin of ${organizationName} declined it.`,
+        url: APP_HOME_PATH,
+      });
+    } catch (error: unknown) {
+      logger.warn({ organizationId, error }, "could not push the seat request answer");
+    }
+  }
+
+  /** Pushes a member's own ask to everyone the mail goes to; a failed push is only logged. */
+  private async pushAsked({
+    notice,
+    seatRequestId,
+    reason,
+  }: {
+    notice: AccessNoticeRow;
+    seatRequestId: string;
+    reason: string | null;
+  }): Promise<void> {
+    const { context, push, logger } = this.dependencies;
+    const { organizationId } = notice;
+    const recipients = await context.recipients({ organizationId }).catch((error: unknown) => {
+      logger.warn({ organizationId, error }, "seat request push found no recipients");
+      return [];
+    });
+    const who = notice.name ?? notice.email;
+    const outcomes = await Promise.allSettled(
+      recipients.map((recipient) =>
+        push.push({
+          userId: recipient.userId,
+          organizationId,
+          idempotencyKey: `seat-request-push:${seatRequestId}:${recipient.userId}:${notice.dayKey}`,
+          topic: `seat-request:${seatRequestId}`,
+          title: `${who} asked for a full seat`,
+          body: reason ? `To ${reason}` : `${who} asked for a full seat.`,
+          url: SEAT_REQUESTS_PATH,
+        }),
+      ),
+    );
+    const failed = outcomes.filter((outcome) => outcome.status === "rejected").length;
+    if (failed > 0) {
+      logger.warn(
+        { organizationId, failed, of: recipients.length },
+        "some seat request pushes failed",
+      );
+    }
+  }
+
   private async mailOne({
     notice,
     heldWithoutAccess,
+    askedFor,
   }: {
     notice: AccessNoticeRow;
     heldWithoutAccess: boolean;
+    askedFor: { reason: string | null } | null;
   }): Promise<boolean> {
     const { context, mail, requestsUrl } = this.dependencies;
     const { organizationId } = notice;
@@ -140,6 +248,7 @@ export class OrganizationAccessNoticeService {
           ? mail.sendSeatRequest({
               ...envelope,
               heldWithoutAccess,
+              askedFor,
               idpRefused: notice.idpRefused ? { idpName } : null,
               approval,
               requestsUrl,

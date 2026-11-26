@@ -27,6 +27,7 @@ export type {
 export {
   accountPaymentFailedNotice,
   billingThresholdFailureNotice,
+  duplicateActiveSubscriptionsNotice,
   licensePurchaseNotice,
   newOrganizationNotice,
   newUserNotice,

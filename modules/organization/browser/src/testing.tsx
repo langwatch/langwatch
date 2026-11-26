@@ -73,6 +73,7 @@ export class FakeOrganizationHost extends OrganizationHostApi {
       activeProject?: OrganizationProjectReading | undefined;
       isEnterprise?: boolean;
       isPlanLoading?: boolean;
+      isLiteMember?: boolean;
       hasEmailProvider?: boolean;
       flags?: ReadonlySet<string>;
       overviewCards?: readonly AuthenticationOverviewCard[];
@@ -123,6 +124,10 @@ export class FakeOrganizationHost extends OrganizationHostApi {
 
   isPlanLoading(): boolean {
     return this.options.isPlanLoading ?? false;
+  }
+
+  isLiteMember(): boolean {
+    return this.options.isLiteMember ?? false;
   }
 
   hasEmailProvider(): boolean {

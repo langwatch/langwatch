@@ -24,6 +24,7 @@ import {
   RecordPricingModelChangedCommand,
   RecordSeatCheckoutPaidCommand,
   RecordSeatCheckoutsAbandonedCommand,
+  RecordSeatInvoicePaidCommand,
   RecordOverPlanChangedCommand,
 } from "./billing-lifecycle.commands.ts";
 import {
@@ -37,6 +38,7 @@ import {
   pricingModelChangedEventSchema,
   seatCheckoutPaidEventSchema,
   seatCheckoutsAbandonedEventSchema,
+  seatInvoicePaidEventSchema,
   overPlanChangedEventSchema,
   type BillingLifecycleEvent,
   type RecordOverPlanChangedCommandData,
@@ -50,6 +52,7 @@ import {
   type RecordPricingModelChangedCommandData,
   type RecordSeatCheckoutPaidCommandData,
   type RecordSeatCheckoutsAbandonedCommandData,
+  type RecordSeatInvoicePaidCommandData,
 } from "./billing-lifecycle.events.ts";
 import {
   BILLING_PLAN_LIMIT_REACHED_SUBSCRIBER_NAME,
@@ -73,6 +76,7 @@ export type BillingLifecyclePipeline = StaticPipelineDefinition<
   | { name: "recordPricingModelChanged"; payload: RecordPricingModelChangedCommandData }
   | { name: "recordSeatCheckoutPaid"; payload: RecordSeatCheckoutPaidCommandData }
   | { name: "recordSeatCheckoutsAbandoned"; payload: RecordSeatCheckoutsAbandonedCommandData }
+  | { name: "recordSeatInvoicePaid"; payload: RecordSeatInvoicePaidCommandData }
   | { name: "recordOverPlanChanged"; payload: RecordOverPlanChangedCommandData }
 >;
 
@@ -101,6 +105,7 @@ export function buildBillingLifecyclePipeline({
       pricingModelChangedEventSchema,
       seatCheckoutPaidEventSchema,
       seatCheckoutsAbandonedEventSchema,
+      seatInvoicePaidEventSchema,
       overPlanChangedEventSchema,
     ])
     .withCommand("recordSubscriptionChanged", RecordSubscriptionChangedCommand)
@@ -113,6 +118,7 @@ export function buildBillingLifecyclePipeline({
     .withCommand("recordPricingModelChanged", RecordPricingModelChangedCommand)
     .withCommand("recordSeatCheckoutPaid", RecordSeatCheckoutPaidCommand)
     .withCommand("recordSeatCheckoutsAbandoned", RecordSeatCheckoutsAbandonedCommand)
+    .withCommand("recordSeatInvoicePaid", RecordSeatInvoicePaidCommand)
     .withCommand("recordOverPlanChanged", RecordOverPlanChangedCommand)
     .withPeerSubscriber(
       BILLING_SEAT_LIMIT_REACHED_SUBSCRIBER_NAME,
