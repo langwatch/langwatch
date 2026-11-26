@@ -32,6 +32,7 @@ vi.mock("../../../../behavior/personal-workspace-api.ts", () => {
   const api = {
     useUtils: () => ({
       auth: { browserSessions: { invalidate: () => Promise.resolve() } },
+      digest: { getMyPreference: { invalidate: () => Promise.resolve() } },
       user: { getLinkedAccounts: { invalidate: vi.fn() }, hasPassword: { invalidate: vi.fn() } },
     }),
     routingPolicy: { personalContext: { useQuery: () => ({ error: null, isFetching: false }) } },
@@ -57,6 +58,10 @@ vi.mock("../../../../behavior/personal-workspace-api.ts", () => {
           isPending: false,
         }),
       },
+    },
+    digest: {
+      getMyPreference: { useQuery: () => ({ data: { subscribed: true } }) },
+      setMyPreference: mutation(),
     },
     license: { getSsoGateStatus: { useQuery: () => ({ data: void 0, isLoading: false }) } },
     plan: { getActivePlan: { useQuery: () => ({ data: { type: "LAUNCH" }, isLoading: false }) } },

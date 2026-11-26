@@ -16481,6 +16481,9 @@ importers:
       '@langwatch/design-system':
         specifier: workspace:*
         version: link:../../../packages/design-system
+      '@langwatch/enterprise-digest-contract':
+        specifier: workspace:*
+        version: link:../../../enterprise/modules/digest/contract
       '@langwatch/enterprise-gateway-contract':
         specifier: workspace:*
         version: link:../../../enterprise/modules/enterprise-gateway/contract

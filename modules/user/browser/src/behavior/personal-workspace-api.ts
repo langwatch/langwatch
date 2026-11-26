@@ -6,6 +6,7 @@
 import { createModuleApi, type ContractApiMap } from "@langwatch/api/web";
 import type { authTrpc } from "@langwatch/auth-contract";
 import type { CodingAgentUsageTotals } from "@langwatch/coding-agent-contract";
+import type { digestTrpc } from "@langwatch/enterprise-digest-contract";
 import type {
   personalVirtualKeysTrpc,
   routingPolicyTrpc,
@@ -165,6 +166,7 @@ type BorrowedProcedures = {
 };
 
 export type PersonalWorkspaceApiMap = ContractApiMap<typeof userTrpc> &
+  ContractApiMap<typeof digestTrpc> &
   ContractApiMap<typeof authTrpc> &
   ContractApiMap<typeof identityTrpc> &
   ContractApiMap<typeof personalVirtualKeysTrpc> &
