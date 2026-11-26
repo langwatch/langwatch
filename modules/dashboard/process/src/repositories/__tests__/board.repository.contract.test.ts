@@ -72,6 +72,42 @@ function contractCases(backend: DashboardBackend): void {
     });
   });
 
+  describe("when a board is marked as a member's My dashboard", () => {
+    /** @scenario "My dashboard can be renamed and stays the member's My dashboard" */
+    it("stores the mark, keeps it through a rename and reads it back on every read", async () => {
+      const boards = backend.boards();
+      const plain = await board("Plain");
+      const projectId = backend.projectId();
+      const mine = await boards.createBoard({
+        id: id("dash"),
+        projectId,
+        name: "My dashboard",
+        createdById: "author",
+        myDashboardOfUserId: "author",
+      });
+      const marked = await boards.updateBoard({
+        projectId,
+        dashboardId: plain.id,
+        data: { myDashboardOfUserId: "other" },
+      });
+      await boards.updateBoard({ projectId, dashboardId: mine.id, data: { name: "Team pulse" } });
+
+      const listed = await boards.findBoards({ projectId });
+      expect({
+        made: mine.myDashboardOfUserId,
+        marked: marked.myDashboardOfUserId,
+        listed: listed.map(({ name, myDashboardOfUserId }) => [name, myDashboardOfUserId]),
+      }).toEqual({
+        made: "author",
+        marked: "other",
+        listed: expect.arrayContaining([
+          ["Plain", "other"],
+          ["Team pulse", "author"],
+        ]),
+      });
+    });
+  });
+
   describe("when a widget is placed on a board the project does not own", () => {
     /** @scenario "The memory and Postgres dashboard repositories answer alike" */
     it("refuses it as a missing board", async () => {

@@ -708,9 +708,9 @@ const presentations = {
       "This project doesn't have the SQL workbench enabled yet. Ask your administrator to switch it on.",
   },
   lwql_not_provisioned: {
-    title: "Custom SQL isn't set up where this data lives",
+    title: "Dashboards aren't available for this data yet",
     describe: () =>
-      "Custom SQL isn't set up yet on the server that holds this organisation's data. Ask your workspace administrator, or contact support.",
+      "Dashboards and custom SQL aren't available yet for the data this organisation keeps on its own server. Nothing is wrong with your account, and trying again won't help. Your workspace administrator or LangWatch support can tell you when it will be switched on.",
   },
   saved_workbench_chart_already_exists: {
     title: "That chart id is already taken",

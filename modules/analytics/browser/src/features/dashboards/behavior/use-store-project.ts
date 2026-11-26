@@ -11,6 +11,8 @@ import { useAnalyticsHost } from "../../../model/analytics-host.ts";
 
 export type StoreProject = {
   storeProject: DashboardProject | undefined;
+  /** Every project the member may create a board in; the store project is one of them. */
+  storeProjects: readonly DashboardProject[];
   /** The names the boards stored there already have, so a new one is numbered past them. */
   namesInStore: readonly string[];
   /** Whether it also grants `analytics:update`, which a board made Only me or Organization asks. */
@@ -37,8 +39,13 @@ export function useStoreProject({ enabled = true }: { enabled?: boolean } = {}):
   const isPending = (read: { data?: unknown; isError: boolean }) =>
     read.data === void 0 && !read.isError;
   const isLoading = asks && (isPending(candidates) || isPending(listed));
-  const read = { isLoading, error: candidates.error, retry: () => void candidates.refetch() };
   const projects = candidates.data ?? [];
+  const read = {
+    storeProjects: projects,
+    isLoading,
+    error: candidates.error,
+    retry: () => void candidates.refetch(),
+  };
   const storeProject = projects.find((project) => project.id === lastUsedId) ?? projects[0];
   if (!storeProject) return { storeProject, namesInStore: [], mayShare: false, ...read };
   const update = { projectId: storeProject.id, permission: "analytics:update" };

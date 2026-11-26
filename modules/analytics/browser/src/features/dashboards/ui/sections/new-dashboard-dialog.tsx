@@ -1,18 +1,20 @@
 /**
  * "New dashboard": a name, the product it lives in and who can see it, then the board is made
- * and opened. The library offers a Product select; a product's "+" fixes it (`product`).
- * Mounted by its opener while open, so each opening starts from fresh defaults.
+ * and opened. The library offers a Product select and, under Project, the project; a product's
+ * "+" fixes the product. Mounted while open, so each opening starts from fresh defaults.
  * @see modules/dashboard/specs/dashboards-organization-area.feature
  */
 
 import {
   DASHBOARD_HOME_PRODUCTS,
   type DashboardHomeProduct,
+  type DashboardProject,
   type DashboardScope,
   homeAllowsScope,
 } from "@langwatch/dashboard-contract";
 import { Dialog } from "@langwatch/design-system/dialog";
 import {
+  Box,
   Button,
   Field,
   HStack,
@@ -22,7 +24,8 @@ import {
   VStack,
 } from "@langwatch/design-system/primitives";
 import { Radio, RadioGroup } from "@langwatch/design-system/radio";
-import { useState } from "react";
+import { ScopeChipPicker } from "@langwatch/design-system/scope-chip-picker";
+import { type ReactNode, useState } from "react";
 
 import {
   DEFAULT_SCOPE_BY_PRODUCT,
@@ -133,15 +136,49 @@ function ProductField({
   );
 }
 
+/** Which project a Project board is kept in, under the Project choice. */
+function ProjectPicker({
+  projects,
+  picked,
+  onPick,
+}: {
+  projects: readonly DashboardProject[];
+  picked: DashboardProject;
+  onPick: (project: DashboardProject) => void;
+}) {
+  return (
+    <Box paddingLeft={6} width="full" data-testid="new-dashboard-project">
+      <ScopeChipPicker<"PROJECT">
+        value={[{ scopeType: "PROJECT", scopeId: picked.id }]}
+        onChange={(next) => {
+          const project = projects.find(({ id }) => id === next[0]?.scopeId);
+          if (project) onPick(project);
+        }}
+        organizationId={void 0}
+        availableProjects={projects.map(({ id, name }) => ({ id, name }))}
+        allowedScopeTypes={["PROJECT"]}
+        variant="single-select"
+        size="sm"
+        singleSelect
+        label=""
+        showSummary={false}
+      />
+    </Box>
+  );
+}
+
 /** Who can see the new board: its project, the whole organization, or only its maker. */
 function SharingFieldset({
   scope,
   onScope,
   choices,
+  underProject,
 }: {
   scope: DashboardScope;
   onScope: (scope: DashboardScope) => void;
   choices: readonly SharingChoice[];
+  /** Drawn under the Project choice while it is picked. */
+  underProject?: ReactNode;
 }) {
   return (
     <VStack as="fieldset" align="stretch" gap={1.5}>
@@ -157,16 +194,19 @@ function SharingFieldset({
       >
         <VStack align="stretch" gap={2}>
           {choices.map((choice) => (
-            <Radio key={choice.scope} value={choice.scope}>
-              <VStack align="start" gap={0}>
-                <Text textStyle="bodySm" fontWeight="medium">
-                  {choice.title}
-                </Text>
-                <Text textStyle="caption" color="fg.muted">
-                  {choice.hint}
-                </Text>
-              </VStack>
-            </Radio>
+            <VStack key={choice.scope} align="stretch" gap={1.5}>
+              <Radio value={choice.scope}>
+                <VStack align="start" gap={0}>
+                  <Text textStyle="bodySm" fontWeight="medium">
+                    {choice.title}
+                  </Text>
+                  <Text textStyle="caption" color="fg.muted">
+                    {choice.hint}
+                  </Text>
+                </VStack>
+              </Radio>
+              {choice.scope === "PROJECT" && scope === "PROJECT" && underProject}
+            </VStack>
           ))}
         </VStack>
       </RadioGroup>
@@ -206,6 +246,7 @@ export function NewDashboardDialog({
   projectName,
   organizationName,
   mayShare,
+  projectChoice,
   isCreating,
   onCreate,
   onClose,
@@ -219,27 +260,32 @@ export function NewDashboardDialog({
   organizationName: string;
   /** Whether the member may make it Only me or Organization there too. */
   mayShare: boolean;
+  /** At the organization level, the projects a Project board may be kept in, offered under it. */
+  projectChoice?: { projects: readonly DashboardProject[]; initial: DashboardProject };
   isCreating: boolean;
-  /** Makes the board; true once it is made, which closes the dialog. */
+  /** Makes the board, in `project` where one was picked; true once made, which closes it. */
   onCreate: (input: {
     name: string;
     scope: DashboardScope;
     homeProduct: DashboardHomeProduct;
+    project?: DashboardProject;
   }) => Promise<boolean>;
   onClose: () => void;
 }) {
+  const [pickedProject, setPickedProject] = useState(projectChoice?.initial);
   const form = useNewDashboardForm({
     fixedProduct,
     takenNamesIn,
-    projectName,
+    projectName: pickedProject?.name ?? projectName,
     organizationName,
     mayShare,
   });
   const { home, name, scope } = form;
+  const inProject = scope === "PROJECT" && pickedProject ? { project: pickedProject } : {};
 
   const submit = async () => {
     if (isCreating || !form.canCreate) return;
-    if (await onCreate({ name: name.trim(), scope, homeProduct: home })) onClose();
+    if (await onCreate({ name: name.trim(), scope, homeProduct: home, ...inProject })) onClose();
   };
 
   return (
@@ -260,7 +306,21 @@ export function NewDashboardDialog({
         {fixedProduct === void 0 && (
           <ProductField product={home} products={form.products} onProduct={form.pickProduct} />
         )}
-        <SharingFieldset scope={scope} onScope={form.setScope} choices={form.choices} />
+        <SharingFieldset
+          scope={scope}
+          onScope={form.setScope}
+          choices={form.choices}
+          underProject={
+            projectChoice &&
+            pickedProject && (
+              <ProjectPicker
+                projects={projectChoice.projects}
+                picked={pickedProject}
+                onPick={setPickedProject}
+              />
+            )
+          }
+        />
         <PlacementNote product={home} scope={scope} projectName={projectName} />
       </VStack>
     </Dialog>

@@ -109,6 +109,11 @@ export class BoardService {
         ? { organizationId: null }
         : await this.#access.getScopeStamp({ projectId: parsed.projectId, createdById, scope });
 
+    const myDashboardOfUserId = await this.#newMyDashboardOwner({
+      projectId: parsed.projectId,
+      name: parsed.name,
+      createdById,
+    });
     const board = await this.#repository.createBoard({
       id: generate(DASHBOARD_KSUID_RESOURCE).toString(),
       projectId: parsed.projectId,
@@ -117,6 +122,7 @@ export class BoardService {
       scope,
       homeProduct,
       organizationId,
+      myDashboardOfUserId,
     });
     // Stored as an ordinary star, so unstarring it later removes it for good.
     if (createdById !== undefined && parsed.name === MY_DASHBOARD_NAME) {
@@ -155,6 +161,22 @@ export class BoardService {
     const ref = boardRef(input);
     await this.#access.getWritable({ ...ref, viewer: input.viewer });
     return this.#repository.deleteBoard(ref);
+  }
+
+  /**
+   * Who a new board is My dashboard of: its maker, when it takes the default name and they have
+   * none marked in the project yet, so a renamed My dashboard keeps that place (AC163).
+   */
+  async #newMyDashboardOwner(input: {
+    projectId: string;
+    name: string;
+    createdById: string | undefined;
+  }): Promise<string | null> {
+    const { projectId, name, createdById } = input;
+    if (createdById === undefined || name !== MY_DASHBOARD_NAME) return null;
+    const boards = await this.#repository.findBoardsInProjects({ projectIds: [projectId] });
+    const marked = boards.some((board) => board.myDashboardOfUserId === createdById);
+    return marked ? null : createdById;
   }
 
   async #starredIds(input: {

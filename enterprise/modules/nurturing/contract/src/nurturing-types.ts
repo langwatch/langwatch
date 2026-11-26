@@ -60,6 +60,7 @@ export interface CioPersonTraits extends CioOrganizationUsageTraits {
   // Onboarding
   email: string;
   name: string;
+  first_name?: string;
   role: string;
   /** The org seat (lite_member/member/admin/developer), not the sign-up `role` (job title). */
   seat?: string;
