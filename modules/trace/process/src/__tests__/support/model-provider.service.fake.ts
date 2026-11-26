@@ -25,6 +25,10 @@ export class TestModelProviderService implements ModelProviderApi {
     return Promise.reject(new Error("Not used by Trace tests."));
   }
 
+  getGatewayCustomKeys(): Promise<never> {
+    return Promise.reject(new Error("Not used by Trace tests."));
+  }
+
   readonly costInputs: ModelCostEstimateInput[] = [];
 
   constructor(private readonly cost = 0) {}

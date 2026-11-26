@@ -1,4 +1,5 @@
 import type { AuthzApi } from "@langwatch/authz-contract";
+import type { ManagedBedrockCredentials } from "@langwatch/enterprise-managed-provider-contract";
 import { HandledError } from "@langwatch/handled-error";
 import {
   ModelProviderCustomKeysMissingError,
@@ -44,6 +45,7 @@ import {
   type BuiltInModel,
   type DecisionModelResolution,
 } from "@langwatch/model-provider-contract";
+import { createLogger } from "@langwatch/observability";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { SecretApi } from "@langwatch/secret-contract";
@@ -98,6 +100,19 @@ interface ModelProviderServiceOptions {
   isOwnDecisionModelAllowed: OwnDecisionModelGate;
   /** Imports an OpenAI-compatible provider's listed models on save; absent imports nothing. */
   modelImport?: ModelProviderModelImportService;
+}
+
+const logger = createLogger("langwatch:model-provider:gateway-keys");
+
+/** A managed Bedrock session in the row's own field names, its private endpoint included. */
+function managedBedrockKeys(session: ManagedBedrockCredentials): Record<string, string> {
+  return {
+    AWS_ACCESS_KEY_ID: session.accessKeyId,
+    AWS_SECRET_ACCESS_KEY: session.secretAccessKey,
+    AWS_SESSION_TOKEN: session.sessionToken,
+    AWS_REGION_NAME: session.region,
+    AWS_BEDROCK_RUNTIME_ENDPOINT: session.runtimeEndpoint,
+  };
 }
 
 /**
@@ -239,6 +254,35 @@ export class ModelProviderService {
       organizationId: row.organizationId,
       customKeys: row.customKeys,
     };
+  }
+
+  /**
+   * The keys the AI gateway runs a row with: its stored keys, and for a managed Bedrock
+   * organization the customer role's session and private endpoint. A failed role hop logs and
+   * leaves the stored keys, so only this row fails and the key's other providers keep serving.
+   */
+  async getGatewayCustomKeys(input: { modelProviderId: string }): Promise<ModelProviderCustomKeys> {
+    const row = await this.options.repository.getById({ id: input.modelProviderId });
+    const owner = { id: row.id, provider: row.provider, organizationId: row.organizationId };
+    const managed = this.options.catalog.isManagedProvider({
+      organizationId: row.organizationId,
+      provider: row.provider,
+    });
+    if (managed) {
+      try {
+        const session = await this.options.catalog.getManagedBedrockCredentials({
+          organizationId: row.organizationId,
+        });
+        return { ...owner, customKeys: { ...row.customKeys, ...managedBedrockKeys(session) } };
+      } catch (error) {
+        logger.warn(
+          { modelProviderId: row.id, error },
+          "Managed Bedrock credentials could not be minted; the row keeps its stored keys",
+        );
+      }
+    }
+    if (!row.customKeys) throw new ModelProviderCustomKeysMissingError();
+    return { ...owner, customKeys: row.customKeys };
   }
 
   countUsage(input: { organizationIds: readonly string[] }): Promise<ModelProviderUsageCount> {

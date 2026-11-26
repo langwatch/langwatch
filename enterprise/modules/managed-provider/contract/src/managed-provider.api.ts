@@ -30,6 +30,23 @@ export const managedModelProviderSchema: ManagedModelProviderSchema =
 
 export type ManagedModelProvider = z.infer<typeof managedModelProviderSchema>;
 
+const managedBedrockCredentialsSchemaDefinition = z.object({
+  accessKeyId: z.string().min(1),
+  secretAccessKey: z.string().min(1),
+  sessionToken: z.string().min(1),
+  region: z.string().min(1),
+  /** The customer's private Bedrock runtime endpoint, with its scheme. */
+  runtimeEndpoint: z.string().min(1),
+});
+export interface ManagedBedrockCredentialsSchema extends Named<
+  typeof managedBedrockCredentialsSchemaDefinition
+> {}
+export const managedBedrockCredentialsSchema: ManagedBedrockCredentialsSchema =
+  managedBedrockCredentialsSchemaDefinition;
+
+/** What a managed Bedrock call runs with: the customer role's short-lived session and endpoint. */
+export type ManagedBedrockCredentials = z.infer<typeof managedBedrockCredentialsSchema>;
+
 export type BuildManagedProviderParametersInput = {
   params: Record<string, string>;
   projectId: string;
@@ -45,6 +62,9 @@ export interface ManagedProviderApi {
   buildLitellmParameters(
     input: BuildManagedProviderParametersInput,
   ): Promise<Record<string, string>>;
+
+  /** Mints the organization's managed Bedrock session; throws for an organization not managed. */
+  getBedrockCredentials(input: { organizationId: string }): Promise<ManagedBedrockCredentials>;
 }
 
 export const ManagedProviderApi = moduleApi<ManagedProviderApi>()(MANAGED_PROVIDER_FEATURE_ID);

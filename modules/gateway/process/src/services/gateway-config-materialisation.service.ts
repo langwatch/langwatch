@@ -55,7 +55,7 @@ const logger = createLogger("langwatch:gateway:config-materialiser");
 export const CONFIG_SPEND_READ_TIMEOUT_MS = 2_000;
 
 /** The one model-provider read the bundle needs. */
-export type GatewayCustomKeys = Pick<ModelProviderApi, "getCustomKeys">;
+export type GatewayCustomKeys = Pick<ModelProviderApi, "getGatewayCustomKeys">;
 
 const NO_KEYS: GatewayModelProviderCredentials = { readCustomKeys: () => ({}) };
 const PLAIN_KEYS: GatewayModelProviderCredentials = {
@@ -370,7 +370,9 @@ export class GatewayConfigMaterialiserService {
   private async credentialReaderFor(mp: ModelProvider): Promise<GatewayModelProviderCredentials> {
     if (mp.id.startsWith(PLATFORM_PROVIDER_ID_PREFIX)) return PLAIN_KEYS;
     try {
-      const { customKeys } = await this.modelProviders.getCustomKeys({ modelProviderId: mp.id });
+      const { customKeys } = await this.modelProviders.getGatewayCustomKeys({
+        modelProviderId: mp.id,
+      });
       return { readCustomKeys: () => customKeys };
     } catch (error) {
       if (error instanceof ModelProviderCustomKeysMissingError) return NO_KEYS;

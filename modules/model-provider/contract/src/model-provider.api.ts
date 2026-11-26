@@ -391,6 +391,11 @@ export interface ModelProviderApi {
    * and `ModelProviderCustomKeysMissingError` for a row that stores none.
    */
   getCustomKeys(input: { modelProviderId: string }): Promise<ModelProviderCustomKeys>;
+  /**
+   * The keys the AI gateway runs a row with: its stored keys, plus for a managed Bedrock
+   * organization the customer role's session and private endpoint (as `base_url`).
+   */
+  getGatewayCustomKeys(input: { modelProviderId: string }): Promise<ModelProviderCustomKeys>;
 }
 
 export const ModelProviderApi = moduleApi<ModelProviderApi>()("model-provider");

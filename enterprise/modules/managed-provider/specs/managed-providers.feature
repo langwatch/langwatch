@@ -79,3 +79,50 @@ Feature: Managed model providers
       When a managed Bedrock call assumes its roles
       Then both the proxy hop and the customer hop are sent to that base
       And a value that is set but is not a URL refuses the process at start, naming the setting
+
+  # A managed organization's Bedrock rows store no AWS keys: LangWatch assumes
+  # the customer's role and calls Bedrock through the customer's private
+  # endpoint. The AI gateway (Langy, virtual keys) reads a row's keys from
+  # model-provider, so those keys must carry what the managed step mints.
+  Rule: The AI gateway runs a managed Bedrock row through the customer's private endpoint
+
+    @unit
+    Scenario: Mint the managed Bedrock credentials for an organization
+      Given an organization whose Bedrock is managed through a private endpoint
+      When its Bedrock credentials are minted
+      Then they carry the customer role's credentials, the region and the private endpoint
+
+    @unit
+    Scenario: The gateway reads a managed Bedrock row with the customer role's credentials
+      Given a Bedrock row of a managed organization that stores no keys
+      When the gateway reads the row's keys
+      Then they carry the customer role's credentials and the region
+      And they name the private endpoint as the Bedrock runtime endpoint
+
+    @unit
+    Scenario: A Bedrock row outside a managed organization reaches the gateway with its own keys
+      Given a Bedrock row of an organization that is not managed
+      When the gateway reads the row's keys
+      Then it gets the row's stored keys unchanged
+
+    @unit
+    Scenario: A failed role hop leaves the row's own keys and fails only that row
+      Given a Bedrock row of a managed organization
+      And assuming the customer's role fails
+      When the gateway reads the row's keys
+      Then it gets the row's stored keys
+      And no error reaches the gateway, so the key's other providers keep serving
+
+    @unit
+    Scenario: A stalled role hop gives up inside the gateway's config fetch
+      Given assuming the customer's role does not answer
+      When the managed Bedrock credentials are minted
+      Then both role hops share one deadline shorter than the gateway's config fetch
+      And the row falls back to its stored keys instead of holding up the key's other providers
+
+    @unit
+    Scenario: The gateway bundle sends a managed Bedrock row to the private endpoint
+      Given a virtual key whose provider is a managed Bedrock row
+      When the gateway's config bundle is built
+      Then the Bedrock slot carries the customer role's credentials and region
+      And its Bedrock credential names the private endpoint, with no base URL

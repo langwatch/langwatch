@@ -6,6 +6,9 @@ import {
   ManagedProviderCredentialVendor,
 } from "../managed-provider-credentials.channel.ts";
 
+/** Both hops share one budget under the gateway's 2s config fetch: a stalled STS fails one row. */
+const ROLE_HOP_BUDGET_MS = 1500;
+
 /**
  * The two-hop STS assumption a managed Bedrock call runs under: this
  * deployment's proxy role first, then the customer's own role from the
@@ -23,6 +26,7 @@ export class HttpManagedProviderCredentialsChannel extends ManagedProviderCreden
 
   async assumeCustomerRole(config: ManagedBedrockConfig): Promise<ManagedProviderCredentials> {
     const endpoint = this.stsBase === undefined ? {} : { endpoint: this.stsBase };
+    const abortSignal = AbortSignal.timeout(ROLE_HOP_BUDGET_MS);
     const proxyClient = new STSClient({
       region: config.region,
       ...endpoint,
@@ -36,6 +40,7 @@ export class HttpManagedProviderCredentialsChannel extends ManagedProviderCreden
         RoleArn: config.proxyRoleArn,
         RoleSessionName: "bedrock-test-python",
       }),
+      { abortSignal },
     );
     const proxyCredentials = proxy.Credentials;
     if (
@@ -60,6 +65,7 @@ export class HttpManagedProviderCredentialsChannel extends ManagedProviderCreden
         RoleArn: config.bedrockRoleArn,
         RoleSessionName: "bedrock-test-python",
       }),
+      { abortSignal },
     );
     const credentials = customer.Credentials;
     if (!credentials?.AccessKeyId || !credentials.SecretAccessKey || !credentials.SessionToken) {

@@ -193,6 +193,40 @@ func TestBedrockVPCEEndpoint_Gate(t *testing.T) {
 	}
 }
 
+// given a hosted gateway (private addresses blocked, https required for
+// customer endpoints) and a managed Bedrock credential naming a plain-http
+// PrivateLink endpoint
+// when the credential is checked before dispatch
+// then it passes as a runtime endpoint and the same URL as base_url is refused.
+/** @scenario "A hosted gateway admits a private runtime endpoint it refuses as a base URL" */
+func TestBedrockVPCE_HostedGatewayAdmitsRuntimeEndpoint(t *testing.T) {
+	hosted := newCustomerEndpointPolicy(true, true, nil)
+	endpoint := "http://vpce-0abc-1234.vpce-svc-0def.eu-west-1.vpce.amazonaws.com"
+	cred := domain.Credential{
+		ProviderID: domain.ProviderBedrock,
+		Extra: map[string]string{
+			"access_key":               "temporary-key",
+			"secret_key":               "temporary-secret",
+			"session_token":            "temporary-token",
+			"region":                   "eu-west-1",
+			"bedrock_runtime_endpoint": endpoint,
+		},
+	}
+
+	if err := validateCredentialEndpoints(context.Background(), cred, hosted); err != nil {
+		t.Fatalf("runtime endpoint credential refused by the hosted check: %v", err)
+	}
+	if ep, err := bedrockVPCEEndpoint(cred, hosted); ep != endpoint || err != nil {
+		t.Fatalf("runtime endpoint: got (%q, %v), want (%q, nil)", ep, err, endpoint)
+	}
+
+	asBaseURL := domain.Credential{ProviderID: domain.ProviderBedrock, Extra: map[string]string{"base_url": endpoint}}
+	err := validateCredentialEndpoints(context.Background(), asBaseURL, hosted)
+	if err == nil || !strings.Contains(err.Error(), "must use https") {
+		t.Fatalf("base_url: got %v, want the https refusal", err)
+	}
+}
+
 // given a Bedrock credential with no runtime endpoint and plain
 // bedrock:InvokeModel access keys
 // when the Converse endpoint is resolved for an OpenAI model (the global.openai.*

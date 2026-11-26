@@ -9,7 +9,7 @@ const sts = vi.hoisted(() => ({
     endpoint?: string;
     credentials: { accessKeyId: string; secretAccessKey: string; sessionToken?: string };
   }[],
-  assumed: [] as { clientIndex: number; roleArn: string }[],
+  assumed: [] as { clientIndex: number; roleArn: string; abortSignal?: AbortSignal }[],
   proxyReturnsCredentials: true,
 }));
 
@@ -30,10 +30,17 @@ vi.mock("@aws-sdk/client-sts", () => {
       sts.clients.push(config);
     }
 
-    async send(command: AssumeRoleCommand): Promise<{
+    async send(
+      command: AssumeRoleCommand,
+      options?: { abortSignal?: AbortSignal },
+    ): Promise<{
       Credentials?: { AccessKeyId?: string; SecretAccessKey?: string; SessionToken?: string };
     }> {
-      sts.assumed.push({ clientIndex: this.index, roleArn: command.input.RoleArn });
+      sts.assumed.push({
+        clientIndex: this.index,
+        roleArn: command.input.RoleArn,
+        abortSignal: options?.abortSignal,
+      });
 
       if (this.index === 0) {
         if (!sts.proxyReturnsCredentials) {
@@ -105,6 +112,17 @@ describe("HttpManagedProviderCredentialsChannel", () => {
           secretAccessKey: "customer-secret",
           sessionToken: "customer-token",
         });
+      });
+    });
+
+    describe("when the role hops run", () => {
+      /** @scenario "A stalled role hop gives up inside the gateway's config fetch" */
+      it("bounds both hops with one deadline", async () => {
+        await HttpManagedProviderCredentialsChannel.create().assumeCustomerRole(CONFIG);
+
+        const [proxyHop, customerHop] = sts.assumed;
+        expect(proxyHop?.abortSignal).toBeInstanceOf(AbortSignal);
+        expect(customerHop?.abortSignal).toBe(proxyHop?.abortSignal);
       });
     });
 

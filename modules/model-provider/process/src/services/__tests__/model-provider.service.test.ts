@@ -754,6 +754,26 @@ class ManagedCatalog extends Catalog {
     return Promise.resolve(input.parameters);
   }
 }
+class ManagedBedrockCatalog extends Catalog {
+  constructor(private readonly roleHop: "succeeds" | "fails" = "succeeds") {
+    super();
+  }
+
+  isManagedProvider(input: { organizationId: string; provider: string }): boolean {
+    return input.provider === "bedrock" && input.organizationId === "org_1";
+  }
+
+  getManagedBedrockCredentials(_input: { organizationId: string }) {
+    if (this.roleHop === "fails") return Promise.reject(new Error("AssumeRole throttled"));
+    return Promise.resolve({
+      accessKeyId: "ASIA-customer-role",
+      secretAccessKey: "customer-role-secret",
+      sessionToken: "customer-role-session",
+      region: "us-east-1",
+      runtimeEndpoint: "http://vpce-1.vpce-svc-1.us-east-1.vpce.amazonaws.com",
+    });
+  }
+}
 class Translator extends ModelTranslation {
   model: string | null = null;
   translate(input: { model: string }): Promise<string> {
@@ -1454,6 +1474,76 @@ describe("ModelProviderService", () => {
       projectId: "project_1",
       model: "openai/gpt-5-mini",
       provider: "openai",
+    });
+  });
+  describe("when the gateway reads a Bedrock row's keys", () => {
+    /** @scenario "The gateway reads a managed Bedrock row with the customer role's credentials" */
+    it("carries the customer role's credentials and names the private endpoint", async () => {
+      const providers = new Providers();
+      providers.rows = [provider({ provider: "bedrock", customKeys: null })];
+      const modelProviders = service(providers, new ManagedBedrockCatalog());
+
+      await expect(
+        modelProviders.getGatewayCustomKeys({ modelProviderId: "mp_1" }),
+      ).resolves.toEqual({
+        id: "mp_1",
+        provider: "bedrock",
+        organizationId: "org_1",
+        customKeys: {
+          AWS_ACCESS_KEY_ID: "ASIA-customer-role",
+          AWS_SECRET_ACCESS_KEY: "customer-role-secret",
+          AWS_SESSION_TOKEN: "customer-role-session",
+          AWS_REGION_NAME: "us-east-1",
+          AWS_BEDROCK_RUNTIME_ENDPOINT: "http://vpce-1.vpce-svc-1.us-east-1.vpce.amazonaws.com",
+        },
+      });
+    });
+
+    it("puts the customer role's session over keys the managed row still stores", async () => {
+      const providers = new Providers();
+      providers.rows = [
+        provider({
+          provider: "bedrock",
+          customKeys: { AWS_ACCESS_KEY_ID: "AKIA-stale", AWS_SECRET_ACCESS_KEY: "stale-secret" },
+        }),
+      ];
+      const modelProviders = service(providers, new ManagedBedrockCatalog());
+
+      await expect(
+        modelProviders.getGatewayCustomKeys({ modelProviderId: "mp_1" }),
+      ).resolves.toMatchObject({
+        customKeys: {
+          AWS_ACCESS_KEY_ID: "ASIA-customer-role",
+          AWS_SECRET_ACCESS_KEY: "customer-role-secret",
+          AWS_SESSION_TOKEN: "customer-role-session",
+        },
+      });
+    });
+
+    /** @scenario "A Bedrock row outside a managed organization reaches the gateway with its own keys" */
+    it("returns the stored keys unchanged for an organization that is not managed", async () => {
+      const stored = { AWS_ACCESS_KEY_ID: "AKIA-own", AWS_SECRET_ACCESS_KEY: "own-secret" };
+      const providers = new Providers();
+      providers.rows = [
+        provider({ provider: "bedrock", organizationId: "org_2", customKeys: stored }),
+      ];
+      const modelProviders = service(providers, new ManagedBedrockCatalog());
+
+      await expect(
+        modelProviders.getGatewayCustomKeys({ modelProviderId: "mp_1" }),
+      ).resolves.toMatchObject({ customKeys: stored });
+    });
+
+    /** @scenario "A failed role hop leaves the row's own keys and fails only that row" */
+    it("falls back to the stored keys when the role hop fails, throwing nothing", async () => {
+      const stored = { MANAGED: "true" };
+      const providers = new Providers();
+      providers.rows = [provider({ provider: "bedrock", customKeys: stored })];
+      const modelProviders = service(providers, new ManagedBedrockCatalog("fails"));
+
+      await expect(
+        modelProviders.getGatewayCustomKeys({ modelProviderId: "mp_1" }),
+      ).resolves.toMatchObject({ customKeys: stored });
     });
   });
   it("keeps the Codex execution refusal byte-for-byte", async () => {

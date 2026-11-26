@@ -1,4 +1,7 @@
-import type { ManagedProviderApi } from "@langwatch/enterprise-managed-provider-contract";
+import type {
+  ManagedBedrockCredentials,
+  ManagedProviderApi,
+} from "@langwatch/enterprise-managed-provider-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 
 /**
@@ -13,6 +16,9 @@ export abstract class ModelProviderManagedGateway {
     model: string;
     provider: string;
   }): Promise<Record<string, string>>;
+  abstract getBedrockCredentials(input: {
+    organizationId: string;
+  }): Promise<ManagedBedrockCredentials>;
 }
 
 /**
@@ -57,6 +63,10 @@ export class ManagedModelProviderGatewayService extends ModelProviderManagedGate
       model: input.model,
       modelProvider: { provider: input.provider },
     });
+  }
+
+  getBedrockCredentials(input: { organizationId: string }): Promise<ManagedBedrockCredentials> {
+    return this.managed.getBedrockCredentials(input);
   }
 
   /** A project never changes organization, so each lookup is kept for the process's life. */

@@ -8,7 +8,7 @@ import type { GatewayCustomKeys } from "../../services/gateway-config-materialis
  */
 export function seededCustomKeys(prisma: PrismaClient): GatewayCustomKeys {
   return {
-    getCustomKeys: async ({ modelProviderId }) => {
+    getGatewayCustomKeys: async ({ modelProviderId }) => {
       const row = await prisma.modelProvider.findUniqueOrThrow({
         where: { id: modelProviderId },
         select: { id: true, provider: true, organizationId: true, customKeys: true },
