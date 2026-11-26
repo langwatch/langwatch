@@ -1580,6 +1580,7 @@ export const prismaModelFieldCatalogue = {
     "extraHeaders",
     "customModels",
     "customEmbeddingsModels",
+    "lastListedModelIds",
     "deploymentMapping",
     "rateLimitRpm",
     "rateLimitTpm",
