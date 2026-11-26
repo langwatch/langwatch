@@ -17,6 +17,7 @@ import { LangWatchQLSqlTextService } from "../../../services/langwatch-ql-sql-te
 import {
   LWQL_SCOPED_READER_GROUP,
   LWQL_SCOPED_SCHEMA,
+  LWQL_PROJECT_KEYS_VIEW,
   scopedCopyLookup,
   scopedSchemaOwnedCondition,
   scopedSchemaStatement,
@@ -299,6 +300,26 @@ export class LangWatchQLProductionProvisioningService {
           `    IF ${scopedSchemaOwnedCondition({ appSchema: schema })} THEN\n`,
           `      EXECUTE ${postgresLiteral(usage)};\n`,
           ...postgresViews.approvedViewNames(views).map((view) => scopedCopyGrant({ view })),
+          `    END IF;\n`,
+        ],
+      }),
+    ];
+  }
+
+  /**
+   * The scoped project-key copy a private ClickHouse's row policies read, and its guarded grant:
+   * the copy first, then the group's SELECT only if it passes the scoped-view check, else revoked.
+   * Nothing runs without the group or outside this installation's scoped schema.
+   */
+  postgresProjectKeysStatements({
+    schema = LWQL_POSTGRES_SCHEMA,
+  }: { schema?: string } = {}): string[] {
+    return [
+      postgresViews.projectKeysScopedViewStatement({ schema }),
+      whenGroupExists({
+        body: [
+          `    IF ${scopedSchemaOwnedCondition({ appSchema: schema })} THEN\n`,
+          scopedCopyGrant({ view: LWQL_PROJECT_KEYS_VIEW }),
           `    END IF;\n`,
         ],
       }),

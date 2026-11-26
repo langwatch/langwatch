@@ -8,7 +8,10 @@ import type {
   LangWatchQLAccessModelAnswer,
   LangWatchQLAccessModelAnswerRepository,
 } from "../repositories/langwatch-ql-access-model-answer.repository.ts";
-import type { LangWatchQLPlacementRepository } from "../repositories/langwatch-ql-placement.repository.ts";
+import type {
+  LangWatchQLPlacement,
+  LangWatchQLPlacementRepository,
+} from "../repositories/langwatch-ql-placement.repository.ts";
 import type { LwqlAccessModelOwner } from "../rules/langwatch-ql-config-store.rules.ts";
 
 const logger = createLogger("langwatch:analytics:lwql:placement-gate");
@@ -28,8 +31,24 @@ type LangWatchQLPlacementGateDeps = Readonly<{
   placement: Pick<LangWatchQLPlacementRepository, "placementOf">;
   target: LangWatchQLPlacementTarget;
   accessModel: LangWatchQLAccessModelProbe;
+  /** Asks a private server, as its own reader login, whether its access model is in place. */
+  privateAccessModel: LangWatchQLPrivateAccessModelProbe;
   answers: LangWatchQLAccessModelAnswerRepository;
 }>;
+
+/** The private servers' probe: one organisation's server, reached through its own route. */
+type LangWatchQLPrivateAccessModelProbe = Readonly<{
+  probe(input: { projectIds: readonly string[] }): Promise<LangWatchQLAccessModelAnswer>;
+}>;
+
+/** Where a run's projects are: one shared server, or one organisation's own, by origin. */
+type LangWatchQLPlacedOn = Readonly<
+  { kind: "shared"; origin: string } | { kind: "private"; origin: string; organizationId: string }
+>;
+
+function ownerAnswer(owner: LwqlAccessModelOwner): LangWatchQLAccessModelAnswer {
+  return owner === "none" ? "not_provisioned" : "provisioned";
+}
 
 function toError(error: unknown): Error {
   return error instanceof Error ? error : new Error(String(error));
@@ -38,7 +57,7 @@ function toError(error: unknown): Error {
 /**
  * The one placement gate every LangWatchQL run passes before any SQL (ADR-200): it answers only
  * where each project's rows and the provisioned access model are on the same server, and fails
- * closed. Spec: specs/lwql/isolation.feature.
+ * closed. A private server is probed as its own reader login. Spec: specs/lwql/isolation.feature.
  */
 export class LangWatchQLPlacementGateService {
   private constructor(private readonly deps: LangWatchQLPlacementGateDeps) {}
@@ -61,51 +80,83 @@ export class LangWatchQLPlacementGateService {
       read: () =>
         Promise.all(projectIds.map((tenantId) => this.deps.placement.placementOf({ tenantId }))),
     });
-    if (placements.some((each) => each.recordedPrivate && !each.routedPrivately)) {
-      const error = new Error("An organisation recorded private has no route in this process");
-      throw this.#undecided({ projectIds, error });
-    }
-    if (placements.some((each) => each.origin === null)) {
-      throw this.#undecided({ projectIds, error: new Error("A project's server has no origin") });
-    }
-    const elsewhere = projectIds.filter(
-      (_, index) =>
-        placements[index]?.routedPrivately === true || placements[index]?.origin !== target.origin,
-    );
-    if (elsewhere.length > 0) {
-      logger.warn(
-        { projectIds: elsewhere },
-        "LangWatchQL refused: the project's data is not on the LangWatchQL server",
-      );
+    const placedOn = this.#placedOn({ projectIds, placements, shared: target.origin });
+    if (placedOn === null) {
+      logger.warn({ projectIds }, "LangWatchQL refused: the data is not on one LangWatchQL server");
       throw new LangWatchQLNotProvisionedError();
     }
-    if (
-      (await this.#accessModelAnswer({ projectIds, origin: target.origin })) === "not_provisioned"
-    ) {
+    const answer = await this.#accessModelAnswer({ projectIds, placedOn });
+    if (answer === "not_provisioned") {
       logger.warn({ projectIds }, "LangWatchQL refused: no access model is provisioned");
       throw new LangWatchQLNotProvisionedError();
     }
   }
 
+  /**
+   * The one server every project's rows are on, or null where they are on several or the shared
+   * ones are not the LangWatchQL server. An unresolvable placement is undecided, never shared.
+   */
+  #placedOn({
+    projectIds,
+    placements,
+    shared,
+  }: {
+    projectIds: readonly string[];
+    placements: readonly LangWatchQLPlacement[];
+    shared: string;
+  }): LangWatchQLPlacedOn | null {
+    if (placements.some((each) => each.recordedPrivate && !each.routedPrivately)) {
+      const error = new Error("An organisation recorded private has no route in this process");
+      throw this.#undecided({ projectIds, error });
+    }
+    if (placements.length === 0) return { kind: "shared", origin: shared };
+    const origins = [...new Set(placements.map((each) => each.origin))];
+    if (origins.includes(null)) {
+      throw this.#undecided({ projectIds, error: new Error("A project's server has no origin") });
+    }
+    const [origin] = origins;
+    if (origin === undefined || origin === null || origins.length !== 1) return null;
+    const isPrivate = placements.every((each) => each.routedPrivately);
+    const isShared = placements.every((each) => !each.routedPrivately);
+    if (isShared && origin === shared) return { kind: "shared", origin };
+    if (!isPrivate) return null;
+    // Two organisations at one origin may hold different databases: never one server's answer.
+    const organizations = [...new Set(placements.map((each) => each.organizationId))];
+    const [organizationId] = organizations;
+    if (organizationId === undefined || organizationId === null || organizations.length !== 1) {
+      return null;
+    }
+    return { kind: "private", origin, organizationId };
+  }
+
   /** Config decides where it can; otherwise the fleet's answer, probing once it has expired. */
   async #accessModelAnswer({
     projectIds,
-    origin,
+    placedOn,
   }: {
     projectIds: readonly string[];
-    origin: string;
+    placedOn: LangWatchQLPlacedOn;
   }): Promise<LangWatchQLAccessModelAnswer> {
-    if (!this.deps.accessModel.configured) return "not_provisioned";
+    // A private answer is the organisation's own: never the shared server's, nor another
+    // organisation's on the same origin, whose reader and database are not this one's.
+    const origin =
+      placedOn.kind === "private"
+        ? `private:${placedOn.origin}:${placedOn.organizationId}`
+        : placedOn.origin;
+    const { accessModel, privateAccessModel } = this.deps;
+    if (placedOn.kind === "shared" && !accessModel.configured) return "not_provisioned";
     const held = await this.#decide({
       projectIds,
       read: () => this.deps.answers.findAnswer({ origin }),
     });
     if (held !== null) return held;
-    const owner = await this.#decide({
+    const answer = await this.#decide({
       projectIds,
-      read: () => this.deps.accessModel.probeOwner(),
+      read: async () =>
+        placedOn.kind === "private"
+          ? privateAccessModel.probe({ projectIds })
+          : ownerAnswer(await accessModel.probeOwner()),
     });
-    const answer = owner === "none" ? "not_provisioned" : "provisioned";
     await this.#decide({
       projectIds,
       read: () => this.deps.answers.recordAnswer({ origin, answer }),

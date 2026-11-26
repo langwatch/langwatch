@@ -33,7 +33,6 @@ const ask = (
 const expand = (shorthand: Partial<InstantEvalShorthandInput> = {}) =>
   expandInstantEvalShorthand({
     shorthand: { target: "traces", questions: [ask()], ...shorthand },
-    database: "analytics",
     now: NOW,
   });
 
@@ -43,7 +42,7 @@ describe("given a target and some questions", () => {
     it("judges the readable trace of each trace, ordered by the paging key", () => {
       const { sql } = expand({ target: "traces" });
 
-      expect(sql).toContain("FROM analytics.traces");
+      expect(sql).toContain("FROM traces");
       expect(sql).toContain("Attributes['gen_ai.conversation.id'] AS ThreadId");
       expect(sql).toContain(
         `eval(llm_readable_trace(TraceId, ${INSTANT_EVAL_SHORTHAND_TEXT_BUDGET}), 'The customer sounds annoyed') AS q1`,
@@ -57,7 +56,7 @@ describe("given a target and some questions", () => {
     it("groups the metrics view by conversation and judges its transcript", () => {
       const { sql } = expand({ target: "threads" });
 
-      expect(sql).toContain("FROM analytics.trace_metrics AS m");
+      expect(sql).toContain("FROM trace_metrics AS m");
       expect(sql).toContain("argMax(m.TraceId, m.OccurredAt) AS TraceId");
       expect(sql).toContain("m.ConversationId AS ThreadId");
       expect(sql).toContain("max(m.OccurredAt) AS OccurredAt");
@@ -77,7 +76,7 @@ describe("given a target and some questions", () => {
     it("keeps the model calls and pages by the trace and span pair", () => {
       const { sql } = expand({ target: "llm_spans" });
 
-      expect(sql).toContain("FROM analytics.spans");
+      expect(sql).toContain("FROM spans");
       expect(sql).toContain("SpanAttributes['langwatch.span.type'] = 'llm'");
       expect(sql).toContain("llm_messages_span(TraceId, SpanId)");
       expect(sql).toContain("StartTime AS OccurredAt");
@@ -87,7 +86,6 @@ describe("given a target and some questions", () => {
     const expandLlmSpans = (floor: { from: string | null; rebuilding: boolean } | null) =>
       expandInstantEvalShorthand({
         shorthand: { target: "llm_spans", questions: [ask()] },
-        database: "analytics",
         now: NOW,
         spanAnalyticsFloor: floor,
       });
@@ -96,8 +94,8 @@ describe("given a target and some questions", () => {
     it("keeps model calls through span_metrics when its floor covers the window", () => {
       const { sql } = expandLlmSpans({ from: "2026-09-01T00:00:00.000Z", rebuilding: false });
 
-      expect(sql).toContain("FROM analytics.spans");
-      expect(sql).toContain("FROM analytics.span_metrics");
+      expect(sql).toContain("FROM spans");
+      expect(sql).toContain("FROM span_metrics");
       expect(sql).toContain("SpanType = 'llm'");
       expect(sql).toContain("StartTime >= {start_at:DateTime64(3, 'UTC')}");
       expect(sql).not.toContain("SpanAttributes");
