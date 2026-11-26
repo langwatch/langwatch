@@ -948,7 +948,12 @@ describe("NurturingDeliveryService", () => {
 
       expect(cio.sent[0]?.body).toEqual(
         expect.objectContaining({
-          traits: { email: "jane@example.com", name: "Jane Doe", createdAt: seconds },
+          traits: {
+            email: "jane@example.com",
+            name: "Jane Doe",
+            first_name: "Jane",
+            createdAt: seconds,
+          },
         }),
       );
       expect(posthog.identified).toEqual([
