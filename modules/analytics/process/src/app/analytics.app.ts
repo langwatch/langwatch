@@ -80,6 +80,7 @@ import {
   filtersReadSpanType,
   type SpanAnalyticsFloor,
   TraceApi,
+  type ThreadTraceIds,
   type Trace,
   TRACE_FILTER_EXAMPLES,
 } from "@langwatch/trace-contract";
@@ -91,6 +92,7 @@ import { statementMightCallEvalFunction } from "../features/app-functions/rules/
 import { LangWatchQLHydrationComputeService } from "../features/hydration/services/langwatch-ql-hydration-compute.service.ts";
 import {
   LangWatchQLHydrationReadService,
+  type LangWatchQLThreadTraceIdsReadInput,
   type LangWatchQLThreadTraceReadInput,
   type LangWatchQLTraceReadInput,
   type LangWatchQLTraceSource,
@@ -514,6 +516,14 @@ class TraceApiHydrationSource implements LangWatchQLTraceSource {
       protections,
       maxTraces,
     });
+  }
+
+  readThreadTraceIds({
+    projectId,
+    threadKeys,
+    maxTraces,
+  }: LangWatchQLThreadTraceIdsReadInput): Promise<readonly ThreadTraceIds[]> {
+    return this.traces.readThreadsTraceIds({ projectId, threadIds: [...threadKeys], maxTraces });
   }
 }
 
@@ -1043,7 +1053,6 @@ export class AnalyticsModule
     return buildQueryReference({
       protections: input.protections,
       lwqlEnabled: input.canRunLangWatchQL,
-      database,
       schema: input.canRunLangWatchQL
         ? await input.schema()
         : { database, functions: [], views: [], appFunctions: [] },
