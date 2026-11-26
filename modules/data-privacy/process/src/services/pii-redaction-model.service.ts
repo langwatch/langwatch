@@ -250,7 +250,14 @@ export class PiiRedactionModelService {
       return null;
     }
     if (plan.kind === "split") {
-      return this.#clearSplit({ input, organizationId, priced, projectId, call, calls: plan.calls });
+      return this.#clearSplit({
+        input,
+        organizationId,
+        priced,
+        projectId,
+        call,
+        calls: plan.calls,
+      });
     }
     return this.#clearSingle({ input, organizationId, priced, projectId, call });
   }
