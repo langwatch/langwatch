@@ -60,7 +60,7 @@ function dedupColumns(view: LangWatchQLViewDefinition) {
 /**
  * Seeds one view's source table, one insert per version so each lands in its own part:
  * superseding versions, an exact duplicate, a replay that ties on the version and wins on the
- * tie-break, and a key whose time column moved, which the sort key keeps as two rows.
+ * tie-break, and a key whose time column moved; answers the text column that tells them apart.
  */
 async function seed({
   harness,
@@ -72,7 +72,7 @@ async function seed({
   view: LangWatchQLViewDefinition;
   columns: Column[];
   sortingKey: string[];
-}): Promise<void> {
+}): Promise<string> {
   const { group, version, tieBreak } = dedupColumns(view);
   const writable = columns.filter(
     (column) => column.default_kind !== "MATERIALIZED" && column.default_kind !== "ALIAS",
@@ -148,11 +148,13 @@ async function seed({
       values: [values],
     });
   }
+  return value.name;
 }
 
 describe("given the views pinned to latest-in-order and their FINAL twins", () => {
   let harness: LangWatchQLClickHouseHarness;
   let finalTwins: string;
+  const textColumns = new Map<string, string>();
 
   async function count(sql: string): Promise<number> {
     const result = await harness.admin.query({
@@ -191,12 +193,13 @@ describe("given the views pinned to latest-in-order and their FINAL twins", () =
       await harness.applyAsAdmin([
         `SYSTEM STOP MERGES ${harness.factDatabase}.${view.sourceTable}`,
       ]);
-      await seed({
+      const textColumn = await seed({
         harness,
         view,
         columns: await columns.json<Column>(),
         sortingKey: source?.sorting_key.split(", ") ?? [],
       });
+      textColumns.set(view.name, textColumn);
     }
   }, 600_000);
 
@@ -222,20 +225,22 @@ describe("given the views pinned to latest-in-order and their FINAL twins", () =
   );
 
   it("keeps the latest version, the replay and both rows of a moved anchor in trace_metrics", async () => {
+    const text = textColumns.get("trace_metrics");
+    expect(text).toBeDefined();
     const result = await harness.admin.query({
       query:
         // The migrated facts hold the harness's own traces too; only this seed's keys are read.
-        `SELECT TraceId, ConversationId FROM ${harness.names.database}.trace_metrics ` +
+        `SELECT TraceId, ${text} AS Text FROM ${harness.names.database}.trace_metrics ` +
         `WHERE startsWith(TraceId, 'key-') ORDER BY TraceId, OccurredAt`,
       format: "JSONEachRow",
     });
 
     expect(await result.json()).toEqual([
-      { TraceId: "key-1", ConversationId: "latest" },
-      { TraceId: "key-2", ConversationId: "duplicate" },
-      { TraceId: "key-3", ConversationId: "replayed" },
-      { TraceId: "key-4", ConversationId: "anchor" },
-      { TraceId: "key-4", ConversationId: "moved anchor" },
+      { TraceId: "key-1", Text: "latest" },
+      { TraceId: "key-2", Text: "duplicate" },
+      { TraceId: "key-3", Text: "replayed" },
+      { TraceId: "key-4", Text: "anchor" },
+      { TraceId: "key-4", Text: "moved anchor" },
     ]);
   });
 });
