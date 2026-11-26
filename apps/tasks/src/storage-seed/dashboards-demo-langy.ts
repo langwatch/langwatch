@@ -138,12 +138,16 @@ const nanos = (ms: number) => `${Math.round(ms)}000000`;
 export function langyMirrorTurnsOn({
   projectId,
   organizationId,
+  sourceProjectIds,
   day,
   scale,
   now,
 }: {
   projectId: string;
+  /** The organization the turns were asked in, never the mirror's own. */
   organizationId: string;
+  /** The projects the turns were asked in; the mirror project itself is never one of them. */
+  sourceProjectIds: readonly string[];
   day: DemoDay;
   scale: number;
   /** Turns later than this have not happened yet. */
@@ -154,7 +158,14 @@ export function langyMirrorTurnsOn({
   const count = Math.round(
     (isWeekend(day) ? 6 : 28) * adoption * scale * (0.8 + random.next() * 0.4),
   );
-  return turnsOn({ projectId, organizationId, day, count, random, now });
+  return turnsOn({
+    projectId,
+    source: { organizationId, projectIds: sourceProjectIds },
+    day,
+    count,
+    random,
+    now,
+  });
 }
 
 /** A set number of turns asked from inside a project, as the gateway sends them there. */
@@ -177,14 +188,14 @@ export function langyTurnsAskedIn({
 /** The day's turns, spread over working hours; the project names every trace id. */
 function turnsOn({
   projectId,
-  organizationId,
+  source,
   day,
   count,
   random,
   now,
 }: {
   projectId: string;
-  organizationId?: string;
+  source?: { organizationId: string; projectIds: readonly string[] };
   day: DemoDay;
   count: number;
   random: DemoRandom;
@@ -200,7 +211,16 @@ function turnsOn({
         3_600_000 +
       random.int({ min: 0, max: 3_500_000 });
     const key = `${projectId}:${day.key}:${index}`;
-    const turn = langyTurn({ key, projectId, organizationId, startedAt, day });
+    const turn = langyTurn({
+      key,
+      projectId,
+      source: source && {
+        organizationId: source.organizationId,
+        projectId: random.pick(source.projectIds),
+      },
+      startedAt,
+      day,
+    });
     if (turn.finishedAt <= now) turns.push(turn);
   }
   return turns;
@@ -209,13 +229,14 @@ function turnsOn({
 function langyTurn({
   key,
   projectId,
-  organizationId,
+  source,
   startedAt,
   day,
 }: {
   key: string;
   projectId: string;
-  organizationId?: string;
+  /** Where a mirrored turn was asked; absent for a turn asked inside this project. */
+  source?: { organizationId: string; projectId: string };
   startedAt: number;
   day: DemoDay;
 }): LangyTurn {
@@ -226,8 +247,8 @@ function langyTurn({
     traceId,
     turnSpanId: hexId({ key: `${traceId}:turn`, length: 16 }),
     projectId,
-    organizationId,
-    sourceProjectId: organizationId ? projectId : undefined,
+    organizationId: source?.organizationId,
+    sourceProjectId: source?.projectId,
     model: random.weighted(MODELS),
   };
   const member = random.weighted(MEMBERS);
@@ -329,7 +350,6 @@ function turnRoot({
             startTimeUnixNano: nanos(start),
             endTimeUnixNano: nanos(end),
             attributes: kv({
-              "langwatch.origin": "langy",
               "gen_ai.conversation.id": conversationId,
               ...(failure ? { "langy.outcome": "agent_error" } : {}),
             }),

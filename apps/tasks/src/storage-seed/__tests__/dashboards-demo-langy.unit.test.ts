@@ -15,6 +15,7 @@ const NOW = Date.UTC(2026, 9, 8, 15);
 const DAYS = demoDays({ days: 30, todayStart: Math.floor(NOW / DAY_MS) * DAY_MS });
 const MIRROR_PROJECT = "langy-mirror-project";
 const SOURCE_ORGANIZATION = "organization-that-asked";
+const SOURCE_PROJECTS = ["project-that-asked", "another-project-that-asked"];
 
 const attributeSchema = z.object({
   key: z.string(),
@@ -81,6 +82,7 @@ const mirrored = DAYS.flatMap((day) =>
   langyMirrorTurnsOn({
     projectId: MIRROR_PROJECT,
     organizationId: SOURCE_ORGANIZATION,
+    sourceProjectIds: SOURCE_PROJECTS,
     day,
     scale: 1,
     now: NOW,
@@ -120,9 +122,11 @@ describe("given the Langy turns the demo makes for the mirror project", () => {
         expect(root?.parentSpanId).toBe("");
         expect(root?.status.code).toBe(turn.failed ? 2 : 1);
         expect(callsOf(turn).every(({ parentSpanId }) => parentSpanId === root?.spanId)).toBe(true);
+        expect(root?.attribute["langwatch.origin"]).toBeUndefined();
         for (const span of spans) {
           expect(span.resource["langwatch.organization_id"]).toBe(SOURCE_ORGANIZATION);
-          expect(span.resource["langwatch.project_id"]).toBe(MIRROR_PROJECT);
+          expect(SOURCE_PROJECTS).toContain(span.resource["langwatch.project_id"]);
+          expect(span.resource["langwatch.project_id"]).not.toBe(MIRROR_PROJECT);
           expect(span.attribute["langwatch.organization_id"]).toBeUndefined();
         }
       }
@@ -187,6 +191,7 @@ describe("given the Langy turns the demo makes for the mirror project", () => {
         langyMirrorTurnsOn({
           projectId: MIRROR_PROJECT,
           organizationId: SOURCE_ORGANIZATION,
+          sourceProjectIds: SOURCE_PROJECTS,
           day,
           scale: 1,
           now: NOW,
