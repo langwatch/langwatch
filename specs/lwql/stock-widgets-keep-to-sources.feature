@@ -23,6 +23,12 @@ Feature: Stock widgets that count production read only views that keep an origin
     And under the langy list it lists Langy's model as new
 
   @integration
+  Scenario: The Release check names production's change, never a model only Langy ran
+    When the Release check's changes query runs under the application list
+    Then it names production's new model as the change
+    And it names no model only Langy's traces used
+
+  @integration
   Scenario: The Release check compares production around a change production made
     When the Release check's traffic query runs under the application list
     Then it compares around production's newest change, not a later model only Langy used

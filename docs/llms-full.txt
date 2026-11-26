@@ -40933,6 +40933,20 @@ To change one, open its **⋮** menu in the sidebar and pick **Duplicate to
 edit**. That makes your own dashboard, named after the template plus "(copy)", with the template's
 widgets and opens it. The dashboard's header has no such button.
 
+### Releases
+
+"Ready to ship?" compares production before and after your newest change. A
+change is a new release of your application, a new prompt version, or a model
+your traces start using.
+
+LangWatch reads the release from the version your application sends with each
+trace: the OpenTelemetry resource attribute `service.version`, else `version` in
+the trace metadata, else `app_version`. A release is marked at the first trace
+that carries its version.
+
+The widget counts only traces of the sources it reads, so a version or model
+that only Langy's own runs used is never a release of your application.
+
 ## Period and grain
 
 Every dashboard has a period, from Live (the last hour) up to one year, defaulting

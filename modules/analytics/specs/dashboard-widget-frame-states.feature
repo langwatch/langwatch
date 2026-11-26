@@ -394,3 +394,31 @@ Feature: A dashboard widget frame shows what its queries report
       Given a board of three widgets
       When two of them fail for another reason, or one fails on a limit and one for another reason
       Then no warning shows above the board
+
+  Rule: A widget bigger than its card shows that there is more
+
+    @unit
+    Scenario: The frame scrolls a widget taller or wider than its card
+      Given a widget whose content is taller or wider than its card
+      When the board draws it
+      Then the frame scrolls inside the card instead of cutting the content off
+
+    @unit
+    Scenario: The frame's scrollbar stays visible
+      Given a widget that scrolls inside its card
+      When the reader's system hides scrollbars until they scroll, as macOS does
+      Then the frame still draws a visible scrollbar
+
+    @unit
+    Scenario: A shadow marks each edge with more content behind it
+      Given a widget that scrolls inside its card
+      When there is content past an edge of the card
+      Then that edge shows a shadow, and an edge with nothing past it shows none
+
+  Rule: Ask Langy shows the widget at its own size
+
+    @unit
+    Scenario: A short widget stays short beside Langy
+      Given a widget whose card is short, such as a row of numbers
+      When the member asks Langy about it
+      Then the widget beside Langy grows with its card, up to a cap, and trails no empty gap

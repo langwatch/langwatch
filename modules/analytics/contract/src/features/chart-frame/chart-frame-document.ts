@@ -36,6 +36,38 @@ export function assertChartFrameNonce(nonce: string): void {
   }
 }
 
+const EDGE_SHADOW = "rgb(0 0 0 / 0.16)";
+const CARD = "var(--chakra-colors-bg-card)";
+
+/**
+ * The body is the frame's scroll container, so a widget bigger than its card scrolls inside it.
+ * Its scrollbar is styled so systems that hide scrollbars until a scroll still draw one, and
+ * the scroll-shadow backgrounds mark each edge with content past it (the `local` covers hide them).
+ */
+export const CHART_FRAME_BASE_STYLE = [
+  `  html { height: 100%; overflow: hidden; background: ${CARD}; }`,
+  "  body {",
+  "    height: 100%; margin: 0; padding: 8px; box-sizing: border-box; overflow: auto;",
+  "    font-family: system-ui, sans-serif; font-size: 13px; color: var(--chakra-colors-fg);",
+  "    background:",
+  `      linear-gradient(${CARD} 30%, transparent) top / 100% 24px no-repeat local,`,
+  `      linear-gradient(transparent, ${CARD} 70%) bottom / 100% 24px no-repeat local,`,
+  `      linear-gradient(to right, ${CARD} 30%, transparent) left / 24px 100% no-repeat local,`,
+  `      linear-gradient(to left, ${CARD} 30%, transparent) right / 24px 100% no-repeat local,`,
+  `      radial-gradient(farthest-side at 50% 0, ${EDGE_SHADOW}, transparent) top / 100% 10px no-repeat scroll,`,
+  `      radial-gradient(farthest-side at 50% 100%, ${EDGE_SHADOW}, transparent) bottom / 100% 10px no-repeat scroll,`,
+  `      radial-gradient(farthest-side at 0 50%, ${EDGE_SHADOW}, transparent) left / 10px 100% no-repeat scroll,`,
+  `      radial-gradient(farthest-side at 100% 50%, ${EDGE_SHADOW}, transparent) right / 10px 100% no-repeat scroll,`,
+  `      ${CARD};`,
+  "  }",
+  "  body::-webkit-scrollbar { width: 8px; height: 8px; }",
+  "  body::-webkit-scrollbar-track { background: transparent; }",
+  "  body::-webkit-scrollbar-thumb {",
+  "    background: var(--chakra-colors-border-emphasized, rgb(0 0 0 / 0.3)); border-radius: 4px;",
+  "  }",
+  "  body::-webkit-scrollbar-corner { background: transparent; }",
+].join("\n");
+
 /**
  * The document, every inline script carrying the caller's nonce. An edge proxy
  * appending its own `'nonce-…'` makes `'unsafe-inline'` ignored, so a served
@@ -57,12 +89,7 @@ export function buildChartFrameDocument(options: { nonce?: string } = {}): strin
     `<html><head>${importMap}${JSON.stringify(buildChartFrameImportMap())}</script>`,
     '<meta charset="utf-8">',
     "<style>",
-    "  html, body { height: 100%; }",
-    "  body {",
-    "    margin: 0; padding: 8px; box-sizing: border-box;",
-    "    font-family: system-ui, sans-serif; font-size: 13px; color: var(--chakra-colors-fg);",
-    "    background: var(--chakra-colors-bg-card);",
-    "  }",
+    CHART_FRAME_BASE_STYLE,
     // The widget's root fills whatever height the parent gave the iframe —
     // a widget wraps its own layout in height: 100% (and, for a chart,
     // ResponsiveContainer height="100%") to actually fill it rather than

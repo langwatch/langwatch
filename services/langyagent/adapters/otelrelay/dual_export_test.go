@@ -14,6 +14,8 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.opentelemetry.io/collector/pdata/pcommon"
 	"go.opentelemetry.io/collector/pdata/ptrace"
+
+	"github.com/langwatch/langwatch/services/langyagent/domain"
 )
 
 const (
@@ -697,6 +699,109 @@ func TestMirrorTiersEndToEnd(t *testing.T) {
 		// The customer forward proves the batch was processed; the mirror must
 		// then be provably silent.
 		assert.Contains(t, string(customer.await(t)), workerPrompt)
+		mirror.assertSilent(t, 300*time.Millisecond)
+	})
+}
+
+// A harness that exports no spans of its own (pi) leaves the manager's
+// langy.turn root as the only relay-built span of the turn, so the root is
+// mirrored too: the gateway's mirrored model calls carry the same trace id and
+// name this span as parent, and the mirror shows one joined trace per turn.
+func TestTurnRootMirror(t *testing.T) {
+	register := func(t *testing.T, relay *Relay, customerURL, tier string) string {
+		t.Helper()
+		token, err := relay.Register(WorkerInfo{
+			ConversationID:       "conv-root-mirror",
+			LangwatchEndpoint:    customerURL,
+			LangwatchAPIKey:      "sk-session",
+			Model:                "gpt-5-mini",
+			MirrorTier:           tier,
+			SourceOrganizationID: "org-acme",
+			SourceProjectID:      "proj-acme",
+		})
+		require.NoError(t, err)
+		return token
+	}
+	failure := &domain.TurnFailure{Code: "agent_error", Message: "the model refused the request"}
+
+	// @scenario "The mirror receives each turn's root with its outcome"
+	t.Run("content tier mirrors the turn root with the source tenant and outcome", func(t *testing.T) {
+		customer := startSignallingIngest(t)
+		mirror := startSignallingIngest(t)
+		collector := startSignallingIngest(t)
+		relay := relayWithOptions(t, Options{
+			InternalOTLPEndpoint: collector.srv.URL,
+			MirrorEndpoint:       mirror.srv.URL,
+			MirrorKey:            "sk-mirror",
+		})
+		token := register(t, relay, customer.srv.URL, "content")
+		turn := turnContext()
+		relay.SetTurnContext(token, turn)
+		relay.ForwardTurnSpan(token, turn, time.Now().Add(-time.Second), time.Now(), failure)
+
+		mirrored, err := (&ptrace.ProtoUnmarshaler{}).UnmarshalTraces(mirror.await(t))
+		require.NoError(t, err)
+		assert.Equal(t, "Bearer sk-mirror", <-mirror.authz)
+		require.Equal(t, 1, mirrored.SpanCount())
+		rs := mirrored.ResourceSpans().At(0)
+		span := rs.ScopeSpans().At(0).Spans().At(0)
+		assert.Equal(t, "langy.turn", span.Name())
+		assert.Equal(t, pcommon.TraceID(turn.TraceID()), span.TraceID(),
+			"the root keeps the trace id the gateway's mirrored calls carry")
+		assert.Equal(t, pcommon.SpanID(turn.SpanID()), span.SpanID(),
+			"the root keeps the span id the gateway's mirrored calls parent on")
+		assert.True(t, span.ParentSpanID().IsEmpty(), "the mirrored root must stay a root")
+		assert.Equal(t, ptrace.StatusCodeError, span.Status().Code())
+		assert.Equal(t, failure.Message, span.Status().Message())
+
+		res := rs.Resource().Attributes()
+		for key, want := range map[string]string{
+			"langwatch.organization_id": "org-acme",
+			"langwatch.project_id":      "proj-acme",
+			"langwatch.origin":          "langy",
+			"langwatch.thread.id":       "conv-root-mirror",
+		} {
+			got, ok := res.Get(key)
+			if assert.True(t, ok, "mirror resource lacks %s", key) {
+				assert.Equal(t, want, got.Str(), key)
+			}
+		}
+
+		customerBody := string(customer.await(t))
+		assert.Contains(t, customerBody, "langy.turn", "the customer still gets the root")
+		assert.NotContains(t, customerBody, "org-acme",
+			"the source org must never ride the customer's own forward")
+		assert.NotContains(t, customerBody, "proj-acme",
+			"the source project must never ride the customer's own forward")
+
+		// The collector already holds the internal langy.turn span; the mirror
+		// leg must not send it a second copy.
+		collector.assertSilent(t, 300*time.Millisecond)
+	})
+
+	t.Run("structural tier still mirrors the turn root", func(t *testing.T) {
+		customer := startSignallingIngest(t)
+		mirror := startSignallingIngest(t)
+		relay := relayWithOptions(t, Options{MirrorEndpoint: mirror.srv.URL, MirrorKey: "sk-mirror"})
+		token := register(t, relay, customer.srv.URL, "structural")
+		turn := turnContext()
+		relay.ForwardTurnSpan(token, turn, time.Now().Add(-time.Second), time.Now(), nil)
+
+		body := string(mirror.await(t))
+		assert.Contains(t, body, "langy.turn")
+		assert.Contains(t, body, "org-acme")
+	})
+
+	// @scenario "A skipped customer's turn root never reaches the mirror"
+	t.Run("skip tier mirrors no turn root while the customer still gets it", func(t *testing.T) {
+		customer := startSignallingIngest(t)
+		mirror := startSignallingIngest(t)
+		relay := relayWithOptions(t, Options{MirrorEndpoint: mirror.srv.URL, MirrorKey: "sk-mirror"})
+		token := register(t, relay, customer.srv.URL, "skip")
+		turn := turnContext()
+		relay.ForwardTurnSpan(token, turn, time.Now().Add(-time.Second), time.Now(), nil)
+
+		assert.Contains(t, string(customer.await(t)), "langy.turn")
 		mirror.assertSilent(t, 300*time.Millisecond)
 	})
 }
