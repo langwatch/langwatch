@@ -162,8 +162,10 @@ describe("analytics metadata filters", () => {
       expect(await countWith({ "metadata.value": { outcome: ["fail"] } })).toBe(1);
     });
 
-    it("counts nothing for values sent without a key", async () => {
-      expect(await countWith({ "metadata.value": ["ok"] })).toBe(0);
+    it("refuses values sent without a key instead of counting", async () => {
+      await expect(countWith({ "metadata.value": ["ok"] })).rejects.toMatchObject({
+        code: "analytics_filter_key_required",
+      });
     });
   });
 });

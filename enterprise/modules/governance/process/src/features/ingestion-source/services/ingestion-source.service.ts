@@ -161,7 +161,6 @@ export class IngestionSourceService {
     organizationId: string;
   }): Promise<GovernanceIngestionSource | null> {
     const row = await this.repository.findById(id);
-
     return row?.organizationId === organizationId ? row : null;
   }
 
@@ -241,10 +240,9 @@ export class IngestionSourceService {
       organizationId: input.organizationId,
       kind: PROJECT_KIND.INTERNAL_GOVERNANCE,
     });
-    // Only a push source has a secret at all: a pull-mode or pure-S3 source
-    // authenticates outbound, so a minted secret would be stored and shown
-    // without ever authenticating anything. The empty hash is the sentinel for
-    // "there is no secret here", which is what the ingest door reads.
+    // Only a push source has a secret: a pull-mode or pure-S3 source authenticates outbound, so a
+    // minted secret would be stored and shown without authenticating anything. The empty hash is
+    // the sentinel for "there is no secret here", which is what the ingest door reads.
     const ingestSecret = isPushSourceType({ sourceType: input.sourceType })
       ? this.secrets.generate()
       : null;
@@ -255,6 +253,7 @@ export class IngestionSourceService {
     this.destinations.assertAllowed(requestedParserConfig);
     this.validation.assertPullConfig(requestedParserConfig);
     this.validation.assertPullCredentials(requestedParserConfig);
+    await this.destinations.assertListingAddressesAllowed(requestedParserConfig);
     await this.assertOttlParses(requestedParserConfig);
     const { providerAccountId } = await this.parserConfigs.assertClaimsAreFree({
       organizationId: input.organizationId,
@@ -312,6 +311,7 @@ export class IngestionSourceService {
       cursorMustNotMove = reportMoves || environmentMoves;
       this.destinations.assertAllowed(incoming);
       this.validation.assertPullConfig(incoming);
+      await this.destinations.assertListingAddressesAllowed(incoming);
       if (input.parserConfig.credentials !== undefined) {
         this.validation.assertPullCredentials(incoming);
       }

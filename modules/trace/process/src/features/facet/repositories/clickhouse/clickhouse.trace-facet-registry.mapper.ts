@@ -1,7 +1,9 @@
 /** The ClickHouse side of the facet registry: each facet's table, time column and SQL. */
 import type { TenantScopeTimeColumn } from "@langwatch/clickhouse-client";
 import {
+  deriveTraceConversationId,
   deriveTraceOrigin,
+  TRACE_CONVERSATION_ID_CLICKHOUSE_EXPRESSION,
   TRACE_ORIGIN_CLICKHOUSE_EXPRESSION,
   deriveTraceStatus,
   TRACE_STATUS_CLICKHOUSE_EXPRESSION,
@@ -88,8 +90,8 @@ export const FACET_REGISTRY: readonly FacetDefinition[] = [
     label: "Conversation",
     group: "trace",
     table: "trace_summaries",
-    expression: "Attributes['gen_ai.conversation.id']",
-    read: (t) => t.summary.attributes["gen_ai.conversation.id"] ?? "",
+    expression: TRACE_CONVERSATION_ID_CLICKHOUSE_EXPRESSION,
+    read: (t) => deriveTraceConversationId(t.summary.attributes),
   },
   {
     // The same key the analytics layer aliases as `metadata.customer_id`.

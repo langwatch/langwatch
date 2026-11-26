@@ -4,6 +4,7 @@ import type { DashboardHomeProduct, StarredDashboardsProject } from "@langwatch/
 import { permissionSatisfiedBy } from "@langwatch/authorization";
 import { RawKbd as Kbd } from "@langwatch/design-system/kbd";
 import { Box, VStack } from "@langwatch/design-system/primitives";
+import { ResizeHandle } from "@langwatch/design-system/resize-handle";
 import { ScrollEdgeFade, useScrollEdges } from "@langwatch/design-system/scroll-fade";
 import { useFeatureFlag } from "@langwatch/feature-flag-client";
 import { FrontendFlags } from "@langwatch/feature-flag-contract";
@@ -16,6 +17,7 @@ import {
   StarredDashboards,
 } from "../../behavior/lent-saved-dashboards.tsx";
 import { navigationApi } from "../../behavior/navigation-api.ts";
+import { useSidebarWidthStore } from "../../behavior/sidebar-width.store.ts";
 import { useAdminMenu } from "../../behavior/use-admin-menu.ts";
 import { useLlmOpsProject, useLlmOpsProjectSlug } from "../../behavior/use-llm-ops-project-slug.ts";
 import { useMenuScrollPosition } from "../../behavior/use-menu-scroll-position.ts";
@@ -57,6 +59,9 @@ import {
 import {
   SHELL_SIDEBAR_WIDTH_COMPACT,
   SHELL_SIDEBAR_WIDTH_EXPANDED,
+  SHELL_SIDEBAR_WIDTH_MAX,
+  SHELL_SIDEBAR_WIDTH_MIN,
+  shellSidebarWidth,
 } from "../../model/shell-layout.ts";
 import { SideMenuItem, SideMenuLink } from "../blocks/side-menu-link.tsx";
 import { SupportMenu } from "../blocks/support-menu.tsx";
@@ -492,10 +497,13 @@ export function SidebarContent({
   surface,
   showExpanded,
   isFullWidth = false,
+  expandedWidth = SHELL_SIDEBAR_WIDTH_EXPANDED,
 }: {
   surface: SidebarSurface;
   showExpanded: boolean;
   isFullWidth?: boolean;
+  /** The width the reader dragged the column to, when they did. */
+  expandedWidth?: string;
 }) {
   const scrollRegionRef = useRef<HTMLDivElement>(null);
   const scrollEdges = useScrollEdges({ axis: "y" });
@@ -510,7 +518,7 @@ export function SidebarContent({
       gap={0}
       height="100%"
       align="start"
-      width={isFullWidth ? "full" : SHELL_SIDEBAR_WIDTH_EXPANDED}
+      width={isFullWidth ? "full" : expandedWidth}
       justifyContent="space-between"
     >
       <Box
@@ -598,8 +606,12 @@ export function ProductSidebar({
   isCompact: boolean;
 }) {
   const [isHovered, setIsHovered] = useState(false);
+  const { rememberedWidth, setRememberedWidth, resetWidth } = useSidebarWidthStore();
   const showExpanded = !isCompact || isHovered;
-  const columnWidth = isCompact ? SHELL_SIDEBAR_WIDTH_COMPACT : SHELL_SIDEBAR_WIDTH_EXPANDED;
+  // The dragged width is the wide screen's: small screens keep their hover-out column.
+  const draggedWidth = shellSidebarWidth({ remembered: rememberedWidth });
+  const expandedWidth = isCompact ? SHELL_SIDEBAR_WIDTH_EXPANDED : `${draggedWidth}px`;
+  const columnWidth = isCompact ? SHELL_SIDEBAR_WIDTH_COMPACT : expandedWidth;
   const fullHeight = `calc(100vh - ${APP_HEADER_HEIGHT}px)`;
 
   return (
@@ -619,14 +631,28 @@ export function ProductSidebar({
           zIndex={isCompact ? 100 : "auto"}
           top={0}
           left={0}
-          width={showExpanded ? SHELL_SIDEBAR_WIDTH_EXPANDED : SHELL_SIDEBAR_WIDTH_COMPACT}
+          width={showExpanded ? expandedWidth : SHELL_SIDEBAR_WIDTH_COMPACT}
           height={fullHeight}
           background="bg.page"
-          transition="width 0.15s ease-in-out"
+          transition={isCompact ? "width 0.15s ease-in-out" : void 0}
           overflow="hidden"
         >
-          <SidebarContent surface={surface} showExpanded={showExpanded} />
+          <SidebarContent
+            surface={surface}
+            showExpanded={showExpanded}
+            expandedWidth={expandedWidth}
+          />
         </Box>
+        {!isCompact && (
+          <ResizeHandle
+            label="Resize sidebar"
+            value={draggedWidth}
+            min={SHELL_SIDEBAR_WIDTH_MIN}
+            max={SHELL_SIDEBAR_WIDTH_MAX}
+            onChange={setRememberedWidth}
+            onReset={resetWidth}
+          />
+        )}
       </Box>
     </SideMenuDensityProvider>
   );

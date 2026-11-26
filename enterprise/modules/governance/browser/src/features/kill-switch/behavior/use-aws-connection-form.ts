@@ -3,7 +3,10 @@
  * A new AWS connection being typed: a key pair or a role to assume, checked against the contract
  * and then created. The secret goes out once and is never read back.
  */
-import { awsConnectionInputSchema } from "@langwatch/enterprise-governance-contract";
+import {
+  awsConnectionInputSchema,
+  type AwsConnectionView,
+} from "@langwatch/enterprise-governance-contract";
 import { useState } from "react";
 
 import { api } from "../../../behavior/governance-api.ts";
@@ -42,7 +45,8 @@ export function useAwsConnectionForm({
   onDone,
 }: {
   organizationId: string;
-  onDone: () => void;
+  /** Called with the new connection once it is saved, and with nothing on cancel. */
+  onDone: (created?: AwsConnectionView) => void;
 }) {
   const [credential, setCredential] = useState<Credential>("keys");
   const [form, setForm] = useState(EMPTY_FORM);
@@ -72,10 +76,10 @@ export function useAwsConnectionForm({
     }
     setSubmitting(true);
     try {
-      await create.mutateAsync({ organizationId, connection: parsed.data });
+      const created = await create.mutateAsync({ organizationId, connection: parsed.data });
       toaster.create({ title: "AWS connection added", type: "success" });
       await refresh.afterConnectionChange();
-      onDone();
+      onDone(created);
     } catch (failure) {
       showErrorToast({ error: failure, fallbackTitle: "Couldn't add the AWS connection" });
     } finally {

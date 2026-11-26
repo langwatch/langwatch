@@ -115,8 +115,8 @@ function canRefold<State, E extends Event>(
 
 /**
  * Names the event the read is for and carries its occurredAt and, when the fold declares
- * `options.readWindow`, the computed `occurredAt ± widthMs` bound. Only the event id is added
- * when occurredAt is unusable, since it cannot anchor a window — the read then stays unbounded.
+ * `options.readWindow`, the `occurredAt ± widthMs` bound, stretched to also cover the fold's
+ * `anchorOf` business time ± widthMs. Only the event id is added when occurredAt is unusable.
  */
 function withReadHints<State, E extends Event>({
   context,
@@ -130,13 +130,20 @@ function withReadHints<State, E extends Event>({
   const named = { ...context, eventId: event.id };
   const occurredAt = (event as Record<string, unknown>).occurredAt;
   if (typeof occurredAt !== "number" || occurredAt <= 0) return named;
-  const widthMs = projection.options?.readWindow?.widthMs;
+  const readWindow = projection.options?.readWindow;
+  if (readWindow === undefined) return { ...named, occurredAtMs: occurredAt };
+  const around = readWindowAround({ anchorMs: occurredAt, widthMs: readWindow.widthMs });
+  const anchorMs = readWindow.anchorOf?.(event);
+  if (typeof anchorMs !== "number" || anchorMs <= 0) {
+    return { ...named, occurredAtMs: occurredAt, readWindow: around };
+  }
   return {
     ...named,
     occurredAtMs: occurredAt,
-    ...(widthMs !== undefined
-      ? { readWindow: readWindowAround({ anchorMs: occurredAt, widthMs }) }
-      : {}),
+    readWindow: {
+      fromMs: Math.min(around.fromMs, anchorMs - readWindow.widthMs),
+      toMs: Math.max(around.toMs, anchorMs + readWindow.widthMs),
+    },
   };
 }
 
