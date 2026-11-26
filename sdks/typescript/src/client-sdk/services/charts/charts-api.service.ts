@@ -2,6 +2,7 @@ import {
   extractStatusFromResponse,
   formatApiErrorForOperation,
 } from "@/client-sdk/services/_shared/format-api-error";
+import { projectInScope } from "@/client-sdk/services/_shared/project-in-scope";
 import { throwIfHandledError } from "@/client-sdk/services/_shared/throw-handled-error";
 import { unwrapApiResult } from "@/client-sdk/services/_shared/unwrap-api-result";
 import {
@@ -101,16 +102,16 @@ export class ChartsApiService {
   }
 
   /**
-   * The same `configuredProjectId ?? scopedProjectId() ?? env` chain `projectId()` throws
-   * on, without the throw — for the one caller that must tolerate "no project" rather than
-   * refuse on it: the query-door client build in the constructor above, which has to keep
+   * The synchronous project for the query-door client built in the constructor, which must
+   * tolerate "no project". A project key's own project is not needed there: the server reads
+   * it off the token. Routes that name the project use `projectId()`.
    */
   private resolvedProjectId(): string | undefined {
     return this.configuredProjectId ?? scopedProjectId() ?? process.env.LANGWATCH_PROJECT_ID;
   }
 
-  private projectId(operation: string): string {
-    const projectId = this.resolvedProjectId();
+  private async projectId(operation: string): Promise<string> {
+    const projectId = await projectInScope({ configuredProjectId: this.configuredProjectId });
     if (!projectId) {
       throw new ChartsApiError(
         "No project is in scope. Pass --project <slug-or-id>, or set LANGWATCH_PROJECT_ID.",
@@ -121,7 +122,7 @@ export class ChartsApiService {
   }
 
   async list(): Promise<{ data: SavedChart[] }> {
-    const projectId = this.projectId("list charts");
+    const projectId = await this.projectId("list charts");
     const { data, error, response } = await this.apiClient.GET(
       "/api/v1/projects/{projectId}/analytics/charts",
       { params: { path: { projectId } } },
@@ -136,7 +137,7 @@ export class ChartsApiService {
   }
 
   async get(id: string): Promise<SavedChart> {
-    const projectId = this.projectId(`get chart "${id}"`);
+    const projectId = await this.projectId(`get chart "${id}"`);
     const { data, error, response } = await this.apiClient.GET(
       "/api/v1/projects/{projectId}/analytics/charts/{chartId}",
       { params: { path: { projectId, chartId: id } } },
@@ -154,7 +155,7 @@ export class ChartsApiService {
     name: string;
     definition: SavedChartDefinitionInput;
   }): Promise<SavedChart> {
-    const projectId = this.projectId("create chart");
+    const projectId = await this.projectId("create chart");
     const { data, error, response } = await this.apiClient.POST(
       "/api/v1/projects/{projectId}/analytics/charts",
       { params: { path: { projectId } }, body: params },
@@ -172,7 +173,7 @@ export class ChartsApiService {
     id: string,
     params: { name?: string; definition?: SavedChartDefinitionInput },
   ): Promise<SavedChart> {
-    const projectId = this.projectId(`update chart "${id}"`);
+    const projectId = await this.projectId(`update chart "${id}"`);
     const { data, error, response } = await this.apiClient.PATCH(
       "/api/v1/projects/{projectId}/analytics/charts/{chartId}",
       { params: { path: { projectId, chartId: id } }, body: params },
@@ -188,7 +189,7 @@ export class ChartsApiService {
 
   /** Deletes a chart. The route answers `204` with no body, like `unplace`. */
   async delete(id: string): Promise<void> {
-    const projectId = this.projectId(`delete chart "${id}"`);
+    const projectId = await this.projectId(`delete chart "${id}"`);
     const { data, error, response } = await this.apiClient.DELETE(
       "/api/v1/projects/{projectId}/analytics/charts/{chartId}",
       { params: { path: { projectId, chartId: id } } },
@@ -213,7 +214,7 @@ export class ChartsApiService {
       rowSpan?: number;
     },
   ): Promise<SavedChart> {
-    const projectId = this.projectId(`place chart "${id}"`);
+    const projectId = await this.projectId(`place chart "${id}"`);
     const { data, error, response } = await this.apiClient.PUT(
       "/api/v1/projects/{projectId}/analytics/charts/{chartId}/placement",
       { params: { path: { projectId, chartId: id } }, body: params },
@@ -228,7 +229,7 @@ export class ChartsApiService {
   }
 
   async unplace(id: string): Promise<void> {
-    const projectId = this.projectId(`unplace chart "${id}"`);
+    const projectId = await this.projectId(`unplace chart "${id}"`);
     const { data, error, response } = await this.apiClient.DELETE(
       "/api/v1/projects/{projectId}/analytics/charts/{chartId}/placement",
       { params: { path: { projectId, chartId: id } } },
