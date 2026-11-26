@@ -44,6 +44,7 @@ import { useEmptyWidgets } from "../../behavior/use-empty-widgets.ts";
 import { useLibraryBoardEdits } from "../../behavior/use-library-board-edits.ts";
 import { useLimitFailedWidgets } from "../../behavior/use-limit-failed-widgets.ts";
 import { useOrganizationLibraryOpen } from "../../behavior/use-organization-library-open.ts";
+import { useRereadMissingBoard } from "../../behavior/use-reread-missing-board.ts";
 import { type SavedBoard, useSavedDashboards } from "../../behavior/use-saved-dashboards.ts";
 import {
   UnsavedBoardProvider,
@@ -446,12 +447,16 @@ export function Board() {
   const host = useAnalyticsHost();
   const projectId = host.project()?.id ?? "";
   const dashboardId = host.route().params.dashboardId;
-  const { boards, organizationBoards, isLoading, isRefreshing, loadError } = useSavedDashboards();
+  const { boards, organizationBoards, isLoading, isRefreshing, loadError, reread } =
+    useSavedDashboards();
   const draft = useDraftBoard({ takenNames: boards.map(({ name }) => name) });
   const isDraft = dashboardId === DRAFT_SEGMENT;
   useEffect(() => {
     if (isDraft && projectId) openDraftAddress(projectId);
   }, [isDraft, projectId]);
+  const isListed = [...boards, ...organizationBoards].some(({ id }) => id === dashboardId);
+  const isMissing = !isLoading && !loadError && !isDraft && !isListed;
+  const isRereading = useRereadMissingBoard({ dashboardId, isMissing, reread });
   if (isLoading) return <UiPageLoading />;
   // A member the list refuses sees the page the flag being off shows (AC21).
   if (loadError) return <UiPageNotFound />;
@@ -459,7 +464,7 @@ export function Board() {
     ? draft.board
     : [...boards, ...organizationBoards].find(({ id }) => id === dashboardId);
   // A board made a moment ago is missing from the list held before it; wait for the re-read.
-  if (!board && isRefreshing) return <UiPageLoading />;
+  if (!board && (isRefreshing || isRereading)) return <UiPageLoading />;
   // A deleted board and one set to Only me read the same: the server tells neither apart.
   if (!board) return <ProjectBoardUnavailable />;
   const unsaved = isDraft ? draft : void 0;

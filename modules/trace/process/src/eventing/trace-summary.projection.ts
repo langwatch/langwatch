@@ -37,6 +37,7 @@ import {
   MAX_PROCESSED_SPANS,
   spanStorabilityOf,
   UNSTORABLE_SPAN_SKIPPED,
+  traceFoldReadAnchorMs,
 } from "@langwatch/trace-contract";
 
 import { LOG_FILL_ONLY_KEYS } from "../features/derivation/services/trace-attribute-accumulation.service.ts";
@@ -144,7 +145,7 @@ export class TraceSummaryFoldProjection
   readonly options = {
     refoldOnOutOfOrder: false,
     trustAbsentMiss: true,
-    readWindow: { widthMs: TRACE_SUMMARY_READ_WINDOW_MS },
+    readWindow: { widthMs: TRACE_SUMMARY_READ_WINDOW_MS, anchorOf: traceFoldReadAnchorMs },
     // Folds in arrival order already, so a redriven span folds late, not wrong (§9).
     onExhausted: "dead-letter",
   } as const;

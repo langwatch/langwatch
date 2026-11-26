@@ -139,22 +139,25 @@ export class WorkbenchProtectionsService {
   }
 
   /**
-   * What an API KEY may see -- a different question from a person. Content categories resolve as
-   * for a no-session caller (a key is not a member); the catalogue is the KEY's own grants, which
-   * authz bounds by its owner's. A legacy project key predates RBAC and reads the whole catalogue.
+   * What a REST credential may see. A project-bound access token is its person, so it reads as
+   * that member. A key is not a member: content resolves as for a no-session caller and the
+   * catalogue is the KEY's own grants, bounded by its owner's. A legacy key reads it all.
    */
   async resolveApiKeyProtections(input: {
     projectId: string;
     credential: RestCredentialPrincipal;
   }): Promise<LangWatchQLProtections> {
     const { credential } = input;
+    if (credential.kind === "cliAccessToken") {
+      return this.resolveMemberProtections({
+        userId: credential.userId,
+        projectId: input.projectId,
+      });
+    }
     const catalogue =
-      credential.kind === "apiKey" || credential.kind === "cliAccessToken"
+      credential.kind === "apiKey"
         ? await this.catalogueFor({
-            principal:
-              credential.kind === "apiKey"
-                ? { type: "apiKey", id: credential.apiKeyId }
-                : { type: "user", id: credential.userId },
+            principal: { type: "apiKey", id: credential.apiKeyId },
             scope: {
               type: "project",
               id: credential.projectId,

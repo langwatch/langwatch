@@ -493,6 +493,12 @@ jobs:
         if: ${{ !cancelled() && needs.changes.outputs.relevant == 'true' }}
         run: node --test --experimental-strip-types .github/scripts/guard-breaking-change-scope.test.ts
 
+      - name: Test dedupe-release-notes.ts
+        if: ${{ !cancelled() && needs.changes.outputs.relevant == 'true' }}
+        run: |
+          node --test --experimental-strip-types .github/scripts/dedupe-release-notes.test.ts
+          bash -n .github/scripts/dedupe-release-notes.sh
+
       - name: Test that every generated file is marked generated
         if: ${{ !cancelled() && needs.changes.outputs.relevant == 'true' }}
         run: node --test --experimental-strip-types .github/scripts/generated-attributes.test.ts

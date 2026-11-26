@@ -32,7 +32,11 @@ function makeFold({
   readWindow,
   refoldable = false,
 }: {
-  readWindow?: { widthMs: number; fallbackLookbackStepsMs?: readonly number[] };
+  readWindow?: {
+    widthMs: number;
+    fallbackLookbackStepsMs?: readonly number[];
+    anchorOf?: (event: Event) => number | undefined;
+  };
   /**
    * Pair `refoldOnStoreMiss` with a wired `eventLoaderUpTo`, the only shape
    * that may answer `undecodable` — rejecting a row is safe only because the
@@ -86,6 +90,53 @@ describe("FoldProjectionExecutor declared read window", () => {
       undefined,
       occurredAt,
     );
+
+  describe("given the fold declares a business-time anchor for its read window", () => {
+    const ANCHOR = OCCURRED_AT - 9 * 24 * 60 * 60 * 1000;
+
+    /** @scenario "A fold's read window covers both occurred-at and the business time it declares" */
+    it("stretches the store read from the anchor to occurredAt, each ± widthMs", async () => {
+      const { fold, store } = makeFold({
+        readWindow: { widthMs: WIDTH_MS, anchorOf: () => ANCHOR },
+      });
+      (store.get as ReturnType<typeof vi.fn>).mockResolvedValue({
+        kind: "folded",
+        state: { count: 3, LastEventOccurredAt: ANCHOR },
+      });
+
+      const state = await executor.execute(fold, eventAt(OCCURRED_AT), context);
+
+      expect(store.get).toHaveBeenCalledTimes(1);
+      expect(store.get).toHaveBeenCalledWith(
+        TEST_CONSTANTS.AGGREGATE_ID,
+        expect.objectContaining({
+          occurredAtMs: OCCURRED_AT,
+          readWindow: { fromMs: ANCHOR - WIDTH_MS, toMs: OCCURRED_AT + WIDTH_MS },
+        }),
+      );
+      expect(state.count).toBe(4);
+    });
+
+    /** @scenario "A fold without a declared anchor centres its read window on occurred-at" */
+    it("falls back to occurredAt when the anchor answers nothing", async () => {
+      const { fold, store } = makeFold({
+        readWindow: { widthMs: WIDTH_MS, anchorOf: () => undefined },
+      });
+      (store.get as ReturnType<typeof vi.fn>).mockResolvedValue({
+        kind: "folded",
+        state: { count: 1, LastEventOccurredAt: OCCURRED_AT - 1 },
+      });
+
+      await executor.execute(fold, eventAt(OCCURRED_AT), context);
+
+      expect(store.get).toHaveBeenCalledWith(
+        TEST_CONSTANTS.AGGREGATE_ID,
+        expect.objectContaining({
+          readWindow: { fromMs: OCCURRED_AT - WIDTH_MS, toMs: OCCURRED_AT + WIDTH_MS },
+        }),
+      );
+    });
+  });
 
   describe("given the fold declares a read window", () => {
     describe("when the windowed read hits", () => {

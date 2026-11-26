@@ -89,12 +89,22 @@ async function appOver(input: {
   enabledProjects?: readonly string[];
 }) {
   const accessAsked: string[] = [];
+  const keysAsked: string[] = [];
+  const peopleAsked: string[] = [];
   const app = await AnalyticsModule.create({
     dependencies: {
       featureFlags: createApiFixture<FeatureFlagApi>(),
       authz: createApiFixture<AuthzApi>({
-        hasApiKeyPermission: ({ permission }) => Promise.resolve(input.grants.includes(permission)),
-        can: ({ permission }) => Promise.resolve(input.grants.includes(permission)),
+        hasApiKeyPermission: ({ apiKeyId, permission }) => {
+          keysAsked.push(apiKeyId);
+          return Promise.resolve(input.grants.includes(permission));
+        },
+        can: ({ principal, permission, scope }) => {
+          peopleAsked.push(
+            `${principal.type}:${"id" in principal ? principal.id : ""}@${"id" in scope ? scope.id : ""}`,
+          );
+          return Promise.resolve(input.grants.includes(permission));
+        },
         hasPermission: ({ permission }) => Promise.resolve(input.grants.includes(permission)),
         getScope: ({ projectId }) =>
           Promise.resolve({
@@ -174,7 +184,7 @@ async function appOver(input: {
     secrets: analyticsTestSecrets(),
   });
 
-  return { app, accessAsked };
+  return { app, accessAsked, keysAsked, peopleAsked };
 }
 
 async function referenceFor(input: { listed: readonly Project[]; grants: readonly string[] }) {
@@ -349,6 +359,86 @@ describe("AnalyticsModule.runLangWatchQLForKey", () => {
 
       const failed = logged.lines.findLine("warn", "LangWatchQL failed");
       expect(failed).toMatchObject({ projectIds: ["project-a", "project-b"] });
+    });
+  });
+});
+
+const TOKEN: LangWatchQLKeyReach = {
+  kind: "cliAccessToken",
+  userId: "admin-1",
+  organizationId: ORGANIZATION_ID,
+  projectId: "project-a",
+  teamId: "team-project-a",
+};
+
+describe("given a project-bound access token, the hosted MCP's OAuth sign-in", () => {
+  describe("when its person holds analytics:view on the bound project", () => {
+    /** @scenario "A project-bound access token runs a LangWatchQL query as its person" */
+    it("opens the reference's LangWatchQL half, judged as the person and never as a key", async () => {
+      const { app, keysAsked, peopleAsked } = await appOver({
+        listed: [project("project-a")],
+        grants: ["analytics:view", "traces:view"],
+      });
+
+      const reference = await app.describeQueryReferenceForKey({ reach: TOKEN });
+
+      expect(reference.lwql.enabled).toBe(true);
+      expect(keysAsked).toEqual([]);
+      expect(new Set(peopleAsked)).toEqual(
+        new Set(["user:admin-1@project-a", `user:admin-1@${ORGANIZATION_ID}`]),
+      );
+    });
+  });
+
+  describe("when its person lacks analytics:view on the bound project", () => {
+    /** @scenario "A project-bound access token runs a LangWatchQL query as its person" */
+    it("closes the reference's LangWatchQL half, as it is closed to that person", async () => {
+      const { app } = await appOver({ listed: [project("project-a")], grants: ["traces:view"] });
+
+      const reference = await app.describeQueryReferenceForKey({ reach: TOKEN });
+
+      expect(reference.lwql.enabled).toBe(false);
+    });
+  });
+
+  describe("when its run names a project other than the bound one", () => {
+    /** @scenario "A project-bound access token reads only the project it is bound to" */
+    it("refuses as not found, though the person can read that project", async () => {
+      const { app } = await appOver({
+        listed: [project("project-a"), project("project-b")],
+        grants: ["analytics:view"],
+      });
+
+      await expect(
+        app.runLangWatchQLForKey({
+          reach: TOKEN,
+          sql: "SELECT count() FROM analytics.traces",
+          projectId: "project-b",
+        }),
+      ).rejects.toMatchObject({ code: "project_not_found" });
+    });
+  });
+
+  describe("when it runs over every project it can read and the engine fails", () => {
+    /** @scenario "A project-bound access token reads only the project it is bound to" */
+    it("ran over the bound project alone", async () => {
+      logged.lines.length = 0;
+      const { app, peopleAsked } = await appOver({
+        listed: [project("project-a"), project("project-b")],
+        grants: ["analytics:view"],
+      });
+
+      await expect(
+        app.runLangWatchQLForKey({
+          reach: TOKEN,
+          sql: "SELECT count() FROM analytics.traces",
+          projects: "all",
+        }),
+      ).rejects.toBeDefined();
+
+      const failed = logged.lines.findLine("warn", "LangWatchQL failed");
+      expect(failed).toMatchObject({ projectIds: ["project-a"] });
+      expect(peopleAsked.some((asked) => asked.endsWith("@project-b"))).toBe(false);
     });
   });
 });

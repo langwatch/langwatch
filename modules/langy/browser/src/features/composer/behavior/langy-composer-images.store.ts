@@ -31,6 +31,14 @@ interface LangyComposerImagesState {
   remove: (keys: readonly string[]) => void;
   /** The ready images, taken out of the draft for a send. */
   takeForSend: () => readonly LangyDraftImage[];
+  /** The ready images, taken out of the draft for a queued message that keeps them. */
+  takeForQueue: () => readonly LangyDraftImage[];
+  /** Images handed back to the draft, such as a queued message's when it is edited. */
+  restore: (images: readonly LangyDraftImage[]) => void;
+  /** Images a send is about to carry, given back to the draft if the send fails. */
+  holdAsLastSent: (images: readonly LangyDraftImage[]) => void;
+  /** The last send's images, taken to go back in the queue when the draft is taken. */
+  takeLastSent: () => readonly LangyDraftImage[];
   restoreLastSent: () => void;
   clear: () => void;
 }
@@ -64,6 +72,22 @@ export const useLangyComposerImages = defineSlice<LangyComposerImagesState>({
       revoke(get().lastSent);
       set({ images: [], lastSent: ready });
       return ready;
+    },
+    takeForQueue: () => {
+      const ready = get().images.filter((image) => image.status === "ready");
+      set((s) => ({ images: s.images.filter((image) => image.status !== "ready") }));
+      return ready;
+    },
+    restore: (images) => set((s) => ({ images: [...s.images, ...images] })),
+    holdAsLastSent: (images) => {
+      const kept = new Set(images.map((image) => image.previewUrl));
+      revoke(get().lastSent.filter((image) => !kept.has(image.previewUrl)));
+      set({ lastSent: images });
+    },
+    takeLastSent: () => {
+      const taken = get().lastSent;
+      set({ lastSent: [] });
+      return taken;
     },
     restoreLastSent: () => set((s) => ({ images: [...s.lastSent, ...s.images], lastSent: [] })),
     clear: () => {

@@ -219,7 +219,7 @@ function SidebarRow({
             />
           )}
         </Box>
-        <Text as="span" truncate minWidth={0}>
+        <Text as="span" truncate minWidth={0} title={name}>
           {name}
         </Text>
         {mark}

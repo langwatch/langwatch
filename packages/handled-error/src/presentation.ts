@@ -6595,9 +6595,8 @@ const presentations = {
     describe: () => "This conversation link isn't one we can open. Start a new chat to keep going.",
   },
   invalid_images: {
-    title: "Images not accepted",
-    describe: () =>
-      "One of the attached images is too large, too many, or not a supported format. Remove it and send again.",
+    title: "These images can't be sent",
+    describe: () => "Attach fewer or smaller images in a supported format and try again.",
   },
   agent_session_not_found: {
     title: "The session was lost",

@@ -27,6 +27,40 @@ Scenario: A failed group membership read hides group-restricted trace content
     When it reads a trace over REST
     Then cost visibility is asked of that person's user principal at the project
 
+  # A project-bound access token (`lw_at_`, minted by the hosted MCP's OAuth sign-in) is its
+  # person capped at one project, so it reads content as that person does in the app. An API
+  # key is not a person and keeps reading the public cut. Outside its own project the token is
+  # capped: a by-id read that falls back to another project reads that project as the public.
+  @unit
+  Scenario: A project-bound access token reads restricted trace content as its person
+    Given trace input, output, system instructions and tool calls are restricted to "Admins"
+    When an admin's project-bound access token reads a trace over REST
+    Then all four are visible to it, as they are to that admin in the app
+
+  @unit
+  Scenario: A project-bound access token reads another project's trace as the public
+    Given a project-bound access token for one project
+    When its by-id read finds the trace only in another project its person may read
+    Then that trace's content is resolved as the public, not as the person
+
+  @unit
+  Scenario: A project-bound access token never reads more than its person
+    Given trace input is restricted to "Admins"
+    When a plain member's project-bound access token reads a trace over REST
+    Then the trace input is hidden from it, as it is from that member in the app
+
+  @unit
+  Scenario: An API key keeps reading restricted trace content as the public
+    Given trace input is restricted to "Admins"
+    When an API key reads a trace over REST
+    Then the trace input is hidden from it
+
+  @unit
+  Scenario: A project-bound access token's read folds in the policies its proof reads
+    Given a project-bound access token reads through a proof that shares another project
+    When its trace content protections are resolved
+    Then the policy is read across the token's project and the shared one, strictest wins
+
   # Moved from project.getFieldRedactionStatus: the door moves with the protections' owner
   # (peer-cycles plan 2026-10-08 T2b, R36; namespace moves with its owner, CD-2).
   @unit
