@@ -64,7 +64,9 @@ export class DigestWeekService {
       this.deps.entitlement.getUsage({ organizationId }),
     ]);
     const mine = folds.filter(({ projectId }) => visible.has(projectId));
-    const projects = await Promise.all(
+    // A project whose read fails is left out of this email and logged; only when every one fails
+    // does the send fail, for the outbox to retry, rather than mail a week with nothing in it.
+    const reads = await Promise.allSettled(
       projectIds.map(async (projectId): Promise<ProjectWeek> => {
         const fold = mine.find((row) => row.projectId === projectId && row.isoWeek === isoWeek);
         const traces = await this.deps.traces.getProjectWeek({
@@ -75,6 +77,16 @@ export class DigestWeekService {
         return { ...(fold ?? emptyProjectWeek()), projectId, organizationId, isoWeek, ...traces };
       }),
     );
+    const projects = reads.flatMap((read, index) => {
+      if (read.status === "fulfilled") return [read.value];
+      logger.warn(
+        { error: read.reason, organizationId, projectId: projectIds[index], isoWeek },
+        "the digest left a project out: its week could not be read",
+      );
+      return [];
+    });
+    const firstFailure = reads.find((read) => read.status === "rejected");
+    if (projects.length === 0 && firstFailure) throw firstFailure.reason;
     // Only a project with traces this week shows a change, so only it needs last week's count; a
     // read that fails leaves that project without one, and the email goes without the change line.
     const previousTraces = new Map<string, number>();

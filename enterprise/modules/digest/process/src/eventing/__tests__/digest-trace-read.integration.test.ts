@@ -183,4 +183,32 @@ describe("a member's traces email", () => {
       expect(digest.world.mostReadsAtOnce).toBeLessThanOrEqual(8);
     });
   });
+
+  describe("when one project's week cannot be read but another's can", () => {
+    /** @scenario "A project whose week cannot be read is left out of the email" */
+    it("sends the email about the readable project alone", async () => {
+      digest.world.projects = [PROJECT, "project-broken"];
+      digest.world.traceNumbers.set(`${PROJECT}:${SENT_WEEK}`, { traces: 1_200 });
+      digest.world.failingAnalytics.add(`project-broken:${SENT_WEEK}`);
+
+      await sendTo(MEMBER);
+
+      expect(digest.mail.map((mail) => mail.props)).toEqual([
+        expect.objectContaining({ traces: 1_200 }),
+      ]);
+    });
+  });
+
+  describe("when every visible project's week cannot be read", () => {
+    /** @scenario "A send fails for a retry when no visible project's week can be read" */
+    it("fails the send, unclaimed, rather than mailing an empty week", async () => {
+      digest.world.projects = [PROJECT, "project-broken"];
+      digest.world.failingAnalytics.add(`${PROJECT}:${SENT_WEEK}`);
+      digest.world.failingAnalytics.add(`project-broken:${SENT_WEEK}`);
+
+      await expect(sendTo(MEMBER)).rejects.toThrow("analytics cannot read");
+
+      expect(digest.mail).toEqual([]);
+    });
+  });
 });

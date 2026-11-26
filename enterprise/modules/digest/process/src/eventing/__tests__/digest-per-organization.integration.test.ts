@@ -247,3 +247,47 @@ describe("when the plan covers several organizations", () => {
     expect(digest.world.failedPlans).toEqual([]);
   });
 });
+
+describe("when a plan cannot ask for one organization or one member", () => {
+  beforeEach(async () => {
+    digest.world.organizations = [OTHER_ORGANIZATION, ORGANIZATION];
+    await arm();
+  });
+
+  /** @scenario "A plan keeps walking past a failure, then fails once so it retries" */
+  it("asks the rest, fails the week's plan, leaves it unplanned, and a retry asks only what was missed", async () => {
+    digest.world.failingPlanRequests.add(OTHER_ORGANIZATION);
+
+    await expect(digest.plan()).rejects.toThrow("left 1 ask(s) unmade");
+
+    expect((await digest.repositories.audience.getSettings()).lastPlannedWeek).toBeNull();
+    expect(await asked(3)).toEqual(
+      Array(3).fill(expect.objectContaining({ organizationId: ORGANIZATION })),
+    );
+
+    digest.world.failingPlanRequests.clear();
+    digest.world.otherMembers = [{ userId: OTHER_MEMBER, role: "MEMBER", disabledAt: null }];
+    await digest.plan();
+
+    expect(await asked(1)).toEqual([
+      expect.objectContaining({ organizationId: OTHER_ORGANIZATION, userId: OTHER_MEMBER }),
+    ]);
+    expect((await digest.repositories.audience.getSettings()).lastPlannedWeek).toBe(SENT_WEEK);
+  });
+
+  /** @scenario "A plan keeps walking past a failure, then fails once so it retries" */
+  it("asks the other members of an organization, fails its plan, and a retry asks only the missed one", async () => {
+    digest.world.failingSendRequests.add(ADMIN);
+    const members = digest.world.members.length;
+
+    await expect(digest.planOrganization({ organizationId: ORGANIZATION })).rejects.toThrow(
+      "left 1 ask(s) unmade",
+    );
+    expect(await asked(members - 1)).toHaveLength(members - 1);
+
+    digest.world.failingSendRequests.clear();
+    await digest.planOrganization({ organizationId: ORGANIZATION });
+
+    expect(await asked(1)).toEqual([expect.objectContaining({ userId: ADMIN })]);
+  });
+});

@@ -194,6 +194,9 @@ export function digestWorld() {
     /** The most analytics reads in flight at once. */
     mostReadsAtOnce: 0,
     readsInFlight: 0,
+    /** Organizations whose plan cannot be asked, and people whose send cannot be asked. */
+    failingPlanRequests: new Set<string>(),
+    failingSendRequests: new Set<string>(),
     /** How many organization plans the week's plan has asked; the fixture carries each out. */
     requestedPlans: 0,
     /** Organizations whose plan failed when carried out, as the outbox would retry them. */
@@ -345,8 +348,12 @@ export function installDigest(
     get publicBaseUrl() {
       return world.publicBaseUrl;
     },
-    requestSend: (request) => commands.requestSend(request),
+    requestSend: async (request) => {
+      if (world.failingSendRequests.has(request.userId)) throw new Error("cannot ask");
+      await commands.requestSend(request);
+    },
     requestOrganizationPlan: async (request) => {
+      if (world.failingPlanRequests.has(request.organizationId)) throw new Error("cannot ask");
       world.requestedPlans += 1;
       await commands.requestOrganizationPlan(request);
     },
@@ -460,8 +467,12 @@ export function installDigest(
     /** The hourly wake's plan of the sendable week, as the outbox carries it out. */
     plan: async ({ at = WAKE_AT, isoWeek = SENT_WEEK }: { at?: number; isoWeek?: string } = {}) => {
       const spec = intentOf({ processName: DIGEST_PLAN_PROCESS_NAME, intent: "planWeek" });
-      await spec.run(spec.schema.parse({ isoWeek, at }), context(DIGEST_PLAN_PROCESS_NAME));
-      await carryOutOrganizationPlans();
+      // The plans asked before a failure are carried out all the same, as the outbox would.
+      try {
+        await spec.run(spec.schema.parse({ isoWeek, at }), context(DIGEST_PLAN_PROCESS_NAME));
+      } finally {
+        await carryOutOrganizationPlans();
+      }
     },
     /**
      * The hourly wake at `at`: its own handler decides whether a plan is asked, and each plan it

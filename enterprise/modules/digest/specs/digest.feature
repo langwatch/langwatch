@@ -114,6 +114,25 @@ Feature: Weekly digest emails
     Then no more than eight analytics reads run at once
 
   @integration
+  Scenario: A plan keeps walking past a failure, then fails once so it retries
+    Given an organization, or a member, whose ask cannot be made
+    When the plan runs
+    Then every other ask is made, the plan fails once at the end and the week is not marked planned
+    And the retry asks only what was missed
+
+  @integration
+  Scenario: A project whose week cannot be read is left out of the email
+    Given analytics cannot answer one of two visible projects' sent week
+    When a member is sent the week
+    Then the email is about the readable project alone
+
+  @integration
+  Scenario: A send fails for a retry when no visible project's week can be read
+    Given analytics cannot answer any visible project's sent week
+    When a member's send is handled
+    Then it fails and no email is sent
+
+  @integration
   Scenario: Each organization is planned as its own intent, a page of ids at a time
     Given three organizations whose ids are paged one at a time
     When the hourly plan runs

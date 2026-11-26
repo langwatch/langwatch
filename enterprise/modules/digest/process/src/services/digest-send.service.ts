@@ -51,6 +51,14 @@ type Member = Readonly<{ userId: string; admin: boolean }>;
 /** A member's standing when their email is sent, which may differ from the plan's. */
 type Membership = Readonly<{ kind: "active"; admin: boolean }> | Readonly<{ kind: "gone" }>;
 
+/** A plan that left some asks unmade, thrown after the walk so the outbox retries it. */
+class DigestPlanIncompleteError extends Error {
+  constructor(detail: { isoWeek: string; organizationId?: string; failed: number }) {
+    super(`the digest plan left ${detail.failed} ask(s) unmade: ${JSON.stringify(detail)}`);
+    this.name = "DigestPlanIncompleteError";
+  }
+}
+
 const logger = createLogger("langwatch:digest");
 
 const MEMBER_PAGE = 500;
@@ -130,18 +138,26 @@ export class DigestSendService {
     if (!settings.armed) return;
     if (settings.lastPlannedWeek !== null && settings.lastPlannedWeek >= isoWeek) return;
     let after: string | undefined;
+    let failed = 0;
     do {
       const page = await this.deps.organizations.listAllIds({
         after,
         limit: ORGANIZATION_PAGE,
       });
       for (const organizationId of page.ids) {
-        await this.deps.requestOrganizationPlan({ organizationId, isoWeek, occurredAt: at });
+        // One organization failing must not keep the rest from being asked.
+        try {
+          await this.deps.requestOrganizationPlan({ organizationId, isoWeek, occurredAt: at });
+        } catch (error) {
+          failed += 1;
+          logger.error({ error, organizationId, isoWeek }, "the digest could not ask a plan");
+        }
       }
       after = page.next ?? undefined;
     } while (after !== undefined);
-    // A request is keyed by organization and week, so a wake that failed partway asks the rest
-    // next hour and the organizations already asked are not planned twice.
+    // Thrown once the walk is done so the intent retries; a request is keyed by organization and
+    // week, so the retry asks nothing twice, and the week is marked planned only when all went.
+    if (failed > 0) throw new DigestPlanIncompleteError({ isoWeek, failed });
     await this.deps.audience.markPlanned({ isoWeek });
   }
 
@@ -157,9 +173,17 @@ export class DigestSendService {
     isoWeek: string;
   }): Promise<void> {
     const occurredAt = this.deps.now();
+    let failed = 0;
     for (const { userId } of await this.members({ organizationId })) {
-      await this.deps.requestSend({ userId, organizationId, isoWeek, occurredAt });
+      // One member failing must not keep the rest from being asked; the retry skips those asked.
+      try {
+        await this.deps.requestSend({ userId, organizationId, isoWeek, occurredAt });
+      } catch (error) {
+        failed += 1;
+        logger.error({ error, organizationId, userId, isoWeek }, "the digest could not ask a send");
+      }
     }
+    if (failed > 0) throw new DigestPlanIncompleteError({ isoWeek, organizationId, failed });
   }
 
   /**
