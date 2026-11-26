@@ -32,8 +32,8 @@ const selfProvisioning = LangWatchQLSelfProvisioningService.create();
 const sqlText = LangWatchQLSqlTextService.create();
 const clusterGuard = LangWatchQLSqlModeClusterGuardService.create();
 
-/** The access stores SQL writes to: a reader held there is one rendered mode never updates. */
-const SQL_ACCESS_STORAGES: readonly string[] = ["local_directory", "replicated"];
+/** The one access store rendered mode owns; a reader held in any other is never updated. */
+const RENDERED_ACCESS_STORAGE = "users_xml";
 
 /** A rendered private server still holding the reader an earlier sql-mode upgrade created. */
 export class LwqlPrivateStaleSqlReaderError extends Error {
@@ -73,27 +73,21 @@ export class LwqlPrivateDatabaseNotReplicatedError extends Error {
 
 type RowReader = Pick<LangWatchQLProvisioningRepository, "queryRows">;
 
-/** Where the server holds the reader: in an access store, or not while it does not know it. */
-type LwqlReaderPlacement =
-  | { readonly held: true; readonly storage: string }
-  | { readonly held: false };
-
-/** Asks `system.users` where the reader is held; the name is checked as an identifier first. */
-export async function readerPlacementOf({
+/** Every access store holding the reader, from `system.users`; none while the server lacks it. */
+export async function findReaderStorages({
   repository,
   reader,
 }: {
   repository: RowReader;
   reader: string;
-}): Promise<LwqlReaderPlacement> {
+}): Promise<string[]> {
   const name = sqlText.assertIdentifier(reader, "reader");
   const rows = await repository.queryRows(
     `SELECT storage FROM system.users WHERE name = ${clickHouseLiteral(name)}`,
   );
-  const storage = rows[0]?.storage;
-  return typeof storage === "string" ? { held: true, storage } : { held: false };
+  // An unreadable storage counts as foreign, so the stale check fails closed.
+  return rows.map((row) => (typeof row.storage === "string" ? row.storage : "unknown"));
 }
-
 /**
  * Rendered mode writes no access entity and no `ON CLUSTER`: a reader a sql-mode upgrade created
  * is never updated, and a plain CREATE reaches one host unless the database is Replicated. Either
@@ -107,9 +101,11 @@ export async function assertRenderedPrivateServer({
   names: LangWatchQLNames;
 }): Promise<void> {
   const reader = names.restrictedUser;
-  const placement = await readerPlacementOf({ repository, reader });
-  if (placement.held && SQL_ACCESS_STORAGES.includes(placement.storage)) {
-    throw new LwqlPrivateStaleSqlReaderError({ reader, storage: placement.storage });
+  const foreign = (await findReaderStorages({ repository, reader })).filter(
+    (storage) => storage !== RENDERED_ACCESS_STORAGE,
+  );
+  if (foreign.length > 0) {
+    throw new LwqlPrivateStaleSqlReaderError({ reader, storage: foreign.join(", ") });
   }
   const query = (sql: string) => repository.queryRows(sql);
   const hostCount = Math.max(
@@ -224,7 +220,10 @@ async function tablesWithoutOwnPolicy({
   const isRendered = selfProvisioning.accessModelMode({ source: plan.settings }) === "rendered";
   const repository = plan.openRepository();
   try {
-    if (isRendered && !(await readerPlacementOf({ repository, reader: reader.username })).held) {
+    const storages = isRendered
+      ? await findReaderStorages({ repository, reader: reader.username })
+      : undefined;
+    if (storages?.length === 0) {
       return "unloaded";
     }
     const policies = await repository.findRowPolicies({ tables });

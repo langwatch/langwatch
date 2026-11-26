@@ -372,5 +372,22 @@ describe("renderLwqlAccessConfig", () => {
       expect(logged).not.toContain(hash);
       expect(logged).not.toContain(PEPPER);
     });
+
+    /** @scenario "A blank private organization id fails rather than render the shared target" */
+    it("fails naming the variable and writes no file when the organisation id is blank", async () => {
+      const source = { ...PRIVATE_ENV, LWQL_RENDER_PRIVATE_ORGANIZATION_ID: "   " };
+
+      await expect(writeLwqlAccessConfig({ outDir, source })).rejects.toThrow(
+        /LWQL_RENDER_PRIVATE_ORGANIZATION_ID is set but blank/,
+      );
+      expect(await readdir(outDir, { recursive: true })).toEqual([]);
+    });
+
+    /** @scenario "The render task renders a private ClickHouse's reader as a users.d file, offline" */
+    it("leaves no temporary file beside the rendered one", async () => {
+      await writeLwqlAccessConfig({ outDir, source: PRIVATE_ENV });
+
+      expect(await readdir(join(outDir, "users.d"))).toEqual(["lwql-access.yaml"]);
+    });
   });
 });

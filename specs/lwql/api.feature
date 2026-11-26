@@ -886,6 +886,7 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
     And a private ClickHouse whose access storage already holds the organization's reader created by an earlier sql-mode upgrade
     When the upgrade provisions LangWatchQL on it
     Then no statement runs, since rendered mode never updates that reader
+    And any access store other than users_xml counts, whatever its name and wherever it is listed among the reader's entries
     And a warning names the reader and its storage, never a password, and says to drop it so the users.d file takes over
 
   @unit
@@ -910,6 +911,7 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
     When lwql-render-access-config runs with no ClickHouse or PostgreSQL connection
     Then it writes users.d/lwql-access.yaml under LWQL_RENDER_OUT_DIR and no named-collection file
     And the file is readable by its owner only, even where an earlier file had a broader mode
+    And it is written to an owner-only file beside it and renamed into place, so it is never readable at a looser mode
     And the file holds the organization's derived reader, its settings profile and the sha256 of its password, never the password or the pepper
     And its profile, row policies and grants are exactly those the private sql path would create, over the private database, the key map being the project-keys engine table
     And every grant is a SELECT, with no POSTGRES or NAMED COLLECTION grant
@@ -921,6 +923,13 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
     When lwql-render-access-config runs
     Then it fails naming those inputs and writes no file
     And with a later pepper in that chain set it derives the same reader the upgrade does
+
+  @unit
+  Scenario: A blank private organization id fails rather than render the shared target
+    Given LWQL_RENDER_PRIVATE_ORGANIZATION_ID is set but holds only whitespace
+    When lwql-render-access-config runs
+    Then it fails naming LWQL_RENDER_PRIVATE_ORGANIZATION_ID
+    And it writes no file, so the shared PostgreSQL reader's password never reaches a private server's config
 
   @unit
   Scenario: The private render reads the key pepper through the upgrade's secrets chain

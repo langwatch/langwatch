@@ -6,8 +6,8 @@
  * @see specs/lwql/api.feature
  */
 
-import { createHash } from "node:crypto";
-import { chmod, mkdir, writeFile } from "node:fs/promises";
+import { createHash, randomBytes } from "node:crypto";
+import { mkdir, rename, rm, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 
 import { createLogger } from "@langwatch/observability";
@@ -124,7 +124,13 @@ function renderedFilesOf(source: Record<string, string | undefined>): {
   privateReader?: LwqlRenderedPrivateReader;
 } {
   const organizationId = source.LWQL_RENDER_PRIVATE_ORGANIZATION_ID?.trim();
-  if (organizationId) {
+  // A blank id must not fall through to the shared target and its PostgreSQL password.
+  if (organizationId === "") {
+    throw new Error(
+      "lwql-render-access-config: LWQL_RENDER_PRIVATE_ORGANIZATION_ID is set but blank; set the organisation id or unset it for the shared target",
+    );
+  }
+  if (organizationId !== undefined) {
     const definition = lwqlPrivateAccessModelDefinitionFromSource({ organizationId, source });
     return {
       definition,
@@ -134,6 +140,18 @@ function renderedFilesOf(source: Record<string, string | undefined>): {
   }
   const definition = lwqlAccessModelDefinitionFromSource(source);
   return { definition, files: accessModelDefinition.renderUsersConfig(definition) };
+}
+
+/** A fresh 0600 file beside the target, renamed over it: never readable at a looser mode. */
+async function writeOwnerOnly({ path, contents }: { path: string; contents: string }) {
+  const temporary = `${path}.${randomBytes(8).toString("hex")}.tmp`;
+  try {
+    await writeFile(temporary, contents, { mode: 0o600, flag: "wx" });
+    await rename(temporary, path);
+  } catch (error) {
+    await rm(temporary, { force: true });
+    throw error;
+  }
 }
 
 /**
@@ -159,9 +177,7 @@ export async function writeLwqlAccessConfig({
   for (const file of files) {
     const absolute = join(outDir, file.relativePath);
     await mkdir(dirname(absolute), { recursive: true });
-    await writeFile(absolute, file.contents, { mode: 0o600 });
-    // writeFile's mode applies only to a file it creates.
-    await chmod(absolute, 0o600);
+    await writeOwnerOnly({ path: absolute, contents: file.contents });
   }
   return {
     files,

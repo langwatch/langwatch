@@ -432,11 +432,11 @@ describe("given a private ClickHouse without a lwql_postgres collection", () => 
 function serverAnswering({
   hosts = 2,
   engine = "Replicated",
-  storage = null,
+  storages = [],
 }: {
   hosts?: number;
   engine?: string;
-  storage?: string | null;
+  storages?: readonly string[];
 }) {
   const held = repositoryHolding({ available: ["lwql_postgres"] });
   const queried: string[] = [];
@@ -447,7 +447,7 @@ function serverAnswering({
       if (sql.includes("system.clusters")) return [{ host_count: String(hosts) }];
       if (sql.includes("system.replicas")) return [{ max_total_replicas: String(hosts) }];
       if (sql.includes("system.databases")) return [{ engine }];
-      if (sql.includes("system.users")) return storage === null ? [] : [{ storage }];
+      if (sql.includes("system.users")) return storages.map((storage) => ({ storage }));
       return [];
     },
   };
@@ -531,10 +531,10 @@ describe("given a rendered access model and a two-host private ClickHouse whose 
 
 describe("given a rendered access model and a private ClickHouse holding a SQL-created reader", () => {
   /** @scenario "In rendered mode a private ClickHouse holding a SQL-created reader is not converged" */
-  it.each(["local_directory", "replicated"])(
+  it.each(["local_directory", "replicated", "custom_sql_store"])(
     "runs no statement when the reader is held in %s",
     async (storage) => {
-      const { repository, statements } = serverAnswering({ hosts: 1, storage });
+      const { repository, statements } = serverAnswering({ hosts: 1, storages: [storage] });
 
       const refusal = await convergeLwqlPrivateRepository({
         repository,
@@ -548,8 +548,25 @@ describe("given a rendered access model and a private ClickHouse holding a SQL-c
   );
 
   /** @scenario "In rendered mode a private ClickHouse holding a SQL-created reader is not converged" */
+  it("refuses when a SQL store is listed after the users.d entry", async () => {
+    const { repository, statements } = serverAnswering({
+      hosts: 1,
+      storages: ["users_xml", "local_directory"],
+    });
+
+    const refusal = await convergeLwqlPrivateRepository({
+      repository,
+      plan: { ...PRIVATE_PLAN, settings: {} },
+    }).catch((error: unknown) => error);
+
+    expect(refusal).toBeInstanceOf(LwqlPrivateStaleSqlReaderError);
+    expect(refusal).toMatchObject({ storage: "local_directory" });
+    expect(statements).toEqual([]);
+  });
+
+  /** @scenario "In rendered mode a private ClickHouse holding a SQL-created reader is not converged" */
   it("converges a server whose reader comes from its users.d file", async () => {
-    const { repository, statements } = serverAnswering({ hosts: 1, storage: "users_xml" });
+    const { repository, statements } = serverAnswering({ hosts: 1, storages: ["users_xml"] });
 
     await convergeLwqlPrivateRepository({ repository, plan: { ...PRIVATE_PLAN, settings: {} } });
 
