@@ -10,7 +10,7 @@ import { pathToFileURL } from "node:url";
 // Spec: specs/ci/release-notes-dedupe.feature
 
 /** A trailing commit link, as Release Please renders it: `([abc1234](…/commit/<sha>))`. */
-const shaPattern = /\]\((https:\/\/[^)\s]*\/commit\/([0-9a-f]{7,40}))\)/;
+const shaPattern = /\(\[[0-9a-f]{7,40}\]\((https:\/\/[^)\s]*\/commit\/([0-9a-f]{7,40}))\)\)\s*$/;
 
 /** A top-level release-note bullet: Release Please writes `* `, a formatted changelog `- `. */
 const bulletPattern = /^[*-] /;

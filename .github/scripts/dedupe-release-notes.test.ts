@@ -39,6 +39,16 @@ void describe("dedupe-release-notes", () => {
       assert.equal(extractSha(line), "fadc6321ddc9846a1208048b2c05994020b65a7c");
     });
 
+    it("reads the trailing commit link, not a commit linked in the note text", () => {
+      const sha = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
+      const line = subjectEntry(
+        "reverts [aaaaaaa](https://github.com/langwatch/langwatch/commit/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa)",
+        7186,
+        sha,
+      );
+      assert.equal(extractSha(line), sha);
+    });
+
     it("reads every pull-request link in the entry", () => {
       const line = subjectEntry("a fix", 7186, "fadc6321ddc9846a1208048b2c05994020b65a7c");
       assert.deepEqual(extractPrNumbers(line), [7186]);
