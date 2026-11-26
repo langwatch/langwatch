@@ -133,8 +133,8 @@ Beside that gate, `.github/workflows/docs-site-lighthouse-all.yml` runs the same
 published page (`audit:site --all-pages --shard i/n --report-only`, one run per page and device,
 three for a page under 0.9 with the median reported,
 ten shards per device), and `src/site/audit/all-pages.ts` merges the shards with the static
-search checks into one sticky PR comment, the run summary and an artifact. It is informational
-and never gates; deleting its `pull_request` trigger leaves the daily run.
+search checks into the run summary and an artifact. It is informational and never gates, so it
+runs nightly and on demand, never on a pull request.
 
 ## Shared command surface and contextual controls
 

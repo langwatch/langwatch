@@ -555,6 +555,10 @@
       "types": "./dist/components/layout/resource-tile.d.ts",
       "default": "./src/components/layout/resource-tile.tsx"
     },
+    "./resize-handle": {
+      "types": "./dist/components/layout/resize-handle.d.ts",
+      "default": "./src/components/layout/resize-handle.tsx"
+    },
     "./scroll-fade": {
       "types": "./dist/components/layout/scroll-fade.d.ts",
       "default": "./src/components/layout/scroll-fade.tsx"

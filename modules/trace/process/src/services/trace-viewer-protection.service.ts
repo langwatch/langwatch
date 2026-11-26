@@ -74,13 +74,31 @@ export class TraceViewerProtectionService {
     }
   }
 
-  /** Credential redactions: anonymous resolution + the principal's cost grant. A legacy
-   * API key (no principal) bypasses RBAC for full access. */
+  /** Credential redactions: an access token (a `user` principal) reads content as its person,
+   * a key as the public; costs are the credential's own grant. A legacy key sees costs. */
   async resolveForApiKey(
-    input: Readonly<{ projectId: string; principal: PrincipalRef | null }>,
+    input: Readonly<{
+      projectId: string;
+      principal: PrincipalRef | null;
+      authorization?: Authorization;
+      /** False outside the token's own project: there it reads as the public. */
+      readsAsPerson?: boolean;
+    }>,
   ): Promise<Protections> {
+    const personId =
+      input.readsAsPerson !== false && input.principal?.type === "user"
+        ? input.principal.id
+        : void 0;
+    const proof = input.authorization;
+    const ownProof =
+      personId && proof?.principal.type === "user" && proof.principal.id === personId;
     const [protections, canSeeCosts] = await Promise.all([
-      this.resolve({ projectId: input.projectId, userId: void 0, publiclyShared: false }),
+      this.resolve({
+        projectId: input.projectId,
+        userId: personId,
+        publiclyShared: false,
+        ...(ownProof ? { authorization: proof } : {}),
+      }),
       this.keyPermitted(input),
     ]);
     return { ...protections, canSeeCosts };

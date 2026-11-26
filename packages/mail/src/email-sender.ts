@@ -13,8 +13,6 @@ export type EmailContent = {
   html: string;
   from?: string;
   attachments?: EmailAttachment[];
-  /** The template's `id`: notification picks the provider for a message by it. */
-  template?: string;
 };
 
 /** All a template needs to hand over what it rendered; NotificationApi's sender answers it. */

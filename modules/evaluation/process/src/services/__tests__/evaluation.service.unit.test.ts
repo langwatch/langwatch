@@ -359,6 +359,7 @@ describe("EvaluationService", () => {
           scoreCount: 2,
           passSum: 0,
           passCount: 0,
+          labelCounts: {},
         },
         {
           evaluatorId: "guardrail",
@@ -368,6 +369,7 @@ describe("EvaluationService", () => {
           scoreCount: 0,
           passSum: 1,
           passCount: 2,
+          labelCounts: {},
         },
       ]),
     ).getMonitorPerformance({

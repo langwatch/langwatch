@@ -125,11 +125,6 @@ const sendEmailCommandSchemaDefinition = z
     attachments: z.array(emailAttachmentSchema).optional(),
     /** Stable identity of one recipient's delivery; a retry carries the same one. */
     idempotencyKey: z.string().min(1).optional(),
-    /** The packaged template's id; on LangWatch Cloud it picks Customer.io for some messages. */
-    template: z
-      .string()
-      .regex(/^[a-z0-9-]+$/)
-      .optional(),
   })
   .strict();
 export interface SendEmailCommandSchema extends Named<typeof sendEmailCommandSchemaDefinition> {}
