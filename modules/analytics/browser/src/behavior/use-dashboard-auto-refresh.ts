@@ -53,10 +53,30 @@ export const useDashboardRefetchInterval = () => useContext(DashboardRefetchInte
 
 const DASHBOARD_REFRESH_CLOCK_KEY = ["analytics", "dashboard-refresh-clock"];
 
-/** With `live`, polls every minute whatever the member picked, without changing their pick. */
-export function useDashboardAutoRefresh({ live = false }: { live?: boolean } = {}) {
+function optionInForce({
+  live,
+  ended,
+  picked,
+}: {
+  live: boolean;
+  ended: boolean;
+  picked: DashboardAutoRefreshOption;
+}): DashboardAutoRefreshOption {
+  if (live) return "1m";
+  if (ended) return "off";
+  return picked;
+}
+
+/**
+ * With `live`, polls every minute whatever the member picked; with `ended` (a window that is
+ * over), never polls. Neither changes the member's pick.
+ */
+export function useDashboardAutoRefresh({
+  live = false,
+  ended = false,
+}: { live?: boolean; ended?: boolean } = {}) {
   const picked = useDashboardAutoRefreshStore((state) => state.option);
-  const option: DashboardAutoRefreshOption = live ? "1m" : picked;
+  const option = optionInForce({ live, ended, picked });
   const setOption = useDashboardAutoRefreshStore((state) => state.setOption);
   const refetchInterval: number | false = DASHBOARD_AUTO_REFRESH_MS[option] ?? false;
 

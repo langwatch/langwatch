@@ -173,6 +173,7 @@ function LibraryDialogs({
           projectName={storeProject.name}
           organizationName={organizationName}
           mayShare={library.mayShare}
+          projectChoice={{ projects: library.storeProjects, initial: storeProject }}
           isCreating={library.isCreating}
           onCreate={library.createBoard}
           onClose={onCloseNewDialog}

@@ -7401,6 +7401,9 @@ importers:
       '@langwatch/time':
         specifier: workspace:*
         version: link:../../../packages/time
+      '@langwatch/upgrade':
+        specifier: workspace:*
+        version: link:../../../packages/upgrade
       '@langwatch/user-contract':
         specifier: workspace:*
         version: link:../../user/contract
@@ -12505,6 +12508,9 @@ importers:
       '@langwatch/feature-flag-contract':
         specifier: workspace:*
         version: link:../../feature-flag/contract
+      '@langwatch/handled-error':
+        specifier: workspace:*
+        version: link:../../../packages/handled-error
       '@langwatch/identity-contract':
         specifier: workspace:*
         version: link:../../identity/contract

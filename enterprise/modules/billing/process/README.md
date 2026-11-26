@@ -416,13 +416,14 @@ Declared at `src/eventing/billing-lifecycle.pipeline.ts:89`. Events: `subscripti
 
 ### Pipeline `billing_reporting` (aggregate `billing_report`)
 
-Declared at `src/eventing/billing-reporting.pipeline.ts:80`.
+Declared at `src/eventing/billing-reporting.pipeline.ts:122`.
 
 | Kind            | Name                    | Handles                                                                                                | Declared at                                      |
 | --------------- | ----------------------- | ------------------------------------------------------------------------------------------------------ | ------------------------------------------------ |
-| command         | –                       | –                                                                                                      | `src/eventing/billing-reporting.pipeline.ts:87`  |
-| peer subscriber | `usageMonthCounted`     | `lw.entitlement.month_counted` from [entitlement](../../../../modules/entitlement/README.md)           | `src/eventing/billing-reporting.pipeline.ts:101` |
-| peer subscriber | `usageThresholdCrossed` | `lw.entitlement.usage_threshold_crossed` from [entitlement](../../../../modules/entitlement/README.md) | `src/eventing/billing-reporting.pipeline.ts:114` |
+| command         | –                       | –                                                                                                      | `src/eventing/billing-reporting.pipeline.ts:129` |
+| peer subscriber | `usageMonthCounted`     | `lw.entitlement.month_counted` from [entitlement](../../../../modules/entitlement/README.md)           | `src/eventing/billing-reporting.pipeline.ts:142` |
+| peer subscriber | `usageThresholdCrossed` | `lw.entitlement.usage_threshold_crossed` from [entitlement](../../../../modules/entitlement/README.md) | `src/eventing/billing-reporting.pipeline.ts:155` |
+| peer subscriber | `gatewaySpendConfirmed` | `lw.gateway.spend.confirmed` from [gateway](../../../../modules/gateway/README.md)                     | `src/eventing/billing-reporting.pipeline.ts:162` |
 
 ### Pipeline `connected_billing` (aggregate `connected_billing`)
 
