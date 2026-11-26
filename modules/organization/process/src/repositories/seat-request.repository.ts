@@ -54,13 +54,15 @@ export abstract class SeatRequestRepository {
   abstract findOpen(input: { organizationId: string }): Promise<SeatRequestRow[]>;
   /** One open request; throws seat_request_not_found when absent or closed. */
   abstract getOpen(input: { organizationId: string; id: string }): Promise<SeatRequestRow>;
-  /** Closes an open request; false when it was no longer open. */
+  /** Closes an open request; false when it was no longer open, or open since another time. */
   abstract resolve(input: {
     organizationId: string;
     id: string;
     status: "APPROVED" | "DECLINED";
     resolvedByUserId: string | null;
     at: number;
+    /** Only the opening made at this time: a reopened request is left open. */
+    openedAt?: number;
   }): Promise<boolean>;
   /** Reopens an approval whose seat could not be given; only the approval made at `at` by `by`. */
   abstract release(input: {

@@ -447,9 +447,11 @@ func (s *Server) refundedOn(intent string) int64 {
 
 // refundAmount is the amount to give back, all that is left when none is named.
 func refundAmount(p params, intent string, left int64) (int64, error) {
-	amount, given := p.integer("amount")
-	if !given {
+	amount, parsed := p.integer("amount")
+	if !p.has("amount") {
 		amount = left
+	} else if !parsed {
+		return 0, invalid("amount", "Invalid integer: %s", p.str("amount"))
 	}
 	if left <= 0 {
 		return 0, &apiError{status: http.StatusBadRequest, errType: "invalid_request_error", code: "charge_already_refunded", message: "Charge " + "ch_" + strings.TrimPrefix(intent, "pi_") + " has already been refunded."}

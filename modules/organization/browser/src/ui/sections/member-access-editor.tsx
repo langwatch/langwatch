@@ -279,7 +279,7 @@ export function MemberAccessEditor({
           {editor.seatPurchaseOffered ? null : (
             <Button
               colorPalette="accent"
-              disabled={!editor.hasChanges}
+              disabled={!editor.hasChanges || editor.isSaving}
               loading={editor.isSaving}
               onClick={() => void editor.handleSave()}
             >
@@ -516,6 +516,94 @@ function seatsOffered({ memberBillingOnly }: { memberBillingOnly: boolean }): In
     .filter((seat) => memberBillingOnly || seat !== BILLING_ONLY_SEAT);
 }
 
+/**
+ * After a paid role change: the staged rows go as one batch (a refused role keeps them unsaved,
+ * since they were staged against the new role), then what it touched is read back. Save stays
+ * busy throughout.
+ */
+async function saveAfterPaidRole({
+  roleChanged,
+  setIsSaving,
+  applyStagedGrants,
+  refresh,
+  onBatchFailed,
+}: {
+  roleChanged: boolean;
+  setIsSaving: (saving: boolean) => void;
+  applyStagedGrants: () => Promise<void>;
+  refresh: () => Promise<unknown>;
+  onBatchFailed: (error: unknown) => void;
+}): Promise<void> {
+  setIsSaving(true);
+  try {
+    if (roleChanged) await applyStagedGrants().catch(onBatchFailed);
+    await refresh();
+  } finally {
+    setIsSaving(false);
+  }
+}
+
+/** The staged rows follow the picked seat. */
+function useStagedFollowsSeat({
+  pendingSeat,
+  setPendingGrantAdditions,
+  setHasDraftGrant,
+}: {
+  pendingSeat: InviteSeat;
+  setPendingGrantAdditions: (update: (staged: PendingGrant[]) => PendingGrant[]) => void;
+  setHasDraftGrant: (hasDraft: boolean) => void;
+}) {
+  useEffect(() => {
+    // Developer (ADR-171) and Billing only (ADR-205) hold nothing shared: every
+    // staged row and draft goes, the way the save deletes every stored one.
+    if (pendingSeat === OrganizationUserRole.DEVELOPER || pendingSeat === BILLING_ONLY_SEAT) {
+      setPendingGrantAdditions(() => []);
+      setHasDraftGrant(false);
+      return;
+    }
+    if (pendingSeat !== OrganizationUserRole.EXTERNAL) return;
+    setPendingGrantAdditions(stagedRowsForLiteSeat);
+  }, [pendingSeat, setPendingGrantAdditions, setHasDraftGrant]);
+}
+
+/** One staged row as the access batch creates it. */
+function bindingToCreate(b: PendingGrant) {
+  return { role: b.role, customRoleId: b.customRoleId, scopeType: b.scopeType, scopeId: b.scopeId };
+}
+
+/**
+ * Staged rows belong to the member they were staged for, never the next one opened. The ref it
+ * returns is set when a paid role change landed but its access batch failed: the refreshed role
+ * then keeps the staged rows, so Save retries them.
+ */
+function useResetStaged({
+  userId,
+  memberSeat,
+  reset,
+  setPendingSeat,
+}: {
+  userId: string;
+  memberSeat: InviteSeat;
+  reset: () => void;
+  setPendingSeat: (seat: InviteSeat) => void;
+}) {
+  const keepStagedOnRoleRefresh = useRef(false);
+  const stagedFor = useRef(userId);
+  const latestReset = useRef(reset);
+  useEffect(() => {
+    latestReset.current = reset;
+  });
+  useEffect(() => {
+    const sameMember = stagedFor.current === userId;
+    stagedFor.current = userId;
+    const keep = sameMember && keepStagedOnRoleRefresh.current;
+    keepStagedOnRoleRefresh.current = false;
+    if (keep) setPendingSeat(memberSeat);
+    else latestReset.current();
+  }, [userId, memberSeat, setPendingSeat]);
+  return keepStagedOnRoleRefresh;
+}
+
 function useMemberAccessEditor({
   organizationId,
   userId,
@@ -553,8 +641,7 @@ function useMemberAccessEditor({
     setPendingGrantAdditions([]);
     setHasDraftGrant(false);
   };
-  // Staged rows belong to the member they were staged for, never the next one opened.
-  useEffect(reset, [userId, memberSeat]);
+  const keepStagedOnRoleRefresh = useResetStaged({ userId, memberSeat, reset, setPendingSeat });
 
   const directGrants = api.authz.listMemberGrants.useQuery(
     { organizationId, userId },
@@ -581,17 +668,7 @@ function useMemberAccessEditor({
     setPendingGrantAdditions((prev) => withStaged({ staged: prev, grant: addition }));
   };
 
-  useEffect(() => {
-    // Developer (ADR-171) and Billing only (ADR-205) hold nothing shared: every
-    // staged row and draft goes, the way the save deletes every stored one.
-    if (pendingSeat === OrganizationUserRole.DEVELOPER || pendingSeat === BILLING_ONLY_SEAT) {
-      setPendingGrantAdditions([]);
-      setHasDraftGrant(false);
-      return;
-    }
-    if (pendingSeat !== OrganizationUserRole.EXTERNAL) return;
-    setPendingGrantAdditions(stagedRowsForLiteSeat);
-  }, [pendingSeat]);
+  useStagedFollowsSeat({ pendingSeat, setPendingGrantAdditions, setHasDraftGrant });
 
   // A role change moves the member between seats and may add one: usage and caps are re-read.
   const refreshAccessQueries = () =>
@@ -620,17 +697,20 @@ function useMemberAccessEditor({
       removals: pendingGrantRemovals,
     });
     if (pendingGrantRemovals.size === 0 && additions.length === 0) return;
-    await applyMemberGrants.mutateAsync({
-      organizationId,
-      userId,
-      bindingIdsToDelete: [...pendingGrantRemovals],
-      bindingsToCreate: additions.map((b) => ({
-        role: b.role,
-        customRoleId: b.customRoleId,
-        scopeType: b.scopeType,
-        scopeId: b.scopeId,
-      })),
-    });
+    // The flushed draft left its input row, so a failed batch stages it for the retry.
+    await applyMemberGrants
+      .mutateAsync({
+        organizationId,
+        userId,
+        bindingIdsToDelete: [...pendingGrantRemovals],
+        bindingsToCreate: additions.map(bindingToCreate),
+      })
+      .catch((error: unknown) => {
+        if (uncommitted) {
+          setPendingGrantAdditions((prev) => withStaged({ staged: prev, grant: uncommitted }));
+        }
+        throw error;
+      });
   };
 
   const seatPanel = useSeatRolePanel({
@@ -641,16 +721,19 @@ function useMemberAccessEditor({
     setPendingSeat,
     memberSeat,
     onChanged: async ({ teamsLeftWithoutAdmin, roleChanged }) => {
-      // Staged rows were staged against the new role, so a refused role keeps them unsaved.
-      if (roleChanged) {
-        await applyStagedGrants().catch((error: unknown) => {
+      await saveAfterPaidRole({
+        roleChanged,
+        setIsSaving,
+        applyStagedGrants,
+        refresh: refreshAccessQueries,
+        onBatchFailed: (error) => {
+          keepStagedOnRoleRefresh.current = true;
           showErrorToast({
             error,
             fallbackTitle: "The role changed, but the access rows did not save",
           });
-        });
-      }
-      await refreshAccessQueries();
+        },
+      });
       return teamsLeftWithoutAdminLine(teamsLeftWithoutAdmin);
     },
   });
@@ -845,9 +928,11 @@ function SeatRolePanel({
   return (
     <VStack align="stretch" gap={3}>
       {flow.step === "failed" && (
-        <Text fontSize="sm" data-testid="seat-role-failed">
-          {`The payment didn't go through, so nothing changed. ${editor.memberName} is still ${withArticle(currentRoleLabel)}.`}
-        </Text>
+        <Banner
+          status="error"
+          title={`The payment didn't go through, so nothing changed. ${editor.memberName} is still ${withArticle(currentRoleLabel)}.`}
+          data-testid="seat-role-failed"
+        />
       )}
       <SeatRoleOffer
         organizationId={organizationId}

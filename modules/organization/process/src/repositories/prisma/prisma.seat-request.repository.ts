@@ -128,7 +128,12 @@ export class PrismaSeatRequestRepository
   async resolve(input: Parameters<SeatRequestRepository["resolve"]>[0]): Promise<boolean> {
     return this.serializableTransaction(async (transaction) => {
       const open = await transaction.seatRequest.findFirst({
-        where: { id: input.id, organizationId: input.organizationId, status: "OPEN" },
+        where: {
+          id: input.id,
+          organizationId: input.organizationId,
+          status: "OPEN",
+          ...(input.openedAt === undefined ? {} : { openedAt: new Date(input.openedAt) }),
+        },
         select: { id: true },
       });
       if (!open) return false;

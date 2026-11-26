@@ -69,6 +69,8 @@ export type SeatBilling = {
   purchases: number;
   /** Runs while a purchase is under way, before billing answers. */
   duringPurchase?: () => Promise<void>;
+  /** Runs while billing reads whether the seat payment landed, before it answers. */
+  duringSettle?: () => Promise<void>;
 };
 
 export async function application(
@@ -79,6 +81,8 @@ export async function application(
     isSaas?: boolean;
     /** The notice log is down, so no access notice can be recorded. */
     noticesDown?: boolean;
+    /** Billing's sales notice fails, as a peer outage would. */
+    salesDown?: boolean;
     /** The seat an arrival joins on; a full Member seat unless named. */
     joinerRole?: "MEMBER" | "DEVELOPER";
   } = {},
@@ -108,6 +112,7 @@ export async function application(
     billing: createApiFixture<BillingApi>(
       {
         notifySalesOfSeatRequest: async (input: SalesNotice) => {
+          if (options.salesDown) throw new Error("sales notice unavailable");
           salesNotices.push(input);
         },
         addFullSeat: async () => {
@@ -126,6 +131,9 @@ export async function application(
           };
         },
         settleSeatPayment: async () => {
+          const during = seatBilling.duringSettle;
+          seatBilling.duringSettle = undefined;
+          await during?.();
           if (seatBilling.payment === "paid") addSeat();
           return { status: seatBilling.payment };
         },

@@ -89,11 +89,14 @@ export class SeatRequestApprovalService {
     seatRequestId,
     by,
     buySeat,
+    openedAt,
   }: {
     organizationId: string;
     seatRequestId: string;
     by: OrganizationPlanUser;
     buySeat?: () => Promise<boolean>;
+    /** Approves only this opening of the request, never one reopened since. */
+    openedAt?: number;
   }): Promise<SeatRequestResolved> {
     const { requests } = this.dependencies;
     const request = await requests.getOpen({ organizationId, id: seatRequestId });
@@ -104,7 +107,8 @@ export class SeatRequestApprovalService {
         membership.role === OrganizationUserRole.ADMIN);
     // Claimed first, so a concurrent decline or second approval cannot also act on it.
     const claim = { organizationId, id: request.id, resolvedByUserId: by.id, at: this.now() };
-    if (!(await requests.resolve({ ...claim, status: "APPROVED" }))) {
+    const opening = openedAt === undefined ? {} : { openedAt };
+    if (!(await requests.resolve({ ...claim, ...opening, status: "APPROVED" }))) {
       throw new SeatRequestNotFoundError(request.id);
     }
     // The early check spares a doomed write; the writes giveFullSeat calls each re-check the

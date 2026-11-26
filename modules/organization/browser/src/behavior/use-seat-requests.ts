@@ -171,8 +171,9 @@ export function useSeatRequests({
     refresh();
   };
 
+  // Observed in whichever organization it began, so paying it after a switch still clears it.
   useWaitForSeatPayment({
-    waiting,
+    waiting: waitingAnywhere,
     complete: completeMutation.mutateAsync,
     onSettled: (settled, settledWaiting) => {
       setWaiting(undefined);

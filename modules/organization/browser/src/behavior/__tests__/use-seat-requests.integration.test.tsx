@@ -12,6 +12,7 @@ import type {
 import "@testing-library/jest-dom/vitest";
 import { act, cleanup, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { useState } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { renderWithOrganizationHost } from "../../testing.tsx";
@@ -330,6 +331,56 @@ describe("useSeatRequests approve", () => {
         }),
       ]);
       expect(calls.map((call) => call.path)).toContain("seatRequest.listOpen:invalidate");
+    });
+
+    describe("when the admin switches organization before paying the first one's page", () => {
+      it("still clears the approval once paid, so the other organization can buy", async () => {
+        state.open = stripeSeats();
+        answer("seatRequest.approveWithSeat", {
+          status: "payment_required",
+          url: "https://invoice.stripe.example/i/1",
+          paymentRef: "ref-1",
+        });
+        answer("seatRequest.completeSeatApproval", { status: "approved", outcome: "promoted" });
+        function Switching() {
+          const [organizationId, setOrganizationId] = useState(ORG);
+          const { approve, waitingId } = useSeatRequests({
+            organizationId,
+            canView: true,
+            canManage: true,
+          });
+          return (
+            <>
+              <button type="button" onClick={() => approve(REQUEST)}>
+                Approve
+              </button>
+              <button type="button" onClick={() => setOrganizationId("org-2")}>
+                Switch
+              </button>
+              {waitingId ? <p>Waiting on {waitingId}</p> : null}
+            </>
+          );
+        }
+        const { host } = renderWithOrganizationHost(<Switching />);
+        await userEvent.click(screen.getByText("Approve"));
+        await screen.findByText(`Waiting on ${REQUEST.id}`);
+
+        await userEvent.click(screen.getByText("Switch"));
+        expect(screen.queryByText(`Waiting on ${REQUEST.id}`)).toBeNull();
+        act(() => {
+          window.dispatchEvent(new Event("focus"));
+        });
+
+        await waitFor(() => expect(host.successes).toHaveLength(1));
+        expect(named("seatRequest.completeSeatApproval")[0]!.input).toMatchObject({
+          organizationId: ORG,
+        });
+        await userEvent.click(screen.getByText("Approve"));
+        expect(named("seatRequest.approveWithSeat")).toHaveLength(2);
+        expect(named("seatRequest.approveWithSeat")[1]!.input).toMatchObject({
+          organizationId: "org-2",
+        });
+      });
     });
 
     it("says the seat payment was not completed when the Stripe page ended unpaid", async () => {

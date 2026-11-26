@@ -19,6 +19,9 @@ export type PendingSeatRoleChangeRecord = Readonly<{
   createdAt: number;
 }>;
 
+/** One change, always read inside its organization. */
+type ChangeRef = { organizationId: string; id: string };
+
 /**
  * The changes waiting on a seat payment. They live a week at most: an unpaid seat invoice is
  * void within a day and a checkout expires the same day. `claim` lets one applier through.
@@ -27,26 +30,28 @@ export interface PendingSeatRoleChangeRepository {
   /** False, saving nothing, when the payment already names a change: one payment, one change. */
   save(record: PendingSeatRoleChangeRecord): Promise<boolean>;
   /** The change, or none once it expired. */
-  findById(input: { id: string }): Promise<PendingSeatRoleChangeRecord[]>;
-  findByPayment(input: { payment: SeatPaymentRef }): Promise<PendingSeatRoleChangeRecord[]>;
+  findById(input: ChangeRef): Promise<PendingSeatRoleChangeRecord[]>;
+  findByPayment(input: {
+    organizationId: string;
+    payment: SeatPaymentRef;
+  }): Promise<PendingSeatRoleChangeRecord[]>;
   /** The member's latest change, if one is still kept. */
   findLatestForMember(input: {
     organizationId: string;
     userId: string;
   }): Promise<PendingSeatRoleChangeRecord[]>;
-  /** The organization's change still waiting on its payment; one waits at a time. */
+  /** The organization's latest saved change, when it still waits: one waits at a time. */
   findWaitingForOrganization(input: {
     organizationId: string;
   }): Promise<PendingSeatRoleChangeRecord[]>;
   /** True for the one caller that may apply the change now, holding it under its own token. */
-  claim(input: { id: string; token: string }): Promise<boolean>;
+  claim(input: ChangeRef & { token: string }): Promise<boolean>;
   /** True while the token is still the claim on the change, false once it expired or moved. */
-  holds(input: { id: string; token: string }): Promise<boolean>;
+  holds(input: ChangeRef & { token: string }): Promise<boolean>;
   /** Frees the claim only when the token still holds it. */
-  release(input: { id: string; token: string }): Promise<void>;
-  settle(input: {
-    id: string;
-    status: Exclude<SeatRoleChangeStatus, "waiting">;
-    reason?: string;
-  }): Promise<void>;
+  release(input: ChangeRef & { token: string }): Promise<void>;
+  /** Moves a waiting change to its outcome; false, changing nothing, once it is settled. */
+  settle(
+    input: ChangeRef & { status: Exclude<SeatRoleChangeStatus, "waiting">; reason?: string },
+  ): Promise<boolean>;
 }

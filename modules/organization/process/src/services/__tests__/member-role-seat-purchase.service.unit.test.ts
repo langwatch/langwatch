@@ -396,11 +396,66 @@ describe("MemberRoleSeatPurchaseService", () => {
       });
     });
 
+    /** @scenario "A newer role change replaces the one waiting on its payment" */
+    it("never writes the older role when its paid fact lands during the newer role write", async () => {
+      const { state, service, pay, changeMemberRole } = await waiting();
+      state.paid += 1;
+      pay("in_seat");
+      const write = changeMemberRole.getMockImplementation()!;
+      changeMemberRole.mockImplementationOnce(async (input, by) => {
+        await expect(
+          service.paymentPaid({ organizationId: ORG, payment: INVOICE }),
+        ).rejects.toThrow(/could not apply yet/);
+        return write(input, by);
+      });
+
+      const newer = await service.changeWithSeat({ ...MAKE_ADMIN, role: "MEMBER" }, ADMIN);
+      await service.paymentPaid({ organizationId: ORG, payment: INVOICE });
+
+      expect(newer).toMatchObject({ status: "changed", seatAdded: false });
+      expect(state.roles.get(SAM)).toBe("MEMBER");
+      expect(state.roleWrites).toBe(1);
+      expect(await service.pendingFor({ organizationId: ORG, userId: SAM })).toMatchObject({
+        status: "seat_only",
+      });
+    });
+
+    /** @scenario "A newer role change replaces the one waiting on its payment" */
+    it("refuses a newer role write while the paid write holds the waiting change", async () => {
+      const { state, service, pending } = await waiting();
+      state.paid += 1;
+      await pending.claim({ organizationId: ORG, id: "change_1", token: "paid-applier" });
+
+      await expect(
+        service.changeWithSeat({ ...MAKE_ADMIN, role: "MEMBER" }, ADMIN),
+      ).rejects.toMatchObject({ code: "seat_payment_waiting" });
+      expect(state.roles.get(SAM)).toBe("EXTERNAL");
+    });
+
+    /** @scenario "The return applies the change, then the paid fact changes nothing" */
+    it("keeps the applied outcome when a stale applier's role write fails afterwards", async () => {
+      const { state, service, pay, pending, changeMemberRole } = await waiting();
+      pay("in_seat");
+      // Another applier wrote the role and settled the change while this one's claim lapsed.
+      changeMemberRole.mockImplementationOnce(async () => {
+        await pending.settle({ organizationId: ORG, id: "change_1", status: "applied" });
+        throw new CannotDisableLastAdminError();
+      });
+
+      const outcome = await service.complete({ organizationId: ORG, changeId: "change_1" });
+
+      expect(outcome).toEqual({ status: "applied", reason: null });
+      expect(await service.pendingFor({ organizationId: ORG, userId: SAM })).toMatchObject({
+        status: "applied",
+      });
+      expect(state.roles.get(SAM)).toBe("EXTERNAL");
+    });
+
     /** @scenario "A paid fact that cannot apply yet is delivered again" */
     it("throws on the paid fact while another applier holds the change", async () => {
       const { service, pay, pending } = await waiting();
       pay("in_seat");
-      await pending.claim({ id: "change_1", token: "another-applier" });
+      await pending.claim({ organizationId: ORG, id: "change_1", token: "another-applier" });
 
       await expect(service.paymentPaid({ organizationId: ORG, payment: INVOICE })).rejects.toThrow(
         /could not apply yet/,

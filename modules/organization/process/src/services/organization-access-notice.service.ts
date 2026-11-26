@@ -83,6 +83,17 @@ export class OrganizationAccessNoticeService {
   }): Promise<{ recorded: boolean; mailed: boolean }> {
     const { notices, now, newId } = this.dependencies;
     const at = now();
+    // A member's own ask is pushed first, so it goes even when the notice cannot be recorded or
+    // today's was already mailed; the push dedupes on its own key.
+    if (input.askedFor && input.seatRequestId) {
+      await this.pushAsked({
+        organizationId: input.organizationId,
+        who: input.name ?? input.email,
+        dayKey: dayKeyOf(at),
+        seatRequestId: input.seatRequestId,
+        reason: input.askedFor.reason,
+      });
+    }
     const [notice] = await notices.record({
       id: newId(),
       organizationId: input.organizationId,
@@ -94,16 +105,6 @@ export class OrganizationAccessNoticeService {
       dayKey: dayKeyOf(at),
       at,
     });
-    // A member's own ask is pushed even when today's notice was already mailed; the push dedupes.
-    if (input.askedFor && input.seatRequestId) {
-      await this.pushAsked({
-        organizationId: input.organizationId,
-        who: input.name ?? input.email,
-        dayKey: dayKeyOf(at),
-        seatRequestId: input.seatRequestId,
-        reason: input.askedFor.reason,
-      });
-    }
     if (!notice) return { recorded: false, mailed: false };
 
     const [claimed] = await notices.markMailed({ ids: [notice.id], at });

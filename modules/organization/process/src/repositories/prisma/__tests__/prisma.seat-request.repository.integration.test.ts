@@ -406,4 +406,47 @@ describe.skipIf(!DB_URL)("Prisma seat requests and access notices", () => {
       expect(after).toMatchObject({ outcome: "reopened", request: { status: "OPEN" } });
     });
   });
+
+  describe("when an approval names an opening the request no longer has", () => {
+    /** @scenario "A Stripe page from before a decline never approves the request opened again" */
+    it("leaves the reopened request open, and approves only its own opening", async () => {
+      const ask = (id: string, at: number) =>
+        requests.open({
+          id,
+          organizationId,
+          email: "noa@acme.example",
+          userId: "user-noa",
+          name: "Noa",
+          source: "requested",
+          idpRefused: false,
+          idpKind: null,
+          at,
+        });
+      const first = await ask(`${namespace}-noa-a`, 1_000);
+      await requests.resolve({
+        organizationId,
+        id: first.request.id,
+        status: "DECLINED",
+        resolvedByUserId: "user-ada",
+        at: 2_000,
+      });
+      await ask(`${namespace}-noa-b`, 3_000);
+      const approve = (openedAt: number) =>
+        requests.resolve({
+          organizationId,
+          id: first.request.id,
+          status: "APPROVED",
+          resolvedByUserId: "user-ada",
+          at: 4_000,
+          openedAt,
+        });
+
+      expect(await approve(1_000)).toBe(false);
+      expect(await requests.getOpen({ organizationId, id: first.request.id })).toMatchObject({
+        status: "OPEN",
+        openedAt: 3_000,
+      });
+      expect(await approve(3_000)).toBe(true);
+    });
+  });
 });

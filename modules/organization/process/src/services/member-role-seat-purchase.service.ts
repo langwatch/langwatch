@@ -88,14 +88,8 @@ export class MemberRoleSeatPurchaseService {
   ): Promise<MemberRoleWithSeatResult> {
     const { organizationId, userId, role } = input;
     const change = { organizationId, userId, role, planUser: by };
-    try {
-      const { teamsLeftWithoutAdmin } = await this.dependencies.changeMemberRole(change, by);
-      await this.supersedeWaiting({ organizationId, userId });
-      return { status: "changed", seatAdded: false, teamsLeftWithoutAdmin };
-    } catch (error) {
-      const refusal = readSeatRefusal(error);
-      if (refusal.kind !== "seat-limit" || refusal.limit.limitType !== "members") throw error;
-    }
+    const direct = await this.changeDirectly({ input, by });
+    if (direct) return direct;
 
     const [waiting] = await this.dependencies.pending.findWaitingForOrganization({
       organizationId,
@@ -114,7 +108,10 @@ export class MemberRoleSeatPurchaseService {
     }
 
     // Billing answers the invoice Stripe already holds, so a second admin finds the first one's.
-    const [sharing] = await this.dependencies.pending.findByPayment({ payment: purchase.payment });
+    const [sharing] = await this.dependencies.pending.findByPayment({
+      organizationId,
+      payment: purchase.payment,
+    });
     if (sharing?.status === "waiting") return this.resumeWaiting({ waiting: sharing, input });
 
     const changeId = this.dependencies.newId();
@@ -132,11 +129,67 @@ export class MemberRoleSeatPurchaseService {
     });
     if (!saved) {
       // A concurrent change saved this payment first: that one is the change it pays for.
-      const [winner] = await this.dependencies.pending.findByPayment({ payment: purchase.payment });
+      const [winner] = await this.dependencies.pending.findByPayment({
+        organizationId,
+        payment: purchase.payment,
+      });
       if (!winner) throw new SeatPaymentWaitingError();
       return this.resumeWaiting({ waiting: winner, input });
     }
     return { status: "payment_required", changeId, url: purchase.url };
+  }
+
+  /**
+   * The role written at once while a full seat is free; undefined when the seat limit refused it.
+   * The member's change waiting on a payment is held meanwhile, so its paid write cannot land
+   * after this newer one, and is then replaced by it.
+   */
+  private async changeDirectly({
+    input,
+    by,
+  }: {
+    input: ChangeInput;
+    by: OrganizationCaller;
+  }): Promise<MemberRoleWithSeatResult | undefined> {
+    const { organizationId, userId, role } = input;
+    const held = await this.holdWaiting({ organizationId, userId });
+    try {
+      const { teamsLeftWithoutAdmin } = await this.dependencies.changeMemberRole(
+        { organizationId, userId, role, planUser: by },
+        by,
+      );
+      if (held) {
+        await this.dependencies.pending.settle({
+          organizationId,
+          id: held.id,
+          status: "seat_only",
+          reason: "a later role change for this member replaced it",
+        });
+      }
+      return { status: "changed", seatAdded: false, teamsLeftWithoutAdmin };
+    } catch (error) {
+      const refusal = readSeatRefusal(error);
+      if (refusal.kind !== "seat-limit" || refusal.limit.limitType !== "members") throw error;
+      return undefined;
+    } finally {
+      if (held) await this.dependencies.pending.release({ organizationId, ...held });
+    }
+  }
+
+  /** Claims the member's waiting change; refuses while its paid write is under way. */
+  private async holdWaiting(member: {
+    organizationId: string;
+    userId: string;
+  }): Promise<{ id: string; token: string } | undefined> {
+    const [latest] = await this.dependencies.pending.findLatestForMember(member);
+    if (latest?.status !== "waiting") return undefined;
+    const held = { id: latest.id, token: this.dependencies.newId() };
+    if (
+      !(await this.dependencies.pending.claim({ organizationId: member.organizationId, ...held }))
+    ) {
+      throw new SeatPaymentWaitingError();
+    }
+    return held;
   }
 
   /** The same change asked again reopens its payment page; any other one waits its turn. */
@@ -200,7 +253,7 @@ export class MemberRoleSeatPurchaseService {
     organizationId: string;
     changeId: string;
   }): Promise<SeatRoleChangeOutcome> {
-    const [record] = await this.dependencies.pending.findById({ id: changeId });
+    const [record] = await this.dependencies.pending.findById({ organizationId, id: changeId });
     if (!record || record.organizationId !== organizationId) {
       throw new NotFoundError("not_found", { resource: "Role change", id: changeId });
     }
@@ -218,8 +271,8 @@ export class MemberRoleSeatPurchaseService {
     organizationId: string;
     payment: SeatPaymentRef;
   }): Promise<void> {
-    const [record] = await this.dependencies.pending.findByPayment({ payment });
-    if (!record || record.organizationId !== organizationId) return;
+    const [record] = await this.dependencies.pending.findByPayment({ organizationId, payment });
+    if (!record) return;
     const { status } = await this.apply({ record, paid: payment.kind === "checkout" });
     if (status === "waiting") throw new SeatRoleChangeNotAppliedYetError(record.id);
   }
@@ -234,9 +287,9 @@ export class MemberRoleSeatPurchaseService {
   }): Promise<void> {
     for (const subscriptionId of subscriptionIds) {
       const payment: SeatPaymentRef = { kind: "checkout", subscriptionId };
-      const [record] = await this.dependencies.pending.findByPayment({ payment });
-      if (record?.organizationId !== organizationId || record.status !== "waiting") continue;
-      await this.dependencies.pending.settle({ id: record.id, status: "failed" });
+      const [record] = await this.dependencies.pending.findByPayment({ organizationId, payment });
+      if (record?.status !== "waiting") continue;
+      await this.dependencies.pending.settle({ organizationId, id: record.id, status: "failed" });
     }
   }
 
@@ -261,17 +314,6 @@ export class MemberRoleSeatPurchaseService {
     };
   }
 
-  /** A newer role write wins: the member's change still waiting on a payment never applies. */
-  private async supersedeWaiting(member: { organizationId: string; userId: string }) {
-    const [latest] = await this.dependencies.pending.findLatestForMember(member);
-    if (latest?.status !== "waiting") return;
-    await this.dependencies.pending.settle({
-      id: latest.id,
-      status: "seat_only",
-      reason: "a later role change for this member replaced it",
-    });
-  }
-
   /** Settled changes answer as they are; a paid one is written by the one applier claiming it. */
   private async apply({
     record,
@@ -289,21 +331,21 @@ export class MemberRoleSeatPurchaseService {
       });
       if (status === "open") return { status: "waiting", reason: null };
       if (status === "failed") {
-        await this.dependencies.pending.settle({ id, status: "failed" });
+        await this.dependencies.pending.settle({ organizationId, id, status: "failed" });
         return { status: "failed", reason: null };
       }
     }
 
     const token = this.dependencies.newId();
-    if (!(await this.dependencies.pending.claim({ id, token }))) {
+    if (!(await this.dependencies.pending.claim({ organizationId, id, token }))) {
       return { status: "waiting", reason: null };
     }
     try {
-      const [current] = await this.dependencies.pending.findById({ id });
+      const [current] = await this.dependencies.pending.findById({ organizationId, id });
       if (current && current.status !== "waiting") return outcomeOf(current);
       return await this.writeRole({ record, token });
     } finally {
-      await this.dependencies.pending.release({ id, token });
+      await this.dependencies.pending.release({ organizationId, id, token });
     }
   }
 
@@ -317,15 +359,21 @@ export class MemberRoleSeatPurchaseService {
   }): Promise<SeatRoleChangeOutcome> {
     const { organizationId, id, userId, role } = record;
     const by: OrganizationCaller = record.requestedBy;
+    // A change settled meanwhile keeps its outcome: a stale applier never overwrites it.
     const settle = async (status: Exclude<SeatRoleChangeStatus, "waiting">, reason?: string) => {
-      await this.dependencies.pending.settle({ id, status, ...(reason ? { reason } : {}) });
-      return { status, reason: reason ?? null };
+      const ref = { organizationId, id };
+      const why = reason ? { reason } : {};
+      if (await this.dependencies.pending.settle({ ...ref, status, ...why })) {
+        return { status, reason: reason ?? null };
+      }
+      const [current] = await this.dependencies.pending.findById(ref);
+      return current ? outcomeOf(current) : { status, reason: reason ?? null };
     };
     if (!(await this.dependencies.canManage({ organizationId, userId: by.id }))) {
       return settle("seat_only", "the admin who asked can no longer change roles");
     }
     // A claim that expired during the checks has passed to another applier, which writes instead.
-    if (!(await this.dependencies.pending.holds({ id, token }))) {
+    if (!(await this.dependencies.pending.holds({ organizationId, id, token }))) {
       return { status: "waiting", reason: null };
     }
     try {

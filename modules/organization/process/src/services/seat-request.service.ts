@@ -262,6 +262,7 @@ export class SeatRequestService {
     seatRequestId: string;
     by: OrganizationPlanUser;
     buySeat?: () => Promise<boolean>;
+    openedAt?: number;
   }): Promise<SeatRequestResolved> {
     const request = await this.dependencies.requests.getOpen({
       organizationId: input.organizationId,
@@ -329,7 +330,8 @@ export class SeatRequestService {
     const { status } = await this.dependencies.peers.settleSeatPayment({ organizationId, payment });
     if (status === "open") return { status: "waiting" };
     if (status === "failed") return { status: "failed" };
-    const { outcome } = await this.approve({ organizationId, seatRequestId, by });
+    // The claim names the opening too, so one declined and reopened meanwhile stays open.
+    const { outcome } = await this.approve({ organizationId, seatRequestId, by, openedAt });
     return { status: "approved", outcome };
   }
 
@@ -491,7 +493,13 @@ export class SeatRequestService {
           "could not record the seat request notice",
         );
       });
-    await this.tellSales({ request: opened.request });
+    // The request is saved; a failed sales notice is logged, and its claim is never taken.
+    await this.tellSales({ request: opened.request }).catch((error: unknown) => {
+      this.dependencies.logger.warn(
+        { organizationId: input.organizationId, error },
+        "could not tell sales about the seat request",
+      );
+    });
   }
 
   /**
@@ -538,6 +546,8 @@ export class SeatRequestService {
       this.approvalOf({ organizationId }),
     ]);
     if (path.kind !== "contact_sales" || !this.dependencies.isSaas) return;
+    // Read before the claim, so a failed read leaves the notice to the next opening or ask.
+    const organizationName = await this.dependencies.peers.organizationName({ organizationId });
     const claimed = await this.dependencies.requests.claimSalesNotice({
       id: request.id,
       at: this.dependencies.now(),
@@ -545,7 +555,7 @@ export class SeatRequestService {
     if (!claimed) return;
     await this.dependencies.peers.notifySales({
       organizationId,
-      organizationName: await this.dependencies.peers.organizationName({ organizationId }),
+      organizationName,
       plan: plan.type,
       seats: plan.maxMembers,
       requestedSeats: plan.maxMembers + 1,

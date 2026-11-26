@@ -19,6 +19,7 @@ function notices() {
   const outage = { recipients: false, nobody: false, bouncing: new Set<string>() };
   let ids = 0;
   const repository = MemoryOrganizationAccessNoticeRepository.create();
+  const push = MemoryAccessNoticePushChannel.create();
   const mail = MemoryAccessNoticeMailChannel.create();
   const deliver = mail.sendSeatRequest.bind(mail);
   mail.sendSeatRequest = async (input) => {
@@ -28,7 +29,7 @@ function notices() {
   const service = OrganizationAccessNoticeService.create({
     notices: repository,
     mail,
-    push: MemoryAccessNoticePushChannel.create(),
+    push,
     context: {
       recipients: async () => {
         if (outage.recipients) throw new Error("recipients unavailable");
@@ -56,7 +57,7 @@ function notices() {
       idp: null,
       idpRefused: false,
     });
-  return { clock, mail, outage, service, seatRequest };
+  return { clock, mail, outage, push, repository, service, seatRequest };
 }
 
 describe("OrganizationAccessNoticeService", () => {
@@ -188,6 +189,30 @@ describe("OrganizationAccessNoticeService", () => {
         { recorded: false, mailed: false },
       ]);
       expect(mail.seatRequests.map((sent) => sent.recipientEmail)).toEqual(["bill@acme.example"]);
+    });
+  });
+
+  describe("when a member asks for a seat and the notice log is down", () => {
+    /** @scenario "Administrators and Billing members get an in-app push when a member asks" */
+    it("still pushes the administrators before the notice write fails", async () => {
+      const { push, repository, service } = notices();
+      repository.record = async () => {
+        throw new Error("notice log unavailable");
+      };
+
+      await expect(
+        service.record({
+          organizationId: ORGANIZATION_ID,
+          kind: "seat_request",
+          email: "lena@acme.example",
+          name: "Lena",
+          idp: null,
+          idpRefused: false,
+          askedFor: { reason: "run the workbench" },
+          seatRequestId: "seat-request-1",
+        }),
+      ).rejects.toThrow("notice log unavailable");
+      expect(push.pushes.map((sent) => sent.userId)).toEqual(["user-ada", "user-bill"]);
     });
   });
 });

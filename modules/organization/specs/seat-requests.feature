@@ -421,7 +421,8 @@ Feature: Seat requests when an organization is over its seat limit
       Then the seat request is listed with Approve and Decline
 
   Rule: a Lite Member refused for want of a full seat asks for one from the refusal
-    Every refusal that tells a Lite Member to ask an organization admin offers Request access.
+    A refusal that a full seat would resolve, such as the workbench, offers Request access.
+    Admin-only actions offer none, since a full seat does not open them.
     The request is a seat request like any other, so it lands where admins already answer them.
 
     @unit

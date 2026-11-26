@@ -1097,6 +1097,12 @@ func TestRefundGivesBackAPaidInvoice(t *testing.T) {
 		t.Fatalf("paid invoice %v", inv)
 	}
 
+	for _, bad := range []string{"abc", "99999999999999999999"} {
+		status, refused := g.stripe(http.MethodPost, "/v1/refunds", "payment_intent="+intent+"&amount="+bad)
+		if status != http.StatusBadRequest || refused["error"].(map[string]any)["code"] != "parameter_invalid" {
+			t.Fatalf("malformed amount %q: %d %v", bad, status, refused)
+		}
+	}
 	status, refund := g.stripe(http.MethodPost, "/v1/refunds", "payment_intent="+intent)
 	if status != http.StatusOK || refund["status"] != "succeeded" || refund["amount"] != inv["amount_paid"] {
 		t.Fatalf("refund: %d %v", status, refund)

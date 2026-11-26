@@ -105,7 +105,10 @@ export class MemorySeatRequestRepository implements SeatRequestRepository {
   async resolve(input: Parameters<SeatRequestRepository["resolve"]>[0]): Promise<boolean> {
     const index = this.rows.findIndex(
       (row) =>
-        row.id === input.id && row.organizationId === input.organizationId && row.status === "OPEN",
+        row.id === input.id &&
+        row.organizationId === input.organizationId &&
+        row.status === "OPEN" &&
+        (input.openedAt === undefined || row.openedAt === input.openedAt),
     );
     const row = this.rows[index];
     if (!row) return false;

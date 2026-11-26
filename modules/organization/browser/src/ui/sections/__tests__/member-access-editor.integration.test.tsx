@@ -7,7 +7,7 @@ import { GrantScopeTier } from "@langwatch/authz-contract";
  */
 import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import type { SeatRoleOfferKind, SeatRoleOfferProps } from "@langwatch/enterprise-billing-client";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import type * as reactModule from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -1079,6 +1079,69 @@ describe("<MemberAccessEditor/>", () => {
       );
     });
 
+    /** @scenario "Access rows that do not save after the paid role change are named" */
+    it("keeps the rows that did not save through the role refresh, so Save retries them", async () => {
+      mockChangeWithSeat.mockResolvedValue({
+        status: "changed",
+        seatAdded: true,
+        teamsLeftWithoutAdmin: [],
+      });
+      mockApplyMemberGrants.mockRejectedValueOnce(new Error("boom"));
+      const view = renderLite();
+      fireEvent.click(screen.getByTestId("stub-add-binding"));
+      pickAdmin();
+      fireEvent.click(screen.getByRole("button", { name: "Buy the seat" }));
+      await vi.waitFor(() => {
+        expect(mockToasterCreate).toHaveBeenCalledWith(
+          expect.objectContaining({ title: "The role changed, but the access rows did not save" }),
+        );
+      });
+      const failedBatch = mockApplyMemberGrants.mock.calls[0]![0];
+
+      // The refreshed member now reads as the Admin the paid change made them.
+      view.rerender(
+        <MemberAccessEditor
+          organizationId="org-1"
+          userId="user-1"
+          memberRole={OrganizationUserRole.ADMIN}
+          canManage={true}
+          isCurrentUser={false}
+        />,
+      );
+      const save = await screen.findByRole("button", { name: /^save$/i });
+      await vi.waitFor(() => expect(save).not.toBeDisabled());
+      fireEvent.click(save);
+
+      await vi.waitFor(() => expect(mockApplyMemberGrants).toHaveBeenCalledTimes(2));
+      expect(mockApplyMemberGrants.mock.calls[1]![0]).toEqual(failedBatch);
+      expect(mockUpdateMemberRole).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "One click adds the seat and changes the role" */
+    it("keeps Save unavailable while the paid change saves its staged access rows", async () => {
+      mockChangeWithSeat.mockResolvedValue({
+        status: "changed",
+        seatAdded: true,
+        teamsLeftWithoutAdmin: [],
+      });
+      let settleBatch: () => void = () => {};
+      mockApplyMemberGrants.mockReturnValueOnce(
+        new Promise<void>((resolve) => {
+          settleBatch = resolve;
+        }),
+      );
+      renderLite();
+      fireEvent.click(screen.getByTestId("stub-add-binding"));
+      pickAdmin();
+      fireEvent.click(screen.getByRole("button", { name: "Buy the seat" }));
+
+      await vi.waitFor(() => expect(mockApplyMemberGrants).toHaveBeenCalledTimes(1));
+      expect(screen.getByRole("button", { name: /^save$/i })).toBeDisabled();
+
+      await act(async () => settleBatch());
+      expect(mockApplyMemberGrants).toHaveBeenCalledTimes(1);
+    });
+
     /** @scenario "A payment the customer must finish waits, then applies" */
     it("waits in the drawer with a new-tab payment link, then applies when it is paid", async () => {
       mockChangeWithSeat.mockResolvedValue({
@@ -1162,14 +1225,16 @@ describe("<MemberAccessEditor/>", () => {
             isCurrentUser={false}
           />,
         );
-        answer({
-          status: "payment_required",
-          changeId: "change-1",
-          url: "https://pay.example.test/a",
+        expect(mockChangeWithSeat).toHaveBeenCalledTimes(1);
+        // Answered inside act, so React has applied the late answer before the assertion.
+        await act(async () => {
+          answer({
+            status: "payment_required",
+            changeId: "change-1",
+            url: "https://pay.example.test/a",
+          });
         });
 
-        await vi.waitFor(() => expect(mockChangeWithSeat).toHaveBeenCalledTimes(1));
-        await new Promise((resolve) => setTimeout(resolve, 0));
         expect(screen.queryByTestId("seat-role-waiting")).toBeNull();
       });
     });

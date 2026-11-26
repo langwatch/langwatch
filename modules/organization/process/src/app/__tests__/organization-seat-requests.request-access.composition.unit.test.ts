@@ -311,6 +311,28 @@ describe("given an organization paying per seat in Stripe with every full seat i
     });
   });
 
+  describe("when the request is declined and asked again while the Stripe page is being settled", () => {
+    /** @scenario "A Stripe page from before a decline never approves the request opened again" */
+    it("refuses with seat_request_not_found and leaves the new request open", async () => {
+      const { app, lena, seatRequestId, seatBilling, openRequests } = await lenaAsking();
+      seatBilling.purchase = "payment_required";
+      const waiting = await app.approveSeatRequestWithSeat({ ...scope, seatRequestId }, ADA);
+      if (waiting.status !== "payment_required") throw new Error("expected a Stripe page");
+      seatBilling.duringSettle = async () => {
+        await app.declineSeatRequest({ ...scope, seatRequestId }, ADA);
+        await new Promise((resolve) => setTimeout(resolve, 2));
+        await app.requestSeatAccess(scope, lena.caller);
+      };
+
+      const refusal = await app
+        .completeSeatApproval({ ...scope, seatRequestId, paymentRef: waiting.paymentRef }, ADA)
+        .catch((error: unknown) => error);
+
+      expect(codeOf(refusal)).toBe("seat_request_not_found");
+      expect((await openRequests()).map((open) => open.id)).toEqual([seatRequestId]);
+    });
+  });
+
   describe("when she asks again while an approval is still buying her seat", () => {
     /** @scenario "Asking again while an approval is giving its seat reopens nothing" */
     it("keeps the approval and buys one seat", async () => {
