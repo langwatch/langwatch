@@ -158,7 +158,12 @@ function messageOf(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
-function setupFailureOf(error: unknown): LwqlSetupFailure | undefined {
+function otherFailure(summary: string): LwqlSetupFailure {
+  return { kind: "other", store: "unknown", reason: `provisioning failed (${summary})` };
+}
+
+/** One error's known setup gap, or kind "other" when it is none of them. */
+function setupFailureOf({ error, summary }: { error: unknown; summary: string }): LwqlSetupFailure {
   const failure = error as { code?: unknown; meta?: { code?: unknown } } | null;
   const message = messageOf(error);
   const clickHouseCode = Number(failure?.code);
@@ -189,7 +194,7 @@ function setupFailureOf(error: unknown): LwqlSetupFailure | undefined {
       reason: `the PostgreSQL user has no permission to ${grant} (CREATEROLE)`,
     };
   }
-  return undefined;
+  return otherFailure(summary);
 }
 
 /** Classifies a provisioning failure: a missing grant, a missing settings prefix, or other. */
@@ -202,8 +207,8 @@ export function classifyLwqlSetupFailure({
   summary: string;
 }): LwqlSetupFailure {
   for (const link of errorChain(error)) {
-    const failure = setupFailureOf(link);
-    if (failure) return failure;
+    const failure = setupFailureOf({ error: link, summary });
+    if (failure.kind !== "other") return failure;
   }
-  return { kind: "other", store: "unknown", reason: `provisioning failed (${summary})` };
+  return otherFailure(summary);
 }
