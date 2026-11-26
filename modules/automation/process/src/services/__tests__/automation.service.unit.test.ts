@@ -310,6 +310,7 @@ const makeService = (
         resolvePlanNextStep: vi.fn(),
         assertWithinUsageLimit: vi.fn(),
         getUsageMonthBreakdown: vi.fn(),
+        getUsageLimits: vi.fn(),
       },
       config: { free: 100, paid: 1_000, enterprise: 10_000 },
       slots: MemoryAutomationPersistCapRepository.create(),
