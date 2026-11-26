@@ -465,12 +465,14 @@ Feature: License registry
     Then the live license no longer names its key
     And the revoked license keeps the key it names
 
-  @unit
+  @unit @integration
   Scenario: A revoke ends a key that attached while it ran
-    Given an operator revokes a bound license and its managed key is ended
+    Given an operator revokes a bound license
     And gateway attaches a new key for that install before the revoke marks the row
-    When the revoke marks the license revoked
-    Then the new key is ended too
+    When the revoke tries to mark the license
+    Then the mark is refused because the license names another key
+    And the new key is ended before the license is marked revoked
+    And if ending the new key fails, the license stays live and revoking again finishes the job
 
   @integration
   Scenario: Retiring an unused key that failed for another reason keeps the new key for the customer

@@ -115,6 +115,17 @@ export interface IssuedLicenseRepository {
     revokedReason: string;
   }): Promise<boolean>;
   /**
+   * Revokes the license only while it still names `virtualKeyId` (none included) and is not
+   * revoked, so a key that attached after the caller ended the old one refuses the mark.
+   */
+  revokeHolding(params: {
+    id: string;
+    virtualKeyId: string | null;
+    at: Instant;
+    revokedById: string;
+    revokedReason: string;
+  }): Promise<boolean>;
+  /**
    * Lets go of an ended managed key on the live license that still names it, so its
    * install's next sync provisions a new one. A revoked license keeps the key it names.
    */

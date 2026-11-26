@@ -180,6 +180,38 @@ export class PrismaIssuedLicenseRepository implements IssuedLicenseRepository {
     return updated > 0;
   }
 
+  async revokeHolding({
+    id,
+    virtualKeyId,
+    at,
+    revokedById,
+    revokedReason,
+  }: {
+    id: string;
+    virtualKeyId: string | null;
+    at: Instant;
+    revokedById: string;
+    revokedReason: string;
+  }): Promise<boolean> {
+    const updated = await this.prisma.$executeRaw`
+      ${skipTenantCheck({
+        // A license is addressed by its own primary key. The row names the organization it was
+        // issued to rather than belonging to one.
+        SKIP_TENANT_CHECK: true,
+      })}
+      UPDATE "IssuedLicense"
+         SET "revokedAt" = ${toDate(at)},
+             "revokedById" = ${revokedById},
+             "revokedReason" = ${revokedReason},
+             "pendingDeliveryLicense" = NULL,
+             "updatedAt" = now()
+       WHERE "id" = ${id}
+         AND "virtualKeyId" IS NOT DISTINCT FROM ${virtualKeyId}::text
+         AND "revokedAt" IS NULL
+    `;
+    return updated === 1;
+  }
+
   async revokeUnbound({
     id,
     at,

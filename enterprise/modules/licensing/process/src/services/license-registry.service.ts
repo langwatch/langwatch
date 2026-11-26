@@ -59,6 +59,8 @@ interface LicenseRegistryOptions {
 
 /** How far a chain is followed each way; a renewal a year is decades of chain. */
 const MAX_CHAIN = 100;
+/** A key attaches at most once (attachVirtualKey requires none), so two passes suffice. */
+const MAX_REVOKE_PASSES = 3;
 
 /** What `issue` decides, with the term as an instant rather than a wire string. */
 type IssueLicenseTerms = Omit<ContractIssueLicenseInput, "expiresAt"> & {
@@ -177,24 +179,44 @@ export class LicenseRegistryService {
     // An expired license can still be revoked: its term may be extended by a
     // reissue, and a leaked key should stay dead through that.
     this.refuseIfSettled(row);
-    // The key ends first. If the row update then fails, the license reads as
-    // active with a dead key, which resolves to a refusal, and revoking again
-    // finishes the job. The other order could leave a revoked license whose
-    // cached credential no gateway was told to drop.
-    await this.retireManagedKey({ row, actorId: input.operatorId });
-    const updated = await this.options.repository.update(row.id, {
-      revokedAt: this.options.now(),
-      revokedById: input.operatorId,
-      revokedReason: input.reason,
-      pendingDeliveryLicense: null,
-    });
-    await this.retireKeyAttachedMeanwhile({
-      before: row,
-      after: updated,
-      actorId: input.operatorId,
+    const updated = await this.revokeEndingEveryKey({
+      row,
+      operatorId: input.operatorId,
+      reason: input.reason,
     });
     await this.syncBudget(updated, input.operatorId);
     return this.toView(updated);
+  }
+
+  /**
+   * The key ends first, then the row is marked only while it still names that key. A key
+   * that attached in between refuses the mark and is ended on the next pass, so every key
+   * ends before the row is revoked and a failure leaves a live license to revoke again.
+   */
+  private async revokeEndingEveryKey({
+    row,
+    operatorId,
+    reason,
+  }: {
+    row: IssuedLicenseRecord;
+    operatorId: string;
+    reason: string;
+  }): Promise<IssuedLicenseRecord> {
+    let current = row;
+    for (let pass = 0; pass < MAX_REVOKE_PASSES; pass++) {
+      await this.retireManagedKey({ row: current, actorId: operatorId });
+      const marked = await this.options.repository.revokeHolding({
+        id: current.id,
+        virtualKeyId: current.virtualKeyId,
+        at: this.options.now(),
+        revokedById: operatorId,
+        revokedReason: reason,
+      });
+      current = await this.getRow(row.id);
+      if (marked) return current;
+      this.refuseIfSettled(current);
+    }
+    throw new Error("The license's managed key kept changing while it was revoked");
   }
 
   /**
@@ -222,7 +244,6 @@ export class LicenseRegistryService {
     });
     if (!revoked) await this.refuseLostRevoke(row);
     const updated = await this.getRow(row.id);
-    await this.retireKeyAttachedMeanwhile({ before: row, after: updated, actorId: operatorId });
     await this.syncBudget(updated, operatorId);
     return this.toView(updated);
   }
@@ -513,23 +534,6 @@ export class LicenseRegistryService {
       organizationId: row.organizationId,
       actorId,
     });
-  }
-
-  /**
-   * A key that attached between ending the old one and marking the row. Once the row is
-   * revoked no key can attach (attachVirtualKey requires an active row), so this is the last.
-   */
-  private async retireKeyAttachedMeanwhile({
-    before,
-    after,
-    actorId,
-  }: {
-    before: IssuedLicenseRecord;
-    after: IssuedLicenseRecord;
-    actorId: string;
-  }): Promise<void> {
-    if (after.virtualKeyId === null || after.virtualKeyId === before.virtualKeyId) return;
-    await this.retireManagedKey({ row: after, actorId });
   }
 
   private async getRow(id: string): Promise<IssuedLicenseRecord> {

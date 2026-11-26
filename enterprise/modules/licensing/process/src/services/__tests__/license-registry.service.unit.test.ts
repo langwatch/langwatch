@@ -400,24 +400,52 @@ describe("the license registry", () => {
     expect(managedKeys.retired).toEqual(["vk-unused"]);
   });
 
-  /** @scenario "A revoke ends a key that attached while it ran" */
-  it("ends a key gateway attached between ending the old one and marking the row", async () => {
-    const { registry, repository, managedKeys } = harness();
-    const { license } = await registry.issue(issueInput());
-    await repository.bindInstance({ id: license.id, instanceId: "install-1", at: NOW });
-    await repository.update(license.id, { virtualKeyId: "vk-old" });
-    const retire = managedKeys.retire.bind(managedKeys);
-    managedKeys.retire = async (params) => {
-      await retire(params);
-      if (params.virtualKeyId === "vk-old") {
-        await repository.update(license.id, { virtualKeyId: "vk-new" });
-      }
+  describe("given gateway attaches a key while a bound license is being revoked", () => {
+    const attachingOnce = async () => {
+      const setup = harness();
+      const { license } = await setup.registry.issue(issueInput());
+      await setup.repository.bindInstance({ id: license.id, instanceId: "install-1", at: NOW });
+      const revokeHolding = setup.repository.revokeHolding.bind(setup.repository);
+      let attached = false;
+      setup.repository.revokeHolding = async (params) => {
+        if (!attached) {
+          attached = true;
+          await setup.repository.update(license.id, { virtualKeyId: "vk-new" });
+        }
+        return revokeHolding(params);
+      };
+      const revoke = () =>
+        setup.registry.revoke({ id: license.id, operatorId: "op", reason: "leaked" });
+      return { ...setup, license, revoke };
     };
 
-    const revoked = await registry.revoke({ id: license.id, operatorId: "op", reason: "leaked" });
+    /** @scenario "A revoke ends a key that attached while it ran" */
+    it("ends the new key before it marks the license revoked", async () => {
+      const { revoke, managedKeys } = await attachingOnce();
 
-    expect(revoked.status).toBe("revoked");
-    expect(managedKeys.retired).toEqual(["vk-old", "vk-new"]);
+      const revoked = await revoke();
+
+      expect(revoked.status).toBe("revoked");
+      expect(managedKeys.retired).toEqual(["vk-new"]);
+    });
+
+    /** @scenario "A revoke ends a key that attached while it ran" */
+    it("leaves the license live when ending the new key fails, and a retry finishes", async () => {
+      const { revoke, managedKeys, repository, license } = await attachingOnce();
+      const retire = managedKeys.retire.bind(managedKeys);
+      managedKeys.retire = async () => {
+        throw new Error("gateway unreachable");
+      };
+
+      await expect(revoke()).rejects.toThrow("gateway unreachable");
+      const live = await repository.findById(license.id);
+      expect(live?.revokedAt).toBeNull();
+      expect(live?.virtualKeyId).toBe("vk-new");
+
+      managedKeys.retire = retire;
+      expect((await revoke()).status).toBe("revoked");
+      expect(managedKeys.retired).toEqual(["vk-new"]);
+    });
   });
 
   /** @scenario "An install that binds while its unused key is being ended gets a fresh key" */

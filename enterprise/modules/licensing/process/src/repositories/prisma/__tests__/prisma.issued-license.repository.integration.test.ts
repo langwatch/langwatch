@@ -294,6 +294,26 @@ describe.skipIf(!TEST_DATABASE_URL)("the license registry on Postgres", () => {
     expect(boundRow?.revokedAt).toBeNull();
   });
 
+  /** @scenario "A revoke ends a key that attached while it ran" */
+  it("revokes a license only while it still names the key the caller ended", async () => {
+    const { license } = await issue("ACME Holding Key");
+    const repository = PrismaIssuedLicenseRepository.create(prisma, SEALING);
+    const mark = (virtualKeyId: string | null) =>
+      repository.revokeHolding({
+        id: license.id,
+        virtualKeyId,
+        at: nowInstant(),
+        revokedById: "op",
+        revokedReason: "leaked",
+      });
+    await repository.update(license.id, { virtualKeyId: "vk-new" });
+
+    expect(await mark(null)).toBe(false);
+    expect((await repository.findById(license.id))?.revokedAt).toBeNull();
+    expect(await mark("vk-new")).toBe(true);
+    expect(await mark("vk-new")).toBe(false);
+  });
+
   /** @scenario "Only a live license lets go of an ended managed key" */
   it("lets go of an ended key on the live license naming it, never on a revoked one", async () => {
     const live = (await issue("ACME Release Key")).license;
