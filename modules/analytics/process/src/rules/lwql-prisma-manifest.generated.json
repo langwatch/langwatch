@@ -467,7 +467,7 @@
           "kind": "scalar",
           "isList": false,
           "isOptional": true,
-          "documentation": "When the borrowed access lapses. A session outlives its impersonation\nwindow: past this the claims are ignored and the operator is themselves\nagain, with nothing ended. The expiry sweep reads it through a partial\nindex (20261126140001_session_impersonation_expiry_index), raw SQL since\nPrisma cannot express one."
+          "documentation": "When the borrowed access lapses. A session outlives its impersonation\nwindow: past this the claims are ignored and the operator is themselves\nagain, with nothing ended. The expiry sweep reads it through a partial\nindex (20261126190001_session_impersonation_expiry_index), raw SQL since\nPrisma cannot express one."
         },
         {
           "name": "lastSeenAt",
@@ -9454,6 +9454,79 @@
         {
           "name": "createdAt",
           "columnName": "createdAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        }
+      ]
+    },
+    {
+      "name": "DashboardSidebarOrder",
+      "tableName": "DashboardSidebarOrder",
+      "documentation": "One member's own order of a product sidebar's Dashboards section in one organization.",
+      "primaryKey": [
+        "id"
+      ],
+      "fields": [
+        {
+          "name": "id",
+          "columnName": "id",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "userId",
+          "columnName": "userId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "organizationId",
+          "columnName": "organizationId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "homeProduct",
+          "columnName": "homeProduct",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": "The product whose sidebar section this orders: llm-ops, me, gateway or governance."
+        },
+        {
+          "name": "dashboardIds",
+          "columnName": "dashboardIds",
+          "type": "String",
+          "kind": "scalar",
+          "isList": true,
+          "isOptional": false,
+          "documentation": "Board ids in the member's order; a board not named lists after them, by name."
+        },
+        {
+          "name": "createdAt",
+          "columnName": "createdAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "updatedAt",
+          "columnName": "updatedAt",
           "type": "DateTime",
           "kind": "scalar",
           "isList": false,

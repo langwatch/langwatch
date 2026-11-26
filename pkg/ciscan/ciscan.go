@@ -136,6 +136,8 @@ type Job struct {
 	Name  string    `yaml:"name"`
 	Needs yaml.Node `yaml:"needs"`
 	If    string    `yaml:"if"`
+	// Outputs maps each job output to its expression, read as literal text.
+	Outputs map[string]string `yaml:"outputs"`
 	// TimeoutMinutes is a number or an expression string; nil when unset.
 	TimeoutMinutes any               `yaml:"timeout-minutes"`
 	Permissions    Permissions       `yaml:"permissions"`

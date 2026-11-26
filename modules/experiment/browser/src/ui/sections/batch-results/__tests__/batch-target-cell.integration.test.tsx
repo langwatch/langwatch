@@ -5,7 +5,7 @@ import "@testing-library/jest-dom/vitest";
  * @vitest-environment jsdom
  */
 import { renderWithDesignSystem } from "@langwatch/design-system/testing";
-import { cleanup, screen } from "@testing-library/react";
+import { cleanup, fireEvent, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -15,7 +15,10 @@ import {
 } from "../../batch-evaluation-results.types.ts";
 import { BatchTargetCell } from "../batch-target-cell.tsx";
 
-// Wrapper with Chakra provider
+// The action bar is drawn once the cell is pointed at.
+const pointAtCell = (): void => {
+  fireEvent.pointerEnter(screen.getByTestId("target-cell-target-1"));
+};
 
 // Helper to create target output data
 const createTargetOutput = (overrides: Partial<BatchTargetOutput> = {}): BatchTargetOutput => ({
@@ -128,15 +131,79 @@ describe("BatchTargetCell", () => {
 
     /** @scenario Expand long target output */
     /** @scenario Truncate long text in dataset cells */
-    it("truncates very long output with indicator", () => {
+    it("truncates very long output with indicator once expanded", async () => {
       const longText = "A".repeat(15000);
       const targetOutput = createTargetOutput({
         output: { text: longText },
       });
 
-      renderWithDesignSystem(<BatchTargetCell targetOutput={targetOutput} />);
+      const { container } = renderWithDesignSystem(<BatchTargetCell targetOutput={targetOutput} />);
+      const collapsed = container.querySelector("[data-row-height]");
+      expect(collapsed?.textContent?.length).toBeLessThanOrEqual(1_000);
+
+      await userEvent.setup().click(collapsed as HTMLElement);
 
       expect(screen.getByText("(truncated)")).toBeInTheDocument();
+    });
+
+    /** @scenario "A results cell draws its actions only once it is pointed at" */
+    it("draws its actions only once the cell is pointed at", () => {
+      renderWithDesignSystem(
+        <BatchTargetCell
+          targetOutput={createTargetOutput({ cost: 0.05, duration: 1500, traceId: "trace-123" })}
+          onOpenTrace={vi.fn()}
+        />,
+      );
+
+      expect(screen.queryByTestId("cost-target-1")).not.toBeInTheDocument();
+      expect(screen.queryByTestId("latency-target-1")).not.toBeInTheDocument();
+      expect(screen.queryByTestId("trace-link-target-1")).not.toBeInTheDocument();
+      expect(screen.queryByTestId("copy-output-target-1")).not.toBeInTheDocument();
+
+      pointAtCell();
+
+      expect(screen.getByTestId("cost-target-1")).toBeInTheDocument();
+      expect(screen.getByTestId("latency-target-1")).toBeInTheDocument();
+      expect(screen.getByTestId("trace-link-target-1")).toBeInTheDocument();
+      expect(screen.getByTestId("copy-output-target-1")).toBeInTheDocument();
+    });
+
+    /** @scenario "A results cell draws its actions only once it is pointed at" */
+    it("draws its actions on keyboard focus and expands on Enter", async () => {
+      const user = userEvent.setup();
+      renderWithDesignSystem(
+        <BatchTargetCell
+          targetOutput={createTargetOutput({ output: { output: "x\n".repeat(400) }, cost: 0.05 })}
+        />,
+      );
+
+      await user.tab();
+
+      expect(screen.getByTestId("target-cell-target-1")).toHaveFocus();
+      expect(screen.getByTestId("copy-output-target-1")).toBeInTheDocument();
+
+      await user.keyboard("{Enter}");
+
+      expect(screen.getByTestId("expanded-cell-backdrop")).toBeInTheDocument();
+    });
+
+    /** @scenario "A collapsed results cell draws only the start of a long output" */
+    it("draws a short preview collapsed, the full value expanded, and copies all of it", async () => {
+      const pages = Array.from({ length: 400 }, (_, line) => `| ${line} | record ${line} |`);
+      const targetOutput = createTargetOutput({ output: { output: pages.join("\n") } });
+      const user = userEvent.setup();
+      const writeText = vi.spyOn(navigator.clipboard, "writeText");
+
+      const { container } = renderWithDesignSystem(<BatchTargetCell targetOutput={targetOutput} />);
+      const collapsed = container.querySelector("[data-row-height]") as HTMLElement;
+      expect(collapsed.textContent).toContain("| 0 | record 0 |");
+      expect(collapsed.textContent).not.toContain("| 399 | record 399 |");
+
+      await user.click(collapsed);
+      expect(screen.getAllByText(/\| 399 \| record 399 \|/).length).toBeGreaterThan(0);
+
+      await user.click(screen.getAllByTestId("copy-output-target-1").at(-1)!);
+      expect(writeText).toHaveBeenCalledWith(pages.join("\n"));
     });
   });
 
@@ -270,6 +337,7 @@ describe("BatchTargetCell", () => {
         />,
       );
 
+      pointAtCell();
       await user.click(screen.getByTestId("trace-link-target-1"));
 
       expect(onOpenTrace).toHaveBeenCalledWith("trace-123");
@@ -279,6 +347,7 @@ describe("BatchTargetCell", () => {
       renderWithDesignSystem(
         <BatchTargetCell targetOutput={createTargetOutput({ traceId: "trace-123" })} />,
       );
+      pointAtCell();
 
       expect(screen.queryByTestId("trace-link-target-1")).not.toBeInTheDocument();
     });
@@ -292,7 +361,7 @@ describe("BatchTargetCell", () => {
 
       renderWithDesignSystem(<BatchTargetCell targetOutput={targetOutput} />);
 
-      // Latency is shown in action buttons on hover, check data-testid
+      pointAtCell();
       expect(screen.getByTestId("latency-target-1")).toBeInTheDocument();
       expect(screen.getByText("1.5s")).toBeInTheDocument();
     });
@@ -301,6 +370,7 @@ describe("BatchTargetCell", () => {
       const targetOutput = createTargetOutput({ cost: 0.05 });
 
       renderWithDesignSystem(<BatchTargetCell targetOutput={targetOutput} />);
+      pointAtCell();
 
       expect(screen.getByTestId("cost-target-1")).toBeInTheDocument();
       expect(screen.getByText("$0.0500")).toBeInTheDocument();

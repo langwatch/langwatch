@@ -23,7 +23,7 @@ import { WidgetExportMenu } from "../blocks/widget-export-menu.tsx";
 import { WidgetMenu } from "../blocks/widget-menu.tsx";
 import { WidgetDragHandle } from "../elements/widget-drag-handle.tsx";
 import { chartAsks, type WidgetCardLangy } from "./board-widget-card.tsx";
-import { WIDGET_VIEW_CHART_HEIGHT_PX, WidgetLangyView } from "./widget-langy-view.tsx";
+import { WidgetLangyView, widgetViewChartHeightPx } from "./widget-langy-view.tsx";
 
 export function CuratedWidgetCard({
   widget,
@@ -157,6 +157,7 @@ export function CuratedWidgetCard({
     </WidgetCardShell>
   );
   if (!isViewOpen || !langyOnData) return card;
+  const viewHeightPx = widgetViewChartHeightPx(widgetBodyHeightPx(rowSpan));
   return (
     <>
       {card}
@@ -166,7 +167,8 @@ export function CuratedWidgetCard({
         footer={footer}
         actions={actionRow}
         onClose={() => setViewOpen(false)}
-        chart={frame({ maxHeight: WIDGET_VIEW_CHART_HEIGHT_PX, onCard: false })}
+        chartHeightPx={viewHeightPx}
+        chart={frame({ maxHeight: viewHeightPx, onCard: false })}
       />
     </>
   );

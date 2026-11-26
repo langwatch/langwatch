@@ -14,10 +14,13 @@ import { useExecuteEvaluation } from "../../../behavior/experiments-v3/use-execu
 import { useOpenEvaluatorMappings } from "../../../behavior/experiments-v3/use-open-evaluator-mappings.ts";
 import { useOpenTargetEditor } from "../../../behavior/experiments-v3/use-open-target-editor.ts";
 import { usePromptTemplateFields } from "../../../behavior/experiments-v3/use-prompt-template-fields.ts";
+import { RUN_NOT_ALLOWED_HINT } from "../../../model/experiments-v3/workbench-access.ts";
 
 type RunEvaluationButtonProps = {
   /** Whether the button is disabled (e.g., while loading) */
   disabled?: boolean;
+  /** False when the reader's role cannot run evaluations: disabled, and the hint says why. */
+  mayRun?: boolean;
 };
 
 /** What the button reads while the evaluation is idle, running or stopping. */
@@ -49,16 +52,19 @@ function RunButtonLabel({ isAborting, isRunning }: { isAborting: boolean; isRunn
 
 /** Why the button reads what it does: stopping, stopping soon, a gap to fill, or ready. */
 const runTooltipOf = ({
+  mayRun,
   isAborting,
   isRunning,
   hasTargets,
   validation,
 }: {
+  mayRun: boolean;
   isAborting: boolean;
   isRunning: boolean;
   hasTargets: boolean;
   validation: () => { firstInvalidTarget?: unknown; firstInvalidEvaluator?: unknown };
 }) => {
+  if (!mayRun) return RUN_NOT_ALLOWED_HINT;
   if (isAborting) return "Stopping evaluation...";
   if (isRunning) return "Stop evaluation";
   if (!hasTargets) return "Click to add a target";
@@ -68,7 +74,10 @@ const runTooltipOf = ({
   return "Run evaluation on all targets";
 };
 
-export const RunEvaluationButton = ({ disabled = false }: RunEvaluationButtonProps) => {
+export const RunEvaluationButton = ({
+  disabled = false,
+  mayRun = true,
+}: RunEvaluationButtonProps) => {
   const { openDrawer } = useDrawer();
   const { openTargetEditor } = useOpenTargetEditor();
   const openEvaluatorMappings = useOpenEvaluatorMappings();
@@ -96,8 +105,12 @@ export const RunEvaluationButton = ({ disabled = false }: RunEvaluationButtonPro
       datasets,
     });
 
+  // Denied, not disabled: the button keeps focus so the hint reaches keyboard users too.
+  const isDenied = !mayRun && !isRunning;
+
   const handleClick = async () => {
     if (isRunning) return abort();
+    if (isDenied) return;
     if (!hasTargets) return openDrawer("targetTypeSelector", {});
     const validation = validate();
     if (validation.isValid) return execute({ type: "full" });
@@ -111,7 +124,7 @@ export const RunEvaluationButton = ({ disabled = false }: RunEvaluationButtonPro
 
   return (
     <Tooltip
-      content={runTooltipOf({ isAborting, isRunning, hasTargets, validation: validate })}
+      content={runTooltipOf({ mayRun, isAborting, isRunning, hasTargets, validation: validate })}
       positioning={{ placement: "bottom" }}
       openDelay={200}
     >
@@ -121,6 +134,7 @@ export const RunEvaluationButton = ({ disabled = false }: RunEvaluationButtonPro
         variant="solid"
         onClick={handleClick}
         disabled={disabled || isAborting}
+        aria-disabled={isDenied || undefined}
         data-testid="run-evaluation-button"
       >
         <RunButtonLabel isAborting={isAborting} isRunning={isRunning} />

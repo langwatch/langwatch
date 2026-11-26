@@ -86,6 +86,12 @@ f483fe302e7c3dfb100e1d6fa9c99b6d9a049c20:specs/server/feature-configuration.feat
 1d121cc04de163d7029f63a3b1baa57c1b1bdea0:packages/browser-host/src/__tests__/crash-redaction.unit.test.ts:generic-api-key:75
 1d121cc04de163d7029f63a3b1baa57c1b1bdea0:packages/browser-host/src/__tests__/crash-redaction.unit.test.ts:generic-api-key:76
 
+# The migration-compat ClickHouse grant step passed the CI service container's
+# throwaway password to curl -u. It now reads CLICKHOUSE_BASE_URL, so the tree
+# is clean and only this pull request's history still carries the literal.
+5660559ce9c3120aecb6ee6cb4a3709f1eb01efb:.github/workflows/migration-compat.yml:curl-auth-user:219
+5660559ce9c3120aecb6ee6cb4a3709f1eb01efb:.github/workflows/migration-compat.yml:curl-auth-user:590
+
 # A Developer seats drawer test stubbed the reissued license as
 # `eyJkZXYiOjd9.signature`, base64 for {"dev":7} plus a placeholder signature,
 # which clears the generic-api-key bar beside a `licenseKey:` key. It was never

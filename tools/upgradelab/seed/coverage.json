@@ -65,6 +65,11 @@
       "cells": ["C3", "C4"],
       "note": "not in plan 3.4; needs usage traffic in the window"
     },
+    "dashboard:mark-my-dashboards": {
+      "status": "pending",
+      "seed": "unplanned",
+      "note": "needs a member's My dashboard written by the previous release, before the mark existed"
+    },
     "data-retention:keep-control-plane-events-forever": {
       "status": "seeded",
       "seed": "heavy:product.retention",
@@ -140,6 +145,11 @@
       "seed": "tenancy-sql:unconfirmed-users",
       "cells": ["C1", "C2"],
       "note": "rows the old image changed after the copy, and accounts identity reopened, reach the new steps"
+    },
+    "trace:link-unowned-trace-media": {
+      "status": "pending",
+      "seed": "unplanned",
+      "note": "needs trace media stored without an owner link, as the previous release wrote it"
     },
     "trace:send-month-trace-ids": {
       "status": "seeded",
@@ -359,6 +369,11 @@
       "cells": ["C2"],
       "note": "SSO connection and SCIM state by SQL"
     },
+    "stored-object:import-clickhouse-index": {
+      "status": "seeded",
+      "seed": "traffic:otlp",
+      "note": "the step form of the stored objects clickhouse import system migration; declared in its migrations file, not the module file"
+    },
     "suite:replay-scenario-facts-for-open-runs": {
       "status": "seeded",
       "seed": "product-seeds:suite",
@@ -397,6 +412,11 @@
       "status": "pending",
       "seed": "unplanned",
       "note": "needs traces with managed prompt versions written by the old release; no seed carries them yet"
+    },
+    "trace:replay-trace-analytics-app-version": {
+      "status": "pending",
+      "seed": "unplanned",
+      "note": "needs traces with service.version or metadata.version written by the old release; no seed carries them yet"
     },
     "trace:replay-span-analytics": {
       "status": "seeded",

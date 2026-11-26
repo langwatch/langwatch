@@ -49,6 +49,11 @@ Feature: Generating a typical upgrade snapshot from an old release
     Then coverage.json maps each one to the seed that feeds it or says why the old release cannot hold it
 
   @unit
+  Scenario: a step listed twice in coverage.json is refused
+    When coverage.json lists the same step id twice in one section
+    Then loading it fails naming the id, rather than keeping only the last entry
+
+  @unit
   Scenario: an unknown shape is refused
     When I plan shape "cloud" from release "3.20.1" at volume "S" with seed 1
     Then planning fails naming the four shapes
