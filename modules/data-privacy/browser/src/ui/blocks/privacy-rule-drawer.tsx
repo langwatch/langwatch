@@ -140,6 +140,7 @@ export function PrivacyRuleDrawer({
     <Drawer
       open={open}
       onClose={onClose}
+      busy={isSaving}
       title={editingRule ? "Edit privacy rule" : "Add privacy rule"}
       size="md"
       footer={{ primaryAction: { label: "Save", onClick: trySave, loading: isSaving } }}

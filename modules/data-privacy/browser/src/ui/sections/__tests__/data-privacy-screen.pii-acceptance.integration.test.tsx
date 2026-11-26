@@ -59,6 +59,15 @@ function acceptanceOnItsWay() {
   return settle;
 }
 
+/** The organization picker's level radio, behind an open drawer that hides the page from roles. */
+const levelBehindTheDrawer = (name: "Essential" | "Strict") =>
+  within(
+    screen.getByRole("radiogroup", {
+      name: "PII redaction level for this organization",
+      hidden: true,
+    }),
+  ).getByRole("radio", { name: new RegExp(`^${name}`), hidden: true });
+
 /** Sets the open rule drawer's PII redaction to a level and presses Save. */
 async function saveDrawerAt(level: RegExp) {
   const user = userEvent.setup();
@@ -219,6 +228,29 @@ describe("given a Cloud organization on the model flag whose price no admin acce
     });
 
     /** @scenario The rule drawer waits while an acceptance is on its way */
+    it("keeps the drawer open and the organization levels still until it is done", async () => {
+      const acceptance = acceptanceOnItsWay();
+      api.snapshot = snapshotWith({
+        rules: [projectRuleWith({ pii: { level: "essential" } })],
+        accepted: false,
+      });
+      const { host } = page({ flagOn: true, query: { rule: "PROJECT:proj-1:false" } });
+
+      await saveDrawerAt(/^Strict/);
+      await confirmStrict();
+      await waitFor(() => expect(api.acceptPiiRedactionModel).toHaveBeenCalled());
+
+      const drawer = within(screen.getByRole("dialog", { name: "Edit privacy rule" }));
+      expect(drawer.getByRole("button", { name: "Close" })).toBeDisabled();
+      await userEvent.setup().keyboard("{Escape}");
+      expect(host.route().query.rule).toBe("PROJECT:proj-1:false");
+      expect(levelBehindTheDrawer("Essential")).toBeDisabled();
+      acceptance.resolve();
+      await waitFor(() => expect(api.setForScope).toHaveBeenCalledTimes(1));
+      await waitFor(() => expect(levelBehindTheDrawer("Essential")).toBeEnabled());
+    });
+
+    /** @scenario The rule drawer waits while an acceptance is on its way */
     it("frees the drawer again once the acceptance fails", async () => {
       const acceptance = acceptanceOnItsWay();
       api.snapshot = snapshotWith({
@@ -240,6 +272,28 @@ describe("given a Cloud organization on the model flag whose price no admin acce
         ),
       );
       expect(api.setForScope).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("when the page moves to another organization while the price prompt is open", () => {
+    /** @scenario An acceptance given on the page holds only for its own organization */
+    it("dismisses the prompt and accepts nothing for either organization", async () => {
+      const { rerender } = page({ flagOn: true });
+
+      await userEvent.setup().click(levelRadio("Strict"));
+      expect(await screen.findByRole("dialog", { name: "Turn on Strict?" })).toBeInTheDocument();
+
+      api.snapshot = snapshotWith({ accepted: false, organizationId: "org-2" });
+      rerender();
+      await waitFor(() =>
+        expect(screen.queryByRole("dialog", { name: "Turn on Strict?" })).toBeNull(),
+      );
+
+      api.snapshot = snapshotWith({ accepted: false });
+      rerender();
+      expect(screen.queryByRole("dialog", { name: "Turn on Strict?" })).toBeNull();
+      expect(api.acceptPiiRedactionModel).not.toHaveBeenCalled();
+      expect(api.setForScope).not.toHaveBeenCalled();
     });
   });
 

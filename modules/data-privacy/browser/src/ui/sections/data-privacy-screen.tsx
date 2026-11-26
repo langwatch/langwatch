@@ -25,7 +25,7 @@ import {
 import { useMemo, useState } from "react";
 
 import { dataPrivacyApi } from "../../behavior/data-privacy-api.ts";
-import { useInFlight } from "../../behavior/use-in-flight.ts";
+import { type InFlight, useInFlight } from "../../behavior/use-in-flight.ts";
 import {
   type AcceptPiiRedactionModel,
   usePiiRedactionModelAcceptance,
@@ -114,6 +114,8 @@ function DataPrivacyPage({ host, projectId }: { host: DataPrivacyHostApi; projec
     host,
     onAccepted: () => void invalidate(),
   });
+  // One acceptance at a time on the page: the picker and the drawer both wait for it.
+  const acceptanceInFlight = useInFlight();
   // Accepting is an organization admin's act, the same permission the organization rule needs.
   const modelAcceptance = modelAcceptanceOf({
     offer: piiRedactionModelOffer,
@@ -188,6 +190,7 @@ function DataPrivacyPage({ host, projectId }: { host: DataPrivacyHostApi; projec
             split={piiRedactionModelOffer.split}
             acceptance={modelAcceptance}
             onAccept={acceptance.accept}
+            acceptanceInFlight={acceptanceInFlight}
             host={host}
             projectId={projectId}
             snapshot={snapshot}
@@ -235,6 +238,7 @@ function DataPrivacyPage({ host, projectId }: { host: DataPrivacyHostApi; projec
             piiRedactionModelOffer={piiRedactionModelOffer}
             acceptance={modelAcceptance}
             onAccept={acceptance.accept}
+            accepting={acceptanceInFlight}
           />
         )}
       </VStack>
@@ -278,6 +282,7 @@ function PrivacyRuleDrawerMount({
   piiRedactionModelOffer,
   acceptance,
   onAccept,
+  accepting,
 }: {
   host: DataPrivacyHostApi;
   projectId: string;
@@ -289,6 +294,8 @@ function PrivacyRuleDrawerMount({
   piiRedactionModelOffer: PiiRedactionModelOffer;
   acceptance: ModelAcceptance;
   onAccept: AcceptPiiRedactionModel;
+  /** The page's acceptance in flight, shared with the organization picker. */
+  accepting: InFlight;
 }) {
   const { organizationId, teamId } = host.scope();
   const setForScope = dataPrivacyApi.dataPrivacy.setForScope.useMutation();
@@ -339,7 +346,6 @@ function PrivacyRuleDrawerMount({
     else void save(scopes, config);
   };
   // The drawer stays busy from the acceptance to the end of the save it leads to.
-  const accepting = useInFlight();
   const acceptThenSave = async (scopes: PrivacyScopeEntry[], config: DataPrivacyConfig) => {
     const organization = available.organization;
     const asksAcceptance = acceptance === "can-accept" && organization !== null;

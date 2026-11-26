@@ -297,7 +297,8 @@ Feature: The organization picks its PII redaction level on the Data Privacy page
     Given release_pii_redaction_model_enabled is on for "acme"
     And no organization admin accepted the model's price
     When an admin saves a rule at Strict, confirms the price, and the acceptance has not come back
-    Then the drawer saves nothing else until the acceptance and the Strict save are done
+    Then the drawer saves nothing else and cannot be closed until the acceptance and the Strict save are done
+    And the organization picker's levels cannot be used meanwhile
     And a failed acceptance frees the drawer again
 
   @integration
@@ -305,6 +306,7 @@ Feature: The organization picks its PII redaction level on the Data Privacy page
     Given an organization admin accepted the model's price on the page for "acme"
     When the page shows a project of another organization whose price no admin accepted
     Then Strict there is still rule-based, with the switch to the model
+    And a price prompt opened for one organization is dismissed when the page shows another, accepting nothing
 
   @unit
   Scenario: Only an organization admin can accept the price

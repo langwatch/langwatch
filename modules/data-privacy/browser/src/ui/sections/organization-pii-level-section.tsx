@@ -8,7 +8,7 @@ import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
 import { useState } from "react";
 
 import { dataPrivacyApi } from "../../behavior/data-privacy-api.ts";
-import { useInFlight } from "../../behavior/use-in-flight.ts";
+import type { InFlight } from "../../behavior/use-in-flight.ts";
 import type { AcceptPiiRedactionModel } from "../../behavior/use-pii-redaction-model-acceptance.ts";
 import type { DataPrivacyHostApi } from "../../model/data-privacy-host.ts";
 import {
@@ -25,8 +25,11 @@ import { OrganizationPiiLevelPicker } from "../blocks/organization-pii-level-pic
 
 type Pick = { level: OrganizationPiiLevel; over: OrganizationPiiLevel | null };
 
-/** What the price prompt is open for: a level picked, or the switch of a rule-based Strict. */
-type Asking = { kind: "level"; level: OrganizationPiiLevel } | { kind: "switch" };
+/** What the price prompt is open for, and for which organization: a level picked, or the switch. */
+type Asking = { organizationId: string } & (
+  | { kind: "level"; level: OrganizationPiiLevel }
+  | { kind: "switch" }
+);
 
 /**
  * Confirming the price: a switch only records the acceptance; a Strict pick that still needs one
@@ -75,6 +78,7 @@ export function OrganizationPiiLevelSection({
   split = false,
   acceptance,
   onAccept,
+  acceptanceInFlight,
   host,
   projectId,
   snapshot,
@@ -86,6 +90,8 @@ export function OrganizationPiiLevelSection({
   split?: boolean;
   acceptance: ModelAcceptance;
   onAccept: AcceptPiiRedactionModel;
+  /** The page's acceptance in flight: a pick made meanwhile would be overwritten by its save. */
+  acceptanceInFlight: InFlight;
   host: DataPrivacyHostApi;
   projectId: string;
   snapshot: DataPrivacySnapshot;
@@ -94,10 +100,11 @@ export function OrganizationPiiLevelSection({
   const setForScope = dataPrivacyApi.dataPrivacy.setForScope.useMutation();
   const [picked, setPicked] = useOptimisticPick(snapshot.effectiveOrganization?.pii.level);
   const [asking, setAsking] = useState<Asking | null>(null);
-  // An acceptance and the save after it run as one step: a pick made meanwhile would be lost.
-  const confirming = useInFlight();
   const organizationId = snapshot.available.organization?.id ?? host.scope().organizationId;
+  // A prompt opened for one organization is dismissed once the page shows another.
+  if (asking && asking.organizationId !== organizationId) setAsking(null);
   if (!organizationId || !snapshot.effectiveOrganization) return null;
+  const askingHere = asking?.organizationId === organizationId ? asking : null;
 
   const storedPii = snapshot.effectiveOrganization.pii;
   const stored = organizationPiiLevel(storedPii.level);
@@ -105,8 +112,8 @@ export function OrganizationPiiLevelSection({
   const ownRule = organizationRule({ rules: snapshot.rules, organizationId });
   const confirmationFor = (level: OrganizationPiiLevel) =>
     levelChangeConfirmation({ from: storedPii.level, to: level, free, acceptance });
-  const confirmation = asking
-    ? confirmationFor(asking.kind === "switch" ? "strict" : asking.level)
+  const confirmation = askingHere
+    ? confirmationFor(askingHere.kind === "switch" ? "strict" : askingHere.level)
     : null;
 
   const save = async (level: OrganizationPiiLevel) => {
@@ -126,13 +133,11 @@ export function OrganizationPiiLevelSection({
     }
   };
 
-  const accept = () => onAccept({ organizationId });
-
   return (
     <>
       <OrganizationPiiLevelPicker
         level={shown}
-        pendingLevel={asking?.kind === "level" ? asking.level : null}
+        pendingLevel={askingHere?.kind === "level" ? askingHere.level : null}
         otherLevelLabel={otherPiiLevelLabel({
           level: storedPii.level,
           entityCount: storedPii.entities.length,
@@ -142,23 +147,29 @@ export function OrganizationPiiLevelSection({
         split={split}
         awaitingAcceptance={awaitsAcceptance(acceptance)}
         canWrite={snapshot.available.organization !== null}
-        isSaving={setForScope.isPending || confirming.inFlight}
+        isSaving={setForScope.isPending || acceptanceInFlight.inFlight}
         onPick={(level) =>
-          confirmationFor(level) ? setAsking({ kind: "level", level }) : void save(level)
+          confirmationFor(level)
+            ? setAsking({ organizationId, kind: "level", level })
+            : void save(level)
         }
         onSwitchToModel={
-          acceptance === "can-accept" ? () => setAsking({ kind: "switch" }) : undefined
+          acceptance === "can-accept"
+            ? () => setAsking({ organizationId, kind: "switch" })
+            : undefined
         }
       />
       <ConfirmDialog
         open={confirmation !== null}
         onClose={() => setAsking(null)}
         onConfirm={() => {
-          const choice = asking;
-          if (choice) {
-            void confirming.run(() => confirmChoice({ choice, acceptance, accept, save, host }));
-          }
+          const choice = askingHere;
           setAsking(null);
+          if (!choice) return;
+          const accept = () => onAccept({ organizationId: choice.organizationId });
+          void acceptanceInFlight.run(() =>
+            confirmChoice({ choice, acceptance, accept, save, host }),
+          );
         }}
         title={confirmation?.title ?? ""}
         description={confirmation?.description ?? ""}
