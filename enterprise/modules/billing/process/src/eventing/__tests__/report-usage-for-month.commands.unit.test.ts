@@ -1879,6 +1879,35 @@ describe("ReportUsageForMonthCommand: the PII redaction price", () => {
     });
   });
 
+  describe("given a pending PII redaction total whose spend read always throws", () => {
+    /** @scenario "A pending PII redaction total that cannot be checked against the acceptance is held" */
+    it("counts each failed read, keeps the pending total and stops at the breaker", async () => {
+      const at = { organizationId: "org-1", billingMonth: "2026-02" };
+      const meter = "langwatch_pii_redaction_usd";
+      const checkpoints = MemoryBillingCheckpointRepository.create(MemoryBillingStore.create());
+      await checkpoints.writeIntent({
+        ...at,
+        meter,
+        lastReportedTotal: 0,
+        pendingReportedTotal: 5_000,
+      });
+      mockOrganizations.getOrganizationForBilling.mockResolvedValue(usageBilledOrg());
+      mockQueryPiiRedactionSpendTotal.mockRejectedValue(new Error("ledger unreachable"));
+      const handler = await createHandler({ billingCheckpoints: checkpoints });
+
+      for (let run = 0; run < 8; run++) await handler.handle(makeCommand());
+
+      expect(mockQueryPiiRedactionSpendTotal).toHaveBeenCalledTimes(5);
+      expect(mockSelfDispatch).toHaveBeenCalledTimes(5);
+      expect(mockReportUsageDelta).not.toHaveBeenCalled();
+      expect(await checkpoints.findCheckpoint({ ...at, meter })).toMatchObject({
+        lastReportedTotal: 0,
+        pendingReportedTotal: 5_000,
+        consecutiveFailures: 5,
+      });
+    });
+  });
+
   describe("given a PII redaction price read that always fails", () => {
     /** @scenario "A PII redaction price read that keeps failing stops at the circuit breaker" */
     it("stops reading and scheduling after five failed reads", async () => {

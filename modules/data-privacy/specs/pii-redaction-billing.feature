@@ -376,6 +376,7 @@ Feature: A PII redaction model call is priced per character, written to the spen
       And the spend from the organization's acceptance on cannot be read
       When the month is reported
       Then nothing is sent and the pending total is kept for the next report
+      And a read that fails counts toward the meter's circuit breaker
 
     @unit
     Scenario: Usage is reported once the subscription carries the PII redaction price
