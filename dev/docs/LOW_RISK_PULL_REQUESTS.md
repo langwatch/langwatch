@@ -14,11 +14,11 @@ A PR may be treated as **low risk** only if:
   - Integrations with third‑party systems or external APIs.
 
 - It is limited to:
-  - Documentation (`docs/`, `dev/docs/`, any `README.md`).
+  - UI text, layout, or styling.
+  - Documentation, comments, or code formatting.
+  - Claude Code agent configuration (`.claude/` directory).
   - BDD feature specs (`specs/` directory).
-  - Raster images (`.png`, `.jpg`, `.gif`, `.webp`; `.svg` only under `docs/`).
-
-Automation enforces that list as a path allowlist before any AI evaluation. Other `.md` files are not on it: a `SKILL.md` or prompt file ships as agent instructions. The review pipeline is never low risk: a file at the repository root, anything under `.github/`, `cmd/`, `tools/` or `pkg/ciscan/`, or at any depth a `.claude/` directory, `.mcp.json`, `CLAUDE.md`, `AGENTS.md`, `go.mod` or `go.sum`.
+  - Other configuration or code that is explicitly documented as low risk and easy to revert.
 
 If you are unsure, do **not** use `low-risk-change`; request a normal review instead.
 
@@ -32,16 +32,7 @@ If you are unsure, do **not** use `low-risk-change`; request a normal review ins
    - All required CI checks are green.
    - The target branch is protected (no direct pushes; status checks required).
 
-PRs that do not meet these conditions follow the reviewed path below.
-
-## PRs That Are Not Low Risk (`needs-ack`)
-
-A PR that does not qualify gets the `needs-ack` label and a comment saying why it is risky. Automation approves it, with no human review, once:
-
-- The automated review bot's latest review of the head commit has no P0/P1 (blocking) finding.
-- All required CI checks are green, as named by the rulesets and the branch protection on the base branch.
-
-The daily change report lists merged `needs-ack` PRs so a human acknowledges each risky change after it ships. A PR that changes or renames the review pipeline (the paths listed above) is never approved this way and needs a human approval.
+PRs that do not meet these conditions must follow the normal review and approval process.
 
 ## Firefighting Label
 

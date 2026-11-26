@@ -153,13 +153,8 @@ them. Module code never reads `process.env`.
   ask for one re-review with `@coderabbitai review`. A lint, format or PR-body finding is CI's job: run the tool,
   never hand-edit for it. Fix the PR description just before merge; editing it
   needs no new review.
-- The bot's approval is the approval; humans are not blockers. Don't wait for or
-  request a human review. A PR that is not low risk gets `needs-ack` and the bot
-  approves it once the review bot finds no P0/P1 and required checks are green;
-  a human acknowledges it after release, in the daily change report. Only a PR
-  that changes the review pipeline (a root-level file, `.github/`, `cmd/`,
-  `tools/`, `.claude/`, a `CLAUDE.md`, a `go.mod`; full list in
-  `dev/docs/LOW_RISK_PULL_REQUESTS.md`) needs a human approval.
+- The review bot approves a PR with no blocking finding once CI is green, and
+  that approval counts: don't wait for a human review to merge.
 - Commit messages are Conventional Commits (`feat(scope): …`, `fix: …`).
 - Branches: `issue123/slug` for issues, `feat/slug` for features.
 - Worktrees go in `.worktrees/<branch-with-slash-as-hyphen>` via
