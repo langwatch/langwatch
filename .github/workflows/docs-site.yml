@@ -499,4 +499,3 @@ jobs:
           go run ./cmd/docsdeploy indexnow -live "$RUNNER_TEMP/live-sitemap.xml"
           -sitemap "$SITE/sitemap.xml" -key-file "$SITE/indexnow.txt"
           || echo "::warning::IndexNow did not accept this deploy's pages"
-
