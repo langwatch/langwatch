@@ -79,28 +79,25 @@ function useLangyPanelDrag({
     setResizing(false);
     setDrag(null);
   }, [resizable]);
-  useEffect(() => {
-    setDrag(null);
-  }, [sizing]);
-  const dragWidth = drag
-    ? clampWidth({ width: drag.width, min: bounds.min, max: bounds.max })
-    : null;
-  const widthPx = resizable && dragWidth !== null ? dragWidth : panelWidthPx;
+  // A drag is live only on the layout it started in; after a layout change it is inert.
+  const live = resizable && drag?.placement === sizing ? drag : null;
+  const widthPx = live
+    ? clampWidth({ width: live.width, min: bounds.min, max: bounds.max })
+    : panelWidthPx;
   return {
     resizing,
     widthPx,
     handleProps: {
-      onChange: (width: number) =>
-        resizing
-          ? setDrag({ placement: drag?.placement ?? sizing, width })
-          : setPanelWidth({ placement: sizing, width }),
+      onChange: (width: number) => {
+        if (!resizing) return setPanelWidth({ placement: sizing, width });
+        if (drag?.placement === sizing) setDrag({ ...drag, width });
+      },
       onDraggingChange: (dragging: boolean) => {
         setResizing(dragging);
-        if (dragging) setDrag({ placement: sizing, width: panelWidthPx });
+        setDrag(dragging ? { placement: sizing, width: panelWidthPx } : null);
       },
       onDragEnd: (width: number) => {
-        if (drag) setPanelWidth({ placement: drag.placement, width });
-        setDrag(null);
+        if (drag?.placement === sizing) setPanelWidth({ placement: sizing, width });
       },
       onReset: () => resetPanelWidth(sizing),
     },

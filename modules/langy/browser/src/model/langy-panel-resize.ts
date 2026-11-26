@@ -56,6 +56,7 @@ export function resolvePanelWidthBounds({
   return { min, max, default: Math.round(Math.min(max, Math.max(min, preferred))) };
 }
 
+// Kept local so model/ stays free of component imports.
 /** A width forced into the bounds, as a whole pixel. */
 export function clampPanelWidth({
   placement,

@@ -268,7 +268,8 @@ describe("given the floating Langy panel is open", () => {
     pointer("pointerDown", handle, 600);
     pointer("pointerMove", handle, 500);
     act(() => useLangyStore.setState({ panelMode: "sidebar" }));
-    pointer("pointerUp", screen.getByRole("separator", HANDLE), 500);
+    pointer("pointerMove", screen.getByRole("separator", HANDLE), 450);
+    pointer("pointerUp", screen.getByRole("separator", HANDLE), 450);
 
     expect(useLangyStore.getState().panelWidths).toEqual({});
   });
@@ -327,6 +328,20 @@ describe("given the floating Langy panel is open", () => {
 
     expect(widthOf(handle)).toBe(432);
     expect(useLangyStore.getState().panelWidths).toEqual({});
+  });
+
+  /** @scenario "Double-clicking the handle restores the default width" */
+  it("still resets and steps by keyboard after a click on the handle that moved nothing", async () => {
+    renderPanel();
+    const handle = await screen.findByRole("separator", HANDLE);
+
+    pointer("pointerDown", handle, 600);
+    pointer("pointerUp", handle, 600);
+    fireEvent.doubleClick(handle);
+    expect(widthOf(handle)).toBe(432);
+
+    fireEvent.keyDown(handle, { key: "ArrowLeft" });
+    expect(widthOf(handle)).toBe(448);
   });
 
   /** @scenario "Each layout remembers its own width across reloads" */
