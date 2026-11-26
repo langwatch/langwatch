@@ -251,6 +251,13 @@ minimumReleaseAgeExclude:
   - es-toolkit@1.51.0
   - '@earendil-works/pi-coding-agent@0.84.2'
   - '@earendil-works/pi-ai@0.84.2'
+  # GHSA-3fx7-qvcv-cffr: @babel/generator 7.29.15 and the parser, types and
+  # string-parser releases it needs were published 2026-11-20; drop these four
+  # entries once they are 7 days old (after 2026-11-28).
+  - '@babel/generator@7.29.15'
+  - '@babel/parser@7.29.15'
+  - '@babel/types@7.29.15'
+  - '@babel/helper-string-parser@7.29.15'
 
 allowBuilds:
   '@prisma/client': true
@@ -281,6 +288,7 @@ allowBuilds:
 overrides:
   '@ai-sdk/provider-utils@>=4.0.0-beta.10 <4.0.33': '>=4.0.33 <5'
   '@aws-sdk/xml-builder>fast-xml-parser': ^5.7.0
+  '@babel/generator@<7.29.15': '>=7.29.15 <8'
   '@better-auth/core': 1.7.11
   '@better-auth/utils': 0.5.0
   '@elastic/elasticsearch': '-'
