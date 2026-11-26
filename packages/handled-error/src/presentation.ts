@@ -6045,10 +6045,6 @@ const presentations = {
   },
 
   // ---- NLP engine ----
-  invalid_images: {
-    title: "These images can't be sent",
-    describe: () => "Attach fewer or smaller images in a supported format and try again.",
-  },
   invalid_workflow: {
     title: "This workflow isn't valid",
     describe: () => "Check the steps and try again.",
@@ -6056,10 +6052,6 @@ const presentations = {
   invalid_dataset: {
     title: "This dataset isn't valid",
     describe: () => "Check its columns and try again.",
-  },
-  invalid_images: {
-    title: "Langy couldn't read an attached image",
-    describe: () => "Attach PNG, JPEG, GIF or WebP images up to 5 MB, then send again.",
   },
   unsupported_node_kind: {
     title: "This step isn't supported",
@@ -6603,9 +6595,8 @@ const presentations = {
     describe: () => "This conversation link isn't one we can open. Start a new chat to keep going.",
   },
   invalid_images: {
-    title: "Images not accepted",
-    describe: () =>
-      "One of the attached images is too large, too many, or not a supported format. Remove it and send again.",
+    title: "These images can't be sent",
+    describe: () => "Attach fewer or smaller images in a supported format and try again.",
   },
   agent_session_not_found: {
     title: "The session was lost",
