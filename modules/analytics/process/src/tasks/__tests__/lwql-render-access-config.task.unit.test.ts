@@ -1,11 +1,12 @@
 /** The render task writes the two per-pod config files and never prints a secret (ADR-159). */
 
 import { createHash } from "node:crypto";
-import { mkdtemp, readdir, readFile, rm } from "node:fs/promises";
+import { chmod, mkdtemp, mkdir, readdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import type * as Observability from "@langwatch/observability";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { LWQL_SCOPED_SCHEMA } from "../../features/provisioning/rules/lwql-scoped-view.rules.ts";
 import { LangWatchQLSelfProvisioningService } from "../../features/provisioning/services/langwatch-ql-self-provisioning.service.ts";
@@ -15,8 +16,23 @@ import { privateNamesOf } from "../lwql-private-targets.task.ts";
 import {
   lwqlAccessModelDefinitionFromSource,
   lwqlPrivateAccessModelDefinitionFromSource,
+  LwqlRenderAccessConfigTask,
   writeLwqlAccessConfig,
 } from "../lwql-render-access-config.task.ts";
+
+const { logCalls } = vi.hoisted(() => ({
+  logCalls: [] as { fields: unknown; message: unknown }[],
+}));
+vi.mock("@langwatch/observability", async (importActual) => {
+  const actual = await importActual<typeof Observability>();
+  const at = (...args: unknown[]) => {
+    logCalls.push({ fields: args.length > 1 ? args[0] : undefined, message: args.at(-1) });
+  };
+  return {
+    ...actual,
+    createLogger: () => ({ info: at, warn: at, error: at, debug: at }),
+  };
+});
 
 const CLICKHOUSE_PASSWORD = "clickhouse-secret-value";
 const READER_PASSWORD = "postgres-reader-secret-value";
@@ -298,6 +314,63 @@ describe("renderLwqlAccessConfig", () => {
       expect(definition.user.passwordSha256Hex).toBe(
         createHash("sha256").update(reader.password).digest("hex"),
       );
+    });
+
+    /** @scenario "The render task renders a private ClickHouse's reader as a users.d file, offline" */
+    it("tightens an existing file with a broader mode to owner-only", async () => {
+      const file = join(outDir, "users.d", "lwql-access.yaml");
+      await mkdir(join(outDir, "users.d"), { recursive: true });
+      await writeFile(file, "stale", { mode: 0o644 });
+      await chmod(file, 0o644);
+
+      await writeLwqlAccessConfig({ outDir, source: PRIVATE_ENV });
+
+      expect((await stat(file)).mode & 0o777).toBe(0o600);
+    });
+
+    /** @scenario "The private render reads the key pepper through the upgrade's secrets chain" */
+    it("derives the reader from the chain's pepper over the environment's", async () => {
+      const chained = "fake-chained-pepper";
+      const lookup = async (id: string) => (id === "API_KEY_PEPPER" ? chained : undefined);
+
+      await writeLwqlAccessConfig({ outDir, source: PRIVATE_ENV, lookup });
+
+      const contents = await readFile(join(outDir, "users.d", "lwql-access.yaml"), "utf8");
+      const expected = privateReaderOf({ keyPepper: chained, organizationId: ORGANIZATION_ID });
+      const hash = createHash("sha256").update(expected.password).digest("hex");
+      expect(contents).toContain(`password_sha256_hex: "${hash}"`);
+    });
+
+    /** @scenario "The private render reads the key pepper through the upgrade's secrets chain" */
+    it("uses the environment's pepper when the chain answers none", async () => {
+      await writeLwqlAccessConfig({ outDir, source: PRIVATE_ENV, lookup: async () => undefined });
+
+      const contents = await readFile(join(outDir, "users.d", "lwql-access.yaml"), "utf8");
+      const hash = createHash("sha256").update(reader.password).digest("hex");
+      expect(contents).toContain(`password_sha256_hex: "${hash}"`);
+    });
+
+    /** @scenario "The private render logs the reader and database it rendered, never a secret" */
+    it("trims the organisation id and logs the reader's login and database, never a secret", async () => {
+      logCalls.length = 0;
+      const source = {
+        ...PRIVATE_ENV,
+        LWQL_RENDER_PRIVATE_ORGANIZATION_ID: `  ${ORGANIZATION_ID}\n`,
+        LWQL_RENDER_OUT_DIR: outDir,
+      };
+
+      await LwqlRenderAccessConfigTask.create({ source }).run({
+        args: [],
+        signal: new AbortController().signal,
+      });
+
+      expect(logCalls).toHaveLength(1);
+      expect(logCalls[0]?.fields).toMatchObject({ user: reader.username, database: "private_db" });
+      const logged = JSON.stringify(logCalls);
+      const hash = createHash("sha256").update(reader.password).digest("hex");
+      expect(logged).not.toContain(reader.password);
+      expect(logged).not.toContain(hash);
+      expect(logged).not.toContain(PEPPER);
     });
   });
 });

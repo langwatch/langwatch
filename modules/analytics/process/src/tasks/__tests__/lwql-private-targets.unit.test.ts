@@ -13,15 +13,21 @@ import {
   LwqlPrivateCollectionAbsentError,
 } from "../../features/provisioning/services/langwatch-ql-self-provisioning.service.ts";
 import { privateReaderOf } from "../../rules/lwql-private-reader.rules.ts";
-import { provisionLwqlPrivateTargets } from "../lwql-private-targets.task.ts";
+import {
+  LwqlPrivateDatabaseNotReplicatedError,
+  LwqlPrivateStaleSqlReaderError,
+  provisionLwqlPrivateTargets,
+} from "../lwql-private-targets.task.ts";
 import { convergeLwqlPrivateRepository, type LwqlConvergencePlan } from "../lwql-provision.task.ts";
 
-const { logCalls, policyRows, policyChecks, readerByUrl } = vi.hoisted(() => ({
+const { logCalls, policyRows, policyChecks, readerByUrl, readerStorage } = vi.hoisted(() => ({
   logCalls: [] as { level: string; fields: unknown; message: unknown }[],
   /** 1: each table has the reader's own policy; 0: the first has none; 2: only another reader's. */
   policyRows: { n: 1 },
   policyChecks: [] as { url: string; tables: readonly string[] }[],
   readerByUrl: new Map<string, string>(),
+  /** Where the post-converge check finds the reader; null: the server does not hold it. */
+  readerStorage: { value: "users_xml" as string | null },
 }));
 vi.mock("@langwatch/observability", async (importActual) => {
   const actual = await importActual<typeof Observability>();
@@ -43,6 +49,10 @@ vi.mock("@langwatch/observability", async (importActual) => {
 vi.mock("../../repositories/clickhouse/clickhouse.langwatch-ql-provisioning.repository.ts", () => ({
   ClickHouseLangWatchQLProvisioningRepository: {
     open: ({ url }: { url: string }) => ({
+      queryRows: async (sql: string) =>
+        sql.includes("system.users") && readerStorage.value !== null
+          ? [{ storage: readerStorage.value }]
+          : [],
       findRowPolicies: async ({ tables }: { tables: readonly string[] }) => {
         policyChecks.push({ url, tables });
         const reader = policyRows.n === 2 ? "langwatch_lwql_other" : (readerByUrl.get(url) ?? "");
@@ -126,6 +136,7 @@ beforeEach(() => {
   logCalls.length = 0;
   policyChecks.length = 0;
   policyRows.n = 1;
+  readerStorage.value = "users_xml";
 });
 
 describe("given a private ClickHouse route for each of two organisations", () => {
@@ -417,16 +428,26 @@ describe("given a private ClickHouse without a lwql_postgres collection", () => 
   });
 });
 
-/** A private server of two replicas with local access storage, as the cluster guard reads it. */
-function twoReplicaRepository() {
+/** A private server as its system tables answer: host count, database engine, reader storage. */
+function serverAnswering({
+  hosts = 2,
+  engine = "Replicated",
+  storage = null,
+}: {
+  hosts?: number;
+  engine?: string;
+  storage?: string | null;
+}) {
   const held = repositoryHolding({ available: ["lwql_postgres"] });
   const queried: string[] = [];
   const repository = {
     ...(held.repository as object),
     queryRows: async (sql: string) => {
       queried.push(sql);
-      if (sql.includes("system.clusters")) return [{ host_count: "2" }];
-      if (sql.includes("system.replicas")) return [{ max_total_replicas: "2" }];
+      if (sql.includes("system.clusters")) return [{ host_count: String(hosts) }];
+      if (sql.includes("system.replicas")) return [{ max_total_replicas: String(hosts) }];
+      if (sql.includes("system.databases")) return [{ engine }];
+      if (sql.includes("system.users")) return storage === null ? [] : [{ storage }];
       return [];
     },
   };
@@ -451,7 +472,7 @@ const ACCESS_ENTITY = /^(CREATE (SETTINGS PROFILE|USER|ROLE|ROW POLICY|QUOTA)|AL
 describe("given a rendered access model and a two-replica private ClickHouse", () => {
   /** @scenario "In rendered mode a private ClickHouse gets its views and engine tables but no access entity" */
   it("writes no access entity, asks no cluster guard, and binds the key map and engine tables to lwql_postgres", async () => {
-    const { repository, statements, queried } = twoReplicaRepository();
+    const { repository, statements, queried } = serverAnswering({});
 
     await convergeLwqlPrivateRepository({ repository, plan: { ...PRIVATE_PLAN, settings: {} } });
 
@@ -467,10 +488,135 @@ describe("given a rendered access model and a two-replica private ClickHouse", (
   });
 });
 
+describe("given a rendered access model and a two-host private ClickHouse whose database is not Replicated", () => {
+  /** @scenario "In rendered mode a private ClickHouse of several hosts whose database is not Replicated is not converged" */
+  it("runs no statement and raises the named error with the database and its engine", async () => {
+    const { repository, statements } = serverAnswering({ engine: "Atomic" });
+
+    const refusal = await convergeLwqlPrivateRepository({
+      repository,
+      plan: { ...PRIVATE_PLAN, settings: {} },
+    }).catch((error: unknown) => error);
+
+    expect(refusal).toBeInstanceOf(LwqlPrivateDatabaseNotReplicatedError);
+    expect(refusal).toMatchObject({ database: "acme_db", engine: "Atomic", hostCount: 2 });
+    expect(statements).toEqual([]);
+  });
+
+  /** @scenario "In rendered mode a private ClickHouse of several hosts whose database is not Replicated is not converged" */
+  it("warns naming the organisation, the database and its engine, and skips the isolation check", async () => {
+    const { done } = run({
+      endpoints: [{ organizationId: "org-acme", url: ADMIN_URL }],
+      converge: async () => {
+        throw new LwqlPrivateDatabaseNotReplicatedError({
+          database: "acme_db",
+          engine: "Atomic",
+          hostCount: 2,
+        });
+      },
+    });
+    await done;
+
+    const warnings = logCalls.filter((call) => call.level === "warn");
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]?.fields).toMatchObject({
+      organizationId: "org-acme",
+      database: "acme_db",
+      engine: "Atomic",
+    });
+    expect(String(warnings[0]?.message)).toContain("Replicated");
+    expect(policyChecks).toEqual([]);
+  });
+});
+
+describe("given a rendered access model and a private ClickHouse holding a SQL-created reader", () => {
+  /** @scenario "In rendered mode a private ClickHouse holding a SQL-created reader is not converged" */
+  it.each(["local_directory", "replicated"])(
+    "runs no statement when the reader is held in %s",
+    async (storage) => {
+      const { repository, statements } = serverAnswering({ hosts: 1, storage });
+
+      const refusal = await convergeLwqlPrivateRepository({
+        repository,
+        plan: { ...PRIVATE_PLAN, settings: {} },
+      }).catch((error: unknown) => error);
+
+      expect(refusal).toBeInstanceOf(LwqlPrivateStaleSqlReaderError);
+      expect(refusal).toMatchObject({ reader: PRIVATE_PLAN.names.restrictedUser, storage });
+      expect(statements).toEqual([]);
+    },
+  );
+
+  /** @scenario "In rendered mode a private ClickHouse holding a SQL-created reader is not converged" */
+  it("converges a server whose reader comes from its users.d file", async () => {
+    const { repository, statements } = serverAnswering({ hosts: 1, storage: "users_xml" });
+
+    await convergeLwqlPrivateRepository({ repository, plan: { ...PRIVATE_PLAN, settings: {} } });
+
+    expect(statements.length).toBeGreaterThan(0);
+  });
+
+  /** @scenario "In rendered mode a private ClickHouse holding a SQL-created reader is not converged" */
+  it("warns naming the reader and its storage, never a password, and says to drop it", async () => {
+    const reader = privateReaderOf({ keyPepper: PEPPER, organizationId: "org-acme" });
+    const { done } = run({
+      endpoints: [{ organizationId: "org-acme", url: ADMIN_URL }],
+      converge: async () => {
+        throw new LwqlPrivateStaleSqlReaderError({
+          reader: reader.username,
+          storage: "local_directory",
+        });
+      },
+    });
+    await done;
+
+    const warnings = logCalls.filter((call) => call.level === "warn");
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]?.fields).toMatchObject({
+      organizationId: "org-acme",
+      reader: reader.username,
+      storage: "local_directory",
+    });
+    expect(String(warnings[0]?.message)).toContain("drop that user");
+    const logged = JSON.stringify(logCalls);
+    expect(logged).not.toContain(reader.password);
+    expect(logged).not.toContain("route-admin-pw");
+  });
+});
+
+describe("given a rendered private ClickHouse that does not hold the reader yet", () => {
+  /** @scenario "A rendered private ClickHouse whose reader is not loaded yet says so, not that it is not isolated" */
+  it("warns that the reader is not loaded yet, never that the server is not isolated", async () => {
+    readerStorage.value = null;
+    policyRows.n = 0;
+
+    await run({ endpoints: [{ organizationId: "org-acme", url: ADMIN_URL }] }).done;
+
+    const warnings = logCalls.filter((call) => call.level === "warn");
+    expect(warnings).toHaveLength(1);
+    expect(String(warnings[0]?.message)).toContain("not loaded yet");
+    expect(String(warnings[0]?.message)).not.toContain("not isolated");
+    expect(policyChecks).toEqual([]);
+  });
+
+  /** @scenario "A rendered private ClickHouse whose reader is not loaded yet says so, not that it is not isolated" */
+  it("keeps the not-isolated warning in sql mode, where the upgrade created the reader", async () => {
+    readerStorage.value = null;
+    policyRows.n = 0;
+    const shared = { ...SHARED_PLAN, settings: { LWQL_ACCESS_MODEL_MODE: "sql" } };
+
+    await run({ endpoints: [{ organizationId: "org-acme", url: ADMIN_URL }], shared }).done;
+
+    const warnings = logCalls.filter((call) => call.level === "warn");
+    expect(warnings).toHaveLength(1);
+    expect(String(warnings[0]?.message)).toContain("not isolated");
+  });
+});
+
 describe("given a sql access model and a private ClickHouse", () => {
   /** @scenario "In sql mode a private ClickHouse keeps the SQL access entities and the cluster guard" */
   it("refuses a two-replica server without replicated access storage before any statement", async () => {
-    const { repository, statements } = twoReplicaRepository();
+    const { repository, statements } = serverAnswering({});
     const plan = { ...PRIVATE_PLAN, settings: { LWQL_ACCESS_MODEL_MODE: "sql" } };
 
     await expect(convergeLwqlPrivateRepository({ repository, plan })).rejects.toThrow(

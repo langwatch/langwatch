@@ -62,12 +62,14 @@ import {
 import {
   classifyLwqlSetupFailure,
   findKeyPeppers,
-  LWQL_CREDENTIAL_SECRETS,
+  type LwqlSecretLookup,
   resolveLwqlSource,
+  withChainedSecrets,
 } from "../rules/lwql-default-credentials.rules.ts";
 import type { LangWatchQLNames } from "../services/langwatch-ql-access-model.service.ts";
 import { LangWatchQLSqlModeClusterGuardService } from "../services/langwatch-ql-sql-mode-cluster-guard.service.ts";
 import {
+  assertRenderedPrivateServer,
   type LwqlPrivateEndpoint,
   provisionLwqlPrivateTargets,
 } from "./lwql-private-targets.task.ts";
@@ -901,26 +903,6 @@ function connectionLimitFields(databaseUrl: string | undefined): { connectionLim
   }
 }
 
-/** Reads one secret through the runner's chain: the sources the api and worker boot with. */
-export type LwqlSecretLookup = (id: string) => Promise<string | undefined>;
-
-/** The environment with each credential secret the chain answers laid over it. */
-async function withChainedSecrets({
-  environment,
-  lookup,
-}: {
-  environment: Record<string, string | undefined>;
-  lookup: LwqlSecretLookup | undefined;
-}): Promise<Record<string, string | undefined>> {
-  if (!lookup) return environment;
-  const resolved = { ...environment };
-  for (const id of LWQL_CREDENTIAL_SECRETS) {
-    const value = await lookup(id);
-    if (value !== undefined) resolved[id] = value;
-  }
-  return resolved;
-}
-
 /** The private routes, or none: a malformed route variable warns and never fails the upgrade. */
 function privateEndpointsOf({
   source,
@@ -1042,6 +1024,8 @@ export async function convergeLwqlPrivateRepository({
       query: (sql) => repository.queryRows(sql),
       source: plan.settings,
     });
+  } else {
+    await assertRenderedPrivateServer({ repository, names });
   }
   const statements = selfProvisioning.clickHouseStatements({
     names,

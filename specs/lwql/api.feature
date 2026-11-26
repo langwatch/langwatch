@@ -780,10 +780,11 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
   # Organizations with a private ClickHouse (issue #9248). The placement gate
   # (specs/lwql/isolation.feature) admits a routed organization only where its
   # own server is provisioned, probed as that organization's derived reader. The
-  # upgrade creates the views on each server, signing in as the route URL's
-  # admin; the reader, its profile, grants and row policies come from a users.d
-  # file the render task writes (rendered mode, the default) or from statements
-  # (sql mode), the same mode as the shared run. Queries use only the reader.
+  # upgrade creates the database, app functions, views and engine tables on
+  # each server, signing in as the route URL's admin; the reader, its profile,
+  # grants and row policies come from a users.d file the render task writes
+  # (rendered mode, the default) or from statements (sql mode), the same mode
+  # as the shared run. Queries use only the reader.
   # ---------------------------------------------------------------------------
 
   @unit
@@ -865,10 +866,35 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
   Scenario: In rendered mode a private ClickHouse gets its views and engine tables but no access entity
     Given the shared run's access model is rendered, as it is with LWQL_ACCESS_MODEL_MODE unset
     And a private ClickHouse of two replicas on local access storage, whose admin cannot manage access, that mounts lwql_postgres
+    And its source database uses the Replicated engine, so a plain CREATE reaches every replica
     When the upgrade provisions LangWatchQL on it
     Then no statement creates a user, settings profile, row policy or grant
     And the sql-mode cluster guard is not asked, so the replicas do not refuse it
     And the key map and every PostgreSQL-backed engine table bind to lwql_postgres, and the views are created
+
+  @unit
+  Scenario: In rendered mode a private ClickHouse of several hosts whose database is not Replicated is not converged
+    Given the shared run's access model is rendered
+    And a private ClickHouse of more than one host whose source database does not use the Replicated engine
+    When the upgrade provisions LangWatchQL on it
+    Then no statement runs, since a plain CREATE would reach one host only
+    And a warning names the organization, the database and its engine, and the organization's queries stay refused
+
+  @unit
+  Scenario: In rendered mode a private ClickHouse holding a SQL-created reader is not converged
+    Given the shared run's access model is rendered
+    And a private ClickHouse whose access storage already holds the organization's reader created by an earlier sql-mode upgrade
+    When the upgrade provisions LangWatchQL on it
+    Then no statement runs, since rendered mode never updates that reader
+    And a warning names the reader and its storage, never a password, and says to drop it so the users.d file takes over
+
+  @unit
+  Scenario: A rendered private ClickHouse whose reader is not loaded yet says so, not that it is not isolated
+    Given the shared run's access model is rendered
+    And a private ClickHouse provisioned without error that does not hold the organization's reader yet
+    When the post-provisioning check reads the server
+    Then a warning says the reader is not loaded yet and the organization's queries stay refused until the users.d file is mounted
+    And no warning says its queries are not isolated
 
   @unit
   Scenario: In sql mode a private ClickHouse keeps the SQL access entities and the cluster guard
@@ -883,6 +909,7 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
     And LWQL_RENDER_PRIVATE_DATABASE names the private database, or is unset for langwatch
     When lwql-render-access-config runs with no ClickHouse or PostgreSQL connection
     Then it writes users.d/lwql-access.yaml under LWQL_RENDER_OUT_DIR and no named-collection file
+    And the file is readable by its owner only, even where an earlier file had a broader mode
     And the file holds the organization's derived reader, its settings profile and the sha256 of its password, never the password or the pepper
     And its profile, row policies and grants are exactly those the private sql path would create, over the private database, the key map being the project-keys engine table
     And every grant is a SELECT, with no POSTGRES or NAMED COLLECTION grant
@@ -894,6 +921,21 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
     When lwql-render-access-config runs
     Then it fails naming those inputs and writes no file
     And with a later pepper in that chain set it derives the same reader the upgrade does
+
+  @unit
+  Scenario: The private render reads the key pepper through the upgrade's secrets chain
+    Given LWQL_RENDER_PRIVATE_ORGANIZATION_ID is set
+    And the runner's secrets chain answers a key pepper
+    When lwql-render-access-config runs
+    Then the reader is derived from the chain's pepper, as the upgrade derives it, over any environment value
+    And with no chain the environment's pepper is used
+
+  @unit
+  Scenario: The private render logs the reader and database it rendered, never a secret
+    Given LWQL_RENDER_PRIVATE_ORGANIZATION_ID is set with surrounding whitespace
+    When lwql-render-access-config runs
+    Then the reader is derived from the trimmed organization id
+    And it logs the reader's login name and the database, never the password, its hash or the pepper
 
   @unit
   Scenario: A private ClickHouse whose rendered reader is not loaded yet stays refused as not provisioned
@@ -966,6 +1008,7 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
   @unit
   Scenario: A private ClickHouse with a source table not policed for the reader after provisioning warns
     Given a private ClickHouse provisioned without error
+    And the server holds the organization's reader
     And a source table or the key map has no row policy for the organization's reader, or one applying to all or all but some
     When the post-provisioning check reads the server
     Then a warning names the tables and says its queries are not isolated
