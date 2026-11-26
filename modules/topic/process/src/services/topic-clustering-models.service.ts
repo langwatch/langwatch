@@ -53,9 +53,6 @@ export class ModelProviderTopicClusteringModelsService extends TopicClusteringMo
     if (!modelProvider) {
       throw notConfigured(`Embeddings model provider ${provider} not found`);
     }
-    if (!modelProvider.enabled) {
-      throw notConfigured(`Embeddings model provider ${provider} is not enabled`);
-    }
     return { model: resolved.model, modelProvider };
   }
 

@@ -66,19 +66,6 @@ def test_a_missing_model_is_a_typed_4xx(client):
     assert response.json()["detail"]["code"] == "model_not_configured"
 
 
-# @scenario "A model provider with no API key is answered as the customer's to fix"
-def test_a_missing_api_key_is_a_typed_4xx(client, monkeypatch):
-    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
-    monkeypatch.setattr(
-        incremental_clustering, "fill_embeddings", failing_embeddings(AssertionError("embedded"))
-    )
-
-    response = client.post("/topics/incremental_clustering", json=request_body())
-
-    assert response.status_code == 422
-    assert response.json()["detail"]["code"] == "model_provider_auth_failed"
-
-
 # @scenario "A failure of ours is still answered as a server error"
 def test_any_other_failure_stays_a_500(client, monkeypatch):
     monkeypatch.setattr(incremental_clustering, "fill_embeddings", failing_embeddings(RuntimeError("boom")))

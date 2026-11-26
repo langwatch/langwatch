@@ -5,6 +5,8 @@ from typing import Optional
 import litellm
 from fastapi import HTTPException
 
+from langevals_topic_clustering.refusals import causes, is_missing_key
+
 
 def configured_model(litellm_params: dict, deployment_name: Optional[str]) -> str:
     """The model to cluster with, or a 422 when none is configured."""
@@ -22,37 +24,29 @@ def configured_model(litellm_params: dict, deployment_name: Optional[str]) -> st
     return model
 
 
-def require_api_key(litellm_params: dict) -> None:
-    """A 422 when the model needs an API key that neither the request nor langevals has.
-
-    Only providers that authenticate with a bare `*_API_KEY` are checked: cloud
-    credentials (AWS, Vertex, Azure) and custom endpoints are left to the call.
-    """
-    if litellm_params.get("api_key") or litellm_params.get("api_base"):
-        return
-    model = litellm_params.get("model")
-    if not model:
-        return
-    environment = litellm.validate_environment(model=model)
-    missing = environment.get("missing_keys") or []
-    if environment.get("keys_in_environment") or not missing:
-        return
-    if all(key.endswith("_API_KEY") for key in missing):
-        raise HTTPException(
-            status_code=422,
-            detail={
-                "code": "model_provider_auth_failed",
-                "message": "The model provider has no API key configured.",
-            },
-        )
-
-
 def customer_failure(error: Exception) -> Optional[HTTPException]:
     """The 4xx a failure the customer fixes answers with, or None when it is ours.
 
     The detail carries a stable code and fixed copy, never the provider's own
-    words: those can quote part of the key that was refused.
+    words: those can quote part of the key that was refused. The naming steps
+    wrap the provider's error, so the whole chain is read.
     """
+    if is_missing_key(error):
+        return HTTPException(
+            status_code=422,
+            detail={
+                "code": "model_provider_key_missing",
+                "message": "The model provider has no API key configured.",
+            },
+        )
+    for cause in causes(error):
+        refusal = _provider_refusal(cause)
+        if refusal is not None:
+            return refusal
+    return None
+
+
+def _provider_refusal(error: BaseException) -> Optional[HTTPException]:
     if isinstance(error, litellm.exceptions.AuthenticationError):
         return HTTPException(
             status_code=422,

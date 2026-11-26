@@ -31,6 +31,7 @@ export const LANGEVALS_CLUSTERING_FAILURE_CODES = [
   "model_not_configured",
   "model_provider_auth_failed",
   "model_provider_bad_request",
+  "model_provider_key_missing",
   "model_provider_rate_limited",
 ] as const;
 export type LangevalsClusteringFailureCode = (typeof LANGEVALS_CLUSTERING_FAILURE_CODES)[number];

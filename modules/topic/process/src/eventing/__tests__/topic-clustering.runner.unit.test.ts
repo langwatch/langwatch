@@ -128,6 +128,29 @@ describe("clusterTopicsForProject", () => {
     });
   });
 
+  describe("when the clustering or the embeddings provider is disabled", () => {
+    /** @scenario "A disabled embeddings provider skips the run like a disabled clustering provider" */
+    it.each(["clustering", "embeddings"] as const)(
+      "skips the run as not configured when the %s provider is disabled",
+      async (disabled) => {
+        const deps = depsReading({ page: tracePage(12) });
+        if (disabled === "clustering") {
+          deps.models.findExecutionProviders.mockResolvedValue({ openai: { enabled: false } });
+        } else {
+          deps.models.resolveEmbeddingsModel.mockResolvedValue({
+            model: "openai/text-embedding-3-small",
+            modelProvider: { enabled: false },
+          });
+        }
+
+        const outcome = await clusterTopicsForProject(deps, { projectId: "proj-1" });
+
+        expect(outcome.skippedReason).toBe("not_configured");
+        expect(deps.evaluations.requestTopicClustering).not.toHaveBeenCalled();
+      },
+    );
+  });
+
   describe("when the project carries enough assigned traces for incremental mode", () => {
     it("asks trace for the traces outside the known topics", async () => {
       const deps = depsReading({ assigned: 1200, page: tracePage(0) });

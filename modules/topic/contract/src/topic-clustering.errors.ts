@@ -13,6 +13,9 @@ export const CLUSTERING_ERROR_CODES = {
   /** The model provider rejected the project's credentials, as named by
    *  langevals' `model_provider_auth_failed` failure code. */
   MODEL_PROVIDER_AUTH: "model_provider_auth",
+  /** The model provider has no API key, so no call was sent: langevals'
+   *  `model_provider_key_missing` failure code. */
+  MODEL_PROVIDER_KEY_MISSING: "model_provider_key_missing",
   /** The model provider refused for rate or quota reasons, as named by
    *  langevals' `model_provider_rate_limited` failure code. */
   MODEL_PROVIDER_QUOTA: "model_provider_quota",
@@ -47,6 +50,7 @@ export interface ClassifiedClusteringError {
 const USER_ACTIONABLE_CODES = new Set<ClusteringErrorCode>([
   CLUSTERING_ERROR_CODES.MODEL_NOT_CONFIGURED,
   CLUSTERING_ERROR_CODES.MODEL_PROVIDER_AUTH,
+  CLUSTERING_ERROR_CODES.MODEL_PROVIDER_KEY_MISSING,
   CLUSTERING_ERROR_CODES.MODEL_PROVIDER_QUOTA,
   CLUSTERING_ERROR_CODES.MODEL_RESTRICTED,
 ]);

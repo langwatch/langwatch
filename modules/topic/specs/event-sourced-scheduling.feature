@@ -88,6 +88,13 @@ Feature: Event-sourced topic clustering scheduling
     And it is marked as something the customer can resolve
 
   @unit
+  Scenario: A model provider with no API key named by the clustering service is the customer's to fix
+    Given the clustering service refused a page because the model provider has no API key
+    When the page fails
+    Then the failure carries the provider-key-missing code, not the provider-authentication code
+    And it is marked as something the customer can resolve
+
+  @unit
   Scenario: A model provider rate limit named by the clustering service is the customer's to fix
     Given the clustering service refused a page because the model provider rate limited the key
     When the page fails
