@@ -336,7 +336,7 @@ Authenticated: Any API key reaches the projects it holds analytics:view on: the 
 Answers at `/api/v1/query`.
 
 ```typescript
-type Body = z.infer<typeof lwqlKeyStatementSchema>; // ../contract/src/features/lwql/analytics-lwql.schemas.ts:277
+type Body = z.infer<typeof lwqlKeyStatementSchema>; // ../contract/src/features/lwql/analytics-lwql.schemas.ts:279
 type Response = z.infer<typeof lwqlResultSchema>; // ../contract/src/analytics.input-schemas.ts:205
 ```
 
@@ -521,11 +521,11 @@ Declared at `src/eventing/analytics-lwql-reconvergence.pipeline.ts:57`.
 
 | Kind   | Leaf                              | Environment variable                      | Declared at                              |
 | ------ | --------------------------------- | ----------------------------------------- | ---------------------------------------- |
-| secret | `lwqlClickHousePassword`          | `LWQL_CLICKHOUSE_PASSWORD`                | `src/app/analytics.app.ts:570`           |
-| secret | `lwqlPostgresReaderPassword`      | `LWQL_POSTGRES_READER_PASSWORD`           | `src/app/analytics.app.ts:571`           |
-| secret | `queryHashKey`                    | `API_KEY_PEPPER`                          | `src/app/analytics.app.ts:572`           |
-| secret | `queryHashKeyFallback`            | `CREDENTIALS_SECRET`                      | `src/app/analytics.app.ts:573`           |
-| secret | `queryHashKeyLastFallback`        | `NEXTAUTH_SECRET`                         | `src/app/analytics.app.ts:574`           |
+| secret | `lwqlClickHousePassword`          | `LWQL_CLICKHOUSE_PASSWORD`                | `src/app/analytics.app.ts:574`           |
+| secret | `lwqlPostgresReaderPassword`      | `LWQL_POSTGRES_READER_PASSWORD`           | `src/app/analytics.app.ts:575`           |
+| secret | `queryHashKey`                    | `API_KEY_PEPPER`                          | `src/app/analytics.app.ts:576`           |
+| secret | `queryHashKeyFallback`            | `CREDENTIALS_SECRET`                      | `src/app/analytics.app.ts:577`           |
+| secret | `queryHashKeyLastFallback`        | `NEXTAUTH_SECRET`                         | `src/app/analytics.app.ts:578`           |
 | config | `langwatchQl.url`                 | `LWQL_CLICKHOUSE_URL`                     | `../contract/src/analytics.config.ts:17` |
 | config | `langwatchQl.username`            | `LWQL_CLICKHOUSE_USER`                    | `../contract/src/analytics.config.ts:18` |
 | config | `langwatchQl.database`            | `LWQL_DATABASE`                           | `../contract/src/analytics.config.ts:19` |
