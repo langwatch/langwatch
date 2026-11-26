@@ -53,6 +53,7 @@ func main() {
 		{name: "ecr-inputs-readable", run: ciguard.ECRInputsReadable},
 		{name: "transform-cache", run: ciguard.TransformCacheProblems},
 		{name: "ffmpeg-cache", run: ciguard.FfmpegCacheProblems},
+		{name: "playwright-chromium", run: ciguard.PlaywrightChromiumProblems},
 		{name: "vitest-transform-flag", run: ciguard.UncachedVitestScripts},
 		{name: "main-suites", run: ciguard.MainSuites},
 	}
