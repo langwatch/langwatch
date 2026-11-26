@@ -16,6 +16,7 @@ type QueryState = {
   data?: CodingAgentAccountBurndownPage;
   isLoading: boolean;
   isError: boolean;
+  error?: unknown;
   refetch: () => unknown;
 };
 
@@ -169,10 +170,10 @@ describe("SubscriptionAccountsSection", () => {
 
   describe("given the read failed", () => {
     it("offers a retry when nothing loaded", () => {
-      queryState = { isLoading: false, isError: true, refetch };
+      queryState = { isLoading: false, isError: true, error: new Error("boom"), refetch };
       renderSection();
 
-      screen.getByText("Retry").click();
+      screen.getByText("Try again").click();
       expect(screen.getByText("Couldn't load subscription accounts")).toBeTruthy();
       expect(refetch).toHaveBeenCalled();
     });
@@ -181,6 +182,7 @@ describe("SubscriptionAccountsSection", () => {
       queryState = {
         isLoading: false,
         isError: true,
+        error: new Error("boom"),
         refetch,
         data: { fromMs: 0, toMs: 0, accounts: [account()] },
       };

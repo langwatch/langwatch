@@ -6,6 +6,7 @@ import { describe, expect, it } from "vitest";
 
 import type { AccountUsageGroupRow } from "../../repositories/coding-agent-session-event.repository.ts";
 import {
+  accountColumnsOf,
   accountWeekWindow,
   buildAccountBurndowns,
   shortAccountName,
@@ -51,6 +52,30 @@ function build(groups: AccountUsageGroupRow[], canSeeCosts = true) {
 }
 
 describe("accountWeekWindow", () => {
+  describe("given a report with only a window and a read time", () => {
+    it("stores no reading, so an older full reading stays the newest", () => {
+      const columns = accountColumnsOf({
+        "langwatch.account.id": ACCOUNT,
+        "langwatch.account.usage.window": "seven_day",
+        "langwatch.account.usage.read_at": "2026-11-26T11:00:00.000Z",
+      });
+      expect(columns.accountId).toBe(ACCOUNT);
+      expect(columns.accountUsageWindow).toBe("");
+      expect(columns.accountUsageReadAtMs).toBeNull();
+    });
+
+    it("keeps the window and read time once a percent comes with them", () => {
+      const columns = accountColumnsOf({
+        "langwatch.account.id": ACCOUNT,
+        "langwatch.account.usage.percent": 42,
+        "langwatch.account.usage.window": "seven_day",
+        "langwatch.account.usage.read_at": "2026-11-26T11:00:00.000Z",
+      });
+      expect(columns.accountUsageWindow).toBe("seven_day");
+      expect(columns.accountUsageReadAtMs).toBe(Date.parse("2026-11-26T11:00:00.000Z"));
+    });
+  });
+
   it("covers seven UTC days ending today, oldest first", () => {
     const window = accountWeekWindow(NOW_MS);
 

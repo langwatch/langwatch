@@ -4,14 +4,8 @@ import { Chip } from "@langwatch/design-system/chip";
 import { DailyBarChart } from "@langwatch/design-system/daily-bar-chart";
 import { MeterBar } from "@langwatch/design-system/meter-bar";
 import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
-import {
-  Button,
-  HStack,
-  SimpleGrid,
-  Skeleton,
-  Text,
-  VStack,
-} from "@langwatch/design-system/primitives";
+import { HStack, SimpleGrid, Skeleton, Text, VStack } from "@langwatch/design-system/primitives";
+import { HandledErrorAlert } from "@langwatch/error-views";
 import { formatBudgetUsd } from "@langwatch/gateway-contract";
 import { docsUrl } from "@langwatch/handled-error/docs-url";
 import { nowEpochMs } from "@langwatch/time";
@@ -60,6 +54,7 @@ function SubscriptionAccountsBody({
   query: {
     isLoading: boolean;
     isError: boolean;
+    error?: unknown;
     data?: { accounts: CodingAgentAccountBurndown[] };
     refetch: () => unknown;
   };
@@ -74,7 +69,13 @@ function SubscriptionAccountsBody({
     );
   }
   if (query.isError && query.data === undefined) {
-    return <LoadFailed message="Couldn't load subscription accounts" onRetry={query.refetch} />;
+    return (
+      <HandledErrorAlert
+        error={query.error}
+        fallbackTitle="Couldn't load subscription accounts"
+        onRetry={() => void query.refetch()}
+      />
+    );
   }
   const accounts = query.data?.accounts ?? [];
   if (accounts.length === 0) {
@@ -93,7 +94,11 @@ function SubscriptionAccountsBody({
   return (
     <VStack align="stretch" gap={3}>
       {query.isError && (
-        <LoadFailed message="Couldn't refresh subscription accounts" onRetry={query.refetch} />
+        <HandledErrorAlert
+          error={query.error}
+          fallbackTitle="Couldn't refresh subscription accounts"
+          onRetry={() => void query.refetch()}
+        />
       )}
       <SimpleGrid columns={{ base: 1, lg: Math.min(3, accounts.length) }} gap={3}>
         {accounts.map((account) => (
@@ -105,19 +110,6 @@ function SubscriptionAccountsBody({
         estimate it from tokens.
       </Text>
     </VStack>
-  );
-}
-
-function LoadFailed({ message, onRetry }: { message: string; onRetry: () => unknown }) {
-  return (
-    <HStack gap={3}>
-      <Text fontSize="sm" color="fg.error">
-        {message}
-      </Text>
-      <Button size="xs" variant="outline" onClick={() => void onRetry()}>
-        Retry
-      </Button>
-    </HStack>
   );
 }
 

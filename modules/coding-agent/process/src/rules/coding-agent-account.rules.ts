@@ -31,20 +31,33 @@ const TOP_MODEL_COUNT = 3;
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
-/** The account columns one row carries; a row with no account id carries none of them. */
+/**
+ * The account columns one row carries; a row with no account id carries none of them. A reading
+ * needs a percent, a reset or a limit; a window or read time alone is not stored, so the read's
+ * newest reading never lands on a report that says nothing.
+ */
 export function accountColumnsOf(facts: ContributionFacts): CodingAgentAccountColumns {
   const accountId = ACCOUNT_KEY_FACTS.map((key) => text(facts[key])).find((id) => id !== "");
   if (accountId === undefined) return NO_ACCOUNT_COLUMNS;
+  const accountUsagePercent = parsePercent(facts[ACCOUNT_USAGE_PERCENT_ATTRIBUTE]) ?? null;
+  const accountUsageResetsAtMs = parseInstant(facts[ACCOUNT_USAGE_RESETS_AT_ATTRIBUTE]) ?? null;
+  const accountLimitedUntilMs = parseInstant(facts[ACCOUNT_LIMITED_UNTIL_ATTRIBUTE]) ?? null;
+  const isReading =
+    accountUsagePercent !== null ||
+    accountUsageResetsAtMs !== null ||
+    accountLimitedUntilMs !== null;
 
   return {
     accountId,
     accountName: text(facts[ACCOUNT_NAME_ATTRIBUTE]),
     accountSource: text(facts[ACCOUNT_SOURCE_ATTRIBUTE]),
-    accountUsagePercent: parsePercent(facts[ACCOUNT_USAGE_PERCENT_ATTRIBUTE]) ?? null,
-    accountUsageWindow: text(facts[ACCOUNT_USAGE_WINDOW_ATTRIBUTE]),
-    accountUsageResetsAtMs: parseInstant(facts[ACCOUNT_USAGE_RESETS_AT_ATTRIBUTE]) ?? null,
-    accountUsageReadAtMs: parseInstant(facts[ACCOUNT_USAGE_READ_AT_ATTRIBUTE]) ?? null,
-    accountLimitedUntilMs: parseInstant(facts[ACCOUNT_LIMITED_UNTIL_ATTRIBUTE]) ?? null,
+    accountUsagePercent,
+    accountUsageWindow: isReading ? text(facts[ACCOUNT_USAGE_WINDOW_ATTRIBUTE]) : "",
+    accountUsageResetsAtMs,
+    accountUsageReadAtMs: isReading
+      ? (parseInstant(facts[ACCOUNT_USAGE_READ_AT_ATTRIBUTE]) ?? null)
+      : null,
+    accountLimitedUntilMs,
   };
 }
 
