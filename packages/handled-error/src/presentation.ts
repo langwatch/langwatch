@@ -5293,6 +5293,11 @@ const presentations = {
     title: "This conversation belongs to someone else",
     describe: () => "You can view shared conversations but only the owner can continue them.",
   },
+  invalid_images: {
+    title: "Langy can't take those images",
+    describe: () =>
+      "Send at most four PNG, JPEG, GIF or WebP images of 5 MB or less each, then try again.",
+  },
   langy_attachment_refused: {
     title: "Langy can't take that file",
     describe: (error) => {
