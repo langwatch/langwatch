@@ -3,7 +3,7 @@
  * @see specs/lwql/release-check-reads-releases.feature
  */
 
-/** The replay step that refolds trace_analytics rows so they carry AppVersion (goose 00134). */
+/** The replay step that refolds trace_analytics rows so they carry AppVersion (goose 00135). */
 export const APP_VERSION_REPLAY_STEP_ID = "trace:replay-trace-analytics-app-version";
 
 /** Where an application puts its version, first non-empty wins. */

@@ -106,7 +106,7 @@ type ClickHouseTraceAnalyticsWriteRecord = {
     // ── The managed prompt version the trace last used (migration 00133) ──
     LastUsedPromptVersionId: string;
 
-    // ── The application version the trace ran on (migration 00134) ──
+    // ── The application version the trace ran on (migration 00135) ──
     AppVersion: string;
 
     // ── Read-back state (ADR-066, migration 00056) ─────────────────────────
