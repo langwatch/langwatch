@@ -11,6 +11,11 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { EMPTY_JUDGE_TRACE_WAIT_INPUT } from "../../../../model/judge-trace-wait.ts";
 import { ScenarioRunModelDialog } from "../scenario-run-model-dialog.tsx";
 
+// The judge picker asks the judge preview flag; off in this suite.
+vi.mock("@langwatch/feature-flag-client", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  useFeatureFlag: () => ({ enabled: false, isLoading: false }),
+}));
 vi.mock("../../../../behavior/scenario-api.ts", () => ({
   api: {
     modelProvider: {

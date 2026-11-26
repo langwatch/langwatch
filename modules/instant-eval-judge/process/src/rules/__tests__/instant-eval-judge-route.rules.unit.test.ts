@@ -22,6 +22,7 @@ import {
 import {
   instantEvalJudgeCallCostOf,
   instantEvalJudgeSendWorstCaseNanoUsd,
+  instantEvalJudgeSpendAfterCall,
 } from "../instant-eval-judge-route-cost.rules.ts";
 import { instantEvalJudgeFirstSendLeadsOf } from "../instant-eval-judge-route-merge.rules.ts";
 import { instantEvalJudgeRoutePlanOf } from "../instant-eval-judge-route.rules.ts";
@@ -29,7 +30,7 @@ import {
   instantEvalVerdictSurenessOf,
   isUnsureAnswer,
 } from "../instant-eval-judge-sureness.rules.ts";
-import { INSTANT_EVAL_LLM_JUDGE_CONTENT_BUDGET_TOKENS } from "../instant-eval-llm-judge-wire.rules.ts";
+import { instantEvalLlmContentBudgetTokensOf } from "../instant-eval-llm-tool-call-wire.rules.ts";
 
 const table = syntheticRouteTable();
 const UPSET = yesNo("q", "is the user upset");
@@ -329,6 +330,68 @@ describe("a routed call's cost", () => {
   });
 });
 
+describe("a judgement's spend after one more call", () => {
+  const pricing = {
+    version: "test",
+    backends: { llm: { usdPerMillionInputTokens: 1, usdPerMillionOutputTokens: 5 } },
+  };
+  const spend = { inputTokens: 1000, costNanoUsd: 7 };
+
+  /** @scenario "A routed judgement is priced from the summed cost of every call" */
+  it("adds a priced call's tokens and cost", () => {
+    expect(
+      instantEvalJudgeSpendAfterCall({
+        spend,
+        backend: "llm",
+        inputTokens: 100,
+        outputTokens: 10,
+        pricing,
+      }),
+    ).toEqual({ spend: { inputTokens: 1100, costNanoUsd: 150_007 }, isUnpriced: false });
+  });
+
+  /** @scenario "Each call's tokens and cost are added to its judgement's spend" */
+  it("adds an unpriced call's tokens and no cost, and says it had no price", () => {
+    expect(
+      instantEvalJudgeSpendAfterCall({
+        spend,
+        backend: "other",
+        inputTokens: 100,
+        outputTokens: 10,
+        pricing,
+      }),
+    ).toEqual({ spend: { inputTokens: 1100, costNanoUsd: 7 }, isUnpriced: true });
+  });
+
+  /** @scenario "Each call's tokens and cost are added to its judgement's spend" */
+  it("changes nothing for a call that billed no tokens, priced or not", () => {
+    for (const backend of ["llm", "other"]) {
+      expect(
+        instantEvalJudgeSpendAfterCall({
+          spend,
+          backend,
+          inputTokens: 0,
+          outputTokens: 0,
+          pricing,
+        }),
+      ).toEqual({ spend, isUnpriced: false });
+    }
+  });
+
+  /** @scenario "Each call's tokens and cost are added to its judgement's spend" */
+  it("counts a call that billed output tokens alone", () => {
+    expect(
+      instantEvalJudgeSpendAfterCall({
+        spend,
+        backend: "llm",
+        inputTokens: 0,
+        outputTokens: 10,
+        pricing,
+      }),
+    ).toEqual({ spend: { inputTokens: 1000, costNanoUsd: 50_007 }, isUnpriced: false });
+  });
+});
+
 describe("a send's worst case", () => {
   const ONE = yesNo("q", "is it");
   const TWO = yesNo("r", "is it not");
@@ -345,6 +408,7 @@ describe("a send's worst case", () => {
         maxOutputTokens: 1_100,
       },
       ant: { kind: "anthropic_messages", model: "llm-model" },
+      gem: { kind: "gemini_generate_content", model: "llm-model" },
     },
   });
   const llmPrice = { usdPerMillionInputTokens: 1, usdPerMillionOutputTokens: 5 };
@@ -357,6 +421,7 @@ describe("a send's worst case", () => {
       llmHigh: llmPrice,
       llmCapped: llmPrice,
       ant: llmPrice,
+      gem: llmPrice,
     },
   };
   const worst = ({
@@ -425,6 +490,20 @@ describe("a send's worst case", () => {
   });
 
   /** @scenario "A send's worst case bounds what it can bill" */
+  it("counts a Gemini call as an LLM call that keeps a longer text", () => {
+    expect(worst({ backend: "gem" })).toBe(worst({ backend: "ant" }));
+    const long = `user: ${"the parcel came late again and nobody answered. ".repeat(42_000)}`;
+    const geminiFit = prepareInstantEvalText({
+      text: long,
+      budgetTokens: instantEvalLlmContentBudgetTokensOf("gemini_generate_content"),
+    }).text;
+    expect(worst({ backend: "gem", text: long })).toBe(worst({ backend: "gem", text: geminiFit }));
+    expect(worst({ backend: "gem", text: long })).toBeGreaterThan(
+      worst({ backend: "ant", text: long }),
+    );
+  });
+
+  /** @scenario "A send's worst case bounds what it can bill" */
   it("adds a backend's own output cap where the table sets one", () => {
     // 1,100 against 8,000 output tokens at 5 per million.
     expect(worst({ backend: "llm" }) - worst({ backend: "llmCapped" })).toBe(6_900 * 5 * 1_000);
@@ -435,7 +514,7 @@ describe("a send's worst case", () => {
     const long = `user: ${"the parcel came late again and nobody answered. ".repeat(42_000)}`;
     const llmFit = prepareInstantEvalText({
       text: long,
-      budgetTokens: INSTANT_EVAL_LLM_JUDGE_CONTENT_BUDGET_TOKENS,
+      budgetTokens: instantEvalLlmContentBudgetTokensOf("openai_responses"),
     }).text;
     const decisionFit = prepareInstantEvalText({
       text: long,

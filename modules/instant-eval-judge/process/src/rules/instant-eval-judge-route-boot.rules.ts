@@ -20,6 +20,8 @@ import {
   type InstantEvalPricing,
 } from "@langwatch/instant-eval-judge-contract";
 
+import { instantEvalJudgeScenarioDecisionBackendsOf } from "./instant-eval-judge-route.rules.ts";
+
 export function instantEvalJudgeRouteBootIssues({
   table,
   pricing,
@@ -31,7 +33,11 @@ export function instantEvalJudgeRouteBootIssues({
   isHeld?: (kind: InstantEvalJudgeBackendKind) => boolean;
 }): string[] {
   const issues: string[] = [];
-  for (const name of reachableBackendsOf(table)) {
+  // The turn decision's backend is called outside every slot, so it is checked beside them.
+  for (const name of new Set([
+    ...reachableBackendsOf(table),
+    ...instantEvalJudgeScenarioDecisionBackendsOf(table),
+  ])) {
     const backend = table.backends[name];
     if (!backend) continue;
     if (!pricing.backends[name]) issues.push(`backend ${name}: no price in the route pricing`);

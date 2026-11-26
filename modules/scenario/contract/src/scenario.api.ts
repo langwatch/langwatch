@@ -55,6 +55,7 @@ import type {
   SimulationStreamFrame,
   SimulationSetData,
 } from "./features/simulation/simulation.ts";
+import type { JudgePreviewChatCompletion, JudgePreviewChatInput } from "./judge-preview-chat.ts";
 import type {
   CodeScenario,
   ResultAtom,
@@ -253,6 +254,11 @@ export type ScenarioLaunchRunInput = z.infer<typeof scenarioTrpcRunSchema> &
  * features such as Suite reach it by. */
 export interface ScenarioApi {
   generateScenario(input: ScenarioGenerateRequest): Promise<ScenarioGenerateResponse>;
+  /**
+   * One call of the scenario judge on LangWatch Judge (preview): its verdict or its turn decision,
+   * answered as the tool call the judge asked for. Throws when the judge may not or cannot answer.
+   */
+  completeJudgePreviewChat(input: JudgePreviewChatInput): Promise<JudgePreviewChatCompletion>;
   reportScenarioEvent(input: ScenarioEventReportInput): Promise<ScenarioEventReportResult>;
   offerScenarioBrowserTab(
     input: ScenarioEventBrowserTabOfferInput,

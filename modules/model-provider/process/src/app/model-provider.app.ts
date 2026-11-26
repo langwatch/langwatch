@@ -503,6 +503,12 @@ export class ModelProviderModule implements ModelProviderApi {
           kind: "organization",
           organizationId,
         }),
+      // Off by default on a self-hosted install; a run there is refused whatever the flag says.
+      isJudgePreviewAllowed: ({ organizationId }) =>
+        dependencies.featureFlags.isEnabled("release_langwatch_judge_preview", {
+          kind: "organization",
+          organizationId,
+        }),
     });
     this.#providerAuthorization = ModelProviderWriteAuthorizationService.create(
       ModelProviderAuthorizationService.create(dependencies.permissions),

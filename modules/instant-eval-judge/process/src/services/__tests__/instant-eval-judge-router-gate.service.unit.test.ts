@@ -485,6 +485,84 @@ describe("InstantEvalJudgeRouterService, given a gated plan", () => {
       expect(judgement.costNanoUsd).toBe(2 * GATE_COST + DECISIONS_COST + LLM_COST);
     });
 
+    describe("and its backend lists the other backend as a fallback", () => {
+      /** @scenario "A gated branch that cannot answer is answered by the other backend, flagged" */
+      it("asks the escalation once for an easy case, as the flagged other ask", async () => {
+        const { classify, llmJudge } = harness({
+          table: gatedRouteTable({
+            backends: {
+              "decision-a": {
+                kind: "decisions",
+                model: "decision-model-a",
+                fallbacks: ["llm-b"],
+              },
+            },
+          }),
+          gate: rated(0),
+          decisions: () => {
+            throw new Error("decisions down");
+          },
+          llm: () => llmSays(true),
+        });
+        const judgement = await classify();
+        expect(llmJudge.requests).toHaveLength(1);
+        expect(judgement.verdicts).toEqual([{ questionId: "q", probability: 1 }]);
+        expect(judgement.routing).toMatchObject({ answeredBy: { "llm-b": 1 } });
+        expect(judgement.routing?.flags).toEqual(
+          expect.arrayContaining(["gate:easy", "primary_failed"]),
+        );
+        expect(judgement.costNanoUsd).toBe(GATE_COST + LLM_COST);
+      });
+
+      /** @scenario "A gated branch that cannot answer is answered by the other backend, flagged" */
+      it("asks the escalation once when it is down too, so it is never billed twice", async () => {
+        const { classify, llmJudge } = harness({
+          table: gatedRouteTable({
+            backends: {
+              "decision-a": {
+                kind: "decisions",
+                model: "decision-model-a",
+                fallbacks: ["llm-b"],
+              },
+            },
+          }),
+          gate: rated(0),
+          decisions: () => instantEvalSkipped("classifier_rate_limited"),
+          llm: () => llmDown,
+        });
+        const judgement = await classify();
+        expect(llmJudge.requests).toHaveLength(1);
+        expect(judgement.verdicts).toEqual([]);
+      });
+
+      /** @scenario "A gated branch that cannot answer is answered by the other backend, flagged" */
+      it("asks the primary once for a hard case, as the flagged other ask", async () => {
+        const { classify, hostedDecisions, llmJudge } = harness({
+          table: gatedRouteTable({
+            backends: {
+              "llm-b": {
+                kind: "openai_responses",
+                model: "llm-model-b",
+                fallbacks: ["decision-a"],
+              },
+            },
+          }),
+          gate: rated(4),
+          llm: () => llmDown,
+          decisions: () => decided(0.8),
+        });
+        const judgement = await classify();
+        expect(llmJudge.requests).toHaveLength(1);
+        expect(hostedDecisions.requests).toHaveLength(1);
+        expect(judgement.verdicts).toEqual([{ questionId: "q", probability: 0.8 }]);
+        expect(judgement.routing).toMatchObject({ answeredBy: { "decision-a": 1 } });
+        expect(judgement.routing?.flags).toEqual(
+          expect.arrayContaining(["gate:hard", "gate_hard_failed"]),
+        );
+        expect(judgement.costNanoUsd).toBe(GATE_COST + DECISIONS_COST);
+      });
+    });
+
     /** @scenario "A gated branch that cannot answer is answered by the other backend, flagged" */
     it("skips with the platform's reason when neither can, keeping the gate billed", async () => {
       const { classify } = harness({

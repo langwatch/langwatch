@@ -8,6 +8,7 @@
 import {
   InstantEvalJudgeStoppedError,
   instantEvalSkipped,
+  isInstantEvalJudgeLlmKind,
   isInstantEvalSpendBillable,
   type InstantEvalJudgeCostCeiling,
   type InstantEvalJudgeRoutePricing,
@@ -25,8 +26,8 @@ import type {
 import type { InstantEvalHostedDecisionsChannel } from "../channels/instant-eval-hosted-decisions.channel.ts";
 import type { InstantEvalLlmJudgeChannel } from "../channels/instant-eval-llm-judge.channel.ts";
 import {
-  instantEvalJudgeCallCostOf,
   instantEvalJudgeSendWorstCaseNanoUsd,
+  instantEvalJudgeSpendAfterCall,
 } from "../rules/instant-eval-judge-route-cost.rules.ts";
 import {
   instantEvalJudgeLegsJoined,
@@ -41,6 +42,7 @@ import { isUnsureAnswer } from "../rules/instant-eval-judge-sureness.rules.ts";
 import { InstantEvalJudgeBackendSendService } from "./instant-eval-judge-backend-send.service.ts";
 import { InstantEvalJudgeCeilingSendService } from "./instant-eval-judge-ceiling-send.service.ts";
 import { InstantEvalJudgeGatedLegsService } from "./instant-eval-judge-gated-legs.service.ts";
+import type { InstantEvalScenarioLlmVerdictService } from "./instant-eval-scenario-llm-verdict.service.ts";
 
 export type InstantEvalJudgeRouteRunDeps = Readonly<{
   table: InstantEvalJudgeRouteTable;
@@ -51,6 +53,28 @@ export type InstantEvalJudgeRouteRunDeps = Readonly<{
   limiter: InstantEvalRateLimiter;
 }>;
 
+/**
+ * A scenario criterion's routed call: its LLM legs read the judge's own verdict call, shared by
+ * every criterion of the judgement, by this criterion's key instead of asking a question.
+ */
+export type InstantEvalJudgeScenarioLeg = Readonly<{
+  criterionKey: string;
+  /** The raw criterion: the gate's task line as the benchmark measured it, unframed. */
+  criterionText: string;
+  verdicts: InstantEvalScenarioLlmVerdictService;
+}>;
+
+type InstantEvalJudgeRouteRunInput = Readonly<{
+  deps: InstantEvalJudgeRouteRunDeps;
+  plan: InstantEvalJudgeRoutePlan;
+  projectId: string;
+  signal: AbortSignal | undefined;
+  logger: Pick<Logger, "error">;
+  scenario?: InstantEvalJudgeScenarioLeg | undefined;
+  /** A judged query's spend cap: each send holds its worst case first (ADR-190 decision 13). */
+  costCeiling?: InstantEvalJudgeCostCeiling | undefined;
+}>;
+
 /** One routed call's legs, the calls they paid for and what the routing reports. */
 export class InstantEvalJudgeRouteRunService {
   private readonly deps: InstantEvalJudgeRouteRunDeps;
@@ -58,26 +82,21 @@ export class InstantEvalJudgeRouteRunService {
   private readonly projectId: string;
   private readonly signal: AbortSignal | undefined;
   private readonly logger: Pick<Logger, "error">;
+  private readonly scenario: InstantEvalJudgeScenarioLeg | undefined;
   private readonly ceilingSend: InstantEvalJudgeCeilingSendService | undefined;
   private readonly backends: InstantEvalJudgeBackendSendService;
   private readonly flags: string[] = [];
   private inputTokens = 0;
   private costNanoUsd = 0;
 
-  private constructor(input: {
-    deps: InstantEvalJudgeRouteRunDeps;
-    plan: InstantEvalJudgeRoutePlan;
-    projectId: string;
-    signal: AbortSignal | undefined;
-    logger: Pick<Logger, "error">;
-    costCeiling?: InstantEvalJudgeCostCeiling | undefined;
-  }) {
+  private constructor(input: InstantEvalJudgeRouteRunInput) {
     this.deps = input.deps;
     this.plan = input.plan;
     this.projectId = input.projectId;
     this.signal = input.signal;
     this.logger = input.logger;
-    const { costCeiling, logger } = input;
+    this.scenario = input.scenario;
+    const { costCeiling, logger, scenario } = input;
     this.backends = InstantEvalJudgeBackendSendService.create({
       ...input.deps,
       projectId: input.projectId,
@@ -85,6 +104,7 @@ export class InstantEvalJudgeRouteRunService {
       signal: input.signal,
       logger,
       flag: (flag) => this.flags.push(flag),
+      ...(scenario ? { scenario } : {}),
     });
     this.ceilingSend = costCeiling
       ? InstantEvalJudgeCeilingSendService.create({ costCeiling, logger })
@@ -95,15 +115,7 @@ export class InstantEvalJudgeRouteRunService {
     if (longerView) this.flags.push(`${longerView}_view_not_shorter`);
   }
 
-  static create(input: {
-    deps: InstantEvalJudgeRouteRunDeps;
-    plan: InstantEvalJudgeRoutePlan;
-    projectId: string;
-    signal: AbortSignal | undefined;
-    logger: Pick<Logger, "error">;
-    /** A judged query's spend cap: each send holds its worst case first (ADR-190 decision 13). */
-    costCeiling?: InstantEvalJudgeCostCeiling | undefined;
-  }): InstantEvalJudgeRouteRunService {
+  static create(input: InstantEvalJudgeRouteRunInput): InstantEvalJudgeRouteRunService {
     return new InstantEvalJudgeRouteRunService(input);
   }
 
@@ -191,6 +203,7 @@ export class InstantEvalJudgeRouteRunService {
       flag: (flag) => this.flags.push(flag),
       ask: (input) => this.ask(input),
       askOne: (input) => this.askOne(input),
+      taskOf: (question) => this.scenario?.criterionText ?? question.instructions,
     }).ask(questions);
     const legs = asked.filter(isInstantEvalJudgeLegAnswered);
     const failed = asked.findLast((leg) => leg.outcome === "failed");
@@ -300,8 +313,7 @@ export class InstantEvalJudgeRouteRunService {
   }
 
   private isLlm(backend: string): boolean {
-    const kind = this.deps.table.backends[backend]?.kind;
-    return kind === "anthropic_messages" || kind === "openai_responses";
+    return isInstantEvalJudgeLlmKind(this.deps.table.backends[backend]?.kind);
   }
 
   /**
@@ -361,18 +373,17 @@ export class InstantEvalJudgeRouteRunService {
     inputTokens: number;
     outputTokens: number;
   }): number {
-    if (inputTokens <= 0 && outputTokens <= 0) return 0;
-    this.inputTokens += inputTokens;
-    const cost = instantEvalJudgeCallCostOf({
+    const before = this.costNanoUsd;
+    const after = instantEvalJudgeSpendAfterCall({
+      spend: { inputTokens: this.inputTokens, costNanoUsd: before },
       backend,
       inputTokens,
       outputTokens,
       pricing: this.deps.pricing,
     });
-    if (cost.outcome === "priced") {
-      this.costNanoUsd += cost.costNanoUsd;
-      return cost.costNanoUsd;
-    }
+    this.inputTokens = after.spend.inputTokens;
+    this.costNanoUsd = after.spend.costNanoUsd;
+    if (!after.isUnpriced) return this.costNanoUsd - before;
     this.flags.push(`unpriced:${backend}`);
     // Boot refuses a table with an unpriced reachable backend, so this is a bug, not a deploy slip.
     this.logger.error(

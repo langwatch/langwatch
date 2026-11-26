@@ -33,6 +33,7 @@ import { InstantEvalJudgeCeilingSendService } from "./instant-eval-judge-ceiling
 import {
   InstantEvalJudgeRouteRunService,
   type InstantEvalJudgeRouteRunDeps,
+  type InstantEvalJudgeScenarioLeg,
 } from "./instant-eval-judge-route-run.service.ts";
 
 const defaultLogger: Logger = createLogger("langwatch:instant-eval-judge:router");
@@ -43,6 +44,8 @@ type InstantEvalJudgeRouterServiceDeps = InstantEvalJudgeRouteRunDeps &
 /** A routed classification: today's input with the route it carries. */
 type RoutedClassification = Omit<InstantEvalClassification, "route" | "decisionModel"> & {
   readonly route: InstantEvalJudgeRouteRequest;
+  /** Present for a scenario criterion: its LLM legs read the judge's own verdict call. */
+  readonly scenario?: InstantEvalJudgeScenarioLeg;
 };
 
 export class InstantEvalJudgeRouterService {
@@ -81,7 +84,7 @@ export class InstantEvalJudgeRouterService {
     input: RoutedClassification;
     groups: readonly { kind: InstantEvalQuestionKind; questions: readonly InstantEvalQuestion[] }[];
   }): Promise<InstantEvalJudgeKindPart>[] {
-    const { projectId, text, signal, route, costCeiling } = input;
+    const { projectId, text, signal, route, scenario, costCeiling } = input;
     const { table } = this.deps;
     const plans = groups.map(({ kind, questions }) =>
       instantEvalJudgeRoutePlanOf({ route, text, questions, table, kind }),
@@ -93,6 +96,7 @@ export class InstantEvalJudgeRouterService {
         projectId,
         signal,
         logger: this.logger,
+        scenario,
         costCeiling,
       }),
     );

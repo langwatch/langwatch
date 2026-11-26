@@ -41,6 +41,9 @@ export const reads = {
     "modules/dashboard/process/src/**/*",
     "modules/topic/process/src/**/*",
   ],
+  "@langwatch/scenario-child": [
+    "modules/instant-eval-judge/process/src/__tests__/support/scenario-sdk-finish-test.json",
+  ],
   "@langwatch/scenario-process": ["infra/docker/Dockerfile", "infra/docker/prune-runtime-tree.sh"],
   "@langwatch/stored-object-process": [
     "modules/stored-object/**/*",

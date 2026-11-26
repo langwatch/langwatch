@@ -18,6 +18,7 @@ import type {
   ScenarioGoChildChannel,
 } from "../channels/scenario-child.channel.ts";
 import { ScenarioChildChoiceService } from "../features/child/services/scenario-child-choice.service.ts";
+import type { JudgePreviewAvailabilityService } from "../features/judge-preview/services/judge-preview-availability.service.ts";
 import { ScenarioExecutionPrefetcherService } from "../features/prefetch/services/scenario-execution-prefetcher.service.ts";
 import { ScenarioVoiceTargetService } from "../features/voice/services/scenario-voice-target.service.ts";
 import type { VoiceNonceRegistryService } from "../features/voice/services/voice-nonce-registry.service.ts";
@@ -66,6 +67,8 @@ type ScenarioExecutorInput = Readonly<{
   cancellationSubscriptions: CancellationSubscriber;
   config: ScenarioServerConfig;
   host: ScenarioExecutorHost;
+  /** The module's one availability check, asked before a run on LangWatch Judge (preview). */
+  judgePreviewAvailability: JudgePreviewAvailabilityService;
 }>;
 
 /**
@@ -130,6 +133,7 @@ export class ScenarioExecutorService {
       secrets: peers.secrets,
       traces: peers.traces,
       apiKeys: peers.apiKeys,
+      judgePreviewAvailability: this.input.judgePreviewAvailability,
       voiceTargets: ScenarioVoiceTargetService.create({
         agents: peers.agents,
         modelProviders: peers.modelProviders,

@@ -28,6 +28,8 @@ type InstantEvalJudgeGatedLegsInput = Readonly<{
   logger: Pick<Logger, "error">;
   /** Adds a routing flag to the run's. */
   flag: (flag: string) => void;
+  /** The gate's task line for a question: a criterion's raw text, else its instructions. */
+  taskOf: (question: InstantEvalQuestion) => string;
   /** A backend, then its fallbacks but those in `skip`. */
   ask: (input: {
     backend: string;
@@ -93,7 +95,7 @@ export class InstantEvalJudgeGatedLegsService {
       const asked = instantEvalJudgeGateQuestionOf({ name: gate.question, id: question.id });
       const text = instantEvalJudgeGateInputOf({
         job: plan.job,
-        task: question.instructions,
+        task: this.input.taskOf(question),
         text: plan.fullText,
       });
       return this.input.askOne({ backend: gate.backend, questions: [asked], text });

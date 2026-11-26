@@ -28,8 +28,26 @@ const INSTANT_EVAL_JUDGE_BACKEND_KINDS = [
   "decisions",
   "anthropic_messages",
   "openai_responses",
+  "gemini_generate_content",
 ] as const;
 export type InstantEvalJudgeBackendKind = (typeof INSTANT_EVAL_JUDGE_BACKEND_KINDS)[number];
+
+/** The kinds that answer as an LLM: one question per call, taken as sure. */
+export const INSTANT_EVAL_JUDGE_LLM_KINDS = [
+  "anthropic_messages",
+  "openai_responses",
+  "gemini_generate_content",
+] as const satisfies readonly InstantEvalJudgeBackendKind[];
+export type InstantEvalJudgeLlmKind = (typeof INSTANT_EVAL_JUDGE_LLM_KINDS)[number];
+
+export function isInstantEvalJudgeLlmKind(
+  kind: InstantEvalJudgeBackendKind | undefined,
+): kind is InstantEvalJudgeLlmKind {
+  return kind !== undefined && (INSTANT_EVAL_JUDGE_LLM_KINDS as readonly string[]).includes(kind);
+}
+
+/** A Gemini model id rides in the request path, so it is held to the characters an id uses. */
+const GEMINI_MODEL_ID = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
 
 /**
  * The reasoning effort an OpenAI Responses backend may be asked for; unset, the model's own.
@@ -270,6 +288,14 @@ const instantEvalJudgeRouteTableSchemaDefinition = z
     routes: perJob(z.record(z.string(), routeSlotSchema)),
     /** Score and category questions' slots; a kind left out takes today's classifier call. */
     kinds: kindsSchema.default({}),
+    /**
+     * The LLM backend that answers a scenario judge's turn decision (go on, or judge now). That
+     * phase is not routed; a table without it answers no turn decision.
+     */
+    scenarioDecision: z
+      .object({ backend: z.string().min(1) })
+      .readonly()
+      .optional(),
   })
   .superRefine((table, ctx) => {
     for (const issue of routeTableIssues(table)) ctx.addIssue({ code: "custom", message: issue });
@@ -301,7 +327,17 @@ function routeTableIssues(table: RouteTableShape): string[] {
     issues.push(...backendIssues({ table, name, backend }));
   }
   issues.push(...kindIssues({ table, slotKeys }));
+  issues.push(...scenarioDecisionIssues(table));
   return issues;
+}
+
+/** The turn decision is the judge's own tool call, which only an LLM backend can take. */
+function scenarioDecisionIssues(table: RouteTableShape): string[] {
+  const name = table.scenarioDecision?.backend;
+  if (name === undefined) return [];
+  if (!table.backends[name]) return [`scenarioDecision: unknown backend ${name}`];
+  if (!isLlmBackendOf(table)(name)) return [`scenarioDecision: ${name} is not an LLM backend`];
+  return [];
 }
 
 /** Each routed kind's default slot and every slot it names, on known jobs and slot keys. */
@@ -370,8 +406,7 @@ function bucketIssues(buckets: RouteTableShape["buckets"]): string[] {
 /** The kinds that cannot answer without a model id in the table: there is no default. */
 const KINDS_NEEDING_A_MODEL: readonly InstantEvalJudgeBackendKind[] = [
   "decisions",
-  "anthropic_messages",
-  "openai_responses",
+  ...INSTANT_EVAL_JUDGE_LLM_KINDS,
 ];
 
 function backendIssues({
@@ -383,19 +418,7 @@ function backendIssues({
   name: string;
   backend: InstantEvalJudgeBackend;
 }): string[] {
-  const issues: string[] = [];
-  if (KINDS_NEEDING_A_MODEL.includes(backend.kind) && !backend.model) {
-    issues.push(`backend ${name}: a ${backend.kind} backend must name its model`);
-  }
-  if (
-    backend.reasoningEffort !== undefined &&
-    !KINDS_TAKING_A_REASONING_EFFORT.includes(backend.kind)
-  ) {
-    issues.push(`backend ${name}: a ${backend.kind} backend takes no reasoningEffort`);
-  }
-  if (backend.maxOutputTokens !== undefined && !KINDS_TAKING_AN_OUTPUT_CAP.includes(backend.kind)) {
-    issues.push(`backend ${name}: a ${backend.kind} backend takes no maxOutputTokens`);
-  }
+  const issues = backendKindIssues({ name, backend });
   const floorMs = instantEvalJudgeReasoningTimeoutFloorMsOf(backend);
   if (isInstantEvalJudgeReasoning(backend.reasoningEffort) && backend.timeoutMs < floorMs) {
     const cap =
@@ -409,6 +432,37 @@ function backendIssues({
   for (const fallback of backend.fallbacks) {
     if (!table.backends[fallback]) issues.push(`backend ${name}: unknown fallback ${fallback}`);
     if (fallback === name) issues.push(`backend ${name}: lists itself as a fallback`);
+  }
+  return issues;
+}
+
+/** What the backend's kind allows: a model id, a reasoning effort, an output cap. */
+function backendKindIssues({
+  name,
+  backend,
+}: {
+  name: string;
+  backend: InstantEvalJudgeBackend;
+}): string[] {
+  const issues: string[] = [];
+  if (KINDS_NEEDING_A_MODEL.includes(backend.kind) && !backend.model) {
+    issues.push(`backend ${name}: a ${backend.kind} backend must name its model`);
+  }
+  if (
+    backend.kind === "gemini_generate_content" &&
+    backend.model &&
+    !GEMINI_MODEL_ID.test(backend.model)
+  ) {
+    issues.push(`backend ${name}: a gemini_generate_content model is a bare model id`);
+  }
+  if (
+    backend.reasoningEffort !== undefined &&
+    !KINDS_TAKING_A_REASONING_EFFORT.includes(backend.kind)
+  ) {
+    issues.push(`backend ${name}: a ${backend.kind} backend takes no reasoningEffort`);
+  }
+  if (backend.maxOutputTokens !== undefined && !KINDS_TAKING_AN_OUTPUT_CAP.includes(backend.kind)) {
+    issues.push(`backend ${name}: a ${backend.kind} backend takes no maxOutputTokens`);
   }
   return issues;
 }
@@ -517,9 +571,19 @@ function pairMembersOf({
  */
 function isLlmBackendOf(table: RouteTableShape) {
   return (name: string): boolean => {
-    const kind = table.backends[name]?.kind;
-    return kind === "anthropic_messages" || kind === "openai_responses";
+    return isInstantEvalJudgeLlmKind(table.backends[name]?.kind);
   };
+}
+
+/** Whether a backend answers as an LLM: one question per call, taken as sure. */
+export function isInstantEvalJudgeLlmBackend({
+  backend,
+  table,
+}: {
+  backend: string;
+  table: InstantEvalJudgeRouteTable;
+}): boolean {
+  return isLlmBackendOf(table)(backend);
 }
 
 /** Every backend an entry may call, its gate included, in the order it may call them. */

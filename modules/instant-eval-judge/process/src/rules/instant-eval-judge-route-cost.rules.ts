@@ -11,15 +11,16 @@ import {
   type InstantEvalJudgeRouteTable,
   type InstantEvalQuestion,
   instantEvalTextBudget,
+  isInstantEvalJudgeLlmKind,
   NANO_USD_PER_USD,
 } from "@langwatch/instant-eval-judge-contract";
 
 import { prepareInstantEvalText } from "./instant-eval-classifier-text.rules.ts";
+import { instantEvalLlmJudgePromptOf } from "./instant-eval-llm-judge-wire.rules.ts";
 import {
-  INSTANT_EVAL_LLM_JUDGE_CONTENT_BUDGET_TOKENS,
+  instantEvalLlmContentBudgetTokensOf,
   instantEvalLlmJudgeMaxOutputTokensOf,
-  instantEvalLlmJudgePromptOf,
-} from "./instant-eval-llm-judge-wire.rules.ts";
+} from "./instant-eval-llm-tool-call-wire.rules.ts";
 
 const NANO_USD_PER_MILLION_TOKENS_PER_USD = 1_000;
 
@@ -50,6 +51,38 @@ export function instantEvalJudgeCallCostOf({
     (inputTokens * rate.usdPerMillionInputTokens + outputTokens * rate.usdPerMillionOutputTokens) *
     NANO_USD_PER_MILLION_TOKENS_PER_USD;
   return { outcome: "priced", costNanoUsd: Math.round(nano) };
+}
+
+/** What a judgement's calls have spent so far: the input tokens and their cost. */
+export type InstantEvalJudgeSpend = Readonly<{ inputTokens: number; costNanoUsd: number }>;
+
+/**
+ * The spend after one more call, and whether that call had no price. A call that billed no
+ * tokens changes nothing; an unpriced one adds its tokens and no cost, for its caller to flag.
+ */
+export function instantEvalJudgeSpendAfterCall({
+  spend,
+  backend,
+  inputTokens,
+  outputTokens,
+  pricing,
+}: {
+  spend: InstantEvalJudgeSpend;
+  backend: string;
+  inputTokens: number;
+  outputTokens: number;
+  pricing: InstantEvalJudgeRoutePricing;
+}): Readonly<{ spend: InstantEvalJudgeSpend; isUnpriced: boolean }> {
+  if (inputTokens <= 0 && outputTokens <= 0) return { spend, isUnpriced: false };
+  const cost = instantEvalJudgeCallCostOf({ backend, inputTokens, outputTokens, pricing });
+  const costNanoUsd = cost.outcome === "priced" ? cost.costNanoUsd : 0;
+  return {
+    spend: {
+      inputTokens: spend.inputTokens + inputTokens,
+      costNanoUsd: spend.costNanoUsd + costNanoUsd,
+    },
+    isUnpriced: cost.outcome === "unpriced",
+  };
 }
 
 /**
@@ -118,7 +151,7 @@ export function instantEvalJudgeSendWorstCaseNanoUsd({
   const costOf = ({ bytes, outputTokens }: { bytes: number; outputTokens: number }) =>
     ((bytes + INSTANT_EVAL_JUDGE_SEND_SLACK_TOKENS) * inputRate + outputTokens * outputRate) *
     NANO_USD_PER_MILLION_TOKENS_PER_USD;
-  if (config.kind === "anthropic_messages" || config.kind === "openai_responses") {
+  if (isInstantEvalJudgeLlmKind(config.kind)) {
     const outputTokens = instantEvalLlmJudgeMaxOutputTokensOf({
       wire: config.kind,
       reasoningEffort: config.reasoningEffort,
@@ -126,7 +159,7 @@ export function instantEvalJudgeSendWorstCaseNanoUsd({
     });
     const fitted = prepareInstantEvalText({
       text,
-      budgetTokens: INSTANT_EVAL_LLM_JUDGE_CONTENT_BUDGET_TOKENS,
+      budgetTokens: instantEvalLlmContentBudgetTokensOf(config.kind),
     }).text;
     return ceilNanoUsd(
       sumOf(

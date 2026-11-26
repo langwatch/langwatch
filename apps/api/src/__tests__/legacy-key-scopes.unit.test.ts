@@ -116,6 +116,7 @@ describe("the routes each legacy project key scope flag opens", () => {
           "GET simulation-runs /:scenarioRunId",
           "GET simulation-runs /batches/:batchRunId",
           "GET simulation-runs /batches/list",
+          "POST judge-preview /api/judge-preview/v1/chat/completions",
           "POST scenario-events /",
           "POST scenario-events /browser-tab",
         ],
