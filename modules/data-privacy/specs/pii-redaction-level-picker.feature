@@ -98,6 +98,28 @@ Feature: The organization picks its PII redaction level on the Data Privacy page
     Given billing charges 500 nano-dollars per character for the PII redaction model
     Then the page shows "$0.50 per 1M characters"
 
+  # The euro price sits on the same dollar meter at 0.85 euros per dollar (ADR-201 decision 11).
+  @unit
+  Scenario: The euro price is 0.85 of the dollar rate
+    Given billing charges 500 nano-dollars per character for the PII redaction model
+    When the organization's subscription is in euros
+    Then the page shows "€0.425 per 1M characters"
+
+  @integration
+  Scenario: Strict shows the euro price to an organization on a euro Growth subscription
+    Given release_pii_redaction_model_enabled is on for "acme"
+    And "acme" is on a Growth subscription in euros
+    When an admin opens the Data Privacy page for project "web-app"
+    Then Strict reads "€0.425 per 1M characters excl. VAT, pay as you go"
+    And turning Strict on asks at "€0.425 per 1M characters"
+
+  @unit
+  Scenario: The price currency is the subscription's, read from its Growth plan
+    Given the organization's active plan as billing answers it
+    When the plan is a euro Growth seat plan
+    Then the price is quoted in euros
+    And any other plan, a plan not yet read, or one the reader may not read quotes dollars
+
   @unit
   Scenario: Changing the organization level keeps the rest of the organization rule
     Given an organization rule with PII level custom, its entities and one exception pattern

@@ -27,6 +27,7 @@ import { expect, vi } from "vitest";
 import type { dataPrivacyApi } from "../../../behavior/data-privacy-api.ts";
 import {
   DataPrivacyHostApi,
+  type PrivacyBillingCurrency,
   DataPrivacyHostProvider,
   type PrivacyFailureNotice,
   type PrivacyHostScope,
@@ -122,12 +123,20 @@ export class TestPrivacyHost extends DataPrivacyHostApi {
 
   constructor(
     private query: Readonly<Record<string, string | undefined>> = {},
-    private readonly plan: { licence: PrivacyLicence; mayManageLicence: boolean } = {
+    private readonly plan: {
+      licence: PrivacyLicence;
+      mayManageLicence: boolean;
+      billingCurrency?: PrivacyBillingCurrency;
+    } = {
       licence: "enterprise",
       mayManageLicence: true,
     },
   ) {
     super();
+  }
+
+  billingCurrency(): PrivacyBillingCurrency {
+    return this.plan.billingCurrency ?? "USD";
   }
 
   licence(): PrivacyLicence {
@@ -168,6 +177,7 @@ export function renderScreen({
   isSaaS = true,
   licence = "enterprise",
   mayManageLicence = true,
+  billingCurrency = "USD",
   query = {},
 }: {
   screenElement: ReactElement;
@@ -178,9 +188,10 @@ export function renderScreen({
   isSaaS?: boolean;
   licence?: PrivacyLicence;
   mayManageLicence?: boolean;
+  billingCurrency?: PrivacyBillingCurrency;
   query?: Record<string, string>;
 }) {
-  const host = new TestPrivacyHost(query, { licence, mayManageLicence });
+  const host = new TestPrivacyHost(query, { licence, mayManageLicence, billingCurrency });
   const answers: Record<string, boolean> = {
     release_pii_redaction_model_enabled: flagOn,
     release_pii_redaction_model_free: free,

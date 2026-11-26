@@ -61,8 +61,9 @@ export function OrganizationPiiLevelSection({
   const stored = organizationPiiLevel(storedPii.level);
   const shown = picked && picked.over === stored ? picked.level : stored;
   const ownRule = organizationRule({ rules: snapshot.rules, organizationId });
+  const currency = host.billingCurrency();
   const confirmationFor = (level: OrganizationPiiLevel) =>
-    levelChangeConfirmation({ from: storedPii.level, to: level, free });
+    levelChangeConfirmation({ from: storedPii.level, to: level, free, currency });
   const confirmation = asking ? confirmationFor(asking) : null;
 
   const save = async (level: OrganizationPiiLevel) => {
@@ -94,6 +95,7 @@ export function OrganizationPiiLevelSection({
         free={free}
         licensed={licensed}
         split={split}
+        currency={currency}
         canWrite={snapshot.available.organization !== null}
         isSaving={setForScope.isPending}
         onPick={(level) => (confirmationFor(level) ? setAsking(level) : void save(level))}

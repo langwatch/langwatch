@@ -2,6 +2,7 @@ import type { PiiLevel } from "@langwatch/data-privacy-contract";
 import { Card } from "@langwatch/design-system/card";
 import { Badge, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 
+import type { PrivacyBillingCurrency } from "../../model/data-privacy-host.ts";
 import {
   ESSENTIAL_MISSES,
   organizationPiiLevel,
@@ -16,12 +17,14 @@ export function PiiRedactionLevelDetail({
   free,
   licensed = false,
   split = false,
+  currency = "USD",
 }: {
   level: PiiLevel;
   free: boolean;
   licensed?: boolean;
   /** Long spans go to the model in parts (ADR-207): the small print names the split limit. */
   split?: boolean;
+  currency?: PrivacyBillingCurrency;
 }) {
   const shown = organizationPiiLevel(level);
   if (!shown) return null;
@@ -36,7 +39,12 @@ export function PiiRedactionLevelDetail({
             <Badge size="sm" variant="subtle" colorPalette="green">
               {PII_REDACTION_MODEL_NAME}
             </Badge>
-            <PiiRedactionModelPrice free={free} licensed={licensed} split={split} />
+            <PiiRedactionModelPrice
+              free={free}
+              licensed={licensed}
+              split={split}
+              currency={currency}
+            />
           </>
         ) : (
           <Badge size="sm" variant="subtle" colorPalette="gray">

@@ -10,12 +10,13 @@ import type {
   PiiLevel,
 } from "@langwatch/data-privacy-contract";
 import {
+  PII_REDACTION_EUR_PER_USD,
   PII_REDACTION_MODEL_MAX_BATCH_CHARACTERS,
   PII_REDACTION_MODEL_MAX_SPLIT_CHARACTERS,
   PII_REDACTION_NANO_USD_PER_CHARACTER,
 } from "@langwatch/data-privacy-contract/pii-redaction-spend";
 
-import type { PrivacyLicence } from "./data-privacy-host.ts";
+import type { PrivacyBillingCurrency, PrivacyLicence } from "./data-privacy-host.ts";
 
 /** The two levels the organization picker offers. */
 export type OrganizationPiiLevel = "essential" | "strict";
@@ -25,23 +26,28 @@ export const PII_REDACTION_MODEL_NAME = "LangWatch PII Redaction Model";
 const NANO_USD_PER_USD = 1_000_000_000;
 const PRICE_UNIT_CHARACTERS = 1_000_000;
 
-/** "$0.50": the rate billing charges, per 1M characters (ADR-201). */
+/** "$0.50", or "€0.425" to a euro subscription: the rate billing charges per 1M characters. */
 export function piiRedactionModelPrice({
   nanoUsdPerCharacter,
+  currency = "USD",
 }: {
   nanoUsdPerCharacter: number;
+  currency?: PrivacyBillingCurrency;
 }): string {
   const usd = (nanoUsdPerCharacter * PRICE_UNIT_CHARACTERS) / NANO_USD_PER_USD;
   return new Intl.NumberFormat("en-US", {
     style: "currency",
-    currency: "USD",
+    currency,
     minimumFractionDigits: 2,
-  }).format(usd);
+    maximumFractionDigits: 3,
+  }).format(currency === "EUR" ? usd * PII_REDACTION_EUR_PER_USD : usd);
 }
 
-export const PII_REDACTION_MODEL_PRICE = piiRedactionModelPrice({
-  nanoUsdPerCharacter: PII_REDACTION_NANO_USD_PER_CHARACTER,
-});
+/** The published price in the subscription's currency. */
+export const piiRedactionModelPriceIn = (currency: PrivacyBillingCurrency = "USD"): string =>
+  piiRedactionModelPrice({ nanoUsdPerCharacter: PII_REDACTION_NANO_USD_PER_CHARACTER, currency });
+
+export const PII_REDACTION_MODEL_PRICE = piiRedactionModelPriceIn("USD");
 export const PII_REDACTION_MODEL_PRICE_UNIT = "per 1M characters excl. VAT, pay as you go";
 
 export const STRICT_BILLING_NOTE =
@@ -92,7 +98,13 @@ export const STRICT_BILLED_NOTE =
  */
 export type PiiRedactionModelOffer =
   /** `split`: the organization's long spans go to the model in parts (ADR-207); Cloud only. */
-  | { kind: "model"; free: boolean; licensed?: boolean; split: boolean }
+  | {
+      kind: "model";
+      free: boolean;
+      licensed?: boolean;
+      split: boolean;
+      currency?: PrivacyBillingCurrency;
+    }
   | { kind: "rule-based"; note: Exclude<StrictRuleBasedNote, "licence"> }
   /** `activate`: this reader may activate a license, so the advert links there. */
   | { kind: "rule-based"; note: "licence"; activate: boolean }
@@ -110,6 +122,7 @@ export function piiRedactionModelOfferOf({
   splitFlag,
   licence,
   mayManageLicence,
+  currency = "USD",
 }: {
   isSaaS: boolean;
   /** `undefined` while the flags are not answered yet: no offer then, so nothing flashes. */
@@ -118,9 +131,13 @@ export function piiRedactionModelOfferOf({
   splitFlag: boolean;
   licence: PrivacyLicence;
   mayManageLicence: boolean;
+  /** The subscription's currency, which a priced Cloud offer quotes in. */
+  currency?: PrivacyBillingCurrency;
 }): PiiRedactionModelOffer {
   if (isSaaS)
-    return modelFlag === true ? { kind: "model", free: freeFlag, split: splitFlag } : null;
+    return modelFlag === true
+      ? { kind: "model", free: freeFlag, split: splitFlag, currency }
+      : null;
   if (licence === "loading" || licence === "unknown" || modelFlag === undefined) return null;
   if (licence === "none")
     return { kind: "rule-based", note: "licence", activate: mayManageLicence };
@@ -140,16 +157,18 @@ export function levelChangeConfirmation({
   from,
   to,
   free,
+  currency = "USD",
 }: {
   from: PiiLevel;
   to: OrganizationPiiLevel;
   free: boolean;
+  currency?: PrivacyBillingCurrency;
 }): LevelChangeConfirmation | null {
   const replacesCustom = from === "custom" ? "This replaces your custom PII settings. " : "";
   if (to === "strict" && !free) {
     return {
       title: "Turn on Strict?",
-      description: `${replacesCustom}Strict uses the ${PII_REDACTION_MODEL_NAME} at ${PII_REDACTION_MODEL_PRICE} ${PII_REDACTION_MODEL_PRICE_UNIT}. Turn it on?`,
+      description: `${replacesCustom}Strict uses the ${PII_REDACTION_MODEL_NAME} at ${piiRedactionModelPriceIn(currency)} ${PII_REDACTION_MODEL_PRICE_UNIT}. Turn it on?`,
       confirmLabel: "Turn on Strict",
     };
   }
@@ -185,7 +204,12 @@ export function ruleSaveConfirmation({
 }): LevelChangeConfirmation | null {
   if (offer?.kind !== "model" || offer.free) return null;
   if (after.pii?.level !== "strict" || before?.pii?.level === "strict") return null;
-  return levelChangeConfirmation({ from: "essential", to: "strict", free: false });
+  return levelChangeConfirmation({
+    from: "essential",
+    to: "strict",
+    free: false,
+    ...(offer.currency ? { currency: offer.currency } : {}),
+  });
 }
 
 /** How the picker names a level it does not offer: "Off", or "Custom (2 types)". */

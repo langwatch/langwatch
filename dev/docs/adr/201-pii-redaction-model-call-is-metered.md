@@ -14,6 +14,10 @@ caller (ADR-207) and stays one priced batch: decisions 2, 6 and 12 say how.
 **Revised 2026-11-26:** usage is billed only from the moment the PII redaction price line was
 added to the Stripe subscription, never from the month's first day (decision 15).
 
+**Revised 2026-11-26:** euro Growth subscriptions are charged through a euro price on the same
+dollar meter, at 0.85 euros per dollar of usage, picked from the Stripe subscription's currency
+(decision 11, tasks#1305).
+
 > One line: every strict batch the PII redaction model answers is priced in data-privacy at a
 > published rate per character and recorded as a priced fact; gateway writes it to
 > `gateway_spend` as request type `pii_redaction`; billing reports the month's dollars on a
@@ -90,14 +94,21 @@ added to the Stripe subscription, never from the month's first day (decision 15)
     subscription line prices and bills it at nothing, so a report would advance the checkpoint
     and lose the charge. The PII meter first lists the customer's subscriptions at Stripe and
     reports only when an active, past-due or trialing one has a line on
-    `GROWTH_PII_REDACTION_USD`, by price id, lookup key or `langwatch_key` metadata. The check
+    `GROWTH_PII_REDACTION_USD` or `GROWTH_PII_REDACTION_EUR`, by price id, lookup key or
+    `langwatch_key` metadata, in one subscriptions read. The check
     is shared with Instant Evals and behaves as ADR-174 decision 18 says: a held month sends
     nothing, writes no total and warns with the amount held; a failed read counts toward the
     circuit breaker; a pending total is replayed. The other meters do not wait on it.
-11. **Checkout adds the price.** A Growth checkout in dollars carries the metered
-    `GROWTH_PII_REDACTION_USD` line, like Instant Evals, wherever the mode maps it. Euros carry
-    none: the meter counts dollars. The price is $1.00 per meter unit (one dollar redacted),
-    monthly, mapped in test mode only until live is provisioned.
+11. **Checkout adds the price in the subscription's currency (revised 2026-11-26).** A Growth
+    checkout in dollars carries the metered `GROWTH_PII_REDACTION_USD` line, like Instant Evals,
+    wherever the mode maps it: $1.00 per meter unit (one dollar redacted), monthly, mapped in
+    test mode only until live is provisioned. A checkout in euros carries
+    `GROWTH_PII_REDACTION_EUR` on the same dollar meter at 85 euro cents per meter unit: the
+    dollar price's unit amount times 0.85, the seat ratio of EUR 29 to USD 34. The currency is
+    the one Stripe holds the customer in, never `Organization.currency`, which can disagree.
+    Neither mode maps a euro id yet; until an operator creates the price under that lookup key
+    and the price sync maps it, a euro checkout carries no PII line. The settings page quotes
+    Strict at 0.425 euros per 1M characters to a euro Growth subscription, read off its plan.
 12. **No free monthly amount.** Every character the model is sent is priced from the first one
     of the month, or of its price line when that was added later (decision 15); the meter reports
     that whole total, nothing taken off. The characters
@@ -127,7 +138,15 @@ added to the Stripe subscription, never from the month's first day (decision 15)
 
 Pricing in code (Instant Evals) over a count priced in Stripe (billable events) was the
 product's call: it reuses the ledger, the spend page and the monthly report as they are. The
-cost is a USD-only price and a deploy for every price change. A meter of its own keeps the
+cost is a price set in dollars and a deploy for every price change.
+
+Euro customers pay through a second price on the same meter at a fixed 0.85 euros per dollar
+(decision 11). A fixed ratio keeps an invoice the same every month, as seats are; the cost is
+that euro and dollar customers drift apart in real terms as the exchange rate moves, until a
+re-price, and a live rate was rejected because the invoice would change month to month. One
+meter keeps usage in one place with one checkpoint, so a currency never splits or double counts
+it; the cost is a meter named in dollars that invoices euros. A separate euro meter was rejected
+as two meters to keep in step. The price sync refuses a euro price that drifts from the ratio. A meter of its own keeps the
 invoice line honest and lets charging start independently of Instant Evals.
 
 No free monthly amount (decision 12) keeps the price one number a customer can check against

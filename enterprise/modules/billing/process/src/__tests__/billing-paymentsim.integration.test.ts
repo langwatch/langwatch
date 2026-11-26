@@ -3,6 +3,7 @@
  * calls, real signed deliveries into the mounted Stripe callback, over the memory tier.
  * @vitest-environment node
  * @see specs/setup/payment-simulator.feature
+ * @see enterprise/modules/billing/specs/euro-usage-prices.feature
  */
 import { type ChildProcess, spawn, spawnSync } from "node:child_process";
 import { createServer, type Server } from "node:http";
@@ -62,6 +63,7 @@ const GROWTH_SEAT_EUR_MONTHLY = "price_1SyxCwIMsTw08cudPPOqniRl";
 const GROWTH_INSTANT_EVAL_USD = "price_instant_eval_usd_sim";
 const INSTANT_EVAL_METER = "mtr_instant_eval_usd_sim";
 const GROWTH_INSTANT_EVAL_USD_REPRICED = "price_instant_eval_usd_sim_v2";
+const GROWTH_INSTANT_EVAL_EUR = "price_instant_eval_eur_sim";
 const NICKNAMED_LOOKALIKE = "price_instant_eval_lookalike_sim";
 const REPO_ROOT = fileURLToPath(new URL("../../../../../../", import.meta.url));
 const CATALOG = fileURLToPath(
@@ -492,18 +494,16 @@ describe.skipIf(!goPresent)(
         queryPiiRedactionSpendTotal: (input) =>
           piiRedactionSpend.queryPiiRedactionSpendTotal(input),
         isPiiRedactionMeterProvisioned: () => true,
-        subscriptionPriceLine: async ({ stripeCustomerId, price, billingMonth }) =>
+        subscriptionPriceLine: async ({ stripeCustomerId, prices, billingMonth }) =>
           priceLineOf({
             subscriptions: await stripeChannels.subscriptions.listCustomerSubscriptions({
               customerId: stripeCustomerId,
             }),
-            prices: [
-              {
-                priceName: price,
-                priceId:
-                  price === "GROWTH_PII_REDACTION_USD" ? GROWTH_PII_REDACTION_USD : undefined,
-              },
-            ],
+            prices: prices.map((priceName) => ({
+              priceName,
+              priceId:
+                priceName === "GROWTH_PII_REDACTION_USD" ? GROWTH_PII_REDACTION_USD : undefined,
+            })),
             billingMonth,
           }),
         errorReporter,
@@ -672,6 +672,8 @@ describe.skipIf(!goPresent)(
 
     /** @scenario "Only a subscription with the Instant Evals price reaches the Stripe simulator" */
     /** @scenario "A re-priced Instant Evals line is still recognised" */
+    /** @scenario "A euro subscription's Instant Evals usage is invoiced at 0.85 euros per dollar" */
+    /** @scenario "An organization whose currency disagrees with its Stripe subscription is reported on the subscription's price" */
     it("reports Instant Eval usage only to the subscription that carries its price", async () => {
       // The catalog maps no Instant Evals meter or price in test mode yet, so both are seeded here.
       await control("/meters", {
@@ -688,6 +690,22 @@ describe.skipIf(!goPresent)(
           lookup_key: "GROWTH_INSTANT_EVAL_USD",
         },
       });
+      // The euro price on the same dollar meter, at 0.85 euros per dollar of usage.
+      await control("/prices", {
+        body: {
+          id: GROWTH_INSTANT_EVAL_EUR,
+          currency: "eur",
+          unit_amount: 85,
+          interval: "month",
+          usage_type: "metered",
+          meter: INSTANT_EVAL_METER,
+          lookup_key: "GROWTH_INSTANT_EVAL_EUR",
+        },
+      });
+      const instantEvalCatalogue: Record<string, string | undefined> = {
+        GROWTH_INSTANT_EVAL_USD,
+        GROWTH_INSTANT_EVAL_EUR,
+      };
       // A re-price under the same keys with another nickname, and a price only named alike.
       await control("/prices", {
         body: {
@@ -716,10 +734,13 @@ describe.skipIf(!goPresent)(
       const growth = async ({
         organizationId,
         currency,
+        organizationCurrency = currency,
         lines,
       }: {
         organizationId: string;
         currency: "USD" | "EUR";
+        /** The organization's own currency field, which may disagree with Stripe's. */
+        organizationCurrency?: "USD" | "EUR";
         lines: string[];
       }) => {
         const customer = (await stripe("/customers", { name: organizationId })).id;
@@ -728,7 +749,7 @@ describe.skipIf(!goPresent)(
           name: organizationId,
           stripeCustomerId: customer,
           pricingModel: "SEAT_EVENT",
-          currency,
+          currency: organizationCurrency,
           selfHostedCustomer: false,
           teamIds: [],
           signupData: {},
@@ -776,6 +797,18 @@ describe.skipIf(!goPresent)(
         currency: "USD",
         lines: [GROWTH_SEAT_USD_MONTHLY, NICKNAMED_LOOKALIKE],
       });
+      // A euro plan with the euro price, and a euro organization whose Stripe plan is in dollars.
+      const eurPriced = await growth({
+        organizationId: "org-instant-eur-priced",
+        currency: "EUR",
+        lines: [GROWTH_SEAT_EUR_MONTHLY, GROWTH_INSTANT_EVAL_EUR],
+      });
+      const disagreeing = await growth({
+        organizationId: "org-instant-eur-org-usd-plan",
+        currency: "USD",
+        organizationCurrency: "EUR",
+        lines: [GROWTH_SEAT_USD_MONTHLY, GROWTH_INSTANT_EVAL_USD],
+      });
       // The month's Instant Eval spend in the meter's units: 0.30, 0.30, 5.0428, 0.30 and 0.30.
       const spend: Record<string, number> = {
         "org-instant-old-usd": 3_000,
@@ -783,6 +816,8 @@ describe.skipIf(!goPresent)(
         "org-instant-paying": 50_428,
         "org-instant-repriced": 3_000,
         "org-instant-lookalike": 3_000,
+        "org-instant-eur-priced": 3_000,
+        "org-instant-eur-org-usd-plan": 3_000,
       };
       const stripeChannels = composeHttpBillingStripe({
         secretKey: SECRET_KEY,
@@ -808,17 +843,15 @@ describe.skipIf(!goPresent)(
         isInstantEvalMeterProvisioned: () => true,
         queryPiiRedactionSpendTotal: async () => ({ outcome: "unavailable" }),
         isPiiRedactionMeterProvisioned: () => false,
-        subscriptionPriceLine: async ({ stripeCustomerId, price, billingMonth }) =>
+        subscriptionPriceLine: async ({ stripeCustomerId, prices, billingMonth }) =>
           priceLineOf({
             subscriptions: await stripeChannels.subscriptions.listCustomerSubscriptions({
               customerId: stripeCustomerId,
             }),
-            prices: [
-              {
-                priceName: price,
-                priceId: price === "GROWTH_INSTANT_EVAL_USD" ? GROWTH_INSTANT_EVAL_USD : undefined,
-              },
-            ],
+            prices: prices.map((priceName) => ({
+              priceName,
+              priceId: instantEvalCatalogue[priceName],
+            })),
             billingMonth,
           }),
         selfDispatch: async () => {},
@@ -855,6 +888,18 @@ describe.skipIf(!goPresent)(
         expect.objectContaining({ value: 0.3, events: 1 }),
       ]);
       expect(await instantUsage(lookalike)).toEqual([]);
+      expect(await instantUsage(eurPriced)).toEqual([
+        expect.objectContaining({ value: 0.3, events: 1 }),
+      ]);
+      const [eurSubscription] = await stripeChannels.subscriptions.listCustomerSubscriptions({
+        customerId: eurPriced,
+      });
+      expect(eurSubscription?.items).toContainEqual(
+        expect.objectContaining({ priceId: GROWTH_INSTANT_EVAL_EUR, unitAmount: 85 }),
+      );
+      expect(await instantUsage(disagreeing)).toEqual([
+        expect.objectContaining({ value: 0.3, events: 1 }),
+      ]);
     }, 30_000);
 
     /** @scenario "A failed renewal payment is recorded" */

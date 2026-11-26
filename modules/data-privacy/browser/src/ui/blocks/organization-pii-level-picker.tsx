@@ -15,6 +15,7 @@ import { SettingsSection } from "@langwatch/design-system/settings-section";
 import { ChevronRight } from "lucide-react";
 import { type ReactNode, useEffect, useRef } from "react";
 
+import type { PrivacyBillingCurrency } from "../../model/data-privacy-host.ts";
 import {
   ESSENTIAL_FINDS,
   ESSENTIAL_MISSES,
@@ -107,10 +108,12 @@ function LevelCards({
   free,
   licensed,
   split,
+  currency,
 }: {
   free: boolean;
   licensed: boolean;
   split: boolean;
+  currency: PrivacyBillingCurrency;
 }) {
   return (
     <Grid templateColumns={{ base: "1fr", md: "1fr 1fr" }} gap={3}>
@@ -132,7 +135,14 @@ function LevelCards({
           </Badge>
         }
         subtitle={PII_REDACTION_MODEL_NAME}
-        price={<PiiRedactionModelPrice free={free} licensed={licensed} split={split} />}
+        price={
+          <PiiRedactionModelPrice
+            free={free}
+            licensed={licensed}
+            split={split}
+            currency={currency}
+          />
+        }
         points={[
           "Names and full street addresses in 8 languages",
           "Plus everything Essential finds",
@@ -193,6 +203,7 @@ export function OrganizationPiiLevelPicker({
   free,
   licensed = false,
   split = false,
+  currency = "USD",
   canWrite,
   isSaving,
   onPick,
@@ -205,6 +216,8 @@ export function OrganizationPiiLevelPicker({
   licensed?: boolean;
   /** Long spans go to the model in parts (ADR-207): the small print names the split limit. */
   split?: boolean;
+  /** The subscription's currency, which Strict's price is quoted in. */
+  currency?: PrivacyBillingCurrency;
   canWrite: boolean;
   isSaving: boolean;
   onPick: (level: OrganizationPiiLevel) => void;
@@ -240,7 +253,7 @@ export function OrganizationPiiLevelPicker({
             }
           }}
         >
-          <LevelCards free={free} licensed={licensed} split={split} />
+          <LevelCards free={free} licensed={licensed} split={split} currency={currency} />
         </RadioCard.Root>
         {level && <LevelExample level={level} />}
         {level === "strict" && !free && (

@@ -126,11 +126,13 @@ describe("given the deployment and the PII redaction model flags", () => {
         kind: "model",
         free: false,
         split: false,
+        currency: "USD",
       });
       expect(cloud({ modelFlag: true, freeFlag: true })).toEqual({
         kind: "model",
         free: true,
         split: false,
+        currency: "USD",
       });
     });
 
@@ -144,7 +146,7 @@ describe("given the deployment and the PII redaction model flags", () => {
         licence: "none",
         mayManageLicence: true,
       });
-      expect(cloud).toEqual({ kind: "model", free: false, split: true });
+      expect(cloud).toEqual({ kind: "model", free: false, split: true, currency: "USD" });
       const selfHosted = piiRedactionModelOfferOf({
         isSaaS: false,
         modelFlag: true,
@@ -154,6 +156,21 @@ describe("given the deployment and the PII redaction model flags", () => {
         mayManageLicence: true,
       });
       expect(selfHosted).toMatchObject({ kind: "model", split: false });
+    });
+
+    /** @scenario "Strict shows the euro price to an organization on a euro Growth subscription" */
+    it("prices the model in the subscription's currency", () => {
+      expect(
+        piiRedactionModelOfferOf({
+          isSaaS: true,
+          modelFlag: true,
+          freeFlag: false,
+          splitFlag: false,
+          licence: "unknown",
+          mayManageLicence: true,
+          currency: "EUR",
+        }),
+      ).toEqual({ kind: "model", free: false, split: false, currency: "EUR" });
     });
   });
 });
@@ -172,6 +189,14 @@ describe("given the rate billing charges for the PII redaction model", () => {
   describe("when the rate changes", () => {
     it("follows it", () => {
       expect(piiRedactionModelPrice({ nanoUsdPerCharacter: 1_250 })).toBe("$1.25");
+    });
+  });
+
+  describe("when the organization's subscription is in euros", () => {
+    /** @scenario "The euro price is 0.85 of the dollar rate" */
+    it("reads €0.425 per 1M characters, 0.85 of the dollar rate unrounded", () => {
+      expect(piiRedactionModelPrice({ nanoUsdPerCharacter: 500, currency: "EUR" })).toBe("€0.425");
+      expect(piiRedactionModelPrice({ nanoUsdPerCharacter: 1_000, currency: "EUR" })).toBe("€0.85");
     });
   });
 });
@@ -253,6 +278,18 @@ describe("given a change of the organization's level", () => {
     });
   });
 
+  describe("when Essential turns into Strict for an organization paying in euros", () => {
+    /** @scenario "Strict shows the euro price to an organization on a euro Growth subscription" */
+    it("asks with the euro price", () => {
+      expect(
+        levelChangeConfirmation({ from: "essential", to: "strict", free: false, currency: "EUR" })
+          ?.description,
+      ).toBe(
+        "Strict uses the LangWatch PII Redaction Model at €0.425 per 1M characters excl. VAT, pay as you go. Turn it on?",
+      );
+    });
+  });
+
   describe("when the organization is free", () => {
     it("turns Strict on without asking", () => {
       expect(levelChangeConfirmation({ from: "essential", to: "strict", free: true })).toBeNull();
@@ -318,6 +355,18 @@ describe("given the fallback note", () => {
 
 describe("given a rule saved from the drawer", () => {
   const model = { kind: "model", free: false, split: false } as const;
+
+  describe("when it turns Strict on where Strict is the model at a euro price", () => {
+    it("asks with the euro price", () => {
+      expect(
+        ruleSaveConfirmation({
+          offer: { kind: "model", free: false, currency: "EUR" },
+          before: { pii: { level: "essential" } },
+          after: { pii: { level: "strict" } },
+        })?.description,
+      ).toContain("€0.425 per 1M characters");
+    });
+  });
 
   describe("when it turns Strict on where Strict is the model at a price", () => {
     it("asks with the price", () => {

@@ -237,6 +237,43 @@ func TestCatalogMetersEachUsagePriceOnItsOwnMeter(t *testing.T) {
 	}
 }
 
+// A euro usage price bills the dollar meter its dollar price bills: one meter, two currencies.
+// @scenario "A euro usage price is metered on its dollar meter in the payment simulator"
+func TestCatalogMetersEuroUsagePriceOnTheDollarMeter(t *testing.T) {
+	raw := []byte(`{
+		"mapping": {
+			"GROWTH_INSTANT_EVAL_EUR": {"test": "price_instant_eur"},
+			"GROWTH_PII_REDACTION_EUR": {"test": "price_pii_eur"}
+		},
+		"meters": {
+			"INSTANT_EVAL_USD": {"test": "mtr_instant"},
+			"PII_REDACTION_USD": {"test": "mtr_pii"}
+		},
+		"prices": {
+			"price_instant_eur": {"id": "price_instant_eur", "unitAmount": 85, "currency": "eur", "recurring": {"interval": "month", "intervalCount": 1}},
+			"price_pii_eur": {"id": "price_pii_eur", "unitAmount": 85, "currency": "eur", "recurring": {"interval": "month", "intervalCount": 1}}
+		}
+	}`)
+	st := newState()
+	if err := st.seedCatalog(raw, "test", epoch); err != nil {
+		t.Fatal(err)
+	}
+	want := map[string]string{"price_instant_eur": "mtr_instant", "price_pii_eur": "mtr_pii"}
+	for _, p := range st.prices {
+		meter, ok := want[p.ID]
+		if !ok {
+			continue
+		}
+		if !isMetered(p) || p.Recurring.Meter == nil || *p.Recurring.Meter != meter {
+			t.Errorf("%s: recurring %+v, want metered on %s", p.ID, p.Recurring, meter)
+		}
+		delete(want, p.ID)
+	}
+	if len(want) != 0 {
+		t.Fatalf("prices not seeded: %v", want)
+	}
+}
+
 // @scenario "The catalog seeds the product's own price ids"
 func TestCatalogSeedsRealPriceIDs(t *testing.T) {
 	g := newRig(t)

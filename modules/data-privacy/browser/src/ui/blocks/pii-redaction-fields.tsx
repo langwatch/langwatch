@@ -139,6 +139,7 @@ export function PiiRedactionFields({
           free={piiRedactionModelOffer.free}
           licensed={piiRedactionModelOffer.licensed}
           split={piiRedactionModelOffer.split}
+          currency={piiRedactionModelOffer.currency}
         />
       )}
       {piiRedactionModelOffer?.kind === "rule-based" && effectiveLevel === "strict" && (

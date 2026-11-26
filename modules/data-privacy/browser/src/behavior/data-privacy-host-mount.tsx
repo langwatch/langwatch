@@ -16,12 +16,14 @@ import { useMemo, type ReactNode } from "react";
 import {
   DataPrivacyHostApi,
   DataPrivacyHostProvider,
+  type PrivacyBillingCurrency,
   type PrivacyFailureNotice,
   type PrivacyHostScope,
   type PrivacyLicence,
   type PrivacyRouteReading,
   type PrivacySuccessNotice,
 } from "../model/data-privacy-host.ts";
+import { billingCurrencyOf, mayReadSubscriptionPlan } from "../model/privacy-billing-currency.ts";
 import { licenceOf, mayReadPlan } from "../model/privacy-licence.ts";
 import { dataPrivacyApi } from "./data-privacy-api.ts";
 
@@ -33,6 +35,7 @@ class HostServiceDataPrivacyHost extends DataPrivacyHostApi {
       feedback: UiFeedback;
       licence: PrivacyLicence;
       mayManageLicence: boolean;
+      billingCurrency: PrivacyBillingCurrency;
     },
   ) {
     super();
@@ -69,6 +72,10 @@ class HostServiceDataPrivacyHost extends DataPrivacyHostApi {
   mayManageLicence(): boolean {
     return this.deps.mayManageLicence;
   }
+
+  billingCurrency(): PrivacyBillingCurrency {
+    return this.deps.billingCurrency;
+  }
 }
 
 /**
@@ -82,17 +89,20 @@ export default function DataPrivacyHostMount({ children }: { children?: ReactNod
   const uiScope = useUiScope();
   const { organizationId, projectId } = uiScope.activeScope();
   const teamId = uiScope.scopeHost()?.team()?.id;
-  // Self-hosted only: the PII redaction model there comes with the Enterprise licence.
-  const mayRead = mayReadPlan({
+  const planReader = {
     isSaaS,
     organizationId: organizationId ?? void 0,
     canViewOrganization: session.hasPermission("organization:view"),
-  });
+  };
+  // Self-hosted the plan is the licence the model comes with; on Cloud, the price's currency.
+  const mayRead = mayReadPlan(planReader);
+  const mayReadCurrency = mayReadSubscriptionPlan(planReader);
   const plan = dataPrivacyApi.plan.getActivePlan.useQuery(
     { organizationId: organizationId ?? "" },
-    { enabled: mayRead, retry: false },
+    { enabled: mayRead || mayReadCurrency, retry: false },
   );
   const licence = licenceOf({ mayRead, plan });
+  const billingCurrency = billingCurrencyOf({ mayRead: mayReadCurrency, plan });
   const mayManageLicence = session.hasPermission("organization:manage");
 
   const host = useMemo(
@@ -107,8 +117,18 @@ export default function DataPrivacyHostMount({ children }: { children?: ReactNod
         feedback,
         licence,
         mayManageLicence,
+        billingCurrency,
       }),
-    [organizationId, teamId, projectId, route, feedback, licence, mayManageLicence],
+    [
+      organizationId,
+      teamId,
+      projectId,
+      route,
+      feedback,
+      licence,
+      mayManageLicence,
+      billingCurrency,
+    ],
   );
   return <DataPrivacyHostProvider value={host}>{children}</DataPrivacyHostProvider>;
 }
