@@ -8190,6 +8190,12 @@ importers:
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../packages/handled-error
+      '@langwatch/log-contract':
+        specifier: workspace:*
+        version: link:../../log/contract
+      '@langwatch/metric-contract':
+        specifier: workspace:*
+        version: link:../../metric/contract
       '@langwatch/module':
         specifier: workspace:*
         version: link:../../../packages/module
@@ -8220,6 +8226,9 @@ importers:
       '@langwatch/trace-contract':
         specifier: workspace:*
         version: link:../../trace/contract
+      '@langwatch/upgrade':
+        specifier: workspace:*
+        version: link:../../../packages/upgrade
       '@trpc/server':
         specifier: 'catalog:'
         version: 11.18.0(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2))
@@ -10802,6 +10811,9 @@ importers:
       '@langwatch/slack-contract':
         specifier: workspace:*
         version: link:../../slack/contract
+      '@langwatch/stored-object-contract':
+        specifier: workspace:*
+        version: link:../../stored-object/contract
       '@langwatch/suite-contract':
         specifier: workspace:*
         version: link:../../suite/contract
@@ -11048,6 +11060,9 @@ importers:
       '@langwatch/secrets':
         specifier: workspace:*
         version: link:../../../packages/secrets
+      '@langwatch/stored-object-contract':
+        specifier: workspace:*
+        version: link:../../stored-object/contract
       '@langwatch/time':
         specifier: workspace:*
         version: link:../../../packages/time

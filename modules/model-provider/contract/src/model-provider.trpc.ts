@@ -6,7 +6,10 @@
 import { defineTrpcContract } from "@langwatch/module";
 import { z } from "zod";
 
-import { modelProviderListEntrySchema } from "./model-provider-list-entry.ts";
+import {
+  modelProviderListEntrySchema,
+  modelProviderSavedEntrySchema,
+} from "./model-provider-list-entry.ts";
 import {
   decisionModelsForScopesTrpcInputSchema,
   modelDefaultConfigDeleteTrpcInputSchema,
@@ -80,7 +83,7 @@ export const modelProviderTrpc = defineTrpcContract("modelProvider")
 
   .mutation("update")
   .withInput(modelProviderUpdateTrpcInputSchema)
-  .withOutput(modelProviderListEntrySchema)
+  .withOutput(modelProviderSavedEntrySchema)
 
   .mutation("delete")
   .withInput(modelProviderDeleteTrpcInputSchema)

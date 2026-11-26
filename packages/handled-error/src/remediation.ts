@@ -1082,6 +1082,9 @@ const registry = {
       "The same idempotency key was reused with different content; mint a fresh key for every new send",
     ],
   },
+  langy_attachment_refused: {
+    tips: ["Attach a PNG, JPEG, GIF or WebP image of 5 MB or less, at most four per message"],
+  },
   langy_empty_message: {
     tips: ["Send a message with actual text content"],
   },

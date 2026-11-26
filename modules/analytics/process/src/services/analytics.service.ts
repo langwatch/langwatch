@@ -148,6 +148,7 @@ export class AnalyticsService {
       try {
         const parsed = analyticsTimeseriesInputSchema.parse(input);
         this.timeseriesRequest.refuseDisallowedAggregations(parsed);
+        this.timeseriesRequest.refuseUnapplicableFilters(parsed);
         // Checked before the cache, so an expired or forged proof is refused even on a repeat.
         const authorization = usableAuthorization({
           authorization:
