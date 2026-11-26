@@ -83,8 +83,8 @@ describe("the dashboard-widgets skill on finding the data", () => {
     const rendered = renderedSkill();
 
     expect(rendered).toContain("langwatch dashboard widget schema -f json > schema.json");
-    expect(rendered).toContain('select(.name | endswith(".trace_metrics"))');
-    expect(rendered).toContain("write the name exactly as `schema.json` gives it");
+    expect(rendered).toContain('select(.name == "trace_metrics")');
+    expect(rendered).toContain("Write a view by its bare name, as `schema.json` gives it");
     expect(rendered).toContain("`judgments`: Instant Eval verdicts");
     expect(rendered).toContain("`evaluation_metrics`");
     expect(rendered).not.toContain("subtractDays(now(), 400) GROUP BY");
