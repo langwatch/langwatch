@@ -33,11 +33,14 @@ export interface InstantEvalLlmJudgeRequest {
   readonly timeoutMs: number;
   /** From the route table's backend; absent, the request names no effort. */
   readonly reasoningEffort?: InstantEvalJudgeReasoningEffort;
+  /** From the route table's backend; absent, the leg's default output cap. */
+  readonly maxOutputTokens?: number;
 }
 
 /**
  * The question's answer (`verdict` for yes or no, `score`, or `label`) with the tokens it billed,
- * or a skip; a skip after a send still bills its tokens.
+ * or a skip; a skip after a send still bills its tokens. `isUsageUnread`: the call went out but no
+ * usage came back (a timeout or a lost socket), so what the provider charged is unknown.
  */
 export type InstantEvalLlmJudgeAnswer =
   | (Readonly<{ outcome: "answered"; inputTokens: number; outputTokens: number }> &
@@ -47,6 +50,7 @@ export type InstantEvalLlmJudgeAnswer =
       reason: InstantEvalSkipReason;
       inputTokens: number;
       outputTokens: number;
+      isUsageUnread?: boolean;
     }>;
 
 export interface InstantEvalLlmJudgeChannel {

@@ -22,6 +22,9 @@ import type { InstantEvalLlmJudgeValue } from "./instant-eval-judge-sureness.rul
 const INSTANT_EVAL_LLM_JUDGE_WIRES = ["anthropic_messages", "openai_responses"] as const;
 export type InstantEvalLlmJudgeWire = (typeof INSTANT_EVAL_LLM_JUDGE_WIRES)[number];
 
+/** Content an LLM leg keeps, as langevals' judge fit does; its channel and worst case share it. */
+export const INSTANT_EVAL_LLM_JUDGE_CONTENT_BUDGET_TOKENS = 128_000;
+
 const SEARCH_SYSTEM_PROMPT =
   "You are an LLM evaluator answering a yes/no question about a trace or conversation";
 
@@ -132,6 +135,25 @@ function categoryTool(question: InstantEvalCategoryQuestion): EvaluationTool {
 
 const MAX_OUTPUT_TOKENS = 8_000;
 
+/**
+ * The output cap one LLM call is sent with: the most output tokens it can be billed for. The
+ * backend's own cap where the table sets one, else the reasoning cap where an effort is set.
+ */
+export function instantEvalLlmJudgeMaxOutputTokensOf({
+  wire,
+  reasoningEffort,
+  maxOutputTokens,
+}: {
+  wire: InstantEvalLlmJudgeWire;
+  reasoningEffort?: InstantEvalJudgeReasoningEffort | undefined;
+  maxOutputTokens?: number | undefined;
+}): number {
+  if (maxOutputTokens !== undefined) return maxOutputTokens;
+  return wire === "openai_responses" && isInstantEvalJudgeReasoning(reasoningEffort)
+    ? INSTANT_EVAL_JUDGE_REASONING_MAX_OUTPUT_TOKENS
+    : MAX_OUTPUT_TOKENS;
+}
+
 /** One LLM leg's messages and the tool it is forced to call. */
 interface InstantEvalLlmJudgePrompt {
   readonly system: string;
@@ -206,17 +228,19 @@ export function instantEvalLlmJudgeBodyOf({
   model,
   prompt,
   reasoningEffort,
+  maxOutputTokens,
 }: {
   wire: InstantEvalLlmJudgeWire;
   model: string;
   prompt: InstantEvalLlmJudgePrompt;
   reasoningEffort?: InstantEvalJudgeReasoningEffort;
+  maxOutputTokens?: number;
 }): Record<string, unknown> {
   const { system, user, tool } = prompt;
   if (wire === "anthropic_messages") {
     return {
       model,
-      max_tokens: MAX_OUTPUT_TOKENS,
+      max_tokens: instantEvalLlmJudgeMaxOutputTokensOf({ wire, maxOutputTokens }),
       system,
       messages: [{ role: "user", content: user }],
       tools: [{ name: tool.name, description: tool.description, input_schema: tool.parameters }],
@@ -229,9 +253,11 @@ export function instantEvalLlmJudgeBodyOf({
       { role: "developer", content: system },
       { role: "user", content: user },
     ],
-    max_output_tokens: isInstantEvalJudgeReasoning(reasoningEffort)
-      ? INSTANT_EVAL_JUDGE_REASONING_MAX_OUTPUT_TOKENS
-      : MAX_OUTPUT_TOKENS,
+    max_output_tokens: instantEvalLlmJudgeMaxOutputTokensOf({
+      wire,
+      reasoningEffort,
+      maxOutputTokens,
+    }),
     ...(reasoningEffort ? { reasoning: { effort: reasoningEffort } } : {}),
     store: false,
     tools: [{ type: "function", ...tool, strict: false }],

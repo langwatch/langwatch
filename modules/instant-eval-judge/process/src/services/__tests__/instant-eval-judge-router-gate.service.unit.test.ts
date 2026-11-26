@@ -138,7 +138,7 @@ function harness({
     hostedDecisions,
     llmJudge,
     limiter: MemoryInstantEvalRateLimiter.create(),
-    logger: { error: () => undefined },
+    logger: { error: () => undefined, warn: () => undefined },
   });
   const classify = (
     questions: InstantEvalQuestion[] = [Q],
