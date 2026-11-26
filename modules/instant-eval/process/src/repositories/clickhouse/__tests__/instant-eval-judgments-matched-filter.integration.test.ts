@@ -28,6 +28,12 @@ const tenantId = `${randomUUID()}-matched`;
 const runId = "run-matched";
 const now = Date.now();
 
+const QUESTION_IDS = {
+  boolean: "resolved",
+  score: "quality",
+  category: "sentiment",
+} as const;
+
 function judgment({
   traceId,
   kind,
@@ -35,7 +41,7 @@ function judgment({
   passed,
 }: {
   traceId: string;
-  kind: "boolean" | "score";
+  kind: keyof typeof QUESTION_IDS;
   status: InstantEvalJudgmentRecord["Status"];
   passed: number | null;
 }): InstantEvalJudgmentRecord {
@@ -43,14 +49,14 @@ function judgment({
     TenantId: tenantId,
     RunId: runId,
     TraceId: traceId,
-    QuestionId: kind === "boolean" ? "resolved" : "quality",
+    QuestionId: QUESTION_IDS[kind],
     ThreadId: "",
     SpanId: "",
     Kind: kind,
     Status: status,
     Passed: passed,
     Score: kind === "score" && status === "judged" ? 4 : null,
-    Label: "",
+    Label: kind === "category" && status === "judged" ? "positive" : "",
     Probability: null,
     Probabilities: "",
     Error: status === "judged" ? "" : "classifier_failed",
@@ -68,6 +74,9 @@ const judgments: readonly InstantEvalJudgmentRecord[] = [
   judgment({ traceId: "score-judged", kind: "score", status: "judged", passed: null }),
   judgment({ traceId: "score-skipped", kind: "score", status: "skipped", passed: null }),
   judgment({ traceId: "score-failed", kind: "score", status: "failed", passed: null }),
+  judgment({ traceId: "category-judged", kind: "category", status: "judged", passed: null }),
+  judgment({ traceId: "category-skipped", kind: "category", status: "skipped", passed: null }),
+  judgment({ traceId: "category-failed", kind: "category", status: "failed", passed: null }),
 ];
 
 async function traceIdsOf({
@@ -91,7 +100,7 @@ async function traceIdsOf({
 function matchedFilterCases(repository: () => InstantEvalJudgmentsRepository): void {
   describe("when the results are read with matches excluded", () => {
     /** @scenario "Results narrowed to non-matches keep the skipped and failed judgements" */
-    it("returns the yes or no judgements that did not pass with every skipped and failed one", async () => {
+    it("returns non-matches with every skipped and failed judgement, and the matches", async () => {
       const unmatched = await traceIdsOf({
         repository: repository(),
         narrowing: { matched: false },
@@ -103,9 +112,12 @@ function matchedFilterCases(repository: () => InstantEvalJudgmentsRepository): v
         "bool-failed",
         "bool-not-passed",
         "bool-skipped",
+        "category-failed",
+        "category-skipped",
         "score-failed",
         "score-skipped",
       ]);
+      expect(matched).toEqual(["bool-passed", "category-judged", "score-judged"]);
       expect([...matched, ...unmatched].toSorted()).toEqual(all);
     });
   });
@@ -115,10 +127,10 @@ function matchedFilterCases(repository: () => InstantEvalJudgmentsRepository): v
     it("returns every judgement with that status", async () => {
       await expect(
         traceIdsOf({ repository: repository(), narrowing: { matched: false, status: "skipped" } }),
-      ).resolves.toEqual(["bool-skipped", "score-skipped"]);
+      ).resolves.toEqual(["bool-skipped", "category-skipped", "score-skipped"]);
       await expect(
         traceIdsOf({ repository: repository(), narrowing: { matched: false, status: "failed" } }),
-      ).resolves.toEqual(["bool-failed", "score-failed"]);
+      ).resolves.toEqual(["bool-failed", "category-failed", "score-failed"]);
     });
   });
 }
