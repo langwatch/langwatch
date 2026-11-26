@@ -77,7 +77,7 @@ Feature: Stripe webhook billing event handling
   Scenario: Upgrade to a seat-event plan migrates old subscriptions
     Given a subscription on a seat-event plan that has not yet been activated
     When the invoice payment succeeded event arrives
-    Then old tiered subscriptions are migrated atomically
+    Then old tiered subscriptions are cancelled in our records once Stripe has cancelled them
     And the corresponding Stripe subscriptions are cancelled with proration
     And a failure to cancel an old Stripe subscription fails the delivery so Stripe sends it again
 

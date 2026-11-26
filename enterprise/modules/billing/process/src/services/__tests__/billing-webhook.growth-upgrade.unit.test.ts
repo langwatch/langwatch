@@ -55,6 +55,8 @@ type Harness = {
   stripe: MemoryStripeSubscriptionsChannel;
   store: MemoryBillingStore;
   pricingModels: string[];
+  activations: string[];
+  checkoutsPaid: string[];
 };
 
 /** A tiered organization with a Growth seat row and its old tiered row, as a test lays them out. */
@@ -86,13 +88,19 @@ function harness({
   stripe.seed(atStripe(TIERED_STRIPE, tieredAtStripe));
 
   const pricingModels: string[] = [];
+  const activations: string[] = [];
+  const checkoutsPaid: string[] = [];
   const announcer = createApiFixture<BillingLifecycleAnnouncerService>({
     pricingModelChanged: async ({ pricingModel }) => {
       pricingModels.push(pricingModel);
     },
-    subscriptionActivated: async () => {},
+    subscriptionActivated: async ({ subscriptionId }) => {
+      activations.push(subscriptionId);
+    },
     subscriptionCancelled: async () => {},
-    seatCheckoutPaid: async () => {},
+    seatCheckoutPaid: async ({ subscriptionId }) => {
+      checkoutsPaid.push(subscriptionId);
+    },
   });
   const subscriptions = MemoryBillingSubscriptionRepository.create(store);
   const webhook = EEWebhookService.create({
@@ -113,7 +121,7 @@ function harness({
     },
     announcer,
   });
-  return { webhook, stripe, store, pricingModels };
+  return { webhook, stripe, store, pricingModels, activations, checkoutsPaid };
 }
 
 const checkoutCompleted = () =>
@@ -264,6 +272,43 @@ describe("given a tiered organization upgrading to Growth seats", () => {
       { subscriptionId: TIERED_STRIPE, prorate: true },
     ]);
     expect(rowOf(upgrade, TIERED_ROW)?.status).toBe("CANCELLED");
+    expect(upgrade.activations).toEqual([GROWTH_ROW]);
+  });
+
+  /** @scenario "A checkout whose old plan Stripe refuses to cancel still records the rest of the checkout" */
+  it("lets waiting members in and announces the start when the old plan's cancel is refused", async () => {
+    const upgrade = harness({
+      growth: {},
+      tiered: { status: "ACTIVE", stripeSubscriptionId: TIERED_STRIPE },
+    });
+    upgrade.stripe.refuse({
+      operation: "cancelSubscription",
+      error: new Error("Stripe is unavailable"),
+    });
+
+    const [result] = await deliverTogether(upgrade, [checkoutCompleted()]);
+
+    expect(result?.status).toBe("error");
+    expect(upgrade.checkoutsPaid).toEqual([GROWTH_ROW]);
+    expect(upgrade.activations).toEqual([GROWTH_ROW]);
+    expect(rowOf(upgrade, TIERED_ROW)?.status).toBe("ACTIVE");
+  });
+
+  /** @scenario "A cancel Stripe refuses because a parallel delivery already ended the old plan counts as done" */
+  it("counts a cancel refused after a parallel delivery ended the old plan as done", async () => {
+    const stuck = harness({
+      growth: { status: "ACTIVE", stripeSubscriptionId: GROWTH_STRIPE },
+      tiered: { status: "ACTIVE", stripeSubscriptionId: TIERED_STRIPE },
+    });
+    stuck.stripe.cancelSubscription = async () => {
+      stuck.stripe.seed(atStripe(TIERED_STRIPE, "canceled"));
+      throw new Error("This subscription is already canceled");
+    };
+
+    const [result] = await deliverTogether(stuck, [paymentSucceeded("in_renewal")]);
+
+    expect(result?.status).toBe("ok");
+    expect(rowOf(stuck, TIERED_ROW)?.status).toBe("CANCELLED");
   });
 
   /** @scenario "An old plan Stripe already ended is not cancelled at Stripe again" */

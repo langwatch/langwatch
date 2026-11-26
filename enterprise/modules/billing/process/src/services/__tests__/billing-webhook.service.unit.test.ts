@@ -866,6 +866,7 @@ describe("EEWebhookService", () => {
 
         expect(await outcome).toBe("rejected");
         expect(subRepo.cancel).not.toHaveBeenCalled();
+        expect(mockSendSlackSubscriptionEvent).toHaveBeenCalled();
       });
     });
 
