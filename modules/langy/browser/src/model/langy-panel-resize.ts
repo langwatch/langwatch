@@ -1,5 +1,3 @@
-import { clampWidth } from "@langwatch/design-system/resize-handle";
-
 import {
   FLOATING_PANEL_MIN_WIDTH,
   FLOATING_PANEL_VIEWPORT_GUTTER,
@@ -69,7 +67,7 @@ export function clampPanelWidth({
   width: number;
 }): number {
   const { min, max } = resolvePanelWidthBounds({ placement, viewportWidth });
-  return clampWidth({ width, min, max });
+  return Math.min(max, Math.max(min, Math.round(width)));
 }
 
 /** The width to render: the user's stored choice, re-clamped to this viewport, else the default. */

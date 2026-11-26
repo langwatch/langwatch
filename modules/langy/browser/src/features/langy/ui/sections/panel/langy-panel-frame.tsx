@@ -1,10 +1,13 @@
 import { Box, chakra } from "@langwatch/design-system/primitives";
-import { ResizeHandle } from "@langwatch/design-system/resize-handle";
+import { clampWidth, ResizeHandle } from "@langwatch/design-system/resize-handle";
 import { motion } from "motion/react";
 import { type ComponentProps, type ReactNode, type RefObject, useEffect, useState } from "react";
 
 import { useLangyStore } from "../../../../../behavior/langy.store.ts";
-import { resolvePanelWidthBounds } from "../../../../../model/langy-panel-resize.ts";
+import {
+  type LangyResizablePlacement,
+  resolvePanelWidthBounds,
+} from "../../../../../model/langy-panel-resize.ts";
 import {
   FLOATING_PEEK_NEAR_PX,
   SIDEBAR_PEEK_NEAR_PX,
@@ -51,6 +54,60 @@ function peekDataAttributes({
 }
 
 /**
+ * The free-edge drag: it follows the pointer in local state and is saved once, when it ends, to
+ * the layout it started in; a layout change mid-drag abandons it.
+ */
+function useLangyPanelDrag({
+  resizable,
+  sizing,
+  bounds,
+  panelWidthPx,
+}: {
+  resizable: boolean;
+  sizing: LangyResizablePlacement;
+  bounds: { min: number; max: number };
+  panelWidthPx: number;
+}) {
+  const setPanelWidth = useLangyStore((s) => s.setPanelWidth);
+  const resetPanelWidth = useLangyStore((s) => s.resetPanelWidth);
+  const [resizing, setResizing] = useState(false);
+  const [drag, setDrag] = useState<{ placement: LangyResizablePlacement; width: number } | null>(
+    null,
+  );
+  useEffect(() => {
+    if (resizable) return;
+    setResizing(false);
+    setDrag(null);
+  }, [resizable]);
+  useEffect(() => {
+    setDrag(null);
+  }, [sizing]);
+  const dragWidth = drag
+    ? clampWidth({ width: drag.width, min: bounds.min, max: bounds.max })
+    : null;
+  const widthPx = resizable && dragWidth !== null ? dragWidth : panelWidthPx;
+  return {
+    resizing,
+    widthPx,
+    handleProps: {
+      onChange: (width: number) =>
+        resizing
+          ? setDrag({ placement: drag?.placement ?? sizing, width })
+          : setPanelWidth({ placement: sizing, width }),
+      onDraggingChange: (dragging: boolean) => {
+        setResizing(dragging);
+        if (dragging) setDrag({ placement: sizing, width: panelWidthPx });
+      },
+      onDragEnd: (width: number) => {
+        if (drag) setPanelWidth({ placement: drag.placement, width });
+        setDrag(null);
+      },
+      onReset: () => resetPanelWidth(sizing),
+    },
+  };
+}
+
+/**
  * The panel itself: one fixed surface that morphs between dock, floating card and drawer
  * companion (`layout="position"`), slides to a peek, and owns its own scrolling. Dialogs, drawers
  * and command surfaces can always cover it.
@@ -89,21 +146,16 @@ export function LangyPanelFrame({
   const edge = placement.floatingDodgesDrawer ? "right" : "left";
   const sizing = floating ? "floating" : "sidebar";
   const resizable = isOpen && !peek.peeking && !isDrawerCompanion;
-  const setPanelWidth = useLangyStore((s) => s.setPanelWidth);
-  const resetPanelWidth = useLangyStore((s) => s.resetPanelWidth);
   const bounds = resolvePanelWidthBounds({
     placement: sizing,
     viewportWidth: placement.viewportWidth,
   });
-  // A drag follows the pointer in local state and is saved once, when it ends.
-  const [resizing, setResizing] = useState(false);
-  const [dragWidth, setDragWidth] = useState<number | null>(null);
-  useEffect(() => {
-    if (resizable) return;
-    setResizing(false);
-    setDragWidth(null);
-  }, [resizable]);
-  const widthPx = resizable && dragWidth !== null ? dragWidth : placement.panelWidthPx;
+  const { resizing, widthPx, handleProps } = useLangyPanelDrag({
+    resizable,
+    sizing,
+    bounds,
+    panelWidthPx: placement.panelWidthPx,
+  });
   return (
     <MotionBox
       ref={panelRef}
@@ -160,15 +212,7 @@ export function LangyPanelFrame({
           value={widthPx}
           min={bounds.min}
           max={bounds.max}
-          onChange={(width) =>
-            resizing ? setDragWidth(width) : setPanelWidth({ placement: sizing, width })
-          }
-          onDraggingChange={setResizing}
-          onDragEnd={(width) => {
-            setPanelWidth({ placement: sizing, width });
-            setDragWidth(null);
-          }}
-          onReset={() => resetPanelWidth(sizing)}
+          {...handleProps}
         />
       ) : null}
       {children}

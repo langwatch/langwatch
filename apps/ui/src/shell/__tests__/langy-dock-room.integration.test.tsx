@@ -27,16 +27,13 @@ function DrawerProbe() {
   return <span data-testid="drawer-inset">{useDrawerEndInset()}</span>;
 }
 
-/**
- * Spec: specs/langy/langy-panel-layout.feature
- * "A drawer opening beside a widened dock sits flush against it"
- */
 describe("given the docked Langy panel was widened", () => {
   afterEach(() => {
     setDrawerEndInset(0);
     cleanup();
   });
 
+  /** @scenario "A drawer opening beside a widened dock sits flush against it" */
   it("a drawer yields the default-width inset while the page keeps the live width", () => {
     let pageInset = -1;
     render(

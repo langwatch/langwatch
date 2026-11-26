@@ -5,7 +5,7 @@
  * Spec: specs/langy/langy-panel-layout.feature
  */
 import { DesignSystemProvider } from "@langwatch/design-system/provider";
-import { cleanup, createEvent, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, createEvent, fireEvent, render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -240,7 +240,7 @@ afterEach(() => {
 });
 
 describe("given the floating Langy panel is open", () => {
-  /** @scenario Dragging the free edge resizes the panel */
+  /** @scenario "Dragging the free edge resizes the panel" */
   it("grows by the distance the handle is dragged toward the page, saved once on release", async () => {
     renderPanel();
     const handle = await screen.findByRole("separator", HANDLE);
@@ -260,7 +260,21 @@ describe("given the floating Langy panel is open", () => {
     expect(useLangyStore.getState().panelWidths).toEqual({ floating: 532 });
   });
 
-  /** @scenario Dragging the free edge resizes the panel */
+  /** @scenario "Dragging the free edge resizes the panel" */
+  it("abandons a drag when the layout changes under it, saving nothing to either layout", async () => {
+    renderPanel();
+    const handle = await screen.findByRole("separator", HANDLE);
+
+    pointer("pointerDown", handle, 600);
+    pointer("pointerMove", handle, 500);
+    act(() => useLangyStore.setState({ panelMode: "sidebar" }));
+    pointer("pointerUp", screen.getByRole("separator", HANDLE), 500);
+
+    expect(useLangyStore.getState().panelWidths).toEqual({});
+  });
+
+  /** @scenario "Dragging the free edge resizes the panel" */
+  /** @scenario "A floating card that dodged to the left corner is dragged from its right edge" */
   it("grows toward the right when the card has dodged to the left corner", async () => {
     currentDrawerRef.current = "traceV2Details";
     renderPanel();
@@ -274,7 +288,7 @@ describe("given the floating Langy panel is open", () => {
     expect(useLangyStore.getState().panelWidths).toEqual({ floating: 492 });
   });
 
-  /** @scenario The width stays within a usable range */
+  /** @scenario "The width stays within a usable range" */
   it("stops at the viewport-derived maximum and the composer-safe minimum", async () => {
     renderPanel();
     const handle = await screen.findByRole("separator", HANDLE);
@@ -287,7 +301,7 @@ describe("given the floating Langy panel is open", () => {
     expect(widthOf(handle)).toBe(Number(handle.getAttribute("aria-valuemin")));
   });
 
-  /** @scenario The handle resizes from the keyboard */
+  /** @scenario "The handle resizes from the keyboard" */
   it("steps with the arrow keys, saving each step", async () => {
     renderPanel();
     const handle = await screen.findByRole("separator", HANDLE);
@@ -302,7 +316,7 @@ describe("given the floating Langy panel is open", () => {
     expect(useLangyStore.getState().panelWidths).toEqual({ floating: 448 });
   });
 
-  /** @scenario Double-clicking the handle restores the default width */
+  /** @scenario "Double-clicking the handle restores the default width" */
   it("returns to the default width on double-click and forgets the choice", async () => {
     renderPanel();
     const handle = await screen.findByRole("separator", HANDLE);
@@ -315,7 +329,7 @@ describe("given the floating Langy panel is open", () => {
     expect(useLangyStore.getState().panelWidths).toEqual({});
   });
 
-  /** @scenario Each layout remembers its own width across reloads */
+  /** @scenario "Each layout remembers its own width across reloads" */
   it("opens at the width stored for the floating card", async () => {
     useLangyStore.setState({ panelWidths: { floating: 500, sidebar: 450 } });
     renderPanel();
@@ -325,7 +339,7 @@ describe("given the floating Langy panel is open", () => {
 });
 
 describe("given the docked Langy panel is open", () => {
-  /** @scenario Dragging the free edge resizes the panel */
+  /** @scenario "Dragging the free edge resizes the panel" */
   it("drags from the dock's own default width and the page reservation follows on release", async () => {
     useLangyStore.setState({ panelMode: "sidebar" });
     renderPanel();
@@ -347,7 +361,7 @@ describe("given the docked Langy panel is open", () => {
 });
 
 describe("given the panel has no free edge to drag", () => {
-  /** @scenario The handle is absent while the panel is minimised or beside a drawer */
+  /** @scenario "The handle is absent while the panel is minimised or beside a drawer" */
   it("shows no handle while minimised", async () => {
     useLangyStore.setState({ isOpen: false });
     renderPanel();
@@ -355,7 +369,7 @@ describe("given the panel has no free edge to drag", () => {
     expect(screen.queryByRole("separator", HANDLE)).not.toBeInTheDocument();
   });
 
-  /** @scenario The handle is absent while the panel is minimised or beside a drawer */
+  /** @scenario "The handle is absent while the panel is minimised or beside a drawer" */
   it("shows no handle while riding beside a drawer", async () => {
     useLangyStore.setState({ panelMode: "sidebar" });
     currentDrawerRef.current = "traceV2Details";

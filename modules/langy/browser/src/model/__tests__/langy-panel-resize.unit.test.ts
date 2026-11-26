@@ -7,8 +7,8 @@ import {
   resolvePanelWidthBounds,
 } from "../langy-panel-resize.ts";
 
-/** @scenario The width stays within a usable range */
 describe("resolvePanelWidthBounds", () => {
+  /** @scenario "The width stays within a usable range" */
   it("bounds the floating card by its minimum and a share of a desktop viewport", () => {
     expect(resolvePanelWidthBounds({ placement: "floating", viewportWidth: 1_440 })).toEqual({
       min: 340,
@@ -17,6 +17,7 @@ describe("resolvePanelWidthBounds", () => {
     });
   });
 
+  /** @scenario "The width stays within a usable range" */
   it("bounds the sidebar to half a laptop viewport, defaulting to the dock width", () => {
     expect(resolvePanelWidthBounds({ placement: "sidebar", viewportWidth: 1_000 })).toEqual({
       min: 320,
@@ -25,11 +26,13 @@ describe("resolvePanelWidthBounds", () => {
     });
   });
 
+  /** @scenario "The width stays within a usable range" */
   it("never exceeds a phone-sized viewport", () => {
     const bounds = resolvePanelWidthBounds({ placement: "floating", viewportWidth: 320 });
     expect(bounds).toEqual({ min: 296, max: 296, default: 296 });
   });
 
+  /** @scenario "The width stays within a usable range" */
   it("uses the absolute caps until the viewport has been measured", () => {
     expect(resolvePanelWidthBounds({ placement: "sidebar", viewportWidth: 0 })).toMatchObject({
       max: 640,
@@ -39,6 +42,7 @@ describe("resolvePanelWidthBounds", () => {
 });
 
 describe("clampPanelWidth", () => {
+  /** @scenario "The width stays within a usable range" */
   it("stops at the minimum and the maximum", () => {
     const base = { placement: "floating", viewportWidth: 1_440 } as const;
     expect(clampPanelWidth({ ...base, width: 100 })).toBe(340);
@@ -47,7 +51,6 @@ describe("clampPanelWidth", () => {
   });
 });
 
-/** @scenario A window resize re-clamps the chosen width */
 describe("resolvePanelWidth", () => {
   it("falls back to the default without a stored choice", () => {
     expect(
@@ -55,6 +58,7 @@ describe("resolvePanelWidth", () => {
     ).toBe(392);
   });
 
+  /** @scenario "A window resize re-clamps the chosen width" */
   it("re-clamps a stored width to a narrower window without losing the choice", () => {
     const stored = 700;
     expect(resolvePanelWidth({ placement: "floating", viewportWidth: 1_440, stored })).toBe(700);
@@ -63,8 +67,8 @@ describe("resolvePanelWidth", () => {
   });
 });
 
-/** @scenario Each layout remembers its own width across reloads */
 describe("parseStoredPanelWidths", () => {
+  /** @scenario "Each layout remembers its own width across reloads" */
   it("keeps usable widths per layout", () => {
     expect(parseStoredPanelWidths({ floating: 500, sidebar: 420 })).toEqual({
       floating: 500,
@@ -72,6 +76,7 @@ describe("parseStoredPanelWidths", () => {
     });
   });
 
+  /** @scenario "Each layout remembers its own width across reloads" */
   it.each([null, undefined, "wide", 12, [], { floating: "500", sidebar: -1 }, { floating: NaN }])(
     "ignores unusable storage %j",
     (raw) => {
