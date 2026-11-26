@@ -14,7 +14,6 @@ import {
   type IssueLicenseInput as ContractIssueLicenseInput,
   IssuedLicenseNotActiveError,
   IssuedLicenseNotFoundError,
-  LicenseInUseError,
   LicenseKeyInvalidError,
   OrganizationNotFoundError,
   type IssuedLicenseCustomerRecord,
@@ -40,9 +39,14 @@ import type {
   IssuedLicenseRepository,
 } from "../repositories/issued-license.repository.ts";
 import { resolveLicenseTerms } from "../rules/issued-license-row.rules.ts";
-import { issuedLicenseView, statusOfIssuedLicense } from "../rules/issued-license.rules.ts";
+import {
+  issuedLicenseView,
+  refuseIfSettled,
+  statusOfIssuedLicense,
+} from "../rules/issued-license.rules.ts";
 import type { ContractBudgets } from "./contract-budget.service.ts";
 import { IssuedLicenseListService } from "./issued-license-list.service.ts";
+import { IssuedLicenseRevocationService } from "./issued-license-revocation.service.ts";
 import { IssuedLicenseWriterService } from "./issued-license-writer.service.ts";
 
 interface LicenseRegistryOptions {
@@ -57,11 +61,6 @@ interface LicenseRegistryOptions {
   now: () => Instant;
 }
 
-/** How far a chain is followed each way; a renewal a year is decades of chain. */
-const MAX_CHAIN = 100;
-/** A key attaches at most once (attachVirtualKey requires none), so two passes suffice. */
-const MAX_REVOKE_PASSES = 3;
-
 /** What `issue` decides, with the term as an instant rather than a wire string. */
 type IssueLicenseTerms = Omit<ContractIssueLicenseInput, "expiresAt"> & {
   expiresAt: Instant;
@@ -74,10 +73,12 @@ export class LicenseRegistryService {
 
   private readonly writer: IssuedLicenseWriterService;
   private readonly lists: IssuedLicenseListService;
+  private readonly revocation: IssuedLicenseRevocationService;
 
   private constructor(private readonly options: LicenseRegistryOptions) {
     this.writer = IssuedLicenseWriterService.create(options);
     this.lists = IssuedLicenseListService.create(options);
+    this.revocation = IssuedLicenseRevocationService.create(options);
   }
 
   /** Signs a new license for a customer and records it. */
@@ -168,95 +169,6 @@ export class LicenseRegistryService {
     return this.toView(row);
   }
 
-  async revoke(input: {
-    id: string;
-    operatorId: string;
-    reason: string;
-    unusedOnly?: boolean;
-  }): Promise<IssuedLicenseView> {
-    const row = await this.getRow(input.id);
-    if (input.unusedOnly) return this.revokeUnused({ row, ...input });
-    // An expired license can still be revoked: its term may be extended by a
-    // reissue, and a leaked key should stay dead through that.
-    this.refuseIfSettled(row);
-    const updated = await this.revokeEndingEveryKey({
-      row,
-      operatorId: input.operatorId,
-      reason: input.reason,
-    });
-    await this.syncBudget(updated, input.operatorId);
-    return this.toView(updated);
-  }
-
-  /**
-   * The key ends first, then the row is marked only while it still names that key. A key
-   * that attached in between refuses the mark and is ended on the next pass, so every key
-   * ends before the row is revoked and a failure leaves a live license to revoke again.
-   */
-  private async revokeEndingEveryKey({
-    row,
-    operatorId,
-    reason,
-  }: {
-    row: IssuedLicenseRecord;
-    operatorId: string;
-    reason: string;
-  }): Promise<IssuedLicenseRecord> {
-    let current = row;
-    for (let pass = 0; pass < MAX_REVOKE_PASSES; pass++) {
-      await this.retireManagedKey({ row: current, actorId: operatorId });
-      const marked = await this.options.repository.revokeHolding({
-        id: current.id,
-        virtualKeyId: current.virtualKeyId,
-        at: this.options.now(),
-        revokedById: operatorId,
-        revokedReason: reason,
-      });
-      current = await this.getRow(row.id);
-      if (marked) return current;
-      this.refuseIfSettled(current);
-    }
-    throw new Error("The license's managed key kept changing while it was revoked");
-  }
-
-  /**
-   * Revokes a key no install used. The key ends first, so a failure leaves the license live
-   * to revoke again. The row is then marked in one conditional write a racing bind cannot
-   * also win; if the bind won, the row lets go of the ended key for a fresh one next sync.
-   */
-  private async revokeUnused({
-    row,
-    operatorId,
-    reason,
-  }: {
-    row: IssuedLicenseRecord;
-    operatorId: string;
-    reason: string;
-  }): Promise<IssuedLicenseView> {
-    this.refuseIfSettled(row);
-    if (row.instanceId !== null) throw new LicenseInUseError();
-    await this.retireManagedKey({ row, actorId: operatorId });
-    const revoked = await this.options.repository.revokeUnbound({
-      id: row.id,
-      at: this.options.now(),
-      revokedById: operatorId,
-      revokedReason: reason,
-    });
-    if (!revoked) await this.refuseLostRevoke(row);
-    const updated = await this.getRow(row.id);
-    await this.syncBudget(updated, operatorId);
-    return this.toView(updated);
-  }
-
-  /** An unused-key revoke lost its write to a bind or another settle: say which. */
-  private async refuseLostRevoke(row: IssuedLicenseRecord): Promise<never> {
-    if (row.virtualKeyId) {
-      await this.options.repository.releaseVirtualKey({ virtualKeyId: row.virtualKeyId });
-    }
-    this.refuseIfSettled(await this.getRow(row.id));
-    throw new LicenseInUseError();
-  }
-
   /**
    * Signs a replacement. The replaced license stays valid until the install
    * presents the new one, which is what authenticates the sync that delivers
@@ -324,6 +236,18 @@ export class LicenseRegistryService {
           ]
         : [],
     );
+  }
+
+  async revoke(input: {
+    id: string;
+    operatorId: string;
+    reason: string;
+    unusedOnly?: boolean;
+  }): Promise<IssuedLicenseView> {
+    const row = await this.getRow(input.id);
+    const updated = await this.revocation.revoke({ row, ...input });
+    await this.syncBudget(updated, input.operatorId);
+    return this.toView(updated);
   }
 
   async resetInstanceBinding(input: { id: string }): Promise<IssuedLicenseView> {
@@ -415,7 +339,7 @@ export class LicenseRegistryService {
     // A managed key belongs to the organization it was created on. Moving the
     // license ends it, and the next call creates one on the new organization.
     const moving = row.organizationId !== null && row.organizationId !== organization.id;
-    if (moving) await this.retireManagedKey({ row, actorId: input.operatorId });
+    if (moving) await this.revocation.retireManagedKey({ row, actorId: input.operatorId });
 
     const updated = await this.options.repository.update(row.id, {
       organizationId: organization.id,
@@ -461,22 +385,8 @@ export class LicenseRegistryService {
 
   /** The licenses one reissue chain holds, followed both ways from any of them. */
   async getChain(input: { id: string }): Promise<IssuedLicenseChain> {
-    const start = await this.getRow(input.id);
-    const older: IssuedLicenseRecord[] = [];
-    for (let row = start; row.replacesId && older.length < MAX_CHAIN;) {
-      const replaced = await this.options.repository.findById(row.replacesId);
-      if (!replaced) break;
-      older.push(replaced);
-      row = replaced;
-    }
-    const newer: IssuedLicenseRecord[] = [];
-    for (let row = start; newer.length < MAX_CHAIN;) {
-      const replacement = await this.options.repository.findByReplacesId(row.id);
-      if (!replacement) break;
-      newer.unshift(replacement);
-      row = replacement;
-    }
-    return { licenses: [...newer, start, ...older].map((row) => this.toView(row)) };
+    const chain = await this.lists.findChain({ start: await this.getRow(input.id) });
+    return { licenses: chain.map((row) => this.toView(row)) };
   }
 
   async list(
@@ -503,12 +413,8 @@ export class LicenseRegistryService {
     return issuedLicenseView({ row, now: this.options.now() });
   }
 
-  /** A license whose fate is settled admits no change; an expired one still may. */
   private refuseIfSettled(row: IssuedLicenseRecord): void {
-    const status = statusOfIssuedLicense(row, this.options.now());
-    if (status === "revoked" || status === "superseded") {
-      throw new IssuedLicenseNotActiveError(status);
-    }
+    refuseIfSettled({ row, now: this.options.now() });
   }
 
   private refuseUnlessActive(row: IssuedLicenseRecord): void {
@@ -519,21 +425,6 @@ export class LicenseRegistryService {
   private async syncBudget(row: IssuedLicenseRecord, operatorId: string): Promise<void> {
     if (!row.organizationId) return;
     await this.options.contractBudgets.sync({ organizationId: row.organizationId, operatorId });
-  }
-
-  private async retireManagedKey({
-    row,
-    actorId,
-  }: {
-    row: IssuedLicenseRecord;
-    actorId: string;
-  }): Promise<void> {
-    if (!row.virtualKeyId || !row.organizationId) return;
-    await this.options.managedKeys.retire({
-      virtualKeyId: row.virtualKeyId,
-      organizationId: row.organizationId,
-      actorId,
-    });
   }
 
   private async getRow(id: string): Promise<IssuedLicenseRecord> {

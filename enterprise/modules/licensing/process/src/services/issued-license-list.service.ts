@@ -11,7 +11,10 @@ import type {
 } from "../repositories/issued-license.repository.ts";
 import { INTERNAL_LICENSE_EMAIL_SUFFIXES } from "../rules/issued-license.rules.ts";
 
-/** Pages the registry for the console, with how many licenses each filter choice would list. */
+/** How far a chain is followed each way; a renewal a year is decades of chain. */
+const MAX_CHAIN = 100;
+
+/** Reads the registry for the console: filtered pages with their counts, and reissue chains. */
 export class IssuedLicenseListService {
   static create(options: {
     repository: IssuedLicenseRepository;
@@ -55,5 +58,25 @@ export class IssuedLicenseListService {
       repository.countAll(heads),
     ]);
     return { rows, total, counts: { active, inactive, customer, internal, all } };
+  }
+
+  /** The licenses one reissue chain holds, newest first, followed both ways from `start`. */
+  async findChain({ start }: { start: IssuedLicenseRecord }): Promise<IssuedLicenseRecord[]> {
+    const { repository } = this.options;
+    const older: IssuedLicenseRecord[] = [];
+    for (let row = start; row.replacesId && older.length < MAX_CHAIN;) {
+      const replaced = await repository.findById(row.replacesId);
+      if (!replaced) break;
+      older.push(replaced);
+      row = replaced;
+    }
+    const newer: IssuedLicenseRecord[] = [];
+    for (let row = start; newer.length < MAX_CHAIN;) {
+      const replacement = await repository.findByReplacesId(row.id);
+      if (!replacement) break;
+      newer.unshift(replacement);
+      row = replacement;
+    }
+    return [...newer, start, ...older];
   }
 }
