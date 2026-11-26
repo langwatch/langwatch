@@ -46,9 +46,13 @@ const RESOURCE_ATTR_MAPPINGS = [
   ["telemetry.sdk.version", "sdk.version"],
   ["telemetry.sdk.language", "sdk.language"],
   ["service.name", "service.name"],
+  // The application version the Release check reads (release-check-reads-releases.feature).
+  ["service.version", "service.version"],
 ] as const;
 
 const SPAN_ATTR_MAPPINGS = [
+  // An SDK that sets service.version as a span attribute rather than on the resource.
+  ["service.version", "service.version"],
   [ATTR_KEYS.GEN_AI_CONVERSATION_ID, "gen_ai.conversation.id"],
   [ATTR_KEYS.LANGWATCH_USER_ID, "langwatch.user_id"],
   [ATTR_KEYS.LANGWATCH_CUSTOMER_ID, "langwatch.customer_id"],

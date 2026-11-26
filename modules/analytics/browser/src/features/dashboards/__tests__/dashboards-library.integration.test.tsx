@@ -1,7 +1,7 @@
 /**
  * @vitest-environment jsdom
- * The organization's Dashboards library at `/dashboards`: what it lists, how its groups fold and
- * what it says when a read fails.
+ * The organization's Dashboards library at `/dashboards`: what its table lists, how its search,
+ * filters and column headers narrow and order it, and what it says when a read fails.
  * @see modules/dashboard/specs/dashboards-organization-area.feature
  */
 
@@ -16,32 +16,34 @@ afterEach(() => {
   toaster.remove();
 });
 
+/** The board names in the table, top to bottom. */
+const boardNames = () =>
+  within(screen.getByRole("table", { name: "Dashboards" }))
+    .getAllByRole("row")
+    .slice(1)
+    .map((tableRow) => within(tableRow).queryAllByRole("link")[0]?.textContent);
+
+const rowOf = (link: HTMLElement) => link.closest("tr") as HTMLElement;
+
 describe("the Dashboards library", () => {
   describe("when the member can see boards in the organization", () => {
     /** @scenario "The library lists the boards I may see, with who sees each and its owner" */
     /** @scenario "From LangWatch boards are not listed for now" */
     it("lists boards with no project first, then by project, and no From LangWatch row", async () => {
       renderLibrary();
-      const group = await screen.findByRole("region", { name: "LLM Ops" });
-      const names = within(group)
-        .getAllByRole("listitem")
-        .map((item) => item.textContent ?? "");
+      await screen.findByRole("link", { name: "Shop board" });
 
       expect(screen.getByRole("heading", { name: "Dashboards" })).toBeInTheDocument();
       expect(screen.getByText("Every dashboard you can see, by product.")).toBeInTheDocument();
-      expect(within(group).getByText("LLM Ops · 2")).toBeVisible();
       expect(screen.queryByText("From LangWatch")).toBeNull();
-      expect(names).toEqual([
-        expect.stringContaining("Everyone's board"),
-        expect.stringContaining("Shop board"),
-      ]);
+      expect(boardNames()).toEqual(["Everyone's board", "Shop board"]);
     });
 
     /** @scenario "The library lists the boards I may see, with who sees each and its owner" */
     it("names who sees each board, the member's own as theirs and another's by its author", async () => {
       renderLibrary();
-      const shopRow = (await screen.findByText("Shop board")).closest("li");
-      const orgRow = screen.getByText("Everyone's board").closest("li");
+      const shopRow = rowOf(await screen.findByRole("link", { name: "Shop board" }));
+      const orgRow = rowOf(screen.getByRole("link", { name: "Everyone's board" }));
 
       expect(shopRow).toHaveTextContent("Shop");
       expect(shopRow).toHaveTextContent("You");
@@ -72,36 +74,116 @@ describe("the Dashboards library", () => {
     const HOMED = [
       row({ id: "board-gw", name: "Key spend", scope: "ORGANIZATION", homeProduct: "gateway" }),
       row({ id: "board-me", name: "Agent spend", scope: "PRIVATE", homeProduct: "me" }),
-      row({ id: "board-ops", name: "Shop board" }),
+      row({ id: "board-ops", name: "Shop board", description: "Checkout health at a glance" }),
     ];
-    const groupLabels = () =>
-      screen
-        .getAllByRole("heading", { level: 2 })
-        .map((heading) => heading.textContent?.split(" · ")[0]);
 
-    /** @scenario "The library lists every board I may see, grouped by product" */
-    it("groups them by product in rail order, and gives a product with none no group", async () => {
+    /** @scenario "The library lists every board I may see in one table" */
+    it("lists them in one table in the rail's product order, with each board's product", async () => {
       renderLibrary({ listed: HOMED });
-      await screen.findByRole("region", { name: "LLM Ops" });
+      const table = await screen.findByRole("table", { name: "Dashboards" });
+      const headers = within(table)
+        .getAllByRole("columnheader")
+        .map((header) => header.textContent);
 
-      expect(groupLabels()).toEqual(["Coding agents", "LLM Ops", "Gateway"]);
-      expect(screen.queryByRole("region", { name: "Governance" })).toBeNull();
+      expect(headers.slice(0, 5)).toEqual(["Name", "Product", "Shared with", "Owner", "Updated"]);
+      expect(boardNames()).toEqual(["Agent spend", "Shop board", "Key spend"]);
+      expect(rowOf(screen.getByRole("link", { name: "Key spend" }))).toHaveTextContent("Gateway");
+      expect(screen.getByText("Checkout health at a glance")).toBeVisible();
+      expect(screen.queryByRole("region", { name: "LLM Ops" })).toBeNull();
+    });
+  });
+
+  describe("when the member searches and filters the library", () => {
+    const MINE = "user-1";
+    const BOARDS = [
+      row({ id: "refund", name: "Refund rate", createdById: MINE, scope: "ORGANIZATION" }),
+      row({ id: "latency", name: "Latency", homeProduct: "gateway", scope: "ORGANIZATION" }),
+      row({ id: "weekly", name: "Weekly", description: "Weekly refunds review" }),
+      row({
+        id: "gw-mine",
+        name: "Key spend",
+        homeProduct: "gateway",
+        scope: "ORGANIZATION",
+        createdById: MINE,
+      }),
+      row({
+        id: "gw-private",
+        name: "My keys",
+        homeProduct: "gateway",
+        scope: "PRIVATE",
+        createdById: MINE,
+      }),
+    ];
+    const search = () => screen.getByRole("searchbox", { name: "Search dashboards" });
+
+    /** @scenario "The library's search finds a board by its name, description, project or owner" */
+    it("lists only what the search finds and says how many of all it shows", async () => {
+      const { user } = renderLibrary({ listed: BOARDS });
+      await screen.findByRole("link", { name: "Latency" });
+
+      await user.type(search(), "REFUND");
+
+      expect(boardNames()).toEqual(["Refund rate", "Weekly"]);
+      expect(screen.getByText("2 of 5 dashboards")).toBeVisible();
     });
 
-    /** @scenario "The library lists every board I may see, grouped by product" */
-    it("lists each board in its own product's group", async () => {
-      renderLibrary({ listed: HOMED });
-      const llmOps = await screen.findByRole("region", { name: "LLM Ops" });
-      const gateway = screen.getByRole("region", { name: "Gateway" });
+    /** @scenario "The library's filters narrow it by product, owner and who sees it" */
+    it("narrows by product, owner and who sees it, and Clear filters puts all back", async () => {
+      const { user } = renderLibrary({ listed: BOARDS });
+      const products = await screen.findByRole("group", { name: "Filter dashboards by product" });
 
-      expect(within(llmOps).getByText("LLM Ops · 1")).toBeVisible();
-      expect(within(gateway).getByText("Gateway · 1")).toBeVisible();
-      expect(within(gateway).getAllByRole("listitem")).toEqual([
-        within(gateway).getByText("Key spend").closest("li"),
-      ]);
       expect(
-        within(screen.getByRole("region", { name: "Coding agents" })).getByText("Agent spend"),
-      ).toBeVisible();
+        within(products)
+          .getAllByRole("button")
+          .map((chip) => chip.getAttribute("aria-label")),
+      ).toEqual(["All, 5 dashboards", "LLM Ops, 2 dashboards", "Gateway, 3 dashboards"]);
+
+      await user.click(within(products).getByRole("button", { name: /^Gateway/ }));
+      await user.click(screen.getByRole("radio", { name: "Me" }));
+      await user.click(screen.getByRole("radio", { name: "Organization" }));
+
+      expect(boardNames()).toEqual(["Key spend"]);
+
+      await user.type(search(), "nothing");
+
+      expect(screen.getByText("No dashboards match these filters")).toBeVisible();
+
+      await user.click(screen.getAllByRole("button", { name: "Clear filters" })[0] as HTMLElement);
+
+      expect(boardNames()).toHaveLength(5);
+      expect(search()).toHaveValue("");
+      expect(screen.queryByRole("button", { name: "Clear filters" })).toBeNull();
+    });
+  });
+
+  describe("when the member presses a column header", () => {
+    const DATED = [
+      row({ id: "b", name: "Beta", updatedAt: "2026-11-01T00:00:00.000Z" }),
+      row({ id: "a", name: "Alpha", updatedAt: "2026-11-25T00:00:00.000Z" }),
+      row({
+        id: "z",
+        name: "Zeta",
+        homeProduct: "me",
+        scope: "PRIVATE",
+        updatedAt: "2026-10-01T00:00:00.000Z",
+      }),
+    ];
+
+    /** @scenario "The library sorts by name or by last change" */
+    it("sorts by name both ways, then by last change newest first", async () => {
+      const { user } = renderLibrary({ listed: DATED });
+      await screen.findByRole("link", { name: "Zeta" });
+
+      expect(boardNames()).toEqual(["Zeta", "Alpha", "Beta"]);
+
+      await user.click(screen.getByRole("button", { name: "Name" }));
+      expect(boardNames()).toEqual(["Alpha", "Beta", "Zeta"]);
+
+      await user.click(screen.getByRole("button", { name: "Name" }));
+      expect(boardNames()).toEqual(["Zeta", "Beta", "Alpha"]);
+
+      await user.click(screen.getByRole("button", { name: "Updated" }));
+      expect(boardNames()).toEqual(["Alpha", "Beta", "Zeta"]);
     });
   });
 
@@ -137,67 +219,6 @@ describe("the Dashboards library", () => {
           expect(inputsTo(calls, "boards.storeProjects").length).toBeGreaterThan(asked),
         );
       });
-    });
-  });
-
-  describe("when a group lists more than eight boards", () => {
-    const ELEVEN = Array.from({ length: 11 }, (_, index) => {
-      const name = `Board ${String(index + 1).padStart(2, "0")}`;
-      return row({ id: `board-${index + 1}`, name });
-    });
-    const boardLinks = (group: HTMLElement) =>
-      within(group)
-        .queryAllByRole("link", { name: /^Board \d+$/ })
-        .map((link) => link.textContent);
-
-    /** @scenario 'A long group shows 8 boards, then "Show N more" and "Show less"' */
-    it("shows eight, opens the rest with Show 3 more, and folds back with Show less", async () => {
-      const { user } = renderLibrary({ listed: ELEVEN });
-      const group = await screen.findByRole("region", { name: "LLM Ops" });
-      const firstEight = ELEVEN.slice(0, 8).map((board) => board.name);
-
-      expect(boardLinks(group)).toEqual(firstEight);
-      expect(within(group).getByText("LLM Ops · 11")).toBeVisible();
-
-      await user.click(within(group).getByRole("button", { name: "Show 3 more" }));
-
-      expect(boardLinks(group)).toEqual(ELEVEN.map((board) => board.name));
-      expect(within(group).queryByRole("button", { name: "Show 3 more" })).toBeNull();
-
-      await user.click(within(group).getByRole("button", { name: "Show less" }));
-
-      expect(boardLinks(group)).toEqual(firstEight);
-      expect(within(group).getByRole("button", { name: "Show 3 more" })).toBeVisible();
-    });
-
-    /** @scenario 'A long group shows 8 boards, then "Show N more" and "Show less"' */
-    it("offers no toggle with eight boards or fewer", async () => {
-      renderLibrary({ listed: ELEVEN.slice(0, 8) });
-      const group = await screen.findByRole("region", { name: "LLM Ops" });
-
-      expect(boardLinks(group)).toHaveLength(8);
-      expect(within(group).queryByRole("button", { name: /^Show / })).toBeNull();
-    });
-
-    /** @scenario "A long group stays open or folded after a reload" */
-    it("keeps the group open when the library is opened again, and folded once folded", async () => {
-      const first = renderLibrary({ listed: ELEVEN });
-      const group = await screen.findByRole("region", { name: "LLM Ops" });
-      await first.user.click(within(group).getByRole("button", { name: "Show 3 more" }));
-      first.unmount();
-
-      const second = renderLibrary({ listed: ELEVEN });
-      const reopened = await screen.findByRole("region", { name: "LLM Ops" });
-
-      expect(boardLinks(reopened)).toEqual(ELEVEN.map((board) => board.name));
-      await second.user.click(within(reopened).getByRole("button", { name: "Show less" }));
-      second.unmount();
-
-      renderLibrary({ listed: ELEVEN });
-      const folded = await screen.findByRole("region", { name: "LLM Ops" });
-
-      expect(boardLinks(folded)).toHaveLength(8);
-      expect(within(folded).getByRole("button", { name: "Show 3 more" })).toBeVisible();
     });
   });
 

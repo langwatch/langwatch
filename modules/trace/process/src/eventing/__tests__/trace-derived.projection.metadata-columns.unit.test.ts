@@ -1,10 +1,12 @@
 /**
  * The analytics fold writes the metadata keys the stock widgets read as columns of its row.
  * @see specs/lwql/stock-widgets-read-no-map.feature
+ * @see specs/lwql/release-check-reads-releases.feature
  */
 import { describe, expect, it } from "vitest";
 
 import { TraceCanonicalisationService } from "../../features/derivation/services/trace-canonicalisation.service.ts";
+import { traceAnalyticsAppVersion } from "../../rules/app-version.rules.ts";
 import {
   TRACE_ANALYTICS_PROJECTION_VERSION_LATEST,
   TraceAnalyticsFoldProjection,
@@ -72,6 +74,20 @@ describe("TraceAnalyticsFoldProjection metadata columns", () => {
         columnsOf({ "metadata.environment": "production", "metadata.env": "staging" })
           .MetadataEnvironment,
       ).toBe("production");
+    });
+  });
+
+  describe("given a trace that names its application version", () => {
+    const versionOf = (attributes: Record<string, string>) =>
+      traceAnalyticsAppVersion(rowOf(attributes).attributes);
+
+    /** @scenario "The trace fold reads the version where an application puts it" */
+    it("writes service.version, else metadata.version, else metadata.app_version", () => {
+      expect(versionOf({ "service.version": "v14.1" })).toBe("v14.1");
+      expect(versionOf({ "metadata.version": "v14" })).toBe("v14");
+      expect(versionOf({ "metadata.app_version": "2.3.0" })).toBe("2.3.0");
+      expect(versionOf({ "service.version": "v14.1", "metadata.version": "v13.2" })).toBe("v14.1");
+      expect(versionOf({ "service.name": "support-agent" })).toBe("");
     });
   });
 

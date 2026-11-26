@@ -31,9 +31,9 @@ export type StoredFavourite = {
 };
 
 /**
- * The dashboard module's five tables in memory, shared by its memory repositories so one's
- * write is the other's read, as in Postgres: Dashboard, CustomGraph, DashboardFavourite,
- * DashboardsV2 and DashboardWidget.
+ * The dashboard module's tables in memory, shared by its memory repositories so one's write is
+ * the other's read, as in Postgres: Dashboard, CustomGraph, DashboardFavourite, DashboardsV2,
+ * DashboardWidget and DashboardSidebarOrder.
  */
 export class MemoryDashboardDatabase {
   dashboards: DashboardRecord[] = [];
@@ -41,6 +41,8 @@ export class MemoryDashboardDatabase {
   favourites: StoredFavourite[] = [];
   boards: BoardRecord[] = [];
   widgets: DashboardWidgetRow[] = [];
+  /** DashboardSidebarOrder, keyed by organization, member and product. */
+  sidebarOrders = new Map<string, readonly string[]>();
   #clock = 0;
   #favouriteId = 0;
 

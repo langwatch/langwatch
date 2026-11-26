@@ -39,7 +39,7 @@ import { WidgetActionRow } from "../blocks/widget-action-row.tsx";
 import { WidgetCardShell, widgetBodyHeightPx } from "../blocks/widget-card-shell.tsx";
 import { WidgetMenu } from "../blocks/widget-menu.tsx";
 import { WidgetDragHandle } from "../elements/widget-drag-handle.tsx";
-import { WIDGET_VIEW_CHART_HEIGHT_PX, WidgetLangyView } from "./widget-langy-view.tsx";
+import { WidgetLangyView, widgetViewChartHeightPx } from "./widget-langy-view.tsx";
 
 /** What a card asks of Langy; every one of them is absent when Langy is not available. */
 export interface WidgetCardLangy {
@@ -248,6 +248,7 @@ export function BoardWidgetCard({
     </WidgetCardShell>
   );
   if (!isViewOpen || !langyOnData) return card;
+  const viewHeightPx = widgetViewChartHeightPx(widgetBodyHeightPx(widget.placement.rowSpan));
   return (
     <>
       {card}
@@ -257,11 +258,12 @@ export function BoardWidgetCard({
         footer={footer}
         actions={actionRow}
         onClose={() => setViewOpen(false)}
+        chartHeightPx={viewHeightPx}
         chart={
           picksNoSources(widget.definition.queries) ? (
             <NoSourcesPicked />
           ) : (
-            frame({ maxHeight: WIDGET_VIEW_CHART_HEIGHT_PX, onCard: false })
+            frame({ maxHeight: viewHeightPx, onCard: false })
           )
         }
       />

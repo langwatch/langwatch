@@ -68,6 +68,31 @@ Feature: CI path filters skip unnecessary workflows on non-code changes
     Given a workflow declares "paths" under "push" but not under "pull_request"
     Then the path-filter guard does not treat it as filtered
 
+  # upgradelab's coverage test reads TypeScript module files, so go-ci's Go-only
+  # filter skipped it on a pull request that declared a step in one.
+  @unit
+  Scenario: A pull request declaring a migration step runs upgradelab's coverage test
+    Given go-ci's upgradelab filter lists every path that declares a step, and the path-filter guard's R1 holds "on.pull_request.paths" to it
+    And the changes job outputs that filter as "upgradelab"
+    When a pull request changes only a module file that declares a step
+    Then the upgradelab job runs "go test ./tools/upgradelab/..."
+
+  @unit
+  Scenario: A step-declaring path missing from go-ci's upgradelab filter is reported
+    When go-ci's upgradelab filter leaves out a step-declaring path
+    Then the upgradelab-trigger guard names the path
+
+  @unit
+  Scenario: A changes job that does not output the upgradelab filter is reported
+    When the changes job has no "upgradelab" output read from the filter step
+    Then the upgradelab-trigger guard fails, because the upgradelab job would read an empty value and never run
+
+  @unit
+  Scenario: An upgradelab job that skips while the full test job also skips is reported
+    Given the full test job runs only when Go changed and the pull request is not a draft
+    When the upgradelab job's if stops negating the test job's own if, or stops running the upgradelab tests
+    Then the upgradelab-trigger guard fails, because a draft touching Go and a module file would run the coverage test nowhere
+
   @unit
   Scenario: CodeQL on a pull request runs only for workflow, auth and billing changes
     When a PR changes no file under .github/ and no auth or billing code

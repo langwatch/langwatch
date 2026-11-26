@@ -5,7 +5,7 @@
  * @see modules/dashboard/specs/dashboards-organization-area.feature
  */
 
-import type { UiProcedureCall } from "@langwatch/browser/testing-transport";
+import { type UiProcedureCall, UiProcedureRefusal } from "@langwatch/browser/testing-transport";
 import { cleanup, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactElement } from "react";
@@ -47,11 +47,13 @@ function render({
   listed,
   host = new StubAnalyticsHost(),
   storeProjects = [SHOP],
+  sidebarOrder = [],
 }: {
   element: ReactElement;
   listed: unknown[];
   host?: StubAnalyticsHost;
   storeProjects?: readonly (typeof SHOP)[];
+  sidebarOrder?: readonly string[] | Error;
 }) {
   const calls: UiProcedureCall[] = [];
   const answer = (call: UiProcedureCall): Promise<unknown> => {
@@ -61,6 +63,12 @@ function render({
     if (call.path === "boards.storeProjects") return Promise.resolve(storeProjects);
     if (call.path === "boards.update") return Promise.resolve({});
     if (call.path === "boards.getAll") return Promise.resolve([]);
+    if (call.path === "boards.sidebarOrder") {
+      return sidebarOrder instanceof Error
+        ? Promise.reject(sidebarOrder)
+        : Promise.resolve({ dashboardIds: sidebarOrder });
+    }
+    if (call.path === "boards.reorderSidebar") return Promise.resolve({ success: true });
     return NO_PROCEDURES(call);
   };
   renderDashboards({ element, host, answer });
@@ -92,6 +100,21 @@ describe("a product's Dashboards section", () => {
       await user.click(screen.getByRole("button", { name: "Show 2 more" }));
       expect(linkNames(list)).toHaveLength(10);
       expect(screen.getByRole("button", { name: "Show less" })).toBeInTheDocument();
+    });
+  });
+
+  describe("given the member's sidebar order cannot be read", () => {
+    /** @scenario "Reordering in one project keeps the place of boards listed only in another" */
+    it("lists the boards by name and offers no reorder, so a save cannot drop stored slots", async () => {
+      render({
+        element: <ProductDashboardsSection product="gateway" />,
+        listed: [board({ id: "Beta" }), board({ id: "Alpha" })],
+        sidebarOrder: new UiProcedureRefusal("forbidden", 403),
+      });
+
+      const list = await screen.findByRole("list", { name: "Dashboards" });
+      expect(linkNames(list)).toEqual(["Alpha", "Beta"]);
+      expect(screen.queryByRole("button", { name: /^Reorder / })).toBeNull();
     });
   });
 

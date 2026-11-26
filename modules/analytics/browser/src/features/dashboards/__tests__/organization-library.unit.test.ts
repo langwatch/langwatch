@@ -27,6 +27,7 @@ const board = (overrides: Partial<LibraryBoard> = {}): LibraryBoard => ({
   homeProduct: "llm-ops",
   project: SHOP,
   openProject: SHOP,
+  updatedAt: "2026-11-20T10:00:00.000Z",
   ...overrides,
 });
 

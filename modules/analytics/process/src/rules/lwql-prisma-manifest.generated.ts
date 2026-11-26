@@ -869,6 +869,15 @@ export interface LwqlPrismaRows {
     readonly position: "Int";
     readonly createdAt: "DateTime";
   };
+  readonly DashboardSidebarOrder: {
+    readonly id: "String";
+    readonly userId: "String";
+    readonly organizationId: "String";
+    readonly homeProduct: "String";
+    readonly dashboardIds: "String[]";
+    readonly createdAt: "DateTime";
+    readonly updatedAt: "DateTime";
+  };
   readonly DashboardsV2: {
     readonly id: "String";
     readonly projectId: "String";
