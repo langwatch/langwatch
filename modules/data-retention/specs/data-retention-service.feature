@@ -131,6 +131,13 @@ Feature: Data Retention service boundary
     Given a project's stored rows are raised or rewritten to its resolved retention
     When the rewrite lands
     Then a "retention_applied_to_existing_data" fact names the project, the category and the resolved days
+    And a raise marks the fact as a raise, so followers never shorten what the rows still keep
+
+  @unit
+  Scenario: Two retention facts in the same millisecond are both recorded
+    Given a project's traces retention is applied twice within one millisecond with different days
+    When both facts are recorded
+    Then each fact has its own idempotency key, and a redelivered fact keeps its key
 
   @unit
   Scenario: The memory and Postgres data retention repositories answer alike

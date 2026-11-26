@@ -40,10 +40,12 @@ function fixture(input: { retentionDays?: number } = {}) {
   const retention = { days: input.retentionDays ?? 30 };
   const inner = memoryObjectStorage();
   const writes: string[] = [];
+  const written: Parameters<ObjectStorage["remove"]>[0][] = [];
   const objectStorage: ObjectStorage = {
     ...inner,
     write: (at, body, facts) => {
       writes.push(at.key);
+      written.push(at);
       return inner.write(at, body, facts);
     },
   };
@@ -104,7 +106,11 @@ function fixture(input: { retentionDays?: number } = {}) {
     });
   }
 
-  return { service, records, memoryLinks, writes, retention, race, store, liveOn };
+  async function loseBytes() {
+    for (const at of written) await inner.remove(at);
+  }
+
+  return { service, records, memoryLinks, writes, retention, race, store, liveOn, loseBytes };
 }
 
 describe("StoredObjectService.storeFromBytes reuse", () => {
@@ -151,6 +157,19 @@ describe("StoredObjectService.storeFromBytes reuse", () => {
         id: first.reference.id,
         idempotencyKey: "delete-first",
       });
+
+      const again = await store();
+
+      expect(again.isDuplicate).toBe(false);
+      expect(again.reference.id).not.toBe(first.reference.id);
+      expect(writes).toHaveLength(2);
+    });
+
+    /** @scenario "An object whose bytes are gone is never reused" */
+    it("writes a new object when the existing one's provider bytes are missing", async () => {
+      const { store, writes, loseBytes } = fixture();
+      const first = await store();
+      await loseBytes();
 
       const again = await store();
 

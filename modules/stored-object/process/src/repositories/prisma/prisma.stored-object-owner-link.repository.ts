@@ -88,10 +88,11 @@ export class PrismaStoredObjectOwnerLinkRepository implements StoredObjectOwnerL
         // The retention sweep's tenant list: every tenant with an ended link, bounded.
         SKIP_TENANT_CHECK: true,
       })}
-      SELECT DISTINCT "tenantId"
+      SELECT "tenantId"
         FROM "StoredObjectOwner"
        WHERE "retainUntil" <= ${toDate(input.before)}
-       ORDER BY "tenantId"
+       GROUP BY "tenantId"
+       ORDER BY MIN("retainUntil"), "tenantId"
        LIMIT ${input.limit}
     `;
 
@@ -142,9 +143,21 @@ export class PrismaStoredObjectOwnerLinkRepository implements StoredObjectOwnerL
     tenantId: StoredObjectProjectId;
     objectIds: readonly StoredObjectId[];
     days: number | null;
+    onlyLater?: boolean;
     at: Instant;
   }): Promise<void> {
     if (input.objectIds.length === 0) return;
+    if (input.onlyLater === true && input.days !== null) {
+      await this.prisma.$executeRaw`
+        UPDATE "StoredObjectOwner"
+           SET "retainUntil" = "createdAt" + make_interval(days => ${input.days}::int),
+               "updatedAt" = ${toDate(input.at)}
+         WHERE "tenantId" = ${input.tenantId}
+           AND "objectId" = ANY(${[...input.objectIds]}::text[])
+           AND "retainUntil" < "createdAt" + make_interval(days => ${input.days}::int)
+      `;
+      return;
+    }
     if (input.days === null) {
       await this.prisma.storedObjectOwner.updateMany({
         where: { tenantId: input.tenantId, objectId: { in: [...input.objectIds] } },

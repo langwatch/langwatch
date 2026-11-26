@@ -80,11 +80,15 @@ export class StoredObjectRetentionService {
     return purposesIn(category).length > 0;
   }
 
-  /** Each link on the category's objects ends `retentionDays` after it began. */
+  /**
+   * Each link on the category's objects ends `retentionDays` after it began. A raise only
+   * lengthened the rows, so it moves a link's end later and never earlier.
+   */
   async followRetention(input: {
     projectId: StoredObjectProjectId;
     category: RetentionCategory;
     retentionDays: number;
+    isRaise?: boolean;
   }): Promise<void> {
     const days = input.retentionDays === INDEFINITE_RETENTION_DAYS ? null : input.retentionDays;
     const limit = this.options.retimePageSize ?? RETIME_PAGE_SIZE;
@@ -103,6 +107,7 @@ export class StoredObjectRetentionService {
           tenantId: input.projectId,
           objectIds: page.map((value) => value.id),
           days,
+          onlyLater: input.isRaise === true,
           at,
         });
         isFullPage = page.length >= limit;
@@ -147,10 +152,10 @@ export class StoredObjectRetentionService {
       limit: input.pageSize,
     });
     const objectIds = [...new Set(page.map((link) => link.objectId))];
-    let deletedObjects = 0;
+    const held: StoredObjectId[] = [];
     for (const id of objectIds) {
-      if (await this.#deleteIfUnheld({ tenantId: input.tenantId, id, now: input.now })) {
-        deletedObjects += 1;
+      if (!(await this.#deleteIfUnheld({ tenantId: input.tenantId, id, now: input.now }))) {
+        held.push(id);
       }
     }
     const removedLinks = await this.options.ownerLinks.deleteExpired({
@@ -158,6 +163,13 @@ export class StoredObjectRetentionService {
       objectIds,
       before: input.now,
     });
+    // A retime between the check and the delete can end a held object's last link: ask again.
+    let deletedObjects = objectIds.length - held.length;
+    for (const id of held) {
+      if (await this.#deleteIfUnheld({ tenantId: input.tenantId, id, now: input.now })) {
+        deletedObjects += 1;
+      }
+    }
 
     return { removedLinks, deletedObjects, isFull: page.length >= input.pageSize };
   }

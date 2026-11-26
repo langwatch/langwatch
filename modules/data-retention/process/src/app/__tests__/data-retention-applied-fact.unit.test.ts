@@ -82,7 +82,7 @@ describe("applying retention to existing data", () => {
   });
 
   describe("given the fact command is handled", () => {
-    it("appends one fact on the project's aggregate, keyed by its instant", () => {
+    it("appends one fact on the project's aggregate, keyed by its instant, days and mode", () => {
       const data = {
         tenantId: "project-1",
         projectId: "project-1",
@@ -103,8 +103,31 @@ describe("applying retention to existing data", () => {
         aggregateId: "project-1",
         type: RETENTION_APPLIED_TO_EXISTING_DATA_EVENT_TYPE,
         data,
-        idempotencyKey: "project-1:traces:retention_applied:1700000000000",
+        idempotencyKey: "project-1:traces:retention_applied:7:apply:1700000000000",
       });
+    });
+
+    /** @scenario Two retention facts in the same millisecond are both recorded */
+    it("keys two changes in one millisecond apart, and a redelivery the same", () => {
+      const keyOf = (data: RetentionAppliedToExistingDataEventData) =>
+        new RecordRetentionAppliedToExistingDataCommand().handle({
+          tenantId: createTenantId("project-1"),
+          aggregateId: "project-1",
+          type: "lw.data_retention.record_retention_applied_to_existing_data",
+          data,
+        })[0]?.idempotencyKey;
+      const base = {
+        tenantId: "project-1",
+        projectId: "project-1",
+        category: "traces" as const,
+        occurredAt: 1_700_000_000_000,
+      };
+
+      expect(keyOf({ ...base, retentionDays: 7 })).not.toBe(keyOf({ ...base, retentionDays: 90 }));
+      expect(keyOf({ ...base, retentionDays: 90 })).not.toBe(
+        keyOf({ ...base, retentionDays: 90, mode: "raise" }),
+      );
+      expect(keyOf({ ...base, retentionDays: 7 })).toBe(keyOf({ ...base, retentionDays: 7 }));
     });
   });
 });

@@ -59,7 +59,12 @@ export class StoredRetentionWriteService {
   ): Promise<{ tables: string[]; retentionDays: number }> {
     const facts = this.#requireFacts();
     const result = await this.retention.raiseStoredRetention(input);
-    await this.#record({ facts, ...input, retentionDays: result.retentionDays });
+    await this.#record({
+      facts,
+      ...input,
+      retentionDays: result.retentionDays,
+      mode: "raise",
+    });
 
     return result;
   }
@@ -84,12 +89,18 @@ export class StoredRetentionWriteService {
     projectId,
     category,
     retentionDays,
-  }: ProjectCategory & { facts: DataRetentionFactSenders; retentionDays: number }): Promise<void> {
+    mode,
+  }: ProjectCategory & {
+    facts: DataRetentionFactSenders;
+    retentionDays: number;
+    mode?: "raise";
+  }): Promise<void> {
     await facts.recordRetentionAppliedToExistingData.send({
       tenantId: projectId,
       projectId,
       category,
       retentionDays,
+      ...(mode ? { mode } : {}),
       occurredAt: nowInstant().epochMilliseconds,
     });
   }

@@ -246,6 +246,18 @@ describe.each(backends)(
         expect(ended).toContain(OTHER);
         expect(ended).not.toContain(ACME);
       });
+
+      /** @scenario "The sweep's tenant list starts with the longest-waiting ended link" */
+      it("lists the tenant whose ended link waited longest first, whatever its id", async () => {
+        const repository = create();
+        await repository.raise(link({ ownerId: "t1", retainUntil: day(2) }));
+        await repository.raise(link({ tenantId: OTHER, retainUntil: day(1) }));
+
+        const ended = await repository.findTenantsWithExpired({ before: day(3), limit: 10_000 });
+
+        expect(ended.indexOf(OTHER)).toBeGreaterThanOrEqual(0);
+        expect(ended.indexOf(OTHER)).toBeLessThan(ended.indexOf(ACME));
+      });
     });
 
     describe("when a project's links are re-timed", () => {
@@ -269,6 +281,31 @@ describe.each(backends)(
         await expect(
           repository.findExpired({ tenantId: OTHER, before: day(30), limit: 10 }),
         ).resolves.toHaveLength(1);
+      });
+
+      /** @scenario "A raise never shortens a media link" */
+      it("moves only earlier ends later when asked for later only", async () => {
+        const repository = create();
+        await repository.raise(link({ ownerId: "short", retainUntil: day(7) }));
+        await repository.raise(link({ ownerId: "long", retainUntil: day(90) }));
+        await repository.raise(link({ ownerId: "forever", retainUntil: null }));
+
+        await repository.retime({
+          tenantId: ACME,
+          objectIds: [OBJECT],
+          days: 30,
+          onlyLater: true,
+          at: day(2),
+        });
+
+        const ends = await repository.findExpired({ tenantId: ACME, before: day(100), limit: 10 });
+        expect(ends.map((value) => [value.ownerId, value.retainUntil])).toEqual([
+          ["long", day(90)],
+          ["short", day(30)],
+        ]);
+        await expect(
+          repository.countLive({ tenantId: ACME, objectId: OBJECT, now: day(10_000) }),
+        ).resolves.toBe(1);
       });
     });
   },

@@ -37,7 +37,7 @@ export interface StoredObjectOwnerLinkRepository {
   /** Removes every link the tenant holds; a tenant with none is not an error. */
   deleteForTenant(input: { tenantId: StoredObjectProjectId }): Promise<void>;
 
-  /** Tenants holding a link that ended at or before `before`, across every tenant, by tenant. */
+  /** Tenants holding a link that ended at or before `before`, the longest-waiting end first. */
   findTenantsWithExpired(input: {
     before: Instant;
     limit: number;
@@ -57,11 +57,15 @@ export interface StoredObjectOwnerLinkRepository {
     before: Instant;
   }): Promise<number>;
 
-  /** Sets every link on these objects to its `createdAt` plus `days`; `null` holds with no end. */
+  /**
+   * Sets every link on these objects to its `createdAt` plus `days`; `null` holds with no end.
+   * `onlyLater` keeps a link's end when it is already later, or none.
+   */
   retime(input: {
     tenantId: StoredObjectProjectId;
     objectIds: readonly StoredObjectId[];
     days: number | null;
+    onlyLater?: boolean;
     at: Instant;
   }): Promise<void>;
 }

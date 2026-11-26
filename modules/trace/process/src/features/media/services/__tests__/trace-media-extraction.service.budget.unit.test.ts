@@ -43,11 +43,7 @@ function makeFakeService(): { service: TraceMediaStore; calls: StoredCall[] } {
 const PARAMS = { projectId: "proj-1", ownerId: "trace-1" } as const;
 
 function extractionOver(store: TraceMediaStore): TraceMediaExtractionService {
-  return TraceMediaExtractionService.create({
-    store,
-    telemetry: { failOpen: vi.fn() },
-    logger: { info: vi.fn(), warn: vi.fn() },
-  });
+  return TraceMediaExtractionService.create({ store });
 }
 
 describe("extraction budget", () => {

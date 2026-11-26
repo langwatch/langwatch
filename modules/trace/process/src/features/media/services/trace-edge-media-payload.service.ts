@@ -2,12 +2,13 @@ import type { RecordSpanCommandData } from "@langwatch/trace-contract";
 
 import { TraceIngressPayload } from "../../ingestion/services/trace-span-collection.service.ts";
 import type { TraceEdgeMediaTelemetry } from "./trace-edge-media-telemetry.service.ts";
+import { TraceMediaExtractionService } from "./trace-media-extraction.service.ts";
+import type { TraceMediaStore } from "./trace-media-store.service.ts";
 import {
   type EdgeMediaExtractionLogger,
   type EdgeMediaExtractionPolicy,
-  TraceMediaExtractionService,
-} from "./trace-media-extraction.service.ts";
-import type { TraceMediaStore } from "./trace-media-store.service.ts";
+  TraceSpanMediaExtractionService,
+} from "./trace-span-media-extraction.service.ts";
 
 // Extraction runs FIRST, which is why `next` is a member here rather than an
 // ordering a composition root remembers: externalizing the heavy part usually
@@ -31,8 +32,8 @@ export class TraceEdgeMediaPayloadService extends TraceIngressPayload {
     next?: TraceIngressPayload;
   }): TraceEdgeMediaPayloadService {
     return new TraceEdgeMediaPayloadService(
-      TraceMediaExtractionService.create({
-        store: options.deps.store,
+      TraceSpanMediaExtractionService.create({
+        extraction: TraceMediaExtractionService.create({ store: options.deps.store }),
         telemetry: options.deps.telemetry,
         logger: options.logger,
       }),
@@ -42,7 +43,7 @@ export class TraceEdgeMediaPayloadService extends TraceIngressPayload {
   }
 
   private constructor(
-    private readonly extraction: TraceMediaExtractionService,
+    private readonly extraction: TraceSpanMediaExtractionService,
     private readonly policy: EdgeMediaExtractionPolicy,
     private readonly next: TraceIngressPayload | undefined,
   ) {

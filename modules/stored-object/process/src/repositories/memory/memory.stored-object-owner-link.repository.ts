@@ -73,13 +73,17 @@ export class MemoryStoredObjectOwnerLinkRepository implements StoredObjectOwnerL
     before: Instant;
     limit: number;
   }): Promise<StoredObjectProjectId[]> {
-    const tenants = new Set(
-      [...this.#links.values()]
-        .filter((link) => hasEndedBy({ link, before: input.before }))
-        .map((link) => link.tenantId),
-    );
+    const oldestEnd = new Map<StoredObjectProjectId, number>();
+    for (const link of this.#links.values()) {
+      if (!link.retainUntil || !hasEndedBy({ link, before: input.before })) continue;
+      const end = link.retainUntil.epochMilliseconds;
+      oldestEnd.set(link.tenantId, Math.min(end, oldestEnd.get(link.tenantId) ?? end));
+    }
 
-    return [...tenants].toSorted().slice(0, input.limit);
+    return [...oldestEnd]
+      .toSorted(([left, a], [right, b]) => a - b || left.localeCompare(right))
+      .map(([tenantId]) => tenantId)
+      .slice(0, input.limit);
   }
 
   async findExpired(input: {
@@ -124,13 +128,17 @@ export class MemoryStoredObjectOwnerLinkRepository implements StoredObjectOwnerL
     tenantId: StoredObjectProjectId;
     objectIds: readonly StoredObjectId[];
     days: number | null;
+    onlyLater?: boolean;
     at: Instant;
   }): Promise<void> {
     for (const [linkKey, link] of this.#links) {
       if (link.tenantId !== input.tenantId || !input.objectIds.includes(link.objectId)) continue;
+      const retimed = input.days === null ? null : link.createdAt.add({ hours: input.days * 24 });
+      const keepsOwn =
+        input.onlyLater === true && isLater({ candidate: link.retainUntil, than: retimed });
       this.#links.set(linkKey, {
         ...link,
-        retainUntil: input.days === null ? null : link.createdAt.add({ hours: input.days * 24 }),
+        retainUntil: keepsOwn ? link.retainUntil : retimed,
         updatedAt: input.at,
       });
     }

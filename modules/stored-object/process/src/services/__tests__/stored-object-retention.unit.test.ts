@@ -163,6 +163,40 @@ describe("StoredObjectRetentionService.sweep", () => {
     });
   });
 
+  describe("given more tenants with ended links than one run takes", () => {
+    /** @scenario "The sweep's tenant list starts with the longest-waiting ended link" */
+    it("takes the tenant whose ended link waited longest, not the first by id", async () => {
+      const f = fixture({ sweepTenantLimit: 1 });
+      const waiting = await f.store();
+      f.clock.now = dayOf(5);
+      const fresher = await f.store({ projectId: OTHER_PROJECT });
+      f.clock.now = dayOf(40);
+
+      await expect(f.sweeper.sweep()).resolves.toMatchObject({ tenants: 1, deletedObjects: 1 });
+
+      expect((await f.rowOf(waiting.reference.id))?.status).toBe("deleted");
+      expect((await f.rowOf(fresher.reference.id, OTHER_PROJECT))?.status).toBe("available");
+    });
+  });
+
+  describe("given an ended link on an object another owner still holds", () => {
+    /** @scenario "A re-time during the sweep still lets the sweep delete the object" */
+    it("deletes the object when a re-time ends the other link before the links are removed", async () => {
+      const f = fixture();
+      const { reference } = await f.store({ ownerId: "t1" });
+      f.clock.now = dayOf(20);
+      await f.store({ ownerId: "t2" });
+      f.clock.now = dayOf(31);
+      f.sweepPages.beforeDelete = () =>
+        f.sweeper.followRetention({ projectId: PROJECT, category: "traces", retentionDays: 7 });
+
+      await expect(f.sweeper.sweep()).resolves.toMatchObject({ deletedObjects: 1 });
+
+      expect((await f.rowOf(reference.id))?.status).toBe("deleted");
+      expect(await f.linksOf(reference.id)).toEqual([]);
+    });
+  });
+
   describe("given two tenants with ended links, the first of which cannot be swept", () => {
     /** @scenario "One tenant's failure does not stop the sweep for the others" */
     it("sweeps the second, fails the run, and a later run finishes the first", async () => {
@@ -299,6 +333,24 @@ describe("StoredObjectRetentionService.followRetention", () => {
         projectId: PROJECT,
         category: "traces",
         retentionDays: 90,
+      });
+
+      expect((await f.linksOf(reference.id)).map((link) => link.retainUntil)).toEqual([dayOf(90)]);
+    });
+  });
+
+  describe("given trace media linked on day 0 until day 90 and a 30-day policy now", () => {
+    /** @scenario "A raise never shortens a media link" */
+    it("keeps the day-90 end when the stored rows are raised to 30 days", async () => {
+      const f = fixture();
+      f.retention.days = 90;
+      const { reference } = await f.store();
+
+      await f.sweeper.followRetention({
+        projectId: PROJECT,
+        category: "traces",
+        retentionDays: 30,
+        isRaise: true,
       });
 
       expect((await f.linksOf(reference.id)).map((link) => link.retainUntil)).toEqual([dayOf(90)]);

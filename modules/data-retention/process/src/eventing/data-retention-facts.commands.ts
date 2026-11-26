@@ -28,7 +28,8 @@ type RetentionAppliedToExistingDataEvent = z.infer<
 
 /**
  * Records that a project's existing data was rewritten to a category's retention. Keyed by its
- * instant, so a redelivered command records nothing new.
+ * instant, days and mode, so a redelivered command records nothing new while two changes in
+ * the same millisecond both land.
  */
 export class RecordRetentionAppliedToExistingDataCommand implements CommandHandler<
   Command<RecordRetentionAppliedToExistingDataCommandData>,
@@ -54,7 +55,7 @@ export class RecordRetentionAppliedToExistingDataCommand implements CommandHandl
         data,
         metadata: {},
         occurredAt: data.occurredAt,
-        idempotencyKey: `${data.projectId}:${data.category}:retention_applied:${data.occurredAt}`,
+        idempotencyKey: `${data.projectId}:${data.category}:retention_applied:${data.retentionDays}:${data.mode ?? "apply"}:${data.occurredAt}`,
       }),
     ];
   }

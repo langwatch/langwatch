@@ -34,7 +34,9 @@ export function dayOf(day: number): Instant {
   return DAY_0.add({ hours: day * 24 });
 }
 
-export function retentionFixture(input: { sweepPageSize?: number; sweepBudgetMs?: number } = {}) {
+export function retentionFixture(
+  input: { sweepPageSize?: number; sweepBudgetMs?: number; sweepTenantLimit?: number } = {},
+) {
   const memoryLinks = MemoryStoredObjectOwnerLinkRepository.create();
   const records = MemoryStoredObjectRecordRepository.create([], memoryLinks);
   const clock = { now: DAY_0 };
@@ -49,7 +51,11 @@ export function retentionFixture(input: { sweepPageSize?: number; sweepBudgetMs?
     if (cleanup.refuses) throw new Error("the provider refused the delete");
     await deleteBytes(target);
   };
-  const sweepPages = { msEach: 0, refuseTenant: undefined as StoredObjectProjectId | undefined };
+  const sweepPages = {
+    msEach: 0,
+    refuseTenant: undefined as StoredObjectProjectId | undefined,
+    beforeDelete: undefined as (() => Promise<unknown>) | undefined,
+  };
   const ownerLinks: StoredObjectOwnerLinkRepository = {
     raise: async (link) => {
       const before = race.beforeRaise;
@@ -70,6 +76,9 @@ export function retentionFixture(input: { sweepPageSize?: number; sweepBudgetMs?
     },
     deleteExpired: async (query) => {
       if (query.tenantId === sweepPages.refuseTenant) throw new Error("interrupted");
+      const before = sweepPages.beforeDelete;
+      sweepPages.beforeDelete = undefined;
+      await before?.();
       return memoryLinks.deleteExpired(query);
     },
     retime: (query) => memoryLinks.retime(query),
@@ -99,6 +108,7 @@ export function retentionFixture(input: { sweepPageSize?: number; sweepBudgetMs?
     now: () => clock.now,
     ...(input.sweepPageSize ? { sweepPageSize: input.sweepPageSize } : {}),
     ...(input.sweepBudgetMs ? { sweepBudgetMs: input.sweepBudgetMs } : {}),
+    ...(input.sweepTenantLimit ? { sweepTenantLimit: input.sweepTenantLimit } : {}),
   });
 
   const reaper = StoredObjectUploadReapService.create({ records, storage, now: () => clock.now });
