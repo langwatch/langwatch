@@ -230,6 +230,9 @@ describe("firstNameTraitOf", () => {
         [null, {}],
         ["J", {}],
         ["J Doe", {}],
+        ["jdoe42", {}],
+        ["j_doe", {}],
+        ["jane.doe", {}],
       ])("decides %j yields %j", (name, expected) => {
         expect(firstNameTraitOf(name)).toEqual(expected);
       });

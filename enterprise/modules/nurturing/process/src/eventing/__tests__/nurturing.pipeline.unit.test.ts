@@ -385,6 +385,7 @@ describe("nurturing's userCreated peer subscriber", () => {
         traits: {
           email: "jane@example.com",
           name: "Jane Doe",
+          first_name: "Jane",
           createdAt: 1,
         },
       });

@@ -32,14 +32,15 @@ function pickDefined(obj: Record<string, unknown>): Record<string, unknown> {
 
 /**
  * The first_name trait for a name that looks like a person's name: its first word, as typed.
- * Email-like and one-letter first words are not usable in a greeting, so they yield no trait.
+ * Email-like, one-letter and username-like first words (digits, "_" or ".") are not usable
+ * in a greeting, so they yield no trait.
  */
 export function firstNameTraitOf(name: string | null | undefined): { first_name?: string } {
   const trimmed = name?.trim();
   if (!trimmed || trimmed.includes("@")) return {};
 
   const [first] = trimmed.split(/\s+/);
-  return first && first.length > 1 ? { first_name: first } : {};
+  return first && first.length > 1 && !/[\d_.]/.test(first) ? { first_name: first } : {};
 }
 
 /**
