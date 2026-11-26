@@ -951,6 +951,62 @@ func TestPendingUpdateExpires(t *testing.T) {
 	}
 }
 
+func TestPendingUpdateExpiredBeforeAdvanceIsNotPaid(t *testing.T) {
+	g := newRig(t)
+	cus, subID := g.subscribe(2)
+	g.control(http.MethodPost, "/_sim/api/payment-failures", `{"customer":"`+cus+`"}`)
+	_, sub := g.seatChange(subID, 3, "pending_if_incomplete")
+	invoiceID := sub["latest_invoice"].(map[string]any)["id"].(string)
+	g.s.mu.Lock()
+	g.s.real = func() time.Time { return epoch.Add(24 * time.Hour) }
+	g.s.mu.Unlock()
+	if status, out := g.stripe(http.MethodPost, "/v1/invoices/"+invoiceID+"/pay", ""); status != http.StatusBadRequest {
+		t.Fatalf("paying an expired held invoice: %d %v", status, out)
+	}
+	_, sub = g.stripe(http.MethodGet, "/v1/subscriptions/"+subID, "")
+	if seatQuantity(t, subItems(sub)) != 2 || sub["pending_update"] != nil {
+		t.Fatalf("after expiry %v", sub)
+	}
+}
+
+func TestPendingUpdateExpiresAtPeriodEndWhenSooner(t *testing.T) {
+	g := newRig(t)
+	cus, subID := g.subscribe(2)
+	g.s.mu.Lock()
+	end := g.s.st.subscriptions[subID].CurrentPeriodEnd
+	g.s.real = func() time.Time { return time.Unix(end, 0).Add(-time.Hour) }
+	g.s.mu.Unlock()
+	g.control(http.MethodPost, "/_sim/api/payment-failures", `{"customer":"`+cus+`"}`)
+	_, sub := g.seatChange(subID, 3, "pending_if_incomplete")
+	pending, _ := sub["pending_update"].(map[string]any)
+	if pending == nil || pending["expires_at"].(float64) != float64(end) {
+		t.Fatalf("pending_update %v, want expires_at %d", sub["pending_update"], end)
+	}
+}
+
+func TestNewItemChangeSupersedesHeldUpdate(t *testing.T) {
+	g := newRig(t)
+	cus, subID := g.subscribe(2)
+	g.control(http.MethodPost, "/_sim/api/payment-failures", `{"customer":"`+cus+`","times":1}`)
+	_, sub := g.seatChange(subID, 3, "pending_if_incomplete")
+	heldID := sub["latest_invoice"].(map[string]any)["id"].(string)
+	_, sub = g.seatChange(subID, 4, "pending_if_incomplete")
+	if seatQuantity(t, subItems(sub)) != 4 || sub["pending_update"] != nil {
+		t.Fatalf("after second change %v", sub)
+	}
+	_, inv := g.stripe(http.MethodGet, "/v1/invoices/"+heldID, "")
+	if inv["status"] != "void" {
+		t.Fatalf("superseded invoice %v", inv)
+	}
+	if status, out := g.stripe(http.MethodPost, "/v1/invoices/"+heldID+"/pay", ""); status != http.StatusBadRequest {
+		t.Fatalf("paying a superseded invoice: %d %v", status, out)
+	}
+	_, sub = g.stripe(http.MethodGet, "/v1/subscriptions/"+subID, "")
+	if seatQuantity(t, subItems(sub)) != 4 {
+		t.Fatalf("seats %v", sub)
+	}
+}
+
 // @scenario "Voiding the held invoice discards its pending update"
 func TestVoidingHeldInvoiceDiscardsPendingUpdate(t *testing.T) {
 	g := newRig(t)

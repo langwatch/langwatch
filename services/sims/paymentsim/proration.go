@@ -87,10 +87,12 @@ const pendingIfIncomplete = "pending_if_incomplete"
 const pendingLifetime = 23 * time.Hour
 
 // holdPending bills lines and, since the charge is about to fail, keeps items
-// as sub's pending update instead of applying them.
+// as sub's pending update instead of applying them. It expires after
+// pendingLifetime, or at the period end when that comes first, as Stripe does.
 func (s *Server) holdPending(sub *Subscription, items []*Item, lines []*Line) {
 	inv := s.draftProrations(sub, lines)
-	sub.PendingUpdate = &PendingUpdate{ExpiresAt: s.now().Add(pendingLifetime).Unix(), SubscriptionItems: items}
+	expires := min(s.now().Add(pendingLifetime).Unix(), sub.CurrentPeriodEnd)
+	sub.PendingUpdate = &PendingUpdate{ExpiresAt: expires, SubscriptionItems: items}
 	sub.pendingInvoice = inv.ID
 	s.finalize(inv)
 }

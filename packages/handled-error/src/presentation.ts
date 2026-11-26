@@ -3459,7 +3459,7 @@ const presentations = {
     // and that is the first thing the customer wants to know on a money path.
     title: "Seat changes need a hand from us",
     describe: () =>
-      "Nothing was charged and nothing changed. We've been alerted and will sort out your plan, so there's nothing you need to do.",
+      "Nothing was charged and nothing changed. Our team has to sort out your plan first. Contact support if it can't wait.",
   },
   subscription_not_linked: {
     // fault: platform. The plan is active but our record of it was never

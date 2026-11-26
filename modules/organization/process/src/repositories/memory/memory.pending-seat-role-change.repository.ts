@@ -17,8 +17,12 @@ export class MemoryPendingSeatRoleChangeRepository implements PendingSeatRoleCha
 
   private constructor() {}
 
-  async save(record: PendingSeatRoleChangeRecord): Promise<void> {
+  async save(record: PendingSeatRoleChangeRecord): Promise<boolean> {
+    const key = paymentKey(record.payment);
+    const saved = [...this.records.values()].map((kept) => paymentKey(kept.payment));
+    if (saved.includes(key)) return false;
     this.records.set(record.id, record);
+    return true;
   }
 
   async findById({ id }: { id: string }): Promise<PendingSeatRoleChangeRecord[]> {

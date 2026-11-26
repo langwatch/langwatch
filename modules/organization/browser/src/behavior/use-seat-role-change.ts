@@ -18,9 +18,6 @@ import { api } from "./organization-api.ts";
 import { useOrganizationToaster, useShowErrorToast } from "./organization-feedback.ts";
 import { reportUnexpected } from "./report-unexpected.ts";
 
-/** How often a change waiting on its payment asks whether it was paid. */
-export const SEAT_PAYMENT_POLL_MS = 5000;
-
 export type SeatRoleFlow =
   | { step: "idle" }
   | { step: "busy" | "done" | "stuck" | "failed"; role: OrganizationUserRole }
@@ -179,7 +176,7 @@ export type SeatRoleSettled =
   | { status: "applied" | "failed"; reason: null }
   | { status: "seat_only"; reason: string };
 
-/** While a change waits on its payment: asks on window focus and every few seconds. */
+/** While a change waits on its payment: asks each time the admin comes back to this window. */
 function useWaitForPayment({
   organizationId,
   waiting,
@@ -219,11 +216,9 @@ function useWaitForPayment({
       );
     };
     const onFocus = () => void ask();
-    const timer = setInterval(onFocus, SEAT_PAYMENT_POLL_MS);
     window.addEventListener("focus", onFocus);
     return () => {
       live = false;
-      clearInterval(timer);
       window.removeEventListener("focus", onFocus);
     };
   }, [changeId, role, organizationId]);
@@ -249,8 +244,11 @@ export function useSeatRoleChange({
   const showErrorToast = useShowErrorToast();
   const [flow, setFlow] = useState<SeatRoleFlow>({ step: "idle" });
   const [offerKind, setOfferKind] = useState<SeatRoleOfferKind | undefined>(undefined);
-  // The flow belongs to the member it was started for, never the next one opened.
+  // The flow belongs to the member it was started for, never the next one opened; a late
+  // answer from an earlier member or a cleared flow sees a newer generation and is dropped.
+  const generation = useRef(0);
   useEffect(() => {
+    generation.current += 1;
     setFlow({ step: "idle" });
     setOfferKind(undefined);
   }, [userId]);
@@ -292,10 +290,12 @@ export function useSeatRoleChange({
 
   /** One click: buys the seat and changes the role, or waits on the payment it needs. */
   const start = async ({ role, quotedAt }: { role: OrganizationUserRole; quotedAt?: number }) => {
+    const started = generation.current;
     setFlow({ step: "busy", role });
     const answer: SeatChangeAnswer = await changeWithSeat
       .mutateAsync({ organizationId, userId, role, quotedAt })
       .catch((error: unknown) => ({ status: "refused" as const, error }));
+    if (generation.current !== started) return;
     setFlow(flowAfter({ answer, role }));
     await settleAnswer({
       answer,
@@ -323,6 +323,9 @@ export function useSeatRoleChange({
     setOfferKind,
     setAmountDue,
     start,
-    clear: () => setFlow({ step: "idle" }),
+    clear: () => {
+      generation.current += 1;
+      setFlow({ step: "idle" });
+    },
   };
 }

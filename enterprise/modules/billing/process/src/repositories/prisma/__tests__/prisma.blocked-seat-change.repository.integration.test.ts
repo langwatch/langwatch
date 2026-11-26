@@ -52,8 +52,30 @@ describe.skipIf(!DB_URL)("refused seat changes on Postgres", () => {
       }),
     ]);
 
-    await changes.markNotified({ organizationId, userId: "user_admin", at: nowInstant() });
+    const [told] = await mine();
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    await changes.record({
+      organizationId,
+      userId: "user_admin",
+      attempt: { kind: "role_change", memberName: "Kim Lee", role: "Admin" },
+      seats: 1,
+    });
+    await changes.markNotified({
+      organizationId,
+      userId: "user_admin",
+      createdUpTo: told!.createdAt,
+      at: nowInstant(),
+    });
+    expect((await mine()).map((each) => each.attempt)).toEqual([
+      { kind: "role_change", memberName: "Kim Lee", role: "Admin" },
+    ]);
 
+    await changes.markNotified({
+      organizationId,
+      userId: "user_admin",
+      createdUpTo: nowInstant(),
+      at: nowInstant(),
+    });
     expect(await mine()).toEqual([]);
   });
 });

@@ -157,11 +157,13 @@ export class MemoryStripeSubscriptionsChannel extends StripeSubscriptionsChannel
     const held = change.paymentBehavior ? this.heldForPayment : undefined;
     if (!held) return subscription;
     this.heldForPayment = undefined;
-    return {
+    const pending: BillingSubscription = {
       ...subscription,
       pendingUpdate: true,
       latestInvoice: { id: held.id, status: "open", hostedUrl: held.hostedUrl },
     };
+    this.held.set(subscriptionId, pending);
+    return pending;
   }
 
   async cancelSubscription({

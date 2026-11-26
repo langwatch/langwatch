@@ -1083,6 +1083,41 @@ describe("<MemberAccessEditor/>", () => {
       mockCompleteChange.mockResolvedValue({ status: "waiting", reason: null });
       renderLite();
       expect(screen.getByTestId("seat-role-waiting")).toBeTruthy();
+      // The paid change is the one in flight, so the ordinary Save cannot race it.
+      expect(screen.queryByRole("button", { name: /^save$/i })).toBeNull();
+    });
+
+    describe("when the drawer moves to another member before the change answers", () => {
+      it("keeps the earlier member's payment out of the next member's drawer", async () => {
+        let answer: (value: unknown) => void = () => {};
+        mockChangeWithSeat.mockReturnValue(
+          new Promise((resolve) => {
+            answer = resolve;
+          }),
+        );
+        const view = renderLite();
+        pickAdmin();
+        fireEvent.click(screen.getByRole("button", { name: "Buy the seat" }));
+
+        view.rerender(
+          <MemberAccessEditor
+            organizationId="org-1"
+            userId="user-2"
+            memberRole={OrganizationUserRole.EXTERNAL}
+            canManage={true}
+            isCurrentUser={false}
+          />,
+        );
+        answer({
+          status: "payment_required",
+          changeId: "change-1",
+          url: "https://pay.example.test/a",
+        });
+
+        await vi.waitFor(() => expect(mockChangeWithSeat).toHaveBeenCalledTimes(1));
+        await new Promise((resolve) => setTimeout(resolve, 0));
+        expect(screen.queryByTestId("seat-role-waiting")).toBeNull();
+      });
     });
 
     /** @scenario "A failed payment changes nothing" */

@@ -3,7 +3,7 @@
  * when a member asks, and the member gets one with the answer.
  * @see modules/organization/specs/seat-requests.feature
  */
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { ADA, application, BILL, ORGANIZATION_ID } from "./support/seat-requests-application.ts";
 
@@ -74,7 +74,7 @@ describe("given a Lite Member with an open request she asked for", () => {
           userId: lena.userId,
           title: "Your seat request was approved",
           url: "/",
-          idempotencyKey: `seat-request-answer-push:${request!.id}:approved`,
+          idempotencyKey: `seat-request-answer-push:${request!.id}:${request!.openedAt}:approved`,
         }),
       ]);
 
@@ -92,6 +92,27 @@ describe("given a Lite Member with an open request she asked for", () => {
     });
   });
 
+  describe("when her request is declined, she asks again and it is declined again", () => {
+    /** @scenario "The member who asked gets an in-app push with the answer" */
+    it("pushes her each answer under its own key", async () => {
+      const { app, liteMember, openRequests, push } = await application();
+      const lena = liteMember({ email: "lena@acme.example" });
+      await app.requestSeatAccess(scope, lena.caller);
+      const [first] = await openRequests();
+      await app.declineSeatRequest({ ...scope, seatRequestId: first!.id }, ADA);
+      await new Promise((resolve) => setTimeout(resolve, 2));
+      await app.requestSeatAccess(scope, lena.caller);
+      const [second] = await openRequests();
+
+      await app.declineSeatRequest({ ...scope, seatRequestId: second!.id }, ADA);
+
+      const answers = push.pushes.filter((sent) => sent.userId === lena.userId);
+      expect(second!.id).toBe(first!.id);
+      expect(answers).toHaveLength(2);
+      expect(new Set(answers.map((sent) => sent.idempotencyKey)).size).toBe(2);
+    });
+  });
+
   describe("when pushes cannot be sent and an administrator declines it", () => {
     /** @scenario "An answer push that cannot be sent leaves the answer standing" */
     it("declines the request all the same", async () => {
@@ -105,6 +126,55 @@ describe("given a Lite Member with an open request she asked for", () => {
 
       expect(answer.outcome).toBe("declined");
       expect(await openRequests()).toEqual([]);
+    });
+  });
+});
+
+describe("given a Lite Member whose arrival already opened a seat request", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  async function arrivedThenAsked({ nextDay }: { nextDay: boolean }) {
+    const context = await application({ freeLite: 1 });
+    const { userId } = await context.arrive({ email: "lena@acme.example" });
+    const [arrival] = await context.openRequests();
+    if (nextDay) {
+      vi.useFakeTimers({ toFake: ["Date"] });
+      vi.setSystemTime(Date.now() + 24 * 60 * 60 * 1000);
+    }
+    const caller = { id: userId, name: null, email: "lena@acme.example" };
+    await context.app.requestSeatAccess({ ...scope, reason: "run the workbench" }, caller);
+    return { ...context, userId, arrival: arrival! };
+  }
+
+  describe("when she presses Request access on a later day", () => {
+    /** @scenario "Administrators and Billing members get an in-app push when a member asks" */
+    it("pushes the administrators and Billing members about the same request", async () => {
+      const { push, arrival, openRequests } = await arrivedThenAsked({ nextDay: true });
+
+      expect(arrival.source).toBe("lite");
+      expect((await openRequests()).map((open) => open.id)).toEqual([arrival.id]);
+      expect(push.pushes.map((sent) => sent.userId).toSorted()).toEqual(
+        [ADA.id, BILL.id].toSorted(),
+      );
+    });
+  });
+
+  describe("when she presses Request access and an administrator declines it", () => {
+    /** @scenario "The member who asked gets an in-app push with the answer" */
+    it("keeps the request as hers and pushes her the answer", async () => {
+      const { app, push, arrival, userId, openRequests } = await arrivedThenAsked({
+        nextDay: false,
+      });
+      const [request] = await openRequests();
+      expect(request).toMatchObject({ id: arrival.id, source: "requested" });
+
+      await app.declineSeatRequest({ ...scope, seatRequestId: arrival.id }, ADA);
+
+      expect(push.pushes).toContainEqual(
+        expect.objectContaining({ userId, title: "Your seat request was declined" }),
+      );
     });
   });
 });

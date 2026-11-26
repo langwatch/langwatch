@@ -55,7 +55,12 @@ export class PrismaBlockedSeatChangeRepository extends BlockedSeatChangeReposito
     input: Parameters<BlockedSeatChangeRepository["markNotified"]>[0],
   ): Promise<void> {
     await this.prisma.blockedSeatChange.updateMany({
-      where: { organizationId: input.organizationId, userId: input.userId, notifiedAt: null },
+      where: {
+        organizationId: input.organizationId,
+        userId: input.userId,
+        createdAt: { lte: toDate(input.createdUpTo) },
+        notifiedAt: null,
+      },
       data: { notifiedAt: toDate(input.at) },
     });
   }

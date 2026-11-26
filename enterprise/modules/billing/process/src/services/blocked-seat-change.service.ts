@@ -45,13 +45,13 @@ export class BlockedSeatChangeService {
 
   private constructor(private readonly options: BlockedSeatChangeOptions) {}
 
-  /** Keeps a refused change for its admin. Never throws: the refusal itself is what they see. */
+  /** Keeps a refused change for its admin; false when it could not be kept. Never throws. */
   async record(input: {
     organizationId: string;
     userId: string;
     attempt: BlockedSeatChangeAttempt;
     seats: number;
-  }): Promise<void> {
+  }): Promise<boolean> {
     try {
       const key = attemptKey(input.attempt);
       const waiting = await this.options.changes.findWaiting();
@@ -62,8 +62,10 @@ export class BlockedSeatChangeService {
           attemptKey(change.attempt) === key,
       );
       if (!known) await this.options.changes.record(input);
+      return true;
     } catch (error) {
       logger.error({ error, organizationId: input.organizationId }, "Refused seat change not kept");
+      return false;
     }
   }
 
@@ -93,7 +95,13 @@ export class BlockedSeatChangeService {
     now: Instant;
   }): Promise<"sent" | "blocked" | "dropped" | "retry"> {
     const { organizationId, userId } = change;
-    const done = () => this.options.changes.markNotified({ organizationId, userId, at: now });
+    const done = () =>
+      this.options.changes.markNotified({
+        organizationId,
+        userId,
+        createdUpTo: change.createdAt,
+        at: now,
+      });
     if (now.epochMilliseconds - change.createdAt.epochMilliseconds > WAIT_LIMIT_MS) {
       await done();
       return "dropped";

@@ -70,13 +70,7 @@ export class PrismaSeatRequestRepository
       if (current.status === "OPEN") {
         const updated = await transaction.seatRequest.update({
           where,
-          data: {
-            userId: current.userId ?? input.userId,
-            name: current.name ?? input.name,
-            idpRefused: current.idpRefused || input.idpRefused,
-            idpKind: input.idpKind ?? current.idpKind,
-            reason: input.reason ?? current.reason,
-          },
+          data: mergedIntoOpen({ current, input }),
         });
         return { request: rowOf(updated), outcome: "already_open" as const };
       }
@@ -222,5 +216,23 @@ function rowOf(row: StoredSeatRequest): SeatRequestRow {
     openedAt: row.openedAt.getTime(),
     resolvedAt: row.resolvedAt?.getTime() ?? null,
     resolvedByUserId: row.resolvedByUserId,
+  };
+}
+
+/** What an open request gains from another opening; a member's own ask makes it `requested`. */
+function mergedIntoOpen({
+  current,
+  input,
+}: {
+  current: StoredSeatRequest;
+  input: Parameters<SeatRequestRepository["open"]>[0];
+}) {
+  return {
+    userId: current.userId ?? input.userId,
+    name: current.name ?? input.name,
+    idpRefused: current.idpRefused || input.idpRefused,
+    idpKind: input.idpKind ?? current.idpKind,
+    reason: input.reason ?? current.reason,
+    source: input.source === "requested" ? "requested" : current.source,
   };
 }

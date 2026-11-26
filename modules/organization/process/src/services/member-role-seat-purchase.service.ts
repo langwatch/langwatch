@@ -117,7 +117,7 @@ export class MemberRoleSeatPurchaseService {
     if (sharing?.status === "waiting") return this.resumeWaiting({ waiting: sharing, input });
 
     const changeId = this.dependencies.newId();
-    await this.dependencies.pending.save({
+    const saved = await this.dependencies.pending.save({
       id: changeId,
       organizationId,
       userId,
@@ -129,6 +129,12 @@ export class MemberRoleSeatPurchaseService {
       reason: null,
       createdAt: nowInstant().epochMilliseconds,
     });
+    if (!saved) {
+      // A concurrent change saved this payment first: that one is the change it pays for.
+      const [winner] = await this.dependencies.pending.findByPayment({ payment: purchase.payment });
+      if (!winner) throw new SeatPaymentWaitingError();
+      return this.resumeWaiting({ waiting: winner, input });
+    }
     return { status: "payment_required", changeId, url: purchase.url };
   }
 

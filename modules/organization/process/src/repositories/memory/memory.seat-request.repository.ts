@@ -52,6 +52,7 @@ export class MemorySeatRequestRepository implements SeatRequestRepository {
         idpRefused: existing.idpRefused || input.idpRefused,
         idpKind: input.idpKind ?? existing.idpKind,
         reason: input.reason ?? existing.reason,
+        source: input.source === "requested" ? "requested" : existing.source,
       };
       this.rows[index] = request;
       return { request, outcome: "already_open" };

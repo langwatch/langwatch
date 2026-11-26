@@ -131,10 +131,14 @@ export class OrganizationAccessNoticeService {
     });
   }
 
-  /** The answer to the person who asked, mailed once per answer; throws when it could not go. */
+  /**
+   * The answer to the person who asked, mailed once per answer; throws when it could not go.
+   * `openedAt` names the opening answered, so a reopened request's next answer is its own.
+   */
   async mailAnswer(input: {
     organizationId: string;
     seatRequestId: string;
+    openedAt: number;
     email: string;
     outcome: "approved" | "declined";
   }): Promise<void> {
@@ -144,7 +148,7 @@ export class OrganizationAccessNoticeService {
       organizationName: await context.organizationName({ organizationId: input.organizationId }),
       outcome: input.outcome,
       appUrl,
-      idempotencyKey: `seat-request-answer:${input.seatRequestId}:${input.outcome}:${dayKeyOf(now())}`,
+      idempotencyKey: `seat-request-answer:${input.seatRequestId}:${input.openedAt}:${input.outcome}:${dayKeyOf(now())}`,
     });
   }
 
@@ -152,17 +156,18 @@ export class OrganizationAccessNoticeService {
   async pushAnswer(input: {
     organizationId: string;
     seatRequestId: string;
+    openedAt: number;
     userId: string;
     outcome: "approved" | "declined";
   }): Promise<void> {
     const { context, push, logger } = this.dependencies;
-    const { organizationId, seatRequestId, outcome } = input;
+    const { organizationId, seatRequestId, openedAt, outcome } = input;
     try {
       const organizationName = await context.organizationName({ organizationId });
       await push.push({
         userId: input.userId,
         organizationId,
-        idempotencyKey: `seat-request-answer-push:${seatRequestId}:${outcome}`,
+        idempotencyKey: `seat-request-answer-push:${seatRequestId}:${openedAt}:${outcome}`,
         topic: `seat-request:${seatRequestId}`,
         title: `Your seat request was ${outcome}`,
         body:

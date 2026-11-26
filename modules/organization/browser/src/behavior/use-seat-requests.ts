@@ -1,4 +1,5 @@
 import type {
+  OpenSeatRequests,
   SeatApprovalCompletion,
   SeatApprovalWithSeat,
   SeatRequest,
@@ -8,10 +9,14 @@ import { useEffect, useRef, useState } from "react";
 import { api } from "./organization-api.ts";
 import { useOrganizationToaster, useShowErrorToast } from "./organization-feedback.ts";
 import { reportUnexpected } from "./report-unexpected.ts";
-import { SEAT_PAYMENT_POLL_MS } from "./use-seat-role-change.ts";
 
-/** An approval waiting on the Stripe page its seat charge opened. */
-export type WaitingSeatApproval = { request: SeatRequest; paymentRef: string; url: string };
+/** An approval waiting on the Stripe page its seat charge opened, in the organization it began. */
+export type WaitingSeatApproval = {
+  organizationId: string;
+  request: SeatRequest;
+  paymentRef: string;
+  url: string;
+};
 
 type CompleteApproval = (input: {
   organizationId: string;
@@ -22,16 +27,14 @@ type CompleteApproval = (input: {
 /** Asks once whether the seat payment landed; a failed ask leaves the approval waiting. */
 async function askPaid({
   complete,
-  organizationId,
   waiting,
 }: {
   complete: CompleteApproval;
-  organizationId: string;
   waiting: WaitingSeatApproval;
 }): Promise<SeatApprovalCompletion> {
   try {
     return await complete({
-      organizationId,
+      organizationId: waiting.organizationId,
       seatRequestId: waiting.request.id,
       paymentRef: waiting.paymentRef,
     });
@@ -41,14 +44,12 @@ async function askPaid({
   }
 }
 
-/** While an approval waits on its payment: asks on window focus and every few seconds. */
+/** While an approval waits on its payment: asks each time the admin comes back to this window. */
 function useWaitForSeatPayment({
-  organizationId,
   waiting,
   complete,
   onSettled,
 }: {
-  organizationId: string;
   waiting: WaitingSeatApproval | undefined;
   complete: CompleteApproval;
   onSettled: (settled: SeatApprovalCompletion, waiting: WaitingSeatApproval) => void;
@@ -67,25 +68,46 @@ function useWaitForSeatPayment({
       const current = latest.current.waiting;
       if (asking || !live || !current) return;
       asking = true;
-      const settled = await askPaid({
-        complete: latest.current.complete,
-        organizationId,
-        waiting: current,
-      });
+      const settled = await askPaid({ complete: latest.current.complete, waiting: current });
       asking = false;
       if (!live || settled.status === "waiting") return;
       live = false;
       latest.current.onSettled(settled, current);
     };
     const onFocus = () => void ask();
-    const timer = setInterval(onFocus, SEAT_PAYMENT_POLL_MS);
     window.addEventListener("focus", onFocus);
     return () => {
       live = false;
-      clearInterval(timer);
       window.removeEventListener("focus", onFocus);
     };
-  }, [paymentRef, organizationId]);
+  }, [paymentRef]);
+}
+
+/** Approve buys the seat only with none free on a live Stripe seat subscription. */
+function buysSeat(open: OpenSeatRequests | undefined): boolean {
+  return !open?.seatFree && open?.approvalPath?.kind === "stripe_seats";
+}
+
+/** The waiting approval when it began in this organization. */
+function waitingIn({
+  waiting,
+  organizationId,
+}: {
+  waiting: WaitingSeatApproval | undefined;
+  organizationId: string;
+}): WaitingSeatApproval | undefined {
+  return waiting?.organizationId === organizationId ? waiting : undefined;
+}
+
+/** The approval still waiting on its payment when it is not this request's own. */
+function otherWaiting({
+  waiting,
+  request,
+}: {
+  waiting: WaitingSeatApproval | undefined;
+  request: SeatRequest;
+}): WaitingSeatApproval | undefined {
+  return waiting && waiting.request.id !== request.id ? waiting : undefined;
 }
 
 /**
@@ -106,7 +128,8 @@ export function useSeatRequests({
   const showErrorToast = useShowErrorToast();
   const utils = api.useUtils();
   const [answeringId, setAnsweringId] = useState<string | null>(null);
-  const [waiting, setWaiting] = useState<WaitingSeatApproval | undefined>(undefined);
+  const [waitingAnywhere, setWaiting] = useState<WaitingSeatApproval | undefined>(undefined);
+  const waiting = waitingIn({ waiting: waitingAnywhere, organizationId });
 
   const open = api.seatRequest.listOpen.useQuery(
     { organizationId },
@@ -137,7 +160,6 @@ export function useSeatRequests({
   };
 
   useWaitForSeatPayment({
-    organizationId,
     waiting,
     complete: completeMutation.mutateAsync,
     onSettled: (settled, settledWaiting) => {
@@ -184,6 +206,15 @@ export function useSeatRequests({
 
   /** One click: the seat bought and the request approved, or the Stripe page it waits on. */
   const approveWithSeat = async (request: SeatRequest) => {
+    // One seat payment at a time: a second would leave the first approval unfinished once paid.
+    const other = otherWaiting({ waiting: waitingAnywhere, request });
+    if (other) {
+      toaster.create({
+        title: `Finish the seat payment for ${nameOf(other.request)} first`,
+        type: "error",
+      });
+      return;
+    }
     setAnsweringId(request.id);
     let answer: SeatApprovalWithSeat;
     try {
@@ -203,18 +234,12 @@ export function useSeatRequests({
       approved({ request, seatAdded: answer.seatAdded });
       return;
     }
-    setWaiting({ request, paymentRef: answer.paymentRef, url: answer.url });
+    setWaiting({ organizationId, request, paymentRef: answer.paymentRef, url: answer.url });
     window.open(answer.url, "_blank", "noopener");
   };
 
-  const approve = (request: SeatRequest) => {
-    const path = open.data?.approvalPath;
-    if (open.data?.seatFree || path?.kind !== "stripe_seats") {
-      void approveNow(request);
-      return;
-    }
-    void approveWithSeat(request);
-  };
+  const approve = (request: SeatRequest) =>
+    void (buysSeat(open.data) ? approveWithSeat(request) : approveNow(request));
 
   const decline = (request: SeatRequest) =>
     void run({

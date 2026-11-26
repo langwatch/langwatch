@@ -24,7 +24,8 @@ export type PendingSeatRoleChangeRecord = Readonly<{
  * void within a day and a checkout expires the same day. `claim` lets one applier through.
  */
 export interface PendingSeatRoleChangeRepository {
-  save(record: PendingSeatRoleChangeRecord): Promise<void>;
+  /** False, saving nothing, when the payment already names a change: one payment, one change. */
+  save(record: PendingSeatRoleChangeRecord): Promise<boolean>;
   /** The change, or none once it expired. */
   findById(input: { id: string }): Promise<PendingSeatRoleChangeRecord[]>;
   findByPayment(input: { payment: SeatPaymentRef }): Promise<PendingSeatRoleChangeRecord[]>;

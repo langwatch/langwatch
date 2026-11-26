@@ -142,6 +142,32 @@ describe("<SeatRoleOffer/>", () => {
       expect(screen.queryByText(/card|visa/i)).toBeNull();
       expect(invalidateSubscription).toHaveBeenCalled();
     });
+
+    it("keeps the done notice when the refetched offer comes back blocked", () => {
+      const { props, view } = renderOffer();
+      fireEvent.click(screen.getByRole("button", { name: /Add 1 seat and make Sam Admin/ }));
+      offering({ kind: "blocked" });
+      view.rerender(
+        <DesignSystemProvider forcedTheme="light">
+          <SeatRoleOffer {...props} state="done" />
+        </DesignSystemProvider>,
+      );
+      expect(screen.getByText("Sam is now an Admin")).toBeInTheDocument();
+      expect(screen.queryByText("We couldn't add the seat yet")).toBeNull();
+    });
+
+    it("reports the amount the admin confirmed, not a later reprice", () => {
+      const { props, view } = renderOffer();
+      fireEvent.click(screen.getByRole("button", { name: /Add 1 seat and make Sam Admin/ }));
+      offering({ ...CHARGE, formattedAmountDue: "$9.20" });
+      view.rerender(
+        <DesignSystemProvider forcedTheme="light">
+          <SeatRoleOffer {...props} state="busy" />
+        </DesignSystemProvider>,
+      );
+      expect(props.onAmountDue).toHaveBeenLastCalledWith("$5.19");
+      expect(props.onAmountDue).not.toHaveBeenCalledWith("$9.20");
+    });
   });
 
   describe("when billing is held on our side", () => {

@@ -20,14 +20,17 @@ export class RedisPendingSeatRoleChangeRepository implements PendingSeatRoleChan
 
   private constructor(private readonly redis: RedisConnection) {}
 
-  async save(record: PendingSeatRoleChangeRecord): Promise<void> {
+  async save(record: PendingSeatRoleChangeRecord): Promise<boolean> {
+    const payment = `${PREFIX}:payment:${paymentKey(record.payment)}`;
+    const taken = await this.redis.set(payment, record.id, "EX", KEEP_SECONDS, "NX");
+    if (taken !== "OK") return false;
     await this.redis
       .multi()
       .set(recordKey(record.id), JSON.stringify(record), "EX", KEEP_SECONDS)
-      .set(`${PREFIX}:payment:${paymentKey(record.payment)}`, record.id, "EX", KEEP_SECONDS)
       .set(memberKey(record), record.id, "EX", KEEP_SECONDS)
       .set(organizationKey(record), record.id, "EX", KEEP_SECONDS)
       .exec();
+    return true;
   }
 
   async findById({ id }: { id: string }): Promise<PendingSeatRoleChangeRecord[]> {
@@ -81,7 +84,7 @@ export class RedisPendingSeatRoleChangeRepository implements PendingSeatRoleChan
     const [record] = await this.findById({ id });
     if (!record) return;
     const settled = { ...record, status, reason: reason ?? null };
-    await this.redis.set(recordKey(id), JSON.stringify(settled), "KEEPTTL");
+    await this.redis.set(recordKey(id), JSON.stringify(settled), "KEEPTTL", "XX");
   }
 }
 

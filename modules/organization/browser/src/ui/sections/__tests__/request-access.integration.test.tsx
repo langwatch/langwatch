@@ -91,6 +91,22 @@ describe("Request access", () => {
     });
   });
 
+  describe("given the request was sent from this page and later answered", () => {
+    it("shows the answer once the reread knows of it", async () => {
+      const { rerenderWithHost } = renderWithOrganizationHost(
+        <RequestAccessAction />,
+        liteMember(),
+      );
+      await userEvent.click(screen.getByRole("button", { name: "Request access" }));
+      expect(await screen.findByRole("button", { name: "Access requested" })).toBeDisabled();
+
+      answered("approved");
+      rerenderWithHost(liteMember());
+
+      expect(await screen.findByText("Your full seat was approved.")).toBeInTheDocument();
+    });
+  });
+
   describe("given the member's request was answered", () => {
     /** @scenario "Request access says what was answered" */
     it("says an approval landed and offers to reload", () => {

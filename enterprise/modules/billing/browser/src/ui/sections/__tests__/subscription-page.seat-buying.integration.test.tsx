@@ -1175,6 +1175,27 @@ describe("<SubscriptionPage/> buying seats", () => {
       expect(seatChange).not.toHaveBeenCalled();
     });
 
+    /** @scenario "Manage seats stops calmly while two live subscriptions hold the billing" */
+    it("keeps no seat purchase when the held change lowers seats", async () => {
+      mockRecordBlockedSeatPurchase.mockClear();
+      givenGrowth({ paid: 5, inUse: 3 });
+      renderPage();
+      await openManageSeats();
+      mockPreviewProration.mockImplementation(() => ({
+        data: undefined,
+        isLoading: false,
+        isError: true,
+        error: { data: { error: { code: "subscription_ambiguous", httpStatus: 409 } } },
+      }));
+
+      fireEvent.click(screen.getByTestId("drawer-seats-stepper-minus"));
+
+      const stuck = await screen.findByTestId("seat-drawer-stuck");
+      expect(stuck).toHaveTextContent("We couldn't change seats yet");
+      expect(stuck).not.toHaveTextContent("We'll email you when it's done");
+      expect(mockRecordBlockedSeatPurchase).not.toHaveBeenCalled();
+    });
+
     /** @scenario "The confirm keeps its question while the invite after a payment is sent" */
     it("keeps asking to add the seat after the plan is re-read", async () => {
       givenGrowth({ paid: 3, inUse: 3 });

@@ -260,6 +260,47 @@ describe("useSeatRequests approve", () => {
       expect(screen.queryByText(`Waiting on ${REQUEST.id}`)).toBeNull();
     });
 
+    describe("when a second approval is pressed while the first waits on its payment", () => {
+      it("refuses it, so the first approval is still finished once paid", async () => {
+        const other: SeatRequest = { ...REQUEST, id: "seat-request-2", name: "Omar" };
+        state.open = { ...stripeSeats(), requests: [REQUEST, other] };
+        answer("seatRequest.approveWithSeat", {
+          status: "payment_required",
+          url: "https://invoice.stripe.example/i/1",
+          paymentRef: "ref-1",
+        });
+        function TwoRequests() {
+          const { approve, waitingId } = useSeatRequests({
+            organizationId: ORG,
+            canView: true,
+            canManage: true,
+          });
+          return (
+            <>
+              <button type="button" onClick={() => approve(REQUEST)}>
+                Approve first
+              </button>
+              <button type="button" onClick={() => approve(other)}>
+                Approve second
+              </button>
+              {waitingId ? <p>Waiting on {waitingId}</p> : null}
+            </>
+          );
+        }
+        const { host } = renderWithOrganizationHost(<TwoRequests />);
+
+        await userEvent.click(screen.getByText("Approve first"));
+        await screen.findByText(`Waiting on ${REQUEST.id}`);
+        await userEvent.click(screen.getByText("Approve second"));
+
+        expect(named("seatRequest.approveWithSeat")).toHaveLength(1);
+        expect(host.failures).toEqual([
+          expect.objectContaining({ fallbackTitle: "Finish the seat payment for Lena first" }),
+        ]);
+        expect(screen.getByText(`Waiting on ${REQUEST.id}`)).toBeInTheDocument();
+      });
+    });
+
     it("says the seat payment was not completed when the Stripe page ended unpaid", async () => {
       state.open = stripeSeats();
       answer("seatRequest.approveWithSeat", {

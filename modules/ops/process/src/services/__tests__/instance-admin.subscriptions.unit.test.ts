@@ -99,6 +99,22 @@ describe("given an organization with an active subscription", () => {
     });
   });
 
+  describe("when an operator writes status or organization as an operator object", () => {
+    /** @scenario "The Back office refuses a second active subscription for an organization" */
+    it.each([
+      { id: "sub_live", data: { organizationId: "org_other", status: { set: "ACTIVE" } } },
+      { id: "sub_pending", data: { organizationId: { set: "org_acme" }, status: "ACTIVE" } },
+    ])("refuses %o with validation_error and writes nothing", async ({ id, data }) => {
+      const { service, statusOf } = await backOffice();
+      const before = await statusOf(id);
+
+      await expect(
+        service.execute(subscriptionWrite("update", { id, data })),
+      ).rejects.toMatchObject({ code: "validation_error" });
+      expect(await statusOf(id)).toBe(before);
+    });
+  });
+
   describe("when an operator sends a bulk edit without explicit ids", () => {
     /** @scenario "A bulk subscription edit that names no rows is refused" */
     it.each([{}, { ids: [] }, { ids: "sub_pending" }, { where: { organizationId: "org_acme" } }])(

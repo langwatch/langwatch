@@ -31,7 +31,10 @@ export type SeatRequestOpened = Readonly<{
 
 /** The seat requests organization keeps, one row per organization and address. */
 export abstract class SeatRequestRepository {
-  /** Opens the request for this address, reusing the row; an open one only gains what is new. */
+  /**
+   * Opens the request for this address, reusing the row; an open one only gains what is new,
+   * and becomes `requested` once the member asks for it themselves.
+   */
   abstract open(input: {
     id: string;
     organizationId: string;

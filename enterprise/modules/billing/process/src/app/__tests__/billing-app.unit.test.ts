@@ -7,7 +7,10 @@ import { describe, expect, it } from "vitest";
 import { billingProcessModule } from "../../billing.module.ts";
 import type { BillingSubscriptionNotifier } from "../../channels/billing-subscription-notifier.channel.ts";
 import { MemoryBillingWebhookHostChannel } from "../../channels/memory/memory.billing-webhook-host.channel.ts";
-import { MemoryPaymentRecoveryEmailChannel } from "../../channels/memory/memory.billing.channels.ts";
+import {
+  MemoryBillingFixedEmailChannel,
+  MemoryPaymentRecoveryEmailChannel,
+} from "../../channels/memory/memory.billing.channels.ts";
 import { MemoryConnectedInvoicingChannel } from "../../channels/memory/memory.connected-invoicing.channel.ts";
 import { MemoryStripeCustomersChannel } from "../../channels/memory/memory.stripe-customers.channel.ts";
 import { MemoryStripeInvoicesChannel } from "../../channels/memory/memory.stripe-invoices.channel.ts";
@@ -183,6 +186,10 @@ function billingApp({
           subscription: {
             notifier: createApiFixture<BillingSubscriptionNotifier>({}),
             facts: lifecycle,
+            fixedMail: {
+              emails: MemoryBillingFixedEmailChannel.create(),
+              publicBaseUrl: "https://app.langwatch.example",
+            },
           },
         }
       : {}),
@@ -539,6 +546,24 @@ describe("the subscription door BillingModule serves", () => {
         code: "not_found",
         httpStatus: 404,
       });
+    });
+
+    it("says a blocked seat purchase was not kept", async () => {
+      const { app } = billingApp({ isSaas: false, withStripe: false });
+
+      await expect(
+        app.recordBlockedSeatPurchase({ organizationId: ACME, seats: 1, userId: "user_admin" }),
+      ).resolves.toEqual({ recorded: false });
+    });
+  });
+
+  describe("given a deployment that sells plans", () => {
+    it("says a blocked seat purchase was kept", async () => {
+      const { app } = billingApp({ isSaas: true, withStripe: true, withSubscriptions: true });
+
+      await expect(
+        app.recordBlockedSeatPurchase({ organizationId: ACME, seats: 1, userId: "user_admin" }),
+      ).resolves.toEqual({ recorded: true });
     });
   });
 });

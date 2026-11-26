@@ -761,7 +761,9 @@ function useSeatRolePanel({
     memberName,
     seat,
     showSeatPanel,
-    seatPurchaseOffered: showSeatPanel && step !== "done" && offersPurchase,
+    // A change waiting on its payment, or still being sent, drops Save until it settles.
+    seatPurchaseOffered:
+      showSeatPanel && step !== "done" && (offersPurchase || step === "waiting" || step === "busy"),
     pickSeat: (next: InviteSeat) => {
       setPendingSeat(next);
       if (step !== "waiting" && step !== "busy") seat.clear();

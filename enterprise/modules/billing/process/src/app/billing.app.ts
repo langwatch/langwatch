@@ -53,6 +53,7 @@ import type {
 } from "@langwatch/eventing";
 import { NotFoundError } from "@langwatch/handled-error";
 import { NotificationService as NotificationApi } from "@langwatch/notification-contract";
+import { createLogger } from "@langwatch/observability";
 import type { FeatureSetup } from "@langwatch/process";
 import { Temporal } from "@langwatch/time";
 
@@ -147,6 +148,8 @@ import type { BillingCurrencyApi } from "../transport/currency.trpc.ts";
 import type { BillingSubscriber, BillingSubscriptionApi } from "../transport/subscription.trpc.ts";
 
 /** Main's `env.BASE_HOST ?? "https://app.langwatch.ai"` for the usage link. */
+const logger = createLogger("langwatch:billing:app");
+
 const DEFAULT_PUBLIC_BASE_URL = "https://app.langwatch.ai";
 
 type BillingSetup = FeatureSetup<
@@ -766,17 +769,32 @@ export class BillingModule
       return await this.#subscriptionDoor.subscriptions.updateSubscriptionItems(items);
     } catch (error) {
       if (requestedBy && error instanceof AmbiguousSubscriptionError) {
-        const billed = await this.#subscriptionDoor.seatEvents.billedSeats(items.organizationId);
-        const seats = Math.max(1, items.totalMembers - billed);
-        await this.recordBlockedSeatChange({
-          organizationId: items.organizationId,
-          userId: requestedBy.userId,
-          attempt: requestedBy.attempt ?? { kind: "seat_purchase", seats },
-          seats,
-        });
+        await this.#keepRefusedChange({ items, requestedBy }).catch((recordError: unknown) =>
+          logger.error(
+            { error: recordError, organizationId: items.organizationId },
+            "Refused seat change not kept",
+          ),
+        );
       }
       throw error;
     }
+  }
+
+  async #keepRefusedChange({
+    items,
+    requestedBy,
+  }: {
+    items: { organizationId: string; totalMembers: number };
+    requestedBy: { userId: string; attempt?: BlockedSeatChangeAttempt };
+  }): Promise<void> {
+    const billed = await this.#subscriptionDoor.seatEvents.billedSeats(items.organizationId);
+    const seats = Math.max(1, items.totalMembers - billed);
+    await this.recordBlockedSeatChange({
+      organizationId: items.organizationId,
+      userId: requestedBy.userId,
+      attempt: requestedBy.attempt ?? { kind: "seat_purchase", seats },
+      seats,
+    });
   }
 
   async #addsSeats(input: { organizationId: string; newTotalSeats: number }): Promise<boolean> {
@@ -1406,7 +1424,16 @@ export class BillingModule
     attempt: BlockedSeatChangeAttempt;
     seats: number;
   }): Promise<void> {
-    await this.#subscriptions?.blockedSeatChanges?.record(input);
+    await this.#keepBlockedSeatChange(input);
+  }
+
+  async #keepBlockedSeatChange(input: {
+    organizationId: string;
+    userId: string;
+    attempt: BlockedSeatChangeAttempt;
+    seats: number;
+  }): Promise<boolean> {
+    return (await this.#subscriptions?.blockedSeatChanges?.record(input)) ?? false;
   }
 
   /** A seat purchase Manage seats could not price for two live subscriptions; kept for its admin. */
@@ -1416,13 +1443,13 @@ export class BillingModule
     userId: string | undefined;
   }): Promise<{ recorded: boolean }> {
     if (!input.userId) return { recorded: false };
-    await this.recordBlockedSeatChange({
+    const recorded = await this.#keepBlockedSeatChange({
       organizationId: input.organizationId,
       userId: input.userId,
       attempt: { kind: "seat_purchase", seats: input.seats },
       seats: input.seats,
     });
-    return { recorded: true };
+    return { recorded };
   }
 
   /** Emails each admin whose refused seat change can be finished now; nothing where not composed. */

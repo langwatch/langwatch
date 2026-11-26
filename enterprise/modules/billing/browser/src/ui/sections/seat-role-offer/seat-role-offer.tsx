@@ -200,13 +200,24 @@ export function SeatRoleOffer({
   useEffect(() => {
     if (kind !== undefined) onKind?.(kind);
   }, [kind, onKind]);
+  // Once confirmed, the owner keeps the amount the admin pressed, whatever a refetch reprices.
   useEffect(() => {
-    if (amountDue !== undefined) onAmountDue?.(amountDue);
-  }, [amountDue, onAmountDue]);
+    if (amountDue !== undefined && confirmed === undefined) onAmountDue?.(amountDue);
+  }, [amountDue, confirmed, onAmountDue]);
   useEffect(() => {
     if (state === "done") void utils.subscription.invalidate();
   }, [state, utils]);
 
+  if (state === "done") {
+    return (
+      <SeatAddedNotice
+        confirmed={confirmed}
+        organizationName={organizationName}
+        memberName={memberName}
+        roleLabel={roleLabel}
+      />
+    );
+  }
   if (state === "stuck" || kind === "blocked") {
     return (
       <SeatHeldNotice
@@ -222,16 +233,6 @@ export function SeatRoleOffer({
         organizationName={organizationName}
         memberName={memberName}
         currentRoleLabel={currentRoleLabel}
-      />
-    );
-  }
-  if (state === "done") {
-    return (
-      <SeatAddedNotice
-        confirmed={confirmed}
-        organizationName={organizationName}
-        memberName={memberName}
-        roleLabel={roleLabel}
       />
     );
   }
@@ -258,6 +259,7 @@ export function SeatRoleOffer({
       busy={state === "busy"}
       onConfirm={() => {
         setConfirmed(buyable);
+        if (buyable.kind === "charge") onAmountDue?.(buyable.formattedAmountDue);
         onConfirm(buyable.kind === "charge" ? buyable.quotedAt : undefined);
       }}
     />

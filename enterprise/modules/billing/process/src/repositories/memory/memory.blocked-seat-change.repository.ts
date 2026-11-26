@@ -42,6 +42,7 @@ export class MemoryBlockedSeatChangeRepository extends BlockedSeatChangeReposito
       if (
         row.organizationId === input.organizationId &&
         row.userId === input.userId &&
+        row.createdAt.epochMilliseconds <= input.createdUpTo.epochMilliseconds &&
         row.notifiedAt === null
       ) {
         row.notifiedAt = input.at;

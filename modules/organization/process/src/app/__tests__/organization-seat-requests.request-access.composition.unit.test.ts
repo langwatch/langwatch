@@ -202,6 +202,27 @@ describe("given an organization paying per seat in Stripe with every full seat i
     });
   });
 
+  describe("when two administrators approve with a seat at once", () => {
+    /** @scenario "Approve with no seat free on a live Stripe seat subscription adds the seat and approves" */
+    it("buys one seat and approves once", async () => {
+      const { app, lena, seatRequestId, membershipOf, seatBilling } = await lenaAsking();
+
+      let second: unknown;
+      seatBilling.duringPurchase = async () => {
+        second = await app
+          .approveSeatRequestWithSeat({ ...scope, seatRequestId }, ADA)
+          .catch((error: unknown) => error);
+      };
+
+      const first = await app.approveSeatRequestWithSeat({ ...scope, seatRequestId }, ADA);
+
+      expect(first).toEqual({ status: "approved", outcome: "promoted", seatAdded: true });
+      expect(codeOf(second)).toBe("seat_request_not_found");
+      expect(seatBilling.purchases).toBe(1);
+      expect(membershipOf(lena.userId)?.role).toBe(OrganizationUserRole.MEMBER);
+    });
+  });
+
   describe("when the seat charge needs the customer", () => {
     /** @scenario "When Stripe needs the customer, Approve answers the Stripe page and approves nothing yet" */
     it("answers the Stripe page and leaves the request open", async () => {

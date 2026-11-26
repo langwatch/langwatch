@@ -178,6 +178,19 @@ export class InstanceAdminService {
     if (input.resource !== "subscription") return;
     if (!["create", "update", "updateMany"].includes(input.method)) return;
     const data = input.params.data ?? {};
+    // The check must see what persists: an operator object (`{ set: "ACTIVE" }`) is dropped.
+    const nonScalar = (["status", "organizationId"] as const).filter(
+      (field) => data[field] !== undefined && typeof data[field] !== "string",
+    );
+    if (nonScalar.length > 0) {
+      throw new ValidationError("A subscription's status and organization are plain values", {
+        meta: {
+          fieldErrors: Object.fromEntries(
+            nonScalar.map((field) => [field, ["Send a plain value."]]),
+          ),
+        },
+      });
+    }
     const ids = this.subscriptionWriteIds(input);
     const stored = await this.repository.findSubscriptionStates({ ids });
     const written =

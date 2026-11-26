@@ -131,7 +131,7 @@ export class NotificationService {
     };
   }
 
-  /** The notice is built inside the try: a refused prop is reported like a failed send. */
+  /** Built inside the try, so a refused prop is reported like a failed send. True once sent. */
   private async sendSlackMessage({
     channelUrl,
     message,
@@ -142,20 +142,22 @@ export class NotificationService {
     message: (origin: NoticeOrigin) => BillingAlertMessage;
     missingConfigLog?: string;
     errorLog: string;
-  }): Promise<void> {
+  }): Promise<boolean> {
     if (!channelUrl) {
       if (missingConfigLog) {
         logger.warn(missingConfigLog);
       }
 
-      return;
+      return false;
     }
 
     try {
       await this.slack.send({ webhookUrl: channelUrl, message: message(this.origin()) });
+      return true;
     } catch (error) {
       logger.error({ error }, errorLog);
       this.errorReporter.capture(error instanceof Error ? error : new Error(String(error)));
+      return false;
     }
   }
 
@@ -264,7 +266,7 @@ export class NotificationService {
     });
   }
 
-  /** Ops hear an organization holds more than one active subscription, which only they can fix. */
+  /** Ops hear an organization holds more than one active subscription; false when not sent. */
   async sendSlackDuplicateActiveSubscriptions(input: {
     organizationId: string;
     organizationName: string;
@@ -272,9 +274,9 @@ export class NotificationService {
     adminEmail?: string;
     planName: string;
     subscriptionIds: string[];
-  }): Promise<void> {
+  }): Promise<boolean> {
     const { organizationId, ...props } = input;
-    await this.sendSlackMessage({
+    return this.sendSlackMessage({
       channelUrl: this.config.slackPlanLimitChannel,
       message: (origin) =>
         duplicateActiveSubscriptionsNotice.render({

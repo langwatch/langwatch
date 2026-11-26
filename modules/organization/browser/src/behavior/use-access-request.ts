@@ -12,6 +12,20 @@ import { useShowErrorToast } from "./organization-feedback.ts";
 
 export type AccessRequestStatus = MyAccessRequest["status"];
 
+/** The read wins once it knows of the request just sent; until then the send's own answer shows. */
+function currentStatus({
+  sent,
+  read,
+}: {
+  sent: MyAccessRequest | undefined;
+  read: MyAccessRequest | undefined;
+}): AccessRequestStatus {
+  if (!sent) return read?.status ?? "none";
+  const caughtUp =
+    read?.openedAt != null && sent.openedAt != null && read.openedAt >= sent.openedAt;
+  return caughtUp ? read.status : sent.status;
+}
+
 export function useAccessRequest({ reason }: { reason?: string }) {
   const host = useOrganizationHost();
   const showErrorToast = useShowErrorToast();
@@ -21,8 +35,10 @@ export function useAccessRequest({ reason }: { reason?: string }) {
 
   const mine = api.seatRequest.myAccessRequest.useQuery({ organizationId }, { enabled: offered });
   const requestAccess = api.seatRequest.requestAccess.useMutation();
-  // The answer to this page's own press, ahead of the reread that follows it.
-  const [sent, setSent] = useState<MyAccessRequest | undefined>(undefined);
+  // The answer to this page's own press, for its organization, until the reread catches up.
+  const [sent, setSent] = useState<{ organizationId: string; answer: MyAccessRequest } | undefined>(
+    undefined,
+  );
 
   const send = async () => {
     try {
@@ -30,7 +46,7 @@ export function useAccessRequest({ reason }: { reason?: string }) {
         organizationId,
         ...(reason ? { reason } : {}),
       });
-      setSent(answer);
+      setSent({ organizationId, answer });
       void utils.seatRequest.myAccessRequest.invalidate();
     } catch (error) {
       showErrorToast({ error, fallbackTitle: "Couldn't send your access request" });
@@ -39,7 +55,10 @@ export function useAccessRequest({ reason }: { reason?: string }) {
 
   return {
     offered,
-    status: (sent?.status ?? mine.data?.status ?? "none") satisfies AccessRequestStatus,
+    status: currentStatus({
+      sent: sent?.organizationId === organizationId ? sent.answer : undefined,
+      read: mine.data,
+    }) satisfies AccessRequestStatus,
     isLoading: offered && mine.isPending,
     isSending: requestAccess.isPending,
     send,

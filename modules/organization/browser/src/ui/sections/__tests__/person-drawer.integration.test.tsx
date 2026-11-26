@@ -30,6 +30,7 @@ vi.mock("../../../behavior/organization-api.ts", () => {
           getMemberById: invalidator,
           getOrganizationWithMembersAndTheirTeams: invalidator,
           listHeldSeats: invalidator,
+          getDirectoryCounts: invalidator,
         },
         authz: { listBillingMembers: invalidator },
         limits: { getUsage: invalidator },
@@ -177,7 +178,7 @@ describe("given a person opened from the members list", () => {
     /** @scenario "The member drawer shows the person's open seat request" */
     it("shows only their request with Approve and Decline", async () => {
       state.seatRequests = openRequest;
-      renderWithOrganizationHost(
+      const { host } = renderWithOrganizationHost(
         <PersonDrawer userId="user-sam" />,
         new FakeOrganizationHost({
           currentUser: ANA,
@@ -197,6 +198,12 @@ describe("given a person opened from the members list", () => {
       expect(state.seatAnswers).toEqual([
         { path: "approve", input: { organizationId: "org-1", seatRequestId: "seat-request-sam" } },
       ]);
+      await vi.waitFor(() =>
+        expect(host.successes).toEqual([
+          expect.objectContaining({ title: "Sam Rivera has a full seat" }),
+        ]),
+      );
+      expect(host.failures).toHaveLength(0);
       expect(screen.getByRole("button", { name: "Decline" })).toBeInTheDocument();
     });
 

@@ -330,6 +330,24 @@ describe("MemberRoleSeatPurchaseService", () => {
       ).rejects.toMatchObject({ code: "seat_payment_waiting" });
     });
 
+    /** @scenario "A purchase while a seat payment waits reopens that payment" */
+    it("maps one held invoice to one change when two admins ask at once", async () => {
+      const { state, service, pending } = world();
+      state.purchase = { status: "payment_required", payment: INVOICE, url: "https://pay.example" };
+
+      const answers = await Promise.all([
+        service.changeWithSeat(MAKE_ADMIN, ADMIN),
+        service.changeWithSeat(MAKE_ADMIN, ADMIN),
+      ]);
+
+      const saved = await pending.findWaitingForOrganization({ organizationId: ORG });
+      expect(saved).toHaveLength(1);
+      expect(answers).toEqual([
+        { status: "payment_required", changeId: saved[0]!.id, url: "https://pay.example" },
+        { status: "payment_required", changeId: saved[0]!.id, url: "https://pay.example" },
+      ]);
+    });
+
     /** @scenario "A paid seat whose role change is refused keeps the seat and says why" */
     it("records a paid seat whose role write is refused, with the reason", async () => {
       const { state, service, pay } = await waiting();

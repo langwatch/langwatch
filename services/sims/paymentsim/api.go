@@ -262,6 +262,11 @@ func (s *Server) updateSubscription(r *http.Request, p params) (any, error) {
 	if err != nil {
 		return nil, err
 	}
+	// A new item change supersedes a held one: its invoice is voided, never paid later.
+	if sub.PendingUpdate != nil && len(p.objects("items")) > 0 {
+		s.discardPending(sub, s.now().Unix())
+		before = fields(sub)
+	}
 	prorations := s.updateProrations(sub, items, p)
 	if s.willHold(sub, p, prorations) {
 		s.holdPending(sub, items, prorations)
@@ -653,6 +658,7 @@ func (s *Server) payInvoice(r *http.Request, p params) (any, error) {
 	if err != nil {
 		return nil, err
 	}
+	s.expirePending(s.now().Unix())
 	if err := notOpen(inv); err != nil {
 		return nil, err
 	}

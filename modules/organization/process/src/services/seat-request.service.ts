@@ -261,6 +261,7 @@ export class SeatRequestService {
     organizationId: string;
     seatRequestId: string;
     by: OrganizationPlanUser;
+    buySeat?: () => Promise<boolean>;
   }): Promise<SeatRequestResolved> {
     const request = await this.dependencies.requests.getOpen({
       organizationId: input.organizationId,
@@ -273,7 +274,8 @@ export class SeatRequestService {
 
   /**
    * Approve that buys the one full seat it needs where the organization pays per seat in Stripe.
-   * Tried first, so only the full seat limit leads to a charge; any other path refuses as before.
+   * The purchase runs under the approval's claim, so one request buys at most one seat; a seat
+   * bought for an approval that then fails stays free for the next one.
    */
   async approveWithSeat(input: {
     organizationId: string;
@@ -281,27 +283,31 @@ export class SeatRequestService {
     by: OrganizationPlanUser;
   }): Promise<SeatApprovalWithSeat> {
     const { organizationId } = input;
-    try {
-      const { outcome } = await this.approve(input);
-      return { status: "approved", outcome, seatAdded: false };
-    } catch (error) {
-      if (!HandledError.isHandled(error) || error.code !== "member_seat_limit_reached") throw error;
+    const bought: { purchase?: SeatPurchase } = {};
+    const buySeat = async () => {
       const { path } = await this.approvalOf({ organizationId });
-      if (path.kind !== "stripe_seats") throw error;
+      if (path.kind !== "stripe_seats") return false;
+      bought.purchase = await this.dependencies.peers.addFullSeat({
+        organizationId,
+        customerEmail: input.by.email ?? null,
+      });
+      return bought.purchase.status === "added";
+    };
+    try {
+      const { outcome } = await this.approve({ ...input, buySeat });
+      return { status: "approved", outcome, seatAdded: bought.purchase !== undefined };
+    } catch (error) {
+      const { purchase } = bought;
+      const refused = HandledError.isHandled(error) && error.code === "member_seat_limit_reached";
+      if (refused && purchase?.status === "payment_required") {
+        return {
+          status: "payment_required",
+          url: purchase.url,
+          paymentRef: JSON.stringify(purchase.payment),
+        };
+      }
+      throw error;
     }
-    const purchase = await this.dependencies.peers.addFullSeat({
-      organizationId,
-      customerEmail: input.by.email ?? null,
-    });
-    if (purchase.status === "payment_required") {
-      return {
-        status: "payment_required",
-        url: purchase.url,
-        paymentRef: JSON.stringify(purchase.payment),
-      };
-    }
-    const { outcome } = await this.approve(input);
-    return { status: "approved", outcome, seatAdded: true };
   }
 
   /** After the Stripe page: approves once the seat is paid; waiting while the page is open. */
@@ -455,7 +461,9 @@ export class SeatRequestService {
   }): Promise<void> {
     const { requests, notices, now, newId } = this.dependencies;
     const opened = await requests.open({ ...input, id: newId(), at: now() });
-    if (opened.outcome !== "opened" && opened.outcome !== "reopened") return;
+    // A member's own ask on an arrival's open request is still noticed, under the daily limit.
+    const asked = opened.outcome === "already_open" && input.source === "requested";
+    if (opened.outcome !== "opened" && opened.outcome !== "reopened" && !asked) return;
     // The request is open either way, and a later arrival answers already_open, so sales are
     // told even when the notice could not be recorded.
     await notices
@@ -496,6 +504,7 @@ export class SeatRequestService {
       .mailAnswer({
         organizationId: request.organizationId,
         seatRequestId: request.id,
+        openedAt: request.openedAt,
         email: request.email,
         outcome,
       })
@@ -509,6 +518,7 @@ export class SeatRequestService {
     await this.dependencies.notices.pushAnswer({
       organizationId: request.organizationId,
       seatRequestId: request.id,
+      openedAt: request.openedAt,
       userId: request.userId,
       outcome,
     });

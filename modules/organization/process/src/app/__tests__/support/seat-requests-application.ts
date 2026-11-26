@@ -67,6 +67,8 @@ export type SeatBilling = {
   /** How the Stripe page stands when the approval is completed. */
   payment: "paid" | "open" | "failed";
   purchases: number;
+  /** Runs while a purchase is under way, before billing answers. */
+  duringPurchase?: () => Promise<void>;
 };
 
 export async function application(
@@ -110,6 +112,9 @@ export async function application(
         },
         addFullSeat: async () => {
           seatBilling.purchases += 1;
+          const during = seatBilling.duringPurchase;
+          seatBilling.duringPurchase = undefined;
+          await during?.();
           if (seatBilling.purchase === "added") {
             addSeat();
             return { status: "added" as const };

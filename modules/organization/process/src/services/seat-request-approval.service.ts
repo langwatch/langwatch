@@ -79,15 +79,21 @@ export class SeatRequestApprovalService {
 
   private constructor(private readonly dependencies: Dependencies) {}
 
-  /** Gives the full seat; refuses member_seat_limit_reached while no full seat is free. */
+  /**
+   * Gives the full seat; refuses member_seat_limit_reached while no full seat is free. With
+   * `buySeat`, the full seat limit buys one seat while the claim is held, so a concurrent
+   * approval of the same request cannot buy another; false from it refuses as before.
+   */
   async approve({
     organizationId,
     seatRequestId,
     by,
+    buySeat,
   }: {
     organizationId: string;
     seatRequestId: string;
     by: OrganizationPlanUser;
+    buySeat?: () => Promise<boolean>;
   }): Promise<SeatRequestResolved> {
     const { requests } = this.dependencies;
     const request = await requests.getOpen({ organizationId, id: seatRequestId });
@@ -104,16 +110,8 @@ export class SeatRequestApprovalService {
     // The early check spares a doomed write; the writes giveFullSeat calls each re-check the
     // seat under the organization's seat lease, so of two approvals for the last seat one wins.
     try {
-      if (!(isFull && membership.disabledAt === null)) {
-        await this.assertFullSeatFree({ organizationId, by });
-      }
-      const outcome = await this.giveFullSeat({
-        organizationId,
-        request,
-        membership,
-        isFull,
-        by,
-      });
+      const give = { organizationId, request, membership, isFull, by };
+      const outcome = await this.giveFullSeatOrBuy({ give, buySeat });
       await this.settle(claim);
       return { outcome };
     } catch (error) {
@@ -248,6 +246,25 @@ export class SeatRequestApprovalService {
   }
 
   /** Lite becomes full, a held row becomes full and is enabled, an address alone is invited. */
+  private async giveFullSeatOrBuy({
+    give,
+    buySeat,
+  }: {
+    give: Parameters<SeatRequestApprovalService["giveFullSeat"]>[0];
+    buySeat: (() => Promise<boolean>) | undefined;
+  }): Promise<SeatRequestResolved["outcome"]> {
+    try {
+      if (!(give.isFull && give.membership?.disabledAt === null)) {
+        await this.assertFullSeatFree({ organizationId: give.organizationId, by: give.by });
+      }
+      return await this.giveFullSeat(give);
+    } catch (error) {
+      if (!buySeat || readSeatRefusal(error).kind !== "seat-limit") throw error;
+      if (!(await buySeat())) throw error;
+      return this.giveFullSeat(give);
+    }
+  }
+
   private async giveFullSeat({
     organizationId,
     request,

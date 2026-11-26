@@ -318,7 +318,7 @@ export function UserManagementDrawer({
         <BillingStuckNotice
           organizationId={mode.organizationId}
           organizationName={organizationName}
-          seats={Math.max(1, growth.seats - mode.paidSeats)}
+          added={growth.seats - mode.paidSeats}
         />
       </Drawer>
     );
@@ -533,29 +533,37 @@ const STUCK_SUPPORT_MAIL = "mailto:support@langwatch.ai?subject=We%20couldn%27t%
 
 /**
  * Two live subscriptions hold the organization's billing: nothing is charged or changed, ops
- * were alerted, and the attempt is kept once so the admin hears when it is fixed.
+ * were alerted, and a seat addition is kept once so the admin hears when it is fixed.
  */
 function BillingStuckNotice({
   organizationId,
   organizationName,
-  seats,
+  added,
 }: {
   organizationId: string;
   organizationName: string;
-  seats: number;
+  /** Seats beyond the paid count; zero or less for a reduction, which is not kept. */
+  added: number;
 }) {
   const record = billingApi.subscription.recordBlockedSeatPurchase.useMutation();
   const recordAttempt = record.mutate;
+  const adding = added > 0;
   useEffect(() => {
-    recordAttempt({ organizationId, seats });
-  }, [recordAttempt, organizationId, seats]);
+    if (added > 0) recordAttempt({ organizationId, seats: added });
+  }, [recordAttempt, organizationId, added]);
   return (
     <VStack align="start" gap={2} data-testid="seat-drawer-stuck">
-      <Banner status="info" icon={<Clock size={16} />} title="We couldn't add seats yet">
+      <Banner
+        status="info"
+        icon={<Clock size={16} />}
+        title={adding ? "We couldn't add seats yet" : "We couldn't change seats yet"}
+      >
         {`Something on our side is holding ${organizationName}'s billing. We were alerted automatically and are fixing it.`}
         <List.Root as="ul" paddingStart={4} marginTop={2}>
           <List.Item>Nothing was charged.</List.Item>
-          <List.Item>We'll email you when it's done, usually the same working day.</List.Item>
+          {adding && (
+            <List.Item>We'll email you when it's done, usually the same working day.</List.Item>
+          )}
         </List.Root>
       </Banner>
       <Button asChild size="sm" variant="outline">

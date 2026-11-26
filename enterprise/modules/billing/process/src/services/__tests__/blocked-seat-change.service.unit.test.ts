@@ -153,6 +153,39 @@ describe("given an admin's seat change was refused for two live subscriptions", 
     });
   });
 
+  describe("when a new refusal for the same admin lands while the email is sent", () => {
+    it("tells the admin about it on the next pass", async () => {
+      const { changes, quote, service, roleChange } = world();
+      await roleChange();
+      quote.mockImplementationOnce(async () => {
+        vi.setSystemTime(NOW.epochMilliseconds + 60_000);
+        await service.record({
+          organizationId: ORG,
+          userId: "user_admin",
+          attempt: { kind: "role_change", memberName: "Kim Lee", role: "Admin" },
+          seats: 1,
+        });
+        return QUOTE;
+      });
+
+      expect(await service.noticeFixed()).toEqual({ sent: 1, waiting: 0 });
+
+      expect((await changes.findWaiting()).map((change) => change.attempt)).toEqual([
+        { kind: "role_change", memberName: "Kim Lee", role: "Admin" },
+      ]);
+    });
+  });
+
+  describe("when the refusal cannot be stored", () => {
+    it("says it was not kept, and never throws", async () => {
+      const { changes, roleChange } = world();
+      vi.spyOn(changes, "record").mockRejectedValueOnce(new Error("database down"));
+
+      await expect(roleChange()).resolves.toBe(false);
+      await expect(roleChange()).resolves.toBe(true);
+    });
+  });
+
   describe("when the mail provider refuses the address", () => {
     it("keeps the change waiting for the next pass", async () => {
       const { changes, emails, service, roleChange } = world();

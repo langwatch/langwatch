@@ -22,10 +22,11 @@ export abstract class BlockedSeatChangeRepository {
   }): Promise<void>;
   /** Every change whose admin has not been told yet, oldest first, across organizations. */
   abstract findWaiting(): Promise<BlockedSeatChange[]>;
-  /** Marks every waiting change of this admin in this organization told. */
+  /** Marks this admin's waiting changes in this organization told, up to the one the notice read. */
   abstract markNotified(input: {
     organizationId: string;
     userId: string;
+    createdUpTo: Instant;
     at: Instant;
   }): Promise<void>;
 }

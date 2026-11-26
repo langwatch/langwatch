@@ -210,6 +210,7 @@ func (s *Server) handleComplete(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleRetry(w http.ResponseWriter, r *http.Request) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	s.expirePending(s.now().Unix())
 	inv := s.st.invoice(r.PathValue("id"))
 	if inv == nil || deref(inv.Status) != "open" {
 		controlError(w, http.StatusBadRequest, "no open invoice %s", r.PathValue("id"))
@@ -394,6 +395,7 @@ func (s *Server) handleInvoicePage(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleInvoicePay(w http.ResponseWriter, r *http.Request) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	s.expirePending(s.now().Unix())
 	inv := s.st.invoice(r.PathValue("id"))
 	if inv == nil || deref(inv.Status) == "draft" {
 		http.NotFound(w, r)

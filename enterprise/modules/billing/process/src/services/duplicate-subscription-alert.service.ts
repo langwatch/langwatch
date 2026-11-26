@@ -62,7 +62,7 @@ export class DuplicateSubscriptionAlertService implements DuplicateSubscriptionA
       const organization = await organizations.findWithAdmins(organizationId);
       const admin = organization?.members[0]?.user;
       const plan = await plans.getActivePlan(organizationId).catch(() => null);
-      await notices.sendSlackDuplicateActiveSubscriptions({
+      const sent = await notices.sendSlackDuplicateActiveSubscriptions({
         organizationId,
         organizationName: organization?.name ?? organizationId,
         adminName: admin?.name ?? undefined,
@@ -70,6 +70,7 @@ export class DuplicateSubscriptionAlertService implements DuplicateSubscriptionA
         planName: plan?.name ?? "unknown",
         subscriptionIds,
       });
+      if (!sent) await cooldown.delete(cooldownKey);
     } catch (error) {
       logger.error(
         { error, organizationId },

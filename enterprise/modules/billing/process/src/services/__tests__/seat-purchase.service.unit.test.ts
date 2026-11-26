@@ -5,6 +5,7 @@
  * @see ../../../../../../../specs/licensing/role-change-seat.feature
  */
 import { type StripePriceMap, SubscriptionStatus } from "@langwatch/enterprise-billing-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { beforeEach, describe, expect, it, type Mock, vi } from "vitest";
 
 import { MemoryStripeCustomersChannel } from "../../channels/memory/memory.stripe-customers.channel.ts";
@@ -58,32 +59,53 @@ const seatSubscription = (quantity: number, id = "sub_stripe_1"): BillingSubscri
   ],
 });
 
-const repository = (): {
-  [K in keyof SeatEventSubscriptionRepository]: Mock<SeatEventSubscriptionRepository[K]>;
-} => ({
-  findSeatCandidates: vi.fn().mockResolvedValue([linkedActive]),
-  findActivePlans: vi.fn().mockResolvedValue([]),
-  supersedeStrayRows: vi.fn().mockResolvedValue(undefined),
-  cancelPendingSeatCheckouts: vi.fn().mockResolvedValue([]),
-  createPendingSeatCheckout: vi.fn().mockResolvedValue({ id: "sub_new_1" }),
-  keepSeats: vi.fn(),
-  reactivateWithSeats: vi.fn(),
-  recordSeatRepair: vi.fn(),
-  findSeatRepairs: vi.fn().mockResolvedValue([]),
-  isSeatRepairPending: vi.fn().mockResolvedValue(false),
-  claimSeatLine: vi.fn().mockResolvedValue({ claimed: true, token: "lease_1" }),
-  renewSeatLine: vi.fn().mockResolvedValue(true),
-  beginSeatLineWrite: vi.fn().mockResolvedValue({ held: true, opened: null }),
-  finishSeatLineWrite: vi.fn().mockResolvedValue(true),
-  findSeatLineWrites: vi.fn().mockResolvedValue([]),
-  findSeatLineWrite: vi.fn().mockResolvedValue(null),
-  findSeatLineTarget: vi.fn().mockResolvedValue({ quantity: null, at: null }),
-  settleSeatLineWrite: vi.fn(),
-  recordSeatLineWriteFailure: vi.fn(),
-  releaseSeatLine: vi.fn().mockResolvedValue(undefined),
-  clearSeatRepair: vi.fn(),
-  recordSeatRepairFailure: vi.fn(),
-});
+/** Only what a purchase and its settlement read and write; any other call throws by name. */
+const repository = () => {
+  const configured = {
+    findSeatCandidates: vi.fn<SeatEventSubscriptionRepository["findSeatCandidates"]>(async () => [
+      linkedActive,
+    ]),
+    findActivePlans: vi.fn<SeatEventSubscriptionRepository["findActivePlans"]>(async () => []),
+    supersedeStrayRows: vi.fn<SeatEventSubscriptionRepository["supersedeStrayRows"]>(
+      async () => undefined,
+    ),
+    cancelPendingSeatCheckouts: vi.fn<
+      SeatEventSubscriptionRepository["cancelPendingSeatCheckouts"]
+    >(async () => []),
+    createPendingSeatCheckout: vi.fn<SeatEventSubscriptionRepository["createPendingSeatCheckout"]>(
+      async () => ({ id: "sub_new_1" }),
+    ),
+    reactivateWithSeats: vi.fn<SeatEventSubscriptionRepository["reactivateWithSeats"]>(
+      async () => undefined,
+    ),
+    isSeatRepairPending: vi.fn<SeatEventSubscriptionRepository["isSeatRepairPending"]>(
+      async () => false,
+    ),
+    claimSeatLine: vi.fn<SeatEventSubscriptionRepository["claimSeatLine"]>(async () => ({
+      claimed: true,
+      token: "lease_1",
+    })),
+    renewSeatLine: vi.fn<SeatEventSubscriptionRepository["renewSeatLine"]>(async () => true),
+    beginSeatLineWrite: vi.fn<SeatEventSubscriptionRepository["beginSeatLineWrite"]>(async () => ({
+      held: true,
+      opened: null,
+    })),
+    finishSeatLineWrite: vi.fn<SeatEventSubscriptionRepository["finishSeatLineWrite"]>(
+      async () => true,
+    ),
+    findSeatLineTarget: vi.fn<SeatEventSubscriptionRepository["findSeatLineTarget"]>(async () => ({
+      quantity: null,
+      at: null,
+    })),
+    releaseSeatLine: vi.fn<SeatEventSubscriptionRepository["releaseSeatLine"]>(
+      async () => undefined,
+    ),
+  };
+  return Object.assign(
+    createApiFixture<SeatEventSubscriptionRepository>(configured, "subscriptions"),
+    configured,
+  );
+};
 
 describe("SeatPurchaseService", () => {
   let stripeSubscriptions: MemoryStripeSubscriptionsChannel;
