@@ -116,6 +116,19 @@ Feature: Product sidebars
     And the group headings use the compact heading style
 
   @integration
+  Scenario: Dragging the sidebar's edge widens it and the width is remembered
+    Given a product sidebar on a wide screen
+    When I drag its right edge to the right
+    Then the column widens up to its maximum width, never below its default
+    And the width I picked is kept for me the next time the sidebar draws
+    And double-clicking the edge puts it back to its default width
+
+  @integration
+  Scenario: A cut-off menu entry shows its full name on hover
+    Given a menu entry whose name is cut off with an ellipsis
+    Then hovering it shows the full name
+
+  @integration
   Scenario: A sidebar entry underlines under the pointer
     Given a product sidebar
     When the pointer rests on a page entry

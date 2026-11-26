@@ -77,11 +77,11 @@ Every verdict is a row in the `judgments` view of [LangWatchQL](/api-reference/q
 
 ```sql
 SELECT
-  t.Attributes['user.id'] AS user,
+  t.Attributes['langwatch.user_id'] AS user,
   sum(j.Passed) AS annoyed,
   count() AS conversations
-FROM analytics.judgments AS j
-JOIN analytics.traces AS t ON t.TraceId = j.TraceId
+FROM judgments AS j
+JOIN traces AS t ON t.TraceId = j.TraceId
 WHERE j.RunId = {run:String}
   AND j.QuestionId = 'annoyed'
   AND j.CreatedAt >= subtractDays(now(), 7)

@@ -6,7 +6,12 @@ import type { agentTrpc } from "@langwatch/agent-contract";
 import type { annotationScoreTrpc, annotationTrpc } from "@langwatch/annotation-contract";
 import { createModuleApi, type ContractApiMap, type OutputsFromMap } from "@langwatch/api/web";
 import type { automationTrpc } from "@langwatch/automation-contract";
-import type { dashboardTrpc, dashboardWidgetTrpc, graphTrpc } from "@langwatch/dashboard-contract";
+import type {
+  boardTrpc,
+  dashboardTrpc,
+  dashboardWidgetTrpc,
+  graphTrpc,
+} from "@langwatch/dashboard-contract";
 import type { datasetRecordTrpc, datasetTrpc } from "@langwatch/dataset-contract";
 import type { evaluatorTrpc } from "@langwatch/evaluator-contract";
 import type { batchRecordTrpc, experimentsTrpc } from "@langwatch/experiment-contract";
@@ -26,6 +31,7 @@ import type { projectTrpc } from "@langwatch/project-contract";
 import type { promptTagTrpc, promptTrpc } from "@langwatch/prompt-contract";
 import type { scenarioTrpc } from "@langwatch/scenario-contract";
 import type { secretTrpc } from "@langwatch/secret-contract";
+import type { storedObjectTrpc } from "@langwatch/stored-object-contract";
 import type { suiteTrpc } from "@langwatch/suite-contract";
 import type { tracesTrpc } from "@langwatch/trace-contract";
 import type { userTrpc } from "@langwatch/user-contract";
@@ -36,6 +42,7 @@ export type LangyApiMap = ContractApiMap<typeof langyTrpc> &
   ContractApiMap<typeof tracesTrpc> &
   ContractApiMap<typeof organizationTrpc> &
   ContractApiMap<typeof dashboardTrpc> &
+  ContractApiMap<typeof boardTrpc> &
   ContractApiMap<typeof dashboardWidgetTrpc> &
   ContractApiMap<typeof graphTrpc> &
   ContractApiMap<typeof integrationsChecksTrpc> &
@@ -47,6 +54,8 @@ export type LangyApiMap = ContractApiMap<typeof langyTrpc> &
   ContractApiMap<typeof userTrpc> &
   ContractApiMap<typeof notificationTrpc> &
   ContractApiMap<typeof automationTrpc> &
+  // The images a sent message shows, read through short-lived signed URLs.
+  ContractApiMap<typeof storedObjectTrpc> &
   // The lists a Langy write can change, invalidated as its result lands.
   ContractApiMap<typeof scenarioTrpc> &
   ContractApiMap<typeof suiteTrpc> &

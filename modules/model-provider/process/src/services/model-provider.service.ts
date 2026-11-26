@@ -21,6 +21,7 @@ import {
   type ModelDefaultSnapshot,
   type ModelDefaultSnapshotInput,
   type ModelProvider,
+  type ModelProviderSave,
   type ModelProviderApiKeyValidation,
   type ModelProviderCredentialVerdict,
   type ModelProviderApiKeyValidationInput,
@@ -57,6 +58,7 @@ import { ModelProviderDefaultsWriteService } from "../features/defaults/services
 import { ModelProviderDefaultsService } from "../features/defaults/services/model-provider-defaults.service.ts";
 import { ModelProviderOnboardingDefaultsService } from "../features/defaults/services/model-provider-onboarding-defaults.service.ts";
 import { ModelProviderCostsService } from "../features/model-cost/services/model-provider-costs.service.ts";
+import type { ModelProviderModelImportService } from "../features/served-models/services/model-provider-model-import.service.ts";
 import type { ModelCostRepository } from "../repositories/model-cost.repository.ts";
 import type { ModelDefaultRepository } from "../repositories/model-default.repository.ts";
 import type { ModelProviderRepository } from "../repositories/model-provider.repository.ts";
@@ -96,6 +98,8 @@ interface ModelProviderServiceOptions {
   isOwnDecisionModelAllowed: OwnDecisionModelGate;
   /** The judge preview flag for the organization. */
   isJudgePreviewAllowed: OwnDecisionModelGate;
+  /** Imports an OpenAI-compatible provider's listed models on save; absent imports nothing. */
+  modelImport?: ModelProviderModelImportService;
 }
 
 /**
@@ -145,12 +149,7 @@ export class ModelProviderService {
       credentialPolicy: options.credentialPolicy,
       catalog: options.catalog,
       connectionRateLimiter: options.connectionRateLimiter,
-      connectionPing: ModelProviderConnectionPingService.create({
-        channel: options.connectionPing,
-        codexChannel: options.codexGatewayPing,
-        secrets: options.secrets,
-        execution: this.execution,
-      }),
+      connectionPing: this.createConnectionPing(),
       writeAuthorization,
       onboardingDefaults: ModelProviderOnboardingDefaultsService.create({
         defaults: options.defaults,
@@ -159,6 +158,7 @@ export class ModelProviderService {
       }),
       ids: options.ids,
       scopes,
+      modelImport: options.modelImport,
     });
     this.costs = ModelProviderCostsService.create({
       costs: options.costs,
@@ -174,14 +174,7 @@ export class ModelProviderService {
       authorization,
       scopes,
     });
-    this.decisionModels = ModelProviderDecisionModelService.create({
-      resolution: this.resolution,
-      scopes,
-      findProviderForProject: (input) => this.query.findProviderForProject(input),
-      findProviderForScope: (input) => this.query.findProviderForScope(input),
-      isOwnModelAllowed: options.isOwnDecisionModelAllowed,
-      isJudgePreviewAllowed: options.isJudgePreviewAllowed,
-    });
+    this.decisionModels = this.createDecisionModels(scopes);
     this.defaultWrites = ModelProviderDefaultsWriteService.create({
       defaults: options.defaults,
       catalog: options.catalog,
@@ -199,6 +192,26 @@ export class ModelProviderService {
 
   static create(options: ModelProviderServiceOptions): ModelProviderService {
     return new ModelProviderService(options);
+  }
+
+  private createDecisionModels(scopes: ModelProviderScopeService): ModelProviderDecisionModelService {
+    return ModelProviderDecisionModelService.create({
+      resolution: this.resolution,
+      scopes,
+      findProviderForProject: (input) => this.query.findProviderForProject(input),
+      findProviderForScope: (input) => this.query.findProviderForScope(input),
+      isOwnModelAllowed: this.options.isOwnDecisionModelAllowed,
+      isJudgePreviewAllowed: this.options.isJudgePreviewAllowed,
+    });
+  }
+
+  private createConnectionPing(): ModelProviderConnectionPingService {
+    return ModelProviderConnectionPingService.create({
+      channel: this.options.connectionPing,
+      codexChannel: this.options.codexGatewayPing,
+      secrets: this.options.secrets,
+      execution: this.execution,
+    });
   }
 
   countEnabledInScopes(input: {
@@ -289,11 +302,11 @@ export class ModelProviderService {
     return this.execution.prepare(input);
   }
 
-  upsert(input: ModelProviderWriteInput): Promise<ModelProvider> {
+  upsert(input: ModelProviderWriteInput): Promise<ModelProviderSave> {
     return this.commands.upsert(input);
   }
 
-  upsertByProviderKey(input: ModelProviderWriteInput): Promise<ModelProvider> {
+  upsertByProviderKey(input: ModelProviderWriteInput): Promise<ModelProviderSave> {
     return this.commands.upsertByProviderKey(input);
   }
 

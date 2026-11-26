@@ -1,6 +1,7 @@
 /**
  * @vitest-environment node
  * @see specs/analytics/evaluation-pass-rate-consistency.feature
+ * @see modules/evaluation/specs/category-evaluator-performance.feature
  * The Online Evaluations table loads every monitor's trend in one bounded ClickHouse read.
  */
 import type { ClickHouseClient } from "@clickhouse/client";
@@ -13,6 +14,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
   buildSeedMatrix,
   deleteSeededTenantRows,
+  type SeededEvaluation,
   seedMonitorPerformance,
   startMigratedClickHouse,
 } from "../../../__tests__/support/monitor-performance.fixtures.ts";
@@ -29,6 +31,7 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 const tenantId = `test-monitor-performance-${generate("test").toString()}`;
 const scoreEvaluatorId = `${tenantId}-score`;
 const guardrailEvaluatorId = `${tenantId}-guardrail`;
+const categoryEvaluatorId = `${tenantId}-category`;
 const endMs = Date.now();
 const currentStartMs = endMs - 7 * DAY_MS;
 // The window analytics compares against, from the rule its contract publishes.
@@ -83,19 +86,57 @@ const readPerformance = (monitors: { id: string; isGuardrail: boolean }[]) =>
     timeZone: "UTC",
   });
 
+/** A classifier: every result carries a label and neither a score nor a pass flag. */
+function categorySeeds(): SeededEvaluation[] {
+  const run = ({
+    startMs,
+    day,
+    label,
+  }: {
+    startMs: number;
+    day: number;
+    label: string;
+  }): SeededEvaluation => {
+    const occurredAtMs = startMs + day * DAY_MS + DAY_MS / 2;
+    return {
+      traceId: `${categoryEvaluatorId}-trace-${generate("test").toString()}`,
+      traceOccurredAtMs: occurredAtMs,
+      scheduledAtMs: occurredAtMs,
+      evaluatorId: categoryEvaluatorId,
+      score: null,
+      passed: null,
+      label,
+    };
+  };
+
+  return [
+    run({ startMs: currentStartMs, day: 1, label: "resolved" }),
+    run({ startMs: currentStartMs, day: 1, label: "resolved" }),
+    run({ startMs: currentStartMs, day: 2, label: "resolved" }),
+    run({ startMs: currentStartMs, day: 2, label: "escalated" }),
+    run({ startMs: previousStartMs, day: 1, label: "resolved" }),
+    run({ startMs: previousStartMs, day: 1, label: "escalated" }),
+    run({ startMs: previousStartMs, day: 2, label: "escalated" }),
+    run({ startMs: previousStartMs, day: 2, label: "escalated" }),
+  ];
+}
+
 describe.skipIf(!clickHouseUrl)("online evaluation monitor performance", () => {
   beforeAll(async () => {
     clickHouse = await startMigratedClickHouse();
     await seedMonitorPerformance({
       client: clickHouse,
       tenantId,
-      seeded: buildSeedMatrix({
-        tenantId,
-        scoreEvaluatorId,
-        guardrailEvaluatorId,
-        currentStartMs,
-        previousStartMs,
-      }),
+      seeded: [
+        ...buildSeedMatrix({
+          tenantId,
+          scoreEvaluatorId,
+          guardrailEvaluatorId,
+          currentStartMs,
+          previousStartMs,
+        }),
+        ...categorySeeds(),
+      ],
     });
     const routed = countingQueryClient(clickHouse);
     service = MonitorPerformanceService.create({
@@ -147,6 +188,25 @@ describe.skipIf(!clickHouseUrl)("online evaluation monitor performance", () => {
         points: [],
         current: null,
         previous: null,
+      },
+    ]);
+  }, 60_000);
+
+  /** @scenario "A classifier's stored results read as a distribution" */
+  it("reads a classifier with no score or pass flag as a label distribution", async () => {
+    const performance = await readPerformance([{ id: categoryEvaluatorId, isGuardrail: false }]);
+
+    expect(performance).toEqual([
+      {
+        monitorId: categoryEvaluatorId,
+        metric: "label",
+        points: [],
+        labels: [
+          { label: "resolved", count: 3, share: 0.75, grouped: false },
+          { label: "escalated", count: 1, share: 0.25, grouped: false },
+        ],
+        current: 0.75,
+        previous: 0.25,
       },
     ]);
   }, 60_000);
