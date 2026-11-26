@@ -39,6 +39,8 @@ import {
 } from "./object-storage-backend.ts";
 
 const API_VERSION = "2021-12-02";
+/** No socket idles past this, so a stalled transfer is cut and its socket freed, as on S3. */
+const AZURE_IDLE_MS = 120_000;
 const UPLOAD_PERMISSIONS = "cw";
 const DOWNLOAD_PERMISSIONS = "r";
 
@@ -63,6 +65,7 @@ interface AzurePlace {
   /** Present under a token mode, so a 401 can drop the token it rejected. */
   readonly tokens: AzureTokenSource | undefined;
   authorize(request: AzureRequest, headers: Readonly<Record<string, string>>): Promise<string>;
+  readonly idleMs?: number;
 }
 
 function byteOrder(left: string, right: string): number {
@@ -133,12 +136,16 @@ function send(options: {
   method: string;
   headers: Readonly<Record<string, string>>;
   body?: Body;
+  idleMs: number;
 }): Promise<IncomingMessage> {
-  const { url, method, headers, body } = options;
+  const { url, method, headers, body, idleMs } = options;
   const transport = url.protocol === "https:" ? https : http;
   return new Promise((resolve, reject) => {
     const outgoing = transport.request(url, { method, headers }, resolve);
     outgoing.once("error", reject);
+    outgoing.setTimeout(idleMs, () => {
+      outgoing.destroy(new Error(`Azure Blob ${method} idled for ${idleMs} ms`));
+    });
     if (body === undefined) {
       outgoing.end();
       return;
@@ -170,12 +177,19 @@ async function call(place: AzurePlace, request: AzureRequest): Promise<IncomingM
   }
   const { method, body } = request;
   const headers = await authorisedHeaders(place, request);
-  const response = await send({ url, method, headers, ...(body === undefined ? {} : { body }) });
+  const idleMs = place.idleMs ?? AZURE_IDLE_MS;
+  const response = await send({
+    url,
+    method,
+    headers,
+    idleMs,
+    ...(body === undefined ? {} : { body }),
+  });
   if (response.statusCode !== 401 || place.tokens === undefined) return response;
   place.tokens.invalidate();
   if (body !== undefined) return response;
   response.resume();
-  return send({ url, method, headers: await authorisedHeaders(place, request) });
+  return send({ url, method, headers: await authorisedHeaders(place, request), idleMs });
 }
 
 async function textOf(response: IncomingMessage): Promise<string> {
@@ -423,8 +437,13 @@ export function azureBackend(options: {
   clock: Clock;
   /** `through-langwatch` hands out the process's own route and signs no SAS. */
   uploads?: ObjectStorageUploads;
+  /** How long a request's socket may idle before the call is cut; AZURE_IDLE_MS by default. */
+  idleMs?: number;
 }): ObjectBackend {
-  const place = azurePlace(options.credentials, options.clock);
+  const place: AzurePlace = {
+    ...azurePlace(options.credentials, options.clock),
+    ...(options.idleMs === undefined ? {} : { idleMs: options.idleMs }),
+  };
   const { accountName, container } = options.credentials;
   const uploadRoute = uploadRouteOf(options.uploads);
   return {
