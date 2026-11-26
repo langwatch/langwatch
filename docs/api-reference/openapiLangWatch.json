@@ -87,7 +87,7 @@
             "type": "string",
             "minLength": 1,
             "maxLength": 255,
-            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+            "pattern": "^[A-Za-z0-9_-][A-Za-z0-9._:-]*$"
           },
           "columnTypes": {
             "type": "array",
@@ -139,7 +139,7 @@
             "type": "string",
             "minLength": 1,
             "maxLength": 255,
-            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+            "pattern": "^[A-Za-z0-9_-][A-Za-z0-9._:-]*$"
           }
         },
         "required": [
@@ -129759,7 +129759,7 @@
                       "type": "string",
                       "minLength": 1,
                       "maxLength": 255,
-                      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+                      "pattern": "^[A-Za-z0-9_-][A-Za-z0-9._:-]*$"
                     },
                     "uploadUrl": {
                       "type": "string",
@@ -129826,7 +129826,7 @@
                     "type": "string",
                     "minLength": 1,
                     "maxLength": 255,
-                    "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+                    "pattern": "^[A-Za-z0-9_-][A-Za-z0-9._:-]*$"
                   },
                   "purpose": {
                     "type": "string",
@@ -129878,13 +129878,13 @@
                       "type": "string",
                       "minLength": 1,
                       "maxLength": 255,
-                      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+                      "pattern": "^[A-Za-z0-9_-][A-Za-z0-9._:-]*$"
                     },
                     "id": {
                       "type": "string",
                       "minLength": 1,
                       "maxLength": 255,
-                      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+                      "pattern": "^[A-Za-z0-9_-][A-Za-z0-9._:-]*$"
                     },
                     "sha256": {
                       "type": "string",
@@ -129990,7 +129990,7 @@
               "type": "string",
               "minLength": 1,
               "maxLength": 255,
-              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+              "pattern": "^[A-Za-z0-9_-][A-Za-z0-9._:-]*$"
             },
             "required": true
           }
@@ -130006,7 +130006,7 @@
                     "type": "string",
                     "minLength": 1,
                     "maxLength": 255,
-                    "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+                    "pattern": "^[A-Za-z0-9_-][A-Za-z0-9._:-]*$"
                   }
                 },
                 "required": [
@@ -130037,13 +130037,13 @@
                           "type": "string",
                           "minLength": 1,
                           "maxLength": 255,
-                          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+                          "pattern": "^[A-Za-z0-9_-][A-Za-z0-9._:-]*$"
                         },
                         "id": {
                           "type": "string",
                           "minLength": 1,
                           "maxLength": 255,
-                          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+                          "pattern": "^[A-Za-z0-9_-][A-Za-z0-9._:-]*$"
                         },
                         "sha256": {
                           "type": "string",
@@ -130306,7 +130306,7 @@
               "type": "string",
               "minLength": 1,
               "maxLength": 255,
-              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+              "pattern": "^[A-Za-z0-9_-][A-Za-z0-9._:-]*$"
             },
             "required": true
           },
@@ -130317,7 +130317,7 @@
               "type": "string",
               "minLength": 1,
               "maxLength": 255,
-              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+              "pattern": "^[A-Za-z0-9_-][A-Za-z0-9._:-]*$"
             },
             "required": true
           },
@@ -130388,7 +130388,7 @@
                       "type": "string",
                       "minLength": 1,
                       "maxLength": 255,
-                      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+                      "pattern": "^[A-Za-z0-9_-][A-Za-z0-9._:-]*$"
                     },
                     "generation": {
                       "type": "integer",
@@ -130438,7 +130438,7 @@
               "type": "string",
               "minLength": 1,
               "maxLength": 255,
-              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+              "pattern": "^[A-Za-z0-9_-][A-Za-z0-9._:-]*$"
             },
             "required": true
           }
@@ -130454,7 +130454,7 @@
                     "type": "string",
                     "minLength": 1,
                     "maxLength": 255,
-                    "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+                    "pattern": "^[A-Za-z0-9_-][A-Za-z0-9._:-]*$"
                   },
                   "idempotencyKey": {
                     "type": "string",
