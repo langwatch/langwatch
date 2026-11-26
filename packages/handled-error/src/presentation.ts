@@ -3582,6 +3582,19 @@ const presentations = {
     describe: () =>
       "Open the chart on the group project to see it, or set the report or alert up on a member project.",
   },
+  analytics_filter_key_required: {
+    title: "This filter needs a key",
+    describe: (error) =>
+      `"${safeProse(str(error, "filterField", "This filter"))}" filters by a key, ` +
+      "such as a metadata key or a metric, so a plain list can't be applied. " +
+      "Pick the key, then the values.",
+  },
+  analytics_filter_value_unsupported: {
+    title: "This filter value isn't one of its options",
+    describe: (error) =>
+      `"${safeProse(str(error, "filterField", "This filter"))}" accepts only its option values, ` +
+      "such as true or false. Pick one of the options listed for it.",
+  },
   analytics_series_percentage_unsupported: {
     // A percentage is the series divided by the same measurement without the
     // series' own filters. A per-entity measurement (average per user, sum per
@@ -5293,11 +5306,6 @@ const presentations = {
     title: "This conversation belongs to someone else",
     describe: () => "You can view shared conversations but only the owner can continue them.",
   },
-  invalid_images: {
-    title: "Langy can't take those images",
-    describe: () =>
-      "Send at most four PNG, JPEG, GIF or WebP images of 5 MB or less each, then try again.",
-  },
   langy_attachment_refused: {
     title: "Langy can't take that file",
     describe: (error) => {
@@ -6161,6 +6169,10 @@ const presentations = {
   },
 
   // ---- NLP engine ----
+  invalid_images: {
+    title: "These images can't be sent",
+    describe: () => "Attach fewer or smaller images in a supported format and try again.",
+  },
   invalid_workflow: {
     title: "This workflow isn't valid",
     describe: () => "Check the steps and try again.",

@@ -83,6 +83,8 @@ export const APP_ERROR_CODES = [
   "already_organization_member",
   "already_redeemed",
   "analytics_aggregate_unattended_read",
+  "analytics_filter_key_required",
+  "analytics_filter_value_unsupported",
   "analytics_series_percentage_unsupported",
   "annotation_annotator_reference_invalid",
   "annotation_not_found",
