@@ -8289,7 +8289,8 @@ model DigestUserWeek {
   @@index([userId])
 }
 
-/// One person's digest for one ISO week, accepted by our own mailer. The id is `userId:isoWeek`.
+/// One person's digest for one organisation for one ISO week, accepted by our own mailer. The id is
+/// `{userId}:{organizationId}:{isoWeek}`.
 model DigestSend {
   id             String   @id
   userId         String

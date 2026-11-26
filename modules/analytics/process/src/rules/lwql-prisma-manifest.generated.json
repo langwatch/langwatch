@@ -30959,7 +30959,7 @@
     {
       "name": "DigestSend",
       "tableName": "DigestSend",
-      "documentation": "One person's digest for one ISO week, accepted by our own mailer. The id is `userId:isoWeek`.",
+      "documentation": "One person's digest for one organisation for one ISO week, accepted by our own mailer. The id is `{userId}:{organizationId}:{isoWeek}`.",
       "primaryKey": [
         "id"
       ],
