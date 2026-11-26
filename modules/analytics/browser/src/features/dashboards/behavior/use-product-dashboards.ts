@@ -5,7 +5,7 @@
  */
 
 import type { DashboardHomeProduct } from "@langwatch/dashboard-contract";
-import { useRef } from "react";
+import { useRef, useState } from "react";
 
 import { analyticsApi } from "../../../behavior/analytics-api.ts";
 import { useAnalyticsHost } from "../../../model/analytics-host.ts";
@@ -34,40 +34,36 @@ export function useProductDashboards({ product }: { product: DashboardHomeProduc
     { enabled: organizationId !== "" },
   );
   const orderInput = { organizationId, homeProduct: product };
+  const scope = `${organizationId}:${product}`;
   const order = analyticsApi.boards.sidebarOrder.useQuery(orderInput, {
     enabled: organizationId !== "",
   });
   const save = analyticsApi.boards.reorderSidebar.useMutation();
+  // While saves are out, the section shows the latest drag's order from here, not the read.
+  const [unsaved, setUnsaved] = useState<Readonly<Record<string, readonly string[]>>>({});
   // Per organization and product: the order the server last confirmed, whether a save is out,
   // and the latest drag's order waiting for it, so saves reach the server in drag order.
   const saves = useRef(new Map<string, SaveQueue>());
   const stored = order.data?.dashboardIds ?? [];
+  const shown = unsaved[scope] ?? stored;
   const allBoards = (list.data ?? []).map(libraryBoardOf);
   const boards = productSidebarBoards({
     boards: allBoards,
     product,
     userId: host.userId(),
     projectId: host.project()?.id,
-    order: stored,
+    order: shown,
   });
 
   const reorder = (shownIds: readonly string[]) => {
-    const scope = `${organizationId}:${product}`;
     const queue = saves.current.get(scope) ?? { confirmed: stored, isSaving: false };
     saves.current.set(scope, queue);
-    // With no save out, the cached order is the one the server holds.
+    // With no save out, the read holds what the server stored.
     if (!queue.isSaving) queue.confirmed = stored;
-    const dashboardIds = nextSidebarOrder({ stored, shown: shownIds });
-    // A read still out would answer over this order; a cancel puts back the state it began from.
-    const show = (ids: readonly string[]) => {
-      utils.boards.sidebarOrder.setData(orderInput, { dashboardIds: [...ids] });
-      void utils.boards.sidebarOrder
-        .cancel(orderInput)
-        .then(() => utils.boards.sidebarOrder.setData(orderInput, { dashboardIds: [...ids] }));
-    };
-    show(dashboardIds);
+    const dashboardIds = nextSidebarOrder({ stored: shown, shown: shownIds });
+    setUnsaved((current) => ({ ...current, [scope]: dashboardIds }));
 
-    // Once the queue is empty, the cache shows what the server confirmed.
+    // Once the queue is empty, the read gets the confirmed order and the section shows it again.
     const send = (ids: string[]) => {
       queue.isSaving = true;
       const settle = () => {
@@ -75,7 +71,8 @@ export function useProductDashboards({ product }: { product: DashboardHomeProduc
         const waiting = queue.waiting;
         queue.waiting = void 0;
         if (waiting) return send(waiting);
-        show(queue.confirmed);
+        utils.boards.sidebarOrder.setData(orderInput, { dashboardIds: [...queue.confirmed] });
+        setUnsaved(({ [scope]: _settled, ...rest }) => rest);
       };
       save
         .mutateAsync({ ...orderInput, dashboardIds: ids })
