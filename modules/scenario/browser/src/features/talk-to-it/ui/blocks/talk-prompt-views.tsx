@@ -7,15 +7,13 @@ import type { TalkState } from "../../model/talk-to-it-machine.ts";
 const MODEL_PROVIDERS_ROUTE = "/settings/model-providers";
 
 export function NeedsNameView({
-  state,
   pendingName,
   setPendingName,
   onSave,
 }: {
-  state: Extract<TalkState, { kind: "needsName" }>;
   pendingName: string;
   setPendingName: (value: string) => void;
-  onSave: (args: { isCutAtLimit: boolean; name: string }) => void;
+  onSave: (args: { name: string }) => void;
 }) {
   return (
     <VStack align="stretch" gap={2} data-testid="talk-needs-name">
@@ -30,7 +28,7 @@ export function NeedsNameView({
         colorPalette="orange"
         variant="solid"
         disabled={pendingName.trim().length === 0}
-        onClick={() => onSave({ isCutAtLimit: state.isCutAtLimit, name: pendingName.trim() })}
+        onClick={() => onSave({ name: pendingName.trim() })}
         data-testid="talk-name-save"
       >
         Save
