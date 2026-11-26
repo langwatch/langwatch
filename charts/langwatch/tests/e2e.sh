@@ -1474,10 +1474,17 @@ test_metrics_secret_key() {
   assert_eq "Worker /healthz stays unauthenticated under secretKeyRef delivery" \
     "$(http_probe "deploy/${RELEASE}-workers" 2999 /healthz)" "200 no-samples"
 
-  # The value really made it out of the Secret and into the auth gate.
+  # The value really made it out of the Secret and into the auth gate. The
+  # pod is Ready once /healthz answers, which can be before the metrics
+  # listener binds, so wait up to 60s for the port before asserting.
+  local scrape attempts=0
+  scrape=$(http_probe "deploy/${RELEASE}-workers" 9464 /metrics "$METRICS_KEY")
+  while [[ "$scrape" == "ERR ERR" && $attempts -lt 30 ]]; do
+    sleep 2; attempts=$((attempts + 1))
+    scrape=$(http_probe "deploy/${RELEASE}-workers" 9464 /metrics "$METRICS_KEY")
+  done
   assert_eq "Worker /metrics serves samples using the Secret-delivered key" \
-    "$(http_probe "deploy/${RELEASE}-workers" 9464 /metrics "$METRICS_KEY")" \
-    "200 samples"
+    "$scrape" "200 samples"
 
   # The Secret is deliberately left in place: the live release still
   # references it, so deleting it would wedge any restarted pod in

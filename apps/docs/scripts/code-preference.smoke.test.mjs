@@ -45,17 +45,16 @@ await it("switches filenames and copied code together and remembers the language
           .filter({ has: page.locator("[data-docs-code-title]", { hasText: "chat.ts" }) })
           .first();
         await frame.getByRole("button", { name: "Copy code", exact: true }).click();
-        await page.waitForFunction(() =>
-          navigator.clipboard.readText().then((text) => text.includes("import { OpenAI }")),
-        );
-        assert.match(
-          await page.evaluate(() => navigator.clipboard.readText()),
-          /async function chat/,
-        );
-        assert.doesNotMatch(
-          await page.evaluate(() => navigator.clipboard.readText()),
-          /from openai import/,
-        );
+        // One read: a later clipboard read can come back empty on CI runners.
+        const copied = await (
+          await page.waitForFunction(() =>
+            navigator.clipboard
+              .readText()
+              .then((text) => (text.includes("import { OpenAI }") ? text : false)),
+          )
+        ).jsonValue();
+        assert.match(copied, /async function chat/);
+        assert.doesNotMatch(copied, /from openai import/);
         await page.reload();
         await page.waitForFunction(
           () =>
