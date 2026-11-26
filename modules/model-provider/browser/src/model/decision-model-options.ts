@@ -31,7 +31,8 @@ const HOSTED_ONE_SWITCH_AWAY: ReadonlySet<string> = new Set(["enable", "ask_admi
 
 /**
  * Whether the column may offer LangWatch Instant (preview): released, or one switch away. Not
- * answered yet counts as offered, so a released organization never sees it flicker to "Not set".
+ * answered yet counts as offered, so a released organization never sees it flicker to
+ * "Choose a decision model".
  */
 export function isHostedDecisionModelOffered(
   access: { hostedReleased: boolean; offer: string } | undefined,

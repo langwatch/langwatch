@@ -436,8 +436,10 @@ export function InstantEvalRefusalPopover({
   );
 }
 
-/** One way to turn Instant Evals on: what it is, who pays, and its button for an admin. */
-/** A recommended option carries the "Recommended" badge and the one solid button. */
+/**
+ * One way to turn Instant Evals on: what it is, who pays, and its button for an admin. A
+ * recommended option carries the "Recommended" badge and the one solid button.
+ */
 function TurnOnOption({
   option,
   icon,
